@@ -1,0 +1,31 @@
+# Environment & secrets
+.env
+*.pem
+*.key
+
+# Data files
+data/trades.json
+data/equity_history.json
+data/*.csv
+data/*.parquet
+
+# Logs
+logs/*.log
+weekly_review.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db

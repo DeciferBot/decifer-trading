@@ -1,0 +1,26 @@
+py_vollib not installed — Greeks will fall back to estimates. Run: pip install py_vollib
+
+
+  ██████╗ ███████╗ ██████╗██╗███████╗███████╗██████╗
+  ██╔══██╗██╔════╝██╔════╝██║██╔════╝██╔════╝██╔══██╗
+  ██║  ██║█████╗  ██║     ██║█████╗  █████╗  ██████╔╝
+  ██║  ██║██╔══╝  ██║     ██║██╔══╝  ██╔══╝  ██╔══██╗
+  ██████╔╝███████╗╚██████╗██║██║     ███████╗██║  ██║
+  ╚═════╝ ╚══════╝ ╚═════╝╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
+
+  <>  Autonomous AI Trading System  v3.0
+  Account : DUP481326
+  Agents  : 6 Claude agents | 3/6 required to trade
+  Risk    : 4% per trade | 6% daily limit
+  Dashboard: http://localhost:8080
+
+[INFO]  Dashboard live → http://localhost:8080
+2026-03-24 23:52:09,307 [decifer.bot] [INFO] Dashboard live → http://localhost:8080
+2026-03-24 23:52:09,309 [ib_async.client] Connecting to 127.0.0.1:7496 with clientId 10...
+2026-03-24 23:52:09,311 [ib_async.client] Disconnecting
+2026-03-24 23:52:09,313 [ib_async.client] API connection failed: ConnectionRefusedError(111, "Connect call failed ('127.0.0.1', 7496)")
+2026-03-24 23:52:09,314 [ib_async.client] Make sure API port on TWS/IBG is open
+[ERROR]  IBKR connection failed: [Errno 111] Connect call failed ('127.0.0.1', 7496)
+2026-03-24 23:52:09,318 [decifer.bot] [ERROR] IBKR connection failed: [Errno 111] Connect call failed ('127.0.0.1', 7496)
+ERROR: Could not connect to IBKR on port 7496.
+  Make sure TWS is running with API enabled on port 7496

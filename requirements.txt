@@ -1,0 +1,12 @@
+ib_async>=0.9.86
+anthropic>=0.25.0
+yfinance>=0.2.40
+pandas>=2.0.0
+numpy>=1.24.0
+schedule>=1.2.0
+colorama>=0.4.6
+pytz>=2024.1
+TA-Lib>=0.4.28
+requests>=2.31.0
+tradingview-screener>=0.3.0
+py_vollib>=1.0.1

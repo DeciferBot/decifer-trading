@@ -1,0 +1,48 @@
+#!/bin/bash
+# <> Decifer Trading 2.0 — App Launcher
+
+# Find the project folder
+PROJ_DIR=""
+
+# First: check if .app is inside the project folder
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+PARENT="$(dirname "$APP_DIR")"
+if [ -f "$PARENT/bot.py" ]; then
+    PROJ_DIR="$PARENT"
+fi
+
+# Fallback: search common locations
+if [ -z "$PROJ_DIR" ] || [ ! -f "$PROJ_DIR/bot.py" ]; then
+    for d in \
+        "$HOME/Documents/Claude/Projects/decifer trading" \
+        "$HOME/Desktop/decifer trading" \
+        "$HOME/decifer trading" \
+    ; do
+        if [ -f "$d/bot.py" ]; then
+            PROJ_DIR="$d"
+            break
+        fi
+    done
+fi
+
+if [ ! -f "$PROJ_DIR/bot.py" ]; then
+    osascript -e 'display dialog "Could not find Decifer Trading project folder." with title "<> Decifer" buttons {"OK"} default button "OK" with icon caution'
+    exit 1
+fi
+
+# Kill any existing bot process on port 8080
+lsof -ti:8080 | xargs kill -9 2>/dev/null
+sleep 1
+
+# Launch bot in a new Terminal window
+osascript -e "
+tell application \"Terminal\"
+    activate
+    do script \"cd \\\"$PROJ_DIR\\\" && source .env 2>/dev/null; export \\\$(grep -v '^#' .env | grep -v '^$' | xargs) && echo '' && echo '  <> Decifer Trading 2.0 — Starting...' && echo '  Dashboard: http://localhost:8080' && echo '' && python3 bot.py\"
+end tell
+"
+
+# Wait for dashboard, then open browser
+sleep 5
+open http://localhost:8080

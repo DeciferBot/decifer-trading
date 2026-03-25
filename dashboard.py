@@ -1,0 +1,1559 @@
+DASHBOARD_HTML = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title><> Decifer 2.0</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@700;800;900&display=swap');
+:root{
+  --bg:#0A0A0A;--bg2:#111111;--bg3:#1A1A1A;
+  --border:#222;--border2:#2A2A2A;
+  --orange:#FF6B00;--orange2:#FF8C33;--orange_dim:rgba(255,107,0,.08);
+  --green:#00C853;--red:#FF1744;--yellow:#FFD600;
+  --text:#E8E8E8;--muted:#555;--muted2:#888;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;height:100vh;overflow:hidden}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(255,107,0,.006) 2px,rgba(255,107,0,.006) 4px);pointer-events:none;z-index:9999}
+
+/* HEADER */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:46px;border-bottom:1px solid var(--border);background:var(--bg2);overflow:hidden}
+.logo{display:flex;align-items:center;gap:8px}
+.logo-sym{font-family:'Syne',sans-serif;font-size:20px;font-weight:900;color:var(--orange);letter-spacing:-2px}
+.logo-name{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:#fff}
+.logo-sub{font-size:10px;color:var(--muted2);margin-left:2px}
+.hdr-right{display:flex;align-items:center;gap:8px;overflow:hidden;flex-shrink:1;min-width:0}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;border:1px solid;white-space:nowrap;flex-shrink:0;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.pg{border-color:var(--green);color:var(--green);background:rgba(0,200,83,.08)}
+.pr{border-color:var(--red);color:var(--red);background:rgba(255,23,68,.08)}
+.po{border-color:var(--orange);color:var(--orange);background:var(--orange_dim)}
+.dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.pulse{animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.7)}}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(6,1fr);height:66px;border-bottom:1px solid var(--border);overflow:hidden}
+.stat{padding:8px 14px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;overflow:hidden;min-width:0}
+.stat:last-child{border-right:none}
+.sl{font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:3px}
+.sv{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ss{font-size:10px;color:var(--muted2);margin-top:2px}
+.co{color:var(--orange)}.cg{color:var(--green)}.cr{color:var(--red)}.cw{color:#fff}
+
+/* TABS */
+.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);height:34px}
+.tab{padding:0 18px;font-size:11px;cursor:pointer;color:var(--muted2);border-bottom:2px solid transparent;transition:.15s;display:flex;align-items:center;font-family:'JetBrains Mono',monospace}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--orange);border-bottom-color:var(--orange)}
+
+/* VIEWS */
+.view{display:none;height:calc(100vh - 46px - 66px - 34px);overflow:hidden}
+.view.active{display:flex}
+
+/* ── VIEW 1: LIVE ── */
+.live-grid{display:grid;grid-template-columns:210px 1fr 290px;width:100%;height:100%;overflow:hidden}
+.col{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
+.col:last-child{border-right:none}
+.col-title{padding:7px 12px;font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted2);text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;display:flex;justify-content:space-between}
+.col-body{overflow-y:auto;flex:1}
+
+/* Regime */
+.regime-wrap{padding:10px}
+.regime-box{border-radius:5px;padding:10px;border:1px solid}
+.bull{border-color:var(--green);background:rgba(0,200,83,.07)}
+.bear{border-color:var(--red);background:rgba(255,23,68,.07)}
+.choppy{border-color:var(--yellow);background:rgba(255,214,0,.07)}
+.panic{border-color:var(--red);background:rgba(255,23,68,.2);animation:flash 1s infinite}
+.unknown{border-color:var(--muted);background:transparent}
+@keyframes flash{0%,100%{opacity:1}50%{opacity:.5}}
+.rl{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;margin-bottom:3px}
+.rm{font-size:10px;color:var(--muted2)}
+.session-row{margin:0 10px 8px;padding:5px 9px;background:var(--bg3);border-radius:4px;font-size:10px;display:flex;justify-content:space-between;color:var(--muted2)}
+
+/* Buttons */
+.kill-btn{margin:8px 10px 4px;padding:9px;background:rgba(255,23,68,.1);border:1px solid var(--red);border-radius:5px;color:var(--red);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;cursor:pointer;width:calc(100% - 20px);letter-spacing:1px;transition:.15s}
+.kill-btn:hover{background:rgba(255,23,68,.25)}
+.pause-btn{margin:0 10px 8px;padding:7px;background:var(--orange_dim);border:1px solid var(--orange);border-radius:5px;color:var(--orange);font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;width:calc(100% - 20px);transition:.15s}
+.pause-btn:hover{background:rgba(255,107,0,.18)}
+
+/* Scan progress */
+.scan-wrap{padding:7px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.scan-bg{height:2px;background:var(--border2);border-radius:1px;overflow:hidden}
+.scan-fill{height:100%;background:var(--orange);border-radius:1px;transition:width 1s linear}
+.scan-meta{display:flex;justify-content:space-between;font-size:10px;color:var(--muted2);margin-top:3px}
+
+/* Logs */
+.log-row{display:grid;grid-template-columns:58px 72px 1fr;gap:6px;padding:5px 12px;border-bottom:1px solid rgba(34,34,34,.5);animation:fi .2s}
+@keyframes fi{from{opacity:0;transform:translateY(-2px)}to{opacity:1}}
+.lt{color:var(--muted2);font-size:10px}
+.lk{font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;text-align:center}
+.lk-TRADE{background:rgba(255,107,0,.15);color:var(--orange)}
+.lk-SIGNAL{background:rgba(0,200,83,.12);color:var(--green)}
+.lk-ANALYSIS{background:rgba(255,214,0,.1);color:var(--yellow)}
+.lk-ERROR{background:rgba(255,23,68,.12);color:var(--red)}
+.lk-INFO{background:rgba(85,85,85,.2);color:var(--muted2)}
+.lk-RISK{background:rgba(255,23,68,.08);color:var(--red)}
+.lk-SCAN{background:var(--orange_dim);color:var(--orange2)}
+.lm{color:var(--text);line-height:1.5;font-size:11px}
+
+/* AI panel */
+.ai-panel{border-top:1px solid var(--border);padding:6px 12px;background:var(--bg2);flex-shrink:0}
+.ai-label{font-size:9px;color:var(--orange);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;display:flex;align-items:center;gap:5px}
+.ai-d{width:5px;height:5px;background:var(--orange);border-radius:50%;animation:pulse 2s infinite}
+.ai-box{background:var(--bg3);border:1px solid var(--border2);border-left:2px solid var(--orange);border-radius:4px;padding:6px 10px;font-size:11px;color:var(--text);line-height:1.65;max-height:55px;overflow-y:auto;white-space:pre-wrap}
+
+/* Positions */
+.pos-card{padding:9px 12px;border-bottom:1px solid var(--border)}
+.pos-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.pos-sym{font-weight:700;font-size:13px;font-family:'Syne',sans-serif}
+.pos-pnl{font-weight:600;font-size:12px}
+.pos-bar-bg{height:3px;background:var(--border2);border-radius:2px;overflow:hidden;margin-bottom:4px}
+.pos-bar{height:100%;border-radius:2px}
+.pos-meta{display:flex;justify-content:space-between;font-size:10px;color:var(--muted2)}
+
+/* Trade rows */
+.trade-row{display:flex;justify-content:space-between;align-items:center;padding:7px 12px;border-bottom:1px solid var(--border)}
+.ts{font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px}
+.tb{background:rgba(0,200,83,.14);color:var(--green)}
+.ts2{background:rgba(255,23,68,.14);color:var(--red)}
+.empty{padding:20px;color:var(--muted2);font-size:11px;text-align:center}
+
+/* ── VIEW 2: TRADE HISTORY ── */
+.hist-view{flex-direction:column}
+.hist-filters{display:flex;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;flex-wrap:wrap}
+.f-btn{padding:3px 10px;border-radius:3px;font-size:10px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted2);font-family:'JetBrains Mono',monospace;transition:.15s}
+.f-btn.active,.f-btn:hover{border-color:var(--orange);color:var(--orange);background:var(--orange_dim)}
+.hist-table{overflow-y:auto;flex:1}
+.th{display:grid;grid-template-columns:90px 70px 55px 55px 85px 85px 80px 60px 1fr;padding:6px 14px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;position:sticky;top:0}
+.tr{display:grid;grid-template-columns:90px 70px 55px 55px 85px 85px 80px 60px 1fr;padding:6px 14px;border-bottom:1px solid rgba(34,34,34,.5);font-size:11px}
+.tr:hover{background:var(--bg3)}
+.pp{color:var(--green)}.pn{color:var(--red)}
+
+/* ── VIEW 3: GROWTH ── */
+.growth-view{flex-direction:column;overflow-y:auto;padding:14px;gap:12px;height:calc(100vh - 46px - 66px - 34px)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px}
+.card-title{font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:10px}
+.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:4px}
+.tf-btn{padding:3px 10px;border-radius:3px;font-size:10px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted2);font-family:'JetBrains Mono',monospace;transition:.15s}
+.tf-btn.active,.tf-btn:hover{border-color:var(--orange);color:var(--orange);background:var(--orange_dim)}
+.metric{background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:10px 12px}
+.metric-label{font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;margin-bottom:4px}
+.metric-val{font-family:'Syne',sans-serif;font-size:20px;font-weight:800}
+canvas{display:block;width:100% !important}
+
+/* ── VIEW 4: AGENTS ── */
+.agents-view{flex-direction:column;overflow-y:auto;padding:14px;gap:12px}
+.agent-card{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:6px;padding:12px}
+.agent-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.agent-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--orange)}
+.agent-accuracy{font-size:11px;font-weight:700}
+.agent-last{font-size:11px;color:var(--muted2);line-height:1.6;max-height:80px;overflow-y:auto;white-space:pre-wrap}
+
+/* ── VIEW 5: RISK ── */
+.risk-view{flex-direction:column;overflow-y:auto;padding:14px;gap:12px}
+.risk-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.risk-meter{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px}
+.rm-label{font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;margin-bottom:8px}
+.rm-bar-bg{height:8px;background:var(--border2);border-radius:4px;overflow:hidden;margin-bottom:4px}
+.rm-bar{height:100%;border-radius:4px;transition:width .5s}
+.rm-meta{display:flex;justify-content:space-between;font-size:10px;color:var(--muted2)}
+
+/* ── VIEW 7: NEWS ── */
+.news-view{flex-direction:column;overflow-y:auto;height:calc(100vh - 46px - 66px - 34px)}
+.news-list{flex:1;overflow-y:auto;padding:0}
+.news-item{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);transition:.1s;cursor:pointer;text-decoration:none;color:inherit}
+.news-item:hover{background:var(--bg3)}
+.news-badge{flex-shrink:0;padding:3px 8px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:.5px;min-width:65px;text-align:center}
+.badge-bullish{background:rgba(0,200,83,.15);color:var(--green);border:1px solid rgba(0,200,83,.3)}
+.badge-bearish{background:rgba(255,23,68,.12);color:var(--red);border:1px solid rgba(255,23,68,.3)}
+.badge-neutral{background:rgba(85,85,85,.15);color:var(--muted2);border:1px solid var(--border2)}
+.news-content{flex:1;min-width:0}
+.news-headline{font-size:12px;color:var(--text);line-height:1.5;margin-bottom:3px}
+.news-meta{font-size:10px;color:var(--muted2);display:flex;gap:12px}
+.news-kw{font-size:9px;color:var(--orange);margin-top:2px}
+.news-refresh{padding:7px 14px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.news-refresh span{font-size:10px;color:var(--muted2)}
+
+/* ── AGENT CONVERSATION ── */
+.convo-panel{border-top:1px solid var(--border);background:var(--bg2);flex:1;min-height:120px;overflow:hidden;display:flex;flex-direction:column}
+.convo-panel.collapsed{flex:0 0 auto;min-height:auto;display:block}
+.convo-toggle{padding:5px 12px;font-size:9px;letter-spacing:1.5px;color:var(--orange);text-transform:uppercase;cursor:pointer;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0}
+.convo-toggle:hover{background:var(--bg3)}
+.convo-body{display:block;overflow-y:auto;flex:1;min-height:0}
+.convo-body.hidden{display:none}
+.convo-msg{padding:8px 12px;border-bottom:1px solid rgba(34,34,34,.4);animation:fi .2s}
+.convo-agent{font-size:10px;font-weight:700;color:var(--orange);margin-bottom:2px;display:flex;justify-content:space-between}
+.convo-role{font-size:9px;color:var(--muted);font-weight:400}
+.convo-time{font-size:9px;color:var(--muted2)}
+.convo-text{font-size:11px;color:var(--text);line-height:1.6;white-space:pre-wrap;max-height:60px;overflow-y:auto}
+.convo-verdict{background:var(--bg3);border:1px solid var(--border2);border-left:3px solid var(--orange);border-radius:0 4px 4px 0;padding:8px 12px;margin:4px 0}
+
+/* Agent conversation in Agents view */
+.agent-convo-full{margin-top:12px}
+.agent-convo-card{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:6px;padding:12px;margin-bottom:10px}
+.agent-convo-card .agent-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--orange);margin-bottom:2px}
+.agent-convo-card .agent-role{font-size:10px;color:var(--muted2);margin-bottom:8px}
+.agent-convo-card .agent-output{font-size:11px;color:var(--text);line-height:1.65;white-space:pre-wrap;max-height:200px;overflow-y:auto}
+.indicator-tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin:1px 2px}
+.tag-bull{background:rgba(0,200,83,.12);color:var(--green)}
+.tag-bear{background:rgba(255,23,68,.1);color:var(--red)}
+.tag-neutral{background:rgba(85,85,85,.12);color:var(--muted2)}
+.tag-squeeze{background:rgba(255,214,0,.1);color:var(--yellow)}
+
+/* ── VIEW 6: SETTINGS ── */
+.settings-view{flex-direction:column;overflow-y:auto;padding:14px;gap:12px}
+.setting-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px}
+.setting-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--orange);margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:8px}
+.setting-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(34,34,34,.4)}
+.setting-row:last-child{border-bottom:none}
+.setting-label{font-size:11px;color:var(--muted2)}
+.setting-val{font-size:11px;color:var(--text);font-weight:600}
+.setting-input{background:var(--bg3);border:1px solid var(--border2);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;padding:3px 8px;border-radius:3px;width:100px}
+.setting-input:focus{outline:none;border-color:var(--orange)}
+.fav-tag{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;background:var(--orange_dim);border:1px solid var(--orange);border-radius:3px;font-size:11px;color:var(--orange);margin:3px}
+.fav-tag span{cursor:pointer;color:var(--muted2);font-size:13px;line-height:1}
+.fav-tag span:hover{color:var(--red)}
+.fav-input{background:var(--bg3);border:1px solid var(--border2);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;padding:5px 10px;border-radius:3px;width:120px;text-transform:uppercase}
+.fav-input:focus{outline:none;border-color:var(--orange)}
+.fav-input::placeholder{color:var(--muted);text-transform:none}
+.apply-btn{padding:8px 16px;background:var(--orange_dim);border:1px solid var(--orange);border-radius:4px;color:var(--orange);font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;transition:.15s}
+.apply-btn:hover{background:rgba(255,107,0,.2)}
+
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="logo">
+    <span class="logo-sym">&lt;&gt;</span>
+    <span class="logo-name">Decifer <span style="color:var(--orange);font-size:13px">2.0</span></span>
+    <span class="logo-sub">Autonomous AI Trading</span>
+  </div>
+  <div class="hdr-right">
+    <div class="pill" id="bot-pill"><div class="dot pulse"></div><span id="bot-status">Connecting...</span></div>
+    <div class="pill po" id="regime-pill">REGIME: —</div>
+    <span style="font-size:10px;color:var(--muted2)" id="upd-time">—</span>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats">
+  <div class="stat"><div class="sl">Portfolio Value</div><div class="sv co" id="s-val">—</div><div class="ss" id="s-acc">Paper</div></div>
+  <div class="stat"><div class="sl">Day P&amp;L</div><div class="sv" id="s-pnl">—</div><div class="ss" id="s-pnlp">—</div></div>
+  <div class="stat"><div class="sl">Session</div><div class="sv co" id="s-session">—</div><div class="ss" id="s-next">—</div></div>
+  <div class="stat"><div class="sl">Scans Run</div><div class="sv co" id="s-scans">0</div><div class="ss" id="s-last">Never</div></div>
+  <div class="stat"><div class="sl">Open Positions</div><div class="sv co" id="s-pos">0</div><div class="ss">bot-managed</div></div>
+  <div class="stat"><div class="sl">Trades</div><div class="sv co"><span id="s-trades">0</span></div><div class="ss" id="s-wr">—</div></div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('live',this)">⚡ Live</div>
+  <div class="tab" onclick="switchTab('orders',this)">📝 Orders</div>
+  <div class="tab" onclick="switchTab('history',this)">📋 Closed Trades</div>
+  <div class="tab" onclick="switchTab('growth',this)">📈 Account Growth</div>
+  <div class="tab" onclick="switchTab('agents',this)">🧠 Agents</div>
+  <div class="tab" onclick="switchTab('risk',this)">🛡 Risk</div>
+  <div class="tab" onclick="switchTab('news',this)">📰 News</div>
+  <div class="tab" onclick="switchTab('settings',this)">⚙️ Settings</div>
+</div>
+
+<!-- VIEW 1: LIVE -->
+<div class="view active" id="view-live">
+  <div class="live-grid">
+
+    <!-- LEFT: Controls -->
+    <div class="col">
+      <div class="col-title">Controls</div>
+      <div class="col-body">
+        <div class="regime-wrap">
+          <div class="regime-box unknown" id="regime-box">
+            <div class="rl" id="regime-label">DETECTING...</div>
+            <div class="rm" id="regime-meta">VIX: — | SPY: —</div>
+          </div>
+        </div>
+        <div class="session-row">
+          <span id="session-name">—</span>
+          <span id="session-time">—</span>
+        </div>
+        <button class="kill-btn" onclick="killSwitch()">🚨 KILL SWITCH</button>
+        <button class="pause-btn" id="pause-btn" onclick="togglePause()">⏸ PAUSE BOT</button>
+      <button class="pause-btn" style="border-color:#00C853;color:#00C853;background:rgba(0,200,83,.08)" onclick="restartBot()">🔄 RESTART BOT</button>
+      <button class="pause-btn" style="border-color:#FF6B00;color:#FF6B00;background:rgba(255,107,0,.08)" onclick="forceScan()">⚡ FORCE SCAN</button>
+        <div style="padding:8px 10px;border-top:1px solid var(--border);margin-top:4px">
+          <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Agent Agreement</div>
+          <div style="font-size:11px;color:var(--muted2)">Required: <span style="color:var(--orange);font-weight:700" id="agents-req">4/6</span></div>
+          <div style="font-size:11px;color:var(--muted2);margin-top:3px">Last scan: <span style="color:var(--text)" id="last-agree">—</span></div>
+        </div>
+        <div style="padding:8px 10px;border-top:1px solid var(--border)">
+          <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Daily Risk Budget</div>
+          <div class="rm-bar-bg"><div class="rm-bar" id="risk-bar" style="width:0%;background:var(--green)"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted2);margin-top:3px">
+            <span id="risk-used">$0 used</span><span id="risk-left">$0 left</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTRE: Activity Log -->
+    <div class="col" style="border-right:1px solid var(--border);display:flex;flex-direction:column">
+      <div class="col-title" style="flex-shrink:0">
+        <span>Activity Log</span>
+        <span id="log-count" style="color:var(--muted2)">0 events</span>
+      </div>
+      <div class="scan-wrap" style="flex-shrink:0">
+        <div class="scan-bg"><div class="scan-fill" id="scan-fill" style="width:0%"></div></div>
+        <div class="scan-meta"><span id="scan-status">Waiting for first scan...</span><span id="scan-eta">—</span></div>
+      </div>
+      <div class="col-body" id="log-area" style="flex:0.6;min-height:0;overflow-y:auto"></div>
+      <div class="ai-panel" style="flex-shrink:0">
+        <div class="ai-label"><div class="ai-d"></div>&lt;&gt; Decifer 2.0 Analysis</div>
+        <div class="ai-box" id="ai-box">Waiting for first scan...</div>
+      </div>
+      <div class="convo-panel" id="convo-panel">
+        <div class="convo-toggle" onclick="toggleConvo()"><span id="convo-arrow">▼</span> Agent Conversation (live)</div>
+        <div class="convo-body" id="convo-body"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Positions + Trades -->
+    <div class="col">
+      <div class="col-title">Open Positions</div>
+      <div style="flex:0 0 auto;overflow-y:auto;max-height:50%;border-bottom:1px solid var(--border)" id="pos-list">
+        <div class="empty">No open positions</div>
+      </div>
+      <div class="col-title" style="flex-shrink:0">Recent Orders</div>
+      <div class="col-body" id="trades-list">
+        <div class="empty">No orders yet</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- VIEW 1B: ORDERS -->
+<div class="view hist-view" id="view-orders">
+  <div class="hist-filters">
+    <span style="font-size:10px;color:var(--muted2);margin-right:4px">Filter:</span>
+    <button class="f-btn active" onclick="filterOrders('all',this)">All</button>
+    <button class="f-btn" onclick="filterOrders('submitted',this)">Pending</button>
+    <button class="f-btn" onclick="filterOrders('filled',this)">Filled</button>
+    <button class="f-btn" onclick="filterOrders('cancelled',this)">Cancelled</button>
+    <button class="f-btn" onclick="filterOrders('stocks',this)">Stocks</button>
+    <button class="f-btn" onclick="filterOrders('options',this)">Options</button>
+  </div>
+  <div class="hist-table">
+    <div class="th"><span>Time</span><span>Symbol</span><span>Side</span><span>Type</span><span>Qty</span><span>Price</span><span>Fill Px</span><span>Status</span><span>Role</span></div>
+    <div id="orders-body"><div class="empty">No orders logged yet. Orders appear here when the bot places them.</div></div>
+  </div>
+</div>
+
+<!-- VIEW 2: CLOSED TRADES -->
+<div class="view hist-view" id="view-history">
+  <div class="hist-filters">
+    <span style="font-size:10px;color:var(--muted2);margin-right:4px">Filter:</span>
+    <button class="f-btn active" onclick="filterTrades('all',this)">All</button>
+    <button class="f-btn" onclick="filterTrades('wins',this)">Wins</button>
+    <button class="f-btn" onclick="filterTrades('losses',this)">Losses</button>
+    <button class="f-btn" onclick="filterTrades('stocks',this)">Stocks</button>
+    <button class="f-btn" onclick="filterTrades('options',this)">Options</button>
+    <button class="f-btn" onclick="filterTrades('fx',this)">FX</button>
+  </div>
+  <div class="hist-table">
+    <div class="th"><span>Time</span><span>Symbol</span><span>Side</span><span>Size</span><span>Entry</span><span>Exit</span><span>P&L</span><span>Hold</span><span>Reason</span></div>
+    <div id="hist-body"><div class="empty">No closed trades yet. Trades appear here after positions are closed.</div></div>
+  </div>
+</div>
+
+<!-- VIEW 3: GROWTH -->
+<div class="view growth-view" id="view-growth">
+
+  <!-- Metric cards -->
+  <div class="metric-grid">
+    <div class="metric"><div class="metric-label">Total P&L</div><div class="metric-val co" id="g-pnl">$0</div></div>
+    <div class="metric"><div class="metric-label">Win Rate</div><div class="metric-val" id="g-wr">0%</div></div>
+    <div class="metric"><div class="metric-label">Profit Factor</div><div class="metric-val" id="g-pf">0</div></div>
+    <div class="metric"><div class="metric-label">Avg Win / Loss Ratio</div><div class="metric-val" id="g-rl">—</div></div>
+    <div class="metric"><div class="metric-label">Total Trades</div><div class="metric-val co" id="g-total">0</div></div>
+    <div class="metric"><div class="metric-label">Best Trade</div><div class="metric-val cg" id="g-best">—</div></div>
+    <div class="metric"><div class="metric-label">Worst Trade</div><div class="metric-val cr" id="g-worst">—</div></div>
+    <div class="metric"><div class="metric-label">Expectancy</div><div class="metric-val" id="g-exp">—</div></div>
+  </div>
+
+  <!-- Equity Curve -->
+  <div class="card" id="equity-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="card-title" style="margin-bottom:0">Equity Curve</div>
+      <div style="display:flex;gap:6px">
+        <button class="tf-btn active" onclick="setEquityTF('1D',this)">1D</button>
+        <button class="tf-btn" onclick="setEquityTF('1W',this)">1W</button>
+        <button class="tf-btn" onclick="setEquityTF('1M',this)">1M</button>
+        <button class="tf-btn" onclick="setEquityTF('MTD',this)">MTD</button>
+        <button class="tf-btn" onclick="setEquityTF('YTD',this)">YTD</button>
+        <button class="tf-btn" onclick="setEquityTF('ALL',this)">ALL</button>
+      </div>
+    </div>
+    <div style="position:relative;height:180px"><canvas id="equity-chart"></canvas></div>
+  </div>
+
+  <!-- Daily P&L -->
+  <div class="card" id="daily-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="card-title" style="margin-bottom:0">Daily P&L</div>
+      <div style="display:flex;gap:6px">
+        <button class="tf-btn active" id="dpnl-1w" onclick="setDailyTF('1W',this)">1W</button>
+        <button class="tf-btn" id="dpnl-1m" onclick="setDailyTF('1M',this)">1M</button>
+        <button class="tf-btn" id="dpnl-mtd" onclick="setDailyTF('MTD',this)">MTD</button>
+        <button class="tf-btn" id="dpnl-ytd" onclick="setDailyTF('YTD',this)">YTD</button>
+        <button class="tf-btn" id="dpnl-all" onclick="setDailyTF('ALL',this)">ALL</button>
+      </div>
+    </div>
+    <div style="position:relative;height:150px"><canvas id="daily-chart"></canvas></div>
+  </div>
+
+</div>
+
+<!-- VIEW 4: AGENTS -->
+<div class="view agents-view" id="view-agents">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase">Agent Live Conversation</div>
+    <div style="font-size:10px;color:var(--muted2)" id="agents-scan-time">Last scan: —</div>
+  </div>
+  <div id="agents-convo-full">
+    <div class="empty" style="padding:30px">Agent conversation appears here after the first scan completes.</div>
+  </div>
+  <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+    <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:10px">Raw Agent Outputs</div>
+    <div id="agents-grid">
+      <div class="empty">Raw outputs appear here after the first scan.</div>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW 5: RISK -->
+<div class="view risk-view" id="view-risk">
+  <div class="risk-grid">
+    <div class="risk-meter">
+      <div class="rm-label">Daily Loss Budget Used</div>
+      <div class="rm-bar-bg"><div class="rm-bar" id="r-daily-bar" style="width:0%;background:var(--green)"></div></div>
+      <div class="rm-meta"><span id="r-daily-used">$0 of $0</span><span id="r-daily-pct">0%</span></div>
+    </div>
+    <div class="risk-meter">
+      <div class="rm-label">Portfolio Exposure</div>
+      <div class="rm-bar-bg"><div class="rm-bar" id="r-exp-bar" style="width:0%;background:var(--orange)"></div></div>
+      <div class="rm-meta"><span id="r-exp-used">0 positions</span><span id="r-exp-pct">0% deployed</span></div>
+    </div>
+    <div class="risk-meter">
+      <div class="rm-label">Consecutive Losses</div>
+      <div class="rm-bar-bg"><div class="rm-bar" id="r-loss-bar" style="width:0%;background:var(--red)"></div></div>
+      <div class="rm-meta"><span id="r-loss-n">0 of 3</span><span id="r-loss-status">OK</span></div>
+    </div>
+    <div class="risk-meter">
+      <div class="rm-label">Cash Reserve</div>
+      <div class="rm-bar-bg"><div class="rm-bar" id="r-cash-bar" style="width:0%;background:var(--green)"></div></div>
+      <div class="rm-meta"><span id="r-cash-pct">100% cash</span><span>Min: 40%</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Open Position Risk</div>
+    <div id="r-pos-detail"><div class="empty">No open positions</div></div>
+  </div>
+</div>
+
+<!-- VIEW 7: NEWS -->
+<div class="view news-view" id="view-news">
+  <div class="news-refresh" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border)">
+    <span id="news-count" style="font-weight:600;color:var(--orange)">0 headlines</span>
+    <input type="text" id="news-keyword" placeholder="Filter by keyword..." oninput="filterNews()" style="background:var(--bg1);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:11px;font-family:'JetBrains Mono',monospace;width:160px">
+    <input type="text" id="news-ticker" placeholder="Filter by ticker..." oninput="filterNews()" style="background:var(--bg1);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:11px;font-family:'JetBrains Mono',monospace;width:100px">
+    <select id="news-sort" onchange="filterNews()" style="background:var(--bg1);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:11px;font-family:'JetBrains Mono',monospace">
+      <option value="time">Sort: Newest</option>
+      <option value="score">Sort: Score</option>
+      <option value="ticker">Sort: Ticker</option>
+    </select>
+    <select id="news-sentiment-filter" onchange="filterNews()" style="background:var(--bg1);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:11px;font-family:'JetBrains Mono',monospace">
+      <option value="all">All Sentiment</option>
+      <option value="BULLISH">Bullish Only</option>
+      <option value="BEARISH">Bearish Only</option>
+    </select>
+    <span id="news-updated" style="color:var(--muted2);font-size:10px;margin-left:auto">Updates every scan cycle</span>
+  </div>
+  <div class="news-list" id="news-list" style="overflow-y:auto;flex:1">
+    <div class="empty">News headlines will appear here after the first scan.</div>
+  </div>
+</div>
+
+<!-- VIEW 6: SETTINGS -->
+<div class="view settings-view" id="view-settings">
+  <div class="setting-card">
+    <div class="setting-title">&lt;&gt; Bot Control</div>
+    <div class="setting-row"><span class="setting-label">Active Account</span><span class="setting-val" id="cfg-account">DUP481326</span></div>
+    <div class="setting-row"><span class="setting-label">Bot Status</span><span class="setting-val" id="cfg-status">Running</span></div>
+    <div style="display:flex;gap:8px;padding-top:10px">
+      <button class="apply-btn" onclick="applySettings()" style="flex:1">✅ Apply Settings</button>
+      <button class="apply-btn" onclick="restartBot()" style="flex:1;border-color:var(--red);color:var(--red);background:rgba(255,23,68,.08)">🔄 Restart Bot</button>
+    </div>
+  </div>
+  <div class="setting-card">
+    <div class="setting-title">Risk Parameters</div>
+    <div class="setting-row"><span class="setting-label">Risk per trade (%)</span><input class="setting-input" id="cfg-risk-pct" type="number" step="0.5" min="0.5" max="10" value="4"></div>
+    <div class="setting-row"><span class="setting-label">Daily loss limit (%)</span><input class="setting-input" id="cfg-daily-limit" type="number" step="0.5" min="1" max="15" value="6"></div>
+    <div class="setting-row"><span class="setting-label">Max positions</span><input class="setting-input" id="cfg-max-pos" type="number" step="1" min="1" max="30" value="12"></div>
+    <div class="setting-row"><span class="setting-label">Min cash reserve (%)</span><input class="setting-input" id="cfg-cash-reserve" type="number" step="5" min="0" max="80" value="10"></div>
+    <div class="setting-row"><span class="setting-label">Max single position (%)</span><input class="setting-input" id="cfg-max-single" type="number" step="1" min="1" max="30" value="15"></div>
+  </div>
+  <div class="setting-card">
+    <div class="setting-title">Scoring &amp; Agents</div>
+    <div class="setting-row"><span class="setting-label">Min score to trade (/50)</span><input class="setting-input" id="cfg-min-score" type="number" step="1" min="10" max="45" value="28"></div>
+    <div class="setting-row"><span class="setting-label">High conviction score</span><input class="setting-input" id="cfg-high-score" type="number" step="1" min="20" max="50" value="38"></div>
+    <div class="setting-row">
+      <span class="setting-label">Agents required to agree</span>
+      <select id="agree-select" class="setting-input" style="width:60px">
+        <option value="2">2/6</option>
+        <option value="3" selected>3/6</option>
+        <option value="4">4/6</option>
+        <option value="5">5/6</option>
+        <option value="6">6/6</option>
+      </select>
+    </div>
+  </div>
+  <div class="setting-card">
+    <div class="setting-title">Options</div>
+    <div class="setting-row"><span class="setting-label">Options risk per trade (%)</span><input class="setting-input" id="cfg-opt-risk" type="number" step="0.5" min="0.5" max="5" value="2.5"></div>
+    <div class="setting-row"><span class="setting-label">Max IV Rank</span><input class="setting-input" id="cfg-opt-ivr" type="number" step="5" min="20" max="100" value="65"></div>
+    <div class="setting-row"><span class="setting-label">Target delta</span><input class="setting-input" id="cfg-opt-delta" type="number" step="0.05" min="0.2" max="0.7" value="0.50"></div>
+    <div class="setting-row"><span class="setting-label">DTE range</span><span class="setting-val">5 — 45 days</span></div>
+  </div>
+
+  <div class="setting-card">
+    <div class="setting-title">💰 Capital Management</div>
+    <p style="font-size:11px;color:var(--muted2);margin-bottom:10px">Record deposits or withdrawals so P&L reflects true trading performance. P&L = NetLiquidation - (Starting Capital + Adjustments)</p>
+    <div class="setting-row"><span class="setting-label">Starting Capital</span><span class="setting-val" id="cfg-start-cap">$1,000,000</span></div>
+    <div class="setting-row"><span class="setting-label">Effective Capital</span><span class="setting-val" id="cfg-eff-cap">$1,000,000</span></div>
+    <div class="setting-row"><span class="setting-label">Current P&L</span><span class="setting-val" id="cfg-current-pnl">—</span></div>
+    <div style="display:flex;gap:8px;align-items:center;padding-top:10px">
+      <select id="cap-type" class="setting-input" style="width:120px">
+        <option value="deposit">Deposit</option>
+        <option value="withdrawal">Withdrawal</option>
+      </select>
+      <input id="cap-amount" class="setting-input" type="number" step="1000" min="0" placeholder="Amount ($)" style="flex:1">
+      <input id="cap-note" class="setting-input" type="text" placeholder="Note (optional)" style="flex:1">
+    </div>
+    <div style="padding-top:8px">
+      <button class="apply-btn" onclick="recordCapitalAdjustment()" style="width:100%">💰 Record Adjustment</button>
+    </div>
+    <div id="cap-history" style="margin-top:10px;font-size:10px;color:var(--muted2)"></div>
+  </div>
+
+  <div class="setting-card">
+    <div class="setting-title">⭐ Favourites Watchlist</div>
+    <p style="font-size:11px;color:var(--muted2);margin-bottom:10px">Tickers added here are always scanned regardless of scanner results. Stocks, ETFs, commodities, anything IBKR supports.</p>
+    <div id="fav-tags" style="margin-bottom:10px;min-height:32px"></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="fav-input" class="fav-input" placeholder="e.g. NVDA, GLD, BTC" maxlength="10"
+             onkeydown="if(event.key==='Enter')addFavourite()">
+      <button class="apply-btn" onclick="addFavourite()">+ Add</button>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <span style="font-size:10px;color:var(--muted2)">Quick add:</span>
+      <button class="f-btn" onclick="addFavTicker('GLD')">GLD</button>
+      <button class="f-btn" onclick="addFavTicker('IBIT')">IBIT</button>
+      <button class="f-btn" onclick="addFavTicker('USO')">USO</button>
+      <button class="f-btn" onclick="addFavTicker('SPY')">SPY</button>
+      <button class="f-btn" onclick="addFavTicker('QQQ')">QQQ</button>
+      <button class="f-btn" onclick="addFavTicker('NVDA')">NVDA</button>
+      <button class="f-btn" onclick="addFavTicker('TSLA')">TSLA</button>
+      <button class="f-btn" onclick="addFavTicker('AAPL')">AAPL</button>
+    </div>
+    <div style="margin-top:10px">
+      <button class="apply-btn" onclick="saveFavourites()" style="width:100%">💾 Save & Apply to Bot</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────
+let allTrades = [];
+let equityHistory = [];
+let currentFilter = 'all';
+let scanTotal = 300; // seconds
+let scanElapsed = 0;
+let scanTimer;
+
+// ── Tab switching ──────────────────────────────────────────
+function switchTab(id, el) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+  el.classList.add('active');
+
+  // Charts render with 0 dimensions when their container is display:none.
+  // Force redraw when switching to growth tab.
+  if (id === 'growth') {
+    _lastEquityFingerprint = '';
+    _lastDailyFingerprint  = '';
+    // Destroy existing charts so they recreate with correct dimensions
+    if (equityChart) { equityChart.destroy(); equityChart = null; }
+    if (dailyChart)  { dailyChart.destroy();  dailyChart  = null; }
+    // Slight delay to let the DOM layout recalculate after display:flex kicks in
+    setTimeout(() => {
+      if (allEquityData && allEquityData.length >= 2) {
+        renderEquityChart(filterByTF(allEquityData, equityTF));
+        renderDailyChart(buildDailyPnL(allEquityData, dailyTF));
+      }
+    }, 50);
+  }
+}
+
+// ── Kill switch ────────────────────────────────────────────
+function forceScan() {
+  fetch('/api/scan', {method: 'POST'}).then(() => {
+    document.getElementById('bot-status').textContent = 'Scanning...';
+    document.getElementById('trades-list').innerHTML = '<div class="empty">No orders yet</div>';
+  });
+}
+function restartBot() {
+  if (confirm('Restart Decifer? Bot will stop, then restart in 3 seconds. Positions are held in IBKR.')) {
+    fetch('/api/restart', {method: 'POST'}).then(() => {
+      document.getElementById('bot-status').textContent = 'Restarting...';
+      setTimeout(() => { window.location.reload(); }, 5000);
+    });
+  }
+}
+
+function killSwitch() {
+  if (confirm('🚨 KILL SWITCH: This will stop all trading and close all positions. Are you sure?')) {
+    fetch('/api/kill', {method:'POST'}).then(r => r.json()).then(d => {
+      if (d.ok) alert('🚨 Kill switch executed. ' + d.detail);
+      else alert('❌ Kill switch failed: ' + (d.error || 'unknown'));
+    }).catch(() => alert('Kill switch sent.'));
+  }
+}
+
+let paused = false;
+function togglePause() {
+  paused = !paused;
+  const btn = document.getElementById('pause-btn');
+  btn.textContent = paused ? '▶ RESUME BOT' : '⏸ PAUSE BOT';
+  btn.style.borderColor = paused ? 'var(--green)' : 'var(--orange)';
+  btn.style.color = paused ? 'var(--green)' : 'var(--orange)';
+  fetch('/api/pause', {method:'POST', body: JSON.stringify({paused}), headers:{'Content-Type':'application/json'}});
+}
+
+// ── Filter trades ──────────────────────────────────────────
+function filterTrades(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderHistory();
+}
+
+// ── Helpers ────────────────────────────────────────────────
+function fmt$(n) { return n == null ? '—' : '$' + Number(n).toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function fmtPct(n) { return n == null ? '—' : (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
+
+// ── Render positions ───────────────────────────────────────
+function closePosition(symbol) {
+  if (confirm('Close ' + symbol + '? Executes immediately via aggressive limit order.')) {
+    fetch('/api/close', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({symbol})})
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) alert('✅ ' + d.detail);
+        else alert('❌ ' + (d.error || 'unknown'));
+      })
+      .catch(e => alert('Error: ' + e));
+  }
+}
+
+function renderPositions(positions) {
+  const el = document.getElementById('pos-list');
+  if (!positions || !positions.length) { el.innerHTML = '<div class="empty">No open positions</div>'; return; }
+  el.innerHTML = positions.map(p => {
+    const pnl = (p.current - p.entry) * p.qty;
+    const pct = ((p.current - p.entry) / p.entry) * 100;
+    const bw  = Math.min(Math.abs(pct) * 10, 100);
+    const col = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const dir = (p.direction === 'SHORT' || p.qty < 0) ? 'SHORT' : 'LONG';
+    return `<div class="pos-card">
+      <div class="pos-hdr">
+        <span class="pos-sym">${p.symbol} <span style="font-size:10px;color:var(--muted2);font-weight:400">${dir} ×${Math.abs(p.qty)}</span></span>
+        <span style="display:flex;align-items:center;gap:6px">
+          <span class="pos-pnl" style="color:${col}">${pnl >= 0 ? '+' : ''}${fmt$(pnl)}</span>
+          <button onclick="closePosition('${p.symbol}')" style="background:rgba(255,23,68,.12);border:1px solid var(--red);color:var(--red);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Close this position">✕</button>
+        </span>
+      </div>
+      <div class="pos-bar-bg"><div class="pos-bar" style="width:${bw}%;background:${col}"></div></div>
+      <div class="pos-meta"><span>Entry ${fmt$(p.entry)}</span><span>Now ${fmt$(p.current)}</span><span>SL ${fmt$(p.sl)}</span><span>TP ${fmt$(p.tp)}</span></div>
+    </div>`;
+  }).join('');
+}
+
+// ── Render recent trades ───────────────────────────────────
+function renderRecentTrades(trades, orders) {
+  const el = document.getElementById('trades-list');
+
+  // Prefer orders.json data (has real statuses) over in-memory trades list
+  if (orders && orders.length > 0) {
+    // Show only entry orders (not SL/TP children) sorted newest first, deduped by order_id
+    const seen = new Set();
+    const entries = orders
+      .filter(o => !o.role || o.role === 'entry' || o.role === 'close' || o.role === 'emergency_flatten')
+      .filter(o => !['CANCELLED','VALIDATIONERROR','INACTIVE','APICANCELLED'].includes((o.status||'').toUpperCase()))
+      .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+      .filter(o => { const k = o.order_id || `${o.symbol}-${o.timestamp}`; if (seen.has(k)) return false; seen.add(k); return true; })
+      .slice(0, 30);
+
+    if (!entries.length) { el.innerHTML = '<div class="empty">No orders yet</div>'; return; }
+    el.innerHTML = entries.map(o => {
+      const status = (o.status || 'SUBMITTED').toUpperCase();
+      const statusColor = status === 'FILLED' ? 'var(--green)' :
+                          status === 'CANCELLED' ? 'var(--red)' :
+                          'var(--yellow)';
+      const statusDot = `<span style="color:${statusColor};font-size:8px;margin-right:4px">●</span>`;
+      const side = o.side || '—';
+      const ts = o.timestamp ? o.timestamp.substring(11, 19) : '';
+      const price = o.fill_price && o.fill_price > 0 ? o.fill_price : o.price || 0;
+      return `<div class="trade-row">
+        <div>${statusDot}<span class="ts ${side === 'BUY' ? 'tb' : 'ts2'}">${side}</span><strong style="margin-left:6px">${o.symbol || '?'}</strong></div>
+        <div style="text-align:right"><div>${fmt$(parseFloat(price))}</div><div style="font-size:10px;color:var(--muted2)">${ts}</div></div>
+      </div>`;
+    }).join('');
+    return;
+  }
+
+  // Fallback to in-memory trades if no orders data yet
+  if (!trades || !trades.length) { el.innerHTML = '<div class="empty">No orders yet</div>'; return; }
+  el.innerHTML = trades.slice(0, 40).map(t => `
+    <div class="trade-row">
+      <div><span class="ts ${t.side === 'BUY' ? 'tb' : 'ts2'}">${t.side}</span><strong style="margin-left:6px">${t.symbol}</strong></div>
+      <div style="text-align:right"><div>${fmt$(parseFloat(t.price))}</div><div style="font-size:10px;color:var(--muted2)">${t.time}</div></div>
+    </div>`).join('');
+}
+
+// ── Order rendering ───────────────────────────────────────
+let allOrders = [];
+let currentOrderFilter = 'all';
+
+function filterOrders(filter, btn) {
+  currentOrderFilter = filter;
+  const parent = btn.parentElement;
+  parent.querySelectorAll('.f-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderOrders();
+}
+
+function renderOrders() {
+  const el = document.getElementById('orders-body');
+  let filtered = [...allOrders];
+
+  if (currentOrderFilter === 'submitted') filtered = filtered.filter(o => ['SUBMITTED','PRESUBMITTED'].includes((o.status||'').toUpperCase()));
+  if (currentOrderFilter === 'filled')    filtered = filtered.filter(o => (o.status||'').toUpperCase() === 'FILLED');
+  if (currentOrderFilter === 'cancelled') filtered = filtered.filter(o => (o.status||'').toUpperCase() === 'CANCELLED');
+  if (currentOrderFilter === 'stocks')    filtered = filtered.filter(o => (o.instrument||'stock') === 'stock');
+  if (currentOrderFilter === 'options')   filtered = filtered.filter(o => (o.instrument||'') === 'option');
+
+  // Sort newest first
+  filtered.sort((a,b) => new Date(b.timestamp||0) - new Date(a.timestamp||0));
+
+  if (!filtered.length) { el.innerHTML = '<div class="empty">No orders match this filter.</div>'; return; }
+
+  const sanitizePrice = p => (typeof p === 'number' && isFinite(p) && Math.abs(p) < 1e10) ? p : 0;
+
+  el.innerHTML = filtered.map(o => {
+    const ts = o.timestamp || '';
+    const side = o.side || '—';
+    const sideClass = side === 'BUY' ? 'tb' : 'ts2';
+    const status = (o.status || 'UNKNOWN').toUpperCase();
+    const statusColor = status === 'FILLED' ? 'var(--green)' :
+                        status === 'CANCELLED' ? 'var(--red)' :
+                        ['SUBMITTED','PRESUBMITTED'].includes(status) ? 'var(--yellow)' : 'var(--muted2)';
+    const role = o.role || '—';
+    const roleLabel = role === 'stop_loss' ? 'SL' :
+                      role === 'take_profit' ? 'TP' :
+                      role === 'close' ? 'CLOSE' :
+                      role === 'emergency_flatten' ? 'KILL' : role === '—' ? 'ENTRY' : role.toUpperCase();
+    const fillPx = o.fill_price ? fmt$(sanitizePrice(o.fill_price)) : '—';
+    const sym = o.symbol || '—';
+    const optLabel = o.instrument === 'option' ? ` ${o.right||''}${o.strike ? ' $'+o.strike : ''}` : '';
+    const px = sanitizePrice(o.price);
+
+    return `<div class="tr">
+      <span>${ts ? ts.slice(0,16).replace('T',' ') : '—'}</span>
+      <span>${sym}${optLabel}</span>
+      <span><span class="ts ${sideClass}">${side}</span></span>
+      <span style="color:var(--muted2)">${o.order_type || '—'}</span>
+      <span style="color:var(--orange)">${o.qty || '—'}</span>
+      <span>${px ? fmt$(px) : '—'}</span>
+      <span>${fillPx}</span>
+      <span style="color:${statusColor};font-weight:700">${status}</span>
+      <span style="color:var(--muted2)">${roleLabel}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Instrument type detection ──────────────────────────────
+function getInstrumentType(t) {
+  // Explicit field takes priority
+  if (t.instrument) return t.instrument.toLowerCase();
+  if (t.asset_class) return t.asset_class.toLowerCase();
+  // Options: has strike, expiry, right, contracts, or option-like symbol
+  if (t.strike || t.expiry || t.right || t.contracts || t.option_type) return 'option';
+  if (t.symbol && /\d{6}[CP]\d+/.test(t.symbol)) return 'option';
+  // FX: currency pair patterns
+  if (t.symbol && /^[A-Z]{3}\.?[A-Z]{3}$/.test(t.symbol)) return 'fx';
+  const fxPairs = ['EUR','GBP','JPY','CHF','AUD','NZD','CAD'];
+  if (t.symbol && fxPairs.some(p => t.symbol.startsWith(p) || t.symbol.endsWith(p))) return 'fx';
+  // Default: stock
+  return 'stock';
+}
+
+// ── Render history view ────────────────────────────────────
+function renderHistory() {
+  const el = document.getElementById('hist-body');
+  // Show all closed trades — any trade with an exit_price
+  let filtered = allTrades.filter(t => t.exit_price != null);
+  if (currentFilter === 'wins')    filtered = filtered.filter(t => t.pnl > 0);
+  if (currentFilter === 'losses')  filtered = filtered.filter(t => t.pnl <= 0);
+  if (currentFilter === 'stocks')  filtered = filtered.filter(t => getInstrumentType(t) === 'stock');
+  if (currentFilter === 'options') filtered = filtered.filter(t => getInstrumentType(t) === 'option');
+  if (currentFilter === 'fx')      filtered = filtered.filter(t => getInstrumentType(t) === 'fx');
+  // Sort newest first
+  filtered = filtered.sort((a,b) => new Date(b.timestamp||b.exit_time||0) - new Date(a.timestamp||a.exit_time||0));
+  if (!filtered.length) { el.innerHTML = '<div class="empty">No closed trades yet.</div>'; return; }
+  el.innerHTML = filtered.map(t => {
+    const pnlClass = t.pnl >= 0 ? 'pp' : 'pn';
+    const direction = t.direction || (t.action === 'BUY' ? 'LONG' : 'SHORT');
+    const ts = t.timestamp || t.exit_time || '';
+    const qty = t.qty || t.shares || t.total_shares || '—';
+    return `<div class="tr">
+      <span>${ts ? ts.slice(0,16).replace('T',' ') : '—'}</span>
+      <span>${t.symbol || '—'}</span>
+      <span><span class="ts ${direction === 'LONG' ? 'tb' : 'ts2'}">${direction}</span></span>
+      <span style="color:var(--orange)">${qty}</span>
+      <span>${fmt$(t.entry_price)}</span>
+      <span>${fmt$(t.exit_price)}</span>
+      <span class="${pnlClass}">${t.pnl != null ? (t.pnl >= 0 ? '+' : '') + fmt$(t.pnl) : '—'}</span>
+      <span>${t.hold_minutes ? t.hold_minutes + 'm' : '—'}</span>
+      <span style="color:var(--muted2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.exit_reason || '—'}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Render agents view ─────────────────────────────────────
+function renderAgents(agentData) {
+  if (!agentData) return;
+  const names = ['Technical Analyst','Macro Analyst','Opportunity Finder','Devil\'s Advocate','Risk Manager','Final Decision'];
+  const keys  = ['technical','macro','opportunity','devils','risk','final'];
+  const el = document.getElementById('agents-grid');
+  el.innerHTML = keys.map((k, i) => `
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-name">Agent ${i+1}: ${names[i]}</span>
+        <span class="agent-accuracy" style="color:var(--muted2)">Last run: ${agentData.last_scan || '—'}</span>
+      </div>
+      <div class="agent-last">${(agentData[k] || 'No output yet').slice(0, 400)}</div>
+    </div>`).join('');
+}
+
+// ── Chart instances ────────────────────────────────────────
+let equityChart = null;
+let dailyChart  = null;
+let allEquityData = [];
+let allDailyData  = [];
+let equityTF = '1D';
+let dailyTF  = '1W';
+// Fingerprints — only redraw charts when data actually changes
+let _lastEquityFingerprint = '';
+let _lastDailyFingerprint  = '';
+
+const CHART_DEFAULTS = {
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: { duration: 400 },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#1A1A1A',
+      borderColor: '#FF6B00',
+      borderWidth: 1,
+      titleColor: '#FF6B00',
+      bodyColor: '#E8E8E8',
+      titleFont: { family: 'JetBrains Mono', size: 11 },
+      bodyFont:  { family: 'JetBrains Mono', size: 11 },
+      callbacks: {
+        label: ctx => ' $' + Number(ctx.parsed.y).toLocaleString('en', {minimumFractionDigits: 2})
+      }
+    }
+  },
+  scales: {
+    x: {
+      ticks: { color: '#555', font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 8, maxRotation: 0 },
+      grid:  { color: 'rgba(42,42,42,0.5)', drawBorder: false }
+    },
+    y: {
+      ticks: { color: '#555', font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 6,
+               callback: v => '$' + Number(v).toLocaleString('en', {minimumFractionDigits: 0}) },
+      grid:  { color: 'rgba(42,42,42,0.5)', drawBorder: false }
+    }
+  }
+};
+
+function filterByTF(data, tf) {
+  if (!data || !data.length) return data;
+  const now = new Date();
+  let cutoff;
+  if (tf === '1D')  cutoff = new Date(now - 1   * 86400000);
+  else if (tf === '1W')  cutoff = new Date(now - 7   * 86400000);
+  else if (tf === '1M')  cutoff = new Date(now - 30  * 86400000);
+  else if (tf === 'MTD') cutoff = new Date(now.getFullYear(), now.getMonth(), 1);
+  else if (tf === 'YTD') cutoff = new Date(now.getFullYear(), 0, 1);
+  else return data; // ALL
+  return data.filter(d => new Date(d.date) >= cutoff);
+}
+
+function setEquityTF(tf, btn) {
+  equityTF = tf;
+  document.querySelectorAll('#equity-card .tf-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderEquityChart(filterByTF(allEquityData, tf));
+}
+
+function setDailyTF(tf, btn) {
+  dailyTF = tf;
+  document.querySelectorAll('#daily-card .tf-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderDailyChart(buildDailyPnL(allEquityData, tf));
+}
+
+function renderEquityChart(data) {
+  if (!data || data.length < 2) return;
+  // Only redraw if data or timeframe actually changed
+  const fp = equityTF + '_' + data.length + '_' + data[0].value + '_' + data[data.length-1].value;
+  if (fp === _lastEquityFingerprint && equityChart) return;
+  _lastEquityFingerprint = fp;
+
+  const ctx = document.getElementById('equity-chart').getContext('2d');
+  const labels = data.map(d => d.date);
+  const values = data.map(d => d.value);
+  const startVal = values[0];
+  const isUp = values[values.length - 1] >= startVal;
+  const lineColor = isUp ? '#00C853' : '#FF1744';
+  const fillColor = isUp ? 'rgba(0,200,83,0.08)' : 'rgba(255,23,68,0.08)';
+
+  if (equityChart) {
+    // Update in-place — no flicker, no destroy
+    equityChart.data.labels = labels;
+    equityChart.data.datasets[0].data = values;
+    equityChart.data.datasets[0].borderColor = lineColor;
+    equityChart.data.datasets[0].backgroundColor = fillColor;
+    equityChart.data.datasets[0].pointBackgroundColor = lineColor;
+    equityChart.data.datasets[0].pointBorderColor = lineColor;
+    equityChart.data.datasets[0].pointRadius = data.length > 50 ? 0 : 3;
+    equityChart.update('none');
+    return;
+  }
+  equityChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        borderColor: lineColor,
+        borderWidth: 2,
+        pointRadius: data.length > 50 ? 0 : 3,
+        pointBackgroundColor: lineColor,
+        pointBorderColor: lineColor,
+        fill: true,
+        backgroundColor: fillColor,
+        tension: 0.3,
+      }]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      plugins: {
+        ...CHART_DEFAULTS.plugins,
+        tooltip: {
+          ...CHART_DEFAULTS.plugins.tooltip,
+          callbacks: {
+            title: ctx => ctx[0].label,
+            label: ctx => ' Portfolio: $' + Number(ctx.parsed.y).toLocaleString('en', {minimumFractionDigits: 2}),
+            afterLabel: ctx => {
+              const pnl = ctx.parsed.y - startVal;
+              const pct = ((pnl / startVal) * 100).toFixed(2);
+              return ' P&L: ' + (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2) + ' (' + pct + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function buildDailyPnL(equityData, tf) {
+  if (!equityData || equityData.length < 2) return [];
+
+  // Group by date, take first and last value per day
+  const byDate = {};
+  equityData.forEach(d => {
+    const date = d.date.split(' ')[0];
+    if (!byDate[date]) byDate[date] = { open: d.value, close: d.value };
+    byDate[date].close = d.value;
+  });
+  let days = Object.entries(byDate).map(([date, v]) => ({ date, pnl: v.close - v.open }));
+
+  // If only 1 day of data, show HOURLY P&L bars instead of one giant bar
+  if (days.length <= 1) {
+    const byHour = {};
+    equityData.forEach(d => {
+      const hour = d.date.substring(0, 13) + ':00'; // "2026-03-25 14:00"
+      if (!byHour[hour]) byHour[hour] = { open: d.value, close: d.value };
+      byHour[hour].close = d.value;
+    });
+    const hours = Object.entries(byHour).map(([hour, v]) => ({
+      date: hour.substring(11),  // just show "14:00" etc.
+      pnl: v.close - v.open
+    }));
+    if (hours.length >= 2) return hours;
+  }
+
+  const now = new Date();
+  let cutoff = null;
+  if      (tf === '1W')  cutoff = new Date(now - 7  * 86400000);
+  else if (tf === '1M')  cutoff = new Date(now - 30 * 86400000);
+  else if (tf === 'MTD') cutoff = new Date(now.getFullYear(), now.getMonth(), 1);
+  else if (tf === 'YTD') cutoff = new Date(now.getFullYear(), 0, 1);
+  if (cutoff) days = days.filter(d => new Date(d.date) >= cutoff);
+  return days;
+}
+
+function renderDailyChart(days) {
+  if (!days || !days.length) return;
+  // Only redraw if data or timeframe actually changed
+  const fp = dailyTF + '_' + days.length + '_' + days[0].pnl + '_' + days[days.length-1].pnl;
+  if (fp === _lastDailyFingerprint && dailyChart) return;
+  _lastDailyFingerprint = fp;
+
+  const ctx = document.getElementById('daily-chart').getContext('2d');
+  const labels = days.map(d => d.date);
+  const values = days.map(d => d.pnl);
+  const colors = values.map(v => v >= 0 ? 'rgba(0,200,83,0.8)' : 'rgba(255,23,68,0.8)');
+  const borders = values.map(v => v >= 0 ? '#00C853' : '#FF1744');
+
+  if (dailyChart) {
+    dailyChart.data.labels = labels;
+    dailyChart.data.datasets[0].data = values;
+    dailyChart.data.datasets[0].backgroundColor = colors;
+    dailyChart.data.datasets[0].borderColor = borders;
+    dailyChart.data.datasets[0].maxBarThickness = 60;
+    dailyChart.update('none');
+    return;
+  }
+  dailyChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderColor: borders,
+        borderWidth: 1,
+        borderRadius: 3,
+        maxBarThickness: 60,
+      }]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      plugins: {
+        ...CHART_DEFAULTS.plugins,
+        tooltip: {
+          ...CHART_DEFAULTS.plugins.tooltip,
+          callbacks: {
+            title: ctx => ctx[0].label,
+            label: ctx => ' P&L: ' + (ctx.parsed.y >= 0 ? '+' : '') + '$' + ctx.parsed.y.toFixed(2)
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Render growth ──────────────────────────────────────────
+function renderGrowth(perf, equity) {
+  if (!perf) return;
+
+  // Metrics
+  const pnlEl = document.getElementById('g-pnl');
+  pnlEl.textContent = (perf.total_pnl >= 0 ? '+' : '') + fmt$(perf.total_pnl);
+  pnlEl.className = 'metric-val ' + (perf.total_pnl >= 0 ? 'cg' : 'cr');
+
+  const wrEl = document.getElementById('g-wr');
+  wrEl.textContent = perf.win_rate + '%';
+  wrEl.className = 'metric-val ' + (perf.win_rate >= 52 ? 'cg' : perf.win_rate >= 45 ? 'co' : 'cr');
+
+  const pfEl = document.getElementById('g-pf');
+  pfEl.textContent = perf.profit_factor;
+  pfEl.className = 'metric-val ' + (perf.profit_factor >= 1.5 ? 'cg' : 'co');
+
+  document.getElementById('g-rl').textContent = perf.avg_win && perf.avg_loss
+    ? Math.abs(perf.avg_win / perf.avg_loss).toFixed(2) + ':1' : '—';
+  document.getElementById('g-total').textContent  = perf.total_trades || 0;
+  document.getElementById('g-best').textContent   = perf.best_trade  ? '+' + fmt$(perf.best_trade)  : '—';
+  document.getElementById('g-worst').textContent  = perf.worst_trade ? fmt$(perf.worst_trade) : '—';
+  document.getElementById('g-exp').textContent    = perf.expectancy  ? (perf.expectancy >= 0 ? '+' : '') + fmt$(perf.expectancy) : '—';
+
+  // Store full data for timeframe filtering
+  if (equity && equity.length > 0) {
+    allEquityData = equity;
+    // Only render charts if the growth view is currently visible
+    // (Chart.js needs a visible container to calculate dimensions)
+    const growthView = document.getElementById('view-growth');
+    if (growthView && growthView.classList.contains('active')) {
+      renderEquityChart(filterByTF(equity, equityTF));
+      renderDailyChart(buildDailyPnL(equity, dailyTF));
+    }
+  }
+}
+
+// ── Regime UI ─────────────────────────────────────────────
+function updateRegime(regime) {
+  const box   = document.getElementById('regime-box');
+  const label = document.getElementById('regime-label');
+  const meta  = document.getElementById('regime-meta');
+  const pill  = document.getElementById('regime-pill');
+
+  const classMap = {
+    'BULL_TRENDING':'bull','BEAR_TRENDING':'bear',
+    'CHOPPY':'choppy','PANIC':'panic','UNKNOWN':'unknown'
+  };
+  box.className = 'regime-box ' + (classMap[regime.regime] || 'unknown');
+  label.textContent = regime.regime || 'UNKNOWN';
+  meta.textContent  = `VIX: ${regime.vix || '—'} | SPY: $${regime.spy_price || '—'}`;
+  pill.textContent  = 'REGIME: ' + (regime.regime || '—');
+}
+
+// ── Main poll ──────────────────────────────────────────────
+async function poll() {
+  try {
+    const d = await (await fetch('/api/state')).json();
+
+    // Header
+    const pill = document.getElementById('bot-pill');
+    const stat = document.getElementById('bot-status');
+    if (d.status === 'running') { pill.className = 'pill pg'; stat.textContent = 'Running ●'; }
+    else { pill.className = 'pill pr'; stat.textContent = 'Stopped'; }
+    document.getElementById('upd-time').textContent = 'Updated ' + new Date().toTimeString().slice(0, 8);
+
+    // Stats
+    document.getElementById('s-val').textContent    = d.portfolio_value ? fmt$(d.portfolio_value) : '—';
+    document.getElementById('s-acc').textContent    = d.account || '';
+    const pnl = d.daily_pnl || 0;
+    const pnlEl = document.getElementById('s-pnl');
+    pnlEl.textContent = (pnl >= 0 ? '+' : '-') + fmt$(Math.abs(pnl));
+    pnlEl.className   = 'sv ' + (pnl >= 0 ? 'cg' : 'cr');
+    const pnlPct = d.portfolio_value ? (pnl / d.portfolio_value * 100).toFixed(3) : '0.000';
+    const pnlPctEl = document.getElementById('s-pnlp');
+    pnlPctEl.textContent = (pnl >= 0 ? '+' : '') + pnlPct + '% today';
+    pnlPctEl.style.color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    document.getElementById('s-session').textContent = d.session || '—';
+    document.getElementById('s-scans').textContent   = d.scan_count || 0;
+    document.getElementById('s-last').textContent    = d.last_scan ? 'Last: ' + d.last_scan : 'Never';
+    document.getElementById('s-pos').textContent     = (d.positions || []).length;
+    document.getElementById('s-trades').textContent  = (d.all_trades || []).length;
+    if (d.performance) {
+      document.getElementById('s-wr').textContent = 'Win: ' + d.performance.win_rate + '%';
+    }
+
+    // Regime
+    if (d.regime) updateRegime(d.regime);
+
+    // Session
+    document.getElementById('session-name').textContent = d.session || '—';
+
+    // Agents required
+    document.getElementById('agents-req').textContent = (d.agents_required || 4) + '/6';
+    document.getElementById('last-agree').textContent  = d.last_agents_agreed != null ? d.last_agents_agreed + '/6' : '—';
+
+    // Risk budget
+    if (d.portfolio_value) {
+      const limit = d.portfolio_value * 0.04;
+      const used  = Math.abs(Math.min(pnl, 0));
+      const pct   = Math.min((used / limit) * 100, 100);
+      document.getElementById('risk-bar').style.width     = pct + '%';
+      document.getElementById('risk-bar').style.background = pct > 75 ? 'var(--red)' : pct > 50 ? 'var(--yellow)' : 'var(--green)';
+      document.getElementById('risk-used').textContent    = fmt$(used) + ' used';
+      document.getElementById('risk-left').textContent    = fmt$(limit - used) + ' left';
+    }
+
+    // Logs
+    const logArea = document.getElementById('log-area');
+    if (d.logs && d.logs.length) {
+      logArea.innerHTML = d.logs.map(l =>
+        `<div class="log-row"><span class="lt">${l.time}</span><span class="lk lk-${l.type}">${l.type}</span><span class="lm">${l.msg}</span></div>`
+      ).join('');
+      document.getElementById('log-count').textContent = d.logs.length + ' events';
+    }
+
+    // AI box
+    if (d.claude_analysis) document.getElementById('ai-box').textContent = d.claude_analysis;
+
+    // Positions and trades
+    renderPositions(d.positions);
+    renderRecentTrades(d.trades, d.recent_orders || []);
+
+    // History view
+    if (d.all_trades) { allTrades = d.all_trades; renderHistory(); }
+
+    // Orders view
+    if (d.all_orders) { allOrders = d.all_orders; renderOrders(); }
+
+    // Growth view
+    if (d.performance) renderGrowth(d.performance, d.equity_history);
+
+    // Agents view
+    if (d.agent_outputs) renderAgents({...d.agent_outputs, last_scan: d.last_scan});
+
+    // Agent conversation (live panel + full view)
+    if (d.agent_conversation && d.agent_conversation.length) {
+      renderAgentConversation(d.agent_conversation);
+      renderAgentConvoFull(d.agent_conversation, d.last_scan);
+    }
+
+    // News view
+    if (d.news_data) renderNews(d.news_data);
+
+    // Risk view
+    if (d.portfolio_value) {
+      const pv   = d.portfolio_value;
+      const limit = pv * 0.04;
+      const used  = Math.abs(Math.min(pnl, 0));
+      const expPct = ((d.positions||[]).length / 6) * 100;
+      const deployed = (d.positions||[]).reduce((s, p) => s + p.current * p.qty, 0) / pv * 100;
+
+      document.getElementById('r-daily-bar').style.width   = Math.min(used/limit*100,100) + '%';
+      document.getElementById('r-daily-used').textContent  = `${fmt$(used)} of ${fmt$(limit)}`;
+      document.getElementById('r-daily-pct').textContent   = (used/limit*100).toFixed(1) + '%';
+      document.getElementById('r-exp-bar').style.width     = Math.min(deployed,100) + '%';
+      document.getElementById('r-exp-used').textContent    = (d.positions||[]).length + ' positions';
+      document.getElementById('r-exp-pct').textContent     = deployed.toFixed(1) + '% deployed';
+      document.getElementById('r-cash-bar').style.width    = Math.min(100 - deployed, 100) + '%';
+      document.getElementById('r-cash-pct').textContent    = (100 - deployed).toFixed(1) + '% cash';
+    }
+
+    // Settings — populate form inputs from live CONFIG values
+    document.getElementById('cfg-account').textContent = d.account || '—';
+    document.getElementById('cfg-status').textContent  = d.status  || '—';
+    if (d.settings && !document.activeElement?.classList.contains('setting-input')) {
+      // Only update form values when user is NOT actively editing an input
+      const s = d.settings;
+      document.getElementById('cfg-risk-pct').value    = (s.risk_pct_per_trade * 100).toFixed(1);
+      document.getElementById('cfg-daily-limit').value = (s.daily_loss_limit * 100).toFixed(1);
+      document.getElementById('cfg-max-pos').value     = s.max_positions;
+      document.getElementById('cfg-cash-reserve').value = (s.min_cash_reserve * 100).toFixed(0);
+      document.getElementById('cfg-max-single').value  = (s.max_single_position * 100).toFixed(0);
+      document.getElementById('cfg-min-score').value   = s.min_score_to_trade;
+      document.getElementById('cfg-high-score').value  = s.high_conviction_score;
+      document.getElementById('agree-select').value    = s.agents_required_to_agree;
+      document.getElementById('cfg-opt-risk').value    = (s.options_max_risk_pct * 100).toFixed(1);
+      document.getElementById('cfg-opt-ivr').value     = s.options_max_ivr;
+      document.getElementById('cfg-opt-delta').value   = s.options_target_delta;
+    }
+
+    // Capital management display
+    if (d.effective_capital) {
+      document.getElementById('cfg-start-cap').textContent = fmt$(1000000);
+      document.getElementById('cfg-eff-cap').textContent   = fmt$(d.effective_capital);
+      const cpnl = (d.portfolio_value || 0) - d.effective_capital;
+      const cpnlEl = document.getElementById('cfg-current-pnl');
+      cpnlEl.textContent = (cpnl >= 0 ? '+' : '') + fmt$(cpnl);
+      cpnlEl.style.color = cpnl >= 0 ? 'var(--green)' : 'var(--red)';
+    }
+
+    // Hot reload indicator
+    if (d.last_reload && d.last_reload_files && d.last_reload_files.length > 0) {
+      const pill = document.getElementById('reload-pill');
+      const info = document.getElementById('reload-info');
+      pill.style.display = 'flex';
+      info.textContent = d.last_reload_files.join(', ') + ' @ ' + d.last_reload;
+      // Hide after 30 seconds
+      setTimeout(() => { pill.style.display = 'none'; }, 30000);
+    }
+
+    // Scan progress
+    if (d.next_scan_seconds != null) {
+      const total = d.scan_interval_seconds || 300;
+      const pct   = Math.max(0, Math.min(100, ((total - d.next_scan_seconds) / total) * 100));
+      document.getElementById('scan-fill').style.width   = pct + '%';
+      document.getElementById('scan-status').textContent = d.scanning ? '⚡ Scanning...' : 'Next scan in';
+      document.getElementById('scan-eta').textContent    = d.next_scan_seconds + 's';
+    }
+
+  } catch(e) {
+    document.getElementById('bot-status').textContent = 'Connection Error';
+  }
+}
+
+poll();
+setInterval(poll, 2000);
+
+// ── News rendering ─────────────────────────────────────────
+let _allNewsItems = [];
+
+function renderNews(newsData) {
+  if (!newsData || !Object.keys(newsData).length) return;
+
+  _allNewsItems = [];
+  for (const [sym, nd] of Object.entries(newsData)) {
+    if (!nd.headlines || !nd.headlines.length) continue;
+    for (const headline of nd.headlines) {
+      _allNewsItems.push({
+        symbol: sym,
+        headline: headline,
+        sentiment: nd.claude_sentiment || 'NEUTRAL',
+        keyword_score: nd.keyword_score || 0,
+        catalyst: nd.claude_catalyst || '',
+        recency: nd.recency_hours || 999,
+        news_score: nd.news_score || 0,
+      });
+    }
+  }
+  filterNews();
+}
+
+function filterNews() {
+  const list = document.getElementById('news-list');
+  const keyword = (document.getElementById('news-keyword').value || '').toLowerCase();
+  const ticker  = (document.getElementById('news-ticker').value || '').toUpperCase().trim();
+  const sortBy  = document.getElementById('news-sort').value;
+  const sentFilter = document.getElementById('news-sentiment-filter').value;
+
+  let items = [..._allNewsItems];
+
+  // Keyword filter
+  if (keyword) items = items.filter(i => i.headline.toLowerCase().includes(keyword) || i.catalyst.toLowerCase().includes(keyword));
+  // Ticker filter
+  if (ticker)  items = items.filter(i => i.symbol.includes(ticker));
+  // Sentiment filter
+  if (sentFilter !== 'all') items = items.filter(i => i.sentiment === sentFilter);
+
+  // Sort
+  if (sortBy === 'time')   items.sort((a, b) => a.recency - b.recency);
+  if (sortBy === 'score')  items.sort((a, b) => b.news_score - a.news_score);
+  if (sortBy === 'ticker') items.sort((a, b) => a.symbol.localeCompare(b.symbol));
+
+  document.getElementById('news-count').textContent = items.length + ' / ' + _allNewsItems.length + ' headlines';
+
+  if (!items.length) {
+    list.innerHTML = '<div class="empty">No matching headlines.</div>';
+    return;
+  }
+
+  list.innerHTML = items.map(item => {
+    const badgeClass = item.sentiment === 'BULLISH' ? 'badge-bullish' :
+                       item.sentiment === 'BEARISH' ? 'badge-bearish' : 'badge-neutral';
+    const badgeText  = item.sentiment === 'BULLISH' ? '▲ BULL' :
+                       item.sentiment === 'BEARISH' ? '▼ BEAR' : '— NEUTRAL';
+    const kwText = item.keyword_score !== 0 ? `kw: ${item.keyword_score > 0 ? '+' : ''}${item.keyword_score}` : '';
+    const ageText = item.recency < 1 ? 'Just now' :
+                    item.recency < 24 ? Math.round(item.recency) + 'h ago' :
+                    Math.round(item.recency / 24) + 'd ago';
+    const url = 'https://finance.yahoo.com/quote/' + item.symbol + '/news/';
+
+    return `<a class="news-item" href="${url}" target="_blank" rel="noopener" style="display:flex;align-items:flex-start;gap:8px">
+      <span class="news-badge ${badgeClass}" style="flex-shrink:0">${badgeText}</span>
+      <span style="color:var(--orange);font-weight:600;font-size:11px;min-width:48px;flex-shrink:0">${item.symbol}</span>
+      <div class="news-content" style="flex:1;min-width:0">
+        <div class="news-headline" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.headline}</div>
+        <div class="news-meta">
+          <span>${ageText}</span>
+          <span>Score: ${item.news_score}/10</span>
+          ${kwText ? `<span class="news-kw">${kwText}</span>` : ''}
+          ${item.catalyst ? `<span style="color:var(--orange)">${item.catalyst}</span>` : ''}
+        </div>
+      </div>
+    </a>`;
+  }).join('');
+}
+
+// ── Agent Conversation ─────────────────────────────────────
+function toggleConvo() {
+  const body = document.getElementById('convo-body');
+  const panel = document.getElementById('convo-panel');
+  const arrow = document.getElementById('convo-arrow');
+  const logArea = document.getElementById('log-area');
+  const isHidden = body.classList.toggle('hidden');
+  panel.classList.toggle('collapsed', isHidden);
+  arrow.textContent = isHidden ? '▶' : '▼';
+  // Restore log area when conversation is closed
+  logArea.style.flex = isHidden ? '1' : '0.6';
+}
+
+function annotateIndicators(text) {
+  // Add plain-English tooltips for common indicator terms
+  const annotations = {
+    'ADX': '<span class="indicator-tag tag-neutral" title="Average Directional Index — measures trend strength. >25 = strong trend, <20 = no trend">ADX</span>',
+    'MFI': '<span class="indicator-tag tag-neutral" title="Money Flow Index — volume-weighted RSI. >65 = overbought (institutions buying), <35 = oversold">MFI</span>',
+    'VWAP': '<span class="indicator-tag tag-neutral" title="Volume-Weighted Average Price — institutional benchmark. Price above VWAP = bullish, below = bearish">VWAP</span>',
+    'OBV': '<span class="indicator-tag tag-neutral" title="On-Balance Volume — cumulative volume direction. Rising = accumulation, falling = distribution">OBV</span>',
+    'Donchian': '<span class="indicator-tag tag-neutral" title="Donchian Channel — 20-period high/low. Breakout = potential new trend">Donchian</span>',
+    'Squeeze': '<span class="indicator-tag tag-squeeze" title="BB Squeeze — Bollinger Bands inside Keltner Channels = volatility compression. Explosive move incoming">Squeeze</span>',
+    'EMA': '<span class="indicator-tag tag-neutral" title="Exponential Moving Average — trend direction. Bull aligned = 9>21>50, Bear = opposite">EMA</span>',
+    'MACD': '<span class="indicator-tag tag-neutral" title="Moving Average Convergence Divergence — momentum and trend changes">MACD</span>',
+    'RSI': '<span class="indicator-tag tag-neutral" title="Relative Strength Index — momentum oscillator. >70 = overbought, <30 = oversold">RSI</span>',
+    'Bollinger': '<span class="indicator-tag tag-neutral" title="Bollinger Bands — volatility envelope around price. Squeeze = low volatility before big move">Bollinger</span>',
+    'Keltner': '<span class="indicator-tag tag-neutral" title="Keltner Channel — ATR-based envelope. When BB is inside KC = squeeze">Keltner</span>',
+  };
+  let result = text;
+  for (const [term, html] of Object.entries(annotations)) {
+    // Only replace first occurrence of standalone term per text block
+    const regex = new RegExp('\\b' + term + '\\b', 'i');
+    result = result.replace(regex, html);
+  }
+  return result;
+}
+
+function renderAgentConversation(convo) {
+  // Live conversation panel (compact, in Live view)
+  const body = document.getElementById('convo-body');
+  if (!convo || !convo.length) return;
+
+  body.innerHTML = convo.map(msg => {
+    const isFinal = msg.agent === 'Final Decision Maker';
+    return `<div class="convo-msg ${isFinal ? 'convo-verdict' : ''}">
+      <div class="convo-agent">
+        <span>${isFinal ? '⚡' : '🧠'} ${msg.agent} <span class="convo-role">— ${msg.role}</span></span>
+        <span class="convo-time">${msg.time}</span>
+      </div>
+      <div class="convo-text">${msg.output.slice(0, 300)}${msg.output.length > 300 ? '...' : ''}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderAgentConvoFull(convo, lastScan) {
+  // Full conversation in Agents view with indicator annotations
+  const el = document.getElementById('agents-convo-full');
+  document.getElementById('agents-scan-time').textContent = 'Last scan: ' + (lastScan || '—');
+  if (!convo || !convo.length) return;
+
+  el.innerHTML = convo.map((msg, i) => {
+    const isFinal = msg.agent === 'Final Decision Maker';
+    const borderColor = isFinal ? 'var(--green)' : `hsl(${25 + i * 40}, 85%, 55%)`;
+    return `<div class="agent-convo-card" style="border-left-color:${borderColor}">
+      <div class="agent-name" style="color:${borderColor}">${isFinal ? '⚡' : 'Agent ' + (i+1) + ':'} ${msg.agent}</div>
+      <div class="agent-role">${msg.role}</div>
+      <div class="agent-output">${annotateIndicators(msg.output)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Capital Management ────────────────────────────────────
+function recordCapitalAdjustment() {
+  const type = document.getElementById('cap-type').value;
+  const raw  = parseFloat(document.getElementById('cap-amount').value);
+  const note = document.getElementById('cap-note').value.trim();
+  if (!raw || raw <= 0) { alert('Enter a valid amount'); return; }
+  const amount = type === 'withdrawal' ? -raw : raw;
+  fetch('/api/capital-adjustment', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({amount, note: note || type})
+  }).then(r => r.json()).then(d => {
+    if (d.ok) {
+      document.getElementById('cfg-eff-cap').textContent = fmt$(d.effective_capital);
+      document.getElementById('cap-amount').value = '';
+      document.getElementById('cap-note').value = '';
+      alert((type === 'deposit' ? 'Deposit' : 'Withdrawal') + ' of ' + fmt$(raw) + ' recorded. New capital base: ' + fmt$(d.effective_capital));
+    }
+  });
+}
+
+// ── Settings Apply ────────────────────────────────────────
+function applySettings() {
+  const settings = {
+    risk_pct_per_trade:       parseFloat(document.getElementById('cfg-risk-pct').value) / 100,
+    daily_loss_limit:         parseFloat(document.getElementById('cfg-daily-limit').value) / 100,
+    max_positions:            parseInt(document.getElementById('cfg-max-pos').value),
+    min_cash_reserve:         parseFloat(document.getElementById('cfg-cash-reserve').value) / 100,
+    max_single_position:      parseFloat(document.getElementById('cfg-max-single').value) / 100,
+    min_score_to_trade:       parseInt(document.getElementById('cfg-min-score').value),
+    high_conviction_score:    parseInt(document.getElementById('cfg-high-score').value),
+    agents_required_to_agree: parseInt(document.getElementById('agree-select').value),
+    options_max_risk_pct:     parseFloat(document.getElementById('cfg-opt-risk').value) / 100,
+    options_max_ivr:          parseInt(document.getElementById('cfg-opt-ivr').value),
+    options_target_delta:     parseFloat(document.getElementById('cfg-opt-delta').value),
+  };
+
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(settings)
+  }).then(r => r.json()).then(d => {
+    if (d.ok) {
+      const btn = document.querySelector('.setting-card .apply-btn');
+      const orig = btn.textContent;
+      btn.textContent = '✅ Applied!';
+      btn.style.borderColor = 'var(--green)';
+      btn.style.color = 'var(--green)';
+      setTimeout(() => { btn.textContent = orig; btn.style.borderColor = ''; btn.style.color = ''; }, 2000);
+    }
+  });
+}
+
+// ── Favourites ─────────────────────────────────────────────
+let favourites = JSON.parse(localStorage.getItem('decifer_favourites') || '[]');
+
+function renderFavTags() {
+  const el = document.getElementById('fav-tags');
+  if (!favourites.length) {
+    el.innerHTML = '<span style="font-size:11px;color:var(--muted2)">No favourites yet — add tickers below</span>';
+    return;
+  }
+  el.innerHTML = favourites.map(t =>
+    `<span class="fav-tag">${t}<span onclick="removeFav('${t}')" title="Remove">×</span></span>`
+  ).join('');
+}
+
+function addFavourite() {
+  const input = document.getElementById('fav-input');
+  const val = input.value.trim().toUpperCase().replace(/[^A-Z0-9.]/g,'');
+  if (!val) return;
+  addFavTicker(val);
+  input.value = '';
+}
+
+function addFavTicker(ticker) {
+  if (!favourites.includes(ticker)) {
+    favourites.push(ticker);
+    renderFavTags();
+  }
+}
+
+function removeFav(ticker) {
+  favourites = favourites.filter(t => t !== ticker);
+  renderFavTags();
+}
+
+function saveFavourites() {
+  localStorage.setItem('decifer_favourites', JSON.stringify(favourites));
+  fetch('/api/favourites', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({favourites})
+  }).then(r => r.json()).then(d => {
+    alert('✅ Favourites saved! Bot will include these on next scan.\n\nActive: ' + favourites.join(', '));
+  }).catch(() => {
+    alert('✅ Favourites saved locally. Will apply on next scan.');
+  });
+}
+
+// Load favourites on page load
+renderFavTags();
+</script>
+</body>
+</html>"""

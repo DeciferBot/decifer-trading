@@ -1,0 +1,364 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║   <>  DECIFER  —  learning.py                                ║
+# ║   Trade logging, performance tracking, weekly review         ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+import json
+import logging
+import os
+from datetime import datetime, timedelta, timezone
+import anthropic
+from config import CONFIG
+
+log = logging.getLogger("decifer.learning")
+
+TRADE_LOG_FILE = CONFIG["trade_log"]
+ORDER_LOG_FILE = CONFIG.get("order_log", "data/orders.json")
+CAPITAL_FILE   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "capital_base.json")
+
+
+# ── Capital base tracking ──────────────────────────────────────────────
+
+def load_capital_base() -> dict:
+    """Load capital base with adjustments for deposits/withdrawals."""
+    if os.path.exists(CAPITAL_FILE):
+        try:
+            with open(CAPITAL_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    # Default: starting capital from config, no adjustments
+    return {
+        "starting_capital": CONFIG.get("starting_capital", 1_000_000),
+        "adjustments": []
+    }
+
+
+def get_effective_capital() -> float:
+    """Return starting capital + all deposits - all withdrawals."""
+    data = load_capital_base()
+    base = data.get("starting_capital", CONFIG.get("starting_capital", 1_000_000))
+    total_adj = sum(a.get("amount", 0) for a in data.get("adjustments", []))
+    return base + total_adj
+
+
+def record_capital_adjustment(amount: float, note: str = ""):
+    """Record a deposit (+) or withdrawal (-) adjustment."""
+    data = load_capital_base()
+    data["adjustments"].append({
+        "amount": amount,
+        "note": note,
+        "timestamp": datetime.now().isoformat()
+    })
+    os.makedirs(os.path.dirname(CAPITAL_FILE) or ".", exist_ok=True)
+    with open(CAPITAL_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+    log.info(f"Capital adjustment: ${amount:+,.2f} ({note}). New base: ${get_effective_capital():,.2f}")
+
+
+# ── Order logging (every order placed, regardless of fill status) ──────
+def log_order(order_record: dict):
+    """
+    Log an order to orders.json.
+    order_record should contain:
+      symbol, side (BUY/SELL), order_type (LMT/MKT/STP), qty, price,
+      order_id, status (SUBMITTED/FILLED/CANCELLED/REJECTED),
+      instrument (stock/option), timestamp, reasoning, etc.
+    """
+    # Sanitise price — reject float overflow / infinity / NaN
+    import math
+    price = order_record.get("price", 0)
+    if isinstance(price, float) and (math.isnan(price) or math.isinf(price) or abs(price) > 1e10):
+        log.warning(f"Corrupt price {price} for {order_record.get('symbol')} — setting to 0")
+        order_record["price"] = 0
+
+    orders = load_orders()
+
+    # Dedup by order_id if present
+    oid = order_record.get("order_id")
+    if oid:
+        for existing in orders:
+            if existing.get("order_id") == oid:
+                # Update existing order (e.g. status change)
+                existing.update({k: v for k, v in order_record.items() if v is not None})
+                _save_orders(orders)
+                log.info(f"Order updated: {order_record.get('symbol')} #{oid} → {order_record.get('status')}")
+                return
+
+    orders.append(order_record)
+    _save_orders(orders)
+    log.info(f"Order logged: {order_record.get('side')} {order_record.get('symbol')} "
+             f"qty={order_record.get('qty')} @ ${order_record.get('price', 0):.2f} "
+             f"[{order_record.get('status', 'SUBMITTED')}]")
+
+
+def update_order_status(order_id: int, status: str, fill_price: float = None,
+                        filled_qty: int = None):
+    """Update an existing order's status (FILLED, CANCELLED, REJECTED, etc.)."""
+    orders = load_orders()
+    for o in orders:
+        if o.get("order_id") == order_id:
+            o["status"] = status
+            o["updated"] = datetime.now(timezone.utc).isoformat()
+            if fill_price is not None:
+                o["fill_price"] = fill_price
+            if filled_qty is not None:
+                o["filled_qty"] = filled_qty
+            _save_orders(orders)
+            log.info(f"Order #{order_id} status → {status}")
+            return
+    log.warning(f"Order #{order_id} not found for status update")
+
+
+def load_orders() -> list:
+    """Load all order records."""
+    if not os.path.exists(ORDER_LOG_FILE):
+        return []
+    try:
+        with open(ORDER_LOG_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def _save_orders(orders: list):
+    """Write orders list to disk."""
+    os.makedirs(os.path.dirname(ORDER_LOG_FILE) or ".", exist_ok=True)
+    with open(ORDER_LOG_FILE, "w") as f:
+        json.dump(orders, f, indent=2)
+
+
+def log_trade(trade: dict, agent_outputs: dict, regime: dict,
+              action: str, outcome: dict = None):
+    """
+    Log every trade with full context for learning.
+    action = "OPEN" or "CLOSE"
+    """
+    # Calculate hold time for CLOSE records
+    hold_minutes = None
+    if action == "CLOSE" and trade.get("open_time"):
+        try:
+            open_dt  = datetime.fromisoformat(trade["open_time"])
+            close_dt = datetime.now(timezone.utc)
+            hold_minutes = int((close_dt - open_dt).total_seconds() / 60)
+        except Exception:
+            pass
+
+    record = {
+        "timestamp":      datetime.now(timezone.utc).isoformat(),
+        "action":         action,
+        "symbol":         trade.get("symbol"),
+        "direction":      trade.get("direction", "LONG"),
+        "qty":            trade.get("qty"),
+        "entry_price":    trade.get("entry"),
+        "exit_price":     outcome.get("exit_price") if outcome else None,
+        "sl":             trade.get("sl"),
+        "tp":             trade.get("tp"),
+        "score":          trade.get("score"),
+        "reasoning":      trade.get("reasoning"),
+        "regime":         regime.get("regime"),
+        "vix":            regime.get("vix"),
+        "pnl":            outcome.get("pnl") if outcome else None,
+        "exit_reason":    outcome.get("reason") if outcome else None,
+        "hold_minutes":   hold_minutes,
+        "agents": {
+            "technical":   agent_outputs.get("technical",   "")[:500],
+            "macro":       agent_outputs.get("macro",       "")[:500],
+            "opportunity": agent_outputs.get("opportunity", "")[:500],
+            "devils":      agent_outputs.get("devils",      "")[:500],
+            "risk":        agent_outputs.get("risk",        "")[:500],
+        }
+    }
+
+    # Load existing log
+    trades = []
+    if os.path.exists(TRADE_LOG_FILE):
+        try:
+            with open(TRADE_LOG_FILE, "r") as f:
+                trades = json.load(f)
+        except Exception:
+            trades = []
+
+    # Deduplication — check if this exact trade already exists
+    # For CLOSE records: any existing CLOSE for the same symbol on the same day is a dupe
+    # (a position can only be closed once per trade)
+    # For OPEN records: match on symbol + action within 5 minutes
+    ts_new = datetime.fromisoformat(record["timestamp"])
+    for existing in trades:
+        if existing.get("symbol") != record.get("symbol"):
+            continue
+        if existing.get("action") != record.get("action"):
+            continue
+        if record.get("action") == "CLOSE":
+            # Any prior CLOSE for this symbol within the same trading day is a dupe.
+            # Partial fills of the same sell order can arrive in rapid succession —
+            # always keep whichever record has the largest qty (most complete fill).
+            try:
+                ts_ex = datetime.fromisoformat(existing["timestamp"])
+                if abs((ts_new - ts_ex).total_seconds()) < 86400:  # within 24 hours
+                    existing_qty = existing.get("qty") or existing.get("shares") or 0
+                    new_qty      = record.get("qty")  or record.get("shares")  or 0
+                    # Prefer the record with better (non-zero) P&L or higher qty
+                    should_update = (
+                        (record.get("pnl") and record["pnl"] != 0.0
+                         and (not existing.get("pnl") or existing.get("pnl") == 0.0))
+                        or (new_qty > existing_qty and record.get("pnl") is not None)
+                    )
+                    if should_update:
+                        existing.update({k: v for k, v in record.items() if v is not None})
+                        with open(TRADE_LOG_FILE, "w") as f:
+                            json.dump(trades, f, indent=2)
+                        log.info(f"Updated existing CLOSE with better data: {record['symbol']} qty={new_qty} P&L=${record.get('pnl')}")
+                    else:
+                        log.info(f"Duplicate CLOSE skipped: {record['symbol']}")
+                    return
+            except Exception:
+                pass
+        else:
+            # OPEN: match within 30 minutes — covers slow/partial fills of the same order
+            try:
+                ts_ex = datetime.fromisoformat(existing["timestamp"])
+                if abs((ts_new - ts_ex).total_seconds()) < 1800:
+                    log.info(f"Duplicate OPEN skipped: {record['symbol']}")
+                    return
+            except Exception:
+                pass
+
+    trades.append(record)
+
+    with open(TRADE_LOG_FILE, "w") as f:
+        json.dump(trades, f, indent=2)
+
+    log.info(f"Trade logged: {action} {trade.get('symbol')} | P&L: {outcome.get('pnl') if outcome else 'open'}")
+
+
+def load_trades() -> list:
+    """Load all trade records."""
+    if not os.path.exists(TRADE_LOG_FILE):
+        return []
+    try:
+        with open(TRADE_LOG_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def get_performance_summary(trades: list = None) -> dict:
+    """Calculate performance metrics from trade history."""
+    if trades is None:
+        trades = load_trades()
+
+    closed = [t for t in trades if t.get("exit_price") is not None and t.get("pnl") is not None]
+
+    if not closed:
+        return {
+            "total_trades": 0, "wins": 0, "losses": 0,
+            "win_rate": 0, "avg_win": 0, "avg_loss": 0,
+            "total_pnl": 0, "best_trade": 0, "worst_trade": 0,
+            "profit_factor": 0, "expectancy": 0,
+        }
+
+    wins   = [t for t in closed if t["pnl"] > 0]
+    losses = [t for t in closed if t["pnl"] <= 0]
+
+    avg_win  = sum(t["pnl"] for t in wins)  / len(wins)  if wins  else 0
+    avg_loss = sum(t["pnl"] for t in losses) / len(losses) if losses else 0
+    total    = sum(t["pnl"] for t in closed)
+    win_rate = len(wins) / len(closed) if closed else 0
+
+    gross_profit = sum(t["pnl"] for t in wins)   if wins   else 0
+    gross_loss   = abs(sum(t["pnl"] for t in losses)) if losses else 1
+    profit_factor = gross_profit / gross_loss if gross_loss > 0 else 0
+
+    expectancy = (win_rate * avg_win) + ((1 - win_rate) * avg_loss)
+
+    return {
+        "total_trades":   len(closed),
+        "wins":           len(wins),
+        "losses":         len(losses),
+        "win_rate":       round(win_rate * 100, 1),
+        "avg_win":        round(avg_win, 2),
+        "avg_loss":       round(avg_loss, 2),
+        "total_pnl":      round(total, 2),
+        "best_trade":     round(max((t["pnl"] for t in closed), default=0), 2),
+        "worst_trade":    round(min((t["pnl"] for t in closed), default=0), 2),
+        "profit_factor":  round(profit_factor, 2),
+        "expectancy":     round(expectancy, 2),
+    }
+
+
+def run_weekly_review() -> str:
+    """
+    Run the weekly review agent — analyse all trades from last 7 days.
+    Returns written review report.
+    """
+    trades = load_trades()
+    if not trades:
+        return "No trades to review yet."
+
+    # Last 7 days
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    recent = [t for t in trades if t["timestamp"] >= cutoff]
+
+    if not recent:
+        return "No trades in the last 7 days."
+
+    perf    = get_performance_summary(recent)
+    closed  = [t for t in recent if t.get("exit_price") is not None]
+
+    trade_details = "\n".join([
+        f"- {t['timestamp'][:10]} | {t['symbol']} {t['direction']} | "
+        f"P&L ${t['pnl']:+.2f} | Regime: {t['regime']} | "
+        f"Reasoning: {t.get('reasoning', 'N/A')[:100]}"
+        for t in closed[:30]
+    ])
+
+    client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
+
+    prompt = f"""You are the Weekly Review Agent for Decifer, an autonomous trading system.
+Analyse the past week's trading performance and provide actionable insights.
+
+PERFORMANCE SUMMARY:
+Total trades: {perf['total_trades']}
+Win rate: {perf['win_rate']}%
+Average win: ${perf['avg_win']}
+Average loss: ${perf['avg_loss']}
+Total P&L: ${perf['total_pnl']}
+Profit factor: {perf['profit_factor']}
+Expectancy per trade: ${perf['expectancy']}
+
+INDIVIDUAL TRADES:
+{trade_details}
+
+Please provide:
+1. OVERALL ASSESSMENT: Was this a good week? Why?
+2. WHAT WORKED: Which setups, regimes, or asset classes performed best?
+3. WHAT FAILED: Which setups, regimes, or asset classes underperformed?
+4. AGENT QUALITY: Based on trade reasoning, which agent appears most/least accurate?
+5. PATTERN RECOGNITION: Any recurring mistakes or missed opportunities?
+6. PROMPT RECOMMENDATIONS: Specific suggestions to improve any agent's prompt next week
+7. RISK ASSESSMENT: Was position sizing appropriate? Any near-misses on risk limits?
+8. NEXT WEEK FOCUS: 2-3 specific things to watch for or improve
+
+Be direct and specific. This report guides real improvements to the system."""
+
+    try:
+        resp = client.messages.create(
+            model=CONFIG["claude_model"],
+            max_tokens=1500,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        review = resp.content[0].text.strip()
+        log.info("Weekly review completed")
+
+        # Save review to file so agents can read it next scan
+        review_file = "weekly_review.txt"
+        header = f"=== WEEKLY REVIEW — {datetime.now().strftime('%Y-%m-%d')} ===\n\n"
+        with open(review_file, 'w') as f:
+            f.write(header + review)
+        log.info(f"Weekly review saved to {review_file}")
+
+        return review
+    except Exception as e:
+        log.error(f"Weekly review error: {e}")
+        return f"Weekly review failed: {e}"
