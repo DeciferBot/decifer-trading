@@ -960,7 +960,7 @@ function renderHistory() {
     const explanation = buildTradeExplanation(t);
     return `<div class="tr tr-clickable" onclick="toggleExplain('${uid}','${tKey.replace(/'/g,"\\'")}')">
       <span><span class="expand-arrow${wasOpen ? ' open' : ''}" id="arr-${uid}">▶</span> ${ts ? ts.slice(0,16).replace('T',' ') : '—'}</span>
-      <span>${t.symbol || '—'}</span>
+      <span>${t.symbol || '—'}${getInstrumentType(t) === 'option' ? ' <span style="font-size:9px;color:var(--cyan);font-weight:600">' + (t.right||'') + (t.strike ? ' $'+t.strike : '') + '</span>' : ''}</span>
       <span><span class="ts ${direction === 'LONG' ? 'tb' : 'ts2'}">${direction}</span></span>
       <span style="color:var(--orange)">${qty}</span>
       <span>${fmt$(t.entry_price)}</span>

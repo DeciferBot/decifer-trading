@@ -18,15 +18,23 @@ _pause_until         = None
 _daily_loss_hit      = False
 _session_start_value = None
 
+# ── Drawdown-from-peak tracking ────────────────────────────────
+_equity_high_water_mark = None
+_drawdown_halt          = False
+
 
 def reset_daily_state(portfolio_value: float):
     """Call at the start of each trading day."""
     global _consecutive_losses, _pause_until, _daily_loss_hit, _session_start_value
+    global _equity_high_water_mark
     _consecutive_losses  = 0
     _pause_until         = None
     _daily_loss_hit      = False
     _session_start_value = portfolio_value
-    log.info(f"Daily risk state reset. Session start value: ${portfolio_value:,.2f}")
+    # Initialize HWM if not yet set (don't reset to current — preserve peak across days)
+    if _equity_high_water_mark is None:
+        _equity_high_water_mark = portfolio_value
+    log.info(f"Daily risk state reset. Session start value: ${portfolio_value:,.2f} | HWM: ${_equity_high_water_mark:,.2f}")
 
 
 def record_loss(source: str = "bot"):
@@ -87,6 +95,11 @@ def can_trade(portfolio_value: float, daily_pnl: float, regime: dict,
 
     now_est = datetime.now(EST)
     now_time = now_est.time()
+
+    # ── Layer 6: Drawdown from peak circuit breaker ───────────
+    dd_ok, dd_reason = check_drawdown()
+    if not dd_ok:
+        return False, dd_reason
 
     # ── Layer 5: Panic regime ─────────────────────────────────
     if regime.get("regime") == "PANIC":
@@ -275,5 +288,269 @@ def check_correlation(new_symbol: str, open_positions: list) -> tuple[bool, str]
         semi_count = len(open_syms & semis)
         if semi_count >= 2:
             return False, f"Already hold {semi_count} semiconductor stocks — too concentrated"
+
+    return True, "OK"
+
+
+# ══════════════════════════════════════════════════════════════════
+# FIX #1: Cross-instrument exposure check (stock + options same underlying)
+# ══════════════════════════════════════════════════════════════════
+
+def get_underlying_exposure(symbol: str, open_positions: list) -> dict:
+    """
+    Calculate total exposure to a single underlying across stocks AND options.
+    Returns dict with exposure details.
+    """
+    stock_value = 0.0
+    option_value = 0.0
+
+    for pos in open_positions:
+        pos_sym = pos.get("symbol", "")
+        if pos_sym != symbol:
+            continue
+
+        instrument = pos.get("instrument", "stock")
+        qty = pos.get("qty", 0)
+
+        if instrument == "option":
+            # Options exposure = contracts × 100 × underlying price (delta-adjusted)
+            delta = abs(pos.get("delta", 0.5))
+            underlying = pos.get("underlying_price", pos.get("current", 0))
+            option_value += qty * 100 * underlying * delta
+        else:
+            # Stock exposure = shares × current price
+            price = pos.get("current", pos.get("entry", 0))
+            stock_value += abs(qty * price)
+
+    return {
+        "symbol": symbol,
+        "stock_exposure": stock_value,
+        "option_exposure": option_value,
+        "total_exposure": stock_value + option_value,
+    }
+
+
+def check_combined_exposure(symbol: str, new_exposure_value: float,
+                            open_positions: list, portfolio_value: float,
+                            instrument: str = "stock") -> tuple[bool, str]:
+    """
+    FIX #1 + #3: Check whether adding a new position would create
+    excessive combined exposure to the same underlying.
+
+    Blocks if:
+    - Already have the same underlying in the OTHER instrument type
+      AND combined exposure would exceed max_single_position
+    - Total deployed capital + new position exceeds max_portfolio_allocation
+
+    Returns (ok_to_trade, reason).
+    """
+    if portfolio_value <= 0:
+        return True, "OK"
+
+    max_single = CONFIG.get("max_single_position", 0.10)
+    max_alloc = CONFIG.get("max_portfolio_allocation", 1.0)
+
+    # ── Check same-underlying cross-instrument concentration ──────
+    existing = get_underlying_exposure(symbol, open_positions)
+
+    if existing["total_exposure"] > 0:
+        combined = existing["total_exposure"] + new_exposure_value
+        combined_pct = combined / portfolio_value
+
+        # If we already have this underlying in the OTHER instrument,
+        # check combined doesn't exceed single-position limit
+        has_stock = existing["stock_exposure"] > 0
+        has_option = existing["option_exposure"] > 0
+        adding_stock = instrument == "stock"
+        adding_option = instrument == "option"
+
+        cross_instrument = (has_stock and adding_option) or (has_option and adding_stock)
+
+        if cross_instrument and combined_pct > max_single:
+            return False, (
+                f"Cross-instrument block: {symbol} already has "
+                f"${existing['total_exposure']:,.0f} exposure "
+                f"({'stock+option' if has_stock and has_option else 'stock' if has_stock else 'option'}). "
+                f"Adding ${new_exposure_value:,.0f} would be {combined_pct:.1%} of portfolio "
+                f"(limit: {max_single:.0%})"
+            )
+
+    # ── Check total portfolio deployment ──────────────────────────
+    total_deployed = 0.0
+    for pos in open_positions:
+        inst = pos.get("instrument", "stock")
+        qty = pos.get("qty", 0)
+        if inst == "option":
+            # Option cost = premium × contracts × 100
+            premium = pos.get("entry_premium", pos.get("entry", 0))
+            total_deployed += qty * premium * 100
+        else:
+            price = pos.get("current", pos.get("entry", 0))
+            total_deployed += abs(qty * price)
+
+    new_total = total_deployed + new_exposure_value
+    alloc_pct = new_total / portfolio_value
+
+    if alloc_pct > max_alloc:
+        return False, (
+            f"Portfolio allocation limit: ${total_deployed:,.0f} deployed + "
+            f"${new_exposure_value:,.0f} new = {alloc_pct:.1%} "
+            f"(limit: {max_alloc:.0%})"
+        )
+
+    return True, "OK"
+
+
+# ══════════════════════════════════════════════════════════════════
+# FIX #4: Max drawdown from peak — circuit breaker
+# ══════════════════════════════════════════════════════════════════
+
+def update_equity_high_water_mark(current_equity: float):
+    """
+    Call on each scan cycle with current portfolio value.
+    Tracks the peak and triggers halt if drawdown exceeds limit.
+    """
+    global _equity_high_water_mark, _drawdown_halt
+
+    if _equity_high_water_mark is None:
+        _equity_high_water_mark = current_equity
+        return
+
+    # Update high water mark
+    if current_equity > _equity_high_water_mark:
+        _equity_high_water_mark = current_equity
+        # If we were halted due to drawdown but recovered, clear the halt
+        if _drawdown_halt:
+            _drawdown_halt = False
+            log.info(f"Drawdown halt cleared — equity recovered to new high: ${current_equity:,.2f}")
+
+    # Check drawdown from peak
+    if _equity_high_water_mark > 0:
+        drawdown = (_equity_high_water_mark - current_equity) / _equity_high_water_mark
+        max_dd = CONFIG.get("max_drawdown_alert", 0.25)
+
+        if drawdown >= max_dd and not _drawdown_halt:
+            _drawdown_halt = True
+            log.warning(
+                f"⛔ DRAWDOWN CIRCUIT BREAKER: {drawdown:.1%} drawdown from peak "
+                f"${_equity_high_water_mark:,.2f} → ${current_equity:,.2f}. "
+                f"Limit: {max_dd:.0%}. New trades halted."
+            )
+
+
+def check_drawdown() -> tuple[bool, str]:
+    """
+    Returns (ok_to_trade, reason). Called from can_trade().
+    """
+    if _drawdown_halt:
+        drawdown = 0.0
+        if _equity_high_water_mark and _equity_high_water_mark > 0:
+            drawdown = CONFIG.get("max_drawdown_alert", 0.25)
+        return False, (
+            f"Drawdown circuit breaker active — "
+            f">{drawdown:.0%} drawdown from peak ${_equity_high_water_mark:,.2f}. "
+            f"No new trades until equity recovers."
+        )
+    return True, "OK"
+
+
+def reset_drawdown_state(portfolio_value: float):
+    """Reset drawdown tracking (e.g. at start of new session or manual override)."""
+    global _equity_high_water_mark, _drawdown_halt
+    _equity_high_water_mark = portfolio_value
+    _drawdown_halt = False
+    log.info(f"Drawdown state reset. High water mark: ${portfolio_value:,.2f}")
+
+
+# ══════════════════════════════════════════════════════════════════
+# FIX #2: Sector concentration enforcement
+# ══════════════════════════════════════════════════════════════════
+
+# Lazy-init sector monitor to avoid circular imports / heavy init at module load
+_sector_monitor = None
+
+
+def _get_sector_monitor():
+    """Lazy-initialize the SectorMonitor from portfolio_optimizer."""
+    global _sector_monitor
+    if _sector_monitor is None:
+        try:
+            from portfolio_optimizer import SectorMonitor
+            _sector_monitor = SectorMonitor()
+            log.info("SectorMonitor initialized for sector concentration enforcement")
+        except ImportError as e:
+            log.warning(f"Could not import SectorMonitor: {e} — sector check disabled")
+    return _sector_monitor
+
+
+def check_sector_concentration(new_symbol: str, open_positions: list,
+                                portfolio_value: float,
+                                regime: str = "NORMAL") -> tuple[bool, str]:
+    """
+    FIX #2: Check if adding new_symbol would breach sector concentration limits.
+    Uses SectorMonitor from portfolio_optimizer.py (was built but never wired in).
+
+    Returns (ok_to_trade, reason).
+    """
+    monitor = _get_sector_monitor()
+    if monitor is None:
+        return True, "OK (sector monitor unavailable)"
+
+    if portfolio_value <= 0 or not open_positions:
+        return True, "OK"
+
+    max_sector = CONFIG.get("max_sector_exposure", 0.50)
+
+    try:
+        # Build portfolio dict: symbol → (qty, price)
+        portfolio_dict = {}
+        for pos in open_positions:
+            sym = pos.get("symbol", "")
+            qty = pos.get("qty", 0)
+            price = pos.get("current", pos.get("entry", 0))
+            if sym and qty > 0 and price > 0:
+                if sym in portfolio_dict:
+                    # Accumulate if same symbol appears multiple times (stock + option)
+                    existing_qty, existing_price = portfolio_dict[sym]
+                    # Use value-weighted combination
+                    total_value = existing_qty * existing_price + qty * price
+                    total_qty = existing_qty + qty
+                    portfolio_dict[sym] = (total_qty, total_value / total_qty if total_qty else price)
+                else:
+                    portfolio_dict[sym] = (qty, price)
+
+        # Get sector of new symbol
+        new_sector = monitor.get_sector(new_symbol)
+
+        # Calculate current sector weights
+        sector_weights = monitor.calculate_sector_weights(portfolio_dict)
+
+        current_sector_pct = sector_weights.get(new_sector, 0.0)
+
+        # Use regime-aware limits from SectorMonitor
+        regime_limits = {
+            "NORMAL": min(max_sector, 0.30),
+            "CHOPPY": min(max_sector, 0.20),
+            "PANIC":  min(max_sector, 0.15),
+        }
+        limit = regime_limits.get(regime, max_sector)
+
+        if current_sector_pct >= limit:
+            return False, (
+                f"Sector concentration block: {new_sector} already at {current_sector_pct:.1%} "
+                f"(limit: {limit:.0%} in {regime} regime). "
+                f"Cannot add {new_symbol}."
+            )
+
+        # Warn if approaching limit (>80%)
+        if current_sector_pct >= limit * 0.8:
+            log.warning(
+                f"Sector warning: {new_sector} at {current_sector_pct:.1%}, "
+                f"approaching {limit:.0%} limit. Allowing {new_symbol} but watch closely."
+            )
+
+    except Exception as e:
+        log.warning(f"Sector concentration check failed for {new_symbol}: {e} — allowing trade")
+        return True, "OK (sector check error, allowing)"
 
     return True, "OK"

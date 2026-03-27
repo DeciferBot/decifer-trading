@@ -57,7 +57,7 @@ from agents import run_all_agents
 from orders import execute_buy, execute_sell, flatten_all, reconcile_with_ibkr, get_open_positions, update_position_prices, update_positions_from_ibkr, execute_buy_option, execute_sell_option
 from options import find_best_contract, check_options_exits
 from options_scanner import scan_options_universe
-from risk import can_trade, get_session, get_scan_interval, reset_daily_state, calculate_position_size, calculate_stops
+from risk import can_trade, get_session, get_scan_interval, reset_daily_state, calculate_position_size, calculate_stops, update_equity_high_water_mark
 from learning import log_trade, load_trades, load_orders, get_performance_summary, run_weekly_review, TRADE_LOG_FILE, get_effective_capital, record_capital_adjustment
 from dashboard import DASHBOARD_HTML
 from news_sentinel import NewsSentinel, get_sentinel_history
@@ -822,15 +822,23 @@ def backfill_trades_from_ibkr():
             "earliest_time": ""
         })
 
+        # Separate groups for stocks vs options — options use composite keys
+        # and ×100 multiplier so they must never mix with stock P&L.
+        from orders import _is_option_contract
+        opt_order_groups = defaultdict(lambda: {
+            "sym": "", "underlying": "", "side": "", "order_id": None,
+            "exec_ids": [], "total_contracts": 0.0,
+            "value": 0.0, "total_pnl": 0.0,
+            "latest_time": "", "earliest_time": "",
+            "right": "", "strike": 0.0, "expiry": "",
+        })
+
         for fill in fills:
             try:
-                # CRITICAL: Only process stock fills — options have tiny premiums
-                # and huge "qty" that corrupt P&L calculations when mixed with stocks.
                 sec_type = getattr(fill.contract, 'secType', 'STK')
-                if sec_type != 'STK':
-                    continue
+                is_opt = _is_option_contract(fill.contract)
 
-                sym      = fill.contract.symbol
+                underlying = fill.contract.symbol
                 side     = fill.execution.side.upper()
                 price    = float(fill.execution.price)
                 shares   = float(fill.execution.shares)
@@ -850,19 +858,50 @@ def backfill_trades_from_ibkr():
                         except (ValueError, TypeError):
                             pass
 
-                key = (sym, order_id, side)
-                g = order_groups[key]
-                g["sym"]          = sym
-                g["side"]         = side
-                g["order_id"]     = order_id
-                g["exec_ids"].append(eid)
-                g["total_shares"] += shares
-                g["value"]        += price * shares   # for weighted avg
-                g["total_pnl"]    += pnl
-                if not g["latest_time"] or etime > g["latest_time"]:
-                    g["latest_time"] = etime
-                if not g["earliest_time"] or etime < g["earliest_time"]:
-                    g["earliest_time"] = etime
+                if is_opt:
+                    # Build composite key matching open_trades format: SYM_RIGHT_STRIKE_EXPIRY
+                    right = getattr(fill.contract, 'right', '') or ''
+                    strike = getattr(fill.contract, 'strike', 0) or 0
+                    raw_exp = str(getattr(fill.contract, 'lastTradeDateOrContractMonth', ''))
+                    if len(raw_exp) == 8 and raw_exp.isdigit():
+                        expiry_str = f"{raw_exp[:4]}-{raw_exp[4:6]}-{raw_exp[6:]}"
+                    else:
+                        expiry_str = raw_exp
+                    opt_sym = f"{underlying}_{right}_{strike}_{expiry_str}"
+
+                    key = (opt_sym, order_id, side)
+                    g = opt_order_groups[key]
+                    g["sym"]              = opt_sym
+                    g["underlying"]       = underlying
+                    g["side"]             = side
+                    g["order_id"]         = order_id
+                    g["exec_ids"].append(eid)
+                    g["total_contracts"]  += shares  # number of contracts
+                    g["value"]            += price * shares
+                    g["total_pnl"]        += pnl
+                    g["right"]            = right
+                    g["strike"]           = strike
+                    g["expiry"]           = expiry_str
+                    if not g["latest_time"] or etime > g["latest_time"]:
+                        g["latest_time"] = etime
+                    if not g["earliest_time"] or etime < g["earliest_time"]:
+                        g["earliest_time"] = etime
+                else:
+                    # Stock fill — original logic
+                    sym = underlying
+                    key = (sym, order_id, side)
+                    g = order_groups[key]
+                    g["sym"]          = sym
+                    g["side"]         = side
+                    g["order_id"]     = order_id
+                    g["exec_ids"].append(eid)
+                    g["total_shares"] += shares
+                    g["value"]        += price * shares   # for weighted avg
+                    g["total_pnl"]    += pnl
+                    if not g["latest_time"] or etime > g["latest_time"]:
+                        g["latest_time"] = etime
+                    if not g["earliest_time"] or etime < g["earliest_time"]:
+                        g["earliest_time"] = etime
             except Exception:
                 continue
 
@@ -1069,6 +1108,120 @@ def backfill_trades_from_ibkr():
                     existing_ids.add(eid)
                 # Mark the SLD entry as consumed so it isn't matched again
                 existing_ids.add(f"order-{matching_short_entry['order_id']}")
+
+        # ── Process OPTIONS trades (separate from stocks) ─────────────────
+        # Options use composite keys (SYM_RIGHT_STRIKE_EXPIRY) and ×100 multiplier.
+        # Group into buy/sell by composite symbol, then pair them.
+        opt_buy_orders  = defaultdict(list)
+        opt_sell_orders = defaultdict(list)
+        for (opt_sym, order_id, side), g in opt_order_groups.items():
+            total = g["total_contracts"]
+            if total == 0:
+                continue
+            avg_premium = g["value"] / total
+            order_rec = {
+                "order_id":        order_id,
+                "exec_ids":        g["exec_ids"],
+                "avg_price":       round(avg_premium, 4),
+                "total_contracts": total,
+                "total_pnl":       g["total_pnl"],
+                "time":            g["latest_time"],
+                "earliest_time":   g["earliest_time"],
+                "right":           g["right"],
+                "strike":          g["strike"],
+                "expiry":          g["expiry"],
+                "underlying":      g["underlying"],
+            }
+            if side in ("BOT", "BUY"):
+                opt_buy_orders[opt_sym].append(order_rec)
+            elif side in ("SLD", "SELL"):
+                opt_sell_orders[opt_sym].append(order_rec)
+
+        for opt_sym, s_orders in opt_sell_orders.items():
+            for sell in s_orders:
+                order_key = f"order-{sell['order_id']}"
+                already = (
+                    order_key in existing_ids
+                    or any(eid in existing_ids for eid in sell["exec_ids"])
+                    or f"{opt_sym}-{sell['time'].replace(' ', 'T')}" in existing_ids
+                )
+                if already:
+                    continue
+
+                # Fuzzy dedup
+                sell_qty = int(sell["total_contracts"])
+                sell_ts  = sell["time"]
+                for (ex_sym, ex_qty, ex_ts) in existing_fuzzy:
+                    # Check both composite key and underlying symbol
+                    if (ex_sym == opt_sym or ex_sym == sell["underlying"]) and ex_qty == sell_qty:
+                        try:
+                            t1 = datetime.strptime(ex_ts.replace("T", " ")[:19], "%Y-%m-%d %H:%M:%S")
+                            t2 = datetime.strptime(sell_ts[:19], "%Y-%m-%d %H:%M:%S")
+                            if abs((t2 - t1).total_seconds()) < 300:
+                                already = True
+                                break
+                        except Exception:
+                            pass
+                if already:
+                    continue
+
+                # Match with a prior BUY (open) for this exact option contract
+                matching_buy = None
+                for buy in sorted(opt_buy_orders.get(opt_sym, []), key=lambda b: b["time"], reverse=True):
+                    if buy["time"] <= sell["time"]:
+                        matching_buy = buy
+                        break
+
+                if not matching_buy:
+                    continue
+
+                entry_premium = matching_buy["avg_price"]
+                entry_time    = matching_buy["time"]
+
+                # Use IBKR realizedPNL if available; else compute from premiums × 100
+                pnl = sell["total_pnl"]
+                if pnl == 0.0:
+                    pnl = round((sell["avg_price"] - entry_premium) * sell["total_contracts"] * 100, 2)
+                if pnl == 0.0:
+                    continue
+
+                try:
+                    entry_dt = datetime.strptime(entry_time, "%Y-%m-%d %H:%M:%S")
+                    exit_dt  = datetime.strptime(sell["time"], "%Y-%m-%d %H:%M:%S")
+                    hold_mins = int((exit_dt - entry_dt).total_seconds() / 60)
+                except Exception:
+                    hold_mins = 0
+
+                trade = {
+                    "symbol":      sell["underlying"],
+                    "action":      "BUY",
+                    "direction":   "LONG",
+                    "instrument":  "option",
+                    "right":       sell["right"],
+                    "strike":      sell["strike"],
+                    "expiry":      sell["expiry"],
+                    "entry_price": entry_premium,
+                    "exit_price":  sell["avg_price"],
+                    "qty":         int(sell["total_contracts"]),
+                    "shares":      int(sell["total_contracts"]),
+                    "pnl":         round(pnl, 2),
+                    "entry_time":  entry_time,
+                    "exit_time":   sell["time"],
+                    "hold_minutes": hold_mins,
+                    "exit_reason": "stop_loss" if pnl < 0 else "take_profit",
+                    "regime":      "UNKNOWN",
+                    "vix":         0.0,
+                    "score":       0,
+                    "order_id":    sell["order_id"],
+                    "exec_id":     sell["exec_ids"][0],
+                    "timestamp":   sell["time"].replace(" ", "T"),
+                    "reasoning":   "Backfilled from IBKR execution history on startup.",
+                    "source":      "ibkr_backfill"
+                }
+                new_trades.append(trade)
+                existing_ids.add(order_key)
+                for eid in sell["exec_ids"]:
+                    existing_ids.add(eid)
 
         if new_trades:
             all_trades = existing + new_trades
@@ -1550,24 +1703,29 @@ def check_external_closes(regime: dict):
                     continue
 
                 # Prefer realizedPNL from IBKR over recalculated value
+                # For options, sym is composite (NVDA_C_180.0_2026-04-17) but
+                # realized_pnl_map is keyed by plain underlying symbol.
                 is_short = trade.get("direction", "LONG") == "SHORT"
-                if sym in realized_pnl_map and realized_pnl_map[sym] != 0.0:
+                rpnl_lookup = underlying if is_opt_pos else sym
+                if rpnl_lookup in realized_pnl_map and realized_pnl_map[rpnl_lookup] != 0.0:
                     import math as _math
-                    rpnl = realized_pnl_map[sym]
+                    rpnl = realized_pnl_map[rpnl_lookup]
                     if not _math.isnan(rpnl):
                         pnl = rpnl
                     else:
-                        # Direction-aware fallback
+                        # Direction-aware fallback (options need ×100 multiplier)
+                        mult = 100 if is_opt_pos else 1
                         if is_short:
-                            pnl = (trade["entry"] - exit_price) * trade["qty"]
+                            pnl = (trade["entry"] - exit_price) * trade["qty"] * mult
                         else:
-                            pnl = (exit_price - trade["entry"]) * trade["qty"]
+                            pnl = (exit_price - trade["entry"]) * trade["qty"] * mult
                 else:
-                    # Direction-aware P&L: short profits when price falls
+                    # Direction-aware P&L (options need ×100 multiplier)
+                    mult = 100 if is_opt_pos else 1
                     if is_short:
-                        pnl = (trade["entry"] - exit_price) * trade["qty"]
+                        pnl = (trade["entry"] - exit_price) * trade["qty"] * mult
                     else:
-                        pnl = (exit_price - trade["entry"]) * trade["qty"]
+                        pnl = (exit_price - trade["entry"]) * trade["qty"] * mult
 
                 exit_reason = "stop_loss" if pnl < 0 else "take_profit"
 
@@ -1630,8 +1788,11 @@ def check_options_positions():
         to_exit = check_options_exits(opts, ib)
         for opt_key in to_exit:
             clog("TRADE", f"Closing options position: {opt_key}")
-            execute_sell_option(ib, opt_key, reason="exit_condition")
-            dash["positions"] = get_open_positions()
+            sold = execute_sell_option(ib, opt_key, reason="exit_condition")
+            if sold:
+                dash["positions"] = get_open_positions()
+            else:
+                clog("WARN", f"Option sell failed for {opt_key} — will retry next cycle (with backoff)")
     except Exception as e:
         clog("ERROR", f"Options position check error: {e}")
 
@@ -1778,6 +1939,11 @@ def run_scan():
     pv, pnl = get_account_data()
     dash["portfolio_value"] = pv
     dash["daily_pnl"]       = pnl
+
+    # ── FIX #4: Update drawdown high-water-mark every cycle ──
+    if pv > 0:
+        update_equity_high_water_mark(pv)
+
     clog("INFO", f"Portfolio: ${pv:,.2f} | DayP&L: ${pnl:+,.2f} | Positions: {len(get_open_positions())}")
 
     # ── Check options exits (profit target / stop loss / DTE) ────────

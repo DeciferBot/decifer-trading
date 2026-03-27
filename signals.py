@@ -159,6 +159,10 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
             },
             "atr":          sig_5m["atr"],
             "vol_ratio":    sig_5m["vol_ratio"],
+            # MTF alignment gate results (for dashboard + logging)
+            "mtf_gate":       confluence.get("mtf_gate", "PASS"),
+            "mtf_conflict":   confluence.get("mtf_conflict", ""),
+            "mtf_daily_trend": confluence.get("mtf_daily_trend", "N/A"),
         }
 
     except Exception as e:
@@ -529,6 +533,121 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
         return None
 
 
+def timeframe_alignment_check(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None) -> dict:
+    """
+    Multi-Timeframe Alignment Gate — checks whether higher timeframes
+    support the 5m signal direction.
+
+    Returns:
+        {
+            "aligned":          bool,   # True if higher TFs support 5m direction
+            "daily_trend":      str,    # "BULL" | "BEAR" | "NEUTRAL"
+            "weekly_trend":     str,    # "BULL" | "BEAR" | "NEUTRAL" | "N/A"
+            "daily_confirms":   bool,   # Daily agrees with 5m direction
+            "weekly_confirms":  bool,   # Weekly agrees with 5m direction
+            "gate_applies":     bool,   # Whether the gate should fire (daily ADX strong enough)
+            "conflict":         str,    # Human-readable conflict description
+        }
+
+    Gate logic:
+        - If 5m says BUY but daily trend is bearish → conflict
+        - If 5m says SELL but daily trend is bullish → conflict
+        - Daily ADX must exceed mtf_adx_min_for_gate for the gate to apply
+          (weak/trendless daily data shouldn't block trades)
+        - Weekly is optional (mtf_require_weekly config flag)
+    """
+    result = {
+        "aligned": True,
+        "daily_trend": "NEUTRAL",
+        "weekly_trend": "N/A",
+        "daily_confirms": True,
+        "weekly_confirms": True,
+        "gate_applies": False,
+        "conflict": "",
+    }
+
+    if sig_1d is None:
+        return result  # No daily data → can't gate, allow trade
+
+    # ── Determine 5m direction ──────────────────────────────────
+    sig_5m_signal = sig_5m.get("signal", "HOLD")
+    if "BUY" in sig_5m_signal:
+        direction_5m = "BULL"
+    elif "SELL" in sig_5m_signal:
+        direction_5m = "BEAR"
+    else:
+        return result  # HOLD signal → no entry to gate
+
+    # ── Determine daily trend ───────────────────────────────────
+    # Uses EMA alignment (same logic as compute_indicators) + MACD direction
+    daily_bull = sig_1d.get("bull_aligned", False)
+    daily_bear = sig_1d.get("bear_aligned", False)
+    daily_adx = sig_1d.get("adx", 0)
+    daily_macd = sig_1d.get("macd_hist", 0)
+
+    # Composite daily trend: EMA alignment is primary, MACD confirms
+    if daily_bull:
+        result["daily_trend"] = "BULL"
+    elif daily_bear:
+        result["daily_trend"] = "BEAR"
+    else:
+        # No EMA alignment — use MACD as tiebreaker
+        if daily_macd > 0:
+            result["daily_trend"] = "LEAN_BULL"
+        elif daily_macd < 0:
+            result["daily_trend"] = "LEAN_BEAR"
+        else:
+            result["daily_trend"] = "NEUTRAL"
+
+    # ── Should the gate fire? ───────────────────────────────────
+    adx_min = CONFIG.get("mtf_adx_min_for_gate", 20)
+    if daily_adx >= adx_min:
+        result["gate_applies"] = True
+
+    # ── Check daily confirmation ────────────────────────────────
+    if result["gate_applies"]:
+        if direction_5m == "BULL" and result["daily_trend"] in ("BEAR",):
+            result["daily_confirms"] = False
+            result["conflict"] = (
+                f"5m={sig_5m_signal} but daily trend BEARISH "
+                f"(EMA: {daily_bear}, ADX: {daily_adx:.0f}, MACD: {daily_macd:.4f})"
+            )
+        elif direction_5m == "BEAR" and result["daily_trend"] in ("BULL",):
+            result["daily_confirms"] = False
+            result["conflict"] = (
+                f"5m={sig_5m_signal} but daily trend BULLISH "
+                f"(EMA: {daily_bull}, ADX: {daily_adx:.0f}, MACD: {daily_macd:.4f})"
+            )
+        # Note: LEAN_BULL/LEAN_BEAR and NEUTRAL don't trigger the gate —
+        # only clear EMA-aligned trends block opposing entries.
+
+    # ── Check weekly confirmation (optional) ────────────────────
+    if sig_1w is not None and CONFIG.get("mtf_require_weekly", False):
+        weekly_bull = sig_1w.get("bull_aligned", False)
+        weekly_bear = sig_1w.get("bear_aligned", False)
+
+        if weekly_bull:
+            result["weekly_trend"] = "BULL"
+        elif weekly_bear:
+            result["weekly_trend"] = "BEAR"
+        else:
+            result["weekly_trend"] = "NEUTRAL"
+
+        if direction_5m == "BULL" and weekly_bear:
+            result["weekly_confirms"] = False
+            if not result["conflict"]:
+                result["conflict"] = f"5m={sig_5m_signal} but weekly trend BEARISH"
+        elif direction_5m == "BEAR" and weekly_bull:
+            result["weekly_confirms"] = False
+            if not result["conflict"]:
+                result["conflict"] = f"5m={sig_5m_signal} but weekly trend BULLISH"
+
+    # ── Final alignment verdict ─────────────────────────────────
+    result["aligned"] = result["daily_confirms"] and result["weekly_confirms"]
+
+    return result
+
+
 def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
                        news_score: int = 0, social_score: int = 0) -> dict:
     """
@@ -536,6 +655,12 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
 
     Each dimension scores 0-10, total max 90, capped at 50.
     Bonus points for candlestick confirmation.
+
+    Multi-Timeframe Alignment Gate (NEW):
+      Before scoring, checks if daily/weekly trends support the 5m direction.
+      - "hard" mode: returns score=0 + HOLD signal if misaligned
+      - "soft" mode: deducts mtf_penalty_points from final score
+      - "off" mode:  legacy behaviour (Dimension 6 only)
 
     Dimensions:
       1. TREND (0-10)      — EMA alignment × ADX gating
@@ -548,6 +673,32 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
       8. SOCIAL (0-10)     — Reddit mention velocity + VADER
       9. REVERSION (0-10)  — Variance Ratio + OU half-life + z-score
     """
+    # ── MULTI-TIMEFRAME ALIGNMENT GATE ─────────────────────────
+    # Run alignment check BEFORE scoring to short-circuit on hard gate
+    gate_mode = CONFIG.get("mtf_gate_mode", "off")
+    mtf_alignment = timeframe_alignment_check(sig_5m, sig_1d, sig_1w)
+
+    if gate_mode == "hard" and not mtf_alignment["aligned"] and mtf_alignment["gate_applies"]:
+        # Hard gate: block the trade entirely — return zero score + HOLD
+        log.info(
+            f"MTF GATE BLOCKED {sig_5m.get('symbol','?')}: {mtf_alignment['conflict']}"
+        )
+        return {
+            "signal":     "HOLD",
+            "direction":  "NEUTRAL",
+            "score":      0,
+            "buy_count":  0,
+            "sell_count": 0,
+            "tf_count":   1,
+            "mtf_gate":   "BLOCKED",
+            "mtf_conflict": mtf_alignment["conflict"],
+            "reversion_score": 0,
+            "variance_ratio": 0,
+            "ou_halflife": 0,
+            "zscore": 0,
+            "adf_pvalue": 1.0,
+        }
+
     signals = [sig_5m["signal"]]
     if sig_1d: signals.append(sig_1d["signal"])
     if sig_1w: signals.append(sig_1w["signal"])
@@ -745,6 +896,22 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     elif "SELL" in sig_5m["signal"] and cd > 0:
         score += min(cd, 3)
 
+    # ── SOFT GATE: MTF penalty (applied before cap) ──────
+    # In "soft" mode, deduct points when daily opposes 5m — the trade
+    # isn't blocked but needs to be much stronger on other dimensions
+    # to still pass the threshold.
+    mtf_gate_status = "PASS"
+    mtf_conflict_msg = ""
+    if gate_mode == "soft" and not mtf_alignment["aligned"] and mtf_alignment["gate_applies"]:
+        penalty = CONFIG.get("mtf_penalty_points", 8)
+        score = max(0, score - penalty)
+        mtf_gate_status = "PENALISED"
+        mtf_conflict_msg = mtf_alignment["conflict"]
+        log.info(
+            f"MTF GATE PENALTY {sig_5m.get('symbol','?')}: -{penalty}pts → {score}/50 | "
+            f"{mtf_alignment['conflict']}"
+        )
+
     # Cap at 50
     score = min(score, 50)
 
@@ -772,6 +939,11 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         "buy_count":  buy_signals,
         "sell_count": sell_signals,
         "tf_count":   total_tf,
+        # Multi-timeframe alignment gate results
+        "mtf_gate":       mtf_gate_status,
+        "mtf_conflict":   mtf_conflict_msg,
+        "mtf_daily_trend": mtf_alignment["daily_trend"],
+        "mtf_weekly_trend": mtf_alignment.get("weekly_trend", "N/A"),
         # Reversion metrics (for dashboard + agent consumption)
         "reversion_score": min(reversion_score, 10),
         "variance_ratio": round(_vr, 3),

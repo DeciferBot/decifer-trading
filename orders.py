@@ -10,7 +10,9 @@ import zoneinfo
 from ib_async import IB, Stock, Forex, Option, Future
 from ib_async import LimitOrder, StopOrder, MarketOrder
 from config import CONFIG
-from risk import calculate_position_size, calculate_stops, check_correlation, record_win, record_loss
+from risk import (calculate_position_size, calculate_stops, check_correlation,
+                  record_win, record_loss, check_combined_exposure,
+                  check_sector_concentration)
 from learning import log_order
 from scanner import get_tv_signal_cache
 
@@ -406,6 +408,26 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             ok, reason = check_correlation(symbol, list(open_trades.values()))
             if not ok:
                 log.warning(f"Correlation block for {symbol}: {reason}")
+                return False
+
+            # ── FIX #1+3: Cross-instrument + combined exposure check ──
+            # Estimate new position value for the exposure check
+            est_value = portfolio_value * CONFIG.get("risk_pct_per_trade", 0.03) * 50  # rough max
+            exp_ok, exp_reason = check_combined_exposure(
+                symbol, est_value, list(open_trades.values()),
+                portfolio_value, instrument="stock"
+            )
+            if not exp_ok:
+                log.warning(f"Combined exposure block for {symbol}: {exp_reason}")
+                return False
+
+            # ── FIX #2: Sector concentration check ────────────────────
+            sec_ok, sec_reason = check_sector_concentration(
+                symbol, list(open_trades.values()),
+                portfolio_value, regime.get("regime", "NORMAL")
+            )
+            if not sec_ok:
+                log.warning(f"Sector block for {symbol}: {sec_reason}")
                 return False
 
         # ── Duplicate open-order guard (prop-duplicate) ────────────────
@@ -1330,8 +1352,27 @@ def execute_buy_option(ib: IB, contract_info: dict,
         log.warning(f"Max positions reached — skipping options trade {symbol}")
         return False
 
+    # ── FIX #1+3: Cross-instrument + combined exposure check ──────
     n_contracts = contract_info["contracts"]
     mid_price   = contract_info["mid"]
+    est_option_value = n_contracts * mid_price * 100  # total premium outlay
+
+    exp_ok, exp_reason = check_combined_exposure(
+        symbol, est_option_value, list(open_trades.values()),
+        portfolio_value, instrument="option"
+    )
+    if not exp_ok:
+        log.warning(f"Combined exposure block for {symbol} options: {exp_reason}")
+        return False
+
+    # ── FIX #2: Sector concentration check ────────────────────────
+    sec_ok, sec_reason = check_sector_concentration(
+        symbol, list(open_trades.values()),
+        portfolio_value  # regime not passed to execute_buy_option, default NORMAL
+    )
+    if not sec_ok:
+        log.warning(f"Sector block for {symbol} options: {sec_reason}")
+        return False
     # Limit price slightly above mid to improve fill probability
     limit_price = round(mid_price * 1.01, 2)
 
@@ -1419,11 +1460,18 @@ def execute_buy_option(ib: IB, contract_info: dict,
         return False
 
 
+_option_sell_attempts: dict = {}   # opt_key → {"count": int, "last_try": datetime}
+_MAX_OPTION_SELL_RETRIES = 3       # after this many failures, pause retries for cooldown
+_OPTION_SELL_COOLDOWN = 600        # seconds (10 min) before retrying after max failures
+
+
 def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
     """
-    Close an open options position at market.
+    Close an open options position using a limit order at the current bid.
+    IBKR (especially paper) rejects MKT orders on illiquid options, so we use
+    an aggressive LMT at the bid price (or mid if bid unavailable).
     opt_key format: SYMBOL_RIGHT_STRIKE_EXPIRY  (e.g. NVDA_C_180_2026-04-01)
-    Returns True if order placed.
+    Returns True if order filled.
     """
     # Options only trade during regular market hours (9:30–16:00 ET)
     if not is_options_market_open():
@@ -1440,6 +1488,17 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
         log.warning(f"{opt_key} is not an options position")
         return False
 
+    # ── Retry gating: don't spam IBKR with the same failing order ──
+    attempts = _option_sell_attempts.get(opt_key, {"count": 0, "last_try": datetime.min})
+    if attempts["count"] >= _MAX_OPTION_SELL_RETRIES:
+        elapsed = (datetime.now(timezone.utc) - attempts["last_try"]).total_seconds()
+        if elapsed < _OPTION_SELL_COOLDOWN:
+            log.warning(f"Option sell for {opt_key} failed {attempts['count']}x — "
+                        f"cooling down ({int(_OPTION_SELL_COOLDOWN - elapsed)}s remaining)")
+            return False
+        # Cooldown expired — reset counter and retry
+        attempts["count"] = 0
+
     try:
         option_contract = Option(
             pos["symbol"],
@@ -1449,14 +1508,43 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
             "SMART", "USD"
         )
         ib.qualifyContracts(option_contract)
-        sell_order = MarketOrder("SELL", pos["contracts"],
-                                 account=CONFIG["active_account"])
-        # Options only trade during regular hours — outsideRth must be False
+
+        # ── Get current bid for limit price ──
+        # IBKR paper accounts reject MKT orders on many options.
+        # Use LMT at the bid (aggressive sell) to ensure fills.
+        ticker = ib.reqMktData(option_contract, '', False, False)
+        ib.sleep(2)  # allow quote data to arrive
+
+        bid = getattr(ticker, 'bid', None)
+        ask = getattr(ticker, 'ask', None)
+        last = getattr(ticker, 'last', None)
+
+        # Determine limit price: bid → mid → last → current_premium
+        import math as _m
+        if bid and not _m.isnan(bid) and bid > 0:
+            limit_price = round(bid, 2)
+        elif bid and ask and not _m.isnan(bid) and not _m.isnan(ask) and bid > 0 and ask > 0:
+            limit_price = round((bid + ask) / 2, 2)
+        elif last and not _m.isnan(last) and last > 0:
+            limit_price = round(last * 0.97, 2)  # 3% below last as safety
+        else:
+            limit_price = round(pos.get("current_premium", 0.01) * 0.95, 2)
+
+        # Floor at $0.01 — can't send a zero-price limit
+        limit_price = max(limit_price, 0.01)
+
+        ib.cancelMktData(option_contract)
+
+        sell_order = LimitOrder("SELL", pos["contracts"], limit_price,
+                                account=CONFIG["active_account"])
         sell_order.outsideRth = False
         opt_sell_trade = ib.placeOrder(option_contract, sell_order)
 
-        # Wait for fill confirmation — don't delete from tracker until confirmed
-        max_wait = 10  # seconds
+        log.info(f"Option LMT sell placed: {opt_key} x{pos['contracts']} @ ${limit_price:.2f} "
+                 f"(bid={bid}, ask={ask})")
+
+        # Wait for fill confirmation — options can take a moment
+        max_wait = 15  # seconds
         for _ in range(max_wait * 2):
             ib.sleep(0.5)
             status = opt_sell_trade.orderStatus.status
@@ -1465,36 +1553,89 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
 
         order_status = opt_sell_trade.orderStatus.status
         if order_status != "Filled":
-            log.error(f"Option sell for {opt_key} not filled — status={order_status}. "
+            # Track failed attempt
+            attempts["count"] += 1
+            attempts["last_try"] = datetime.now(timezone.utc)
+            _option_sell_attempts[opt_key] = attempts
+            log.error(f"Option sell for {opt_key} not filled — status={order_status}, "
+                      f"limit=${limit_price:.2f}. Attempt {attempts['count']}/{_MAX_OPTION_SELL_RETRIES}. "
                       f"Keeping position in tracker (IBKR still holds it).")
+            # Cancel the unfilled order so it doesn't linger
+            try:
+                ib.cancelOrder(opt_sell_trade.order)
+            except Exception:
+                pass
             return False
+
+        # Success — clear retry counter
+        _option_sell_attempts.pop(opt_key, None)
+
+        # Get actual fill price from the trade object
+        fill_price = opt_sell_trade.orderStatus.avgFillPrice or limit_price
 
         # Log the option sell order
         log_order({
             "order_id":   opt_sell_trade.order.orderId,
             "symbol":     pos["symbol"],
             "side":       "SELL",
-            "order_type": "MKT",
+            "order_type": "LMT",
             "qty":        pos["contracts"],
-            "price":      pos.get("current_premium", 0),
+            "price":      limit_price,
             "status":     "FILLED",
             "instrument": "option",
             "right":      pos["right"],
             "strike":     pos["strike"],
             "expiry":     pos["expiry_str"],
+            "fill_price": fill_price,
             "role":       "close",
             "reason":     reason,
             "timestamp":  datetime.now(timezone.utc).isoformat(),
         })
 
         entry   = pos["entry_premium"]
-        current = pos.get("current_premium", entry)
+        current = fill_price  # use actual fill price, not stale current_premium
         pnl     = (current - entry) * pos["contracts"] * 100
+
+        # ── Check commission report for IBKR realizedPNL (most accurate) ──
+        try:
+            import math as _math
+            _fills = ib.fills()
+            opt_sell_fills = [
+                f for f in _fills
+                if f.contract.symbol == pos["symbol"]
+                and f.execution.side.upper() in ("SLD", "SELL")
+                and _is_option_contract(f.contract)
+            ]
+            for f in opt_sell_fills:
+                cr = f.commissionReport
+                if cr is not None:
+                    raw = getattr(cr, 'realizedPNL', None)
+                    if raw is not None:
+                        raw_f = float(raw)
+                        if not _math.isnan(raw_f) and raw_f != 0.0:
+                            pnl = raw_f
+                            break
+        except Exception:
+            pass  # fall back to fill-based P&L
 
         if pnl >= 0:
             record_win()
         else:
             record_loss()
+
+        # ── Log to trade history (trades.json) ──
+        from learning import log_trade
+        log_trade(
+            trade=pos,
+            agent_outputs={},
+            regime={"regime": "UNKNOWN", "vix": 0.0},
+            action="CLOSE",
+            outcome={
+                "exit_price": round(current, 4),
+                "pnl":        round(pnl, 2),
+                "reason":     reason,
+            }
+        )
 
         log.info(
             f"{'✅' if pnl >= 0 else '❌'} SELL {pos['right']} {pos['symbol']} "

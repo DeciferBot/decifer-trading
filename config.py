@@ -98,6 +98,25 @@ CONFIG = {
     # Breakout detection
     "donchian_period":          20,     # Donchian channel lookback
 
+    # ── MULTI-TIMEFRAME ALIGNMENT GATE ──────────────────────
+    # Hard filter that blocks entries when higher timeframes disagree
+    # with the 5m signal direction. Fixes structural bullish bias by
+    # preventing noisy intraday signals from triggering trades against
+    # the daily/weekly trend.
+    #
+    # Modes:
+    #   "hard"   — Block entry entirely if daily trend opposes signal
+    #   "soft"   — Apply score penalty (mtf_penalty_points) instead of blocking
+    #   "off"    — Disabled (current behaviour, just Dimension 6 scoring)
+    #
+    # NOTE: Set to "soft" for paper trading to still capture data while
+    # penalising bad setups. Switch to "hard" for live trading.
+    "mtf_gate_mode":            "soft",      # "hard" | "soft" | "off" (live: "hard")
+    "mtf_penalty_points":       8,           # Score deduction when daily opposes 5m (soft mode)
+    "mtf_require_weekly":       False,       # Also require weekly alignment? (stricter)
+    "mtf_adx_min_for_gate":     20,          # Only enforce gate when daily ADX > this
+    #                                           (weak trends don't reliably predict direction)
+
     # ── DASHBOARD ─────────────────────────────────────────────
     "dashboard_port":           8080,
 

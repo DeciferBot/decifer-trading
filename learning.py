@@ -193,6 +193,13 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
         }
     }
 
+    # ── Options metadata — store if present so dashboard can display correctly ──
+    if trade.get("instrument") == "option":
+        record["instrument"] = "option"
+        record["right"]      = trade.get("right", "")
+        record["strike"]     = trade.get("strike", 0)
+        record["expiry"]     = trade.get("expiry_str") or trade.get("expiry", "")
+
     # Load existing log
     trades = []
     if os.path.exists(TRADE_LOG_FILE):
