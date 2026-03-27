@@ -317,6 +317,82 @@ def get_performance_summary(trades: list = None) -> dict:
     }
 
 
+def get_directional_skew(window_hours: int = 48, regime: str = None) -> dict:
+    """
+    Calculate directional skew over a rolling window (roadmap #07).
+
+    Returns:
+        {
+            "skew":        float,   # -1.0 (all short) to +1.0 (all long)
+            "long_count":  int,
+            "short_count": int,
+            "total":       int,
+            "regime_aligned": bool | None,  # GREEN/RED indicator
+            "alert":       str | None,      # Warning message if misaligned
+        }
+    """
+    trades = load_trades()
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=window_hours)).isoformat()
+
+    recent = [t for t in trades if t.get("timestamp", "") >= cutoff and t.get("action") == "OPEN"]
+
+    long_count  = sum(1 for t in recent if t.get("direction", "LONG") == "LONG")
+    short_count = sum(1 for t in recent if t.get("direction") == "SHORT")
+    total = long_count + short_count
+
+    if total == 0:
+        return {
+            "skew": 0.0, "long_count": 0, "short_count": 0, "total": 0,
+            "regime_aligned": None, "alert": None,
+        }
+
+    skew = (long_count - short_count) / total  # -1.0 to +1.0
+
+    # Regime alignment check
+    regime_aligned = None
+    alert = None
+    if regime:
+        if regime in ("CHOPPY", "BEAR_TRENDING") and skew > 0.8:
+            regime_aligned = False
+            alert = (
+                f"Directional skew {skew:+.2f} (heavy LONG) in {regime} regime. "
+                f"Short scanner may not be surfacing enough candidates."
+            )
+            log.warning(f"SKEW ALERT: {alert}")
+        elif regime == "BULL_TRENDING" and skew < -0.8:
+            regime_aligned = False
+            alert = (
+                f"Directional skew {skew:+.2f} (heavy SHORT) in {regime} regime. "
+                f"Unusual bearish positioning in a bull market."
+            )
+            log.warning(f"SKEW ALERT: {alert}")
+        elif regime == "BULL_TRENDING" and skew > 0.5:
+            regime_aligned = True
+        elif regime == "BEAR_TRENDING" and skew < -0.5:
+            regime_aligned = True
+        else:
+            regime_aligned = True  # Neutral / no concern
+
+    return {
+        "skew":           round(skew, 3),
+        "long_count":     long_count,
+        "short_count":    short_count,
+        "total":          total,
+        "regime_aligned": regime_aligned,
+        "alert":          alert,
+    }
+
+
+def get_directional_skew_multi() -> dict:
+    """
+    Return skew across multiple time windows for dashboard display.
+    """
+    return {
+        "48h": get_directional_skew(window_hours=48),
+        "7d":  get_directional_skew(window_hours=168),
+    }
+
+
 def run_weekly_review() -> str:
     """
     Run the weekly review agent — analyse all trades from last 7 days.

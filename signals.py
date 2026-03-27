@@ -710,123 +710,185 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
 
     score = 0
 
-    # ── 1. TREND (0-10) — EMA alignment gated by ADX ────
+    # ════════════════════════════════════════════════════════════════
+    # DIRECTION-AGNOSTIC SCORING (Roadmap #01)
+    #
+    # Each dimension scores QUALITY of setup (0-10) independently of
+    # direction. A clean bearish breakdown scores the same as the
+    # equivalent bullish setup. Direction is tracked separately via
+    # dim_directions[] and resolved by weighted majority vote at the end.
+    #
+    # dim_directions: list of (direction, weight) tuples
+    #   direction: +1 = long, -1 = short, 0 = neutral
+    #   weight: the dimension's score (higher score = more influence)
+    # ════════════════════════════════════════════════════════════════
+    dim_directions = []  # [(direction, weight), ...]
+
+    # ── 1. TREND (0-10) — EMA alignment quality × ADX strength ──
+    # Score measures how cleanly aligned the EMAs are, regardless of
+    # which direction they point. Direction comes from which way.
     adx  = sig_5m.get("adx", 0)
-    # ADX multiplier: strong trend gets full credit, weak trend gets partial
     adx_mult = 1.0 if adx > 25 else 0.7 if adx > 20 else 0.4
 
     base_trend = 0
-    if sig_5m["bull_aligned"] or sig_5m["bear_aligned"]:
+    trend_dir = 0
+    if sig_5m["bull_aligned"]:
         base_trend = 8
-        # Bonus for MACD confirming trend direction
-        ma = sig_5m["macd_accel"]
-        if ("BUY" in sig_5m["signal"] and ma > 0) or ("SELL" in sig_5m["signal"] and ma < 0):
-            base_trend = 10
+        trend_dir = +1
+        if sig_5m["macd_accel"] > 0:
+            base_trend = 10  # MACD confirms the alignment
+    elif sig_5m["bear_aligned"]:
+        base_trend = 8
+        trend_dir = -1
+        if sig_5m["macd_accel"] < 0:
+            base_trend = 10  # MACD confirms the alignment
     elif "BUY" in sig_5m["signal"] or "SELL" in sig_5m["signal"]:
         base_trend = 4  # Signal without full alignment
-    score += int(base_trend * adx_mult)
+        trend_dir = +1 if "BUY" in sig_5m["signal"] else -1
+    trend_pts = int(base_trend * adx_mult)
+    score += trend_pts
+    dim_directions.append((trend_dir, trend_pts))
 
-    # ── 2. MOMENTUM (0-10) — MFI is the single source of truth ──
+    # ── 2. MOMENTUM (0-10) — MFI distance from 50 (symmetric) ──
+    # MFI > 65 and MFI < 35 both score 10. The distance from the
+    # neutral 50 line measures directional pressure strength.
+    # Direction = which side of 50.
     mfi = sig_5m.get("mfi", 50)
     rs  = sig_5m.get("rsi_slope", 0)
 
-    momentum = 0
-    if "BUY" in sig_5m["signal"]:
-        if mfi > 65 and rs > 0:     momentum = 10  # Strong money flow in + rising
-        elif mfi > 55 and rs > 0:   momentum = 8
-        elif mfi > 50:              momentum = 5
-        elif mfi > 40:              momentum = 2   # Weak but possible reversal
-    elif "SELL" in sig_5m["signal"]:
-        if mfi < 35 and rs < 0:     momentum = 10
-        elif mfi < 45 and rs < 0:   momentum = 8
-        elif mfi < 50:              momentum = 5
-        elif mfi < 60:              momentum = 2
-    score += momentum
+    mfi_dist = abs(mfi - 50)        # 0-50 range
+    rsi_confirms = (mfi > 50 and rs > 0) or (mfi < 50 and rs < 0)
 
-    # ── 3. SQUEEZE (0-10) — coiled spring detection ─────
+    momentum = 0
+    if mfi_dist > 15 and rsi_confirms:
+        momentum = 10   # Strong directional pressure + RSI confirming
+    elif mfi_dist > 15:
+        momentum = 8    # Strong pressure, RSI not confirming
+    elif mfi_dist > 5 and rsi_confirms:
+        momentum = 8    # Moderate pressure + RSI confirming
+    elif mfi_dist > 5:
+        momentum = 5    # Moderate pressure
+    elif mfi_dist > 0:
+        momentum = 2    # Weak but non-neutral
+    mom_dir = +1 if mfi > 50 else (-1 if mfi < 50 else 0)
+    score += momentum
+    dim_directions.append((mom_dir, momentum))
+
+    # ── 3. SQUEEZE (0-10) — coiled spring detection (symmetric) ──
+    # Squeeze scoring is already direction-agnostic (measures compression).
+    # Direction comes from BB position: >0.5 = bullish breakout, <0.5 = bearish.
     squeeze_on = sig_5m.get("squeeze_on", False)
     squeeze_int = sig_5m.get("squeeze_intensity", 0)
     bb_pos = sig_5m.get("bb_position", 0.5)
 
     squeeze_score = 0
+    squeeze_dir = 0
     if squeeze_on:
-        # Squeeze is ON — this is a setup, not a signal by itself
         squeeze_score = 4 + int(squeeze_int * 4)  # 4-8 based on tightness
-
-        # Squeeze + breakout direction = full points
-        if ("BUY" in sig_5m["signal"] and bb_pos > 0.7):
-            squeeze_score = 10  # Breaking out of squeeze upward
-        elif ("SELL" in sig_5m["signal"] and bb_pos < 0.3):
-            squeeze_score = 10  # Breaking out of squeeze downward
+        # BB position shows which direction the breakout is going
+        if bb_pos > 0.7:
+            squeeze_score = 10
+            squeeze_dir = +1
+        elif bb_pos < 0.3:
+            squeeze_score = 10
+            squeeze_dir = -1
+        else:
+            squeeze_dir = +1 if bb_pos > 0.5 else -1
     else:
-        # No squeeze — BB position still useful for extension check
-        if "BUY" in sig_5m["signal"] and 0.3 < bb_pos < 0.8:
+        # Not in squeeze — BB position measures room to move
+        bb_dist = abs(bb_pos - 0.5)
+        if 0.1 < bb_dist < 0.3:
             squeeze_score = 3   # Healthy position, room to run
-        elif "SELL" in sig_5m["signal"] and 0.2 < bb_pos < 0.7:
-            squeeze_score = 3
-    score += min(squeeze_score, 10)
+        squeeze_dir = +1 if bb_pos > 0.5 else (-1 if bb_pos < 0.5 else 0)
+    squeeze_score = min(squeeze_score, 10)
+    score += squeeze_score
+    dim_directions.append((squeeze_dir, squeeze_score))
 
-    # ── 4. FLOW (0-10) — VWAP + OBV institutional tracking ──
+    # ── 4. FLOW (0-10) — VWAP + OBV (symmetric) ──
+    # Score measures the STRENGTH of institutional flow, not its direction.
+    # VWAP distance from price = strength; OBV slope = confirmation.
+    # Direction = above/below VWAP + OBV slope.
     vwap_d  = sig_5m.get("vwap_dist", 0)
     obv_s   = sig_5m.get("obv_slope", 0)
 
     flow_score = 0
-    if "BUY" in sig_5m["signal"]:
-        # Above VWAP = institutions supporting the move
-        if vwap_d > 0.3:       flow_score += 4   # Solidly above VWAP
-        elif vwap_d > 0:       flow_score += 2   # Slightly above
-        elif vwap_d > -0.2:    flow_score += 1   # Near VWAP (could reclaim)
-        # OBV confirming
-        if obv_s > 0:          flow_score += 4   # Volume backing the move
-        elif obv_s == 0:       flow_score += 1
-        # OBV divergence WARNING: price up but OBV down = distribution
-        if vwap_d > 0 and obv_s < 0:
-            flow_score = max(0, flow_score - 3)   # Penalise divergence
-    elif "SELL" in sig_5m["signal"]:
-        if vwap_d < -0.3:      flow_score += 4
-        elif vwap_d < 0:       flow_score += 2
-        elif vwap_d < 0.2:     flow_score += 1
-        if obv_s < 0:          flow_score += 4
-        elif obv_s == 0:       flow_score += 1
-        if vwap_d < 0 and obv_s > 0:
-            flow_score = max(0, flow_score - 3)
-    score += min(flow_score, 10)
+    flow_dir = 0
+    abs_vwap = abs(vwap_d)
+    if abs_vwap > 0.3:
+        flow_score += 4   # Solidly away from VWAP
+    elif abs_vwap > 0:
+        flow_score += 2   # Slightly away
+    elif abs_vwap > -0.01:  # essentially at VWAP
+        flow_score += 1
 
-    # ── 5. BREAKOUT (0-10) — Donchian channel breach ────
+    # OBV confirms direction
+    if abs(obv_s) > 0:
+        flow_score += 4
+    # Divergence penalty: VWAP and OBV disagree
+    vwap_dir = +1 if vwap_d > 0 else (-1 if vwap_d < 0 else 0)
+    obv_dir  = +1 if obv_s > 0 else (-1 if obv_s < 0 else 0)
+    if vwap_dir != 0 and obv_dir != 0 and vwap_dir != obv_dir:
+        flow_score = max(0, flow_score - 3)   # Penalise divergence
+
+    # Flow direction: majority of VWAP + OBV
+    if vwap_dir == obv_dir:
+        flow_dir = vwap_dir
+    elif abs(vwap_d) > 0.2:
+        flow_dir = vwap_dir  # Strong VWAP signal wins
+    else:
+        flow_dir = obv_dir   # Near VWAP — OBV wins
+    flow_score = min(flow_score, 10)
+    score += flow_score
+    dim_directions.append((flow_dir, flow_score))
+
+    # ── 5. BREAKOUT (0-10) — Donchian channel breach (symmetric) ──
+    # Donchian high break and low break score identically.
+    # Volume confirmation applies to both.
     donch = sig_5m.get("donch_breakout", 0)
     vr    = sig_5m.get("vol_ratio", 0)
 
     breakout_score = 0
-    if "BUY" in sig_5m["signal"]:
-        if donch == 1:  # Breaking above Donchian high
-            breakout_score = 6
-            if vr >= 2.0:   breakout_score = 10  # Volume-confirmed breakout
-            elif vr >= 1.5: breakout_score = 8
-        elif vr >= 2.0:     breakout_score = 4   # High volume without channel break
-        elif vr >= 1.5:     breakout_score = 2
-    elif "SELL" in sig_5m["signal"]:
-        if donch == -1:
-            breakout_score = 6
-            if vr >= 2.0:   breakout_score = 10
-            elif vr >= 1.5: breakout_score = 8
-        elif vr >= 2.0:     breakout_score = 4
-        elif vr >= 1.5:     breakout_score = 2
-    score += min(breakout_score, 10)
+    breakout_dir = 0
+    if donch != 0:  # Channel breach in either direction
+        breakout_score = 6
+        breakout_dir = donch  # +1 for high break, -1 for low break
+        if vr >= 2.0:
+            breakout_score = 10
+        elif vr >= 1.5:
+            breakout_score = 8
+    else:
+        # No channel break — volume alone is directionally neutral
+        if vr >= 2.0:
+            breakout_score = 4
+        elif vr >= 1.5:
+            breakout_score = 2
+    breakout_score = min(breakout_score, 10)
+    score += breakout_score
+    dim_directions.append((breakout_dir, breakout_score))
 
     # ── 6. MULTI-TIMEFRAME CONFLUENCE (0-10) ────────────
     total_tf = len(signals)
     agree    = max(buy_signals, sell_signals)
-    score   += int((agree / total_tf) * 10)
+    mtf_score = int((agree / total_tf) * 10)
+    score += mtf_score
+    # MTF direction = majority of timeframes
+    mtf_dir = +1 if buy_signals > sell_signals else (-1 if sell_signals > buy_signals else 0)
+    dim_directions.append((mtf_dir, mtf_score))
 
     # ── 7. NEWS SENTIMENT (0-10) ────────────────────────
     # news_score is pre-computed by news.py (keyword + Claude two-tier)
-    score += min(10, max(0, news_score))
+    ns = min(10, max(0, news_score))
+    score += ns
+    # News direction is embedded in the score sign from news.py
+    # (positive = bullish news, negative = bearish) — but here we get
+    # abs value, so direction comes from the raw news_score sign
+    dim_directions.append((+1 if news_score > 0 else (-1 if news_score < 0 else 0), ns))
 
     # ── 8. SOCIAL SENTIMENT (0-10) ────────────────────
     # social_score from social_sentiment.py (Reddit mention velocity + VADER)
-    # Tracks mention acceleration, not raw count — a spike from 5 to 50
-    # mentions/hr is a signal; 50 steady mentions is not.
-    score += min(10, max(0, social_score))
+    ss = min(10, max(0, social_score))
+    score += ss
+    dim_directions.append((+1 if social_score > 0 else (-1 if social_score < 0 else 0), ss))
 
     # ── 9. REVERSION (0-10) — mean-reversion tendency ──────
     # Composite of Hurst exponent + OU half-life + z-score.
@@ -886,20 +948,27 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             zscore_pts = 1
 
         reversion_score = vr_pts + ou_pts + zscore_pts
-    score += min(reversion_score, 10)
+    rev_score_capped = min(reversion_score, 10)
+    score += rev_score_capped
+    # Reversion direction: z-score tells us which way to trade.
+    # Positive z = price above mean → SHORT (fade it)
+    # Negative z = price below mean → LONG (fade it)
+    rev_dir = -1 if _zscore > 0.5 else (+1 if _zscore < -0.5 else 0)
+    dim_directions.append((rev_dir, rev_score_capped))
 
     # ── BONUS: Candlestick confirmation (+3 max) ────────
+    # Direction-agnostic: both bull and bear candles add bonus points.
+    # Direction already captured in dim_directions.
     cb = sig_5m.get("candle_bull", 0)
     cd = sig_5m.get("candle_bear", 0)
-    if "BUY" in sig_5m["signal"] and cb > 0:
-        score += min(cb, 3)
-    elif "SELL" in sig_5m["signal"] and cd > 0:
-        score += min(cd, 3)
+    candle_bonus = 0
+    if cb > 0 or cd > 0:
+        candle_bonus = min(max(cb, cd), 3)
+        score += candle_bonus
+        candle_dir = +1 if cb > cd else (-1 if cd > cb else 0)
+        dim_directions.append((candle_dir, candle_bonus))
 
     # ── SOFT GATE: MTF penalty (applied before cap) ──────
-    # In "soft" mode, deduct points when daily opposes 5m — the trade
-    # isn't blocked but needs to be much stronger on other dimensions
-    # to still pass the threshold.
     mtf_gate_status = "PASS"
     mtf_conflict_msg = ""
     if gate_mode == "soft" and not mtf_alignment["aligned"] and mtf_alignment["gate_applies"]:
@@ -915,21 +984,39 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # Cap at 50
     score = min(score, 50)
 
-    # Final direction
-    if buy_signals > sell_signals:
+    # ── DIRECTION: Weighted majority vote of all dimensions ──────
+    # Each dimension casts a vote (+1 long, -1 short) weighted by its
+    # score. Higher-scoring dimensions have more influence on direction.
+    # This replaces the old buy_signals/sell_signals count which was
+    # biased toward the signal classification (itself asymmetric).
+    weighted_sum = sum(d * w for d, w in dim_directions)
+
+    # Determine direction from weighted vote
+    if weighted_sum > 2:
         direction = "LONG"
+    elif weighted_sum < -2:
+        direction = "SHORT"
+    else:
+        # Tie or near-zero — fall back to timeframe signals
+        if buy_signals > sell_signals:
+            direction = "LONG"
+        elif sell_signals > buy_signals:
+            direction = "SHORT"
+        else:
+            direction = "NEUTRAL"
+
+    # Signal strength from score + direction
+    if direction == "LONG":
         if strong_buy >= 2 or (strong_buy >= 1 and buy_signals == total_tf):
             final_signal = "STRONG_BUY"
         else:
             final_signal = "BUY"
-    elif sell_signals > buy_signals:
-        direction = "SHORT"
+    elif direction == "SHORT":
         if strong_sell >= 2 or (strong_sell >= 1 and sell_signals == total_tf):
             final_signal = "STRONG_SELL"
         else:
             final_signal = "SELL"
     else:
-        direction = "NEUTRAL"
         final_signal = "HOLD"
 
     return {
@@ -939,6 +1026,8 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         "buy_count":  buy_signals,
         "sell_count": sell_signals,
         "tf_count":   total_tf,
+        # Direction-agnostic dimension vote (roadmap #01)
+        "direction_weighted_sum": round(weighted_sum, 1),
         # Multi-timeframe alignment gate results
         "mtf_gate":       mtf_gate_status,
         "mtf_conflict":   mtf_conflict_msg,

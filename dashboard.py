@@ -338,6 +338,22 @@ canvas{display:block;width:100% !important}
             <span id="risk-used">$0 used</span><span id="risk-left">$0 left</span>
           </div>
         </div>
+        <div style="padding:8px 10px;border-top:1px solid var(--border)">
+          <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Directional Skew</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <div style="flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden;position:relative;border:1px solid var(--border2)">
+              <div style="position:absolute;left:50%;width:1px;height:100%;background:var(--muted)"></div>
+              <div id="skew-bar" style="position:absolute;top:0;height:100%;background:var(--orange);border-radius:4px;transition:all .3s;left:50%;width:0%"></div>
+            </div>
+            <span id="skew-val" style="font-size:12px;font-weight:700;color:var(--orange);min-width:40px;text-align:right">0.0</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted)">
+            <span>SHORT</span>
+            <span id="skew-detail">—</span>
+            <span>LONG</span>
+          </div>
+          <div id="skew-alert" style="font-size:9px;color:var(--red);margin-top:3px;display:none"></div>
+        </div>
       </div>
     </div>
 
@@ -1482,6 +1498,30 @@ async function poll() {
       document.getElementById('risk-bar').style.background = pct > 75 ? 'var(--red)' : pct > 50 ? 'var(--yellow)' : 'var(--green)';
       document.getElementById('risk-used').textContent    = fmt$(used) + ' used';
       document.getElementById('risk-left').textContent    = fmt$(limit - used) + ' left';
+    }
+
+    // Directional Skew (roadmap #07)
+    if (d.skew) {
+      const sk = d.skew['48h'] || d.skew;
+      const sv = sk.skew || 0;
+      const skBar = document.getElementById('skew-bar');
+      const pctWidth = Math.abs(sv) * 50; // 0-50% of bar width
+      if (sv >= 0) {
+        skBar.style.left = '50%';
+        skBar.style.width = pctWidth + '%';
+        skBar.style.background = sv > 0.8 ? 'var(--red)' : sv > 0.5 ? 'var(--yellow)' : 'var(--green)';
+      } else {
+        skBar.style.left = (50 - pctWidth) + '%';
+        skBar.style.width = pctWidth + '%';
+        skBar.style.background = sv < -0.8 ? 'var(--red)' : sv < -0.5 ? 'var(--yellow)' : 'var(--green)';
+      }
+      const skValEl = document.getElementById('skew-val');
+      skValEl.textContent = (sv >= 0 ? '+' : '') + sv.toFixed(2);
+      skValEl.style.color = sk.regime_aligned === false ? 'var(--red)' : sk.regime_aligned === true ? 'var(--green)' : 'var(--orange)';
+      document.getElementById('skew-detail').textContent = sk.long_count + 'L / ' + sk.short_count + 'S (48h)';
+      const alertEl = document.getElementById('skew-alert');
+      if (sk.alert) { alertEl.textContent = sk.alert; alertEl.style.display = 'block'; }
+      else { alertEl.style.display = 'none'; }
     }
 
     // Logs

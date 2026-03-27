@@ -77,16 +77,22 @@ _COLS = [
     "premarket_volume",             # pre-market volume
     "Recommend.All",                # TV composite signal (-1 → +1)
     "market_cap_basic",
+    "change_from_open",             # Intraday % change from open (short scanner)
+    "EMA20",                        # 20-period EMA (breakdown scanner)
+    "EMA50",                        # 50-period EMA (breakdown scanner)
 ]
 
 # ── Base filter applied to every query ────────────────────────
-_BASE = [
-    col("exchange").isin(["NYSE", "NASDAQ", "AMEX"]),
-    col("type") == "stock",
-    col("market_cap_basic") > 100_000_000,  # $100M+ market cap
-    col("volume") > 500_000,                # minimum liquidity
-    col("close").between(2.0, 500.0),       # no pennies, no extreme prices
-]
+if _TV_AVAILABLE:
+    _BASE = [
+        col("exchange").isin(["NYSE", "NASDAQ", "AMEX"]),
+        col("type") == "stock",
+        col("market_cap_basic") > 100_000_000,  # $100M+ market cap
+        col("volume") > 500_000,                # minimum liquidity
+        col("close").between(2.0, 500.0),       # no pennies, no extreme prices
+    ]
+else:
+    _BASE = []
 
 
 def _query(extra_filters: list, sort_by: str, ascending: bool, limit: int):
@@ -133,6 +139,9 @@ def _extract(df, source_name: str, symbols: set) -> int:
             "tv_pm_volume":     row.get("premarket_volume"),
             "tv_recommend":     row.get("Recommend.All"),
             "tv_market_cap":    row.get("market_cap_basic"),
+            "tv_change_open":   row.get("change_from_open"),
+            "tv_ema20":         row.get("EMA20"),
+            "tv_ema50":         row.get("EMA50"),
             "tv_source":        source_name,
         }
     return added
@@ -142,22 +151,29 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
     """
     Build a dynamic universe using TradingView Screener.
 
-    Runs six targeted queries every scan cycle:
-      1. Volume leaders       — most active by raw volume (always)
-      2. Relative vol surge   — rel_vol > 1.5×, momentum confirmation
-      3. Momentum longs       — RSI 1h 45–68, MACD positive (BULL bias)
-      4. Momentum shorts      — RSI 1h 32–55, MACD negative (BEAR bias)
-      5. Gap & go             — gap > 3 %, volume > 1 M
-      6. Pre-market movers    — pm_change > 3 %, pm_vol > 50 k
+    Runs ten targeted queries every scan cycle:
+      ALWAYS:
+        1. Volume leaders        — most active by raw volume
+        2. Relative vol surge    — rel_vol > 1.5×, momentum confirmation
+      DIRECTIONAL (regime-weighted):
+        3. Momentum longs        — RSI 1h 45–68, MACD positive
+        4. Momentum shorts       — RSI 1h 32–55, MACD negative
+      SHORT-CANDIDATE PIPELINE (roadmap #02 — all non-PANIC regimes):
+        5. Breakdown             — price below EMA20/50, bearish alignment
+        6. Volume distribution   — heavy selling on 2x+ volume
+        7. Bearish momentum      — RSI < 40, MACD bearish crossover
+        8. Intraday breakdown    — down > 3% from open
+      CATALYST:
+        9. Gap & go + gap-down   — overnight gaps > 3%
+       10. Pre-market movers     — pm_change > 3%
 
-    Queries 3 & 4 are weighted by regime:
-      BULL_TRENDING → long scan runs at full size, short scan at half
-      BEAR_TRENDING → short scan full, long scan half
-      CHOPPY        → only scans 1 & 2 (momentum/volume)
-      PANIC         → skip scans 3–6; core + fallback only
+    Regime scaling:
+      BULL_TRENDING → long scans full, short/breakdown scans reduced
+      BEAR_TRENDING → short/breakdown scans full, long scans reduced
+      CHOPPY        → breakdown + distribution scans run (fixes old blind spot)
+      PANIC         → core + fallback only
 
-    The `ib` parameter is retained for API compatibility (regime detection
-    still uses it) but is NOT used here.
+    The `ib` parameter is retained for API compatibility.
     """
     global _tv_cache
     _tv_cache = {}   # Fresh cache each scan cycle
@@ -247,7 +263,84 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
         except Exception as e:
             log.warning(f"TV momentum_short scan failed: {e}")
 
-    # ── 5. Gap & go — overnight catalyst plays ────────────────
+    # ── 5. BREAKDOWN — price below key EMAs, bearish alignment ──
+    # Runs in ALL non-PANIC regimes (including CHOPPY — this is the fix
+    # for the structural bullish bias: agents need to SEE short candidates)
+    if not is_panic:
+        breakdown_limit = 25 if is_bear else (15 if is_choppy else 10)
+        try:
+            _, df = _query(
+                extra_filters=[
+                    col("close") < col("EMA20"),
+                    col("close") < col("EMA50"),
+                    col("change") < -1.0,            # Down at least 1% today
+                    col("relative_volume_10d_calc") > 1.2,
+                ],
+                sort_by="change",
+                ascending=True,                      # Biggest losers first
+                limit=breakdown_limit,
+            )
+            total_from_tv += _extract(df, "breakdown", symbols)
+            log.debug(f"TV scan 5a (breakdown limit={breakdown_limit}): {len(df)} rows")
+        except Exception as e:
+            log.warning(f"TV breakdown scan failed: {e}")
+
+    # ── 6. VOLUME DISTRIBUTION — heavy selling on high volume ────
+    if not is_panic:
+        dist_limit = 20 if is_bear else 10
+        try:
+            _, df = _query(
+                extra_filters=[
+                    col("relative_volume_10d_calc") > 2.0,  # 2x avg volume
+                    col("change") < -2.0,                   # Down > 2%
+                ],
+                sort_by="relative_volume_10d_calc",
+                ascending=False,
+                limit=dist_limit,
+            )
+            total_from_tv += _extract(df, "volume_distribution", symbols)
+            log.debug(f"TV scan 6a (volume_distribution limit={dist_limit}): {len(df)} rows")
+        except Exception as e:
+            log.warning(f"TV volume_distribution scan failed: {e}")
+
+    # ── 7. BEARISH MOMENTUM — RSI oversold + MACD bearish crossover ──
+    if not is_panic:
+        bear_mom_limit = 20 if is_bear else (12 if is_choppy else 8)
+        try:
+            _, df = _query(
+                extra_filters=[
+                    col("RSI|60") < 40,                    # 1h RSI below 40
+                    col("MACD.macd|60") < col("MACD.signal|60"),  # MACD bearish
+                    col("change") < -0.5,                  # Confirming price action
+                    col("relative_volume_10d_calc") > 1.0,
+                ],
+                sort_by="RSI|60",
+                ascending=True,                            # Most oversold first
+                limit=bear_mom_limit,
+            )
+            total_from_tv += _extract(df, "bearish_momentum", symbols)
+            log.debug(f"TV scan 7a (bearish_momentum limit={bear_mom_limit}): {len(df)} rows")
+        except Exception as e:
+            log.warning(f"TV bearish_momentum scan failed: {e}")
+
+    # ── 8. INTRADAY BREAKDOWN — large drop from open ────────────
+    if not is_panic:
+        try:
+            _, df = _query(
+                extra_filters=[
+                    col("change_from_open") < -3.0,        # Down > 3% from today's open
+                    col("volume") > 500_000,
+                ],
+                sort_by="change_from_open",
+                ascending=True,
+                limit=15,
+            )
+            total_from_tv += _extract(df, "intraday_breakdown", symbols)
+            log.debug(f"TV scan 8a (intraday_breakdown): {len(df)} rows")
+        except Exception as e:
+            log.warning(f"TV intraday_breakdown scan failed: {e}")
+
+    # ── 9. Gap & go — overnight catalyst plays ────────────────
     if not is_panic:
         try:
             _, df = _query(

@@ -2648,6 +2648,16 @@ class DashHandler(BaseHTTPRequestHandler):
             if state.get("performance"):
                 state["performance"] = dict(state["performance"])
                 state["performance"]["total_pnl"] = round(state.get("portfolio_value", 0) - eff_cap, 2)
+            # Directional skew (roadmap #07)
+            try:
+                regime_name = (state.get("regime") or {}).get("regime", "UNKNOWN")
+                from learning import get_directional_skew
+                state["skew"] = {
+                    "48h": get_directional_skew(window_hours=48, regime=regime_name),
+                    "7d":  get_directional_skew(window_hours=168, regime=regime_name),
+                }
+            except Exception:
+                state["skew"] = None
             state["settings"] = {
                 "risk_pct_per_trade":       CONFIG.get("risk_pct_per_trade", 0.04),
                 "daily_loss_limit":         CONFIG.get("daily_loss_limit", 0.06),

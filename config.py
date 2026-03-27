@@ -52,8 +52,9 @@ CONFIG = {
     # ── DISAGREEMENT PROTOCOL ─────────────────────────────────
     # How many of 6 agents must agree before a trade is taken
     # 4 = conservative (default), 3 = standard, 2 = aggressive
-    # NOTE: Set to 2 for paper trading to maximise trade data generation (live: 4)
-    "agents_required_to_agree": 2,
+    # NOTE: Raised from 2→3 to filter low-conviction trades (roadmap #08).
+    # 2/6 was rubber-stamping; 3/6 requires real consensus. (live: 4)
+    "agents_required_to_agree": 3,
 
     # ── SCANNING ──────────────────────────────────────────────
     # NOTE: Faster scans for paper trading data generation (live values in comments)

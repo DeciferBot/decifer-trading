@@ -82,10 +82,12 @@ class _FakeContract:
 
 
 class _FakeMarketOrder:
-    def __init__(self, action, quantity):
+    def __init__(self, action, quantity, **kwargs):
         self.action = action
         self.totalQuantity = quantity
         self.orderType = "MKT"
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
 
 _ib_insync = _fake_module(
@@ -97,13 +99,16 @@ _ib_insync = _fake_module(
     ),
     Option=lambda *a, **kw: _FakeContract(**kw),
     Forex=lambda *a, **kw: _FakeContract(**kw),
+    Future=lambda *a, **kw: _FakeContract(**kw),
     MarketOrder=_FakeMarketOrder,
     LimitOrder=MagicMock(),
+    StopOrder=MagicMock(),
     Ticker=MagicMock(),
     BarData=MagicMock(),
     util=MagicMock(),
     Trade=MagicMock(),
     Order=MagicMock(),
+    OrderStatus=MagicMock(),
 )
 sys.modules["ib_async"] = _ib_insync
 
