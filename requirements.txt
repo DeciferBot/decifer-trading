@@ -1,12 +1,42 @@
-ib_async>=0.9.86
-anthropic>=0.25.0
-yfinance>=0.2.40
-pandas>=2.0.0
-numpy>=1.24.0
-schedule>=1.2.0
-colorama>=0.4.6
-pytz>=2024.1
-TA-Lib>=0.4.28
-requests>=2.31.0
-tradingview-screener>=0.3.0
-py_vollib>=1.0.1
+# ╔══════════════════════════════════════════════════════════════╗
+# ║   <> DECIFER — Python Dependencies                          ║
+# ║   Install: python3 -m pip install -r requirements.txt       ║
+# ║   System prerequisite: brew install ta-lib                  ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+# ── Core IBKR Connection ──
+ib_async>=0.9.86             # Interactive Brokers API (bot.py, orders.py, scanner.py, ibkr_streaming.py, smart_execution.py)
+
+# ── AI / LLM ──
+anthropic>=0.25.0            # Claude API for 6-agent pipeline + news sentiment (agents.py, learning.py, news.py, sentinel_agents.py)
+
+# ── Market Data ──
+yfinance>=0.2.40             # Free market data — OHLCV, options chains, fundamentals (signals.py, scanner.py, options.py, options_scanner.py, data_collector.py, portfolio_optimizer.py)
+tradingview-screener>=0.3.0  # TradingView screener API — dynamic universe builder (scanner.py). Free, no API key
+
+# ── Data / Numerical ──
+pandas>=2.0.0                # DataFrames (signals.py, data_collector.py, ml_engine.py, backtester.py, portfolio_optimizer.py, ibkr_streaming.py)
+numpy>=1.24.0                # Numerical computation (signals.py, options.py, ml_engine.py, backtester.py, portfolio_optimizer.py, smart_execution.py, ibkr_streaming.py)
+pyarrow>=14.0.0              # Parquet file format for historical ML training data (data_collector.py)
+
+# ── Technical Analysis ──
+TA-Lib>=0.4.28               # Technical indicators — requires C library: brew install ta-lib (signals.py). Has pure-Python fallback if missing
+
+# ── Options Greeks ──
+py_vollib>=1.0.1             # Black-Scholes Greeks (delta, gamma, theta, vega) for options analysis (options.py)
+
+# ── ML / AI Learning Loop ──
+scikit-learn>=1.3.0          # RandomForest + GradientBoosting for trade prediction (ml_engine.py). Optional — graceful fallback if missing
+joblib>=1.3.0                # Model persistence — save/load trained .pkl models (ml_engine.py). Optional — graceful fallback if missing
+statsmodels>=0.14.0          # ADF test for mean-reversion gating in REVERSION dimension (signals.py). Optional — graceful fallback if missing
+
+# ── NLP / Sentiment ──
+nltk>=3.8.0                  # VADER sentiment analysis (social_sentiment.py). After install run: python3 -c "import nltk; nltk.download('vader_lexicon')"
+
+# ── HTTP / Networking ──
+requests>=2.31.0             # HTTP requests for news feeds, Reddit API, ApeWisdom (news.py, news_sentinel.py, social_sentiment.py)
+
+# ── Utilities ──
+schedule>=1.2.0              # Task scheduling (bot.py)
+colorama>=0.4.6              # Terminal color output (bot.py)
+pytz>=2024.1                 # Timezone handling (risk.py, backtester.py)

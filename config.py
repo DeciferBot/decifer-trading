@@ -12,13 +12,13 @@ CONFIG = {
     "ibkr_host":        "127.0.0.1",
     "ibkr_port":        7496,           # 7496 = TWS/Gateway
     "ibkr_client_id":   10,
-    "active_account":   "DUP481326",    # PAPER — change to U3059777 or U24093086 for live
+    "active_account":   os.environ.get("IBKR_ACTIVE_ACCOUNT", ""),
 
     # ── ACCOUNT REGISTRY ──────────────────────────────────────
     "accounts": {
-        "paper":  "DUP481326",
-        "live_1": "U3059777",
-        "live_2": "U24093086",
+        "paper":  os.environ.get("IBKR_PAPER_ACCOUNT", ""),
+        "live_1": os.environ.get("IBKR_LIVE_1_ACCOUNT", ""),
+        "live_2": os.environ.get("IBKR_LIVE_2_ACCOUNT", ""),
     },
 
     # ── AI BRAIN ──────────────────────────────────────────────
@@ -27,14 +27,17 @@ CONFIG = {
     "claude_max_tokens": 800,                    # Per agent call
 
     # ── RISK MANAGEMENT ───────────────────────────────────────
-    "risk_pct_per_trade":       0.04,   # 4% of portfolio per trade
-    "max_positions":            12,     # Max simultaneous positions
-    "daily_loss_limit":         0.06,   # 6% daily stop — bot halts for day
-    "max_drawdown_alert":       0.15,   # 15% drawdown — alert + pause
-    "min_cash_reserve":         0.10,   # 10% always in cash
-    "max_single_position":      0.15,   # 15% max in any one position
-    "max_sector_exposure":      0.40,   # 40% max in any one sector
-    "consecutive_loss_pause":   5,      # Losses before 2-hour pause
+    # NOTE: Tuned for PAPER TRADING data generation — maximise trade volume
+    # across regimes to build ML training dataset. Revert to conservative
+    # values before switching to live. Original live values in comments.
+    "risk_pct_per_trade":       0.03,   # 3% of portfolio per trade (live: 0.04)
+    "max_positions":            20,     # More concurrent positions = more data (live: 12)
+    "daily_loss_limit":         0.10,   # 10% daily — paper can absorb more (live: 0.06)
+    "max_drawdown_alert":       0.25,   # 25% drawdown alert (live: 0.15)
+    "min_cash_reserve":         0.05,   # 5% cash reserve (live: 0.10)
+    "max_single_position":      0.10,   # 10% per position with more positions (live: 0.15)
+    "max_sector_exposure":      0.50,   # 50% sector — allow concentration (live: 0.40)
+    "consecutive_loss_pause":   8,      # More tolerance for losing streaks (live: 5)
     "max_portfolio_allocation": 1.0,    # 1.0 = full account, 0.2 = 20% of account
     "starting_capital":         1_000_000,  # Starting portfolio value for P&L tracking
 
@@ -49,17 +52,20 @@ CONFIG = {
     # ── DISAGREEMENT PROTOCOL ─────────────────────────────────
     # How many of 6 agents must agree before a trade is taken
     # 4 = conservative (default), 3 = standard, 2 = aggressive
-    "agents_required_to_agree": 3,
+    # NOTE: Set to 2 for paper trading to maximise trade data generation (live: 4)
+    "agents_required_to_agree": 2,
 
     # ── SCANNING ──────────────────────────────────────────────
-    "scan_interval_prime":      5,      # Minutes — 9:32am-11:30am, 2pm-3:59pm
-    "scan_interval_standard":   10,     # Minutes — 11:30am-2pm (lunch lull)
-    "scan_interval_extended":   7,      # Minutes — pre-market 4am-9:30am & after-hours 4pm-8pm
-    "scan_interval_overnight":  60,     # Minutes — overnight 8pm-4am (monitoring only)
+    # NOTE: Faster scans for paper trading data generation (live values in comments)
+    "scan_interval_prime":      3,      # Minutes — 9:32am-11:30am, 2pm-3:59pm (live: 5)
+    "scan_interval_standard":   5,      # Minutes — 11:30am-2pm (lunch lull) (live: 10)
+    "scan_interval_extended":   5,      # Minutes — pre-market 4am-9:30am & after-hours 4pm-8pm (live: 7)
+    "scan_interval_overnight":  30,     # Minutes — overnight 8pm-4am (monitoring only) (live: 60)
 
     # ── SCORING THRESHOLD ─────────────────────────────────────
-    "min_score_to_trade":       28,     # Out of 50 — below this = skip
-    "high_conviction_score":    38,     # Above this = 1.5x position size
+    # NOTE: Lowered for paper trading to capture more setups for ML training (live values in comments)
+    "min_score_to_trade":       18,     # Out of 50 — lower = more trades for training (live: 28)
+    "high_conviction_score":    30,     # Above this = 1.5x position size (live: 38)
 
     # ── MARKET HOURS (EST) ────────────────────────────────────
     "pre_market_start":         "04:00",
@@ -127,14 +133,16 @@ CONFIG = {
 
     # Contract selection
     "options_target_delta":   0.50,    # Target delta (ATM for max leverage)
-    "options_delta_range":    0.20,    # Acceptable window either side of target
+    "options_delta_range":    0.35,    # Acceptable window either side of target (0.15-0.85)
+    #                                     Wider range needed for biotechs/small-caps
+    #                                     with $5 strike spacing where ATM doesn't exist
     "options_min_dte":        5,       # Minimum days to expiry
     "options_max_dte":        45,      # Maximum days to expiry
 
     # Liquidity filters
-    "options_min_volume":     50,      # Minimum contracts traded today
-    "options_min_oi":         200,     # Minimum open interest
-    "options_max_spread_pct": 0.25,    # Max bid-ask spread as % of mid price
+    "options_min_volume":     25,      # Minimum contracts traded today (was 50, relaxed for mid-cap)
+    "options_min_oi":         100,     # Minimum open interest (was 200, relaxed for mid-cap)
+    "options_max_spread_pct": 0.35,    # Max bid-ask spread as % of mid price (was 0.25, too tight for small/mid-cap)
 
     # Position sizing
     "options_max_risk_pct":   0.025,   # Max 2.5% of portfolio per options trade
@@ -144,4 +152,29 @@ CONFIG = {
     "options_profit_target":  1.00,    # Take profit at 100% premium gain
     "options_stop_loss":      0.50,    # Stop loss at 50% premium loss
     "options_exit_dte":       2,       # Hard exit at this many DTE (gamma risk)
+
+    # ── NEWS SENTINEL (real-time news trigger) ───────────────
+    # Runs independently of the scan loop. Polls news every N seconds
+    # and fires a 3-agent mini pipeline when material news is detected.
+    "sentinel_enabled":             True,     # Master switch for News Sentinel
+    "sentinel_poll_seconds":        45,       # Seconds between news polls (30-60 recommended)
+    "sentinel_cooldown_minutes":    10,       # Don't re-trigger same symbol within N minutes
+    "sentinel_batch_size":          10,       # Symbols per poll cycle (rotates through universe)
+    "sentinel_max_symbols":         80,       # Max symbols in sentinel universe
+    "sentinel_keyword_threshold":   3,        # Minimum |keyword_score| to consider material
+    "sentinel_claude_confidence":   7,        # Min Claude confidence to auto-upgrade urgency
+    "sentinel_min_confidence":      5,        # Min final decision confidence to execute trade
+    "sentinel_use_ibkr":            True,     # Use IBKR news API as a source
+    "sentinel_use_finviz":          True,     # Use Finviz news scraping as a source
+    "sentinel_risk_multiplier":     0.75,     # Position size multiplier for sentinel trades (smaller = safer)
+    "sentinel_max_trades_per_hour": 3,        # Max sentinel trades per hour (rate limit)
+
+    # ── ML ENGINE (scikit-learn learning loop) ─────────────────────
+    # Learns from trade history to identify winning patterns and enhance signals.
+    # Requires: scikit-learn, joblib (pip install scikit-learn joblib)
+    "ml_enabled":                True,        # Master switch: enable ML enhancements
+    "ml_min_trades":             50,          # Minimum trades before ML kicks in
+    "ml_retrain_interval":       168,         # Hours between automatic retraining (1 week)
+    "ml_confidence_weight":      0.3,         # Weight of ML adjustment: 0.3 = 30% of change
+    "ml_models_dir":             "data/models",  # Where to persist trained models
 }

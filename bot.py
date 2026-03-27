@@ -18,6 +18,8 @@ import hashlib
 import time
 import logging
 import threading
+import asyncio
+import urllib.request
 import schedule
 
 # Suppress noisy yfinance HTTP errors globally (401 Invalid Crumb, 404 No fundamentals)
@@ -30,6 +32,24 @@ from colorama import Fore, Style, init as colorama_init
 from ib_async import IB
 
 from config import CONFIG
+
+# ── Reconnect / heartbeat state ──────────────────────────────────────────────
+_reconnect_lock        = threading.Lock()
+_reconnecting          = False
+_subscription_registry: dict = {}   # symbol -> {"type": "ticker"|"pnl", ...}
+_heartbeat_thread: threading.Thread | None = None
+
+# ── Reconnect / heartbeat state ──────────────────────────────────────────────
+_reconnect_lock        = threading.Lock()
+_reconnecting          = False
+_subscription_registry: dict = {}   # symbol -> {"type": "ticker"|"pnl", ...}
+_heartbeat_thread: threading.Thread | None = None
+
+# ── Reconnect / heartbeat state ──────────────────────────────────────────────
+_reconnect_lock        = threading.Lock()
+_reconnecting          = False
+_subscription_registry: dict = {}   # symbol -> {"type": "ticker"|"pnl", ...}
+_heartbeat_thread: threading.Thread | None = None
 from scanner import get_dynamic_universe, get_market_regime, get_tv_signal_cache
 from signals import score_universe, fetch_multi_timeframe
 from news import batch_news_sentiment
@@ -37,9 +57,12 @@ from agents import run_all_agents
 from orders import execute_buy, execute_sell, flatten_all, reconcile_with_ibkr, get_open_positions, update_position_prices, update_positions_from_ibkr, execute_buy_option, execute_sell_option
 from options import find_best_contract, check_options_exits
 from options_scanner import scan_options_universe
-from risk import can_trade, get_session, get_scan_interval, reset_daily_state
+from risk import can_trade, get_session, get_scan_interval, reset_daily_state, calculate_position_size, calculate_stops
 from learning import log_trade, load_trades, load_orders, get_performance_summary, run_weekly_review, TRADE_LOG_FILE, get_effective_capital, record_capital_adjustment
 from dashboard import DASHBOARD_HTML
+from news_sentinel import NewsSentinel, get_sentinel_history
+from theme_tracker import build_sentinel_universe, load_custom_themes, get_all_themes
+from sentinel_agents import run_sentinel_pipeline
 
 EQUITY_FILE = "equity_history.json"
 PROMPTS_FILE = "prompt_versions.json"
@@ -101,6 +124,11 @@ dash = {
     "news_data":            {},
     "all_orders":           [],
     "recent_orders":        [],
+    # ── News Sentinel state ────────────────────────────────
+    "sentinel_status":      "stopped",
+    "sentinel_stats":       {},
+    "sentinel_triggers":    [],
+    "sentinel_themes":      {},
 }
 
 # ── Load persistent equity history ────────────────────────────
@@ -129,7 +157,13 @@ _DASHBOARD_SETTINGS_KEYS = {
     "risk_pct_per_trade", "daily_loss_limit", "max_positions",
     "min_cash_reserve", "max_single_position",
     "min_score_to_trade", "high_conviction_score", "agents_required_to_agree",
-    "options_max_risk_pct", "options_max_ivr", "options_target_delta",
+    "options_min_score", "options_max_risk_pct", "options_max_ivr", "options_target_delta", "options_delta_range",
+    # News Sentinel
+    "sentinel_enabled", "sentinel_poll_seconds", "sentinel_cooldown_minutes",
+    "sentinel_batch_size", "sentinel_max_symbols", "sentinel_keyword_threshold",
+    "sentinel_claude_confidence", "sentinel_min_confidence",
+    "sentinel_use_ibkr", "sentinel_use_finviz",
+    "sentinel_risk_multiplier", "sentinel_max_trades_per_hour",
 }
 
 def load_settings_overrides():
@@ -143,10 +177,16 @@ def load_settings_overrides():
                 if key in CONFIG and key in _DASHBOARD_SETTINGS_KEYS:
                     CONFIG[key] = val
                     applied.append(key)
+            # Sync dash state that was initialized from CONFIG at module level
+            _sync_dash_from_config()
             if applied:
                 clog("INFO", f"⚙️ Loaded saved settings: {', '.join(applied)}")
     except Exception as e:
         clog("ERROR", f"Failed to load settings overrides: {e}")
+
+def _sync_dash_from_config():
+    """Keep dash dictionary in sync with CONFIG values that were copied at module load."""
+    dash["agents_required"] = CONFIG["agents_required_to_agree"]
 
 def save_settings_overrides(settings: dict):
     """Persist dashboard settings to disk."""
@@ -170,13 +210,17 @@ def save_settings_overrides(settings: dict):
 # Bot keeps running — positions, state, and IBKR connection are preserved.
 
 WATCHED_MODULES = {
-    "signals":   "signals",
-    "scanner":   "scanner",
-    "agents":    "agents",
-    "risk":      "risk",
-    "orders":    "orders",
-    "learning":  "learning",
-    "dashboard": "dashboard",
+    "signals":          "signals",
+    "scanner":          "scanner",
+    "agents":           "agents",
+    "risk":             "risk",
+    "orders":           "orders",
+    "learning":         "learning",
+    "dashboard":        "dashboard",
+    "news":             "news",
+    "news_sentinel":    "news_sentinel",
+    "theme_tracker":    "theme_tracker",
+    "sentinel_agents":  "sentinel_agents",
 }
 
 _file_hashes = {}
@@ -241,9 +285,11 @@ def check_and_reload():
             import config as _config
             importlib.reload(_config)
             CONFIG.update(_config.CONFIG)
+            # Re-apply dashboard overrides so they aren't wiped by config.py defaults
+            load_settings_overrides()
             _file_hashes["config"] = config_current
             changed.append("config")
-            clog("INFO", "🔄 Hot reload: config.py updated — new settings active immediately")
+            clog("INFO", "🔄 Hot reload: config.py updated — new settings active immediately (dashboard overrides preserved)")
         except Exception as e:
             clog("ERROR", f"Hot reload failed for config: {e}")
 
@@ -253,6 +299,483 @@ def check_and_reload():
         dash["last_reload_files"] = changed
 
     return changed
+
+
+# ── Subscription registry helpers ────────────────────────────────────────────
+
+def _register_subscription(key: str, params: dict) -> None:
+    """Record a market-data or PnL subscription so it can be restored after reconnect."""
+    _subscription_registry[key] = params
+
+
+def _unregister_subscription(key: str) -> None:
+    """Remove a subscription from the registry."""
+    _subscription_registry.pop(key, None)
+
+
+def _restore_subscriptions() -> None:
+    """
+    Re-subscribe to all registered market data and PnL feeds after a reconnect.
+    Called once the new IB connection is fully established.
+    """
+    if not _subscription_registry:
+        log.info("No subscriptions to restore after reconnect.")
+        return
+
+    log.info(f"Restoring {len(_subscription_registry)} subscription(s) after reconnect…")
+    for key, params in list(_subscription_registry.items()):
+        sub_type = params.get("type")
+        try:
+            if sub_type == "pnl":
+                account = params.get("account", CONFIG["active_account"])
+                ib.reqPnL(account)
+                log.info(f"  ✔ Re-subscribed PnL for account {account}")
+            elif sub_type == "ticker":
+                from ib_async import Stock
+                contract = Stock(key, "SMART", "USD")
+                ib.reqMktData(contract, "", False, False)
+                log.info(f"  ✔ Re-subscribed market data for {key}")
+            else:
+                log.warning(f"  ⚠ Unknown subscription type '{sub_type}' for key '{key}' — skipped")
+        except Exception as exc:
+            log.error(f"  ✗ Failed to restore subscription '{key}': {exc}")
+
+
+def _send_reconnect_exhausted_alert(attempts: int) -> None:
+    """
+    Fire an external alert (Slack/Teams webhook) when all reconnect attempts
+    are exhausted so the operator is notified even if they are not watching logs.
+    """
+    webhook = CONFIG.get("reconnect_alert_webhook", "")
+    msg = (
+        f"🔴 DECIFER IBKR RECONNECT FAILED — "
+        f"all {attempts} attempts exhausted. Bot is disconnected and STOPPED. "
+        f"Manual restart required."
+    )
+    # Always update the dashboard flag
+    dash["status"] = "disconnected — reconnect failed"
+    clog("ERROR", msg)
+
+    if not webhook:
+        return
+    try:
+        payload = json.dumps({"text": msg}).encode()
+        req = urllib.request.Request(
+            webhook,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+        log.info("Reconnect-exhausted alert sent to webhook.")
+    except Exception as exc:
+        log.error(f"Failed to send reconnect-exhausted alert: {exc}")
+
+
+def _reconnect_worker() -> None:
+    """
+    Background thread: attempt to reconnect to IBKR using exponential backoff.
+
+    Delays: 1 s, 2 s, 4 s, 8 s, 16 s, 32 s, 60 s, 60 s … (capped)
+    Gives up after CONFIG['reconnect_max_attempts'] failures.
+    On success, re-subscribes to all registered feeds.
+    """
+    global _reconnecting
+
+    max_attempts = CONFIG.get("reconnect_max_attempts", 10)
+    max_wait     = CONFIG.get("reconnect_max_wait_secs", 60)
+    base_wait    = CONFIG.get("reconnect_base_wait_secs", 1)
+    host         = CONFIG.get("ibkr_host", "127.0.0.1")
+    port         = CONFIG.get("ibkr_port", 7497)
+    client_id    = CONFIG.get("ibkr_client_id", 1)
+
+    wait = base_wait
+    for attempt in range(1, max_attempts + 1):
+        log.warning(
+            f"IBKR reconnect attempt {attempt}/{max_attempts} "
+            f"(waiting {wait}s before connect)…"
+        )
+        dash["status"] = f"reconnecting ({attempt}/{max_attempts})"
+        time.sleep(wait)
+
+        try:
+            ib.connect(host, port, clientId=client_id, readonly=False)
+            log.info(f"✔ IBKR reconnected on attempt {attempt}.")
+            dash["status"] = "connected"
+            _restore_subscriptions()
+            break
+        except Exception as exc:
+            log.error(f"Reconnect attempt {attempt} failed: {exc}")
+            wait = min(wait * 2, max_wait)
+    else:
+        # All attempts exhausted
+        _send_reconnect_exhausted_alert(max_attempts)
+
+    with _reconnect_lock:
+        _reconnecting = False
+
+
+def _on_disconnected() -> None:
+    """
+    Callback registered with ib_async's disconnectedEvent.
+    Spawns the reconnect worker thread (only one at a time).
+    """
+    global _reconnecting
+    with _reconnect_lock:
+        if _reconnecting:
+            log.debug("Disconnect event received but reconnect already in progress — ignoring.")
+            return
+        _reconnecting = True
+
+    log.warning("⚠ IBKR connection lost — starting auto-reconnect…")
+    dash["status"] = "disconnected"
+    t = threading.Thread(target=_reconnect_worker, name="ibkr-reconnect", daemon=True)
+    t.start()
+
+
+def _heartbeat_worker() -> None:
+    """
+    Background thread: send a lightweight reqCurrentTime() to IBKR every
+    CONFIG['heartbeat_interval_secs'] seconds to prevent idle-timeout disconnects.
+    Uses short sleep intervals so it stays responsive during reconnect activity.
+    """
+    interval   = CONFIG.get("heartbeat_interval_secs", 1200)
+    tick       = 60          # check every minute; avoids long sleeps during reconnect
+    elapsed    = 0
+
+    while True:
+        time.sleep(tick)
+        elapsed += tick
+        if elapsed < interval:
+            continue
+        elapsed = 0
+        if not ib.isConnected():
+            log.debug("Heartbeat skipped — not connected.")
+            continue
+        try:
+            ib.reqCurrentTime()
+            log.debug("IBKR heartbeat sent (reqCurrentTime).")
+        except Exception as exc:
+            log.warning(f"IBKR heartbeat failed: {exc}")
+
+
+# ── Subscription registry helpers ────────────────────────────────────────────
+
+def _register_subscription(key: str, params: dict) -> None:
+    """Record a market-data or PnL subscription so it can be restored after reconnect."""
+    _subscription_registry[key] = params
+
+
+def _unregister_subscription(key: str) -> None:
+    """Remove a subscription from the registry."""
+    _subscription_registry.pop(key, None)
+
+
+def _restore_subscriptions() -> None:
+    """
+    Re-subscribe to all registered market data and PnL feeds after a reconnect.
+    Called once the new IB connection is fully established.
+    """
+    if not _subscription_registry:
+        log.info("No subscriptions to restore after reconnect.")
+        return
+
+    log.info(f"Restoring {len(_subscription_registry)} subscription(s) after reconnect…")
+    for key, params in list(_subscription_registry.items()):
+        sub_type = params.get("type")
+        try:
+            if sub_type == "pnl":
+                account = params.get("account", CONFIG["active_account"])
+                ib.reqPnL(account)
+                log.info(f"  ✔ Re-subscribed PnL for account {account}")
+            elif sub_type == "ticker":
+                from ib_async import Stock
+                contract = Stock(key, "SMART", "USD")
+                ib.reqMktData(contract, "", False, False)
+                log.info(f"  ✔ Re-subscribed market data for {key}")
+            else:
+                log.warning(f"  ⚠ Unknown subscription type '{sub_type}' for key '{key}' — skipped")
+        except Exception as exc:
+            log.error(f"  ✗ Failed to restore subscription '{key}': {exc}")
+
+
+def _send_reconnect_exhausted_alert(attempts: int) -> None:
+    """
+    Fire an external alert (Slack/Teams webhook) when all reconnect attempts
+    are exhausted so the operator is notified even if they are not watching logs.
+    """
+    webhook = CONFIG.get("reconnect_alert_webhook", "")
+    msg = (
+        f"🔴 DECIFER IBKR RECONNECT FAILED — "
+        f"all {attempts} attempts exhausted. Bot is disconnected and STOPPED. "
+        f"Manual restart required."
+    )
+    # Always update the dashboard flag
+    dash["status"] = "disconnected — reconnect failed"
+    clog("ERROR", msg)
+
+    if not webhook:
+        return
+    try:
+        payload = json.dumps({"text": msg}).encode()
+        req = urllib.request.Request(
+            webhook,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+        log.info("Reconnect-exhausted alert sent to webhook.")
+    except Exception as exc:
+        log.error(f"Failed to send reconnect-exhausted alert: {exc}")
+
+
+def _reconnect_worker() -> None:
+    """
+    Background thread: attempt to reconnect to IBKR using exponential backoff.
+
+    Delays: 1 s, 2 s, 4 s, 8 s, 16 s, 32 s, 60 s, 60 s … (capped)
+    Gives up after CONFIG['reconnect_max_attempts'] failures.
+    On success, re-subscribes to all registered feeds.
+    """
+    global _reconnecting
+
+    max_attempts = CONFIG.get("reconnect_max_attempts", 10)
+    max_wait     = CONFIG.get("reconnect_max_wait_secs", 60)
+    base_wait    = CONFIG.get("reconnect_base_wait_secs", 1)
+    host         = CONFIG.get("ibkr_host", "127.0.0.1")
+    port         = CONFIG.get("ibkr_port", 7497)
+    client_id    = CONFIG.get("ibkr_client_id", 1)
+
+    wait = base_wait
+    for attempt in range(1, max_attempts + 1):
+        log.warning(
+            f"IBKR reconnect attempt {attempt}/{max_attempts} "
+            f"(waiting {wait}s before connect)…"
+        )
+        dash["status"] = f"reconnecting ({attempt}/{max_attempts})"
+        time.sleep(wait)
+
+        try:
+            ib.connect(host, port, clientId=client_id, readonly=False)
+            log.info(f"✔ IBKR reconnected on attempt {attempt}.")
+            dash["status"] = "connected"
+            _restore_subscriptions()
+            break
+        except Exception as exc:
+            log.error(f"Reconnect attempt {attempt} failed: {exc}")
+            wait = min(wait * 2, max_wait)
+    else:
+        # All attempts exhausted
+        _send_reconnect_exhausted_alert(max_attempts)
+
+    with _reconnect_lock:
+        _reconnecting = False
+
+
+def _on_disconnected() -> None:
+    """
+    Callback registered with ib_async's disconnectedEvent.
+    Spawns the reconnect worker thread (only one at a time).
+    """
+    global _reconnecting
+    with _reconnect_lock:
+        if _reconnecting:
+            log.debug("Disconnect event received but reconnect already in progress — ignoring.")
+            return
+        _reconnecting = True
+
+    log.warning("⚠ IBKR connection lost — starting auto-reconnect…")
+    dash["status"] = "disconnected"
+    t = threading.Thread(target=_reconnect_worker, name="ibkr-reconnect", daemon=True)
+    t.start()
+
+
+def _heartbeat_worker() -> None:
+    """
+    Background thread: send a lightweight reqCurrentTime() to IBKR every
+    CONFIG['heartbeat_interval_secs'] seconds to prevent idle-timeout disconnects.
+    Uses short sleep intervals so it stays responsive during reconnect activity.
+    """
+    interval   = CONFIG.get("heartbeat_interval_secs", 1200)
+    tick       = 60          # check every minute; avoids long sleeps during reconnect
+    elapsed    = 0
+
+    while True:
+        time.sleep(tick)
+        elapsed += tick
+        if elapsed < interval:
+            continue
+        elapsed = 0
+        if not ib.isConnected():
+            log.debug("Heartbeat skipped — not connected.")
+            continue
+        try:
+            ib.reqCurrentTime()
+            log.debug("IBKR heartbeat sent (reqCurrentTime).")
+        except Exception as exc:
+            log.warning(f"IBKR heartbeat failed: {exc}")
+
+
+# ── Subscription registry helpers ────────────────────────────────────────────
+
+def _register_subscription(key: str, params: dict) -> None:
+    """Record a market-data or PnL subscription so it can be restored after reconnect."""
+    _subscription_registry[key] = params
+
+
+def _unregister_subscription(key: str) -> None:
+    """Remove a subscription from the registry."""
+    _subscription_registry.pop(key, None)
+
+
+def _restore_subscriptions() -> None:
+    """
+    Re-subscribe to all registered market data and PnL feeds after a reconnect.
+    Called once the new IB connection is fully established.
+    """
+    if not _subscription_registry:
+        log.info("No subscriptions to restore after reconnect.")
+        return
+
+    log.info(f"Restoring {len(_subscription_registry)} subscription(s) after reconnect…")
+    for key, params in list(_subscription_registry.items()):
+        sub_type = params.get("type")
+        try:
+            if sub_type == "pnl":
+                account = params.get("account", CONFIG["active_account"])
+                ib.reqPnL(account)
+                log.info(f"  ✔ Re-subscribed PnL for account {account}")
+            elif sub_type == "ticker":
+                from ib_async import Stock
+                contract = Stock(key, "SMART", "USD")
+                ib.reqMktData(contract, "", False, False)
+                log.info(f"  ✔ Re-subscribed market data for {key}")
+            else:
+                log.warning(f"  ⚠ Unknown subscription type '{sub_type}' for key '{key}' — skipped")
+        except Exception as exc:
+            log.error(f"  ✗ Failed to restore subscription '{key}': {exc}")
+
+
+def _send_reconnect_exhausted_alert(attempts: int) -> None:
+    """
+    Fire an external alert (Slack/Teams webhook) when all reconnect attempts
+    are exhausted so the operator is notified even if they are not watching logs.
+    """
+    webhook = CONFIG.get("reconnect_alert_webhook", "")
+    msg = (
+        f"🔴 DECIFER IBKR RECONNECT FAILED — "
+        f"all {attempts} attempts exhausted. Bot is disconnected and STOPPED. "
+        f"Manual restart required."
+    )
+    # Always update the dashboard flag
+    dash["status"] = "disconnected — reconnect failed"
+    clog("ERROR", msg)
+
+    if not webhook:
+        return
+    try:
+        payload = json.dumps({"text": msg}).encode()
+        req = urllib.request.Request(
+            webhook,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10):
+            pass
+        log.info("Reconnect-exhausted alert sent to webhook.")
+    except Exception as exc:
+        log.error(f"Failed to send reconnect-exhausted alert: {exc}")
+
+
+def _reconnect_worker() -> None:
+    """
+    Background thread: attempt to reconnect to IBKR using exponential backoff.
+
+    Delays: 1 s, 2 s, 4 s, 8 s, 16 s, 32 s, 60 s, 60 s … (capped)
+    Gives up after CONFIG['reconnect_max_attempts'] failures.
+    On success, re-subscribes to all registered feeds.
+    """
+    global _reconnecting
+
+    max_attempts = CONFIG.get("reconnect_max_attempts", 10)
+    max_wait     = CONFIG.get("reconnect_max_wait_secs", 60)
+    base_wait    = CONFIG.get("reconnect_base_wait_secs", 1)
+    host         = CONFIG.get("ibkr_host", "127.0.0.1")
+    port         = CONFIG.get("ibkr_port", 7497)
+    client_id    = CONFIG.get("ibkr_client_id", 1)
+
+    wait = base_wait
+    for attempt in range(1, max_attempts + 1):
+        log.warning(
+            f"IBKR reconnect attempt {attempt}/{max_attempts} "
+            f"(waiting {wait}s before connect)…"
+        )
+        dash["status"] = f"reconnecting ({attempt}/{max_attempts})"
+        time.sleep(wait)
+
+        try:
+            ib.connect(host, port, clientId=client_id, readonly=False)
+            log.info(f"✔ IBKR reconnected on attempt {attempt}.")
+            dash["status"] = "connected"
+            _restore_subscriptions()
+            break
+        except Exception as exc:
+            log.error(f"Reconnect attempt {attempt} failed: {exc}")
+            wait = min(wait * 2, max_wait)
+    else:
+        # All attempts exhausted
+        _send_reconnect_exhausted_alert(max_attempts)
+
+    with _reconnect_lock:
+        _reconnecting = False
+
+
+def _on_disconnected() -> None:
+    """
+    Callback registered with ib_async's disconnectedEvent.
+    Spawns the reconnect worker thread (only one at a time).
+    """
+    global _reconnecting
+    with _reconnect_lock:
+        if _reconnecting:
+            log.debug("Disconnect event received but reconnect already in progress — ignoring.")
+            return
+        _reconnecting = True
+
+    log.warning("⚠ IBKR connection lost — starting auto-reconnect…")
+    dash["status"] = "disconnected"
+    t = threading.Thread(target=_reconnect_worker, name="ibkr-reconnect", daemon=True)
+    t.start()
+
+
+def _heartbeat_worker() -> None:
+    """
+    Background thread: send a lightweight reqCurrentTime() to IBKR every
+    CONFIG['heartbeat_interval_secs'] seconds to prevent idle-timeout disconnects.
+    Uses short sleep intervals so it stays responsive during reconnect activity.
+    """
+    interval   = CONFIG.get("heartbeat_interval_secs", 1200)
+    tick       = 60          # check every minute; avoids long sleeps during reconnect
+    elapsed    = 0
+
+    while True:
+        time.sleep(tick)
+        elapsed += tick
+        if elapsed < interval:
+            continue
+        elapsed = 0
+        if not ib.isConnected():
+            log.debug("Heartbeat skipped — not connected.")
+            continue
+        try:
+            ib.reqCurrentTime()
+            log.debug("IBKR heartbeat sent (reqCurrentTime).")
+        except Exception as exc:
+            log.warning(f"IBKR heartbeat failed: {exc}")
 
 
 def backfill_trades_from_ibkr():
@@ -849,6 +1372,33 @@ def get_account_data():
         return dash["portfolio_value"], dash["daily_pnl"]
 
 
+def get_account_details():
+    """Fetch extended account metrics from IBKR for dashboard KPI row."""
+    details = {}
+    try:
+        vals = ib.accountValues(CONFIG["active_account"])
+        tag_map = {
+            "AvailableFunds":    "available_cash",
+            "BuyingPower":       "buying_power",
+            "GrossPositionValue":"gross_position_value",
+            "MaintMarginReq":    "margin_used",
+            "ExcessLiquidity":   "excess_liquidity",
+            "TotalCashValue":    "total_cash",
+            "UnrealizedPnL":     "unrealized_pnl",
+            "RealizedPnL":       "realized_pnl",
+            "NetLiquidation":    "net_liquidation",
+        }
+        for v in vals:
+            if v.tag in tag_map and v.currency == "USD":
+                try:
+                    details[tag_map[v.tag]] = round(float(v.value), 2)
+                except (ValueError, TypeError):
+                    pass
+    except Exception as e:
+        clog("ERROR", f"Account details error: {e}")
+    return details
+
+
 def get_news_headlines() -> list:
     """Return recent news headlines from cached scan data for agents."""
     try:
@@ -902,13 +1452,14 @@ def check_external_closes(regime: dict):
     externally (stop loss hit, take profit hit, or manual close).
     Log it properly so Trade History tab shows it.
     """
-    from orders import open_trades
+    from orders import open_trades, _ibkr_item_to_key, _is_option_contract
     from learning import log_trade, load_trades
 
     try:
         # Use portfolio() — same source as reconcile, includes position=0 settled items
         portfolio_items = ib.portfolio(CONFIG["active_account"])
-        ibkr_syms = {item.contract.symbol for item in portfolio_items if item.position != 0}
+        # Use composite keys so stock and option positions don't collide
+        ibkr_syms = {_ibkr_item_to_key(item) for item in portfolio_items if item.position != 0}
 
         # Build a lookup of realizedPNL from portfolio for settled positions
         realized_pnl_map = {}
@@ -925,25 +1476,55 @@ def check_external_closes(regime: dict):
             if sym not in ibkr_syms:
                 trade = open_trades[sym]
 
-                # ── CRITICAL: Skip PENDING orders that never filled ──
-                # If status is PENDING, the buy order was placed but never
-                # confirmed by IBKR. Not being in portfolio just means it
-                # didn't fill — NOT that a position was "closed externally".
+                # ── PENDING orders: check if order is still live in IBKR ──
+                # A PENDING entry means a buy order was placed but not yet filled.
+                # Not being in portfolio just means it hasn't filled yet — NOT
+                # that it was "closed externally". Only remove if the order is
+                # no longer active in IBKR (cancelled, expired, or rejected).
                 if trade.get("status") == "PENDING":
-                    clog("INFO", f"Removing unfilled order from tracker: {sym} (never filled)")
-                    del open_trades[sym]
-                    continue
+                    order_id = trade.get("order_id")
+                    still_active = False
+                    if order_id:
+                        try:
+                            for t in ib.openTrades():
+                                if t.order.orderId == order_id:
+                                    still_active = True
+                                    break
+                        except Exception:
+                            still_active = True  # err on the side of keeping it
+                    if still_active:
+                        # Order is still working in IBKR — keep in tracker
+                        continue
+                    else:
+                        clog("INFO", f"Removing unfilled order from tracker: {sym} (order #{order_id} no longer active in IBKR)")
+                        del open_trades[sym]
+                        continue
 
                 # Get real exit price from IBKR fills (most accurate)
+                # For options, sym is a composite key (NVDA_C_180.0_2026-04-17)
+                # but f.contract.symbol is just the underlying ("NVDA").
+                # Use the underlying symbol for fill matching.
                 exit_price = None
+                is_opt_pos = trade.get("instrument") == "option"
+                underlying = trade.get("symbol", sym)  # plain symbol stored in the trade dict
                 try:
                     import math as _math
                     fills = ib.fills()
-                    sell_fills = [
-                        f for f in fills
-                        if f.contract.symbol == sym
-                        and f.execution.side.upper() in ("SLD", "SELL")
-                    ]
+                    if is_opt_pos:
+                        # Match option fills by underlying + option-specific fields
+                        sell_fills = [
+                            f for f in fills
+                            if f.contract.symbol == underlying
+                            and f.execution.side.upper() in ("SLD", "SELL")
+                            and _is_option_contract(f.contract)
+                        ]
+                    else:
+                        sell_fills = [
+                            f for f in fills
+                            if f.contract.symbol == underlying
+                            and f.execution.side.upper() in ("SLD", "SELL")
+                            and not _is_option_contract(f.contract)
+                        ]
                     if sell_fills:
                         # Use the most recent sell fill
                         sell_fills.sort(key=lambda f: f.execution.time or datetime.min)
@@ -952,11 +1533,14 @@ def check_external_closes(regime: dict):
                     pass
 
                 # Fall back to deriving exit from realizedPNL if fills unavailable
-                if exit_price is None and sym in realized_pnl_map:
-                    rpnl = realized_pnl_map[sym]
+                # realized_pnl_map is keyed by plain symbol, not composite key
+                rpnl_key = underlying if is_opt_pos else sym
+                if exit_price is None and rpnl_key in realized_pnl_map:
+                    rpnl = realized_pnl_map[rpnl_key]
                     qty  = trade["qty"]
+                    mult = 100 if is_opt_pos else 1
                     if qty and not _math.isnan(rpnl) and rpnl != 0.0:
-                        exit_price = round(trade["entry"] + rpnl / qty, 4)
+                        exit_price = round(trade["entry"] + rpnl / (qty * mult), 4)
 
                 # If no fills AND no realizedPNL, this position was never
                 # actually held — remove silently, don't log a fake trade.
@@ -1018,7 +1602,7 @@ def check_external_closes(regime: dict):
 
                 # Remove from tracker
                 del open_trades[sym]
-                dash["positions"] = list(open_trades.values())
+                dash["positions"] = get_open_positions()
 
                 if pnl >= 0:
                     from risk import record_win
@@ -1083,6 +1667,79 @@ def _process_close_queue():
             clog("ERROR", f"❌ Close {sym} failed: {e}")
 
 
+def _auto_rebalance_cash(portfolio_value: float, regime: dict):
+    """
+    Auto-close the weakest position(s) to bring cash reserve back above
+    the min_cash_reserve threshold. Picks the worst-performing position
+    by unrealized P&L percentage and closes it.
+
+    Only closes ONE position per scan cycle to avoid panic-selling.
+    The next scan will re-check and close another if still under threshold.
+    """
+    min_reserve = CONFIG.get("min_cash_reserve", 0.10)
+    positions = get_open_positions()
+
+    if not positions:
+        clog("RISK", "Auto-rebalance: No positions to close")
+        return
+
+    # Use IBKR real cash (same source of truth as can_trade)
+    from risk import _get_ibkr_cash
+    ibkr_cash = _get_ibkr_cash(ib, CONFIG.get("active_account", ""))
+    if ibkr_cash is not None:
+        cash_pct = ibkr_cash / portfolio_value if portfolio_value > 0 else 1.0
+    else:
+        # Fallback: use current market value (not entry cost)
+        deployed = sum(p.get("current", p.get("entry", 0)) * p.get("qty", 0) for p in positions)
+        cash_pct = (portfolio_value - deployed) / portfolio_value if portfolio_value > 0 else 1.0
+    cash_deficit = (min_reserve - cash_pct) * portfolio_value
+    clog("RISK", f"Auto-rebalance: cash={cash_pct*100:.1f}% (need {min_reserve*100:.0f}%) "
+         f"— need to free ~${cash_deficit:,.0f}")
+
+    # Rank positions by unrealized P&L % (worst first = best to close)
+    ranked = []
+    for p in positions:
+        entry = p.get("entry", 0)
+        current = p.get("current", entry)
+        qty = p.get("qty", 0)
+        if entry > 0 and qty != 0:
+            pnl_pct = (current - entry) / entry
+            position_value = abs(current * qty)
+            ranked.append({
+                "symbol": p.get("symbol"),
+                "pnl_pct": pnl_pct,
+                "position_value": position_value,
+                "entry": entry,
+                "current": current,
+                "qty": qty,
+            })
+
+    if not ranked:
+        clog("RISK", "Auto-rebalance: Could not evaluate positions")
+        return
+
+    # Sort: worst unrealized P&L first (most negative = close first)
+    ranked.sort(key=lambda x: x["pnl_pct"])
+
+    # Close the single worst position
+    worst = ranked[0]
+    sym = worst["symbol"]
+    clog("RISK", f"Auto-rebalance: Closing {sym} (worst P&L: {worst['pnl_pct']:+.1%}, "
+         f"value: ${worst['position_value']:,.0f}) to free cash")
+
+    try:
+        from orders import close_position
+        result = close_position(ib, sym)
+        if result:
+            clog("RISK", f"Auto-rebalance: {result}")
+            # Give IBKR a moment to process
+            ib.sleep(2)
+        else:
+            clog("ERROR", f"Auto-rebalance: Could not close {sym}")
+    except Exception as e:
+        clog("ERROR", f"Auto-rebalance: Failed to close {sym}: {e}")
+
+
 def run_scan():
     global scan_count, last_sunday_review
 
@@ -1140,12 +1797,24 @@ def run_scan():
     check_external_closes(regime)
 
     # ── Can we trade? ────────────────────────────────────────
-    tradeable, reason = can_trade(pv, pnl, regime, get_open_positions())
+    tradeable, reason = can_trade(pv, pnl, regime, get_open_positions(), ib=ib)
     if not tradeable:
-        clog("RISK", f"Trading suspended: {reason}")
-        dash["claude_analysis"] = f"Trading suspended: {reason}"
-        dash["scanning"] = False
-        return
+        # ── Auto-rebalance: if cash reserve too low, close weakest position(s) ──
+        if "Cash reserve too low" in reason:
+            clog("RISK", f"Cash reserve below minimum — auto-rebalancing to free up cash")
+            _auto_rebalance_cash(pv, regime)
+            # Re-check after rebalancing
+            pv, pnl = get_account_data()
+            dash["portfolio_value"] = pv
+            dash["daily_pnl"] = pnl
+            dash["positions"] = get_open_positions()
+            tradeable, reason = can_trade(pv, pnl, regime, get_open_positions(), ib=ib)
+
+        if not tradeable:
+            clog("RISK", f"Trading suspended: {reason}")
+            dash["claude_analysis"] = f"Trading suspended: {reason}"
+            dash["scanning"] = False
+            return
 
     # ── Dynamic universe ─────────────────────────────────────
     clog("SCAN", "Building dynamic universe from TradingView screener...")
@@ -1185,16 +1854,20 @@ def run_scan():
             vwap    = tv.get("tv_vwap")
 
             # ── HARD KILLS — no edge, don't waste yfinance calls ──
+            # NOTE: Thresholds loosened for paper trading data generation.
+            # Original values (for live): rec < 0.1, rel_vol < 1.0, RSI 42-58, change < 0.3%
+            # Paper values: wider funnel to capture mean-reversion, early breakouts,
+            # and accumulation setups that generate ML training data across regimes.
             if close is None or close <= 0:
                 continue
-            if rec is None or abs(rec) < 0.1:
+            if rec is None or abs(rec) < 0.05:
                 continue  # Dead neutral — TV sees no directional signal
-            if rel_vol is None or rel_vol < 1.0:
-                continue  # Below-average volume — no institutional interest
-            if rsi is not None and 42 < rsi < 58:
-                continue  # RSI dead zone — no momentum either way
-            if change is not None and abs(change) < 0.3:
-                continue  # Flat — less than 0.3% move today
+            if rel_vol is not None and rel_vol < 0.5:
+                continue  # Very low volume only — allow early breakouts at 0.5-1.0x
+            if rsi is not None and 47 < rsi < 53:
+                continue  # Tight RSI dead zone only — allow mean-reversion setups (42-47, 53-58)
+            if change is not None and abs(change) < 0.1:
+                continue  # Only truly flat stocks — allow slow accumulation at 0.1-0.3%
 
             # ── EMA ALIGNMENT CHECK — need some trend structure ──
             ema_aligned = False
@@ -1223,9 +1896,16 @@ def run_scan():
 
             ranked.append((sym, rank_score))
 
-        # Sort by rank score, take top 15
+        # Sort by rank score, take top 25 (widened from 15 for paper trading data generation)
         ranked.sort(key=lambda x: x[1], reverse=True)
-        universe = [sym for sym, _ in ranked[:15]]
+        universe = [sym for sym, _ in ranked[:25]]
+
+        # Always include favourites — never let pre-filter drop them
+        favs_set = set(dash.get("favourites", []))
+        missed_favs = favs_set - set(universe)
+        if missed_favs:
+            universe = list(set(universe) | missed_favs)
+            clog("INFO", f"Favourites preserved through TV pre-filter: {sorted(missed_favs)}")
 
         clog("SCAN", f"TV pre-filter: {pre_universe} → {len(universe)} symbols "
              f"(top by |signal| × rel_vol, VWAP-confirmed)")
@@ -1242,9 +1922,22 @@ def run_scan():
         news_sentiment = {}
         dash["news_data"] = {}
 
+    # ── Fetch social sentiment ───────────────────────────────
+    social_sentiment = {}
+    try:
+        from social_sentiment import get_social_sentiment
+        social_sentiment = get_social_sentiment(universe[:50])
+        social_with_signal = sum(1 for v in social_sentiment.values() if v.get("social_score", 0) > 0)
+        clog("INFO", f"Social: {len(social_sentiment)} symbols scanned, {social_with_signal} with sentiment signal")
+    except ImportError:
+        clog("INFO", "Social sentiment module not available — skipping")
+    except Exception as e:
+        clog("ERROR", f"Social sentiment error: {e}")
+
     # ── Score universe ────────────────────────────────────────
-    clog("SCAN", "Scoring universe on 7 dimensions...")
-    scored = score_universe(universe, regime.get("regime", "UNKNOWN"), news_data=news_sentiment)
+    clog("SCAN", "Scoring universe on 8 dimensions...")
+    scored = score_universe(universe, regime.get("regime", "UNKNOWN"),
+                            news_data=news_sentiment, social_data=social_sentiment)
     regime_name = regime.get('regime','UNKNOWN')
     regime_thresholds = {"BULL_TRENDING":28,"BEAR_TRENDING":25,"CHOPPY":22,"PANIC":99,"UNKNOWN":25}
     used_threshold = regime_thresholds.get(regime_name, CONFIG['min_score_to_trade'])
@@ -1270,8 +1963,11 @@ def run_scan():
         try:
             clog("ANALYSIS", "Scanning options flow (unusual vol, IV rank, earnings)...")
             top_scored_syms = [s["symbol"] for s in scored[:20]]
+            # Always include favourites in options scanning
+            favs_for_opts = dash.get("favourites", [])
+            extra = list(set(top_scored_syms + favs_for_opts))
             options_signals = scan_options_universe(
-                extra_symbols=top_scored_syms,
+                extra_symbols=extra,
                 regime=regime
             )
             clog("ANALYSIS", f"Options scan: {len(options_signals)} notable setups found")
@@ -1383,7 +2079,7 @@ def run_scan():
 
     # Re-check can_trade() — scan + agents can take 15-30 min,
     # market may have closed or risk state may have changed since initial check
-    tradeable_now, reason_now = can_trade(pv, pnl, regime, get_open_positions())
+    tradeable_now, reason_now = can_trade(pv, pnl, regime, get_open_positions(), ib=ib)
     if not tradeable_now:
         clog("RISK", f"Trading suspended before buy execution: {reason_now}")
         # Still complete the scan (positions updated, agents ran) — just skip buys
@@ -1416,48 +2112,57 @@ def run_scan():
 
         clog("TRADE", f"Buying {sym} | Score={sig['score']}/50 | {reason[:80]}")
 
-        # ── Options path ──────────────────────────────────────────────
-        options_taken = False
+        # ── INDEPENDENT EVALUATION: Options and Stocks ────────────────
+        # Both paths are evaluated on their own merits. An options trade
+        # does NOT prevent a stock trade and vice versa. Each instrument
+        # is judged independently — the risk manager and position sizing
+        # handle total exposure.
+
+        # ── Stock evaluation ─────────────────────────────────────────
+        stock_success = execute_buy(
+            ib=ib,
+            symbol=sym,
+            price=sig["price"],
+            atr=sig["atr"],
+            score=sig["score"],
+            portfolio_value=pv,
+            regime=regime,
+            reasoning=reason
+        )
+        if stock_success:
+            dash["trades"].insert(0, {
+                "side": "BUY", "symbol": sym,
+                "price": str(sig["price"]),
+                "time": datetime.now().strftime("%H:%M:%S")
+            })
+
+        # ── Options evaluation (independent of stock outcome) ────────
+        # Only evaluate options during market hours (9:30-16:00 ET) to avoid
+        # wasting API calls scanning chains that can't be executed after hours
+        from orders import is_options_market_open
         if (CONFIG.get("options_enabled") and
                 sig["score"] >= CONFIG.get("options_min_score", 42)):
-            direction = "LONG" if sig.get("direction", "LONG") == "LONG" else "SHORT"
-            clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
-            try:
-                contract_info = find_best_contract(sym, direction, pv, ib, regime)
-                if contract_info:
-                    opt_success = execute_buy_option(ib, contract_info, pv, reasoning=reason)
-                    if opt_success:
-                        options_taken = True
-                        dash["trades"].insert(0, {
-                            "side": f"BUY {contract_info['right']} OPT",
-                            "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
-                            "price": str(contract_info["mid"]),
-                            "time": datetime.now().strftime("%H:%M:%S")
-                        })
-                        clog("TRADE", f"Options trade taken for {sym} — skipping stock buy")
-                else:
-                    clog("INFO", f"No suitable options contract for {sym} — falling through to stock buy")
-            except Exception as _opt_err:
-                clog("ERROR", f"Options evaluation failed for {sym}: {_opt_err} — falling through to stock buy")
-
-        # ── Stock path (fallback or when options_enabled=False) ──────
-        if not options_taken:
-            success = execute_buy(
-                ib=ib,
-                symbol=sym,
-                price=sig["price"],
-                atr=sig["atr"],
-                score=sig["score"],
-                portfolio_value=pv,
-                regime=regime,
-                reasoning=reason
-            )
-            if success:
-                dash["trades"].insert(0, {
-                    "side": "BUY", "symbol": sym,
-                    "price": str(sig["price"]),
-                    "time": datetime.now().strftime("%H:%M:%S")
-                })
+            if not is_options_market_open():
+                clog("INFO", f"Score {sig['score']} qualifies for options but market closed — will retry next open scan")
+            else:
+                direction = "LONG" if sig.get("direction", "LONG") == "LONG" else "SHORT"
+                clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
+                try:
+                    contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
+                    if contract_info:
+                        opt_success = execute_buy_option(ib, contract_info, pv, reasoning=reason)
+                        if opt_success:
+                            dash["trades"].insert(0, {
+                                "side": f"BUY {contract_info['right']} OPT",
+                                "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
+                                "price": str(contract_info["mid"]),
+                                "time": datetime.now().strftime("%H:%M:%S")
+                            })
+                            clog("TRADE", f"Options trade executed for {sym} (independent of stock)")
+                    else:
+                        clog("INFO", f"No suitable options contract for {sym}")
+                except Exception as _opt_err:
+                    clog("ERROR", f"Options evaluation failed for {sym}: {_opt_err}")
 
     # ── Update dashboard positions ────────────────────────────
     dash["positions"] = get_open_positions()
@@ -1511,6 +2216,239 @@ def run_scan():
     clog("SCAN", f"Scan #{scan_count} complete")
 
 
+# ═══════════════════════════════════════════════════════════════
+# NEWS SENTINEL — real-time news trigger handler
+# ═══════════════════════════════════════════════════════════════
+_sentinel: NewsSentinel = None
+_sentinel_trades_this_hour = 0
+_sentinel_hour_start = None
+
+
+def _get_sentinel_universe() -> list[str]:
+    """Callback for NewsSentinel — returns current universe to monitor."""
+    try:
+        open_pos = get_open_positions()
+        favs = dash.get("favourites", [])
+        # Use recent news headlines to detect trending themes
+        recent_headlines = []
+        for sym_data in dash.get("news_data", {}).values():
+            recent_headlines.extend(sym_data.get("headlines", []))
+        return build_sentinel_universe(
+            open_positions=open_pos,
+            favourites=favs,
+            trending_headlines=recent_headlines[:50],
+        )
+    except Exception as e:
+        log.error(f"Sentinel universe error: {e}")
+        # Fallback: just monitor holdings + favourites
+        syms = [p.get("symbol") for p in get_open_positions() if p.get("symbol")]
+        syms += dash.get("favourites", [])
+        return list(set(syms))
+
+
+def handle_news_trigger(trigger: dict):
+    """
+    Callback fired by NewsSentinel when material news is detected.
+    Runs the 3-agent mini pipeline and executes trades immediately.
+    This runs on the sentinel's background thread.
+    """
+    global _sentinel_trades_this_hour, _sentinel_hour_start
+
+    sym = trigger.get("symbol", "?")
+
+    # ── Rate limit: max N sentinel trades per hour ──────────
+    now = datetime.now()
+    if _sentinel_hour_start is None or (now - _sentinel_hour_start).seconds > 3600:
+        _sentinel_trades_this_hour = 0
+        _sentinel_hour_start = now
+
+    max_per_hour = CONFIG.get("sentinel_max_trades_per_hour", 3)
+    if _sentinel_trades_this_hour >= max_per_hour:
+        clog("RISK", f"Sentinel rate limit: {_sentinel_trades_this_hour}/{max_per_hour} trades this hour — skipping {sym}")
+        return
+
+    # ── Safety checks ───────────────────────────────────────
+    if dash.get("paused") or dash.get("killed"):
+        clog("INFO", f"Sentinel trigger for {sym} — bot paused/killed, skipping")
+        return
+
+    if not ib.isConnected():
+        clog("ERROR", f"Sentinel trigger for {sym} — IBKR disconnected, skipping")
+        return
+
+    # ── Get portfolio state ─────────────────────────────────
+    try:
+        pv = dash.get("portfolio_value", 0)
+        pnl = dash.get("daily_pnl", 0)
+        regime = dash.get("regime", {"regime": "UNKNOWN", "vix": 0, "position_size_multiplier": 0.5})
+        open_pos = get_open_positions()
+
+        # Can we trade?
+        tradeable, reason = can_trade(pv, pnl, regime, open_pos, ib=ib)
+        if not tradeable:
+            clog("RISK", f"Sentinel {sym}: trading suspended — {reason}")
+            return
+
+        # ── Run 3-agent mini pipeline ───────────────────────
+        clog("SIGNAL", f"🚨 SENTINEL TRIGGER: {sym} | {trigger.get('direction')} | urgency={trigger.get('urgency')}")
+
+        decision = run_sentinel_pipeline(
+            trigger=trigger,
+            open_positions=open_pos,
+            portfolio_value=pv,
+            daily_pnl=pnl,
+            regime=regime,
+        )
+
+        # ── Update dashboard ────────────────────────────────
+        dash["sentinel_triggers"].insert(0, {
+            "symbol": sym,
+            "action": decision.get("action", "SKIP"),
+            "direction": trigger.get("direction"),
+            "urgency": trigger.get("urgency"),
+            "confidence": decision.get("confidence", 0),
+            "reasoning": decision.get("reasoning", "")[:100],
+            "catalyst": trigger.get("claude_catalyst", "")[:80],
+            "time": datetime.now().strftime("%H:%M:%S"),
+        })
+        dash["sentinel_triggers"] = dash["sentinel_triggers"][:50]
+
+        # ── Execute the decision ────────────────────────────
+        action = decision.get("action", "SKIP")
+        confidence = decision.get("confidence", 0)
+        min_confidence = CONFIG.get("sentinel_min_confidence", 5)
+
+        if confidence < min_confidence:
+            clog("INFO", f"Sentinel {sym}: confidence {confidence}/10 < {min_confidence} min — skipping")
+            return
+
+        if action == "BUY":
+            _execute_sentinel_buy(decision, pv, regime, trigger)
+            _sentinel_trades_this_hour += 1
+
+        elif action == "SELL":
+            _execute_sentinel_sell(decision, open_pos, regime, trigger)
+            _sentinel_trades_this_hour += 1
+
+        elif action == "HOLD":
+            clog("INFO", f"Sentinel {sym}: HOLD — {decision.get('reasoning', '')[:80]}")
+
+        else:  # SKIP
+            clog("INFO", f"Sentinel {sym}: SKIP — {decision.get('reasoning', '')[:80]}")
+
+    except Exception as e:
+        log.error(f"Sentinel trigger handler error for {sym}: {e}")
+
+
+def _execute_sentinel_buy(decision: dict, portfolio_value: float,
+                          regime: dict, trigger: dict):
+    """Execute a sentinel-triggered buy order."""
+    sym = decision.get("symbol", "")
+    qty = decision.get("qty", 0)
+    sl = decision.get("sl", 0)
+    tp = decision.get("tp", 0)
+    instrument = decision.get("instrument", "stock")
+    reasoning = decision.get("reasoning", "")
+
+    # If agent didn't provide qty, calculate it
+    if qty <= 0:
+        try:
+            from signals import fetch_multi_timeframe
+            sig = fetch_multi_timeframe(sym)
+            if sig:
+                price = sig.get("price", 0)
+                atr = sig.get("atr", 0)
+                score = max(sig.get("score", 0), 30)
+                # Sentinel trades use reduced position sizing
+                sentinel_mult = CONFIG.get("sentinel_risk_multiplier", 0.75)
+                qty = int(calculate_position_size(portfolio_value, price, score, regime) * sentinel_mult)
+                if sl <= 0 and atr > 0:
+                    sl, tp = calculate_stops(price, atr, "LONG")
+        except Exception as e:
+            log.error(f"Sentinel position sizing error for {sym}: {e}")
+            return
+
+    if qty <= 0:
+        clog("INFO", f"Sentinel BUY {sym}: calculated qty=0, skipping")
+        return
+
+    # Check for inverse ETF (SHORT signal)
+    if instrument == "inverse_etf" and decision.get("inverse_symbol"):
+        sym = decision["inverse_symbol"]
+        clog("TRADE", f"⚡ Sentinel SHORT via {sym} (inverse ETF)")
+
+    clog("TRADE", f"⚡ Sentinel BUY {sym} | qty={qty} | SL=${sl:.2f} | TP=${tp:.2f} | {reasoning[:60]}")
+
+    try:
+        # Fetch signal data for execute_buy
+        from signals import fetch_multi_timeframe
+        sig = fetch_multi_timeframe(sym)
+        if sig:
+            success = execute_buy(
+                ib=ib,
+                symbol=sym,
+                price=sig["price"],
+                atr=sig["atr"],
+                score=max(sig.get("score", 0), 30),
+                portfolio_value=portfolio_value,
+                regime=regime,
+                reasoning=f"[SENTINEL] {reasoning}"
+            )
+            if success:
+                dash["trades"].insert(0, {
+                    "side": "⚡ BUY", "symbol": sym,
+                    "price": str(sig["price"]),
+                    "time": datetime.now().strftime("%H:%M:%S"),
+                })
+                clog("TRADE", f"⚡ Sentinel BUY {sym} executed successfully")
+        else:
+            clog("ERROR", f"Sentinel BUY {sym}: failed to fetch signal data")
+    except Exception as e:
+        clog("ERROR", f"Sentinel BUY execution error for {sym}: {e}")
+
+
+def _execute_sentinel_sell(decision: dict, open_positions: list,
+                           regime: dict, trigger: dict):
+    """Execute a sentinel-triggered sell order."""
+    sym = decision.get("symbol", "")
+    reasoning = decision.get("reasoning", "")
+
+    pos = next((p for p in open_positions if p.get("symbol") == sym), None)
+    if not pos:
+        clog("INFO", f"Sentinel SELL {sym}: no position found, skipping")
+        return
+
+    clog("TRADE", f"⚡ Sentinel SELL {sym} | {reasoning[:80]}")
+
+    try:
+        exit_price = pos.get("current", 0)
+        execute_sell(ib, sym, reason=f"[SENTINEL] {reasoning}")
+
+        dash["trades"].insert(0, {
+            "side": "⚡ SELL", "symbol": sym,
+            "price": str(exit_price),
+            "time": datetime.now().strftime("%H:%M:%S"),
+        })
+
+        # Log trade
+        pnl_val = (exit_price - pos.get("entry", 0)) * pos.get("qty", 0)
+        from learning import log_trade as _log_trade
+        _log_trade(
+            trade=pos,
+            agent_outputs=decision.get("_sentinel_outputs", {}),
+            regime=regime,
+            action="CLOSE",
+            outcome={
+                "exit_price": round(exit_price, 4),
+                "pnl": round(pnl_val, 2),
+                "reason": f"sentinel_{trigger.get('direction', 'news').lower()}",
+            }
+        )
+        clog("TRADE", f"⚡ Sentinel SELL {sym} executed | P&L: ${pnl_val:+,.2f}")
+    except Exception as e:
+        clog("ERROR", f"Sentinel SELL execution error for {sym}: {e}")
+
+
 # ── Scan countdown ─────────────────────────────────────────────
 def countdown_tick():
     """Update next_scan_seconds every second for dashboard progress bar."""
@@ -1539,6 +2477,8 @@ class DashHandler(BaseHTTPRequestHandler):
             # Total P&L = NetLiquidation - effective capital (starting + deposits - withdrawals)
             eff_cap = get_effective_capital()
             state["effective_capital"] = eff_cap
+            # Extended account metrics for KPI row
+            state["account_details"] = get_account_details()
             if state.get("performance"):
                 state["performance"] = dict(state["performance"])
                 state["performance"]["total_pnl"] = round(state.get("portfolio_value", 0) - eff_cap, 2)
@@ -1551,9 +2491,21 @@ class DashHandler(BaseHTTPRequestHandler):
                 "min_score_to_trade":       CONFIG.get("min_score_to_trade", 28),
                 "high_conviction_score":    CONFIG.get("high_conviction_score", 38),
                 "agents_required_to_agree": CONFIG.get("agents_required_to_agree", 3),
+                "options_min_score":        CONFIG.get("options_min_score", 35),
                 "options_max_risk_pct":     CONFIG.get("options_max_risk_pct", 0.025),
                 "options_max_ivr":          CONFIG.get("options_max_ivr", 65),
                 "options_target_delta":     CONFIG.get("options_target_delta", 0.50),
+                "options_delta_range":      CONFIG.get("options_delta_range", 0.35),
+                # Sentinel settings
+                "sentinel_enabled":             CONFIG.get("sentinel_enabled", True),
+                "sentinel_poll_seconds":        CONFIG.get("sentinel_poll_seconds", 45),
+                "sentinel_cooldown_minutes":    CONFIG.get("sentinel_cooldown_minutes", 10),
+                "sentinel_max_trades_per_hour": CONFIG.get("sentinel_max_trades_per_hour", 3),
+                "sentinel_risk_multiplier":     CONFIG.get("sentinel_risk_multiplier", 0.75),
+                "sentinel_keyword_threshold":   CONFIG.get("sentinel_keyword_threshold", 3),
+                "sentinel_min_confidence":      CONFIG.get("sentinel_min_confidence", 5),
+                "sentinel_use_ibkr":            CONFIG.get("sentinel_use_ibkr", True),
+                "sentinel_use_finviz":          CONFIG.get("sentinel_use_finviz", True),
             }
             self.wfile.write(json.dumps(state).encode())
         elif self.path == "/api/favourites":
@@ -1617,6 +2569,53 @@ class DashHandler(BaseHTTPRequestHandler):
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
                     self.wfile.write(json.dumps({"ok": False, "error": str(e)}).encode())
+        elif self.path == "/api/cancel-order":
+            length = int(self.headers.get("Content-Length", 0))
+            body   = json.loads(self.rfile.read(length)) if length else {}
+            order_id = body.get("order_id")
+            if not order_id:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": False, "error": "No order_id provided"}).encode())
+            else:
+                try:
+                    cancelled = False
+                    for t in ib.openTrades():
+                        if t.order.orderId == order_id:
+                            ib.cancelOrder(t.order)
+                            ib.sleep(1)
+                            cancelled = True
+                            clog("TRADE", f"❌ Cancelled order #{order_id} ({t.contract.symbol}) via dashboard")
+                            break
+                    if cancelled:
+                        # Update orders.json
+                        from learning import update_order_status
+                        update_order_status(order_id, "CANCELLED")
+                        sync_orders_from_ibkr()
+                        # Remove pending entry from open_trades tracker
+                        from orders import open_trades
+                        cancelled_keys = [k for k, v in open_trades.items()
+                                          if v.get("order_id") == order_id and v.get("status") == "PENDING"]
+                        for k in cancelled_keys:
+                            clog("TRADE", f"Removed cancelled pending order {k} from tracker")
+                            del open_trades[k]
+                        dash["positions"] = get_open_positions()
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/json")
+                        self.end_headers()
+                        self.wfile.write(json.dumps({"ok": True, "detail": f"Order #{order_id} cancelled"}).encode())
+                    else:
+                        self.send_response(404)
+                        self.send_header("Content-Type", "application/json")
+                        self.end_headers()
+                        self.wfile.write(json.dumps({"ok": False, "error": f"Order #{order_id} not found in open orders"}).encode())
+                except Exception as e:
+                    clog("ERROR", f"Cancel order #{order_id} failed: {e}")
+                    self.send_response(500)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"ok": False, "error": str(e)}).encode())
         elif self.path == "/api/pause":
             length = int(self.headers.get("Content-Length", 0))
             body   = json.loads(self.rfile.read(length)) if length else {}
@@ -1653,6 +2652,7 @@ class DashHandler(BaseHTTPRequestHandler):
                     applied.append(key)
             # Persist to disk so settings survive restarts
             save_settings_overrides(body)
+            _sync_dash_from_config()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -1724,6 +2724,31 @@ def main():
     # Start dashboard
     start_dashboard()
 
+    # ── One-time setup: NLTK VADER lexicon (needed for social sentiment) ──
+    try:
+        import nltk
+        nltk.download("vader_lexicon", quiet=True)
+    except Exception:
+        pass  # Optional — social_sentiment.py has keyword fallback
+
+    # ── Background data collection (historical training data) ──
+    # Runs in a daemon thread so it doesn't block the bot startup.
+    # Collects daily + intraday data for the default universe, saves to data/historical/.
+    # Safe to run repeatedly — appends new bars, deduplicates, never overwrites.
+    def _background_data_collection():
+        try:
+            from data_collector import collect_all
+            clog("INFO", "Background data collection started (historical training data)")
+            result = collect_all(intraday=True, daily=True, add_ml_features=True)
+            clog("INFO", f"Data collection complete: {result['total_rows']:,} rows, "
+                 f"{result['daily_symbols']} daily + {result['intraday_symbols']} intraday symbols")
+        except ImportError:
+            clog("INFO", "data_collector.py not found — skipping historical data collection")
+        except Exception as e:
+            clog("ERROR", f"Background data collection error: {e}")
+
+    threading.Thread(target=_background_data_collection, daemon=True, name="DataCollector").start()
+
     # Connect to IBKR
     if not connect_ibkr():
         print(f"{Fore.RED}ERROR: Could not connect to IBKR on port {CONFIG['ibkr_port']}.{Style.RESET_ALL}")
@@ -1764,11 +2789,20 @@ def main():
     dash["performance"]    = get_performance_summary(dash["all_trades"])
 
     dash["status"] = "running"
+
+    # ── Load custom themes from disk ────────────────────────
+    load_custom_themes()
+    dash["sentinel_themes"] = get_all_themes()
+
     run_scan()
 
     # Schedule subsequent scans dynamically based on session
     def scheduled_scan():
         run_scan()
+        # Update sentinel dashboard state after each scan
+        if _sentinel:
+            dash["sentinel_stats"] = _sentinel.stats
+            dash["sentinel_status"] = _sentinel.stats.get("status", "unknown")
         # Reschedule with fresh interval
         interval = get_scan_interval()
         dash["next_scan_seconds"] = interval
@@ -1778,6 +2812,44 @@ def main():
     interval = get_scan_interval()
     dash["next_scan_seconds"] = interval
     schedule.every(interval).seconds.do(scheduled_scan).tag("scan")
+
+    # ── Start News Sentinel (independent background thread) ──
+    global _sentinel
+    if CONFIG.get("sentinel_enabled", True):
+        _sentinel = NewsSentinel(
+            get_universe_fn=_get_sentinel_universe,
+            on_trigger_fn=handle_news_trigger,
+            ib=ib,
+            poll_interval=CONFIG.get("sentinel_poll_seconds", 45),
+        )
+        _sentinel.start()
+        dash["sentinel_status"] = "running"
+        dash["sentinel_stats"] = _sentinel.stats
+        clog("INFO", f"📡 News Sentinel active | polling every {CONFIG.get('sentinel_poll_seconds', 45)}s")
+    else:
+        clog("INFO", "📡 News Sentinel disabled (sentinel_enabled=False in config)")
+
+    # ── Start Social Sentiment background polling ──
+    try:
+        from social_sentiment import start_sentiment_polling
+        start_sentiment_polling()
+        clog("INFO", "Social sentiment polling active (Reddit + ApeWisdom, 60s interval)")
+    except ImportError:
+        clog("INFO", "Social sentiment module not installed — skipping background polling")
+    except Exception as e:
+        clog("ERROR", f"Social sentiment startup error: {e}")
+
+    # ── Start ML Signal Enhancement ──
+    try:
+        from ml_engine import enhance_score
+        if CONFIG.get("ml_enabled", False):
+            clog("INFO", "ML signal enhancement active (will enhance scores when models trained)")
+        else:
+            clog("INFO", "ML engine available but disabled (ml_enabled=False)")
+    except ImportError:
+        clog("INFO", "ML engine not installed — skipping")
+    except Exception as e:
+        clog("ERROR", f"ML engine startup error: {e}")
 
     clog("INFO", f"<> Decifer running. Dashboard → http://localhost:{CONFIG['dashboard_port']}")
     clog("INFO", "Press Ctrl+C to stop.")
@@ -1790,10 +2862,17 @@ def main():
             # ── Process individual position close requests ──
             _process_close_queue()
 
+            # ── Sync sentinel state to dashboard ──
+            if _sentinel:
+                dash["sentinel_stats"] = _sentinel.stats
+                dash["sentinel_status"] = _sentinel.stats.get("status", "unknown")
+
             schedule.run_pending()
             ib.sleep(1)
     except KeyboardInterrupt:
         dash["status"] = "stopped"
+        if _sentinel:
+            _sentinel.stop()
         clog("INFO", "<> Decifer stopped.")
         ib.disconnect()
 

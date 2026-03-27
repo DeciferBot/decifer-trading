@@ -42,20 +42,32 @@ def agent_technical(signals: list, regime: dict) -> str:
     if not signals:
         return "No symbols above scoring threshold. No technical setups."
 
-    signal_text = "\n".join([
-        f"{s['symbol']}: ${s['price']} | Score={s['score']}/50 | Signal={s['signal']} | "
-        f"MFI={s['timeframes']['5m']['mfi']} | RSI_slope={s['timeframes']['5m']['rsi_slope']} | "
-        f"MACD_accel={s['timeframes']['5m']['macd_accel']} | Vol={s['vol_ratio']}x | ATR={s['atr']} | "
-        f"EMA={'BULL' if s['timeframes']['5m']['bull_aligned'] else 'BEAR' if s['timeframes']['5m']['bear_aligned'] else 'MIXED'} | "
-        f"ADX={s['timeframes']['5m']['adx']}({s['timeframes']['5m']['trend_strength']}) | "
-        f"Squeeze={'ON(' + str(s['timeframes']['5m']['squeeze_intensity']) + ')' if s['timeframes']['5m']['squeeze_on'] else 'off'} | "
-        f"VWAP_dist={s['timeframes']['5m']['vwap_dist']}% | "
-        f"Donchian={'BREAKOUT_HIGH' if s['timeframes']['5m']['donch_breakout']==1 else 'BREAKOUT_LOW' if s['timeframes']['5m']['donch_breakout']==-1 else 'inside'} | "
-        f"OBV={'UP' if s['timeframes']['5m']['obv_slope']>0 else 'DOWN' if s['timeframes']['5m']['obv_slope']<0 else 'FLAT'} | "
-        f"News={s.get('news', {}).get('claude_sentiment', 'N/A')}(kw={s.get('news', {}).get('keyword_score', 0)}) | "
-        f"TF={s['timeframes']['5m']['signal']}/{s['timeframes']['1d']['signal'] if s['timeframes']['1d'] else 'N/A'}/{s['timeframes']['1w']['signal'] if s['timeframes']['1w'] else 'N/A'}"
-        for s in signals[:15]
-    ])
+    signal_lines = []
+    for s in signals[:15]:
+        news = s.get("news", {})
+        catalyst = news.get("claude_catalyst", "")
+        headlines = news.get("headlines", [])
+        top_headline = headlines[0] if headlines else ""
+        news_str = f"News={news.get('claude_sentiment', 'N/A')}(kw={news.get('keyword_score', 0)})"
+        if catalyst:
+            news_str += f" CATALYST: {catalyst}"
+        elif top_headline:
+            news_str += f" HEADLINE: {top_headline}"
+
+        signal_lines.append(
+            f"{s['symbol']}: ${s['price']} | Score={s['score']}/50 | Signal={s['signal']} | "
+            f"MFI={s['timeframes']['5m']['mfi']} | RSI_slope={s['timeframes']['5m']['rsi_slope']} | "
+            f"MACD_accel={s['timeframes']['5m']['macd_accel']} | Vol={s['vol_ratio']}x | ATR={s['atr']} | "
+            f"EMA={'BULL' if s['timeframes']['5m']['bull_aligned'] else 'BEAR' if s['timeframes']['5m']['bear_aligned'] else 'MIXED'} | "
+            f"ADX={s['timeframes']['5m']['adx']}({s['timeframes']['5m']['trend_strength']}) | "
+            f"Squeeze={'ON(' + str(s['timeframes']['5m']['squeeze_intensity']) + ')' if s['timeframes']['5m']['squeeze_on'] else 'off'} | "
+            f"VWAP_dist={s['timeframes']['5m']['vwap_dist']}% | "
+            f"Donchian={'BREAKOUT_HIGH' if s['timeframes']['5m']['donch_breakout']==1 else 'BREAKOUT_LOW' if s['timeframes']['5m']['donch_breakout']==-1 else 'inside'} | "
+            f"OBV={'UP' if s['timeframes']['5m']['obv_slope']>0 else 'DOWN' if s['timeframes']['5m']['obv_slope']<0 else 'FLAT'} | "
+            f"{news_str} | "
+            f"TF={s['timeframes']['5m']['signal']}/{s['timeframes']['1d']['signal'] if s['timeframes']['1d'] else 'N/A'}/{s['timeframes']['1w']['signal'] if s['timeframes']['1w'] else 'N/A'}"
+        )
+    signal_text = "\n".join(signal_lines)
 
     prompt = f"""Current scanned universe (symbols scoring above threshold):
 
@@ -214,6 +226,10 @@ For each opportunity provide:
 2. DIRECTION: LONG or SHORT
 3. CONVICTION: HIGH / MEDIUM / LOW
 4. ENTRY RATIONALE: Why this, why now? (reference options flow if relevant)
+   IMPORTANT: Lead with the REAL WORLD reason — a news catalyst, earnings event, sector rotation,
+   fundamental change, or a clear chart pattern (e.g. "breaking out of 3-month base on 2x volume").
+   Do NOT lead with indicator values. A human reading this should understand the trade thesis
+   without knowing what ADX or MFI means.
 5. KEY RISK: What could make this wrong?
 6. SUGGESTED INSTRUMENT: Stock / Call option / Put option / Inverse ETF / FX pair
    — If options flow data supports the trade and IVR is low, PREFER options over stock.
@@ -299,10 +315,15 @@ Open positions ({len(open_positions)}/{max_pos}):
 
 RISK CONSTRAINTS:
 - Max risk per trade: {risk_pct*100:.0f}% (${portfolio_value * risk_pct:,.2f})
-- Position slots available: {positions_remaining}
+- CONFIGURED max positions: {max_pos} (this is the ACTUAL system limit — do NOT invent a lower number)
+- Position slots available: {positions_remaining} of {max_pos}
 - Min cash reserve: {cash_reserve*100:.0f}% (${portfolio_value * cash_reserve:,.2f})
 - Regime size multiplier: {regime['position_size_multiplier']}x
 - Current regime: {regime['regime']}
+
+CRITICAL INSTRUCTION: The maximum position limit is {max_pos}. This is configured by the user.
+You MUST use {max_pos} as the position cap — do NOT reduce it, override it, or substitute your own number.
+If there are {positions_remaining} slots remaining out of {max_pos}, new trades ARE admissible.
 
 For each proposed trade, output:
 DECISION: APPROVE / REDUCE SIZE / REJECT
@@ -311,7 +332,7 @@ STOP LOSS: $ price
 TAKE PROFIT: $ price (first partial exit)
 REASON: One sentence justification
 
-If daily loss limit is near or position slots are full, say so explicitly."""
+If daily loss limit is near or position slots are full (0 remaining of {max_pos}), say so explicitly."""
 
     return _call_claude(RISK_SYSTEM, prompt)
 
@@ -336,12 +357,18 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
     """
 
     open_syms = [p["symbol"] for p in open_positions]
+    max_pos = CONFIG["max_positions"]
+    slots_remaining = max_pos - len(open_positions)
 
     prompt = f"""You have received reports from 5 specialist agents. Synthesise into trade instructions.
 
 DISAGREEMENT PROTOCOL: A trade requires at least {agents_required} of 6 agents to support it.
 (Technical + Macro + Opportunity = 3 analysts. Devil's Advocate strong concern = -1 agent support.
 Risk Manager is advisory only — counts as 1 vote like every other agent. No single agent has veto power.)
+
+POSITION LIMIT: The system is configured for {max_pos} max positions. Currently {len(open_positions)} open, {slots_remaining} slots available.
+If the Risk Manager claims a different max (e.g. "8-slot maximum"), IGNORE that — the real limit is {max_pos}.
+New buys ARE allowed as long as open positions < {max_pos}.
 
 ═══ AGENT REPORTS ═══
 
@@ -371,15 +398,32 @@ Open positions: {open_syms if open_syms else 'None'}
 Respond ONLY with valid JSON:
 {{
   "buys": [
-    {{"symbol": "AAPL", "qty": 10, "sl": 150.00, "tp": 165.00, "instrument": "stock", "reasoning": "one line"}}
+    {{"symbol": "AAPL", "qty": 10, "sl": 150.00, "tp": 165.00, "instrument": "stock", "reasoning": "REAL WORLD REASON here"}}
   ],
   "sells": ["MSFT"],
   "hold": ["NVDA"],
   "cash": false,
   "agents_agreed": 4,
   "summary": "One sentence market assessment",
-  "claude_reasoning": "2-3 sentences explaining the key decision logic"
+  "claude_reasoning": "2-3 sentences explaining the key decision logic with real-world context"
 }}
+
+═══ CRITICAL — REASONING QUALITY ═══
+The "reasoning" field for each buy MUST contain a REAL WORLD reason a human trader would understand.
+Good reasoning includes:
+- A specific news catalyst: "FDA approval announced today for lead drug candidate"
+- An earnings event: "Reports earnings tomorrow, options flow shows 4x call buying"
+- A fundamental driver: "Revenue beat by 15% last quarter, raised guidance"
+- A clear chart pattern: "Breaking out of 3-month consolidation on 2x volume"
+- Unusual market activity: "Institutional accumulation — 3x normal volume, dark pool prints"
+
+BAD reasoning (DO NOT DO THIS):
+- "ADX 47.8, MTF STRONG_SELL, MFI 10.7" — this is indicator gibberish nobody can learn from
+- "3+ agents aligned, sized conservatively" — this describes the bot's process, not the trade
+- "Highest technical score with zero OBV divergence" — still just indicators
+
+Ask yourself: "Would a human trader reading this learn WHY this trade makes sense?"
+If the answer is no, rewrite it. Reference the NEWS CATALYST or HEADLINE if one exists.
 
 Rules:
 - Only include buys where Risk Manager said APPROVE

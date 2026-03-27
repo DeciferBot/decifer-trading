@@ -89,12 +89,16 @@ def get_ibkr_greeks(ib, symbol: str, expiry: str,
         return None
     try:
         from ib_async import Option as IBOption
-        contract = IBOption(symbol, expiry, strike, right, "SMART", "USD")
+        contract = IBOption(symbol, expiry, strike, right, exchange="SMART", currency="USD")
         ib.qualifyContracts(contract)
+        # Request delayed data (type 3) as fallback if no live options subscription
+        ib.reqMarketDataType(3)
         ticker = ib.reqMktData(contract, genericTickList="100", snapshot=False)
-        ib.sleep(2)
+        ib.sleep(3)  # slightly longer to allow delayed data to arrive
         mg = ticker.modelGreeks
         ib.cancelMktData(contract)
+        # Restore live data type for other requests
+        ib.reqMarketDataType(1)
         if mg and mg.delta is not None:
             return {
                 "delta": round(float(mg.delta), 4),
@@ -195,13 +199,21 @@ def _select_strike(df, flag: str, S: float, dte: int,
     min_vol    = CONFIG.get("options_min_volume", 50)
     min_oi     = CONFIG.get("options_min_oi", 200)
 
-    rows = df[
-        (df["spread_pct"] < max_spread) &
-        (df["volume"].fillna(0) >= min_vol) &
-        (df["openInterest"].fillna(0) >= min_oi)
-    ].copy()
+    total_before = len(df)
+    spread_ok = df["spread_pct"] < max_spread
+    vol_ok    = df["volume"].fillna(0) >= min_vol
+    oi_ok     = df["openInterest"].fillna(0) >= min_oi
+
+    rows = df[spread_ok & vol_ok & oi_ok].copy()
 
     if rows.empty:
+        n_spread = int((~spread_ok).sum())
+        n_vol    = int((~vol_ok).sum())
+        n_oi     = int((~oi_ok).sum())
+        log.info(
+            f"Options: {flag.upper()} chain liquidity filter killed all {total_before} strikes — "
+            f"spread>{max_spread:.0%}: {n_spread} | vol<{min_vol}: {n_vol} | OI<{min_oi}: {n_oi}"
+        )
         return None
 
     # Calculate delta for every remaining strike
@@ -216,9 +228,18 @@ def _select_strike(df, flag: str, S: float, dte: int,
     rows["delta_dist"] = abs(rows["abs_delta"] - target_delta)
 
     # Must be within the allowed delta window
-    rows = rows[rows["delta_dist"] <= delta_range]
-    if rows.empty:
+    in_window = rows[rows["delta_dist"] <= delta_range]
+    if in_window.empty:
+        delta_range_str = f"{target_delta - delta_range:.2f}-{target_delta + delta_range:.2f}"
+        actual_deltas = rows["abs_delta"].tolist()
+        closest = min(actual_deltas, key=lambda d: abs(d - target_delta))
+        log.info(
+            f"Options: {len(rows)} strikes passed liquidity but none in delta window "
+            f"{delta_range_str} (target={target_delta:.2f}) — "
+            f"closest delta={closest:.3f}, all deltas={[round(d,3) for d in sorted(actual_deltas)[:8]]}"
+        )
         return None
+    rows = in_window
 
     best = rows.sort_values("delta_dist").iloc[0]
     iv   = float(best["impliedVolatility"])
@@ -249,7 +270,8 @@ def find_best_contract(symbol: str,
                        direction: str,
                        portfolio_value: float,
                        ib=None,
-                       regime: dict = None) -> dict | None:
+                       regime: dict = None,
+                       score: int = 0) -> dict | None:
     """
     Given a high-conviction signal, find the best options contract.
 
@@ -273,7 +295,21 @@ def find_best_contract(symbol: str,
     max_ivr    = CONFIG.get("options_max_ivr",      50)
     t_delta    = CONFIG.get("options_target_delta", 0.40)
     d_range    = CONFIG.get("options_delta_range",  0.15)
-    max_risk   = CONFIG.get("options_max_risk_pct", 0.01) * portfolio_value
+    base_risk  = CONFIG.get("options_max_risk_pct", 0.01) * portfolio_value
+
+    # ── Conviction scaling — mirror stock logic ──────────────────
+    # Higher scores → larger options allocation, lower scores → smaller.
+    high_conv = CONFIG.get("high_conviction_score", 38)
+    if score >= high_conv:
+        conviction_mult = 1.5     # High conviction → 1.5x base risk
+    elif score >= 32:
+        conviction_mult = 1.0     # Moderate conviction → base risk
+    else:
+        conviction_mult = 0.75    # Low conviction → 0.75x base risk
+
+    max_risk = base_risk * conviction_mult
+    log.info(f"Options sizing {symbol}: score={score} → conviction={conviction_mult}x → "
+             f"max_risk=${max_risk:,.0f} (base=${base_risk:,.0f})")
 
     try:
         ticker = yf.Ticker(symbol)
@@ -283,7 +319,7 @@ def find_best_contract(symbol: str,
             warnings.simplefilter("ignore")
             hist = ticker.history(period="1d", interval="1m")
         if hist is None or hist.empty:
-            log.debug(f"Options: no price data for {symbol}")
+            log.info(f"Options: no price data for {symbol} — cannot evaluate")
             return None
         S = float(hist["Close"].iloc[-1])
 
@@ -298,7 +334,9 @@ def find_best_contract(symbol: str,
                 valid_exp.append((exp, exp_date, dte))
 
         if not valid_exp:
-            log.debug(f"Options: no expiry in {min_dte}-{max_dte} DTE window for {symbol}")
+            all_dtes = [(exp, (datetime.strptime(exp, "%Y-%m-%d").date() - today).days) for exp in all_exps[:6]]
+            log.info(f"Options: no expiry in {min_dte}-{max_dte} DTE window for {symbol} — "
+                     f"available: {all_dtes}")
             return None
 
         # Try each valid expiry, take the first good contract
@@ -320,11 +358,12 @@ def find_best_contract(symbol: str,
                 break
 
             except Exception as e:
-                log.debug(f"Options chain error {symbol} {exp_str}: {e}")
+                log.info(f"Options chain error {symbol} {exp_str}: {e}")
                 continue
 
         if best_contract is None:
-            log.debug(f"Options: no suitable contract found for {symbol}")
+            log.info(f"Options: no suitable contract found for {symbol} after checking "
+                     f"{len(valid_exp)} expiries — all filtered out by liquidity/delta")
             return None
 
         # IV Rank check — bail if options too expensive
@@ -413,7 +452,7 @@ def check_options_exits(open_options: dict, ib=None) -> list[str]:
                 contract = IBOption(
                     sym, pos["expiry_ibkr"],
                     pos["strike"], pos["right"],
-                    "SMART", "USD"
+                    exchange="SMART", currency="USD",
                 )
                 ib.qualifyContracts(contract)
                 ticker = ib.reqMktData(contract, snapshot=True)

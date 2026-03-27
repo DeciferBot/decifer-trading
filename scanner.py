@@ -306,12 +306,16 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
     return list(symbols)
 
 
+_last_good_regime: dict | None = None   # Cache last valid regime for bad-data fallback
+
+
 def get_market_regime(ib: IB) -> dict:
     """
     Classify current market regime using SPY, QQQ, and VIX.
     Returns regime dict used by all agents.
+    Includes sanity checks to reject corrupt/stale price data.
     """
-
+    global _last_good_regime
 
     def _flat(df):
         """Flatten multi-level columns from newer yfinance."""
@@ -345,13 +349,44 @@ def get_market_regime(ib: IB) -> dict:
         else:
             vix_now = float(vix_close.iloc[-1])
 
+        spy_price_now = float(spy_close.iloc[-1])
+        qqq_price_now = float(qqq_close.iloc[-1])
+
+        # ── SANITY CHECKS — reject obviously corrupt data ──────────
+        # SPY trades ~$400-800, QQQ ~$300-600, VIX ~8-80 in normal/stressed markets.
+        # Anything wildly outside these bands is bad data, not a real move.
+        spy_sane = 100 < spy_price_now < 2000
+        qqq_sane = 50  < qqq_price_now < 1500
+        vix_sane = 5   < vix_now < 100
+
+        if not spy_sane or not qqq_sane or not vix_sane:
+            bad_parts = []
+            if not spy_sane: bad_parts.append(f"SPY=${spy_price_now:.2f}")
+            if not qqq_sane: bad_parts.append(f"QQQ=${qqq_price_now:.2f}")
+            if not vix_sane: bad_parts.append(f"VIX={vix_now:.2f}")
+            log.error(
+                f"REGIME DATA SANITY FAIL: {', '.join(bad_parts)} — "
+                f"values outside plausible range, rejecting corrupt data"
+            )
+            if _last_good_regime:
+                log.warning(f"Falling back to last known good regime: {_last_good_regime['regime']}")
+                return _last_good_regime
+            else:
+                log.warning("No previous good regime cached — returning UNKNOWN")
+                return {
+                    "regime": "UNKNOWN", "vix": 0, "vix_1h_change": 0,
+                    "spy_price": 0, "spy_above_ema": False,
+                    "qqq_price": 0, "qqq_above_ema": False,
+                    "position_size_multiplier": 0.5,
+                }
+
         vix_prev      = float(vix_close.iloc[-2]) if vix_close is not None and len(vix_close) > 1 else vix_now
         vix_1h_change = (vix_now - vix_prev) / vix_prev if vix_prev > 0 else 0
 
         spy_ema        = float(spy_close.ewm(span=20, adjust=False).mean().iloc[-1])
         qqq_ema        = float(qqq_close.ewm(span=20, adjust=False).mean().iloc[-1])
-        spy_trending_up = float(spy_close.iloc[-1]) > spy_ema
-        qqq_trending_up = float(qqq_close.iloc[-1]) > qqq_ema
+        spy_trending_up = spy_price_now > spy_ema
+        qqq_trending_up = qqq_price_now > qqq_ema
 
         if vix_now > CONFIG["vix_panic_min"] or vix_1h_change > CONFIG["vix_spike_pct"]:
             regime = "PANIC"
@@ -364,19 +399,26 @@ def get_market_regime(ib: IB) -> dict:
         else:
             regime = "CHOPPY"
 
-        return {
+        result = {
             "regime":                   regime,
             "vix":                      round(vix_now, 2),
             "vix_1h_change":            round(vix_1h_change * 100, 2),
-            "spy_price":                round(float(spy_close.iloc[-1]), 2),
+            "spy_price":                round(spy_price_now, 2),
             "spy_above_ema":            spy_trending_up,
-            "qqq_price":                round(float(qqq_close.iloc[-1]), 2),
+            "qqq_price":                round(qqq_price_now, 2),
             "qqq_above_ema":            qqq_trending_up,
             "position_size_multiplier": _regime_size_mult(regime),
         }
 
+        # Cache this as last known good regime
+        _last_good_regime = result
+        return result
+
     except Exception as e:
         log.error(f"Regime detection error: {e}")
+        if _last_good_regime:
+            log.warning(f"Falling back to last known good regime: {_last_good_regime['regime']}")
+            return _last_good_regime
         return {
             "regime": "UNKNOWN",
             "vix": 0,

@@ -1,16 +1,24 @@
 # Environment & secrets
 .env
+.env.local
+.env.production
 *.pem
 *.key
 
-# Data files
+# Data files (large, regenerable)
 data/trades.json
 data/equity_history.json
+data/orders.json
+data/orders.json.bak*
+data/settings_override.json
 data/*.csv
 data/*.parquet
+data/historical/
+equity_history.json
+favourites.json
 
 # Logs
-logs/*.log
+logs/
 weekly_review.txt
 
 # Python
@@ -26,6 +34,24 @@ build/
 # Jupyter
 .ipynb_checkpoints/
 
+# Chief Decifer (separate project, will get its own repo)
+chief-decifer/
+
+# Old git backup (leftover)
+.git_old/
+
 # OS
 .DS_Store
 Thumbs.db
+.~lock.*
+
+# macOS app bundles and launch scripts (machine-specific)
+*.app/
+*.command
+
+# Generated docs (can be regenerated)
+chief-decifer-dashboard-preview.html
+chief_icon.png
+
+# Office temp files
+~$*

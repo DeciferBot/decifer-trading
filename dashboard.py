@@ -34,6 +34,9 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 
 /* STATS */
 .stats{display:grid;grid-template-columns:repeat(6,1fr);height:66px;border-bottom:1px solid var(--border);overflow:hidden}
+.stats2{display:grid;grid-template-columns:repeat(6,1fr);height:58px;border-bottom:1px solid var(--border);overflow:hidden;background:var(--bg2)}
+.stats2 .stat{padding:6px 14px}
+.stats2 .sv{font-size:15px}
 .stat{padding:8px 14px;border-right:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;overflow:hidden;min-width:0}
 .stat:last-child{border-right:none}
 .sl{font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:3px}
@@ -48,11 +51,11 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .tab.active{color:var(--orange);border-bottom-color:var(--orange)}
 
 /* VIEWS */
-.view{display:none;height:calc(100vh - 46px - 66px - 34px);overflow:hidden}
+.view{display:none;height:calc(100vh - 46px - 66px - 58px - 34px);overflow:hidden}
 .view.active{display:flex}
 
 /* ── VIEW 1: LIVE ── */
-.live-grid{display:grid;grid-template-columns:210px 1fr 290px;width:100%;height:100%;overflow:hidden}
+.live-grid{display:grid;grid-template-columns:210px 1fr 360px;width:100%;height:100%;overflow:hidden}
 .col{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
 .col:last-child{border-right:none}
 .col-title{padding:7px 12px;font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted2);text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;display:flex;justify-content:space-between}
@@ -98,13 +101,12 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .lm{color:var(--text);line-height:1.5;font-size:11px}
 
 /* AI panel */
-.ai-panel{border-top:1px solid var(--border);padding:6px 12px;background:var(--bg2);flex-shrink:0}
+.ai-panel{border-top:1px solid var(--border);padding:6px 12px;background:var(--bg2);flex:0 1 auto;min-height:60px}
 .ai-label{font-size:9px;color:var(--orange);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;display:flex;align-items:center;gap:5px}
 .ai-d{width:5px;height:5px;background:var(--orange);border-radius:50%;animation:pulse 2s infinite}
-.ai-box{background:var(--bg3);border:1px solid var(--border2);border-left:2px solid var(--orange);border-radius:4px;padding:6px 10px;font-size:11px;color:var(--text);line-height:1.65;max-height:55px;overflow-y:auto;white-space:pre-wrap}
+.ai-box{background:var(--bg3);border:1px solid var(--border2);border-left:2px solid var(--orange);border-radius:4px;padding:6px 10px;font-size:11px;color:var(--text);line-height:1.65;max-height:200px;overflow-y:auto;white-space:pre-wrap;resize:vertical}
 
 /* Positions */
-.pos-card{padding:9px 12px;border-bottom:1px solid var(--border)}
 .pos-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 .pos-sym{font-weight:700;font-size:13px;font-family:'Syne',sans-serif}
 .pos-pnl{font-weight:600;font-size:12px}
@@ -125,9 +127,18 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .f-btn{padding:3px 10px;border-radius:3px;font-size:10px;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted2);font-family:'JetBrains Mono',monospace;transition:.15s}
 .f-btn.active,.f-btn:hover{border-color:var(--orange);color:var(--orange);background:var(--orange_dim)}
 .hist-table{overflow-y:auto;flex:1}
-.th{display:grid;grid-template-columns:90px 70px 55px 55px 85px 85px 80px 60px 1fr;padding:6px 14px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;position:sticky;top:0}
-.tr{display:grid;grid-template-columns:90px 70px 55px 55px 85px 85px 80px 60px 1fr;padding:6px 14px;border-bottom:1px solid rgba(34,34,34,.5);font-size:11px}
+.th{display:grid;grid-template-columns:90px 70px 55px 55px 85px 85px 80px 60px 1fr 40px;padding:6px 14px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;position:sticky;top:0}
+.tr{display:grid;grid-template-columns:90px 70px 55px 55px 85px 85px 80px 60px 1fr 40px;padding:6px 14px;border-bottom:1px solid rgba(34,34,34,.5);font-size:11px}
 .tr:hover{background:var(--bg3)}
+.tr.tr-clickable{cursor:pointer}
+.tr.tr-clickable:hover .expand-arrow{color:var(--orange)}
+.expand-arrow{color:var(--muted);font-size:9px;transition:.2s;display:inline-block}
+.expand-arrow.open{transform:rotate(90deg)}
+.trade-explain{display:none;padding:10px 14px 12px 14px;background:rgba(255,107,0,.03);border-bottom:1px solid rgba(34,34,34,.5);border-left:3px solid var(--orange);margin:0;font-size:11px;line-height:1.6;color:var(--muted2)}
+.trade-explain.open{display:block}
+.trade-explain .explain-title{color:var(--orange);font-size:10px;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;font-weight:600}
+.trade-explain .explain-body{color:var(--text);opacity:.85}
+.trade-explain .explain-outcome{margin-top:8px;padding-top:8px;border-top:1px solid rgba(34,34,34,.5);font-size:10px;color:var(--muted2)}
 .pp{color:var(--green)}.pn{color:var(--red)}
 
 /* ── VIEW 3: GROWTH ── */
@@ -223,6 +234,25 @@ canvas{display:block;width:100% !important}
 ::-webkit-scrollbar{width:3px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* Position Detail Modal */
+.pos-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.pos-modal-overlay.active{display:flex}
+.pos-modal{background:var(--bg2);border:1px solid var(--orange);border-radius:8px;width:480px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.pos-modal-hdr{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border)}
+.pos-modal-hdr h3{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px}
+.pos-modal-close{background:none;border:none;color:var(--muted2);font-size:20px;cursor:pointer;padding:4px 8px;border-radius:4px;transition:.15s}
+.pos-modal-close:hover{color:var(--red);background:rgba(255,23,68,.1)}
+.pos-modal-body{padding:16px 18px}
+.pos-modal-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px}
+.pos-modal-row:last-child{border-bottom:none}
+.pos-modal-label{color:var(--muted2);text-transform:uppercase;letter-spacing:1px;font-size:9px}
+.pos-modal-val{font-weight:600;color:var(--text)}
+.pos-modal-section{margin-top:14px;padding-top:10px;border-top:1px solid var(--border2)}
+.pos-modal-section h4{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--orange);margin-bottom:8px;font-family:'Syne',sans-serif}
+.pos-modal-reasoning{font-size:11px;color:var(--text);line-height:1.7;white-space:pre-wrap;background:var(--bg3);border:1px solid var(--border2);border-left:2px solid var(--orange);border-radius:4px;padding:10px 12px;max-height:200px;overflow-y:auto}
+.pos-card{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.pos-card:hover{background:rgba(255,107,0,.04)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
@@ -250,6 +280,16 @@ canvas{display:block;width:100% !important}
   <div class="stat"><div class="sl">Scans Run</div><div class="sv co" id="s-scans">0</div><div class="ss" id="s-last">Never</div></div>
   <div class="stat"><div class="sl">Open Positions</div><div class="sv co" id="s-pos">0</div><div class="ss">bot-managed</div></div>
   <div class="stat"><div class="sl">Trades</div><div class="sv co"><span id="s-trades">0</span></div><div class="ss" id="s-wr">—</div></div>
+</div>
+
+<!-- STATS ROW 2: KPIs -->
+<div class="stats2">
+  <div class="stat"><div class="sl">Available Cash</div><div class="sv cg" id="s-cash">—</div><div class="ss" id="s-cash-pct">—</div></div>
+  <div class="stat"><div class="sl">Buying Power</div><div class="sv cw" id="s-bp">—</div><div class="ss">IBKR margin</div></div>
+  <div class="stat"><div class="sl">Unrealized P&amp;L</div><div class="sv" id="s-upnl">—</div><div class="ss" id="s-upnl-sub">open positions</div></div>
+  <div class="stat"><div class="sl">Realized P&amp;L</div><div class="sv" id="s-rpnl">—</div><div class="ss">closed today</div></div>
+  <div class="stat"><div class="sl">Margin Used</div><div class="sv cw" id="s-margin">—</div><div class="ss" id="s-margin-pct">—</div></div>
+  <div class="stat"><div class="sl">Excess Liquidity</div><div class="sv cw" id="s-excess">—</div><div class="ss">safety buffer</div></div>
 </div>
 
 <!-- TABS -->
@@ -312,7 +352,7 @@ canvas{display:block;width:100% !important}
         <div class="scan-meta"><span id="scan-status">Waiting for first scan...</span><span id="scan-eta">—</span></div>
       </div>
       <div class="col-body" id="log-area" style="flex:0.6;min-height:0;overflow-y:auto"></div>
-      <div class="ai-panel" style="flex-shrink:0">
+      <div class="ai-panel">
         <div class="ai-label"><div class="ai-d"></div>&lt;&gt; Decifer 2.0 Analysis</div>
         <div class="ai-box" id="ai-box">Waiting for first scan...</div>
       </div>
@@ -324,7 +364,7 @@ canvas{display:block;width:100% !important}
 
     <!-- RIGHT: Positions + Trades -->
     <div class="col">
-      <div class="col-title">Open Positions</div>
+      <div class="col-title">Open Positions <span style="margin-left:auto;display:flex;gap:6px"><button class="pos-sort-btn" id="pos-sort-recency" onclick="sortPositions('recency')" style="background:none;border:none;color:var(--orange);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0">Recent</button><button class="pos-sort-btn" id="pos-sort-size" onclick="sortPositions('size')" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0">Size</button><button class="pos-sort-btn" id="pos-sort-pnl" onclick="sortPositions('pnl')" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0">P&amp;L</button></span></div>
       <div style="flex:0 0 auto;overflow-y:auto;max-height:50%;border-bottom:1px solid var(--border)" id="pos-list">
         <div class="empty">No open positions</div>
       </div>
@@ -349,7 +389,7 @@ canvas{display:block;width:100% !important}
     <button class="f-btn" onclick="filterOrders('options',this)">Options</button>
   </div>
   <div class="hist-table">
-    <div class="th"><span>Time</span><span>Symbol</span><span>Side</span><span>Type</span><span>Qty</span><span>Price</span><span>Fill Px</span><span>Status</span><span>Role</span></div>
+    <div class="th"><span>Time</span><span>Symbol</span><span>Side</span><span>Type</span><span>Qty</span><span>Price</span><span>Fill Px</span><span>Status</span><span>Role</span><span></span></div>
     <div id="orders-body"><div class="empty">No orders logged yet. Orders appear here when the bot places them.</div></div>
   </div>
 </div>
@@ -525,12 +565,32 @@ canvas{display:block;width:100% !important}
   </div>
   <div class="setting-card">
     <div class="setting-title">Options</div>
+    <div class="setting-row"><span class="setting-label">Min score for options</span><input class="setting-input" id="cfg-opt-min-score" type="number" step="1" min="20" max="50" value="35"></div>
     <div class="setting-row"><span class="setting-label">Options risk per trade (%)</span><input class="setting-input" id="cfg-opt-risk" type="number" step="0.5" min="0.5" max="5" value="2.5"></div>
     <div class="setting-row"><span class="setting-label">Max IV Rank</span><input class="setting-input" id="cfg-opt-ivr" type="number" step="5" min="20" max="100" value="65"></div>
     <div class="setting-row"><span class="setting-label">Target delta</span><input class="setting-input" id="cfg-opt-delta" type="number" step="0.05" min="0.2" max="0.7" value="0.50"></div>
+    <div class="setting-row"><span class="setting-label">Delta range (±)</span><input class="setting-input" id="cfg-opt-delta-range" type="number" step="0.05" min="0.10" max="0.45" value="0.35"></div>
     <div class="setting-row"><span class="setting-label">DTE range</span><span class="setting-val">5 — 45 days</span></div>
   </div>
 
+  <div class="setting-card">
+    <div class="setting-title">📡 News Sentinel</div>
+    <div class="setting-row"><span class="setting-label">Sentinel enabled</span>
+      <select id="cfg-sentinel-enabled" class="setting-input" style="width:70px"><option value="true">On</option><option value="false">Off</option></select>
+    </div>
+    <div class="setting-row"><span class="setting-label">Poll interval (sec)</span><input class="setting-input" id="cfg-sentinel-poll" type="number" step="5" min="15" max="120" value="45"></div>
+    <div class="setting-row"><span class="setting-label">Cooldown per symbol (min)</span><input class="setting-input" id="cfg-sentinel-cooldown" type="number" step="1" min="1" max="60" value="10"></div>
+    <div class="setting-row"><span class="setting-label">Max trades / hour</span><input class="setting-input" id="cfg-sentinel-max-trades" type="number" step="1" min="1" max="10" value="3"></div>
+    <div class="setting-row"><span class="setting-label">Position size multiplier</span><input class="setting-input" id="cfg-sentinel-risk-mult" type="number" step="0.05" min="0.25" max="1.5" value="0.75"></div>
+    <div class="setting-row"><span class="setting-label">Keyword threshold</span><input class="setting-input" id="cfg-sentinel-kw-thresh" type="number" step="1" min="1" max="10" value="3"></div>
+    <div class="setting-row"><span class="setting-label">Min confidence to trade</span><input class="setting-input" id="cfg-sentinel-min-conf" type="number" step="1" min="1" max="10" value="5"></div>
+    <div class="setting-row"><span class="setting-label">Use IBKR news</span>
+      <select id="cfg-sentinel-ibkr" class="setting-input" style="width:70px"><option value="true">On</option><option value="false">Off</option></select>
+    </div>
+    <div class="setting-row"><span class="setting-label">Use Finviz news</span>
+      <select id="cfg-sentinel-finviz" class="setting-input" style="width:70px"><option value="true">On</option><option value="false">Off</option></select>
+    </div>
+  </div>
   <div class="setting-card">
     <div class="setting-title">💰 Capital Management</div>
     <p style="font-size:11px;color:var(--muted2);margin-bottom:10px">Record deposits or withdrawals so P&L reflects true trading performance. P&L = NetLiquidation - (Starting Capital + Adjustments)</p>
@@ -672,25 +732,86 @@ function closePosition(symbol) {
   }
 }
 
+function cancelOrder(orderId, symbol) {
+  if (confirm('Cancel pending order #' + orderId + ' (' + symbol + ')?')) {
+    fetch('/api/cancel-order', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({order_id: orderId})})
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) { alert('✅ ' + d.detail); update(); }
+        else alert('❌ ' + (d.error || 'unknown'));
+      })
+      .catch(e => alert('Error: ' + e));
+  }
+}
+
+let posSort = 'recency'; // 'recency' | 'size' | 'pnl'
+let lastPositions = [];
+
+function sortPositions(mode) {
+  posSort = mode;
+  // Update button styles
+  document.querySelectorAll('.pos-sort-btn').forEach(b => b.style.color = 'var(--muted2)');
+  const active = document.getElementById('pos-sort-' + mode);
+  if (active) active.style.color = 'var(--orange)';
+  renderPositions(lastPositions);
+}
+
 function renderPositions(positions) {
   const el = document.getElementById('pos-list');
   if (!positions || !positions.length) { el.innerHTML = '<div class="empty">No open positions</div>'; return; }
-  el.innerHTML = positions.map(p => {
-    const pnl = (p.current - p.entry) * p.qty;
-    const pct = ((p.current - p.entry) / p.entry) * 100;
-    const bw  = Math.min(Math.abs(pct) * 10, 100);
-    const col = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+  lastPositions = positions;
+
+  // Enrich with computed fields
+  let enriched = positions.map((p, idx) => {
     const dir = (p.direction === 'SHORT' || p.qty < 0) ? 'SHORT' : 'LONG';
-    return `<div class="pos-card">
+    const isOpt = p.instrument === 'option';
+    // Options: multiply by 100 (contract multiplier) for correct P&L and position value
+    const mult = isOpt ? 100 : 1;
+    const pnl = dir === 'SHORT'
+      ? (p.entry - p.current) * Math.abs(p.qty) * mult
+      : (p.current - p.entry) * Math.abs(p.qty) * mult;
+    const pct = dir === 'SHORT'
+      ? ((p.entry - p.current) / p.entry) * 100
+      : ((p.current - p.entry) / p.entry) * 100;
+    const posValue = Math.abs(p.current * p.qty * mult);
+    return {...p, dir, pnl, pct, posValue, isOpt, _idx: idx};
+  });
+
+  // Sort
+  if (posSort === 'size') enriched.sort((a, b) => b.posValue - a.posValue);
+  else if (posSort === 'pnl') enriched.sort((a, b) => a.pnl - b.pnl);
+  // 'recency' = original order (most recent entries first)
+
+  el.innerHTML = enriched.map(p => {
+    const bw  = Math.min(Math.abs(p.pct) * 10, 100);
+    const col = p.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const isPending = p.status === 'PENDING';
+    const cardOpacity = isPending ? 'opacity:0.55' : '';
+    // Option subtitle: show strike + expiry + right
+    const optSub = p.isOpt ? `<div style="font-size:9px;color:var(--cyan);margin-top:1px">${p.right === 'C' ? 'CALL' : 'PUT'} $${p.strike} exp ${p.expiry_str || p.expiry || ''}</div>` : '';
+    // Pending badge
+    const pendingBadge = isPending ? ' <span style="font-size:8px;color:var(--yellow);background:rgba(255,214,0,.12);border:1px solid var(--yellow);padding:1px 5px;border-radius:8px;font-weight:600;letter-spacing:0.5px">PENDING</span>' : '';
+    // Action button: Cancel for pending, Close for active
+    const actionBtn = isPending && p.order_id
+      ? `<button onclick="event.stopPropagation();cancelOrder(${p.order_id},'${p.symbol}')" style="background:rgba(255,214,0,.12);border:1px solid var(--yellow);color:var(--yellow);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Cancel pending order">CANCEL</button>`
+      : `<button onclick="event.stopPropagation();closePosition('${p._trade_key || p.symbol}')" style="background:rgba(255,23,68,.12);border:1px solid var(--red);color:var(--red);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Close this position">✕</button>`;
+    return `<div class="pos-card" onclick="showPositionDetail(${p._idx})" title="Click for details" style="${cardOpacity}">
       <div class="pos-hdr">
-        <span class="pos-sym">${p.symbol} <span style="font-size:10px;color:var(--muted2);font-weight:400">${dir} ×${Math.abs(p.qty)}</span></span>
+        <span class="pos-sym">${p.symbol}${p.instrument === 'option' ? ' <span style="font-size:9px;color:var(--cyan);font-weight:600">OPT</span>' : ''}${pendingBadge} <span style="font-size:10px;color:var(--muted2);font-weight:400">${p.dir} ×${Math.abs(p.qty)}</span></span>
         <span style="display:flex;align-items:center;gap:6px">
-          <span class="pos-pnl" style="color:${col}">${pnl >= 0 ? '+' : ''}${fmt$(pnl)}</span>
-          <button onclick="closePosition('${p.symbol}')" style="background:rgba(255,23,68,.12);border:1px solid var(--red);color:var(--red);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Close this position">✕</button>
+          ${isPending ? '<span style="font-size:10px;color:var(--yellow)">Awaiting fill</span>' : `<span class="pos-pnl" style="color:${col}">${p.pnl >= 0 ? '+' : ''}${fmt$(p.pnl)}</span>`}
+          ${actionBtn}
         </span>
       </div>
-      <div class="pos-bar-bg"><div class="pos-bar" style="width:${bw}%;background:${col}"></div></div>
-      <div class="pos-meta"><span>Entry ${fmt$(p.entry)}</span><span>Now ${fmt$(p.current)}</span><span>SL ${fmt$(p.sl)}</span><span>TP ${fmt$(p.tp)}</span></div>
+      ${optSub}
+      ${isPending ? '' : `<div class="pos-bar-bg"><div class="pos-bar" style="width:${bw}%;background:${col}"></div></div>`}
+      <div class="pos-meta">
+        ${isPending ? `<span style="color:var(--yellow)">Limit ${fmt$(p.entry)}</span>` : `<span style="color:var(--orange);font-weight:600">${fmt$(p.posValue)}</span>`}
+        ${isPending ? '' : `<span>${p.pct >= 0 ? '+' : ''}${p.pct.toFixed(2)}%</span>`}
+        ${isPending ? '' : `<span>Entry ${fmt$(p.entry)}</span>`}
+        ${isPending ? '' : `<span title="${p._price_sources || 'unknown'}">Now ${fmt$(p.current)}</span>`}
+      </div>
+      ${isPending ? '' : `<div class="pos-meta"><span>SL ${fmt$(p.sl)}</span><span>TP ${fmt$(p.tp)}</span></div>`}
     </div>`;
   }).join('');
 }
@@ -794,6 +915,7 @@ function renderOrders() {
       <span>${fillPx}</span>
       <span style="color:${statusColor};font-weight:700">${status}</span>
       <span style="color:var(--muted2)">${roleLabel}</span>
+      <span>${['SUBMITTED','PRESUBMITTED'].includes(status) && o.order_id ? `<button onclick="cancelOrder(${o.order_id}, '${sym}')" style="background:rgba(255,23,68,.15);border:1px solid var(--red);color:var(--red);border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 8px;font-weight:700" title="Cancel order #${o.order_id}">✕</button>` : ''}</span>
     </div>`;
   }).join('');
 }
@@ -827,13 +949,17 @@ function renderHistory() {
   // Sort newest first
   filtered = filtered.sort((a,b) => new Date(b.timestamp||b.exit_time||0) - new Date(a.timestamp||a.exit_time||0));
   if (!filtered.length) { el.innerHTML = '<div class="empty">No closed trades yet.</div>'; return; }
-  el.innerHTML = filtered.map(t => {
+  el.innerHTML = filtered.map((t, idx) => {
     const pnlClass = t.pnl >= 0 ? 'pp' : 'pn';
     const direction = t.direction || (t.action === 'BUY' ? 'LONG' : 'SHORT');
     const ts = t.timestamp || t.exit_time || '';
     const qty = t.qty || t.shares || t.total_shares || '—';
-    return `<div class="tr">
-      <span>${ts ? ts.slice(0,16).replace('T',' ') : '—'}</span>
+    const uid = 'te-' + idx;
+    const tKey = _explainKey(t);
+    const wasOpen = _openExplains.has(tKey);
+    const explanation = buildTradeExplanation(t);
+    return `<div class="tr tr-clickable" onclick="toggleExplain('${uid}','${tKey.replace(/'/g,"\\'")}')">
+      <span><span class="expand-arrow${wasOpen ? ' open' : ''}" id="arr-${uid}">▶</span> ${ts ? ts.slice(0,16).replace('T',' ') : '—'}</span>
       <span>${t.symbol || '—'}</span>
       <span><span class="ts ${direction === 'LONG' ? 'tb' : 'ts2'}">${direction}</span></span>
       <span style="color:var(--orange)">${qty}</span>
@@ -842,8 +968,136 @@ function renderHistory() {
       <span class="${pnlClass}">${t.pnl != null ? (t.pnl >= 0 ? '+' : '') + fmt$(t.pnl) : '—'}</span>
       <span>${t.hold_minutes ? t.hold_minutes + 'm' : '—'}</span>
       <span style="color:var(--muted2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.exit_reason || '—'}</span>
+    </div>
+    <div class="trade-explain${wasOpen ? ' open' : ''}" id="${uid}">
+      <div class="explain-title">Why This Trade Was Taken</div>
+      <div class="explain-body">${explanation}</div>
     </div>`;
   }).join('');
+}
+
+// Track which trade explanations are open (by symbol+timestamp key for stability across re-renders)
+const _openExplains = new Set();
+
+function _explainKey(t) {
+  return (t.symbol || '') + '|' + (t.timestamp || t.exit_time || '');
+}
+
+function toggleExplain(uid, tradeKey) {
+  const el = document.getElementById(uid);
+  const arr = document.getElementById('arr-' + uid);
+  if (!el) return;
+  const opening = !el.classList.contains('open');
+  el.classList.toggle('open');
+  if (arr) arr.classList.toggle('open');
+  if (opening) _openExplains.add(tradeKey);
+  else _openExplains.delete(tradeKey);
+}
+
+function buildTradeExplanation(t) {
+  const sym = t.symbol || 'this stock';
+  const dir = t.direction || (t.action === 'BUY' ? 'LONG' : (t.action === 'SELL' || t.action === 'CLOSE') ? 'SHORT' : 'LONG');
+  const isLong = dir === 'LONG';
+  const isSentinel = (t.reasoning || '').includes('[SENTINEL]') || (t.source === 'sentinel');
+  const isBackfill = (t.source === 'ibkr_backfill') || (t.reasoning || '').includes('Backfill');
+  const reasoning = (t.reasoning || '').replace('[SENTINEL]', '').replace('Backfilled from IBKR execution history on startup.', '').trim();
+
+  // ── Build a narrative paragraph, not bullet points ──
+  let story = '';
+
+  // OPENING: How did the bot find this trade?
+  if (isBackfill) {
+    story += `This <strong>${sym}</strong> ${isLong ? 'long' : 'short'} trade was placed before full logging was enabled, so the detailed reasoning wasn't captured. `;
+  } else if (isSentinel) {
+    story += `Breaking news hit for <strong>${sym}</strong> and the bot's News Sentinel picked it up in real time. Instead of waiting for the next scheduled scan, it ran a rapid analysis and decided to go ${isLong ? 'long' : 'short'}. `;
+  } else {
+    story += `During a routine market scan, the bot's AI agents analysed <strong>${sym}</strong> and decided to go ${isLong ? 'long (buy)' : 'short (bet on a decline)'}. `;
+  }
+
+  // CONVICTION: Why was the bot confident?
+  if (t.score && t.score > 0) {
+    if (t.score >= 38) {
+      story += `The conviction was <strong>very high</strong> — the agents scored it ${t.score} out of 50, well above the threshold to trade. `;
+    } else if (t.score >= 28) {
+      story += `The conviction was <strong>moderate</strong> — scored ${t.score}/50, clearing the minimum bar. `;
+    } else {
+      story += `The conviction was <strong>borderline</strong> at ${t.score}/50 — the bot took it but it wasn't a slam dunk. `;
+    }
+  }
+
+  // REASONING: The actual "why" in plain English
+  if (reasoning && reasoning.length > 10 && !isBackfill) {
+    // Clean up technical jargon for readability
+    let clean = reasoning
+      .replace(/MACD/g, 'momentum indicator')
+      .replace(/RSI/g, 'strength indicator')
+      .replace(/agents agreed \d\/\d\.?\s*/gi, '')
+      .replace(/Stop loss triggered.*$/i, '')
+      .trim();
+    if (clean.length > 10) {
+      story += clean.endsWith('.') ? clean + ' ' : clean + '. ';
+    }
+  }
+
+  // MARKET CONTEXT
+  if (t.regime && t.regime !== 'UNKNOWN') {
+    const regimeMap = {
+      'BULL_TRENDING': 'bullish and trending up',
+      'BEAR_TRENDING': 'bearish and trending down',
+      'CHOPPY': 'choppy with no clear direction',
+      'PANIC': 'in panic mode with extreme fear'
+    };
+    const regimeDesc = regimeMap[t.regime] || t.regime.toLowerCase();
+    story += `The overall market was <strong>${regimeDesc}</strong>`;
+    if (t.vix) story += ` with a VIX (fear gauge) of ${Number(t.vix).toFixed(0)}`;
+    story += '. ';
+  }
+
+  // OUTCOME: What happened?
+  if (t.pnl != null) {
+    const won = t.pnl >= 0;
+    const holdStr = t.hold_minutes
+      ? (t.hold_minutes >= 60
+        ? (t.hold_minutes / 60).toFixed(1) + ' hours'
+        : t.hold_minutes + ' minutes')
+      : null;
+
+    const exitMap = {
+      'stop_loss': 'the price moved against the position and hit the stop-loss — the safety net that limits how much a trade can lose',
+      'take_profit': 'the price reached the profit target and the bot locked in gains automatically',
+      'agent_sell': 'the AI agents re-analysed the position and decided it was time to exit',
+      'trailing_stop': 'a trailing stop kicked in — the bot locked in profit as the price pulled back',
+      'manual': 'the position was closed manually'
+    };
+    const exitDesc = exitMap[t.exit_reason] || t.exit_reason || 'the position was closed';
+
+    if (won) {
+      story += `<span class="pp"><strong>This was a winning trade (+${fmt$(t.pnl)})</strong></span>`;
+    } else {
+      story += `<span class="pn"><strong>This was a losing trade (${fmt$(t.pnl)})</strong></span>`;
+    }
+    if (holdStr) story += `, held for ${holdStr}`;
+    story += `. It closed because ${exitDesc}.`;
+  }
+
+  // LESSON (short takeaway)
+  if (t.pnl != null && !isBackfill) {
+    story += '<div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(34,34,34,.5);font-size:10px;color:var(--muted2)">';
+    if (t.pnl < 0 && t.exit_reason === 'stop_loss') {
+      story += '💡 <strong>Takeaway:</strong> The stop-loss did its job — it kept the loss controlled. Not every trade wins, but the key is keeping losses small.';
+    } else if (t.pnl >= 0 && t.exit_reason === 'take_profit') {
+      story += '💡 <strong>Takeaway:</strong> Clean trade — the bot identified the opportunity, set a target, and exited with profit when it was hit.';
+    } else if (t.pnl >= 0 && t.exit_reason === 'agent_sell') {
+      story += '💡 <strong>Takeaway:</strong> The agents spotted a shift in conditions and decided to take profit before things changed.';
+    } else if (t.pnl < 0 && t.exit_reason === 'agent_sell') {
+      story += '💡 <strong>Takeaway:</strong> The agents decided to cut the position early rather than wait for the stop-loss — sometimes exiting a losing trade quickly is the right call.';
+    } else {
+      story += '💡 <strong>Takeaway:</strong> Every trade is a data point. The bot learns from wins and losses to refine future decisions.';
+    }
+    story += '</div>';
+  }
+
+  return story || 'No explanation available — this trade was placed before detailed logging was enabled.';
 }
 
 // ── Render agents view ─────────────────────────────────────
@@ -920,6 +1174,7 @@ function filterByTF(data, tf) {
 
 function setEquityTF(tf, btn) {
   equityTF = tf;
+  _lastEquityFingerprint = '';  // Force redraw on explicit timeframe change
   document.querySelectorAll('#equity-card .tf-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderEquityChart(filterByTF(allEquityData, tf));
@@ -927,6 +1182,7 @@ function setEquityTF(tf, btn) {
 
 function setDailyTF(tf, btn) {
   dailyTF = tf;
+  _lastDailyFingerprint = '';  // Force redraw on explicit timeframe change
   document.querySelectorAll('#daily-card .tf-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderDailyChart(buildDailyPnL(allEquityData, tf));
@@ -935,7 +1191,7 @@ function setDailyTF(tf, btn) {
 function renderEquityChart(data) {
   if (!data || data.length < 2) return;
   // Only redraw if data or timeframe actually changed
-  const fp = equityTF + '_' + data.length + '_' + data[0].value + '_' + data[data.length-1].value;
+  const fp = equityTF + '_' + data.length + '_' + data[0].date + '_' + data[0].value + '_' + data[data.length-1].date + '_' + data[data.length-1].value;
   if (fp === _lastEquityFingerprint && equityChart) return;
   _lastEquityFingerprint = fp;
 
@@ -1036,7 +1292,7 @@ function buildDailyPnL(equityData, tf) {
 function renderDailyChart(days) {
   if (!days || !days.length) return;
   // Only redraw if data or timeframe actually changed
-  const fp = dailyTF + '_' + days.length + '_' + days[0].pnl + '_' + days[days.length-1].pnl;
+  const fp = dailyTF + '_' + days.length + '_' + days[0].date + '_' + days[0].pnl + '_' + days[days.length-1].date + '_' + days[days.length-1].pnl;
   if (fp === _lastDailyFingerprint && dailyChart) return;
   _lastDailyFingerprint = fp;
 
@@ -1170,6 +1426,43 @@ async function poll() {
       document.getElementById('s-wr').textContent = 'Win: ' + d.performance.win_rate + '%';
     }
 
+    // KPI Row 2 — Account details
+    if (d.account_details) {
+      const ad = d.account_details;
+      const pv = d.portfolio_value || 1;
+
+      // Available Cash
+      const cash = ad.total_cash || ad.available_cash || 0;
+      document.getElementById('s-cash').textContent = fmt$(cash);
+      document.getElementById('s-cash').className = 'sv ' + (cash > 0 ? 'cg' : 'cr');
+      const cashPct = (cash / pv * 100).toFixed(1);
+      document.getElementById('s-cash-pct').textContent = cashPct + '% of portfolio';
+
+      // Buying Power
+      document.getElementById('s-bp').textContent = ad.buying_power ? fmt$(ad.buying_power) : '—';
+
+      // Unrealized P&L
+      const upnl = ad.unrealized_pnl || 0;
+      const upnlEl = document.getElementById('s-upnl');
+      upnlEl.textContent = (upnl >= 0 ? '+' : '-') + fmt$(Math.abs(upnl));
+      upnlEl.className = 'sv ' + (upnl >= 0 ? 'cg' : 'cr');
+
+      // Realized P&L
+      const rpnl = ad.realized_pnl || 0;
+      const rpnlEl = document.getElementById('s-rpnl');
+      rpnlEl.textContent = (rpnl >= 0 ? '+' : '-') + fmt$(Math.abs(rpnl));
+      rpnlEl.className = 'sv ' + (rpnl >= 0 ? 'cg' : 'cr');
+
+      // Margin Used
+      const margin = ad.margin_used || 0;
+      document.getElementById('s-margin').textContent = fmt$(margin);
+      const marginPct = (margin / pv * 100).toFixed(1);
+      document.getElementById('s-margin-pct').textContent = marginPct + '% utilization';
+
+      // Excess Liquidity
+      document.getElementById('s-excess').textContent = ad.excess_liquidity ? fmt$(ad.excess_liquidity) : '—';
+    }
+
     // Regime
     if (d.regime) updateRegime(d.regime);
 
@@ -1234,7 +1527,10 @@ async function poll() {
       const limit = pv * 0.04;
       const used  = Math.abs(Math.min(pnl, 0));
       const expPct = ((d.positions||[]).length / 6) * 100;
-      const deployed = (d.positions||[]).reduce((s, p) => s + p.current * p.qty, 0) / pv * 100;
+      const deployed = (d.positions||[]).reduce((s, p) => {
+        const mult = p.instrument === 'option' ? 100 : 1;
+        return s + Math.abs(p.current * p.qty * mult);
+      }, 0) / pv * 100;
 
       document.getElementById('r-daily-bar').style.width   = Math.min(used/limit*100,100) + '%';
       document.getElementById('r-daily-used').textContent  = `${fmt$(used)} of ${fmt$(limit)}`;
@@ -1260,9 +1556,23 @@ async function poll() {
       document.getElementById('cfg-min-score').value   = s.min_score_to_trade;
       document.getElementById('cfg-high-score').value  = s.high_conviction_score;
       document.getElementById('agree-select').value    = s.agents_required_to_agree;
+      document.getElementById('cfg-opt-min-score').value = s.options_min_score;
       document.getElementById('cfg-opt-risk').value    = (s.options_max_risk_pct * 100).toFixed(1);
       document.getElementById('cfg-opt-ivr').value     = s.options_max_ivr;
       document.getElementById('cfg-opt-delta').value   = s.options_target_delta;
+      document.getElementById('cfg-opt-delta-range').value = s.options_delta_range;
+      // Sentinel settings
+      if (s.sentinel_enabled != null) {
+        document.getElementById('cfg-sentinel-enabled').value  = String(s.sentinel_enabled);
+        document.getElementById('cfg-sentinel-poll').value     = s.sentinel_poll_seconds;
+        document.getElementById('cfg-sentinel-cooldown').value = s.sentinel_cooldown_minutes;
+        document.getElementById('cfg-sentinel-max-trades').value = s.sentinel_max_trades_per_hour;
+        document.getElementById('cfg-sentinel-risk-mult').value  = s.sentinel_risk_multiplier;
+        document.getElementById('cfg-sentinel-kw-thresh').value  = s.sentinel_keyword_threshold;
+        document.getElementById('cfg-sentinel-min-conf').value   = s.sentinel_min_confidence;
+        document.getElementById('cfg-sentinel-ibkr').value     = String(s.sentinel_use_ibkr);
+        document.getElementById('cfg-sentinel-finviz').value   = String(s.sentinel_use_finviz);
+      }
     }
 
     // Capital management display
@@ -1484,9 +1794,21 @@ function applySettings() {
     min_score_to_trade:       parseInt(document.getElementById('cfg-min-score').value),
     high_conviction_score:    parseInt(document.getElementById('cfg-high-score').value),
     agents_required_to_agree: parseInt(document.getElementById('agree-select').value),
+    options_min_score:        parseInt(document.getElementById('cfg-opt-min-score').value),
     options_max_risk_pct:     parseFloat(document.getElementById('cfg-opt-risk').value) / 100,
     options_max_ivr:          parseInt(document.getElementById('cfg-opt-ivr').value),
     options_target_delta:     parseFloat(document.getElementById('cfg-opt-delta').value),
+    options_delta_range:      parseFloat(document.getElementById('cfg-opt-delta-range').value),
+    // Sentinel
+    sentinel_enabled:             document.getElementById('cfg-sentinel-enabled').value === 'true',
+    sentinel_poll_seconds:        parseInt(document.getElementById('cfg-sentinel-poll').value),
+    sentinel_cooldown_minutes:    parseInt(document.getElementById('cfg-sentinel-cooldown').value),
+    sentinel_max_trades_per_hour: parseInt(document.getElementById('cfg-sentinel-max-trades').value),
+    sentinel_risk_multiplier:     parseFloat(document.getElementById('cfg-sentinel-risk-mult').value),
+    sentinel_keyword_threshold:   parseInt(document.getElementById('cfg-sentinel-kw-thresh').value),
+    sentinel_min_confidence:      parseInt(document.getElementById('cfg-sentinel-min-conf').value),
+    sentinel_use_ibkr:            document.getElementById('cfg-sentinel-ibkr').value === 'true',
+    sentinel_use_finviz:          document.getElementById('cfg-sentinel-finviz').value === 'true',
   };
 
   fetch('/api/settings', {
@@ -1554,6 +1876,85 @@ function saveFavourites() {
 
 // Load favourites on page load
 renderFavTags();
+
+// ── Position Detail Modal ─────────────────────────────────
+function showPositionDetail(idx) {
+  const p = lastPositions[idx];
+  if (!p) return;
+
+  const dir = (p.direction === 'SHORT' || p.qty < 0) ? 'SHORT' : 'LONG';
+  const isOpt = p.instrument === 'option';
+  const mult = isOpt ? 100 : 1;
+  const pnl = dir === 'SHORT'
+    ? (p.entry - p.current) * Math.abs(p.qty) * mult
+    : (p.current - p.entry) * Math.abs(p.qty) * mult;
+  const pct = dir === 'SHORT'
+    ? ((p.entry - p.current) / p.entry) * 100
+    : ((p.current - p.entry) / p.entry) * 100;
+  const posValue = Math.abs(p.current * p.qty * mult);
+  const pnlCol = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+
+  // Build option details section
+  let optRows = '';
+  if (isOpt) {
+    const right = p.right === 'C' ? 'CALL' : 'PUT';
+    optRows = `
+      <div class="pos-modal-row"><span class="pos-modal-label">Type</span><span class="pos-modal-val" style="color:var(--cyan)">${right} Option</span></div>
+      <div class="pos-modal-row"><span class="pos-modal-label">Strike</span><span class="pos-modal-val">${fmt$(p.strike)}</span></div>
+      <div class="pos-modal-row"><span class="pos-modal-label">Expiry</span><span class="pos-modal-val">${p.expiry_str || p.expiry || '—'}</span></div>
+      <div class="pos-modal-row"><span class="pos-modal-label">Contracts</span><span class="pos-modal-val">${p.contracts || p.qty}</span></div>
+      ${p.delta != null ? `<div class="pos-modal-row"><span class="pos-modal-label">Delta</span><span class="pos-modal-val">${Number(p.delta).toFixed(3)}</span></div>` : ''}
+      ${p.theta != null ? `<div class="pos-modal-row"><span class="pos-modal-label">Theta</span><span class="pos-modal-val">${Number(p.theta).toFixed(4)}</span></div>` : ''}
+      ${p.iv != null ? `<div class="pos-modal-row"><span class="pos-modal-label">IV</span><span class="pos-modal-val">${(Number(p.iv)*100).toFixed(1)}%</span></div>` : ''}
+      ${p.iv_rank != null ? `<div class="pos-modal-row"><span class="pos-modal-label">IV Rank</span><span class="pos-modal-val">${p.iv_rank}%</span></div>` : ''}
+    `;
+  } else {
+    optRows = `<div class="pos-modal-row"><span class="pos-modal-label">Type</span><span class="pos-modal-val">Common Stock</span></div>
+      <div class="pos-modal-row"><span class="pos-modal-label">Shares</span><span class="pos-modal-val">${Math.abs(p.qty)}</span></div>`;
+  }
+
+  const badge = isOpt ? ' <span style="color:var(--cyan);font-size:12px">OPT</span>' : '';
+  const dirBadge = `<span style="font-size:11px;color:${dir==='LONG'?'var(--green)':'var(--red)'};font-weight:600;background:${dir==='LONG'?'rgba(0,200,83,.1)':'rgba(255,23,68,.1)'};padding:2px 8px;border-radius:10px">${dir}</span>`;
+
+  const reasoning = p.reasoning || 'No reasoning recorded for this position.';
+
+  document.getElementById('pos-modal-content').innerHTML = `
+    <div class="pos-modal-hdr">
+      <h3>${p.symbol}${badge} ${dirBadge}</h3>
+      <button class="pos-modal-close" onclick="closePositionModal()">&times;</button>
+    </div>
+    <div class="pos-modal-body">
+      <div class="pos-modal-row"><span class="pos-modal-label">Position Value</span><span class="pos-modal-val" style="color:var(--orange)">${fmt$(posValue)}</span></div>
+      <div class="pos-modal-row"><span class="pos-modal-label">P&L</span><span class="pos-modal-val" style="color:${pnlCol}">${pnl >= 0 ? '+' : ''}${fmt$(pnl)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)</span></div>
+      <div class="pos-modal-row"><span class="pos-modal-label">Entry Price</span><span class="pos-modal-val">${fmt$(p.entry)}</span></div>
+      <div class="pos-modal-row"><span class="pos-modal-label">Current Price</span><span class="pos-modal-val">${fmt$(p.current)}</span></div>
+      <div class="pos-modal-row"><span class="pos-modal-label">Stop Loss</span><span class="pos-modal-val" style="color:var(--red)">${fmt$(p.sl)}</span></div>
+      <div class="pos-modal-row"><span class="pos-modal-label">Take Profit</span><span class="pos-modal-val" style="color:var(--green)">${fmt$(p.tp)}</span></div>
+      ${optRows}
+      <div class="pos-modal-row"><span class="pos-modal-label">Score</span><span class="pos-modal-val">${p.score || '—'}</span></div>
+      <div class="pos-modal-row"><span class="pos-modal-label">Status</span><span class="pos-modal-val">${p.status || '—'}</span></div>
+      ${p._price_sources ? `<div class="pos-modal-row"><span class="pos-modal-label">Price Source</span><span class="pos-modal-val" style="font-size:10px">${p._price_sources}</span></div>` : ''}
+      <div class="pos-modal-section">
+        <h4>Why Decifer Took This Position</h4>
+        <div class="pos-modal-reasoning">${reasoning}</div>
+      </div>
+    </div>
+  `;
+  document.getElementById('pos-modal-overlay').classList.add('active');
+}
+
+function closePositionModal() {
+  document.getElementById('pos-modal-overlay').classList.remove('active');
+}
+
+// Close modal on overlay click or Escape
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositionModal(); });
 </script>
+
+<!-- Position Detail Modal -->
+<div id="pos-modal-overlay" class="pos-modal-overlay" onclick="if(event.target===this)closePositionModal()">
+  <div class="pos-modal" id="pos-modal-content"></div>
+</div>
+
 </body>
 </html>"""

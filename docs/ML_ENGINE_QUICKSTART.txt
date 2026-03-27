@@ -1,0 +1,268 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║  DECIFER ML ENGINE — QUICK START REFERENCE                           ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+FILE LOCATION
+  /sessions/vigilant-hopeful-clarke/mnt/decifer trading/ml_engine.py
+  (949 lines, production quality)
+
+INSTALLATION
+  pip install scikit-learn joblib
+
+CLI COMMANDS
+  python3 ml_engine.py --train      Train models from scratch
+  python3 ml_engine.py --report     Generate weekly performance report
+  python3 ml_engine.py --eval       Evaluate trained models
+  python3 ml_engine.py --verbose    Enable detailed logging
+
+
+CORE CLASSES
+═══════════════════════════════════════════════════════════════════════
+
+TradeLabeler
+  - Loads trades.json and labels outcomes (WIN/LOSS/BREAKEVEN)
+  - Extracts 17+ features at entry time
+  - Creates DataFrame ready for ML training
+
+DeciferML
+  - Main ML engine
+  - Trains RandomForest classifier + GradientBoosting regressor
+  - Includes walk-forward cross-validation (no lookahead bias)
+  - Saves/loads models from data/models/
+
+SignalEnhancer
+  - Wraps existing 0-50 base score with ML confidence
+  - Returns enhanced_score, ml_confidence, ml_details
+  - Gracefully degrades if models unavailable
+
+RegimeClassifier
+  - ML-based market regime detection
+  - Supplements VIX-based system
+  - Predicts: BULL_TRENDING, BEAR_TRENDING, CHOPPY, PANIC, BREAKOUT
+
+WeeklyReportGenerator
+  - Performance analytics by regime, time-of-day, score range
+  - Feature importance over time
+  - Win rate statistics
+
+
+PUBLIC API
+═══════════════════════════════════════════════════════════════════════
+
+enhance_score(symbol_data: dict) -> dict
+  Enhanced 0-50 score with ML confidence multiplier
+
+  Input (all optional):
+    base_score: 0-50 from signal engine (default 25)
+    symbol: ticker name
+    regime: market regime string
+    vix: current VIX level (default 20)
+    time_of_day: hour 0-23 (default 10)
+    day_of_week: 0=Mon, 6=Sun (default 0)
+    is_after_hours: bool (default False)
+    agents_agreed: count 1-6 (default 2)
+    holding_target: minutes (default 60)
+
+  Output:
+    enhanced_score: adjusted 0-50 score
+    ml_confidence: 0-1 confidence level
+    ml_details: {win_probability, expected_return, confidence}
+    ml_enabled: whether ML is active
+
+train_models() -> bool
+  Train all models from scratch
+
+generate_weekly_report() -> str
+  Generate performance report
+
+
+CONFIGURATION (config.py)
+═══════════════════════════════════════════════════════════════════════
+
+ml_enabled              True/False  Master switch
+ml_min_trades           50         Minimum trades before ML active
+ml_retrain_interval     168        Hours between retraining (7 days)
+ml_confidence_weight    0.3        Weight of ML adjustment (0.3 = 30%)
+ml_models_dir           "data/models"  Where to save models
+
+
+INTEGRATION EXAMPLE
+═══════════════════════════════════════════════════════════════════════
+
+from ml_engine import enhance_score
+
+# In your signal evaluation code:
+base_score = 35  # From signals.py
+
+result = enhance_score({
+    "base_score": base_score,
+    "symbol": "AAPL",
+    "regime": "BULL_TRENDING",
+    "vix": 18.5,
+    "time_of_day": 10,
+    "day_of_week": 2,
+    "is_after_hours": False,
+    "agents_agreed": 4,
+    "holding_target": 60
+})
+
+final_score = result["enhanced_score"]  # 35 → 42.3 if high win prob
+confidence = result["ml_confidence"]     # 0.6 = 60% confidence
+
+
+MODEL PERSISTENCE
+═══════════════════════════════════════════════════════════════════════
+
+Saved to data/models/:
+  classifier.pkl      RandomForest for win/loss prediction
+  regressor.pkl       GradientBoosting for return prediction
+  scaler.pkl          Feature standardization
+  features.pkl        Column names (training features)
+  metadata.json       Training date, feature importance
+
+
+FEATURE EXTRACTION
+═══════════════════════════════════════════════════════════════════════
+
+Automatically extracted from each trade:
+  score               Signal score at entry (0-50)
+  regime              Market regime (BULL_TRENDING, CHOPPY, etc.)
+  vix                 VIX level at entry
+  holding_minutes     Time held (calculated from entry/exit times)
+  time_of_day         Hour of entry (0-23)
+  day_of_week         Weekday (0=Monday, 6=Sunday)
+  is_after_hours      True if outside 9:30-16:00 EST
+  agents_agreed       How many of 6 agents agreed
+  regime_BULL_TRENDING, regime_BEAR_TRENDING, etc.  One-hot encoded
+
+
+HOW IT ENHANCES SCORES
+═══════════════════════════════════════════════════════════════════════
+
+1. Extract features from current setup
+2. Predict win_probability [0-1] using RandomForest
+   - 0.5 = no confidence (50/50 setup)
+   - 0.8 = high confidence (setup looks like past winners)
+
+3. Calculate multiplier: 0.5 + win_probability
+   - Range: [0.5, 1.5]
+   - Example: win_prob=0.8 → multiplier=1.3 (30% boost)
+
+4. Apply to base score: enhanced = base × multiplier
+   - Clamped to [0, 50] range
+
+5. Return enhanced score + confidence level
+
+
+PERFORMANCE TARGETS
+═══════════════════════════════════════════════════════════════════════
+
+ROC-AUC Score       0.60 = good,  0.70+ = excellent
+Classifier Accuracy 55%+ acceptable
+Regressor R²        0.20+ useful, 0.40+ strong
+Cross-Val CV Score  Should not drop > 10% from training
+
+
+GRACEFUL DEGRADATION
+═══════════════════════════════════════════════════════════════════════
+
+If scikit-learn or joblib not installed:
+  - Warnings logged but bot continues
+  - enhance_score() returns base_score unchanged
+  - ml_enabled = False in results
+  - No model training/loading possible
+
+This allows the bot to run without ML dependencies.
+
+
+WALK-FORWARD CROSS-VALIDATION
+═══════════════════════════════════════════════════════════════════════
+
+Prevents lookahead bias by:
+  - TimeSeriesSplit: Train on older trades, test on newer
+  - 5-fold splits (default)
+  - No future data leaks into past predictions
+  - CV scores reported alongside training scores
+
+
+TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════
+
+"Insufficient trades (N < 50)"
+  → Normal. Models activate once you have 50+ trades logged.
+
+"scikit-learn not installed"
+  → pip install scikit-learn joblib
+
+Models not loading
+  → Run: python3 ml_engine.py --train
+
+Score not enhancing (stuck at base_score)
+  → Check: (1) ml_enabled=True in config
+            (2) data/models/ directory exists with .pkl files
+            (3) Run --train if missing models
+
+
+WHAT GETS LOGGED
+═══════════════════════════════════════════════════════════════════════
+
+Training messages:
+  "Loaded N trades from data/trades.json"
+  "Created dataset: N trades. Outcomes: ..."
+  "Win/Loss classifier trained. CV ROC-AUC: ..."
+  "Return regressor trained. CV R²: ..."
+  "Models saved to data/models/"
+
+Prediction messages (when score changes > 2 points):
+  "AAPL: ML enhanced score 35 → 42.3"
+  "  (similar setups won 80% of time)"
+
+
+TESTING
+═══════════════════════════════════════════════════════════════════════
+
+Test basic functionality without dependencies:
+  python3 ml_engine.py --help
+
+Test with sample data:
+  python3 ml_engine.py --report
+
+Full test (requires sklearn):
+  pip install scikit-learn joblib
+  python3 ml_engine.py --train --verbose
+  python3 ml_engine.py --eval
+
+
+SCHEDULING RETRAINING
+═══════════════════════════════════════════════════════════════════════
+
+Example with APScheduler:
+  from apscheduler.schedulers.background import BackgroundScheduler
+  from ml_engine import train_models
+
+  scheduler = BackgroundScheduler()
+  scheduler.add_job(
+    train_models,
+    'cron',
+    day_of_week='sun',
+    hour=0,
+    minute=0
+  )
+  scheduler.start()
+
+This retrains models weekly on Sunday at midnight.
+
+
+NEXT STEPS
+═══════════════════════════════════════════════════════════════════════
+
+1. Install: pip install scikit-learn joblib
+2. Get 50+ trades in data/trades.json (normal bot operation)
+3. Train: python3 ml_engine.py --train --verbose
+4. Integrate into bot.py:
+     from ml_engine import enhance_score
+     # Use enhance_score() when evaluating signals
+5. Monitor: python3 ml_engine.py --report (weekly)
+
+
+For detailed documentation, see: docs/ML_ENGINE_GUIDE.md

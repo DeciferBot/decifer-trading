@@ -58,8 +58,26 @@ def record_win():
     _consecutive_losses = 0
 
 
+def _get_ibkr_cash(ib, account: str) -> float | None:
+    """
+    Get actual cash from IBKR account.
+    Uses TotalCashValue — the real USD cash in the account.
+    This is the source of truth for a margin account, NOT entry_price * qty.
+    """
+    if ib is None:
+        return None
+    try:
+        vals = ib.accountValues(account)
+        for v in vals:
+            if v.tag == "TotalCashValue" and v.currency == "USD":
+                return float(v.value)
+    except Exception as e:
+        log.warning(f"Could not fetch IBKR cash: {e}")
+    return None
+
+
 def can_trade(portfolio_value: float, daily_pnl: float, regime: dict,
-              open_positions: list = None) -> tuple[bool, str]:
+              open_positions: list = None, ib=None) -> tuple[bool, str]:
     """
     Master check — can we take new trades right now?
     Returns (bool, reason_if_not).
@@ -76,7 +94,7 @@ def can_trade(portfolio_value: float, daily_pnl: float, regime: dict,
 
     # ── Layer 3: Daily loss limit ─────────────────────────────
     daily_loss_limit = portfolio_value * CONFIG["daily_loss_limit"]
-    if daily_pnl <= -daily_loss_limit:
+    if portfolio_value > 0 and daily_pnl < 0 and daily_pnl <= -daily_loss_limit:
         _daily_loss_hit = True
         return False, f"Daily loss limit hit (${daily_pnl:,.2f}). Bot halted for today."
 
@@ -87,9 +105,18 @@ def can_trade(portfolio_value: float, daily_pnl: float, regime: dict,
         _pause_until = None  # Pause expired
 
     # ── Layer 4: Min cash reserve ────────────────────────────
-    if open_positions:
-        invested = sum(p.get("entry", 0) * p.get("qty", 0) for p in open_positions)
-        cash_pct  = (portfolio_value - invested) / portfolio_value if portfolio_value > 0 else 1.0
+    # Use IBKR's actual TotalCashValue — this is the source of truth for a
+    # margin account. The old entry*qty calculation was wrong because it
+    # treated the account as 100% cash (no margin), making the bot think
+    # it had almost no cash when IBKR reported plenty.
+    if open_positions and portfolio_value > 0:
+        ibkr_cash = _get_ibkr_cash(ib, CONFIG.get("active_account", ""))
+        if ibkr_cash is not None:
+            cash_pct = ibkr_cash / portfolio_value
+        else:
+            # Fallback: use current market value of positions (not entry cost)
+            deployed = sum(p.get("current", p.get("entry", 0)) * p.get("qty", 0) for p in open_positions)
+            cash_pct = (portfolio_value - deployed) / portfolio_value
         if cash_pct < CONFIG["min_cash_reserve"]:
             return False, f"Cash reserve too low ({cash_pct*100:.1f}% < {CONFIG['min_cash_reserve']*100:.0f}% min). Preserve capital."
 

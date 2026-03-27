@@ -74,15 +74,38 @@ def log_order(order_record: dict):
 
     orders = load_orders()
 
-    # Dedup by order_id if present
+    # Dedup by order_id if present (and non-zero)
     oid = order_record.get("order_id")
-    if oid:
+    if oid:  # truthy order_id (non-zero, non-None)
         for existing in orders:
             if existing.get("order_id") == oid:
                 # Update existing order (e.g. status change)
                 existing.update({k: v for k, v in order_record.items() if v is not None})
                 _save_orders(orders)
                 log.info(f"Order updated: {order_record.get('symbol')} #{oid} → {order_record.get('status')}")
+                return
+
+    # For order_id=0 (bracket children, synced orders), dedup on
+    # symbol + side + qty + price + instrument to prevent duplicates
+    # from repeated sync cycles
+    if oid == 0 or oid is None:
+        sym   = order_record.get("symbol")
+        side  = order_record.get("side")
+        qty   = order_record.get("qty")
+        price = order_record.get("price")
+        inst  = order_record.get("instrument", "stock")
+        for existing in orders:
+            if (existing.get("order_id") in (0, None) and
+                    existing.get("symbol") == sym and
+                    existing.get("side") == side and
+                    existing.get("qty") == qty and
+                    existing.get("price") == price and
+                    existing.get("instrument", "stock") == inst):
+                # Already logged — just update status if changed
+                if existing.get("status") != order_record.get("status"):
+                    existing.update({k: v for k, v in order_record.items() if v is not None})
+                    _save_orders(orders)
+                    log.info(f"Order updated: {sym} (id=0) → {order_record.get('status')}")
                 return
 
     orders.append(order_record)
