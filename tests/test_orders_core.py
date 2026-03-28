@@ -226,12 +226,15 @@ class TestExecuteBuy:
     @patch('orders.calculate_position_size')
     @patch('orders.calculate_stops')
     @patch('orders.check_correlation')
+    @patch('orders.check_combined_exposure')
+    @patch('orders.check_sector_concentration')
     @patch('orders.get_tv_signal_cache')
     @patch('orders._get_yf_price')
     @patch('orders.log_order')
     def test_execute_buy_happy_path_returns_true(
         self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_correlation, mock_stops, mock_position_size, mock_config_obj,
+        mock_sector, mock_exposure, mock_correlation,
+        mock_stops, mock_position_size, mock_config_obj,
         mock_config, mock_ib
     ):
         """Happy path: execute_buy places bracket order and returns True."""
@@ -241,6 +244,8 @@ class TestExecuteBuy:
         mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK")
+        mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (98.0, 105.0)  # SL, TP
         mock_position_size.return_value = 100  # qty
         mock_log_order.return_value = None
@@ -336,12 +341,15 @@ class TestExecuteBuy:
     @patch('orders.calculate_position_size')
     @patch('orders.calculate_stops')
     @patch('orders.check_correlation')
+    @patch('orders.check_combined_exposure')
+    @patch('orders.check_sector_concentration')
     @patch('orders.get_tv_signal_cache')
     @patch('orders._get_yf_price')
     @patch('orders.log_order')
     def test_execute_buy_poor_rr_returns_false(
         self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_correlation, mock_stops, mock_position_size, mock_config_obj,
+        mock_sector, mock_exposure, mock_correlation,
+        mock_stops, mock_position_size, mock_config_obj,
         mock_config, mock_ib
     ):
         """execute_buy should reject if R:R ratio is below threshold."""
@@ -351,6 +359,8 @@ class TestExecuteBuy:
         mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK")
+        mock_sector.return_value = (True, "OK")
         # SL too close, poor R:R
         mock_stops.return_value = (99.5, 100.5)  # SL = 0.5, TP = 0.5 (R:R = 1.0 < 1.5)
         mock_position_size.return_value = 100
@@ -371,12 +381,15 @@ class TestExecuteBuy:
     @patch('orders.calculate_position_size')
     @patch('orders.calculate_stops')
     @patch('orders.check_correlation')
+    @patch('orders.check_combined_exposure')
+    @patch('orders.check_sector_concentration')
     @patch('orders.get_tv_signal_cache')
     @patch('orders._get_yf_price')
     @patch('orders.log_order')
     def test_execute_buy_price_too_low_returns_false(
         self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_correlation, mock_stops, mock_position_size, mock_config_obj,
+        mock_sector, mock_exposure, mock_correlation,
+        mock_stops, mock_position_size, mock_config_obj,
         mock_config, mock_ib
     ):
         """execute_buy should reject prices under $1 (contaminated data)."""
@@ -386,6 +399,8 @@ class TestExecuteBuy:
         mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 0.50  # Too low
         mock_correlation.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK")
+        mock_sector.return_value = (True, "OK")
 
         result = orders.execute_buy(
             ib=mock_ib,
@@ -403,12 +418,15 @@ class TestExecuteBuy:
     @patch('orders.calculate_position_size')
     @patch('orders.calculate_stops')
     @patch('orders.check_correlation')
+    @patch('orders.check_combined_exposure')
+    @patch('orders.check_sector_concentration')
     @patch('orders.get_tv_signal_cache')
     @patch('orders._get_yf_price')
     @patch('orders.log_order')
     def test_execute_buy_price_too_high_returns_false(
         self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_correlation, mock_stops, mock_position_size, mock_config_obj,
+        mock_sector, mock_exposure, mock_correlation,
+        mock_stops, mock_position_size, mock_config_obj,
         mock_config, mock_ib
     ):
         """execute_buy should reject prices over $10,000 (contaminated data)."""
@@ -418,6 +436,8 @@ class TestExecuteBuy:
         mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 50000.0  # Too high
         mock_correlation.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK")
+        mock_sector.return_value = (True, "OK")
 
         result = orders.execute_buy(
             ib=mock_ib,
@@ -435,18 +455,23 @@ class TestExecuteBuy:
     @patch('orders.calculate_position_size')
     @patch('orders.calculate_stops')
     @patch('orders.check_correlation')
+    @patch('orders.check_combined_exposure')
+    @patch('orders.check_sector_concentration')
     @patch('orders.get_tv_signal_cache')
     @patch('orders._get_yf_price')
     @patch('orders.log_order')
     def test_execute_buy_no_price_data_returns_false(
         self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_correlation, mock_stops, mock_position_size, mock_config_obj,
+        mock_sector, mock_exposure, mock_correlation,
+        mock_stops, mock_position_size, mock_config_obj,
         mock_config, mock_ib
     ):
         """execute_buy should reject if no price data from any source."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
         mock_correlation.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK")
+        mock_sector.return_value = (True, "OK")
 
         # All sources return 0
         mock_tv_cache.return_value = {}
@@ -469,12 +494,15 @@ class TestExecuteBuy:
     @patch('orders.calculate_position_size')
     @patch('orders.calculate_stops')
     @patch('orders.check_correlation')
+    @patch('orders.check_combined_exposure')
+    @patch('orders.check_sector_concentration')
     @patch('orders.get_tv_signal_cache')
     @patch('orders._get_yf_price')
     @patch('orders.log_order')
     def test_execute_buy_price_contamination_blocks_trade(
         self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_correlation, mock_stops, mock_position_size, mock_config_obj,
+        mock_sector, mock_exposure, mock_correlation,
+        mock_stops, mock_position_size, mock_config_obj,
         mock_config, mock_ib
     ):
         """execute_buy should reject if sources diverge >50%."""
@@ -482,6 +510,8 @@ class TestExecuteBuy:
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
 
         mock_correlation.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK")
+        mock_sector.return_value = (True, "OK")
         # Diverging sources: 100 vs 200 = 50% divergence
         mock_tv_cache.return_value = {"SYM": {"tv_close": 200.0}}
         mock_yf_price.return_value = 100.0
@@ -808,12 +838,15 @@ class TestEdgeCases:
     @patch('orders.calculate_position_size')
     @patch('orders.calculate_stops')
     @patch('orders.check_correlation')
+    @patch('orders.check_combined_exposure')
+    @patch('orders.check_sector_concentration')
     @patch('orders.get_tv_signal_cache')
     @patch('orders._get_yf_price')
     @patch('orders.log_order')
     def test_execute_buy_qty_capped_at_5000(
         self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_correlation, mock_stops, mock_position_size, mock_config_obj,
+        mock_sector, mock_exposure, mock_correlation,
+        mock_stops, mock_position_size, mock_config_obj,
         mock_config, mock_ib
     ):
         """execute_buy should cap qty at 5000 shares."""
@@ -823,6 +856,8 @@ class TestEdgeCases:
         mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 0  # No yfinance fallback
         mock_correlation.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK")
+        mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (95.0, 115.0)  # Reasonable stops for $100 price
         mock_position_size.return_value = 10000  # Exceeds 5000 hard cap
 
@@ -844,12 +879,15 @@ class TestEdgeCases:
     @patch('orders.calculate_position_size')
     @patch('orders.calculate_stops')
     @patch('orders.check_correlation')
+    @patch('orders.check_combined_exposure')
+    @patch('orders.check_sector_concentration')
     @patch('orders.get_tv_signal_cache')
     @patch('orders._get_yf_price')
     @patch('orders.log_order')
     def test_execute_buy_order_value_capped_at_20pct_portfolio(
         self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_correlation, mock_stops, mock_position_size, mock_config_obj,
+        mock_sector, mock_exposure, mock_correlation,
+        mock_stops, mock_position_size, mock_config_obj,
         mock_config, mock_ib
     ):
         """execute_buy should cap order value at 20% of portfolio."""
@@ -862,6 +900,8 @@ class TestEdgeCases:
         mock_tv_cache.return_value = {}
         mock_yf_price.return_value = price
         mock_correlation.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK")
+        mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (95.0, 110.0)
         # Position size would be 3000 shares = $300,000 (300% of portfolio)
         mock_position_size.return_value = 3000
@@ -890,12 +930,15 @@ class TestEdgeCases:
     @patch('orders.calculate_position_size')
     @patch('orders.calculate_stops')
     @patch('orders.check_correlation')
+    @patch('orders.check_combined_exposure')
+    @patch('orders.check_sector_concentration')
     @patch('orders.get_tv_signal_cache')
     @patch('orders._get_yf_price')
     @patch('orders.log_order')
     def test_execute_buy_reason_parameter_stored(
         self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_correlation, mock_stops, mock_position_size, mock_config_obj,
+        mock_sector, mock_exposure, mock_correlation,
+        mock_stops, mock_position_size, mock_config_obj,
         mock_config, mock_ib
     ):
         """execute_buy should store the reasoning parameter."""
@@ -905,6 +948,8 @@ class TestEdgeCases:
         mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK")
+        mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (98.0, 105.0)
         mock_position_size.return_value = 100
 
