@@ -21,6 +21,13 @@ CONFIG = {
         "live_2": os.environ.get("IBKR_LIVE_2_ACCOUNT", ""),
     },
 
+    # ── MULTI-ACCOUNT AGGREGATION ──────────────────────────────
+    # List of account IDs to include in the unified portfolio view.
+    # Empty list (default) = auto-include all non-empty accounts above.
+    # Set explicitly to restrict aggregation to specific accounts, e.g.:
+    #   ["DUP481326", "U3059777"]
+    "aggregate_accounts": [],
+
     # ── AI BRAIN ──────────────────────────────────────────────
     "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", "YOUR_API_KEY_HERE"),
     "claude_model":      "claude-sonnet-4-6",   # Latest Sonnet

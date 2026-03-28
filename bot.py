@@ -2378,6 +2378,19 @@ class DashHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"favourites": dash.get("favourites", [])}).encode())
+        elif self.path == "/api/portfolio":
+            # Multi-account aggregated position view
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                from portfolio import get_aggregate_summary
+                summary = get_aggregate_summary(ib)
+            except Exception as exc:
+                log.warning("Portfolio aggregation error: %s", exc)
+                summary = {"accounts": [], "positions": {}, "totals": {}, "error": str(exc)}
+            self.wfile.write(json.dumps(summary).encode())
         else:
             self.send_response(404)
             self.end_headers()

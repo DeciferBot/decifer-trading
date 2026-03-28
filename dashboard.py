@@ -301,6 +301,7 @@ canvas{display:block;width:100% !important}
   <div class="tab" onclick="switchTab('agents',this)">🧠 Agents</div>
   <div class="tab" onclick="switchTab('risk',this)">🛡 Risk</div>
   <div class="tab" onclick="switchTab('news',this)">📰 News</div>
+  <div class="tab" onclick="switchTab('portfolio',this)">🏦 Portfolio</div>
   <div class="tab" onclick="switchTab('settings',this)">⚙️ Settings</div>
 </div>
 
@@ -545,6 +546,65 @@ canvas{display:block;width:100% !important}
   </div>
 </div>
 
+<!-- VIEW 7: PORTFOLIO (multi-account aggregation) -->
+<div class="view" id="view-portfolio" style="flex-direction:column;overflow-y:auto;padding:16px;gap:14px">
+
+  <!-- Summary KPI strip -->
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px">
+    <div class="setting-card" style="padding:10px 14px;margin:0">
+      <div class="sl">Gross Exposure</div>
+      <div class="sv co" id="pf-gross">—</div>
+    </div>
+    <div class="setting-card" style="padding:10px 14px;margin:0">
+      <div class="sl">Net Exposure</div>
+      <div class="sv" id="pf-net">—</div>
+    </div>
+    <div class="setting-card" style="padding:10px 14px;margin:0">
+      <div class="sl">Unrealised P&amp;L</div>
+      <div class="sv" id="pf-unreal">—</div>
+    </div>
+    <div class="setting-card" style="padding:10px 14px;margin:0">
+      <div class="sl">Realised P&amp;L</div>
+      <div class="sv" id="pf-real">—</div>
+    </div>
+    <div class="setting-card" style="padding:10px 14px;margin:0">
+      <div class="sl">Long / Short</div>
+      <div class="sv" id="pf-ls">—</div>
+    </div>
+    <div class="setting-card" style="padding:10px 14px;margin:0">
+      <div class="sl">Accounts</div>
+      <div class="sv cw" id="pf-accts">—</div>
+    </div>
+  </div>
+
+  <!-- Exposure bar -->
+  <div class="setting-card" style="margin:0;padding:12px 16px">
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted2);margin-bottom:6px">
+      <span>LONG EXPOSURE</span><span id="pf-long-pct">0%</span>
+    </div>
+    <div style="height:6px;background:var(--border2);border-radius:3px;overflow:hidden;margin-bottom:4px">
+      <div id="pf-long-bar" style="height:100%;background:var(--green);border-radius:3px;transition:width .4s;width:0%"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted2);margin-bottom:6px;margin-top:8px">
+      <span>SHORT EXPOSURE</span><span id="pf-short-pct">0%</span>
+    </div>
+    <div style="height:6px;background:var(--border2);border-radius:3px;overflow:hidden">
+      <div id="pf-short-bar" style="height:100%;background:var(--red);border-radius:3px;transition:width .4s;width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Position table -->
+  <div class="setting-card" style="margin:0;padding:0;overflow:hidden">
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted2);display:flex;justify-content:space-between">
+      <span>AGGREGATED POSITIONS</span>
+      <span id="pf-count" style="color:var(--orange)">0 positions</span>
+    </div>
+    <div id="pf-table" style="overflow-y:auto;max-height:340px">
+      <div class="empty" style="padding:20px;text-align:center;color:var(--muted2)">Click the Portfolio tab to load aggregated positions.</div>
+    </div>
+  </div>
+</div>
+
 <!-- VIEW 6: SETTINGS -->
 <div class="view settings-view" id="view-settings">
   <div class="setting-card">
@@ -663,12 +723,101 @@ let scanTotal = 300; // seconds
 let scanElapsed = 0;
 let scanTimer;
 
+// ── Portfolio aggregation ──────────────────────────────────
+async function loadPortfolio() {
+  const tableEl = document.getElementById('pf-table');
+  tableEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted2)">Loading…</div>';
+  try {
+    const resp = await fetch('/api/portfolio');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const d = await resp.json();
+
+    // KPI strip
+    const t = d.totals || {};
+    const pnlColor = v => v >= 0 ? 'var(--green)' : 'var(--red)';
+    document.getElementById('pf-gross').textContent   = '$' + fmt$(t.gross_exposure   || 0);
+    document.getElementById('pf-gross').className     = 'sv co';
+
+    const netEl = document.getElementById('pf-net');
+    netEl.textContent = (t.net_exposure >= 0 ? '+' : '') + '$' + fmt$(t.net_exposure || 0);
+    netEl.style.color = pnlColor(t.net_exposure || 0);
+
+    const urEl = document.getElementById('pf-unreal');
+    urEl.textContent = (t.unrealized_pnl >= 0 ? '+' : '') + '$' + fmt$(t.unrealized_pnl || 0);
+    urEl.style.color = pnlColor(t.unrealized_pnl || 0);
+
+    const rlEl = document.getElementById('pf-real');
+    rlEl.textContent = (t.realized_pnl >= 0 ? '+' : '') + '$' + fmt$(t.realized_pnl || 0);
+    rlEl.style.color = pnlColor(t.realized_pnl || 0);
+
+    document.getElementById('pf-ls').textContent =
+      (t.long_count || 0) + 'L / ' + (t.short_count || 0) + 'S';
+    document.getElementById('pf-accts').textContent =
+      (d.accounts || []).length;
+
+    // Exposure bars
+    const lp = t.long_exposure_pct  || 0;
+    const sp = t.short_exposure_pct || 0;
+    document.getElementById('pf-long-pct').textContent  = lp.toFixed(1) + '%';
+    document.getElementById('pf-short-pct').textContent = sp.toFixed(1) + '%';
+    document.getElementById('pf-long-bar').style.width  = Math.min(lp, 100) + '%';
+    document.getElementById('pf-short-bar').style.width = Math.min(sp, 100) + '%';
+
+    // Position table
+    const positions = Object.values(d.positions || {});
+    document.getElementById('pf-count').textContent = positions.length + ' position' + (positions.length !== 1 ? 's' : '');
+
+    if (!positions.length) {
+      tableEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted2)">No open positions across all accounts.</div>';
+      return;
+    }
+
+    // Sort by |market_value| desc
+    positions.sort((a, b) => Math.abs(b.market_value) - Math.abs(a.market_value));
+
+    tableEl.innerHTML = positions.map(p => {
+      const dirColor = p.direction === 'LONG' ? 'var(--green)' : p.direction === 'SHORT' ? 'var(--red)' : 'var(--muted2)';
+      const pnlColor2 = p.unrealized_pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      const pnlSign   = p.unrealized_pnl >= 0 ? '+' : '';
+      const acctList  = Object.keys(p.accounts || {}).join(', ') || '—';
+      const isOpt = p.sec_type === 'OPT';
+      const label = isOpt
+        ? `${p.symbol} ${p.right === 'C' ? 'CALL' : 'PUT'} @${p.strike}`
+        : p.symbol;
+      return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1.5fr;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);align-items:center;font-size:11px">
+        <div>
+          <span style="font-weight:700;font-family:'Syne',sans-serif;font-size:13px">${label}</span>
+          ${isOpt ? '<span style="font-size:9px;color:var(--muted2);margin-left:4px">OPT</span>' : ''}
+        </div>
+        <div style="color:${dirColor};font-weight:600">${p.direction}</div>
+        <div style="color:var(--text)">${p.net_position > 0 ? '+' : ''}${p.net_position}</div>
+        <div style="color:var(--orange)">$${fmt$(p.market_value)}</div>
+        <div style="color:${pnlColor2}">${pnlSign}$${fmt$(p.unrealized_pnl)}</div>
+        <div style="color:var(--muted2);font-size:10px">${acctList}</div>
+      </div>`;
+    }).join('');
+
+    // Column header (prepend)
+    tableEl.insertAdjacentHTML('afterbegin',
+      `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1.5fr;gap:8px;padding:6px 14px;font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;border-bottom:1px solid var(--border)">
+        <div>Symbol</div><div>Dir</div><div>Qty</div><div>Mkt Val</div><div>Unreal P&L</div><div>Accounts</div>
+      </div>`
+    );
+
+  } catch (err) {
+    tableEl.innerHTML = `<div style="padding:20px;color:var(--red)">⚠ Could not load portfolio data: ${err.message}</div>`;
+  }
+}
+
 // ── Tab switching ──────────────────────────────────────────
 function switchTab(id, el) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('view-' + id).classList.add('active');
   el.classList.add('active');
+
+  // Load portfolio aggregation when switching to that tab
+  if (id === 'portfolio') loadPortfolio();
 
   // Charts render with 0 dimensions when their container is display:none.
   // Force redraw when switching to growth tab.
