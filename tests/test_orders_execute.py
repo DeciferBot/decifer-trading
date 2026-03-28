@@ -92,7 +92,12 @@ learning_stub.get_effective_capital = MagicMock(return_value=100_000.0)
 learning_stub.get_performance_summary = MagicMock(return_value={})
 learning_stub.load_capital_base = MagicMock(return_value=100_000.0)
 learning_stub.record_capital_adjustment = MagicMock()
-sys.modules["learning"] = learning_stub
+# Use setdefault so the real learning module installed by test_learning.py
+# (which runs before this file alphabetically: l < orders_execute) is preserved.
+# Replacing it with a stub here would break test_learning.py's
+# patch("learning.anthropic") calls since they'd target the wrong module object.
+# test_orders_execute.py patches orders.log_order directly anyway (not via learning).
+sys.modules.setdefault("learning", learning_stub)
 
 # scanner stub — scanner.py imports signals which imports talib;
 # stub to prevent the whole chain at import time.

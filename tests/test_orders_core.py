@@ -43,11 +43,13 @@ from datetime import datetime, timezone
 # "learning", "scanner", etc. to keep bot.py from dragging in the real code.
 # If those stubs are still cached here, `import orders` gets the hollow shell
 # and none of orders.py's module-level attributes (open_trades, etc.) exist.
-for _decifer_mod in ("orders", "risk", "learning", "scanner", "signals",
-                     "news", "agents"):
-    # NOTE: do NOT pop "options" or "options_scanner" — orders.py doesn't import
-    # them, so evicting them would invalidate test_options_scanner.py's module
-    # that was imported at collection time (breaking cross-test patching).
+for _decifer_mod in ("orders", "risk", "scanner", "signals", "news", "agents"):
+    # NOTE: do NOT pop "options", "options_scanner", or "learning":
+    #  - options/options_scanner: orders.py doesn't import them; evicting would
+    #    invalidate test_options_scanner.py's cached module and break its patches.
+    #  - learning: test_learning.py (l < o alphabetically) has already installed
+    #    the real learning; evicting it here causes test_learning.py's
+    #    patch("learning.anthropic") calls to target a stale module object.
     sys.modules.pop(_decifer_mod, None)
 
 # Import the REAL orders module (conftest has already patched all heavy deps)
