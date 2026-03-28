@@ -1,0 +1,71 @@
+{
+  "model": "claude-sonnet-4-6",
+  "env": {
+    "CHIEF_STATE_PATH": "../Chief-Decifer/state"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git branch*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git checkout*)",
+      "Bash(git push*)",
+      "Bash(git merge*)",
+      "Bash(git fetch*)",
+      "Bash(python*)",
+      "Bash(pytest*)",
+      "Bash(pip*)",
+      "Bash(node*)",
+      "Bash(ls*)",
+      "Bash(find*)",
+      "Bash(cat*)",
+      "Bash(echo*)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -f*)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf .)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/session-start-hook.mjs"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/session-end-hook.mjs"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/pre-tool-hook.mjs"
+          }
+        ]
+      }
+    ]
+  },
+  "statusline": {
+    "enabled": true,
+    "format": "Decifer | Branch: $(git rev-parse --abbrev-ref HEAD 2>/dev/null) | Phase: $(cat .claude/memory/checkpoint.json 2>/dev/null | python3 -c \"import json,sys; d=json.load(sys.stdin); print(d.get('roadmapPhase','?'))\" 2>/dev/null || echo '?')"
+  }
+}

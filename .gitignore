@@ -55,3 +55,5 @@ chief_icon.png
 
 # Office temp files
 ~$*
+.claude/memory/checkpoint.json
+.claude/memory/session-history.jsonl
