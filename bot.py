@@ -473,7 +473,7 @@ def backfill_trades_from_ibkr():
 
         existing = load_trades()
         existing_ids = set()
-        # Build a list of (symbol, qty, timestamp) for fuzzy dedup matching
+        # Build a list of (symbol, qty, timestamp, exit_price) for fuzzy dedup matching
         existing_fuzzy = []
         for t in existing:
             eid = t.get("exec_id") or f"{t.get('symbol')}-{t.get('exit_time')}"
@@ -482,11 +482,12 @@ def backfill_trades_from_ibkr():
             # Also index by order_id so we never double-log the same order
             if t.get("order_id"):
                 existing_ids.add(f"order-{t['order_id']}")
-            # Fuzzy match: (symbol, qty, exit_time) for catching re-created dupes
+            # Fuzzy match: (symbol, qty, exit_time, exit_price) for catching re-created dupes
             eq = t.get("qty") or t.get("shares") or t.get("total_shares") or 0
             ets = t.get("exit_time") or t.get("timestamp") or ""
+            ep = float(t.get("exit_price") or t.get("avg_price") or 0)
             if ets:
-                existing_fuzzy.append((t.get("symbol",""), eq, ets))
+                existing_fuzzy.append((t.get("symbol",""), eq, ets, ep))
 
         fills = ib.fills()
         if not fills:
@@ -624,11 +625,19 @@ def backfill_trades_from_ibkr():
                 if already:
                     continue
 
-                # Fuzzy dedup: skip if an existing trade matches (symbol, qty, ~time)
-                sell_qty = int(sell["total_shares"])
-                sell_ts  = sell["time"]
-                for (ex_sym, ex_qty, ex_ts) in existing_fuzzy:
+                # Fuzzy dedup: skip if an existing trade matches (symbol, qty, ~time, ~price)
+                sell_qty   = int(sell["total_shares"])
+                sell_ts    = sell["time"]
+                sell_price = float(sell.get("avg_price") or 0)
+                for (ex_sym, ex_qty, ex_ts, ex_price) in existing_fuzzy:
                     if ex_sym == sym and ex_qty == sell_qty:
+                        # Price must also be within 1% to be considered the same fill
+                        price_match = (
+                            ex_price == 0 or sell_price == 0
+                            or abs(ex_price - sell_price) / max(ex_price, sell_price) < 0.01
+                        )
+                        if not price_match:
+                            continue
                         try:
                             t1 = datetime.strptime(ex_ts.replace("T", " ")[:19], "%Y-%m-%d %H:%M:%S")
                             t2 = datetime.strptime(sell_ts[:19], "%Y-%m-%d %H:%M:%S")
@@ -714,10 +723,17 @@ def backfill_trades_from_ibkr():
                     continue
 
                 # Fuzzy dedup for shorts too
-                cover_qty = int(buy_cover["total_shares"])
-                cover_ts  = buy_cover["time"]
-                for (ex_sym, ex_qty, ex_ts) in existing_fuzzy:
+                cover_qty   = int(buy_cover["total_shares"])
+                cover_ts    = buy_cover["time"]
+                cover_price = float(buy_cover.get("avg_price") or 0)
+                for (ex_sym, ex_qty, ex_ts, ex_price) in existing_fuzzy:
                     if ex_sym == sym and ex_qty == cover_qty:
+                        price_match = (
+                            ex_price == 0 or cover_price == 0
+                            or abs(ex_price - cover_price) / max(ex_price, cover_price) < 0.01
+                        )
+                        if not price_match:
+                            continue
                         try:
                             t1 = datetime.strptime(ex_ts.replace("T", " ")[:19], "%Y-%m-%d %H:%M:%S")
                             t2 = datetime.strptime(cover_ts[:19], "%Y-%m-%d %H:%M:%S")
@@ -831,11 +847,18 @@ def backfill_trades_from_ibkr():
                     continue
 
                 # Fuzzy dedup
-                sell_qty = int(sell["total_contracts"])
-                sell_ts  = sell["time"]
-                for (ex_sym, ex_qty, ex_ts) in existing_fuzzy:
+                sell_qty   = int(sell["total_contracts"])
+                sell_ts    = sell["time"]
+                sell_price = float(sell.get("avg_price") or 0)
+                for (ex_sym, ex_qty, ex_ts, ex_price) in existing_fuzzy:
                     # Check both composite key and underlying symbol
                     if (ex_sym == opt_sym or ex_sym == sell["underlying"]) and ex_qty == sell_qty:
+                        price_match = (
+                            ex_price == 0 or sell_price == 0
+                            or abs(ex_price - sell_price) / max(ex_price, sell_price) < 0.01
+                        )
+                        if not price_match:
+                            continue
                         try:
                             t1 = datetime.strptime(ex_ts.replace("T", " ")[:19], "%Y-%m-%d %H:%M:%S")
                             t2 = datetime.strptime(sell_ts[:19], "%Y-%m-%d %H:%M:%S")

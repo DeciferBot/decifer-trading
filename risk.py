@@ -21,6 +21,7 @@ _session_start_value = None
 # ── Drawdown-from-peak tracking ────────────────────────────────
 _equity_high_water_mark = None
 _drawdown_halt          = False
+_last_known_equity      = None
 
 
 def reset_daily_state(portfolio_value: float):
@@ -502,7 +503,9 @@ def update_equity_high_water_mark(current_equity: float):
     Call on each scan cycle with current portfolio value.
     Tracks the peak and triggers halt if drawdown exceeds limit.
     """
-    global _equity_high_water_mark, _drawdown_halt
+    global _equity_high_water_mark, _drawdown_halt, _last_known_equity
+
+    _last_known_equity = current_equity
 
     if _equity_high_water_mark is None:
         _equity_high_water_mark = current_equity
@@ -536,11 +539,11 @@ def check_drawdown() -> tuple[bool, str]:
     """
     if _drawdown_halt:
         drawdown = 0.0
-        if _equity_high_water_mark and _equity_high_water_mark > 0:
-            drawdown = CONFIG.get("max_drawdown_alert", 0.25)
+        if _equity_high_water_mark and _equity_high_water_mark > 0 and _last_known_equity is not None:
+            drawdown = (_equity_high_water_mark - _last_known_equity) / _equity_high_water_mark
         return False, (
             f"Drawdown circuit breaker active — "
-            f">{drawdown:.0%} drawdown from peak ${_equity_high_water_mark:,.2f}. "
+            f"{drawdown:.1%} drawdown from peak ${_equity_high_water_mark:,.2f}. "
             f"No new trades until equity recovers."
         )
     return True, "OK"
