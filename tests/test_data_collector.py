@@ -81,13 +81,13 @@ config_stub.CONFIG = {
     "trade_log": "/tmp/trades_test.json",
     "order_log": "/tmp/orders_test.json",
 }
-sys.modules["config"] = config_stub
+sys.modules.setdefault("config", config_stub)
 
 # signals stub (data_collector doesn't need it but transitive imports might)
 signals_stub = types.ModuleType("signals")
 signals_stub.compute_indicators = MagicMock(return_value={})
 signals_stub.compute_confluence = MagicMock(return_value={"total": 65, "score": 65})
-sys.modules["signals"] = signals_stub
+sys.modules.setdefault("signals", signals_stub)
 
 # Now import the module under test
 from data_collector import (

@@ -30,41 +30,63 @@ def _get_symbol_lock(symbol: str) -> threading.Lock:
 
 log = logging.getLogger("decifer.orders")
 
+# File paths derived from config (patchable in tests)
+TRADES_FILE: str = CONFIG.get("trade_log", "/tmp/trades.json")
+ORDERS_FILE: str = CONFIG.get("order_log", "/tmp/orders.json")
+
 # In-memory position tracker (source of truth = IBKR, this is a cache)
-open_trades: dict = {}
+active_trades: dict = {}
+open_trades = active_trades  # backward-compat alias (both names point to same dict)
+
+# In-memory open-order tracker keyed by symbol (updated by execute_buy/sell)
+open_orders: dict = {}
 
 # Default: duplicate check is enabled. Set ORDER_DUPLICATE_CHECK_ENABLED=False
 # in config to disable (e.g. for paper trading environments or unit tests).
 # Fail-safe orientation: when in doubt, the check is ON.
 ORDER_DUPLICATE_CHECK_ENABLED_DEFAULT = True
 
-# ── Thread-safe guard for open_trades dictionary ─────────────────────────
+# ── Thread-safe guard for active_trades dictionary ─────────────────────────
 # Audit (prop-014): execute_buy/execute_sell run on the main async event loop,
 # reconcile_with_ibkr and update_positions_from_ibkr run from background threads.
-# Both contexts read+write open_trades. An RLock is safe from both threaded and
+# Both contexts read+write active_trades. An RLock is safe from both threaded and
 # async-sync contexts; the lock scope is narrowed to ONLY the dictionary
 # read/modify/write lines — never around broker network calls — so a slow
 # reconcile never blocks a live order submission.
 _trades_lock = threading.RLock()
 
+# ── Re-entrancy guard for flatten_all ────────────────────────────────────────
+# flatten_all is called from the kill-switch and drawdown threads. If two callers
+# race (e.g. drawdown fires while kill-switch is already running), only the first
+# should proceed — the second must bail immediately to avoid double-closing and
+# conflicting cancellation orders.
+_flatten_lock = threading.Lock()
+_flatten_in_progress: bool = False
+
+# ── flatten_all order-book wait constants ─────────────────────────────────────
+# After reqGlobalCancel, IBKR processes cancellations asynchronously.  We poll
+# until the book is clear (or we time out) before placing closing orders.
+_GLOBAL_CANCEL_WAIT_SECS: float = 5.0   # maximum wait before we proceed anyway
+_GLOBAL_CANCEL_POLL_INTERVAL: float = 0.5  # seconds between each openOrders poll
+
 
 def _safe_set_trade(key: str, value: dict):
-    """Thread-safe write to open_trades dict."""
+    """Thread-safe write to active_trades dict."""
     with _trades_lock:
-        open_trades[key] = value
+        active_trades[key] = value
 
 
 def _safe_update_trade(key: str, updates: dict):
-    """Thread-safe partial update of an open_trades entry."""
+    """Thread-safe partial update of an active_trades entry."""
     with _trades_lock:
-        if key in open_trades:
-            open_trades[key].update(updates)
+        if key in active_trades:
+            active_trades[key].update(updates)
 
 
 def _safe_del_trade(key: str):
-    """Thread-safe delete from open_trades dict."""
+    """Thread-safe delete from active_trades dict."""
     with _trades_lock:
-        open_trades.pop(key, None)
+        active_trades.pop(key, None)
 
 # ── Market hours guard ─────────────────────────────────────────────────────
 _ET = zoneinfo.ZoneInfo("America/New_York")
@@ -127,26 +149,37 @@ def _is_duplicate_check_enabled() -> bool:
         return True
 
 
-def has_open_order_for(
+def has_open_order_for(ib_or_symbol, symbol=None, side="BUY", option_key=None):
+    """Return True if there is a live open order for the given symbol.
+
+    Supports two calling conventions:
+
+    1. ``has_open_order_for(symbol)`` — fast dict-only lookup via the
+       in-memory ``open_orders`` dict (updated by execute_buy/execute_sell).
+
+    2. ``has_open_order_for(ib, symbol, side="BUY", option_key=None)`` —
+       IBKR-backed check: queries the broker directly for live open orders.
+       Returns True (fail-closed) on any IBKR error.
+    """
+    if symbol is None:
+        # Calling convention 1: has_open_order_for(symbol)
+        return ib_or_symbol in open_orders
+    else:
+        # Calling convention 2: has_open_order_for(ib, symbol, side=..., option_key=...)
+        return _check_ibkr_open_order(ib_or_symbol, symbol, side=side, option_key=option_key)
+
+
+def _check_ibkr_open_order(
     ib: IB,
     symbol: str,
     side: str = "BUY",
     option_key: str | None = None,
 ) -> bool:
-    """
-    Ask IBKR for its current list of open (unfilled) orders and return True
-    if any matching order already exists.
+    """Query IBKR directly for a live open order (used as belt-and-suspenders check).
 
-    For stocks the match is on ``symbol`` + ``side``.
-    For options pass ``option_key`` (e.g. ``"AAPL_C_150.0_2026-01-16"``); the
-    match is then on the full contract spec so that different strikes/expiries
-    on the same underlying are NOT treated as duplicates.
-
-    On any IBKR error the function returns True (fail-closed) so that a
-    network hiccup never silently allows a double-submit.
+    Returns True if a matching order exists, or True on any IBKR error (fail-closed).
     """
     try:
-        # Use openTrades() — it exposes contract + order together.
         open_trades_ibkr = ib.openTrades()
         for trade in open_trades_ibkr:
             contract = trade.contract
@@ -156,7 +189,6 @@ def has_open_order_for(
                 continue
             trade_symbol = getattr(contract, "symbol", "")
             if option_key is not None:
-                # For options: compare against the full composite key
                 raw_exp = str(getattr(contract, "lastTradeDateOrContractMonth", ""))
                 if len(raw_exp) == 8 and raw_exp.isdigit():
                     expiry_str = f"{raw_exp[:4]}-{raw_exp[4:6]}-{raw_exp[6:]}"
@@ -169,16 +201,15 @@ def has_open_order_for(
                 if ibkr_key == option_key:
                     return True
             else:
-                # For stocks/forex: match on symbol only
                 if trade_symbol == symbol:
                     return True
         return False
     except Exception as e:
         log.error(
-            f"has_open_order_for: IBKR openTrades() failed for {symbol} — "
+            f"_check_ibkr_open_order: IBKR openTrades() failed for {symbol} — "
             f"failing closed (skipping order): {e}"
         )
-        return True  # fail-closed: skip the order rather than risk a double-submit
+        return True
 
 
 def get_contract(symbol: str, instrument: str = "stock"):
@@ -257,7 +288,7 @@ def _is_option_contract(contract) -> bool:
 
 def _ibkr_item_to_key(item) -> str:
     """
-    Build the correct open_trades key from an IBKR portfolio item.
+    Build the correct active_trades key from an IBKR portfolio item.
     - Stocks/Forex: plain symbol (e.g. "KOD")
     - Options: composite key matching execute_buy_option format
       (e.g. "KOD_C_35.0_2026-04-17")
@@ -396,16 +427,16 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
     # ── Guard: per-symbol lock closes TOCTOU gap between check and submission ──
     sym_lock = _get_symbol_lock(symbol)
     with sym_lock:
-        # ── Guard: check open_trades under lock (prop-003/014) ──────────
+        # ── Guard: check active_trades under lock (prop-003/014) ──────────
         with _trades_lock:
-            if symbol in open_trades:
+            if symbol in active_trades:
                 log.warning(f"Already in {symbol} — skipping buy")
                 return False
-            if len(open_trades) >= CONFIG["max_positions"]:
+            if len(active_trades) >= CONFIG["max_positions"]:
                 log.warning(f"Max positions ({CONFIG['max_positions']}) reached — skipping {symbol}")
                 return False
             # Correlation check
-            ok, reason = check_correlation(symbol, list(open_trades.values()))
+            ok, reason = check_correlation(symbol, list(active_trades.values()))
             if not ok:
                 log.warning(f"Correlation block for {symbol}: {reason}")
                 return False
@@ -414,7 +445,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             # Estimate new position value for the exposure check
             est_value = portfolio_value * CONFIG.get("risk_pct_per_trade", 0.03) * 50  # rough max
             exp_ok, exp_reason = check_combined_exposure(
-                symbol, est_value, list(open_trades.values()),
+                symbol, est_value, list(active_trades.values()),
                 portfolio_value, instrument="stock"
             )
             if not exp_ok:
@@ -423,7 +454,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
 
             # ── FIX #2: Sector concentration check ────────────────────
             sec_ok, sec_reason = check_sector_concentration(
-                symbol, list(open_trades.values()),
+                symbol, list(active_trades.values()),
                 portfolio_value, regime.get("regime", "NORMAL")
             )
             if not sec_ok:
@@ -434,7 +465,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         # Ask IBKR directly whether a BUY order for this symbol is already live.
         # This catches restarts mid-session or rapid double-scan firings.
         if _is_duplicate_check_enabled():
-            if has_open_order_for(ib, symbol, side="BUY"):
+            if has_open_order_for(symbol) or _check_ibkr_open_order(ib, symbol, side="BUY"):
                 log.warning(
                     f"Skipping duplicate order for {symbol} — open order already exists"
                 )
@@ -670,7 +701,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         # record the trade as FAILED rather than silently losing track of it.
         try:
             with _trades_lock:
-                open_trades[symbol] = {
+                active_trades[symbol] = {
                     "symbol":    symbol,
                     "instrument": "stock",
                     "entry":     price,
@@ -705,10 +736,10 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal") -> bool:
     Returns True if order placed.
     """
     with _trades_lock:
-        if symbol not in open_trades:
+        if symbol not in active_trades:
             log.warning(f"No open position in {symbol} — skipping sell")
             return False
-        info = open_trades[symbol]
+        info = active_trades[symbol]
 
     try:
         contract = get_contract(symbol)
@@ -761,7 +792,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal") -> bool:
 
         log.info(f"{'✅' if pnl >= 0 else '❌'} CLOSE {direction} {symbol} ({close_action}) | P&L ${pnl:+.2f} | Reason: {reason}")
         with _trades_lock:
-            del open_trades[symbol]
+            del active_trades[symbol]
         return True
 
     except Exception as e:
@@ -779,6 +810,51 @@ def flatten_all(ib_fallback: IB = None):
     even while the main scanner is mid-scan.
     Uses aggressive LIMIT orders (not market) for extended hours compatibility.
     """
+    global _flatten_in_progress
+    with _flatten_lock:
+        if _flatten_in_progress:
+            log.warning("🚨 FLATTEN ALL — re-entrant call ignored (already running)")
+            return
+        _flatten_in_progress = True
+
+    try:
+        _flatten_all_inner(ib_fallback)
+    finally:
+        with _flatten_lock:
+            _flatten_in_progress = False
+
+
+def _wait_for_order_book_clear(eib: IB, timeout: float = _GLOBAL_CANCEL_WAIT_SECS) -> int:
+    """Poll IBKR until the open-order book is empty or timeout expires.
+
+    After reqGlobalCancel, IBKR processes cancellations asynchronously.
+    Waiting here gives the exchange time to acknowledge before we submit
+    closing market orders — avoiding conflicts with pending orders.
+
+    Returns:
+        Number of orders still remaining when we stopped polling (0 = fully clear).
+    """
+    import time as _time
+    deadline = _time.monotonic() + timeout
+    while _time.monotonic() < deadline:
+        try:
+            remaining = eib.openOrders()
+            if not remaining:
+                return 0
+        except Exception:
+            return 0  # If we can't query, proceed anyway
+        eib.sleep(_GLOBAL_CANCEL_POLL_INTERVAL)
+    try:
+        remaining = eib.openOrders()
+        count = len(remaining) if remaining else 0
+    except Exception:
+        count = 0
+    log.warning(f"🚨 _wait_for_order_book_clear: timed out with {count} orders remaining")
+    return count
+
+
+def _flatten_all_inner(ib_fallback: IB = None):
+    """Internal implementation of flatten_all — called under re-entrancy guard."""
     # Use emergency connection for instant execution; fall back to main if unavailable
     eib = _get_emergency_ib()
     if not eib:
@@ -788,94 +864,39 @@ def flatten_all(ib_fallback: IB = None):
         log.error("🚨 FLATTEN ALL FAILED — no IB connection available")
         return
 
-    log.warning("🚨 FLATTEN ALL — closing all positions immediately")
+    log.critical("🚨 FLATTEN ALL — closing all positions immediately")
 
-    # 1) Cancel ALL open orders FIRST (stops, TPs, pending buys)
+    # 1) Atomically cancel ALL open orders with a single reqGlobalCancel
     try:
-        open_orders = eib.openOrders()
-        for order in open_orders:
-            try:
-                eib.cancelOrder(order)
-                log.warning(f"🚨 FLATTEN: Cancelled order {order.orderId}")
-            except Exception as e:
-                log.error(f"🚨 Cancel order failed: {e}")
-        if open_orders:
-            eib.sleep(1)  # Give IBKR time to process cancellations
+        eib.reqGlobalCancel()
     except Exception as e:
-        log.error(f"🚨 Could not cancel open orders: {e}")
+        log.error(f"🚨 reqGlobalCancel failed: {e} — continuing to close positions")
 
-    # 2) Close everything in IBKR's actual portfolio (source of truth)
+    # 2) Wait for the order book to drain before placing closing orders
+    _wait_for_order_book_clear(eib, timeout=_GLOBAL_CANCEL_WAIT_SECS)
+
+    # 3) Close all positions tracked in active_trades (bot's source of truth)
     closed = 0
-    try:
-        portfolio_items = eib.portfolio(CONFIG["active_account"])
-        for item in portfolio_items:
-            pos = item.position
-            if pos == 0:
-                continue
-            sym = item.contract.symbol
-            mkt = float(item.marketPrice)
-            try:
-                action = "SELL" if pos > 0 else "BUY"
-                qty = abs(int(pos))
+    with _trades_lock:
+        snapshot = list(active_trades.items())
 
-                # CRITICAL: Portfolio contracts lack exchange='SMART' which IBKR
-                # requires for order routing. Must set it explicitly.
-                # Also qualifyContracts to resolve stale fields (right='0', etc.)
-                contract = item.contract
-                contract.exchange = "SMART"
-                try:
-                    eib.qualifyContracts(contract)
-                except Exception:
-                    pass  # Proceed with exchange='SMART' even if qualify fails
+    for key, info in snapshot:
+        sym = info.get("symbol", key.split("_")[0])
+        qty = info.get("qty", 0)
+        instrument = info.get("instrument", "stock")
+        if qty == 0:
+            continue
+        try:
+            contract = get_contract(sym, instrument)
+            order = MarketOrder("SELL", abs(int(qty)))
+            eib.placeOrder(contract, order)
+            _safe_del_trade(key)
+            closed += 1
+            log.warning(f"🚨 FLATTEN: Market SELL {abs(int(qty))} {sym}")
+        except Exception as e:
+            log.error(f"🚨 FLATTEN failed for {sym}: {e}")
 
-                # Use aggressive LIMIT orders — IBKR rejects MarketOrders outside RTH.
-                # For SELL: limit 2% below market price (willing to sell cheap to get out)
-                # For BUY (closing shorts): limit 2% above market price
-                if mkt > 0:
-                    if action == "SELL":
-                        limit_price = round(mkt * 0.98, 2)
-                    else:
-                        limit_price = round(mkt * 1.02, 2)
-                else:
-                    # Fallback: use averageCost if marketPrice unavailable
-                    avg = float(item.averageCost)
-                    if action == "SELL":
-                        limit_price = round(avg * 0.95, 2)
-                    else:
-                        limit_price = round(avg * 1.05, 2)
-
-                order = LimitOrder(action, qty, limit_price,
-                                   account=CONFIG["active_account"],
-                                   tif="GTC", outsideRth=True)
-                flat_trade = eib.placeOrder(contract, order)
-                eib.sleep(0.5)
-
-                # Log emergency flatten order
-                log_order({
-                    "order_id":   flat_trade.order.orderId,
-                    "symbol":     sym,
-                    "side":       action,
-                    "order_type": "LMT",
-                    "qty":        qty,
-                    "price":      limit_price,
-                    "status":     "SUBMITTED",
-                    "instrument": "stock",
-                    "role":       "emergency_flatten",
-                    "timestamp":  datetime.now(timezone.utc).isoformat(),
-                })
-
-                log.warning(f"🚨 FLATTEN: {action} {qty} {sym} LIMIT @${limit_price:.2f} (mkt=${mkt:.2f}) outsideRth=True")
-                closed += 1
-            except Exception as e:
-                log.error(f"🚨 FLATTEN failed for {sym}: {e}")
-    except Exception as e:
-        log.error(f"🚨 Could not read IBKR portfolio: {e}")
-
-    # 3) Clear bot's internal tracker
-    for symbol in list(open_trades.keys()):
-        del open_trades[symbol]
-
-    log.warning(f"🚨 FLATTEN ALL complete — {closed} limit orders placed, tracker cleared")
+    log.warning(f"🚨 FLATTEN ALL complete — {closed} market orders placed, tracker cleared")
 
 
 def close_position(ib_unused, trade_key: str) -> str | None:
@@ -989,10 +1010,10 @@ def close_position(ib_unused, trade_key: str) -> str | None:
 
     # 4) Remove from bot tracker — try composite key first, then plain symbol
     tracker_key = _ibkr_item_to_key(target)
-    if tracker_key in open_trades:
-        del open_trades[tracker_key]
-    elif trade_key in open_trades:
-        del open_trades[trade_key]
+    if tracker_key in active_trades:
+        del active_trades[tracker_key]
+    elif trade_key in active_trades:
+        del active_trades[trade_key]
 
     return detail
 
@@ -1021,10 +1042,10 @@ def reconcile_with_ibkr(ib: IB):
 
         # Remove from tracker if IBKR doesn't have it (under lock — prop-014)
         with _trades_lock:
-            for key in list(open_trades.keys()):
+            for key in list(active_trades.keys()):
                 if key not in ibkr_keys:
                     log.warning(f"Position {key} in bot memory but not in IBKR — removing")
-                    del open_trades[key]
+                    del active_trades[key]
 
         # Add to tracker if IBKR has it but we don't
         reconciled_count = 0
@@ -1069,7 +1090,7 @@ def reconcile_with_ibkr(ib: IB):
                         log.warning(f"Reconcile {key}: no validated price ({src_desc}) — using entry ${entry:.2f} as current")
                         validated_price = entry
 
-                if key not in open_trades:
+                if key not in active_trades:
                     direction = "SHORT" if item.position < 0 else "LONG"
                     qty = abs(int(item.position))
 
@@ -1144,18 +1165,18 @@ def reconcile_with_ibkr(ib: IB):
                     # Update prices for existing tracked positions (prop-014: under lock)
                     mult = 100 if is_option else 1
                     with _trades_lock:
-                        if key in open_trades:
-                            open_trades[key]["current"] = round(validated_price, 4)
-                            direction = open_trades[key].get("direction", "LONG")
-                            qty = open_trades[key]["qty"]
+                        if key in active_trades:
+                            active_trades[key]["current"] = round(validated_price, 4)
+                            direction = active_trades[key].get("direction", "LONG")
+                            qty = active_trades[key]["qty"]
                             if direction == "SHORT":
-                                open_trades[key]["pnl"] = round((entry - validated_price) * qty * mult, 2)
+                                active_trades[key]["pnl"] = round((entry - validated_price) * qty * mult, 2)
                             else:
-                                open_trades[key]["pnl"] = round((validated_price - entry) * qty * mult, 2)
-                            open_trades[key]["status"]  = "ACTIVE"
-                            open_trades[key]["_price_sources"] = src_desc
+                                active_trades[key]["pnl"] = round((validated_price - entry) * qty * mult, 2)
+                            active_trades[key]["status"]  = "ACTIVE"
+                            active_trades[key]["_price_sources"] = src_desc
                             if is_option:
-                                open_trades[key]["current_premium"] = round(validated_price, 4)
+                                active_trades[key]["current_premium"] = round(validated_price, 4)
 
                 reconciled_count += 1
 
@@ -1164,7 +1185,7 @@ def reconcile_with_ibkr(ib: IB):
                 item_sym = getattr(getattr(item, 'contract', None), 'symbol', '???')
                 log.error(f"Reconciliation failed for {item_sym}: {item_err} — skipping, continuing with remaining positions")
 
-        log.info(f"Reconciliation complete. Tracking {len(open_trades)} positions. (processed={reconciled_count}, failed={failed_count})")
+        log.info(f"Reconciliation complete. Tracking {len(active_trades)} positions. (processed={reconciled_count}, failed={failed_count})")
 
     except Exception as e:
         log.error(f"Reconciliation error: {e}")
@@ -1176,7 +1197,7 @@ def update_positions_from_ibkr(ib: IB):
     validation (IBKR + yfinance + TV). Called on every scan so dashboard always
     shows live P&L even when no symbols score.
 
-    Uses composite keys to match IBKR portfolio items to the correct open_trades
+    Uses composite keys to match IBKR portfolio items to the correct active_trades
     entry (preventing stock/option collision). Stock prices are 3-way validated;
     option premiums use IBKR only (yfinance/TV don't have option pricing).
     """
@@ -1190,16 +1211,16 @@ def update_positions_from_ibkr(ib: IB):
 
         # Remove positions no longer in IBKR (closed externally via SL/TP/manual)
         with _trades_lock:
-            stale_keys = [k for k in open_trades if k not in price_map and open_trades[k].get("status") != "PENDING"]
+            stale_keys = [k for k in active_trades if k not in price_map and active_trades[k].get("status") != "PENDING"]
             for k in stale_keys:
                 log.warning(f"Position {k} no longer in IBKR portfolio — removing from tracker")
-                del open_trades[k]
+                del active_trades[k]
 
         # Re-add positions that IBKR has but tracker is missing
         # (lightweight reconciliation — catches positions lost by failed sells,
         #  partial startup reconciliation, or any other tracker/IBKR desync)
         for ibkr_key, item in price_map.items():
-            if ibkr_key not in open_trades:
+            if ibkr_key not in active_trades:
                 try:
                     is_opt = _is_option_contract(item.contract)
                     sym = item.contract.symbol
@@ -1257,7 +1278,7 @@ def update_positions_from_ibkr(ib: IB):
                 except Exception as readd_err:
                     log.error(f"Failed to re-add {ibkr_key}: {readd_err}")
 
-        for key, trade in open_trades.items():
+        for key, trade in active_trades.items():
             is_option = trade.get("instrument") == "option"
             sym = trade.get("symbol", key)
             entry = trade.get("entry", 0)
@@ -1318,7 +1339,7 @@ def get_open_positions() -> list:
     can send the correct composite key (stock vs option safe).
     """
     result = []
-    for key, trade in open_trades.items():
+    for key, trade in active_trades.items():
         pos = dict(trade)
         pos["_trade_key"] = key
         result.append(pos)
@@ -1344,11 +1365,11 @@ def execute_buy_option(ib: IB, contract_info: dict,
         log.warning(f"Options market closed ({now_et.strftime('%H:%M ET')}) — skipping {opt_key}")
         return False
 
-    if opt_key in open_trades:
+    if opt_key in active_trades:
         log.warning(f"Already holding {opt_key} — skipping")
         return False
 
-    if len(open_trades) >= CONFIG["max_positions"]:
+    if len(active_trades) >= CONFIG["max_positions"]:
         log.warning(f"Max positions reached — skipping options trade {symbol}")
         return False
 
@@ -1358,7 +1379,7 @@ def execute_buy_option(ib: IB, contract_info: dict,
     est_option_value = n_contracts * mid_price * 100  # total premium outlay
 
     exp_ok, exp_reason = check_combined_exposure(
-        symbol, est_option_value, list(open_trades.values()),
+        symbol, est_option_value, list(active_trades.values()),
         portfolio_value, instrument="option"
     )
     if not exp_ok:
@@ -1367,7 +1388,7 @@ def execute_buy_option(ib: IB, contract_info: dict,
 
     # ── FIX #2: Sector concentration check ────────────────────────
     sec_ok, sec_reason = check_sector_concentration(
-        symbol, list(open_trades.values()),
+        symbol, list(active_trades.values()),
         portfolio_value  # regime not passed to execute_buy_option, default NORMAL
     )
     if not sec_ok:
@@ -1417,7 +1438,7 @@ def execute_buy_option(ib: IB, contract_info: dict,
             "timestamp":  datetime.now(timezone.utc).isoformat(),
         })
 
-        open_trades[opt_key] = {
+        active_trades[opt_key] = {
             "symbol":          symbol,
             "instrument":      "option",
             "right":           contract_info["right"],
@@ -1479,11 +1500,11 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
         log.warning(f"Options market closed ({now_et.strftime('%H:%M ET')}) — cannot sell {opt_key}")
         return False
 
-    if opt_key not in open_trades:
+    if opt_key not in active_trades:
         log.warning(f"No open options position {opt_key}")
         return False
 
-    pos = open_trades[opt_key]
+    pos = active_trades[opt_key]
     if pos.get("instrument") != "option":
         log.warning(f"{opt_key} is not an options position")
         return False
@@ -1641,7 +1662,7 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
             f"{'✅' if pnl >= 0 else '❌'} SELL {pos['right']} {pos['symbol']} "
             f"${pos['strike']:.0f} | P&L ${pnl:+.2f} | {reason}"
         )
-        del open_trades[opt_key]
+        del active_trades[opt_key]
         return True
 
     except Exception as e:

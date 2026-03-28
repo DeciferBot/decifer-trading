@@ -49,6 +49,9 @@ config_mod.CONFIG = {
 }
 sys.modules.setdefault("config", config_mod)
 
+# Ensure we get the real module, not any stub left by test_bot.py
+sys.modules.pop("smart_execution", None)
+
 import smart_execution
 from smart_execution import (
     ExecutionConfig,

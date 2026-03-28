@@ -82,8 +82,8 @@ config_stub.CONFIG = {
     "min_score_to_trade": 60,
     "atr_stop_multiplier": 2.0,
     "atr_trail_multiplier": 1.5,
-    "partial_exit_1_pct": 0.03,
-    "partial_exit_2_pct": 0.06,
+    "partial_exit_1_pct": 0.04,
+    "partial_exit_2_pct": 0.08,
     "max_positions": 5,
     "max_portfolio_risk_pct": 0.02,
     "risk_per_trade_pct": 0.01,
@@ -91,13 +91,13 @@ config_stub.CONFIG = {
     "trade_log": "/tmp/trades_test.json",
     "order_log": "/tmp/orders_test.json",
 }
-sys.modules["config"] = config_stub
+sys.modules.setdefault("config", config_stub)
 
 # Stub signals module
 signals_stub = types.ModuleType("signals")
 signals_stub.compute_indicators = MagicMock(return_value={})
 signals_stub.compute_confluence = MagicMock(return_value={"total": 65, "score": 65})
-sys.modules["signals"] = signals_stub
+sys.modules.setdefault("signals", signals_stub)
 
 # Now import backtester
 from backtester import (

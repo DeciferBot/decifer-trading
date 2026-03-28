@@ -170,7 +170,7 @@ config_mod.CONFIG = {
     "reconnect_base_wait_secs":     1,
     "reconnect_alert_webhook":      "",
 }
-sys.modules["config"] = config_mod
+sys.modules.setdefault("config", config_mod)
 
 # Stub all Decifer sub-modules so they don't try to import real deps
 # NOTE: ml_engine, data_collector are excluded — they have their own test stubs
@@ -229,7 +229,8 @@ optscan_stub.scan_options_universe = lambda *a, **kw: []
 
 # risk
 risk_stub = sys.modules["risk"]
-risk_stub.can_trade              = lambda *a, **kw: (True, "ok")
+risk_stub.can_trade              = lambda *a, **kw: True
+risk_stub.check_risk_conditions  = lambda *a, **kw: (True, "ok")
 risk_stub.get_session            = lambda: "REGULAR"
 risk_stub.get_scan_interval      = lambda: 300
 risk_stub.reset_daily_state      = lambda *a, **kw: None

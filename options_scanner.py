@@ -22,6 +22,11 @@ import pandas as pd
 import yfinance as yf
 
 from config import CONFIG
+try:
+    from options import get_iv_rank  # module-level so tests can patch options_scanner.get_iv_rank
+except (ImportError, Exception):
+    def get_iv_rank(symbol, iv=None):  # type: ignore
+        return None
 
 log = logging.getLogger("decifer.options_scanner")
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
@@ -231,7 +236,6 @@ def _analyse_symbol(symbol: str, regime: dict = None) -> dict | None:
             dom_iv = 0.30
 
         # ── IV Rank (uses options.py proxy) ───────────────────────────
-        from options import get_iv_rank
         iv_rank = get_iv_rank(symbol, dom_iv)
 
         # ── Earnings catalyst ─────────────────────────────────────────
@@ -422,6 +426,6 @@ def scan_options_universe(extra_symbols: list = None,
         f"(regime={regime_name})"
     )
     for r in top[:5]:
-        log.info(f"  [{r['options_score']:>2}/30] {r['signal']:<14} {r['reasoning'][:90]}")
+        log.info(f"  [{r['options_score']:>2}/30] {r['signal']:<14} {r.get('reasoning', '')[:90]}")
 
     return top

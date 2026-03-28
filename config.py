@@ -26,11 +26,22 @@ CONFIG = {
     "claude_model":      "claude-sonnet-4-6",   # Latest Sonnet
     "claude_max_tokens": 800,                    # Per agent call
 
+    # ── IBKR RECONNECT & HEARTBEAT ────────────────────────────
+    "reconnect_max_attempts":   10,     # Retry attempts before giving up
+    "reconnect_max_wait_secs":  60,     # Cap on exponential backoff delay (secs)
+    "reconnect_base_wait_secs": 1,      # Starting backoff delay (secs)
+    "reconnect_alert_webhook":  "",     # Slack/Teams URL for reconnect-failed alert
+    "heartbeat_interval_secs":  1200,   # 20 min heartbeat (reqCurrentTime)
+
     # ── RISK MANAGEMENT ───────────────────────────────────────
     # NOTE: Tuned for PAPER TRADING data generation — maximise trade volume
     # across regimes to build ML training dataset. Revert to conservative
     # values before switching to live. Original live values in comments.
     "risk_pct_per_trade":       0.03,   # 3% of portfolio per trade (live: 0.04)
+    "risk_per_trade":           0.01,   # 1% per trade — used by position_size()
+    "max_position_size":        0.30,   # Max fraction of account per position (30%)
+    "max_daily_loss":           5000,   # Max daily loss in dollars before halting
+    "correlation_threshold":    0.75,   # Block new trade if correlation > this
     "max_positions":            20,     # More concurrent positions = more data (live: 12)
     "daily_loss_limit":         0.10,   # 10% daily — paper can absorb more (live: 0.06)
     "max_drawdown_alert":       0.25,   # 25% drawdown alert (live: 0.15)

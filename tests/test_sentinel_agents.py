@@ -18,7 +18,7 @@ sys.modules.setdefault("ib_async", MagicMock())
 config_mod = types.ModuleType("config")
 config_mod.CONFIG = {
     "anthropic_api_key": "test-key",
-    "claude_model": "claude-3-haiku-20240307",
+    "claude_model": "claude-sonnet-4-6",  # must match real config.py
     "max_positions": 5,
     "risk_pct_per_trade": 0.02,
     "daily_loss_limit": 0.05,
@@ -28,6 +28,9 @@ config_mod.CONFIG = {
     "order_log": "/tmp/test_orders.json",
 }
 sys.modules.setdefault("config", config_mod)
+
+# Ensure we get the real module, not any stub left by test_bot.py
+sys.modules.pop("sentinel_agents", None)
 
 # ── now import ───────────────────────────────────────────────────────────────
 import sentinel_agents as sa

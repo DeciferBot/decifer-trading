@@ -49,6 +49,16 @@ PROJECT_ROOT = Path(__file__).parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# Evict any hollow stub test_bot.py may have cached for 'orders' and its deps
+# Only evict orders and its deps if the cached module is a hollow stub
+# (e.g. planted by test_bot.py).  If a real orders module (recognised by the
+# presence of _symbol_locks) is already cached — as test_orders_core.py would
+# have installed — keep it so that @patch('orders.CONFIG') in test_orders_core.py
+# applies to the same module object that execute_buy() runs in.
+if "orders" not in sys.modules or not hasattr(sys.modules["orders"], "_symbol_locks"):
+    for _decifer_mod in ("orders", "risk", "learning", "scanner", "signals",
+                         "news", "agents"):
+        sys.modules.pop(_decifer_mod, None)
 import orders
 
 log = logging.getLogger("decifer.tests.test_orders_guard")
@@ -361,8 +371,13 @@ class TestOrdersModuleSmoke:
     def test_no_syntax_errors_at_import(self):
         """If orders imported without exception, it has no syntax errors."""
         import importlib
+        # Use sys.modules['orders'] rather than the local `orders` reference —
+        # other test files may have popped+reimported orders, replacing the object
+        # in sys.modules, which would make importlib.reload(orders) fail with
+        # "module not in sys.modules".
+        mod = sys.modules.get("orders", orders)
         try:
-            importlib.reload(orders)
+            importlib.reload(mod)
         except Exception as e:
             pytest.fail(f"orders.py failed on reload: {e}")
 

@@ -76,6 +76,9 @@ config_stub.CONFIG = {
 sys.modules.setdefault("config", config_stub)
 
 import pytest
+# Evict any hollow stub test_bot.py may have cached for 'options'
+for _decifer_mod in ("options", "orders", "risk", "learning", "scanner"):
+    sys.modules.pop(_decifer_mod, None)
 import options  # noqa: E402
 
 

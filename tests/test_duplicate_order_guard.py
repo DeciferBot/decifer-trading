@@ -134,8 +134,11 @@ _scanner_stub.MOMENTUM_FALLBACK = []
 sys.modules.setdefault("scanner", _scanner_stub)
 
 # ---------------------------------------------------------------------------
-# 5. NOW import orders
+# 5. NOW import orders  (pop any hollow stub test_bot.py may have cached)
 # ---------------------------------------------------------------------------
+for _decifer_mod in ("orders", "risk", "learning", "scanner", "signals",
+                     "news", "agents", "options", "options_scanner"):
+    sys.modules.pop(_decifer_mod, None)
 import orders  # noqa: E402
 
 import pytest  # noqa: E402

@@ -32,6 +32,12 @@ class _FakeBarData:
         self.average = average
         self.barCount = barCount
 
+class _FakeEventList(list):
+    """A list that supports += for event handler registration."""
+    def __iadd__(self, handler):
+        self.append(handler)
+        return self
+
 class _FakeTicker:
     def __init__(self, symbol="AAPL"):
         self.bid = 149.90
@@ -44,14 +50,9 @@ class _FakeTicker:
         contract.symbol = symbol
         self.contract = contract
         self._handlers = []
-
-    @property
-    def updateEvent(self):
-        return self
-
-    def __iadd__(self, handler):
-        self._handlers.append(handler)
-        return self
+        # updateEvent must be a settable attribute (not a property) so that
+        # ibkr_streaming.py can do:  ticker.updateEvent += handler
+        self.updateEvent = _FakeEventList()
 
 class _FakeIB:
     def __init__(self):
@@ -69,10 +70,22 @@ class _FakeIB:
         return MagicMock()
 
 ib_async_mod.IB = _FakeIB
-ib_async_mod.Contract = MagicMock(side_effect=lambda **kw: MagicMock(**kw, symbol=kw.get('symbol','')))
+ib_async_mod.Contract = MagicMock(side_effect=lambda **kw: MagicMock(**kw))
 ib_async_mod.Ticker = _FakeTicker
 ib_async_mod.BarData = _FakeBarData
-sys.modules.setdefault("ib_async", ib_async_mod)
+# Add extras needed by other modules (orders.py, options.py, etc.)
+ib_async_mod.Stock = MagicMock()
+ib_async_mod.Forex = MagicMock()
+ib_async_mod.Option = MagicMock()
+ib_async_mod.Future = MagicMock()
+ib_async_mod.LimitOrder = MagicMock()
+ib_async_mod.StopOrder = MagicMock()
+ib_async_mod.MarketOrder = MagicMock()
+# Force-install our ib_async stub (not setdefault) so earlier MagicMock stubs
+# from test_agents.py don't leave BarData/Ticker as auto-generated MagicMocks.
+# Also evict ibkr_streaming so it re-imports and picks up our proper BarData.
+sys.modules["ib_async"] = ib_async_mod
+sys.modules.pop("ibkr_streaming", None)
 
 # Stub anthropic
 anthropic_mod = types.ModuleType("anthropic")

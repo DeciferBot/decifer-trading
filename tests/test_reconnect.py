@@ -6,7 +6,7 @@ Comprehensive unit tests for the IBKR auto-reconnect logic in bot.py.
 All heavy dependencies are mocked before import.
 """
 import os, sys, types
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -47,34 +47,37 @@ def _make_stub(name):
     mod = types.ModuleType(name)
     return mod
 
-# ib_async
+# ib_async — use setdefault so real/conftest stub is preserved
 ib_async_stub = _make_stub("ib_async")
-ib_async_stub.IB    = MagicMock
-ib_async_stub.Stock = MagicMock
-sys.modules["ib_async"] = ib_async_stub
+ib_async_stub.IB       = MagicMock
+ib_async_stub.Stock    = MagicMock
+ib_async_stub.Contract = MagicMock
+ib_async_stub.Order    = MagicMock
+ib_async_stub.OrderStatus = MagicMock
+sys.modules.setdefault("ib_async", ib_async_stub)
 
-# anthropic
+# anthropic — use setdefault
 anthropic_stub = _make_stub("anthropic")
 anthropic_stub.Anthropic = MagicMock
-sys.modules["anthropic"] = anthropic_stub
+sys.modules.setdefault("anthropic", anthropic_stub)
 
-# yfinance
+# yfinance — use setdefault
 yfinance_stub = _make_stub("yfinance")
 yfinance_stub.download = MagicMock(return_value=MagicMock())
-sys.modules["yfinance"] = yfinance_stub
+sys.modules.setdefault("yfinance", yfinance_stub)
 
-# schedule
+# schedule — use setdefault
 schedule_stub = _make_stub("schedule")
 schedule_stub.every       = MagicMock()
 schedule_stub.run_pending = MagicMock()
-sys.modules["schedule"] = schedule_stub
+sys.modules.setdefault("schedule", schedule_stub)
 
-# colorama
+# colorama — use setdefault
 colorama_stub       = _make_stub("colorama")
 colorama_stub.Fore  = MagicMock()
 colorama_stub.Style = MagicMock()
 colorama_stub.init  = MagicMock()
-sys.modules["colorama"] = colorama_stub
+sys.modules.setdefault("colorama", colorama_stub)
 
 # Stub every local module that bot.py imports at module level
 for _mod_name in [
@@ -103,7 +106,8 @@ for _mod_name in [
     _stub.find_best_contract          = MagicMock()
     _stub.check_options_exits         = MagicMock()
     _stub.scan_options_universe       = MagicMock(return_value=[])
-    _stub.can_trade                   = MagicMock(return_value=(True, ""))
+    _stub.can_trade                   = MagicMock(return_value=True)
+    _stub.check_risk_conditions       = MagicMock(return_value=(True, ""))
     _stub.get_session                 = MagicMock(return_value="REGULAR")
     _stub.get_scan_interval           = MagicMock(return_value=300)
     _stub.reset_daily_state           = MagicMock()
@@ -125,7 +129,7 @@ for _mod_name in [
     _stub.load_custom_themes          = MagicMock(return_value={})
     _stub.get_all_themes              = MagicMock(return_value={})
     _stub.run_sentinel_pipeline       = MagicMock()
-    sys.modules[_mod_name] = _stub
+    sys.modules.setdefault(_mod_name, _stub)
 
 # ── Now import bot ────────────────────────────────────────────────────────────
 import bot  # noqa: E402
@@ -633,8 +637,18 @@ class TestConnectIbkr(unittest.TestCase):
 
     def _make_mock_ib(self):
         mock_ib = MagicMock()
-        mock_ib.connect           = MagicMock()
-        mock_ib.disconnectedEvent = []
+        mock_ib.connect              = MagicMock()
+        mock_ib.isConnected          = MagicMock(return_value=False)
+        mock_ib.reqMarketDataType    = MagicMock()
+        mock_ib.reqPnL               = MagicMock()
+
+        # Use a list subclass that supports the += event-subscription pattern
+        class EventList(list):
+            def __iadd__(self, handler):
+                self.append(handler)
+                return self
+
+        mock_ib.disconnectedEvent = EventList()
         return mock_ib
 
     def _make_thread_factory(self, started_list=None):

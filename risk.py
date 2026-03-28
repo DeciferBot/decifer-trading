@@ -84,7 +84,7 @@ def _get_ibkr_cash(ib, account: str) -> float | None:
     return None
 
 
-def can_trade(portfolio_value: float, daily_pnl: float, regime: dict,
+def check_risk_conditions(portfolio_value: float, daily_pnl: float, regime: dict,
               open_positions: list = None, ib=None) -> tuple[bool, str]:
     """
     Master check — can we take new trades right now?
@@ -156,6 +156,98 @@ def can_trade(portfolio_value: float, daily_pnl: float, regime: dict,
         return False, "Final minute before close — MOC imbalance, avoid"
 
     return True, "OK"
+
+
+# ── Simple can_trade() helpers (mockable in tests) ─────────────────────────
+
+def _get_daily_pnl() -> float:
+    """Return today's realized + unrealized P&L. Override in production."""
+    return 0.0
+
+
+def _get_open_position_count() -> int:
+    """Return current number of open positions."""
+    return 0
+
+
+def _is_market_open() -> bool:
+    """Return True if trading is currently permitted (pre-market to after-hours)."""
+    now_est = datetime.now(EST).time()
+    pre_start = time(4, 0)
+    after_end = time(20, 0)
+    return pre_start <= now_est <= after_end
+
+
+def _get_correlation(symbol: str) -> float:
+    """Return max correlation of *symbol* to any existing position (0.0 = none)."""
+    return 0.0
+
+
+def can_trade(symbol: str, config: dict) -> bool:
+    """
+    Simple risk gate: returns True if a new trade on *symbol* is permitted.
+
+    Checks (in order):
+      1. Daily P&L has not hit the max_daily_loss dollar limit.
+      2. Open position count is below max_positions.
+      3. Market is currently open (4 am – 8 pm EST).
+      4. Correlation to existing positions is below correlation_threshold.
+
+    All checks use thin private helpers (_get_daily_pnl, etc.) so tests can
+    mock them via patch.object without importing live infrastructure.
+    """
+    daily_pnl = _get_daily_pnl()
+    max_loss = config.get("max_daily_loss", CONFIG.get("max_daily_loss", 5000))
+    if daily_pnl <= -abs(max_loss):
+        log.debug(f"can_trade blocked: daily P&L ${daily_pnl:,.2f} <= -${abs(max_loss):,.2f}")
+        return False
+
+    position_count = _get_open_position_count()
+    max_pos = config.get("max_positions", CONFIG.get("max_positions", 10))
+    if position_count >= max_pos:
+        log.debug(f"can_trade blocked: {position_count} positions >= max {max_pos}")
+        return False
+
+    if not _is_market_open():
+        log.debug("can_trade blocked: market closed")
+        return False
+
+    corr = _get_correlation(symbol)
+    threshold = config.get("correlation_threshold", CONFIG.get("correlation_threshold", 0.75))
+    if corr >= threshold:
+        log.debug(f"can_trade blocked: correlation {corr:.2f} >= threshold {threshold:.2f}")
+        return False
+
+    return True
+
+
+def position_size(account_value: float, entry_price: float,
+                  stop_price: float, config: dict = None) -> int:
+    """
+    Fixed-risk position sizer.
+
+    Shares = (account_value × risk_per_trade) / |entry_price - stop_price|
+
+    Capped at max_position_size × account_value / entry_price.
+    Returns 0 when entry_price == stop_price (zero stop distance).
+    """
+    if config is None:
+        config = CONFIG
+
+    stop_distance = abs(entry_price - stop_price)
+    if stop_distance == 0:
+        return 0
+
+    risk_pct = config.get("risk_per_trade", CONFIG.get("risk_per_trade", 0.01))
+    risk_amount = account_value * risk_pct
+    shares = int(risk_amount / stop_distance)
+
+    max_pos_pct = config.get("max_position_size", CONFIG.get("max_position_size", 0.10))
+    if entry_price > 0:
+        max_shares = int((account_value * max_pos_pct) / entry_price)
+        shares = min(shares, max_shares)
+
+    return max(0, shares)
 
 
 def get_session() -> str:

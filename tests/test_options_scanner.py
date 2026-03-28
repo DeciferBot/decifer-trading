@@ -73,6 +73,8 @@ config_stub.CONFIG = {
 sys.modules.setdefault("config", config_stub)
 
 import pytest
+# Evict any hollow stub test_bot.py may have cached for 'options_scanner'
+sys.modules.pop("options_scanner", None)
 import options_scanner  # noqa: E402
 
 
@@ -233,8 +235,7 @@ class TestGetNearestExpiry:
     def test_returns_none_on_exception(self):
         """If ticker.options raises, return (None, None)."""
         ticker = mock.MagicMock()
-        ticker.options = mock.PropertyMock(side_effect=Exception("network"))()
-        # Make the attribute access itself raise
+        # Make the attribute access itself raise on property read
         type(ticker).options = mock.PropertyMock(side_effect=Exception("network"))
         exp_str, dte = options_scanner._get_nearest_expiry(ticker)
         assert exp_str is None

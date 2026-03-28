@@ -430,19 +430,26 @@ class VWAPExecutor:
         Returns:
             Dictionary mapping hour (0-23 in market timezone) to volume weight
         """
-        # Simplified historical profile (typical US market)
-        # Hours in EST (9:30 AM - 4 PM = 9.5 - 16)
-        profile = {
-            9: 1.8,   # 9:30 AM - Open
-            10: 1.5,  # 10 AM
-            11: 0.9,  # 11 AM
-            12: 0.6,  # 12 PM - Lunch
-            13: 0.7,  # 1 PM
-            14: 1.0,  # 2 PM
-            15: 1.3,  # 3 PM
-            16: 1.5,  # 3:30 PM - Close
+        # Full 24-hour volume profile (hours 0-23 in EST/market timezone).
+        # Market hours (9-16) carry real volume; pre/after-hours get small
+        # positive weights; overnight hours (0-8, 17-23) get minimal weight.
+        # All weights are normalized so they sum to exactly 1.0.
+        raw = {
+            0: 0.2, 1: 0.1, 2: 0.1, 3: 0.1, 4: 0.2,   # Overnight
+            5: 0.3, 6: 0.4, 7: 0.5, 8: 0.7,             # Pre-market build-up
+            9: 18.0,   # 9:30 AM - Open (highest)
+            10: 15.0,  # 10 AM
+            11: 9.0,   # 11 AM
+            12: 6.0,   # Noon - Lunch lull
+            13: 7.0,   # 1 PM
+            14: 10.0,  # 2 PM
+            15: 13.0,  # 3 PM - Power hour
+            16: 15.0,  # 4 PM - Close
+            17: 0.7, 18: 0.5, 19: 0.4, 20: 0.3,         # After-hours
+            21: 0.2, 22: 0.2, 23: 0.1,                   # Late evening
         }
-        return profile
+        total = sum(raw.values())
+        return {hour: weight / total for hour, weight in raw.items()}
 
     async def execute(
         self,

@@ -42,7 +42,10 @@ if hasattr(_config_mod, "CONFIG"):
 else:
     _config_mod.CONFIG = _cfg
 
-# ── 4. NOW safe to import orders ──────────────────────────────────────────────
+# ── 4. NOW safe to import orders  (pop any hollow stub test_bot.py cached) ────
+for _decifer_mod in ("orders", "risk", "learning", "scanner", "signals",
+                     "news", "agents", "options", "options_scanner"):
+    sys.modules.pop(_decifer_mod, None)
 import orders
 
 

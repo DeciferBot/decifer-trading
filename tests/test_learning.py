@@ -46,6 +46,9 @@ configmod.CONFIG = {
 }
 sys.modules.setdefault("config", configmod)
 
+# Evict any hollow stub that test_bot.py may have planted for 'learning'
+sys.modules.pop("learning", None)
+
 import learning
 
 
@@ -89,15 +92,24 @@ class TestCapitalBase:
     """Tests for capital tracking functions."""
 
     def setup_method(self):
-        """Point CAPITAL_FILE to a temp file."""
+        """Point CAPITAL_FILE to a temp file and fix starting_capital to test value."""
         self.tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
         self.tmp.close()
         os.remove(self.tmp.name)  # start without file
         self._orig = learning.CAPITAL_FILE
         learning.CAPITAL_FILE = self.tmp.name
+        # The real config may have a different starting_capital (e.g. 1_000_000).
+        # Override it in learning's CONFIG to the value this test suite uses.
+        self._orig_capital = learning.CONFIG.get("starting_capital")
+        learning.CONFIG["starting_capital"] = 100_000
 
     def teardown_method(self):
         learning.CAPITAL_FILE = self._orig
+        # Restore original starting_capital
+        if self._orig_capital is not None:
+            learning.CONFIG["starting_capital"] = self._orig_capital
+        else:
+            learning.CONFIG.pop("starting_capital", None)
         if os.path.exists(self.tmp.name):
             os.remove(self.tmp.name)
 
@@ -451,8 +463,11 @@ class TestWeeklyReview:
     def teardown_method(self):
         learning.TRADE_LOG_FILE = self._orig_tl
         _clear_files()
-        if os.path.exists("weekly_review.txt"):
-            os.remove("weekly_review.txt")
+        try:
+            if os.path.exists("weekly_review.txt"):
+                os.remove("weekly_review.txt")
+        except (PermissionError, OSError):
+            pass  # workspace mount may not allow deletion; non-fatal
 
     def test_weekly_review_no_trades_returns_message(self):
         """run_weekly_review returns informative string when no trades exist."""

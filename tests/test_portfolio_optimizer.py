@@ -30,6 +30,9 @@ config_mod.CONFIG = {
 }
 sys.modules.setdefault("config", config_mod)
 
+# Ensure we get the real module, not any stub left by test_bot.py
+sys.modules.pop("portfolio_optimizer", None)
+
 # ── now import the module ────────────────────────────────────────────────────
 import portfolio_optimizer as po
 

@@ -48,6 +48,7 @@ from theme_tracker import (
     toggle_theme,
     get_all_themes,
     score_headline_theme_relevance,
+    get_holdings_symbols,
     THEMES,
 )
 

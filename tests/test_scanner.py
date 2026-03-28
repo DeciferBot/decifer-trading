@@ -40,10 +40,14 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+# Evict any hollow stub (e.g. MagicMock planted by test_bot.py) so we get the
+# real scanner module with actual filter_by_volume / rank_candidates functions.
+sys.modules.pop("scanner", None)
 try:
     import scanner
-    HAS_SCANNER = True
-except ImportError:
+    # Confirm it's the real module (a MagicMock stub would have no __file__)
+    HAS_SCANNER = hasattr(scanner, "__file__") and scanner.__file__ is not None
+except (ImportError, Exception):
     HAS_SCANNER = False
 
 

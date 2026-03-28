@@ -91,7 +91,10 @@ if "config" not in sys.modules:
         "trade_log": "/tmp/trades_test.json",
         "order_log": "/tmp/orders_test.json",
     }
-    sys.modules["config"] = config_stub
+    sys.modules.setdefault("config", config_stub)
+
+# Ensure we get the real dashboard module, not any stub left by test_bot.py
+sys.modules.pop("dashboard", None)
 
 # Now import dashboard
 import dashboard

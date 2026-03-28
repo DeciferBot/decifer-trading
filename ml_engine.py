@@ -518,6 +518,7 @@ class SignalEnhancer:
         base_score = symbol_data.get("base_score", 25)
         result = {
             "enhanced_score": base_score,
+            "adjusted_score": base_score,  # alias — same value, preferred key in tests
             "ml_confidence": 0.0,
             "ml_details": {},
             "ml_enabled": self.ml_enabled,
@@ -552,6 +553,7 @@ class SignalEnhancer:
             enhanced = max(0, min(50, enhanced))
 
             result["enhanced_score"] = enhanced
+            result["adjusted_score"] = enhanced  # keep alias in sync
             result["ml_confidence"] = ml_pred["confidence"]
             result["ml_details"] = {
                 "win_probability": ml_pred["win_prob"],

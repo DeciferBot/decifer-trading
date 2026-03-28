@@ -57,7 +57,7 @@ from agents import run_all_agents
 from orders import execute_buy, execute_sell, flatten_all, reconcile_with_ibkr, get_open_positions, update_position_prices, update_positions_from_ibkr, execute_buy_option, execute_sell_option
 from options import find_best_contract, check_options_exits
 from options_scanner import scan_options_universe
-from risk import can_trade, get_session, get_scan_interval, reset_daily_state, calculate_position_size, calculate_stops, update_equity_high_water_mark
+from risk import check_risk_conditions, get_session, get_scan_interval, reset_daily_state, calculate_position_size, calculate_stops, update_equity_high_water_mark
 from learning import log_trade, load_trades, load_orders, get_performance_summary, run_weekly_review, TRADE_LOG_FILE, get_effective_capital, record_capital_adjustment
 from dashboard import DASHBOARD_HTML
 from news_sentinel import NewsSentinel, get_sentinel_history
@@ -94,7 +94,7 @@ COLORS = {
 # ── Live dashboard state ────────────────────────────────────────
 dash = {
     "status":               "starting",
-    "account":              CONFIG["active_account"],
+    "account":              CONFIG.get("active_account", ""),
     "portfolio_value":      0.0,
     "daily_pnl":            0.0,
     "session":              "UNKNOWN",
@@ -327,325 +327,7 @@ def _restore_subscriptions() -> None:
         sub_type = params.get("type")
         try:
             if sub_type == "pnl":
-                account = params.get("account", CONFIG["active_account"])
-                ib.reqPnL(account)
-                log.info(f"  ✔ Re-subscribed PnL for account {account}")
-            elif sub_type == "ticker":
-                from ib_async import Stock
-                contract = Stock(key, "SMART", "USD")
-                ib.reqMktData(contract, "", False, False)
-                log.info(f"  ✔ Re-subscribed market data for {key}")
-            else:
-                log.warning(f"  ⚠ Unknown subscription type '{sub_type}' for key '{key}' — skipped")
-        except Exception as exc:
-            log.error(f"  ✗ Failed to restore subscription '{key}': {exc}")
-
-
-def _send_reconnect_exhausted_alert(attempts: int) -> None:
-    """
-    Fire an external alert (Slack/Teams webhook) when all reconnect attempts
-    are exhausted so the operator is notified even if they are not watching logs.
-    """
-    webhook = CONFIG.get("reconnect_alert_webhook", "")
-    msg = (
-        f"🔴 DECIFER IBKR RECONNECT FAILED — "
-        f"all {attempts} attempts exhausted. Bot is disconnected and STOPPED. "
-        f"Manual restart required."
-    )
-    # Always update the dashboard flag
-    dash["status"] = "disconnected — reconnect failed"
-    clog("ERROR", msg)
-
-    if not webhook:
-        return
-    try:
-        payload = json.dumps({"text": msg}).encode()
-        req = urllib.request.Request(
-            webhook,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=10):
-            pass
-        log.info("Reconnect-exhausted alert sent to webhook.")
-    except Exception as exc:
-        log.error(f"Failed to send reconnect-exhausted alert: {exc}")
-
-
-def _reconnect_worker() -> None:
-    """
-    Background thread: attempt to reconnect to IBKR using exponential backoff.
-
-    Delays: 1 s, 2 s, 4 s, 8 s, 16 s, 32 s, 60 s, 60 s … (capped)
-    Gives up after CONFIG['reconnect_max_attempts'] failures.
-    On success, re-subscribes to all registered feeds.
-    """
-    global _reconnecting
-
-    max_attempts = CONFIG.get("reconnect_max_attempts", 10)
-    max_wait     = CONFIG.get("reconnect_max_wait_secs", 60)
-    base_wait    = CONFIG.get("reconnect_base_wait_secs", 1)
-    host         = CONFIG.get("ibkr_host", "127.0.0.1")
-    port         = CONFIG.get("ibkr_port", 7497)
-    client_id    = CONFIG.get("ibkr_client_id", 1)
-
-    wait = base_wait
-    for attempt in range(1, max_attempts + 1):
-        log.warning(
-            f"IBKR reconnect attempt {attempt}/{max_attempts} "
-            f"(waiting {wait}s before connect)…"
-        )
-        dash["status"] = f"reconnecting ({attempt}/{max_attempts})"
-        time.sleep(wait)
-
-        try:
-            ib.connect(host, port, clientId=client_id, readonly=False)
-            log.info(f"✔ IBKR reconnected on attempt {attempt}.")
-            dash["status"] = "connected"
-            _restore_subscriptions()
-            break
-        except Exception as exc:
-            log.error(f"Reconnect attempt {attempt} failed: {exc}")
-            wait = min(wait * 2, max_wait)
-    else:
-        # All attempts exhausted
-        _send_reconnect_exhausted_alert(max_attempts)
-
-    with _reconnect_lock:
-        _reconnecting = False
-
-
-def _on_disconnected() -> None:
-    """
-    Callback registered with ib_async's disconnectedEvent.
-    Spawns the reconnect worker thread (only one at a time).
-    """
-    global _reconnecting
-    with _reconnect_lock:
-        if _reconnecting:
-            log.debug("Disconnect event received but reconnect already in progress — ignoring.")
-            return
-        _reconnecting = True
-
-    log.warning("⚠ IBKR connection lost — starting auto-reconnect…")
-    dash["status"] = "disconnected"
-    t = threading.Thread(target=_reconnect_worker, name="ibkr-reconnect", daemon=True)
-    t.start()
-
-
-def _heartbeat_worker() -> None:
-    """
-    Background thread: send a lightweight reqCurrentTime() to IBKR every
-    CONFIG['heartbeat_interval_secs'] seconds to prevent idle-timeout disconnects.
-    Uses short sleep intervals so it stays responsive during reconnect activity.
-    """
-    interval   = CONFIG.get("heartbeat_interval_secs", 1200)
-    tick       = 60          # check every minute; avoids long sleeps during reconnect
-    elapsed    = 0
-
-    while True:
-        time.sleep(tick)
-        elapsed += tick
-        if elapsed < interval:
-            continue
-        elapsed = 0
-        if not ib.isConnected():
-            log.debug("Heartbeat skipped — not connected.")
-            continue
-        try:
-            ib.reqCurrentTime()
-            log.debug("IBKR heartbeat sent (reqCurrentTime).")
-        except Exception as exc:
-            log.warning(f"IBKR heartbeat failed: {exc}")
-
-
-# ── Subscription registry helpers ────────────────────────────────────────────
-
-def _register_subscription(key: str, params: dict) -> None:
-    """Record a market-data or PnL subscription so it can be restored after reconnect."""
-    _subscription_registry[key] = params
-
-
-def _unregister_subscription(key: str) -> None:
-    """Remove a subscription from the registry."""
-    _subscription_registry.pop(key, None)
-
-
-def _restore_subscriptions() -> None:
-    """
-    Re-subscribe to all registered market data and PnL feeds after a reconnect.
-    Called once the new IB connection is fully established.
-    """
-    if not _subscription_registry:
-        log.info("No subscriptions to restore after reconnect.")
-        return
-
-    log.info(f"Restoring {len(_subscription_registry)} subscription(s) after reconnect…")
-    for key, params in list(_subscription_registry.items()):
-        sub_type = params.get("type")
-        try:
-            if sub_type == "pnl":
-                account = params.get("account", CONFIG["active_account"])
-                ib.reqPnL(account)
-                log.info(f"  ✔ Re-subscribed PnL for account {account}")
-            elif sub_type == "ticker":
-                from ib_async import Stock
-                contract = Stock(key, "SMART", "USD")
-                ib.reqMktData(contract, "", False, False)
-                log.info(f"  ✔ Re-subscribed market data for {key}")
-            else:
-                log.warning(f"  ⚠ Unknown subscription type '{sub_type}' for key '{key}' — skipped")
-        except Exception as exc:
-            log.error(f"  ✗ Failed to restore subscription '{key}': {exc}")
-
-
-def _send_reconnect_exhausted_alert(attempts: int) -> None:
-    """
-    Fire an external alert (Slack/Teams webhook) when all reconnect attempts
-    are exhausted so the operator is notified even if they are not watching logs.
-    """
-    webhook = CONFIG.get("reconnect_alert_webhook", "")
-    msg = (
-        f"🔴 DECIFER IBKR RECONNECT FAILED — "
-        f"all {attempts} attempts exhausted. Bot is disconnected and STOPPED. "
-        f"Manual restart required."
-    )
-    # Always update the dashboard flag
-    dash["status"] = "disconnected — reconnect failed"
-    clog("ERROR", msg)
-
-    if not webhook:
-        return
-    try:
-        payload = json.dumps({"text": msg}).encode()
-        req = urllib.request.Request(
-            webhook,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=10):
-            pass
-        log.info("Reconnect-exhausted alert sent to webhook.")
-    except Exception as exc:
-        log.error(f"Failed to send reconnect-exhausted alert: {exc}")
-
-
-def _reconnect_worker() -> None:
-    """
-    Background thread: attempt to reconnect to IBKR using exponential backoff.
-
-    Delays: 1 s, 2 s, 4 s, 8 s, 16 s, 32 s, 60 s, 60 s … (capped)
-    Gives up after CONFIG['reconnect_max_attempts'] failures.
-    On success, re-subscribes to all registered feeds.
-    """
-    global _reconnecting
-
-    max_attempts = CONFIG.get("reconnect_max_attempts", 10)
-    max_wait     = CONFIG.get("reconnect_max_wait_secs", 60)
-    base_wait    = CONFIG.get("reconnect_base_wait_secs", 1)
-    host         = CONFIG.get("ibkr_host", "127.0.0.1")
-    port         = CONFIG.get("ibkr_port", 7497)
-    client_id    = CONFIG.get("ibkr_client_id", 1)
-
-    wait = base_wait
-    for attempt in range(1, max_attempts + 1):
-        log.warning(
-            f"IBKR reconnect attempt {attempt}/{max_attempts} "
-            f"(waiting {wait}s before connect)…"
-        )
-        dash["status"] = f"reconnecting ({attempt}/{max_attempts})"
-        time.sleep(wait)
-
-        try:
-            ib.connect(host, port, clientId=client_id, readonly=False)
-            log.info(f"✔ IBKR reconnected on attempt {attempt}.")
-            dash["status"] = "connected"
-            _restore_subscriptions()
-            break
-        except Exception as exc:
-            log.error(f"Reconnect attempt {attempt} failed: {exc}")
-            wait = min(wait * 2, max_wait)
-    else:
-        # All attempts exhausted
-        _send_reconnect_exhausted_alert(max_attempts)
-
-    with _reconnect_lock:
-        _reconnecting = False
-
-
-def _on_disconnected() -> None:
-    """
-    Callback registered with ib_async's disconnectedEvent.
-    Spawns the reconnect worker thread (only one at a time).
-    """
-    global _reconnecting
-    with _reconnect_lock:
-        if _reconnecting:
-            log.debug("Disconnect event received but reconnect already in progress — ignoring.")
-            return
-        _reconnecting = True
-
-    log.warning("⚠ IBKR connection lost — starting auto-reconnect…")
-    dash["status"] = "disconnected"
-    t = threading.Thread(target=_reconnect_worker, name="ibkr-reconnect", daemon=True)
-    t.start()
-
-
-def _heartbeat_worker() -> None:
-    """
-    Background thread: send a lightweight reqCurrentTime() to IBKR every
-    CONFIG['heartbeat_interval_secs'] seconds to prevent idle-timeout disconnects.
-    Uses short sleep intervals so it stays responsive during reconnect activity.
-    """
-    interval   = CONFIG.get("heartbeat_interval_secs", 1200)
-    tick       = 60          # check every minute; avoids long sleeps during reconnect
-    elapsed    = 0
-
-    while True:
-        time.sleep(tick)
-        elapsed += tick
-        if elapsed < interval:
-            continue
-        elapsed = 0
-        if not ib.isConnected():
-            log.debug("Heartbeat skipped — not connected.")
-            continue
-        try:
-            ib.reqCurrentTime()
-            log.debug("IBKR heartbeat sent (reqCurrentTime).")
-        except Exception as exc:
-            log.warning(f"IBKR heartbeat failed: {exc}")
-
-
-# ── Subscription registry helpers ────────────────────────────────────────────
-
-def _register_subscription(key: str, params: dict) -> None:
-    """Record a market-data or PnL subscription so it can be restored after reconnect."""
-    _subscription_registry[key] = params
-
-
-def _unregister_subscription(key: str) -> None:
-    """Remove a subscription from the registry."""
-    _subscription_registry.pop(key, None)
-
-
-def _restore_subscriptions() -> None:
-    """
-    Re-subscribe to all registered market data and PnL feeds after a reconnect.
-    Called once the new IB connection is fully established.
-    """
-    if not _subscription_registry:
-        log.info("No subscriptions to restore after reconnect.")
-        return
-
-    log.info(f"Restoring {len(_subscription_registry)} subscription(s) after reconnect…")
-    for key, params in list(_subscription_registry.items()):
-        sub_type = params.get("type")
-        try:
-            if sub_type == "pnl":
-                account = params.get("account", CONFIG["active_account"])
+                account = params.get("account", CONFIG.get("active_account", ""))
                 ib.reqPnL(account)
                 log.info(f"  ✔ Re-subscribed PnL for account {account}")
             elif sub_type == "ticker":
@@ -1477,13 +1159,20 @@ def connect_ibkr() -> bool:
         if ib.isConnected():
             return True
         ib.connect(CONFIG["ibkr_host"], CONFIG["ibkr_port"],
-                   clientId=CONFIG["ibkr_client_id"], timeout=15)
+                   clientId=CONFIG["ibkr_client_id"], readonly=False)
         # Request delayed market data (type 3) — FREE, no subscription needed.
         # Fixes Error 10089 ("Requested market data requires additional subscription").
         # IBKR will try live first; if no subscription, falls back to 15-min delayed.
         # Delayed price is used for order validation only — actual fill is at market.
         ib.reqMarketDataType(3)
-        clog("INFO", f"IBKR connected — port {CONFIG['ibkr_port']} | Account: {CONFIG['active_account']} | Market data: DELAYED (free)")
+        # Register disconnect handler — guard against double-registration on reconnect
+        if _on_disconnected not in ib.disconnectedEvent:
+            ib.disconnectedEvent += _on_disconnected
+        ht = threading.Thread(target=_heartbeat_worker, name="ibkr-heartbeat", daemon=True)
+        ht.start()
+        # Register PnL subscription so it can be restored after reconnect
+        _register_subscription("__pnl__", {"type": "pnl", "account": CONFIG.get("active_account", "")})
+        clog("INFO", f"IBKR connected — port {CONFIG['ibkr_port']} | Account: {CONFIG.get('active_account', '')} | Market data: DELAYED (free)")
         reconcile_with_ibkr(ib)
         dash["status"] = "running"
         return True
@@ -1963,7 +1652,7 @@ def run_scan():
     check_external_closes(regime)
 
     # ── Can we trade? ────────────────────────────────────────
-    tradeable, reason = can_trade(pv, pnl, regime, get_open_positions(), ib=ib)
+    tradeable, reason = check_risk_conditions(pv, pnl, regime, get_open_positions(), ib=ib)
     if not tradeable:
         # ── Auto-rebalance: if cash reserve too low, close weakest position(s) ──
         if "Cash reserve too low" in reason:
@@ -1974,7 +1663,7 @@ def run_scan():
             dash["portfolio_value"] = pv
             dash["daily_pnl"] = pnl
             dash["positions"] = get_open_positions()
-            tradeable, reason = can_trade(pv, pnl, regime, get_open_positions(), ib=ib)
+            tradeable, reason = check_risk_conditions(pv, pnl, regime, get_open_positions(), ib=ib)
 
         if not tradeable:
             clog("RISK", f"Trading suspended: {reason}")
@@ -2245,7 +1934,7 @@ def run_scan():
 
     # Re-check can_trade() — scan + agents can take 15-30 min,
     # market may have closed or risk state may have changed since initial check
-    tradeable_now, reason_now = can_trade(pv, pnl, regime, get_open_positions(), ib=ib)
+    tradeable_now, reason_now = check_risk_conditions(pv, pnl, regime, get_open_positions(), ib=ib)
     if not tradeable_now:
         clog("RISK", f"Trading suspended before buy execution: {reason_now}")
         # Still complete the scan (positions updated, agents ran) — just skip buys
@@ -2450,7 +2139,7 @@ def handle_news_trigger(trigger: dict):
         open_pos = get_open_positions()
 
         # Can we trade?
-        tradeable, reason = can_trade(pv, pnl, regime, open_pos, ib=ib)
+        tradeable, reason = check_risk_conditions(pv, pnl, regime, open_pos, ib=ib)
         if not tradeable:
             clog("RISK", f"Sentinel {sym}: trading suspended — {reason}")
             return

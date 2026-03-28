@@ -37,7 +37,20 @@ import time
 from unittest.mock import patch, MagicMock, call
 from datetime import datetime, timezone
 
-# Import orders module (conftest has already patched dependencies)
+# Force-evict any hollow stubs that earlier test files (e.g. test_bot.py) may
+# have planted into sys.modules for orders and its local dependencies.
+# test_bot.py installs bare types.ModuleType() objects for "orders", "risk",
+# "learning", "scanner", etc. to keep bot.py from dragging in the real code.
+# If those stubs are still cached here, `import orders` gets the hollow shell
+# and none of orders.py's module-level attributes (open_trades, etc.) exist.
+for _decifer_mod in ("orders", "risk", "learning", "scanner", "signals",
+                     "news", "agents"):
+    # NOTE: do NOT pop "options" or "options_scanner" — orders.py doesn't import
+    # them, so evicting them would invalidate test_options_scanner.py's module
+    # that was imported at collection time (breaking cross-test patching).
+    sys.modules.pop(_decifer_mod, None)
+
+# Import the REAL orders module (conftest has already patched all heavy deps)
 import orders
 
 

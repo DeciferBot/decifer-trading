@@ -101,6 +101,8 @@ class BarAggregator:
 
                 self._current_1m = self._create_aggregated_bar(bar_time, 60)
                 self._last_1m_time = bar_time
+                # Include the bar that opened this new period
+                self._update_aggregated_bar(self._current_1m, bar)
             else:
                 # Update current 1-min bar
                 if self._current_1m is not None:
@@ -114,6 +116,8 @@ class BarAggregator:
 
                 self._current_5m = self._create_aggregated_bar(bar_time, 300)
                 self._last_5m_time = bar_time
+                # Include the bar that opened this new period
+                self._update_aggregated_bar(self._current_5m, bar)
             else:
                 # Update current 5-min bar
                 if self._current_5m is not None:
