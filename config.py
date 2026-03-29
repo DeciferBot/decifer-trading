@@ -289,7 +289,12 @@ CONFIG = {
     #   4 — Advanced data & execution (multi-account, live accounts, cloud)
     #   5 — Infrastructure (Docker, multi-user, hosted deployment)
     #
-    # Phase 1 exit criteria (ALL must be met before advancing):
+    # Alpha Validation Gate (must be cleared FIRST — before any of the below):
+    #   - 50+ closed paper trades with positive average PnL (positive expectancy)
+    #   - This gate blocks: new signal dimensions, infrastructure work, live trading
+    #   - See LIVE_TRADING_GATE.md for the full criteria document
+    #
+    # Phase 1 exit criteria (ALL must be met before advancing to Phase 2):
     #   - 200+ closed paper trades logged to data/trades.json
     #   - Test suite ≥ 80% pass rate
     #   - 30+ consecutive paper trading days without critical bugs
@@ -298,6 +303,16 @@ CONFIG = {
     # DO NOT change current_phase without meeting all exit criteria above.
     "phase_gate": {
         "current_phase": 1,
+
+        # ── Alpha Validation Gate ──────────────────────────────────────────────
+        # Hard checkpoint before any new signal dimension, infrastructure work,
+        # or live trading gate. Signal model has no demonstrated alpha until this
+        # is cleared. See LIVE_TRADING_GATE.md.
+        "alpha_validation_gate": {
+            "min_closed_trades":          50,   # Minimum closed paper trades required
+            "require_positive_expectancy": True, # avg PnL/trade must be > 0
+        },
+
         "phase1_exit_criteria": {
             "min_closed_trades":       200,   # Trades needed before ML/backtest are meaningful
             "min_test_pass_rate":      0.80,  # Fraction of pytest tests that must pass
