@@ -239,4 +239,65 @@ CONFIG = {
     "ml_retrain_interval":       168,         # Hours between automatic retraining (1 week)
     "ml_confidence_weight":      0.3,         # Weight of ML adjustment: 0.3 = 30% of change
     "ml_models_dir":             "data/models",  # Where to persist trained models
+
+    # ── TELEGRAM KILL SWITCH ──────────────────────────────────────
+    # Emergency stop accessible via Telegram (supplement to dashboard).
+    # Required before live trading (Phase 4) — see phase_gate frozen_features.
+    #
+    # Setup:
+    #   1. Create a bot via @BotFather — copy the token below (or set env var)
+    #   2. Start a chat with your bot, then run:
+    #        curl https://api.telegram.org/bot<TOKEN>/getUpdates
+    #      to find your chat_id and add it to authorized_chat_ids
+    #
+    # Commands once running:
+    #   /kill   — flatten all positions, cancel orders, halt bot
+    #   /status — current bot state + open position count
+    #   /resume — clear kill flag and resume trading
+    "telegram": {
+        "bot_token":           os.environ.get("TELEGRAM_BOT_TOKEN", ""),
+        "authorized_chat_ids": [],   # e.g. [123456789] — integer chat IDs only
+    },
+
+    # ── PHASE GATE ────────────────────────────────────────────────
+    # Enforces strict sequencing: Phase 4+ work (cloud, multi-user, Docker,
+    # live accounts) is frozen until Phase 1 exit criteria are satisfied.
+    #
+    # Phases:
+    #   1 — Paper trading validation (single account, core pipeline)
+    #   2 — Bias removal & regime adaptation (roadmap A/B/C/D)
+    #   3 — Signal validation & ML calibration (Alphalens, walk-forward)
+    #   4 — Advanced data & execution (multi-account, live accounts, cloud)
+    #   5 — Infrastructure (Docker, multi-user, hosted deployment)
+    #
+    # Phase 1 exit criteria (ALL must be met before advancing):
+    #   - 200+ closed paper trades logged to data/trades.json
+    #   - Test suite ≥ 80% pass rate
+    #   - 30+ consecutive paper trading days without critical bugs
+    #   - Amit explicitly sets current_phase = 2 after reviewing results
+    #
+    # DO NOT change current_phase without meeting all exit criteria above.
+    "phase_gate": {
+        "current_phase": 1,
+        "phase1_exit_criteria": {
+            "min_closed_trades":       200,   # Trades needed before ML/backtest are meaningful
+            "min_test_pass_rate":      0.80,  # Fraction of pytest tests that must pass
+            "min_paper_trading_days":  30,    # Consecutive days running without critical bugs
+        },
+        # Features frozen until the specified phase is reached.
+        # Attempting to enable these in earlier phases triggers a PhaseGateViolation.
+        "frozen_features": {
+            # Phase 4: multi-account, live accounts, cloud infrastructure
+            "live_account_trading":     4,   # Enabling live_1 / live_2 for order execution
+            "multi_account_aggregation":4,   # aggregate_accounts with multiple live accounts
+            "cloud_deployment":         4,   # Any hosted / cloud infra work
+            # Phase 4 safety gate: Telegram kill switch MUST be configured before live trading.
+            # phase_gate.validate() will block Phase 4 if bot_token or authorized_chat_ids is unset.
+            "telegram_kill_switch":     4,   # Emergency stop via Telegram (gate for live trading)
+            # Phase 5: infrastructure & multi-user
+            "docker_deployment":        5,   # Dockerising the bot
+            "multi_user_auth":          5,   # User accounts / auth layer
+            "hosted_dashboard":         5,   # Public-facing dashboard
+        },
+    },
 }

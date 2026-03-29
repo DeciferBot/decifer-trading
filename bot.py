@@ -2745,6 +2745,46 @@ def main():
     except Exception as e:
         clog("ERROR", f"Social sentiment startup error: {e}")
 
+    # ── Start Telegram Kill Switch ──
+    _tg_cfg = CONFIG.get("telegram", {})
+    _tg_token = _tg_cfg.get("bot_token", "")
+    _tg_chat_ids = _tg_cfg.get("authorized_chat_ids", [])
+    if _tg_token and _tg_chat_ids:
+        try:
+            import telegram_bot as _tg_mod
+
+            def _tg_on_kill() -> str:
+                dash["killed"] = True
+                clog("RISK", "🚨 Telegram KILL — executing FLATTEN ALL...")
+                try:
+                    flatten_all(ib)
+                    clog("RISK", "🚨 Telegram FLATTEN ALL complete")
+                    return "✅ KILL executed — all positions flattened and bot halted."
+                except Exception as _exc:
+                    clog("ERROR", f"🚨 Telegram FLATTEN ALL failed: {_exc}")
+                    return f"❌ FLATTEN ALL failed: {_exc}"
+
+            def _tg_on_status() -> str:
+                state = "HALTED 🛑" if dash.get("killed") else ("PAUSED ⏸" if dash.get("paused") else "RUNNING ✅")
+                n_pos = len(dash.get("positions", {}))
+                return f"Bot state: {state}\nOpen positions: {n_pos}"
+
+            def _tg_on_resume() -> str:
+                if not dash.get("killed"):
+                    return "ℹ️ Bot is not halted — nothing to resume."
+                dash["killed"] = False
+                clog("INFO", "▶️ Telegram RESUME — kill flag cleared")
+                return "▶️ Bot resumed. Kill flag cleared."
+
+            _tg_mod.start(_tg_token, _tg_chat_ids, _tg_on_kill, _tg_on_status, _tg_on_resume)
+            clog("INFO", f"📱 Telegram kill switch active | {len(_tg_chat_ids)} authorized chat(s)")
+        except ImportError:
+            clog("INFO", "telegram_bot.py not found — Telegram kill switch disabled")
+        except Exception as _tg_exc:
+            clog("ERROR", f"Telegram kill switch startup error: {_tg_exc}")
+    else:
+        clog("INFO", "📱 Telegram kill switch not configured (set TELEGRAM_BOT_TOKEN + authorized_chat_ids)")
+
     # ── Start ML Signal Enhancement ──
     try:
         from ml_engine import enhance_score
