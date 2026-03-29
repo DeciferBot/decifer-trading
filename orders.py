@@ -569,7 +569,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         # The final child has transmit=True which transmits the entire group together.
         # This prevents the "parent already filled" rejection that kills child orders.
         limit_price = round(price * 1.002, 2)
-        tp_qty = max(1, qty // 3)
+        tp_qty = qty if qty < 3 else max(1, qty // 3)
 
         # Leg 1: Entry (parent) — DO NOT transmit yet
         entry_order = LimitOrder("BUY", qty, limit_price,
@@ -659,10 +659,12 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 f"Bracket child rejected for {symbol} (SL={sl_status}, TP={tp_status}) "
                 f"— placing standalone SL/TP orders as fallback"
             )
-            # Cancel any broken children first
+            # Cancel ALL bracket children before placing OCA replacement.
+            # Always cancel the original SL even if it wasn't rejected — placing a new
+            # standalone OCA SL while the original is still live would create two active
+            # stop losses on the same position.
             try:
-                if sl_status in ('Inactive', 'Cancelled', 'ApiCancelled'):
-                    ib.cancelOrder(sl_trade.order)
+                ib.cancelOrder(sl_trade.order)
                 if tp_status in ('Inactive', 'Cancelled', 'ApiCancelled'):
                     ib.cancelOrder(tp_trade.order)
                 ib.sleep(0.5)
@@ -888,11 +890,13 @@ def _flatten_all_inner(ib_fallback: IB = None):
             continue
         try:
             contract = get_contract(sym, instrument)
-            order = MarketOrder("SELL", abs(int(qty)))
+            direction = info.get("direction", "LONG")
+            close_action = "BUY" if direction == "SHORT" else "SELL"
+            order = MarketOrder(close_action, abs(int(qty)))
             eib.placeOrder(contract, order)
             _safe_del_trade(key)
             closed += 1
-            log.warning(f"🚨 FLATTEN: Market SELL {abs(int(qty))} {sym}")
+            log.warning(f"🚨 FLATTEN: Market {close_action} {abs(int(qty))} {sym} ({direction})")
         except Exception as e:
             log.error(f"🚨 FLATTEN failed for {sym}: {e}")
 
