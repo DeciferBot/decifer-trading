@@ -416,7 +416,10 @@ def _validate_position_price(symbol: str, ibkr_price: float, entry: float) -> tu
 
 def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 score: int, portfolio_value: float, regime: dict,
-                reasoning: str = "") -> bool:
+                reasoning: str = "",
+                signal_scores: dict = None,
+                agent_outputs: dict = None,
+                open_time: str = None) -> bool:
     """
     Place a buy order with full OCO bracket.
     Entry: Limit order at IBKR real-time price (yfinance price is only a fallback)
@@ -702,22 +705,34 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         # error occurs between order submission and trade logging, we always
         # record the trade as FAILED rather than silently losing track of it.
         try:
+            _open_time = open_time or datetime.now(timezone.utc).isoformat()
             with _trades_lock:
                 active_trades[symbol] = {
-                    "symbol":    symbol,
-                    "instrument": "stock",
-                    "entry":     price,
-                    "current":   price,
-                    "qty":       qty,
-                    "sl":        sl,
-                    "tp":        tp,
-                    "score":     score,
-                    "reasoning": reasoning,
-                    "direction": "LONG",
-                    "pnl":       0.0,
-                    "status":    "PENDING",   # Submitted to IBKR but not yet filled
-                    "order_id":  parent_id,
+                    "symbol":        symbol,
+                    "instrument":    "stock",
+                    "entry":         price,
+                    "current":       price,
+                    "qty":           qty,
+                    "sl":            sl,
+                    "tp":            tp,
+                    "score":         score,
+                    "reasoning":     reasoning,
+                    "direction":     "LONG",
+                    "pnl":           0.0,
+                    "status":        "PENDING",   # Submitted to IBKR but not yet filled
+                    "order_id":      parent_id,
+                    "open_time":     _open_time,
+                    "signal_scores": signal_scores or {},
+                    "agent_outputs": agent_outputs or {},
                 }
+            # Log OPEN record to trades.json for feedback loop
+            from learning import log_trade
+            log_trade(
+                trade=active_trades[symbol],
+                agent_outputs=agent_outputs or {},
+                regime=regime,
+                action="OPEN",
+            )
         except Exception as record_err:
             # Ghost position safety: order was submitted but we failed to record it
             log.error(f"GHOST POSITION RISK {symbol}: order submitted (id={parent_id}) but "

@@ -208,7 +208,8 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
             "opportunity": agent_outputs.get("opportunity", "")[:500],
             "devils":      agent_outputs.get("devils",      "")[:500],
             "risk":        agent_outputs.get("risk",        "")[:500],
-        }
+        },
+        "signal_scores": trade.get("signal_scores", {}),
     }
 
     # ── Options metadata — store if present so dashboard can display correctly ──

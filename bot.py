@@ -2004,7 +2004,10 @@ def run_scan():
             score=sig["score"],
             portfolio_value=pv,
             regime=regime,
-            reasoning=reason
+            reasoning=reason,
+            signal_scores=sig.get("score_breakdown", {}),
+            agent_outputs=decision.get("_agent_outputs", {}),
+            open_time=datetime.now(timezone.utc).isoformat(),
         )
         if stock_success:
             dash["trades"].insert(0, {
@@ -2269,7 +2272,10 @@ def _execute_sentinel_buy(decision: dict, portfolio_value: float,
                 score=max(sig.get("score", 0), 30),
                 portfolio_value=portfolio_value,
                 regime=regime,
-                reasoning=f"[SENTINEL] {reasoning}"
+                reasoning=f"[SENTINEL] {reasoning}",
+                signal_scores=sig.get("score_breakdown", {}),
+                agent_outputs={},
+                open_time=datetime.now(timezone.utc).isoformat(),
             )
             if success:
                 dash["trades"].insert(0, {

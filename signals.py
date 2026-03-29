@@ -1057,6 +1057,18 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         "ou_halflife": round(_ou_hl, 1),
         "zscore":     round(_zscore, 2),
         "adf_pvalue": round(_adf_p, 4),
+        # Per-dimension score breakdown (for trade logging / feedback loop)
+        "score_breakdown": {
+            "trend":     trend_pts,
+            "momentum":  momentum,
+            "squeeze":   squeeze_score,
+            "flow":      flow_score,
+            "breakout":  breakout_score,
+            "mtf":       mtf_score,
+            "news":      ns,
+            "social":    ss,
+            "reversion": rev_score_capped,
+        },
     }
 
 
