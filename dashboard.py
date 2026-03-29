@@ -303,6 +303,7 @@ canvas{display:block;width:100% !important}
   <div class="tab" onclick="switchTab('news',this)">📰 News</div>
   <div class="tab" onclick="switchTab('portfolio',this)">🏦 Portfolio</div>
   <div class="tab" onclick="switchTab('settings',this)">⚙️ Settings</div>
+  <div class="tab" onclick="switchTab('alpha',this)">📉 Alpha Decay</div>
 </div>
 
 <!-- VIEW 1: LIVE -->
@@ -714,6 +715,49 @@ canvas{display:block;width:100% !important}
 
 </div>
 
+<!-- VIEW: ALPHA DECAY -->
+<div class="view growth-view" id="view-alpha">
+
+  <!-- Summary KPIs -->
+  <div class="metric-grid" id="ad-kpi-row" style="grid-template-columns:repeat(4,1fr)">
+    <div class="metric"><div class="metric-label">Trades Analysed</div><div class="metric-val co" id="ad-count">—</div></div>
+    <div class="metric"><div class="metric-label">Optimal Hold</div><div class="metric-val cg" id="ad-optimal">—</div></div>
+    <div class="metric"><div class="metric-label">T+1 Median</div><div class="metric-val" id="ad-t1">—</div></div>
+    <div class="metric"><div class="metric-label">T+10 Median</div><div class="metric-val" id="ad-t10">—</div></div>
+  </div>
+
+  <!-- Forward return curve -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="card-title" style="margin-bottom:0">Forward Return Distribution by Horizon</div>
+      <div style="display:flex;gap:6px" id="ad-legend"></div>
+    </div>
+    <div style="font-size:10px;color:var(--muted2);margin-bottom:10px">
+      Median direction-adjusted return (%) for closed trades at T+N bars after entry.
+      Positive = favourable outcome for the trade direction. Shaded band = P25–P75 for all trades.
+    </div>
+    <div style="position:relative;height:220px"><canvas id="alpha-decay-chart"></canvas></div>
+  </div>
+
+  <!-- Per-segment breakdown table -->
+  <div class="card">
+    <div class="card-title">Segment Breakdown</div>
+    <div id="ad-segment-table" style="font-size:11px">
+      <div style="display:grid;grid-template-columns:120px repeat(4,1fr);gap:4px;padding:5px 0;border-bottom:1px solid var(--border);font-size:9px;letter-spacing:1.2px;color:var(--muted2);text-transform:uppercase">
+        <div>Segment</div><div>n</div><div>T+1</div><div>T+5</div><div>T+10</div>
+      </div>
+      <div id="ad-seg-rows" style="color:var(--muted2);padding:12px 0">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Data quality note -->
+  <div style="font-size:10px;color:var(--muted);padding:4px 2px">
+    ⚠ Forward returns fetched live via yfinance. Horizons not yet reached for recent trades are omitted.
+    Signal half-life analysis requires ≥20 agent-scored trades for statistical significance.
+  </div>
+
+</div>
+
 <script>
 // ── State ──────────────────────────────────────────────────
 let allTrades = [];
@@ -722,6 +766,7 @@ let currentFilter = 'all';
 let scanTotal = 300; // seconds
 let scanElapsed = 0;
 let scanTimer;
+let alphaDecayChart = null;
 
 // ── Portfolio aggregation ──────────────────────────────────
 async function loadPortfolio() {
@@ -809,6 +854,190 @@ async function loadPortfolio() {
   }
 }
 
+// ── Alpha Decay ────────────────────────────────────────────
+async function loadAlphaDecay() {
+  document.getElementById('ad-seg-rows').textContent = 'Fetching forward returns…';
+  document.getElementById('ad-count').textContent    = '…';
+  document.getElementById('ad-optimal').textContent  = '…';
+  document.getElementById('ad-t1').textContent       = '…';
+  document.getElementById('ad-t10').textContent      = '…';
+  try {
+    const resp = await fetch('/api/alpha_decay');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const d = await resp.json();
+    if (d.error) throw new Error(d.error);
+    renderAlphaDecay(d);
+  } catch (err) {
+    document.getElementById('ad-seg-rows').innerHTML =
+      `<div style="color:var(--red);padding:8px 0">⚠ ${err.message}</div>`;
+  }
+}
+
+function _fmtPct(v) {
+  if (v === null || v === undefined) return '—';
+  const pct = (v * 100).toFixed(2);
+  const col  = v >= 0 ? 'var(--green)' : 'var(--red)';
+  return `<span style="color:${col}">${v >= 0 ? '+' : ''}${pct}%</span>`;
+}
+
+function renderAlphaDecay(d) {
+  const horizons = d.horizons || [1, 3, 5, 10];
+  const groups   = d.groups  || {};
+  const all      = groups.all || {};
+
+  // KPI strip
+  document.getElementById('ad-count').textContent =
+    d.trade_count > 0 ? d.trade_count : '0';
+  document.getElementById('ad-optimal').textContent =
+    d.optimal_horizon != null ? `T+${d.optimal_horizon}d` : '—';
+
+  const t1val  = all.median && all.median[0]  != null ? all.median[0]  : null;
+  const t10val = all.median && all.median[horizons.length - 1] != null
+                   ? all.median[horizons.length - 1] : null;
+  document.getElementById('ad-t1').innerHTML  = _fmtPct(t1val);
+  document.getElementById('ad-t10').innerHTML = _fmtPct(t10val);
+
+  // Chart
+  const labels = horizons.map(h => `T+${h}d`);
+
+  // Dataset colours
+  const COLORS = {
+    all:        'rgba(255,107,0,1)',
+    high_score: 'rgba(0,200,83,1)',
+    low_score:  'rgba(255,214,0,1)',
+    bull:       'rgba(0,150,255,1)',
+    bear:       'rgba(255,23,68,1)',
+  };
+
+  const datasets = [];
+
+  // P25–P75 shaded band for "all"
+  if (all.p75 && all.p25) {
+    datasets.push({
+      label:           'P75 (all)',
+      data:            all.p75.map(v => v != null ? parseFloat((v * 100).toFixed(4)) : null),
+      borderColor:     'transparent',
+      backgroundColor: 'rgba(255,107,0,0.10)',
+      fill:            '+1',
+      tension:         0.35,
+      pointRadius:     0,
+      spanGaps:        true,
+    });
+    datasets.push({
+      label:           'P25 (all)',
+      data:            all.p25.map(v => v != null ? parseFloat((v * 100).toFixed(4)) : null),
+      borderColor:     'transparent',
+      backgroundColor: 'rgba(255,107,0,0.10)',
+      fill:            false,
+      tension:         0.35,
+      pointRadius:     0,
+      spanGaps:        true,
+    });
+  }
+
+  // Named segment median lines
+  const visibleGroups = ['all', 'high_score', 'low_score', 'bull', 'bear'];
+  const groupLabels   = {
+    all: 'All', high_score: 'Hi-Conv (≥38)', low_score: 'Lo-Conv (<38)',
+    bull: 'Bull Regime', bear: 'Bear Regime'
+  };
+  for (const key of visibleGroups) {
+    const g = groups[key];
+    if (!g || !g.n) continue;
+    datasets.push({
+      label:           `${groupLabels[key]} (n=${g.n})`,
+      data:            (g.median || []).map(v => v != null ? parseFloat((v * 100).toFixed(4)) : null),
+      borderColor:     COLORS[key],
+      backgroundColor: 'transparent',
+      borderWidth:     key === 'all' ? 2.5 : 1.5,
+      borderDash:      key === 'all' ? [] : [4, 3],
+      tension:         0.35,
+      pointRadius:     key === 'all' ? 4 : 3,
+      pointBackgroundColor: COLORS[key],
+      spanGaps:        true,
+    });
+  }
+
+  const ctx = document.getElementById('alpha-decay-chart').getContext('2d');
+  if (alphaDecayChart) alphaDecayChart.destroy();
+  alphaDecayChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive:          true,
+      maintainAspectRatio: false,
+      interaction:         { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            color:     '#888',
+            font:      { family: "'JetBrains Mono', monospace", size: 10 },
+            boxWidth:  12,
+            filter:    item => !item.text.startsWith('P75') && !item.text.startsWith('P25'),
+          },
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              if (v === null) return `${ctx.dataset.label}: —`;
+              return `${ctx.dataset.label}: ${v >= 0 ? '+' : ''}${v.toFixed(3)}%`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid:  { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#888', font: { family: "'JetBrains Mono',monospace", size: 10 } },
+        },
+        y: {
+          grid:  { color: 'rgba(255,255,255,0.04)' },
+          ticks: {
+            color: '#888',
+            font:  { family: "'JetBrains Mono',monospace", size: 10 },
+            callback: v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%',
+          },
+        },
+      },
+    },
+  });
+
+  // Segment table
+  const segRows = [
+    ['All Trades',       'all'],
+    ['Hi-Conv (≥38)',    'high_score'],
+    ['Lo-Conv (<38)',    'low_score'],
+    ['Bull Regime',      'bull'],
+    ['Bear Regime',      'bear'],
+    ['Long Only',        'long_only'],
+    ['Short Only',       'short_only'],
+  ];
+  const hi1  = d.horizons.indexOf(1);
+  const hi5  = d.horizons.indexOf(5);
+  const hi10 = d.horizons.indexOf(10);
+
+  const rowsHtml = segRows.map(([label, key]) => {
+    const g = groups[key];
+    if (!g || !g.n) return '';
+    const m  = g.median || [];
+    const v1  = hi1  >= 0 ? m[hi1]  : null;
+    const v5  = hi5  >= 0 ? m[hi5]  : null;
+    const v10 = hi10 >= 0 ? m[hi10] : null;
+    return `<div style="display:grid;grid-template-columns:120px repeat(4,1fr);gap:4px;padding:5px 0;border-bottom:1px solid var(--border)">
+      <div style="color:var(--text)">${label}</div>
+      <div style="color:var(--muted2)">${g.n}</div>
+      <div>${_fmtPct(v1)}</div>
+      <div>${_fmtPct(v5)}</div>
+      <div>${_fmtPct(v10)}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('ad-seg-rows').innerHTML = rowsHtml ||
+    '<div style="padding:8px 0;color:var(--muted2)">No data with usable forward returns yet.</div>';
+}
+
 // ── Tab switching ──────────────────────────────────────────
 function switchTab(id, el) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -818,6 +1047,12 @@ function switchTab(id, el) {
 
   // Load portfolio aggregation when switching to that tab
   if (id === 'portfolio') loadPortfolio();
+
+  // Alpha decay: load fresh data each time the tab opens
+  if (id === 'alpha') {
+    if (alphaDecayChart) { alphaDecayChart.destroy(); alphaDecayChart = null; }
+    setTimeout(loadAlphaDecay, 50);
+  }
 
   // Charts render with 0 dimensions when their container is display:none.
   // Force redraw when switching to growth tab.

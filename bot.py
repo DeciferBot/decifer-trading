@@ -2467,6 +2467,19 @@ class DashHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"favourites": dash.get("favourites", [])}).encode())
+        elif self.path == "/api/alpha_decay":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                from alpha_decay import get_alpha_decay_stats
+                stats = get_alpha_decay_stats()
+            except Exception as exc:
+                log.warning("alpha_decay error: %s", exc)
+                stats = {"error": str(exc), "trade_count": 0,
+                         "horizons": [], "groups": {}, "optimal_horizon": None}
+            self.wfile.write(json.dumps(stats).encode())
         elif self.path == "/api/portfolio":
             # Multi-account aggregated position view
             self.send_response(200)
