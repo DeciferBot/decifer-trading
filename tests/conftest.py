@@ -68,6 +68,9 @@ class _FakeIB:
         ticker.ask = 150.1
         return ticker
 
+    def reqPnL(self, *a, **kw):
+        pass
+
     def sleep(self, secs=0):
         pass
 

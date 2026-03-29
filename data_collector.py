@@ -66,6 +66,25 @@ DEFAULT_UNIVERSE = [
 ]
 
 
+def _fetch_with_retry(fn, *args, retries: int = 3, backoff: float = 1.5, label: str = "", **kwargs):
+    """Call fn(*args, **kwargs) up to `retries` times with exponential backoff.
+    Re-raises the last exception when all attempts are exhausted."""
+    last_exc = None
+    for attempt in range(retries):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as exc:
+            last_exc = exc
+            if attempt < retries - 1:
+                wait = backoff * (2 ** attempt)
+                log.warning(
+                    f"{label} attempt {attempt + 1}/{retries} failed: {exc} "
+                    f"— retrying in {wait:.1f}s"
+                )
+                time.sleep(wait)
+    raise last_exc
+
+
 def ensure_dirs():
     """Create data directories if they don't exist."""
     INTRADAY_DIR.mkdir(parents=True, exist_ok=True)
@@ -104,7 +123,11 @@ def download_intraday_yf(symbol: str, interval: str = "5m") -> Optional[pd.DataF
         ticker = yf.Ticker(symbol)
         # 5m: "60d" is the max period yfinance allows
         period = "60d" if interval in ("5m", "15m") else "7d"
-        df = ticker.history(period=period, interval=interval, prepost=True)
+        df = _fetch_with_retry(
+            ticker.history,
+            period=period, interval=interval, prepost=True,
+            label=f"[yf-intraday] {symbol}",
+        )
 
         if df is None or df.empty:
             log.warning(f"[yf-intraday] No data for {symbol} ({interval})")
@@ -141,7 +164,11 @@ def download_daily_yf(symbol: str) -> Optional[pd.DataFrame]:
     """
     try:
         ticker = yf.Ticker(symbol)
-        df = ticker.history(period="max", interval="1d")
+        df = _fetch_with_retry(
+            ticker.history,
+            period="max", interval="1d",
+            label=f"[yf-daily] {symbol}",
+        )
 
         if df is None or df.empty:
             log.warning(f"[yf-daily] No data for {symbol}")
@@ -187,7 +214,7 @@ def download_daily_stooq(symbol: str) -> Optional[pd.DataFrame]:
     try:
         stooq_sym = f"{symbol}.US"
         url = f"https://stooq.com/q/d/l/?s={stooq_sym}&i=d"
-        df = pd.read_csv(url)
+        df = _fetch_with_retry(pd.read_csv, url, label=f"[stooq] {symbol}")
 
         if df is None or df.empty or "Date" not in df.columns:
             log.warning(f"[stooq] No data for {symbol}")
@@ -226,7 +253,7 @@ def download_daily_alphavantage(symbol: str, api_key: str = None) -> Optional[pd
     try:
         url = (f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY"
                f"&symbol={symbol}&outputsize=full&apikey={key}&datatype=csv")
-        df = pd.read_csv(url)
+        df = _fetch_with_retry(pd.read_csv, url, label=f"[alphavantage] {symbol}")
 
         if df is None or df.empty or "timestamp" not in df.columns:
             log.warning(f"[alphavantage] No data for {symbol}")

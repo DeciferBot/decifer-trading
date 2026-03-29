@@ -879,6 +879,18 @@ def _flatten_all_inner(ib_fallback: IB = None):
         eib = ib_fallback
     if not eib:
         log.error("🚨 FLATTEN ALL FAILED — no IB connection available")
+        with _trades_lock:
+            stranded = list(active_trades.items())
+        if stranded:
+            log.critical(
+                f"🚨 FLATTEN ABORTED — {len(stranded)} position(s) NOT closed. "
+                "Manual intervention required:"
+            )
+            for key, info in stranded:
+                sym = info.get("symbol", key.split("_")[0])
+                qty = info.get("qty", 0)
+                direction = info.get("direction", "LONG")
+                log.critical(f"   ↳ {sym}  qty={qty}  dir={direction}  key={key}")
         return
 
     log.critical("🚨 FLATTEN ALL — closing all positions immediately")

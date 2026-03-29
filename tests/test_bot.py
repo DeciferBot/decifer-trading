@@ -197,6 +197,7 @@ scanner_stub.get_tv_signal_cache  = lambda: {}
 signals_stub = sys.modules["signals"]
 signals_stub.score_universe        = lambda *a, **kw: []
 signals_stub.fetch_multi_timeframe = lambda *a, **kw: {}
+signals_stub.get_regime_threshold  = lambda *a, **kw: 18
 
 # news
 news_stub = sys.modules["news"]
