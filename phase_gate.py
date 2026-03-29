@@ -54,6 +54,25 @@ def _load_config() -> dict[str, Any]:
     return CONFIG
 
 
+def _is_closed_trade(t: dict) -> bool:
+    """
+    Return True if a trade record represents a completed (closed) trade.
+
+    Supports two shapes:
+    - Legacy shape: ``status`` field in ("closed", "exited", "filled")
+    - Production shape: no ``status`` field; trade is closed when both
+      ``exit_price`` (non-zero) and ``exit_time`` (non-empty) are present.
+      This is the actual shape written by bot.py / IBKR backfill.
+    """
+    if t.get("status") in ("closed", "exited", "filled"):
+        return True
+    if not t.get("status"):
+        exit_price = t.get("exit_price")
+        exit_time = t.get("exit_time")
+        return bool(exit_time) and bool(exit_price)
+    return False
+
+
 def _count_closed_trades(trades_path: str) -> int:
     """Return the number of closed (exited) trades from trades.json."""
     p = Path(trades_path)
@@ -64,8 +83,42 @@ def _count_closed_trades(trades_path: str) -> int:
     except (json.JSONDecodeError, OSError):
         return 0
     if isinstance(data, list):
-        return sum(1 for t in data if t.get("status") in ("closed", "exited", "filled"))
+        return sum(1 for t in data if _is_closed_trade(t))
     return 0
+
+
+def _compute_expectancy(trades_path: str) -> tuple[int, float | None]:
+    """
+    Return ``(n_closed, expectancy)`` where *expectancy* is the average PnL
+    per closed trade (positive = signal has demonstrated alpha).
+
+    Returns ``(n, None)`` when fewer than 2 closed trades exist (insufficient
+    sample to compute a meaningful average).
+    """
+    p = Path(trades_path)
+    if not p.exists():
+        return 0, None
+    try:
+        data = json.loads(p.read_text())
+    except (json.JSONDecodeError, OSError):
+        return 0, None
+    if not isinstance(data, list):
+        return 0, None
+
+    pnls: list[float] = []
+    for t in data:
+        if _is_closed_trade(t):
+            pnl = t.get("pnl")
+            if pnl is not None:
+                try:
+                    pnls.append(float(pnl))
+                except (TypeError, ValueError):
+                    pass
+
+    n = len(pnls)
+    if n < 2:
+        return n, None
+    return n, sum(pnls) / n
 
 
 def _get_test_pass_rate() -> float | None:
@@ -98,6 +151,26 @@ def _get_test_pass_rate() -> float | None:
 
 
 @dataclass
+class AlphaGateStatus:
+    gate_passed: bool
+    closed_trades: int
+    min_closed_trades: int
+    expectancy: float | None
+    positive_expectancy: bool
+    blocking_reason: str | None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "gate_passed": self.gate_passed,
+            "closed_trades": self.closed_trades,
+            "min_closed_trades": self.min_closed_trades,
+            "expectancy": self.expectancy,
+            "positive_expectancy": self.positive_expectancy,
+            "blocking_reason": self.blocking_reason,
+        }
+
+
+@dataclass
 class PhaseStatus:
     current_phase: int
     phase_description: str
@@ -109,6 +182,7 @@ class PhaseStatus:
     frozen_features: dict[str, int]
     criteria_met: dict[str, bool] = field(default_factory=dict)
     phase1_complete: bool = False
+    alpha_gate: AlphaGateStatus | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -122,7 +196,80 @@ class PhaseStatus:
             "frozen_features": self.frozen_features,
             "criteria_met": self.criteria_met,
             "phase1_complete": self.phase1_complete,
+            "alpha_gate": self.alpha_gate.as_dict() if self.alpha_gate else None,
         }
+
+
+def check_alpha_gate(config: dict[str, Any] | None = None) -> AlphaGateStatus:
+    """
+    Check the alpha validation gate: 50 closed paper trades with positive expectancy.
+
+    This is the hard checkpoint that must be cleared **before**:
+    - Adding any new signal dimensions (e.g. mean-reversion, HMM)
+    - Beginning infrastructure work (Docker, cloud, multi-user)
+    - Opening the live trading gate
+
+    Returns an :class:`AlphaGateStatus` with full diagnostic detail.
+    See ``LIVE_TRADING_GATE.md`` for the full gate criteria document.
+    """
+    if config is None:
+        config = _load_config()
+
+    pg = config.get("phase_gate", {})
+    alpha_cfg = pg.get("alpha_validation_gate", {})
+    min_trades: int = alpha_cfg.get("min_closed_trades", 50)
+    require_positive: bool = alpha_cfg.get("require_positive_expectancy", True)
+
+    trades_path: str = config.get("trade_log", "data/trades.json")
+    n_closed, expectancy = _compute_expectancy(trades_path)
+
+    has_min_trades = n_closed >= min_trades
+    has_positive_expectancy = expectancy is not None and expectancy > 0
+
+    reasons: list[str] = []
+    if not has_min_trades:
+        remaining = min_trades - n_closed
+        reasons.append(
+            f"Need {min_trades} closed paper trades — currently {n_closed} "
+            f"({remaining} more required)"
+        )
+    if require_positive and not has_positive_expectancy:
+        exp_str = f"${expectancy:.2f}" if expectancy is not None else "N/A (< 2 trades)"
+        reasons.append(
+            f"Positive expectancy required — current avg PnL/trade: {exp_str}"
+        )
+
+    return AlphaGateStatus(
+        gate_passed=len(reasons) == 0,
+        closed_trades=n_closed,
+        min_closed_trades=min_trades,
+        expectancy=expectancy,
+        positive_expectancy=has_positive_expectancy,
+        blocking_reason=" | ".join(reasons) if reasons else None,
+    )
+
+
+def assert_alpha_gate_passed(config: dict[str, Any] | None = None) -> None:
+    """
+    Raise :class:`PhaseGateViolation` if the alpha validation gate has not been cleared.
+
+    Call this before pulling any of the following into active work:
+    - New signal dimensions (mean-reversion, HMM regime, walk-forward weights)
+    - Infrastructure work (Docker, cloud deployment, multi-user)
+    - Advancing the live trading gate
+
+    The rule: **50 closed paper trades with positive average PnL must be on the
+    board before downstream work is built on the signal model.**
+
+    See ``LIVE_TRADING_GATE.md`` for the full gate criteria.
+    """
+    result = check_alpha_gate(config)
+    if not result.gate_passed:
+        raise PhaseGateViolation(
+            f"ALPHA VALIDATION GATE BLOCKED — {result.blocking_reason}. "
+            f"No new signal dimensions, no infrastructure work, and no live trading "
+            f"gate opens until this gate is cleared. See LIVE_TRADING_GATE.md."
+        )
 
 
 def get_status(config: dict[str, Any] | None = None) -> PhaseStatus:
@@ -155,6 +302,8 @@ def get_status(config: dict[str, Any] | None = None) -> PhaseStatus:
     }
     phase1_complete = all(criteria_met.values())
 
+    alpha_gate = check_alpha_gate(config)
+
     return PhaseStatus(
         current_phase=current_phase,
         phase_description=PHASE_DESCRIPTIONS.get(current_phase, "Unknown phase"),
@@ -166,6 +315,7 @@ def get_status(config: dict[str, Any] | None = None) -> PhaseStatus:
         frozen_features=frozen,
         criteria_met=criteria_met,
         phase1_complete=phase1_complete,
+        alpha_gate=alpha_gate,
     )
 
 
