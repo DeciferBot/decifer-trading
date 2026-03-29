@@ -145,10 +145,28 @@ def load_orders() -> list:
 
 
 def _save_orders(orders: list):
-    """Write orders list to disk."""
-    os.makedirs(os.path.dirname(ORDER_LOG_FILE) or ".", exist_ok=True)
-    with open(ORDER_LOG_FILE, "w") as f:
-        json.dump(orders, f, indent=2)
+    """Write orders list to disk atomically, sanitising corrupt float values first."""
+    import math, tempfile
+    # Sanitise any inf/nan prices that may have slipped through in existing records
+    for o in orders:
+        p = o.get("price")
+        if isinstance(p, float) and (math.isnan(p) or math.isinf(p) or abs(p) > 1e10):
+            o["price"] = 0
+    target = ORDER_LOG_FILE
+    dir_ = os.path.dirname(os.path.abspath(target)) or "."
+    os.makedirs(dir_, exist_ok=True)
+    # Atomic write: write to a temp file then rename so the file is never half-written
+    fd, tmp = tempfile.mkstemp(dir=dir_, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(orders, f, indent=2)
+        os.replace(tmp, target)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def log_trade(trade: dict, agent_outputs: dict, regime: dict,

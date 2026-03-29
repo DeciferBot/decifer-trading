@@ -117,6 +117,30 @@ CONFIG = {
     # Breakout detection
     "donchian_period":          20,     # Donchian channel lookback
 
+    # ── REGIME-AWARE SCORE THRESHOLDS ────────────────────────
+    # Score thresholds are adjusted per market regime, relative to
+    # min_score_to_trade (base). Offsets lower the bar in bear/choppy
+    # regimes to capture more setups; floors prevent thresholds going
+    # too low. PANIC blocks all entries (threshold set to 99).
+    #
+    # Effective thresholds (with default min_score_to_trade=18 for paper):
+    #   BULL_TRENDING: 18  (base, no change)
+    #   BEAR_TRENDING: 15  (max(15, 18-3))
+    #   CHOPPY:        12  (max(12, 18-6))
+    #   PANIC:         99  (block all)
+    "regime_threshold_bear_offset":   -3,   # BEAR_TRENDING = base + offset
+    "regime_threshold_choppy_offset": -6,   # CHOPPY = base + offset
+    "regime_threshold_panic":         99,   # Effectively infinite — no trades in panic
+    "regime_threshold_bear_min":      15,   # Floor for BEAR_TRENDING
+    "regime_threshold_choppy_min":    12,   # Floor for CHOPPY
+
+    # ── CANDLESTICK CONFIRMATION GATE ────────────────────────
+    # When True, a BUY or SELL signal must have at least one confirming
+    # candlestick pattern (candle_bull or candle_bear > 0) or it is
+    # downgraded to HOLD. Candles still add bonus points regardless.
+    # False = collect more data on paper; True = higher precision on live.
+    "candle_required":  False,   # (live: True)
+
     # ── MULTI-TIMEFRAME ALIGNMENT GATE ──────────────────────
     # Hard filter that blocks entries when higher timeframes disagree
     # with the 5m signal direction. Fixes structural bullish bias by

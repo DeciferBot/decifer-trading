@@ -51,7 +51,7 @@ _reconnecting          = False
 _subscription_registry: dict = {}   # symbol -> {"type": "ticker"|"pnl", ...}
 _heartbeat_thread: threading.Thread | None = None
 from scanner import get_dynamic_universe, get_market_regime, get_tv_signal_cache
-from signals import score_universe, fetch_multi_timeframe
+from signals import score_universe, fetch_multi_timeframe, get_regime_threshold
 from news import batch_news_sentiment
 from agents import run_all_agents
 from orders import execute_buy, execute_sell, flatten_all, reconcile_with_ibkr, get_open_positions, update_position_prices, update_positions_from_ibkr, execute_buy_option, execute_sell_option
@@ -1817,8 +1817,7 @@ def run_scan():
     scored = score_universe(universe, regime.get("regime", "UNKNOWN"),
                             news_data=news_sentiment, social_data=social_sentiment)
     regime_name = regime.get('regime','UNKNOWN')
-    regime_thresholds = {"BULL_TRENDING":28,"BEAR_TRENDING":25,"CHOPPY":22,"PANIC":99,"UNKNOWN":25}
-    used_threshold = regime_thresholds.get(regime_name, CONFIG['min_score_to_trade'])
+    used_threshold = get_regime_threshold(regime_name)
     clog("INFO", f"Scored: {len(scored)} symbols above threshold ({used_threshold}/50) [{regime_name}]")
 
     # ── Update existing position prices ──────────────────────

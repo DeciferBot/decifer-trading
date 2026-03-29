@@ -692,6 +692,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             "tf_count":   1,
             "mtf_gate":   "BLOCKED",
             "mtf_conflict": mtf_alignment["conflict"],
+            "candle_gate": "PASS",
             "reversion_score": 0,
             "variance_ratio": 0,
             "ou_halflife": 0,
@@ -1019,6 +1020,21 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     else:
         final_signal = "HOLD"
 
+    # ── CANDLESTICK CONFIRMATION GATE ───────────────────────
+    # If candle_required is True, any directional entry (BUY/SELL)
+    # without a confirming candlestick pattern is downgraded to HOLD.
+    # candle_bonus is 0 when neither candle_bull nor candle_bear fired.
+    candle_gate_status = "PASS"
+    if CONFIG.get("candle_required", False) and candle_bonus == 0:
+        if "BUY" in final_signal or "SELL" in final_signal:
+            candle_gate_status = "BLOCKED"
+            final_signal = "HOLD"
+            direction = "NEUTRAL"
+            log.info(
+                f"CANDLE GATE BLOCKED {sig_5m.get('symbol', '?')}: "
+                f"no confirming candle (bull={cb}, bear={cd})"
+            )
+
     return {
         "signal":     final_signal,
         "direction":  direction,
@@ -1033,6 +1049,8 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         "mtf_conflict":   mtf_conflict_msg,
         "mtf_daily_trend": mtf_alignment["daily_trend"],
         "mtf_weekly_trend": mtf_alignment.get("weekly_trend", "N/A"),
+        # Candlestick confirmation gate
+        "candle_gate":    candle_gate_status,
         # Reversion metrics (for dashboard + agent consumption)
         "reversion_score": min(reversion_score, 10),
         "variance_ratio": round(_vr, 3),
@@ -1040,6 +1058,33 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         "zscore":     round(_zscore, 2),
         "adf_pvalue": round(_adf_p, 4),
     }
+
+
+def get_regime_threshold(regime: str) -> int:
+    """
+    Return the minimum score threshold for the given market regime.
+
+    Thresholds are relative to config's min_score_to_trade (base) so that
+    paper trading vs live configs automatically scale together.
+    Offsets and floors are configurable in config.py.
+
+    Returns an int score threshold (0-99).
+    """
+    base         = CONFIG["min_score_to_trade"]
+    bear_offset  = CONFIG.get("regime_threshold_bear_offset",   -3)
+    choppy_offset= CONFIG.get("regime_threshold_choppy_offset", -6)
+    panic        = CONFIG.get("regime_threshold_panic",          99)
+    bear_min     = CONFIG.get("regime_threshold_bear_min",       15)
+    choppy_min   = CONFIG.get("regime_threshold_choppy_min",     12)
+
+    thresholds = {
+        "BULL_TRENDING": base,
+        "BEAR_TRENDING": max(bear_min,   base + bear_offset),
+        "CHOPPY":        max(choppy_min, base + choppy_offset),
+        "PANIC":         panic,
+        "UNKNOWN":       max(bear_min,   base + bear_offset),
+    }
+    return thresholds.get(regime, base)
 
 
 def score_universe(symbols: list, regime: str = "UNKNOWN",
@@ -1056,17 +1101,7 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
     if social_data is None:
         social_data = {}
 
-    # Regime-specific thresholds, scaled relative to config's min_score_to_trade.
-    # This way paper trading config (min_score=18) automatically loosens all thresholds.
-    base = CONFIG["min_score_to_trade"]
-    regime_thresholds = {
-        "BULL_TRENDING": base,           # Full threshold in bull (was hardcoded 28)
-        "BEAR_TRENDING": max(15, base - 3),  # Slightly lower for bear setups
-        "CHOPPY":        max(12, base - 6),  # Much lower for choppy — need data from all regimes
-        "PANIC":         99,             # Still block trades in panic
-        "UNKNOWN":       max(15, base - 3),
-    }
-    threshold = regime_thresholds.get(regime, base)
+    threshold = get_regime_threshold(regime)
 
     # ── PARALLEL SCORING via ProcessPoolExecutor ────────────────
     # Each worker is a separate process with its own yfinance globals,

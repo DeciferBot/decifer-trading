@@ -326,7 +326,8 @@ def _rsi(close, period=14):
     loss = np.where(delta < 0, -delta, 0)
     avg_gain = pd.Series(gain).rolling(period).mean().values
     avg_loss = pd.Series(loss).rolling(period).mean().values
-    rs = np.where(avg_loss > 0, avg_gain / avg_loss, 100)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rs = np.where(avg_loss > 0, avg_gain / avg_loss, 100)
     return 100 - (100 / (1 + rs))
 
 
@@ -339,7 +340,8 @@ def _mfi(high, low, close, volume, period=14):
     neg_mf = np.where(delta < 0, mf, 0)
     pos_sum = pd.Series(pos_mf).rolling(period).sum().values
     neg_sum = pd.Series(neg_mf).rolling(period).sum().values
-    ratio = np.where(neg_sum > 0, pos_sum / neg_sum, 100)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio = np.where(neg_sum > 0, pos_sum / neg_sum, 100)
     return 100 - (100 / (1 + ratio))
 
 
