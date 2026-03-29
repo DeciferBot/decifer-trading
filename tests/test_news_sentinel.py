@@ -38,16 +38,19 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+# Evict any hollow stub (e.g. MagicMock planted by an earlier test file) so
+# we get the real news_sentinel module with keyword_score imported from news.py.
+sys.modules.pop("news_sentinel", None)
 try:
     import news_sentinel
-    HAS_NEWS_SENTINEL = True
-except ImportError:
+    HAS_NEWS_SENTINEL = hasattr(news_sentinel, "keyword_score")
+except (ImportError, Exception):
     HAS_NEWS_SENTINEL = False
 
 
 pytestmark = pytest.mark.skipif(
     not HAS_NEWS_SENTINEL,
-    reason="news_sentinel module not importable"
+    reason="news_sentinel module not importable or keyword_score not found"
 )
 
 
@@ -92,47 +95,46 @@ def mixed_articles(bullish_articles, bearish_articles):
 # ---------------------------------------------------------------------------
 
 class TestNewsKeywordScoring:
+    """Tests for keyword_score — the fast headline sentiment scorer.
+
+    news_sentinel imports keyword_score from news.py, so it is accessible
+    as news_sentinel.keyword_score([headline])  ->  {"score": int, ...}.
+    score is an integer in [-10, +10]: positive = bullish, negative = bearish.
+    """
 
     def test_bullish_headline_scores_positive(self):
-        """A clearly positive headline must produce a positive/high sentiment score."""
-        if not hasattr(news_sentinel, "score_headline"):
-            pytest.skip("score_headline not exposed")
-        score = news_sentinel.score_headline(BULLISH_HEADLINE)
-        assert score > 0, f"Expected positive score for bullish headline, got {score}"
+        """A clearly positive headline must produce a positive score."""
+        result = news_sentinel.keyword_score([BULLISH_HEADLINE])
+        assert result["score"] > 0, (
+            f"Expected positive score for bullish headline, got {result['score']}"
+        )
 
     def test_bearish_headline_scores_negative(self):
-        """A clearly negative headline must produce a negative/low sentiment score."""
-        if not hasattr(news_sentinel, "score_headline"):
-            pytest.skip("score_headline not exposed")
-        score = news_sentinel.score_headline(BEARISH_HEADLINE)
-        assert score < 0, f"Expected negative score for bearish headline, got {score}"
+        """A clearly negative headline must produce a negative score."""
+        result = news_sentinel.keyword_score([BEARISH_HEADLINE])
+        assert result["score"] < 0, (
+            f"Expected negative score for bearish headline, got {result['score']}"
+        )
 
     def test_neutral_headline_near_zero(self):
-        """A neutral headline should score near zero."""
-        if not hasattr(news_sentinel, "score_headline"):
-            pytest.skip("score_headline not exposed")
-        score = news_sentinel.score_headline(NEUTRAL_HEADLINE)
-        assert -0.5 <= score <= 0.5, (
-            f"Expected near-zero score for neutral headline, got {score}"
+        """A headline with no keyword hits should score zero."""
+        result = news_sentinel.keyword_score([NEUTRAL_HEADLINE])
+        assert -2 <= result["score"] <= 2, (
+            f"Expected near-zero score for neutral headline, got {result['score']}"
         )
 
     def test_empty_headline_no_exception(self):
-        """Empty headline must not raise."""
-        if not hasattr(news_sentinel, "score_headline"):
-            pytest.skip("score_headline not exposed")
-        try:
-            score = news_sentinel.score_headline("")
-            assert isinstance(score, (int, float))
-        except Exception as exc:
-            pytest.fail(f"score_headline raised for empty string: {exc}")
+        """Empty headline must not raise and must return a numeric score."""
+        result = news_sentinel.keyword_score([""])
+        assert isinstance(result["score"], (int, float))
 
     def test_score_is_deterministic(self):
-        """Same headline always produces same score."""
-        if not hasattr(news_sentinel, "score_headline"):
-            pytest.skip("score_headline not exposed")
-        s1 = news_sentinel.score_headline(BULLISH_HEADLINE)
-        s2 = news_sentinel.score_headline(BULLISH_HEADLINE)
-        assert s1 == s2, f"Non-deterministic: {s1} vs {s2}"
+        """Same headline always produces the same score."""
+        r1 = news_sentinel.keyword_score([BULLISH_HEADLINE])
+        r2 = news_sentinel.keyword_score([BULLISH_HEADLINE])
+        assert r1["score"] == r2["score"], (
+            f"Non-deterministic: {r1['score']} vs {r2['score']}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -140,27 +142,30 @@ class TestNewsKeywordScoring:
 # ---------------------------------------------------------------------------
 
 class TestNewsAggregateScoring:
+    """Tests for keyword_score applied across multiple article titles.
+
+    keyword_score accepts a list of headline strings and accumulates bull/bear
+    points across all of them, returning a combined score dict.
+    """
 
     def test_bullish_articles_aggregate_positive(self, bullish_articles):
-        """Aggregating bullish articles should yield a positive sentiment."""
-        if not hasattr(news_sentinel, "aggregate_sentiment"):
-            pytest.skip("aggregate_sentiment not exposed")
-        score = news_sentinel.aggregate_sentiment(bullish_articles)
-        assert score > 0, f"Expected positive aggregate, got {score}"
+        """Aggregating bullish article titles must yield a positive score."""
+        headlines = [a["title"] for a in bullish_articles]
+        result = news_sentinel.keyword_score(headlines)
+        assert result["score"] > 0, (
+            f"Expected positive aggregate for bullish articles, got {result['score']}"
+        )
 
     def test_bearish_articles_aggregate_negative(self, bearish_articles):
-        """Aggregating bearish articles should yield a negative sentiment."""
-        if not hasattr(news_sentinel, "aggregate_sentiment"):
-            pytest.skip("aggregate_sentiment not exposed")
-        score = news_sentinel.aggregate_sentiment(bearish_articles)
-        assert score < 0, f"Expected negative aggregate, got {score}"
+        """Aggregating bearish article titles must yield a negative score."""
+        headlines = [a["title"] for a in bearish_articles]
+        result = news_sentinel.keyword_score(headlines)
+        assert result["score"] < 0, (
+            f"Expected negative aggregate for bearish articles, got {result['score']}"
+        )
 
     def test_empty_articles_no_exception(self):
-        """Empty article list must not raise."""
-        if not hasattr(news_sentinel, "aggregate_sentiment"):
-            pytest.skip("aggregate_sentiment not exposed")
-        try:
-            score = news_sentinel.aggregate_sentiment([])
-            assert isinstance(score, (int, float))
-        except Exception as exc:
-            pytest.fail(f"aggregate_sentiment raised for empty list: {exc}")
+        """Empty article list must return a zero score without raising."""
+        result = news_sentinel.keyword_score([])
+        assert isinstance(result["score"], (int, float))
+        assert result["score"] == 0

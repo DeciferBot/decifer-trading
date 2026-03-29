@@ -39,16 +39,19 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+# Evict any hollow stub (e.g. MagicMock planted by test_bot.py) so we
+# get the real social_sentiment module with FinanceVADER defined.
+sys.modules.pop("social_sentiment", None)
 try:
     import social_sentiment
-    HAS_SOCIAL = True
-except ImportError:
+    HAS_SOCIAL = hasattr(social_sentiment, "FinanceVADER")
+except (ImportError, Exception):
     HAS_SOCIAL = False
 
 
 pytestmark = pytest.mark.skipif(
     not HAS_SOCIAL,
-    reason="social_sentiment module not importable"
+    reason="social_sentiment module not importable or FinanceVADER not found"
 )
 
 
@@ -79,36 +82,31 @@ NEUTRAL_POSTS = [
 # ---------------------------------------------------------------------------
 
 class TestSocialTextScoring:
+    """Tests for FinanceVADER.get_sentiment — finance-context text scorer.
+
+    Returns -1.0 (bearish) to +1.0 (bullish).
+    When VADER/NLTK is unavailable (test environment), falls back to
+    the finance keyword lexicon defined in social_sentiment.FINANCE_LEXICON.
+    """
+
+    def _vader(self):
+        return social_sentiment.FinanceVADER()
 
     def test_bullish_text_positive(self):
-        """Clearly bullish social post should score positive."""
-        scorer = getattr(social_sentiment, "score_post", None) or \
-                 getattr(social_sentiment, "score_text", None)
-        if scorer is None:
-            pytest.skip("No text scoring function found")
-        score = scorer(BULLISH_POSTS[0]["text"])
+        """Clearly bullish social post scores positive."""
+        score = self._vader().get_sentiment(BULLISH_POSTS[0]["text"])
         assert score > 0, f"Expected positive score for bullish text, got {score}"
 
     def test_bearish_text_negative(self):
-        """Clearly bearish social post should score negative or low."""
-        scorer = getattr(social_sentiment, "score_post", None) or \
-                 getattr(social_sentiment, "score_text", None)
-        if scorer is None:
-            pytest.skip("No text scoring function found")
-        score = scorer(BEARISH_POSTS[0]["text"])
+        """Clearly bearish social post scores negative or near zero."""
+        score = self._vader().get_sentiment(BEARISH_POSTS[0]["text"])
         assert score < 0.5, f"Expected low/negative score for bearish text, got {score}"
 
     def test_empty_text_no_exception(self):
-        """Empty string must not crash the scorer."""
-        scorer = getattr(social_sentiment, "score_post", None) or \
-                 getattr(social_sentiment, "score_text", None)
-        if scorer is None:
-            pytest.skip("No text scoring function found")
-        try:
-            result = scorer("")
-            assert isinstance(result, (int, float))
-        except Exception as exc:
-            pytest.fail(f"Scorer raised for empty string: {exc}")
+        """Empty string returns 0.0 without raising."""
+        result = self._vader().get_sentiment("")
+        assert isinstance(result, float)
+        assert result == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -116,48 +114,36 @@ class TestSocialTextScoring:
 # ---------------------------------------------------------------------------
 
 class TestSocialAggregateSentiment:
+    """Tests for FinanceVADER.get_sentiment_batch — average sentiment across texts.
+
+    Returns the mean of get_sentiment() over a list of strings.
+    """
+
+    def _vader(self):
+        return social_sentiment.FinanceVADER()
 
     def test_bullish_posts_aggregate_positive(self):
-        """Aggregating bullish posts yields positive sentiment."""
-        aggregator = getattr(social_sentiment, "aggregate_reddit_sentiment", None) or \
-                     getattr(social_sentiment, "aggregate_sentiment", None)
-        if aggregator is None:
-            pytest.skip("No aggregate function found")
-        score = aggregator(BULLISH_POSTS)
+        """Averaging bullish post texts yields a positive score."""
+        texts = [p["text"] for p in BULLISH_POSTS]
+        score = self._vader().get_sentiment_batch(texts)
         assert score > 0, f"Expected positive aggregate for bullish posts, got {score}"
 
     def test_bearish_posts_aggregate_lower_than_bullish(self):
-        """Bearish posts must score lower than bullish posts in aggregate."""
-        aggregator = getattr(social_sentiment, "aggregate_reddit_sentiment", None) or \
-                     getattr(social_sentiment, "aggregate_sentiment", None)
-        if aggregator is None:
-            pytest.skip("No aggregate function found")
-        bull_score = aggregator(BULLISH_POSTS)
-        bear_score = aggregator(BEARISH_POSTS)
+        """Bearish post average must be lower than bullish post average."""
+        vader = self._vader()
+        bull_score = vader.get_sentiment_batch([p["text"] for p in BULLISH_POSTS])
+        bear_score = vader.get_sentiment_batch([p["text"] for p in BEARISH_POSTS])
         assert bull_score > bear_score, (
-            f"Bullish ({bull_score}) must > bearish ({bear_score})"
+            f"Bullish ({bull_score:.3f}) must exceed bearish ({bear_score:.3f})"
         )
 
     def test_empty_posts_no_exception(self):
-        """Empty post list must not raise."""
-        aggregator = getattr(social_sentiment, "aggregate_reddit_sentiment", None) or \
-                     getattr(social_sentiment, "aggregate_sentiment", None)
-        if aggregator is None:
-            pytest.skip("No aggregate function found")
-        try:
-            result = aggregator([])
-            assert isinstance(result, (int, float))
-        except Exception as exc:
-            pytest.fail(f"Aggregator raised for empty list: {exc}")
+        """Empty list returns 0.0 without raising."""
+        result = self._vader().get_sentiment_batch([])
+        assert isinstance(result, float)
+        assert result == 0.0
 
     def test_single_post_no_exception(self):
-        """Single post must not crash."""
-        aggregator = getattr(social_sentiment, "aggregate_reddit_sentiment", None) or \
-                     getattr(social_sentiment, "aggregate_sentiment", None)
-        if aggregator is None:
-            pytest.skip("No aggregate function found")
-        try:
-            result = aggregator([BULLISH_POSTS[0]])
-            assert isinstance(result, (int, float))
-        except Exception as exc:
-            pytest.fail(f"Aggregator raised for single post: {exc}")
+        """Single post list does not crash and returns a float."""
+        result = self._vader().get_sentiment_batch([BULLISH_POSTS[0]["text"]])
+        assert isinstance(result, float)

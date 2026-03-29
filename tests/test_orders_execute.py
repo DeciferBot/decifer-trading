@@ -262,94 +262,61 @@ def rejecting_broker():
 # ---------------------------------------------------------------------------
 
 class TestValidatePrice:
-    """Tests for the price validation helper that guards entry price quality."""
+    """Tests for _validate_position_price — the 3-way price consensus guard.
 
-    def _import_validate_price(self):
-        """Import validate_price lazily so stubs are in place."""
-        try:
-            import orders as orders_module
-            if hasattr(orders_module, "validate_price"):
-                return orders_module.validate_price
-            if hasattr(orders_module, "_validate_price"):
-                return orders_module._validate_price
-        except Exception as exc:
-            log.warning("Could not import orders.validate_price: %s", exc)
-        return None
+    Signature: _validate_position_price(symbol, ibkr_price, entry) -> (float, str)
+    Returns (0, reason) when no valid price; (price, description) when valid.
+    Internal sources: ibkr_price param + _get_yf_price() + get_tv_signal_cache().
+    """
+
+    def _fn(self):
+        import orders as o
+        return o._validate_position_price
 
     def test_both_sources_none_returns_falsy(self):
-        """When both IBKR price and Yahoo Finance fallback return None,
-        validate_price must return a falsy / None result rather than silently
-        passing a bad price downstream."""
-        validate_price = self._import_validate_price()
-        if validate_price is None:
-            pytest.skip("validate_price not found in orders module — adjust function name")
-
-        with (
-            patch("orders.get_ibkr_price", return_value=None, create=True),
-            patch("orders.get_yahoo_price", return_value=None, create=True),
-        ):
-            result = validate_price("AAPL")
-
-        assert not result, (
-            "validate_price must refuse to return a price when both sources are None, "
-            f"but got: {result!r}"
+        """When ibkr_price=0 and yfinance returns 0 and TV cache is empty,
+        the function must return a zero price rather than silently passing
+        bad data downstream."""
+        fn = self._fn()
+        with patch("orders._get_yf_price", return_value=0.0), \
+             patch("orders.get_tv_signal_cache", return_value={}):
+            price, desc = fn("AAPL", 0.0, 150.0)
+        assert price == 0, (
+            f"Expected zero price when all sources are empty, got {price!r} ({desc})"
         )
 
-    def test_zero_price_from_primary_falls_back(self):
-        """When the primary price source returns zero, the function must NOT
-        use that value and should attempt the fallback source."""
-        validate_price = self._import_validate_price()
-        if validate_price is None:
-            pytest.skip("validate_price not found in orders module — adjust function name")
-
-        fallback_price = 123.45
-
-        with (
-            patch("orders.get_ibkr_price", return_value=0.0, create=True),
-            patch("orders.get_yahoo_price", return_value=fallback_price, create=True),
-        ):
-            result = validate_price("MSFT")
-
-        # The result should either be the fallback price or falsy if the
-        # implementation rejects zero entirely without fallback.
-        if result:
-            assert result == pytest.approx(fallback_price), (
-                f"Expected fallback price {fallback_price} but got {result!r}"
-            )
-        # If result is falsy that is also acceptable — zero price was rejected
-
-    def test_negative_price_rejected(self):
-        """A negative price from any source must never be returned."""
-        validate_price = self._import_validate_price()
-        if validate_price is None:
-            pytest.skip("validate_price not found in orders module — adjust function name")
-
-        with (
-            patch("orders.get_ibkr_price", return_value=-5.0, create=True),
-            patch("orders.get_yahoo_price", return_value=-1.0, create=True),
-        ):
-            result = validate_price("TSLA")
-
-        assert not result or result > 0, (
-            f"validate_price must not return a negative price, got: {result!r}"
+    def test_zero_ibkr_falls_back_to_yfinance(self):
+        """When ibkr_price=0 (excluded), yfinance provides the fallback price."""
+        fn = self._fn()
+        fallback = 123.45
+        with patch("orders._get_yf_price", return_value=fallback), \
+             patch("orders.get_tv_signal_cache", return_value={}):
+            price, desc = fn("MSFT", 0.0, 0.0)
+        assert price == pytest.approx(fallback), (
+            f"Expected yfinance fallback {fallback}, got {price!r} ({desc})"
         )
 
-    def test_valid_price_returned(self):
-        """Sanity check: a healthy price passes through correctly."""
-        validate_price = self._import_validate_price()
-        if validate_price is None:
-            pytest.skip("validate_price not found in orders module — adjust function name")
+    def test_negative_price_excluded(self):
+        """Negative ibkr_price and negative yfinance price are both excluded;
+        result must be a zero price, never a negative value."""
+        fn = self._fn()
+        with patch("orders._get_yf_price", return_value=-1.0), \
+             patch("orders.get_tv_signal_cache", return_value={}):
+            price, desc = fn("TSLA", -5.0, 200.0)
+        assert price == 0 or price > 0, (
+            f"Negative prices must never be returned, got {price!r} ({desc})"
+        )
+        assert price >= 0, f"Price must be non-negative, got {price!r}"
 
+    def test_valid_price_passes_through(self):
+        """When ibkr and yfinance agree on a healthy price, it passes through."""
+        fn = self._fn()
         expected = 250.00
-
-        with (
-            patch("orders.get_ibkr_price", return_value=expected, create=True),
-            patch("orders.get_yahoo_price", return_value=expected, create=True),
-        ):
-            result = validate_price("NVDA")
-
-        assert result == pytest.approx(expected) or result, (
-            f"Expected valid price ~{expected} to pass through, got: {result!r}"
+        with patch("orders._get_yf_price", return_value=expected), \
+             patch("orders.get_tv_signal_cache", return_value={}):
+            price, desc = fn("NVDA", expected, expected)
+        assert price == pytest.approx(expected), (
+            f"Expected {expected} to pass consensus check, got {price!r} ({desc})"
         )
 
 

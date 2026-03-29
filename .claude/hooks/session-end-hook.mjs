@@ -22,6 +22,11 @@ const CHECKPOINT_PATH = join(MEMORY_DIR, 'checkpoint.json');
 const SEEN_HASHES_PATH = join(MEMORY_DIR, 'seen-hashes.json');
 const SESSION_LOG_PATH = join(MEMORY_DIR, 'session-history.jsonl');
 
+// Chief Decifer state path — absolute so it never breaks regardless of CWD
+const CHIEF_STATE_PATH = process.env.CHIEF_STATE_PATH
+  || '/Users/amitchopra/Documents/Claude/Projects/Chief Designer/Chief-Decifer/state';
+const CHIEF_SESSIONS_DIR = join(CHIEF_STATE_PATH, 'sessions');
+
 const MAX_SEEN_HASHES = 50; // rolling dedup window
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -29,6 +34,10 @@ function ensureMemoryDir() {
   if (!existsSync(MEMORY_DIR)) {
     mkdirSync(MEMORY_DIR, { recursive: true });
   }
+}
+
+function ensureDir(dir) {
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
 function safeExec(cmd) {
@@ -115,6 +124,47 @@ function appendSessionHistory(checkpoint, sessionData) {
   writeFileSync(SESSION_LOG_PATH, line, { flag: 'a', encoding: 'utf-8' });
 }
 
+// ─── Write session log to Chief Decifer's state/sessions/ ─────────────────────
+// Chief's analyse.py does: sorted(SESSIONS_DIR.glob("*.json")) — must be .json
+// Format: YYYY-MM-DD_<slug>.json
+function writeChiefSessionLog(checkpoint, sessionData) {
+  if (!existsSync(CHIEF_STATE_PATH)) {
+    process.stderr.write(`[session-end-hook] Chief state path not found: ${CHIEF_STATE_PATH} — skipping\n`);
+    return;
+  }
+
+  ensureDir(CHIEF_SESSIONS_DIR);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const commitMsg = checkpoint.lastCommit || '';
+  const slug = (commitMsg.split(' ').slice(1, 4).join('-') || checkpoint.branch || 'session')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 40);
+
+  const filename = `${today}_${slug}.json`;
+  const filepath = join(CHIEF_SESSIONS_DIR, filename);
+
+  const testMatch = commitMsg.match(/(\d+)\s+passed/);
+
+  const sessionLog = {
+    date: today,
+    timestamp: checkpoint.timestamp,
+    branch: checkpoint.branch,
+    phase: checkpoint.roadmapPhase || 'unknown',
+    last_commit: checkpoint.lastCommit,
+    files_changed: checkpoint.lastFilesTouched,
+    test_status: testMatch ? `${testMatch[1]} passed` : 'unknown',
+    summary: sessionData.summary || commitMsg || 'Session ended',
+    open_todos: checkpoint.openTodos || [],
+    session_count: checkpoint.sessionCount,
+  };
+
+  writeFileSync(filepath, JSON.stringify(sessionLog, null, 2), 'utf-8');
+  process.stderr.write(`[session-end-hook] Chief session log written: ${filename}\n`);
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 try {
   ensureMemoryDir();
@@ -122,12 +172,12 @@ try {
   const sessionData = readStdin();
   const checkpoint = saveCheckpoint(sessionData);
 
-  // Record the context hash we used this session so next session can deduplicate
   if (sessionData.contextHash) {
     updateSeenHashes(sessionData.contextHash);
   }
 
   appendSessionHistory(checkpoint, sessionData);
+  writeChiefSessionLog(checkpoint, sessionData);
 
   process.stderr.write(`[session-end-hook] Checkpoint saved. Branch: ${checkpoint.branch}, Phase: ${checkpoint.roadmapPhase || 'unknown'}, Session #${checkpoint.sessionCount}\n`);
 } catch (err) {

@@ -1,7 +1,7 @@
 {
   "model": "claude-sonnet-4-6",
   "env": {
-    "CHIEF_STATE_PATH": "../Chief-Decifer/state"
+    "CHIEF_STATE_PATH": "/Users/amitchopra/Documents/Claude/Projects/Chief Designer/Chief-Decifer/state"
   },
   "permissions": {
     "allow": [

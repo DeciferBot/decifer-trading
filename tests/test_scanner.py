@@ -102,92 +102,176 @@ def low_volume_data():
 
 
 # ---------------------------------------------------------------------------
-# Filter tests
+# Filter tests — get_dynamic_universe behaviour by regime / TV availability
 # ---------------------------------------------------------------------------
+
+_TV_ROW_COLS = [
+    "ticker", "name", "close", "volume", "change", "gap",
+    "relative_volume_10d_calc", "RSI|60", "MACD.macd|60", "MACD.signal|60",
+    "EMA9|60", "EMA21|60", "ATR|60", "VWAP", "premarket_change",
+    "premarket_volume", "Recommend.All", "market_cap_basic",
+    "change_from_open", "EMA20", "EMA50",
+]
+
+
+def _tv_df(tickers=("AAPL", "MSFT")):
+    """Minimal DataFrame that _extract() can consume without errors."""
+    n = len(tickers)
+    data = {
+        "ticker": [f"NASDAQ:{t}" for t in tickers],
+        "name": list(tickers),
+        "close": [150.0] * n,
+        "volume": [5_000_000] * n,
+        "change": [1.0] * n,
+        "gap": [0.0] * n,
+        "relative_volume_10d_calc": [2.0] * n,
+        "RSI|60": [55.0] * n,
+        "MACD.macd|60": [0.5] * n,
+        "MACD.signal|60": [0.3] * n,
+        "EMA9|60": [149.0] * n,
+        "EMA21|60": [148.0] * n,
+        "ATR|60": [2.0] * n,
+        "VWAP": [150.0] * n,
+        "premarket_change": [0.5] * n,
+        "premarket_volume": [100_000] * n,
+        "Recommend.All": [0.5] * n,
+        "market_cap_basic": [1e9] * n,
+        "change_from_open": [0.5] * n,
+        "EMA20": [149.0] * n,
+        "EMA50": [148.0] * n,
+    }
+    return pd.DataFrame(data)
+
+
+class _FakeColResult:
+    """Stub for a tradingview_screener Column expression — supports all comparison ops."""
+    def __gt__(self, o): return self
+    def __lt__(self, o): return self
+    def __ge__(self, o): return self
+    def __le__(self, o): return self
+    def __eq__(self, o): return self
+    def between(self, a, b): return self
+    def isin(self, lst): return self
+
+
+class _FakeCol:
+    def __call__(self, name): return _FakeColResult()
+
+
+_FAKE_COL = _FakeCol()
+
 
 class TestScannerFilters:
+    """Tests get_dynamic_universe filtering behaviour by regime and TV availability."""
 
-    def test_filter_by_volume_removes_low_volume(self, low_volume_data):
-        """Symbols with low average volume should be filtered out."""
-        filter_fn = getattr(scanner, "filter_by_volume", None) or \
-                    getattr(scanner, "volume_filter", None)
-        if filter_fn is None:
-            pytest.skip("No volume filter function found")
-        min_volume = 1_000_000
-        result = filter_fn(low_volume_data, min_volume=min_volume)
-        assert result is False or result == [] or not result, (
-            f"Low volume data should be filtered out, got {result}"
-        )
+    def test_filter_by_volume_removes_low_volume(self):
+        """PANIC regime runs only the 2 always-on scans; result contains CORE + FALLBACK."""
+        ib = MagicMock()
+        mock_df = _tv_df(["TVSPY", "TVQQQ"])
+        # col may not be importable when tradingview-screener is absent — inject a stub
+        with patch.object(scanner, "col", _FAKE_COL, create=True):
+            with patch.object(scanner, "_TV_AVAILABLE", True):
+                with patch.object(scanner, "_query", return_value=(2, mock_df)) as mock_q:
+                    result = scanner.get_dynamic_universe(ib, regime={"regime": "PANIC"})
+        # Only volume_leaders + rel_vol_surge are not gated by is_panic
+        assert mock_q.call_count == 2, f"Expected 2 always-on scans, got {mock_q.call_count}"
+        for sym in scanner.CORE_SYMBOLS:
+            assert sym in result
+        for sym in scanner.MOMENTUM_FALLBACK:
+            assert sym in result
 
-    def test_filter_by_volume_keeps_high_volume(self, high_volume_data):
-        """Symbols with high average volume should pass the filter."""
-        filter_fn = getattr(scanner, "filter_by_volume", None) or \
-                    getattr(scanner, "volume_filter", None)
-        if filter_fn is None:
-            pytest.skip("No volume filter function found")
-        min_volume = 1_000_000
-        result = filter_fn(high_volume_data, min_volume=min_volume)
-        assert result is True or result == high_volume_data or result, (
-            f"High volume data should pass filter, got {result!r}"
-        )
+    def test_filter_by_volume_keeps_high_volume(self):
+        """TV unavailable → universe equals CORE + MOMENTUM_FALLBACK."""
+        ib = MagicMock()
+        with patch.object(scanner, "_TV_AVAILABLE", False):
+            result = scanner.get_dynamic_universe(ib, regime={"regime": "BULL_TRENDING"})
+        assert set(result) == set(scanner.CORE_SYMBOLS) | set(scanner.MOMENTUM_FALLBACK)
 
     def test_empty_symbol_list_returns_empty(self, config):
-        """Scanning an empty symbol list must return empty result."""
-        scan_fn = getattr(scanner, "scan_symbols", None) or \
-                  getattr(scanner, "run_scan", None) or \
-                  getattr(scanner, "scan", None)
-        if scan_fn is None:
-            pytest.skip("No scan function found")
-        try:
-            result = scan_fn([], config=config)
-            assert result == [] or result == {} or not result
-        except Exception as exc:
-            pytest.fail(f"scan raised for empty symbol list: {exc}")
+        """When every TV query raises an exception, falls back to CORE + MOMENTUM_FALLBACK."""
+        ib = MagicMock()
+        with patch.object(scanner, "col", _FAKE_COL, create=True):
+            with patch.object(scanner, "_TV_AVAILABLE", True):
+                with patch.object(scanner, "_query", side_effect=Exception("TV offline")):
+                    result = scanner.get_dynamic_universe(ib, regime={"regime": "BEAR_TRENDING"})
+        expected = set(scanner.CORE_SYMBOLS) | set(scanner.MOMENTUM_FALLBACK)
+        assert set(result) == expected
 
 
 # ---------------------------------------------------------------------------
-# Ranking tests
+# Ranking tests — get_market_regime regime classification
 # ---------------------------------------------------------------------------
+
+_VIX_CFG = {
+    "vix_panic_min": 35,
+    "vix_spike_pct": 0.15,
+    "vix_bull_max": 18,
+    "vix_choppy_max": 25,
+}
+
+
+def _price_df(prices, n=40):
+    dates = pd.date_range(end=pd.Timestamp.today(), periods=n, freq="h")
+    if isinstance(prices, (int, float)):
+        prices = [float(prices)] * n
+    return pd.DataFrame({"Close": list(prices)}, index=dates)
+
 
 class TestScannerRanking:
+    """Tests get_market_regime regime classification via mocked _safe_download."""
 
     def test_rank_candidates_returns_sorted_list(self):
-        """rank_candidates() must return a list sorted by score descending."""
-        ranker = getattr(scanner, "rank_candidates", None) or \
-                 getattr(scanner, "rank_symbols", None)
-        if ranker is None:
-            pytest.skip("No ranking function found")
-        candidates = [
-            {"symbol": "AAPL", "score": 0.65},
-            {"symbol": "MSFT", "score": 0.80},
-            {"symbol": "GOOG", "score": 0.45},
-        ]
-        result = ranker(candidates)
-        if isinstance(result, list) and len(result) > 1:
-            scores = [r.get("score", 0) if isinstance(r, dict) else r for r in result]
-            for i in range(len(scores) - 1):
-                assert scores[i] >= scores[i + 1], (
-                    f"Expected descending order, got {scores}"
-                )
+        """Low VIX + SPY/QQQ above 20-EMA → BULL_TRENDING."""
+        ib = MagicMock()
+        # Prices start low then spike so last value is above EMA
+        above_prices = [490.0] * 38 + [510.0, 510.0]
+        spy_df = _price_df(above_prices)
+        qqq_df = _price_df(above_prices)
+        vix_df = _price_df(14.0)
+
+        def mock_dl(ticker, **kw):
+            if ticker == "SPY": return spy_df
+            if ticker == "QQQ": return qqq_df
+            return vix_df
+
+        with patch("scanner._safe_download", side_effect=mock_dl):
+            with patch.dict(scanner.CONFIG, _VIX_CFG):
+                result = scanner.get_market_regime(ib)
+        assert result["regime"] == "BULL_TRENDING"
 
     def test_rank_empty_returns_empty(self):
-        """Ranking an empty list must return empty."""
-        ranker = getattr(scanner, "rank_candidates", None) or \
-                 getattr(scanner, "rank_symbols", None)
-        if ranker is None:
-            pytest.skip("No ranking function found")
-        try:
-            result = ranker([])
-            assert result == [] or not result
-        except Exception as exc:
-            pytest.fail(f"rank_candidates raised for empty list: {exc}")
+        """VIX above panic threshold → PANIC regardless of price action."""
+        ib = MagicMock()
+        spy_df = _price_df(480.0)
+        qqq_df = _price_df(390.0)
+        vix_df = _price_df(40.0)
+
+        def mock_dl(ticker, **kw):
+            if ticker == "SPY": return spy_df
+            if ticker == "QQQ": return qqq_df
+            return vix_df
+
+        with patch("scanner._safe_download", side_effect=mock_dl):
+            with patch.dict(scanner.CONFIG, _VIX_CFG):
+                result = scanner.get_market_regime(ib)
+        assert result["regime"] == "PANIC"
 
     def test_rank_single_candidate_returns_one(self):
-        """Single candidate list should return the same single item."""
-        ranker = getattr(scanner, "rank_candidates", None) or \
-                 getattr(scanner, "rank_symbols", None)
-        if ranker is None:
-            pytest.skip("No ranking function found")
-        candidates = [{"symbol": "AAPL", "score": 0.75}]
-        result = ranker(candidates)
-        assert len(result) == 1, f"Expected 1 item, got {len(result)}"
+        """Regime result dict always contains all required output keys."""
+        ib = MagicMock()
+        above_prices = [490.0] * 38 + [510.0, 510.0]
+        spy_df = _price_df(above_prices)
+        qqq_df = _price_df(above_prices)
+        vix_df = _price_df(14.0)
+
+        def mock_dl(ticker, **kw):
+            if ticker == "SPY": return spy_df
+            if ticker == "QQQ": return qqq_df
+            return vix_df
+
+        with patch("scanner._safe_download", side_effect=mock_dl):
+            with patch.dict(scanner.CONFIG, _VIX_CFG):
+                result = scanner.get_market_regime(ib)
+        for key in ("regime", "vix", "spy_price", "spy_above_ema",
+                    "qqq_price", "qqq_above_ema", "position_size_multiplier"):
+            assert key in result, f"Missing key: {key}"

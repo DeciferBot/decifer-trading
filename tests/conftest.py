@@ -289,6 +289,7 @@ _sklearn = _fake_module("sklearn")
 _sklearn_ensemble = _fake_module("sklearn.ensemble")
 _sklearn_ensemble.RandomForestClassifier = MagicMock
 _sklearn_ensemble.GradientBoostingClassifier = MagicMock
+_sklearn_ensemble.GradientBoostingRegressor = MagicMock
 _sklearn_ensemble.RandomForestRegressor = MagicMock
 _sklearn_preprocessing = _fake_module("sklearn.preprocessing")
 _sklearn_preprocessing.StandardScaler = MagicMock
@@ -300,10 +301,14 @@ _sklearn_model_selection.train_test_split = MagicMock(
 _sklearn_model_selection.cross_val_score = MagicMock(
     return_value=np.array([0.8, 0.82, 0.79])
 )
+_sklearn_model_selection.TimeSeriesSplit = MagicMock
 _sklearn_metrics = _fake_module("sklearn.metrics")
 _sklearn_metrics.accuracy_score = MagicMock(return_value=0.8)
 _sklearn_metrics.classification_report = MagicMock(return_value="")
 _sklearn_metrics.mean_squared_error = MagicMock(return_value=0.01)
+_sklearn_metrics.confusion_matrix = MagicMock(return_value=np.array([[1, 0], [0, 1]]))
+_sklearn_metrics.roc_auc_score = MagicMock(return_value=0.85)
+_sklearn_metrics.r2_score = MagicMock(return_value=0.75)
 
 # ---------------------------------------------------------------------------
 # joblib stub
