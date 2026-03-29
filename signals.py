@@ -724,6 +724,15 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     #   weight: the dimension's score (higher score = more influence)
     # ════════════════════════════════════════════════════════════════
     dim_directions = []  # [(direction, weight), ...]
+    disabled_dimensions = []  # track which flags were off, for diagnostics
+
+    # ── Dimension flags — read once, guard each section ───────────
+    _flags = CONFIG.get("dimension_flags", {})
+    def _enabled(name: str) -> bool:
+        on = _flags.get(name, True)
+        if not on:
+            disabled_dimensions.append(name)
+        return on
 
     # ── 1. TREND (0-10) — EMA alignment quality × ADX strength ──
     # Score measures how cleanly aligned the EMAs are, regardless of
@@ -733,22 +742,24 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
 
     base_trend = 0
     trend_dir = 0
-    if sig_5m["bull_aligned"]:
-        base_trend = 8
-        trend_dir = +1
-        if sig_5m["macd_accel"] > 0:
-            base_trend = 10  # MACD confirms the alignment
-    elif sig_5m["bear_aligned"]:
-        base_trend = 8
-        trend_dir = -1
-        if sig_5m["macd_accel"] < 0:
-            base_trend = 10  # MACD confirms the alignment
-    elif "BUY" in sig_5m["signal"] or "SELL" in sig_5m["signal"]:
-        base_trend = 4  # Signal without full alignment
-        trend_dir = +1 if "BUY" in sig_5m["signal"] else -1
-    trend_pts = int(base_trend * adx_mult)
-    score += trend_pts
-    dim_directions.append((trend_dir, trend_pts))
+    trend_pts = 0
+    if _enabled("trend"):
+        if sig_5m["bull_aligned"]:
+            base_trend = 8
+            trend_dir = +1
+            if sig_5m["macd_accel"] > 0:
+                base_trend = 10  # MACD confirms the alignment
+        elif sig_5m["bear_aligned"]:
+            base_trend = 8
+            trend_dir = -1
+            if sig_5m["macd_accel"] < 0:
+                base_trend = 10  # MACD confirms the alignment
+        elif "BUY" in sig_5m["signal"] or "SELL" in sig_5m["signal"]:
+            base_trend = 4  # Signal without full alignment
+            trend_dir = +1 if "BUY" in sig_5m["signal"] else -1
+        trend_pts = int(base_trend * adx_mult)
+        score += trend_pts
+        dim_directions.append((trend_dir, trend_pts))
 
     # ── 2. MOMENTUM (0-10) — MFI distance from 50 (symmetric) ──
     # MFI > 65 and MFI < 35 both score 10. The distance from the
@@ -757,23 +768,25 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     mfi = sig_5m.get("mfi", 50)
     rs  = sig_5m.get("rsi_slope", 0)
 
-    mfi_dist = abs(mfi - 50)        # 0-50 range
-    rsi_confirms = (mfi > 50 and rs > 0) or (mfi < 50 and rs < 0)
-
     momentum = 0
-    if mfi_dist > 15 and rsi_confirms:
-        momentum = 10   # Strong directional pressure + RSI confirming
-    elif mfi_dist > 15:
-        momentum = 8    # Strong pressure, RSI not confirming
-    elif mfi_dist > 5 and rsi_confirms:
-        momentum = 8    # Moderate pressure + RSI confirming
-    elif mfi_dist > 5:
-        momentum = 5    # Moderate pressure
-    elif mfi_dist > 0:
-        momentum = 2    # Weak but non-neutral
-    mom_dir = +1 if mfi > 50 else (-1 if mfi < 50 else 0)
-    score += momentum
-    dim_directions.append((mom_dir, momentum))
+    mom_dir = 0
+    if _enabled("momentum"):
+        mfi_dist = abs(mfi - 50)        # 0-50 range
+        rsi_confirms = (mfi > 50 and rs > 0) or (mfi < 50 and rs < 0)
+
+        if mfi_dist > 15 and rsi_confirms:
+            momentum = 10   # Strong directional pressure + RSI confirming
+        elif mfi_dist > 15:
+            momentum = 8    # Strong pressure, RSI not confirming
+        elif mfi_dist > 5 and rsi_confirms:
+            momentum = 8    # Moderate pressure + RSI confirming
+        elif mfi_dist > 5:
+            momentum = 5    # Moderate pressure
+        elif mfi_dist > 0:
+            momentum = 2    # Weak but non-neutral
+        mom_dir = +1 if mfi > 50 else (-1 if mfi < 50 else 0)
+        score += momentum
+        dim_directions.append((mom_dir, momentum))
 
     # ── 3. SQUEEZE (0-10) — coiled spring detection (symmetric) ──
     # Squeeze scoring is already direction-agnostic (measures compression).
@@ -784,26 +797,27 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
 
     squeeze_score = 0
     squeeze_dir = 0
-    if squeeze_on:
-        squeeze_score = 4 + int(squeeze_int * 4)  # 4-8 based on tightness
-        # BB position shows which direction the breakout is going
-        if bb_pos > 0.7:
-            squeeze_score = 10
-            squeeze_dir = +1
-        elif bb_pos < 0.3:
-            squeeze_score = 10
-            squeeze_dir = -1
+    if _enabled("squeeze"):
+        if squeeze_on:
+            squeeze_score = 4 + int(squeeze_int * 4)  # 4-8 based on tightness
+            # BB position shows which direction the breakout is going
+            if bb_pos > 0.7:
+                squeeze_score = 10
+                squeeze_dir = +1
+            elif bb_pos < 0.3:
+                squeeze_score = 10
+                squeeze_dir = -1
+            else:
+                squeeze_dir = +1 if bb_pos > 0.5 else -1
         else:
-            squeeze_dir = +1 if bb_pos > 0.5 else -1
-    else:
-        # Not in squeeze — BB position measures room to move
-        bb_dist = abs(bb_pos - 0.5)
-        if 0.1 < bb_dist < 0.3:
-            squeeze_score = 3   # Healthy position, room to run
-        squeeze_dir = +1 if bb_pos > 0.5 else (-1 if bb_pos < 0.5 else 0)
-    squeeze_score = min(squeeze_score, 10)
-    score += squeeze_score
-    dim_directions.append((squeeze_dir, squeeze_score))
+            # Not in squeeze — BB position measures room to move
+            bb_dist = abs(bb_pos - 0.5)
+            if 0.1 < bb_dist < 0.3:
+                squeeze_score = 3   # Healthy position, room to run
+            squeeze_dir = +1 if bb_pos > 0.5 else (-1 if bb_pos < 0.5 else 0)
+        squeeze_score = min(squeeze_score, 10)
+        score += squeeze_score
+        dim_directions.append((squeeze_dir, squeeze_score))
 
     # ── 4. FLOW (0-10) — VWAP + OBV (symmetric) ──
     # Score measures the STRENGTH of institutional flow, not its direction.
@@ -814,33 +828,34 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
 
     flow_score = 0
     flow_dir = 0
-    abs_vwap = abs(vwap_d)
-    if abs_vwap > 0.3:
-        flow_score += 4   # Solidly away from VWAP
-    elif abs_vwap > 0:
-        flow_score += 2   # Slightly away
-    elif abs_vwap > -0.01:  # essentially at VWAP
-        flow_score += 1
+    if _enabled("flow"):
+        abs_vwap = abs(vwap_d)
+        if abs_vwap > 0.3:
+            flow_score += 4   # Solidly away from VWAP
+        elif abs_vwap > 0:
+            flow_score += 2   # Slightly away
+        elif abs_vwap > -0.01:  # essentially at VWAP
+            flow_score += 1
 
-    # OBV confirms direction
-    if abs(obv_s) > 0:
-        flow_score += 4
-    # Divergence penalty: VWAP and OBV disagree
-    vwap_dir = +1 if vwap_d > 0 else (-1 if vwap_d < 0 else 0)
-    obv_dir  = +1 if obv_s > 0 else (-1 if obv_s < 0 else 0)
-    if vwap_dir != 0 and obv_dir != 0 and vwap_dir != obv_dir:
-        flow_score = max(0, flow_score - 3)   # Penalise divergence
+        # OBV confirms direction
+        if abs(obv_s) > 0:
+            flow_score += 4
+        # Divergence penalty: VWAP and OBV disagree
+        vwap_dir = +1 if vwap_d > 0 else (-1 if vwap_d < 0 else 0)
+        obv_dir  = +1 if obv_s > 0 else (-1 if obv_s < 0 else 0)
+        if vwap_dir != 0 and obv_dir != 0 and vwap_dir != obv_dir:
+            flow_score = max(0, flow_score - 3)   # Penalise divergence
 
-    # Flow direction: majority of VWAP + OBV
-    if vwap_dir == obv_dir:
-        flow_dir = vwap_dir
-    elif abs(vwap_d) > 0.2:
-        flow_dir = vwap_dir  # Strong VWAP signal wins
-    else:
-        flow_dir = obv_dir   # Near VWAP — OBV wins
-    flow_score = min(flow_score, 10)
-    score += flow_score
-    dim_directions.append((flow_dir, flow_score))
+        # Flow direction: majority of VWAP + OBV
+        if vwap_dir == obv_dir:
+            flow_dir = vwap_dir
+        elif abs(vwap_d) > 0.2:
+            flow_dir = vwap_dir  # Strong VWAP signal wins
+        else:
+            flow_dir = obv_dir   # Near VWAP — OBV wins
+        flow_score = min(flow_score, 10)
+        score += flow_score
+        dim_directions.append((flow_dir, flow_score))
 
     # ── 5. BREAKOUT (0-10) — Donchian channel breach (symmetric) ──
     # Donchian high break and low break score identically.
@@ -850,46 +865,54 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
 
     breakout_score = 0
     breakout_dir = 0
-    if donch != 0:  # Channel breach in either direction
-        breakout_score = 6
-        breakout_dir = donch  # +1 for high break, -1 for low break
-        if vr >= 2.0:
-            breakout_score = 10
-        elif vr >= 1.5:
-            breakout_score = 8
-    else:
-        # No channel break — volume alone is directionally neutral
-        if vr >= 2.0:
-            breakout_score = 4
-        elif vr >= 1.5:
-            breakout_score = 2
-    breakout_score = min(breakout_score, 10)
-    score += breakout_score
-    dim_directions.append((breakout_dir, breakout_score))
+    if _enabled("breakout"):
+        if donch != 0:  # Channel breach in either direction
+            breakout_score = 6
+            breakout_dir = donch  # +1 for high break, -1 for low break
+            if vr >= 2.0:
+                breakout_score = 10
+            elif vr >= 1.5:
+                breakout_score = 8
+        else:
+            # No channel break — volume alone is directionally neutral
+            if vr >= 2.0:
+                breakout_score = 4
+            elif vr >= 1.5:
+                breakout_score = 2
+        breakout_score = min(breakout_score, 10)
+        score += breakout_score
+        dim_directions.append((breakout_dir, breakout_score))
 
     # ── 6. MULTI-TIMEFRAME CONFLUENCE (0-10) ────────────
     total_tf = len(signals)
     agree    = max(buy_signals, sell_signals)
-    mtf_score = int((agree / total_tf) * 10)
-    score += mtf_score
-    # MTF direction = majority of timeframes
-    mtf_dir = +1 if buy_signals > sell_signals else (-1 if sell_signals > buy_signals else 0)
-    dim_directions.append((mtf_dir, mtf_score))
+    mtf_score = 0
+    mtf_dir = 0
+    if _enabled("mtf"):
+        mtf_score = int((agree / total_tf) * 10)
+        score += mtf_score
+        # MTF direction = majority of timeframes
+        mtf_dir = +1 if buy_signals > sell_signals else (-1 if sell_signals > buy_signals else 0)
+        dim_directions.append((mtf_dir, mtf_score))
 
     # ── 7. NEWS SENTIMENT (0-10) ────────────────────────
     # news_score is pre-computed by news.py (keyword + Claude two-tier)
-    ns = min(10, max(0, news_score))
-    score += ns
-    # News direction is embedded in the score sign from news.py
-    # (positive = bullish news, negative = bearish) — but here we get
-    # abs value, so direction comes from the raw news_score sign
-    dim_directions.append((+1 if news_score > 0 else (-1 if news_score < 0 else 0), ns))
+    ns = 0
+    if _enabled("news"):
+        ns = min(10, max(0, news_score))
+        score += ns
+        # News direction is embedded in the score sign from news.py
+        # (positive = bullish news, negative = bearish) — but here we get
+        # abs value, so direction comes from the raw news_score sign
+        dim_directions.append((+1 if news_score > 0 else (-1 if news_score < 0 else 0), ns))
 
     # ── 8. SOCIAL SENTIMENT (0-10) ────────────────────
     # social_score from social_sentiment.py (Reddit mention velocity + VADER)
-    ss = min(10, max(0, social_score))
-    score += ss
-    dim_directions.append((+1 if social_score > 0 else (-1 if social_score < 0 else 0), ss))
+    ss = 0
+    if _enabled("social"):
+        ss = min(10, max(0, social_score))
+        score += ss
+        dim_directions.append((+1 if social_score > 0 else (-1 if social_score < 0 else 0), ss))
 
     # ── 9. REVERSION (0-10) — mean-reversion tendency ──────
     # Composite of Hurst exponent + OU half-life + z-score.
@@ -908,54 +931,57 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     _zscore = sig_5m.get("zscore", 0.0)  # Z-score always from 5m (current price)
 
     reversion_score = 0
+    rev_score_capped = 0
+    rev_dir = 0
 
-    # ── ADF GATE — the only thing that matters first ──────
-    # ADF p < 0.05 = statistically significant evidence of mean-reversion.
-    # Without this gate, VR and OU produce ~32% false positives on 60-bar
-    # random walks. With ADF gate: ~7.7% FP, 75% TP on strong OU.
-    # If ADF fails (p >= 0.05), entire REVERSION dimension scores 0.
-    if _adf_p < 0.05:
-        # Sub-metric 1: Variance Ratio (0-3 pts)
-        # VR < 1 = mean-reverting returns. Calibrated on 60-bar Monte Carlo.
-        vr_pts = 0
-        if _vr < 0.55:
-            vr_pts = 3       # Strong mean-reversion (OU theta ≈ 0.3)
-        elif _vr < 0.70:
-            vr_pts = 2       # Moderate mean-reversion (OU theta ≈ 0.2)
-        elif _vr < 0.80:
-            vr_pts = 1       # Weak signal
+    if _enabled("reversion"):
+        # ── ADF GATE — the only thing that matters first ──────
+        # ADF p < 0.05 = statistically significant evidence of mean-reversion.
+        # Without this gate, VR and OU produce ~32% false positives on 60-bar
+        # random walks. With ADF gate: ~7.7% FP, 75% TP on strong OU.
+        # If ADF fails (p >= 0.05), entire REVERSION dimension scores 0.
+        if _adf_p < 0.05:
+            # Sub-metric 1: Variance Ratio (0-3 pts)
+            # VR < 1 = mean-reverting returns. Calibrated on 60-bar Monte Carlo.
+            vr_pts = 0
+            if _vr < 0.55:
+                vr_pts = 3       # Strong mean-reversion (OU theta ≈ 0.3)
+            elif _vr < 0.70:
+                vr_pts = 2       # Moderate mean-reversion (OU theta ≈ 0.2)
+            elif _vr < 0.80:
+                vr_pts = 1       # Weak signal
 
-        # Sub-metric 2: OU half-life (0-4 pts)
-        # Shorter half-life = faster reversion = more tradeable
-        ou_pts = 0
-        if _ou_hl < 5:
-            ou_pts = 4       # Reverts in < 5 periods — very tradeable
-        elif _ou_hl < 10:
-            ou_pts = 3
-        elif _ou_hl < 20:
-            ou_pts = 2
-        elif _ou_hl < 40:
-            ou_pts = 1
+            # Sub-metric 2: OU half-life (0-4 pts)
+            # Shorter half-life = faster reversion = more tradeable
+            ou_pts = 0
+            if _ou_hl < 5:
+                ou_pts = 4       # Reverts in < 5 periods — very tradeable
+            elif _ou_hl < 10:
+                ou_pts = 3
+            elif _ou_hl < 20:
+                ou_pts = 2
+            elif _ou_hl < 40:
+                ou_pts = 1
 
-        # Sub-metric 3: Z-score magnitude (0-3 pts)
-        # How far price has deviated from its 20-period mean
-        _abs_z = abs(_zscore)
-        zscore_pts = 0
-        if _abs_z > 2.5:
-            zscore_pts = 3   # Extreme deviation — high reversion probability
-        elif _abs_z > 2.0:
-            zscore_pts = 2
-        elif _abs_z > 1.5:
-            zscore_pts = 1
+            # Sub-metric 3: Z-score magnitude (0-3 pts)
+            # How far price has deviated from its 20-period mean
+            _abs_z = abs(_zscore)
+            zscore_pts = 0
+            if _abs_z > 2.5:
+                zscore_pts = 3   # Extreme deviation — high reversion probability
+            elif _abs_z > 2.0:
+                zscore_pts = 2
+            elif _abs_z > 1.5:
+                zscore_pts = 1
 
-        reversion_score = vr_pts + ou_pts + zscore_pts
-    rev_score_capped = min(reversion_score, 10)
-    score += rev_score_capped
-    # Reversion direction: z-score tells us which way to trade.
-    # Positive z = price above mean → SHORT (fade it)
-    # Negative z = price below mean → LONG (fade it)
-    rev_dir = -1 if _zscore > 0.5 else (+1 if _zscore < -0.5 else 0)
-    dim_directions.append((rev_dir, rev_score_capped))
+            reversion_score = vr_pts + ou_pts + zscore_pts
+        rev_score_capped = min(reversion_score, 10)
+        score += rev_score_capped
+        # Reversion direction: z-score tells us which way to trade.
+        # Positive z = price above mean → SHORT (fade it)
+        # Negative z = price below mean → LONG (fade it)
+        rev_dir = -1 if _zscore > 0.5 else (+1 if _zscore < -0.5 else 0)
+        dim_directions.append((rev_dir, rev_score_capped))
 
     # ── BONUS: Candlestick confirmation (+3 max) ────────
     # Direction-agnostic: both bull and bear candles add bonus points.
@@ -1069,6 +1095,8 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             "social":    ss,
             "reversion": rev_score_capped,
         },
+        # Dimensions that were zeroed by a False flag (for diagnostics / dashboard)
+        "disabled_dimensions": disabled_dimensions,
     }
 
 

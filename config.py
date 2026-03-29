@@ -86,6 +86,24 @@ CONFIG = {
     "min_score_to_trade":       18,     # Out of 50 — lower = more trades for training (live: 28)
     "high_conviction_score":    30,     # Above this = 1.5x position size (live: 38)
 
+    # ── DIMENSION FLAGS ───────────────────────────────────────────
+    # Enable / disable individual signal dimensions without code changes.
+    # Set any flag to False to zero that dimension's score and remove its
+    # direction vote. Useful when Signal Decay Monitor identifies a harmful
+    # or noisy dimension — flip the flag, no deploy required.
+    # All flags default to True (full pipeline, backward-compatible).
+    "dimension_flags": {
+        "trend":     True,   # Dim 1 — EMA alignment × ADX
+        "momentum":  True,   # Dim 2 — MFI + RSI slope
+        "squeeze":   True,   # Dim 3 — BB/Keltner compression
+        "flow":      True,   # Dim 4 — VWAP + OBV
+        "breakout":  True,   # Dim 5 — Donchian channel breach
+        "mtf":       True,   # Dim 6 — Multi-timeframe agreement
+        "news":      True,   # Dim 7 — Yahoo RSS + Claude sentiment
+        "social":    True,   # Dim 8 — Reddit velocity + VADER
+        "reversion": True,   # Dim 9 — Variance Ratio + OU half-life + z-score
+    },
+
     # ── MARKET HOURS (EST) ────────────────────────────────────
     "pre_market_start":         "04:00",
     "market_open":              "09:30",
