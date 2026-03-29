@@ -154,6 +154,34 @@ def validate_wip(backlog: dict[str, Any] | None = None,
             f"feature(s) before pulling in new work."
         )
 
+    # Duplicate ID check
+    seen_ids: dict[str, int] = {}
+    for item in backlog.get("items", []):
+        item_id = item.get("id")
+        if item_id:
+            seen_ids[item_id] = seen_ids.get(item_id, 0) + 1
+    for item_id, count in seen_ids.items():
+        if count > 1:
+            violations.append(
+                f"DUPLICATE_ID: '{item_id}' appears {count} times in backlog items. "
+                f"Each feature must have a unique ID."
+            )
+
+    # Duplicate title check (case-insensitive, whitespace-normalised)
+    seen_titles: dict[str, list[str]] = {}
+    for item in backlog.get("items", []):
+        raw = item.get("title", "").strip()
+        if not raw:
+            continue
+        key = " ".join(raw.lower().split())
+        seen_titles.setdefault(key, []).append(item.get("id", "?"))
+    for title_key, ids in seen_titles.items():
+        if len(ids) > 1:
+            violations.append(
+                f"DUPLICATE_TITLE: title '{title_key}' shared by {ids}. "
+                f"Each feature must have a unique title to prevent double-shipping."
+            )
+
     # Check for items blocked by unfinished dependencies still marked in_progress
     terminal_statuses = set(
         backlog.get("wip_policy", {}).get(

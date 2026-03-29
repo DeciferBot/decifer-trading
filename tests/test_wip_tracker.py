@@ -241,6 +241,92 @@ class TestValidateWIP:
         assert any("WIP_LIMIT_EXCEEDED" in v for v in violations)
         assert any("UNMET_DEPENDENCY" in v for v in violations)
 
+    # ── Deduplication checks ──────────────────────────────────────────────────
+
+    def test_duplicate_id_triggers_violation(self):
+        """IC-001 regression: same ID on two items must be caught."""
+        bl = _base_backlog(items=[
+            {"id": "F1", "title": "Feature One", "status": "ready", "dependencies": []},
+            {"id": "F1", "title": "Feature One (copy)", "status": "pending", "dependencies": []},
+        ])
+        violations = validate_wip(bl)
+        assert any("DUPLICATE_ID" in v for v in violations)
+        assert any("F1" in v for v in violations if "DUPLICATE_ID" in v)
+
+    def test_duplicate_id_violation_includes_count(self):
+        bl = _base_backlog(items=[
+            {"id": "DUP", "title": "Alpha", "status": "ready", "dependencies": []},
+            {"id": "DUP", "title": "Beta", "status": "pending", "dependencies": []},
+        ])
+        violations = validate_wip(bl)
+        dup = next(v for v in violations if "DUPLICATE_ID" in v)
+        assert "2" in dup
+
+    def test_unique_ids_no_duplicate_id_violation(self):
+        bl = _base_backlog(items=[
+            _item("A1", "ready"),
+            _item("A2", "ready"),
+            _item("A3", "pending"),
+        ])
+        violations = validate_wip(bl)
+        assert not any("DUPLICATE_ID" in v for v in violations)
+
+    def test_duplicate_title_triggers_violation(self):
+        """IC-001 regression: same title on two items must be caught."""
+        bl = _base_backlog(items=[
+            {"id": "F1", "title": "IC-Weighted Signal Scoring", "status": "ready", "dependencies": []},
+            {"id": "F2", "title": "IC-Weighted Signal Scoring", "status": "pending", "dependencies": []},
+        ])
+        violations = validate_wip(bl)
+        assert any("DUPLICATE_TITLE" in v for v in violations)
+
+    def test_duplicate_title_case_insensitive(self):
+        """Title dedup is case-insensitive to catch reformulations."""
+        bl = _base_backlog(items=[
+            {"id": "F1", "title": "Connection Manager", "status": "ready", "dependencies": []},
+            {"id": "F2", "title": "connection manager", "status": "pending", "dependencies": []},
+        ])
+        violations = validate_wip(bl)
+        assert any("DUPLICATE_TITLE" in v for v in violations)
+
+    def test_duplicate_title_whitespace_normalised(self):
+        """Extra whitespace should not allow duplicate titles to slip through."""
+        bl = _base_backlog(items=[
+            {"id": "F1", "title": "Account Decision Agent", "status": "ready", "dependencies": []},
+            {"id": "F2", "title": "Account  Decision  Agent", "status": "pending", "dependencies": []},
+        ])
+        violations = validate_wip(bl)
+        assert any("DUPLICATE_TITLE" in v for v in violations)
+
+    def test_duplicate_title_violation_includes_both_ids(self):
+        bl = _base_backlog(items=[
+            {"id": "F1", "title": "Telegram Bot", "status": "ready", "dependencies": []},
+            {"id": "F2", "title": "Telegram Bot", "status": "pending", "dependencies": []},
+        ])
+        violations = validate_wip(bl)
+        dup = next(v for v in violations if "DUPLICATE_TITLE" in v)
+        assert "F1" in dup
+        assert "F2" in dup
+
+    def test_unique_titles_no_duplicate_title_violation(self):
+        bl = _base_backlog(items=[
+            {"id": "A1", "title": "Scanner", "status": "ready", "dependencies": []},
+            {"id": "A2", "title": "Risk Engine", "status": "ready", "dependencies": []},
+            {"id": "A3", "title": "Dashboard", "status": "pending", "dependencies": []},
+        ])
+        violations = validate_wip(bl)
+        assert not any("DUPLICATE_TITLE" in v for v in violations)
+
+    def test_duplicate_id_and_duplicate_title_both_reported(self):
+        """Both violation types can coexist in a single bad backlog."""
+        bl = _base_backlog(items=[
+            {"id": "F1", "title": "Same Title", "status": "ready", "dependencies": []},
+            {"id": "F1", "title": "Same Title", "status": "pending", "dependencies": []},
+        ])
+        violations = validate_wip(bl)
+        assert any("DUPLICATE_ID" in v for v in violations)
+        assert any("DUPLICATE_TITLE" in v for v in violations)
+
 
 # ── check_wip_limit ───────────────────────────────────────────────────────────
 
@@ -365,3 +451,21 @@ class TestRealBacklogCompliance:
             assert "roadmap_phase" in item or item.get("status") in ("resolved",), (
                 f"Item {item.get('id')} missing 'roadmap_phase'"
             )
+
+    def test_real_backlog_has_no_duplicate_ids(self):
+        """Regression guard: duplicate IDs cause double-shipping risk (IC-001)."""
+        bl = load_backlog()
+        violations = validate_wip(bl)
+        dup_id_violations = [v for v in violations if v.startswith("DUPLICATE_ID")]
+        assert dup_id_violations == [], (
+            "backlog.json contains duplicate feature IDs:\n" + "\n".join(dup_id_violations)
+        )
+
+    def test_real_backlog_has_no_duplicate_titles(self):
+        """Regression guard: duplicate titles cause conflicting implementations (IC-001)."""
+        bl = load_backlog()
+        violations = validate_wip(bl)
+        dup_title_violations = [v for v in violations if v.startswith("DUPLICATE_TITLE")]
+        assert dup_title_violations == [], (
+            "backlog.json contains duplicate feature titles:\n" + "\n".join(dup_title_violations)
+        )
