@@ -341,6 +341,102 @@ class TestTradeLogging:
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# Signal scan logging tests
+# ────────────────────────────────────────────────────────────────────────────
+
+class TestSignalScanLogging:
+    """Tests for log_signal_scan."""
+
+    _TMP = "/tmp/test_signals_log.jsonl"
+
+    def setup_method(self):
+        self._orig = learning.SIGNALS_LOG_FILE
+        learning.SIGNALS_LOG_FILE = self._TMP
+        if os.path.exists(self._TMP):
+            os.remove(self._TMP)
+
+    def teardown_method(self):
+        learning.SIGNALS_LOG_FILE = self._orig
+        if os.path.exists(self._TMP):
+            os.remove(self._TMP)
+
+    def _regime(self):
+        return {"regime": "BEAR_TRENDING", "vix": 22.5}
+
+    def _sig(self, symbol="AAPL", score=35, price=150.0):
+        return {
+            "symbol": symbol,
+            "score": score,
+            "price": price,
+            "score_breakdown": {
+                "trend": 5, "momentum": 4, "squeeze": 3, "flow": 4,
+                "breakout": 3, "mtf": 4, "news": 5, "social": 3, "reversion": 4,
+            },
+            "disabled_dimensions": [],
+        }
+
+    def test_writes_one_line_per_symbol(self):
+        """Each symbol in scored produces one JSONL line."""
+        scored = [self._sig("AAPL"), self._sig("TSLA", score=40)]
+        learning.log_signal_scan(scored, self._regime())
+        with open(self._TMP) as f:
+            lines = [l for l in f.read().splitlines() if l]
+        assert len(lines) == 2
+        records = [json.loads(l) for l in lines]
+        assert records[0]["symbol"] == "AAPL"
+        assert records[1]["symbol"] == "TSLA"
+
+    def test_record_contains_required_fields(self):
+        """Each record has ts, scan_id, symbol, score, price, regime, vix, score_breakdown."""
+        learning.log_signal_scan([self._sig()], self._regime())
+        with open(self._TMP) as f:
+            record = json.loads(f.readline())
+        for field in ("ts", "scan_id", "symbol", "score", "price", "regime", "vix", "score_breakdown"):
+            assert field in record, f"missing field: {field}"
+
+    def test_score_breakdown_preserved(self):
+        """All 9 dimension scores are present in score_breakdown."""
+        learning.log_signal_scan([self._sig()], self._regime())
+        with open(self._TMP) as f:
+            record = json.loads(f.readline())
+        dims = record["score_breakdown"]
+        for dim in ("trend", "momentum", "squeeze", "flow", "breakout", "mtf", "news", "social", "reversion"):
+            assert dim in dims, f"missing dimension: {dim}"
+
+    def test_appends_across_multiple_scans(self):
+        """Two scan calls append to the same file (not overwrite)."""
+        learning.log_signal_scan([self._sig("AAPL")], self._regime())
+        learning.log_signal_scan([self._sig("NVDA", score=42)], self._regime())
+        with open(self._TMP) as f:
+            lines = [l for l in f.read().splitlines() if l]
+        assert len(lines) == 2
+        syms = [json.loads(l)["symbol"] for l in lines]
+        assert "AAPL" in syms and "NVDA" in syms
+
+    def test_same_scan_id_per_cycle(self):
+        """All symbols in one call share the same scan_id."""
+        scored = [self._sig("AAPL"), self._sig("TSLA"), self._sig("NVDA")]
+        learning.log_signal_scan(scored, self._regime())
+        with open(self._TMP) as f:
+            records = [json.loads(l) for l in f.read().splitlines() if l]
+        scan_ids = {r["scan_id"] for r in records}
+        assert len(scan_ids) == 1
+
+    def test_empty_scored_writes_nothing(self):
+        """Empty scored list produces no output."""
+        learning.log_signal_scan([], self._regime())
+        assert not os.path.exists(self._TMP)
+
+    def test_missing_score_breakdown_writes_empty_dict(self):
+        """Symbol with no score_breakdown writes {} rather than crashing."""
+        sig = {"symbol": "XYZ", "score": 30, "price": 10.0}
+        learning.log_signal_scan([sig], self._regime())
+        with open(self._TMP) as f:
+            record = json.loads(f.readline())
+        assert record["score_breakdown"] == {}
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # Performance summary tests
 # ────────────────────────────────────────────────────────────────────────────
 

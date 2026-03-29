@@ -58,13 +58,16 @@ from orders import execute_buy, execute_sell, flatten_all, reconcile_with_ibkr, 
 from options import find_best_contract, check_options_exits
 from options_scanner import scan_options_universe
 from risk import check_risk_conditions, get_session, get_scan_interval, reset_daily_state, calculate_position_size, calculate_stops, update_equity_high_water_mark
-from learning import log_trade, load_trades, load_orders, get_performance_summary, run_weekly_review, TRADE_LOG_FILE, get_effective_capital, record_capital_adjustment
+from learning import log_trade, load_trades, load_orders, get_performance_summary, run_weekly_review, TRADE_LOG_FILE, get_effective_capital, record_capital_adjustment, log_signal_scan
 from dashboard import DASHBOARD_HTML
 from news_sentinel import NewsSentinel, get_sentinel_history
 from theme_tracker import build_sentinel_universe, load_custom_themes, get_all_themes
 from sentinel_agents import run_sentinel_pipeline
+from signal_types import Signal
+from signal_dispatcher import dispatch_signals as _dispatch_signals
 
 EQUITY_FILE = "equity_history.json"
+TYPED_SIGNALS_LOG = "signals_log.jsonl"
 PROMPTS_FILE = "prompt_versions.json"
 
 colorama_init()
@@ -1613,6 +1616,45 @@ def _auto_rebalance_cash(portfolio_value: float, regime: dict):
         clog("ERROR", f"Auto-rebalance: Failed to close {sym}: {e}")
 
 
+def _scored_to_signals(scored: list, regime_name: str) -> list:
+    """
+    Convert score_universe() output into typed Signal objects.
+
+    Called once per scan cycle after scoring completes.  The resulting list
+    is used by dispatch_signals() for order routing and is written to
+    signals_log.jsonl as the source data for IC tracking.
+    """
+    now = datetime.now(timezone.utc)
+    signals = []
+    for s in scored:
+        direction = s.get("direction", "NEUTRAL")
+        if direction not in ("LONG", "SHORT", "NEUTRAL"):
+            direction = "NEUTRAL"
+        signals.append(Signal(
+            symbol=s["symbol"],
+            direction=direction,
+            conviction_score=round(s.get("score", 0) / 5.0, 3),
+            dimension_scores=s.get("score_breakdown", {}),
+            timestamp=now,
+            regime_context=regime_name,
+            price=s.get("price", 0.0),
+            atr=s.get("atr", 0.0),
+        ))
+    return signals
+
+
+def _append_signals_log(signals: list) -> None:
+    """Append typed Signal objects to signals_log.jsonl (one JSON line per signal)."""
+    if not signals:
+        return
+    try:
+        with open(TYPED_SIGNALS_LOG, "a") as f:
+            for s in signals:
+                f.write(s.to_json() + "\n")
+    except Exception as e:
+        log.warning(f"typed signals_log write failed: {e}")
+
+
 def run_scan():
     global scan_count, last_sunday_review
 
@@ -1814,11 +1856,16 @@ def run_scan():
 
     # ── Score universe ────────────────────────────────────────
     clog("SCAN", "Scoring universe on 8 dimensions...")
-    scored = score_universe(universe, regime.get("regime", "UNKNOWN"),
-                            news_data=news_sentiment, social_data=social_sentiment)
+    scored, all_scored = score_universe(universe, regime.get("regime", "UNKNOWN"),
+                                        news_data=news_sentiment, social_data=social_sentiment)
     regime_name = regime.get('regime','UNKNOWN')
     used_threshold = get_regime_threshold(regime_name)
-    clog("INFO", f"Scored: {len(scored)} symbols above threshold ({used_threshold}/50) [{regime_name}]")
+    clog("INFO", f"Scored: {len(scored)} above threshold ({used_threshold}/50), {len(all_scored)} total [{regime_name}]")
+    log_signal_scan(all_scored, regime)
+
+    # ── Build typed Signal objects + write to signals_log.jsonl ──
+    signals = _scored_to_signals(scored, regime_name)
+    _append_signals_log(signals)
 
     # ── Update existing position prices ──────────────────────
     update_position_prices(scored)
@@ -1995,20 +2042,34 @@ def run_scan():
         # is judged independently — the risk manager and position sizing
         # handle total exposure.
 
-        # ── Stock evaluation ─────────────────────────────────────────
-        stock_success = execute_buy(
+        # ── Stock evaluation via signal dispatcher ────────────────────
+        # Find the typed Signal for this symbol (may not exist if agent
+        # recommended a symbol outside the scored universe — in that case
+        # build a minimal Signal from the fetched raw data).
+        buy_signal = next((s for s in signals if s.symbol == sym), None)
+        if buy_signal is None:
+            buy_signal = Signal(
+                symbol=sym,
+                direction="LONG",
+                conviction_score=round(sig.get("score", 30) / 5.0, 3),
+                dimension_scores=sig.get("score_breakdown", {}),
+                timestamp=datetime.now(timezone.utc),
+                regime_context=regime_name,
+                price=sig["price"],
+                atr=sig["atr"],
+            )
+        buy_signal.rationale = reason
+        buy_signal.source_agents = list(range(decision.get("agents_agreed", 0)))
+
+        dispatch_results = _dispatch_signals(
+            [buy_signal],
             ib=ib,
-            symbol=sym,
-            price=sig["price"],
-            atr=sig["atr"],
-            score=sig["score"],
             portfolio_value=pv,
             regime=regime,
-            reasoning=reason,
-            signal_scores=sig.get("score_breakdown", {}),
+            account_id=CONFIG.get("active_account", ""),
             agent_outputs=decision.get("_agent_outputs", {}),
-            open_time=datetime.now(timezone.utc).isoformat(),
         )
+        stock_success = any(r["success"] for r in dispatch_results)
         if stock_success:
             dash["trades"].insert(0, {
                 "side": "BUY", "symbol": sym,

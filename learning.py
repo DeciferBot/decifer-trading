@@ -12,9 +12,10 @@ from config import CONFIG
 
 log = logging.getLogger("decifer.learning")
 
-TRADE_LOG_FILE = CONFIG["trade_log"]
-ORDER_LOG_FILE = CONFIG.get("order_log", "data/orders.json")
-CAPITAL_FILE   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "capital_base.json")
+TRADE_LOG_FILE   = CONFIG["trade_log"]
+ORDER_LOG_FILE   = CONFIG.get("order_log", "data/orders.json")
+SIGNALS_LOG_FILE = CONFIG.get("signals_log", "data/signals_log.jsonl")
+CAPITAL_FILE     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "capital_base.json")
 
 
 # ── Capital base tracking ──────────────────────────────────────────────
@@ -167,6 +168,37 @@ def _save_orders(orders: list):
         except OSError:
             pass
         raise
+
+
+def log_signal_scan(scored: list, regime: dict) -> None:
+    """
+    Append one line per scored symbol to signals_log.jsonl after each scan cycle.
+    Each line records the full 9-dimension breakdown alongside regime context so
+    forward returns can be correlated against individual dimension scores later.
+
+    Expects the full universe from score_universe() (the all_scored return value),
+    not the above-threshold subset — so the IC distribution is untruncated.
+    """
+    if not scored:
+        return
+    scan_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    try:
+        with open(SIGNALS_LOG_FILE, "a") as f:
+            for sig in scored:
+                record = {
+                    "ts":              datetime.now(timezone.utc).isoformat(),
+                    "scan_id":         scan_id,
+                    "symbol":          sig.get("symbol"),
+                    "score":           sig.get("score"),
+                    "price":           sig.get("price"),
+                    "regime":          regime.get("regime"),
+                    "vix":             regime.get("vix"),
+                    "score_breakdown": sig.get("score_breakdown", {}),
+                    "disabled_dims":   sig.get("disabled_dimensions", []),
+                }
+                f.write(json.dumps(record) + "\n")
+    except Exception as e:
+        log.warning(f"signals_log write failed: {e}")
 
 
 def log_trade(trade: dict, agent_outputs: dict, regime: dict,

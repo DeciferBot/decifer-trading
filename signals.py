@@ -1128,10 +1128,15 @@ def get_regime_threshold(regime: str) -> int:
 
 
 def score_universe(symbols: list, regime: str = "UNKNOWN",
-                   news_data: dict = None, social_data: dict = None) -> list:
+                   news_data: dict = None, social_data: dict = None) -> tuple:
     """
     Score all symbols in the universe.
-    Returns only those above the minimum score threshold, sorted by score.
+
+    Returns a tuple: (above_threshold, all_scored)
+      above_threshold — list of symbols whose score >= regime threshold, sorted
+                        descending. Use this for trading decisions.
+      all_scored      — list of ALL scored symbols regardless of threshold, sorted
+                        descending. Use this for IC logging and analysis.
 
     news_data: optional {symbol: news_sentiment_dict} from news.py
     social_data: optional {symbol: social_sentiment_dict} from social_sentiment.py
@@ -1147,7 +1152,7 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
     # Each worker is a separate process with its own yfinance globals,
     # completely avoiding the thread-safety bug (GitHub issue #2557).
     # Falls back to sequential if multiprocessing fails (e.g. fork issues).
-    results = []
+    all_results = []
     args_list = [
         (sym,
          news_data.get(sym, {}).get("news_score", 0),
@@ -1162,10 +1167,10 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
             sym = futures[future]
             try:
                 data = future.result(timeout=60)
-                if data and data["score"] >= threshold:
+                if data:
                     if sym in news_data:
                         data["news"] = news_data[sym]
-                    results.append(data)
+                    all_results.append(data)
             except Exception:
                 pass
     except Exception as e:
@@ -1174,11 +1179,13 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
         for sym, ns, ss in args_list:
             try:
                 data = fetch_multi_timeframe(sym, news_score=ns, social_score=ss)
-                if data and data["score"] >= threshold:
+                if data:
                     if sym in news_data:
                         data["news"] = news_data[sym]
-                    results.append(data)
+                    all_results.append(data)
             except Exception:
                 pass
 
-    return sorted(results, key=lambda x: x["score"], reverse=True)
+    all_sorted = sorted(all_results, key=lambda x: x["score"], reverse=True)
+    above_threshold = [r for r in all_sorted if r["score"] >= threshold]
+    return above_threshold, all_sorted

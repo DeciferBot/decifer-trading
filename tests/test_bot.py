@@ -195,7 +195,7 @@ scanner_stub.get_tv_signal_cache  = lambda: {}
 
 # signals
 signals_stub = sys.modules["signals"]
-signals_stub.score_universe        = lambda *a, **kw: []
+signals_stub.score_universe        = lambda *a, **kw: ([], [])
 signals_stub.fetch_multi_timeframe = lambda *a, **kw: {}
 signals_stub.get_regime_threshold  = lambda *a, **kw: 18
 
@@ -242,6 +242,7 @@ risk_stub.update_equity_high_water_mark = lambda *a, **kw: None
 # learning
 learning_stub = sys.modules["learning"]
 learning_stub.log_trade                = lambda *a, **kw: None
+learning_stub.log_signal_scan          = lambda *a, **kw: None
 learning_stub.load_trades              = lambda: []
 learning_stub.load_orders              = lambda: []
 learning_stub.get_performance_summary  = lambda *a, **kw: {}

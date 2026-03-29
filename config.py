@@ -198,6 +198,7 @@ CONFIG = {
     "log_file":     "logs/decifer.log",
     "trade_log":    "data/trades.json",
     "order_log":    "data/orders.json",
+    "signals_log":  "data/signals_log.jsonl",
 
     # ── OPTIONS TRADING ───────────────────────────────────────
     # Set options_enabled to True to activate options trading.
