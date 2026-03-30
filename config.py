@@ -230,7 +230,7 @@ CONFIG = {
     #                                     (premium paid = max loss if goes to zero)
 
     # Exit rules
-    "options_profit_target":  1.00,    # Take profit at 100% premium gain
+    "options_profit_target":  0.75,    # Take profit at 75% premium gain
     "options_stop_loss":      0.50,    # Stop loss at 50% premium loss
     "options_exit_dte":       2,       # Hard exit at this many DTE (gamma risk)
 

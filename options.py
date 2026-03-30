@@ -445,9 +445,11 @@ def check_options_exits(open_options: dict, ib=None) -> list[str]:
         entry_premium = pos.get("entry_premium", 0)
         curr_premium  = pos.get("current_premium")
 
-        # Always fetch live premium from IBKR when a connection is available.
-        # Do NOT guard on curr_premium is None — update_positions_from_ibkr always
-        # sets it, so that guard made the live fetch unreachable every cycle.
+        # Always fetch a fresh live premium — IBKR first, yfinance if IBKR returns nothing.
+        # Do NOT rely solely on pos["current_premium"]: on paper accounts IBKR's
+        # portfolio() marketPrice for options is frequently 0, leaving current_premium
+        # stale at the entry value and making the P&L check always read ~0%.
+        ibkr_live_ok = False
         if ib:
             try:
                 from ib_async import Option as IBOption
@@ -457,8 +459,11 @@ def check_options_exits(open_options: dict, ib=None) -> list[str]:
                     exchange="SMART", currency="USD",
                 )
                 ib.qualifyContracts(contract)
+                # Request delayed data as fallback (type 3) then restore live (type 1)
+                ib.reqMarketDataType(3)
                 ticker = ib.reqMktData(contract, snapshot=True)
-                ib.sleep(1)
+                ib.sleep(2)
+                ib.reqMarketDataType(1)
                 import math as _om
                 _tbid = ticker.bid
                 _task = ticker.ask
@@ -475,11 +480,12 @@ def check_options_exits(open_options: dict, ib=None) -> list[str]:
                 if mid and mid > 0:
                     curr_premium = float(mid)
                     pos["current_premium"] = curr_premium
+                    ibkr_live_ok = True
             except Exception:
                 pass
 
-        # yfinance fallback for current premium
-        if curr_premium is None:
+        # yfinance fallback — always run if IBKR snapshot returned nothing valid
+        if not ibkr_live_ok:
             try:
                 exp_str = pos.get("expiry_str", "")
                 strike  = pos.get("strike", 0)
@@ -489,8 +495,13 @@ def check_options_exits(open_options: dict, ib=None) -> list[str]:
                     df    = chain.calls if right == "C" else chain.puts
                     row   = df[df["strike"] == strike]
                     if not row.empty:
-                        curr_premium = float((row.iloc[0]["bid"] + row.iloc[0]["ask"]) / 2)
-                        pos["current_premium"] = curr_premium
+                        _bid = row.iloc[0]["bid"]
+                        _ask = row.iloc[0]["ask"]
+                        _mid = (_bid + _ask) / 2 if _bid > 0 and _ask > 0 else row.iloc[0].get("lastPrice", 0)
+                        if _mid and _mid > 0:
+                            curr_premium = float(_mid)
+                            pos["current_premium"] = curr_premium
+                            log.debug(f"Options price fallback (yfinance): {sym} premium=${curr_premium:.4f}")
             except Exception:
                 pass
 
