@@ -916,18 +916,30 @@ def _flatten_all_inner(ib_fallback: IB = None):
         if qty == 0:
             continue
         try:
-            contract = get_contract(sym, instrument)
             direction = info.get("direction", "LONG")
             close_action = "BUY" if direction == "SHORT" else "SELL"
-            order = MarketOrder(close_action, abs(int(qty)))
+            if instrument == "option":
+                from ib_async import Option as _FlatOpt
+                contract = _FlatOpt(sym, info["expiry_ibkr"], info["strike"], info["right"], "SMART", "USD")
+                try:
+                    eib.qualifyContracts(contract)
+                except Exception:
+                    pass
+                mkt = info.get("current_premium") or info.get("entry_premium") or 0.01
+                lp = max(round(float(mkt) * 0.90, 2), 0.01)
+                order = LimitOrder(close_action, abs(int(qty)), lp, tif="GTC")
+                log.warning(f"🚨 FLATTEN: LMT {close_action} {abs(int(qty))} {sym} OPT @${lp:.2f} ({direction})")
+            else:
+                contract = get_contract(sym, instrument)
+                order = MarketOrder(close_action, abs(int(qty)))
+                log.warning(f"🚨 FLATTEN: Market {close_action} {abs(int(qty))} {sym} ({direction})")
             eib.placeOrder(contract, order)
             _safe_del_trade(key)
             closed += 1
-            log.warning(f"🚨 FLATTEN: Market {close_action} {abs(int(qty))} {sym} ({direction})")
         except Exception as e:
             log.error(f"🚨 FLATTEN failed for {sym}: {e}")
 
-    log.warning(f"🚨 FLATTEN ALL complete — {closed} market orders placed, tracker cleared")
+    log.warning(f"🚨 FLATTEN ALL complete — {closed} orders placed, tracker cleared")
 
 
 def close_position(ib_unused, trade_key: str) -> str | None:
@@ -1571,12 +1583,14 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
         ask = getattr(ticker, 'ask', None)
         last = getattr(ticker, 'last', None)
 
-        # Determine limit price: bid → mid → last → current_premium
+        # Determine limit price: mid → bid → last → current_premium
         import math as _m
-        if bid and not _m.isnan(bid) and bid > 0:
-            limit_price = round(bid, 2)
-        elif bid and ask and not _m.isnan(bid) and not _m.isnan(ask) and bid > 0 and ask > 0:
+        _bid_ok = bid is not None and not _m.isnan(bid) and bid > 0
+        _ask_ok = ask is not None and not _m.isnan(ask) and ask > 0
+        if _bid_ok and _ask_ok:
             limit_price = round((bid + ask) / 2, 2)
+        elif _bid_ok:
+            limit_price = round(bid, 2)
         elif last and not _m.isnan(last) and last > 0:
             limit_price = round(last * 0.97, 2)  # 3% below last as safety
         else:

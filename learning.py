@@ -15,7 +15,25 @@ log = logging.getLogger("decifer.learning")
 TRADE_LOG_FILE   = CONFIG["trade_log"]
 ORDER_LOG_FILE   = CONFIG.get("order_log", "data/orders.json")
 SIGNALS_LOG_FILE = CONFIG.get("signals_log", "data/signals_log.jsonl")
+AUDIT_LOG_FILE   = CONFIG.get("audit_log", "data/audit_log.jsonl")
 CAPITAL_FILE     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "capital_base.json")
+
+
+# ── Immutable audit log ────────────────────────────────────────────────
+
+def _append_audit_event(event_type: str, **fields) -> None:
+    """Append one JSON line to the immutable audit log.
+
+    File is opened in append mode only — never overwritten or truncated.
+    This is the compliance trail for all order submissions and risk decisions.
+    """
+    record = {"ts": datetime.utcnow().isoformat() + "Z", "event": event_type, **fields}
+    os.makedirs(os.path.dirname(os.path.abspath(AUDIT_LOG_FILE)), exist_ok=True)
+    try:
+        with open(AUDIT_LOG_FILE, "a") as fh:
+            fh.write(json.dumps(record) + "\n")
+    except Exception as exc:
+        log.error(f"audit_log write failed: {exc} — event was: {record}")
 
 
 # ── Capital base tracking ──────────────────────────────────────────────
@@ -114,6 +132,16 @@ def log_order(order_record: dict):
     log.info(f"Order logged: {order_record.get('side')} {order_record.get('symbol')} "
              f"qty={order_record.get('qty')} @ ${order_record.get('price', 0):.2f} "
              f"[{order_record.get('status', 'SUBMITTED')}]")
+    _append_audit_event(
+        order_record.get("status", "SUBMITTED"),
+        symbol=order_record.get("symbol"),
+        order_id=order_record.get("order_id"),
+        side=order_record.get("side"),
+        qty=order_record.get("qty"),
+        order_type=order_record.get("order_type"),
+        limit_price=order_record.get("price"),
+        fill_price=order_record.get("fill_price"),
+    )
 
 
 def update_order_status(order_id: int, status: str, fill_price: float = None,

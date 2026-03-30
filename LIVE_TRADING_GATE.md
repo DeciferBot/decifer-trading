@@ -1,5 +1,5 @@
 # Live Trading Gate — Decifer Trading
-## Version 1.0 | 2026-03-29
+## Version 1.1 | 2026-03-30
 
 This document is the single source of truth for all criteria that must be met
 before live-money trading is permitted. Three sequential gates must be cleared in
@@ -13,7 +13,8 @@ order. No gate may be bypassed. Amit must explicitly sign off on each transition
 |------|--------|----------|
 | Gate 0 — Alpha Validation | **BLOCKED** | 0/50 closed trades with positive expectancy |
 | Gate 1 — Phase 1 Exit | Locked (requires Gate 0) | 0/200 closed trades |
-| Gate 2 — Live Trading | Locked (requires Gate 1) | Telegram not configured |
+| Gate 2 — Live Trading Prerequisites | Locked (requires Gate 1) | Telegram not configured |
+| Gate 3 — Founder Sign-Off | Locked (requires Gate 2) | Awaiting all prior gates |
 
 _Status is informational only. Authoritative check: `phase_gate.check_alpha_gate()` and `phase_gate.get_status()`._
 
@@ -86,6 +87,40 @@ All of the following must be true:
 ### Checked by
 
 `phase_gate.validate()` — returns a list of violation strings (empty = clear).
+
+---
+
+## Gate 3 — Founder Sign-Off
+
+_Requires Gate 2 to be cleared first. This gate is human-enforced — no code can substitute for it._
+
+Gates 0–2 are verified programmatically. Gate 3 is Amit's explicit, deliberate decision
+to deploy real capital. It cannot be automated or inferred.
+
+### Required actions (all must be completed in order)
+
+- [ ] **Read the full paper trading session log** covering ≥ 30 consecutive trading days
+- [ ] **Inspect the top 5 trades by absolute PnL** — confirm Gate 0 expectancy is not driven
+      by 1–2 outlier trades. If removing the top 2 trades flips expectancy negative, do not proceed.
+- [ ] **Confirm per-dimension IC** — at least 3 of 9 signal dimensions show positive
+      information coefficient over the paper trading period
+- [ ] **Review the weekly review logs** in `chief-decifer/state/sessions/` — no unresolved
+      action items, no systemic issues flagged
+- [ ] **Amit sets** `config["phase_gate"]["founder_approved_live"] = true` in `config.py`
+- [ ] **Amit commits** with message:
+      `chore(live-gate): founder approval — live trading authorised`
+
+### What "founder approved" means
+
+This is a deliberate acknowledgement that:
+1. You have read the evidence, not just the metrics
+2. You accept the risk of real capital loss
+3. The system's behaviour matches your expectations from watching it in paper mode
+
+### Enforcement
+
+`phase_gate.validate()` will be updated to check `founder_approved_live` before clearing Gate 2.
+Until that code change is made, this gate is human-process only.
 
 ---
 

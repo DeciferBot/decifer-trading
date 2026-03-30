@@ -457,7 +457,18 @@ def check_options_exits(open_options: dict, ib=None) -> list[str]:
                 ib.qualifyContracts(contract)
                 ticker = ib.reqMktData(contract, snapshot=True)
                 ib.sleep(1)
-                mid = (ticker.bid + ticker.ask) / 2 if ticker.bid and ticker.ask else ticker.last
+                import math as _om
+                _tbid = ticker.bid
+                _task = ticker.ask
+                _tlst = ticker.last
+                _bid_ok = _tbid is not None and not _om.isnan(_tbid) and _tbid > 0
+                _ask_ok = _task is not None and not _om.isnan(_task) and _task > 0
+                if _bid_ok and _ask_ok:
+                    mid = (_tbid + _task) / 2
+                elif _tlst is not None and not _om.isnan(_tlst) and _tlst > 0:
+                    mid = _tlst
+                else:
+                    mid = None
                 ib.cancelMktData(contract)
                 if mid and mid > 0:
                     curr_premium = float(mid)

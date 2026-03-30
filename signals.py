@@ -1153,6 +1153,7 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
     # completely avoiding the thread-safety bug (GitHub issue #2557).
     # Falls back to sequential if multiprocessing fails (e.g. fork issues).
     all_results = []
+    failures = 0
     args_list = [
         (sym,
          news_data.get(sym, {}).get("news_score", 0),
@@ -1171,8 +1172,10 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
                     if sym in news_data:
                         data["news"] = news_data[sym]
                     all_results.append(data)
+                else:
+                    failures += 1
             except Exception:
-                pass
+                failures += 1
     except Exception as e:
         # Fallback: sequential scoring if process pool fails
         logging.warning(f"Process pool failed ({e}), falling back to sequential scoring")
@@ -1183,8 +1186,18 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
                     if sym in news_data:
                         data["news"] = news_data[sym]
                     all_results.append(data)
+                else:
+                    failures += 1
             except Exception:
-                pass
+                failures += 1
+
+    total = len(symbols)
+    if total > 0 and failures / total > 0.8:
+        logging.critical(
+            f"score_universe: {failures}/{total} symbols failed data fetch "
+            f"— aborting scan cycle to prevent low-confidence orders"
+        )
+        return [], []
 
     all_sorted = sorted(all_results, key=lambda x: x["score"], reverse=True)
     above_threshold = [r for r in all_sorted if r["score"] >= threshold]

@@ -120,6 +120,7 @@ dash = {
     "equity_history":       [],
     "paused":               False,
     "killed":               False,
+    "ibkr_disconnected":    False,
     "favourites":           [],
     "hot_reload_count":     0,
     "last_reload":          None,
@@ -406,6 +407,7 @@ def _reconnect_worker() -> None:
             ib.connect(host, port, clientId=client_id, readonly=False)
             log.info(f"✔ IBKR reconnected on attempt {attempt}.")
             dash["status"] = "connected"
+            dash["ibkr_disconnected"] = False
             _restore_subscriptions()
             break
         except Exception as exc:
@@ -433,6 +435,7 @@ def _on_disconnected() -> None:
 
     log.warning("⚠ IBKR connection lost — starting auto-reconnect…")
     dash["status"] = "disconnected"
+    dash["ibkr_disconnected"] = True
     t = threading.Thread(target=_reconnect_worker, name="ibkr-reconnect", daemon=True)
     t.start()
 
@@ -1521,7 +1524,7 @@ def _check_kill():
     """Check if kill switch was activated. Abort scan if so.
     Note: flatten_all now executes immediately from the HTTP handler
     via emergency IB connection — this just stops the scan."""
-    if dash.get("killed"):
+    if dash.get("killed") or dash.get("ibkr_disconnected"):
         dash["scanning"] = False
         return True
     return False
