@@ -223,6 +223,9 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
             "mtf_gate":       confluence.get("mtf_gate", "PASS"),
             "mtf_conflict":   confluence.get("mtf_conflict", ""),
             "mtf_daily_trend": confluence.get("mtf_daily_trend", "N/A"),
+            # Per-dimension score breakdown (for IC calculator + feedback loop)
+            "score_breakdown":     confluence.get("score_breakdown", {}),
+            "disabled_dimensions": confluence.get("disabled_dimensions", []),
             # Regime router state (for logging / dashboard)
             "regime_router":  regime_router,
         }
@@ -1064,6 +1067,42 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         score += candle_bonus
         candle_dir = +1 if cb > cd else (-1 if cd > cb else 0)
         dim_directions.append((candle_dir, candle_bonus))
+
+    # ── IC-WEIGHTED COMPOSITE ─────────────────────────────────────────────
+    # Replace the static equal-weight additive sum with a rolling IC-weighted
+    # composite.  Weight_i = normalised Spearman IC between dimension i and
+    # 5-day forward return (recomputed weekly via update_ic_weights()).
+    #
+    # Under equal weights (1/9 per dim) the result is IDENTICAL to the prior
+    # equal-weight sum, so this is a fully backward-compatible no-op at
+    # system startup before any IC data has accumulated.
+    #
+    # Scaling factor = _N (number of dimensions) ensures that with equal
+    # weights: sum(1/N * N * d_i) = sum(d_i) — same 0-50 scale as before.
+    try:
+        from ic_calculator import get_current_weights as _get_ic_weights, DIMENSIONS as _IC_DIMS
+        _icw = _get_ic_weights()
+        _N_DIMS = len(_IC_DIMS)
+        _ic_breakdown = {
+            "trend":     trend_pts,
+            "momentum":  momentum,
+            "squeeze":   squeeze_score,
+            "flow":      flow_score,
+            "breakout":  breakout_score,
+            "mtf":       mtf_score,
+            "news":      ns,
+            "social":    ss,
+            "reversion": rev_score_capped,
+        }
+        _ic_sum = sum(
+            _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v
+            for k, v in _ic_breakdown.items()
+        )
+        # candle_bonus is a non-dimension extra (0-3); add it on top of the
+        # weighted composite so candlestick confirmation still lifts the score.
+        score = int(round(_ic_sum)) + candle_bonus
+    except Exception:
+        pass  # keep the incrementally-accumulated score if IC module unavailable
 
     # ── SOFT GATE: MTF penalty (applied before cap) ──────
     mtf_gate_status = "PASS"

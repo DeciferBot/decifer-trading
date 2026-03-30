@@ -718,6 +718,25 @@ canvas{display:block;width:100% !important}
 <!-- VIEW: ALPHA DECAY -->
 <div class="view growth-view" id="view-alpha">
 
+  <!-- IC Weights Panel -->
+  <div class="card" id="ic-weights-card" style="margin-bottom:0">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="card-title" style="margin-bottom:0">IC-Weighted Signal Composite</div>
+      <div id="ic-status-pill" style="font-size:9px;padding:2px 8px;border-radius:10px;border:1px solid var(--muted);color:var(--muted2)">Loading…</div>
+    </div>
+    <div style="font-size:10px;color:var(--muted2);margin-bottom:10px">
+      Spearman IC (rank correlation) between each dimension and 5-day forward return — rolling 60-trade window.
+      Negative IC dimensions receive zero weight. Updated weekly.
+    </div>
+    <div id="ic-bars" style="display:grid;grid-template-columns:80px 1fr 52px 52px;gap:5px 8px;align-items:center;font-size:11px">
+      <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase">Dim</div>
+      <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase">Weight</div>
+      <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;text-align:right">IC</div>
+      <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;text-align:right">4w</div>
+    </div>
+    <div style="font-size:10px;color:var(--muted2);margin-top:8px" id="ic-updated">—</div>
+  </div>
+
   <!-- Summary KPIs -->
   <div class="metric-grid" id="ad-kpi-row" style="grid-template-columns:repeat(4,1fr)">
     <div class="metric"><div class="metric-label">Trades Analysed</div><div class="metric-val co" id="ad-count">—</div></div>
@@ -851,6 +870,95 @@ async function loadPortfolio() {
 
   } catch (err) {
     tableEl.innerHTML = `<div style="padding:20px;color:var(--red)">⚠ Could not load portfolio data: ${err.message}</div>`;
+  }
+}
+
+// ── IC Weights ─────────────────────────────────────────────
+const _IC_DIMS = ['trend','momentum','squeeze','flow','breakout','mtf','news','social','reversion'];
+const _IC_LABELS = {
+  trend:'TREND', momentum:'MOM', squeeze:'SQZ', flow:'FLOW', breakout:'BRK',
+  mtf:'MTF', news:'NEWS', social:'SOC', reversion:'REV'
+};
+
+async function loadICWeights() {
+  try {
+    const resp = await fetch('/api/ic_weights');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const d = await resp.json();
+    if (d.error) throw new Error(d.error);
+    renderICWeights(d);
+  } catch (err) {
+    document.getElementById('ic-status-pill').textContent = '⚠ ' + err.message;
+  }
+}
+
+function renderICWeights(d) {
+  const weights = d.weights || {};
+  const rawIC   = d.raw_ic  || {};
+  const history = d.history || [];
+  const isEqual = d.using_equal_weights;
+
+  const pill = document.getElementById('ic-status-pill');
+  if (isEqual) {
+    pill.textContent = 'Equal weights (insufficient data)';
+    pill.style.borderColor = 'var(--yellow)';
+    pill.style.color = 'var(--yellow)';
+  } else {
+    const nr = d.n_records || 0;
+    pill.textContent = `IC-weighted · n=${nr}`;
+    pill.style.borderColor = 'var(--green)';
+    pill.style.color = 'var(--green)';
+  }
+
+  if (d.updated) {
+    const updDt = new Date(d.updated);
+    document.getElementById('ic-updated').textContent =
+      'Updated ' + updDt.toLocaleDateString() + ' ' + updDt.toTimeString().slice(0,5);
+  }
+
+  // Build per-dimension bars
+  const maxW  = Math.max(...Object.values(weights), 1/9);
+  const barsEl = document.getElementById('ic-bars');
+
+  // Header row already in HTML; clear and re-render data rows
+  barsEl.innerHTML =
+    `<div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase">Dim</div>
+     <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase">Weight (${isEqual?'equal':'IC-weighted'})</div>
+     <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;text-align:right">IC</div>
+     <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;text-align:right">4w trend</div>`;
+
+  for (const dim of _IC_DIMS) {
+    const w    = weights[dim] || 0;
+    const ic   = rawIC[dim];
+    const pct  = (w * 100).toFixed(1) + '%';
+    const barW = Math.round((w / maxW) * 100);
+    const barCol = isEqual ? 'var(--muted)' : (w > 1/9 * 1.1 ? 'var(--green)' : w < 1/9 * 0.9 ? 'var(--red)' : 'var(--orange)');
+
+    // 4-week trend: compare most recent vs 4-weeks-ago weight for this dim
+    let trendTxt = '—';
+    if (history.length >= 2) {
+      const old_w = (history[0].weights || {})[dim] || 0;
+      const new_w = (history[history.length - 1].weights || {})[dim] || 0;
+      const delta = new_w - old_w;
+      if (Math.abs(delta) < 0.005) trendTxt = '<span style="color:var(--muted2)">→</span>';
+      else if (delta > 0) trendTxt = '<span style="color:var(--green)">↑</span>';
+      else trendTxt = '<span style="color:var(--red)">↓</span>';
+    }
+
+    const icTxt = (ic === null || ic === undefined)
+      ? '<span style="color:var(--muted2)">—</span>'
+      : `<span style="color:${ic >= 0 ? 'var(--green)' : 'var(--red)'}">${(ic*100).toFixed(1)}%</span>`;
+
+    barsEl.innerHTML +=
+      `<div style="color:var(--orange);font-size:10px;font-weight:600">${_IC_LABELS[dim]||dim}</div>
+       <div style="display:flex;align-items:center;gap:6px">
+         <div style="flex:1;background:var(--bg3);border-radius:2px;height:8px;overflow:hidden">
+           <div style="width:${barW}%;height:100%;background:${barCol};border-radius:2px;transition:width .4s"></div>
+         </div>
+         <span style="font-size:10px;color:var(--text);min-width:36px;text-align:right">${pct}</span>
+       </div>
+       <div style="text-align:right;font-size:10px">${icTxt}</div>
+       <div style="text-align:right;font-size:11px">${trendTxt}</div>`;
   }
 }
 
@@ -1048,10 +1156,10 @@ function switchTab(id, el) {
   // Load portfolio aggregation when switching to that tab
   if (id === 'portfolio') loadPortfolio();
 
-  // Alpha decay: load fresh data each time the tab opens
+  // Alpha decay + IC weights: load fresh data each time the tab opens
   if (id === 'alpha') {
     if (alphaDecayChart) { alphaDecayChart.destroy(); alphaDecayChart = null; }
-    setTimeout(loadAlphaDecay, 50);
+    setTimeout(() => { loadICWeights(); loadAlphaDecay(); }, 50);
   }
 
   // Charts render with 0 dimensions when their container is display:none.

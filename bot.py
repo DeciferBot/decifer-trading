@@ -1045,7 +1045,9 @@ def sync_orders_from_ibkr():
             else:
                 mapped_status = ibkr_status
 
-            fill_price = float(t.orderStatus.avgFillPrice) if t.orderStatus.avgFillPrice else 0
+            # Explicit None guard: avgFillPrice can be None (not-yet-filled) or 0.0 (rare edge case)
+            _fp = t.orderStatus.avgFillPrice
+            fill_price = float(_fp) if (_fp is not None and _fp > 0) else 0
             filled_qty = int(t.orderStatus.filled) if t.orderStatus.filled else 0
 
             _log_order({
@@ -1061,6 +1063,21 @@ def sync_orders_from_ibkr():
                 "fill_price":  fill_price if fill_price > 0 else None,
                 "source":      "ibkr_sync",
             })
+
+            # ── Sync fill back to active_trades (partial fill correction) ──
+            # When IBKR fills a BUY order, update the tracker with the actual fill
+            # price and qty. Prevents P&L and position sizing errors when fills
+            # differ from the original limit order parameters.
+            if mapped_status == "FILLED" and fill_price > 0 and order.action == "BUY" and instrument == "stock":
+                from orders import _safe_update_trade
+                sym = contract.symbol
+                total_qty = int(order.totalQuantity)
+                updates = {"entry": fill_price, "status": "FILLED"}
+                if 0 < filled_qty < total_qty:
+                    # Partial fill — shrink tracked qty to what actually executed
+                    updates["qty"] = filled_qty
+                    clog("WARNING", f"Partial fill: {sym} ordered {total_qty} filled {filled_qty} @ ${fill_price:.2f} — tracker qty adjusted")
+                _safe_update_trade(sym, updates)
 
         # ── Pass 2: Mark stale SUBMITTED orders as CANCELLED ──
         # An order is stale if it's SUBMITTED in our file but IBKR doesn't have it
@@ -1129,7 +1146,9 @@ def _on_order_status_event(trade):
         else:
             mapped_status = ibkr_status
 
-        fill_price = float(trade.orderStatus.avgFillPrice) if trade.orderStatus.avgFillPrice else 0
+        _fp = trade.orderStatus.avgFillPrice
+        fill_price = float(_fp) if (_fp is not None and _fp > 0) else 0
+        filled_qty = int(trade.orderStatus.filled) if trade.orderStatus.filled else 0
 
         _log_order({
             "order_id":    order.orderId,
@@ -1140,10 +1159,22 @@ def _on_order_status_event(trade):
             "price":       float(order.lmtPrice) if order.lmtPrice and abs(float(order.lmtPrice)) < 1e10 else (float(order.auxPrice) if order.auxPrice and abs(float(order.auxPrice)) < 1e10 else 0),
             "status":      mapped_status,
             "instrument":  instrument,
-            "filled_qty":  int(trade.orderStatus.filled) if trade.orderStatus.filled else 0,
+            "filled_qty":  filled_qty,
             "fill_price":  fill_price if fill_price > 0 else None,
             "source":      "ibkr_event",
         })
+
+        # ── Real-time fill → active_trades sync (partial fill correction) ──
+        if mapped_status == "FILLED" and fill_price > 0 and order.action == "BUY" and instrument == "stock":
+            from orders import _safe_update_trade
+            sym = contract.symbol
+            total_qty = int(order.totalQuantity)
+            updates = {"entry": fill_price, "status": "FILLED"}
+            if 0 < filled_qty < total_qty:
+                updates["qty"] = filled_qty
+                clog("WARNING", f"Partial fill event: {sym} ordered {total_qty} filled {filled_qty} @ ${fill_price:.2f} — tracker qty adjusted")
+            _safe_update_trade(sym, updates)
+
     except Exception as e:
         clog("ERROR", f"Order status event error: {e}")
 
@@ -2158,12 +2189,22 @@ def run_scan():
         dash["equity_history"] = dash["equity_history"][-2000:]
     save_equity_history(dash["equity_history"])
 
-    # ── Weekly review (Sunday) ────────────────────────────────
+    # ── Weekly review + IC weight update (Sunday) ───────────────
     today = datetime.now().weekday()  # 6 = Sunday
     if today == 6 and last_sunday_review != datetime.now().date():
         clog("ANALYSIS", "Running weekly performance review...")
         review = run_weekly_review()
         clog("ANALYSIS", f"Weekly review: {review[:200]}...")
+
+        # Recompute IC weights with the latest signals_log data
+        try:
+            from ic_calculator import update_ic_weights
+            new_weights = update_ic_weights()
+            clog("ANALYSIS", "IC weights updated: " +
+                 ", ".join(f"{k}={v:.3f}" for k, v in new_weights.items()))
+        except Exception as _ic_exc:
+            log.warning("IC weight update failed: %s", _ic_exc)
+
         last_sunday_review = datetime.now().date()
 
     dash["scanning"] = False
@@ -2480,6 +2521,47 @@ class DashHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"favourites": dash.get("favourites", [])}).encode())
+        elif self.path == "/api/ic_weights":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                from ic_calculator import (
+                    get_current_weights, get_ic_weight_history, EQUAL_WEIGHTS,
+                )
+                import json as _json, os as _os
+                weights = get_current_weights()
+                history = get_ic_weight_history(last_n=4)
+                # Read raw_ic and metadata from cache file if available
+                _wf = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                                    "data", "ic_weights.json")
+                raw_ic = {}
+                updated = None
+                n_records = 0
+                using_equal = True
+                if _os.path.exists(_wf):
+                    try:
+                        with open(_wf) as _f:
+                            _d = _json.load(_f)
+                        raw_ic     = _d.get("raw_ic", {})
+                        updated    = _d.get("updated")
+                        n_records  = _d.get("n_records", 0)
+                        using_equal = _d.get("using_equal_weights", True)
+                    except Exception:
+                        pass
+                payload = {
+                    "weights":            weights,
+                    "raw_ic":             raw_ic,
+                    "updated":            updated,
+                    "n_records":          n_records,
+                    "using_equal_weights": using_equal,
+                    "history":            history,
+                }
+            except Exception as exc:
+                log.warning("ic_weights error: %s", exc)
+                payload = {"error": str(exc), "weights": {}, "history": []}
+            self.wfile.write(json.dumps(payload).encode())
         elif self.path == "/api/alpha_decay":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
