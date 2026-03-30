@@ -1714,8 +1714,16 @@ def run_scan():
     # ── Regime detection ────────────────────────────────────
     clog("INFO", "Detecting market regime...")
     regime = get_market_regime(ib)
+    # Two-state signal router: reuse VIX already fetched above (no second fetch)
+    _vix_val = regime.get("vix") or 0
+    _rr_threshold = CONFIG.get("regime_router_vix_threshold", 20)
+    if CONFIG.get("regime_routing_enabled", True):
+        _router_state = "momentum" if _vix_val and _vix_val < _rr_threshold else "mean_reversion"
+    else:
+        _router_state = "disabled"
+    regime["regime_router"] = _router_state
     dash["regime"] = regime
-    clog("INFO", f"Regime: {regime['regime']} | VIX: {regime['vix']} | SPY: ${regime['spy_price']}")
+    clog("INFO", f"Regime: {regime['regime']} | VIX: {_vix_val} | SPY: ${regime['spy_price']} | Router: {_router_state}")
 
     # ── Detect externally closed positions (stop loss / take profit) ──
     check_external_closes(regime)
@@ -1859,9 +1867,10 @@ def run_scan():
         clog("ERROR", f"Social sentiment error: {e}")
 
     # ── Score universe ────────────────────────────────────────
-    clog("SCAN", "Scoring universe on 8 dimensions...")
+    clog("SCAN", "Scoring universe on 9 dimensions...")
     scored, all_scored = score_universe(universe, regime.get("regime", "UNKNOWN"),
-                                        news_data=news_sentiment, social_data=social_sentiment)
+                                        news_data=news_sentiment, social_data=social_sentiment,
+                                        regime_router=regime.get("regime_router", "unknown"))
     regime_name = regime.get('regime','UNKNOWN')
     used_threshold = get_regime_threshold(regime_name)
     clog("INFO", f"Scored: {len(scored)} above threshold ({used_threshold}/50), {len(all_scored)} total [{regime_name}]")

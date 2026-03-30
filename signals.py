@@ -37,6 +37,63 @@ except ImportError:
     STATSMODELS_AVAILABLE = False
 from config import CONFIG
 
+# ── REGIME SIGNAL ROUTER ─────────────────────────────────────────────────────
+
+def get_market_regime_vix() -> dict:
+    """
+    Fetch ^VIX and classify into the two-state signal-routing regime.
+
+    LOW_VOL  (VIX < regime_router_vix_threshold)  → "momentum"
+    HIGH_VOL (VIX >= regime_router_vix_threshold) → "mean_reversion"
+
+    Returns {"regime": str, "vix": float|None, "source": str}
+    """
+    threshold = CONFIG.get("regime_router_vix_threshold", 20)
+    try:
+        raw = _safe_download("^VIX", period="2d", interval="1h", progress=False, auto_adjust=True)
+        raw = _flatten_columns(raw)
+        if raw is None or len(raw) == 0:
+            log.warning("get_market_regime_vix: no VIX data — defaulting to momentum")
+            return {"regime": "momentum", "vix": None, "source": "fallback"}
+        vix_now = float(raw["Close"].iloc[-1])
+        regime = "momentum" if vix_now < threshold else "mean_reversion"
+        log.info(f"Regime router: {regime} (VIX={vix_now:.2f}, threshold={threshold})")
+        return {"regime": regime, "vix": round(vix_now, 2), "source": "^VIX"}
+    except Exception as e:
+        log.warning(f"get_market_regime_vix: VIX fetch failed ({e}) — defaulting to momentum")
+        return {"regime": "momentum", "vix": None, "source": "fallback"}
+
+
+def _regime_multipliers(regime_router: str) -> dict:
+    """
+    Return per-dimension score multipliers for the two-state routing regime.
+
+    "momentum":       TREND/MOMENTUM/SQUEEZE/FLOW/BREAKOUT/MTF × 1.3, REVERSION × 0.7
+    "mean_reversion": same dims × 0.7, REVERSION × 1.3
+    All other values (or regime_routing_enabled=False): all multipliers = 1.0
+
+    NEWS and SOCIAL are neutral (unaffected by regime routing).
+    """
+    _all_ones = {"trend": 1.0, "momentum": 1.0, "squeeze": 1.0, "flow": 1.0,
+                 "breakout": 1.0, "mtf": 1.0, "news": 1.0, "social": 1.0, "reversion": 1.0}
+
+    if not CONFIG.get("regime_routing_enabled", True):
+        return _all_ones
+
+    mom_up   = CONFIG.get("regime_router_momentum_mult",  1.3)
+    rev_down = CONFIG.get("regime_router_reversion_mult", 0.7)
+
+    if regime_router == "momentum":
+        return {"trend": mom_up, "momentum": mom_up, "squeeze": mom_up,
+                "flow": mom_up, "breakout": mom_up, "mtf": mom_up,
+                "news": 1.0, "social": 1.0, "reversion": rev_down}
+    if regime_router == "mean_reversion":
+        return {"trend": rev_down, "momentum": rev_down, "squeeze": rev_down,
+                "flow": rev_down, "breakout": rev_down, "mtf": rev_down,
+                "news": 1.0, "social": 1.0, "reversion": mom_up}
+    return _all_ones
+
+
 # ── PROCESS POOL for score_universe() ───────────────────────────
 # yfinance.download() is NOT thread-safe (GitHub issue #2557): concurrent
 # threads share a global dict (_DFS) causing cross-symbol data contamination.
@@ -60,9 +117,10 @@ def _fetch_one_process(args):
     Top-level function for ProcessPoolExecutor (must be picklable).
     Each process gets its own yfinance globals — no contamination.
     """
-    symbol, news_score, social_score = args
+    symbol, news_score, social_score, regime_router = args
     try:
-        return fetch_multi_timeframe(symbol, news_score=news_score, social_score=social_score)
+        return fetch_multi_timeframe(symbol, news_score=news_score, social_score=social_score,
+                                     regime_router=regime_router)
     except Exception:
         return None
 
@@ -101,7 +159,8 @@ def _flatten_columns(df):
     return df
 
 
-def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 0) -> dict | None:
+def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 0,
+                          regime_router: str = "unknown") -> dict | None:
     """
     Fetch data across 3 timeframes for confluence scoring.
     Weekly → Daily → 5-minute
@@ -144,7 +203,8 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
 
         # Multi-timeframe confluence score (with news + social as 7th/8th dimensions)
         confluence = compute_confluence(sig_5m, sig_1d, sig_1w,
-                                        news_score=news_score, social_score=social_score)
+                                        news_score=news_score, social_score=social_score,
+                                        regime_router=regime_router)
 
         return {
             "symbol":       symbol,
@@ -163,6 +223,8 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
             "mtf_gate":       confluence.get("mtf_gate", "PASS"),
             "mtf_conflict":   confluence.get("mtf_conflict", ""),
             "mtf_daily_trend": confluence.get("mtf_daily_trend", "N/A"),
+            # Regime router state (for logging / dashboard)
+            "regime_router":  regime_router,
         }
 
     except Exception as e:
@@ -649,7 +711,8 @@ def timeframe_alignment_check(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | 
 
 
 def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
-                       news_score: int = 0, social_score: int = 0) -> dict:
+                       news_score: int = 0, social_score: int = 0,
+                       regime_router: str = "unknown") -> dict:
     """
     Decifer 2.0 — 9-dimension scoring engine.
 
@@ -729,10 +792,16 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # ── Dimension flags — read once, guard each section ───────────
     _flags = CONFIG.get("dimension_flags", {})
     def _enabled(name: str) -> bool:
-        on = _flags.get(name, True)
+        on = bool(_flags.get(name, True))  # bool() coerces int 0/1; str "False" is truthy — flags must be Python bool False
         if not on:
             disabled_dimensions.append(name)
         return on
+
+    # ── Regime-gated score multipliers ────────────────────────────
+    # Apply a scalar multiplier to each dimension's contribution based on
+    # the two-state VIX routing regime. Multiplier = 1.0 when routing is
+    # disabled (config flag) or regime is unknown — zero-cost no-op.
+    _rmult = _regime_multipliers(regime_router)
 
     # ── 1. TREND (0-10) — EMA alignment quality × ADX strength ──
     # Score measures how cleanly aligned the EMAs are, regardless of
@@ -757,7 +826,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         elif "BUY" in sig_5m["signal"] or "SELL" in sig_5m["signal"]:
             base_trend = 4  # Signal without full alignment
             trend_dir = +1 if "BUY" in sig_5m["signal"] else -1
-        trend_pts = int(base_trend * adx_mult)
+        trend_pts = int(round(int(base_trend * adx_mult) * _rmult["trend"]))
         score += trend_pts
         dim_directions.append((trend_dir, trend_pts))
 
@@ -785,6 +854,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         elif mfi_dist > 0:
             momentum = 2    # Weak but non-neutral
         mom_dir = +1 if mfi > 50 else (-1 if mfi < 50 else 0)
+        momentum = int(round(momentum * _rmult["momentum"]))
         score += momentum
         dim_directions.append((mom_dir, momentum))
 
@@ -815,7 +885,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             if 0.1 < bb_dist < 0.3:
                 squeeze_score = 3   # Healthy position, room to run
             squeeze_dir = +1 if bb_pos > 0.5 else (-1 if bb_pos < 0.5 else 0)
-        squeeze_score = min(squeeze_score, 10)
+        squeeze_score = int(round(min(squeeze_score, 10) * _rmult["squeeze"]))
         score += squeeze_score
         dim_directions.append((squeeze_dir, squeeze_score))
 
@@ -853,7 +923,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             flow_dir = vwap_dir  # Strong VWAP signal wins
         else:
             flow_dir = obv_dir   # Near VWAP — OBV wins
-        flow_score = min(flow_score, 10)
+        flow_score = int(round(min(flow_score, 10) * _rmult["flow"]))
         score += flow_score
         dim_directions.append((flow_dir, flow_score))
 
@@ -879,7 +949,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
                 breakout_score = 4
             elif vr >= 1.5:
                 breakout_score = 2
-        breakout_score = min(breakout_score, 10)
+        breakout_score = int(round(min(breakout_score, 10) * _rmult["breakout"]))
         score += breakout_score
         dim_directions.append((breakout_dir, breakout_score))
 
@@ -889,7 +959,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     mtf_score = 0
     mtf_dir = 0
     if _enabled("mtf"):
-        mtf_score = int((agree / total_tf) * 10)
+        mtf_score = int(round(int((agree / total_tf) * 10) * _rmult["mtf"]))
         score += mtf_score
         # MTF direction = majority of timeframes
         mtf_dir = +1 if buy_signals > sell_signals else (-1 if sell_signals > buy_signals else 0)
@@ -899,7 +969,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # news_score is pre-computed by news.py (keyword + Claude two-tier)
     ns = 0
     if _enabled("news"):
-        ns = min(10, max(0, news_score))
+        ns = int(round(min(10, max(0, news_score)) * _rmult["news"]))
         score += ns
         # News direction is embedded in the score sign from news.py
         # (positive = bullish news, negative = bearish) — but here we get
@@ -910,7 +980,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # social_score from social_sentiment.py (Reddit mention velocity + VADER)
     ss = 0
     if _enabled("social"):
-        ss = min(10, max(0, social_score))
+        ss = int(round(min(10, max(0, social_score)) * _rmult["social"]))
         score += ss
         dim_directions.append((+1 if social_score > 0 else (-1 if social_score < 0 else 0), ss))
 
@@ -975,7 +1045,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
                 zscore_pts = 1
 
             reversion_score = vr_pts + ou_pts + zscore_pts
-        rev_score_capped = min(reversion_score, 10)
+        rev_score_capped = int(round(min(reversion_score, 10) * _rmult["reversion"]))
         score += rev_score_capped
         # Reversion direction: z-score tells us which way to trade.
         # Positive z = price above mean → SHORT (fade it)
@@ -1097,6 +1167,8 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         },
         # Dimensions that were zeroed by a False flag (for diagnostics / dashboard)
         "disabled_dimensions": disabled_dimensions,
+        # Regime routing state that produced these scores
+        "regime_router":       regime_router,
     }
 
 
@@ -1128,7 +1200,8 @@ def get_regime_threshold(regime: str) -> int:
 
 
 def score_universe(symbols: list, regime: str = "UNKNOWN",
-                   news_data: dict = None, social_data: dict = None) -> tuple:
+                   news_data: dict = None, social_data: dict = None,
+                   regime_router: str | None = None) -> tuple:
     """
     Score all symbols in the universe.
 
@@ -1138,8 +1211,11 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
       all_scored      — list of ALL scored symbols regardless of threshold, sorted
                         descending. Use this for IC logging and analysis.
 
-    news_data: optional {symbol: news_sentiment_dict} from news.py
-    social_data: optional {symbol: social_sentiment_dict} from social_sentiment.py
+    news_data:     optional {symbol: news_sentiment_dict} from news.py
+    social_data:   optional {symbol: social_sentiment_dict} from social_sentiment.py
+    regime_router: two-state routing regime ("momentum"|"mean_reversion"|"unknown").
+                   If None and regime_routing_enabled is True, fetches ^VIX to compute
+                   it. Pass the value from bot.py to avoid a duplicate VIX fetch.
     """
     if news_data is None:
         news_data = {}
@@ -1147,6 +1223,15 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
         social_data = {}
 
     threshold = get_regime_threshold(regime)
+
+    # ── Determine two-state signal routing regime ────────────────
+    if regime_router is None:
+        if CONFIG.get("regime_routing_enabled", True):
+            vix_regime = get_market_regime_vix()
+            regime_router = vix_regime["regime"]
+            log.info(f"score_universe regime router: {regime_router} (VIX={vix_regime.get('vix')})")
+        else:
+            regime_router = "unknown"
 
     # ── PARALLEL SCORING via ProcessPoolExecutor ────────────────
     # Each worker is a separate process with its own yfinance globals,
@@ -1157,7 +1242,8 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
     args_list = [
         (sym,
          news_data.get(sym, {}).get("news_score", 0),
-         int(social_data.get(sym, {}).get("social_score", 0)))
+         int(social_data.get(sym, {}).get("social_score", 0)),
+         regime_router)
         for sym in symbols
     ]
 
@@ -1179,9 +1265,10 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
     except Exception as e:
         # Fallback: sequential scoring if process pool fails
         logging.warning(f"Process pool failed ({e}), falling back to sequential scoring")
-        for sym, ns, ss in args_list:
+        for sym, ns, ss, rr in args_list:
             try:
-                data = fetch_multi_timeframe(sym, news_score=ns, social_score=ss)
+                data = fetch_multi_timeframe(sym, news_score=ns, social_score=ss,
+                                             regime_router=rr)
                 if data:
                     if sym in news_data:
                         data["news"] = news_data[sym]

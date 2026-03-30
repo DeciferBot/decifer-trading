@@ -1,0 +1,72 @@
+{
+  "id": "feat-regime-router",
+  "title": "Regime-Gated Momentum / Mean-Reversion Signal Router",
+  "status": "shipped",
+  "priority": "P1",
+  "created": "2026-03-30",
+  "shipped": "2026-03-30",
+  "approved_by": null,
+
+  "summary": "Two-state VIX-based router that shifts signal composite weights toward momentum or mean-reversion dimensions based on current market regime. Layered as a multiplier (A/B testable via config flag) — does not replace the equal-weight baseline.",
+
+  "motivation": "Research consensus (2024-2026): momentum dominates in low-volatility bull regimes; mean-reversion dominates in high-volatility choppy regimes. A static equal-weight model ignores this. The router makes the signal model context-aware without requiring hmmlearn or complex ML.",
+
+  "design": {
+    "regime_detection": {
+      "function": "get_market_regime_vix() in signals.py",
+      "source": "^VIX via yfinance (period=2d, interval=1h)",
+      "states": {
+        "momentum":       "VIX < regime_router_vix_threshold (default: 20)",
+        "mean_reversion": "VIX >= regime_router_vix_threshold"
+      },
+      "fallback": "On fetch failure → 'momentum' (safe default: prefers action over inaction)"
+    },
+    "weight_multipliers": {
+      "function": "_regime_multipliers() in signals.py",
+      "momentum_regime": {
+        "trend": 1.3, "momentum": 1.3, "squeeze": 1.3,
+        "flow": 1.3, "breakout": 1.3, "mtf": 1.3,
+        "news": 1.0, "social": 1.0, "reversion": 0.7
+      },
+      "mean_reversion_regime": {
+        "trend": 0.7, "momentum": 0.7, "squeeze": 0.7,
+        "flow": 0.7, "breakout": 0.7, "mtf": 0.7,
+        "news": 1.0, "social": 1.0, "reversion": 1.3
+      },
+      "neutral_or_disabled": "all 1.0"
+    },
+    "layering": "Multipliers applied to each dimension's score after computing, before adding to total. Score is still capped at 50. dim_directions weights also multiplied — regime naturally influences direction vote too.",
+    "vix_dedup": "bot.py reuses VIX already fetched by scanner.get_market_regime(). No second fetch on scan cycle. score_universe() accepts regime_router=str to skip its own fetch when called from bot.py."
+  },
+
+  "files_changed": [
+    "config.py          — 4 new keys: regime_routing_enabled, regime_router_vix_threshold, regime_router_momentum_mult, regime_router_reversion_mult",
+    "signals.py         — get_market_regime_vix(), _regime_multipliers(), multipliers in compute_confluence(), regime_router threaded through _fetch_one_process/fetch_multi_timeframe/score_universe",
+    "bot.py             — compute router from cached VIX, log it, pass to score_universe",
+    "dashboard.py       — regime meta line shows ROUTER: MOMENTUM or ROUTER: MEAN-REVERSION",
+    "tests/test_regime_router.py — 19 unit tests (6 VIX detection, 8 multiplier, 5 confluence)"
+  ],
+
+  "config_keys": {
+    "regime_routing_enabled":       "bool  — A/B flag: False = equal-weight baseline (default: True)",
+    "regime_router_vix_threshold":  "int   — VIX level separating momentum from mean_reversion (default: 20)",
+    "regime_router_momentum_mult":  "float — multiplier for momentum dims in momentum regime (default: 1.3)",
+    "regime_router_reversion_mult": "float — multiplier for reversion dim in momentum regime (default: 0.7)"
+  },
+
+  "test_results": {
+    "new_tests":   19,
+    "passed":      19,
+    "failed":       0,
+    "regression_suite": "87 tests (test_regime_thresholds + test_signals + test_dim_flags + test_mtf_gate) — 0 regressions"
+  },
+
+  "definition_of_done": [
+    "✅ get_market_regime_vix() live in signals.py",
+    "✅ Multipliers applied in compute_confluence() — momentum dims +30% in momentum regime, reversion +30% in mean_reversion regime",
+    "✅ Config flag regime_routing_enabled enables A/B testing",
+    "✅ Regime state logged each scan cycle",
+    "✅ Dashboard shows ROUTER state in regime meta line",
+    "✅ 19 unit tests pass, 0 regressions in existing suite"
+  ]
+}

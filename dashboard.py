@@ -1790,7 +1790,9 @@ function updateRegime(regime) {
   };
   box.className = 'regime-box ' + (classMap[regime.regime] || 'unknown');
   label.textContent = regime.regime || 'UNKNOWN';
-  meta.textContent  = `VIX: ${regime.vix || '—'} | SPY: $${regime.spy_price || '—'}`;
+  const routerStr = regime.regime_router && regime.regime_router !== 'disabled'
+    ? ` | ROUTER: ${regime.regime_router.replace('_', '-').toUpperCase()}` : '';
+  meta.textContent  = `VIX: ${regime.vix || '—'} | SPY: $${regime.spy_price || '—'}${routerStr}`;
   pill.textContent  = 'REGIME: ' + (regime.regime || '—');
 }
 

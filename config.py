@@ -152,6 +152,17 @@ CONFIG = {
     "regime_threshold_bear_min":      15,   # Floor for BEAR_TRENDING
     "regime_threshold_choppy_min":    12,   # Floor for CHOPPY
 
+    # ── REGIME SIGNAL ROUTER ──────────────────────────────────
+    # Two-state VIX router: upweights momentum dims (TREND, MOMENTUM, SQUEEZE,
+    # FLOW, BREAKOUT, MTF) in low-vol markets, upweights REVERSION in high-vol.
+    # Layered as a multiplier — set regime_routing_enabled: False for equal-weight
+    # A/B baseline without code changes.
+    "regime_routing_enabled":       True,   # A/B flag: False = equal weights
+    "regime_router_vix_threshold":  20,     # VIX < 20 → "momentum"; >= 20 → "mean_reversion"
+    "regime_router_momentum_mult":  1.3,    # Momentum dim multiplier in momentum regime
+    "regime_router_reversion_mult": 0.7,    # Reversion dim multiplier in momentum regime
+    #                                         (roles invert in mean_reversion regime)
+
     # ── CANDLESTICK CONFIRMATION GATE ────────────────────────
     # When True, a BUY or SELL signal must have at least one confirming
     # candlestick pattern (candle_bull or candle_bear > 0) or it is

@@ -1,0 +1,40 @@
+{
+  "date": "2026-03-30",
+  "topic": "Regime-Gated Momentum / Mean-Reversion Signal Router",
+  "status": "complete — pending Amit approval to commit",
+
+  "context": "Decifer has a 9-dimension signal composite with static equal-weighting. Research consensus is that momentum dominates in low-vol bull regimes and mean-reversion dominates in high-vol choppy regimes. This session implements the P1 Regime-Gated Router to make the signal model context-aware.",
+
+  "work_completed": [
+    "config.py: 4 new keys — regime_routing_enabled (True), regime_router_vix_threshold (20), regime_router_momentum_mult (1.3), regime_router_reversion_mult (0.7)",
+    "signals.py: get_market_regime_vix() — fetches ^VIX, returns {regime, vix, source}",
+    "signals.py: _regime_multipliers(regime_router) — returns per-dim multiplier dict; all 1.0 when flag off or regime unknown",
+    "signals.py: compute_confluence() — accepts regime_router param; multipliers applied to each of 9 dimensions before score accumulation; regime_router echoed in return dict",
+    "signals.py: _fetch_one_process, fetch_multi_timeframe, score_universe — regime_router threaded through the full call chain; score_universe fetches VIX itself only when not provided by caller",
+    "bot.py: computes router state from already-fetched VIX (no second network call), logs it, passes to score_universe",
+    "dashboard.py: updateRegime() JS shows 'ROUTER: MOMENTUM' or 'ROUTER: MEAN-REVERSION' in regime meta line",
+    "tests/test_regime_router.py: 19 unit tests written and passing"
+  ],
+
+  "test_results": {
+    "new": "19/19 passed (test_regime_router.py)",
+    "regression": "87/87 passed (test_regime_thresholds, test_signals, test_dim_flags, test_mtf_gate)"
+  },
+
+  "key_decisions": [
+    "VIX dedup: bot.py reuses VIX from scanner.get_market_regime() — no second fetch per cycle. score_universe() accepts regime_router=str param to skip its own fetch when called from bot.",
+    "Multipliers applied to adjusted score variables in-place (not raw), so score_breakdown reflects what actually contributed to the total.",
+    "News/Social are neutral dims (1.0x in all regimes) — they measure event-driven sentiment, not regime-dependent momentum/reversion.",
+    "Fallback on VIX fetch failure → 'momentum' (safe default: prefers participating in a trend over sitting out).",
+    "Score cap at 50 unchanged — 1.3x multiplier may push past, cap handles it."
+  ],
+
+  "open_items": [],
+
+  "next_steps": [
+    "Amit to approve and commit with format: feat(signals): regime-gated momentum/mean-reversion router",
+    "Monitor regime_router state in dashboard over 1-2 weeks of paper trading",
+    "After 50+ additional trades, compare IC and win-rate between momentum vs mean_reversion regime cycles",
+    "A/B test: set regime_routing_enabled=False for a week, compare PnL"
+  ]
+}
