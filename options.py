@@ -452,7 +452,7 @@ def check_options_exits(open_options: dict, ib=None) -> list[str]:
             try:
                 from ib_async import Option as IBOption
                 contract = IBOption(
-                    sym, pos["expiry_ibkr"],
+                    pos["symbol"], pos["expiry_ibkr"],
                     pos["strike"], pos["right"],
                     exchange="SMART", currency="USD",
                 )

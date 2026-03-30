@@ -920,7 +920,7 @@ def _flatten_all_inner(ib_fallback: IB = None):
             close_action = "BUY" if direction == "SHORT" else "SELL"
             if instrument == "option":
                 from ib_async import Option as _FlatOpt
-                contract = _FlatOpt(sym, info["expiry_ibkr"], info["strike"], info["right"], "SMART", "USD")
+                contract = _FlatOpt(sym, info["expiry_ibkr"], info["strike"], info["right"], exchange="SMART", currency="USD")
                 try:
                     eib.qualifyContracts(contract)
                 except Exception:
@@ -1569,7 +1569,8 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
             pos["expiry_ibkr"],
             pos["strike"],
             pos["right"],
-            "SMART", "USD"
+            exchange="SMART",
+            currency="USD",
         )
         ib.qualifyContracts(option_contract)
 
@@ -1602,7 +1603,8 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
         ib.cancelMktData(option_contract)
 
         sell_order = LimitOrder("SELL", pos["contracts"], limit_price,
-                                account=CONFIG["active_account"])
+                                account=CONFIG["active_account"],
+                                tif="DAY")
         sell_order.outsideRth = False
         opt_sell_trade = ib.placeOrder(option_contract, sell_order)
 
