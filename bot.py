@@ -1703,12 +1703,13 @@ def run_scan():
 
     clog("INFO", f"Portfolio: ${pv:,.2f} | DayP&L: ${pnl:+,.2f} | Positions: {len(get_open_positions())}")
 
-    # ── Check options exits (profit target / stop loss / DTE) ────────
-    check_options_positions()
-
     # ── Refresh position prices from IBKR (always live, even when 0 symbols score) ──
+    # Must run BEFORE check_options_positions so exit checks use current-cycle prices.
     update_positions_from_ibkr(ib)
     dash["positions"] = get_open_positions()
+
+    # ── Check options exits (profit target / stop loss / DTE) ────────
+    check_options_positions()
 
     # ── Regime detection ────────────────────────────────────
     clog("INFO", "Detecting market regime...")

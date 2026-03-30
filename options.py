@@ -445,8 +445,10 @@ def check_options_exits(open_options: dict, ib=None) -> list[str]:
         entry_premium = pos.get("entry_premium", 0)
         curr_premium  = pos.get("current_premium")
 
-        # Try to get current premium from IBKR if available
-        if ib and curr_premium is None:
+        # Always fetch live premium from IBKR when a connection is available.
+        # Do NOT guard on curr_premium is None — update_positions_from_ibkr always
+        # sets it, so that guard made the live fetch unreachable every cycle.
+        if ib:
             try:
                 from ib_async import Option as IBOption
                 contract = IBOption(
