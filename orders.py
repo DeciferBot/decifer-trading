@@ -464,6 +464,11 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 log.warning(f"Sector block for {symbol}: {sec_reason}")
                 return False
 
+            # ── Reserve slot — closes TOCTOU gap between check and submission ──
+            # A second execute_buy thread for the same symbol will now see this entry
+            # and exit early. Replaced with the full entry after order placement.
+            active_trades[symbol] = {"status": "RESERVED", "symbol": symbol}
+
         # ── Duplicate open-order guard (prop-duplicate) ────────────────
         # Ask IBKR directly whether a BUY order for this symbol is already live.
         # This catches restarts mid-session or rapid double-scan firings.
@@ -472,6 +477,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 log.warning(
                     f"Skipping duplicate order for {symbol} — open order already exists"
                 )
+                _safe_del_trade(symbol)  # release reservation
                 return False
 
     try:
@@ -743,6 +749,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         return True
 
     except Exception as e:
+        _safe_del_trade(symbol)  # clean up any reservation or partial entry if order failed
         log.error(f"Buy failed {symbol}: {e}")
         return False
 
@@ -1321,7 +1328,9 @@ def update_positions_from_ibkr(ib: IB):
                 except Exception as readd_err:
                     log.error(f"Failed to re-add {ibkr_key}: {readd_err}")
 
-        for key, trade in active_trades.items():
+        with _trades_lock:
+            trades_snapshot = dict(active_trades)
+        for key, trade in trades_snapshot.items():
             is_option = trade.get("instrument") == "option"
             sym = trade.get("symbol", key)
             entry = trade.get("entry", 0)
@@ -1381,8 +1390,10 @@ def get_open_positions() -> list:
     Injects '_trade_key' into each position so the dashboard close button
     can send the correct composite key (stock vs option safe).
     """
+    with _trades_lock:
+        snapshot = list(active_trades.items())
     result = []
-    for key, trade in active_trades.items():
+    for key, trade in snapshot:
         pos = dict(trade)
         pos["_trade_key"] = key
         result.append(pos)
@@ -1408,35 +1419,40 @@ def execute_buy_option(ib: IB, contract_info: dict,
         log.warning(f"Options market closed ({now_et.strftime('%H:%M ET')}) — skipping {opt_key}")
         return False
 
-    if opt_key in active_trades:
-        log.warning(f"Already holding {opt_key} — skipping")
-        return False
+    with _trades_lock:
+        if opt_key in active_trades:
+            log.warning(f"Already holding {opt_key} — skipping")
+            return False
 
-    if len(active_trades) >= CONFIG["max_positions"]:
-        log.warning(f"Max positions reached — skipping options trade {symbol}")
-        return False
+        if len(active_trades) >= CONFIG["max_positions"]:
+            log.warning(f"Max positions reached — skipping options trade {symbol}")
+            return False
 
-    # ── FIX #1+3: Cross-instrument + combined exposure check ──────
-    n_contracts = contract_info["contracts"]
-    mid_price   = contract_info["mid"]
-    est_option_value = n_contracts * mid_price * 100  # total premium outlay
+        # ── FIX #1+3: Cross-instrument + combined exposure check ──────
+        n_contracts = contract_info["contracts"]
+        mid_price   = contract_info["mid"]
+        est_option_value = n_contracts * mid_price * 100  # total premium outlay
 
-    exp_ok, exp_reason = check_combined_exposure(
-        symbol, est_option_value, list(active_trades.values()),
-        portfolio_value, instrument="option"
-    )
-    if not exp_ok:
-        log.warning(f"Combined exposure block for {symbol} options: {exp_reason}")
-        return False
+        exp_ok, exp_reason = check_combined_exposure(
+            symbol, est_option_value, list(active_trades.values()),
+            portfolio_value, instrument="option"
+        )
+        if not exp_ok:
+            log.warning(f"Combined exposure block for {symbol} options: {exp_reason}")
+            return False
 
-    # ── FIX #2: Sector concentration check ────────────────────────
-    sec_ok, sec_reason = check_sector_concentration(
-        symbol, list(active_trades.values()),
-        portfolio_value  # regime not passed to execute_buy_option, default NORMAL
-    )
-    if not sec_ok:
-        log.warning(f"Sector block for {symbol} options: {sec_reason}")
-        return False
+        # ── FIX #2: Sector concentration check ────────────────────────
+        sec_ok, sec_reason = check_sector_concentration(
+            symbol, list(active_trades.values()),
+            portfolio_value  # regime not passed to execute_buy_option, default NORMAL
+        )
+        if not sec_ok:
+            log.warning(f"Sector block for {symbol} options: {sec_reason}")
+            return False
+
+        # ── Reserve slot — closes TOCTOU gap between check and submission ──
+        active_trades[opt_key] = {"status": "RESERVED", "symbol": symbol, "instrument": "option"}
+
     # Limit price slightly above mid to improve fill probability
     limit_price = round(mid_price * 1.01, 2)
 
@@ -1462,6 +1478,7 @@ def execute_buy_option(ib: IB, contract_info: dict,
         order_status = trade.orderStatus.status
         if order_status in ('Cancelled', 'Inactive', 'ApiCancelled', 'ValidationError'):
             log.error(f"Option order immediately rejected by IBKR for {opt_key}: {order_status}")
+            _safe_del_trade(opt_key)  # release reservation
             return False
 
         # Log the option order
@@ -1520,6 +1537,7 @@ def execute_buy_option(ib: IB, contract_info: dict,
         return True
 
     except Exception as e:
+        _safe_del_trade(opt_key)  # clean up reservation if order failed
         log.error(f"Option buy failed {symbol}: {e}")
         return False
 

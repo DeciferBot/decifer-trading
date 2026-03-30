@@ -242,8 +242,8 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
             open_dt  = datetime.fromisoformat(trade["open_time"])
             close_dt = datetime.now(timezone.utc)
             hold_minutes = int((close_dt - open_dt).total_seconds() / 60)
-        except Exception:
-            pass
+        except Exception as _e:
+            log.debug(f"hold_minutes unavailable for {trade.get('symbol')} (open_time={trade.get('open_time')!r}): {_e}")
 
     record = {
         "timestamp":      datetime.now(timezone.utc).isoformat(),

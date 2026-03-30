@@ -299,7 +299,7 @@ def find_best_contract(symbol: str,
 
     # ── Conviction scaling — mirror stock logic ──────────────────
     # Higher scores → larger options allocation, lower scores → smaller.
-    high_conv = CONFIG.get("high_conviction_score", 38)
+    high_conv = CONFIG.get("high_conviction_score", 30)  # match config.py default (was 38 — diverged)
     if score >= high_conv:
         conviction_mult = 1.5     # High conviction → 1.5x base risk
     elif score >= 32:

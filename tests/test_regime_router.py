@@ -22,7 +22,13 @@ import config as _config_mod
 if "signals" in sys.modules and not hasattr(sys.modules["signals"], "__file__"):
     del sys.modules["signals"]
 
+import signals as _signals_mod  # capture module reference for patch.object (see below)
 from signals import get_market_regime_vix, _regime_multipliers, compute_confluence
+# NOTE: other test files (test_signals.py, test_signal_dispatch.py) replace
+# sys.modules["signals"] at collection time with a new module object, so
+# patch("signals._safe_download") would target the wrong module at runtime.
+# patch.object(_signals_mod, ...) always targets THIS module, whose __dict__
+# is also get_market_regime_vix.__globals__, guaranteeing the mock is seen.
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -102,16 +108,16 @@ class TestGetMarketRegimeVix:
 
     def test_low_vix_returns_momentum(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_vix_threshold", 20)
-        with patch("signals._safe_download", return_value=_vix_df(14.5)), \
-             patch("signals._flatten_columns", side_effect=lambda df: df):
+        with patch.object(_signals_mod, "_safe_download", return_value=_vix_df(14.5)), \
+             patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df):
             result = get_market_regime_vix()
         assert result["regime"] == "momentum"
         assert result["vix"] == 14.5
 
     def test_high_vix_returns_mean_reversion(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_vix_threshold", 20)
-        with patch("signals._safe_download", return_value=_vix_df(28.0)), \
-             patch("signals._flatten_columns", side_effect=lambda df: df):
+        with patch.object(_signals_mod, "_safe_download", return_value=_vix_df(28.0)), \
+             patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df):
             result = get_market_regime_vix()
         assert result["regime"] == "mean_reversion"
         assert result["vix"] == 28.0
@@ -119,29 +125,29 @@ class TestGetMarketRegimeVix:
     def test_vix_exactly_at_threshold_returns_mean_reversion(self, monkeypatch):
         """VIX == threshold is NOT low-vol — boundary belongs to mean_reversion."""
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_vix_threshold", 20)
-        with patch("signals._safe_download", return_value=_vix_df(20.0)), \
-             patch("signals._flatten_columns", side_effect=lambda df: df):
+        with patch.object(_signals_mod, "_safe_download", return_value=_vix_df(20.0)), \
+             patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df):
             result = get_market_regime_vix()
         assert result["regime"] == "mean_reversion"
 
     def test_threshold_is_configurable(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_vix_threshold", 25)
-        with patch("signals._safe_download", return_value=_vix_df(24.9)), \
-             patch("signals._flatten_columns", side_effect=lambda df: df):
+        with patch.object(_signals_mod, "_safe_download", return_value=_vix_df(24.9)), \
+             patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df):
             result = get_market_regime_vix()
         assert result["regime"] == "momentum"
 
     def test_fetch_failure_defaults_to_momentum(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_vix_threshold", 20)
-        with patch("signals._safe_download", side_effect=Exception("network error")):
+        with patch.object(_signals_mod, "_safe_download", side_effect=Exception("network error")):
             result = get_market_regime_vix()
         assert result["regime"] == "momentum"
         assert result["source"] == "fallback"
 
     def test_empty_data_defaults_to_momentum(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_vix_threshold", 20)
-        with patch("signals._safe_download", return_value=None), \
-             patch("signals._flatten_columns", side_effect=lambda df: df):
+        with patch.object(_signals_mod, "_safe_download", return_value=None), \
+             patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df):
             result = get_market_regime_vix()
         assert result["regime"] == "momentum"
         assert result["source"] == "fallback"
