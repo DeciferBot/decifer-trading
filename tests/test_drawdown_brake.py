@@ -173,7 +173,9 @@ class TestInitHWMFromHistory:
         risk.init_equity_high_water_mark_from_history(history)
         assert risk._equity_high_water_mark == 115_000.0
 
-    def test_empty_list_is_noop_when_hwm_is_none(self):
+    def test_empty_list_is_noop_when_hwm_is_none(self, tmp_path, monkeypatch):
+        # No state file AND empty list → HWM stays None
+        monkeypatch.setattr(risk, "HWM_STATE_FILE", str(tmp_path / "nonexistent.json"))
         risk.init_equity_high_water_mark_from_history([])
         assert risk._equity_high_water_mark is None
 
@@ -193,3 +195,107 @@ class TestInitHWMFromHistory:
         history = [{"date": "2026-03-25 09:30", "value": 150_000.0}]
         risk.init_equity_high_water_mark_from_history(history)
         assert risk._equity_high_water_mark == 150_000.0
+
+
+# ---------------------------------------------------------------------------
+# (NEW) HWM state file persistence tests
+# ---------------------------------------------------------------------------
+
+class TestHWMStatePersistence:
+    """
+    Validates load_hwm_state() / save_hwm_state() and the updated
+    init_equity_high_water_mark_from_history() that checks the state file
+    before the (truncatable) equity history list.
+    """
+
+    def setup_method(self):
+        _reset()
+
+    def test_save_hwm_state_creates_valid_json(self, tmp_path, monkeypatch):
+        """save_hwm_state() must create a readable JSON file with 'hwm' and 'updated' keys."""
+        import json as _json
+        monkeypatch.setattr(risk, "HWM_STATE_FILE", str(tmp_path / "hwm_state.json"))
+        risk.save_hwm_state(123_456.78)
+
+        state_file = tmp_path / "hwm_state.json"
+        assert state_file.exists(), "hwm_state.json was not created"
+        data = _json.loads(state_file.read_text())
+        assert "hwm" in data
+        assert abs(data["hwm"] - 123_456.78) < 0.01
+        assert "updated" in data
+
+    def test_load_hwm_state_returns_saved_value(self, tmp_path, monkeypatch):
+        """load_hwm_state() must return exactly the value written by save_hwm_state()."""
+        monkeypatch.setattr(risk, "HWM_STATE_FILE", str(tmp_path / "hwm_state.json"))
+        risk.save_hwm_state(200_000.0)
+        loaded = risk.load_hwm_state()
+        assert loaded == pytest.approx(200_000.0)
+
+    def test_load_hwm_state_missing_file_returns_none(self, tmp_path, monkeypatch):
+        """load_hwm_state() with no file must return None (no crash)."""
+        monkeypatch.setattr(risk, "HWM_STATE_FILE",
+                            str(tmp_path / "nonexistent.json"))
+        assert risk.load_hwm_state() is None
+
+    def test_load_hwm_state_corrupt_file_returns_none(self, tmp_path, monkeypatch):
+        """load_hwm_state() with corrupt JSON must return None, not raise."""
+        state_file = tmp_path / "hwm_state.json"
+        state_file.write_text("{ not valid json }")
+        monkeypatch.setattr(risk, "HWM_STATE_FILE", str(state_file))
+        assert risk.load_hwm_state() is None
+
+    def test_truncated_history_without_state_file_misses_peak(self, tmp_path, monkeypatch):
+        """
+        Documents the original bug: 2000 truncated entries that don't include
+        the all-time peak produce a lower HWM when no state file is present.
+        """
+        monkeypatch.setattr(risk, "HWM_STATE_FILE",
+                            str(tmp_path / "nonexistent.json"))
+        all_time_peak = 200_000.0
+        truncated_history = [
+            {"date": f"2026-01-{i:04d}", "value": 100_000.0 + i}
+            for i in range(2000)
+        ]
+        risk.init_equity_high_water_mark_from_history(truncated_history)
+        assert risk._equity_high_water_mark < all_time_peak, (
+            "Without state file, truncated history should produce a lower HWM"
+        )
+
+    def test_state_file_restores_peak_lost_by_truncation(self, tmp_path, monkeypatch):
+        """
+        With state file holding the all-time peak (200k), even a truncated
+        history (max 101,999) seeds HWM at 200k after restart.
+        """
+        monkeypatch.setattr(risk, "HWM_STATE_FILE", str(tmp_path / "hwm_state.json"))
+        risk.save_hwm_state(200_000.0)
+
+        truncated_history = [
+            {"date": f"2026-01-{i:04d}", "value": 100_000.0 + i}
+            for i in range(2000)
+        ]
+        risk.init_equity_high_water_mark_from_history(truncated_history)
+        assert risk._equity_high_water_mark == pytest.approx(200_000.0), (
+            f"State file must restore all-time peak, got {risk._equity_high_water_mark:,.2f}"
+        )
+
+    def test_state_file_takes_priority_over_lower_history_peak(self, tmp_path, monkeypatch):
+        """State file 150k + history max 120k → HWM = 150k."""
+        monkeypatch.setattr(risk, "HWM_STATE_FILE", str(tmp_path / "hwm_state.json"))
+        risk.save_hwm_state(150_000.0)
+        history = [{"date": "2026-01-01", "value": 120_000.0}]
+        risk.init_equity_high_water_mark_from_history(history)
+        assert risk._equity_high_water_mark == pytest.approx(150_000.0)
+
+    def test_update_hwm_saves_to_state_file_on_new_peak(self, tmp_path, monkeypatch):
+        """
+        update_equity_high_water_mark() must call save_hwm_state() every time
+        a new all-time high is set so the state file stays current.
+        """
+        monkeypatch.setattr(risk, "HWM_STATE_FILE", str(tmp_path / "hwm_state.json"))
+        risk.update_equity_high_water_mark(100_000.0)   # init
+        risk.update_equity_high_water_mark(110_000.0)   # new high
+
+        loaded = risk.load_hwm_state()
+        assert loaded == pytest.approx(110_000.0), (
+            "State file must reflect the new all-time high after update"
+        )

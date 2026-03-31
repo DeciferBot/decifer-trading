@@ -287,3 +287,102 @@ class TestRegimeRoutingInConfluence:
         """1.3× multiplier on all momentum dims must not push score above 50."""
         result = self._score("momentum", monkeypatch)
         assert result["score"] <= 50
+
+
+# ── 4. PANIC/momentum inconsistency and state distribution ───────────────────
+
+class TestPanicMomentumInconsistency:
+    """
+    Documents the interaction gap between the 2-state VIX router and the
+    5-state regime classifier, and validates multiplier math properties.
+    """
+
+    def test_momentum_fallback_bias_on_vix_failure(self, monkeypatch):
+        """
+        When VIX fetch fails, get_market_regime_vix() ALWAYS returns 'momentum',
+        never 'mean_reversion'. Documents the asymmetric fallback bias.
+        """
+        monkeypatch.setitem(_config_mod.CONFIG, "regime_router_vix_threshold", 20)
+        with patch.object(_signals_mod, "_safe_download",
+                          side_effect=Exception("timeout")):
+            result = get_market_regime_vix()
+
+        assert result["regime"] == "momentum", (
+            "Fallback bias regression: VIX fetch failure must return 'momentum' "
+            "(documents asymmetric bias)"
+        )
+        assert result["source"] == "fallback"
+        assert result["vix"] is None
+
+    def test_vix_boundary_at_default_threshold(self, monkeypatch):
+        """
+        VIX < 20 → 'momentum', VIX >= 20 → 'mean_reversion' at default threshold=20.
+        Documents the distribution imbalance (typical calm-market VIX 12-18 is
+        always 'momentum').
+        """
+        monkeypatch.setitem(_config_mod.CONFIG, "regime_router_vix_threshold", 20)
+
+        calm_vix_values = [12.0, 14.5, 16.0, 18.0, 19.9]
+        high_vix_values = [20.0, 22.0, 25.0, 30.0, 45.0]
+
+        for vix in calm_vix_values:
+            with patch.object(_signals_mod, "_safe_download",
+                              return_value=_vix_df(vix)), \
+                 patch.object(_signals_mod, "_flatten_columns",
+                              side_effect=lambda df: df):
+                result = get_market_regime_vix()
+            assert result["regime"] == "momentum", (
+                f"VIX={vix} should be 'momentum' with threshold=20"
+            )
+
+        for vix in high_vix_values:
+            with patch.object(_signals_mod, "_safe_download",
+                              return_value=_vix_df(vix)), \
+                 patch.object(_signals_mod, "_flatten_columns",
+                              side_effect=lambda df: df):
+                result = get_market_regime_vix()
+            assert result["regime"] == "mean_reversion", (
+                f"VIX={vix} should be 'mean_reversion' with threshold=20"
+            )
+
+    def test_regime_multipliers_cover_all_nine_dimensions(self, monkeypatch):
+        """
+        _regime_multipliers() must return all 9 dimension keys with positive
+        values for both routing regimes and the unknown fallback. A missing
+        key would cause a KeyError in compute_confluence.
+        """
+        monkeypatch.setitem(_config_mod.CONFIG, "regime_routing_enabled", True)
+        _all_dims = {"trend", "momentum", "squeeze", "flow", "breakout",
+                     "mtf", "news", "social", "reversion"}
+
+        for regime in ("momentum", "mean_reversion", "unknown"):
+            mults = _regime_multipliers(regime)
+            assert set(mults.keys()) == _all_dims, (
+                f"Regime '{regime}' missing dimensions: "
+                f"{_all_dims - set(mults.keys())}"
+            )
+            for dim, val in mults.items():
+                assert val > 0, (
+                    f"Multiplier for '{dim}' in '{regime}' must be positive, got {val}"
+                )
+
+    def test_trend_effective_weight_exceeds_reversion_in_momentum_regime(self, monkeypatch):
+        """
+        In 'momentum' regime with equal IC weights (1/9 each):
+        effective_trend (1.3/9) must exceed effective_reversion (0.7/9).
+        Documents that combined suppression ordering is correct.
+        """
+        monkeypatch.setitem(_config_mod.CONFIG, "regime_routing_enabled", True)
+        monkeypatch.setitem(_config_mod.CONFIG, "regime_router_momentum_mult", 1.3)
+        monkeypatch.setitem(_config_mod.CONFIG, "regime_router_reversion_mult", 0.7)
+
+        mults = _regime_multipliers("momentum")
+        ic_weight = 1.0 / 9  # equal weight for all dims
+
+        effective_trend     = ic_weight * mults["trend"]
+        effective_reversion = ic_weight * mults["reversion"]
+
+        assert effective_trend > effective_reversion, (
+            f"trend ({effective_trend:.4f}) should > reversion ({effective_reversion:.4f}) "
+            "in momentum regime"
+        )

@@ -210,7 +210,7 @@ class TestNegativeICZeroWeight:
         raw["trend"]    = -0.5  # strongly negative → must be zeroed
         raw["momentum"] = -0.2  # negative → zero
 
-        weights = ic.normalize_ic_weights(raw)
+        weights, _ = ic.normalize_ic_weights(raw)
 
         assert weights["trend"]    == 0.0, "Negative IC must produce zero weight"
         assert weights["momentum"] == 0.0, "Negative IC must produce zero weight"
@@ -220,13 +220,13 @@ class TestNegativeICZeroWeight:
         raw = {d: 0.1 for d in DIMS}
         raw["squeeze"] = 0.0
 
-        weights = ic.normalize_ic_weights(raw)
+        weights, _ = ic.normalize_ic_weights(raw)
         assert weights["squeeze"] == 0.0
 
     def test_all_positive_ic_all_nonzero_weights(self):
         """All positive IC → every dimension gets a positive weight."""
         raw = {d: 0.1 for d in DIMS}
-        weights = ic.normalize_ic_weights(raw)
+        weights, _ = ic.normalize_ic_weights(raw)
         for d, w in weights.items():
             assert w > 0, f"Expected positive weight for {d}, got {w}"
 
@@ -243,7 +243,7 @@ class TestNegativeICZeroWeight:
             "social":   -0.05,
             "reversion": 0.05,
         }
-        weights = ic.normalize_ic_weights(raw)
+        weights, _ = ic.normalize_ic_weights(raw)
 
         assert weights["squeeze"]  == 0.0
         assert weights["flow"]     == 0.0
@@ -263,25 +263,25 @@ class TestEqualWeightFallback:
     def test_all_none_ic_returns_equal_weights(self):
         """All None IC → equal weights."""
         raw = {d: None for d in DIMS}
-        weights = ic.normalize_ic_weights(raw)
+        weights, _ = ic.normalize_ic_weights(raw)
         _assert_equal_weights(weights)
 
     def test_all_negative_ic_returns_equal_weights(self):
         """All negative IC → equal weights."""
         raw = {d: -0.2 for d in DIMS}
-        weights = ic.normalize_ic_weights(raw)
+        weights, _ = ic.normalize_ic_weights(raw)
         _assert_equal_weights(weights)
 
     def test_all_zero_ic_returns_equal_weights(self):
         """All zero IC → equal weights."""
         raw = {d: 0.0 for d in DIMS}
-        weights = ic.normalize_ic_weights(raw)
+        weights, _ = ic.normalize_ic_weights(raw)
         _assert_equal_weights(weights)
 
     def test_mixed_none_and_negative_returns_equal_weights(self):
         """Mix of None and negative → equal weights."""
         raw = {d: (None if i % 2 == 0 else -0.1) for i, d in enumerate(DIMS)}
-        weights = ic.normalize_ic_weights(raw)
+        weights, _ = ic.normalize_ic_weights(raw)
         _assert_equal_weights(weights)
 
 
@@ -300,7 +300,7 @@ class TestWeightsSumToOne:
          for i, d in enumerate(DIMS)},           # mixed
     ])
     def test_weights_sum_to_one(self, ic_scenario):
-        weights = ic.normalize_ic_weights(ic_scenario)
+        weights, _ = ic.normalize_ic_weights(ic_scenario)
         total = sum(weights.values())
         assert abs(total - 1.0) < 1e-9, (
             f"Weights sum to {total}, not 1.0 (scenario={ic_scenario})"
@@ -309,15 +309,80 @@ class TestWeightsSumToOne:
     def test_weights_always_all_dimensions_present(self):
         """Output must contain exactly the 9 canonical dimensions."""
         raw = {d: 0.1 for d in DIMS}
-        weights = ic.normalize_ic_weights(raw)
+        weights, _ = ic.normalize_ic_weights(raw)
         assert set(weights.keys()) == set(DIMS)
 
     def test_weights_non_negative(self):
         """No weight should ever be negative."""
         raw = {d: (-0.1 if i % 2 == 0 else 0.2) for i, d in enumerate(DIMS)}
-        weights = ic.normalize_ic_weights(raw)
+        weights, _ = ic.normalize_ic_weights(raw)
         for d, w in weights.items():
             assert w >= 0.0, f"Negative weight for {d}: {w}"
+
+
+# ---------------------------------------------------------------------------
+# Noise floor (ic_min_threshold) and HHI cap (max_single_weight)
+# ---------------------------------------------------------------------------
+
+class TestNoiseFlorAndHHICap:
+
+    def test_noise_floor_suppresses_below_threshold(self, monkeypatch):
+        """Dimensions with IC below the noise floor should receive zero weight."""
+        monkeypatch.setattr(ic, "_ic_cfg",
+                            lambda key, default: 0.05 if key == "ic_min_threshold" else default)
+        raw = {d: 0.1 for d in DIMS}
+        raw["news"]   = 0.02  # below 0.05 floor
+        raw["social"] = 0.03  # below 0.05 floor
+        weights, meta = ic.normalize_ic_weights(raw)
+        assert weights["news"]   == 0.0, "news IC below floor must be zeroed"
+        assert weights["social"] == 0.0, "social IC below floor must be zeroed"
+        assert meta["noise_floor_applied"] is True
+        assert "news"   in meta["dimensions_suppressed"]
+        assert "social" in meta["dimensions_suppressed"]
+
+    def test_noise_floor_zero_means_positive_ic_passes(self, monkeypatch):
+        """With ic_min_threshold=0.0 (Phase 1 default), any positive IC should pass."""
+        monkeypatch.setattr(ic, "_ic_cfg",
+                            lambda key, default: 0.0 if key == "ic_min_threshold" else default)
+        raw = {d: 0.01 for d in DIMS}  # all very small but positive
+        weights, meta = ic.normalize_ic_weights(raw)
+        for d, w in weights.items():
+            assert w > 0.0, f"{d} should pass with ic_min_threshold=0.0"
+        assert meta["noise_floor_applied"] is False
+        assert meta["dimensions_suppressed"] == []
+
+    def test_noise_floor_all_below_threshold_returns_equal_weights(self, monkeypatch):
+        """If all dimensions are below the noise floor, fall back to equal weights."""
+        monkeypatch.setattr(ic, "_ic_cfg",
+                            lambda key, default: 0.10 if key == "ic_min_threshold" else default)
+        raw = {d: 0.05 for d in DIMS}  # all below 0.10 floor
+        weights, meta = ic.normalize_ic_weights(raw)
+        _assert_equal_weights(weights)
+
+    def test_hhi_cap_clips_dominant_dimension(self, monkeypatch):
+        """If one dimension would exceed max_single_weight, it must be clipped."""
+        monkeypatch.setattr(ic, "_ic_cfg", lambda key, default: (
+            0.0  if key == "ic_min_threshold" else
+            0.40 if key == "max_single_weight" else default
+        ))
+        # Give trend a huge IC so it would otherwise dominate
+        raw = {d: 0.01 for d in DIMS}
+        raw["trend"] = 1.0
+        weights, meta = ic.normalize_ic_weights(raw)
+        assert weights["trend"] <= 0.40 + 1e-9, \
+            f"trend weight {weights['trend']:.3f} exceeds HHI cap 0.40"
+        assert meta["hhi_capped"] is True
+        assert abs(sum(weights.values()) - 1.0) < 1e-9, "weights must still sum to 1.0 after HHI cap"
+
+    def test_hhi_cap_not_triggered_when_within_limit(self, monkeypatch):
+        """No clipping if all weights are within the cap."""
+        monkeypatch.setattr(ic, "_ic_cfg", lambda key, default: (
+            0.0  if key == "ic_min_threshold" else
+            0.40 if key == "max_single_weight" else default
+        ))
+        raw = {d: 0.1 for d in DIMS}  # uniform — equal 1/9 ≈ 0.111, well below 0.40
+        weights, meta = ic.normalize_ic_weights(raw)
+        assert meta["hhi_capped"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -405,3 +470,108 @@ def _assert_equal_weights(weights: dict):
             f"Expected equal weight {1/N:.6f} for {d}, got {weights[d]}"
         )
     assert abs(sum(weights.values()) - 1.0) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# (NEW) IC Weight Initialization Edge Cases
+# ---------------------------------------------------------------------------
+
+class TestICInitializationEdgeCases:
+    """
+    Validates equal-weights fallback correctness, consistency, and JSON
+    edge-case handling. Addresses the risk that the fallback is wrong, cached
+    incorrectly, or silently swallowed for partial/corrupt JSON.
+    """
+
+    def test_equal_weights_sum_to_exactly_one(self):
+        """EQUAL_WEIGHTS constant must sum to exactly 1.0 (no floating-point drift)."""
+        total = sum(ic.EQUAL_WEIGHTS.values())
+        assert abs(total - 1.0) < 1e-9, (
+            f"EQUAL_WEIGHTS sums to {total}, not 1.0"
+        )
+
+    def test_equal_weights_contains_all_nine_dimensions(self):
+        """EQUAL_WEIGHTS must contain exactly the 9 canonical dimension keys."""
+        expected = {"trend", "momentum", "squeeze", "flow", "breakout",
+                    "mtf", "news", "social", "reversion"}
+        assert set(ic.EQUAL_WEIGHTS.keys()) == expected, (
+            f"EQUAL_WEIGHTS has wrong keys: {set(ic.EQUAL_WEIGHTS.keys())}"
+        )
+
+    def test_equal_weights_each_dimension_is_one_ninth(self):
+        """Each dimension's weight must be 1/9 (equal share)."""
+        for dim, w in ic.EQUAL_WEIGHTS.items():
+            assert abs(w - 1.0 / 9) < 1e-9, (
+                f"EQUAL_WEIGHTS[{dim!r}] = {w}, expected {1/9}"
+            )
+
+    def test_get_current_weights_consistent_across_two_calls(self, tmp_path, monkeypatch):
+        """
+        Calling get_current_weights() twice with no file must return identical
+        equal-weights dicts — no caching anomaly between calls.
+        """
+        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE",
+                            str(tmp_path / "nonexistent.json"))
+        w1 = ic.get_current_weights()
+        w2 = ic.get_current_weights()
+        assert w1 == w2, "Two successive calls with no file must return identical dicts"
+        _assert_equal_weights(w1)
+
+    def test_partial_json_missing_some_dimensions_triggers_fallback(self, tmp_path, monkeypatch):
+        """
+        A JSON file with only 4 of 9 dimensions must trigger the equal-weights
+        fallback, not silently use the partial weights.
+        """
+        partial = {
+            "weights": {
+                "trend": 0.3,
+                "momentum": 0.3,
+                "squeeze": 0.2,
+                "flow": 0.2,
+                # missing: breakout, mtf, news, social, reversion
+            }
+        }
+        f = tmp_path / "ic_weights.json"
+        f.write_text(json.dumps(partial))
+        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE", str(f))
+
+        weights = ic.get_current_weights()
+        _assert_equal_weights(weights)
+
+    def test_json_with_wrong_sum_triggers_fallback(self, tmp_path, monkeypatch):
+        """
+        A JSON file whose weights sum to ~0.5 (clearly wrong) must trigger
+        the equal-weights fallback, not return the malformed weights.
+        """
+        bad_weights = {d: round(1.0 / (9 * 2), 6) for d in ic.DIMENSIONS}
+        f = tmp_path / "ic_weights.json"
+        f.write_text(json.dumps({"weights": bad_weights}))
+        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE", str(f))
+
+        weights = ic.get_current_weights()
+        _assert_equal_weights(weights)
+
+    def test_empty_json_object_triggers_fallback(self, tmp_path, monkeypatch):
+        """An empty JSON object {} must trigger the equal-weights fallback."""
+        f = tmp_path / "ic_weights.json"
+        f.write_text("{}")
+        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE", str(f))
+
+        weights = ic.get_current_weights()
+        _assert_equal_weights(weights)
+
+    def test_fallback_returns_independent_copy_not_shared_reference(self, tmp_path, monkeypatch):
+        """
+        get_current_weights() must return a copy of EQUAL_WEIGHTS, not the dict
+        itself. Mutating the returned value must not affect the next call.
+        """
+        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE",
+                            str(tmp_path / "nonexistent.json"))
+        w1 = ic.get_current_weights()
+        w1["trend"] = 999.0   # mutate the returned copy
+
+        w2 = ic.get_current_weights()
+        assert w2["trend"] == pytest.approx(1.0 / N, abs=1e-6), (
+            "Mutating the returned dict polluted the next call — "
+            "fallback must return a fresh copy"
+        )

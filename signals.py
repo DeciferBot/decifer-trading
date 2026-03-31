@@ -121,7 +121,9 @@ def _fetch_one_process(args):
     try:
         return fetch_multi_timeframe(symbol, news_score=news_score, social_score=social_score,
                                      regime_router=regime_router)
-    except Exception:
+    except Exception as exc:
+        import logging as _logging
+        _logging.getLogger("decifer.signals").debug(f"_fetch_one_process failed for {symbol}: {exc}")
         return None
 
 log = logging.getLogger("decifer.signals")

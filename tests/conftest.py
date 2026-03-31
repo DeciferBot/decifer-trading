@@ -420,6 +420,22 @@ def _patch_trades_file(tmp_path, monkeypatch):
     yield
 
 
+@pytest.fixture(autouse=True)
+def _redirect_hwm_state_file(tmp_path, monkeypatch):
+    """
+    Redirect risk.HWM_STATE_FILE to a per-test temp path so tests that call
+    update_equity_high_water_mark() never write to the real data/hwm_state.json.
+    Tests that specifically test HWM persistence override this via their own
+    monkeypatch.setattr(risk, 'HWM_STATE_FILE', ...) call (which takes precedence).
+    """
+    try:
+        import risk
+        monkeypatch.setattr(risk, "HWM_STATE_FILE", str(tmp_path / "hwm_state.json"))
+    except Exception:
+        pass  # risk not yet imported in this test — no-op
+    yield
+
+
 @pytest.fixture
 def config():
     """Return the Decifer CONFIG dict for signal tests."""

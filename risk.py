@@ -7,7 +7,7 @@ import json
 import logging
 import os
 from collections import defaultdict
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 import pytz
 from config import CONFIG
 
@@ -25,6 +25,40 @@ _session_start_value = None
 _equity_high_water_mark = None
 _drawdown_halt          = False
 _last_known_equity      = None
+
+# ── HWM state file — survives equity_history truncation ────────
+_BASE          = os.path.dirname(os.path.abspath(__file__))
+HWM_STATE_FILE = os.path.join(_BASE, "data", "hwm_state.json")
+
+
+def load_hwm_state() -> float | None:
+    """
+    Load the persisted all-time HWM from data/hwm_state.json.
+    Returns the stored float, or None if the file is missing or corrupt.
+    """
+    try:
+        if not os.path.exists(HWM_STATE_FILE):
+            return None
+        with open(HWM_STATE_FILE) as f:
+            data = json.load(f)
+        val = data.get("hwm")
+        return float(val) if val is not None else None
+    except Exception as e:
+        log.warning(f"load_hwm_state: could not read {HWM_STATE_FILE} — {e}")
+        return None
+
+
+def save_hwm_state(hwm: float) -> None:
+    """
+    Persist the all-time HWM to data/hwm_state.json so it survives
+    equity_history truncation and bot restarts.
+    """
+    try:
+        os.makedirs(os.path.dirname(HWM_STATE_FILE), exist_ok=True)
+        with open(HWM_STATE_FILE, "w") as f:
+            json.dump({"hwm": hwm, "updated": datetime.now(timezone.utc).isoformat()}, f)
+    except Exception as e:
+        log.error(f"save_hwm_state: failed to write {HWM_STATE_FILE} — {e}")
 
 # ── Intraday adaptive strategy state ───────────────────────────
 _session_opening_regime: str | None = None  # Regime at session open (set on first scan)
@@ -618,11 +652,13 @@ def update_equity_high_water_mark(current_equity: float) -> bool:
 
     if _equity_high_water_mark is None:
         _equity_high_water_mark = current_equity
+        save_hwm_state(_equity_high_water_mark)
         return False
 
     # Update high water mark
     if current_equity > _equity_high_water_mark:
         _equity_high_water_mark = current_equity
+        save_hwm_state(_equity_high_water_mark)
         if _drawdown_halt:
             _drawdown_halt = False
             log.info(f"Drawdown halt cleared — equity recovered to new high: ${current_equity:,.2f}")
@@ -671,13 +707,23 @@ def reset_drawdown_state(portfolio_value: float):
 
 def init_equity_high_water_mark_from_history(equity_history: list):
     """
-    Seed the in-memory HWM from persisted equity_history on bot startup.
-    Prevents a restart from silently resetting the drawdown brake.
+    Seed the in-memory HWM from two sources on bot startup:
+      1. data/hwm_state.json — persisted all-time peak (not subject to truncation)
+      2. equity_history list — truncated last-2000 entries
 
-    Only upgrades — never downgrades — the existing HWM.
+    Takes the maximum of all sources. Only upgrades, never downgrades.
     equity_history: list of {"date": str, "value": float} dicts.
     """
     global _equity_high_water_mark
+
+    # Source 1: dedicated HWM state file (all-time peak, truncation-immune)
+    persisted_hwm = load_hwm_state()
+    if persisted_hwm is not None:
+        if _equity_high_water_mark is None or persisted_hwm > _equity_high_water_mark:
+            _equity_high_water_mark = persisted_hwm
+            log.info(f"HWM seeded from hwm_state.json: ${persisted_hwm:,.2f}")
+
+    # Source 2: equity history (truncated — may miss older peaks)
     if not equity_history:
         return
     try:
@@ -687,7 +733,7 @@ def init_equity_high_water_mark_from_history(equity_history: list):
         return
     if _equity_high_water_mark is None or historical_peak > _equity_high_water_mark:
         _equity_high_water_mark = historical_peak
-        log.info(f"HWM seeded from equity history: ${historical_peak:,.2f}")
+        log.info(f"HWM upgraded from equity history: ${historical_peak:,.2f}")
 
 
 # ══════════════════════════════════════════════════════════════════

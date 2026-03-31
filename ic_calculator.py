@@ -45,6 +45,15 @@ ROLLING_WINDOW = 60   # records to use for IC calculation
 MIN_VALID      = 20   # minimum records with forward returns before IC is trusted
 
 
+def _ic_cfg(key: str, default):
+    """Read a value from CONFIG['ic_calculator'], falling back to *default*."""
+    try:
+        from config import CONFIG
+        return CONFIG.get("ic_calculator", {}).get(key, default)
+    except Exception:
+        return default
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _spearman(x: np.ndarray, y: np.ndarray) -> float:
@@ -287,7 +296,7 @@ def compute_rolling_ic(
 
 # ── Weight normalisation ───────────────────────────────────────────────────────
 
-def normalize_ic_weights(raw_ic: dict) -> dict:
+def normalize_ic_weights(raw_ic: dict) -> tuple:
     """
     Convert raw IC values to normalised dimension weights.
 
@@ -295,23 +304,75 @@ def normalize_ic_weights(raw_ic: dict) -> dict:
     -----
     - Negative IC → weight = 0  (don't invert a negatively-predictive dimension)
     - None or non-finite IC     → treated as 0
+    - IC < ic_min_threshold     → weight = 0  (noise floor, default 0.0 = Phase 1)
     - If all weights == 0 after flooring → fall back to equal weights
     - Remaining positives normalised to sum to 1.0
+    - HHI cap: if any weight > max_single_weight, clip and renormalize (logged as WARNING)
+
+    Returns
+    -------
+    (weights dict, metadata dict) where metadata contains:
+      noise_floor_applied, dimensions_suppressed, hhi_capped
     """
+    ic_min  = _ic_cfg("ic_min_threshold", 0.0)
+    hhi_cap = _ic_cfg("max_single_weight", 0.40)
+
     floored: dict = {}
+    suppressed: list = []
     for d in DIMENSIONS:
         ic = raw_ic.get(d)
         if ic is None or not np.isfinite(float(ic)):
             floored[d] = 0.0
         else:
-            floored[d] = max(float(ic), 0.0)
+            v = float(ic)
+            if v < ic_min:
+                floored[d] = 0.0
+                if v > 0.0:  # positive but below noise floor — worth tracking
+                    suppressed.append(d)
+            else:
+                floored[d] = max(v, 0.0)
 
     total = sum(floored.values())
     if total <= 1e-9:
-        # All IC non-positive — fall back to equal weights
-        return dict(EQUAL_WEIGHTS)
+        # All IC non-positive or below noise floor — fall back to equal weights
+        return dict(EQUAL_WEIGHTS), {
+            "noise_floor_applied": ic_min > 0.0,
+            "dimensions_suppressed": suppressed,
+            "hhi_capped": False,
+        }
 
-    return {d: floored[d] / total for d in DIMENSIONS}
+    normalized = {d: floored[d] / total for d in DIMENSIONS}
+
+    # HHI concentration cap: no single dimension may exceed max_single_weight.
+    # Set over-cap dims to exactly hhi_cap; distribute the remainder
+    # proportionally among the under-cap dims (equal split if all are zero).
+    hhi_capped = False
+    if any(w > hhi_cap for w in normalized.values()):
+        hhi_capped = True
+        over  = [d for d, w in normalized.items() if w > hhi_cap]
+        under = {d: w for d, w in normalized.items() if w <= hhi_cap}
+        log.warning(
+            "normalize_ic_weights: HHI cap triggered — %s exceeded %.0f%% weight; clipping",
+            over, hhi_cap * 100,
+        )
+        remaining    = 1.0 - len(over) * hhi_cap
+        under_total  = sum(under.values())
+        capped: dict = {}
+        for d in DIMENSIONS:
+            if d in over:
+                capped[d] = hhi_cap
+            elif under_total > 1e-9:
+                capped[d] = under[d] / under_total * remaining
+            else:
+                # All remaining dims have zero IC — split remainder equally
+                capped[d] = remaining / max(len(under), 1)
+        normalized = capped
+
+    return normalized, {
+        "noise_floor_applied": ic_min > 0.0,
+        "dimensions_suppressed": suppressed,
+        "hhi_capped": hhi_capped,
+    }
 
 
 # ── Cache I/O ──────────────────────────────────────────────────────────────────
@@ -349,8 +410,8 @@ def update_ic_weights(signals_log_path: str = None) -> dict:
     Returns the new normalised weight dict.
     Should be called once per week (Sunday review cycle).
     """
-    raw_ic  = compute_rolling_ic(signals_log_path)
-    weights = normalize_ic_weights(raw_ic)
+    raw_ic          = compute_rolling_ic(signals_log_path)
+    weights, ic_meta = normalize_ic_weights(raw_ic)
 
     all_none  = all(v is None for v in raw_ic.values())
     all_equal = weights == {d: round(1.0 / _N, 10) for d in DIMENSIONS}
@@ -358,12 +419,15 @@ def update_ic_weights(signals_log_path: str = None) -> dict:
     n_records = len(_load_signal_records(signals_log_path))
 
     record = {
-        "updated":            datetime.now(timezone.utc).isoformat(),
-        "raw_ic":             {d: (raw_ic.get(d) if raw_ic.get(d) is not None
-                                   else None) for d in DIMENSIONS},
-        "weights":            weights,
-        "n_records":          n_records,
-        "using_equal_weights": all_none or all_equal,
+        "updated":              datetime.now(timezone.utc).isoformat(),
+        "raw_ic":               {d: (raw_ic.get(d) if raw_ic.get(d) is not None
+                                     else None) for d in DIMENSIONS},
+        "weights":              weights,
+        "n_records":            n_records,
+        "using_equal_weights":  all_none or all_equal,
+        "noise_floor_applied":  ic_meta["noise_floor_applied"],
+        "dimensions_suppressed": ic_meta["dimensions_suppressed"],
+        "hhi_capped":           ic_meta["hhi_capped"],
     }
 
     os.makedirs(os.path.dirname(IC_WEIGHTS_FILE), exist_ok=True)
