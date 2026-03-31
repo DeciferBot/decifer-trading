@@ -1867,7 +1867,7 @@ def run_scan():
     )
 
     # ── Update dashboard with agent outputs ──────────────────
-    dash["claude_analysis"]    = decision.get("claude_reasoning", decision.get("summary", ""))
+    dash["claude_analysis"]    = decision.get("summary", decision.get("claude_reasoning", ""))
     dash["agent_outputs"]      = decision.get("_agent_outputs", {})
     dash["last_agents_agreed"] = decision.get("agents_agreed", 0)
 
@@ -1891,12 +1891,27 @@ def run_scan():
                 "time":    now_str,
                 "output":  raw[:800],
             })
-    # Final Decision Maker summary
+    # Final Decision Maker — plain-English trade list with per-trade reasons
+    _buys  = decision.get("buys", [])
+    _sells = decision.get("sells", [])
+    _holds = decision.get("hold", [])
+    _action_lines = []
+    for _b in _buys:
+        _sym    = _b.get("symbol", "?") if isinstance(_b, dict) else _b
+        _reason = _b.get("reasoning", "No reason given") if isinstance(_b, dict) else "No reason given"
+        _action_lines.append(f"BUY {_sym} — {_reason}")
+    for _s in _sells:
+        _sym = _s if isinstance(_s, str) else _s.get("symbol", str(_s))
+        _action_lines.append(f"SELL {_sym}")
+    for _h in _holds:
+        _sym = _h if isinstance(_h, str) else _h.get("symbol", str(_h))
+        _action_lines.append(f"HOLD {_sym}")
+    _final_output = "\n".join(_action_lines) if _action_lines else "No trades this cycle."
     agent_convo.append({
         "agent":  "Final Decision Maker",
         "role":   "Synthesises all 5 reports into executable trade instructions",
         "time":   now_str,
-        "output": decision.get("claude_reasoning", decision.get("summary", "No reasoning provided")),
+        "output": _final_output,
     })
     dash["agent_conversation"] = agent_convo
 

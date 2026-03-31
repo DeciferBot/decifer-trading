@@ -445,8 +445,8 @@ Respond ONLY with valid JSON:
   "hold": ["NVDA"],
   "cash": false,
   "agents_agreed": 4,
-  "summary": "One sentence market assessment",
-  "claude_reasoning": "2-3 sentences explaining the key decision logic with real-world context"
+  "summary": "One sentence market regime snapshot, e.g. 'TRENDING — momentum favours tech longs'",
+  "claude_reasoning": "2-3 sentences on THIS cycle's decision logic: what drove buys/sells, key risk factor, why hold or pass"
 }}
 
 ═══ CRITICAL — REASONING QUALITY ═══
