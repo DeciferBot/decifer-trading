@@ -7,9 +7,13 @@
 # ╚══════════════════════════════════════════════════════════════╝
 
 import json
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
+
+# Canonical path for the typed signals audit log — single source of truth
+SIGNALS_LOG = "signals_log.jsonl"
 
 
 @dataclass

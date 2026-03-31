@@ -11,10 +11,8 @@
 import logging
 from datetime import datetime, timezone
 
-from signal_types import Signal
+from signal_types import Signal, SIGNALS_LOG
 from orders import execute_buy
-
-SIGNALS_LOG = "signals_log.jsonl"
 log = logging.getLogger("decifer.dispatcher")
 
 

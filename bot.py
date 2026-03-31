@@ -51,8 +51,7 @@ _reconnecting          = False
 _subscription_registry: dict = {}   # symbol -> {"type": "ticker"|"pnl", ...}
 _heartbeat_thread: threading.Thread | None = None
 from scanner import get_dynamic_universe, get_market_regime, get_tv_signal_cache
-from signals import score_universe, fetch_multi_timeframe, get_regime_threshold
-from news import batch_news_sentiment
+from signals import fetch_multi_timeframe
 from agents import run_all_agents
 from orders import execute_buy, execute_sell, flatten_all, reconcile_with_ibkr, get_open_positions, update_position_prices, update_positions_from_ibkr, execute_buy_option, execute_sell_option, update_trailing_stops
 from options import find_best_contract, check_options_exits
@@ -62,17 +61,17 @@ from risk import (check_risk_conditions, get_session, get_scan_interval, reset_d
                   init_equity_high_water_mark_from_history,
                   get_intraday_strategy_mode, set_session_opening_regime,
                   check_thesis_validity, get_consecutive_losses)
-from learning import log_trade, load_trades, load_orders, get_performance_summary, run_weekly_review, TRADE_LOG_FILE, get_effective_capital, record_capital_adjustment, log_signal_scan
+from learning import log_trade, load_trades, load_orders, get_performance_summary, run_weekly_review, TRADE_LOG_FILE, get_effective_capital, record_capital_adjustment
 from dashboard import DASHBOARD_HTML
 from news_sentinel import NewsSentinel, get_sentinel_history
 from theme_tracker import build_sentinel_universe, load_custom_themes, get_all_themes
 from sentinel_agents import run_sentinel_pipeline
 from catalyst_sentinel import CatalystSentinel, get_catalyst_history
-from signal_types import Signal
+from signal_types import Signal, SIGNALS_LOG
 from signal_dispatcher import dispatch_signals as _dispatch_signals
+from signal_pipeline import run_signal_pipeline, SignalPipelineResult
 
 EQUITY_FILE = "equity_history.json"
-TYPED_SIGNALS_LOG = "signals_log.jsonl"
 PROMPTS_FILE = "prompt_versions.json"
 
 colorama_init()
@@ -1658,45 +1657,6 @@ def _auto_rebalance_cash(portfolio_value: float, regime: dict):
         clog("ERROR", f"Auto-rebalance: Failed to close {sym}: {e}")
 
 
-def _scored_to_signals(scored: list, regime_name: str) -> list:
-    """
-    Convert score_universe() output into typed Signal objects.
-
-    Called once per scan cycle after scoring completes.  The resulting list
-    is used by dispatch_signals() for order routing and is written to
-    signals_log.jsonl as the source data for IC tracking.
-    """
-    now = datetime.now(timezone.utc)
-    signals = []
-    for s in scored:
-        direction = s.get("direction", "NEUTRAL")
-        if direction not in ("LONG", "SHORT", "NEUTRAL"):
-            direction = "NEUTRAL"
-        signals.append(Signal(
-            symbol=s["symbol"],
-            direction=direction,
-            conviction_score=round(s.get("score", 0) / 5.0, 3),
-            dimension_scores=s.get("score_breakdown", {}),
-            timestamp=now,
-            regime_context=regime_name,
-            price=s.get("price", 0.0),
-            atr=s.get("atr", 0.0),
-        ))
-    return signals
-
-
-def _append_signals_log(signals: list) -> None:
-    """Append typed Signal objects to signals_log.jsonl (one JSON line per signal)."""
-    if not signals:
-        return
-    try:
-        with open(TYPED_SIGNALS_LOG, "a") as f:
-            for s in signals:
-                f.write(s.to_json() + "\n")
-    except Exception as e:
-        log.warning(f"typed signals_log write failed: {e}")
-
-
 def run_scan():
     global scan_count, last_sunday_review
 
@@ -1824,139 +1784,29 @@ def run_scan():
         clog("INFO", f"Favourites: {len(favs)} tickers ({new_count} new additions to universe)")
     clog("INFO", f"Universe: {len(universe)} symbols to score")
 
-    # ── TV PRE-FILTER — use free TradingView data to cut universe before yfinance ──
-    # TV screener already gave us RSI, MACD, EMA, VWAP, rel_vol, Recommend.All
-    # for every symbol. Use these to eliminate dead-weight BEFORE the expensive
-    # yfinance multi-timeframe fetch (which is sequential to avoid thread-safety bugs).
-    # Goal: 97 symbols → ~10-15 high-potential candidates → yfinance deep-scores only those.
-    tv_cache = get_tv_signal_cache()
-    if tv_cache:
-        pre_universe = len(universe)
-        ranked = []
-        for sym in universe:
-            tv = tv_cache.get(sym)
-            if not tv:
-                continue  # No TV data = skip (CORE_SYMBOLS without TV hits)
+    # ── Signal pipeline — filter → sentiment → score → typed Signal objects ──
+    # Runs as a pure, IBKR-free unit: all logic lives in signal_pipeline.py.
+    clog("SCAN", "Running signal pipeline (TV pre-filter → sentiment → 9-dim score)...")
+    pipeline = run_signal_pipeline(
+        universe=universe,
+        regime=regime,
+        strategy_mode=strategy_mode,
+        session=get_session(),
+        favourites=favs,
+        tv_cache=get_tv_signal_cache(),
+    )
+    signals        = pipeline.signals        # typed Signal objects → dispatcher
+    scored         = pipeline.scored         # raw dicts above threshold → run_all_agents
+    news_sentiment = pipeline.news_sentiment # → dash + agents context
+    universe       = pipeline.universe       # filtered → options scanner
+    regime_name    = pipeline.regime_name
 
-            close   = tv.get("tv_close")
-            rec     = tv.get("tv_recommend")
-            rel_vol = tv.get("tv_rel_vol")
-            rsi     = tv.get("tv_rsi_1h")
-            ema9    = tv.get("tv_ema9_1h")
-            ema21   = tv.get("tv_ema21_1h")
-            macd    = tv.get("tv_macd_1h")
-            macd_s  = tv.get("tv_macd_sig_1h")
-            change  = tv.get("tv_change")
-            vwap    = tv.get("tv_vwap")
-
-            # ── HARD KILLS — no edge, don't waste yfinance calls ──
-            # NOTE: Thresholds loosened for paper trading data generation.
-            # Original values (for live): rec < 0.1, rel_vol < 1.0, RSI 42-58, change < 0.3%
-            # Paper values: wider funnel to capture mean-reversion, early breakouts,
-            # and accumulation setups that generate ML training data across regimes.
-            if close is None or close <= 0:
-                continue
-            if rec is None or abs(rec) < 0.05:
-                continue  # Dead neutral — TV sees no directional signal
-            if rel_vol is not None and rel_vol < 0.5:
-                continue  # Very low volume only — allow early breakouts at 0.5-1.0x
-            if rsi is not None and 47 < rsi < 53:
-                continue  # Tight RSI dead zone only — allow mean-reversion setups (42-47, 53-58)
-            if change is not None and abs(change) < 0.1:
-                continue  # Only truly flat stocks — allow slow accumulation at 0.1-0.3%
-
-            # ── EMA ALIGNMENT CHECK — need some trend structure ──
-            ema_aligned = False
-            if ema9 is not None and ema21 is not None and ema9 != 0 and ema21 != 0:
-                ema_spread = abs(ema9 - ema21) / max(ema9, ema21)
-                if ema_spread > 0.001:  # EMAs at least 0.1% apart
-                    ema_aligned = True
-
-            # ── MACD THRUST CHECK — need some acceleration ──
-            macd_thrust = False
-            if macd is not None and macd_s is not None:
-                if abs(macd - macd_s) > 0.01:  # MACD and signal not equal
-                    macd_thrust = True
-
-            # Need at least one of: EMA alignment OR MACD thrust
-            if not ema_aligned and not macd_thrust:
-                continue
-
-            # ── RANK SCORE — strongest signal × most unusual volume ──
-            # |Recommend.All| ranges 0-1, rel_vol typically 1-10+
-            rank_score = abs(rec) * rel_vol
-            # Bonus for VWAP confirmation (price on the right side of VWAP)
-            if vwap and close and vwap > 0:
-                if (rec > 0 and close > vwap) or (rec < 0 and close < vwap):
-                    rank_score *= 1.3  # 30% bonus for VWAP alignment
-
-            ranked.append((sym, rank_score))
-
-        # Sort by rank score, take top 25 (widened from 15 for paper trading data generation)
-        ranked.sort(key=lambda x: x[1], reverse=True)
-        universe = [sym for sym, _ in ranked[:25]]
-
-        # Always include favourites — never let pre-filter drop them
-        favs_set = set(dash.get("favourites", []))
-        missed_favs = favs_set - set(universe)
-        if missed_favs:
-            universe = list(set(universe) | missed_favs)
-            clog("INFO", f"Favourites preserved through TV pre-filter: {sorted(missed_favs)}")
-
-        clog("SCAN", f"TV pre-filter: {pre_universe} → {len(universe)} symbols "
-             f"(top by |signal| × rel_vol, VWAP-confirmed)")
-
-    # ── Fetch news sentiment for universe ─────────────────────
-    clog("SCAN", "Fetching news sentiment (Yahoo RSS + keyword scoring)...")
-    try:
-        news_sentiment = batch_news_sentiment(universe[:50])  # Top 50 to limit RSS calls
-        dash["news_data"] = news_sentiment
-        news_with_signal = sum(1 for v in news_sentiment.values() if v.get("news_score", 0) > 0)
-        clog("INFO", f"News: {len(news_sentiment)} symbols scanned, {news_with_signal} with sentiment signal")
-    except Exception as e:
-        clog("ERROR", f"News sentiment error: {e}")
-        news_sentiment = {}
-        dash["news_data"] = {}
-
-    # ── Fetch social sentiment ───────────────────────────────
-    # Skip during extended hours — Reddit/ApeWisdom inactive at 4am/7pm
-    social_sentiment = {}
-    if get_session() not in ("PRE_MARKET", "AFTER_HOURS"):
-        try:
-            from social_sentiment import get_social_sentiment
-            social_sentiment = get_social_sentiment(universe[:50])
-            social_with_signal = sum(1 for v in social_sentiment.values() if v.get("social_score", 0) > 0)
-            clog("INFO", f"Social: {len(social_sentiment)} symbols scanned, {social_with_signal} with sentiment signal")
-        except ImportError:
-            clog("INFO", "Social sentiment module not available — skipping")
-        except Exception as e:
-            clog("ERROR", f"Social sentiment error: {e}")
-
-    # ── Score universe ────────────────────────────────────────
-    clog("SCAN", "Scoring universe on 9 dimensions...")
-    scored, all_scored = score_universe(universe, regime.get("regime", "UNKNOWN"),
-                                        news_data=news_sentiment, social_data=social_sentiment,
-                                        regime_router=regime.get("regime_router", "unknown"))
-    regime_name = regime.get('regime','UNKNOWN')
-    used_threshold = get_regime_threshold(regime_name)
-    effective_threshold = used_threshold + strategy_mode["score_threshold_adj"]
-    if strategy_mode["score_threshold_adj"] > 0:
-        pre_filter = len(scored)
-        scored = [s for s in scored if s["score"] >= effective_threshold]
-        clog("INFO", f"Scored: {pre_filter} → {len(scored)} after strategy mode filter "
-                     f"(threshold raised {used_threshold}→{effective_threshold}/50 in "
-                     f"{strategy_mode['mode']} mode) | {len(all_scored)} total [{regime_name}]")
-    else:
-        clog("INFO", f"Scored: {len(scored)} above threshold ({used_threshold}/50), "
-                     f"{len(all_scored)} total [{regime_name}]")
-    log_signal_scan(all_scored, regime)
-
-    # ── Build typed Signal objects + write to signals_log.jsonl ──
-    signals = _scored_to_signals(scored, regime_name)
-    _append_signals_log(signals)
+    dash["news_data"] = news_sentiment
+    clog("SCAN", f"Pipeline: {len(universe)} symbols → {len(scored)} scored "
+         f"→ {len(signals)} signals [{regime_name}]")
 
     # ── Update existing position prices ──────────────────────
-    update_position_prices(scored)
+    update_position_prices(pipeline.scored)
 
     # ── KILL CHECK + process close queue ─────────────────────────
     if _check_kill():
