@@ -71,7 +71,8 @@ CONFIG = {
 
     # ── TAKE PROFIT / STOP LOSS ───────────────────────────────
     "atr_stop_multiplier":      1.5,    # Stop = entry - (1.5 × ATR)
-    "atr_trail_multiplier":     2.0,    # Trailing stop = 2 × ATR from high
+    "atr_trail_multiplier":     2.0,    # Trailing stop = 2 × ATR from high-water mark
+    "trailing_stop_enabled":    True,   # Slide stop up as price advances (ATR-based)
     "partial_exit_1_pct":       0.04,   # Sell 33% at +4%
     "partial_exit_2_pct":       0.08,   # Sell 33% at +8%, trail rest
     "min_reward_risk_ratio":    1.5,    # Minimum R:R to enter trade
@@ -370,6 +371,19 @@ CONFIG = {
             "hosted_dashboard":         5,   # Public-facing dashboard
         },
     },
+
+    # ── CATALYST SENTINEL (real-time M&A / acquisition monitor) ──────────────
+    # Two daemon threads alongside the News Sentinel:
+    #   1. News thread  — polls Yahoo RSS for M&A keywords (60s interval)
+    #   2. EDGAR thread — polls SEC RSS for 13D/13G/Form 4 filings (10 min)
+    # Fires handle_catalyst_trigger() immediately on detection.
+    "catalyst_sentinel_enabled":      True,
+    "catalyst_news_poll_seconds":     60,    # News polling interval (seconds)
+    "catalyst_edgar_poll_seconds":    600,   # EDGAR polling interval (10 minutes)
+    "catalyst_cooldown_minutes":      60,    # Re-trigger cooldown per symbol (minutes)
+    "catalyst_min_confidence":        5,     # Min agent confidence to execute trade
+    "catalyst_max_trades_per_day":    2,     # Hard cap: catalyst-driven trades per trading day
+    "catalyst_risk_multiplier":       0.50,  # Size multiplier vs normal sentinel (0.5 = ~1.5% portfolio)
 
     # ── FILL WATCHER ──────────────────────────────────────────────
     # Background thread that monitors an unfilled limit order after placement

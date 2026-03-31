@@ -42,6 +42,13 @@ BULLISH_STRONG = {
     "massive growth", "blows past", "exceeds expectations", "upgrades",
     "strong buy", "outperform", "bullish", "raises guidance", "raised guidance",
     "accelerating", "blockbuster", "doubles", "triples", "rockets",
+    # ── M&A / acquisition announcement keywords ──────────────────────────────
+    # Added to ensure the News Sentinel flags acquisition headlines as CRITICAL
+    # without waiting for Claude confidence scoring.
+    "to be acquired", "acquisition agreement", "merger agreement",
+    "definitive agreement", "agreed to be acquired", "agreed to acquire",
+    "tender offer", "per share in cash", "takeover bid", "going private",
+    "take-private", "management buyout",
 }
 
 BULLISH_NORMAL = {
