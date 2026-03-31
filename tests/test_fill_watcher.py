@@ -294,8 +294,16 @@ class TestOrphanedPendingDetection:
     """update_positions_from_ibkr should cancel and remove watcherless PENDING orders past timeout."""
 
     def _setup_orders_module(self):
-        """Ensure the real orders module is loaded, not a stub."""
-        import importlib
+        """Ensure the real orders module is loaded, not a stub.
+
+        If the real module is already in sys.modules (identified by having
+        execute_buy), return it directly rather than evicting and reimporting.
+        Evicting creates a *new* module object and breaks @patch targets in
+        test_orders_core.py, which bound the name at its own import time.
+        """
+        existing = sys.modules.get("orders")
+        if existing is not None and hasattr(existing, "execute_buy"):
+            return existing
         for mod in ("orders", "risk", "scanner", "signals", "news", "agents"):
             sys.modules.pop(mod, None)
         import orders as _o

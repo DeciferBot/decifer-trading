@@ -231,14 +231,23 @@ optscan_stub.scan_options_universe = lambda *a, **kw: []
 
 # risk
 risk_stub = sys.modules["risk"]
-risk_stub.can_trade              = lambda *a, **kw: True
-risk_stub.check_risk_conditions  = lambda *a, **kw: (True, "ok")
-risk_stub.get_session            = lambda: "REGULAR"
-risk_stub.get_scan_interval      = lambda: 300
-risk_stub.reset_daily_state      = lambda *a, **kw: None
-risk_stub.calculate_position_size= lambda *a, **kw: 10
-risk_stub.calculate_stops        = lambda *a, **kw: (0.95, 1.10)
+risk_stub.can_trade                     = lambda *a, **kw: True
+risk_stub.check_risk_conditions         = lambda *a, **kw: (True, "ok")
+risk_stub.get_session                   = lambda: "REGULAR"
+risk_stub.get_scan_interval             = lambda: 300
+risk_stub.reset_daily_state             = lambda *a, **kw: None
+risk_stub.calculate_position_size       = lambda *a, **kw: 10
+risk_stub.calculate_stops               = lambda *a, **kw: (0.95, 1.10)
 risk_stub.update_equity_high_water_mark = lambda *a, **kw: None
+# ── intraday adaptive strategy (feat/intraday-adaptive) ─────────────────────
+risk_stub.get_intraday_strategy_mode    = lambda *a, **kw: {
+    "mode": "NORMAL", "score_threshold_adj": 0, "size_multiplier": 1.0,
+    "max_new_trades": 5, "context": "test", "regime_changed": False,
+    "daily_pnl_pct": 0.0,
+}
+risk_stub.set_session_opening_regime    = lambda *a, **kw: None
+risk_stub.check_thesis_validity         = lambda *a, **kw: []
+risk_stub.get_consecutive_losses        = lambda: 0
 
 # learning
 learning_stub = sys.modules["learning"]
