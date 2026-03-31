@@ -375,8 +375,10 @@ canvas{display:block;width:100% !important}
         <div class="ai-box" id="ai-box">Waiting for first scan...</div>
       </div>
       <div class="convo-panel" id="convo-panel">
-        <div class="convo-toggle" onclick="toggleConvo()"><span id="convo-arrow">▼</span> Agent Conversation (live)</div>
-        <div class="convo-body" id="convo-body"></div>
+        <div class="convo-toggle" onclick="toggleConvo()"><span id="convo-arrow">▼</span> Last Decision</div>
+        <div class="convo-body" id="convo-body">
+          <div style="padding:12px;color:var(--muted2);font-size:11px">Waiting for first scan...</div>
+        </div>
       </div>
     </div>
 
@@ -386,9 +388,9 @@ canvas{display:block;width:100% !important}
       <div style="flex:0 0 auto;overflow-y:auto;max-height:50%;border-bottom:1px solid var(--border)" id="pos-list">
         <div class="empty">No open positions</div>
       </div>
-      <div class="col-title" style="flex-shrink:0">Recent Orders</div>
+      <div class="col-title" style="flex-shrink:0">Today's Results</div>
       <div class="col-body" id="trades-list">
-        <div class="empty">No orders yet</div>
+        <div class="empty">No closed trades today</div>
       </div>
     </div>
 
@@ -869,7 +871,7 @@ async function loadPortfolio() {
     );
 
   } catch (err) {
-    tableEl.innerHTML = `<div style="padding:20px;color:var(--red)">⚠ Could not load portfolio data: ${err.message}</div>`;
+    tableEl.innerHTML = `<div style="padding:20px;color:var(--red)">⚠ Could not load portfolio data: ${esc(err.message)}</div>`;
   }
 }
 
@@ -1066,7 +1068,9 @@ function renderAlphaDecay(d) {
     });
   }
 
-  const ctx = document.getElementById('alpha-decay-chart').getContext('2d');
+  const alphaCanvas = document.getElementById('alpha-decay-chart');
+  if (!alphaCanvas) return;
+  const ctx = alphaCanvas.getContext('2d');
   if (alphaDecayChart) alphaDecayChart.destroy();
   alphaDecayChart = new Chart(ctx, {
     type: 'line',
@@ -1184,7 +1188,7 @@ function switchTab(id, el) {
 function forceScan() {
   fetch('/api/scan', {method: 'POST'}).then(() => {
     document.getElementById('bot-status').textContent = 'Scanning...';
-    document.getElementById('trades-list').innerHTML = '<div class="empty">No orders yet</div>';
+    document.getElementById('trades-list').innerHTML = '<div class="empty">Scanning...</div>';
   });
 }
 function restartBot() {
@@ -1224,8 +1228,16 @@ function filterTrades(filter, btn) {
 }
 
 // ── Helpers ────────────────────────────────────────────────
-function fmt$(n) { return n == null ? '—' : '$' + Number(n).toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2}); }
-function fmtPct(n) { return n == null ? '—' : (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
+function fmt$(n) {
+  const v = typeof n === 'number' ? n : parseFloat(n);
+  return (v == null || isNaN(v) || !isFinite(v)) ? '—' : '$' + v.toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function fmtPct(n) { return (n == null || isNaN(n)) ? '—' : (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
+// HTML-escape user/external data before inserting into innerHTML
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 
 // ── Render positions ───────────────────────────────────────
 function closePosition(symbol) {
@@ -1245,7 +1257,7 @@ function cancelOrder(orderId, symbol) {
     fetch('/api/cancel-order', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({order_id: orderId})})
       .then(r => r.json())
       .then(d => {
-        if (d.ok) { alert('✅ ' + d.detail); update(); }
+        if (d.ok) { alert('✅ ' + d.detail); poll(); }
         else alert('❌ ' + (d.error || 'unknown'));
       })
       .catch(e => alert('Error: ' + e));
@@ -1278,9 +1290,11 @@ function renderPositions(positions) {
     const pnl = dir === 'SHORT'
       ? (p.entry - p.current) * Math.abs(p.qty) * mult
       : (p.current - p.entry) * Math.abs(p.qty) * mult;
-    const pct = dir === 'SHORT'
-      ? ((p.entry - p.current) / p.entry) * 100
-      : ((p.current - p.entry) / p.entry) * 100;
+    const pct = (p.entry && p.entry !== 0)
+      ? (dir === 'SHORT'
+        ? ((p.entry - p.current) / p.entry) * 100
+        : ((p.current - p.entry) / p.entry) * 100)
+      : 0;
     const posValue = Math.abs(p.current * p.qty * mult);
     return {...p, dir, pnl, pct, posValue, isOpt, _idx: idx};
   });
@@ -1301,8 +1315,8 @@ function renderPositions(positions) {
     const pendingBadge = isPending ? ' <span style="font-size:8px;color:var(--yellow);background:rgba(255,214,0,.12);border:1px solid var(--yellow);padding:1px 5px;border-radius:8px;font-weight:600;letter-spacing:0.5px">PENDING</span>' : '';
     // Action button: Cancel for pending, Close for active
     const actionBtn = isPending && p.order_id
-      ? `<button onclick="event.stopPropagation();cancelOrder(${p.order_id},'${p.symbol}')" style="background:rgba(255,214,0,.12);border:1px solid var(--yellow);color:var(--yellow);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Cancel pending order">CANCEL</button>`
-      : `<button onclick="event.stopPropagation();closePosition('${p._trade_key || p.symbol}')" style="background:rgba(255,23,68,.12);border:1px solid var(--red);color:var(--red);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Close this position">✕</button>`;
+      ? `<button onclick="event.stopPropagation();cancelOrder(${p.order_id},${JSON.stringify(p.symbol)})" style="background:rgba(255,214,0,.12);border:1px solid var(--yellow);color:var(--yellow);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Cancel pending order">CANCEL</button>`
+      : `<button onclick="event.stopPropagation();closePosition(${JSON.stringify(p._trade_key || p.symbol)})" style="background:rgba(255,23,68,.12);border:1px solid var(--red);color:var(--red);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Close this position">✕</button>`;
     return `<div class="pos-card" onclick="showPositionDetail(${p._idx})" title="Click for details" style="${cardOpacity}">
       <div class="pos-hdr">
         <span class="pos-sym">${p.symbol}${p.instrument === 'option' ? ' <span style="font-size:9px;color:var(--cyan);font-weight:600">OPT</span>' : ''}${pendingBadge} <span style="font-size:10px;color:var(--muted2);font-weight:400">${p.dir} ×${Math.abs(p.qty)}</span></span>
@@ -1324,46 +1338,62 @@ function renderPositions(positions) {
   }).join('');
 }
 
-// ── Render recent trades ───────────────────────────────────
-function renderRecentTrades(trades, orders) {
+// ── Today's Results ────────────────────────────────────────
+// Shows closed trades from today with P&L, direction, exit reason.
+function renderTodaysTrades(allTrades) {
   const el = document.getElementById('trades-list');
-
-  // Prefer orders.json data (has real statuses) over in-memory trades list
-  if (orders && orders.length > 0) {
-    // Show only entry orders (not SL/TP children) sorted newest first, deduped by order_id
-    const seen = new Set();
-    const entries = orders
-      .filter(o => !o.role || o.role === 'entry' || o.role === 'close' || o.role === 'emergency_flatten')
-      .filter(o => !['CANCELLED','VALIDATIONERROR','INACTIVE','APICANCELLED'].includes((o.status||'').toUpperCase()))
-      .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
-      .filter(o => { const k = o.order_id || `${o.symbol}-${o.timestamp}`; if (seen.has(k)) return false; seen.add(k); return true; })
-      .slice(0, 30);
-
-    if (!entries.length) { el.innerHTML = '<div class="empty">No orders yet</div>'; return; }
-    el.innerHTML = entries.map(o => {
-      const status = (o.status || 'SUBMITTED').toUpperCase();
-      const statusColor = status === 'FILLED' ? 'var(--green)' :
-                          status === 'CANCELLED' ? 'var(--red)' :
-                          'var(--yellow)';
-      const statusDot = `<span style="color:${statusColor};font-size:8px;margin-right:4px">●</span>`;
-      const side = o.side || '—';
-      const ts = o.timestamp ? o.timestamp.substring(11, 19) : '';
-      const price = o.fill_price && o.fill_price > 0 ? o.fill_price : o.price || 0;
-      return `<div class="trade-row">
-        <div>${statusDot}<span class="ts ${side === 'BUY' ? 'tb' : 'ts2'}">${side}</span><strong style="margin-left:6px">${o.symbol || '?'}</strong></div>
-        <div style="text-align:right"><div>${fmt$(parseFloat(price))}</div><div style="font-size:10px;color:var(--muted2)">${ts}</div></div>
-      </div>`;
-    }).join('');
+  if (!allTrades || !allTrades.length) {
+    el.innerHTML = '<div class="empty">No closed trades today</div>';
     return;
   }
 
-  // Fallback to in-memory trades if no orders data yet
-  if (!trades || !trades.length) { el.innerHTML = '<div class="empty">No orders yet</div>'; return; }
-  el.innerHTML = trades.slice(0, 40).map(t => `
-    <div class="trade-row">
-      <div><span class="ts ${t.side === 'BUY' ? 'tb' : 'ts2'}">${t.side}</span><strong style="margin-left:6px">${t.symbol}</strong></div>
-      <div style="text-align:right"><div>${fmt$(parseFloat(t.price))}</div><div style="font-size:10px;color:var(--muted2)">${t.time}</div></div>
-    </div>`).join('');
+  const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const todayTrades = allTrades
+    .filter(t => {
+      const ts = t.timestamp || t.exit_time || '';
+      return ts.slice(0, 10) === todayStr && t.exit_price != null;
+    })
+    .sort((a, b) => new Date(b.timestamp || b.exit_time || 0) - new Date(a.timestamp || a.exit_time || 0));
+
+  if (!todayTrades.length) {
+    el.innerHTML = '<div class="empty">No closed trades today</div>';
+    return;
+  }
+
+  const exitLabels = {
+    'stop_loss':     'SL',
+    'take_profit':   'TP',
+    'agent_sell':    'Exit',
+    'trailing_stop': 'Trail',
+    'manual':        'Manual',
+    'kill':          'Kill'
+  };
+
+  el.innerHTML = todayTrades.map(t => {
+    const dir = t.direction || (t.action === 'BUY' ? 'LONG' : 'SHORT');
+    const dirColor = dir === 'LONG' ? 'var(--green)' : 'var(--red)';
+    const pnl = t.pnl || 0;
+    const pnlColor = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const pnlSign = pnl >= 0 ? '+' : '';
+    const exitLabel = exitLabels[t.exit_reason] || (t.exit_reason || '—');
+    const exitColor = t.exit_reason === 'stop_loss' ? 'var(--red)' :
+                      t.exit_reason === 'take_profit' ? 'var(--green)' : 'var(--muted2)';
+    const entry = t.entry_price || 0;
+    const exit  = t.exit_price  || 0;
+    const holdMin = t.hold_minutes ? (t.hold_minutes >= 60
+      ? (t.hold_minutes / 60).toFixed(1) + 'h'
+      : t.hold_minutes + 'm') : '';
+    return `<div class="trade-row" style="padding:6px 10px;display:flex;flex-direction:column;gap:2px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:700;font-size:12px">${t.symbol || '—'} <span style="font-size:9px;color:${dirColor};font-weight:600">${dir}</span></span>
+        <span style="font-weight:700;color:${pnlColor}">${pnlSign}${fmt$(pnl)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted2)">
+        <span>${fmt$(entry)} → ${fmt$(exit)}</span>
+        <span style="color:${exitColor}">${exitLabel}${holdMin ? ' · ' + holdMin : ''}</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── Order rendering ───────────────────────────────────────
@@ -1423,7 +1453,7 @@ function renderOrders() {
       <span>${fillPx}</span>
       <span style="color:${statusColor};font-weight:700">${status}</span>
       <span style="color:var(--muted2)">${roleLabel}</span>
-      <span>${['SUBMITTED','PRESUBMITTED'].includes(status) && o.order_id ? `<button onclick="cancelOrder(${o.order_id}, '${sym}')" style="background:rgba(255,23,68,.15);border:1px solid var(--red);color:var(--red);border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 8px;font-weight:700" title="Cancel order #${o.order_id}">✕</button>` : ''}</span>
+      <span>${['SUBMITTED','PRESUBMITTED'].includes(status) && o.order_id ? `<button onclick="cancelOrder(${o.order_id}, ${JSON.stringify(sym)})" style="background:rgba(255,23,68,.15);border:1px solid var(--red);color:var(--red);border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 8px;font-weight:700" title="Cancel order #${o.order_id}">✕</button>` : ''}</span>
     </div>`;
   }).join('');
 }
@@ -1507,105 +1537,96 @@ function buildTradeExplanation(t) {
   const dir = t.direction || (t.action === 'BUY' ? 'LONG' : (t.action === 'SELL' || t.action === 'CLOSE') ? 'SHORT' : 'LONG');
   const isLong = dir === 'LONG';
   const isSentinel = (t.reasoning || '').includes('[SENTINEL]') || (t.source === 'sentinel');
-  const isBackfill = (t.source === 'ibkr_backfill') || (t.reasoning || '').includes('Backfill');
-  const reasoning = (t.reasoning || '').replace('[SENTINEL]', '').replace('Backfilled from IBKR execution history on startup.', '').trim();
+  const isCatalyst = (t.reasoning || '').includes('[CATALYST') || (t.source === 'catalyst');
+  const isBackfill = (t.source === 'ibkr_backfill') || (t.source === 'manual_backfill') ||
+                     (t.reasoning || '').toLowerCase().includes('backfill') ||
+                     (t.reasoning || '').toLowerCase().includes('reconciled');
+  const rawReasoning = (t.reasoning || '')
+    .replace(/\[SENTINEL\]/g, '')
+    .replace(/\[CATALYST:[^\]]*\]/g, '')
+    .trim();
 
-  // ── Build a narrative paragraph, not bullet points ──
   let story = '';
 
-  // OPENING: How did the bot find this trade?
-  if (isBackfill) {
-    story += `This <strong>${sym}</strong> ${isLong ? 'long' : 'short'} trade was placed before full logging was enabled, so the detailed reasoning wasn't captured. `;
-  } else if (isSentinel) {
-    story += `Breaking news hit for <strong>${sym}</strong> and the bot's News Sentinel picked it up in real time. Instead of waiting for the next scheduled scan, it ran a rapid analysis and decided to go ${isLong ? 'long' : 'short'}. `;
-  } else {
-    story += `During a routine market scan, the bot's AI agents analysed <strong>${sym}</strong> and decided to go ${isLong ? 'long (buy)' : 'short (bet on a decline)'}. `;
+  // ── AGENT REASONING QUOTE — shown first if substantive ──
+  const isSubstantive = rawReasoning.length > 60 && !isBackfill;
+  if (isSubstantive) {
+    const sourceTag = isSentinel ? '<span style="font-size:9px;color:var(--orange);letter-spacing:1px">NEWS SENTINEL</span> '
+                    : isCatalyst ? '<span style="font-size:9px;color:var(--orange);letter-spacing:1px">CATALYST</span> '
+                    : '<span style="font-size:9px;color:var(--muted2);letter-spacing:1px">AGENT REASONING</span> ';
+    story += `<div style="border-left:2px solid var(--orange);padding:6px 10px;margin-bottom:10px;background:rgba(255,107,0,.04)">
+      ${sourceTag}
+      <div style="margin-top:4px;font-size:11px;color:var(--text);line-height:1.6">${esc(rawReasoning)}</div>
+    </div>`;
   }
 
-  // CONVICTION: Why was the bot confident?
+  // ── SCORE BREAKDOWN BARS (if available) ──
+  if (t.score_breakdown && Object.keys(t.score_breakdown).length > 0) {
+    const dims = Object.entries(t.score_breakdown);
+    const maxVal = Math.max(...dims.map(([,v]) => Math.abs(v || 0)), 1);
+    story += `<div style="margin-bottom:10px">
+      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:4px">SIGNAL DIMENSIONS</div>
+      ${dims.map(([dim, val]) => {
+        const pct = Math.min(Math.abs((val || 0) / maxVal) * 100, 100);
+        const barColor = (val || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+        return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+          <div style="width:60px;font-size:9px;color:var(--muted2);text-transform:uppercase">${dim}</div>
+          <div style="flex:1;height:4px;background:var(--border2);border-radius:2px">
+            <div style="width:${pct}%;height:100%;background:${barColor};border-radius:2px"></div>
+          </div>
+          <div style="width:32px;font-size:9px;color:${barColor};text-align:right">${(val||0).toFixed(1)}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  // ── CONVICTION ──
   if (t.score && t.score > 0) {
-    if (t.score >= 38) {
-      story += `The conviction was <strong>very high</strong> — the agents scored it ${t.score} out of 50, well above the threshold to trade. `;
-    } else if (t.score >= 28) {
-      story += `The conviction was <strong>moderate</strong> — scored ${t.score}/50, clearing the minimum bar. `;
-    } else {
-      story += `The conviction was <strong>borderline</strong> at ${t.score}/50 — the bot took it but it wasn't a slam dunk. `;
-    }
+    const convLabel = t.score >= 38 ? 'very high' : t.score >= 28 ? 'moderate' : 'borderline';
+    story += `Conviction: <strong>${convLabel}</strong> — scored ${t.score}/50. `;
   }
 
-  // REASONING: The actual "why" in plain English
-  if (reasoning && reasoning.length > 10 && !isBackfill) {
-    // Clean up technical jargon for readability
-    let clean = reasoning
-      .replace(/MACD/g, 'momentum indicator')
-      .replace(/RSI/g, 'strength indicator')
-      .replace(/agents agreed \d\/\d\.?\s*/gi, '')
-      .replace(/Stop loss triggered.*$/i, '')
-      .trim();
-    if (clean.length > 10) {
-      story += clean.endsWith('.') ? clean + ' ' : clean + '. ';
-    }
-  }
-
-  // MARKET CONTEXT
+  // ── MARKET CONTEXT ──
   if (t.regime && t.regime !== 'UNKNOWN') {
     const regimeMap = {
-      'BULL_TRENDING': 'bullish and trending up',
-      'BEAR_TRENDING': 'bearish and trending down',
-      'CHOPPY': 'choppy with no clear direction',
-      'PANIC': 'in panic mode with extreme fear'
+      'BULL_TRENDING': 'bullish, trending up',
+      'BEAR_TRENDING': 'bearish, trending down',
+      'CHOPPY': 'choppy, no clear direction',
+      'PANIC': 'panic — extreme fear'
     };
-    const regimeDesc = regimeMap[t.regime] || t.regime.toLowerCase();
-    story += `The overall market was <strong>${regimeDesc}</strong>`;
-    if (t.vix) story += ` with a VIX (fear gauge) of ${Number(t.vix).toFixed(0)}`;
+    const regimeDesc = regimeMap[t.regime] || t.regime;
+    story += `Market regime: <strong>${regimeDesc}</strong>`;
+    if (t.vix) story += ` | VIX: ${Number(t.vix).toFixed(0)}`;
     story += '. ';
   }
 
-  // OUTCOME: What happened?
+  // ── OUTCOME ──
   if (t.pnl != null) {
     const won = t.pnl >= 0;
     const holdStr = t.hold_minutes
-      ? (t.hold_minutes >= 60
-        ? (t.hold_minutes / 60).toFixed(1) + ' hours'
-        : t.hold_minutes + ' minutes')
+      ? (t.hold_minutes >= 60 ? (t.hold_minutes / 60).toFixed(1) + 'h' : t.hold_minutes + 'm')
       : null;
-
     const exitMap = {
-      'stop_loss': 'the price moved against the position and hit the stop-loss — the safety net that limits how much a trade can lose',
-      'take_profit': 'the price reached the profit target and the bot locked in gains automatically',
-      'agent_sell': 'the AI agents re-analysed the position and decided it was time to exit',
-      'trailing_stop': 'a trailing stop kicked in — the bot locked in profit as the price pulled back',
-      'manual': 'the position was closed manually'
+      'stop_loss':     'stop-loss triggered',
+      'take_profit':   'take-profit hit',
+      'agent_sell':    'agents voted to exit',
+      'trailing_stop': 'trailing stop triggered',
+      'manual':        'manually closed'
     };
-    const exitDesc = exitMap[t.exit_reason] || t.exit_reason || 'the position was closed';
-
-    if (won) {
-      story += `<span class="pp"><strong>This was a winning trade (+${fmt$(t.pnl)})</strong></span>`;
-    } else {
-      story += `<span class="pn"><strong>This was a losing trade (${fmt$(t.pnl)})</strong></span>`;
-    }
-    if (holdStr) story += `, held for ${holdStr}`;
-    story += `. It closed because ${exitDesc}.`;
+    const exitDesc = exitMap[t.exit_reason] || t.exit_reason || 'position closed';
+    story += won
+      ? `<span class="pp"><strong>WIN: +${fmt$(t.pnl)}</strong></span>`
+      : `<span class="pn"><strong>LOSS: ${fmt$(t.pnl)}</strong></span>`;
+    if (holdStr) story += ` held ${holdStr}`;
+    story += ` — ${exitDesc}.`;
   }
 
-  // LESSON (short takeaway)
-  if (t.pnl != null && !isBackfill) {
-    story += '<div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(34,34,34,.5);font-size:10px;color:var(--muted2)">';
-    if (t.pnl < 0 && t.exit_reason === 'stop_loss') {
-      story += '💡 <strong>Takeaway:</strong> The stop-loss did its job — it kept the loss controlled. Not every trade wins, but the key is keeping losses small.';
-    } else if (t.pnl >= 0 && t.exit_reason === 'take_profit') {
-      story += '💡 <strong>Takeaway:</strong> Clean trade — the bot identified the opportunity, set a target, and exited with profit when it was hit.';
-    } else if (t.pnl >= 0 && t.exit_reason === 'agent_sell') {
-      story += '💡 <strong>Takeaway:</strong> The agents spotted a shift in conditions and decided to take profit before things changed.';
-    } else if (t.pnl < 0 && t.exit_reason === 'agent_sell') {
-      story += '💡 <strong>Takeaway:</strong> The agents decided to cut the position early rather than wait for the stop-loss — sometimes exiting a losing trade quickly is the right call.';
-    } else {
-      story += '💡 <strong>Takeaway:</strong> Every trade is a data point. The bot learns from wins and losses to refine future decisions.';
-    }
-    story += '</div>';
+  // ── BACKFILL NOTICE ──
+  if (isBackfill) {
+    story += '<div style="color:var(--muted2);font-size:10px;margin-top:6px">Imported from IBKR history — no agent reasoning captured for this trade.</div>';
   }
 
-  return story || 'No explanation available — this trade was placed before detailed logging was enabled.';
+  return story || '<div style="color:var(--muted2)">No reasoning recorded for this trade.</div>';
 }
 
 // ── Render agents view ─────────────────────────────────────
@@ -1750,7 +1771,7 @@ function renderEquityChart(data) {
             label: ctx => ' Portfolio: $' + Number(ctx.parsed.y).toLocaleString('en', {minimumFractionDigits: 2}),
             afterLabel: ctx => {
               const pnl = ctx.parsed.y - startVal;
-              const pct = ((pnl / startVal) * 100).toFixed(2);
+              const pct = startVal > 0 ? ((pnl / startVal) * 100).toFixed(2) : '0.00';
               return ' P&L: ' + (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2) + ' (' + pct + '%)';
             }
           }
@@ -1858,12 +1879,15 @@ function renderGrowth(perf, equity) {
   pnlEl.className = 'metric-val ' + (perf.total_pnl >= 0 ? 'cg' : 'cr');
 
   const wrEl = document.getElementById('g-wr');
-  wrEl.textContent = perf.win_rate + '%';
-  wrEl.className = 'metric-val ' + (perf.win_rate >= 52 ? 'cg' : perf.win_rate >= 45 ? 'co' : 'cr');
+  const wr = perf.win_rate != null ? perf.win_rate : null;
+  wrEl.textContent = wr != null ? wr + '%' : '—';
+  wrEl.className = 'metric-val ' + (wr >= 52 ? 'cg' : wr >= 45 ? 'co' : 'cr');
 
   const pfEl = document.getElementById('g-pf');
-  pfEl.textContent = perf.profit_factor;
-  pfEl.className = 'metric-val ' + (perf.profit_factor >= 1.5 ? 'cg' : 'co');
+  const pf = perf.profit_factor;
+  // profit_factor=0 means no losing trades (backend returns 0 when gross_loss=0) → show ∞
+  pfEl.textContent = pf == null ? '—' : pf === 0 ? '∞' : pf;
+  pfEl.className = 'metric-val ' + (pf === 0 || pf >= 1.5 ? 'cg' : 'co');
 
   document.getElementById('g-rl').textContent = perf.avg_win && perf.avg_loss
     ? Math.abs(perf.avg_win / perf.avg_loss).toFixed(2) + ':1' : '—';
@@ -1923,7 +1947,7 @@ async function poll() {
     const pnlEl = document.getElementById('s-pnl');
     pnlEl.textContent = (pnl >= 0 ? '+' : '-') + fmt$(Math.abs(pnl));
     pnlEl.className   = 'sv ' + (pnl >= 0 ? 'cg' : 'cr');
-    const pnlPct = d.portfolio_value ? (pnl / d.portfolio_value * 100).toFixed(3) : '0.000';
+    const pnlPct = (d.portfolio_value > 0) ? (pnl / d.portfolio_value * 100).toFixed(3) : '0.000';
     const pnlPctEl = document.getElementById('s-pnlp');
     pnlPctEl.textContent = (pnl >= 0 ? '+' : '') + pnlPct + '% today';
     pnlPctEl.style.color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
@@ -1979,9 +2003,17 @@ async function poll() {
     // Session
     document.getElementById('session-name').textContent = d.session || '—';
 
-    // Agents required
-    document.getElementById('agents-req').textContent = (d.agents_required || 4) + '/6';
-    document.getElementById('last-agree').textContent  = d.last_agents_agreed != null ? d.last_agents_agreed + '/6' : '—';
+    // Agents required — store globals for Last Decision card and color-code the vote
+    const _req = d.agents_required || 4;
+    const _agreed = d.last_agents_agreed;
+    window._agentsRequired   = _req;
+    window._lastAgentsAgreed = _agreed;
+    window._lastScanTime     = d.last_scan || '';
+    document.getElementById('agents-req').textContent = _req + '/6';
+    const agreeEl = document.getElementById('last-agree');
+    agreeEl.textContent = _agreed != null ? _agreed + '/6' : '—';
+    if (_agreed != null) agreeEl.style.color = _agreed >= _req ? 'var(--green)' : 'var(--red)';
+    else agreeEl.style.color = '';
 
     // Risk budget
     if (d.portfolio_value) {
@@ -1997,9 +2029,9 @@ async function poll() {
     // Directional Skew (roadmap #07)
     if (d.skew) {
       const sk = d.skew['48h'] || d.skew;
-      const sv = sk.skew || 0;
+      const sv = (isFinite(sk.skew) && sk.skew != null) ? sk.skew : 0;
       const skBar = document.getElementById('skew-bar');
-      const pctWidth = Math.abs(sv) * 50; // 0-50% of bar width
+      const pctWidth = Math.min(Math.abs(sv) * 50, 50); // cap at 50% each side
       if (sv >= 0) {
         skBar.style.left = '50%';
         skBar.style.width = pctWidth + '%';
@@ -2018,11 +2050,12 @@ async function poll() {
       else { alertEl.style.display = 'none'; }
     }
 
-    // Logs
+    // Logs — only rebuild DOM when count changes (preserves scroll position)
     const logArea = document.getElementById('log-area');
-    if (d.logs && d.logs.length) {
+    if (d.logs && d.logs.length && d.logs.length !== _lastLogCount) {
+      _lastLogCount = d.logs.length;
       logArea.innerHTML = d.logs.map(l =>
-        `<div class="log-row"><span class="lt">${l.time}</span><span class="lk lk-${l.type}">${l.type}</span><span class="lm">${l.msg}</span></div>`
+        `<div class="log-row"><span class="lt">${esc(l.time)}</span><span class="lk lk-${esc(l.type)}">${esc(l.type)}</span><span class="lm">${esc(l.msg)}</span></div>`
       ).join('');
       document.getElementById('log-count').textContent = d.logs.length + ' events';
     }
@@ -2030,9 +2063,9 @@ async function poll() {
     // AI box
     if (d.claude_analysis) document.getElementById('ai-box').textContent = d.claude_analysis;
 
-    // Positions and trades
+    // Positions and today's results
     renderPositions(d.positions);
-    renderRecentTrades(d.trades, d.recent_orders || []);
+    if (d.all_trades) renderTodaysTrades(d.all_trades);
 
     // History view
     if (d.all_trades) { allTrades = d.all_trades; renderHistory(); }
@@ -2111,7 +2144,7 @@ async function poll() {
 
     // Capital management display
     if (d.effective_capital) {
-      document.getElementById('cfg-start-cap').textContent = fmt$(1000000);
+      document.getElementById('cfg-start-cap').textContent = fmt$(d.effective_capital || 1000000);
       document.getElementById('cfg-eff-cap').textContent   = fmt$(d.effective_capital);
       const cpnl = (d.portfolio_value || 0) - d.effective_capital;
       const cpnlEl = document.getElementById('cfg-current-pnl');
@@ -2123,10 +2156,11 @@ async function poll() {
     if (d.last_reload && d.last_reload_files && d.last_reload_files.length > 0) {
       const pill = document.getElementById('reload-pill');
       const info = document.getElementById('reload-info');
-      pill.style.display = 'flex';
-      info.textContent = d.last_reload_files.join(', ') + ' @ ' + d.last_reload;
-      // Hide after 30 seconds
-      setTimeout(() => { pill.style.display = 'none'; }, 30000);
+      if (pill && info) {
+        pill.style.display = 'flex';
+        info.textContent = d.last_reload_files.join(', ') + ' @ ' + d.last_reload;
+        setTimeout(() => { pill.style.display = 'none'; }, 30000);
+      }
     }
 
     // Scan progress
@@ -2143,8 +2177,15 @@ async function poll() {
   }
 }
 
+// ── Poll guard: skip tick if previous fetch is still in flight ─
+let _pollInFlight = false;
+let _lastLogCount = 0;
 poll();
-setInterval(poll, 2000);
+setInterval(async () => {
+  if (_pollInFlight) return;
+  _pollInFlight = true;
+  try { await poll(); } finally { _pollInFlight = false; }
+}, 2000);
 
 // ── News rendering ─────────────────────────────────────────
 let _allNewsItems = [];
@@ -2207,18 +2248,18 @@ function filterNews() {
     const ageText = item.recency < 1 ? 'Just now' :
                     item.recency < 24 ? Math.round(item.recency) + 'h ago' :
                     Math.round(item.recency / 24) + 'd ago';
-    const url = 'https://finance.yahoo.com/quote/' + item.symbol + '/news/';
+    const url = 'https://finance.yahoo.com/quote/' + encodeURIComponent(item.symbol) + '/news/';
 
     return `<a class="news-item" href="${url}" target="_blank" rel="noopener" style="display:flex;align-items:flex-start;gap:8px">
       <span class="news-badge ${badgeClass}" style="flex-shrink:0">${badgeText}</span>
-      <span style="color:var(--orange);font-weight:600;font-size:11px;min-width:48px;flex-shrink:0">${item.symbol}</span>
+      <span style="color:var(--orange);font-weight:600;font-size:11px;min-width:48px;flex-shrink:0">${esc(item.symbol)}</span>
       <div class="news-content" style="flex:1;min-width:0">
-        <div class="news-headline" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.headline}</div>
+        <div class="news-headline" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.headline)}</div>
         <div class="news-meta">
-          <span>${ageText}</span>
+          <span>${esc(ageText)}</span>
           <span>Score: ${item.news_score}/10</span>
-          ${kwText ? `<span class="news-kw">${kwText}</span>` : ''}
-          ${item.catalyst ? `<span style="color:var(--orange)">${item.catalyst}</span>` : ''}
+          ${kwText ? `<span class="news-kw">${esc(kwText)}</span>` : ''}
+          ${item.catalyst ? `<span style="color:var(--orange)">${esc(item.catalyst)}</span>` : ''}
         </div>
       </div>
     </a>`;
@@ -2231,6 +2272,7 @@ function toggleConvo() {
   const panel = document.getElementById('convo-panel');
   const arrow = document.getElementById('convo-arrow');
   const logArea = document.getElementById('log-area');
+  if (!body || !panel || !arrow || !logArea) return;
   const isHidden = body.classList.toggle('hidden');
   panel.classList.toggle('collapsed', isHidden);
   arrow.textContent = isHidden ? '▶' : '▼';
@@ -2239,23 +2281,23 @@ function toggleConvo() {
 }
 
 function annotateIndicators(text) {
-  // Add plain-English tooltips for common indicator terms
+  // Escape raw text first so agent output can't inject HTML, then add our own annotation spans.
+  let result = esc(text);
   const annotations = {
-    'ADX': '<span class="indicator-tag tag-neutral" title="Average Directional Index — measures trend strength. >25 = strong trend, <20 = no trend">ADX</span>',
-    'MFI': '<span class="indicator-tag tag-neutral" title="Money Flow Index — volume-weighted RSI. >65 = overbought (institutions buying), <35 = oversold">MFI</span>',
-    'VWAP': '<span class="indicator-tag tag-neutral" title="Volume-Weighted Average Price — institutional benchmark. Price above VWAP = bullish, below = bearish">VWAP</span>',
+    'ADX': '<span class="indicator-tag tag-neutral" title="Average Directional Index — measures trend strength. &gt;25 = strong trend, &lt;20 = no trend">ADX</span>',
+    'MFI': '<span class="indicator-tag tag-neutral" title="Money Flow Index — volume-weighted RSI. &gt;65 = overbought, &lt;35 = oversold">MFI</span>',
+    'VWAP': '<span class="indicator-tag tag-neutral" title="Volume-Weighted Average Price — institutional benchmark. Above VWAP = bullish, below = bearish">VWAP</span>',
     'OBV': '<span class="indicator-tag tag-neutral" title="On-Balance Volume — cumulative volume direction. Rising = accumulation, falling = distribution">OBV</span>',
     'Donchian': '<span class="indicator-tag tag-neutral" title="Donchian Channel — 20-period high/low. Breakout = potential new trend">Donchian</span>',
     'Squeeze': '<span class="indicator-tag tag-squeeze" title="BB Squeeze — Bollinger Bands inside Keltner Channels = volatility compression. Explosive move incoming">Squeeze</span>',
-    'EMA': '<span class="indicator-tag tag-neutral" title="Exponential Moving Average — trend direction. Bull aligned = 9>21>50, Bear = opposite">EMA</span>',
+    'EMA': '<span class="indicator-tag tag-neutral" title="Exponential Moving Average — trend direction. Bull aligned = 9&gt;21&gt;50, Bear = opposite">EMA</span>',
     'MACD': '<span class="indicator-tag tag-neutral" title="Moving Average Convergence Divergence — momentum and trend changes">MACD</span>',
-    'RSI': '<span class="indicator-tag tag-neutral" title="Relative Strength Index — momentum oscillator. >70 = overbought, <30 = oversold">RSI</span>',
+    'RSI': '<span class="indicator-tag tag-neutral" title="Relative Strength Index — momentum oscillator. &gt;70 = overbought, &lt;30 = oversold">RSI</span>',
     'Bollinger': '<span class="indicator-tag tag-neutral" title="Bollinger Bands — volatility envelope around price. Squeeze = low volatility before big move">Bollinger</span>',
     'Keltner': '<span class="indicator-tag tag-neutral" title="Keltner Channel — ATR-based envelope. When BB is inside KC = squeeze">Keltner</span>',
   };
-  let result = text;
   for (const [term, html] of Object.entries(annotations)) {
-    // Only replace first occurrence of standalone term per text block
+    // Only annotate first occurrence per text block (avoids double-wrapping on re-render)
     const regex = new RegExp('\\b' + term + '\\b', 'i');
     result = result.replace(regex, html);
   }
@@ -2263,20 +2305,36 @@ function annotateIndicators(text) {
 }
 
 function renderAgentConversation(convo) {
-  // Live conversation panel (compact, in Live view)
+  // Last Decision card — shows final decision summary, not raw agent debate
   const body = document.getElementById('convo-body');
   if (!convo || !convo.length) return;
 
-  body.innerHTML = convo.map(msg => {
-    const isFinal = msg.agent === 'Final Decision Maker';
-    return `<div class="convo-msg ${isFinal ? 'convo-verdict' : ''}">
-      <div class="convo-agent">
-        <span>${isFinal ? '⚡' : '🧠'} ${msg.agent} <span class="convo-role">— ${msg.role}</span></span>
-        <span class="convo-time">${msg.time}</span>
+  // Extract final decision maker output
+  const final = convo.find(m => m.agent === 'Final Decision Maker') || convo[convo.length - 1];
+  const agreed = (window._lastAgentsAgreed != null) ? window._lastAgentsAgreed : null;
+  const required = (window._agentsRequired != null) ? window._agentsRequired : 4;
+  const scanTime = (window._lastScanTime) ? window._lastScanTime : '';
+
+  const voteColor = (agreed != null)
+    ? (agreed >= required ? 'var(--green)' : 'var(--red)')
+    : 'var(--muted2)';
+  const voteBadge = agreed != null
+    ? `<span style="color:${voteColor};font-weight:700;font-size:11px">${agreed}/6 agents agreed</span>`
+    : '';
+
+  const summary = (final && final.output) ? esc(final.output) : 'No decision yet.';
+
+  body.innerHTML = `
+    <div style="padding:10px 12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        ${voteBadge}
+        <span style="font-size:9px;color:var(--muted2)">${esc(scanTime)}</span>
       </div>
-      <div class="convo-text">${msg.output.slice(0, 300)}${msg.output.length > 300 ? '...' : ''}</div>
+      <div style="font-size:11px;color:var(--text);line-height:1.6;white-space:pre-wrap;border-left:2px solid var(--orange);padding-left:8px">${summary}</div>
+      <div style="margin-top:8px;text-align:right">
+        <a href="#" onclick="event.preventDefault();const agTab=document.querySelector('[onclick*=\'agents\']');if(agTab)switchTab('agents',agTab);" style="font-size:9px;color:var(--orange);letter-spacing:1px;text-decoration:none">FULL DEBATE →</a>
+      </div>
     </div>`;
-  }).join('');
 }
 
 function renderAgentConvoFull(convo, lastScan) {
@@ -2289,9 +2347,9 @@ function renderAgentConvoFull(convo, lastScan) {
     const isFinal = msg.agent === 'Final Decision Maker';
     const borderColor = isFinal ? 'var(--green)' : `hsl(${25 + i * 40}, 85%, 55%)`;
     return `<div class="agent-convo-card" style="border-left-color:${borderColor}">
-      <div class="agent-name" style="color:${borderColor}">${isFinal ? '⚡' : 'Agent ' + (i+1) + ':'} ${msg.agent}</div>
-      <div class="agent-role">${msg.role}</div>
-      <div class="agent-output">${annotateIndicators(msg.output)}</div>
+      <div class="agent-name" style="color:${borderColor}">${isFinal ? '⚡' : 'Agent ' + (i+1) + ':'} ${esc(msg.agent)}</div>
+      <div class="agent-role">${esc(msg.role)}</div>
+      <div class="agent-output">${annotateIndicators(msg.output || '')}</div>
     </div>`;
   }).join('');
 }
@@ -2345,19 +2403,29 @@ function applySettings() {
     sentinel_use_finviz:          document.getElementById('cfg-sentinel-finviz').value === 'true',
   };
 
+  const btn = document.querySelector('.setting-card .apply-btn');
+  const orig = btn.textContent;
   fetch('/api/settings', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(settings)
   }).then(r => r.json()).then(d => {
     if (d.ok) {
-      const btn = document.querySelector('.setting-card .apply-btn');
-      const orig = btn.textContent;
       btn.textContent = '✅ Applied!';
       btn.style.borderColor = 'var(--green)';
       btn.style.color = 'var(--green)';
       setTimeout(() => { btn.textContent = orig; btn.style.borderColor = ''; btn.style.color = ''; }, 2000);
+    } else {
+      btn.textContent = '⚠ Error';
+      btn.style.borderColor = 'var(--red)';
+      btn.style.color = 'var(--red)';
+      setTimeout(() => { btn.textContent = orig; btn.style.borderColor = ''; btn.style.color = ''; }, 3000);
     }
+  }).catch(() => {
+    btn.textContent = '⚠ Failed';
+    btn.style.borderColor = 'var(--red)';
+    btn.style.color = 'var(--red)';
+    setTimeout(() => { btn.textContent = orig; btn.style.borderColor = ''; btn.style.color = ''; }, 3000);
   });
 }
 
@@ -2371,7 +2439,7 @@ function renderFavTags() {
     return;
   }
   el.innerHTML = favourites.map(t =>
-    `<span class="fav-tag">${t}<span onclick="removeFav('${t}')" title="Remove">×</span></span>`
+    `<span class="fav-tag">${esc(t)}<span onclick="removeFav(${JSON.stringify(t)})" title="Remove">×</span></span>`
   ).join('');
 }
 
@@ -2422,9 +2490,11 @@ function showPositionDetail(idx) {
   const pnl = dir === 'SHORT'
     ? (p.entry - p.current) * Math.abs(p.qty) * mult
     : (p.current - p.entry) * Math.abs(p.qty) * mult;
-  const pct = dir === 'SHORT'
-    ? ((p.entry - p.current) / p.entry) * 100
-    : ((p.current - p.entry) / p.entry) * 100;
+  const pct = (p.entry && p.entry !== 0)
+    ? (dir === 'SHORT'
+      ? ((p.entry - p.current) / p.entry) * 100
+      : ((p.current - p.entry) / p.entry) * 100)
+    : 0;
   const posValue = Math.abs(p.current * p.qty * mult);
   const pnlCol = pnl >= 0 ? 'var(--green)' : 'var(--red)';
 

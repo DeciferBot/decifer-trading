@@ -44,8 +44,8 @@ def load_capital_base() -> dict:
         try:
             with open(CAPITAL_FILE, "r") as f:
                 return json.load(f)
-        except Exception:
-            pass
+        except Exception as exc:
+            log.error(f"load_capital_base: failed to parse {CAPITAL_FILE} — {exc}. Returning defaults.")
     # Default: starting capital from config, no adjustments
     return {
         "starting_capital": CONFIG.get("starting_capital", 1_000_000),
@@ -169,7 +169,8 @@ def load_orders() -> list:
     try:
         with open(ORDER_LOG_FILE, "r") as f:
             return json.load(f)
-    except Exception:
+    except Exception as exc:
+        log.error(f"load_orders: failed to parse {ORDER_LOG_FILE} — {exc}. Returning empty list.")
         return []
 
 
@@ -315,8 +316,7 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
                     )
                     if should_update:
                         existing.update({k: v for k, v in record.items() if v is not None})
-                        with open(TRADE_LOG_FILE, "w") as f:
-                            json.dump(trades, f, indent=2)
+                        _save_trades(trades)
                         log.info(f"Updated existing CLOSE with better data: {record['symbol']} qty={new_qty} P&L=${record.get('pnl')}")
                     else:
                         log.info(f"Duplicate CLOSE skipped: {record['symbol']}")
@@ -334,11 +334,34 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
                 pass
 
     trades.append(record)
-
-    with open(TRADE_LOG_FILE, "w") as f:
-        json.dump(trades, f, indent=2)
-
+    _save_trades(trades)
     log.info(f"Trade logged: {action} {trade.get('symbol')} | P&L: {outcome.get('pnl') if outcome else 'open'}")
+
+
+def _save_trades(trades: list) -> None:
+    """Write trades list to disk atomically (tempfile + rename) so a crash never corrupts the file.
+    Falls back to a direct write if the directory does not support temp files (e.g. /dev/null in tests).
+    """
+    import tempfile
+    target = TRADE_LOG_FILE
+    dir_ = os.path.dirname(os.path.abspath(target)) or "."
+    try:
+        os.makedirs(dir_, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=dir_, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(trades, f, indent=2)
+            os.replace(tmp, target)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+    except Exception:
+        # Fallback: direct write (e.g. target is /dev/null in test environments)
+        with open(target, "w") as f:
+            json.dump(trades, f, indent=2)
 
 
 def load_trades() -> list:
@@ -348,7 +371,8 @@ def load_trades() -> list:
     try:
         with open(TRADE_LOG_FILE, "r") as f:
             return json.load(f)
-    except Exception:
+    except Exception as exc:
+        log.error(f"load_trades: failed to parse {TRADE_LOG_FILE} — {exc}. Returning empty list.")
         return []
 
 
