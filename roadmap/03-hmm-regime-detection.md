@@ -1,11 +1,21 @@
 # Feature: HMM-Based Regime Detection
 
-**Status:** Research Complete — Needs Validation
-**Priority:** HIGH — Enables regime-weighted scoring
-**Estimated Build Time:** 1-2 weeks
+**Status:** DEFERRED — Gate: ≥200 closed trades + IC Phase 2 review (see DECISIONS.md Action #9)
+**Priority:** ON HOLD — Do not build until gate is met
+**Estimated Build Time:** 1-2 weeks (when gate opens)
 **Files to Modify:** `scanner.py`, `bot.py`, `config.py`
 **Dependencies:** Enough historical trade data to validate (50+ trades across regimes)
 **New Dependencies:** `pip install hmmlearn`
+
+---
+
+## Gate Condition (DO NOT BUILD UNTIL MET)
+
+This feature is locked pending:
+1. `closed_trades >= 200` — need enough IC data across multiple regimes to validate any alternative approach
+2. IC Phase 2 review confirms the current VIX-proxy is the limiting factor in signal quality (not scoring, execution, or data quality)
+
+When the gate is met, HMM **replaces** the VIX-proxy entirely — it does not run alongside it. Running two regime detectors in parallel produces architectural incoherence.
 
 ---
 

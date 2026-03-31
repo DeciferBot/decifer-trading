@@ -584,7 +584,16 @@ class RegimeClassifier:
     """
     ML-based regime detection. Trained on labeled historical data.
     Predicts: BULL_TRENDING, BEAR_TRENDING, CHOPPY, PANIC, BREAKOUT
+
+    NOT connected to the production pipeline.
+    Use scanner.get_market_regime() for live regime detection.
+    See DECISIONS.md Action #9 and config["regime_detector"].
     """
+
+    # Production guard — prevents accidental wiring into the live pipeline.
+    # Set to False only after IC Phase 2 gate review (closed_trades >= 200)
+    # and only when replacing (not supplementing) the VIX-proxy detector.
+    PRODUCTION_LOCKED = True
 
     def __init__(self):
         if not SKLEARN_AVAILABLE:
@@ -630,6 +639,13 @@ class RegimeClassifier:
         market_data: {returns, volatility, volume_ma_ratio}
         Returns: regime string
         """
+        if self.PRODUCTION_LOCKED:
+            raise RuntimeError(
+                "RegimeClassifier.predict_regime() is locked for production use. "
+                "Use scanner.get_market_regime() instead. "
+                "See DECISIONS.md Action #9."
+            )
+
         if self.model is None:
             return "UNKNOWN"
 

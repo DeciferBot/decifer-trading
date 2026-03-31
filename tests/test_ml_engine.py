@@ -444,39 +444,18 @@ class TestSignalEnhancer:
 
 @pytest.mark.skipif(not SKLEARN_AVAILABLE, reason="scikit-learn not installed")
 class TestRegimeClassifier:
-    """Tests for RegimeClassifier.predict_regime."""
+    """Tests for RegimeClassifier — production-locked, research use only."""
 
-    def test_predict_regime_without_training_returns_default(self):
-        """predict_regime gracefully returns a string regime without a trained model."""
+    def test_production_locked_flag_is_true(self):
+        """RegimeClassifier must carry PRODUCTION_LOCKED=True (see DECISIONS.md Action #9)."""
+        assert RegimeClassifier.PRODUCTION_LOCKED is True
+
+    def test_predict_regime_raises_when_locked(self):
+        """predict_regime must raise RuntimeError while PRODUCTION_LOCKED is True."""
         rc = RegimeClassifier()
-        rc.model = None  # ensure untrained
-        market_data = {"returns": 0.01, "volatility": 0.15, "volume": 1.0}
-        result = rc.predict_regime(market_data)
-        # Must return a string (regime name)
-        assert isinstance(result, str)
-
-    def test_predict_regime_with_trained_model(self):
-        """predict_regime returns a known regime after training on synthetic data."""
-        import pandas as pd
-        import numpy as np
-
-        rc = RegimeClassifier()
-        # Build minimal synthetic OHLCV + regime_label DataFrame
-        n = 120
-        df = pd.DataFrame({
-            "close": 100 + np.cumsum(np.random.randn(n) * 0.5),
-            "volume": np.random.randint(1_000_000, 5_000_000, n),
-            "regime_label": [["BULL_TRENDING", "CHOPPY", "BEAR_TRENDING"][i % 3] for i in range(n)]
-        })
-        df["high"] = df["close"] * 1.01
-        df["low"] = df["close"] * 0.99
-        df["open"] = df["close"].shift(1).fillna(df["close"])
-
-        rc.train_from_data(df)
-        market_data = {"returns": 0.005, "volatility": 0.12, "volume": 2_000_000}
-        result = rc.predict_regime(market_data)
-        assert isinstance(result, str)
-        assert len(result) > 0
+        market_data = {"returns": 0.01, "volatility": 0.15, "volume_ma_ratio": 1.0}
+        with pytest.raises(RuntimeError, match="production"):
+            rc.predict_regime(market_data)
 
 
 # ────────────────────────────────────────────────────────────────────────────

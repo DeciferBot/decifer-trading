@@ -6,6 +6,23 @@
 
 ---
 
+## 2026-04-01 — Action #9: Regime Approach Decision
+
+### VIX-Proxy Locked as Sole Regime Detector
+
+**Decision**: Commit to VIX-proxy + SPY/QQQ EMA as the sole market regime detector. HMM upgrade explicitly deferred until IC Phase 2 gate (≥200 closed trades).
+
+**Rescinds**: The 2026-03-26 "Regime Probabilities (HMM) over Hard Labels" entry. That decision was premature — it was recorded before we had enough live trade data to validate any alternative. The architectural risk of building HMM alongside the existing VIX-proxy outweighs the potential accuracy gain at current trade volume.
+
+**Gate for HMM**: Reopen when `closed_trades >= 200` AND IC Phase 2 review is complete. At that point, HMM replaces VIX-proxy entirely — it does not run alongside it. Running two regime detectors in parallel produces architectural incoherence (conflicting hard labels for the same decision point).
+
+**What stays active**:
+- `scanner.get_market_regime()` — 4-state hard classifier (BULL_TRENDING / BEAR_TRENDING / CHOPPY / PANIC)
+- `signals.get_market_regime_vix()` — 2-state VIX router for dimension weighting (momentum / mean_reversion)
+- `ml_engine.RegimeClassifier` — remains in codebase for future research; `PRODUCTION_LOCKED = True`, not connected to the production pipeline
+
+---
+
 ## 2026-03-26 — Bias Removal & Regime Adaptation Roadmap
 
 ### Identified Structural Bullish Bias
