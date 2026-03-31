@@ -160,9 +160,16 @@ def _fetch_social(universe: list, session: str) -> dict:
     """
     Fetch social sentiment for up to 50 symbols.
     Skipped during PRE_MARKET and AFTER_HOURS (Reddit/ApeWisdom inactive).
+    Skipped when social dimension is disabled in config (saves 2-5s per scan).
     """
     if session in ("PRE_MARKET", "AFTER_HOURS"):
         return {}
+    try:
+        from config import CONFIG
+        if not CONFIG.get("dimension_flags", {}).get("social", True):
+            return {}
+    except Exception:
+        pass
     try:
         from social_sentiment import get_social_sentiment
         sentiment = get_social_sentiment(universe[:50])
@@ -257,8 +264,9 @@ def run_signal_pipeline(
     ---------------
     1. TV pre-filter      — cuts universe using TradingView indicators
     2. News sentiment     — Yahoo RSS + keyword scoring
-    3. Social sentiment   — Reddit/ApeWisdom (skipped in extended hours)
-    4. Score universe     — 9-dimension yfinance scoring
+    3. Social sentiment   — Reddit/ApeWisdom (skipped in extended hours + when disabled)
+    4. Score universe     — 10-dimension yfinance scoring (alpha-pipeline-v2)
+    4b. Small cap track   — supplemental $50M-$2B universe (if enabled)
     5. Strategy threshold — raise bar in defensive strategy modes
     6. IC audit log       — write all_scored to learning log (side effect)
     7. Typed signals      — convert scored dicts → Signal objects
@@ -296,9 +304,9 @@ def run_signal_pipeline(
     # 3. Social sentiment (gated on session)
     social_sentiment = _fetch_social(filtered, session)
 
-    # 4. Score universe on 9 dimensions
+    # 4. Score universe on 10 dimensions (alpha-pipeline-v2)
     regime_name = regime.get("regime", "UNKNOWN")
-    log.info(f"Scoring universe on 9 dimensions [{regime_name}]...")
+    log.info(f"Scoring universe on 10 dimensions [{regime_name}]...")
     scored, all_scored = score_universe(
         filtered,
         regime_name,
@@ -307,6 +315,37 @@ def run_signal_pipeline(
         regime_router=regime.get("regime_router", "unknown"),
     )
     log.info(f"score_universe: {len(scored)} above threshold, {len(all_scored)} total")
+
+    # 4b. Small cap supplemental track ($50M–$2B market cap)
+    try:
+        from config import CONFIG as _cfg
+        if _cfg.get("small_cap_enabled", False):
+            from scanner import get_small_cap_universe
+            sc_symbols = get_small_cap_universe()
+            if sc_symbols:
+                sc_threshold = _cfg.get("small_cap_min_score", 22)
+                sc_scored, sc_all = score_universe(
+                    sc_symbols,
+                    regime_name,
+                    news_data=news_sentiment,
+                    social_data=social_sentiment,
+                    regime_router=regime.get("regime_router", "unknown"),
+                )
+                # Tag small cap results so downstream can apply tighter position sizing
+                for s in sc_scored:
+                    s["universe_track"] = "small_cap"
+                for s in sc_all:
+                    s["universe_track"] = "small_cap"
+                # Filter by small cap threshold and merge (dedup by symbol)
+                existing_syms = {s["symbol"] for s in scored}
+                sc_above = [s for s in sc_scored
+                            if s["score"] >= sc_threshold and s["symbol"] not in existing_syms]
+                scored.extend(sc_above)
+                sc_all_new = [s for s in sc_all if s["symbol"] not in {x["symbol"] for x in all_scored}]
+                all_scored.extend(sc_all_new)
+                log.info(f"Small cap track: {len(sc_above)} new candidates above {sc_threshold}/50")
+    except Exception as _sc_e:
+        log.debug(f"Small cap track skipped: {_sc_e}")
 
     # 5. Strategy-mode threshold adjustment
     scored = _apply_strategy_threshold(scored, strategy_mode, regime_name)

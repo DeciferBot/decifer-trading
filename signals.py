@@ -1,21 +1,22 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║   <>  DECIFER 2.0  —  signals.py                           ║
-# ║   Lean 9-dimension signal engine — Wall Street alpha        ║
+# ║   10-dimension alpha signal engine — genuine edge focused   ║
 # ║                                                              ║
 # ║   Architecture: ONE indicator per dimension.                 ║
 # ║   No redundant oscillators. Every signal measures something  ║
 # ║   different. Clean scores that differentiate, not confuse.   ║
 # ║                                                              ║
 # ║   Dimensions:                                                ║
-# ║     1. TREND      — EMA alignment + ADX strength             ║
-# ║     2. MOMENTUM   — MFI (volume-weighted RSI)                ║
-# ║     3. SQUEEZE    — BB inside Keltner = coiled spring         ║
-# ║     4. FLOW       — VWAP position + OBV divergence            ║
-# ║     5. BREAKOUT   — Donchian channel breach + volume          ║
-# ║     6. CONFLUENCE — Multi-timeframe agreement                 ║
-# ║     7. NEWS       — Yahoo RSS keyword + Claude sentiment      ║
-# ║     8. SOCIAL     — Reddit mention velocity + VADER           ║
-# ║     9. REVERSION  — Variance Ratio + OU half-life + z-score    ║
+# ║     1.  DIRECTIONAL   — EMA alignment × ADX + TF vote        ║
+# ║     2.  MOMENTUM      — MFI (volume-weighted RSI)            ║
+# ║     3.  SQUEEZE       — BB inside Keltner = coiled spring     ║
+# ║     4.  FLOW          — VWAP position + OBV divergence        ║
+# ║     5.  BREAKOUT      — Donchian channel breach + volume      ║
+# ║     6.  PEAD          — Post-Earnings Announcement Drift      ║
+# ║     7.  NEWS          — Yahoo RSS keyword + Claude sentiment  ║
+# ║     8.  SHORT_SQUEEZE — High short float + volume surge       ║
+# ║     9.  REVERSION     — Variance Ratio + OU half-life + z     ║
+# ║     10. OVERNIGHT_DRIFT — 90-day close-to-open statistics     ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import time as _time
@@ -68,14 +69,18 @@ def _regime_multipliers(regime_router: str) -> dict:
     """
     Return per-dimension score multipliers for the two-state routing regime.
 
-    "momentum":       TREND/MOMENTUM/SQUEEZE/FLOW/BREAKOUT/MTF × 1.3, REVERSION × 0.7
-    "mean_reversion": same dims × 0.7, REVERSION × 1.3
+    "momentum":       DIRECTIONAL/MOMENTUM/SQUEEZE/FLOW/BREAKOUT x 1.3, REVERSION x 0.7
+    "mean_reversion": same dims x 0.7, REVERSION x 1.3
     All other values (or regime_routing_enabled=False): all multipliers = 1.0
 
-    NEWS and SOCIAL are neutral (unaffected by regime routing).
+    NEWS, PEAD, SHORT_SQUEEZE, OVERNIGHT_DRIFT are regime-neutral (fundamental/event).
     """
-    _all_ones = {"trend": 1.0, "momentum": 1.0, "squeeze": 1.0, "flow": 1.0,
-                 "breakout": 1.0, "mtf": 1.0, "news": 1.0, "social": 1.0, "reversion": 1.0}
+    _all_ones = {
+        "directional":    1.0, "momentum": 1.0, "squeeze": 1.0,
+        "flow":           1.0, "breakout": 1.0, "pead":    1.0,
+        "news":           1.0, "short_squeeze":  1.0,
+        "reversion":      1.0, "overnight_drift": 1.0,
+    }
 
     if not CONFIG.get("regime_routing_enabled", True):
         return _all_ones
@@ -84,13 +89,19 @@ def _regime_multipliers(regime_router: str) -> dict:
     rev_down = CONFIG.get("regime_router_reversion_mult", 0.7)
 
     if regime_router == "momentum":
-        return {"trend": mom_up, "momentum": mom_up, "squeeze": mom_up,
-                "flow": mom_up, "breakout": mom_up, "mtf": mom_up,
-                "news": 1.0, "social": 1.0, "reversion": rev_down}
+        return {
+            "directional":    mom_up,  "momentum":    mom_up,  "squeeze": mom_up,
+            "flow":           mom_up,  "breakout":    mom_up,
+            "pead":           1.0,     "news":        1.0,
+            "short_squeeze":  1.0,     "reversion":   rev_down, "overnight_drift": 1.0,
+        }
     if regime_router == "mean_reversion":
-        return {"trend": rev_down, "momentum": rev_down, "squeeze": rev_down,
-                "flow": rev_down, "breakout": rev_down, "mtf": rev_down,
-                "news": 1.0, "social": 1.0, "reversion": mom_up}
+        return {
+            "directional":    rev_down, "momentum":   rev_down, "squeeze": rev_down,
+            "flow":           rev_down, "breakout":   rev_down,
+            "pead":           1.0,      "news":       1.0,
+            "short_squeeze":  1.0,      "reversion":  mom_up,   "overnight_drift": 1.0,
+        }
     return _all_ones
 
 
@@ -130,6 +141,15 @@ log = logging.getLogger("decifer.signals")
 
 # Suppress noisy yfinance warnings (ETF fundamentals 404s, Invalid Crumb 401s)
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+
+# ── Module-level caches for new alpha dimensions ─────────────────────────────
+# These live in the worker process memory (multiprocessing). TTL is enforced by
+# checking time.time() against the cache timestamp.
+import time as _cache_time
+_PEAD_CACHE: dict = {}          # symbol → (earnings_df, timestamp)
+_SHORT_FLOAT_CACHE: dict = {}   # symbol → (short_float_pct, timestamp)
+_PEAD_CACHE_TTL = 6 * 3600      # 6 hours (earnings data changes quarterly)
+_SHORT_FLOAT_CACHE_TTL = 4 * 3600  # 4 hours (short float updates daily)
 
 
 def _safe_download(symbol: str, **kwargs) -> pd.DataFrame | None:
@@ -525,6 +545,30 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
             except Exception:
                 adf_pvalue = 1.0
 
+        # ── OVERNIGHT DRIFT STATS (1d timeframe only) ────────
+        # Computed here from raw close/open series already in memory.
+        # Stored in sig_1d and consumed by score_overnight_drift() in
+        # compute_confluence(). No extra API calls required.
+        overnight_mean_return = 0.0
+        overnight_sharpe = 0.0
+        overnight_n_days = 0
+        if tf == "1d" and len(close) >= 30:
+            try:
+                _o = open_.values.astype(float)
+                _c = close.values.astype(float)
+                # overnight[t] = open[t] / close[t-1] - 1
+                _denom = np.where(_c[:-1] > 0, _c[:-1], 1e-9)
+                _ov_ret = (_o[1:] / _denom) - 1
+                _ov_ret = _ov_ret[-90:]  # Last 90 days max
+                if len(_ov_ret) >= 20:
+                    overnight_mean_return = float(np.mean(_ov_ret))
+                    _ov_std = float(np.std(_ov_ret, ddof=1))
+                    overnight_n_days = len(_ov_ret)
+                    if _ov_std > 1e-8:
+                        overnight_sharpe = float(overnight_mean_return / _ov_std * np.sqrt(252))
+            except Exception:
+                overnight_mean_return = 0.0
+
         # ── SIGNAL CLASSIFICATION ────────────────────────────
         h_val = float(macd_hist.iloc[-1])
 
@@ -591,6 +635,10 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
             "ou_halflife":      round(ou_halflife, 1),
             "zscore":           round(zscore_val, 2),
             "adf_pvalue":       round(adf_pvalue, 4),
+            # Overnight drift (populated for 1d timeframe only; 0 for others)
+            "overnight_mean":   round(overnight_mean_return, 6),
+            "overnight_sharpe": round(overnight_sharpe, 3),
+            "overnight_n_days": overnight_n_days,
             # Signal
             "signal":           signal,
         }
@@ -715,13 +763,316 @@ def timeframe_alignment_check(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | 
     return result
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# NEW ALPHA DIMENSION SCORING FUNCTIONS
+# Each returns (score: int 0-10, direction: int +1/-1/0)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def score_directional(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None) -> tuple:
+    """
+    DIRECTIONAL — replaces the old separate TREND + MTF dimensions.
+
+    Merges EMA alignment quality (ADX-gated) with multi-timeframe consensus
+    into a single dimension, eliminating correlated IC weight splitting.
+
+    Sub-components:
+      A. EMA alignment × ADX gate  (0-5 pts)
+      B. MACD acceleration          (0-2 pts)
+      C. Timeframe agreement vote   (0-3 pts)
+    Max = 10.
+    Direction = majority vote across timeframes, EMA tiebreak.
+    """
+    # ── Component A: EMA alignment quality × ADX ──────────────────
+    adx = sig_5m.get("adx", 0)
+    adx_mult = 1.25 if adx > 25 else 1.0 if adx > 20 else 0.7
+
+    bull = sig_5m.get("bull_aligned", False)
+    bear = sig_5m.get("bear_aligned", False)
+    sig_str = sig_5m.get("signal", "HOLD")
+
+    if bull or bear:
+        base = 4
+    elif "BUY" in sig_str or "SELL" in sig_str:
+        base = 2
+    else:
+        base = 0
+
+    a_pts = min(5, int(round(base * adx_mult)))
+
+    # ── Component B: MACD acceleration ────────────────────────────
+    macd_accel = sig_5m.get("macd_accel", 0)
+    dir_guess = +1 if (bull or "BUY" in sig_str) else (-1 if (bear or "SELL" in sig_str) else 0)
+
+    if dir_guess == +1:
+        b_pts = 2 if macd_accel > 0 else (1 if macd_accel > -0.001 else 0)
+    elif dir_guess == -1:
+        b_pts = 2 if macd_accel < 0 else (1 if macd_accel < 0.001 else 0)
+    else:
+        b_pts = 0
+
+    # ── Component C: Timeframe agreement vote ─────────────────────
+    tfs = [sig_5m]
+    if sig_1d: tfs.append(sig_1d)
+    if sig_1w: tfs.append(sig_1w)
+    total_tfs = len(tfs)
+
+    buys  = sum(1 for s in tfs if "BUY"  in s.get("signal", ""))
+    sells = sum(1 for s in tfs if "SELL" in s.get("signal", ""))
+    agree = max(buys, sells)
+    agree_ratio = agree / total_tfs if total_tfs > 0 else 0
+
+    c_pts = 3 if agree_ratio >= 1.0 else (2 if agree_ratio >= 0.67 else (1 if agree_ratio >= 0.5 else 0))
+
+    score = min(10, a_pts + b_pts + c_pts)
+
+    # Direction: majority timeframe vote, tiebreak from EMA
+    if buys > sells:
+        direction = +1
+    elif sells > buys:
+        direction = -1
+    elif bull:
+        direction = +1
+    elif bear:
+        direction = -1
+    else:
+        direction = 0
+
+    return (score, direction)
+
+
+def score_pead(symbol: str, sig_1d: dict | None, vol_ratio: float = 0.0) -> tuple:
+    """
+    PEAD — Post-Earnings Announcement Drift.
+
+    One of the most documented behavioral finance anomalies: analysts
+    systematically underreact to earnings surprises, causing drift that
+    continues 20-60 days post-announcement.
+
+    Score formula:
+      surprise_tier (0-6 pts) x recency_decay (linear 0-1)
+      + price_momentum_pts (0-2 pts)
+      + volume_confirmation (0-2 pts)
+
+    Direction: LONG only (anomaly is reliably long-side; short-side PEAD
+    requires higher conviction and separate validation).
+    """
+    try:
+        now = _cache_time.time()
+        if symbol in _PEAD_CACHE:
+            cached_df, cached_ts = _PEAD_CACHE[symbol]
+            if now - cached_ts < _PEAD_CACHE_TTL:
+                earnings_df = cached_df
+            else:
+                earnings_df = None
+        else:
+            earnings_df = None
+
+        if earnings_df is None:
+            try:
+                ticker = yf.Ticker(symbol)
+                earnings_df = ticker.get_earnings_dates(limit=8)
+                _PEAD_CACHE[symbol] = (earnings_df, now)
+            except Exception:
+                return (0, 0)
+
+        if earnings_df is None or len(earnings_df) == 0:
+            return (0, 0)
+
+        # Find most recent past earnings with a known surprise
+        today = pd.Timestamp.now(tz="UTC").normalize()
+        surprise_col = None
+        for col in earnings_df.columns:
+            if "surprise" in col.lower() or "Surprise" in col:
+                surprise_col = col
+                break
+        if surprise_col is None:
+            return (0, 0)
+
+        past = earnings_df[earnings_df.index <= today].dropna(subset=[surprise_col])
+        if len(past) == 0:
+            return (0, 0)
+
+        latest = past.iloc[0]  # Most recent (index is sorted descending)
+        surprise_pct = float(latest[surprise_col])
+
+        if surprise_pct < 3.0:  # Below noise threshold
+            return (0, 0)
+
+        # Recency decay (linear: 1.0 at day 0 → 0.0 at day 60)
+        earnings_date = latest.name
+        if hasattr(earnings_date, 'tz_localize') and earnings_date.tzinfo is None:
+            earnings_date = earnings_date.tz_localize("UTC")
+        days_since = (today - earnings_date).days
+        if days_since > 60 or days_since < 0:
+            return (0, 0)
+        decay = max(0.0, 1.0 - (days_since / 60.0))
+
+        # Surprise tier (0-6 pts)
+        if surprise_pct >= 20:   surprise_pts = 6
+        elif surprise_pct >= 10: surprise_pts = 5
+        elif surprise_pct >= 7:  surprise_pts = 4
+        elif surprise_pct >= 5:  surprise_pts = 3
+        else:                    surprise_pts = 2  # >= 3%
+
+        # Price momentum confirmation (0-2 pts) — is drift actually happening?
+        mom_pts = 0
+        if sig_1d is not None:
+            # bull_aligned = price is above key EMAs = drift in progress
+            if sig_1d.get("bull_aligned", False):
+                mom_pts = 2
+            elif "BUY" in sig_1d.get("signal", ""):
+                mom_pts = 1
+
+        # Volume confirmation (0-2 pts)
+        vol_pts = 2 if vol_ratio >= 2.0 else (1 if vol_ratio >= 1.5 else 0)
+
+        raw = (surprise_pts * decay) + mom_pts + vol_pts
+        score = int(round(min(10, raw)))
+        direction = +1 if score > 0 else 0
+
+        return (score, direction)
+
+    except Exception:
+        return (0, 0)
+
+
+def _fetch_short_float(symbol: str) -> float | None:
+    """
+    Scrape short float % from finviz.com/quote.ashx?t=SYMBOL.
+    Returns float (e.g. 15.2 for 15.2%) or None on failure.
+    Cached per symbol with 4-hour TTL.
+    """
+    import requests as _requests
+
+    now = _cache_time.time()
+    if symbol in _SHORT_FLOAT_CACHE:
+        cached_val, cached_ts = _SHORT_FLOAT_CACHE[symbol]
+        if now - cached_ts < _SHORT_FLOAT_CACHE_TTL:
+            return cached_val
+
+    try:
+        url = f"https://finviz.com/quote.ashx?t={symbol}"
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; Decifer/1.0)"}
+        resp = _requests.get(url, headers=headers, timeout=5)
+        if resp.status_code != 200:
+            return None
+
+        html = resp.text
+        # Find "Short Float" label in fundamentals table
+        idx = html.find("Short Float")
+        if idx == -1:
+            return None
+        # The value is in the next <td> tag
+        td_start = html.find("<td", idx + 1)
+        td_content_start = html.find(">", td_start) + 1
+        td_content_end = html.find("<", td_content_start)
+        raw_val = html[td_content_start:td_content_end].strip().rstrip("%")
+        if raw_val in ("", "-", "N/A"):
+            return None
+        val = float(raw_val)
+        _SHORT_FLOAT_CACHE[symbol] = (val, now)
+        return val
+    except Exception:
+        return None
+
+
+def score_short_squeeze(symbol: str, sig_5m: dict) -> tuple:
+    """
+    SHORT_SQUEEZE — High short float + volume surge + price vs resistance.
+
+    Shorts forced to cover when: high short interest + volume surge drives
+    price above their stop levels (Donchian resistance). Asymmetric upside.
+
+    Score components:
+      A. Short float tier       (0-4 pts)
+      B. Volume surge           (0-3 pts)
+      C. Price vs Donchian high (0-3 pts)
+    Direction: LONG only.
+    """
+    short_float = _fetch_short_float(symbol)
+    if short_float is None:
+        return (0, 0)
+
+    # Component A: Short float tier (0-4 pts)
+    if short_float >= 30:   sf_pts = 4
+    elif short_float >= 20: sf_pts = 3
+    elif short_float >= 15: sf_pts = 2
+    elif short_float >= 10: sf_pts = 1
+    else:
+        return (0, 0)   # Below 10% — squeeze unlikely
+
+    # Component B: Volume surge (0-3 pts)
+    vol_ratio = sig_5m.get("vol_ratio", 0)
+    vol_pts = 3 if vol_ratio >= 3.0 else (2 if vol_ratio >= 2.0 else (1 if vol_ratio >= 1.5 else 0))
+
+    # Component C: Price vs Donchian high (0-3 pts)
+    donch_high = sig_5m.get("donch_high", 0)
+    price = sig_5m.get("price", 0)
+    if donch_high > 0 and price > 0:
+        pct = (price - donch_high) / donch_high
+        resist_pts = 3 if pct >= 0 else (2 if pct >= -0.02 else (1 if pct >= -0.05 else 0))
+    else:
+        resist_pts = 0
+
+    raw = sf_pts + vol_pts + resist_pts
+    score = min(10, raw)
+    direction = +1 if score > 0 else 0
+    return (score, direction)
+
+
+def score_overnight_drift(sig_1d: dict | None) -> tuple:
+    """
+    OVERNIGHT_DRIFT — 90-day close-to-open return statistics.
+
+    One of the most persistent market anomalies: equity risk premium
+    accrues disproportionately overnight. Per-symbol stats are computed
+    inside compute_indicators() for the 1d timeframe and stored in sig_1d.
+
+    Score = mean_overnight_return_tier x Sharpe_consistency_multiplier x 2
+    Direction: +1 if positive drift, -1 if negative drift.
+    """
+    if sig_1d is None:
+        return (0, 0)
+
+    mean_ov   = sig_1d.get("overnight_mean", 0.0)
+    sharpe    = sig_1d.get("overnight_sharpe", 0.0)
+    n_days    = sig_1d.get("overnight_n_days", 0)
+
+    if n_days < 20:
+        return (0, 0)
+
+    abs_mean = abs(mean_ov)
+
+    # Mean return tier (0-5 pts)
+    if abs_mean >= 0.0015:  mean_pts = 5
+    elif abs_mean >= 0.0010: mean_pts = 4
+    elif abs_mean >= 0.0006: mean_pts = 3
+    elif abs_mean >= 0.0003: mean_pts = 2
+    elif abs_mean >= 0.0001: mean_pts = 1
+    else:
+        return (0, 0)   # No discernible edge
+
+    # Sharpe consistency multiplier
+    abs_sharpe = abs(sharpe)
+    sharpe_mult = 1.0 if abs_sharpe >= 1.5 else (0.8 if abs_sharpe >= 1.0 else
+                  (0.5 if abs_sharpe >= 0.5 else 0.2))
+
+    raw = mean_pts * sharpe_mult * 2
+    score = int(round(min(10, raw)))
+    direction = +1 if mean_ov > 0 else (-1 if mean_ov < -0.0001 else 0)
+    return (score, direction)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+
+
 def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
                        news_score: int = 0, social_score: int = 0,
                        regime_router: str = "unknown") -> dict:
     """
-    Decifer 2.0 — 9-dimension scoring engine.
+    Decifer 2.0 — 10-dimension scoring engine (alpha-pipeline-v2).
 
-    Each dimension scores 0-10, total max 90, capped at 50.
+    Each dimension scores 0-10, total max 100, capped at 50.
     Bonus points for candlestick confirmation.
 
     Multi-Timeframe Alignment Gate (NEW):
@@ -730,16 +1081,17 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
       - "soft" mode: deducts mtf_penalty_points from final score
       - "off" mode:  legacy behaviour (Dimension 6 only)
 
-    Dimensions:
-      1. TREND (0-10)      — EMA alignment × ADX gating
-      2. MOMENTUM (0-10)   — MFI + RSI slope
-      3. SQUEEZE (0-10)    — BB/Keltner compression → breakout potential
-      4. FLOW (0-10)       — VWAP position + OBV confirmation
-      5. BREAKOUT (0-10)   — Donchian channel breach + volume
-      6. MTF (0-10)        — Multi-timeframe agreement
-      7. NEWS (0-10)       — Yahoo RSS keyword + Claude sentiment
-      8. SOCIAL (0-10)     — Reddit mention velocity + VADER
-      9. REVERSION (0-10)  — Variance Ratio + OU half-life + z-score
+    Dimensions (alpha-pipeline-v2):
+      1.  DIRECTIONAL (0-10)    — EMA alignment × ADX + timeframe vote
+      2.  MOMENTUM (0-10)       — MFI + RSI slope
+      3.  SQUEEZE (0-10)        — BB/Keltner compression → breakout potential
+      4.  FLOW (0-10)           — VWAP position + OBV confirmation
+      5.  BREAKOUT (0-10)       — Donchian channel breach + volume
+      6.  PEAD (0-10)           — Post-Earnings Announcement Drift
+      7.  NEWS (0-10)           — Yahoo RSS keyword + Claude sentiment
+      8.  SHORT_SQUEEZE (0-10)  — High short float + volume surge
+      9.  REVERSION (0-10)      — Variance Ratio + OU half-life + z-score
+      10. OVERNIGHT_DRIFT (0-10)— 90-day close-to-open statistics
     """
     # ── MULTI-TIMEFRAME ALIGNMENT GATE ─────────────────────────
     # Run alignment check BEFORE scoring to short-circuit on hard gate
@@ -766,6 +1118,12 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             "ou_halflife": 0,
             "zscore": 0,
             "adf_pvalue": 1.0,
+            "score_breakdown": {
+                "directional": 0, "momentum": 0, "squeeze": 0, "flow": 0,
+                "breakout": 0, "pead": 0, "news": 0, "short_squeeze": 0,
+                "reversion": 0, "overnight_drift": 0,
+            },
+            "disabled_dimensions": [],
         }
 
     signals = [sig_5m["signal"]]
@@ -808,32 +1166,16 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # disabled (config flag) or regime is unknown — zero-cost no-op.
     _rmult = _regime_multipliers(regime_router)
 
-    # ── 1. TREND (0-10) — EMA alignment quality × ADX strength ──
-    # Score measures how cleanly aligned the EMAs are, regardless of
-    # which direction they point. Direction comes from which way.
-    adx  = sig_5m.get("adx", 0)
-    adx_mult = 1.0 if adx > 25 else 0.7 if adx > 20 else 0.4
-
-    base_trend = 0
-    trend_dir = 0
-    trend_pts = 0
-    if _enabled("trend"):
-        if sig_5m["bull_aligned"]:
-            base_trend = 8
-            trend_dir = +1
-            if sig_5m["macd_accel"] > 0:
-                base_trend = 10  # MACD confirms the alignment
-        elif sig_5m["bear_aligned"]:
-            base_trend = 8
-            trend_dir = -1
-            if sig_5m["macd_accel"] < 0:
-                base_trend = 10  # MACD confirms the alignment
-        elif "BUY" in sig_5m["signal"] or "SELL" in sig_5m["signal"]:
-            base_trend = 4  # Signal without full alignment
-            trend_dir = +1 if "BUY" in sig_5m["signal"] else -1
-        trend_pts = int(round(int(base_trend * adx_mult) * _rmult["trend"]))
-        score += trend_pts
-        dim_directions.append((trend_dir, trend_pts))
+    # ── 1. DIRECTIONAL (0-10) — EMA alignment × ADX + timeframe vote ──
+    # Merges the old TREND (EMA+ADX) and MTF (timeframe consensus) dimensions.
+    # Eliminates correlated IC weight splitting. See score_directional().
+    directional_pts = 0
+    directional_dir = 0
+    if _enabled("directional"):
+        directional_pts, directional_dir = score_directional(sig_5m, sig_1d, sig_1w)
+        directional_pts = int(round(directional_pts * _rmult.get("directional", 1.0)))
+        score += directional_pts
+        dim_directions.append((directional_dir, directional_pts))
 
     # ── 2. MOMENTUM (0-10) — MFI distance from 50 (symmetric) ──
     # MFI > 65 and MFI < 35 both score 10. The distance from the
@@ -958,17 +1300,17 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         score += breakout_score
         dim_directions.append((breakout_dir, breakout_score))
 
-    # ── 6. MULTI-TIMEFRAME CONFLUENCE (0-10) ────────────
-    total_tf = len(signals)
-    agree    = max(buy_signals, sell_signals)
-    mtf_score = 0
-    mtf_dir = 0
-    if _enabled("mtf"):
-        mtf_score = int(round(int((agree / total_tf) * 10) * _rmult["mtf"]))
-        score += mtf_score
-        # MTF direction = majority of timeframes
-        mtf_dir = +1 if buy_signals > sell_signals else (-1 if sell_signals > buy_signals else 0)
-        dim_directions.append((mtf_dir, mtf_score))
+    # ── 6. PEAD (0-10) — Post-Earnings Announcement Drift ──
+    # Analysts systematically underreact to earnings surprises.
+    # Drift continues 20-60 days post-announcement. See score_pead().
+    pead_pts = 0
+    pead_dir = 0
+    if _enabled("pead"):
+        _vol_ratio = sig_5m.get("vol_ratio", 0)
+        pead_pts, pead_dir = score_pead(sig_5m.get("symbol", ""), sig_1d, _vol_ratio)
+        pead_pts = int(round(pead_pts * _rmult.get("pead", 1.0)))
+        score += pead_pts
+        dim_directions.append((pead_dir, pead_pts))
 
     # ── 7. NEWS SENTIMENT (0-10) ────────────────────────
     # news_score is pre-computed by news.py (keyword + Claude two-tier)
@@ -981,13 +1323,16 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         # abs value, so direction comes from the raw news_score sign
         dim_directions.append((+1 if news_score > 0 else (-1 if news_score < 0 else 0), ns))
 
-    # ── 8. SOCIAL SENTIMENT (0-10) ────────────────────
-    # social_score from social_sentiment.py (Reddit mention velocity + VADER)
-    ss = 0
-    if _enabled("social"):
-        ss = int(round(min(10, max(0, social_score)) * _rmult["social"]))
-        score += ss
-        dim_directions.append((+1 if social_score > 0 else (-1 if social_score < 0 else 0), ss))
+    # ── 8. SHORT_SQUEEZE (0-10) ───────────────────────
+    # High short float + volume surge + price vs resistance.
+    # Asymmetric upside when shorts are forced to cover. See score_short_squeeze().
+    ss_pts = 0
+    ss_dir = 0
+    if _enabled("short_squeeze"):
+        ss_pts, ss_dir = score_short_squeeze(sig_5m.get("symbol", ""), sig_5m)
+        ss_pts = int(round(ss_pts * _rmult.get("short_squeeze", 1.0)))
+        score += ss_pts
+        dim_directions.append((ss_dir, ss_pts))
 
     # ── 9. REVERSION (0-10) — mean-reversion tendency ──────
     # Composite of Hurst exponent + OU half-life + z-score.
@@ -1058,6 +1403,17 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         rev_dir = -1 if _zscore > 0.5 else (+1 if _zscore < -0.5 else 0)
         dim_directions.append((rev_dir, rev_score_capped))
 
+    # ── 10. OVERNIGHT_DRIFT (0-10) ─────────────────────────
+    # Per-symbol 90-day close-to-open drift statistics. Computed in
+    # compute_indicators() for the 1d timeframe, read from sig_1d.
+    overnight_pts = 0
+    overnight_dir = 0
+    if _enabled("overnight_drift"):
+        overnight_pts, overnight_dir = score_overnight_drift(sig_1d)
+        overnight_pts = int(round(overnight_pts * _rmult.get("overnight_drift", 1.0)))
+        score += overnight_pts
+        dim_directions.append((overnight_dir, overnight_pts))
+
     # ── BONUS: Candlestick confirmation (+3 max) ────────
     # Direction-agnostic: both bull and bear candles add bonus points.
     # Direction already captured in dim_directions.
@@ -1086,15 +1442,16 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         _icw = _get_ic_weights()
         _N_DIMS = len(_IC_DIMS)
         _ic_breakdown = {
-            "trend":     trend_pts,
-            "momentum":  momentum,
-            "squeeze":   squeeze_score,
-            "flow":      flow_score,
-            "breakout":  breakout_score,
-            "mtf":       mtf_score,
-            "news":      ns,
-            "social":    ss,
-            "reversion": rev_score_capped,
+            "directional":    directional_pts,
+            "momentum":       momentum,
+            "squeeze":        squeeze_score,
+            "flow":           flow_score,
+            "breakout":       breakout_score,
+            "pead":           pead_pts,
+            "news":           ns,
+            "short_squeeze":  ss_pts,
+            "reversion":      rev_score_capped,
+            "overnight_drift":overnight_pts,
         }
         _ic_sum = sum(
             _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v
@@ -1194,17 +1551,19 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         "ou_halflife": round(_ou_hl, 1),
         "zscore":     round(_zscore, 2),
         "adf_pvalue": round(_adf_p, 4),
-        # Per-dimension score breakdown (for trade logging / feedback loop)
+        # Per-dimension score breakdown (for trade logging / IC feedback loop)
+        # Keys must exactly match ic_calculator.DIMENSIONS for IC computation.
         "score_breakdown": {
-            "trend":     trend_pts,
-            "momentum":  momentum,
-            "squeeze":   squeeze_score,
-            "flow":      flow_score,
-            "breakout":  breakout_score,
-            "mtf":       mtf_score,
-            "news":      ns,
-            "social":    ss,
-            "reversion": rev_score_capped,
+            "directional":    directional_pts,
+            "momentum":       momentum,
+            "squeeze":        squeeze_score,
+            "flow":           flow_score,
+            "breakout":       breakout_score,
+            "pead":           pead_pts,
+            "news":           ns,
+            "short_squeeze":  ss_pts,
+            "reversion":      rev_score_capped,
+            "overnight_drift":overnight_pts,
         },
         # Dimensions that were zeroed by a False flag (for diagnostics / dashboard)
         "disabled_dimensions": disabled_dimensions,

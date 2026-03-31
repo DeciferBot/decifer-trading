@@ -113,17 +113,20 @@ CONFIG = {
     # Set any flag to False to zero that dimension's score and remove its
     # direction vote. Useful when Signal Decay Monitor identifies a harmful
     # or noisy dimension — flip the flag, no deploy required.
-    # All flags default to True (full pipeline, backward-compatible).
+    # IC auto-disable (ic_calculator.py) will write overrides to
+    # data/settings_override.json which is merged into dimension_flags at startup.
     "dimension_flags": {
-        "trend":     True,   # Dim 1 — EMA alignment × ADX
-        "momentum":  True,   # Dim 2 — MFI + RSI slope
-        "squeeze":   True,   # Dim 3 — BB/Keltner compression
-        "flow":      True,   # Dim 4 — VWAP + OBV
-        "breakout":  True,   # Dim 5 — Donchian channel breach
-        "mtf":       True,   # Dim 6 — Multi-timeframe agreement
-        "news":      True,   # Dim 7 — Yahoo RSS + Claude sentiment
-        "social":    True,   # Dim 8 — Reddit velocity + VADER
-        "reversion": True,   # Dim 9 — Variance Ratio + OU half-life + z-score
+        "directional":    True,   # Dim 1  — EMA alignment × ADX + timeframe vote (merged TREND+MTF)
+        "momentum":       True,   # Dim 2  — MFI + RSI slope
+        "squeeze":        True,   # Dim 3  — BB/Keltner compression
+        "flow":           True,   # Dim 4  — VWAP + OBV
+        "breakout":       True,   # Dim 5  — Donchian channel breach
+        "pead":           True,   # Dim 6  — Post-Earnings Announcement Drift
+        "news":           True,   # Dim 7  — Yahoo RSS + Claude sentiment
+        "short_squeeze":  True,   # Dim 8  — Short float + volume surge + price vs resistance
+        "reversion":      True,   # Dim 9  — Variance Ratio + OU half-life + z-score
+        "overnight_drift":True,   # Dim 10 — 90-day close-to-open drift statistics
+        "social":         False,  # Disabled — Reddit velocity (meme-prone, IC auto-enable if proven)
     },
 
     # ── IC CALCULATOR ────────────────────────────────────────────
@@ -132,12 +135,32 @@ CONFIG = {
     # Phase 2 (needs 200+ trades): raise ic_min_threshold to 0.03 to suppress noise.
     "ic_calculator": {
         "rolling_window":    60,    # Trades in rolling IC window
-        "min_valid_records": 20,    # Min records with resolved forward returns before IC trusted
+        "min_valid_records": 10,    # Lowered from 20: IC history resets on dim refactor; recover faster
         "ic_min_threshold":  0.0,   # Noise floor — dimensions below this get zero weight
                                     #   Phase 1: 0.0 (any positive IC passes)
                                     #   Phase 2: raise to 0.03 once 200+ trades available
         "max_single_weight": 0.40,  # HHI cap — no dimension may exceed this share of total weight
+
+        # IC auto-disable: if a dimension's IC falls below the threshold for N
+        # consecutive weekly updates, it is automatically disabled via
+        # data/settings_override.json. Re-enabled when IC recovers above re-enable
+        # threshold for M consecutive weeks.
+        "auto_disable_threshold":  -0.02,  # IC below this triggers disable countdown
+        "auto_disable_weeks":       3,     # Consecutive weeks before disable fires
+        "auto_enable_threshold":    0.01,  # IC above this triggers re-enable countdown
+        "auto_enable_weeks":        2,     # Consecutive weeks before re-enable fires
     },
+
+    # ── OVERNIGHT DRIFT CACHE ────────────────────────────────────
+    "overnight_cache_path": "data/overnight_cache.json",
+
+    # ── SMALL / MICRO CAP UNIVERSE ───────────────────────────────
+    # Supplemental universe track for market caps $50M–$2B.
+    # Smaller companies are less efficiently priced — fewer institutional
+    # participants means exploitable anomalies persist longer.
+    "small_cap_enabled":      True,
+    "small_cap_min_score":    22,   # Slightly higher threshold (wider spreads, more risk)
+    "small_cap_max_position": 0.05, # 5% max per position (vs 10% for large cap)
 
     # ── MARKET HOURS (EST) ────────────────────────────────────
     "pre_market_start":         "04:00",
@@ -232,6 +255,17 @@ CONFIG = {
     "vix_choppy_max":           25,     # VIX 15-25 = choppy
     "vix_panic_min":            35,     # VIX above = panic — no trades
     "vix_spike_pct":            0.20,   # 20% VIX spike in 1 hour = exit all
+
+    # ── REGIME DETECTOR LOCK ──────────────────────────────────
+    # Committed approach: "vix_proxy" (scanner.get_market_regime + signals.get_market_regime_vix)
+    # DO NOT change to "ml_random_forest" or "hmm" without IC Phase 2 gate review.
+    # Gate: closed_trades >= 200. See DECISIONS.md Action #9.
+    "regime_detector":          "vix_proxy",
+
+    # Canonical regime state names produced by the VIX-proxy detector.
+    # Any function that produces or consumes regime strings must use only these values.
+    # "UNKNOWN" is the safe fallback when data is unavailable.
+    "regime_states":            ("BULL_TRENDING", "BEAR_TRENDING", "CHOPPY", "PANIC", "UNKNOWN"),
 
     # ── INVERSE ETFs FOR SHORT EXPOSURE ───────────────────────
     "inverse_etfs": {
@@ -359,6 +393,21 @@ CONFIG = {
             "require_positive_expectancy": True, # avg PnL/trade must be > 0
         },
 
+        # ── IC + Walk-Forward Validation Gate ─────────────────────────────────
+        # Hard gate before Phase 4 / live trading. All three sub-gates must pass:
+        #   1. Sample gate  — enough signal records with resolved forward returns
+        #   2. IC gate      — composite IC is meaningfully predictive
+        #   3. Sharpe gate  — out-of-sample walk-forward Sharpe > threshold
+        #
+        # Run: python ic_validator.py  to evaluate and persist the result to
+        # data/ic_validation_result.json.  phase_gate.validate() reads that file.
+        "ic_validation_gate": {
+            "min_valid_records":      50,    # records with resolved 5-day forward returns
+            "min_mean_positive_ic":   0.05,  # mean IC of positive-IC dimensions
+            "min_positive_dims":      5,     # at least N dimensions with IC > 0
+            "min_walkforward_sharpe": 0.8,   # out-of-sample Sharpe threshold
+        },
+
         "phase1_exit_criteria": {
             "min_closed_trades":       200,   # Trades needed before ML/backtest are meaningful
             "min_test_pass_rate":      0.80,  # Fraction of pytest tests that must pass
@@ -368,16 +417,20 @@ CONFIG = {
         # Attempting to enable these in earlier phases triggers a PhaseGateViolation.
         "frozen_features": {
             # Phase 4: multi-account, live accounts, cloud infrastructure
-            "live_account_trading":     4,   # Enabling live_1 / live_2 for order execution
-            "multi_account_aggregation":4,   # aggregate_accounts with multiple live accounts
-            "cloud_deployment":         4,   # Any hosted / cloud infra work
+            "live_account_trading":      4,   # Enabling live_1 / live_2 for order execution
+            "multi_account_aggregation": 4,   # aggregate_accounts with multiple live accounts
+            "cloud_deployment":          4,   # Any hosted / cloud infra work
             # Phase 4 safety gate: Telegram kill switch MUST be configured before live trading.
             # phase_gate.validate() will block Phase 4 if bot_token or authorized_chat_ids is unset.
-            "telegram_kill_switch":     4,   # Emergency stop via Telegram (gate for live trading)
+            "telegram_kill_switch":      4,   # Emergency stop via Telegram (gate for live trading)
+            # Phase 4 signal gate: IC + walk-forward validation must pass before live trading.
+            # ic_validator.validate_and_persist() writes data/ic_validation_result.json.
+            # phase_gate.validate() reads that file when live accounts are active.
+            "ic_walkforward_validation": 4,   # IC quality + out-of-sample Sharpe > 0.8
             # Phase 5: infrastructure & multi-user
-            "docker_deployment":        5,   # Dockerising the bot
-            "multi_user_auth":          5,   # User accounts / auth layer
-            "hosted_dashboard":         5,   # Public-facing dashboard
+            "docker_deployment":         5,   # Dockerising the bot
+            "multi_user_auth":           5,   # User accounts / auth layer
+            "hosted_dashboard":          5,   # Public-facing dashboard
         },
     },
 
@@ -393,6 +446,12 @@ CONFIG = {
     "catalyst_min_confidence":        5,     # Min agent confidence to execute trade
     "catalyst_max_trades_per_day":    2,     # Hard cap: catalyst-driven trades per trading day
     "catalyst_risk_multiplier":       0.50,  # Size multiplier vs normal sentinel (0.5 = ~1.5% portfolio)
+
+    # ── SETTINGS OVERRIDE (written by IC auto-disable) ───────────────────────
+    # data/settings_override.json may contain {"dimension_flags": {"dim": false}}
+    # entries written by ic_calculator._check_ic_auto_disable(). These are merged
+    # into dimension_flags below. Only dimension_flags may be overridden this way.
+    "settings_override_path": "data/settings_override.json",
 
     # ── FILL WATCHER ──────────────────────────────────────────────
     # Background thread that monitors an unfilled limit order after placement
@@ -412,3 +471,26 @@ CONFIG = {
         "orphan_timeout_mins": 5,    # Hard cancel watcherless PENDING orders after this many minutes
     },
 }
+
+# ── SETTINGS OVERRIDE MERGE ───────────────────────────────────────────────────
+# Load data/settings_override.json (written by IC auto-disable) and merge only
+# the dimension_flags section into CONFIG. Runs once at import time. The running
+# bot picks up changes on the next scan cycle when config.py is re-evaluated.
+def _apply_settings_override() -> None:
+    import json, os
+    path = CONFIG.get("settings_override_path", "data/settings_override.json")
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path) as f:
+            override = json.load(f)
+        dim_overrides = override.get("dimension_flags", {})
+        if not isinstance(dim_overrides, dict):
+            return
+        for dim, enabled in dim_overrides.items():
+            if dim in CONFIG["dimension_flags"] and isinstance(enabled, bool):
+                CONFIG["dimension_flags"][dim] = enabled
+    except Exception:
+        pass  # Never let a corrupt override file crash the bot
+
+_apply_settings_override()

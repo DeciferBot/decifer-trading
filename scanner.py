@@ -532,3 +532,53 @@ def _regime_size_mult(regime: str) -> float:
         "PANIC":         0.0,
         "UNKNOWN":       0.75,
     }.get(regime, 0.75)
+
+
+def get_small_cap_universe() -> list[str]:
+    """
+    Supplemental small / micro cap universe via TradingView Screener.
+
+    Market cap $50M–$2B: less efficient, fewer institutional participants,
+    anomalies like PEAD and short squeeze persist longer than in large caps.
+
+    Filters:
+      - Market cap $50M–$2B
+      - Volume > 200K (minimum liquidity)
+      - Price $2–$50 (excludes sub-penny and high-priced names)
+      - Relative volume > 1.5× (must have an active catalyst today)
+      - TV recommendation > 0.2 (bullish lean — squeeze/drift plays are long-only)
+
+    Returns up to 20 tickers, or [] if TV unavailable.
+    Also populates _tv_cache for downstream use.
+    """
+    if not _TV_AVAILABLE:
+        log.debug("get_small_cap_universe: tradingview-screener not available")
+        return []
+
+    try:
+        _, df = (
+            Query()
+            .select(*_COLS)
+            .where(
+                col("exchange").isin(["NYSE", "NASDAQ", "AMEX"]),
+                col("type") == "stock",
+                col("market_cap_basic").between(50_000_000, 2_000_000_000),
+                col("volume") > 200_000,
+                col("close").between(2.0, 50.0),
+                col("relative_volume_10d_calc") > 1.5,
+                col("Recommend.All") > 0.2,
+            )
+            .order_by("relative_volume_10d_calc", ascending=False)
+            .limit(20)
+            .get_scanner_data()
+        )
+
+        symbols: set[str] = set()
+        _extract(df, "small_cap", symbols)
+        result = list(symbols)
+        log.info(f"Small cap universe: {len(result)} symbols (rel_vol filtered, $50M-$2B)")
+        return result
+
+    except Exception as e:
+        log.debug(f"get_small_cap_universe failed: {e}")
+        return []

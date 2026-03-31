@@ -30,8 +30,8 @@ log = logging.getLogger("decifer.ic_calculator")
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 DIMENSIONS = [
-    "trend", "momentum", "squeeze", "flow", "breakout",
-    "mtf", "news", "social", "reversion",
+    "directional", "momentum", "squeeze", "flow", "breakout",
+    "pead", "news", "short_squeeze", "reversion", "overnight_drift",
 ]
 _N = len(DIMENSIONS)
 EQUAL_WEIGHTS: dict = {d: 1.0 / _N for d in DIMENSIONS}
@@ -457,6 +457,10 @@ def update_ic_weights(signals_log_path: str = None) -> dict:
         record["using_equal_weights"],
         ", ".join(f"{d}={weights[d]:.3f}" for d in DIMENSIONS),
     )
+
+    # Auto-disable / auto-enable dimensions based on consecutive IC history
+    _check_ic_auto_disable(raw_ic)
+
     return weights
 
 
@@ -480,3 +484,115 @@ def get_ic_weight_history(last_n: int = 4) -> list:
     except Exception:
         return []
     return records[-last_n:]
+
+
+def _check_ic_auto_disable(raw_ic: dict) -> None:
+    """
+    Auto-disable / auto-enable dimensions based on consecutive IC history.
+
+    Rules:
+      - IC < auto_disable_threshold for N consecutive weeks → disable
+      - IC > auto_enable_threshold for M consecutive weeks → re-enable
+        (only if previously disabled by this function)
+
+    Writes to data/settings_override.json (dimension_flags section only).
+    CONFIG._apply_settings_override() merges this at scan time.
+    Appends IC_AUTO_DISABLE / IC_AUTO_ENABLE events to data/audit_log.jsonl.
+    """
+    try:
+        from config import CONFIG
+        ic_cfg = CONFIG.get("ic_calculator", {})
+        disable_thresh  = ic_cfg.get("auto_disable_threshold", -0.02)
+        disable_weeks   = ic_cfg.get("auto_disable_weeks",     3)
+        enable_thresh   = ic_cfg.get("auto_enable_threshold",  0.01)
+        enable_weeks    = ic_cfg.get("auto_enable_weeks",      2)
+
+        # Load IC history (need enough snapshots to check consecutive weeks)
+        needed = max(disable_weeks, enable_weeks) + 1
+        history = get_ic_weight_history(last_n=needed)
+        if len(history) < 2:
+            return  # Not enough history yet
+
+        # Load current override state
+        override_path = os.path.join(_BASE, "data", "settings_override.json")
+        override = {}
+        if os.path.exists(override_path):
+            try:
+                with open(override_path) as f:
+                    override = json.load(f)
+            except Exception:
+                override = {}
+        dim_overrides = override.setdefault("dimension_flags", {})
+
+        # Audit log path
+        audit_path = os.path.join(_BASE, "data", "audit_log.jsonl")
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        changed = False
+        for dim in DIMENSIONS:
+            # Gather recent IC values for this dimension
+            recent_ics = [h.get("raw_ic", {}).get(dim) for h in history]
+            recent_ics = [v for v in recent_ics if v is not None]
+
+            if len(recent_ics) < 2:
+                continue
+
+            currently_disabled = dim_overrides.get(dim) is False
+
+            # ── Auto-disable check ─────────────────────────────────────
+            if not currently_disabled and len(recent_ics) >= disable_weeks:
+                last_n_ics = recent_ics[-disable_weeks:]
+                if all(v < disable_thresh for v in last_n_ics):
+                    dim_overrides[dim] = False
+                    changed = True
+                    log.warning(
+                        "IC_AUTO_DISABLE: %s (IC %s for %d consecutive weeks)",
+                        dim, [round(v, 4) for v in last_n_ics], disable_weeks,
+                    )
+                    try:
+                        with open(audit_path, "a") as f:
+                            f.write(json.dumps({
+                                "ts": now_iso, "event": "IC_AUTO_DISABLE",
+                                "dimension": dim, "ic_history": last_n_ics,
+                                "reason": f"{disable_weeks} consecutive weeks IC < {disable_thresh}",
+                            }) + "\n")
+                    except Exception:
+                        pass
+
+            # ── Auto-re-enable check (only dims disabled by this function) ──
+            elif currently_disabled and len(recent_ics) >= enable_weeks:
+                last_m_ics = recent_ics[-enable_weeks:]
+                if all(v > enable_thresh for v in last_m_ics):
+                    dim_overrides[dim] = True
+                    changed = True
+                    log.info(
+                        "IC_AUTO_ENABLE: %s (IC %s for %d consecutive weeks)",
+                        dim, [round(v, 4) for v in last_m_ics], enable_weeks,
+                    )
+                    try:
+                        with open(audit_path, "a") as f:
+                            f.write(json.dumps({
+                                "ts": now_iso, "event": "IC_AUTO_ENABLE",
+                                "dimension": dim, "ic_history": last_m_ics,
+                                "reason": f"{enable_weeks} consecutive weeks IC > {enable_thresh}",
+                            }) + "\n")
+                    except Exception:
+                        pass
+
+        if changed:
+            import tempfile
+            dir_ = os.path.dirname(override_path)
+            os.makedirs(dir_, exist_ok=True)
+            fd, tmp = tempfile.mkstemp(dir=dir_, suffix=".tmp")
+            try:
+                with os.fdopen(fd, "w") as f:
+                    json.dump(override, f, indent=2)
+                os.replace(tmp, override_path)
+            except Exception:
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
+
+    except Exception as e:
+        log.debug("_check_ic_auto_disable failed (non-critical): %s", e)
