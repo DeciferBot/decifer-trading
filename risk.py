@@ -278,14 +278,14 @@ def get_scan_interval() -> int:
     """Return appropriate scan interval in seconds for current session."""
     session = get_session()
     intervals = {
-        "PRE_MARKET":   CONFIG["scan_interval_extended"] * 60,
-        "OPEN_BUFFER":  CONFIG["scan_interval_extended"] * 60,
-        "PRIME_AM":     CONFIG["scan_interval_prime"]    * 60,
-        "LUNCH":        CONFIG["scan_interval_standard"] * 60,
-        "PRIME_PM":     CONFIG["scan_interval_prime"]    * 60,
-        "CLOSE_BUFFER": CONFIG["scan_interval_extended"] * 60,
-        "AFTER_HOURS":  CONFIG["scan_interval_extended"] * 60,
-        "OVERNIGHT":    CONFIG["scan_interval_overnight"] * 60,
+        "PRE_MARKET":   CONFIG["scan_interval_pre_market"]   * 60,
+        "OPEN_BUFFER":  CONFIG["scan_interval_extended"]     * 60,
+        "PRIME_AM":     CONFIG["scan_interval_prime"]        * 60,
+        "LUNCH":        CONFIG["scan_interval_standard"]     * 60,
+        "PRIME_PM":     CONFIG["scan_interval_prime"]        * 60,
+        "CLOSE_BUFFER": CONFIG["scan_interval_extended"]     * 60,
+        "AFTER_HOURS":  CONFIG["scan_interval_after_hours"]  * 60,
+        "OVERNIGHT":    CONFIG["scan_interval_overnight"]    * 60,
     }
     return intervals.get(session, CONFIG["scan_interval_standard"] * 60)
 

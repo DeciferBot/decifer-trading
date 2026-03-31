@@ -1739,6 +1739,11 @@ def run_scan():
     update_positions_from_ibkr(ib)
     dash["positions"] = get_open_positions()
 
+    # ── Overnight: sleep everything — sentinel handles news monitoring ──
+    if get_session() == "OVERNIGHT":
+        clog("INFO", "Overnight — pipeline sleeping. Sentinel monitoring news.")
+        return
+
     # ── Check options exits (profit target / stop loss / DTE) ────────
     check_options_positions()
 
@@ -1886,16 +1891,18 @@ def run_scan():
         dash["news_data"] = {}
 
     # ── Fetch social sentiment ───────────────────────────────
+    # Skip during extended hours — Reddit/ApeWisdom inactive at 4am/7pm
     social_sentiment = {}
-    try:
-        from social_sentiment import get_social_sentiment
-        social_sentiment = get_social_sentiment(universe[:50])
-        social_with_signal = sum(1 for v in social_sentiment.values() if v.get("social_score", 0) > 0)
-        clog("INFO", f"Social: {len(social_sentiment)} symbols scanned, {social_with_signal} with sentiment signal")
-    except ImportError:
-        clog("INFO", "Social sentiment module not available — skipping")
-    except Exception as e:
-        clog("ERROR", f"Social sentiment error: {e}")
+    if get_session() not in ("PRE_MARKET", "AFTER_HOURS"):
+        try:
+            from social_sentiment import get_social_sentiment
+            social_sentiment = get_social_sentiment(universe[:50])
+            social_with_signal = sum(1 for v in social_sentiment.values() if v.get("social_score", 0) > 0)
+            clog("INFO", f"Social: {len(social_sentiment)} symbols scanned, {social_with_signal} with sentiment signal")
+        except ImportError:
+            clog("INFO", "Social sentiment module not available — skipping")
+        except Exception as e:
+            clog("ERROR", f"Social sentiment error: {e}")
 
     # ── Score universe ────────────────────────────────────────
     clog("SCAN", "Scoring universe on 9 dimensions...")

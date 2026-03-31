@@ -32,7 +32,7 @@ log = logging.getLogger("decifer.news")
 
 # ── NEWS CACHE (avoid refetching within scan window) ───────
 _news_cache = {}       # {symbol: {"data": {...}, "fetched_at": datetime}}
-_CACHE_TTL_MIN = 5     # Cache results for 5 minutes
+_CACHE_TTL_MIN = 15    # Cache results for 15 minutes (sentinel handles real-time news)
 
 # ── SENTIMENT KEYWORD DICTIONARIES ───────────────────────────
 # Curated for financial news. Weighted: strong words = 2, normal = 1.

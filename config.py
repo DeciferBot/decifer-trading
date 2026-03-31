@@ -76,10 +76,12 @@ CONFIG = {
 
     # ── SCANNING ──────────────────────────────────────────────
     # NOTE: Faster scans for paper trading data generation (live values in comments)
-    "scan_interval_prime":      3,      # Minutes — 9:32am-11:30am, 2pm-3:59pm (live: 5)
-    "scan_interval_standard":   5,      # Minutes — 11:30am-2pm (lunch lull) (live: 10)
-    "scan_interval_extended":   5,      # Minutes — pre-market 4am-9:30am & after-hours 4pm-8pm (live: 7)
-    "scan_interval_overnight":  30,     # Minutes — overnight 8pm-4am (monitoring only) (live: 60)
+    "scan_interval_prime":        3,      # Minutes — PRIME_AM/PM (live: 5)
+    "scan_interval_standard":    5,      # Minutes — LUNCH lull (live: 10)
+    "scan_interval_extended":    5,      # Minutes — OPEN_BUFFER / CLOSE_BUFFER (live: 7)
+    "scan_interval_pre_market":  15,     # Minutes — PRE_MARKET 4am–9:30am (reduced activity)
+    "scan_interval_after_hours": 15,     # Minutes — AFTER_HOURS 4pm–8pm (reduced activity)
+    "scan_interval_overnight":   60,     # Minutes — OVERNIGHT 8pm–4am (sentinel only)
 
     # ── SCORING THRESHOLD ─────────────────────────────────────
     # NOTE: Lowered for paper trading to capture more setups for ML training (live values in comments)
@@ -102,6 +104,19 @@ CONFIG = {
         "news":      True,   # Dim 7 — Yahoo RSS + Claude sentiment
         "social":    True,   # Dim 8 — Reddit velocity + VADER
         "reversion": True,   # Dim 9 — Variance Ratio + OU half-life + z-score
+    },
+
+    # ── IC CALCULATOR ────────────────────────────────────────────
+    # Controls the rolling IC-weighted signal composite (ic_calculator.py).
+    # Phase 1 (current): ic_min_threshold = 0.0 — any positive IC gets weight.
+    # Phase 2 (needs 200+ trades): raise ic_min_threshold to 0.03 to suppress noise.
+    "ic_calculator": {
+        "rolling_window":    60,    # Trades in rolling IC window
+        "min_valid_records": 20,    # Min records with resolved forward returns before IC trusted
+        "ic_min_threshold":  0.0,   # Noise floor — dimensions below this get zero weight
+                                    #   Phase 1: 0.0 (any positive IC passes)
+                                    #   Phase 2: raise to 0.03 once 200+ trades available
+        "max_single_weight": 0.40,  # HHI cap — no dimension may exceed this share of total weight
     },
 
     # ── MARKET HOURS (EST) ────────────────────────────────────

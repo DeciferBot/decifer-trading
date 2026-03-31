@@ -14,12 +14,12 @@ client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
 
 
 def _call_claude(system_prompt: str, user_message: str) -> str:
-    """Single Claude API call. Returns text response."""
+    """Single Claude API call with prompt caching on system prompt (~90% cost reduction)."""
     try:
         resp = client.messages.create(
             model=CONFIG["claude_model"],
             max_tokens=CONFIG["claude_max_tokens"],
-            system=system_prompt,
+            system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_message}]
         )
         return resp.content[0].text.strip()
