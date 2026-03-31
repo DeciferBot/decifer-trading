@@ -47,7 +47,7 @@ CONFIG = {
     "risk_pct_per_trade":       0.03,   # 3% of portfolio per trade (live: 0.04)
     "risk_per_trade":           0.01,   # 1% per trade — used by position_size()
     "max_position_size":        0.30,   # Max fraction of account per position (30%)
-    "max_daily_loss":           5000,   # Max daily loss in dollars before halting
+    "max_daily_loss_pct":       0.05,   # 5% max daily loss before halting (live: 0.05)
     "correlation_threshold":    0.75,   # Block new trade if correlation > this
     "max_positions":            20,     # More concurrent positions = more data (live: 12)
     "daily_loss_limit":         0.10,   # 10% daily — paper can absorb more (live: 0.06)
@@ -67,7 +67,16 @@ CONFIG = {
     "thesis_invalidation_regime_change": True,    # Re-evaluate open positions on significant regime shift
 
     "max_portfolio_allocation": 1.0,    # 1.0 = full account, 0.2 = 20% of account
-    "starting_capital":         1_000_000,  # Starting portfolio value for P&L tracking
+    "starting_capital":         1_000_000,  # Starting portfolio value for P&L tracking — update to match real account before going live
+
+    # ── PDT RULE (Pattern Day Trader) ─────────────────────────
+    # Applies when portfolio_value < pdt_threshold AND live account.
+    # Paper accounts are exempt (IBKR paper does not enforce the SEC PDT rule).
+    "pdt": {
+        "enabled":       True,
+        "threshold":     25_000,   # USD — below this, PDT rule is active
+        "max_day_trades": 3,       # Max day trades per rolling 5 trading days
+    },
 
     # ── TAKE PROFIT / STOP LOSS ───────────────────────────────
     "atr_stop_multiplier":      1.5,    # Stop = entry - (1.5 × ATR)
@@ -400,5 +409,6 @@ CONFIG = {
         "interval_secs":     20,     # Seconds between each adjustment attempt
         "step_pct":          0.002,  # Price chase step: 0.2% per attempt (e.g. $0.20 on a $100 stock)
         "max_chase_pct":     0.01,   # Hard ceiling: never pay more than 1% above the original limit
+        "orphan_timeout_mins": 5,    # Hard cancel watcherless PENDING orders after this many minutes
     },
 }

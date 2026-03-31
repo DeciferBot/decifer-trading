@@ -3,8 +3,11 @@
 # ║   Five-layer risk management — hardcoded, agent-proof        ║
 # ╚══════════════════════════════════════════════════════════════╝
 
+import json
 import logging
-from datetime import datetime, time
+import os
+from collections import defaultdict
+from datetime import datetime, time, timedelta
 import pytz
 from config import CONFIG
 
@@ -95,6 +98,72 @@ def _get_ibkr_cash(ib, account: str) -> float | None:
     return None
 
 
+def _count_day_trades_remaining_local() -> int:
+    """
+    Count day trades used in last 5 trading days from orders.json.
+    A day trade = same symbol with role 'open' and role 'close' on the same EST calendar date.
+    Returns remaining = max_day_trades - used (floored at 0).
+    """
+    max_dt = CONFIG.get("pdt", {}).get("max_day_trades", 3)
+    orders_path = os.path.join(os.path.dirname(__file__), "data", "orders.json")
+    try:
+        with open(orders_path) as f:
+            orders = json.load(f)
+    except Exception:
+        return max_dt  # Can't read — don't block on uncertainty
+
+    cutoff = datetime.now(EST) - timedelta(days=7)
+    opens_by_date: defaultdict  = defaultdict(set)
+    closes_by_date: defaultdict = defaultdict(set)
+
+    for o in orders:
+        if o.get("status") != "FILLED":
+            continue
+        ts_str = o.get("timestamp", "")
+        if not ts_str:
+            continue
+        try:
+            ts = datetime.fromisoformat(ts_str).astimezone(EST)
+        except Exception:
+            continue
+        if ts < cutoff:
+            continue
+        date_key = ts.date()
+        symbol   = o.get("symbol", "")
+        if o.get("role") == "open":
+            opens_by_date[date_key].add(symbol)
+        elif o.get("role") == "close":
+            closes_by_date[date_key].add(symbol)
+
+    # A day trade occurred on any date where the same symbol was both opened and closed
+    day_trade_dates = sorted(
+        d for d in opens_by_date
+        if opens_by_date[d] & closes_by_date[d]
+    )
+    used = len(day_trade_dates[-5:]) if day_trade_dates else 0
+    return max(0, max_dt - used)
+
+
+def _get_day_trades_remaining(ib, account: str) -> int | None:
+    """
+    Return how many day trades remain in the rolling 5-day window.
+    Primary: IBKR's DayTradesRemaining account value tag.
+    Fallback: local count from orders.json.
+    Returns None only if count is genuinely indeterminate.
+    """
+    if ib is not None:
+        try:
+            vals = ib.accountValues(account)
+            for v in vals:
+                if v.tag == "DayTradesRemaining":
+                    val = v.value
+                    if val not in ("", "Unlimited", None):
+                        return int(float(val))
+        except Exception as e:
+            log.warning(f"Could not fetch DayTradesRemaining from IBKR: {e}")
+    return _count_day_trades_remaining_local()
+
+
 def check_risk_conditions(portfolio_value: float, daily_pnl: float, regime: dict,
               open_positions: list = None, ib=None) -> tuple[bool, str]:
     """
@@ -115,6 +184,23 @@ def check_risk_conditions(portfolio_value: float, daily_pnl: float, regime: dict
     # ── Layer 5: Panic regime ─────────────────────────────────
     if regime.get("regime") == "PANIC":
         return False, "PANIC regime — VIX too high or spiking. No new trades."
+
+    # ── Layer 5.5: PDT Rule (Pattern Day Trader) ──────────────
+    # Only applies to live accounts under $25K. Paper is exempt.
+    pdt_cfg = CONFIG.get("pdt", {})
+    if pdt_cfg.get("enabled", True) and portfolio_value > 0:
+        pdt_threshold  = pdt_cfg.get("threshold", 25_000)
+        active_account = CONFIG.get("active_account", "")
+        paper_account  = CONFIG.get("accounts", {}).get("paper", "")
+        is_live = active_account != "" and active_account != paper_account
+        if is_live and portfolio_value < pdt_threshold:
+            remaining = _get_day_trades_remaining(ib, active_account)
+            if remaining is not None and remaining <= 0:
+                return False, (
+                    f"PDT rule: 0 day trades remaining "
+                    f"(account ${portfolio_value:,.0f} < ${pdt_threshold:,.0f} threshold). "
+                    f"New entries blocked until next trading day."
+                )
 
     # ── Layer 3: Daily loss limit ─────────────────────────────
     daily_loss_limit = portfolio_value * CONFIG["daily_loss_limit"]
@@ -176,6 +262,11 @@ def _get_daily_pnl() -> float:
     return 0.0
 
 
+def _get_portfolio_value() -> float:
+    """Return current portfolio value for risk calculations. Override in tests."""
+    return _session_start_value or 0.0
+
+
 def _get_open_position_count() -> int:
     """Return current number of open positions."""
     return 0
@@ -199,7 +290,7 @@ def can_trade(symbol: str, config: dict) -> bool:
     Simple risk gate: returns True if a new trade on *symbol* is permitted.
 
     Checks (in order):
-      1. Daily P&L has not hit the max_daily_loss dollar limit.
+      1. Daily P&L has not hit the max_daily_loss_pct percentage limit.
       2. Open position count is below max_positions.
       3. Market is currently open (4 am – 8 pm EST).
       4. Correlation to existing positions is below correlation_threshold.
@@ -207,10 +298,14 @@ def can_trade(symbol: str, config: dict) -> bool:
     All checks use thin private helpers (_get_daily_pnl, etc.) so tests can
     mock them via patch.object without importing live infrastructure.
     """
-    daily_pnl = _get_daily_pnl()
-    max_loss = config.get("max_daily_loss", CONFIG.get("max_daily_loss", 5000))
-    if daily_pnl <= -abs(max_loss):
-        log.debug(f"can_trade blocked: daily P&L ${daily_pnl:,.2f} <= -${abs(max_loss):,.2f}")
+    daily_pnl       = _get_daily_pnl()
+    portfolio_value = _get_portfolio_value()
+    max_loss_pct    = config.get("max_daily_loss_pct", CONFIG.get("max_daily_loss_pct", 0.05))
+    if portfolio_value > 0 and daily_pnl <= -(portfolio_value * max_loss_pct):
+        log.debug(
+            f"can_trade blocked: daily P&L ${daily_pnl:,.2f} <= "
+            f"-{max_loss_pct:.0%} of ${portfolio_value:,.2f}"
+        )
         return False
 
     position_count = _get_open_position_count()

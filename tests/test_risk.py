@@ -83,14 +83,15 @@ class TestCanTradeBlocked:
     """risk.can_trade() must block trades when safety conditions are violated."""
 
     def _run_can_trade(self, config, daily_pnl=0.0, position_count=0,
-                       market_open=True, correlation=0.0):
+                       market_open=True, correlation=0.0, portfolio_value=100_000.0):
         """Helper: run can_trade with controlled helper return values."""
         active_patches = []
         helper_map = {
-            "_get_daily_pnl": daily_pnl,
-            "_get_open_position_count": position_count,
-            "_is_market_open": market_open,
-            "_get_correlation": correlation,
+            "_get_daily_pnl":             daily_pnl,
+            "_get_portfolio_value":       portfolio_value,
+            "_get_open_position_count":   position_count,
+            "_is_market_open":            market_open,
+            "_get_correlation":           correlation,
         }
         for name, ret in helper_map.items():
             if hasattr(risk, name):
@@ -104,20 +105,24 @@ class TestCanTradeBlocked:
                 p.stop()
 
     def test_blocked_daily_loss_limit_hit(self, config):
-        """Block when daily loss equals max_daily_loss."""
+        """Block when daily loss equals max_daily_loss_pct of portfolio."""
+        pv = 100_000.0
         result = self._run_can_trade(
             config,
-            daily_pnl=-config["max_daily_loss"]
+            daily_pnl=-(pv * config["max_daily_loss_pct"]),
+            portfolio_value=pv,
         )
         assert result is False, (
             f"Expected can_trade() to block when daily loss limit is hit, got {result}"
         )
 
     def test_blocked_daily_loss_exceeded(self, config):
-        """Block when daily loss exceeds max_daily_loss."""
+        """Block when daily loss exceeds max_daily_loss_pct of portfolio."""
+        pv = 100_000.0
         result = self._run_can_trade(
             config,
-            daily_pnl=-(config["max_daily_loss"] + 500.0)
+            daily_pnl=-(pv * config["max_daily_loss_pct"]) - 500.0,
+            portfolio_value=pv,
         )
         assert result is False, (
             f"Expected can_trade() to block when daily loss is exceeded, got {result}"
@@ -172,6 +177,81 @@ class TestCanTradeBlocked:
         assert result is False, (
             f"Expected can_trade() to block at correlation threshold, got {result}"
         )
+
+
+# ---------------------------------------------------------------------------
+# PDT Rule — check_risk_conditions() Layer 5.5
+# ---------------------------------------------------------------------------
+
+class TestPDTRule:
+    """PDT gate blocks new entries on live accounts under $25K when day trades are exhausted."""
+
+    _REGIME = {"regime": "NEUTRAL", "position_size_multiplier": 1.0}
+
+    def _run_check(self, portfolio_value, day_trades_remaining,
+                   is_live=True, pdt_enabled=True):
+        """Run check_risk_conditions with PDT-relevant mocks."""
+        import config as config_mod
+        cfg = config_mod.CONFIG
+
+        # Temporarily patch PDT config and account settings
+        original_pdt      = cfg.get("pdt", {}).copy()
+        original_active   = cfg.get("active_account", "")
+        original_accounts = cfg.get("accounts", {}).copy()
+
+        cfg["pdt"] = {"enabled": pdt_enabled, "threshold": 25_000, "max_day_trades": 3}
+        if is_live:
+            cfg["active_account"] = "DUL123"
+            cfg["accounts"] = {"paper": "DUP999", "live_1": "DUL123"}
+        else:
+            cfg["active_account"] = "DUP999"
+            cfg["accounts"] = {"paper": "DUP999", "live_1": "DUL123"}
+
+        try:
+            with patch.object(risk, "_get_day_trades_remaining",
+                              return_value=day_trades_remaining):
+                # Pass a safe daily_pnl to avoid triggering other layers
+                return risk.check_risk_conditions(
+                    portfolio_value=portfolio_value,
+                    daily_pnl=0.0,
+                    regime=self._REGIME,
+                    open_positions=[],
+                    ib=None,
+                )
+        finally:
+            cfg["pdt"]            = original_pdt
+            cfg["active_account"] = original_active
+            cfg["accounts"]       = original_accounts
+
+    def test_pdt_blocks_when_exhausted_under_threshold(self):
+        """Live account under $25K with 0 day trades remaining — block entries."""
+        ok, reason = self._run_check(portfolio_value=15_000, day_trades_remaining=0)
+        assert ok is False
+        assert "PDT" in reason
+
+    def test_pdt_allows_when_trades_remain(self):
+        """Live account under $25K but day trades remain — allow entries."""
+        ok, _reason = self._run_check(portfolio_value=15_000, day_trades_remaining=2)
+        assert ok is True
+
+    def test_pdt_skipped_above_threshold(self):
+        """Account above $25K — PDT gate is never checked."""
+        ok, _reason = self._run_check(portfolio_value=30_000, day_trades_remaining=0)
+        assert ok is True
+
+    def test_pdt_skipped_on_paper_account(self):
+        """Paper account — PDT gate is exempt even if under threshold."""
+        ok, _reason = self._run_check(
+            portfolio_value=15_000, day_trades_remaining=0, is_live=False
+        )
+        assert ok is True
+
+    def test_pdt_skipped_when_disabled(self):
+        """PDT gate disabled in config — never blocks."""
+        ok, _reason = self._run_check(
+            portfolio_value=15_000, day_trades_remaining=0, pdt_enabled=False
+        )
+        assert ok is True
 
 
 # ---------------------------------------------------------------------------
