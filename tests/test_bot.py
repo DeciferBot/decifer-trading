@@ -218,6 +218,7 @@ orders_stub.update_position_prices    = lambda *a, **kw: None
 orders_stub.update_positions_from_ibkr= lambda *a, **kw: None
 orders_stub.execute_buy_option        = lambda *a, **kw: None
 orders_stub.execute_sell_option       = lambda *a, **kw: None
+orders_stub.update_trailing_stops     = lambda *a, **kw: None
 
 # options
 options_stub = sys.modules["options"]

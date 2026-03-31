@@ -595,6 +595,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         sl_order.transmit = False
         sl_trade = ib.placeOrder(contract, sl_order)
         ib.sleep(0.1)
+        _sl_order_id = sl_trade.order.orderId  # captured for trailing stop modifications
 
         # Leg 3: Take profit — attached to parent, transmit=True sends ALL 3 legs together
         tp_order = LimitOrder("SELL", tp_qty, tp, account=account, tif="GTC", outsideRth=True)
@@ -691,7 +692,8 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 standalone_sl.transmit = True
                 sl_trade2 = ib.placeOrder(contract, standalone_sl)
                 ib.sleep(0.3)
-                log.info(f"Standalone SL placed for {symbol} @ ${sl:.2f} OCA={oca_group} (orderId={sl_trade2.order.orderId})")
+                _sl_order_id = sl_trade2.order.orderId  # update to standalone order
+                log.info(f"Standalone SL placed for {symbol} @ ${sl:.2f} OCA={oca_group} (orderId={_sl_order_id})")
             except Exception as e:
                 log.error(f"CRITICAL: Failed to place standalone SL for {symbol}: {e}")
 
@@ -714,22 +716,25 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             _open_time = open_time or datetime.now(timezone.utc).isoformat()
             with _trades_lock:
                 active_trades[symbol] = {
-                    "symbol":        symbol,
-                    "instrument":    "stock",
-                    "entry":         price,
-                    "current":       price,
-                    "qty":           qty,
-                    "sl":            sl,
-                    "tp":            tp,
-                    "score":         score,
-                    "reasoning":     reasoning,
-                    "direction":     "LONG",
-                    "pnl":           0.0,
-                    "status":        "PENDING",   # Submitted to IBKR but not yet filled
-                    "order_id":      parent_id,
-                    "open_time":     _open_time,
-                    "signal_scores": signal_scores or {},
-                    "agent_outputs": agent_outputs or {},
+                    "symbol":           symbol,
+                    "instrument":       "stock",
+                    "entry":            price,
+                    "current":          price,
+                    "qty":              qty,
+                    "sl":               sl,
+                    "tp":               tp,
+                    "score":            score,
+                    "reasoning":        reasoning,
+                    "direction":        "LONG",
+                    "pnl":              0.0,
+                    "status":           "PENDING",   # Submitted to IBKR but not yet filled
+                    "order_id":         parent_id,
+                    "open_time":        _open_time,
+                    "signal_scores":    signal_scores or {},
+                    "agent_outputs":    agent_outputs or {},
+                    "atr":              atr,
+                    "sl_order_id":      _sl_order_id,
+                    "high_water_mark":  price,
                 }
             # Log OPEN record to trades.json for feedback loop
             from learning import log_trade
@@ -1768,3 +1773,90 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
     except Exception as e:
         log.error(f"Option sell failed {opt_key}: {e}")
         return False
+
+
+# ── ATR TRAILING STOP ─────────────────────────────────────────────────────────
+
+def update_trailing_stops(ib: IB) -> None:
+    """
+    Called each scan cycle after update_positions_from_ibkr().
+    For every ACTIVE stock position that has a tracked sl_order_id, check whether
+    the high-water mark has advanced and, if the resulting trailing stop would be
+    higher (LONG) / lower (SHORT) than the current stop, modify the live IBKR
+    stop order and update the tracker.
+
+    Trail formula:
+      LONG:  new_sl = high_water_mark - (atr_trail_multiplier × atr)
+      SHORT: new_sl = low_water_mark  + (atr_trail_multiplier × atr)
+
+    The trail only beats the initial stop (1.5 × ATR) once price has moved
+    ~0.5 ATR in favour, so no separate activation threshold is needed.
+    """
+    if not CONFIG.get("trailing_stop_enabled", True):
+        return
+
+    trail_mult = CONFIG.get("atr_trail_multiplier", 2.0)
+
+    with _trades_lock:
+        snapshot = list(active_trades.items())
+
+    for symbol, trade in snapshot:
+        try:
+            if trade.get("instrument") != "stock":
+                continue
+            if trade.get("status") != "ACTIVE":
+                continue
+            sl_order_id = trade.get("sl_order_id")
+            if not sl_order_id:
+                continue
+
+            atr      = trade.get("atr")
+            if not atr or atr <= 0:
+                continue
+
+            direction = trade.get("direction", "LONG")
+            current   = trade.get("current", trade["entry"])
+            hwm       = trade.get("high_water_mark", trade["entry"])
+            old_sl    = trade["sl"]
+            qty       = trade["qty"]
+
+            if direction == "LONG":
+                new_hwm = max(hwm, current)
+                new_sl  = round(new_hwm - trail_mult * atr, 2)
+                if new_sl <= old_sl:
+                    continue  # no improvement — keep existing stop
+            else:  # SHORT
+                new_hwm = min(hwm, current)
+                new_sl  = round(new_hwm + trail_mult * atr, 2)
+                if new_sl >= old_sl:
+                    continue  # no improvement — keep existing stop
+
+            if not ib.isConnected():
+                log.warning("[TRAIL] IBKR disconnected — skipping trailing stop update")
+                return
+
+            contract = get_contract(symbol)
+            modified_stop = StopOrder(
+                "SELL", qty, new_sl,
+                account=CONFIG["active_account"],
+                tif="GTC",
+                outsideRth=True,
+            )
+            modified_stop.orderId = sl_order_id
+            modified_stop.transmit = True
+            ib.placeOrder(contract, modified_stop)
+            ib.sleep(0.1)
+
+            with _trades_lock:
+                if symbol in active_trades:
+                    active_trades[symbol]["sl"]               = new_sl
+                    active_trades[symbol]["high_water_mark"]  = new_hwm
+
+            log.info(
+                f"[TRAIL] {symbol} {'▲' if direction == 'LONG' else '▼'} "
+                f"stop {old_sl:.2f} → {new_sl:.2f}  hwm={new_hwm:.2f}"
+            )
+
+        except Exception as exc:
+            log.error(f"[TRAIL] {symbol} trailing stop update failed: {exc}")
+            continue

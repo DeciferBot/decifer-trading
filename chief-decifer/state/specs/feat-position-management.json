@@ -1,0 +1,85 @@
+{
+  "id": "feat-position-management",
+  "title": "Position Management Suite — Pyramiding, Scale-Out, Between-Scan Agents",
+  "status": "pending",
+  "phase": "B-D",
+  "priority": "medium",
+  "created": "2026-03-31",
+  "author": "Cowork",
+
+  "summary": "Three future enhancements to active position management, deferred after the ATR trailing stop shipped (2026-03-31). Research synthesis from quantitative literature and codebase analysis. Each feature has its own backlog item (BACK-012, BACK-013, BACK-014).",
+
+  "research_summary": {
+    "pyramiding": {
+      "evidence_strength": "Conditional — strong in trending markets, harmful in choppy",
+      "key_finding": "Works best with decreasing layer sizes (50/30/20%) and strict rule: new layer's risk must be covered by existing unrealised P&L. Modern algo implementations use rule-based triggers, not discretion.",
+      "fit_for_decifer": "Low-medium. Intraday holds may not provide enough runway for 2nd layer. Activate only in BULL/MOMENTUM regimes with multi-day hold intention.",
+      "sources": ["quantstrategy.io/pyramiding", "luxalgo.com/pyramiding-strategies"]
+    },
+    "partial_scale_out": {
+      "evidence_strength": "Moderate — does NOT maximise raw returns but consistently improves Sharpe/Sortino",
+      "key_finding": "Scale-out is about survivability and consistency, not maximising returns. Literature recommends: TP1 close 33%, TP2 close 33%, let final 34% ride with trailing stop.",
+      "fit_for_decifer": "High. The 33% TP1 tier already exists. Adding TP2 + trail-the-rest is a low-effort extension of existing bracket logic.",
+      "sources": ["morpher.com/scaling-out-trading", "tradewiththepros.com/scaling-in-out"]
+    },
+    "between_scan_agents": {
+      "evidence_strength": "Weak at current scan frequency — belongs to HFT/execution-algo territory",
+      "key_finding": "For scan-based intraday/swing systems, the scan IS the heartbeat. Between-scan agents add complexity and can conflict with the main scan pipeline. Only beneficial if upgraded to tick/1-min data.",
+      "fit_for_decifer": "Low until Phase D data infrastructure upgrade.",
+      "sources": ["internal architecture analysis"]
+    }
+  },
+
+  "features": [
+    {
+      "backlog_id": "BACK-012",
+      "name": "Pyramiding",
+      "phase": "B",
+      "design": {
+        "trigger": "Price > entry + 1 ATR AND status == ACTIVE AND regime in [BULL, MOMENTUM]",
+        "sizing": "2nd layer = 30% of initial qty, 3rd layer = 20% of initial qty",
+        "risk_rule": "new_layer_risk = (new_entry - new_sl) * new_qty <= unrealised_pnl of existing position",
+        "stop_update": "After each pyramid layer, update trailing stop to cover FULL stacked position",
+        "max_layers": 2,
+        "blocked_in": ["BEAR", "CHOPPY", "PANIC"],
+        "new_config_keys": ["pyramid_enabled", "pyramid_max_layers", "pyramid_min_atr_move"],
+        "files": ["orders.py (new execute_pyramid_add())", "bot.py (check in scan loop)", "config.py", "risk.py (pyramid risk check)"]
+      }
+    },
+    {
+      "backlog_id": "BACK-013",
+      "name": "2-Tier Partial Scale-Out",
+      "phase": "B",
+      "design": {
+        "current_state": "TP1: 33% sold at entry + partial_exit_1_pct (4%). No TP2. Remaining 67% has hard TP limit.",
+        "target_state": "TP1: 33% at +4% (existing). TP2: 33% at +8% (new limit child). Remainder 34%: ATR trailing stop only, no hard TP.",
+        "implementation": "In execute_buy(), add a 3rd SELL child to the bracket: TP2 at partial_exit_2_pct. Remaining qty gets no TP limit — protected only by ATR trail. All 3 exit legs in same OCA group.",
+        "config_keys_needed": ["partial_exit_2_pct already defined at 0.08"],
+        "files": ["orders.py (execute_buy bracket construction)", "config.py (no change needed)"],
+        "notes": "The math: initial qty N → tp1_qty = N//3, tp2_qty = N//3, trail_qty = N - tp1_qty - tp2_qty. Trail qty gets sl_order_id tracking (already shipping with BACK-012)."
+      }
+    },
+    {
+      "backlog_id": "BACK-014",
+      "name": "Between-Scan Position Management Agents",
+      "phase": "D",
+      "design": {
+        "scope": "Defensive only — no new entries. Triggers: (a) thesis-invalidation close, (b) panic-regime exit.",
+        "architecture": "Daemon thread polling every 60s. Reads active_trades snapshot + fetches 1-min OHLCV. Runs a 2-agent mini-pipeline: ThesisValidator + RiskManager.",
+        "thesis_invalidation": "If key support level (entry - 1.5 ATR) breaks on 1-min close, close position immediately without waiting for scan.",
+        "panic_exit": "If VIX crosses panic threshold mid-hold, close all positions. Currently handled by check_risk_conditions() at scan time — between-scan agent closes the gap.",
+        "data_requirement": "Needs 1-min yfinance data. Rate-limit concern: yfinance download(interval='1m') is limited to 7 days of data and has undocumented rate limits. Validate in Phase D.",
+        "conflict_prevention": "Use existing _trades_lock (RLock) and _flatten_lock. The daemon thread never submits new buy orders — only calls execute_sell() which is already thread-safe.",
+        "gate": "Phase C IC validation complete AND ≥200 closed trades AND 1-min data feed validated"
+      }
+    }
+  ],
+
+  "shipped_dependencies": {
+    "atr_trailing_stop": {
+      "shipped": "2026-03-31",
+      "description": "ATR trailing stop slides stop-loss up as high-water mark advances. Stores atr, sl_order_id, high_water_mark in active_trades per position. Called each scan via update_trailing_stops(ib) in bot.py.",
+      "files_changed": ["orders.py", "bot.py", "config.py"]
+    }
+  }
+}
