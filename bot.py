@@ -59,6 +59,7 @@ from options import find_best_contract, check_options_exits
 from options_scanner import scan_options_universe
 from risk import (check_risk_conditions, get_session, get_scan_interval, reset_daily_state,
                   calculate_position_size, calculate_stops, update_equity_high_water_mark,
+                  init_equity_high_water_mark_from_history,
                   get_intraday_strategy_mode, set_session_opening_regime,
                   check_thesis_validity, get_consecutive_losses)
 from learning import log_trade, load_trades, load_orders, get_performance_summary, run_weekly_review, TRADE_LOG_FILE, get_effective_capital, record_capital_adjustment, log_signal_scan
@@ -1737,7 +1738,12 @@ def run_scan():
 
     # ── FIX #4: Update drawdown high-water-mark every cycle ──
     if pv > 0:
-        update_equity_high_water_mark(pv)
+        newly_halted = update_equity_high_water_mark(pv)
+        if newly_halted:
+            clog("RISK", "⛔ DRAWDOWN BRAKE: drawdown limit exceeded — flattening all positions")
+            flatten_all(ib)
+            dash["scanning"] = False
+            return
 
     clog("INFO", f"Portfolio: ${pv:,.2f} | DayP&L: ${pnl:+,.2f} | Positions: {len(get_open_positions())}")
 
@@ -3105,6 +3111,8 @@ def main():
     load_settings_overrides()   # Apply saved dashboard settings on top of config.py defaults
     dash["favourites"]     = load_favourites()
     dash["equity_history"] = load_equity_history()
+    if dash["equity_history"]:
+        init_equity_high_water_mark_from_history(dash["equity_history"])
     dash["all_trades"]     = load_trades()
     dash["all_orders"]     = load_orders()
     dash["performance"]    = get_performance_summary(dash["all_trades"])

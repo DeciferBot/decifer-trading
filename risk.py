@@ -603,10 +603,14 @@ def check_combined_exposure(symbol: str, new_exposure_value: float,
 # FIX #4: Max drawdown from peak — circuit breaker
 # ══════════════════════════════════════════════════════════════════
 
-def update_equity_high_water_mark(current_equity: float):
+def update_equity_high_water_mark(current_equity: float) -> bool:
     """
     Call on each scan cycle with current portfolio value.
     Tracks the peak and triggers halt if drawdown exceeds limit.
+
+    Returns True only when the halt is NEWLY triggered (first breach) so the
+    caller can take immediate action (e.g. flatten_all). Returns False in all
+    other cases (already halted, no breach, recovering).
     """
     global _equity_high_water_mark, _drawdown_halt, _last_known_equity
 
@@ -614,15 +618,15 @@ def update_equity_high_water_mark(current_equity: float):
 
     if _equity_high_water_mark is None:
         _equity_high_water_mark = current_equity
-        return
+        return False
 
     # Update high water mark
     if current_equity > _equity_high_water_mark:
         _equity_high_water_mark = current_equity
-        # If we were halted due to drawdown but recovered, clear the halt
         if _drawdown_halt:
             _drawdown_halt = False
             log.info(f"Drawdown halt cleared — equity recovered to new high: ${current_equity:,.2f}")
+        return False
 
     # Check drawdown from peak
     if _equity_high_water_mark > 0:
@@ -634,8 +638,11 @@ def update_equity_high_water_mark(current_equity: float):
             log.warning(
                 f"⛔ DRAWDOWN CIRCUIT BREAKER: {drawdown:.1%} drawdown from peak "
                 f"${_equity_high_water_mark:,.2f} → ${current_equity:,.2f}. "
-                f"Limit: {max_dd:.0%}. New trades halted."
+                f"Limit: {max_dd:.0%}. Flattening all positions."
             )
+            return True  # Newly halted — caller must flatten
+
+    return False
 
 
 def check_drawdown() -> tuple[bool, str]:
@@ -660,6 +667,27 @@ def reset_drawdown_state(portfolio_value: float):
     _equity_high_water_mark = portfolio_value
     _drawdown_halt = False
     log.info(f"Drawdown state reset. High water mark: ${portfolio_value:,.2f}")
+
+
+def init_equity_high_water_mark_from_history(equity_history: list):
+    """
+    Seed the in-memory HWM from persisted equity_history on bot startup.
+    Prevents a restart from silently resetting the drawdown brake.
+
+    Only upgrades — never downgrades — the existing HWM.
+    equity_history: list of {"date": str, "value": float} dicts.
+    """
+    global _equity_high_water_mark
+    if not equity_history:
+        return
+    try:
+        historical_peak = max(r["value"] for r in equity_history if "value" in r)
+    except (ValueError, TypeError) as e:
+        log.warning(f"init_equity_high_water_mark_from_history: could not parse history — {e}")
+        return
+    if _equity_high_water_mark is None or historical_peak > _equity_high_water_mark:
+        _equity_high_water_mark = historical_peak
+        log.info(f"HWM seeded from equity history: ${historical_peak:,.2f}")
 
 
 # ══════════════════════════════════════════════════════════════════
