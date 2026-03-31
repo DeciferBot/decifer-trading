@@ -367,7 +367,7 @@ class TestExecuteBuy:
         mock_stops, mock_position_size, mock_config_obj,
         mock_config, mock_ib
     ):
-        """execute_buy should reject if R:R ratio is below threshold."""
+        """execute_buy should reject if R:R ratio is below threshold (legacy mode only)."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
 
@@ -380,6 +380,7 @@ class TestExecuteBuy:
         mock_stops.return_value = (99.5, 100.5)  # SL = 0.5, TP = 0.5 (R:R = 1.0 < 1.5)
         mock_position_size.return_value = 100
 
+        # R:R check only applies in legacy mode — tranche mode skips it (T2 provides upside)
         result = orders.execute_buy(
             ib=mock_ib,
             symbol="AAPL",
@@ -388,6 +389,7 @@ class TestExecuteBuy:
             score=30,
             portfolio_value=100_000,
             regime={"regime": "bull"},
+            tranche_mode=False,
         )
 
         assert result is False
