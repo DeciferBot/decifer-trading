@@ -57,7 +57,10 @@ from agents import run_all_agents
 from orders import execute_buy, execute_sell, flatten_all, reconcile_with_ibkr, get_open_positions, update_position_prices, update_positions_from_ibkr, execute_buy_option, execute_sell_option
 from options import find_best_contract, check_options_exits
 from options_scanner import scan_options_universe
-from risk import check_risk_conditions, get_session, get_scan_interval, reset_daily_state, calculate_position_size, calculate_stops, update_equity_high_water_mark
+from risk import (check_risk_conditions, get_session, get_scan_interval, reset_daily_state,
+                  calculate_position_size, calculate_stops, update_equity_high_water_mark,
+                  get_intraday_strategy_mode, set_session_opening_regime,
+                  check_thesis_validity, get_consecutive_losses)
 from learning import log_trade, load_trades, load_orders, get_performance_summary, run_weekly_review, TRADE_LOG_FILE, get_effective_capital, record_capital_adjustment, log_signal_scan
 from dashboard import DASHBOARD_HTML
 from news_sentinel import NewsSentinel, get_sentinel_history
@@ -1760,6 +1763,8 @@ def run_scan():
     regime["regime_router"] = _router_state
     dash["regime"] = regime
     clog("INFO", f"Regime: {regime['regime']} | VIX: {_vix_val} | SPY: ${regime['spy_price']} | Router: {_router_state}")
+    # Record session opening regime (idempotent — only captures on first scan of the day)
+    set_session_opening_regime(regime["regime"])
 
     # ── Detect externally closed positions (stop loss / take profit) ──
     check_external_closes(regime)
@@ -1783,6 +1788,18 @@ def run_scan():
             dash["claude_analysis"] = f"Trading suspended: {reason}"
             dash["scanning"] = False
             return
+
+    # ── Intraday adaptive strategy mode ──────────────────────
+    strategy_mode = get_intraday_strategy_mode(pv, pnl, regime["regime"])
+    if strategy_mode["mode"] != "NORMAL":
+        clog("RISK", f"Strategy mode: {strategy_mode['mode']} | "
+                     f"PnL={strategy_mode['daily_pnl_pct']*100:+.1f}% | "
+                     f"Streak={get_consecutive_losses()} | "
+                     f"ScoreAdj=+{strategy_mode['score_threshold_adj']} | "
+                     f"SizeMult={strategy_mode['size_multiplier']}x | "
+                     f"MaxTrades={strategy_mode['max_new_trades']}")
+    if strategy_mode["regime_changed"]:
+        clog("RISK", "Regime changed since session open — thesis check active for open positions")
 
     # ── Dynamic universe ─────────────────────────────────────
     clog("SCAN", "Building dynamic universe from TradingView screener...")
@@ -1911,7 +1928,16 @@ def run_scan():
                                         regime_router=regime.get("regime_router", "unknown"))
     regime_name = regime.get('regime','UNKNOWN')
     used_threshold = get_regime_threshold(regime_name)
-    clog("INFO", f"Scored: {len(scored)} above threshold ({used_threshold}/50), {len(all_scored)} total [{regime_name}]")
+    effective_threshold = used_threshold + strategy_mode["score_threshold_adj"]
+    if strategy_mode["score_threshold_adj"] > 0:
+        pre_filter = len(scored)
+        scored = [s for s in scored if s["score"] >= effective_threshold]
+        clog("INFO", f"Scored: {pre_filter} → {len(scored)} after strategy mode filter "
+                     f"(threshold raised {used_threshold}→{effective_threshold}/50 in "
+                     f"{strategy_mode['mode']} mode) | {len(all_scored)} total [{regime_name}]")
+    else:
+        clog("INFO", f"Scored: {len(scored)} above threshold ({used_threshold}/50), "
+                     f"{len(all_scored)} total [{regime_name}]")
     log_signal_scan(all_scored, regime)
 
     # ── Build typed Signal objects + write to signals_log.jsonl ──
@@ -1958,6 +1984,14 @@ def run_scan():
     clog("ANALYSIS", "Running 6-agent analysis pipeline...")
     open_pos = get_open_positions()
 
+    # Check if any open positions have a thesis invalidated by the current regime
+    positions_to_reconsider = check_thesis_validity(open_pos, regime["regime"])
+    if positions_to_reconsider:
+        clog("RISK", f"Thesis invalidation: {len(positions_to_reconsider)} position(s) flagged "
+                     f"for agent review (regime shift)")
+        for _p in positions_to_reconsider:
+            clog("RISK", f"  Reconsider: {_p['symbol']} — {_p['reason']}")
+
     decision = run_all_agents(
         signals=scored,
         regime=regime,
@@ -1966,7 +2000,9 @@ def run_scan():
         open_positions=open_pos,
         portfolio_value=pv,
         daily_pnl=pnl,
-        options_signals=options_signals
+        options_signals=options_signals,
+        strategy_mode=strategy_mode,
+        positions_to_reconsider=positions_to_reconsider,
     )
 
     # ── Update dashboard with agent outputs ──────────────────
@@ -2061,7 +2097,15 @@ def run_scan():
         dash["scanning"] = False
         return
 
-    for buy in decision.get("buys", []):
+    # Apply strategy mode cap on number of new buys this scan
+    _all_buys  = decision.get("buys", [])
+    _max_buys  = strategy_mode.get("max_new_trades", 3)
+    if len(_all_buys) > _max_buys:
+        clog("RISK", f"Strategy mode cap: {len(_all_buys)} agent buys → {_max_buys} "
+                     f"(mode: {strategy_mode['mode']})")
+        _all_buys = _all_buys[:_max_buys]
+
+    for buy in _all_buys:
         sym      = buy.get("symbol") if isinstance(buy, dict) else buy
         qty_hint = buy.get("qty")    if isinstance(buy, dict) else None
         reason   = buy.get("reasoning", "") if isinstance(buy, dict) else ""

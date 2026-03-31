@@ -23,11 +23,17 @@ _equity_high_water_mark = None
 _drawdown_halt          = False
 _last_known_equity      = None
 
+# ── Intraday adaptive strategy state ───────────────────────────
+_session_opening_regime: str | None = None  # Regime at session open (set on first scan)
+_session_regime_set:     bool       = False  # Guard: only set once per trading day
+_strategy_size_multiplier: float    = 1.0   # Applied inside calculate_position_size()
+
 
 def reset_daily_state(portfolio_value: float):
     """Call at the start of each trading day."""
     global _consecutive_losses, _pause_until, _daily_loss_hit, _session_start_value
     global _equity_high_water_mark
+    global _session_opening_regime, _session_regime_set, _strategy_size_multiplier
     _consecutive_losses  = 0
     _pause_until         = None
     _daily_loss_hit      = False
@@ -35,6 +41,10 @@ def reset_daily_state(portfolio_value: float):
     # Initialize HWM if not yet set (don't reset to current — preserve peak across days)
     if _equity_high_water_mark is None:
         _equity_high_water_mark = portfolio_value
+    # Reset intraday adaptive strategy state for new day
+    _session_opening_regime   = None
+    _session_regime_set       = False
+    _strategy_size_multiplier = 1.0
     log.info(f"Daily risk state reset. Session start value: ${portfolio_value:,.2f} | HWM: ${_equity_high_water_mark:,.2f}")
 
 
@@ -317,8 +327,8 @@ def calculate_position_size(portfolio_value: float, price: float,
     else:
         session_mult = 1.0
 
-    # Final risk amount
-    risk_amount = base_risk * conviction_mult * regime_mult * session_mult
+    # Final risk amount (includes intraday strategy mode size reduction)
+    risk_amount = base_risk * conviction_mult * regime_mult * session_mult * _strategy_size_multiplier
 
     # Max position size check
     max_position_value = portfolio_value * CONFIG["max_single_position"]
@@ -649,3 +659,190 @@ def check_sector_concentration(new_symbol: str, open_positions: list,
         return True, "OK (sector check error, allowing)"
 
     return True, "OK"
+
+
+# ══════════════════════════════════════════════════════════════
+# INTRADAY ADAPTIVE STRATEGY
+# ══════════════════════════════════════════════════════════════
+
+def get_consecutive_losses() -> int:
+    """Return current consecutive loss count (for logging in bot.py)."""
+    return _consecutive_losses
+
+
+def set_session_opening_regime(regime_name: str) -> None:
+    """
+    Record the regime at session open.
+    Idempotent — only captures once per trading day (guarded by _session_regime_set).
+    Call this on every scan; the guard ensures only the first call per day takes effect.
+    """
+    global _session_opening_regime, _session_regime_set
+    if not _session_regime_set and regime_name:
+        _session_opening_regime = regime_name
+        _session_regime_set     = True
+        log.info(f"Session opening regime recorded: {regime_name}")
+
+
+# Regime changes that meaningfully break a position's original thesis.
+# Moving from a trend into CHOPPY/PANIC invalidates trending assumptions.
+# Moving from CHOPPY into a trend is an improvement, not thesis-breaking.
+_SIGNIFICANT_REGIME_CHANGES = {
+    ("BULL_TRENDING", "BEAR_TRENDING"),
+    ("BULL_TRENDING", "CHOPPY"),
+    ("BULL_TRENDING", "PANIC"),
+    ("BEAR_TRENDING", "BULL_TRENDING"),
+    ("BEAR_TRENDING", "PANIC"),
+    ("CHOPPY",        "PANIC"),
+}
+
+
+def get_regime_changed(current_regime: str) -> bool:
+    """
+    Returns True if the market regime has changed significantly since session open.
+    'Significant' = the change breaks the thesis of positions entered at the open.
+    """
+    if _session_opening_regime is None:
+        return False
+    return (_session_opening_regime, current_regime) in _SIGNIFICANT_REGIME_CHANGES
+
+
+def get_intraday_strategy_mode(portfolio_value: float,
+                                daily_pnl: float,
+                                current_regime: str) -> dict:
+    """
+    Compute the current intraday strategy mode from three signals:
+      1. Daily PnL % (primary)
+      2. Consecutive loss count (secondary — can only escalate mode)
+      3. Regime change (tertiary — can only escalate to DEFENSIVE minimum)
+
+    Returns a dict with mode parameters and context string for agent injection.
+
+    Modes:
+      NORMAL    — full bar, full size, up to 3 new trades
+      DEFENSIVE — +5 score threshold, 0.7x size, max 2 new trades
+      RECOVERY  — +10 score threshold, 0.5x size, max 1 new trade
+
+    The mode is computed fresh each scan from live data.
+    Hard circuit breakers in check_risk_conditions() are unchanged and still fire independently.
+    """
+    global _strategy_size_multiplier
+
+    _MODE_PARAMS = {
+        "NORMAL":    {"score_threshold_adj": 0,  "size_multiplier": 1.0, "max_new_trades": 3},
+        "DEFENSIVE": {"score_threshold_adj": 5,  "size_multiplier": 0.7, "max_new_trades": 2},
+        "RECOVERY":  {"score_threshold_adj": 10, "size_multiplier": 0.5, "max_new_trades": 1},
+    }
+
+    daily_pnl_pct = (daily_pnl / portfolio_value) if portfolio_value > 0 else 0.0
+
+    # ── Determine mode from daily PnL % (primary signal) ───────
+    if daily_pnl_pct <= -CONFIG["strategy_recovery_loss_pct"]:
+        mode = "RECOVERY"
+    elif daily_pnl_pct <= -CONFIG["strategy_pivot_loss_pct"]:
+        mode = "DEFENSIVE"
+    else:
+        mode = "NORMAL"
+
+    # ── Escalate from consecutive losses (can only raise mode) ──
+    if _consecutive_losses >= CONFIG["strategy_recovery_streak"]:
+        if mode != "RECOVERY":
+            mode = "RECOVERY"
+            log.info(f"Strategy mode escalated to RECOVERY from consecutive losses ({_consecutive_losses})")
+    elif _consecutive_losses >= CONFIG["strategy_defensive_streak"] and mode == "NORMAL":
+        mode = "DEFENSIVE"
+        log.info(f"Strategy mode escalated to DEFENSIVE from consecutive losses ({_consecutive_losses})")
+
+    # ── Escalate from regime change (floor: DEFENSIVE) ──────────
+    regime_changed = get_regime_changed(current_regime)
+    if regime_changed and mode == "NORMAL":
+        mode = "DEFENSIVE"
+        log.info(f"Strategy mode escalated to DEFENSIVE — regime changed from "
+                 f"{_session_opening_regime} to {current_regime}")
+
+    # ── Build human-readable context for agent prompts ──────────
+    if mode == "DEFENSIVE":
+        context = (
+            f"STRATEGY MODE: DEFENSIVE — We have lost {abs(daily_pnl_pct * 100):.1f}% today "
+            f"({_consecutive_losses} consecutive losses). "
+            "Entry bar is ELEVATED. Only trade exceptional setups — no marginal trades. "
+            f"Reduce all recommended position sizes to 70% of normal. Max 2 new positions this scan."
+        )
+        if regime_changed:
+            context += (
+                f" NOTE: Market regime has shifted from {_session_opening_regime} to {current_regime} "
+                "since session open — validate every proposed setup against the new environment."
+            )
+    elif mode == "RECOVERY":
+        context = (
+            f"STRATEGY MODE: RECOVERY — We have lost {abs(daily_pnl_pct * 100):.1f}% today "
+            f"({_consecutive_losses} consecutive losses). "
+            "We are in capital preservation mode. ONE new position maximum, and only if the setup is "
+            "outstanding with high conviction. Position sizes at 50% of normal. "
+            "If there is any doubt, the answer is NO TRADE. Cash is a valid and preferred position."
+        )
+        if regime_changed:
+            context += (
+                f" NOTE: Market regime has shifted from {_session_opening_regime} to {current_regime} "
+                "since session open — re-evaluate everything against current conditions."
+            )
+    else:
+        context = ""
+        if regime_changed:
+            context = (
+                f"NOTE: Market regime has changed from {_session_opening_regime} to {current_regime} "
+                "since session open. Validate all proposed setups against the new environment."
+            )
+
+    params = _MODE_PARAMS[mode]
+
+    # Update the module-level multiplier so calculate_position_size() picks it up
+    _strategy_size_multiplier = params["size_multiplier"]
+    if mode != "NORMAL":
+        log.info(f"Strategy mode: {mode} | PnL={daily_pnl_pct*100:+.2f}% | "
+                 f"Streak={_consecutive_losses} | ScoreAdj=+{params['score_threshold_adj']} | "
+                 f"SizeMult={params['size_multiplier']}x | MaxTrades={params['max_new_trades']}")
+
+    return {
+        "mode":                 mode,
+        "score_threshold_adj":  params["score_threshold_adj"],
+        "size_multiplier":      params["size_multiplier"],
+        "max_new_trades":       params["max_new_trades"],
+        "context":              context,
+        "regime_changed":       regime_changed,
+        "daily_pnl_pct":        daily_pnl_pct,
+    }
+
+
+def check_thesis_validity(open_positions: list, current_regime: str) -> list:
+    """
+    Returns a list of {symbol, reason} dicts for open positions whose entry-regime
+    thesis is invalidated by the current regime.
+
+    Only runs if:
+      - The regime has changed significantly since session open
+      - thesis_invalidation_regime_change is enabled in config
+
+    The result is passed to agent_final_decision() so agents can recommend exits.
+    This is advisory — agents decide; no forced closes bypass the consensus protocol.
+    """
+    if not CONFIG.get("thesis_invalidation_regime_change", True):
+        return []
+    if not get_regime_changed(current_regime):
+        return []
+    if not open_positions:
+        return []
+
+    flagged = []
+    for pos in open_positions:
+        # Use the regime the position was opened in; fall back to session opening regime
+        entry_regime = pos.get("regime") or _session_opening_regime
+        if not entry_regime:
+            continue
+        if (entry_regime, current_regime) in _SIGNIFICANT_REGIME_CHANGES:
+            reason = (
+                f"Opened in {entry_regime} regime; market is now {current_regime}. "
+                "Original thesis may no longer hold — reconsider."
+            )
+            flagged.append({"symbol": pos.get("symbol", "?"), "reason": reason})
+
+    return flagged

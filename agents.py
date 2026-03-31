@@ -179,7 +179,8 @@ For any unfamiliar symbol, reason about it from first principles using the data 
 Do not dismiss a symbol just because it is unfamiliar — analyse the data."""
 
 def agent_opportunity(technical_report: str, macro_report: str,
-                      signals: list, options_signals: list = None) -> str:
+                      signals: list, options_signals: list = None,
+                      strategy_mode: dict = None) -> str:
     """Identify top 3 opportunities by synthesising technical, macro, and options flow."""
 
     available = ", ".join([s["symbol"] for s in signals]) if signals else "None above threshold"
@@ -210,6 +211,14 @@ def agent_opportunity(technical_report: str, macro_report: str,
         options_section = "OPTIONS FLOW DATA: Not available this cycle."
         options_note = ""
 
+    # ── Strategy mode context block ──────────────────────────────
+    _sm = strategy_mode or {}
+    _sm_context = _sm.get("context", "")
+    if _sm_context:
+        strategy_block = f"\n═══ TRADING CONTEXT ═══\n{_sm_context}\n═══════════════════════\n"
+    else:
+        strategy_block = ""
+
     prompt = f"""TECHNICAL ANALYST REPORT:
 {technical_report}
 
@@ -219,7 +228,7 @@ MACRO ANALYST REPORT:
 SYMBOLS CURRENTLY SCORING ABOVE THRESHOLD: {available}
 
 {options_section}{options_note}
-
+{strategy_block}
 Based on all reports, identify the TOP 3 trading opportunities right now.
 For each opportunity provide:
 1. SYMBOL and ASSET CLASS
@@ -283,7 +292,8 @@ Note: Your opinion counts as 1 vote of 6 in the consensus — same as every othe
 
 def agent_risk_manager(opportunity_report: str, devils_report: str,
                        open_positions: list, portfolio_value: float,
-                       daily_pnl: float, regime: dict) -> str:
+                       daily_pnl: float, regime: dict,
+                       strategy_mode: dict = None) -> str:
     """Assess portfolio risk and approve/reject each trade with sizing."""
 
     positions_text = "\n".join([
@@ -334,6 +344,17 @@ REASON: One sentence justification
 
 If daily loss limit is near or position slots are full (0 remaining of {max_pos}), say so explicitly."""
 
+    # Append strategy mode block
+    _sm = strategy_mode or {}
+    _sm_mode    = _sm.get("mode", "NORMAL")
+    _sm_ctx     = _sm.get("context", "") or "Normal operating mode — no size adjustments required."
+    _sm_mult    = _sm.get("size_multiplier", 1.0)
+    prompt += f"""
+
+STRATEGY MODE: {_sm_mode}
+{_sm_ctx}
+Sizing guidance: Apply {_sm_mult}x multiplier to all recommended position sizes."""
+
     return _call_claude(RISK_SYSTEM, prompt)
 
 
@@ -350,7 +371,9 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
                          devils: str, risk: str, signals: list,
                          open_positions: list, regime: dict,
                          agents_required: int,
-                         weekly_memory: str = "") -> dict:
+                         weekly_memory: str = "",
+                         strategy_mode: dict = None,
+                         positions_to_reconsider: list = None) -> dict:
     """
     Final synthesis — outputs actionable JSON trade instructions.
     Enforces the disagreement protocol.
@@ -359,6 +382,17 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
     open_syms = [p["symbol"] for p in open_positions]
     max_pos = CONFIG["max_positions"]
     slots_remaining = max_pos - len(open_positions)
+
+    # ── Build strategy mode + reconsider blocks ───────────────────
+    _sm = strategy_mode or {}
+    _sm_mode       = _sm.get("mode", "NORMAL")
+    _sm_context    = _sm.get("context") or "Normal operating mode — no restrictions."
+    _sm_max_trades = _sm.get("max_new_trades", 3)
+    _reconsider    = positions_to_reconsider or []
+    if _reconsider:
+        _reconsider_text = "\n".join(f"  {p['symbol']}: {p['reason']}" for p in _reconsider)
+    else:
+        _reconsider_text = "None — thesis valid for all open positions."
 
     prompt = f"""You have received reports from 5 specialist agents. Synthesise into trade instructions.
 
@@ -393,6 +427,13 @@ New buys ARE allowed as long as open positions < {max_pos}.
 ═══ CURRENT STATE ═══
 Regime: {regime['regime']} | VIX: {regime['vix']}
 Open positions: {open_syms if open_syms else 'None'}
+
+═══ STRATEGY MODE ═══
+{_sm_mode} — {_sm_context}
+Max new buys this scan: {_sm_max_trades}
+
+═══ POSITIONS TO RECONSIDER ═══
+{_reconsider_text}
 
 ═══ OUTPUT FORMAT ═══
 Respond ONLY with valid JSON:
@@ -467,7 +508,9 @@ def load_weekly_review() -> str:
 def run_all_agents(signals: list, regime: dict, news: list,
                    fx_data: dict, open_positions: list,
                    portfolio_value: float, daily_pnl: float,
-                   options_signals: list = None) -> dict:
+                   options_signals: list = None,
+                   strategy_mode: dict = None,
+                   positions_to_reconsider: list = None) -> dict:
     """
     Run all 6 agents sequentially and return final decision.
     Each agent's output feeds into the next.
@@ -475,6 +518,13 @@ def run_all_agents(signals: list, regime: dict, news: list,
     """
     # Inject learning memory from last weekly review
     weekly_memory = load_weekly_review()
+
+    # Resolve defaults for new optional params
+    if strategy_mode is None:
+        strategy_mode = {"mode": "NORMAL", "context": "", "size_multiplier": 1.0,
+                         "max_new_trades": 3, "score_threshold_adj": 0, "regime_changed": False}
+    if positions_to_reconsider is None:
+        positions_to_reconsider = []
 
     log.info("Agents 1+2: Technical + Macro (parallel)...")
     with ThreadPoolExecutor(max_workers=2) as pool:
@@ -484,20 +534,24 @@ def run_all_agents(signals: list, regime: dict, news: list,
         macro = macro_future.result()
 
     log.info("Agent 3: Opportunity Finder (with options flow)...")
-    opp    = agent_opportunity(tech, macro, signals, options_signals=options_signals or [])
+    opp    = agent_opportunity(tech, macro, signals, options_signals=options_signals or [],
+                               strategy_mode=strategy_mode)
 
     log.info("Agent 4: Devil's Advocate...")
     devils = agent_devils_advocate(opp, regime)
 
     log.info("Agent 5: Risk Manager...")
     risk   = agent_risk_manager(opp, devils, open_positions,
-                                portfolio_value, daily_pnl, regime)
+                                portfolio_value, daily_pnl, regime,
+                                strategy_mode=strategy_mode)
 
     log.info("Agent 6: Final Decision Maker...")
     final  = agent_final_decision(tech, macro, opp, devils, risk,
                                   signals, open_positions, regime,
                                   CONFIG["agents_required_to_agree"],
-                                  weekly_memory)
+                                  weekly_memory=weekly_memory,
+                                  strategy_mode=strategy_mode,
+                                  positions_to_reconsider=positions_to_reconsider)
 
     # Attach full agent outputs for logging
     final["_agent_outputs"] = {

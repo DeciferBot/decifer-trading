@@ -56,6 +56,16 @@ CONFIG = {
     "max_single_position":      0.10,   # 10% per position with more positions (live: 0.15)
     "max_sector_exposure":      0.50,   # 50% sector — allow concentration (live: 0.40)
     "consecutive_loss_pause":   8,      # More tolerance for losing streaks (live: 5)
+
+    # ── INTRADAY ADAPTIVE STRATEGY ────────────────────────────────
+    # When the day is going badly, the bot shifts posture rather than trading normally
+    # until a hard circuit breaker fires. Three modes: NORMAL → DEFENSIVE → RECOVERY.
+    "strategy_pivot_loss_pct":           0.015,  # -1.5% daily PnL → DEFENSIVE mode
+    "strategy_recovery_loss_pct":        0.030,  # -3.0% daily PnL → RECOVERY mode
+    "strategy_defensive_streak":         3,       # 3 consecutive losses → DEFENSIVE
+    "strategy_recovery_streak":          6,       # 6 consecutive losses → RECOVERY (before 8-loss hard pause)
+    "thesis_invalidation_regime_change": True,    # Re-evaluate open positions on significant regime shift
+
     "max_portfolio_allocation": 1.0,    # 1.0 = full account, 0.2 = 20% of account
     "starting_capital":         1_000_000,  # Starting portfolio value for P&L tracking
 
@@ -359,5 +369,22 @@ CONFIG = {
             "multi_user_auth":          5,   # User accounts / auth layer
             "hosted_dashboard":         5,   # Public-facing dashboard
         },
+    },
+
+    # ── FILL WATCHER ──────────────────────────────────────────────
+    # Background thread that monitors an unfilled limit order after placement
+    # and adjusts the price in small steps to chase a fill.  Cancels the order
+    # if the price ceiling is hit or max attempts are exhausted — never chases
+    # a stale signal indefinitely.
+    #
+    # Total max order life = initial_wait_secs + max_attempts × interval_secs
+    # Defaults: 30 + 3×20 = 90 seconds before cancel.
+    "fill_watcher": {
+        "enabled":           True,   # Master switch — set False to disable without removing code
+        "initial_wait_secs": 30,     # Seconds to wait before the first price adjustment
+        "max_attempts":      3,      # Max number of adjustments before cancelling
+        "interval_secs":     20,     # Seconds between each adjustment attempt
+        "step_pct":          0.002,  # Price chase step: 0.2% per attempt (e.g. $0.20 on a $100 stock)
+        "max_chase_pct":     0.01,   # Hard ceiling: never pay more than 1% above the original limit
     },
 }
