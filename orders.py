@@ -746,6 +746,26 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             raise
 
         log.info(f"✅ BUY {symbol} qty={qty} @ ${price:.2f} | SL=${sl:.2f} TP=${tp:.2f} | R:R={reward/risk:.1f}")
+
+        # ── Start fill watcher for this order ────────────────────────────────
+        if CONFIG.get("fill_watcher", {}).get("enabled", True):
+            from fill_watcher import FillWatcher, _active_watchers, _watchers_lock
+            if symbol not in _active_watchers:   # guard: should never be True, but free to check
+                watcher = FillWatcher(
+                    ib=ib,
+                    symbol=symbol,
+                    order_id=parent_id,
+                    entry_trade=trade,
+                    original_limit=limit_price,
+                    contract=contract,
+                    qty=qty,
+                )
+                with _watchers_lock:
+                    _active_watchers[symbol] = watcher
+                t = threading.Thread(target=watcher.run,
+                                     name=f"fill_watcher_{symbol}", daemon=True)
+                t.start()
+
         return True
 
     except Exception as e:
@@ -764,6 +784,10 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal") -> bool:
             log.warning(f"No open position in {symbol} — skipping sell")
             return False
         info = active_trades[symbol]
+
+    # Stop any active fill watcher so it doesn't race the sell
+    from fill_watcher import stop_watcher as _stop_watcher
+    _stop_watcher(symbol)
 
     try:
         contract = get_contract(symbol)
@@ -901,6 +925,17 @@ def _flatten_all_inner(ib_fallback: IB = None):
         return
 
     log.critical("🚨 FLATTEN ALL — closing all positions immediately")
+
+    # 0) Stop all fill watchers so they don't race reqGlobalCancel
+    try:
+        from fill_watcher import stop_watcher as _stop_watcher
+        with _trades_lock:
+            symbols_to_stop = [info.get("symbol", key.split("_")[0])
+                               for key, info in active_trades.items()]
+        for sym in symbols_to_stop:
+            _stop_watcher(sym)
+    except Exception as _fw_err:
+        log.warning(f"FillWatcher stop-all raised: {_fw_err}")
 
     # 1) Atomically cancel ALL open orders with a single reqGlobalCancel
     try:
