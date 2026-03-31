@@ -6,6 +6,7 @@
 import os
 import sys
 import json
+import pytest
 import tempfile
 from datetime import date, datetime, timezone
 from unittest.mock import patch, MagicMock
@@ -26,6 +27,8 @@ from alpha_decay import (
     _parse_entry_date,
     _percentile,
     _aggregate,
+    _dominant_dimension,
+    _DIMENSIONS,
     get_alpha_decay_stats,
     compute_alpha_decay,
     HORIZONS,
@@ -306,7 +309,114 @@ class TestComputeAlphaDecay:
             result = compute_alpha_decay()
         assert result == []
 
+    def test_direction_inferred_long_from_buy_action(self):
+        """Trade with action=BUY and no direction field → LONG."""
+        trade = _make_trade()
+        trade.pop("direction", None)
+        trade["action"] = "BUY"
+        fwd = {1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005}
+        with patch.object(alpha_decay, "fetch_forward_returns", return_value=fwd):
+            result = compute_alpha_decay(trades=[trade])
+        assert result[0]["direction"] == "LONG"
+        assert result[0]["direction_adj_returns"][1] == pytest.approx(0.01)
 
-# ── pytest import ─────────────────────────────────────────────────────────
+    def test_direction_inferred_short_from_sell_action(self):
+        """Trade with action=SELL and no direction field → SHORT (inverted returns)."""
+        trade = _make_trade()
+        trade.pop("direction", None)
+        trade["action"] = "SELL"
+        fwd = {1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005}
+        with patch.object(alpha_decay, "fetch_forward_returns", return_value=fwd):
+            result = compute_alpha_decay(trades=[trade])
+        assert result[0]["direction"] == "SHORT"
+        assert result[0]["direction_adj_returns"][1] == pytest.approx(-0.01)
 
-import pytest
+    def test_signal_scores_preserved_in_output(self):
+        """signal_scores from the trade record pass through to the decay result."""
+        trade = _make_trade()
+        trade["signal_scores"] = {"trend": 8, "momentum": 5}
+        fwd = {1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005}
+        with patch.object(alpha_decay, "fetch_forward_returns", return_value=fwd):
+            result = compute_alpha_decay(trades=[trade])
+        assert result[0]["signal_scores"] == {"trend": 8, "momentum": 5}
+
+    def test_signal_scores_defaults_to_empty_dict(self):
+        """Trades without signal_scores produce an empty dict, not KeyError."""
+        trade = _make_trade()
+        trade.pop("signal_scores", None)
+        fwd = {1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005}
+        with patch.object(alpha_decay, "fetch_forward_returns", return_value=fwd):
+            result = compute_alpha_decay(trades=[trade])
+        assert result[0]["signal_scores"] == {}
+
+
+# ── _dominant_dimension ───────────────────────────────────────────────────
+
+class TestDominantDimension:
+
+    def test_returns_highest_scoring_dimension(self):
+        scores = {"trend": 7, "momentum": 9, "squeeze": 4}
+        assert _dominant_dimension(scores) == "momentum"
+
+    def test_ignores_unrecognised_keys(self):
+        scores = {"unknown_dim": 99, "trend": 3}
+        assert _dominant_dimension(scores) == "trend"
+
+    def test_returns_none_for_empty_dict(self):
+        assert _dominant_dimension({}) is None
+
+    def test_returns_none_for_all_unrecognised(self):
+        assert _dominant_dimension({"foo": 10, "bar": 5}) is None
+
+    def test_returns_none_for_none_input(self):
+        assert _dominant_dimension(None) is None
+
+    def test_all_dimensions_are_recognised(self):
+        scores = {dim: i for i, dim in enumerate(_DIMENSIONS)}
+        # Last dimension in tuple gets highest index → should win
+        assert _dominant_dimension(scores) == _DIMENSIONS[-1]
+
+    def test_ties_resolved_by_first_key(self):
+        # dict preserves insertion order in Python 3.7+; first key wins on tie
+        scores = {"trend": 5, "momentum": 5}
+        assert _dominant_dimension(scores) == "trend"
+
+
+# ── Dimension segments in get_alpha_decay_stats ───────────────────────────
+
+class TestDimensionSegments:
+
+    def _records_with_scores(self):
+        r1 = _make_record(returns={1: 0.02, 3: 0.03, 5: 0.025, 10: 0.01})
+        r1["signal_scores"] = {"trend": 9, "momentum": 4}
+        r2 = _make_record(returns={1: 0.01, 3: 0.015, 5: 0.01, 10: -0.005})
+        r2["signal_scores"] = {"momentum": 8, "trend": 2}
+        r3 = _make_record(returns={1: -0.01, 3: 0.0, 5: 0.005, 10: 0.0})
+        r3["signal_scores"] = {}  # no dimension data
+        return [r1, r2, r3]
+
+    def test_all_dimension_keys_present(self):
+        with patch.object(alpha_decay, "compute_alpha_decay",
+                          return_value=self._records_with_scores()):
+            stats = get_alpha_decay_stats()
+        for dim in _DIMENSIONS:
+            assert f"dim_{dim}" in stats["groups"], f"Missing: dim_{dim}"
+
+    def test_dimension_counts_correct(self):
+        with patch.object(alpha_decay, "compute_alpha_decay",
+                          return_value=self._records_with_scores()):
+            stats = get_alpha_decay_stats()
+        g = stats["groups"]
+        assert g["dim_trend"]["n"]    == 1  # r1 dominant = trend
+        assert g["dim_momentum"]["n"] == 1  # r2 dominant = momentum
+        assert g["dim_squeeze"]["n"]  == 0  # no trade dominated by squeeze
+
+    def test_empty_signal_scores_not_counted_in_any_dimension(self):
+        with patch.object(alpha_decay, "compute_alpha_decay",
+                          return_value=self._records_with_scores()):
+            stats = get_alpha_decay_stats()
+        # r3 has empty signal_scores → must not appear in any dim segment
+        total_dim_n = sum(
+            stats["groups"][f"dim_{d}"]["n"] for d in _DIMENSIONS
+        )
+        assert total_dim_n == 2  # only r1 and r2

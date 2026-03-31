@@ -190,7 +190,10 @@ def compute_alpha_decay(trades: list = None, horizons: list = None) -> list:
         if not fwd:
             continue
 
-        direction = trade.get("direction") or "LONG"
+        direction = trade.get("direction") or ""
+        if not direction:
+            action = (trade.get("action") or "").upper()
+            direction = "SHORT" if action == "SELL" else "LONG"
         dir_sign  = -1 if direction == "SHORT" else 1
         dir_adj   = {h: round(v * dir_sign, 6) for h, v in fwd.items()}
 
@@ -203,6 +206,7 @@ def compute_alpha_decay(trades: list = None, horizons: list = None) -> list:
             "pnl":                   trade.get("pnl"),
             "forward_returns":       fwd,
             "direction_adj_returns": dir_adj,
+            "signal_scores":         trade.get("signal_scores") or {},
         })
 
     return results
@@ -240,6 +244,31 @@ def _aggregate(records: list, horizons: list) -> dict:
         p75s.append(_percentile(vals, 75))
 
     return {"median": medians, "p25": p25s, "p75": p75s, "n": len(records)}
+
+
+# ── Dimension segmentation ────────────────────────────────────────────────
+
+_DIMENSIONS = (
+    "trend", "momentum", "squeeze", "flow", "breakout",
+    "mtf", "news", "social", "reversion",
+)
+
+
+def _dominant_dimension(signal_scores: dict):
+    """
+    Return the name of the dimension with the highest score, or None if
+    signal_scores is empty or contains no recognised dimension keys.
+    Ties are broken by iteration order (first key wins).
+    """
+    if not signal_scores:
+        return None
+    valid = {
+        k: v for k, v in signal_scores.items()
+        if k in _DIMENSIONS and isinstance(v, (int, float))
+    }
+    if not valid:
+        return None
+    return max(valid, key=lambda k: valid[k])
 
 
 # ── Public summary API ────────────────────────────────────────────────────
@@ -284,6 +313,14 @@ def get_alpha_decay_stats(trades: list = None, horizons: list = None) -> dict:
         "long_only":  [r for r in records if r.get("direction") == "LONG"],
         "short_only": [r for r in records if r.get("direction") == "SHORT"],
     }
+
+    # Per-dimension segments: trades where that dimension had the highest score.
+    # Sparse until live trades with signal_scores accumulate.
+    for _dim in _DIMENSIONS:
+        groups[f"dim_{_dim}"] = [
+            r for r in records
+            if _dominant_dimension(r.get("signal_scores", {})) == _dim
+        ]
 
     agg = {name: _aggregate(recs, horizons) for name, recs in groups.items()}
 

@@ -1130,23 +1130,36 @@ function renderAlphaDecay(d) {
   const hi5  = d.horizons.indexOf(5);
   const hi10 = d.horizons.indexOf(10);
 
-  const rowsHtml = segRows.map(([label, key]) => {
-    const g = groups[key];
+  function _segRow(label, g, indent) {
     if (!g || !g.n) return '';
-    const m  = g.median || [];
+    const m   = g.median || [];
     const v1  = hi1  >= 0 ? m[hi1]  : null;
     const v5  = hi5  >= 0 ? m[hi5]  : null;
     const v10 = hi10 >= 0 ? m[hi10] : null;
+    const pl  = indent ? 'padding-left:10px' : '';
     return `<div style="display:grid;grid-template-columns:120px repeat(4,1fr);gap:4px;padding:5px 0;border-bottom:1px solid var(--border)">
-      <div style="color:var(--text)">${label}</div>
+      <div style="color:var(--text);${pl}">${label}</div>
       <div style="color:var(--muted2)">${g.n}</div>
       <div>${_fmtPct(v1)}</div>
       <div>${_fmtPct(v5)}</div>
       <div>${_fmtPct(v10)}</div>
     </div>`;
-  }).join('');
+  }
 
-  document.getElementById('ad-seg-rows').innerHTML = rowsHtml ||
+  const rowsHtml = segRows.map(([label, key]) => _segRow(label, groups[key], false)).join('');
+
+  // Dimension rows — only shown when at least one dimension has data
+  const DIM_LABELS = {
+    dim_trend: 'Trend', dim_momentum: 'Momentum', dim_squeeze: 'Squeeze',
+    dim_flow: 'Flow', dim_breakout: 'Breakout', dim_mtf: 'MTF',
+    dim_news: 'News', dim_social: 'Social', dim_reversion: 'Reversion',
+  };
+  const dimKeys = Object.keys(DIM_LABELS).filter(k => groups[k] && groups[k].n > 0);
+  const dimHtml = dimKeys.length === 0 ? '' :
+    `<div style="padding:6px 0 2px;font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase">— by dominant dimension —</div>` +
+    dimKeys.map(k => _segRow(DIM_LABELS[k], groups[k], true)).join('');
+
+  document.getElementById('ad-seg-rows').innerHTML = (rowsHtml + dimHtml) ||
     '<div style="padding:8px 0;color:var(--muted2)">No data with usable forward returns yet.</div>';
 }
 
