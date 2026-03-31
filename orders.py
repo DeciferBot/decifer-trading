@@ -436,7 +436,8 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 reasoning: str = "",
                 signal_scores: dict = None,
                 agent_outputs: dict = None,
-                open_time: str = None) -> bool:
+                open_time: str = None,
+                tranche_mode: bool = True) -> bool:
     """
     Place a buy order with full OCO bracket.
     Entry: Limit order at IBKR real-time price (yfinance price is only a fallback)
@@ -580,14 +581,31 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
 
         sl, tp = calculate_stops(price, atr, "LONG")
 
-        # Validate R:R
+        # Validate R:R — skip in tranche mode (T2 open-ended upside lifts combined R:R above threshold)
         reward = tp - price
         risk   = price - sl
-        if risk <= 0 or (reward / risk) < CONFIG["min_reward_risk_ratio"]:
-            log.warning(f"Poor R:R on {symbol}: reward={reward:.2f} risk={risk:.2f} — skipping")
-            return False
+        if not tranche_mode:
+            if risk <= 0 or (reward / risk) < CONFIG["min_reward_risk_ratio"]:
+                log.warning(f"Poor R:R on {symbol}: reward={reward:.2f} risk={risk:.2f} — skipping")
+                return False
 
         account = CONFIG["active_account"]
+
+        # ── Tranche sizing ────────────────────────────────────────
+        # Guard: need at least 2 shares to split into two tranches
+        if tranche_mode and qty < 2:
+            log.warning(f"[TRANCHE] qty={qty} too small for dual-tranche — falling back to legacy for {symbol}")
+            tranche_mode = False
+
+        if tranche_mode:
+            t1_qty = qty // 2
+            t2_qty = qty - t1_qty          # handles odd qty — T2 gets the extra share
+            tp     = round(price + atr * CONFIG["atr_stop_multiplier"], 2)  # T1 target: +1.5×ATR
+            tp_qty = t1_qty
+        else:
+            tp_qty = qty if qty < 3 else max(1, qty // 3)
+            t1_qty = tp_qty
+            t2_qty = qty - tp_qty
 
         # ── ATOMIC BRACKET ORDER ──────────────────────────────────
         # All 3 legs (entry + SL + TP) are submitted as one atomic bracket.
@@ -595,7 +613,6 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         # The final child has transmit=True which transmits the entire group together.
         # This prevents the "parent already filled" rejection that kills child orders.
         limit_price = round(price * 1.002, 2)
-        tp_qty = qty if qty < 3 else max(1, qty // 3)
 
         # Leg 1: Entry (parent) — DO NOT transmit yet
         entry_order = LimitOrder("BUY", qty, limit_price,
@@ -722,6 +739,11 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 tp_trade2 = ib.placeOrder(contract, standalone_tp)
                 ib.sleep(0.3)
                 log.info(f"Standalone TP placed for {symbol} @ ${tp:.2f} OCA={oca_group} (orderId={tp_trade2.order.orderId})")
+                # Update t1_order_id to the standalone TP so update_tranche_status tracks it
+                if tranche_mode:
+                    with _trades_lock:
+                        if symbol in active_trades:
+                            active_trades[symbol]["t1_order_id"] = tp_trade2.order.orderId
             except Exception as e:
                 log.error(f"CRITICAL: Failed to place standalone TP for {symbol}: {e}")
 
@@ -752,22 +774,47 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                     "atr":              atr,
                     "sl_order_id":      _sl_order_id,
                     "high_water_mark":  price,
+                    # ── Tranche tracking ──────────────────────────────────
+                    "tranche_mode":     tranche_mode,
+                    "t1_qty":           t1_qty,
+                    "t2_qty":           t2_qty,
+                    "t1_status":        "OPEN" if tranche_mode else "N/A",
+                    "t1_order_id":      tp_trade.order.orderId if tranche_mode else None,
+                    "t2_sl_order_id":   None,  # set by update_tranche_status after T1 fills
                 }
             # Log OPEN record to trades.json for feedback loop
             from learning import log_trade
-            log_trade(
-                trade=active_trades[symbol],
-                agent_outputs=agent_outputs or {},
-                regime=regime,
-                action="OPEN",
-            )
+            if tranche_mode:
+                log_trade(
+                    trade={**active_trades[symbol], "qty": t1_qty,
+                           "tranche_id": 1, "parent_trade_id": parent_id},
+                    agent_outputs=agent_outputs or {},
+                    regime=regime,
+                    action="OPEN",
+                )
+                log_trade(
+                    trade={**active_trades[symbol], "qty": t2_qty,
+                           "tranche_id": 2, "parent_trade_id": parent_id},
+                    agent_outputs=agent_outputs or {},
+                    regime=regime,
+                    action="OPEN",
+                )
+            else:
+                log_trade(
+                    trade=active_trades[symbol],
+                    agent_outputs=agent_outputs or {},
+                    regime=regime,
+                    action="OPEN",
+                )
         except Exception as record_err:
             # Ghost position safety: order was submitted but we failed to record it
             log.error(f"GHOST POSITION RISK {symbol}: order submitted (id={parent_id}) but "
                        f"failed to record in tracker: {record_err}")
             raise
 
-        log.info(f"✅ BUY {symbol} qty={qty} @ ${price:.2f} | SL=${sl:.2f} TP=${tp:.2f} | R:R={reward/risk:.1f}")
+        _rr = (tp - price) / (price - sl) if (price - sl) > 0 else 0
+        _tranche_tag = f" [T1={t1_qty}/T2={t2_qty}]" if tranche_mode else ""
+        log.info(f"✅ BUY {symbol} qty={qty}{_tranche_tag} @ ${price:.2f} | SL=${sl:.2f} TP=${tp:.2f} | R:R={_rr:.1f}")
 
         # ── Start fill watcher for this order ────────────────────────────────
         if CONFIG.get("fill_watcher", {}).get("enabled", True):
@@ -1857,6 +1904,101 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
         return False
 
 
+# ── DUAL-TRANCHE STATUS ───────────────────────────────────────────────────────
+
+def update_tranche_status(ib: IB) -> None:
+    """
+    Called each scan cycle after update_positions_from_ibkr(), before update_trailing_stops().
+
+    For positions with tranche_mode=True and t1_status="OPEN":
+    - Checks whether the T1 limit order (t1_order_id) has been filled by querying
+      IBKR open trades. If the order ID is no longer live, T1 has filled.
+    - On T1 fill: logs partial close, cancels full-qty bracket SL, places standalone
+      T2 stop for t2_qty, updates active_trades to reflect T2-only position.
+    """
+    if not ib.isConnected():
+        log.warning("[TRANCHE] IBKR disconnected — skipping tranche status update")
+        return
+
+    with _trades_lock:
+        snapshot = list(active_trades.items())
+
+    try:
+        live_order_ids = {t.order.orderId for t in ib.openTrades()}
+    except Exception as e:
+        log.error(f"[TRANCHE] Failed to fetch open trades from IBKR: {e}")
+        return
+
+    for symbol, trade in snapshot:
+        try:
+            if not trade.get("tranche_mode"):
+                continue
+            if trade.get("t1_status") != "OPEN":
+                continue
+            if trade.get("instrument") != "stock":
+                continue
+            if trade.get("status") != "ACTIVE":
+                continue
+
+            t1_order_id = trade.get("t1_order_id")
+            if t1_order_id is None or t1_order_id in live_order_ids:
+                continue  # T1 still live — nothing to do
+
+            # ── T1 HAS FILLED ──────────────────────────────────────────────────
+            log.info(f"[TRANCHE] T1 filled for {symbol} (order #{t1_order_id})")
+
+            entry    = trade["entry"]
+            t1_qty   = trade["t1_qty"]
+            t2_qty   = trade["t2_qty"]
+            tp_t1    = trade["tp"]       # tp was set to entry + 1.5×ATR at entry time
+            sl_price = trade["sl"]
+
+            t1_pnl = round((tp_t1 - entry) * t1_qty, 2)
+            from learning import log_trade
+            log_trade(
+                trade={**trade, "qty": t1_qty,
+                       "tranche_id": 1, "parent_trade_id": trade.get("order_id")},
+                agent_outputs=trade.get("agent_outputs", {}),
+                regime={"regime": "UNKNOWN", "vix": 0.0},
+                action="CLOSE",
+                outcome={"exit_price": tp_t1, "pnl": t1_pnl, "reason": "tranche_1_tp"},
+            )
+
+            # Cancel full-qty bracket SL (T2 needs its own standalone stop)
+            old_sl_id = trade.get("sl_order_id")
+            if old_sl_id:
+                _cancel_ibkr_order_by_id(ib, old_sl_id)
+                ib.sleep(0.3)
+
+            # Place standalone T2 stop at current sl_price (will be trailed by update_trailing_stops)
+            contract = get_contract(symbol)
+            t2_stop = StopOrder(
+                "SELL", t2_qty, sl_price,
+                account=CONFIG["active_account"],
+                tif="GTC", outsideRth=True,
+            )
+            t2_stop.transmit = True
+            t2_stop_trade = ib.placeOrder(contract, t2_stop)
+            ib.sleep(0.5)
+            new_id = t2_stop_trade.order.orderId
+
+            # Update active_trades: switch to T2-only state
+            with _trades_lock:
+                if symbol in active_trades:
+                    active_trades[symbol]["t1_status"]      = "FILLED"
+                    active_trades[symbol]["t2_sl_order_id"] = new_id
+                    active_trades[symbol]["sl_order_id"]    = new_id   # trailing stop reads this
+                    active_trades[symbol]["qty"]            = t2_qty   # execute_sell reads this
+
+            log.info(
+                f"[TRANCHE] {symbol} T1 ✅ P&L ${t1_pnl:+.2f} — "
+                f"T2 stop placed: qty={t2_qty} @ ${sl_price:.2f} orderId={new_id}"
+            )
+
+        except Exception as exc:
+            log.error(f"[TRANCHE] update_tranche_status failed for {symbol}: {exc}")
+
+
 # ── ATR TRAILING STOP ─────────────────────────────────────────────────────────
 
 def update_trailing_stops(ib: IB) -> None:
@@ -1887,6 +2029,11 @@ def update_trailing_stops(ib: IB) -> None:
             if trade.get("instrument") != "stock":
                 continue
             if trade.get("status") != "ACTIVE":
+                continue
+            # Tranche guard: while T1 is still open, the bracket SL covers both tranches
+            # and is intentionally kept static. Only trail once T1 fills and T2 gets its
+            # own standalone stop (update_tranche_status updates sl_order_id and qty).
+            if trade.get("tranche_mode") and trade.get("t1_status") == "OPEN":
                 continue
             sl_order_id = trade.get("sl_order_id")
             if not sl_order_id:

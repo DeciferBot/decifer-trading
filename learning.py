@@ -270,7 +270,10 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
             "devils":      agent_outputs.get("devils",      "")[:500],
             "risk":        agent_outputs.get("risk",        "")[:500],
         },
-        "signal_scores": trade.get("signal_scores", {}),
+        "signal_scores":   trade.get("signal_scores", {}),
+        # Sanitise to JSON-safe types — orderId can be a MagicMock in test environments
+        "tranche_id":      trade.get("tranche_id") if isinstance(trade.get("tranche_id"), (int, type(None))) else None,
+        "parent_trade_id": trade.get("parent_trade_id") if isinstance(trade.get("parent_trade_id"), (int, str, type(None))) else None,
     }
 
     # ── Options metadata — store if present so dashboard can display correctly ──
@@ -306,6 +309,11 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
             try:
                 ts_ex = datetime.fromisoformat(existing["timestamp"])
                 if abs((ts_new - ts_ex).total_seconds()) < 86400:  # within 24 hours
+                    # Tranche guard: T1 close and T2 close are distinct — never treat as dupes
+                    if (record.get("tranche_id") is not None
+                            and existing.get("tranche_id") is not None
+                            and record["tranche_id"] != existing["tranche_id"]):
+                        continue
                     existing_qty = existing.get("qty") or existing.get("shares") or 0
                     new_qty      = record.get("qty")  or record.get("shares")  or 0
                     # Prefer the record with better (non-zero) P&L or higher qty
@@ -328,6 +336,11 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
             try:
                 ts_ex = datetime.fromisoformat(existing["timestamp"])
                 if abs((ts_new - ts_ex).total_seconds()) < 1800:
+                    # Tranche guard: T1 open and T2 open are distinct — never treat as dupes
+                    if (record.get("tranche_id") is not None
+                            and existing.get("tranche_id") is not None
+                            and record["tranche_id"] != existing["tranche_id"]):
+                        continue
                     log.info(f"Duplicate OPEN skipped: {record['symbol']}")
                     return
             except Exception:

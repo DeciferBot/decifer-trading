@@ -147,6 +147,21 @@ def _get_test_pass_rate() -> float | None:
         return None
 
 
+def _load_ic_validation_result(data_dir: str | None = None) -> dict | None:
+    """
+    Read data/ic_validation_result.json (written by ic_validator.validate_and_persist).
+    Returns the parsed dict, or None if the file is absent or malformed.
+    """
+    base = data_dir or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+    path = Path(os.path.join(base, "ic_validation_result.json"))
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
 # ── Public API ────────────────────────────────────────────────────
 
 
@@ -183,6 +198,7 @@ class PhaseStatus:
     criteria_met: dict[str, bool] = field(default_factory=dict)
     phase1_complete: bool = False
     alpha_gate: AlphaGateStatus | None = None
+    ic_validation_passed: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -197,6 +213,7 @@ class PhaseStatus:
             "criteria_met": self.criteria_met,
             "phase1_complete": self.phase1_complete,
             "alpha_gate": self.alpha_gate.as_dict() if self.alpha_gate else None,
+            "ic_validation_passed": self.ic_validation_passed,
         }
 
 
@@ -304,6 +321,9 @@ def get_status(config: dict[str, Any] | None = None) -> PhaseStatus:
 
     alpha_gate = check_alpha_gate(config)
 
+    ic_result = _load_ic_validation_result()
+    ic_validation_passed = bool(ic_result and ic_result.get("ready_for_live", False))
+
     return PhaseStatus(
         current_phase=current_phase,
         phase_description=PHASE_DESCRIPTIONS.get(current_phase, "Unknown phase"),
@@ -316,6 +336,7 @@ def get_status(config: dict[str, Any] | None = None) -> PhaseStatus:
         criteria_met=criteria_met,
         phase1_complete=phase1_complete,
         alpha_gate=alpha_gate,
+        ic_validation_passed=ic_validation_passed,
     )
 
 
@@ -412,10 +433,34 @@ def validate(config: dict[str, Any] | None = None) -> list[str]:
                     f"and config['telegram']['authorized_chat_ids'] before enabling live accounts."
                 )
 
+    # IC + walk-forward validation gate (required before Phase 4 / live trading)
+    # Silent in Phase 1 without live accounts — no noise during paper trading.
+    _live_account_being_used = bool(live_accounts)
+    _at_or_past_phase4 = current_phase >= frozen.get("live_account_trading", 4)
+    if _live_account_being_used or _at_or_past_phase4:
+        ic_result = _load_ic_validation_result()
+        if ic_result is None:
+            violations.append(
+                "FROZEN [ic_walkforward_validation, Phase 4]: "
+                "data/ic_validation_result.json not found. "
+                "Run: python ic_validator.py --save  to generate the IC + walk-forward "
+                "validation report before enabling live accounts."
+            )
+        elif not ic_result.get("ready_for_live", False):
+            gate_failures = ic_result.get("failures", [])
+            summary = " | ".join(gate_failures) if gate_failures else "see data/ic_validation_result.json"
+            violations.append(
+                f"FROZEN [ic_walkforward_validation, Phase 4]: "
+                f"IC validation gate not passed — {summary}"
+            )
+
     # Check any other explicitly frozen features via feature flags in config
     # (future-proof: if a key matching a frozen feature name appears in config
     #  and is truthy, warn)
-    _handled = {"live_account_trading", "multi_account_aggregation", "telegram_kill_switch"}
+    _handled = {
+        "live_account_trading", "multi_account_aggregation",
+        "telegram_kill_switch", "ic_walkforward_validation",
+    }
     for feature, required_phase in frozen.items():
         if feature in _handled:
             continue  # Already checked above with richer context

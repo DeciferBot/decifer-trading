@@ -49,6 +49,7 @@ def _base_config(current_phase: int = 1, overrides: dict | None = None) -> dict:
                 "live_account_trading":      4,
                 "multi_account_aggregation": 4,
                 "cloud_deployment":          4,
+                "ic_walkforward_validation": 4,
                 "docker_deployment":         5,
                 "multi_user_auth":           5,
                 "hosted_dashboard":          5,
@@ -128,21 +129,25 @@ class TestValidate:
         cfg = _base_config(current_phase=1)
         assert validate(cfg) == []
 
-    def test_live_accounts_populated_in_phase1_triggers_violation(self):
+    def test_live_accounts_populated_in_phase1_triggers_violation(self, monkeypatch):
+        import phase_gate as pg
+        monkeypatch.setattr(pg, "_load_ic_validation_result", lambda data_dir=None: None)
         cfg = _base_config(current_phase=1)
         cfg["accounts"]["live_1"] = "U3059777"
         violations = validate(cfg)
-        assert len(violations) == 1
-        assert "live_account_trading" in violations[0]
+        live_v = [v for v in violations if "live_account_trading" in v]
+        assert len(live_v) == 1
 
-    def test_both_live_accounts_populated_triggers_single_violation(self):
-        """Both live_1 and live_2 set should produce one violation (same feature)."""
+    def test_both_live_accounts_populated_triggers_single_violation(self, monkeypatch):
+        """Both live_1 and live_2 set should produce one live_account_trading violation."""
+        import phase_gate as pg
+        monkeypatch.setattr(pg, "_load_ic_validation_result", lambda data_dir=None: None)
         cfg = _base_config(current_phase=1)
         cfg["accounts"]["live_1"] = "U3059777"
         cfg["accounts"]["live_2"] = "U24093086"
         violations = validate(cfg)
-        assert len(violations) == 1
-        assert "live_account_trading" in violations[0]
+        live_v = [v for v in violations if "live_account_trading" in v]
+        assert len(live_v) == 1
 
     def test_aggregate_accounts_non_empty_in_phase1_triggers_violation(self):
         cfg = _base_config(current_phase=1)
@@ -150,14 +155,22 @@ class TestValidate:
         violations = validate(cfg)
         assert any("multi_account_aggregation" in v for v in violations)
 
-    def test_live_accounts_and_aggregate_in_phase1_triggers_two_violations(self):
+    def test_live_accounts_and_aggregate_in_phase1_triggers_two_violations(self, monkeypatch):
+        import phase_gate as pg
+        monkeypatch.setattr(pg, "_load_ic_validation_result", lambda data_dir=None: None)
         cfg = _base_config(current_phase=1)
         cfg["accounts"]["live_1"] = "U3059777"
         cfg["aggregate_accounts"] = ["DUP481326", "U3059777"]
         violations = validate(cfg)
-        assert len(violations) == 2
+        live_v  = [v for v in violations if "live_account_trading"      in v]
+        agg_v   = [v for v in violations if "multi_account_aggregation" in v]
+        assert len(live_v) == 1
+        assert len(agg_v)  == 1
 
-    def test_phase4_config_with_live_accounts_is_clean(self):
+    def test_phase4_config_with_live_accounts_is_clean(self, monkeypatch):
+        import phase_gate as pg
+        monkeypatch.setattr(pg, "_load_ic_validation_result",
+                            lambda data_dir=None: {"ready_for_live": True, "failures": []})
         cfg = _base_config(current_phase=4)
         cfg["accounts"]["live_1"] = "U3059777"
         cfg["aggregate_accounts"] = ["DUP481326", "U3059777"]
@@ -317,3 +330,120 @@ class TestRealConfigCompatibility:
         tg = CONFIG.get("telegram", {})
         assert "bot_token" in tg
         assert "authorized_chat_ids" in tg
+
+
+# ── IC + walk-forward validation gate ────────────────────────────────────────
+
+
+class TestICValidationGate:
+    """
+    phase_gate.validate() must enforce the IC + walk-forward gate when
+    live accounts are active or current_phase >= 4.
+    The gate must be silent in Phase 1 without live accounts.
+    """
+
+    def test_missing_ic_result_triggers_violation_when_live_active(self, monkeypatch):
+        """
+        When live_1 is set and ic_validation_result.json does not exist,
+        validate() must include an ic_walkforward_validation violation.
+        """
+        import phase_gate as pg
+        monkeypatch.setattr(pg, "_load_ic_validation_result", lambda data_dir=None: None)
+        cfg = _base_config(current_phase=4)
+        cfg["accounts"]["live_1"] = "U3059777"
+        violations = validate(cfg)
+        ic_v = [v for v in violations if "ic_walkforward_validation" in v]
+        assert len(ic_v) == 1
+        assert "not found" in ic_v[0].lower() or "ic_validation_result" in ic_v[0]
+
+    def test_ic_result_not_ready_blocks_live_transition(self, monkeypatch):
+        """
+        When ic_validation_result.json exists but ready_for_live is False,
+        validate() must still include the IC validation violation.
+        """
+        import phase_gate as pg
+        not_ready = {
+            "ready_for_live": False,
+            "failures": ["SHARPE GATE: sharpe 0.3 < 0.8"],
+        }
+        monkeypatch.setattr(pg, "_load_ic_validation_result",
+                            lambda data_dir=None: not_ready)
+        cfg = _base_config(current_phase=4)
+        cfg["accounts"]["live_1"] = "U3059777"
+        violations = validate(cfg)
+        ic_v = [v for v in violations if "ic_walkforward_validation" in v]
+        assert len(ic_v) == 1
+        assert "sharpe" in ic_v[0].lower() or "gate not passed" in ic_v[0].lower()
+
+    def test_ic_result_ready_clears_ic_violation(self, monkeypatch):
+        """
+        When ic_validation_result.json has ready_for_live=True,
+        the IC validation violation must NOT appear.
+        """
+        import phase_gate as pg
+        monkeypatch.setattr(pg, "_load_ic_validation_result",
+                            lambda data_dir=None: {"ready_for_live": True, "failures": []})
+        cfg = _base_config(current_phase=4)
+        cfg["accounts"]["live_1"] = "U3059777"
+        violations = validate(cfg)
+        ic_v = [v for v in violations if "ic_walkforward_validation" in v]
+        assert len(ic_v) == 0
+
+    def test_ic_gate_silent_in_phase1_without_live_accounts(self, monkeypatch):
+        """
+        In Phase 1 with no live accounts, the IC gate must not fire.
+        Do not add noise to the paper trading setup.
+        """
+        import phase_gate as pg
+        monkeypatch.setattr(pg, "_load_ic_validation_result", lambda data_dir=None: None)
+        cfg = _base_config(current_phase=1)
+        # No live accounts in default _base_config
+        violations = validate(cfg)
+        ic_v = [v for v in violations if "ic_walkforward_validation" in v]
+        assert len(ic_v) == 0
+
+    def test_get_status_has_ic_validation_passed_field(self):
+        cfg = _base_config(current_phase=1)
+        status = get_status(cfg)
+        assert hasattr(status, "ic_validation_passed")
+        assert isinstance(status.ic_validation_passed, bool)
+
+    def test_as_dict_includes_ic_validation_passed(self):
+        cfg = _base_config(current_phase=1)
+        d = get_status(cfg).as_dict()
+        assert "ic_validation_passed" in d
+
+    def test_ic_validation_passed_true_when_result_ready(self, monkeypatch):
+        import phase_gate as pg
+        monkeypatch.setattr(pg, "_load_ic_validation_result",
+                            lambda data_dir=None: {"ready_for_live": True, "failures": []})
+        cfg = _base_config(current_phase=4)
+        status = get_status(cfg)
+        assert status.ic_validation_passed is True
+
+    def test_ic_validation_passed_false_when_result_missing(self, monkeypatch):
+        import phase_gate as pg
+        monkeypatch.setattr(pg, "_load_ic_validation_result", lambda data_dir=None: None)
+        cfg = _base_config(current_phase=1)
+        status = get_status(cfg)
+        assert status.ic_validation_passed is False
+
+    def test_production_config_has_ic_walkforward_validation_frozen(self):
+        from config import CONFIG
+        frozen = CONFIG.get("phase_gate", {}).get("frozen_features", {})
+        assert "ic_walkforward_validation" in frozen, (
+            "ic_walkforward_validation must be in frozen_features (Phase 4 gate)"
+        )
+        assert frozen["ic_walkforward_validation"] == 4
+
+    def test_production_config_has_ic_validation_gate_thresholds(self):
+        from config import CONFIG
+        gate = CONFIG.get("phase_gate", {}).get("ic_validation_gate", {})
+        assert "min_valid_records"      in gate
+        assert "min_mean_positive_ic"   in gate
+        assert "min_positive_dims"      in gate
+        assert "min_walkforward_sharpe" in gate
+        assert gate["min_valid_records"]      == 50
+        assert gate["min_mean_positive_ic"]   == pytest.approx(0.05)
+        assert gate["min_positive_dims"]      == 5
+        assert gate["min_walkforward_sharpe"] == pytest.approx(0.8)

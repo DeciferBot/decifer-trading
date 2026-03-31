@@ -1313,13 +1313,17 @@ function renderPositions(positions) {
     const optSub = p.isOpt ? `<div style="font-size:9px;color:var(--cyan);margin-top:1px">${p.right === 'C' ? 'CALL' : 'PUT'} $${p.strike} exp ${p.expiry_str || p.expiry || ''}</div>` : '';
     // Pending badge
     const pendingBadge = isPending ? ' <span style="font-size:8px;color:var(--yellow);background:rgba(255,214,0,.12);border:1px solid var(--yellow);padding:1px 5px;border-radius:8px;font-weight:600;letter-spacing:0.5px">PENDING</span>' : '';
+    // Tranche badge: shows T1 OPEN / T1 FILLED when dual-tranche mode is active
+    const trancheBadge = (!isPending && p.tranche_mode)
+      ? ` <span style="font-size:8px;color:var(--cyan);background:rgba(0,229,255,.12);border:1px solid var(--cyan);padding:1px 5px;border-radius:8px;font-weight:600;letter-spacing:0.5px">${p.t1_status === 'FILLED' ? 'T1 FILLED' : 'T1 OPEN'}</span>`
+      : '';
     // Action button: Cancel for pending, Close for active
     const actionBtn = isPending && p.order_id
       ? `<button onclick="event.stopPropagation();cancelOrder(${p.order_id},${JSON.stringify(p.symbol)})" style="background:rgba(255,214,0,.12);border:1px solid var(--yellow);color:var(--yellow);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Cancel pending order">CANCEL</button>`
       : `<button onclick="event.stopPropagation();closePosition(${JSON.stringify(p._trade_key || p.symbol)})" style="background:rgba(255,23,68,.12);border:1px solid var(--red);color:var(--red);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Close this position">✕</button>`;
     return `<div class="pos-card" onclick="showPositionDetail(${p._idx})" title="Click for details" style="${cardOpacity}">
       <div class="pos-hdr">
-        <span class="pos-sym">${p.symbol}${p.instrument === 'option' ? ' <span style="font-size:9px;color:var(--cyan);font-weight:600">OPT</span>' : ''}${pendingBadge} <span style="font-size:10px;color:var(--muted2);font-weight:400">${p.dir} ×${Math.abs(p.qty)}</span></span>
+        <span class="pos-sym">${p.symbol}${p.instrument === 'option' ? ' <span style="font-size:9px;color:var(--cyan);font-weight:600">OPT</span>' : ''}${pendingBadge}${trancheBadge} <span style="font-size:10px;color:var(--muted2);font-weight:400">${p.dir} ×${Math.abs(p.qty)}</span></span>
         <span style="display:flex;align-items:center;gap:6px">
           ${isPending ? '<span style="font-size:10px;color:var(--yellow)">Awaiting fill</span>' : `<span class="pos-pnl" style="color:${col}">${p.pnl >= 0 ? '+' : ''}${fmt$(p.pnl)}</span>`}
           ${actionBtn}

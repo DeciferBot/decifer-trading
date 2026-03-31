@@ -53,7 +53,7 @@ _heartbeat_thread: threading.Thread | None = None
 from scanner import get_dynamic_universe, get_market_regime, get_tv_signal_cache
 from signals import fetch_multi_timeframe
 from agents import run_all_agents
-from orders import execute_buy, execute_sell, flatten_all, reconcile_with_ibkr, get_open_positions, update_position_prices, update_positions_from_ibkr, execute_buy_option, execute_sell_option, update_trailing_stops
+from orders import execute_buy, execute_sell, flatten_all, reconcile_with_ibkr, get_open_positions, update_position_prices, update_positions_from_ibkr, execute_buy_option, execute_sell_option, update_trailing_stops, update_tranche_status
 from options import find_best_contract, check_options_exits
 from options_scanner import scan_options_universe
 from risk import (check_risk_conditions, get_session, get_scan_interval, reset_daily_state,
@@ -1710,6 +1710,7 @@ def run_scan():
     # ── Refresh position prices from IBKR (always live, even when 0 symbols score) ──
     # Must run BEFORE check_options_positions so exit checks use current-cycle prices.
     update_positions_from_ibkr(ib)
+    update_tranche_status(ib)      # detect T1 fills, cancel full-qty SL, place T2 stop
     update_trailing_stops(ib)
     dash["positions"] = get_open_positions()
 
