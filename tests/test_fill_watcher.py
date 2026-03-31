@@ -284,3 +284,85 @@ class TestAdjustPriceFailure:
 
         # Loop breaks after failed adjust — max_attempts_exhausted cancel fires
         mock_cancel.assert_called_once_with("max_attempts_exhausted")
+
+
+# ---------------------------------------------------------------------------
+# Orphaned PENDING detection (update_positions_from_ibkr scan-cycle backstop)
+# ---------------------------------------------------------------------------
+
+class TestOrphanedPendingDetection:
+    """update_positions_from_ibkr should cancel and remove watcherless PENDING orders past timeout."""
+
+    def _setup_orders_module(self):
+        """Ensure the real orders module is loaded, not a stub."""
+        import importlib
+        for mod in ("orders", "risk", "scanner", "signals", "news", "agents"):
+            sys.modules.pop(mod, None)
+        import orders as _o
+        return _o
+
+    def test_orphan_check_cancels_watcherless_pending_past_timeout(self):
+        """A PENDING order with no watcher and age > orphan_timeout_mins is cancelled."""
+        from datetime import datetime, timezone, timedelta
+        import fill_watcher as fw
+
+        orders = self._setup_orders_module()
+
+        ib = _make_ib(connected=True)
+        ib.portfolio.return_value = []
+
+        # Seed a PENDING entry that is 10 minutes old — well past the 5-min default
+        stale_time = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        orders.active_trades.clear()
+        orders.active_trades["TSLA"] = {
+            "status": "PENDING",
+            "order_id": 99,
+            "symbol": "TSLA",
+            "open_time": stale_time,
+        }
+
+        # No watcher running
+        with fw._watchers_lock:
+            fw._active_watchers.pop("TSLA", None)
+
+        cfg_patch = {"active_account": "TEST", "fill_watcher": {"orphan_timeout_mins": 5}}
+        with patch("orders.CONFIG", cfg_patch):
+            orders.update_positions_from_ibkr(ib)
+
+        assert "TSLA" not in orders.active_trades
+        ib.cancelOrder.assert_called_once()
+
+    def test_orphan_check_leaves_pending_alone_when_watcher_active(self):
+        """A PENDING order with an active FillWatcher must not be cancelled."""
+        from datetime import datetime, timezone, timedelta
+        import fill_watcher as fw
+
+        orders = self._setup_orders_module()
+
+        ib = _make_ib(connected=True)
+        ib.portfolio.return_value = []
+
+        stale_time = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        orders.active_trades.clear()
+        orders.active_trades["TSLA"] = {
+            "status": "PENDING",
+            "order_id": 99,
+            "symbol": "TSLA",
+            "open_time": stale_time,
+        }
+
+        # Register a mock watcher — order is being managed
+        mock_watcher = MagicMock()
+        with fw._watchers_lock:
+            fw._active_watchers["TSLA"] = mock_watcher
+
+        cfg_patch = {"active_account": "TEST", "fill_watcher": {"orphan_timeout_mins": 5}}
+        try:
+            with patch("orders.CONFIG", cfg_patch):
+                orders.update_positions_from_ibkr(ib)
+
+            assert "TSLA" in orders.active_trades
+            ib.cancelOrder.assert_not_called()
+        finally:
+            with fw._watchers_lock:
+                fw._active_watchers.pop("TSLA", None)

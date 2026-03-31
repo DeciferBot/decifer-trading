@@ -88,6 +88,23 @@ def _safe_del_trade(key: str):
     with _trades_lock:
         active_trades.pop(key, None)
 
+
+def _cancel_ibkr_order_by_id(ib, order_id: int) -> None:
+    """Cancel a live IBKR order by orderId only. Safe to call if order is already gone."""
+    from ib_async import Order as _Order
+    try:
+        if not ib.isConnected():
+            log.warning(f"_cancel_ibkr_order_by_id: IBKR disconnected — cannot cancel #{order_id}")
+            return
+        bare = _Order()
+        bare.orderId = order_id
+        ib.cancelOrder(bare)
+        ib.sleep(0.3)
+        log.info(f"_cancel_ibkr_order_by_id: cancel sent for order #{order_id}")
+    except Exception as exc:
+        log.error(f"_cancel_ibkr_order_by_id: failed for #{order_id}: {exc}")
+
+
 # ── Market hours guard ─────────────────────────────────────────────────────
 _ET = zoneinfo.ZoneInfo("America/New_York")
 
@@ -1131,11 +1148,37 @@ def reconcile_with_ibkr(ib: IB):
                 ibkr_keys.add(_ibkr_item_to_key(item))
 
         # Remove from tracker if IBKR doesn't have it (under lock — prop-014)
+        # PENDING entries need special handling: they're not in portfolio yet (unfilled),
+        # so check ib.openTrades() before deciding whether to remove them.
         with _trades_lock:
             for key in list(active_trades.keys()):
                 if key not in ibkr_keys:
-                    log.warning(f"Position {key} in bot memory but not in IBKR — removing")
-                    del active_trades[key]
+                    trade = active_trades[key]
+                    if trade.get("status") == "PENDING":
+                        order_id = trade.get("order_id")
+                        still_live = False
+                        if order_id:
+                            try:
+                                for t in ib.openTrades():
+                                    if t.order.orderId == order_id:
+                                        still_live = True
+                                        break
+                            except Exception:
+                                still_live = True  # err on side of keeping it
+                        if still_live:
+                            log.debug(f"Reconcile: PENDING {key} order #{order_id} still live in IBKR — keeping")
+                            continue
+                        else:
+                            log.warning(
+                                f"Reconcile: PENDING {key} order #{order_id} not in IBKR open orders "
+                                f"— cancelling and removing from tracker"
+                            )
+                            if order_id:
+                                _cancel_ibkr_order_by_id(ib, order_id)
+                            del active_trades[key]
+                    else:
+                        log.warning(f"Position {key} in bot memory but not in IBKR — removing")
+                        del active_trades[key]
 
         # Add to tracker if IBKR has it but we don't
         reconciled_count = 0
@@ -1305,6 +1348,45 @@ def update_positions_from_ibkr(ib: IB):
             for k in stale_keys:
                 log.warning(f"Position {k} no longer in IBKR portfolio — removing from tracker")
                 del active_trades[k]
+
+        # ── Orphaned PENDING detection ────────────────────────────────────────
+        # A PENDING entry with no active FillWatcher and past orphan_timeout_mins
+        # is unmanaged (e.g. watcher aborted on disconnect). Cancel at IBKR and remove.
+        from fill_watcher import _active_watchers, _watchers_lock as _fw_lock
+        _orphan_mins = CONFIG.get("fill_watcher", {}).get("orphan_timeout_mins", 5)
+
+        with _trades_lock:
+            _pending_keys = [k for k in active_trades if active_trades[k].get("status") == "PENDING"]
+
+        for _key in _pending_keys:
+            with _fw_lock:
+                _has_watcher = _key in _active_watchers
+            if _has_watcher:
+                continue
+
+            with _trades_lock:
+                _trade = active_trades.get(_key)
+            if _trade is None:
+                continue
+
+            _open_time_str = _trade.get("open_time")
+            try:
+                _open_dt = datetime.fromisoformat(_open_time_str)
+                _age_mins = (datetime.now(timezone.utc) - _open_dt).total_seconds() / 60
+            except (ValueError, TypeError):
+                _age_mins = _orphan_mins + 1  # treat unparseable timestamp as timed-out
+
+            if _age_mins < _orphan_mins:
+                continue
+
+            _oid = _trade.get("order_id")
+            log.warning(
+                f"Orphaned PENDING order {_key} order #{_oid} "
+                f"(age={_age_mins:.1f} min, no FillWatcher) — cancelling"
+            )
+            if _oid:
+                _cancel_ibkr_order_by_id(ib, _oid)
+            _safe_del_trade(_key)
 
         # Re-add positions that IBKR has but tracker is missing
         # (lightweight reconciliation — catches positions lost by failed sells,

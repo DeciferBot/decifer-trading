@@ -982,3 +982,63 @@ class TestEdgeCases:
 
         assert result is True
         assert orders.open_trades["AAPL"]["reasoning"] == reason
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RECONCILE — PENDING ORDER HANDLING
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestReconcileWithIbkr:
+    """reconcile_with_ibkr must not blindly delete PENDING orders (unfilled buys)."""
+
+    def _make_ib(self, portfolio=None, open_trades=None, connected=True):
+        ib = MagicMock()
+        ib.isConnected.return_value = connected
+        ib.portfolio.return_value = portfolio or []
+        ib.openTrades.return_value = open_trades or []
+        ib.cancelOrder.return_value = None
+        ib.sleep.return_value = None
+        return ib
+
+    def test_reconcile_preserves_pending_with_live_ibkr_order(self, mock_config):
+        """PENDING entry should survive reconcile when the order is still live in IBKR."""
+        with patch("orders.CONFIG", mock_config):
+            orders.active_trades.clear()
+            orders.active_trades["AAPL"] = {"status": "PENDING", "order_id": 42, "symbol": "AAPL"}
+
+            live_trade = MagicMock()
+            live_trade.order.orderId = 42
+            ib = self._make_ib(open_trades=[live_trade])
+
+            orders.reconcile_with_ibkr(ib)
+
+            assert "AAPL" in orders.active_trades
+            ib.cancelOrder.assert_not_called()
+
+    def test_reconcile_cancels_pending_when_order_gone_from_ibkr(self, mock_config):
+        """PENDING entry with no matching IBKR open order should be cancelled and removed."""
+        with patch("orders.CONFIG", mock_config):
+            orders.active_trades.clear()
+            orders.active_trades["AAPL"] = {"status": "PENDING", "order_id": 42, "symbol": "AAPL"}
+
+            ib = self._make_ib(open_trades=[])  # order gone from IBKR
+
+            orders.reconcile_with_ibkr(ib)
+
+            assert "AAPL" not in orders.active_trades
+            ib.cancelOrder.assert_called_once()
+            cancelled_order = ib.cancelOrder.call_args[0][0]
+            assert cancelled_order.orderId == 42
+
+    def test_reconcile_removes_active_position_not_in_portfolio(self, mock_config):
+        """ACTIVE positions absent from IBKR portfolio should be removed without checking openTrades."""
+        with patch("orders.CONFIG", mock_config):
+            orders.active_trades.clear()
+            orders.active_trades["MSFT"] = {"status": "ACTIVE", "symbol": "MSFT"}
+
+            ib = self._make_ib(portfolio=[])
+
+            orders.reconcile_with_ibkr(ib)
+
+            assert "MSFT" not in orders.active_trades
+            ib.openTrades.assert_not_called()
