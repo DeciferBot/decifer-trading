@@ -244,8 +244,8 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
             log.warning(f"TV momentum_long scan failed: {e}")
 
     # ── 4. Momentum shorts — RSI declining, MACD negative ─────
-    # Run at full size in BEAR, half in BULL, skip in CHOPPY/PANIC
-    if not is_panic and not is_choppy:
+    # Run at full size in BEAR, half in BULL/CHOPPY, skip in PANIC only
+    if not is_panic:
         short_limit = 25 if is_bear else 12
         try:
             _, df = _query(
