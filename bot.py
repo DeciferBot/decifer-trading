@@ -268,6 +268,10 @@ class _BotModule(_types.ModuleType):
 sys.modules[__name__].__class__ = _BotModule
 # Seed ib into __dict__ (bypassing __setattr__) so patch.object is_local=True
 sys.modules[__name__].__dict__["ib"] = bot_state.ib
+# Register as "bot" so sub-modules can resolve via sys.modules.get("bot")
+# (when run as __main__ the module lives under "__main__", not "bot")
+if "bot" not in sys.modules:
+    sys.modules["bot"] = sys.modules[__name__]
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

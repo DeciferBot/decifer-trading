@@ -459,6 +459,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 signal_scores: dict = None,
                 agent_outputs: dict = None,
                 open_time: str = None,
+                candle_gate: str = None,
                 tranche_mode: bool = True) -> bool:
     """
     Place a buy order with full OCO bracket.
@@ -715,9 +716,10 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             "direction":  "LONG",
             "sl":         sl,
             "tp":         tp,
-            "score":      score,
-            "reasoning":  reasoning,
-            "timestamp":  datetime.now(timezone.utc).isoformat(),
+            "score":       score,
+            "reasoning":   reasoning,
+            "candle_gate": candle_gate or "UNKNOWN",
+            "timestamp":   datetime.now(timezone.utc).isoformat(),
         })
         log_order({
             "order_id":   sl_trade.order.orderId,
