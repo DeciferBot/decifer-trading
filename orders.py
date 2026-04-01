@@ -500,8 +500,12 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 return False
 
             # ── FIX #1+3: Cross-instrument + combined exposure check ──
-            # Estimate new position value for the exposure check
-            est_value = portfolio_value * CONFIG.get("risk_pct_per_trade", 0.03) * 50  # rough max
+            # Estimate new position value for the exposure check.
+            # Use max_single_position (10%) as the upper bound — the actual
+            # order is capped to 20% of portfolio downstream, so 10% is
+            # a safe conservative estimate. The previous formula (risk_pct * 50)
+            # produced 1.5× portfolio, which permanently broke this check.
+            est_value = portfolio_value * CONFIG.get("max_single_position", 0.10)
             exp_ok, exp_reason = check_combined_exposure(
                 symbol, est_value, list(active_trades.values()),
                 portfolio_value, instrument="stock"
