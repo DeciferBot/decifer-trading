@@ -163,6 +163,47 @@ class TestAgentResponseParsing:
 
 
 # ---------------------------------------------------------------------------
+# Abstain on bad Claude responses — the three exact ERROR-log strings
+# ---------------------------------------------------------------------------
+
+class TestAbstainOnBadResponse:
+    """The three exact failure strings from the ERROR log — assert clean abstain, no ERROR log."""
+
+    _REQUIRED_KEYS = ("buys", "sells", "hold", "cash", "agents_agreed", "summary")
+
+    def _assert_clean_abstain(self, result, caplog):
+        error_records = [r for r in caplog.records if r.levelname == "ERROR"]
+        assert error_records == [], f"Unexpected ERROR log(s): {error_records}"
+        for key in self._REQUIRED_KEYS:
+            assert key in result, f"Missing key: {key}"
+        assert result["buys"] == []
+        assert result["sells"] == []
+        assert result["agents_agreed"] == 0
+        assert result.get("abstain") is True
+
+    def test_apology_string_abstains(self, caplog):
+        """'Sorry, no recommendation.' → clean abstain, no ERROR log."""
+        with patch.object(agents, "_call_claude", return_value="Sorry, no recommendation."):
+            with patch.dict(agents.CONFIG, _AGENTS_CFG):
+                result = agents.agent_final_decision(**_final_kwargs())
+        self._assert_clean_abstain(result, caplog)
+
+    def test_empty_response_abstains(self, caplog):
+        """Empty string → clean abstain, no ERROR log."""
+        with patch.object(agents, "_call_claude", return_value=""):
+            with patch.dict(agents.CONFIG, _AGENTS_CFG):
+                result = agents.agent_final_decision(**_final_kwargs())
+        self._assert_clean_abstain(result, caplog)
+
+    def test_non_json_abstains(self, caplog):
+        """'not json at all' → clean abstain, no ERROR log."""
+        with patch.object(agents, "_call_claude", return_value="not json at all"):
+            with patch.dict(agents.CONFIG, _AGENTS_CFG):
+                result = agents.agent_final_decision(**_final_kwargs())
+        self._assert_clean_abstain(result, caplog)
+
+
+# ---------------------------------------------------------------------------
 # agents_agreed propagation
 # ---------------------------------------------------------------------------
 

@@ -480,12 +480,13 @@ Rules:
         result = json.loads(clean)
         return result
     except json.JSONDecodeError:
-        log.error(f"Final agent JSON parse error. Raw: {raw[:200]}")
+        log.warning(f"Final agent JSON parse error — returning abstain. Raw: {raw[:200]}")
         return {
             "buys": [], "sells": [], "hold": [], "cash": False,
             "agents_agreed": 0,
+            "abstain": True,
             "summary": "Parse error — no trades this cycle",
-            "claude_reasoning": "JSON parsing failed on final agent output."
+            "claude_reasoning": "JSON parsing failed on final agent output.",
         }
 
 
