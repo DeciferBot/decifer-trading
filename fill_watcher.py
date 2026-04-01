@@ -72,23 +72,27 @@ class FillWatcher:
     """
 
     def __init__(self, ib, symbol: str, order_id: int, entry_trade,
-                 original_limit: float, contract, qty: int):
-        self._ib            = ib
-        self._symbol        = symbol
-        self._order_id      = order_id
-        self._entry_trade   = entry_trade
+                 original_limit: float, contract, qty: int,
+                 watcher_params: dict = None):
+        self._ib             = ib
+        self._symbol         = symbol
+        self._order_id       = order_id
+        self._entry_trade    = entry_trade
         self._original_limit = original_limit
-        self._contract      = contract
-        self._qty           = qty
-        self._stop_event    = threading.Event()
+        self._contract       = contract
+        self._qty            = qty
+        self._stop_event     = threading.Event()
+        self._watcher_params = watcher_params  # per-trade overrides from execution_agent
 
     # ── Public entry point ─────────────────────────────────────────────────────
 
     def run(self) -> None:
         """Thread entry point. Runs entirely within a daemon thread."""
-        cfg = CONFIG.get("fill_watcher", {})
-        if not cfg.get("enabled", True):
+        _static = CONFIG.get("fill_watcher", {})
+        if not _static.get("enabled", True):
             return
+        # Use per-trade params injected by execution_agent; fall back to static CONFIG
+        cfg = self._watcher_params if self._watcher_params else _static
 
         initial_wait = float(cfg.get("initial_wait_secs", 30))
         interval     = float(cfg.get("interval_secs", 20))

@@ -256,6 +256,25 @@ CONFIG = {
     "vix_panic_min":            35,     # VIX above = panic — no trades
     "vix_spike_pct":            0.20,   # 20% VIX spike in 1 hour = exit all
 
+    # ── ATR VOLATILITY-TARGETING POSITION SIZE CAP ────────────
+    # Limits qty so that a 1-ATR adverse move costs at most atr_vol_target_pct
+    # of portfolio. Applied after Kelly sizing — more conservative wins.
+    "atr_vol_cap_enabled":      True,
+    "atr_vol_target_pct":       0.01,   # 1 ATR move = 1% of portfolio value
+                                         # atr_capped_qty = (portfolio * 0.01) / atr
+
+    # ── VIX-RANK ADAPTIVE KELLY FRACTION ──────────────────────
+    # kelly_fraction = base_kelly * (1 - vix_rank * max_reduction)
+    # low VIX rank (calm) → fraction near base_kelly (0.50)
+    # high VIX rank (panic) → fraction near base_kelly*(1-max_reduction) (0.10)
+    "vix_kelly": {
+        "base_kelly":        0.50,   # Kelly fraction at 0th VIX percentile
+        "max_reduction":     0.80,   # Scalar applied at 100th percentile
+                                      # rank=1.0 → 0.50*(1-0.80)=0.10
+        "vix_lookback_days": 252,    # Trailing window for percentile calc
+        "cache_ttl_seconds": 3600,   # Re-fetch VIX data at most once per hour
+    },
+
     # ── REGIME DETECTOR LOCK ──────────────────────────────────
     # Committed approach: "vix_proxy" (scanner.get_market_regime + signals.get_market_regime_vix)
     # DO NOT change to "ml_random_forest" or "hmm" without IC Phase 2 gate review.
@@ -469,6 +488,16 @@ CONFIG = {
         "step_pct":          0.002,  # Price chase step: 0.2% per attempt (e.g. $0.20 on a $100 stock)
         "max_chase_pct":     0.01,   # Hard ceiling: never pay more than 1% above the original limit
         "orphan_timeout_mins": 5,    # Hard cancel watcherless PENDING orders after this many minutes
+    },
+
+    # ── EXECUTION AGENT ───────────────────────────────────────────────────────
+    # 7th Claude agent — decides HOW to execute a trade (order type, aggression,
+    # fill watcher params). Runs once synchronously per trade, before order
+    # placement. Falls back to static fill_watcher config on any error.
+    "execution_agent": {
+        "enabled":           True,   # Master switch — False = always use static config
+        "max_tokens":        350,    # Compact JSON response; 350 well above minimum
+        "fallback_on_error": True,   # Never block a trade if Claude fails
     },
 }
 

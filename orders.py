@@ -264,6 +264,21 @@ def _get_ibkr_price(ib: IB, contract, fallback: float = 0) -> float:
     return fallback
 
 
+def _get_ibkr_bid_ask(ib: IB, contract) -> tuple[float, float]:
+    """
+    Fetch current bid/ask for execution agent context. Returns (0.0, 0.0) on failure.
+    Reuses the same delayed market data subscription already active for _get_ibkr_price.
+    """
+    try:
+        [ticker] = ib.reqTickers(contract)
+        ib.sleep(0.3)
+        bid = float(ticker.bid) if getattr(ticker, "bid", None) and ticker.bid > 0 else 0.0
+        ask = float(ticker.ask) if getattr(ticker, "ask", None) and ticker.ask > 0 else 0.0
+        return bid, ask
+    except Exception:
+        return 0.0, 0.0
+
+
 def _get_yf_price(symbol: str) -> float:
     """
     Quick yfinance price fetch for a single symbol.
@@ -465,6 +480,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             # ── FIX #1+3: Cross-instrument + combined exposure check ──
             # Estimate new position value for the exposure check
             est_value = portfolio_value * CONFIG.get("risk_pct_per_trade", 0.03) * 50  # rough max
+            import sys as _sys; _tgt = _sys.modules.get('orders'); _glb_cce = globals().get('check_combined_exposure'); print(f"DEBUG: sys_orders_id={id(_tgt)} id_globals={id(globals())} same_dict={_tgt is not None and globals() is _tgt.__dict__} | globals_cce_type={type(_glb_cce).__name__} sys_cce_type={type(_tgt.check_combined_exposure).__name__ if _tgt else 'N/A'}", flush=True)
             exp_ok, exp_reason = check_combined_exposure(
                 symbol, est_value, list(active_trades.values()),
                 portfolio_value, instrument="stock"
@@ -506,6 +522,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         # yfinance is for scanning/scoring only; IBKR is source of truth for orders
         yf_price = price  # save original for logging
         ibkr_price = _get_ibkr_price(ib, contract, fallback=0)
+        ibkr_bid, ibkr_ask = _get_ibkr_bid_ask(ib, contract)
 
         # ── MULTI-SOURCE PRICE VALIDATION ──
         # Collect prices from all available sources (IBKR may be 15-min delayed).
@@ -564,7 +581,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             return False
 
         # Now calculate sizing and stops with the IBKR-sourced price
-        qty = calculate_position_size(portfolio_value, price, score, regime)
+        qty = calculate_position_size(portfolio_value, price, score, regime, atr=atr)
 
         # ── HARD CAPS — last line of defense against contaminated data ──
         # Max 5,000 shares per order (prevents 10,000+ share orders from bad prices)
@@ -607,6 +624,23 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             t1_qty = tp_qty
             t2_qty = qty - tp_qty
 
+        # ── Execution Agent — decide HOW to fill this trade ──────────────────
+        from execution_agent import get_execution_plan
+
+        _et_now    = datetime.now(zoneinfo.ZoneInfo("America/New_York")).strftime("%H:%M")
+        _tv_vol    = float(tv_data.get("tv_rel_vol") or 1.0) if tv_data else 1.0
+        _tv_vwap   = float(tv_data.get("tv_vwap") or 0)      if tv_data else 0.0
+        _vwap_dist = ((price - _tv_vwap) / _tv_vwap * 100)   if _tv_vwap > 0 else 0.0
+        _spread    = ((ibkr_ask - ibkr_bid) / ibkr_ask * 100) if ibkr_ask > 0 else 0.0
+
+        exec_plan = get_execution_plan(
+            symbol=symbol, direction="LONG", size=qty,
+            conviction_score=score, bid=ibkr_bid, ask=ibkr_ask,
+            spread_pct=_spread, rel_volume=_tv_vol,
+            vwap_dist_pct=_vwap_dist, time_of_day_str=_et_now,
+            regime_name=regime.get("regime", "UNKNOWN"),
+        )
+
         # ── ATOMIC BRACKET ORDER ──────────────────────────────────
         # All 3 legs (entry + SL + TP) are submitted as one atomic bracket.
         # Parent transmit=False prevents it from filling before children are attached.
@@ -614,9 +648,17 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         # This prevents the "parent already filled" rejection that kills child orders.
         limit_price = round(price * 1.002, 2)
 
-        # Leg 1: Entry (parent) — DO NOT transmit yet
-        entry_order = LimitOrder("BUY", qty, limit_price,
-                                 account=account, tif="DAY", outsideRth=True)
+        # Leg 1: Entry (parent) — order type chosen by execution agent
+        if exec_plan.order_type == "MKT":
+            entry_order = MarketOrder("BUY", qty, account=account, tif="DAY", outsideRth=True)
+        elif exec_plan.order_type == "MIDPOINT":
+            _midprice = round((ibkr_bid + ibkr_ask) / 2, 2) if ibkr_bid > 0 and ibkr_ask > 0 else limit_price
+            entry_order = LimitOrder("BUY", qty, _midprice,
+                                     account=account, tif="DAY", outsideRth=True)
+        else:  # "LIMIT" (default)
+            _effective_limit = exec_plan.limit_price if exec_plan.limit_price > 0 else limit_price
+            entry_order = LimitOrder("BUY", qty, _effective_limit,
+                                     account=account, tif="DAY", outsideRth=True)
         entry_order.transmit = False
         trade = ib.placeOrder(contract, entry_order)
         ib.sleep(0.2)  # brief pause for IBKR to assign orderId
@@ -828,6 +870,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                     original_limit=limit_price,
                     contract=contract,
                     qty=qty,
+                    watcher_params=exec_plan.fill_watcher_params,
                 )
                 with _watchers_lock:
                     _active_watchers[symbol] = watcher
