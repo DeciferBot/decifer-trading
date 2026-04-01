@@ -271,6 +271,7 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
             "risk":        agent_outputs.get("risk",        "")[:500],
         },
         "signal_scores":   trade.get("signal_scores", {}),
+        "candle_gate":     trade.get("candle_gate", "UNKNOWN"),
         # Sanitise to JSON-safe types — orderId can be a MagicMock in test environments
         "tranche_id":      trade.get("tranche_id") if isinstance(trade.get("tranche_id"), (int, type(None))) else None,
         "parent_trade_id": trade.get("parent_trade_id") if isinstance(trade.get("parent_trade_id"), (int, str, type(None))) else None,

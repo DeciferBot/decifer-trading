@@ -96,6 +96,7 @@ def dispatch_signals(
                     signal_scores=signal.dimension_scores,
                     agent_outputs=agent_outputs,
                     open_time=datetime.now(timezone.utc).isoformat(),
+                    candle_gate=signal.candle_gate,
                 )
             except Exception as exc:
                 log.error(f"dispatch execute_buy failed {signal.symbol}: {exc}")

@@ -230,4 +230,33 @@ class TestCandleGateEdgeCases:
         assert result["signal"] == "HOLD"
         assert result["mtf_gate"] == "BLOCKED"
         assert "candle_gate" in result  # Must be present even on early return
-        assert result["candle_gate"] == "PASS"
+        assert result["candle_gate"] == "SKIPPED"  # MTF hard gate fired — candle gate was never evaluated
+
+
+# ---------------------------------------------------------------------------
+# tf_count regression — guards against total_tf NameError (Bug #1)
+# ---------------------------------------------------------------------------
+
+class TestTfCountRegression:
+
+    def test_tf_count_always_in_return_dict(self, monkeypatch):
+        """tf_count must be present in return dict — absence means total_tf NameError."""
+        monkeypatch.setitem(_config_mod.CONFIG, "candle_required", False)
+        monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "off")
+        result = compute_confluence(_make_sig(), None, None)
+        assert "tf_count" in result, "tf_count missing — total_tf NameError regression"
+
+    def test_tf_count_equals_1_when_only_5m(self, monkeypatch):
+        """tf_count == 1 when only the 5m signal is passed."""
+        monkeypatch.setitem(_config_mod.CONFIG, "candle_required", False)
+        monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "off")
+        result = compute_confluence(_make_sig(), None, None)
+        assert result["tf_count"] == 1
+
+    def test_tf_count_equals_2_when_5m_and_1d(self, monkeypatch):
+        """tf_count == 2 when 5m + daily signals are passed."""
+        monkeypatch.setitem(_config_mod.CONFIG, "candle_required", False)
+        monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "off")
+        daily = _make_sig(signal="BUY", timeframe="1d")
+        result = compute_confluence(_make_sig(), daily, None)
+        assert result["tf_count"] == 2

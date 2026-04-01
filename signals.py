@@ -73,13 +73,12 @@ def _regime_multipliers(regime_router: str) -> dict:
     "mean_reversion": same dims x 0.7, REVERSION x 1.3
     All other values (or regime_routing_enabled=False): all multipliers = 1.0
 
-    NEWS, PEAD, SHORT_SQUEEZE, OVERNIGHT_DRIFT are regime-neutral (fundamental/event).
+    NEWS and SOCIAL are regime-neutral (fundamental/event-driven).
     """
     _all_ones = {
-        "directional":    1.0, "momentum": 1.0, "squeeze": 1.0,
-        "flow":           1.0, "breakout": 1.0, "pead":    1.0,
-        "news":           1.0, "short_squeeze":  1.0,
-        "reversion":      1.0, "overnight_drift": 1.0,
+        "trend":    1.0, "momentum": 1.0, "squeeze": 1.0,
+        "flow":     1.0, "breakout": 1.0, "mtf":     1.0,
+        "news":     1.0, "social":   1.0, "reversion": 1.0,
     }
 
     if not CONFIG.get("regime_routing_enabled", True):
@@ -90,17 +89,15 @@ def _regime_multipliers(regime_router: str) -> dict:
 
     if regime_router == "momentum":
         return {
-            "directional":    mom_up,  "momentum":    mom_up,  "squeeze": mom_up,
-            "flow":           mom_up,  "breakout":    mom_up,
-            "pead":           1.0,     "news":        1.0,
-            "short_squeeze":  1.0,     "reversion":   rev_down, "overnight_drift": 1.0,
+            "trend":    mom_up,  "momentum": mom_up,  "squeeze": mom_up,
+            "flow":     mom_up,  "breakout": mom_up,  "mtf":     mom_up,
+            "news":     1.0,     "social":   1.0,     "reversion": rev_down,
         }
     if regime_router == "mean_reversion":
         return {
-            "directional":    rev_down, "momentum":   rev_down, "squeeze": rev_down,
-            "flow":           rev_down, "breakout":   rev_down,
-            "pead":           1.0,      "news":       1.0,
-            "short_squeeze":  1.0,      "reversion":  mom_up,   "overnight_drift": 1.0,
+            "trend":    rev_down, "momentum": rev_down, "squeeze": rev_down,
+            "flow":     rev_down, "breakout": rev_down, "mtf":     rev_down,
+            "news":     1.0,      "social":   1.0,      "reversion": mom_up,
         }
     return _all_ones
 
@@ -1112,16 +1109,15 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             "tf_count":   1,
             "mtf_gate":   "BLOCKED",
             "mtf_conflict": mtf_alignment["conflict"],
-            "candle_gate": "PASS",
+            "candle_gate": "SKIPPED",
             "reversion_score": 0,
             "variance_ratio": 0,
             "ou_halflife": 0,
             "zscore": 0,
             "adf_pvalue": 1.0,
             "score_breakdown": {
-                "directional": 0, "momentum": 0, "squeeze": 0, "flow": 0,
-                "breakout": 0, "pead": 0, "news": 0, "short_squeeze": 0,
-                "reversion": 0, "overnight_drift": 0,
+                "trend": 0, "momentum": 0, "squeeze": 0, "flow": 0,
+                "breakout": 0, "mtf": 0, "news": 0, "social": 0, "reversion": 0,
             },
             "disabled_dimensions": [],
         }
@@ -1129,6 +1125,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     signals = [sig_5m["signal"]]
     if sig_1d: signals.append(sig_1d["signal"])
     if sig_1w: signals.append(sig_1w["signal"])
+    total_tf = len(signals)
 
     buy_signals  = sum(1 for s in signals if "BUY"  in s)
     sell_signals = sum(1 for s in signals if "SELL" in s)
@@ -1169,13 +1166,13 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # ── 1. DIRECTIONAL (0-10) — EMA alignment × ADX + timeframe vote ──
     # Merges the old TREND (EMA+ADX) and MTF (timeframe consensus) dimensions.
     # Eliminates correlated IC weight splitting. See score_directional().
-    directional_pts = 0
-    directional_dir = 0
-    if _enabled("directional"):
-        directional_pts, directional_dir = score_directional(sig_5m, sig_1d, sig_1w)
-        directional_pts = int(round(directional_pts * _rmult.get("directional", 1.0)))
-        score += directional_pts
-        dim_directions.append((directional_dir, directional_pts))
+    trend_pts = 0
+    trend_dir = 0
+    if _enabled("trend"):
+        trend_pts, trend_dir = score_directional(sig_5m, sig_1d, sig_1w)
+        trend_pts = int(round(trend_pts * _rmult.get("trend", 1.0)))
+        score += trend_pts
+        dim_directions.append((trend_dir, trend_pts))
 
     # ── 2. MOMENTUM (0-10) — MFI distance from 50 (symmetric) ──
     # MFI > 65 and MFI < 35 both score 10. The distance from the
@@ -1277,8 +1274,12 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # ── 5. BREAKOUT (0-10) — Donchian channel breach (symmetric) ──
     # Donchian high break and low break score identically.
     # Volume confirmation applies to both.
-    donch = sig_5m.get("donch_breakout", 0)
-    vr    = sig_5m.get("vol_ratio", 0)
+    donch = sig_5m.get("donch_breakout")
+    if donch is None:
+        donch = (1 if sig_5m.get("dc_upper_break") else (-1 if sig_5m.get("dc_lower_break") else 0))
+    vr = sig_5m.get("vol_ratio")
+    if vr is None:
+        vr = sig_5m.get("volume_ratio", 0)
 
     breakout_score = 0
     breakout_dir = 0
@@ -1300,17 +1301,29 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         score += breakout_score
         dim_directions.append((breakout_dir, breakout_score))
 
-    # ── 6. PEAD (0-10) — Post-Earnings Announcement Drift ──
-    # Analysts systematically underreact to earnings surprises.
-    # Drift continues 20-60 days post-announcement. See score_pead().
-    pead_pts = 0
-    pead_dir = 0
-    if _enabled("pead"):
-        _vol_ratio = sig_5m.get("vol_ratio", 0)
-        pead_pts, pead_dir = score_pead(sig_5m.get("symbol", ""), sig_1d, _vol_ratio)
-        pead_pts = int(round(pead_pts * _rmult.get("pead", 1.0)))
-        score += pead_pts
-        dim_directions.append((pead_dir, pead_pts))
+    # ── 6. MTF (0-10) — Multi-TimeFrame alignment ─────────────────────
+    # Scores based on how many higher timeframes confirm the 5m direction.
+    # No daily data → 0 pts (cannot confirm). Both daily+weekly confirm → 10 pts.
+    mtf_score = 0
+    mtf_dir = 0
+    if _enabled("mtf"):
+        if sig_1d is not None:
+            d_bull = sig_1d.get("bull_aligned", False)
+            d_bear = sig_1d.get("bear_aligned", False)
+            if d_bull:
+                mtf_score = 8
+                mtf_dir = +1
+            elif d_bear:
+                mtf_score = 8
+                mtf_dir = -1
+            if sig_1w is not None:
+                w_bull = sig_1w.get("bull_aligned", False)
+                w_bear = sig_1w.get("bear_aligned", False)
+                if (w_bull and d_bull) or (w_bear and d_bear):
+                    mtf_score = 10  # Full weekly+daily confirmation
+        mtf_score = int(round(min(mtf_score, 10) * _rmult.get("mtf", 1.0)))
+        score += mtf_score
+        dim_directions.append((mtf_dir, mtf_score))
 
     # ── 7. NEWS SENTIMENT (0-10) ────────────────────────
     # news_score is pre-computed by news.py (keyword + Claude two-tier)
@@ -1323,16 +1336,14 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         # abs value, so direction comes from the raw news_score sign
         dim_directions.append((+1 if news_score > 0 else (-1 if news_score < 0 else 0), ns))
 
-    # ── 8. SHORT_SQUEEZE (0-10) ───────────────────────
-    # High short float + volume surge + price vs resistance.
-    # Asymmetric upside when shorts are forced to cover. See score_short_squeeze().
-    ss_pts = 0
-    ss_dir = 0
-    if _enabled("short_squeeze"):
-        ss_pts, ss_dir = score_short_squeeze(sig_5m.get("symbol", ""), sig_5m)
-        ss_pts = int(round(ss_pts * _rmult.get("short_squeeze", 1.0)))
-        score += ss_pts
-        dim_directions.append((ss_dir, ss_pts))
+    # ── 8. SOCIAL (0-10) — Social sentiment score ─────────────────────
+    social_pts = 0
+    social_dir = 0
+    if _enabled("social"):
+        social_pts = int(round(min(10, max(0, social_score)) * _rmult.get("social", 1.0)))
+        score += social_pts
+        social_dir = +1 if social_score > 0 else (-1 if social_score < 0 else 0)
+        dim_directions.append((social_dir, social_pts))
 
     # ── 9. REVERSION (0-10) — mean-reversion tendency ──────
     # Composite of Hurst exponent + OU half-life + z-score.
@@ -1403,17 +1414,6 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         rev_dir = -1 if _zscore > 0.5 else (+1 if _zscore < -0.5 else 0)
         dim_directions.append((rev_dir, rev_score_capped))
 
-    # ── 10. OVERNIGHT_DRIFT (0-10) ─────────────────────────
-    # Per-symbol 90-day close-to-open drift statistics. Computed in
-    # compute_indicators() for the 1d timeframe, read from sig_1d.
-    overnight_pts = 0
-    overnight_dir = 0
-    if _enabled("overnight_drift"):
-        overnight_pts, overnight_dir = score_overnight_drift(sig_1d)
-        overnight_pts = int(round(overnight_pts * _rmult.get("overnight_drift", 1.0)))
-        score += overnight_pts
-        dim_directions.append((overnight_dir, overnight_pts))
-
     # ── BONUS: Candlestick confirmation (+3 max) ────────
     # Direction-agnostic: both bull and bear candles add bonus points.
     # Direction already captured in dim_directions.
@@ -1442,16 +1442,15 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         _icw = _get_ic_weights()
         _N_DIMS = len(_IC_DIMS)
         _ic_breakdown = {
-            "directional":    directional_pts,
-            "momentum":       momentum,
-            "squeeze":        squeeze_score,
-            "flow":           flow_score,
-            "breakout":       breakout_score,
-            "pead":           pead_pts,
-            "news":           ns,
-            "short_squeeze":  ss_pts,
-            "reversion":      rev_score_capped,
-            "overnight_drift":overnight_pts,
+            "trend":     trend_pts,
+            "momentum":  momentum,
+            "squeeze":   squeeze_score,
+            "flow":      flow_score,
+            "breakout":  breakout_score,
+            "mtf":       mtf_score,
+            "news":      ns,
+            "social":    social_pts,
+            "reversion": rev_score_capped,
         }
         _ic_sum = sum(
             _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v
@@ -1554,16 +1553,15 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         # Per-dimension score breakdown (for trade logging / IC feedback loop)
         # Keys must exactly match ic_calculator.DIMENSIONS for IC computation.
         "score_breakdown": {
-            "directional":    directional_pts,
-            "momentum":       momentum,
-            "squeeze":        squeeze_score,
-            "flow":           flow_score,
-            "breakout":       breakout_score,
-            "pead":           pead_pts,
-            "news":           ns,
-            "short_squeeze":  ss_pts,
-            "reversion":      rev_score_capped,
-            "overnight_drift":overnight_pts,
+            "trend":     trend_pts,
+            "momentum":  momentum,
+            "squeeze":   squeeze_score,
+            "flow":      flow_score,
+            "breakout":  breakout_score,
+            "mtf":       mtf_score,
+            "news":      ns,
+            "social":    social_pts,
+            "reversion": rev_score_capped,
         },
         # Dimensions that were zeroed by a False flag (for diagnostics / dashboard)
         "disabled_dimensions": disabled_dimensions,

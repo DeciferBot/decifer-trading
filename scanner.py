@@ -409,6 +409,8 @@ def get_market_regime(ib: IB) -> dict:
     Includes sanity checks to reject corrupt/stale price data.
     """
     global _last_good_regime
+    import sys as _sys; _sm = _sys.modules.get('scanner', _sys.modules[__name__])
+    _safe_download = _sm._safe_download  # noqa: F841 — rebind so @patch('scanner._safe_download') takes effect
 
     def _flat(df):
         """Flatten multi-level columns from newer yfinance."""

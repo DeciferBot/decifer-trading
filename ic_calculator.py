@@ -30,8 +30,8 @@ log = logging.getLogger("decifer.ic_calculator")
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 DIMENSIONS = [
-    "directional", "momentum", "squeeze", "flow", "breakout",
-    "pead", "news", "short_squeeze", "reversion", "overnight_drift",
+    "trend", "momentum", "squeeze", "flow", "breakout",
+    "mtf", "news", "social", "reversion",
 ]
 _N = len(DIMENSIONS)
 EQUAL_WEIGHTS: dict = {d: 1.0 / _N for d in DIMENSIONS}

@@ -50,6 +50,7 @@ class Signal:
     # Routing metadata — populated from raw scored dict, needed by execute_buy
     price: float = 0.0
     atr: float = 0.0
+    candle_gate: str = "UNKNOWN"
 
     def to_dict(self) -> dict:
         """Serialise to a JSON-safe dict (timestamp as ISO string)."""
