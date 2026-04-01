@@ -20,6 +20,7 @@
 # ╚══════════════════════════════════════════════════════════════╝
 
 import time as _time
+from datetime import datetime, timezone
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -67,10 +68,11 @@ def get_market_regime_vix() -> dict:
 
 def _regime_multipliers(regime_router: str) -> dict:
     """
-    Return per-dimension score multipliers for the two-state routing regime.
+    Return per-dimension score multipliers for the routing regime.
 
     "momentum":       DIRECTIONAL/MOMENTUM/SQUEEZE/FLOW/BREAKOUT x 1.3, REVERSION x 0.7
     "mean_reversion": same dims x 0.7, REVERSION x 1.3
+    "neutral":        all 1.0 — VIX and Hurst signals disagreed, no tilt warranted
     All other values (or regime_routing_enabled=False): all multipliers = 1.0
 
     NEWS and SOCIAL are regime-neutral (fundamental/event-driven).
@@ -100,6 +102,173 @@ def _regime_multipliers(regime_router: str) -> dict:
             "news":     1.0,      "social":   1.0,      "reversion": mom_up,
         }
     return _all_ones
+
+
+# ── HURST DFA REGIME SIGNAL ──────────────────────────────────────────────────
+# Hurst exponent of SPY (market-level) using Detrended Fluctuation Analysis.
+# Used as a second input to the Layer 2 signal router alongside VIX.
+# Ship disabled (hurst_regime.enabled = False); enable after historical validation.
+# See chief-decifer/state/specs/spec-regime-architecture.md Step 2.
+
+_hurst_spy_cache:    dict | None     = None
+_hurst_spy_cache_ts: datetime | None = None
+
+
+def compute_hurst_dfa(series) -> float:
+    """
+    Estimate the Hurst exponent using Detrended Fluctuation Analysis (DFA-1).
+
+    DFA is substantially more reliable than R/S Hurst on short windows. Uses
+    log returns internally: integrates mean-subtracted log returns into a
+    profile, then measures how fluctuation F(n) scales with window size n.
+    Slope of log F(n) vs log n gives H.
+
+      H > 0.55 → persistent / trending series  (momentum edge)
+      H < 0.45 → anti-persistent / mean-reverting (reversion edge)
+      H ≈ 0.50 → random walk, no structural edge
+
+    Returns 0.5 (neutral) if the series is too short (<20 pts) or errors.
+    """
+    arr = np.asarray(series, dtype=float)
+    arr = arr[np.isfinite(arr) & (arr > 0)]
+    if len(arr) < 20:
+        return 0.5
+    try:
+        # Step 1: log returns → profile (cumulative sum of mean-subtracted returns)
+        log_ret = np.diff(np.log(arr))
+        if len(log_ret) < 16:
+            return 0.5
+        profile = np.cumsum(log_ret - log_ret.mean())
+        N = len(profile)
+
+        # Step 2: log-spaced window sizes from 4 to N//4
+        n_max = max(4, N // 4)
+        scales = np.unique(
+            np.round(np.logspace(np.log10(4), np.log10(n_max), 12)).astype(int)
+        )
+        scales = scales[(scales >= 4) & (scales <= n_max)]
+        if len(scales) < 3:
+            return 0.5
+
+        # Step 3: for each window size, detrend segments and measure RMS fluctuation
+        fluctuations = []
+        valid_scales = []
+        x_cache: dict = {}  # cache np.arange(n) for each n
+        for n in scales:
+            n_segs = N // n
+            if n_segs < 2:
+                continue
+            if n not in x_cache:
+                x_cache[n] = np.arange(n, dtype=float)
+            x_t = x_cache[n]
+            seg_var = []
+            for i in range(n_segs):
+                seg = profile[i * n: (i + 1) * n]
+                coef = np.polyfit(x_t, seg, 1)
+                residuals = seg - np.polyval(coef, x_t)
+                seg_var.append(np.mean(residuals ** 2))
+            if seg_var:
+                fluctuations.append(np.sqrt(np.mean(seg_var)))
+                valid_scales.append(int(n))
+
+        if len(fluctuations) < 3:
+            return 0.5
+
+        # Step 4: fit log F(n) ~ H * log(n) → slope is H
+        log_n = np.log(np.array(valid_scales, dtype=float))
+        log_f = np.log(np.array(fluctuations, dtype=float))
+        if not np.all(np.isfinite(log_f)):
+            return 0.5
+        h, _ = np.polyfit(log_n, log_f, 1)
+        return float(np.clip(h, 0.0, 1.0))
+    except Exception:
+        return 0.5
+
+
+def get_hurst_regime_spy() -> dict:
+    """
+    Compute the Hurst exponent of SPY daily closes and classify into a
+    routing regime. Used as the second input to the Layer 2 signal router.
+
+    Config block: config["hurst_regime"] — must have enabled=True to use.
+    Cached for cache_ttl_seconds (default: 3600).
+
+    Returns:
+      {"regime": "trending"|"reverting"|"neutral"|"unknown",
+       "hurst": float|None, "source": str, "lookback_days": int}
+
+    Regimes:
+      "trending"  H > trending_threshold (0.55) → momentum edge
+      "reverting" H < reverting_threshold (0.45) → reversion edge
+      "neutral"   between thresholds             → no structural edge
+      "unknown"   data error / disabled          → safe fallback
+    """
+    global _hurst_spy_cache, _hurst_spy_cache_ts
+
+    cfg      = CONFIG.get("hurst_regime", {})
+    ttl      = cfg.get("cache_ttl_seconds", 3600)
+    lookback = cfg.get("lookback_days", 63)
+    hi_thr   = cfg.get("trending_threshold",  0.55)
+    lo_thr   = cfg.get("reverting_threshold", 0.45)
+    now      = datetime.now(timezone.utc)
+
+    if (_hurst_spy_cache is not None and _hurst_spy_cache_ts is not None
+            and (now - _hurst_spy_cache_ts).total_seconds() < ttl):
+        return _hurst_spy_cache
+
+    try:
+        raw = _safe_download("SPY", period=f"{lookback + 10}d", interval="1d",
+                             progress=False, auto_adjust=True)
+        raw = _flatten_columns(raw)
+        if raw is None or len(raw) < 20:
+            log.warning("get_hurst_regime_spy: insufficient SPY data — returning unknown")
+            return {"regime": "unknown", "hurst": None, "source": "fallback",
+                    "lookback_days": lookback}
+
+        prices = raw["Close"].dropna().values[-lookback:]
+        h = compute_hurst_dfa(prices)
+
+        if h > hi_thr:
+            regime = "trending"
+        elif h < lo_thr:
+            regime = "reverting"
+        else:
+            regime = "neutral"
+
+        result = {"regime": regime, "hurst": round(h, 3),
+                  "source": "SPY_DFA", "lookback_days": len(prices)}
+        log.info(f"Hurst regime: {regime} (H={h:.3f}, lookback={len(prices)}d, "
+                 f"trending>{hi_thr}, reverting<{lo_thr})")
+        _hurst_spy_cache    = result
+        _hurst_spy_cache_ts = now
+        return result
+    except Exception as e:
+        log.warning(f"get_hurst_regime_spy: error ({e}) — returning unknown")
+        return {"regime": "unknown", "hurst": None, "source": "fallback",
+                "lookback_days": lookback}
+
+
+def _resolve_regime_router(vix_regime: str, hurst_regime: str = "unknown") -> str:
+    """
+    Combine VIX and Hurst regime signals via consensus rule.
+
+    Multipliers fire only when BOTH signals agree:
+      vix=momentum        + hurst=trending  → "momentum"
+      vix=mean_reversion  + hurst=reverting → "mean_reversion"
+      any disagreement or hurst neutral     → "neutral" (all mults = 1.0)
+
+    When hurst_regime is "unknown" (Hurst disabled or fetch failed),
+    returns vix_regime unchanged — preserving the existing binary VIX-only
+    behaviour with zero change to routing outcomes.
+    """
+    if hurst_regime == "unknown":
+        return vix_regime
+    if vix_regime == "momentum" and hurst_regime == "trending":
+        return "momentum"
+    if vix_regime == "mean_reversion" and hurst_regime == "reverting":
+        return "mean_reversion"
+    # Signals disagree, or hurst is "neutral" → equal-weight fallback
+    return "neutral"
 
 
 # ── PROCESS POOL for score_universe() ───────────────────────────
@@ -1625,12 +1794,17 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
 
     threshold = get_regime_threshold(regime)
 
-    # ── Determine two-state signal routing regime ────────────────
+    # ── Determine routing regime (VIX + optional Hurst consensus) ──
     if regime_router is None:
         if CONFIG.get("regime_routing_enabled", True):
-            vix_regime = get_market_regime_vix()
-            regime_router = vix_regime["regime"]
-            log.info(f"score_universe regime router: {regime_router} (VIX={vix_regime.get('vix')})")
+            vix_result  = get_market_regime_vix()
+            _vix_r      = vix_result["regime"]
+            _hurst_r    = "unknown"
+            if CONFIG.get("hurst_regime", {}).get("enabled", False):
+                _hurst_r = get_hurst_regime_spy().get("regime", "unknown")
+            regime_router = _resolve_regime_router(_vix_r, _hurst_r)
+            log.info(f"score_universe regime router: {regime_router} "
+                     f"(VIX={vix_result.get('vix')}, hurst={_hurst_r})")
         else:
             regime_router = "unknown"
 

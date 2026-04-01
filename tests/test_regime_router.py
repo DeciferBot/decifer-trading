@@ -23,7 +23,8 @@ if "signals" in sys.modules and not hasattr(sys.modules["signals"], "__file__"):
     del sys.modules["signals"]
 
 import signals as _signals_mod  # capture module reference for patch.object (see below)
-from signals import get_market_regime_vix, _regime_multipliers, compute_confluence
+from signals import (get_market_regime_vix, _regime_multipliers, compute_confluence,
+                     compute_hurst_dfa, get_hurst_regime_spy, _resolve_regime_router)
 # NOTE: other test files (test_signals.py, test_signal_dispatch.py) replace
 # sys.modules["signals"] at collection time with a new module object, so
 # patch("signals._safe_download") would target the wrong module at runtime.
@@ -386,3 +387,197 @@ class TestPanicMomentumInconsistency:
             f"trend ({effective_trend:.4f}) should > reversion ({effective_reversion:.4f}) "
             "in momentum regime"
         )
+
+
+# ── 5. compute_hurst_dfa() ───────────────────────────────────────────────────
+
+class TestComputeHurstDfa:
+
+    def _trending_series(self, n: int = 80) -> np.ndarray:
+        """Strongly trending price series (random walk with positive drift)."""
+        rng = np.random.default_rng(42)
+        returns = 0.003 + rng.normal(0, 0.005, n)  # positive drift
+        prices = 100.0 * np.cumprod(1 + returns)
+        return prices
+
+    def _reverting_series(self, n: int = 80) -> np.ndarray:
+        """Mean-reverting OU price series."""
+        rng = np.random.default_rng(7)
+        prices = [100.0]
+        for _ in range(n - 1):
+            mean_pull = 0.3 * (100.0 - prices[-1])
+            prices.append(prices[-1] + mean_pull + rng.normal(0, 0.8))
+        return np.array(prices)
+
+    def _random_walk(self, n: int = 80) -> np.ndarray:
+        """Pure Gaussian random walk (H ≈ 0.5)."""
+        rng = np.random.default_rng(99)
+        returns = rng.normal(0, 0.01, n)
+        return 100.0 * np.cumprod(1 + returns)
+
+    def test_returns_float_in_unit_interval(self):
+        prices = self._random_walk()
+        h = compute_hurst_dfa(prices)
+        assert isinstance(h, float)
+        assert 0.0 <= h <= 1.0
+
+    def test_too_short_returns_neutral(self):
+        assert compute_hurst_dfa(np.array([100.0, 101.0])) == 0.5
+
+    def test_empty_returns_neutral(self):
+        assert compute_hurst_dfa(np.array([])) == 0.5
+
+    def test_nan_series_returns_neutral(self):
+        assert compute_hurst_dfa(np.array([np.nan, np.nan, np.nan])) == 0.5
+
+    def test_trending_series_gives_higher_h_than_reverting(self):
+        h_trend = compute_hurst_dfa(self._trending_series())
+        h_revert = compute_hurst_dfa(self._reverting_series())
+        assert h_trend > h_revert, (
+            f"Trending series H={h_trend:.3f} should exceed reverting H={h_revert:.3f}"
+        )
+
+    def test_random_walk_h_near_half(self):
+        """Random walk Hurst should be in [0.3, 0.7] — not perfectly 0.5 on finite data."""
+        h = compute_hurst_dfa(self._random_walk(120))
+        assert 0.25 <= h <= 0.75, f"Random walk H={h:.3f} far from 0.5"
+
+    def test_flat_series_returns_neutral(self):
+        flat = np.full(40, 100.0)
+        h = compute_hurst_dfa(flat)
+        assert h == 0.5  # log returns all zero → division issues → fallback
+
+
+# ── 6. get_hurst_regime_spy() ────────────────────────────────────────────────
+
+class TestGetHurstRegimeSpy:
+
+    def _spy_df(self, h_target: float, n: int = 70) -> "pd.DataFrame":
+        """Build a synthetic SPY price DataFrame designed to produce H near h_target."""
+        rng = np.random.default_rng(0)
+        if h_target > 0.55:
+            # Trending: strong positive autocorrelation
+            returns = 0.004 + rng.normal(0, 0.004, n)
+        elif h_target < 0.45:
+            # Mean-reverting: OU process
+            prices = [100.0]
+            for _ in range(n - 1):
+                prices.append(prices[-1] + 0.4 * (100.0 - prices[-1]) + rng.normal(0, 0.5))
+            return pd.DataFrame({"Close": prices})
+        else:
+            returns = rng.normal(0, 0.01, n)
+        prices = 100.0 * np.cumprod(1 + returns)
+        return pd.DataFrame({"Close": prices})
+
+    def test_returns_dict_with_required_keys(self, monkeypatch):
+        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache",    None)
+        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache_ts", None)
+        monkeypatch.setitem(_config_mod.CONFIG, "hurst_regime", {
+            "enabled": True, "trending_threshold": 0.55,
+            "reverting_threshold": 0.45, "lookback_days": 63,
+            "cache_ttl_seconds": 3600,
+        })
+        with patch.object(_signals_mod, "_safe_download",
+                          return_value=self._spy_df(0.6)), \
+             patch.object(_signals_mod, "_flatten_columns",
+                          side_effect=lambda df: df):
+            result = get_hurst_regime_spy()
+        assert "regime"  in result
+        assert "hurst"   in result
+        assert "source"  in result
+        assert result["regime"] in ("trending", "reverting", "neutral", "unknown")
+
+    def test_fetch_failure_returns_unknown(self, monkeypatch):
+        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache",    None)
+        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache_ts", None)
+        monkeypatch.setitem(_config_mod.CONFIG, "hurst_regime", {
+            "enabled": True, "trending_threshold": 0.55,
+            "reverting_threshold": 0.45, "lookback_days": 63,
+            "cache_ttl_seconds": 3600,
+        })
+        with patch.object(_signals_mod, "_safe_download",
+                          side_effect=Exception("network error")):
+            result = get_hurst_regime_spy()
+        assert result["regime"] == "unknown"
+        assert result["source"] == "fallback"
+
+    def test_insufficient_data_returns_unknown(self, monkeypatch):
+        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache",    None)
+        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache_ts", None)
+        monkeypatch.setitem(_config_mod.CONFIG, "hurst_regime", {
+            "enabled": True, "trending_threshold": 0.55,
+            "reverting_threshold": 0.45, "lookback_days": 63,
+            "cache_ttl_seconds": 3600,
+        })
+        small_df = pd.DataFrame({"Close": [100.0, 101.0, 102.0]})
+        with patch.object(_signals_mod, "_safe_download",
+                          return_value=small_df), \
+             patch.object(_signals_mod, "_flatten_columns",
+                          side_effect=lambda df: df):
+            result = get_hurst_regime_spy()
+        assert result["regime"] == "unknown"
+
+    def test_hurst_value_is_float_in_unit_interval(self, monkeypatch):
+        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache",    None)
+        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache_ts", None)
+        monkeypatch.setitem(_config_mod.CONFIG, "hurst_regime", {
+            "enabled": True, "trending_threshold": 0.55,
+            "reverting_threshold": 0.45, "lookback_days": 63,
+            "cache_ttl_seconds": 3600,
+        })
+        with patch.object(_signals_mod, "_safe_download",
+                          return_value=self._spy_df(0.5)), \
+             patch.object(_signals_mod, "_flatten_columns",
+                          side_effect=lambda df: df):
+            result = get_hurst_regime_spy()
+        if result["hurst"] is not None:
+            assert 0.0 <= result["hurst"] <= 1.0
+
+
+# ── 7. _resolve_regime_router() ──────────────────────────────────────────────
+
+class TestResolveRegimeRouter:
+
+    def test_hurst_unknown_returns_vix_regime_unchanged(self):
+        """When Hurst is disabled/failed (unknown), VIX regime passes through unchanged."""
+        assert _resolve_regime_router("momentum",      "unknown") == "momentum"
+        assert _resolve_regime_router("mean_reversion","unknown") == "mean_reversion"
+
+    def test_both_agree_momentum(self):
+        assert _resolve_regime_router("momentum", "trending") == "momentum"
+
+    def test_both_agree_mean_reversion(self):
+        assert _resolve_regime_router("mean_reversion", "reverting") == "mean_reversion"
+
+    def test_vix_momentum_hurst_reverting_gives_neutral(self):
+        """VIX says bull, Hurst says mean-reverting → signals disagree → neutral."""
+        assert _resolve_regime_router("momentum", "reverting") == "neutral"
+
+    def test_vix_mean_reversion_hurst_trending_gives_neutral(self):
+        """VIX says bear, Hurst says trending → signals disagree → neutral."""
+        assert _resolve_regime_router("mean_reversion", "trending") == "neutral"
+
+    def test_hurst_neutral_always_gives_neutral(self):
+        """Hurst in the random-walk zone → no consensus possible → neutral."""
+        assert _resolve_regime_router("momentum",      "neutral") == "neutral"
+        assert _resolve_regime_router("mean_reversion","neutral") == "neutral"
+
+    def test_neutral_regime_router_string_maps_to_all_ones_multipliers(self, monkeypatch):
+        """'neutral' passed to _regime_multipliers must return all 1.0 (fallthrough)."""
+        monkeypatch.setitem(_config_mod.CONFIG, "regime_routing_enabled", True)
+        mults = _regime_multipliers("neutral")
+        assert all(v == 1.0 for v in mults.values()), (
+            "neutral routing state must produce equal-weight multipliers"
+        )
+
+    def test_disabled_routing_returns_disabled_not_neutral(self):
+        """regime_routing_enabled=False in bot_trading produces 'disabled', not 'neutral'.
+        _regime_multipliers('disabled') must also return all 1.0."""
+        import config as _c
+        orig = _c.CONFIG.get("regime_routing_enabled", True)
+        _c.CONFIG["regime_routing_enabled"] = False
+        try:
+            mults = _regime_multipliers("disabled")
+            assert all(v == 1.0 for v in mults.values())
+        finally:
+            _c.CONFIG["regime_routing_enabled"] = orig

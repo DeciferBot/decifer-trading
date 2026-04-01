@@ -374,7 +374,16 @@ def run_scan():
     _vix_val       = regime.get("vix") or 0
     _rr_threshold  = CONFIG.get("regime_router_vix_threshold", 20)
     if CONFIG.get("regime_routing_enabled", True):
-        _router_state = "momentum" if _vix_val and _vix_val < _rr_threshold else "mean_reversion"
+        _vix_regime = "momentum" if _vix_val and _vix_val < _rr_threshold else "mean_reversion"
+        # Hurst DFA second signal — only fetched when enabled (default: False)
+        _hurst_regime = "unknown"
+        if CONFIG.get("hurst_regime", {}).get("enabled", False):
+            from signals import get_hurst_regime_spy
+            _hurst_result = get_hurst_regime_spy()
+            _hurst_regime = _hurst_result.get("regime", "unknown")
+            regime["hurst_regime"] = _hurst_result
+        from signals import _resolve_regime_router
+        _router_state = _resolve_regime_router(_vix_regime, _hurst_regime)
     else:
         _router_state = "disabled"
     regime["regime_router"] = _router_state

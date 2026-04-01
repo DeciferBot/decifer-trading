@@ -275,6 +275,22 @@ CONFIG = {
         "cache_ttl_seconds": 3600,   # Re-fetch VIX data at most once per hour
     },
 
+    # ── HURST DFA REGIME SIGNAL ───────────────────────────────────
+    # Second input to the Layer 2 signal router (alongside VIX).
+    # Uses DFA-1 Hurst of SPY daily closes over a 63-day window.
+    # Ship disabled — enable only after validating DFA stability on
+    # SPY historical data. See spec-regime-architecture.md Step 2.
+    #
+    # Consensus rule: routing multipliers fire only when VIX and Hurst
+    # agree. Disagreement falls back to neutral (all mults = 1.0).
+    "hurst_regime": {
+        "enabled":              False,   # Ship disabled — validate before enabling
+        "trending_threshold":   0.55,    # H > this → "trending" (momentum edge)
+        "reverting_threshold":  0.45,    # H < this → "reverting" (reversion edge)
+        "lookback_days":        63,      # ~1 quarter of daily closes
+        "cache_ttl_seconds":    3600,    # Re-fetch SPY daily at most once per hour
+    },
+
     # ── REGIME DETECTOR LOCK ──────────────────────────────────
     # Committed approach: "vix_proxy" (scanner.get_market_regime + signals.get_market_regime_vix)
     # DO NOT change to "ml_random_forest" or "hmm" without IC Phase 2 gate review.
