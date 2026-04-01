@@ -65,6 +65,12 @@ _session_opening_regime: str | None = None  # Regime at session open (set on fir
 _session_regime_set:     bool       = False  # Guard: only set once per trading day
 _strategy_size_multiplier: float    = 1.0   # Applied inside calculate_position_size()
 
+# ── VIX-rank Kelly state ────────────────────────────────────────
+_vix_rank_cache:      float | None    = None
+_vix_rank_cache_ts:   datetime | None = None
+_last_vix_rank:       float           = 0.5  # Latest computed rank (for dashboard)
+_last_kelly_fraction: float           = 0.5  # Latest computed fraction (for dashboard)
+
 
 def reset_daily_state(portfolio_value: float):
     """Call at the start of each trading day."""
@@ -429,14 +435,94 @@ def get_scan_interval() -> int:
     return intervals.get(session, CONFIG["scan_interval_standard"] * 60)
 
 
+# ══════════════════════════════════════════════════════════════════
+# VIX-RANK ADAPTIVE KELLY FRACTION
+# ══════════════════════════════════════════════════════════════════
+
+def get_vix_rank(vix_override: float | None = None) -> float:
+    """
+    Returns the percentile (0.0–1.0) of the current ^VIX reading within
+    its trailing 252-day range. Caches the result for cache_ttl_seconds.
+    Falls back to 0.5 (neutral) on any data error.
+
+    vix_override: if provided, compute rank against the cached history using
+    this value instead of fetching live — useful for tests and intraday callers
+    that already have the current VIX reading.
+    """
+    global _vix_rank_cache, _vix_rank_cache_ts
+
+    ttl     = CONFIG["vix_kelly"]["cache_ttl_seconds"]
+    lookback = CONFIG["vix_kelly"]["vix_lookback_days"]
+    now     = datetime.now(timezone.utc)
+
+    # Return cached value if still fresh and no override
+    if (vix_override is None
+            and _vix_rank_cache is not None
+            and _vix_rank_cache_ts is not None
+            and (now - _vix_rank_cache_ts).total_seconds() < ttl):
+        return _vix_rank_cache
+
+    try:
+        import yfinance as yf
+        hist = yf.Ticker("^VIX").history(period=f"{lookback + 15}d")["Close"].dropna()
+        if len(hist) < 20:
+            log.warning("get_vix_rank: insufficient VIX history — defaulting to 0.5")
+            return 0.5
+        hist = hist.iloc[-lookback:]
+        current = float(vix_override if vix_override is not None else hist.iloc[-1])
+        rank    = float((hist < current).sum()) / len(hist)
+        if vix_override is None:
+            _vix_rank_cache    = rank
+            _vix_rank_cache_ts = now
+        log.debug(f"VIX rank: VIX={current:.2f} rank={rank:.3f} window={len(hist)}d")
+        return rank
+    except Exception as exc:
+        log.warning(f"get_vix_rank: failed to fetch ^VIX — {exc}. Defaulting to 0.5")
+        return 0.5
+
+
+def get_kelly_fraction(vix_rank_override: float | None = None) -> tuple[float, float]:
+    """
+    Returns (kelly_fraction, vix_rank).
+    Formula: kelly = base_kelly * (1 - vix_rank * max_reduction)
+      rank=0.0 (calm)  → kelly = base_kelly            (e.g. 0.50)
+      rank=1.0 (panic) → kelly = base_kelly*(1-max_r)  (e.g. 0.10)
+    """
+    global _last_vix_rank, _last_kelly_fraction
+    cfg      = CONFIG["vix_kelly"]
+    vix_rank = get_vix_rank(vix_rank_override)
+    kelly    = cfg["base_kelly"] * (1.0 - vix_rank * cfg["max_reduction"])
+    kelly    = max(0.05, min(1.0, kelly))   # floor 5%, ceiling 100%
+    _last_vix_rank       = vix_rank
+    _last_kelly_fraction = kelly
+    return kelly, vix_rank
+
+
+def get_sizing_state() -> dict:
+    """Returns current VIX rank and Kelly fraction for dashboard injection."""
+    return {
+        "vix_rank":       round(_last_vix_rank, 3),
+        "kelly_fraction": round(_last_kelly_fraction, 3),
+    }
+
+
 def calculate_position_size(portfolio_value: float, price: float,
-                             score: int, regime: dict) -> int:
+                             score: int, regime: dict,
+                             atr: float = 0.0) -> int:
     """
-    Kelly-inspired position sizing.
+    VIX-rank adaptive Kelly position sizing with ATR volatility cap.
     Returns number of shares to buy.
+
+    Sizing stack (most conservative wins):
+      1. Kelly path  — base_risk * kelly_frac * conviction * regime * session * strategy
+      2. ATR vol cap — (portfolio * atr_vol_target_pct) / atr
+      3. Hard safety cap — 20% of portfolio
     """
-    # Base risk amount
-    base_risk = portfolio_value * CONFIG["risk_pct_per_trade"]
+    # ── VIX-rank adaptive Kelly fraction ──────────────────────
+    kelly_frac, vix_rank = get_kelly_fraction()
+
+    # Base risk amount scaled by Kelly fraction
+    base_risk = portfolio_value * CONFIG["risk_pct_per_trade"] * kelly_frac
 
     # Conviction multiplier based on score
     if score >= CONFIG["high_conviction_score"]:
@@ -465,14 +551,29 @@ def calculate_position_size(portfolio_value: float, price: float,
 
     qty = max(1, int(position_value / price))
 
-    # ── HARD SAFETY CAP — catch any remaining edge cases ──
+    # ── ATR volatility cap ─────────────────────────────────────
+    # Cap qty so that a 1-ATR adverse move costs at most atr_vol_target_pct of portfolio.
+    # More conservative of Kelly path vs ATR cap wins.
+    atr_capped_qty: int | None = None
+    if CONFIG.get("atr_vol_cap_enabled") and atr > 0:
+        atr_target     = portfolio_value * CONFIG["atr_vol_target_pct"]
+        atr_capped_qty = max(1, int(atr_target / atr))
+        if atr_capped_qty < qty:
+            qty = atr_capped_qty
+
+    # ── HARD SAFETY CAP — catch any remaining edge cases ──────
     # If computed qty × price > 20% of portfolio, something is wrong (likely bad price data)
     order_value = qty * price
-    hard_cap = portfolio_value * 0.20
+    hard_cap    = portfolio_value * 0.20
     if order_value > hard_cap and qty > 1:
         qty = max(1, int(hard_cap / price))
         log.warning(f"Position size hard cap triggered: {order_value:,.0f} > {hard_cap:,.0f}, reduced to {qty} shares")
 
+    log.info(
+        f"[sizing] vix_rank={vix_rank:.2f} kelly={kelly_frac:.3f} "
+        f"atr_cap={atr_capped_qty if atr_capped_qty is not None else 'N/A'} "
+        f"final_qty={qty}"
+    )
     return qty
 
 

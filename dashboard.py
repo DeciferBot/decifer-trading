@@ -1941,7 +1941,9 @@ function updateRegime(regime) {
   label.textContent = regime.regime || 'UNKNOWN';
   const routerStr = regime.regime_router && regime.regime_router !== 'disabled'
     ? ` | ROUTER: ${regime.regime_router.replace('_', '-').toUpperCase()}` : '';
-  meta.textContent  = `VIX: ${regime.vix || '—'} | SPY: $${regime.spy_price || '—'}${routerStr}`;
+  const vixRankStr  = regime.vix_rank   != null ? (regime.vix_rank * 100).toFixed(0) + '%' : '—';
+  const kellyStr    = regime.kelly_fraction != null ? regime.kelly_fraction.toFixed(2) : '—';
+  meta.textContent  = `VIX: ${regime.vix || '—'} | Rank: ${vixRankStr} | Kelly: ${kellyStr} | SPY: $${regime.spy_price || '—'}${routerStr}`;
   pill.textContent  = 'REGIME: ' + (regime.regime || '—');
 }
 

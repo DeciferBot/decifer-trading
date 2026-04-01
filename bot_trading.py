@@ -657,24 +657,28 @@ def run_scan():
             if not is_options_market_open():
                 clog("INFO", f"Score {sig['score']} qualifies for options but market closed — will retry next open scan")
             else:
-                direction = "LONG" if sig.get("direction", "LONG") == "LONG" else "SHORT"
-                clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
-                try:
-                    contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
-                    if contract_info:
-                        opt_success = execute_buy_option(ib, contract_info, pv, reasoning=reason)
-                        if opt_success:
-                            dash["trades"].insert(0, {
-                                "side":   f"BUY {contract_info['right']} OPT",
-                                "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
-                                "price":  str(contract_info["mid"]),
-                                "time":   datetime.now().strftime("%H:%M:%S")
-                            })
-                            clog("TRADE", f"Options trade executed for {sym} (independent of stock)")
-                    else:
-                        clog("INFO", f"No suitable options contract for {sym}")
-                except Exception as _opt_err:
-                    clog("ERROR", f"Options evaluation failed for {sym}: {_opt_err}")
+                _sig_dir = sig.get("direction", "LONG")
+                if _sig_dir not in ("LONG", "SHORT"):
+                    clog("INFO", f"Score {sig['score']} qualifies for options but direction={_sig_dir!r} — skipping (no clear conviction)")
+                else:
+                    direction = _sig_dir
+                    clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
+                    try:
+                        contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
+                        if contract_info:
+                            opt_success = execute_buy_option(ib, contract_info, pv, reasoning=reason)
+                            if opt_success:
+                                dash["trades"].insert(0, {
+                                    "side":   f"BUY {contract_info['right']} OPT",
+                                    "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
+                                    "price":  str(contract_info["mid"]),
+                                    "time":   datetime.now().strftime("%H:%M:%S")
+                                })
+                                clog("TRADE", f"Options trade executed for {sym} (independent of stock)")
+                        else:
+                            clog("INFO", f"No suitable options contract for {sym}")
+                    except Exception as _opt_err:
+                        clog("ERROR", f"Options evaluation failed for {sym}: {_opt_err}")
 
     dash["positions"] = get_open_positions()
     _seen_dash = {}

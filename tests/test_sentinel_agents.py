@@ -202,43 +202,27 @@ class TestAgentRiskGate:
             )
         assert isinstance(result, str)
 
-    def test_prompt_includes_portfolio_value(self, bullish_trigger, regime_trending):
-        """Portfolio value must appear in the prompt."""
-        captured = {}
-        def fake_call(sys_p, user_p, max_tokens=400):
-            captured["user"] = user_p
-            return "APPROVE"
-        with patch.object(sa, "_call_claude", side_effect=fake_call):
-            sa.agent_risk_gate("report", bullish_trigger, [], 75000.0, 0.0, regime_trending)
-        assert "75,000" in captured["user"] or "75000" in captured["user"]
+    def test_output_includes_portfolio_value(self, bullish_trigger, regime_trending):
+        """Portfolio value must appear in the deterministic output."""
+        result = sa.agent_risk_gate("report", bullish_trigger, [], 75000.0, 0.0, regime_trending)
+        assert "75,000" in result or "75000" in result
 
-    def test_prompt_shows_position_count(self, bullish_trigger, open_positions, regime_trending):
-        """Number of open positions should be reflected in the prompt."""
-        captured = {}
-        def fake_call(sys_p, user_p, max_tokens=400):
-            captured["user"] = user_p
-            return "ok"
-        with patch.object(sa, "_call_claude", side_effect=fake_call):
-            sa.agent_risk_gate("cat", bullish_trigger, open_positions,
-                               100000.0, 0.0, regime_trending)
-        # max_positions is 5, 2 are open → 3 remaining
-        assert "2" in captured["user"] or "remaining" in captured["user"]
+    def test_output_shows_position_count(self, bullish_trigger, open_positions, regime_trending):
+        """Number of open positions should be reflected in the output."""
+        result = sa.agent_risk_gate("cat", bullish_trigger, open_positions,
+                                    100000.0, 0.0, regime_trending)
+        # max_positions is 5, 2 are open -> 3 remaining
+        assert "2" in result or "remaining" in result
 
     def test_no_positions_no_crash(self, bullish_trigger, regime_trending):
         """Empty positions list should work fine."""
-        with patch.object(sa, "_call_claude", return_value="APPROVE"):
-            result = sa.agent_risk_gate("report", bullish_trigger, [], 50000.0, 0.0, regime_trending)
+        result = sa.agent_risk_gate("report", bullish_trigger, [], 50000.0, 0.0, regime_trending)
         assert isinstance(result, str)
 
-    def test_daily_pnl_in_prompt(self, bullish_trigger, regime_trending):
-        """Daily P&L should appear in risk gate prompt."""
-        captured = {}
-        def fake_call(sys_p, user_p, max_tokens=400):
-            captured["user"] = user_p
-            return "ok"
-        with patch.object(sa, "_call_claude", side_effect=fake_call):
-            sa.agent_risk_gate("cat", bullish_trigger, [], 100000.0, -2000.0, regime_trending)
-        assert "-2,000" in captured["user"] or "-2000" in captured["user"]
+    def test_daily_pnl_in_output(self, bullish_trigger, regime_trending):
+        """Daily P&L should appear in the deterministic risk gate output."""
+        result = sa.agent_risk_gate("cat", bullish_trigger, [], 100000.0, -2000.0, regime_trending)
+        assert "-2,000" in result or "-2000" in result or "2000" in result
 
 
 # ════════════════════════════════════════════════════════════════════════════

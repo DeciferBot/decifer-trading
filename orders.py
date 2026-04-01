@@ -358,6 +358,13 @@ def _validate_position_price(symbol: str, ibkr_price: float, entry: float) -> tu
       not fill-friendliness)
     - Final sanity check: reject prices < $0.01 or > $50,000
     """
+    # Rebind patchable names from the current sys.modules entry so that
+    # @patch('orders.*') works even when this module object differs from
+    # sys.modules['orders'] (can happen during pytest collection cycles).
+    import sys as _sys; _om = _sys.modules.get('orders', _sys.modules[__name__])
+    get_tv_signal_cache = _om.get_tv_signal_cache  # noqa: F841
+    _get_yf_price = _om._get_yf_price              # noqa: F841
+
     tv_cache = get_tv_signal_cache()
     tv_data = tv_cache.get(symbol) if tv_cache else None
     tv_close = float(tv_data.get("tv_close")) if tv_data and tv_data.get("tv_close") else 0
@@ -460,6 +467,20 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
     Take profit: Limit order (placed immediately)
     Returns True if order placed successfully.
     """
+    # Rebind patchable names from the current sys.modules entry so that
+    # @patch('orders.*') works even when this module object differs from
+    # sys.modules['orders'] (can happen during pytest collection cycles).
+    import sys as _sys; _om = _sys.modules.get('orders', _sys.modules[__name__])
+    CONFIG = _om.CONFIG                                      # noqa: F841
+    check_correlation = _om.check_correlation                # noqa: F841
+    check_combined_exposure = _om.check_combined_exposure    # noqa: F841
+    check_sector_concentration = _om.check_sector_concentration  # noqa: F841
+    calculate_position_size = _om.calculate_position_size    # noqa: F841
+    calculate_stops = _om.calculate_stops                    # noqa: F841
+    log_order = _om.log_order                                # noqa: F841
+    get_tv_signal_cache = _om.get_tv_signal_cache            # noqa: F841
+    _get_yf_price = _om._get_yf_price                        # noqa: F841
+
     # ── Guard: per-symbol lock closes TOCTOU gap between check and submission ──
     sym_lock = _get_symbol_lock(symbol)
     with sym_lock:
@@ -480,7 +501,6 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             # ── FIX #1+3: Cross-instrument + combined exposure check ──
             # Estimate new position value for the exposure check
             est_value = portfolio_value * CONFIG.get("risk_pct_per_trade", 0.03) * 50  # rough max
-            import sys as _sys; _tgt = _sys.modules.get('orders'); _glb_cce = globals().get('check_combined_exposure'); print(f"DEBUG: sys_orders_id={id(_tgt)} id_globals={id(globals())} same_dict={_tgt is not None and globals() is _tgt.__dict__} | globals_cce_type={type(_glb_cce).__name__} sys_cce_type={type(_tgt.check_combined_exposure).__name__ if _tgt else 'N/A'}", flush=True)
             exp_ok, exp_reason = check_combined_exposure(
                 symbol, est_value, list(active_trades.values()),
                 portfolio_value, instrument="stock"
@@ -891,6 +911,17 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal") -> bool:
     Close an existing position at market.
     Returns True if order placed.
     """
+    # Rebind patchable names from the current sys.modules entry so that
+    # @patch('orders.*') works even when this module object differs from
+    # sys.modules['orders'] (can happen during pytest collection cycles).
+    import sys as _sys; _om = _sys.modules.get('orders', _sys.modules[__name__])
+    CONFIG = _om.CONFIG                                          # noqa: F841
+    _validate_position_price = _om._validate_position_price      # noqa: F841
+    _get_ibkr_price = _om._get_ibkr_price                        # noqa: F841
+    log_order = _om.log_order                                    # noqa: F841
+    record_win = _om.record_win                                  # noqa: F841
+    record_loss = _om.record_loss                                # noqa: F841
+
     with _trades_lock:
         if symbol not in active_trades:
             log.warning(f"No open position in {symbol} — skipping sell")

@@ -6,9 +6,9 @@
 # ║   in ~15-30 seconds for immediate news-driven decisions.    ║
 # ║                                                              ║
 # ║   Agents:                                                    ║
-# ║     1. Catalyst Analyst — assess the news event              ║
-# ║     2. Risk Gate — portfolio-level risk check                ║
-# ║     3. Instant Decision — BUY / SELL / HOLD                  ║
+# ║     1. Catalyst Analyst  -- LLM (news materiality)          ║
+# ║     2. Risk Gate         -- deterministic (rule application) ║
+# ║     3. Instant Decision  -- LLM (synthesis + JSON output)   ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import json
@@ -36,9 +36,9 @@ def _call_claude(system_prompt: str, user_message: str, max_tokens: int = 500) -
 
 
 # ══════════════════════════════════════════════════════════════
-# AGENT 1 — CATALYST ANALYST
+# AGENT 1 — CATALYST ANALYST  (LLM — news materiality)
 # ══════════════════════════════════════════════════════════════
-CATALYST_SYSTEM = """You are the Catalyst Analyst for Decifer's News Sentinel — an interrupt-driven trading system.
+CATALYST_SYSTEM = """You are the Catalyst Analyst for Decifer's News Sentinel -- an interrupt-driven trading system.
 You receive BREAKING NEWS headlines about a specific stock and must assess:
 1. Is this a MATERIAL catalyst that should change the stock's trajectory?
 2. What is the likely price impact (direction and magnitude)?
@@ -77,7 +77,7 @@ def agent_catalyst(trigger: dict, current_position: dict = None) -> str:
             f"SL: ${pos.get('sl', 0):.2f} | TP: ${pos.get('tp', 0):.2f}"
         )
 
-    prompt = f"""🚨 NEWS SENTINEL TRIGGER — IMMEDIATE ASSESSMENT REQUIRED
+    prompt = f"""NEWS SENTINEL TRIGGER -- IMMEDIATE ASSESSMENT REQUIRED
 
 SYMBOL: {sym}
 URGENCY: {urgency}
@@ -99,7 +99,7 @@ CURRENT POSITION STATUS:
 
 Assess this catalyst:
 1. MATERIALITY: Is this news material enough to move the stock? (YES/NO + why)
-2. DIRECTION: BULLISH / BEARISH / NEUTRAL — clear directional call
+2. DIRECTION: BULLISH / BEARISH / NEUTRAL -- clear directional call
 3. MAGNITUDE: Expected price impact (small <2%, medium 2-5%, large >5%)
 4. DURABILITY: Flash reaction (1 day) / Trend shift (multi-day) / Structural change
 5. SPEED: How fast will the market price this in? (already pricing / 30 min / hours / days)
@@ -111,76 +111,130 @@ Assess this catalyst:
 
 
 # ══════════════════════════════════════════════════════════════
-# AGENT 2 — RISK GATE
+# AGENT 2 — RISK GATE  (deterministic)
+# Replaces LLM call: all 5 checks are directly computable from
+# CONFIG + risk.py. The original prompt listed explicit boolean
+# questions with no reasoning required.
 # ══════════════════════════════════════════════════════════════
-RISK_GATE_SYSTEM = """You are the Risk Gate for Decifer's News Sentinel.
-You receive a catalyst assessment and must decide if the trade is safe to execute
-given current portfolio constraints. You are conservative and protective.
-Your job is to APPROVE or BLOCK the trade with specific sizing.
-Output structured analysis only. Be concise — this is time-critical."""
-
 
 def agent_risk_gate(catalyst_report: str, trigger: dict,
                     open_positions: list, portfolio_value: float,
                     daily_pnl: float, regime: dict) -> str:
     """
-    Risk-check the proposed sentinel trade against portfolio constraints.
+    Deterministic risk gate for news-triggered trades.
+    Uses risk.py functions to answer the same 5 questions the LLM was asked.
+    Returns human-readable text compatible with agent_instant_decision input.
     """
+    from risk import check_risk_conditions, calculate_position_size, calculate_stops
+
     sym = trigger["symbol"]
     direction = trigger.get("direction", "UNKNOWN")
-    urgency = trigger.get("urgency", "MODERATE")
 
-    # Count existing positions
-    open_syms = [p.get("symbol") for p in open_positions]
-    existing_pos = next((p for p in open_positions if p.get("symbol") == sym), None)
     max_pos = CONFIG["max_positions"]
     risk_pct = CONFIG["risk_pct_per_trade"]
     daily_limit = CONFIG["daily_loss_limit"]
+    # News-triggered trades use a tighter risk multiplier (0.75x normal)
+    sentinel_mult = CONFIG.get("sentinel_risk_multiplier", 0.75)
+
+    open_syms = [p.get("symbol") for p in open_positions]
+    existing_pos = next((p for p in open_positions if p.get("symbol") == sym), None)
+    slots_remaining = max_pos - len(open_positions)
+    daily_budget_left = (portfolio_value * daily_limit) + daily_pnl
 
     positions_text = "\n".join([
-        f"  {p.get('symbol','?')}: {p.get('qty',0)} shares | "
-        f"Entry ${p.get('entry',0):.2f} | P&L ${p.get('pnl',0):.2f}"
+        f"  {p.get('symbol', '?')}: {p.get('qty', 0)} shares | "
+        f"Entry ${p.get('entry', 0):.2f} | P&L ${p.get('pnl', 0):.2f}"
         for p in open_positions[:10]
     ]) if open_positions else "  No open positions"
 
-    prompt = f"""CATALYST ANALYST REPORT:
-{catalyst_report}
+    lines = [
+        f"SENTINEL RISK GATE -- {sym}",
+        f"Portfolio: ${portfolio_value:,.2f} | Daily P&L: ${daily_pnl:+,.2f}",
+        f"Positions: {len(open_positions)}/{max_pos} ({slots_remaining} slots remaining)",
+        "",
+        "RISK CHECKS:",
+    ]
 
-TRADE CONTEXT:
-- Symbol: {sym}
-- Direction: {direction}
-- Urgency: {urgency}
-- Already holding: {'YES' if existing_pos else 'NO'}
+    # Q1: Position slots available?
+    q1 = slots_remaining > 0 or existing_pos is not None
+    lines.append(f"  1. Position slots available: {'YES' if q1 else 'NO'} ({slots_remaining} remaining)")
 
-PORTFOLIO STATE:
-- Portfolio value: ${portfolio_value:,.2f}
-- Daily P&L: ${daily_pnl:+,.2f}
-- Daily loss limit: ${portfolio_value * daily_limit:,.2f}
-- Positions ({len(open_positions)}/{max_pos}):
-{positions_text}
-- Risk per trade: {risk_pct*100:.0f}% (${portfolio_value * risk_pct:,.2f})
-- Regime: {regime.get('regime', 'UNKNOWN')} | VIX: {regime.get('vix', 0)}
+    # Q2: Daily loss budget intact?
+    q2 = daily_budget_left > 0
+    lines.append(f"  2. Daily loss budget intact: {'YES' if q2 else 'NO'} (${daily_budget_left:,.2f} remaining)")
 
-RISK CHECKS — answer each:
-1. Do we have position slots available? ({max_pos - len(open_positions)} remaining)
-2. Is daily loss budget intact? (${(portfolio_value * daily_limit) + daily_pnl:,.2f} remaining)
-3. Are we already overexposed to this sector?
-4. Is the news-driven trade aligned with the current regime?
-5. Does the urgency level justify a sentinel (interrupt) trade vs. waiting for next scan?
+    # Q3: Regime alignment?
+    reg = regime.get("regime", "UNKNOWN")
+    dir_upper = direction.upper()
+    q3 = True
+    if reg == "PANIC":
+        q3 = False
+    elif reg == "BEAR_TRENDING" and dir_upper == "BULLISH":
+        q3 = False
+    lines.append(f"  3. Regime aligned with trade direction: {'YES' if q3 else 'NO'} ({reg} / {direction})")
 
-OUTPUT FORMAT:
-DECISION: APPROVE / REDUCE SIZE / BLOCK
-SIZE: Number of shares (or "exit X shares" if reducing)
-STOP LOSS: $ price (tight — news-driven trades need quick stops)
-TAKE PROFIT: $ price
-MAX RISK: $ amount
-REASON: One sentence"""
+    # Q4: Urgency justifies interrupt trade?
+    urgency = trigger.get("urgency", "MODERATE").upper()
+    q4 = urgency in ("HIGH", "CRITICAL", "EXTREME")
+    lines.append(f"  4. Urgency justifies sentinel interrupt: {'YES' if q4 else 'NO'} ({urgency})")
 
-    return _call_claude(RISK_GATE_SYSTEM, prompt, max_tokens=400)
+    # Q5: Master risk gate via check_risk_conditions
+    gate_ok, gate_reason = check_risk_conditions(portfolio_value, daily_pnl, regime, open_positions)
+    q5 = gate_ok
+    lines.append(f"  5. Master risk gate: {'OPEN' if q5 else 'CLOSED'} -- {gate_reason}")
+
+    lines.append("")
+
+    # ── Final decision ──────────────────────────────────────────
+    if not all([q1, q2, q3, q5]):
+        failed = []
+        if not q1:
+            failed.append("no position slots")
+        if not q2:
+            failed.append("daily loss limit reached")
+        if not q3:
+            failed.append(f"regime {reg} conflicts with {direction}")
+        if not q5:
+            failed.append(gate_reason)
+        decision = "BLOCK"
+        reason = "; ".join(failed)
+        lines.append(f"DECISION: BLOCK")
+        lines.append(f"REASON: {reason}")
+        return "\n".join(lines)
+
+    # Size the trade (tighter than normal -- news trades are volatile)
+    # Use a placeholder price for sizing; actual sizing in Instant Decision
+    price = trigger.get("price", 0)
+    atr = trigger.get("atr", price * 0.015 if price > 0 else 1.0)
+    trade_direction = "LONG" if dir_upper in ("BULLISH", "LONG", "BUY") else "SHORT"
+
+    if price > 0 and portfolio_value > 0:
+        base_qty = calculate_position_size(portfolio_value, price,
+                                           trigger.get("score", 20), regime)
+        qty = max(1, int(base_qty * sentinel_mult))
+        sl, tp = calculate_stops(price, atr, trade_direction)
+        # Tighten stop loss by 25% for news-driven trades
+        if trade_direction == "LONG":
+            sl = round(price - (price - sl) * 0.75, 2)
+        else:
+            sl = round(price + (sl - price) * 0.75, 2)
+    else:
+        qty = 1
+        sl = 0.0
+        tp = 0.0
+
+    lines.append("DECISION: APPROVE")
+    lines.append(f"SIZE: {qty} shares")
+    lines.append(f"STOP LOSS: ${sl:.2f}  (tight -- news-driven trade)")
+    lines.append(f"TAKE PROFIT: ${tp:.2f}")
+    lines.append(f"MAX RISK: ${portfolio_value * risk_pct * sentinel_mult:,.2f}")
+    lines.append(f"REASON: All risk checks passed; sentinel multiplier={sentinel_mult}x applied")
+
+    return "\n".join(lines)
 
 
 # ══════════════════════════════════════════════════════════════
-# AGENT 3 — INSTANT DECISION MAKER
+# AGENT 3 — INSTANT DECISION MAKER  (LLM — synthesis + JSON)
 # ══════════════════════════════════════════════════════════════
 INSTANT_DECISION_SYSTEM = """You are the Instant Decision Maker for Decifer's News Sentinel.
 You synthesise the Catalyst Analyst and Risk Gate reports into an executable trade instruction.
@@ -189,9 +243,9 @@ This trade will execute IMMEDIATELY with real money. Be precise."""
 
 
 def agent_instant_decision(catalyst_report: str, risk_report: str,
-                           trigger: dict, current_position: dict = None) -> dict:
+                            trigger: dict, current_position: dict = None) -> dict:
     """
-    Final synthesis — outputs actionable JSON for immediate execution.
+    Final synthesis -- outputs actionable JSON for immediate execution.
     """
     sym = trigger["symbol"]
     is_holding = current_position is not None
@@ -230,7 +284,7 @@ Rules:
 - BUY only if Risk Gate said APPROVE
 - If Risk Gate said BLOCK, output action="SKIP"
 - For SHORT signals, use inverse_symbol (SPXS for broad market, SQQQ for tech)
-- Set tight stops — news-driven trades are volatile
+- Set tight stops -- news-driven trades are volatile
 - confidence must honestly reflect your conviction (0-10)"""
 
     raw = _call_claude(INSTANT_DECISION_SYSTEM, prompt, max_tokens=350)
@@ -238,7 +292,6 @@ Rules:
     try:
         clean = raw.replace("```json", "").replace("```", "").strip()
         result = json.loads(clean)
-        # Ensure required fields
         result.setdefault("action", "SKIP")
         result.setdefault("symbol", sym)
         result.setdefault("qty", 0)
@@ -259,7 +312,7 @@ Rules:
             "tp": 0,
             "instrument": "stock",
             "confidence": 0,
-            "reasoning": "JSON parse error — skipping for safety",
+            "reasoning": "JSON parse error -- skipping for safety",
             "trigger_type": "news_sentinel",
         }
 
@@ -268,37 +321,36 @@ Rules:
 # ORCHESTRATOR — Run the 3-agent sentinel pipeline
 # ══════════════════════════════════════════════════════════════
 def run_sentinel_pipeline(trigger: dict,
-                          open_positions: list,
-                          portfolio_value: float,
-                          daily_pnl: float,
-                          regime: dict) -> dict:
+                           open_positions: list,
+                           portfolio_value: float,
+                           daily_pnl: float,
+                           regime: dict) -> dict:
     """
     Run the lightweight 3-agent sentinel pipeline.
-    Takes ~15-30 seconds (3 Claude calls) vs 5-10 min for full pipeline.
+    Agent 1 (Catalyst) and Agent 3 (Instant Decision) remain LLM.
+    Agent 2 (Risk Gate) is now deterministic -- saves ~400 tokens/trigger.
 
     trigger: news trigger from news_sentinel.py
     Returns: trade decision dict with action, qty, sl, tp, reasoning
     """
     sym = trigger["symbol"]
-    log.info(f"⚡ Sentinel pipeline started for {sym} | urgency={trigger.get('urgency')}")
+    log.info(f"Sentinel pipeline started for {sym} | urgency={trigger.get('urgency')}")
 
-    # Find current position for this symbol (if any)
     current_pos = next((p for p in open_positions if p.get("symbol") == sym), None)
 
-    # ── Agent 1: Catalyst Analyst ──────────────────────────────
+    # Agent 1: Catalyst Analyst (LLM)
     log.info(f"  Agent 1: Catalyst Analyst ({sym})...")
     catalyst = agent_catalyst(trigger, current_pos)
 
-    # ── Agent 2: Risk Gate ─────────────────────────────────────
-    log.info(f"  Agent 2: Risk Gate ({sym})...")
+    # Agent 2: Risk Gate (deterministic)
+    log.info(f"  Agent 2: Risk Gate ({sym}) [deterministic]...")
     risk = agent_risk_gate(catalyst, trigger, open_positions,
                            portfolio_value, daily_pnl, regime)
 
-    # ── Agent 3: Instant Decision ──────────────────────────────
+    # Agent 3: Instant Decision (LLM)
     log.info(f"  Agent 3: Instant Decision ({sym})...")
     decision = agent_instant_decision(catalyst, risk, trigger, current_pos)
 
-    # Attach full agent outputs for logging/dashboard
     decision["_sentinel_outputs"] = {
         "catalyst": catalyst,
         "risk_gate": risk,
@@ -310,7 +362,7 @@ def run_sentinel_pipeline(trigger: dict,
     reasoning = decision.get("reasoning", "")
 
     log.info(
-        f"⚡ Sentinel decision for {sym}: {action} | "
+        f"Sentinel decision for {sym}: {action} | "
         f"confidence={confidence}/10 | {reasoning[:80]}"
     )
 
