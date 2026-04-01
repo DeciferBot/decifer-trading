@@ -25,6 +25,51 @@ log = logging.getLogger("decifer.alpha_decay")
 
 HORIZONS = [1, 3, 5, 10]  # trading days after entry
 _TRADE_LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "trades.json")
+_CACHE_FILE     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "alpha_decay_cache.json")
+_CACHE_TTL      = 3600  # seconds — re-use yfinance data for up to 1 hour
+
+
+# ── Disk cache ───────────────────────────────────────────────────────────────
+
+def _cache_key(trades: list) -> str:
+    """
+    Stable string key for the current closed-trade set.
+    Built from (closed-trade count, latest entry date) so that:
+      - a new trade arriving → different key → cache miss
+      - same trades, repeated call within TTL → cache hit
+    """
+    closed = [t for t in trades if t.get("exit_price") is not None or t.get("pnl") is not None]
+    count  = len(closed)
+    if not closed:
+        return f"{count}|"
+    dates = []
+    for t in closed:
+        d = _parse_entry_date(t)
+        if d:
+            dates.append(d.isoformat())
+    latest = max(dates) if dates else ""
+    return f"{count}|{latest}"
+
+
+def _load_cache(key: str) -> Optional[dict]:
+    """Return cached stats dict if key matches and TTL has not expired, else None."""
+    try:
+        with open(_CACHE_FILE) as f:
+            c = json.load(f)
+        if c.get("key") == key and (time.time() - c.get("ts", 0)) < _CACHE_TTL:
+            return c.get("data")
+    except Exception:
+        pass
+    return None
+
+
+def _save_cache(key: str, data: dict) -> None:
+    """Persist stats to disk so the next tab-switch is instant."""
+    try:
+        with open(_CACHE_FILE, "w") as f:
+            json.dump({"key": key, "ts": time.time(), "data": data}, f)
+    except Exception as exc:
+        log.debug("alpha_decay cache write failed: %s", exc)
 
 
 # ── Entry-date parser ──────────────────────────────────────────────────────
@@ -302,6 +347,29 @@ def get_alpha_decay_stats(trades: list = None, horizons: list = None) -> dict:
     if horizons is None:
         horizons = HORIZONS
 
+    # Load trades upfront (only when caller didn't provide them) so we can
+    # build a stable cache key before hitting yfinance.
+    _from_file = trades is None
+    if _from_file:
+        if not os.path.exists(_TRADE_LOG_FILE):
+            trades = []
+        else:
+            try:
+                with open(_TRADE_LOG_FILE) as f:
+                    trades = json.load(f)
+            except Exception:
+                trades = []
+
+    # Cache check — only for file-sourced data (caller-supplied trades are
+    # typically small test sets, not worth caching).
+    cache_key = None
+    if _from_file:
+        cache_key = _cache_key(trades)
+        cached    = _load_cache(cache_key)
+        if cached is not None:
+            log.debug("alpha_decay: cache hit (%s)", cache_key)
+            return cached
+
     records = compute_alpha_decay(trades=trades, horizons=horizons)
 
     groups = {
@@ -332,10 +400,15 @@ def get_alpha_decay_stats(trades: list = None, horizons: list = None) -> dict:
         best_i  = max(valid, key=lambda x: x[1])[0]
         optimal = horizons[best_i]
 
-    return {
+    result = {
         "horizons":        horizons,
         "groups":          agg,
         "optimal_horizon": optimal,
         "trade_count":     len(records),
         "computed_at":     datetime.now(timezone.utc).isoformat(),
     }
+
+    if cache_key is not None:
+        _save_cache(cache_key, result)
+
+    return result

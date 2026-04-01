@@ -28,6 +28,9 @@ from alpha_decay import (
     _percentile,
     _aggregate,
     _dominant_dimension,
+    _cache_key,
+    _load_cache,
+    _save_cache,
     _DIMENSIONS,
     get_alpha_decay_stats,
     compute_alpha_decay,
@@ -228,7 +231,10 @@ class TestGetAlphaDecayStats:
         assert stats["optimal_horizon"] in HORIZONS
 
     def test_empty_trade_set(self):
-        with patch.object(alpha_decay, "compute_alpha_decay", return_value=[]):
+        with patch.object(alpha_decay, "compute_alpha_decay", return_value=[]), \
+             patch.object(alpha_decay, "_load_cache", return_value=None), \
+             patch.object(alpha_decay, "_save_cache"), \
+             patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"):
             stats = get_alpha_decay_stats()
 
         assert stats["trade_count"]     == 0
@@ -238,7 +244,10 @@ class TestGetAlphaDecayStats:
 
     def test_custom_horizons(self):
         custom = [2, 7]
-        with patch.object(alpha_decay, "compute_alpha_decay", return_value=[]):
+        with patch.object(alpha_decay, "compute_alpha_decay", return_value=[]), \
+             patch.object(alpha_decay, "_load_cache", return_value=None), \
+             patch.object(alpha_decay, "_save_cache"), \
+             patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"):
             stats = get_alpha_decay_stats(horizons=custom)
 
         assert stats["horizons"] == custom
@@ -404,7 +413,10 @@ class TestDimensionSegments:
 
     def test_dimension_counts_correct(self):
         with patch.object(alpha_decay, "compute_alpha_decay",
-                          return_value=self._records_with_scores()):
+                          return_value=self._records_with_scores()), \
+             patch.object(alpha_decay, "_load_cache", return_value=None), \
+             patch.object(alpha_decay, "_save_cache"), \
+             patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"):
             stats = get_alpha_decay_stats()
         g = stats["groups"]
         assert g["dim_trend"]["n"]    == 1  # r1 dominant = trend
@@ -413,10 +425,118 @@ class TestDimensionSegments:
 
     def test_empty_signal_scores_not_counted_in_any_dimension(self):
         with patch.object(alpha_decay, "compute_alpha_decay",
-                          return_value=self._records_with_scores()):
+                          return_value=self._records_with_scores()), \
+             patch.object(alpha_decay, "_load_cache", return_value=None), \
+             patch.object(alpha_decay, "_save_cache"), \
+             patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"):
             stats = get_alpha_decay_stats()
         # r3 has empty signal_scores → must not appear in any dim segment
         total_dim_n = sum(
             stats["groups"][f"dim_{d}"]["n"] for d in _DIMENSIONS
         )
         assert total_dim_n == 2  # only r1 and r2
+
+
+# ── Caching ───────────────────────────────────────────────────────────────────
+
+class TestCaching:
+    """Tests for _cache_key, _load_cache, _save_cache, and cache integration
+    in get_alpha_decay_stats."""
+
+    # ── _cache_key ──────────────────────────────────────────────────────────
+
+    def test_cache_key_empty_list(self):
+        assert _cache_key([]) == "0|"
+
+    def test_cache_key_includes_closed_count_and_latest_date(self):
+        trades = [
+            _make_trade(entry_time="2026-03-20 10:00:00"),
+            _make_trade(entry_time="2026-03-25 10:00:00"),
+        ]
+        key = _cache_key(trades)
+        assert key.startswith("2|")
+        assert "2026-03-25" in key
+
+    def test_cache_key_only_counts_closed_trades(self):
+        closed = _make_trade(entry_time="2026-03-20 10:00:00")  # has pnl
+        open_  = _make_trade(entry_time="2026-03-21 10:00:00", exit_price=None, pnl=None)
+        key = _cache_key([closed, open_])
+        assert key.startswith("1|")  # only 1 closed
+
+    def test_cache_key_changes_when_new_trade_added(self):
+        t1 = [_make_trade(entry_time="2026-03-20 10:00:00")]
+        t2 = t1 + [_make_trade(entry_time="2026-03-22 10:00:00")]
+        assert _cache_key(t1) != _cache_key(t2)
+
+    def test_cache_key_stable_for_same_data(self):
+        trades = [_make_trade(entry_time="2026-03-20 10:00:00")]
+        assert _cache_key(trades) == _cache_key(trades)
+
+    # ── _load_cache / _save_cache ────────────────────────────────────────────
+
+    def test_save_and_load_roundtrip(self, tmp_path):
+        cache_file = str(tmp_path / "cache.json")
+        data = {"horizons": [1, 3, 5, 10], "trade_count": 5}
+        with patch.object(alpha_decay, "_CACHE_FILE", cache_file):
+            _save_cache("key1", data)
+            result = _load_cache("key1")
+        assert result == data
+
+    def test_load_returns_none_for_wrong_key(self, tmp_path):
+        cache_file = str(tmp_path / "cache.json")
+        with patch.object(alpha_decay, "_CACHE_FILE", cache_file):
+            _save_cache("key1", {"x": 1})
+            assert _load_cache("key2") is None
+
+    def test_load_returns_none_when_file_missing(self, tmp_path):
+        cache_file = str(tmp_path / "nonexistent.json")
+        with patch.object(alpha_decay, "_CACHE_FILE", cache_file):
+            assert _load_cache("any-key") is None
+
+    def test_load_returns_none_when_ttl_expired(self, tmp_path):
+        import time as _time
+        cache_file = str(tmp_path / "cache.json")
+        data = {"x": 1}
+        with patch.object(alpha_decay, "_CACHE_FILE", cache_file), \
+             patch.object(alpha_decay, "_CACHE_TTL", 60):
+            _save_cache("k", data)
+            # Simulate clock advancing beyond TTL
+            with patch("alpha_decay.time") as mock_time:
+                mock_time.time.return_value = _time.time() + 9999
+                assert _load_cache("k") is None
+
+    # ── Integration: get_alpha_decay_stats uses cache ────────────────────────
+
+    def test_stats_cached_on_first_call(self, tmp_path):
+        """Second call with same trades returns cached result without re-computing."""
+        cache_file = str(tmp_path / "cache.json")
+        sample     = [_make_trade()]
+        fwd        = {1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005}
+
+        with patch.object(alpha_decay, "_CACHE_FILE", cache_file), \
+             patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"), \
+             patch.object(alpha_decay, "fetch_forward_returns", return_value=fwd):
+            # First call: compute and cache
+            stats1 = get_alpha_decay_stats(trades=None)
+
+        # Overwrite trade file content — second call still uses cache
+        with patch.object(alpha_decay, "_CACHE_FILE", cache_file), \
+             patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"), \
+             patch.object(alpha_decay, "compute_alpha_decay", side_effect=AssertionError("should not recompute")) as mock_compute:
+            # Cache key will match (0 closed trades → "0|")
+            stats2 = get_alpha_decay_stats(trades=None)
+
+        assert stats2["trade_count"] == stats1["trade_count"]
+
+    def test_explicit_trades_arg_bypasses_cache(self, tmp_path):
+        """When trades are passed explicitly, the cache is not read or written."""
+        cache_file = str(tmp_path / "cache.json")
+        sample     = [_make_trade()]
+        fwd        = {1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005}
+
+        with patch.object(alpha_decay, "_CACHE_FILE", cache_file), \
+             patch.object(alpha_decay, "fetch_forward_returns", return_value=fwd):
+            get_alpha_decay_stats(trades=sample)
+
+        import os
+        assert not os.path.exists(cache_file), "cache must not be written for explicit trades"

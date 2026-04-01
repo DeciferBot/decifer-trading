@@ -751,7 +751,10 @@ canvas{display:block;width:100% !important}
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div class="card-title" style="margin-bottom:0">Forward Return Distribution by Horizon</div>
-      <div style="display:flex;gap:6px" id="ad-legend"></div>
+      <div style="display:flex;gap:4px">
+        <button id="ad-view-conviction" onclick="setAdView('conviction')" style="font-size:9px;padding:2px 8px;border-radius:10px;border:1px solid var(--orange);background:var(--orange);color:#000;cursor:pointer;font-family:inherit;letter-spacing:.5px">All / Regime</button>
+        <button id="ad-view-dims" onclick="setAdView('dims')" style="font-size:9px;padding:2px 8px;border-radius:10px;border:1px solid var(--muted);background:transparent;color:var(--muted2);cursor:pointer;font-family:inherit;letter-spacing:.5px">By Dimension</button>
+      </div>
     </div>
     <div style="font-size:10px;color:var(--muted2);margin-bottom:10px">
       Median direction-adjusted return (%) for closed trades at T+N bars after entry.
@@ -764,8 +767,8 @@ canvas{display:block;width:100% !important}
   <div class="card">
     <div class="card-title">Segment Breakdown</div>
     <div id="ad-segment-table" style="font-size:11px">
-      <div style="display:grid;grid-template-columns:120px repeat(4,1fr);gap:4px;padding:5px 0;border-bottom:1px solid var(--border);font-size:9px;letter-spacing:1.2px;color:var(--muted2);text-transform:uppercase">
-        <div>Segment</div><div>n</div><div>T+1</div><div>T+5</div><div>T+10</div>
+      <div style="display:grid;grid-template-columns:120px repeat(5,1fr);gap:4px;padding:5px 0;border-bottom:1px solid var(--border);font-size:9px;letter-spacing:1.2px;color:var(--muted2);text-transform:uppercase">
+        <div>Segment</div><div>n</div><div>T+1</div><div>T+3</div><div>T+5</div><div>T+10</div>
       </div>
       <div id="ad-seg-rows" style="color:var(--muted2);padding:12px 0">Loading…</div>
     </div>
@@ -788,6 +791,26 @@ let scanTotal = 300; // seconds
 let scanElapsed = 0;
 let scanTimer;
 let alphaDecayChart = null;
+let _adData = null;
+let _adView = 'conviction';
+
+// ── Alpha decay view toggle ────────────────────────────────
+function setAdView(v) {
+  _adView = v;
+  const b1 = document.getElementById('ad-view-conviction');
+  const b2 = document.getElementById('ad-view-dims');
+  if (b1) {
+    b1.style.background  = v === 'conviction' ? 'var(--orange)' : 'transparent';
+    b1.style.color       = v === 'conviction' ? '#000' : 'var(--muted2)';
+    b1.style.borderColor = v === 'conviction' ? 'var(--orange)' : 'var(--muted)';
+  }
+  if (b2) {
+    b2.style.background  = v === 'dims' ? 'var(--orange)' : 'transparent';
+    b2.style.color       = v === 'dims' ? '#000' : 'var(--muted2)';
+    b2.style.borderColor = v === 'dims' ? 'var(--orange)' : 'var(--muted)';
+  }
+  if (_adData) renderAlphaDecay(_adData);
+}
 
 // ── Portfolio aggregation ──────────────────────────────────
 async function loadPortfolio() {
@@ -990,7 +1013,31 @@ function _fmtPct(v) {
   return `<span style="color:${col}">${v >= 0 ? '+' : ''}${pct}%</span>`;
 }
 
+// Inline Chart.js plugin: draws a vertical dashed line at the optimal horizon.
+const _adOptimalLinePlugin = {
+  id: 'adOptimalLine',
+  afterDraw(chart, _args, opts) {
+    if (opts.xIndex == null) return;
+    const meta = chart.getDatasetMeta(chart.data.datasets.findIndex(ds => ds._isMedianAll));
+    const pt   = meta && meta.data && meta.data[opts.xIndex];
+    if (!pt) return;
+    const {top, bottom} = chart.chartArea;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pt.x, top);
+    ctx.lineTo(pt.x, bottom);
+    ctx.lineWidth   = 1.5;
+    ctx.strokeStyle = 'rgba(255,214,0,0.5)';
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.restore();
+  },
+};
+if (typeof Chart !== 'undefined') Chart.register(_adOptimalLinePlugin);
+
 function renderAlphaDecay(d) {
+  _adData = d;
   const horizons = d.horizons || [1, 3, 5, 10];
   const groups   = d.groups  || {};
   const all      = groups.all || {};
@@ -1008,63 +1055,108 @@ function renderAlphaDecay(d) {
   document.getElementById('ad-t10').innerHTML = _fmtPct(t10val);
 
   // Chart
-  const labels = horizons.map(h => `T+${h}d`);
-
-  // Dataset colours
-  const COLORS = {
-    all:        'rgba(255,107,0,1)',
-    high_score: 'rgba(0,200,83,1)',
-    low_score:  'rgba(255,214,0,1)',
-    bull:       'rgba(0,150,255,1)',
-    bear:       'rgba(255,23,68,1)',
-  };
+  const labels   = horizons.map(h => `T+${h}d`);
+  const optIndex = d.optimal_horizon != null ? horizons.indexOf(d.optimal_horizon) : null;
 
   const datasets = [];
 
-  // P25–P75 shaded band for "all"
-  if (all.p75 && all.p25) {
-    datasets.push({
-      label:           'P75 (all)',
-      data:            all.p75.map(v => v != null ? parseFloat((v * 100).toFixed(4)) : null),
-      borderColor:     'transparent',
-      backgroundColor: 'rgba(255,107,0,0.10)',
-      fill:            '+1',
-      tension:         0.35,
-      pointRadius:     0,
-      spanGaps:        true,
-    });
-    datasets.push({
-      label:           'P25 (all)',
-      data:            all.p25.map(v => v != null ? parseFloat((v * 100).toFixed(4)) : null),
-      borderColor:     'transparent',
-      backgroundColor: 'rgba(255,107,0,0.10)',
-      fill:            false,
-      tension:         0.35,
-      pointRadius:     0,
-      spanGaps:        true,
-    });
-  }
+  if (_adView === 'conviction') {
+    // ── Conviction & Regime view ──────────────────────────────────────────
+    const COLORS = {
+      all:        'rgba(255,107,0,1)',
+      high_score: 'rgba(0,200,83,1)',
+      low_score:  'rgba(255,214,0,1)',
+      bull:       'rgba(0,150,255,1)',
+      bear:       'rgba(255,23,68,1)',
+    };
 
-  // Named segment median lines
-  const visibleGroups = ['all', 'high_score', 'low_score', 'bull', 'bear'];
-  const groupLabels   = {
-    all: 'All', high_score: 'Hi-Conv (≥38)', low_score: 'Lo-Conv (<38)',
-    bull: 'Bull Regime', bear: 'Bear Regime'
-  };
-  for (const key of visibleGroups) {
-    const g = groups[key];
-    if (!g || !g.n) continue;
-    datasets.push({
-      label:           `${groupLabels[key]} (n=${g.n})`,
-      data:            (g.median || []).map(v => v != null ? parseFloat((v * 100).toFixed(4)) : null),
-      borderColor:     COLORS[key],
-      backgroundColor: 'transparent',
-      borderWidth:     key === 'all' ? 2.5 : 1.5,
-      borderDash:      key === 'all' ? [] : [4, 3],
-      tension:         0.35,
-      pointRadius:     key === 'all' ? 4 : 3,
-      pointBackgroundColor: COLORS[key],
-      spanGaps:        true,
+    // P25–P75 shaded band for "all"
+    if (all.p75 && all.p25) {
+      datasets.push({
+        label:           'P75 (all)',
+        data:            all.p75.map(v => v != null ? parseFloat((v * 100).toFixed(4)) : null),
+        borderColor:     'transparent',
+        backgroundColor: 'rgba(255,107,0,0.10)',
+        fill:            '+1',
+        tension:         0.35,
+        pointRadius:     0,
+        spanGaps:        true,
+      });
+      datasets.push({
+        label:           'P25 (all)',
+        data:            all.p25.map(v => v != null ? parseFloat((v * 100).toFixed(4)) : null),
+        borderColor:     'transparent',
+        backgroundColor: 'rgba(255,107,0,0.10)',
+        fill:            false,
+        tension:         0.35,
+        pointRadius:     0,
+        spanGaps:        true,
+      });
+    }
+
+    const visibleGroups = ['all', 'high_score', 'low_score', 'bull', 'bear'];
+    const groupLabels   = {
+      all: 'All', high_score: 'Hi-Conv (≥38)', low_score: 'Lo-Conv (<38)',
+      bull: 'Bull Regime', bear: 'Bear Regime'
+    };
+    for (const key of visibleGroups) {
+      const g = groups[key];
+      if (!g || !g.n) continue;
+      const ds = {
+        label:           `${groupLabels[key]} (n=${g.n})`,
+        data:            (g.median || []).map(v => v != null ? parseFloat((v * 100).toFixed(4)) : null),
+        borderColor:     COLORS[key],
+        backgroundColor: 'transparent',
+        borderWidth:     key === 'all' ? 2.5 : 1.5,
+        borderDash:      key === 'all' ? [] : [4, 3],
+        tension:         0.35,
+        pointRadius:     key === 'all' ? 4 : 3,
+        pointBackgroundColor: COLORS[key],
+        spanGaps:        true,
+      };
+      if (key === 'all') ds._isMedianAll = true;
+      datasets.push(ds);
+    }
+  } else {
+    // ── By Signal Dimension view ──────────────────────────────────────────
+    const DIM_COLORS = [
+      'rgba(255,107,0,1)',   // trend
+      'rgba(0,200,83,1)',    // momentum
+      'rgba(0,150,255,1)',   // squeeze
+      'rgba(255,214,0,1)',   // flow
+      'rgba(200,80,255,1)',  // breakout
+      'rgba(255,160,0,1)',   // mtf
+      'rgba(0,230,200,1)',   // news
+      'rgba(255,80,180,1)',  // social
+      'rgba(120,200,80,1)',  // reversion
+    ];
+    const DIM_NAMES = [
+      'dim_trend','dim_momentum','dim_squeeze','dim_flow','dim_breakout',
+      'dim_mtf','dim_news','dim_social','dim_reversion',
+    ];
+    const DIM_LABELS_SHORT = {
+      dim_trend:'Trend', dim_momentum:'Momentum', dim_squeeze:'Squeeze',
+      dim_flow:'Flow', dim_breakout:'Breakout', dim_mtf:'MTF',
+      dim_news:'News', dim_social:'Social', dim_reversion:'Reversion',
+    };
+    let first = true;
+    DIM_NAMES.forEach((k, i) => {
+      const g = groups[k];
+      if (!g || !g.n) return;
+      const ds = {
+        label:           `${DIM_LABELS_SHORT[k]} (n=${g.n})`,
+        data:            (g.median || []).map(v => v != null ? parseFloat((v * 100).toFixed(4)) : null),
+        borderColor:     DIM_COLORS[i],
+        backgroundColor: 'transparent',
+        borderWidth:     first ? 2.5 : 1.5,
+        borderDash:      first ? [] : [4, 3],
+        tension:         0.35,
+        pointRadius:     first ? 4 : 3,
+        pointBackgroundColor: DIM_COLORS[i],
+        spanGaps:        true,
+      };
+      if (first) { ds._isMedianAll = true; first = false; }
+      datasets.push(ds);
     });
   }
 
@@ -1096,13 +1188,26 @@ function renderAlphaDecay(d) {
               if (v === null) return `${ctx.dataset.label}: —`;
               return `${ctx.dataset.label}: ${v >= 0 ? '+' : ''}${v.toFixed(3)}%`;
             },
+            title: items => {
+              const lbl = items[0].label;
+              return optIndex != null && items[0].dataIndex === optIndex
+                ? `${lbl}  ← optimal exit`
+                : lbl;
+            },
           },
         },
+        adOptimalLine: { xIndex: optIndex != null && optIndex >= 0 ? optIndex : null },
       },
       scales: {
         x: {
           grid:  { color: 'rgba(255,255,255,0.04)' },
-          ticks: { color: '#888', font: { family: "'JetBrains Mono',monospace", size: 10 } },
+          ticks: {
+            color: (ctx2) => {
+              if (optIndex != null && ctx2.index === optIndex) return '#FFD600';
+              return '#888';
+            },
+            font: { family: "'JetBrains Mono',monospace", size: 10 },
+          },
         },
         y: {
           grid:  { color: 'rgba(255,255,255,0.04)' },
@@ -1127,6 +1232,7 @@ function renderAlphaDecay(d) {
     ['Short Only',       'short_only'],
   ];
   const hi1  = d.horizons.indexOf(1);
+  const hi3  = d.horizons.indexOf(3);
   const hi5  = d.horizons.indexOf(5);
   const hi10 = d.horizons.indexOf(10);
 
@@ -1134,13 +1240,15 @@ function renderAlphaDecay(d) {
     if (!g || !g.n) return '';
     const m   = g.median || [];
     const v1  = hi1  >= 0 ? m[hi1]  : null;
+    const v3  = hi3  >= 0 ? m[hi3]  : null;
     const v5  = hi5  >= 0 ? m[hi5]  : null;
     const v10 = hi10 >= 0 ? m[hi10] : null;
     const pl  = indent ? 'padding-left:10px' : '';
-    return `<div style="display:grid;grid-template-columns:120px repeat(4,1fr);gap:4px;padding:5px 0;border-bottom:1px solid var(--border)">
+    return `<div style="display:grid;grid-template-columns:120px repeat(5,1fr);gap:4px;padding:5px 0;border-bottom:1px solid var(--border)">
       <div style="color:var(--text);${pl}">${label}</div>
       <div style="color:var(--muted2)">${g.n}</div>
       <div>${_fmtPct(v1)}</div>
+      <div>${_fmtPct(v3)}</div>
       <div>${_fmtPct(v5)}</div>
       <div>${_fmtPct(v10)}</div>
     </div>`;
