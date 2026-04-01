@@ -1346,13 +1346,16 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         dim_directions.append((social_dir, social_pts))
 
     # ── 9. REVERSION (0-10) — mean-reversion tendency ──────
-    # Composite of Hurst exponent + OU half-life + z-score.
-    # Fires in ranging/choppy markets where TREND and MOMENTUM score low.
-    # Uses daily data when available (more stable for Hurst/OU).
-    # Z-score provides direction; Hurst + OU provide conviction.
+    # Composite of Variance Ratio (VR) + OU half-life + z-score,
+    # gated by ADF test (p < 0.05). Fires in ranging/choppy markets
+    # where TREND and MOMENTUM score low.
+    # Uses daily data when available (more stable for VR/OU/ADF).
+    # ADF is the primary quality gate; VR and OU provide conviction;
+    # z-score provides direction.
     #
-    # SAFETY: Hurst must confirm mean-reversion (H < 0.50) before
-    # z-score counts. Without this, we'd catch falling knives.
+    # Note: R/S Hurst exponent was evaluated and rejected — unreliable
+    # on windows < 500 bars. Replaced by Variance Ratio (Lo-MacKinlay).
+    # See roadmap/04-mean-reversion-dimension.md for full rationale.
 
     # Prefer daily data for VR/OU/ADF (more stable), fall back to 5m
     _rev_sig = sig_1d if sig_1d is not None else sig_5m
