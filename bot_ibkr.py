@@ -181,6 +181,12 @@ def _heartbeat_worker() -> None:
     Background thread: send a lightweight reqCurrentTime() to IBKR every
     CONFIG['heartbeat_interval_secs'] seconds to prevent idle-timeout disconnects.
     """
+    import asyncio
+    # ib_async's synchronous wrappers require an event loop on the calling thread.
+    # Create one for this daemon thread so reqCurrentTime() doesn't raise
+    # "There is no current event loop in thread 'ibkr-heartbeat'".
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
     interval = CONFIG.get("heartbeat_interval_secs", 1200)
     tick     = 60
     elapsed  = 0

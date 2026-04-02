@@ -1,6 +1,7 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║   <>  DECIFER  —  orders.py                                  ║
 # ║   Order execution — limit orders, OCO brackets, exits        ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import logging
@@ -796,6 +797,20 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 ib.sleep(0.3)
                 _sl_order_id = sl_trade2.order.orderId  # update to standalone order
                 log.info(f"Standalone SL placed for {symbol} @ ${sl:.2f} OCA={oca_group} (orderId={_sl_order_id})")
+                log_order({
+                    "order_id":   _sl_order_id,
+                    "parent_id":  parent_id,
+                    "symbol":     symbol,
+                    "side":       "SELL",
+                    "order_type": "STP",
+                    "qty":        qty,
+                    "price":      sl,
+                    "status":     "SUBMITTED",
+                    "instrument": "stock",
+                    "role":       "stop_loss_standalone",
+                    "oca_group":  oca_group,
+                    "timestamp":  datetime.now(timezone.utc).isoformat(),
+                })
             except Exception as e:
                 log.error(f"CRITICAL: Failed to place standalone SL for {symbol}: {e}")
 
@@ -807,6 +822,20 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 tp_trade2 = ib.placeOrder(contract, standalone_tp)
                 ib.sleep(0.3)
                 log.info(f"Standalone TP placed for {symbol} @ ${tp:.2f} OCA={oca_group} (orderId={tp_trade2.order.orderId})")
+                log_order({
+                    "order_id":   tp_trade2.order.orderId,
+                    "parent_id":  parent_id,
+                    "symbol":     symbol,
+                    "side":       "SELL",
+                    "order_type": "LMT",
+                    "qty":        tp_qty,
+                    "price":      tp,
+                    "status":     "SUBMITTED",
+                    "instrument": "stock",
+                    "role":       "take_profit_standalone",
+                    "oca_group":  oca_group,
+                    "timestamp":  datetime.now(timezone.utc).isoformat(),
+                })
                 # Update t1_order_id to the standalone TP so update_tranche_status tracks it
                 if tranche_mode:
                     with _trades_lock:
@@ -1486,10 +1515,20 @@ def update_positions_from_ibkr(ib: IB):
             _pending_keys = [k for k in active_trades if active_trades[k].get("status") == "PENDING"]
 
         for _key in _pending_keys:
-            with _fw_lock:
-                _has_watcher = _key in _active_watchers
-            if _has_watcher:
-                continue
+            _trade_instrument = active_trades.get(_key, {}).get("instrument", "stock")
+
+            if _trade_instrument == "option":
+                # Options don't use FillWatcher — use a longer per-session timeout so
+                # DAY orders get cleaned up if the bot misses the IBKR cancellation callback.
+                # Default 480 min (8 h) covers a full extended-hours session.
+                _effective_timeout = CONFIG.get("fill_watcher", {}).get(
+                    "option_orphan_timeout_mins", 480)
+            else:
+                with _fw_lock:
+                    _has_watcher = _key in _active_watchers
+                if _has_watcher:
+                    continue
+                _effective_timeout = _orphan_mins
 
             with _trades_lock:
                 _trade = active_trades.get(_key)
@@ -1501,9 +1540,9 @@ def update_positions_from_ibkr(ib: IB):
                 _open_dt = datetime.fromisoformat(_open_time_str)
                 _age_mins = (datetime.now(timezone.utc) - _open_dt).total_seconds() / 60
             except (ValueError, TypeError):
-                _age_mins = _orphan_mins + 1  # treat unparseable timestamp as timed-out
+                _age_mins = _effective_timeout + 1  # treat unparseable timestamp as timed-out
 
-            if _age_mins < _orphan_mins:
+            if _age_mins < _effective_timeout:
                 continue
 
             _oid = _trade.get("order_id")

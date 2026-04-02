@@ -1,6 +1,7 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║   <>  DECIFER  —  fill_watcher.py                            ║
 # ║   Background order fill watcher — chases limit price         ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 """
 Per-symbol background thread that monitors a PENDING buy limit order after
@@ -120,6 +121,7 @@ class FillWatcher:
                 self._log_audit("fill_watcher_aborted",
                                 reason="IBKR_DISCONNECTED", attempts=attempts)
                 log.warning(f"FillWatcher: {self._symbol} aborted — IBKR disconnected")
+                self._remove_from_registry()   # BUG FIX: registry was not cleaned on disconnect abort
                 return
 
             if self._is_filled():

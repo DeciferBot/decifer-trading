@@ -17,10 +17,12 @@
 # ║     8.  SHORT_SQUEEZE — High short float + volume surge       ║
 # ║     9.  REVERSION     — Variance Ratio + OU half-life + z     ║
 # ║     10. OVERNIGHT_DRIFT — 90-day close-to-open statistics     ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import time as _time
 from datetime import datetime, timezone
+import zoneinfo as _zoneinfo
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -212,8 +214,12 @@ def get_hurst_regime_spy() -> dict:
     lo_thr   = cfg.get("reverting_threshold", 0.45)
     now      = datetime.now(timezone.utc)
 
+    _et_tz        = _zoneinfo.ZoneInfo("America/New_York")
+    _cache_day    = _hurst_spy_cache_ts.astimezone(_et_tz).date() if _hurst_spy_cache_ts else None
+    _today_et     = now.astimezone(_et_tz).date()
     if (_hurst_spy_cache is not None and _hurst_spy_cache_ts is not None
-            and (now - _hurst_spy_cache_ts).total_seconds() < ttl):
+            and (now - _hurst_spy_cache_ts).total_seconds() < ttl
+            and _cache_day == _today_et):
         return _hurst_spy_cache
 
     try:
