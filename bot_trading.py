@@ -44,6 +44,118 @@ from signal_pipeline import run_signal_pipeline, SignalPipelineResult
 
 log = logging.getLogger("decifer.bot")
 
+# ── EOD options review state ──────────────────────────────────────────────────
+_eod_options_review_done: bool = False
+
+# ── Last-decision writer (for Chief Decifer trade card) ───────────────────────
+
+def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
+                         portfolio_value: float) -> None:
+    """
+    Write data/last_decision.json after a successful BUY so Chief Decifer
+    can display a rich trade card on its home page.
+    """
+    import json, re
+    from pathlib import Path
+
+    outputs   = decision.get("_agent_outputs", {})
+    opp_text  = outputs.get("opportunity", "")
+    dev_text  = outputs.get("devils", "")
+
+    price  = sig.get("price", 0)
+    qty    = buy.get("qty", 1)
+    sl     = buy.get("sl", 0)
+    tp     = buy.get("tp", 0)
+    score  = sig.get("score", 20)
+    alloc  = round((qty * price / portfolio_value * 100), 1) if portfolio_value > 0 else 0
+
+    # ── Company name (best-effort) ────────────────────────────────────────────
+    company_name = symbol
+    try:
+        import yfinance as yf
+        info = yf.Ticker(symbol).fast_info
+        long_name = getattr(info, "company_name", None) or getattr(info, "longName", None)
+        if not long_name:
+            full = yf.Ticker(symbol).info
+            long_name = full.get("longName") or full.get("shortName")
+        if long_name:
+            company_name = long_name
+    except Exception:
+        pass
+
+    # ── Thesis — entry rationale from opportunity agent ───────────────────────
+    reasoning = buy.get("reasoning", "")
+    thesis = reasoning[:300] if reasoning else f"{symbol} selected by AI agent council"
+
+    # ── Edge (why now) — sentences containing timing language ─────────────────
+    edge = ""
+    timing_kws = ("now", "today", "catalyst", "announ", "break", "decis",
+                  "approv", "launch", "event", "earning", "FDA", "catalyst",
+                  "coming", "imminent", "near-term", "upcoming", "expect")
+    for sent in re.split(r"(?<=[.!?])\s+", thesis):
+        if any(kw.lower() in sent.lower() for kw in timing_kws):
+            edge = sent.strip()
+            break
+
+    # ── Key risk — from devil's advocate for this symbol ─────────────────────
+    risk = ""
+    if dev_text:
+        upper_dev = dev_text.upper()
+        idx = upper_dev.find(symbol)
+        if idx != -1:
+            section = dev_text[idx:idx + 800]
+            # Look for KEY RISK / RISK / concern label
+            m = re.search(
+                r"(?:KEY\s+RISK|RISK[:\s]|MAIN\s+CONCERN)[:\s]+(.+?)(?:\n[0-9A-Z]|\Z)",
+                section, re.IGNORECASE | re.DOTALL
+            )
+            if m:
+                risk = m.group(1).strip()[:250]
+            else:
+                # Fallback: pull a sentence containing "risk" or "wrong"
+                for sent in re.split(r"(?<=[.!?])\s+", section):
+                    if any(kw in sent.lower() for kw in ("risk", "wrong", "concern", "veto", "fail")):
+                        risk = sent.strip()[:250]
+                        break
+    if not risk:
+        risk = "Market or macro conditions could shift against the thesis."
+
+    # ── Expected returns — derived from stops (indicative, not advice) ────────
+    exp_returns: dict = {}
+    if price > 0 and tp > 0:
+        tp_pct = round((tp - price) / price * 100, 1)
+        exp_returns = {
+            "1m":  round(tp_pct * 0.45, 1),
+            "3m":  round(tp_pct * 0.85, 1),
+            "12m": round(tp_pct * 1.35, 1),
+        }
+
+    payload = {
+        "symbol":          symbol,
+        "company_name":    company_name,
+        "direction":       "BUY",
+        "allocation_pct":  alloc,
+        "price":           round(price, 2),
+        "qty":             qty,
+        "stop_loss":       round(sl, 2),
+        "take_profit":     round(tp, 2),
+        "score":           score,
+        "thesis":          thesis,
+        "edge_why_now":    edge,
+        "risk":            risk,
+        "expected_returns": exp_returns,
+        "agents_agreed":   decision.get("agents_agreed", 0),
+        "timestamp":       datetime.now().isoformat(timespec="seconds"),
+    }
+
+    out_path = Path(__file__).parent / "data" / "last_decision.json"
+    try:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(payload, indent=2))
+        clog("INFO", f"last_decision.json written for {symbol}")
+    except Exception as e:
+        clog("ERROR", f"Could not write last_decision.json: {e}")
+
 
 # ── Detect positions closed externally (stop loss / take profit) ──────────────
 
@@ -195,9 +307,11 @@ def check_external_closes(regime: dict):
 
 def check_options_positions():
     """Monitor open options positions for profit target, stop loss, and DTE exits."""
-    from orders import open_trades
+    from orders import open_trades, is_options_market_open
     ib = bot_state.ib
     if not CONFIG.get("options_enabled"):
+        return
+    if not is_options_market_open():
         return
     try:
         opts = {k: v for k, v in open_trades.items() if v.get("instrument") == "option"}
@@ -245,7 +359,8 @@ def _process_close_queue():
 def _auto_rebalance_cash(portfolio_value: float, regime: dict):
     """
     Auto-close the weakest position(s) to bring cash reserve back above
-    min_cash_reserve.  Closes ONE position per scan cycle.
+    min_cash_reserve.  Closes positions one by one (worst P&L first) until
+    cash is restored or no positions remain.
     """
     ib = bot_state.ib
     min_reserve = CONFIG.get("min_cash_reserve", 0.10)
@@ -256,18 +371,25 @@ def _auto_rebalance_cash(portfolio_value: float, regime: dict):
         return
 
     from risk import _get_ibkr_cash
-    ibkr_cash = _get_ibkr_cash(ib, CONFIG.get("active_account", ""))
-    if ibkr_cash is not None:
-        cash_pct = ibkr_cash / portfolio_value if portfolio_value > 0 else 1.0
-    else:
-        deployed = sum(p.get("current", p.get("entry", 0)) * p.get("qty", 0) for p in positions)
-        cash_pct = (portfolio_value - deployed) / portfolio_value if portfolio_value > 0 else 1.0
+    from orders import close_position
+
+    def _current_cash_pct():
+        cash = _get_ibkr_cash(ib, CONFIG.get("active_account", ""))
+        if cash is not None:
+            return cash / portfolio_value if portfolio_value > 0 else 1.0
+        open_pos = get_open_positions()
+        deployed = sum(p.get("current", p.get("entry", 0)) * p.get("qty", 0) for p in open_pos)
+        return (portfolio_value - deployed) / portfolio_value if portfolio_value > 0 else 1.0
+
+    cash_pct = _current_cash_pct()
     cash_deficit = (min_reserve - cash_pct) * portfolio_value
     clog("RISK", f"Auto-rebalance: cash={cash_pct*100:.1f}% (need {min_reserve*100:.0f}%) "
          f"— need to free ~${cash_deficit:,.0f}")
 
     ranked = []
     for p in positions:
+        if p.get("instrument") == "option":
+            continue  # Options can't close outside regular hours — stocks only
         entry   = p.get("entry", 0)
         current = p.get("current", entry)
         qty     = p.get("qty", 0)
@@ -275,12 +397,9 @@ def _auto_rebalance_cash(portfolio_value: float, regime: dict):
             pnl_pct        = (current - entry) / entry
             position_value = abs(current * qty)
             ranked.append({
-                "symbol":         p.get("symbol"),
+                "symbol":         p.get("_trade_key", p.get("symbol")),
                 "pnl_pct":        pnl_pct,
                 "position_value": position_value,
-                "entry":          entry,
-                "current":        current,
-                "qty":            qty,
             })
 
     if not ranked:
@@ -288,21 +407,135 @@ def _auto_rebalance_cash(portfolio_value: float, regime: dict):
         return
 
     ranked.sort(key=lambda x: x["pnl_pct"])
-    worst = ranked[0]
-    sym   = worst["symbol"]
-    clog("RISK", f"Auto-rebalance: Closing {sym} (worst P&L: {worst['pnl_pct']:+.1%}, "
-         f"value: ${worst['position_value']:,.0f}) to free cash")
 
+    for candidate in ranked:
+        if cash_pct >= min_reserve:
+            break
+        sym = candidate["symbol"]
+        clog("RISK", f"Auto-rebalance: Closing {sym} (P&L: {candidate['pnl_pct']:+.1%}, "
+             f"value: ${candidate['position_value']:,.0f}) to free cash")
+        try:
+            result = close_position(ib, sym)
+            if result:
+                clog("RISK", f"Auto-rebalance: {result}")
+                ib.sleep(2)
+                cash_pct = _current_cash_pct()
+                clog("RISK", f"Auto-rebalance: cash now at {cash_pct*100:.1f}%")
+            else:
+                clog("ERROR", f"Auto-rebalance: Could not close {sym}")
+                break
+        except Exception as e:
+            clog("ERROR", f"Auto-rebalance: Failed to close {sym}: {e}")
+            break
+
+    if cash_pct < min_reserve:
+        clog("RISK", f"Auto-rebalance: cash still at {cash_pct*100:.1f}% after closing all eligible positions")
+
+
+# ── Pre-close options review ──────────────────────────────────────────────────
+
+def _eod_options_review(regime: dict):
+    """
+    At 3:30 PM ET, ask Claude whether each open options position should be
+    held overnight or closed before the bell.  No hard-coded rules — pure AI
+    judgment based on each position's greeks, P&L, and the current regime.
+    """
+    import json, zoneinfo as _zi
+    from agents import _call_claude
+    from orders import close_position, get_open_positions
+
+    ib = bot_state.ib
+    positions = get_open_positions()
+    opts = [p for p in positions if p.get("instrument") == "option"]
+
+    if not opts:
+        clog("INFO", "EOD options review: no open options positions")
+        return
+
+    clog("ANALYSIS", f"EOD options review: evaluating {len(opts)} position(s) at 3:30 PM")
+
+    # Build a readable context block for each position
+    pos_lines = []
+    for p in opts:
+        entry_prem  = p.get("entry_premium", 0)
+        curr_prem   = p.get("current_premium", entry_prem)
+        pnl_pct     = ((curr_prem - entry_prem) / entry_prem * 100) if entry_prem else 0
+        key         = p.get("_trade_key", p.get("symbol"))
+        pos_lines.append(
+            f"- Key: {key} | {p.get('right','?')} ${p.get('strike','?')} exp {p.get('expiry_str','?')} "
+            f"| DTE: {p.get('dte','?')} | P&L: {pnl_pct:+.1f}% "
+            f"| Delta: {p.get('delta','?')} | Theta/day: {p.get('theta','?')} "
+            f"| IV: {p.get('iv','?')} | Entry thesis: {str(p.get('reasoning',''))[:120]}"
+        )
+
+    regime_str = (
+        f"Regime: {regime.get('regime','unknown')} | VIX: {regime.get('vix','?')} | "
+        f"Trend: {regime.get('trend','?')}"
+    )
+
+    system_prompt = (
+        "You are a senior options risk manager conducting a pre-close end-of-day review. "
+        "For each open options position, decide whether it should be HOLD (carry overnight) "
+        "or CLOSE (exit before today's bell). "
+        "Consider: DTE and gamma risk near expiry, theta decay cost of holding overnight, "
+        "delta exposure relative to regime, current P&L and whether the thesis is still valid. "
+        "Lean toward CLOSE when the overnight edge is not clearly positive. "
+        "Respond ONLY with a JSON array, one object per position, using the exact key provided:\n"
+        '[{"key": "...", "decision": "HOLD", "reason": "..."}, ...]'
+    )
+
+    user_message = (
+        f"Market regime at 3:30 PM ET:\n{regime_str}\n\n"
+        f"Open options positions:\n" + "\n".join(pos_lines) +
+        "\n\nReturn your JSON array decision now."
+    )
+
+    raw = _call_claude(system_prompt, user_message)
+
+    # Parse Claude's JSON response
     try:
-        from orders import close_position
-        result = close_position(ib, sym)
-        if result:
-            clog("RISK", f"Auto-rebalance: {result}")
-            ib.sleep(2)
-        else:
-            clog("ERROR", f"Auto-rebalance: Could not close {sym}")
+        # Strip markdown fences if present
+        clean = raw.strip()
+        if clean.startswith("```"):
+            clean = "\n".join(clean.split("\n")[1:])
+            clean = clean.rsplit("```", 1)[0].strip()
+        decisions = json.loads(clean)
     except Exception as e:
-        clog("ERROR", f"Auto-rebalance: Failed to close {sym}: {e}")
+        clog("ERROR", f"EOD options review: could not parse Claude response — {e}\nRaw: {raw[:300]}")
+        return
+
+    for item in decisions:
+        key      = item.get("key", "")
+        decision = item.get("decision", "HOLD").upper()
+        reason   = item.get("reason", "")
+        clog("ANALYSIS", f"EOD [{decision}] {key} — {reason}")
+        if decision == "CLOSE":
+            try:
+                sym = key.split("_")[0]  # underlying symbol for close_position lookup
+                result = close_position(ib, key) or close_position(ib, sym)
+                if result:
+                    clog("TRADE", f"EOD closed: {key} — {result}")
+                else:
+                    clog("ERROR", f"EOD close failed for {key}")
+            except Exception as e:
+                clog("ERROR", f"EOD close error for {key}: {e}")
+
+
+def _maybe_eod_options_review(regime: dict):
+    """Fire _eod_options_review once per day between 3:30 PM and 3:55 PM ET."""
+    global _eod_options_review_done
+    import zoneinfo as _zi
+    _ET = _zi.ZoneInfo("America/New_York")
+    from datetime import time as dtime
+    now_et = datetime.now(_ET)
+    t = now_et.time()
+    # Reset each morning before the session opens
+    if t < dtime(9, 30):
+        _eod_options_review_done = False
+    # Fire once in the pre-close window
+    if dtime(15, 30) <= t < dtime(15, 55) and not _eod_options_review_done:
+        _eod_options_review_done = True
+        _eod_options_review(regime)
 
 
 # ── Main scan ─────────────────────────────────────────────────────────────────
@@ -392,6 +625,7 @@ def run_scan():
     dash["regime"].update(get_sizing_state())
     clog("INFO", f"Regime: {regime['regime']} | VIX: {_vix_val} | SPY: ${regime['spy_price']} | Router: {_router_state}")
     set_session_opening_regime(regime["regime"])
+    _maybe_eod_options_review(regime)
 
     check_external_closes(regime)
 
@@ -462,7 +696,7 @@ def run_scan():
     fx   = get_fx_snapshot()
 
     options_signals = []
-    if CONFIG.get("options_enabled"):
+    if CONFIG.get("options_enabled") and get_session() not in ("PRE_MARKET", "AFTER_HOURS"):
         try:
             clog("ANALYSIS", "Scanning options flow (unusual vol, IV rank, earnings)...")
             top_scored_syms = [s["symbol"] for s in scored[:20]]
@@ -659,12 +893,14 @@ def run_scan():
                 "price": str(sig["price"]),
                 "time": datetime.now().strftime("%H:%M:%S")
             })
+            _write_last_decision(sym, buy, sig, decision, pv)
 
         from orders import is_options_market_open
         if (CONFIG.get("options_enabled") and
+                get_session() not in ("PRE_MARKET", "AFTER_HOURS") and
                 sig["score"] >= CONFIG.get("options_min_score", 42)):
             if not is_options_market_open():
-                clog("INFO", f"Score {sig['score']} qualifies for options but market closed — will retry next open scan")
+                clog("INFO", f"Score {sig['score']} qualifies for options — market closed until 9:30 ET. Stock trade executed.")
             else:
                 _sig_dir = sig.get("direction", "LONG")
                 if _sig_dir not in ("LONG", "SHORT"):
