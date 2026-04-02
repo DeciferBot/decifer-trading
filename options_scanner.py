@@ -11,6 +11,7 @@
 # ║                                                              ║
 # ║   Output feeds directly into the 6-agent pipeline alongside  ║
 # ║   stock signals — agents can recommend options as instrument  ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import logging

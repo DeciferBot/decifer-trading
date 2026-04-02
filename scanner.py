@@ -5,6 +5,7 @@
 # ║                                                              ║
 # ║   3,000+ fields · RSI/MACD/EMA on any timeframe             ║
 # ║   Pre-market/gap scans · No API key · Free                   ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import logging

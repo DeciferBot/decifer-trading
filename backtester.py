@@ -12,6 +12,7 @@
 # ║   Usage:                                                     ║
 # ║   python backtester.py --symbols AAPL TSLA --start 2024-01-01 ║
 # ║   python backtester.py --param-sweep atr_mult 1.0 2.0 0.5    ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import os

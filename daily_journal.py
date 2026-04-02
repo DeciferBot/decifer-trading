@@ -2,6 +2,7 @@
 # ║   <>  DECIFER  —  daily_journal.py                          ║
 # ║   Automated daily trade journal. Run at end of each day.    ║
 # ║   Produces a dated .md file in journals/ with full analysis ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import json

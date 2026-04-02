@@ -6,6 +6,7 @@
 # ║   order execution.  It replaces direct execute_buy() calls  ║
 # ║   in bot.py, enabling future multi-account routing and       ║
 # ║   per-account filters without touching order logic.          ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import logging

@@ -770,7 +770,8 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         sl_status = sl_trade.orderStatus.status
         tp_status = tp_trade.orderStatus.status
 
-        if sl_status in ('Inactive', 'Cancelled', 'ApiCancelled') or tp_status in ('Inactive', 'Cancelled', 'ApiCancelled'):
+        _child_reject = ('Inactive', 'Cancelled', 'ApiCancelled', 'ValidationError')
+        if sl_status in _child_reject or tp_status in _child_reject:
             log.warning(
                 f"Bracket child rejected for {symbol} (SL={sl_status}, TP={tp_status}) "
                 f"— placing standalone SL/TP orders as fallback"
@@ -798,8 +799,15 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 standalone_sl.transmit = True
                 sl_trade2 = ib.placeOrder(contract, standalone_sl)
                 ib.sleep(0.3)
-                _sl_order_id = sl_trade2.order.orderId  # update to standalone order
-                log.info(f"Standalone SL placed for {symbol} @ ${sl:.2f} OCA={oca_group} (orderId={_sl_order_id})")
+                sl2_status = sl_trade2.orderStatus.status
+                if sl2_status in _child_reject:
+                    log.error(
+                        f"CRITICAL: Standalone SL also rejected for {symbol} "
+                        f"({sl2_status}) — position has NO stop loss, sl_order_id unchanged"
+                    )
+                else:
+                    _sl_order_id = sl_trade2.order.orderId  # update to standalone order
+                    log.info(f"Standalone SL placed for {symbol} @ ${sl:.2f} OCA={oca_group} (orderId={_sl_order_id})")
                 log_order({
                     "order_id":   _sl_order_id,
                     "parent_id":  parent_id,

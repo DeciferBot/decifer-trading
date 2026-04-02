@@ -1,6 +1,7 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║   <>  DECIFER  —  risk.py                                    ║
 # ║   Five-layer risk management — hardcoded, agent-proof        ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import json

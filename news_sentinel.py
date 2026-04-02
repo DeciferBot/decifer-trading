@@ -5,6 +5,7 @@
 # ║   news every 30-60 seconds. When material news is detected  ║
 # ║   for a holding, watchlist symbol, or theme-tracked stock,  ║
 # ║   it fires the mini agent pipeline immediately.             ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import re

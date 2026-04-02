@@ -1,6 +1,7 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║   <>  DECIFER  —  execution_agent.py                         ║
 # ║   7th Claude agent — decides HOW to execute each trade       ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 """
 Sits between the 6-agent signal pipeline and IBKR order placement.

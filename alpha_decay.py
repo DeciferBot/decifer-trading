@@ -12,6 +12,7 @@
 # ║     beats one that dips and recovers.                        ║
 # ║     MicroAlphas (2025): swing-trade signal effectiveness     ║
 # ║     diminishes after 3–10 days.                              ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import json

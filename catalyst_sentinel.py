@@ -14,6 +14,7 @@
 # ║     - An insider cluster buy appears for a watchlist ticker  ║
 # ║                                                              ║
 # ║   Completely independent of the scan loop — never blocks it. ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import json

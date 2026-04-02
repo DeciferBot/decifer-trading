@@ -4,6 +4,7 @@
 # ║                                                              ║
 # ║   Produced by: scan_and_score() in bot.py                   ║
 # ║   Consumed by: signal_dispatcher.py, IC tracker (future)    ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import json

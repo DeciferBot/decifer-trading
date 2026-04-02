@@ -1,6 +1,7 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║   <>  DECIFER  —  agents.py                                  ║
 # ║   The 6-agent multi-perspective trading intelligence system  ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import json

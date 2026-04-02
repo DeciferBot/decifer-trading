@@ -15,6 +15,7 @@
 # ║   Files written:                                             ║
 # ║     data/ic_weights.json          — current weights          ║
 # ║     data/ic_weights_history.jsonl — weekly snapshots         ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import json

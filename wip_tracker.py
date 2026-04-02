@@ -2,6 +2,7 @@
 # ║   <>  DECIFER  —  wip_tracker.py                             ║
 # ║   Enforces the WIP (Work In Progress) limit: no more than    ║
 # ║   max_active features may be in_progress simultaneously.     ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 #
 # Root cause this addresses

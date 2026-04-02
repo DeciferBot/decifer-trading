@@ -7,6 +7,7 @@
 # ║                                                              ║
 # ║   Entry point: run_signal_pipeline()                         ║
 # ║   Result type: SignalPipelineResult                          ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import logging

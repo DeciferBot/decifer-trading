@@ -57,6 +57,18 @@ class DashHandler(BaseHTTPRequestHandler):
                 }
             except Exception:
                 state["skew"] = None
+            # Last decision — for trade card on home page
+            try:
+                import os as _os
+                _ld_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                                         "data", "last_decision.json")
+                if _os.path.exists(_ld_path):
+                    with open(_ld_path) as _ldf:
+                        state["last_decision"] = json.load(_ldf)
+                else:
+                    state["last_decision"] = None
+            except Exception:
+                state["last_decision"] = None
             state["settings"] = {
                 "risk_pct_per_trade":       CONFIG.get("risk_pct_per_trade", 0.04),
                 "daily_loss_limit":         CONFIG.get("daily_loss_limit", 0.06),

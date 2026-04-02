@@ -3,6 +3,7 @@
 # ║   ML Learning Loop: Trade Outcome Labeler, Pattern           ║
 # ║   Recognition, Signal Enhancement, Regime Classification    ║
 # ║   Production quality. Uses only free resources (scikit-learn)║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import json

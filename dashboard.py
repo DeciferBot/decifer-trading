@@ -191,6 +191,25 @@ canvas{display:block;width:100% !important}
 .convo-panel.collapsed{flex:0 0 auto;min-height:auto;display:block}
 .convo-toggle{padding:5px 12px;font-size:9px;letter-spacing:1.5px;color:var(--orange);text-transform:uppercase;cursor:pointer;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0}
 .convo-toggle:hover{background:var(--bg3)}
+
+/* ── TRADE CARD ── */
+.trade-card-panel{flex:0 0 auto;border-bottom:1px solid var(--border);background:var(--bg);display:flex;flex-direction:column}
+.trade-card-body{padding:10px 14px;overflow-y:auto;max-height:260px}
+.tc-headline{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;line-height:1.3;margin-bottom:10px}
+.tc-ticker{color:#fff;font-size:15px}
+.tc-sep{color:var(--muted2)}
+.tc-company{color:var(--text)}
+.tc-alloc{color:var(--muted2);font-size:12px}
+.tc-dir-buy{color:var(--green);font-weight:800;margin-left:6px}
+.tc-dir-sell{color:var(--red);font-weight:800;margin-left:6px}
+.tc-row{font-size:11px;line-height:1.65;margin-bottom:5px;color:var(--text)}
+.tc-label{color:var(--text);font-weight:700}
+.tc-val{color:#aaa}
+.tc-returns{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;margin-top:4px}
+.tc-ret-item .tc-label{color:var(--muted2)}
+.tc-ret-pos{color:var(--green);font-weight:700}
+.tc-ret-neg{color:var(--red);font-weight:700}
+.tc-footer{font-size:9px;color:var(--muted);margin-top:8px;letter-spacing:.5px}
 .convo-body{display:block;overflow-y:auto;flex:1;min-height:0}
 .convo-body.hidden{display:none}
 .convo-msg{padding:8px 12px;border-bottom:1px solid rgba(34,34,34,.4);animation:fi .2s}
@@ -264,6 +283,7 @@ canvas{display:block;width:100% !important}
     <span class="logo-sym">&lt;&gt;</span>
     <span class="logo-name">Decifer <span style="color:var(--orange);font-size:13px">2.0</span></span>
     <span class="logo-sub">Autonomous AI Trading</span>
+    <span style="font-size:10px;color:var(--orange);font-weight:700;margin-left:6px;opacity:0.85;">by AMIT CHOPRA</span>
   </div>
   <div class="hdr-right">
     <div class="pill" id="bot-pill"><div class="dot pulse"></div><span id="bot-status">Connecting...</span></div>
@@ -359,27 +379,33 @@ canvas{display:block;width:100% !important}
       </div>
     </div>
 
-    <!-- CENTRE: Activity Log -->
+    <!-- CENTRE: Last Decision (top) + Activity Log (bottom) -->
     <div class="col" style="border-right:1px solid var(--border);display:flex;flex-direction:column">
-      <div class="col-title" style="flex-shrink:0">
-        <span>Activity Log</span>
-        <span id="log-count" style="color:var(--muted2)">0 events</span>
+
+      <!-- LAST DECISION trade card — always at the top -->
+      <div class="trade-card-panel">
+        <div class="col-title" style="flex-shrink:0">
+          <span>Last Decision</span>
+          <span id="trade-card-age" style="color:var(--muted2);font-size:9px"></span>
+        </div>
+        <div class="trade-card-body" id="trade-card-body">
+          <div style="color:var(--muted2);font-size:11px">No trades taken yet.</div>
+        </div>
       </div>
+
+      <!-- SCAN PROGRESS -->
       <div class="scan-wrap" style="flex-shrink:0">
         <div class="scan-bg"><div class="scan-fill" id="scan-fill" style="width:0%"></div></div>
         <div class="scan-meta"><span id="scan-status">Waiting for first scan...</span><span id="scan-eta">—</span></div>
       </div>
-      <div class="col-body" id="log-area" style="flex:0.6;min-height:0;overflow-y:auto"></div>
-      <div class="ai-panel">
-        <div class="ai-label"><div class="ai-d"></div>&lt;&gt; Decifer 2.0 Analysis</div>
-        <div class="ai-box" id="ai-box">Waiting for first scan...</div>
+
+      <!-- ACTIVITY LOG — at the bottom, fills remaining space -->
+      <div class="col-title" style="flex-shrink:0">
+        <span>Activity Log</span>
+        <span id="log-count" style="color:var(--muted2)">0 events</span>
       </div>
-      <div class="convo-panel" id="convo-panel">
-        <div class="convo-toggle" onclick="toggleConvo()"><span id="convo-arrow">▼</span> Last Decision</div>
-        <div class="convo-body" id="convo-body">
-          <div style="padding:12px;color:var(--muted2);font-size:11px">Waiting for first scan...</div>
-        </div>
-      </div>
+      <div class="col-body" id="log-area" style="flex:1;min-height:0;overflow-y:auto"></div>
+
     </div>
 
     <!-- RIGHT: Positions + Trades -->
@@ -2187,8 +2213,8 @@ async function poll() {
       document.getElementById('log-count').textContent = d.logs.length + ' events';
     }
 
-    // AI box
-    if (d.claude_analysis) document.getElementById('ai-box').textContent = d.claude_analysis;
+    // AI box (element removed from LIVE view — no-op)
+    // if (d.claude_analysis) document.getElementById('ai-box').textContent = d.claude_analysis;
 
     // Positions and today's results
     renderPositions(d.positions);
@@ -2206,9 +2232,11 @@ async function poll() {
     // Agents view
     if (d.agent_outputs) renderAgents({...d.agent_outputs, last_scan: d.last_scan});
 
-    // Agent conversation (live panel + full view)
+    // Trade card — last decision (always refresh, even when null)
+    renderTradeCard(d.last_decision || null);
+
+    // Agent conversation (full agents view only — live panel replaced by trade card)
     if (d.agent_conversation && d.agent_conversation.length) {
-      renderAgentConversation(d.agent_conversation);
       renderAgentConvoFull(d.agent_conversation, d.last_scan);
     }
 
@@ -2394,18 +2422,7 @@ function filterNews() {
 }
 
 // ── Agent Conversation ─────────────────────────────────────
-function toggleConvo() {
-  const body = document.getElementById('convo-body');
-  const panel = document.getElementById('convo-panel');
-  const arrow = document.getElementById('convo-arrow');
-  const logArea = document.getElementById('log-area');
-  if (!body || !panel || !arrow || !logArea) return;
-  const isHidden = body.classList.toggle('hidden');
-  panel.classList.toggle('collapsed', isHidden);
-  arrow.textContent = isHidden ? '▶' : '▼';
-  // Restore log area when conversation is closed
-  logArea.style.flex = isHidden ? '1' : '0.6';
-}
+function toggleConvo() { /* no-op — convo panel replaced by trade card */ }
 
 function annotateIndicators(text) {
   // Escape raw text first so agent output can't inject HTML, then add our own annotation spans.
@@ -2431,37 +2448,73 @@ function annotateIndicators(text) {
   return result;
 }
 
-function renderAgentConversation(convo) {
-  // Last Decision card — shows final decision summary, not raw agent debate
-  const body = document.getElementById('convo-body');
-  if (!convo || !convo.length) return;
+function renderTradeCard(ld) {
+  // Render the rich last-decision trade card (thesis / edge / risk / returns).
+  const body = document.getElementById('trade-card-body');
+  const ageEl = document.getElementById('trade-card-age');
+  if (!body) return;
 
-  // Extract final decision maker output
-  const final = convo.find(m => m.agent === 'Final Decision Maker') || convo[convo.length - 1];
-  const agreed = (window._lastAgentsAgreed != null) ? window._lastAgentsAgreed : null;
-  const required = (window._agentsRequired != null) ? window._agentsRequired : 4;
-  const scanTime = (window._lastScanTime) ? window._lastScanTime : '';
+  if (!ld || !ld.symbol) {
+    body.innerHTML = '<div style="color:var(--muted2);font-size:11px">No trades taken yet.</div>';
+    if (ageEl) ageEl.textContent = '';
+    return;
+  }
 
-  const voteColor = (agreed != null)
-    ? (agreed >= required ? 'var(--green)' : 'var(--red)')
-    : 'var(--muted2)';
-  const voteBadge = agreed != null
-    ? `<span style="color:${voteColor};font-weight:700;font-size:11px">${agreed}/6 agents agreed</span>`
-    : '';
+  const sym     = esc(ld.symbol);
+  const co      = esc(ld.company_name || ld.symbol);
+  const dir     = esc(ld.direction || 'BUY');
+  const dirCls  = dir === 'BUY' ? 'tc-dir-buy' : 'tc-dir-sell';
+  const alloc   = ld.allocation_pct != null ? ld.allocation_pct.toFixed(0) + '%' : '';
+  const thesis  = esc(ld.thesis || '');
+  const edge    = esc(ld.edge_why_now || '');
+  const risk    = esc(ld.risk || '');
+  const exp     = ld.expected_returns || {};
+  const agents  = ld.agents_agreed != null ? ld.agents_agreed + '/6 agents agreed' : '';
+  const ts      = ld.timestamp ? esc(ld.timestamp.replace('T', ' ').slice(0, 16)) : '';
 
-  const summary = (final && final.output) ? esc(final.output) : 'No decision yet.';
+  // Age label
+  let age = ts;
+  if (ld.timestamp) {
+    try {
+      const diff = (Date.now() - new Date(ld.timestamp).getTime()) / 1000;
+      if (diff < 300)       age = 'just now';
+      else if (diff < 3600) age = Math.floor(diff / 60) + 'm ago';
+      else if (diff < 86400) age = Math.floor(diff / 3600) + 'h ago';
+      else                  age = Math.floor(diff / 86400) + 'd ago';
+    } catch(e) {}
+  }
+  if (ageEl) ageEl.textContent = age;
+
+  // Expected returns row
+  let retHtml = '';
+  const retKeys = [['1M','1m'],['3M','3m'],['12M','12m']];
+  for (const [label, key] of retKeys) {
+    const v = exp[key];
+    if (v != null) {
+      const sign = v >= 0 ? '+' : '';
+      const cls  = v >= 0 ? 'tc-ret-pos' : 'tc-ret-neg';
+      retHtml += `<span class="tc-ret-item"><span class="tc-label">${label}: </span><span class="${cls}">${sign}${v.toFixed(1)}%</span></span>`;
+    }
+  }
 
   body.innerHTML = `
-    <div style="padding:10px 12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        ${voteBadge}
-        <span style="font-size:9px;color:var(--muted2)">${esc(scanTime)}</span>
-      </div>
-      <div style="font-size:11px;color:var(--text);line-height:1.6;white-space:pre-wrap;border-left:2px solid var(--orange);padding-left:8px">${summary}</div>
-      <div style="margin-top:8px;text-align:right">
-        <a href="#" onclick="event.preventDefault();const agTab=document.querySelector('[onclick*=\'agents\']');if(agTab)switchTab('agents',agTab);" style="font-size:9px;color:var(--orange);letter-spacing:1px;text-decoration:none">FULL DEBATE →</a>
-      </div>
-    </div>`;
+    <div class="tc-headline">
+      <span class="tc-ticker">${sym}</span>
+      <span class="tc-sep"> — </span>
+      <span class="tc-company">${co}</span>
+      ${alloc ? `<span class="tc-alloc"> | ${alloc}</span>` : ''}
+      <span class="${dirCls}"> | ${dir}</span>
+    </div>
+    ${thesis ? `<div class="tc-row"><span class="tc-label">Thesis: </span><span class="tc-val">${thesis}</span></div>` : ''}
+    ${edge   ? `<div class="tc-row"><span class="tc-label">Edge (why now): </span><span class="tc-val">${edge}</span></div>` : ''}
+    ${risk   ? `<div class="tc-row"><span class="tc-label">Risk: </span><span class="tc-val">${risk}</span></div>` : ''}
+    ${retHtml ? `<div class="tc-returns"><span class="tc-label" style="margin-right:4px">Expected Returns:</span>${retHtml}</div>` : ''}
+    <div class="tc-footer">${agents}${agents && ts ? '  ·  ' : ''}${ts}</div>`;
+}
+
+function renderAgentConversation(convo) {
+  // Keep for backwards compat — no-op since the convo-body element is removed.
+  // Full agent debate is still visible in the Agents tab.
 }
 
 function renderAgentConvoFull(convo, lastScan) {
@@ -2687,5 +2740,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
   <div class="pos-modal" id="pos-modal-content"></div>
 </div>
 
+<!-- FOOTER -->
+<div style="text-align:center;padding:18px 0 12px;font-size:11px;color:var(--muted2);border-top:1px solid var(--border);margin-top:32px;">
+  <span style="color:var(--orange);font-weight:700;">DECIFER 2.0</span> &nbsp;|&nbsp; Invented &amp; built by <span style="color:#fff;font-weight:700;">AMIT CHOPRA</span>
+</div>
 </body>
 </html>"""

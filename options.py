@@ -2,6 +2,7 @@
 # ║   <>  DECIFER  —  options.py                                 ║
 # ║   Options chain analysis, IV rank, strike selection,         ║
 # ║   Greeks via py_vollib (model) + IBKR (real-time)            ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import logging

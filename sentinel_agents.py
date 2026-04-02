@@ -9,6 +9,7 @@
 # ║     1. Catalyst Analyst  -- LLM (news materiality)          ║
 # ║     2. Risk Gate         -- deterministic (rule application) ║
 # ║     3. Instant Decision  -- LLM (synthesis + JSON output)   ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import json

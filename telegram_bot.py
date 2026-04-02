@@ -3,6 +3,7 @@
 # ║   Emergency kill switch accessible via Telegram.             ║
 # ║   Polls the Telegram Bot API using long-polling (requests).  ║
 # ║   No heavy async dependency — works alongside ib_insync.     ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 #
 # Commands (authorized chat IDs only):

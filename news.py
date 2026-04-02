@@ -6,6 +6,7 @@
 # ║   Two-tier system:                                           ║
 # ║     Tier 1: Fast keyword scoring (all symbols, ~0ms each)    ║
 # ║     Tier 2: Claude sentiment analysis (top scorers only)     ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import re

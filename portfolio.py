@@ -3,6 +3,7 @@
 # ║   Multi-account position aggregation                         ║
 # ║   Fetches positions across all configured IBKR accounts,     ║
 # ║   merges them by symbol, and computes net exposure/P&L.      ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import logging

@@ -2,6 +2,7 @@
 # ║   <>  DECIFER  —  config.py                                  ║
 # ║   All settings in one place. This is the only file you       ║
 # ║   need to edit to change bot behaviour.                      ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import os

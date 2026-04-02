@@ -3,6 +3,7 @@
 # ║   Reddit + ApeWisdom + VADER sentiment analysis              ║
 # ║   Tracks mention VELOCITY (acceleration, not raw count)       ║
 # ║   Plugs into signals.py as 8th dimension for confluence       ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import json

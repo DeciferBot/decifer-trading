@@ -8,6 +8,7 @@
 # ║     python3 bot.py                                           ║
 # ║                                                              ║
 # ║   Dashboard: http://localhost:8080                           ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import sys

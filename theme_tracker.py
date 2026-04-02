@@ -9,6 +9,7 @@
 # ║                                                              ║
 # ║   Feeds into News Sentinel to determine which symbols       ║
 # ║   to monitor for real-time news triggers.                   ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import json

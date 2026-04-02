@@ -1,5 +1,7 @@
 # Decifer Trading 2.0 — Autonomous Trading System
 
+**Invented by: AMIT CHOPRA**
+
 AI-powered autonomous trading bot built on Claude + Interactive Brokers. Uses a 6-agent multi-perspective intelligence system to scan, analyse, and execute trades across stocks and options. Includes ML learning loop, social sentiment tracking, smart order execution, portfolio optimization, and real-time IBKR streaming.
 
 This document is the master rebuild guide. If everything is lost, follow this document to reconstruct the entire system from scratch.

@@ -15,6 +15,7 @@
 # ║     python data_collector.py --symbols AAPL TSLA             ║
 # ║     python data_collector.py --intraday-only                 ║
 # ║     python data_collector.py --daily-only                    ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 import os

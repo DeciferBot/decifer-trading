@@ -3,6 +3,7 @@
 # ║   Enforces phase sequencing: Phase 4+ features (live         ║
 # ║   accounts, cloud, Docker, multi-user) are frozen until      ║
 # ║   Phase 1 paper-trading validation exit criteria are met.    ║
+# ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 #
 # Root cause this addresses
