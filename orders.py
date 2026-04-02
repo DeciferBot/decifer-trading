@@ -482,6 +482,9 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
     log_order = _om.log_order                                # noqa: F841
     get_tv_signal_cache = _om.get_tv_signal_cache            # noqa: F841
     _get_yf_price = _om._get_yf_price                        # noqa: F841
+    MarketOrder = _om.MarketOrder                            # noqa: F841
+    LimitOrder  = _om.LimitOrder                             # noqa: F841
+    StopOrder   = _om.StopOrder                              # noqa: F841
 
     # ── Guard: per-symbol lock closes TOCTOU gap between check and submission ──
     sym_lock = _get_symbol_lock(symbol)
