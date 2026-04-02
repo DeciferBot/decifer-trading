@@ -100,6 +100,7 @@ signals_stub.compute_confluence = MagicMock(return_value={"total": 65, "score": 
 sys.modules.setdefault("signals", signals_stub)
 
 # Now import backtester
+import backtester as _backtester_mod
 from backtester import (
     Trade,
     Position,
@@ -244,8 +245,11 @@ class TestPortfolioOpenPosition:
         open_one(p, price=100.0)
         trade_id = list(p.positions.keys())[0]
         pos = p.positions[trade_id]
-        expected_1 = 100.0 * (1 + config_stub.CONFIG["partial_exit_1_pct"])
-        expected_2 = 100.0 * (1 + config_stub.CONFIG["partial_exit_2_pct"])
+        # Use backtester's own CONFIG so the test is correct regardless of
+        # whether the real config or the stub was loaded first.
+        cfg = _backtester_mod.CONFIG
+        expected_1 = 100.0 * (1 + cfg["partial_exit_1_pct"])
+        expected_2 = 100.0 * (1 + cfg["partial_exit_2_pct"])
         assert pos.exit_target_1 == pytest.approx(expected_1)
         assert pos.exit_target_2 == pytest.approx(expected_2)
 

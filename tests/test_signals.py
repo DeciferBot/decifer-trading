@@ -8,6 +8,7 @@ Covers:
 - Empty / None / single-row data -> no exception
 - End-to-end: compute_indicators() -> compute_confluence() with synthetic OHLCV
 """
+from __future__ import annotations
 import os, sys, types
 from unittest.mock import MagicMock
 

@@ -5,6 +5,7 @@ Covers:
 2. _regime_multipliers()   — correct multipliers per regime; flag disables routing
 3. compute_confluence()    — weights shift per regime; flag disables cleanly
 """
+from __future__ import annotations
 import os
 import sys
 import types

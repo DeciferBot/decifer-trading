@@ -537,9 +537,13 @@ class TestAtrZeroDefensiveBehaviour:
 class TestAtrCapEndToEnd:
     """Verifies the ATR volatility cap is active and correctly calibrated.
 
-    Kelly_qty with these params = 200 (int(10000 / 50)).
-    ATR cap fires when int(portfolio * atr_vol_target_pct / atr) < 200.
-    That requires atr > 5.0.  We use _ATR_TIGHT=10 → cap=100 < Kelly=200.
+    With VIX-adaptive Kelly (base_kelly=0.5, vix_rank=0.0, risk_pct=0.005):
+      base_risk  = 100000 * 0.005 * 0.5 = 250
+      risk_amount = 250 * 1.5 (conviction) = 375
+      kelly_qty  = int(375 / (10 * 1.5)) = 25   ← below cap, cap cannot fire
+
+    To exercise the cap we need kelly_qty > atr_cap (100).  We patch
+    risk_pct_per_trade=0.05 so kelly_qty=250 > cap=100 → cap fires → qty=100.
     """
 
     def test_tight_atr_produces_fewer_shares_than_loose_atr(self):
@@ -559,12 +563,18 @@ class TestAtrCapEndToEnd:
         )
 
     def test_atr_cap_formula_matches_expected_qty(self):
-        """ATR-capped qty == int(portfolio * atr_vol_target_pct / atr) when cap wins."""
-        # atr=_ATR_TIGHT=10 → cap = int(100000*0.01/10) = 100 < Kelly=200 → cap wins
+        """ATR-capped qty == int(portfolio * atr_vol_target_pct / atr) when cap wins.
+
+        With default risk_pct=0.005 Kelly yields 25 shares (below the 100-share cap).
+        We patch risk_pct_per_trade=0.05 so Kelly yields 250 shares, forcing the cap
+        to fire and reduce qty to 100.
+        """
+        # atr=10 → cap = int(100000*0.01/10) = 100
         expected_cap = int((_PORTFOLIO * CONFIG["atr_vol_target_pct"]) / _ATR_TIGHT)
 
         with patch.object(risk, "get_vix_rank", return_value=0.0), \
-             patch.object(risk, "get_session",  return_value="MARKET"):
+             patch.object(risk, "get_session",  return_value="MARKET"), \
+             patch.dict(risk.CONFIG, {"risk_pct_per_trade": 0.05}):
             qty = _real_calculate_position_size(
                 _PORTFOLIO, _PRICE, _SCORE, _REGIME_BULL, atr=_ATR_TIGHT
             )

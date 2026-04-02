@@ -6,6 +6,7 @@ All tests are pure unit tests: no network calls, no IBKR dependency.
 get_vix_rank() is patched to inject VIX rank values.
 """
 
+from __future__ import annotations
 import sys
 import os
 import pytest
@@ -15,6 +16,8 @@ from unittest.mock import patch
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import CONFIG
+# Evict any hollow stub that test_reconnect.py may have installed for 'risk'
+sys.modules.pop("risk", None)
 import risk
 
 
@@ -70,57 +73,73 @@ class TestHighVixRankSmallerFraction:
         assert frac == pytest.approx(_BASE_KELLY, rel=1e-6)
 
 
-# ── Test 3: ATR cap wins when more conservative than Kelly ────────────────────
+# ── Test 3: ATR is now in the PRIMARY formula — larger ATR → fewer shares ─────
+#
+# Previously ATR was only the secondary vol cap.  It is now in the denominator
+# of the primary formula (risk_amount / stop_dollars).  Larger ATR = wider stop
+# = fewer shares for the same risk budget.
 
-class TestAtrCapWins:
-    def test_atr_cap_reduces_qty(self):
+class TestAtrPrimaryEffect:
+    def test_larger_atr_gives_fewer_shares(self):
         """
-        With a small ATR (tight vol), atr_capped_qty should be less than the
-        Kelly-sized qty, and the function should return the ATR-capped value.
-        """
-        portfolio   = 100_000.0
-        price       = 50.0
-        score       = 30   # conviction_mult = 1.0
-        # Force neutral Kelly (rank 0.0 → kelly = base_kelly = 0.5)
-        with patch.object(risk, "get_vix_rank", return_value=0.0):
-            # Small ATR → tight ATR cap
-            # atr_vol_target_pct = 0.01 → target = $1,000
-            # atr = $5.00 → atr_capped_qty = 1000/5 = 200
-            small_atr = 5.0
-            qty = risk.calculate_position_size(portfolio, price, score, _REGIME_NEUTRAL, atr=small_atr)
-
-        # atr_capped_qty = int(100000 * 0.01 / 5.0) = 200
-        atr_expected = int((portfolio * CONFIG["atr_vol_target_pct"]) / small_atr)
-        assert qty == atr_expected, (
-            f"Expected ATR-capped qty {atr_expected}, got {qty}"
-        )
-
-
-# ── Test 4: Kelly path wins when ATR cap is loose ─────────────────────────────
-
-class TestKellyWins:
-    def test_large_atr_does_not_further_restrict(self):
-        """
-        With a large ATR (wide vol), atr_capped_qty is loose (many shares allowed),
-        so the Kelly path determines final qty.
+        Doubling ATR doubles the stop distance, halving shares (same risk budget).
+        Primary formula: qty = risk_amount / (atr × atr_stop_multiplier)
         """
         portfolio = 100_000.0
         price     = 50.0
         score     = 30
 
         with patch.object(risk, "get_vix_rank", return_value=0.0):
-            # Large ATR → ATR cap is very generous
-            # atr_vol_target_pct=0.01 → target=$1,000; atr=0.01 → cap=100,000 shares
-            large_atr = 0.01
-            qty_with_atr = risk.calculate_position_size(
-                portfolio, price, score, _REGIME_NEUTRAL, atr=large_atr
-            )
-            qty_no_atr = risk.calculate_position_size(
-                portfolio, price, score, _REGIME_NEUTRAL, atr=0.0
-            )
+            qty_tight = risk.calculate_position_size(portfolio, price, score, _REGIME_NEUTRAL, atr=2.0)
+            qty_wide  = risk.calculate_position_size(portfolio, price, score, _REGIME_NEUTRAL, atr=4.0)
 
-        # With a very loose ATR cap, sizing should match the no-ATR path
-        assert qty_with_atr == qty_no_atr, (
-            f"Expected Kelly path to dominate: qty_with_atr={qty_with_atr}, "
-            f"qty_no_atr={qty_no_atr}"
+        assert qty_wide < qty_tight, (
+            f"Wider ATR stop should yield fewer shares: atr=2→{qty_tight}, atr=4→{qty_wide}"
+        )
+        # Doubling ATR halves qty (within integer-truncation tolerance)
+        ratio = qty_wide / qty_tight
+        assert abs(ratio - 0.5) < 0.1, f"Doubling ATR should halve qty, got ratio={ratio:.3f}"
+
+    def test_no_atr_fallback_returns_sensible_qty(self):
+        """
+        atr=0 triggers the assumed_stop_pct fallback.  Result should be a
+        positive integer in a reasonable range (not zero, not thousands).
+        """
+        portfolio = 100_000.0
+        price     = 50.0
+        score     = 30
+
+        with patch.object(risk, "get_vix_rank", return_value=0.0):
+            qty = risk.calculate_position_size(portfolio, price, score, _REGIME_NEUTRAL, atr=0.0)
+
+        assert qty >= 1
+        # Fallback assumed_stop=4%: position ≈ risk_amount/0.04/price
+        # = 100000*0.005*0.5 / 0.04 / 50 = 125 shares; check within 2×
+        assert qty <= 300, f"Fallback qty {qty} seems unreasonably large"
+
+
+# ── Test 4: Secondary ATR vol cap (belt-and-suspenders) ──────────────────────
+#
+# With ATR-based primary sizing, the secondary ATR vol cap (Layer 9) rarely
+# fires.  It is kept as an emergency guard for corrupted data.
+
+class TestAtrVolCapSecondary:
+    def test_secondary_cap_does_not_fire_under_normal_conditions(self):
+        """
+        At typical ATR (2.0), the primary formula already produces conservative
+        sizing; the secondary vol cap should not further reduce qty.
+        """
+        portfolio = 100_000.0
+        price     = 50.0
+        score     = 30
+        atr       = 2.0
+
+        secondary_cap = int((portfolio * CONFIG["atr_vol_target_pct"]) / atr)  # 500 shares
+
+        with patch.object(risk, "get_vix_rank", return_value=0.0):
+            qty = risk.calculate_position_size(portfolio, price, score, _REGIME_NEUTRAL, atr=atr)
+
+        # Primary path should give fewer shares than the secondary cap
+        assert qty <= secondary_cap, (
+            f"qty={qty} should not exceed secondary vol cap={secondary_cap}"
         )

@@ -5,6 +5,7 @@ tests/test_reconnect.py
 Comprehensive unit tests for the IBKR auto-reconnect logic in bot.py.
 All heavy dependencies are mocked before import.
 """
+from __future__ import annotations
 import os, sys, types
 from unittest.mock import MagicMock, patch
 

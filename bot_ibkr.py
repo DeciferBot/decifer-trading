@@ -11,6 +11,8 @@ so that test patching via `patch.object(bot, "ib", mock)` propagates correctly
 through the module shim in bot.py.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import math
@@ -768,6 +770,9 @@ def sync_orders_from_ibkr():
             _fp        = t.orderStatus.avgFillPrice
             fill_price = float(_fp) if (_fp is not None and _fp > 0) else 0
             filled_qty = int(t.orderStatus.filled) if t.orderStatus.filled else 0
+
+            if not order.orderId:  # IBKR hasn't assigned an ID yet — skip to avoid order_id=0 accumulation
+                continue
 
             _log_order({
                 "order_id":   order.orderId,

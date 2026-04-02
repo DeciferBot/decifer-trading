@@ -407,7 +407,10 @@ class TestSettingsPersistence:
     def test_save_and_reload_updates_config(self, monkeypatch, tmp_path):
         settings_path = str(tmp_path / "settings_override.json")
         monkeypatch.setattr(bot, "SETTINGS_FILE", settings_path)
-        bot.CONFIG["risk_pct_per_trade"] = 0.01          # baseline
+        # Use monkeypatch.setitem so CONFIG is restored after the test.
+        # Direct dict mutation persists across tests because bot.CONFIG and
+        # risk.CONFIG are the same object (both `from config import CONFIG`).
+        monkeypatch.setitem(bot.CONFIG, "risk_pct_per_trade", 0.01)
         bot.save_settings_overrides({"risk_pct_per_trade": 0.025})
         bot.load_settings_overrides()
         assert bot.CONFIG["risk_pct_per_trade"] == pytest.approx(0.025)

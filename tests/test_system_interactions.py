@@ -8,6 +8,7 @@ correctly in edge-case scenarios not covered by individual unit tests.
 Test isolation: module-level stubs, _reset_risk() in each setup_method.
 """
 
+from __future__ import annotations
 import json
 import os
 import sys

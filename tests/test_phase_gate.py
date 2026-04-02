@@ -6,6 +6,8 @@ These tests use isolated config dicts so they never touch config.py on disk
 and are fully offline (no IBKR, no Claude API, no yfinance).
 """
 
+from __future__ import annotations
+
 import json
 import os
 import sys

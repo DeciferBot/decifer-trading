@@ -2,6 +2,7 @@
 
 All external I/O is mocked; no live IBKR or market-data connections are made.
 """
+from __future__ import annotations
 import os, sys, types
 from unittest.mock import MagicMock
 

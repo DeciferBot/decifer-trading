@@ -6,6 +6,8 @@ Covers: P&L subscription, portfolio value snapshot, account details,
 news headline aggregation, FX snapshot, and equity history persistence.
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import math

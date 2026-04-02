@@ -5,6 +5,7 @@ bot_sentinel.py — News and Catalyst sentinel handlers for the Decifer trading 
 Covers: handle_news_trigger, _execute_sentinel_buy/sell,
 handle_catalyst_trigger, _execute_catalyst_buy, and the countdown ticker.
 """
+from __future__ import annotations
 
 import logging
 import time
@@ -150,7 +151,7 @@ def _execute_sentinel_buy(decision: dict, portfolio_value: float,
                 atr            = sig.get("atr", 0)
                 score          = max(sig.get("score", 0), 30)
                 sentinel_mult  = CONFIG.get("sentinel_risk_multiplier", 0.75)
-                qty            = int(calculate_position_size(portfolio_value, price, score, regime) * sentinel_mult)
+                qty            = calculate_position_size(portfolio_value, price, score, regime, external_mult=sentinel_mult)
                 if sl <= 0 and atr > 0:
                     sl, tp = calculate_stops(price, atr, "LONG")
         except Exception as e:
@@ -362,7 +363,7 @@ def _execute_catalyst_buy(decision: dict, portfolio_value: float,
                 price = sig.get("price", 0)
                 atr   = sig.get("atr", 0)
                 score = max(sig.get("score", 0), 30)
-                qty   = int(calculate_position_size(portfolio_value, price, score, regime) * size_mult)
+                qty   = calculate_position_size(portfolio_value, price, score, regime, external_mult=size_mult)
                 if sl <= 0 and atr > 0:
                     sl, tp = calculate_stops(price, atr, "LONG")
         except Exception as e:

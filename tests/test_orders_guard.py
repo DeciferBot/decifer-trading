@@ -12,6 +12,7 @@ Approach:
 
 All tests run fully offline using AsyncMock / MagicMock.
 """
+from __future__ import annotations
 import os, sys, types
 from unittest.mock import MagicMock
 
@@ -236,16 +237,17 @@ class TestAsyncLockSemantics:
     def test_async_lock_serialises_same_symbol(self):
         """Two coroutines for same symbol via single Lock must not interleave."""
         execution_log: List[str] = []
-        lock = asyncio.Lock()
-
-        async def place_order(symbol: str, hold: float = 0.0) -> None:
-            async with lock:
-                execution_log.append(f"{symbol}:enter")
-                if hold:
-                    await asyncio.sleep(hold)
-                execution_log.append(f"{symbol}:exit")
 
         async def run():
+            lock = asyncio.Lock()  # create inside event loop (py3.9 compat)
+
+            async def place_order(symbol: str, hold: float = 0.0) -> None:
+                async with lock:
+                    execution_log.append(f"{symbol}:enter")
+                    if hold:
+                        await asyncio.sleep(hold)
+                    execution_log.append(f"{symbol}:exit")
+
             await asyncio.gather(
                 place_order("AAPL", hold=0.01),
                 place_order("AAPL", hold=0.0),
@@ -287,24 +289,25 @@ class TestAsyncLockSemantics:
 
     def test_async_lock_prevents_second_entry_while_held(self):
         """While lock is held, second coroutine must wait (lock.locked() is True)."""
-        lock = asyncio.Lock()
         status: List[str] = []
 
-        async def first_coroutine():
-            async with lock:
-                status.append("first:holding")
-                assert lock.locked()
-                await asyncio.sleep(0.02)
-            status.append("first:released")
-
-        async def second_coroutine():
-            await asyncio.sleep(0.005)  # let first acquire lock
-            assert lock.locked(), "Lock should be held by first coroutine"
-            status.append("second:waiting")
-            async with lock:
-                status.append("second:acquired")
-
         async def run():
+            lock = asyncio.Lock()  # create inside event loop (py3.9 compat)
+
+            async def first_coroutine():
+                async with lock:
+                    status.append("first:holding")
+                    assert lock.locked()
+                    await asyncio.sleep(0.02)
+                status.append("first:released")
+
+            async def second_coroutine():
+                await asyncio.sleep(0.005)  # let first acquire lock
+                assert lock.locked(), "Lock should be held by first coroutine"
+                status.append("second:waiting")
+                async with lock:
+                    status.append("second:acquired")
+
             await asyncio.gather(first_coroutine(), second_coroutine())
 
         asyncio.run(run())
@@ -317,19 +320,20 @@ class TestAsyncLockSemantics:
     def test_three_concurrent_same_symbol_fully_serialised(self):
         """Three concurrent orders for the same symbol must fully serialise."""
         execution_log: List[str] = []
-        lock = asyncio.Lock()
         order_count = [0]
 
-        async def place_order(order_id: int) -> None:
-            async with lock:
-                execution_log.append(f"enter:{order_id}")
-                order_count[0] += 1
-                assert order_count[0] == 1, f"Multiple orders running concurrently! count={order_count[0]}"
-                await asyncio.sleep(0.005)
-                order_count[0] -= 1
-                execution_log.append(f"exit:{order_id}")
-
         async def run():
+            lock = asyncio.Lock()  # create inside event loop (py3.9 compat)
+
+            async def place_order(order_id: int) -> None:
+                async with lock:
+                    execution_log.append(f"enter:{order_id}")
+                    order_count[0] += 1
+                    assert order_count[0] == 1, f"Multiple orders running concurrently! count={order_count[0]}"
+                    await asyncio.sleep(0.005)
+                    order_count[0] -= 1
+                    execution_log.append(f"exit:{order_id}")
+
             await asyncio.gather(
                 place_order(1),
                 place_order(2),

@@ -17,6 +17,8 @@ KNOWN UNTESTED PATHS (coverage debt — expand these tests):
   - TODO: trades.json / learning.py log_order integration path
 """
 
+from __future__ import annotations
+
 import sys
 import os
 import asyncio

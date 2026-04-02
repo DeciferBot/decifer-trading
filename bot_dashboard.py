@@ -5,6 +5,8 @@ bot_dashboard.py — HTTP dashboard handler for the Decifer trading bot.
 Covers: DashHandler(BaseHTTPRequestHandler) and start_dashboard().
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import sys
@@ -69,6 +71,18 @@ class DashHandler(BaseHTTPRequestHandler):
                     state["last_decision"] = None
             except Exception:
                 state["last_decision"] = None
+            # Decision history — last 50 entries for trade card navigation
+            try:
+                _hist_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                                           "data", "decision_history.jsonl")
+                if _os.path.exists(_hist_path):
+                    with open(_hist_path) as _hf:
+                        _lines = [l.strip() for l in _hf if l.strip()]
+                        state["decision_history"] = [json.loads(l) for l in _lines[-50:]]
+                else:
+                    state["decision_history"] = []
+            except Exception:
+                state["decision_history"] = []
             state["settings"] = {
                 "risk_pct_per_trade":       CONFIG.get("risk_pct_per_trade", 0.04),
                 "daily_loss_limit":         CONFIG.get("daily_loss_limit", 0.06),

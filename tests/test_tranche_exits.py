@@ -11,6 +11,7 @@ Covers:
 7. tranche_mode=False preserves legacy TP qty (qty//3) and t1_status="N/A"
 """
 
+from __future__ import annotations
 import sys
 import os
 from unittest.mock import MagicMock, patch

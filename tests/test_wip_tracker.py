@@ -6,6 +6,8 @@ These tests use isolated backlog dicts so they never touch backlog.json on
 disk and are fully offline.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import sys
