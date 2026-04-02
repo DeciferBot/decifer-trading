@@ -207,6 +207,8 @@ _VIX_CFG = {
     "vix_spike_pct": 0.15,
     "vix_bull_max": 18,
     "vix_choppy_max": 25,
+    # Disable breadth in unit tests — ^MMTH is not mocked
+    "breadth_regime": {"enabled": False},
 }
 
 
@@ -272,6 +274,6 @@ class TestScannerRanking:
         with patch("scanner._safe_download", side_effect=mock_dl):
             with patch.dict(scanner.CONFIG, _VIX_CFG):
                 result = scanner.get_market_regime(ib)
-        for key in ("regime", "vix", "spy_price", "spy_above_ema",
-                    "qqq_price", "qqq_above_ema", "position_size_multiplier"):
+        for key in ("regime", "vix", "spy_price", "spy_above_200d",
+                    "qqq_price", "qqq_above_200d", "position_size_multiplier"):
             assert key in result, f"Missing key: {key}"

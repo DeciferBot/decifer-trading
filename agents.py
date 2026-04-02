@@ -45,7 +45,7 @@ def agent_technical(signals: list, regime: dict) -> str:
         f"TECHNICAL ANALYSIS — {min(len(signals), 15)} symbols above threshold",
         (
             f"Market: VIX={regime['vix']:.1f} | SPY=${regime['spy_price']} "
-            f"({'above' if regime['spy_above_ema'] else 'below'} 20-EMA)"
+            f"({'above' if regime.get('spy_above_200d', regime.get('spy_above_ema')) else 'below'} 200d MA)"
         ),
         "",
     ]
@@ -166,8 +166,8 @@ def agent_macro(regime: dict, news_headlines: list, fx_data: dict) -> str:
 
 REGIME CLASSIFICATION: {regime['regime']}
 VIX: {regime['vix']} ({regime['vix_1h_change']:+.1f}% in last hour)
-SPY: ${regime['spy_price']} (above 20-EMA: {regime['spy_above_ema']})
-QQQ: ${regime['qqq_price']} (above 20-EMA: {regime['qqq_above_ema']})
+SPY: ${regime['spy_price']} (above 200d MA: {regime.get('spy_above_200d', regime.get('spy_above_ema'))})
+QQQ: ${regime['qqq_price']} (above 200d MA: {regime.get('qqq_above_200d', regime.get('qqq_above_ema'))})
 
 FX MARKETS:
 {fx_text}

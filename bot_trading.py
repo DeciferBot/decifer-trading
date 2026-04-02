@@ -6,7 +6,11 @@ Covers: run_scan (main loop), external-close detection, options position
 monitoring, kill-switch check, close-queue processing, and cash rebalancing.
 """
 
+from __future__ import annotations
+
+import json
 import logging
+import pathlib
 import sys
 import time
 import threading
@@ -47,7 +51,113 @@ log = logging.getLogger("decifer.bot")
 # ── EOD options review state ──────────────────────────────────────────────────
 _eod_options_review_done: bool = False
 
+# ── Session-scoped options attempt ledger ────────────────────────────────────
+# Tracks which (symbol, direction) pairs have already been attempted today.
+# Key  : "{symbol}_{direction}"  e.g. "NKE_LONG"
+# Value: ISO date string         e.g. "2026-04-02"
+#
+# Design rationale (industry standard for DAY orders):
+#   A cancelled DAY order is TERMINAL for that signal instance.  Retrying the
+#   same symbol+direction on the same session date is almost always wrong —
+#   if IBKR couldn't fill it once, market conditions (spread, liquidity) haven't
+#   changed enough in 5 minutes to justify another attempt.
+#   The natural retry boundary is the NEXT session, when a fresh signal fires.
+#
+# This survives bot restarts (disk-persisted) and auto-expires by date — no
+# manual clearing needed.  A new trading day generates new signal dates, new
+# keys, and allows fresh attempts automatically.
+_OPTIONS_LEDGER_PATH = pathlib.Path("data/options_attempt_ledger.json")
+
+
+def _load_options_ledger() -> dict:
+    """Load ledger from disk.  Returns {} on any error."""
+    try:
+        if _OPTIONS_LEDGER_PATH.exists():
+            return json.loads(_OPTIONS_LEDGER_PATH.read_text())
+    except Exception:
+        pass
+    return {}
+
+
+def _save_options_ledger(ledger: dict) -> None:
+    """Persist ledger to disk.  Silently ignores write errors."""
+    try:
+        _OPTIONS_LEDGER_PATH.write_text(json.dumps(ledger))
+    except Exception:
+        pass
+
+
+def _options_attempted_today(symbol: str, direction: str) -> bool:
+    """Return True if we already attempted options on this symbol+direction today."""
+    key   = f"{symbol}_{direction}"
+    today = datetime.now().strftime("%Y-%m-%d")
+    return _options_ledger.get(key) == today
+
+
+def _record_options_attempt(symbol: str, direction: str) -> None:
+    """Mark this symbol+direction as attempted today and persist."""
+    key   = f"{symbol}_{direction}"
+    today = datetime.now().strftime("%Y-%m-%d")
+    _options_ledger[key] = today
+    # Prune stale entries (any date != today) to keep the file tidy
+    stale = [k for k, v in _options_ledger.items() if v != today]
+    for k in stale:
+        del _options_ledger[k]
+    _save_options_ledger(_options_ledger)
+
+
+_options_ledger: dict = _load_options_ledger()
+
 # ── Last-decision writer (for Chief Decifer trade card) ───────────────────────
+
+def _synthesize_trade_card(symbol: str, company_name: str,
+                           opp_text: str, dev_text: str, tech_text: str,
+                           price: float, sl: float, tp: float,
+                           score: int, api_key: str) -> dict:
+    """
+    Call Claude Haiku to synthesize a clean thesis/edge/risk from raw agent outputs.
+    Returns dict with keys: thesis, edge_why_now, risk.
+    Raises on API failure so caller can fall back gracefully.
+    """
+    import re as _re
+    import anthropic
+
+    sl_pct = round(abs(price - sl) / price * 100, 1) if price > 0 and sl > 0 else 0
+    tp_pct = round(abs(tp - price) / price * 100, 1) if price > 0 and tp > 0 else 0
+
+    prompt = (
+        f"You are summarizing a live trading decision for {symbol} ({company_name}).\n\n"
+        f"Signal score: {score}/50  |  Entry: ${price:.2f}  |  "
+        f"Stop: ${sl:.2f} (-{sl_pct}%)  |  Target: ${tp:.2f} (+{tp_pct}%)\n\n"
+        f"OPPORTUNITY AGENT:\n{opp_text[:2500]}\n\n"
+        f"DEVIL'S ADVOCATE:\n{dev_text[:1500]}\n\n"
+        f"TECHNICAL AGENT (excerpt):\n{tech_text[:800]}\n\n"
+        f"Write exactly three labelled fields. Be specific to {symbol} — no generic filler.\n\n"
+        f"THESIS: [2 sentences. Why this stock, what structural or technical theme supports entry.]\n"
+        f"EDGE: [1 sentence. The specific catalyst, breakout level, or time-sensitive setup that "
+        f"makes this actionable RIGHT NOW. Must add new information beyond the thesis.]\n"
+        f"RISK: [1 sentence. The most specific bear case from the devil's advocate — "
+        f"what could make this trade wrong.]"
+    )
+
+    client = anthropic.Anthropic(api_key=api_key)
+    msg = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=350,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    text = msg.content[0].text.strip()
+
+    result: dict = {}
+    for label, key in [("THESIS", "thesis"), ("EDGE", "edge_why_now"), ("RISK", "risk")]:
+        m = _re.search(
+            rf"{label}:\s*(.+?)(?=(?:THESIS:|EDGE:|RISK:)|\Z)",
+            text, _re.DOTALL | _re.IGNORECASE,
+        )
+        if m:
+            result[key] = m.group(1).strip()
+    return result
+
 
 def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
                          portfolio_value: float) -> None:
@@ -55,12 +165,13 @@ def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
     Write data/last_decision.json after a successful BUY so Chief Decifer
     can display a rich trade card on its home page.
     """
-    import json, re
+    import json, os, re
     from pathlib import Path
 
     outputs   = decision.get("_agent_outputs", {})
     opp_text  = outputs.get("opportunity", "")
     dev_text  = outputs.get("devils", "")
+    tech_text = outputs.get("technical", "")
 
     price  = sig.get("price", 0)
     qty    = buy.get("qty", 1)
@@ -83,51 +194,73 @@ def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
     except Exception:
         pass
 
-    # ── Thesis — entry rationale from opportunity agent ───────────────────────
+    # ── Claude synthesis of thesis / edge / risk ──────────────────────────────
+    api_key = CONFIG.get("anthropic_api_key", "") or os.environ.get("ANTHROPIC_API_KEY", "")
+    synthesis: dict = {}
+    if api_key and api_key not in ("YOUR_API_KEY_HERE", ""):
+        try:
+            synthesis = _synthesize_trade_card(
+                symbol, company_name, opp_text, dev_text, tech_text,
+                price, sl, tp, score, api_key,
+            )
+            clog("INFO", f"Claude trade card synthesis complete for {symbol}")
+        except Exception as exc:
+            clog("WARN", f"Claude synthesis failed for {symbol}, using fallback: {exc}")
+
+    # Fallback extraction if Claude synthesis unavailable or incomplete
     reasoning = buy.get("reasoning", "")
-    thesis = reasoning[:300] if reasoning else f"{symbol} selected by AI agent council"
 
-    # ── Edge (why now) — sentences containing timing language ─────────────────
-    edge = ""
-    timing_kws = ("now", "today", "catalyst", "announ", "break", "decis",
-                  "approv", "launch", "event", "earning", "FDA", "catalyst",
-                  "coming", "imminent", "near-term", "upcoming", "expect")
-    for sent in re.split(r"(?<=[.!?])\s+", thesis):
-        if any(kw.lower() in sent.lower() for kw in timing_kws):
-            edge = sent.strip()
-            break
+    thesis = synthesis.get("thesis") or (
+        reasoning[:400] if reasoning else f"{symbol} selected by AI agent council"
+    )
 
-    # ── Key risk — from devil's advocate for this symbol ─────────────────────
-    risk = ""
-    if dev_text:
+    edge = synthesis.get("edge_why_now") or ""
+    if not edge and reasoning:
+        # Last-resort regex: find a sentence with timing language distinct from thesis start
+        timing_kws = ("catalyst", "announ", "break", "decis", "approv", "launch",
+                      "event", "earning", "FDA", "coming", "imminent", "near-term",
+                      "upcoming", "breakout", "momentum", "volume spike")
+        sentences = re.split(r"(?<=[.!?])\s+", reasoning)
+        for i, sent in enumerate(sentences):
+            if i == 0:
+                continue  # always skip first — it's already the thesis
+            if any(kw.lower() in sent.lower() for kw in timing_kws):
+                edge = sent.strip()
+                break
+
+    risk = synthesis.get("risk") or ""
+    if not risk and dev_text:
         upper_dev = dev_text.upper()
         idx = upper_dev.find(symbol)
         if idx != -1:
             section = dev_text[idx:idx + 800]
-            # Look for KEY RISK / RISK / concern label
             m = re.search(
                 r"(?:KEY\s+RISK|RISK[:\s]|MAIN\s+CONCERN)[:\s]+(.+?)(?:\n[0-9A-Z]|\Z)",
-                section, re.IGNORECASE | re.DOTALL
+                section, re.IGNORECASE | re.DOTALL,
             )
             if m:
                 risk = m.group(1).strip()[:250]
             else:
-                # Fallback: pull a sentence containing "risk" or "wrong"
                 for sent in re.split(r"(?<=[.!?])\s+", section):
                     if any(kw in sent.lower() for kw in ("risk", "wrong", "concern", "veto", "fail")):
                         risk = sent.strip()[:250]
                         break
     if not risk:
-        risk = "Market or macro conditions could shift against the thesis."
+        risk = "No specific risk identified by devil's advocate this cycle."
 
-    # ── Expected returns — derived from stops (indicative, not advice) ────────
-    exp_returns: dict = {}
-    if price > 0 and tp > 0:
+    # ── Price targets — honest representation of stops ────────────────────────
+    # Labelled as targets, not forecasts. BUY requires tp > price to be valid.
+    price_targets: dict = {}
+    if price > 0 and tp > price and sl > 0 and sl < price:
         tp_pct = round((tp - price) / price * 100, 1)
-        exp_returns = {
-            "1m":  round(tp_pct * 0.45, 1),
-            "3m":  round(tp_pct * 0.85, 1),
-            "12m": round(tp_pct * 1.35, 1),
+        sl_pct = round((price - sl) / price * 100, 1)
+        rr     = round(tp_pct / sl_pct, 1) if sl_pct else 0
+        price_targets = {
+            "target_pct": tp_pct,
+            "stop_pct":   -sl_pct,
+            "rr_ratio":   rr,
+            "target_price": round(tp, 2),
+            "stop_price":   round(sl, 2),
         }
 
     payload = {
@@ -143,7 +276,7 @@ def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
         "thesis":          thesis,
         "edge_why_now":    edge,
         "risk":            risk,
-        "expected_returns": exp_returns,
+        "price_targets":   price_targets,
         "agents_agreed":   decision.get("agents_agreed", 0),
         "timestamp":       datetime.now().isoformat(timespec="seconds"),
     }
@@ -155,6 +288,14 @@ def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
         clog("INFO", f"last_decision.json written for {symbol}")
     except Exception as e:
         clog("ERROR", f"Could not write last_decision.json: {e}")
+
+    # Append to decision history so dashboard can navigate back through all trades
+    hist_path = Path(__file__).parent / "data" / "decision_history.jsonl"
+    try:
+        with hist_path.open("a") as hf:
+            hf.write(json.dumps(payload) + "\n")
+    except Exception as e:
+        clog("ERROR", f"Could not append to decision_history.jsonl: {e}")
 
 
 # ── Detect positions closed externally (stop loss / take profit) ──────────────
@@ -239,7 +380,19 @@ def check_external_closes(regime: dict):
                     if qty and not _math.isnan(rpnl) and rpnl != 0.0:
                         exit_price = round(trade["entry"] + rpnl / (qty * mult), 4)
 
-                if exit_price is None:
+                if exit_price is None and not is_opt_pos:
+                    # Fill event was lost (connectivity blip, reconnect).  Use the
+                    # recorded stop_loss price as a best-effort exit so the trade
+                    # lands in learning history rather than being silently discarded.
+                    stop_px = trade.get("stop_loss") or trade.get("sl")
+                    if stop_px:
+                        exit_price = float(stop_px)
+                        clog("WARN", f"No fill evidence for {sym} — estimating exit at stop_loss ${exit_price:.2f}")
+                    else:
+                        clog("INFO", f"No fill evidence for {sym} — removing from tracker (not logging as trade)")
+                        del open_trades[sym]
+                        continue
+                elif exit_price is None:
                     clog("INFO", f"No fill evidence for {sym} — removing from tracker (not logging as trade)")
                     del open_trades[sym]
                     continue
@@ -422,11 +575,13 @@ def _auto_rebalance_cash(portfolio_value: float, regime: dict):
                 cash_pct = _current_cash_pct()
                 clog("RISK", f"Auto-rebalance: cash now at {cash_pct*100:.1f}%")
             else:
-                clog("ERROR", f"Auto-rebalance: Could not close {sym}")
-                break
+                clog("ERROR", f"Auto-rebalance: Could not close {sym} (not in IBKR — phantom entry?), purging and trying next")
+                from orders import reconcile_with_ibkr
+                reconcile_with_ibkr(ib)
+                continue
         except Exception as e:
-            clog("ERROR", f"Auto-rebalance: Failed to close {sym}: {e}")
-            break
+            clog("ERROR", f"Auto-rebalance: Failed to close {sym}: {e}, trying next")
+            continue
 
     if cash_pct < min_reserve:
         clog("RISK", f"Auto-rebalance: cash still at {cash_pct*100:.1f}% after closing all eligible positions")
@@ -532,6 +687,8 @@ def _maybe_eod_options_review(regime: dict):
     # Reset each morning before the session opens
     if t < dtime(9, 30):
         _eod_options_review_done = False
+        # Ledger auto-expires by date — no explicit clear needed.
+        # Pruning of stale entries happens inside _record_options_attempt.
     # Fire once in the pre-close window
     if dtime(15, 30) <= t < dtime(15, 55) and not _eod_options_review_done:
         _eod_options_review_done = True
@@ -608,15 +765,22 @@ def run_scan():
     _rr_threshold  = CONFIG.get("regime_router_vix_threshold", 20)
     if CONFIG.get("regime_routing_enabled", True):
         _vix_regime = "momentum" if _vix_val and _vix_val < _rr_threshold else "mean_reversion"
-        # Hurst DFA second signal — only fetched when enabled (default: False)
+        # Hurst DFA second signal
         _hurst_regime = "unknown"
         if CONFIG.get("hurst_regime", {}).get("enabled", False):
             from signals import get_hurst_regime_spy
             _hurst_result = get_hurst_regime_spy()
             _hurst_regime = _hurst_result.get("regime", "unknown")
             regime["hurst_regime"] = _hurst_result
+        # HMM third signal — 2-state Gaussian HMM on SPY daily returns
+        _hmm_regime = "unknown"
+        if CONFIG.get("hmm_regime", {}).get("enabled", False):
+            from signals import get_hmm_regime_spy
+            _hmm_result = get_hmm_regime_spy()
+            _hmm_regime = _hmm_result.get("regime", "unknown")
+            regime["hmm_regime"] = _hmm_result
         from signals import _resolve_regime_router
-        _router_state = _resolve_regime_router(_vix_regime, _hurst_regime)
+        _router_state = _resolve_regime_router(_vix_regime, _hurst_regime, _hmm_regime)
     else:
         _router_state = "disabled"
     regime["regime_router"] = _router_state
@@ -907,23 +1071,29 @@ def run_scan():
                     clog("INFO", f"Score {sig['score']} qualifies for options but direction={_sig_dir!r} — skipping (no clear conviction)")
                 else:
                     direction = _sig_dir
-                    clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
-                    try:
-                        contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
-                        if contract_info:
-                            opt_success = execute_buy_option(ib, contract_info, pv, reasoning=reason)
-                            if opt_success:
-                                dash["trades"].insert(0, {
-                                    "side":   f"BUY {contract_info['right']} OPT",
-                                    "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
-                                    "price":  str(contract_info["mid"]),
-                                    "time":   datetime.now().strftime("%H:%M:%S")
-                                })
-                                clog("TRADE", f"Options trade executed for {sym} (independent of stock)")
-                        else:
-                            clog("INFO", f"No suitable options contract for {sym}")
-                    except Exception as _opt_err:
-                        clog("ERROR", f"Options evaluation failed for {sym}: {_opt_err}")
+                    if _options_attempted_today(sym, direction):
+                        clog("INFO", f"Options attempt already recorded for {sym} {direction} today — skipping (DAY order terminal)")
+                    else:
+                        clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
+                        _record_options_attempt(sym, direction)  # mark BEFORE submit (survives crash)
+                        try:
+                            contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
+                            if contract_info:
+                                opt_success = execute_buy_option(ib, contract_info, pv, reasoning=reason)
+                                if opt_success:
+                                    dash["trades"].insert(0, {
+                                        "side":   f"BUY {contract_info['right']} OPT",
+                                        "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
+                                        "price":  str(contract_info["mid"]),
+                                        "time":   datetime.now().strftime("%H:%M:%S")
+                                    })
+                                    clog("TRADE", f"Options trade executed for {sym} (independent of stock)")
+                                    if not stock_success:
+                                        _write_last_decision(sym, buy, sig, decision, pv)
+                            else:
+                                clog("INFO", f"No suitable options contract for {sym}")
+                        except Exception as _opt_err:
+                            clog("ERROR", f"Options evaluation failed for {sym}: {_opt_err}")
 
     dash["positions"] = get_open_positions()
     _seen_dash = {}

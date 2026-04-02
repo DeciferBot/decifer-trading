@@ -5,6 +5,8 @@
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
+from __future__ import annotations
+
 import os
 
 CONFIG = {
@@ -42,21 +44,22 @@ CONFIG = {
     "heartbeat_interval_secs":  1200,   # 20 min heartbeat (reqCurrentTime)
 
     # ── RISK MANAGEMENT ───────────────────────────────────────
-    # NOTE: Tuned for PAPER TRADING data generation — maximise trade volume
-    # across regimes to build ML training dataset. Revert to conservative
-    # values before switching to live. Original live values in comments.
-    "risk_pct_per_trade":       0.03,   # 3% of portfolio per trade (live: 0.04)
-    "risk_per_trade":           0.01,   # 1% per trade — used by position_size()
+    "risk_pct_per_trade":       0.005,  # 0.5% of portfolio AT RISK per trade.
+                                        # With ATR stop sizing, this yields ~4-6% position
+                                        # size at neutral conditions, capped at max_single_position.
+    "assumed_stop_pct":         0.04,   # 4% fallback stop when ATR is unavailable.
+                                        # Primary path uses atr × atr_stop_multiplier instead.
+    "risk_per_trade":           0.01,   # 1% per trade — used by legacy position_size()
     "max_position_size":        0.30,   # Max fraction of account per position (30%)
-    "max_daily_loss_pct":       0.05,   # 5% max daily loss before halting (live: 0.05)
+    "max_daily_loss_pct":       0.05,   # 5% max daily loss before halting
     "correlation_threshold":    0.75,   # Block new trade if correlation > this
-    "max_positions":            20,     # More concurrent positions = more data (live: 12)
-    "daily_loss_limit":         0.10,   # 10% daily — paper can absorb more (live: 0.06)
-    "max_drawdown_alert":       0.25,   # 25% drawdown alert (live: 0.15)
-    "min_cash_reserve":         0.05,   # 5% cash reserve (live: 0.10)
-    "max_single_position":      0.10,   # 10% per position with more positions (live: 0.15)
-    "max_sector_exposure":      0.50,   # 50% sector — allow concentration (live: 0.40)
-    "consecutive_loss_pause":   8,      # More tolerance for losing streaks (live: 5)
+    "max_positions":            15,     # 15 × 6% = 90% deployed; 10% cash floor stops at ~14
+    "daily_loss_limit":         0.10,   # 10% daily loss limit
+    "max_drawdown_alert":       0.25,   # 25% drawdown alert
+    "min_cash_reserve":         0.10,   # 10% cash floor — hard stop on new entries
+    "max_single_position":      0.06,   # 6% per position — keeps 14 positions before hitting floor
+    "max_sector_exposure":      0.40,   # 40% sector cap
+    "consecutive_loss_pause":   5,      # Pause after 5 consecutive losses
 
     # ── INTRADAY ADAPTIVE STRATEGY ────────────────────────────────
     # When the day is going badly, the bot shifts posture rather than trading normally
@@ -80,11 +83,11 @@ CONFIG = {
     },
 
     # ── TAKE PROFIT / STOP LOSS ───────────────────────────────
-    "atr_stop_multiplier":      1.5,    # Stop = entry - (1.5 × ATR)
-    "atr_trail_multiplier":     2.0,    # Trailing stop = 2 × ATR from high-water mark
+    "atr_stop_multiplier":      1.0,    # Stop = entry - (1.0 × ATR)  — tighter, cut losses faster
+    "atr_trail_multiplier":     1.5,    # Trailing stop = 1.5 × ATR from high-water mark
     "trailing_stop_enabled":    True,   # Slide stop up as price advances (ATR-based)
-    "partial_exit_1_pct":       0.04,   # Sell 33% at +4%
-    "partial_exit_2_pct":       0.08,   # Sell 33% at +8%, trail rest
+    "partial_exit_1_pct":       0.02,   # Sell 33% at +2%  — take profit faster
+    "partial_exit_2_pct":       0.04,   # Sell 33% at +4%, trail rest
     "min_reward_risk_ratio":    1.5,    # Minimum R:R to enter trade
     "gap_protection_pct":       0.03,   # Exit if opens 3% against position
 
@@ -107,7 +110,7 @@ CONFIG = {
     # ── SCORING THRESHOLD ─────────────────────────────────────
     # NOTE: Lowered for paper trading to capture more setups for ML training (live values in comments)
     "min_score_to_trade":       18,     # Out of 50 — lower = more trades for training (live: 28)
-    "high_conviction_score":    30,     # Above this = 1.5x position size (live: 38)
+    "high_conviction_score":    36,     # Above this = 1.5x position size — narrower band, fewer bloated positions
 
     # ── DIMENSION FLAGS ───────────────────────────────────────────
     # Enable / disable individual signal dimensions without code changes.
@@ -252,8 +255,12 @@ CONFIG = {
     "dashboard_port":           8080,
 
     # ── VIX REGIME THRESHOLDS ─────────────────────────────────
-    "vix_bull_max":             15,     # VIX below = bull trending
-    "vix_choppy_max":           25,     # VIX 15-25 = choppy
+    # Raised vix_bull_max 15→20: with the 200d daily MA as trend filter (more
+    # stable than 20h EMA), VIX < 20 in an uptrend is a genuine bull regime.
+    # Lowered vix_choppy_max 25→20: VIX > 20 while both SPY and QQQ are below
+    # their 200d MA is a bear market, not merely choppy.
+    "vix_bull_max":             20,     # VIX below this + above 200d MA = BULL_TRENDING
+    "vix_choppy_max":           20,     # VIX above this + below 200d MA = BEAR_TRENDING
     "vix_panic_min":            35,     # VIX above = panic — no trades
     "vix_spike_pct":            0.20,   # 20% VIX spike in 1 hour = exit all
 
@@ -276,20 +283,53 @@ CONFIG = {
         "cache_ttl_seconds": 3600,   # Re-fetch VIX data at most once per hour
     },
 
+    # ── MARKET BREADTH REGIME INPUT ───────────────────────────────
+    # % of S&P 500 stocks above their 200-day MA (^MMTH from Yahoo Finance).
+    # Used as a third factor in scanner.get_market_regime() alongside VIX
+    # level and the 200-day MA trend. Breadth confirms or contradicts the
+    # price-based signal: a SPY above its 200d MA with weak breadth (<50%)
+    # is a narrow-leader rally, not a genuine bull regime.
+    "breadth_regime": {
+        "enabled":          True,
+        "ticker":           "^MMTH",    # % of S&P 500 stocks above 200d MA
+        "bull_min":         55.0,       # > 55% → breadth confirms BULL
+        "bear_max":         40.0,       # < 40% → breadth confirms BEAR
+        "cache_ttl_seconds": 3600,
+    },
+
     # ── HURST DFA REGIME SIGNAL ───────────────────────────────────
     # Second input to the Layer 2 signal router (alongside VIX).
     # Uses DFA-1 Hurst of SPY daily closes over a 63-day window.
-    # Ship disabled — enable only after validating DFA stability on
-    # SPY historical data. See spec-regime-architecture.md Step 2.
+    # Enabled: consensus rule requires VIX+Hurst (and optionally HMM) to
+    # agree before multipliers fire — prevents false tilts in transitional
+    # regimes where VIX alone would be ambiguous.
     #
-    # Consensus rule: routing multipliers fire only when VIX and Hurst
-    # agree. Disagreement falls back to neutral (all mults = 1.0).
+    # Consensus rule (3-way with HMM): majority (>50%) of participating
+    # signals required. Hurst "neutral" dilutes but does not veto.
     "hurst_regime": {
-        "enabled":              False,   # Ship disabled — validate before enabling
+        "enabled":              True,    # Live — validated DFA implementation
         "trending_threshold":   0.55,    # H > this → "trending" (momentum edge)
         "reverting_threshold":  0.45,    # H < this → "reverting" (reversion edge)
         "lookback_days":        63,      # ~1 quarter of daily closes
         "cache_ttl_seconds":    3600,    # Re-fetch SPY daily at most once per hour
+    },
+
+    # ── HMM REGIME SIGNAL ─────────────────────────────────────────
+    # Third input to the Layer 2 signal router. 2-state Gaussian Hidden
+    # Markov Model on SPY daily log returns, fitted via Baum-Welch EM and
+    # decoded via Viterbi. Pure numpy — no external ML dependencies.
+    #
+    # State 0 (bear): lower mean return, higher vol → mean_reversion vote
+    # State 1 (bull): higher mean return, lower vol → momentum vote
+    #
+    # Academic basis: Hamilton (1989) Markov regime switching. The HMM
+    # is the canonical latent-state approach for financial regime detection.
+    # Unlike VIX (implied vol) and Hurst (serial correlation), the HMM
+    # directly models the return distribution — genuinely orthogonal signal.
+    "hmm_regime": {
+        "enabled":          True,
+        "lookback_days":    252,        # 1 year of daily returns
+        "cache_ttl_seconds": 3600,      # Re-fit at most once per hour
     },
 
     # ── REGIME DETECTOR LOCK ──────────────────────────────────

@@ -8,6 +8,8 @@
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
+from __future__ import annotations
+
 import logging
 from ib_async import IB
 from config import CONFIG
@@ -471,27 +473,80 @@ def get_market_regime(ib: IB) -> dict:
                 log.warning("No previous good regime cached — returning UNKNOWN")
                 return {
                     "regime": "UNKNOWN", "vix": 0, "vix_1h_change": 0,
-                    "spy_price": 0, "spy_above_ema": False,
-                    "qqq_price": 0, "qqq_above_ema": False,
+                    "spy_price": 0, "spy_above_200d": False,
+                    "qqq_price": 0, "qqq_above_200d": False,
                     "position_size_multiplier": 0.5,
                 }
 
         vix_prev      = float(vix_close.iloc[-2]) if vix_close is not None and len(vix_close) > 1 else vix_now
         vix_1h_change = (vix_now - vix_prev) / vix_prev if vix_prev > 0 else 0
 
-        spy_ema        = float(spy_close.ewm(span=20, adjust=False).mean().iloc[-1])
-        qqq_ema        = float(qqq_close.ewm(span=20, adjust=False).mean().iloc[-1])
-        spy_trending_up = spy_price_now > spy_ema
-        qqq_trending_up = qqq_price_now > qqq_ema
+        # ── 200-DAY DAILY MA — more reliable trend signal than 20h EMA ──
+        # The 20h EMA (~2.5 trading days) flipped on intraday noise, causing
+        # BULL↔CHOPPY oscillation mid-trend. The 200d daily MA is the standard
+        # institutional benchmark and is slow enough to reflect genuine regime.
+        # Fallback: use short-term EMA if daily fetch fails.
+        spy_above_200d = False
+        qqq_above_200d = False
+        spy_200d_ma    = None
+        qqq_200d_ma    = None
+        try:
+            spy_daily = _flat(_safe_download("SPY", period="1y", interval="1d",
+                                             progress=False, auto_adjust=True))
+            qqq_daily = _flat(_safe_download("QQQ", period="1y", interval="1d",
+                                             progress=False, auto_adjust=True))
+            if spy_daily is not None and len(spy_daily) >= 50:
+                spy_d_close   = spy_daily["Close"].squeeze().dropna()
+                spy_200d_ma   = float(spy_d_close.rolling(min(200, len(spy_d_close))).mean().iloc[-1])
+                spy_above_200d = spy_price_now > spy_200d_ma
+            else:
+                # Fallback: short-term EMA on hourly bars
+                spy_above_200d = spy_price_now > float(spy_close.ewm(span=20, adjust=False).mean().iloc[-1])
+            if qqq_daily is not None and len(qqq_daily) >= 50:
+                qqq_d_close   = qqq_daily["Close"].squeeze().dropna()
+                qqq_200d_ma   = float(qqq_d_close.rolling(min(200, len(qqq_d_close))).mean().iloc[-1])
+                qqq_above_200d = qqq_price_now > qqq_200d_ma
+            else:
+                qqq_above_200d = qqq_price_now > float(qqq_close.ewm(span=20, adjust=False).mean().iloc[-1])
+        except Exception as _daily_err:
+            log.warning(f"200d MA fetch failed ({_daily_err}) — falling back to 20h EMA")
+            spy_above_200d = spy_price_now > float(spy_close.ewm(span=20, adjust=False).mean().iloc[-1])
+            qqq_above_200d = qqq_price_now > float(qqq_close.ewm(span=20, adjust=False).mean().iloc[-1])
+
+        # ── MARKET BREADTH (^MMTH: % of S&P 500 above their 200d MA) ────
+        # Breadth confirms whether a trend has broad participation or is
+        # driven by a handful of mega-caps. A SPY above its 200d MA with
+        # MMTH < 40% is a narrow-leader rally, not a genuine bull regime.
+        breadth_pct  = None
+        breadth_cfg  = CONFIG.get("breadth_regime", {})
+        if breadth_cfg.get("enabled", True):
+            try:
+                _bt = breadth_cfg.get("ticker", "^MMTH")
+                _bd = _flat(_safe_download(_bt, period="5d", interval="1d",
+                                           progress=False, auto_adjust=True))
+                if _bd is not None and len(_bd) > 0:
+                    breadth_pct = float(_bd["Close"].squeeze().dropna().iloc[-1])
+            except Exception as _be:
+                log.debug(f"Breadth fetch failed ({_be}) — proceeding without breadth")
+
+        # ── REGIME CLASSIFICATION ─────────────────────────────────────────
+        # Three-factor classification:
+        #   Factor 1: VIX level (fear / implied vol)
+        #   Factor 2: SPY + QQQ vs 200d daily MA (structural trend)
+        #   Factor 3: Market breadth (participation confirmation)
+        _bull_min = breadth_cfg.get("bull_min", 55.0)
+        _bear_max = breadth_cfg.get("bear_max", 40.0)
+        _breadth_confirms_bull = (breadth_pct is None or breadth_pct > _bull_min)
+        _breadth_confirms_bear = (breadth_pct is None or breadth_pct < _bear_max)
 
         if vix_now > CONFIG["vix_panic_min"] or vix_1h_change > CONFIG["vix_spike_pct"]:
             regime = "PANIC"
-        elif vix_now < CONFIG["vix_bull_max"] and spy_trending_up and qqq_trending_up:
+        elif (vix_now < CONFIG["vix_bull_max"] and spy_above_200d and qqq_above_200d
+              and _breadth_confirms_bull):
             regime = "BULL_TRENDING"
-        elif vix_now > CONFIG["vix_choppy_max"] and not spy_trending_up and not qqq_trending_up:
+        elif (not spy_above_200d and not qqq_above_200d and vix_now > CONFIG["vix_choppy_max"]
+              and _breadth_confirms_bear):
             regime = "BEAR_TRENDING"
-        elif vix_now < CONFIG["vix_choppy_max"] and not spy_trending_up:
-            regime = "CHOPPY"
         else:
             regime = "CHOPPY"
 
@@ -500,9 +555,12 @@ def get_market_regime(ib: IB) -> dict:
             "vix":                      round(vix_now, 2),
             "vix_1h_change":            round(vix_1h_change * 100, 2),
             "spy_price":                round(spy_price_now, 2),
-            "spy_above_ema":            spy_trending_up,
+            "spy_above_200d":           spy_above_200d,
+            "spy_200d_ma":              round(spy_200d_ma, 2) if spy_200d_ma else None,
             "qqq_price":                round(qqq_price_now, 2),
-            "qqq_above_ema":            qqq_trending_up,
+            "qqq_above_200d":           qqq_above_200d,
+            "qqq_200d_ma":              round(qqq_200d_ma, 2) if qqq_200d_ma else None,
+            "breadth_pct":              round(breadth_pct, 1) if breadth_pct is not None else None,
             "position_size_multiplier": _regime_size_mult(regime),
         }
 
@@ -520,9 +578,12 @@ def get_market_regime(ib: IB) -> dict:
             "vix": 0,
             "vix_1h_change": 0,
             "spy_price": 0,
-            "spy_above_ema": False,
+            "spy_above_200d": False,
+            "spy_200d_ma": None,
             "qqq_price": 0,
-            "qqq_above_ema": False,
+            "qqq_above_200d": False,
+            "qqq_200d_ma": None,
+            "breadth_pct": None,
             "position_size_multiplier": 0.5,
         }
 

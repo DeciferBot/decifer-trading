@@ -20,6 +20,8 @@
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
+from __future__ import annotations
+
 import time as _time
 from datetime import datetime, timezone
 import zoneinfo as _zoneinfo
@@ -254,26 +256,267 @@ def get_hurst_regime_spy() -> dict:
                 "lookback_days": lookback}
 
 
-def _resolve_regime_router(vix_regime: str, hurst_regime: str = "unknown") -> str:
-    """
-    Combine VIX and Hurst regime signals via consensus rule.
+# ── 2-STATE GAUSSIAN HMM REGIME SIGNAL ──────────────────────────────────────
+# Third input to the Layer 2 signal router. Fits a 2-state Hidden Markov Model
+# on SPY daily log returns via Baum-Welch EM and decodes via Viterbi.
+#
+# State 0 (bear): lower mean return, higher volatility → mean_reversion vote
+# State 1 (bull): higher mean return, lower volatility → momentum vote
+#
+# Pure numpy implementation — no scipy/sklearn/hmmlearn dependencies.
+# Academic basis: Hamilton (1989) Markov regime-switching model.
+# Orthogonal to VIX (implied vol) and Hurst (serial correlation): the HMM
+# directly models the latent return-distribution state.
 
-    Multipliers fire only when BOTH signals agree:
-      vix=momentum        + hurst=trending  → "momentum"
-      vix=mean_reversion  + hurst=reverting → "mean_reversion"
-      any disagreement or hurst neutral     → "neutral" (all mults = 1.0)
+_hmm_spy_cache:    dict | None     = None
+_hmm_spy_cache_ts: datetime | None = None
 
-    When hurst_regime is "unknown" (Hurst disabled or fetch failed),
-    returns vix_regime unchanged — preserving the existing binary VIX-only
-    behaviour with zero change to routing outcomes.
+
+def _log_gauss(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
+    """Log N(x; mu, sigma^2) element-wise."""
+    return -0.5 * ((x - mu) / sigma) ** 2 - np.log(sigma * np.sqrt(2.0 * np.pi))
+
+
+def _hmm_fit_2state(obs: np.ndarray, n_iter: int = 60) -> tuple:
     """
-    if hurst_regime == "unknown":
-        return vix_regime
-    if vix_regime == "momentum" and hurst_regime == "trending":
+    Fit a 2-state Gaussian HMM via Baum-Welch EM (log-space, numerically stable).
+
+    Initialisation: split obs on the median so state 0 always starts as the
+    lower-mean state (bear). The median split is more robust than random init
+    for financial return distributions that are roughly symmetric.
+
+    Transition matrix prior: A = [[0.97, 0.03], [0.03, 0.97]] — highly
+    persistent. Equity market regimes typically last weeks to months; forcing
+    high persistence prevents the model from oscillating on daily noise.
+
+    Returns (A, mu, sigma, states) where:
+      A      — (2, 2) row-stochastic transition matrix
+      mu     — (2,) state means (mu[0] < mu[1] by construction)
+      sigma  — (2,) state std devs
+      states — (T,) Viterbi-decoded state sequence (0=bear, 1=bull)
+    """
+    T = len(obs)
+    med = np.median(obs)
+    lo  = obs[obs <= med]
+    hi  = obs[obs >  med]
+    mu    = np.array([lo.mean() if len(lo) else obs.mean() - obs.std(),
+                      hi.mean() if len(hi) else obs.mean() + obs.std()])
+    sigma = np.array([max(lo.std(), 1e-6) if len(lo) else obs.std(),
+                      max(hi.std(), 1e-6) if len(hi) else obs.std()])
+    if mu[0] > mu[1]:
+        mu, sigma = mu[::-1].copy(), sigma[::-1].copy()
+
+    A      = np.array([[0.97, 0.03], [0.03, 0.97]])
+    log_pi = np.log(np.array([0.5, 0.5]))
+
+    for _ in range(n_iter):
+        log_A = np.log(np.maximum(A, 1e-300))
+        log_e = np.column_stack([_log_gauss(obs, mu[k], sigma[k]) for k in range(2)])
+
+        # ── Forward pass (log-space) ──────────────────────────────
+        la = np.empty((T, 2))
+        la[0] = log_pi + log_e[0]
+        for t in range(1, T):
+            la[t, 0] = np.logaddexp(la[t-1, 0] + log_A[0, 0],
+                                    la[t-1, 1] + log_A[1, 0]) + log_e[t, 0]
+            la[t, 1] = np.logaddexp(la[t-1, 0] + log_A[0, 1],
+                                    la[t-1, 1] + log_A[1, 1]) + log_e[t, 1]
+
+        # ── Backward pass (log-space) ─────────────────────────────
+        lb = np.zeros((T, 2))
+        for t in range(T - 2, -1, -1):
+            lb[t, 0] = np.logaddexp(log_A[0, 0] + log_e[t+1, 0] + lb[t+1, 0],
+                                    log_A[0, 1] + log_e[t+1, 1] + lb[t+1, 1])
+            lb[t, 1] = np.logaddexp(log_A[1, 0] + log_e[t+1, 0] + lb[t+1, 0],
+                                    log_A[1, 1] + log_e[t+1, 1] + lb[t+1, 1])
+
+        # ── Gamma ────────────────────────────────────────────────
+        log_gam = la + lb
+        log_norm = np.logaddexp(log_gam[:, 0], log_gam[:, 1])
+        log_gam -= log_norm[:, np.newaxis]
+        gam = np.exp(log_gam)
+
+        # ── Xi (pairwise posteriors) ──────────────────────────────
+        log_ll = np.logaddexp(la[T-1, 0], la[T-1, 1])
+        xi = np.zeros((2, 2))
+        for t in range(T - 1):
+            for i in range(2):
+                for j in range(2):
+                    xi[i, j] += np.exp(
+                        la[t, i] + log_A[i, j] + log_e[t+1, j] + lb[t+1, j] - log_ll
+                    )
+
+        # ── M-step ───────────────────────────────────────────────
+        row_sums = xi.sum(axis=1, keepdims=True)
+        row_sums = np.where(row_sums < 1e-300, 1e-300, row_sums)
+        A = np.maximum(xi / row_sums, 1e-300)
+        A /= A.sum(axis=1, keepdims=True)
+
+        gs = np.maximum(gam.sum(axis=0), 1e-300)
+        mu    = (gam * obs[:, np.newaxis]).sum(axis=0) / gs
+        sigma = np.maximum(
+            np.sqrt((gam * (obs[:, np.newaxis] - mu) ** 2).sum(axis=0) / gs), 1e-6
+        )
+        log_pi = np.log(np.maximum(gam[0], 1e-300))
+        log_pi -= np.logaddexp(log_pi[0], log_pi[1])
+
+    # ── Viterbi decoding ──────────────────────────────────────────
+    log_A = np.log(np.maximum(A, 1e-300))
+    log_e = np.column_stack([_log_gauss(obs, mu[k], sigma[k]) for k in range(2)])
+    ld    = np.empty((T, 2))
+    psi   = np.zeros((T, 2), dtype=np.int8)
+    ld[0] = log_pi + log_e[0]
+    for t in range(1, T):
+        c0 = np.array([ld[t-1, 0] + log_A[0, 0], ld[t-1, 1] + log_A[1, 0]])
+        c1 = np.array([ld[t-1, 0] + log_A[0, 1], ld[t-1, 1] + log_A[1, 1]])
+        psi[t, 0], psi[t, 1] = int(c0.argmax()), int(c1.argmax())
+        ld[t, 0] = c0.max() + log_e[t, 0]
+        ld[t, 1] = c1.max() + log_e[t, 1]
+
+    states     = np.empty(T, dtype=np.int8)
+    states[-1] = int(ld[-1].argmax())
+    for t in range(T - 2, -1, -1):
+        states[t] = psi[t + 1, int(states[t + 1])]
+
+    return A, mu, sigma, states
+
+
+def get_hmm_regime_spy() -> dict:
+    """
+    2-state Gaussian HMM on SPY daily log returns.
+
+    Runs Baum-Welch EM to fit the model then Viterbi to decode the most likely
+    current state. Cached once per trading day to avoid re-fitting on every scan.
+
+    Config block: config["hmm_regime"] — must have enabled=True to use.
+
+    Returns:
+      {"regime": "bull"|"bear"|"unknown",
+       "confidence": float,   # A[s,s]: persistence prob of current state
+       "mu_bull": float,      # fitted mean log-return for bull state
+       "mu_bear": float,      # fitted mean log-return for bear state
+       "source": str,
+       "lookback_days": int}
+
+    "bull"  → +1 momentum vote in _resolve_regime_router
+    "bear"  → +1 mean_reversion vote
+    "unknown" → no vote cast (disabled, insufficient data, or fetch error)
+    """
+    global _hmm_spy_cache, _hmm_spy_cache_ts
+
+    cfg = CONFIG.get("hmm_regime", {})
+    if not cfg.get("enabled", False):
+        return {"regime": "unknown", "source": "disabled"}
+
+    ttl      = cfg.get("cache_ttl_seconds", 3600)
+    lookback = cfg.get("lookback_days", 252)
+    now      = datetime.now(timezone.utc)
+
+    _et_tz     = _zoneinfo.ZoneInfo("America/New_York")
+    _cache_day = _hmm_spy_cache_ts.astimezone(_et_tz).date() if _hmm_spy_cache_ts else None
+    _today_et  = now.astimezone(_et_tz).date()
+    if (_hmm_spy_cache is not None and _hmm_spy_cache_ts is not None
+            and (now - _hmm_spy_cache_ts).total_seconds() < ttl
+            and _cache_day == _today_et):
+        return _hmm_spy_cache
+
+    try:
+        raw = _safe_download("SPY", period=f"{lookback + 30}d", interval="1d",
+                             progress=False, auto_adjust=True)
+        raw = _flatten_columns(raw)
+        if raw is None or len(raw) < 40:
+            log.warning("get_hmm_regime_spy: insufficient SPY data — returning unknown")
+            return {"regime": "unknown", "source": "insufficient_data"}
+
+        prices      = raw["Close"].dropna().values[-lookback:]
+        if len(prices) < 40:
+            return {"regime": "unknown", "source": "insufficient_data"}
+        log_returns = np.diff(np.log(prices))
+        log_returns = log_returns[np.isfinite(log_returns)]
+        if len(log_returns) < 40:
+            return {"regime": "unknown", "source": "insufficient_data"}
+
+        A, mu, sigma, states = _hmm_fit_2state(log_returns)
+
+        current_state = int(states[-1])
+        regime        = "bull" if current_state == 1 else "bear"
+        confidence    = float(A[current_state, current_state])
+
+        result = {
+            "regime":       regime,
+            "confidence":   round(confidence, 3),
+            "mu_bull":      round(float(mu[1]), 6),
+            "mu_bear":      round(float(mu[0]), 6),
+            "source":       "HMM_SPY_2state",
+            "lookback_days": len(log_returns),
+        }
+        log.info(
+            f"HMM regime: {regime} (conf={confidence:.3f}, "
+            f"μ_bull={mu[1]:.5f}, μ_bear={mu[0]:.5f}, lookback={len(log_returns)}d)"
+        )
+        _hmm_spy_cache    = result
+        _hmm_spy_cache_ts = now
+        return result
+
+    except Exception as e:
+        log.warning(f"get_hmm_regime_spy: error ({e}) — returning unknown")
+        return {"regime": "unknown", "source": "error"}
+
+
+def _resolve_regime_router(vix_regime: str, hurst_regime: str = "unknown",
+                            hmm_regime: str = "unknown") -> str:
+    """
+    Combine VIX, Hurst DFA, and HMM signals into a single routing regime.
+
+    Voting:
+      vix "momentum"       → +1 momentum
+      vix "mean_reversion" → +1 mean_reversion
+      hurst "trending"     → +1 momentum
+      hurst "reverting"    → +1 mean_reversion
+      hmm "bull"           → +1 momentum
+      hmm "bear"           → +1 mean_reversion
+      "unknown" / "neutral" → no directional vote; still counts as participating
+                              (dilutes the majority threshold)
+
+    Majority rule: a direction wins only when its votes exceed 50% of the
+    number of participating (non-unknown) signals. "neutral" from Hurst counts
+    as participating-but-not-voting, preventing VIX alone from tilting.
+
+    Fallback: when BOTH Hurst and HMM are "unknown" (e.g. both disabled or
+    fetches failed), VIX passes through unchanged — preserving the original
+    VIX-only behaviour with no regression.
+    """
+    if hurst_regime == "unknown" and hmm_regime == "unknown":
+        return vix_regime   # Original VIX-only path — no regression
+
+    mom_votes = 0
+    rev_votes = 0
+
+    if vix_regime == "momentum":
+        mom_votes += 1
+    elif vix_regime == "mean_reversion":
+        rev_votes += 1
+
+    if hurst_regime == "trending":
+        mom_votes += 1
+    elif hurst_regime == "reverting":
+        rev_votes += 1
+
+    if hmm_regime == "bull":
+        mom_votes += 1
+    elif hmm_regime == "bear":
+        rev_votes += 1
+
+    # Participating = all non-unknown signals (includes VIX always, plus
+    # Hurst and HMM if they returned any result — even "neutral")
+    n_participating = (1
+                       + (0 if hurst_regime == "unknown" else 1)
+                       + (0 if hmm_regime   == "unknown" else 1))
+
+    if mom_votes * 2 > n_participating:
         return "momentum"
-    if vix_regime == "mean_reversion" and hurst_regime == "reverting":
+    if rev_votes * 2 > n_participating:
         return "mean_reversion"
-    # Signals disagree, or hurst is "neutral" → equal-weight fallback
     return "neutral"
 
 
@@ -1597,6 +1840,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # Direction already captured in dim_directions.
     cb = sig_5m.get("candle_bull", 0)
     cd = sig_5m.get("candle_bear", 0)
+    candle_dir = 0  # safe default: no candle pattern
     candle_bonus = 0
     if cb > 0 or cd > 0:
         candle_bonus = min(max(cb, cd), 3)
@@ -1604,7 +1848,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         candle_dir = +1 if cb > cd else (-1 if cd > cb else 0)
         dim_directions.append((candle_dir, candle_bonus))
 
-    # ── IC-WEIGHTED COMPOSITE ─────────────────────────────────────────────
+    # ── IC-WEIGHTED COMPOSITE + DIRECTION VOTE ───────────────────────────────
     # Replace the static equal-weight additive sum with a rolling IC-weighted
     # composite.  Weight_i = normalised Spearman IC between dimension i and
     # 5-day forward return (recomputed weekly via update_ic_weights()).
@@ -1615,6 +1859,13 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     #
     # Scaling factor = _N (number of dimensions) ensures that with equal
     # weights: sum(1/N * N * d_i) = sum(d_i) — same 0-50 scale as before.
+    #
+    # Crucially, IC weights are also applied to the direction vote so that
+    # a dimension with zero IC weight (negative or noise-floor) cannot swing
+    # the consensus direction.  Without this fix, a high-scoring dimension
+    # with negative IC would still dominate the direction vote even though its
+    # score contribution has been correctly suppressed.
+    _ic_dir_sum = None  # None → fall back to raw score-weighted vote below
     try:
         from ic_calculator import get_current_weights as _get_ic_weights, DIMENSIONS as _IC_DIMS
         _icw = _get_ic_weights()
@@ -1637,6 +1888,29 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         # candle_bonus is a non-dimension extra (0-3); add it on top of the
         # weighted composite so candlestick confirmation still lifts the score.
         score = int(round(_ic_sum)) + candle_bonus
+
+        # IC-weighted direction vote — dims with weight=0 (negative/noise-floor IC)
+        # contribute nothing to the consensus direction, matching their zero score
+        # contribution above.  With equal weights this produces the same result as
+        # the raw score-weighted sum, so no behaviour change before IC data exists.
+        _dim_dirs = {
+            "trend":     trend_dir,
+            "momentum":  mom_dir,
+            "squeeze":   squeeze_dir,
+            "flow":      flow_dir,
+            "breakout":  breakout_dir,
+            "mtf":       mtf_dir,
+            "news":      (+1 if news_score > 0 else (-1 if news_score < 0 else 0)),
+            "social":    social_dir,
+            "reversion": rev_dir,
+        }
+        _ic_dir_sum = (
+            sum(
+                _dim_dirs.get(k, 0) * _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v
+                for k, v in _ic_breakdown.items()
+            )
+            + candle_dir * candle_bonus  # candlestick bonus preserves its direction influence
+        )
     except Exception:
         pass  # keep the incrementally-accumulated score if IC module unavailable
 
@@ -1661,7 +1935,12 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # score. Higher-scoring dimensions have more influence on direction.
     # This replaces the old buy_signals/sell_signals count which was
     # biased toward the signal classification (itself asymmetric).
-    weighted_sum = sum(d * w for d, w in dim_directions)
+    # When IC weights are available, the IC-weighted sum is used so that
+    # zero-IC-weight dimensions don't swing direction (see IC block above).
+    weighted_sum = (
+        _ic_dir_sum if _ic_dir_sum is not None
+        else sum(d * w for d, w in dim_directions)
+    )
 
     # Determine direction from weighted vote
     if weighted_sum > 2:
@@ -1800,17 +2079,20 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
 
     threshold = get_regime_threshold(regime)
 
-    # ── Determine routing regime (VIX + optional Hurst consensus) ──
+    # ── Determine routing regime (VIX + Hurst + HMM 3-way consensus) ──
     if regime_router is None:
         if CONFIG.get("regime_routing_enabled", True):
             vix_result  = get_market_regime_vix()
             _vix_r      = vix_result["regime"]
             _hurst_r    = "unknown"
+            _hmm_r      = "unknown"
             if CONFIG.get("hurst_regime", {}).get("enabled", False):
                 _hurst_r = get_hurst_regime_spy().get("regime", "unknown")
-            regime_router = _resolve_regime_router(_vix_r, _hurst_r)
+            if CONFIG.get("hmm_regime", {}).get("enabled", False):
+                _hmm_r = get_hmm_regime_spy().get("regime", "unknown")
+            regime_router = _resolve_regime_router(_vix_r, _hurst_r, _hmm_r)
             log.info(f"score_universe regime router: {regime_router} "
-                     f"(VIX={vix_result.get('vix')}, hurst={_hurst_r})")
+                     f"(VIX={vix_result.get('vix')}, hurst={_hurst_r}, hmm={_hmm_r})")
         else:
             regime_router = "unknown"
 
