@@ -1,96 +1,124 @@
 # Decifer Trading — Rebuild Guide
 
-Complete runbook to rebuild the bot on a new machine from scratch.
-**Estimated time: 15 minutes** (+ background iCloud historical data sync)
+> **FOR CLAUDE:** If Amit says "rebuild decifer trading", follow this document exactly.
+> Run each command using your Bash tool. Do not ask for manual input — everything
+> is automated. The only prerequisite is that this Mac is signed into Amit's Apple ID
+> (iCloud Keychain and iCloud Drive will supply all secrets and data automatically).
 
 ---
 
-## Prerequisites
+## One-Command Bootstrap
+
+Run this single command from any terminal on any Mac:
 
 ```bash
-brew install python@3.11 ta-lib node
+bash <(curl -fsSL https://raw.githubusercontent.com/DeciferBot/decifer-trading/master/scripts/setup.sh)
 ```
+
+This script:
+1. Installs Homebrew (if missing)
+2. Installs `python@3.11`, `ta-lib`, `node`, `git` via Homebrew
+3. Clones `https://github.com/DeciferBot/decifer-trading.git` to `~/Documents/Claude/Projects/decifer trading/`
+4. Installs all Python packages (`requirements.txt`) + NLTK VADER
+5. Writes `.env` from **iCloud Keychain** (auto-synced via Apple ID — no manual input)
+6. Restores `data/historical/` (276 MB) from iCloud Drive backup
+7. Loads `com.decifer.auto-push` and `com.decifer.icloud-sync` launchd daemons
+8. Verifies the installation
+
+**Estimated time: 10–15 minutes** (plus background historical data sync)
 
 ---
 
-## Steps
+## After Setup
 
-### 1. Clone the repo
+Start TWS or IB Gateway (paper account, port 7496), then:
+
 ```bash
-git clone https://github.com/DeciferBot/decifer-trading.git
-cd decifer-trading
-```
-
-### 2. Create .env from 1Password
-Open 1Password → search "Decifer Trading .env" → copy contents into `.env`:
-```
-ANTHROPIC_API_KEY=sk-ant-...
-IBKR_ACTIVE_ACCOUNT=DU...
-IBKR_PAPER_ACCOUNT=DU...
-IBKR_LIVE_1_ACCOUNT=U...
-IBKR_LIVE_2_ACCOUNT=U...
-```
-
-### 3. Install Python dependencies
-```bash
-python3.11 -m pip install -r requirements.txt
-python3 -c "import nltk; nltk.download('vader_lexicon')"
-```
-
-### 4. Restore historical market data
-Historical OHLCV data (276 MB) syncs from iCloud automatically.
-Copy from iCloud backup:
-```bash
-cp -r ~/Library/Mobile\ Documents/com~apple~CloudDocs/Decifer-Backup/decifer-trading/data/historical/ data/historical/
-```
-
-### 5. Activate backup daemons
-```bash
-./setup-auto-push.sh   # auto-push commits to GitHub every 2 min
-launchctl load ~/Library/LaunchAgents/com.decifer.icloud-sync.plist   # iCloud sync every 5 min
-```
-
-### 6. Verify daemons running
-```bash
-launchctl list | grep decifer
-# Should show: com.decifer.auto-push AND com.decifer.icloud-sync
-```
-
-### 7. Enable Time Machine
-System Settings → General → Time Machine → add a backup disk.
-
-### 8. Make launchers executable
-```bash
-chmod +x Decifer.command Chief.command launch_decifer.command
-```
-
-### 9. Start IBKR Gateway
-Open TWS or IB Gateway, log in to paper account, ensure API enabled on port 7496.
-
-### 10. Launch the bot
-```bash
+cd ~/Documents/Claude/Projects/decifer\ trading
 python3 bot.py
 ```
-Dashboard opens at http://localhost:8080
+
+Dashboard: http://localhost:8080
 
 ---
 
-## Backup Layers (for reference)
+## How Secrets Are Stored
 
-| Layer | Mechanism | Covers |
-|---|---|---|
-| 1 | GitHub (auto-pushed) | All code + state files |
-| 2 | iCloud sync (every 5 min) | Uncommitted changes + historical data |
-| 3 | 1Password | `.env` secrets |
-| 4 | Time Machine | Everything, hourly |
+Secrets are stored in **iCloud Keychain** under account `amit@decifer`:
+
+| Key | iCloud Keychain Service Name |
+|---|---|
+| ANTHROPIC_API_KEY | `ANTHROPIC_API_KEY` |
+| IBKR_ACTIVE_ACCOUNT | `IBKR_ACTIVE_ACCOUNT` |
+| IBKR_PAPER_ACCOUNT | `IBKR_PAPER_ACCOUNT` |
+| IBKR_LIVE_1_ACCOUNT | `IBKR_LIVE_1_ACCOUNT` |
+| IBKR_LIVE_2_ACCOUNT | `IBKR_LIVE_2_ACCOUNT` |
+
+iCloud Keychain syncs automatically to any Mac signed into the same Apple ID.
+
+To verify secrets are in keychain:
+```bash
+security find-generic-password -a "amit@decifer" -s "ANTHROPIC_API_KEY" -w
+```
+
+To re-store secrets after changing `.env`:
+```bash
+./scripts/store-secrets.sh
+```
+
+---
+
+## 5-Layer Backup Architecture
+
+| Layer | Mechanism | Covers | Frequency |
+|---|---|---|---|
+| 1 | GitHub (`com.decifer.auto-push`) | All committed code + state | Every 2 min |
+| 2 | iCloud Drive (`com.decifer.icloud-sync`) | Uncommitted changes + `data/historical/` | Every 5 min |
+| 3 | iCloud Keychain | `.env` secrets | Real-time sync |
+| 4 | iCloud Drive `.env` file | Backup of `.env` | Every 5 min |
+| 5 | Time Machine | Full disk | Hourly |
 
 ---
 
 ## Versioning
 
-Check current version: `python3 -c "from version import __version__; print(__version__)"`
-
-Bump version after a milestone:
 ```bash
+# Check current version
+python3 -c "from version import __version__, __codename__; print(f'v{__version__} — {__codename__}')"
+
+# Bump version after a milestone
 ./scripts/bump-version.sh 1.4.0 "IC Weighted Scoring"
 ```
+
+---
+
+## Project Structure Reference
+
+```
+decifer trading/
+├── bot.py              — main orchestrator (python3 bot.py)
+├── config.py           — all configuration (risk, thresholds, accounts)
+├── version.py          — semantic version (v1.3.0 "Regime Router")
+├── requirements.txt    — Python dependencies
+├── REBUILD.md          — this file
+├── scripts/
+│   ├── setup.sh        — full automated setup (entry point)
+│   ├── store-secrets.sh — re-sync .env to iCloud Keychain
+│   ├── bump-version.sh  — version bump + git tag
+│   └── icloud-sync.sh  — iCloud rsync script
+├── data/
+│   ├── historical/     — 276 MB OHLCV data (iCloud backed up)
+│   ├── trades.json     — trade records (git tracked)
+│   └── orders.json     — order records (git tracked)
+├── chief-decifer/state/ — session logs + specs (git tracked)
+└── .claude/memory/     — Claude's persistent memory (git tracked)
+```
+
+---
+
+## GitHub Repository
+
+`https://github.com/DeciferBot/decifer-trading.git`
+
+Branch: `master`
+Latest tag: `v1.3.0`

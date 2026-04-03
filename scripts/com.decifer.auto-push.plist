@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.decifer.auto-push</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/amitchopra/Documents/Claude/Projects/decifer trading/auto-push.sh</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>120</integer>
+    <key>WorkingDirectory</key>
+    <string>/Users/amitchopra/Documents/Claude/Projects/decifer trading</string>
+    <key>StandardOutPath</key>
+    <string>/tmp/decifer-auto-push.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/decifer-auto-push.err</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    </dict>
+</dict>
+</plist>
