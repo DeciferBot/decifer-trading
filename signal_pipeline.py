@@ -214,6 +214,58 @@ def _apply_strategy_threshold(
     return scored
 
 
+_SHORT_QUALITY_MIN_SCORE = 28   # raised bar for shorts when IC is unproven (vs 18 for longs)
+_SHORT_IC_PROVEN_THRESHOLD = 0.03  # IC quality score above which shorts are treated equally
+
+
+def _apply_short_quality_gate(scored: list, regime_name: str) -> list:
+    """
+    Gate SHORT-direction signals when short IC is unproven.
+
+    When get_short_quality_score() < _SHORT_IC_PROVEN_THRESHOLD (not yet proven),
+    require SHORT signals to have score >= _SHORT_QUALITY_MIN_SCORE (28) instead of
+    the standard 18. This prevents the system from taking short positions before the
+    IC data confirms that the signal engine has edge on the short side.
+
+    Regime context: in BULL_TRENDING regimes, shorts are naturally harder — this gate
+    is applied regardless of regime but the threshold could be tightened further in
+    future versions.
+
+    Does NOT block shorts entirely. Proven shorts (IC >= threshold) or high-conviction
+    shorts (score >= 28) still pass.
+    """
+    try:
+        from ic_calculator import get_short_quality_score
+        short_quality = get_short_quality_score()
+    except Exception as e:
+        log.debug(f"Short quality gate: could not fetch IC — skipping gate: {e}")
+        return scored
+
+    if short_quality >= _SHORT_IC_PROVEN_THRESHOLD:
+        log.debug(f"Short quality gate: IC proven (quality={short_quality:.3f}) — no extra filter")
+        return scored
+
+    pre = len(scored)
+    result = []
+    for s in scored:
+        if s.get("direction") == "SHORT" and s.get("score", 0) < _SHORT_QUALITY_MIN_SCORE:
+            log.info(
+                f"Short quality gate: {s['symbol']} score={s['score']}/50 below "
+                f"SHORT threshold {_SHORT_QUALITY_MIN_SCORE} "
+                f"(IC_short unproven: quality={short_quality:.3f})"
+            )
+            continue
+        result.append(s)
+
+    n_filtered = pre - len(result)
+    if n_filtered > 0:
+        log.info(
+            f"Short quality gate: filtered {n_filtered} low-confidence short signals "
+            f"(IC_short quality={short_quality:.3f} < {_SHORT_IC_PROVEN_THRESHOLD})"
+        )
+    return result
+
+
 def _scored_to_signals(scored: list, regime_name: str) -> list:
     """Convert score_universe() raw dicts → typed Signal objects."""
     now = datetime.now(timezone.utc)
@@ -351,6 +403,9 @@ def run_signal_pipeline(
 
     # 5. Strategy-mode threshold adjustment
     scored = _apply_strategy_threshold(scored, strategy_mode, regime_name)
+
+    # 5b. Short quality gate — raise bar for SHORT signals when IC is unproven
+    scored = _apply_short_quality_gate(scored, regime_name)
 
     # 6. IC audit log — write all scored symbols for forward-return tracking
     log_signal_scan(all_scored, regime)

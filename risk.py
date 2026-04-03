@@ -604,6 +604,28 @@ def calculate_position_size(portfolio_value: float, price: float,
     return qty
 
 
+def get_short_size_multiplier() -> float:
+    """
+    Return a position-size multiplier for SHORT entries based on IC quality.
+
+    When short IC is unproven (< 0.03), reduce position size to 0.60 of normal.
+    This limits capital at risk while still allowing short trades through.
+    Returns 1.0 when IC is proven or unavailable (fail-open).
+
+    Called from execute_short() (future) or anywhere sizing SHORT positions.
+    The multiplier should be passed as external_mult to calculate_position_size().
+    """
+    try:
+        from ic_calculator import get_short_quality_score
+        short_quality = get_short_quality_score()
+        if short_quality < 0.03:
+            log.info(f"[sizing] Short IC unproven (quality={short_quality:.3f}) → 0.60x size mult")
+            return 0.60
+        return 1.0
+    except Exception:
+        return 1.0  # fail-open: don't block shorts on IC calculator errors
+
+
 def calculate_stops(price: float, atr: float, direction: str) -> tuple[float, float]:
     """
     Calculate stop loss and first take profit using ATR.
