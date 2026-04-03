@@ -1755,8 +1755,14 @@ def execute_buy_option(ib: IB, contract_info: dict,
         # ── Reserve slot — closes TOCTOU gap between check and submission ──
         active_trades[opt_key] = {"status": "RESERVED", "symbol": symbol, "instrument": "option"}
 
-    # Limit price slightly above mid to improve fill probability
-    limit_price = round(mid_price * 1.01, 2)
+    # Price at the ask to ensure fill. Options have wide bid-ask spreads (5-25%);
+    # pricing at mid means we sit below the ask and never fill (74% cancel rate in data).
+    # The alpha is in getting the position on, not saving $0.05-0.10 on entry.
+    ask_price = contract_info.get("ask", 0.0)
+    if ask_price > mid_price > 0:
+        limit_price = round(ask_price, 2)        # at-ask: fills reliably
+    else:
+        limit_price = round(mid_price * 1.05, 2)  # fallback: 5% above mid
 
     try:
         option_contract = Option(
@@ -1796,6 +1802,9 @@ def execute_buy_option(ib: IB, contract_info: dict,
             "right":      contract_info["right"],
             "strike":     contract_info["strike"],
             "expiry":     contract_info["expiry_str"],
+            "mid":        mid_price,
+            "ask":        ask_price,
+            "spread_pct": contract_info.get("spread_pct"),
             "reasoning":  reasoning,
             "timestamp":  datetime.now(timezone.utc).isoformat(),
         })
@@ -1832,7 +1841,7 @@ def execute_buy_option(ib: IB, contract_info: dict,
         log.info(
             f"✅ BUY {contract_info['right']} {symbol} "
             f"${contract_info['strike']:.0f} exp={contract_info['expiry_str']} "
-            f"x{n_contracts} @ ${limit_price:.2f} mid "
+            f"x{n_contracts} @ ${limit_price:.2f} (ask=${ask_price:.2f} mid=${mid_price:.2f}) "
             f"| delta={contract_info.get('delta'):.3f} "
             f"| IVR={contract_info.get('iv_rank')}%"
         )
