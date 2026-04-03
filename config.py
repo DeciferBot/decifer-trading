@@ -9,7 +9,7 @@ import os
 CONFIG = {
 
     # ── IBKR CONNECTION ────────────────────────────────────────
-    "ibkr_host":        "192.0.2.1",
+    "ibkr_host":        "192.168.86.24",
     "ibkr_port":        7496,           # 7496 = TWS/Gateway
     "ibkr_client_id":   10,
     "active_account":   os.environ.get("IBKR_ACTIVE_ACCOUNT", ""),
