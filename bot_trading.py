@@ -1039,6 +1039,7 @@ def run_scan():
                 atr=sig["atr"],
                 candle_gate=sig.get("candle_gate", "UNKNOWN"),
             )
+        buy_signal.direction     = "LONG"   # agents decided to buy — override pipeline direction
         buy_signal.rationale     = reason
         buy_signal.source_agents = list(range(decision.get("agents_agreed", 0)))
 

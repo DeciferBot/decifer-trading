@@ -110,7 +110,10 @@ def _cancel_ibkr_order_by_id(ib, order_id: int) -> None:
 _ET = zoneinfo.ZoneInfo("America/New_York")
 
 def is_options_market_open() -> bool:
-    """Options trade 9:30 AM – 4:00 PM ET, Mon–Fri only."""
+    """Options trade 9:30 AM – 4:00 PM ET, Mon–Fri, trading days only."""
+    from risk import is_trading_day
+    if not is_trading_day():
+        return False
     now_et = datetime.now(_ET)
     if now_et.weekday() >= 5:          # Saturday=5, Sunday=6
         return False

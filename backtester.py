@@ -760,6 +760,104 @@ def parameter_sweep(symbols: List[str], start_date: datetime, end_date: datetime
 
 
 # ═════════════════════════════════════════════════════════════════
+# DATA DOWNLOADER
+# ═════════════════════════════════════════════════════════════════
+
+def download_historical_data(
+    symbols: List[str],
+    start: str,
+    end: str,
+    interval: str = "1d",
+    out_dir=None,
+) -> Dict[str, bool]:
+    """
+    Download OHLCV history via yfinance and cache as Parquet files.
+
+    Required before running the walk-forward backtester when no local data
+    files exist.  Each symbol is downloaded individually to work around
+    yfinance thread-safety issues.
+
+    Parameters
+    ----------
+    symbols  : list of ticker strings
+    start    : "YYYY-MM-DD" start date (inclusive)
+    end      : "YYYY-MM-DD" end date (exclusive, yfinance convention)
+    interval : yfinance interval string — "1d" (default) or "5m", etc.
+    out_dir  : override the output directory (used in tests); accepts str or Path
+
+    Returns
+    -------
+    dict mapping symbol → True (saved successfully) / False (failed or empty)
+
+    Usage
+    -----
+    # Download 2 years of daily data before running a backtest:
+    from backtester import download_historical_data, Backtester
+    download_historical_data(["AAPL", "TSLA"], "2022-01-01", "2024-01-01")
+    bt = Backtester(["AAPL", "TSLA"], ...)
+    bt.load_data()   # will now find the Parquet files
+    """
+    import yfinance as yf
+
+    if out_dir is None:
+        if interval == "1d":
+            out_dir = DATA_DIR / "daily"
+        else:
+            out_dir = DATA_DIR / "intraday"
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    results: Dict[str, bool] = {}
+    suffix = "" if interval == "1d" else f"_{interval}"
+
+    for symbol in symbols:
+        out_file = out_dir / f"{symbol}{suffix}.parquet"
+        try:
+            df = yf.download(
+                symbol,
+                start=start,
+                end=end,
+                interval=interval,
+                progress=False,
+                auto_adjust=True,
+            )
+            if df is None or df.empty:
+                log.warning("download_historical_data: no data returned for %s", symbol)
+                results[symbol] = False
+                continue
+
+            # Flatten multi-level columns (yfinance >= 0.2 multi-ticker response)
+            if hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
+                df.columns = df.columns.get_level_values(0)
+
+            # Normalise to lowercase so backtester can read open/high/low/close/volume
+            df.columns = [c.lower() for c in df.columns]
+
+            required = {"open", "high", "low", "close", "volume"}
+            missing = required - set(df.columns)
+            if missing:
+                log.warning(
+                    "download_historical_data: %s missing required columns %s",
+                    symbol, missing,
+                )
+                results[symbol] = False
+                continue
+
+            df.to_parquet(out_file)
+            log.info(
+                "download_historical_data: saved %s (%d bars) → %s",
+                symbol, len(df), out_file,
+            )
+            results[symbol] = True
+
+        except Exception as e:
+            log.warning("download_historical_data: %s failed — %s", symbol, e)
+            results[symbol] = False
+
+    return results
+
+
+# ═════════════════════════════════════════════════════════════════
 # CLI & MAIN
 # ═════════════════════════════════════════════════════════════════
 
@@ -782,8 +880,20 @@ def main():
                         help="Grid search: --param-sweep min_score 10 15 20 25")
     parser.add_argument("--save-trades", action="store_true",
                         help="Save individual trades to JSON")
+    parser.add_argument("--download-data", action="store_true",
+                        help="Download historical data via yfinance before running backtest")
 
     args = parser.parse_args()
+
+    # Optionally download data before backtesting
+    if args.download_data:
+        log.info("Downloading historical data via yfinance...")
+        dl_results = download_historical_data(args.symbols, args.start, args.end)
+        failed = [s for s, ok in dl_results.items() if not ok]
+        if failed:
+            log.warning("Failed to download data for: %s", failed)
+        else:
+            log.info("All symbols downloaded successfully.")
 
     start_date = pd.to_datetime(args.start)
     end_date = pd.to_datetime(args.end)

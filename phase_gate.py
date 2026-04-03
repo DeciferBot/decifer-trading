@@ -311,19 +311,26 @@ def get_status(config: dict[str, Any] | None = None) -> PhaseStatus:
     closed_trades = _count_closed_trades(trades_path)
     pass_rate = _get_test_pass_rate()
 
+    # Compute IC validation before criteria_met — it is a mandatory exit criterion.
+    # Walk-forward Sharpe + IC quality must be validated before paper trading is
+    # declared done, otherwise profitable paper results could be regime-driven luck.
+    ic_result = _load_ic_validation_result()
+    ic_validation_passed = bool(ic_result and ic_result.get("ready_for_live", False))
+
     criteria_met = {
         "min_closed_trades": closed_trades >= min_trades,
         "min_test_pass_rate": (pass_rate is not None and pass_rate >= min_pass),
         # min_paper_trading_days is validated by Amit manually — defaults False until
         # current_phase is manually advanced.
         "min_paper_trading_days": current_phase > 1,
+        # IC + walk-forward Sharpe must pass before paper trading exit is declared.
+        # Run: python backtester.py --download-data --symbols ... then
+        #      python ic_validator.py --save  to generate the result file.
+        "ic_walkforward_validated": ic_validation_passed,
     }
     phase1_complete = all(criteria_met.values())
 
     alpha_gate = check_alpha_gate(config)
-
-    ic_result = _load_ic_validation_result()
-    ic_validation_passed = bool(ic_result and ic_result.get("ready_for_live", False))
 
     return PhaseStatus(
         current_phase=current_phase,

@@ -449,3 +449,112 @@ class TestICValidationGate:
         assert gate["min_mean_positive_ic"]   == pytest.approx(0.05)
         assert gate["min_positive_dims"]      == 5
         assert gate["min_walkforward_sharpe"] == pytest.approx(0.8)
+
+
+# ── IC + walk-forward as mandatory paper trading exit criterion ────────────────
+
+
+class TestPhase1CompleteRequiresICValidation:
+    """
+    Regression guard for the high-severity risk:
+      'System could be paper trading profitably due to favorable market
+       conditions rather than valid signals.'
+
+    phase1_complete MUST be False until ic_walkforward_validated is True.
+    Walk-forward out-of-sample Sharpe and IC quality are mandatory paper
+    trading exit criteria — not optional enhancements.
+    """
+
+    def test_criteria_met_always_contains_ic_walkforward_validated_key(self, monkeypatch):
+        """criteria_met must always expose the ic_walkforward_validated key."""
+        import phase_gate as pg
+        monkeypatch.setattr(pg, "_load_ic_validation_result", lambda data_dir=None: None)
+        cfg = _base_config(current_phase=1)
+        status = get_status(cfg)
+        assert "ic_walkforward_validated" in status.criteria_met
+
+    def test_ic_walkforward_validated_false_when_result_missing(self, monkeypatch):
+        """Missing ic_validation_result.json → ic_walkforward_validated is False."""
+        import phase_gate as pg
+        monkeypatch.setattr(pg, "_load_ic_validation_result", lambda data_dir=None: None)
+        cfg = _base_config(current_phase=1)
+        status = get_status(cfg)
+        assert status.criteria_met["ic_walkforward_validated"] is False
+
+    def test_ic_walkforward_validated_false_when_not_ready(self, monkeypatch):
+        """ready_for_live=False → ic_walkforward_validated is False."""
+        import phase_gate as pg
+        monkeypatch.setattr(
+            pg, "_load_ic_validation_result",
+            lambda data_dir=None: {"ready_for_live": False, "failures": ["SHARPE GATE: 0.3 < 0.8"]},
+        )
+        cfg = _base_config(current_phase=1)
+        status = get_status(cfg)
+        assert status.criteria_met["ic_walkforward_validated"] is False
+
+    def test_ic_walkforward_validated_true_when_ready(self, monkeypatch):
+        """ready_for_live=True → ic_walkforward_validated is True."""
+        import phase_gate as pg
+        monkeypatch.setattr(
+            pg, "_load_ic_validation_result",
+            lambda data_dir=None: {"ready_for_live": True, "failures": []},
+        )
+        cfg = _base_config(current_phase=1)
+        status = get_status(cfg)
+        assert status.criteria_met["ic_walkforward_validated"] is True
+
+    def test_phase1_complete_false_when_only_ic_missing(self, monkeypatch, tmp_path):
+        """
+        Even with 200+ trades and all other criteria met,
+        phase1_complete must be False when IC validation has not been run.
+        """
+        import phase_gate as pg
+        monkeypatch.setattr(pg, "_load_ic_validation_result", lambda data_dir=None: None)
+        trades_file = tmp_path / "trades.json"
+        trades_file.write_text(
+            json.dumps([{"id": i, "status": "closed"} for i in range(200)])
+        )
+        cfg = _base_config(current_phase=1, overrides={"trade_log": str(trades_file)})
+        status = get_status(cfg)
+        assert status.criteria_met["ic_walkforward_validated"] is False
+        assert not status.phase1_complete
+
+    def test_phase1_complete_false_when_only_ic_not_ready(self, monkeypatch, tmp_path):
+        """
+        IC validation result exists but Sharpe gate failed →
+        phase1_complete must still be False.
+        """
+        import phase_gate as pg
+        monkeypatch.setattr(
+            pg, "_load_ic_validation_result",
+            lambda data_dir=None: {"ready_for_live": False, "failures": ["SHARPE GATE: 0.3 < 0.8"]},
+        )
+        trades_file = tmp_path / "trades.json"
+        trades_file.write_text(
+            json.dumps([{"id": i, "status": "closed"} for i in range(200)])
+        )
+        cfg = _base_config(current_phase=1, overrides={"trade_log": str(trades_file)})
+        status = get_status(cfg)
+        assert not status.phase1_complete
+
+    def test_phase1_complete_still_false_when_only_ic_passes_no_trades(self, monkeypatch):
+        """IC passing alone is not enough — trade count must also be met."""
+        import phase_gate as pg
+        monkeypatch.setattr(
+            pg, "_load_ic_validation_result",
+            lambda data_dir=None: {"ready_for_live": True, "failures": []},
+        )
+        cfg = _base_config(current_phase=1, overrides={"trade_log": "/nonexistent/trades.json"})
+        status = get_status(cfg)
+        assert status.criteria_met["ic_walkforward_validated"] is True
+        assert status.criteria_met["min_closed_trades"] is False
+        assert not status.phase1_complete
+
+    def test_as_dict_exposes_ic_walkforward_validated_in_criteria_met(self, monkeypatch):
+        """as_dict() must include ic_walkforward_validated inside criteria_met."""
+        import phase_gate as pg
+        monkeypatch.setattr(pg, "_load_ic_validation_result", lambda data_dir=None: None)
+        cfg = _base_config(current_phase=1)
+        d = get_status(cfg).as_dict()
+        assert "ic_walkforward_validated" in d["criteria_met"]
+        assert d["criteria_met"]["ic_walkforward_validated"] is False

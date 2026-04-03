@@ -210,9 +210,9 @@ def agent_risk_gate(catalyst_report: str, trigger: dict,
     trade_direction = "LONG" if dir_upper in ("BULLISH", "LONG", "BUY") else "SHORT"
 
     if price > 0 and portfolio_value > 0:
-        base_qty = calculate_position_size(portfolio_value, price,
-                                           trigger.get("score", 20), regime)
-        qty = max(1, int(base_qty * sentinel_mult))
+        qty = calculate_position_size(portfolio_value, price,
+                                       trigger.get("score", 20), regime,
+                                       atr=atr, external_mult=sentinel_mult)
         sl, tp = calculate_stops(price, atr, trade_direction)
         # Tighten stop loss by 25% for news-driven trades
         if trade_direction == "LONG":

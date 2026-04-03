@@ -40,3 +40,4 @@ requests>=2.31.0             # HTTP requests for news feeds, Reddit API, ApeWisd
 schedule>=1.2.0              # Task scheduling (bot.py)
 colorama>=0.4.6              # Terminal color output (bot.py)
 pytz>=2024.1                 # Timezone handling (risk.py, backtester.py)
+pandas-market-calendars>=4.0.0  # NYSE holiday calendar — is_trading_day() in risk.py

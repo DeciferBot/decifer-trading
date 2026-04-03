@@ -502,3 +502,180 @@ def test_pnl_calculation_matrix(entry, exit_p, qty, expected_pnl):
     trade_id = list(p.positions.keys())[0]
     closed = p.close_position(trade_id, exit_p, NOW + timedelta(hours=1))
     assert closed.pnl == pytest.approx(expected_pnl)
+
+
+# ─────────────────────────────────────────────────────────────────
+# download_historical_data — walk-forward data fetcher
+# ─────────────────────────────────────────────────────────────────
+
+from backtester import download_historical_data
+
+
+def _make_ohlcv_df(n: int = 3) -> pd.DataFrame:
+    """Minimal lowercase-column OHLCV DataFrame (no multi-level headers)."""
+    idx = pd.date_range("2024-01-02", periods=n, freq="B")
+    return pd.DataFrame(
+        {
+            "open":   [100.0 + i for i in range(n)],
+            "high":   [102.0 + i for i in range(n)],
+            "low":    [99.0  + i for i in range(n)],
+            "close":  [101.0 + i for i in range(n)],
+            "volume": [1_000_000] * n,
+        },
+        index=idx,
+    )
+
+
+class TestDownloadHistoricalData:
+    """
+    Regression guard for the walk-forward data downloader.
+    All tests use a tmp_path override and mocked yfinance + to_parquet — no
+    network calls, no pyarrow dependency.
+    """
+
+    def _mock_yf(self, monkeypatch, df):
+        """Replace yfinance.download with a stub returning *df*."""
+        mock_mod = types.ModuleType("yfinance")
+        mock_mod.download = MagicMock(return_value=df)
+        monkeypatch.setitem(sys.modules, "yfinance", mock_mod)
+        return mock_mod
+
+    def _mock_parquet_write(self, monkeypatch):
+        """
+        Patch pd.DataFrame.to_parquet to write a sentinel file at the given path.
+        The sentinel is a plain text file (not real Parquet) — it lets tests verify
+        that the correct path was targeted without requiring pyarrow.
+        Returns a list that collects (path, df) pairs for each write call.
+        """
+        calls = []
+
+        def _fake_to_parquet(self_df, path, *args, **kwargs):
+            path = str(path)
+            with open(path, "w") as fh:
+                fh.write(",".join(str(c) for c in self_df.columns) + "\n")
+            calls.append((path, self_df.copy()))
+
+        monkeypatch.setattr(pd.DataFrame, "to_parquet", _fake_to_parquet)
+        return calls
+
+    # ── happy path ──────────────────────────────────────────────────
+
+    def test_returns_dict_mapping_symbol_to_bool(self, monkeypatch, tmp_path):
+        self._mock_yf(monkeypatch, _make_ohlcv_df())
+        self._mock_parquet_write(monkeypatch)
+        result = download_historical_data(
+            ["AAPL"], "2024-01-01", "2024-12-31", out_dir=tmp_path
+        )
+        assert isinstance(result, dict)
+        assert "AAPL" in result
+        assert isinstance(result["AAPL"], bool)
+
+    def test_success_writes_parquet_file(self, monkeypatch, tmp_path):
+        self._mock_yf(monkeypatch, _make_ohlcv_df())
+        self._mock_parquet_write(monkeypatch)
+        download_historical_data(
+            ["AAPL"], "2024-01-01", "2024-12-31", out_dir=tmp_path
+        )
+        assert (tmp_path / "AAPL.parquet").exists()
+
+    def test_success_returns_true(self, monkeypatch, tmp_path):
+        self._mock_yf(monkeypatch, _make_ohlcv_df())
+        self._mock_parquet_write(monkeypatch)
+        result = download_historical_data(
+            ["AAPL"], "2024-01-01", "2024-12-31", out_dir=tmp_path
+        )
+        assert result["AAPL"] is True
+
+    # ── failure cases ────────────────────────────────────────────────
+
+    def test_empty_dataframe_returns_false(self, monkeypatch, tmp_path):
+        self._mock_yf(monkeypatch, pd.DataFrame())
+        result = download_historical_data(
+            ["AAPL"], "2024-01-01", "2024-12-31", out_dir=tmp_path
+        )
+        assert result["AAPL"] is False
+
+    def test_empty_dataframe_does_not_write_file(self, monkeypatch, tmp_path):
+        self._mock_yf(monkeypatch, pd.DataFrame())
+        download_historical_data(
+            ["AAPL"], "2024-01-01", "2024-12-31", out_dir=tmp_path
+        )
+        assert not (tmp_path / "AAPL.parquet").exists()
+
+    def test_yfinance_exception_returns_false(self, monkeypatch, tmp_path):
+        mock_mod = types.ModuleType("yfinance")
+        mock_mod.download = MagicMock(side_effect=Exception("network error"))
+        monkeypatch.setitem(sys.modules, "yfinance", mock_mod)
+        result = download_historical_data(
+            ["AAPL"], "2024-01-01", "2024-12-31", out_dir=tmp_path
+        )
+        assert result["AAPL"] is False
+
+    def test_yfinance_exception_does_not_crash(self, monkeypatch, tmp_path):
+        """Exception for one symbol must not abort the whole batch."""
+        self._mock_parquet_write(monkeypatch)
+        call_results = {"AAPL": _make_ohlcv_df(), "FAIL": Exception("bad")}
+
+        def mock_download(sym, *args, **kwargs):
+            v = call_results[sym]
+            if isinstance(v, Exception):
+                raise v
+            return v
+
+        mock_mod = types.ModuleType("yfinance")
+        mock_mod.download = mock_download
+        monkeypatch.setitem(sys.modules, "yfinance", mock_mod)
+
+        result = download_historical_data(
+            ["AAPL", "FAIL"], "2024-01-01", "2024-12-31", out_dir=tmp_path
+        )
+        assert result["AAPL"] is True
+        assert result["FAIL"] is False
+
+    def test_missing_required_columns_returns_false(self, monkeypatch, tmp_path):
+        """DataFrame without 'close' column → failure, no file written."""
+        df_bad = pd.DataFrame(
+            {"open": [100.0], "high": [102.0], "low": [99.0]},
+            index=pd.date_range("2024-01-02", periods=1),
+        )
+        self._mock_yf(monkeypatch, df_bad)
+        self._mock_parquet_write(monkeypatch)
+        result = download_historical_data(
+            ["AAPL"], "2024-01-01", "2024-12-31", out_dir=tmp_path
+        )
+        assert result["AAPL"] is False
+        assert not (tmp_path / "AAPL.parquet").exists()
+
+    def test_multilevel_columns_flattened_to_lowercase(self, monkeypatch, tmp_path):
+        """yfinance multi-level headers are flattened and lowercased before saving."""
+        df = _make_ohlcv_df()
+        df.columns = pd.MultiIndex.from_tuples(
+            [(c.capitalize(), "AAPL") for c in df.columns]
+        )
+        self._mock_yf(monkeypatch, df)
+        calls = self._mock_parquet_write(monkeypatch)
+        result = download_historical_data(
+            ["AAPL"], "2024-01-01", "2024-12-31", out_dir=tmp_path
+        )
+        assert result["AAPL"] is True
+        _, saved_df = calls[0]
+        assert list(saved_df.columns) == ["open", "high", "low", "close", "volume"]
+
+    def test_creates_output_directory_if_missing(self, monkeypatch, tmp_path):
+        """out_dir is created automatically if it doesn't exist."""
+        nested = tmp_path / "a" / "b" / "c"
+        self._mock_yf(monkeypatch, _make_ohlcv_df())
+        self._mock_parquet_write(monkeypatch)
+        download_historical_data(
+            ["AAPL"], "2024-01-01", "2024-12-31", out_dir=nested
+        )
+        assert nested.is_dir()
+
+    def test_multiple_symbols_all_succeed(self, monkeypatch, tmp_path):
+        self._mock_yf(monkeypatch, _make_ohlcv_df())
+        self._mock_parquet_write(monkeypatch)
+        result = download_historical_data(
+            ["AAPL", "TSLA", "NVDA"], "2024-01-01", "2024-12-31", out_dir=tmp_path
+        )
+        assert all(result[s] is True for s in ["AAPL", "TSLA", "NVDA"])
+        assert len(list(tmp_path.glob("*.parquet"))) == 3

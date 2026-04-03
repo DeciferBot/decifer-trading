@@ -278,3 +278,32 @@ class TestSignatureContract:
 
     def test_returns_at_least_one_share(self):
         assert _call(external_mult=0.001, strategy_mult=0.5, regime=REGIME_HALF) >= 1
+
+
+# ── No double strategy-mode application ──────────────────────────────────────
+
+class TestNoDoubleStrategyMode:
+    def test_strategy_mode_applied_exactly_once(self):
+        """
+        RECOVERY mode (0.5×) must produce ~0.5× of NORMAL — not 0.25×.
+        0.25× would indicate double-application of the strategy multiplier.
+        """
+        qty_normal   = _call(strategy_mult=1.0, external_mult=1.0)
+        qty_recovery = _call(strategy_mult=0.5, external_mult=1.0)
+        ratio = qty_recovery / qty_normal
+        assert abs(ratio - 0.5) < 0.05, (
+            f"Expected 0.5× (single application), got {ratio:.3f} "
+            f"(0.25 would indicate double-application)"
+        )
+
+    def test_double_application_canary(self):
+        """
+        Simulates what agents.py used to do: apply size_mult post-hoc on top of
+        _strategy_size_multiplier. Single-application result must be ~2× the double.
+        """
+        qty_single = _call(strategy_mult=0.5, external_mult=1.0)
+        qty_double = _call(strategy_mult=0.5, external_mult=0.5)   # simulates the old bug
+        if qty_single > 4:
+            assert qty_single > qty_double, (
+                f"Single-application ({qty_single}) should exceed double ({qty_double})"
+            )

@@ -10,6 +10,7 @@ import os
 from collections import defaultdict
 from datetime import datetime, time, timedelta, timezone
 import pytz
+import pandas_market_calendars as mcal
 from config import CONFIG
 
 log = logging.getLogger("decifer.risk")
@@ -313,8 +314,23 @@ def _get_open_position_count() -> int:
     return 0
 
 
+def is_trading_day(date=None) -> bool:
+    """Return True if the NYSE is open on *date* (defaults to today ET).
+
+    Handles all NYSE holidays (Good Friday, Christmas, Thanksgiving, etc.)
+    in addition to weekends.
+    """
+    if date is None:
+        date = datetime.now(EST).date()
+    cal = mcal.get_calendar("NYSE")
+    days = cal.valid_days(start_date=date, end_date=date)
+    return len(days) > 0
+
+
 def _is_market_open() -> bool:
-    """Return True if trading is currently permitted (pre-market to after-hours)."""
+    """Return True if trading is currently permitted (pre-market to after-hours, trading days only)."""
+    if not is_trading_day():
+        return False
     now_est = datetime.now(EST).time()
     pre_start = time(4, 0)
     after_end = time(20, 0)
@@ -509,7 +525,8 @@ def get_sizing_state() -> dict:
 
 def calculate_position_size(portfolio_value: float, price: float,
                              score: int, regime: dict,
-                             atr: float = 0.0) -> int:
+                             atr: float = 0.0,
+                             external_mult: float = 1.0) -> int:
     """
     VIX-rank adaptive Kelly position sizing with ATR volatility cap.
     Returns number of shares to buy.
@@ -519,6 +536,9 @@ def calculate_position_size(portfolio_value: float, price: float,
       2. ATR vol cap — (portfolio * atr_vol_target_pct) / atr
       3. Hard safety cap — 20% of portfolio
     """
+    # Clamp external_mult: floor prevents accidental zero; ceiling prevents amplification
+    external_mult = max(0.1, min(external_mult, 1.0))
+
     # ── VIX-rank adaptive Kelly fraction ──────────────────────
     kelly_frac, vix_rank = get_kelly_fraction()
 
@@ -543,14 +563,20 @@ def calculate_position_size(portfolio_value: float, price: float,
     else:
         session_mult = 1.0
 
-    # Final risk amount (includes intraday strategy mode size reduction)
-    risk_amount = base_risk * conviction_mult * regime_mult * session_mult * _strategy_size_multiplier
+    # Final risk amount — all multipliers including external (sentinel/catalyst)
+    risk_amount = base_risk * conviction_mult * regime_mult * session_mult * _strategy_size_multiplier * external_mult
 
-    # Max position size check
-    max_position_value = portfolio_value * CONFIG["max_single_position"]
-    position_value = min(risk_amount / 0.02, max_position_value)  # Assume 2% stop
+    # Primary conversion: ATR-based stop (preferred) or assumed-stop fallback
+    if atr > 0:
+        stop_dollars = atr * CONFIG["atr_stop_multiplier"]
+        qty = max(1, int(risk_amount / stop_dollars))
+    else:
+        assumed_stop = price * CONFIG["assumed_stop_pct"]
+        qty = max(1, int(risk_amount / assumed_stop))
 
-    qty = max(1, int(position_value / price))
+    # Max single-position cap
+    max_pos_qty = max(1, int(portfolio_value * CONFIG["max_single_position"] / price))
+    qty = min(qty, max_pos_qty)
 
     # ── ATR volatility cap ─────────────────────────────────────
     # Cap qty so that a 1-ATR adverse move costs at most atr_vol_target_pct of portfolio.

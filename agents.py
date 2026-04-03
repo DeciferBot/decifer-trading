@@ -490,7 +490,6 @@ def agent_risk_manager(opportunity_report: str, devils_report: str,
             continue
 
         qty = calculate_position_size(portfolio_value, price, score, regime, atr=atr)
-        qty = max(1, int(qty * size_mult))
         sl, tp = calculate_stops(price, atr, direction)
 
         lines.append(f"{sym}:")

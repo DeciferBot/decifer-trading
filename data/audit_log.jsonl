@@ -8254,3 +8254,31 @@
 {"ts": "2026-04-02T14:10:42.688897Z", "event": "fill_watcher_adjusted", "symbol": "DOCN", "order_id": 3361, "new_limit": 89.29, "attempt": 2}
 {"ts": "2026-04-02T14:11:02.699265Z", "event": "fill_watcher_filled", "symbol": "DOCN", "order_id": 3361, "attempts": 2, "fill_limit": 89.29}
 {"ts": "2026-04-02T14:13:28.878430Z", "event": "SUBMITTED", "symbol": "INTC", "order_id": 3384, "side": "SELL", "qty": 329, "order_type": "LMT", "limit_price": 2.47, "fill_price": null}
+{"ts": "2026-04-02T17:50:27.704194Z", "event": "SUBMITTED", "symbol": "HIMS", "order_id": 4034, "side": "BUY", "qty": 567, "order_type": "LMT", "limit_price": 0.81, "fill_price": null}
+{"ts": "2026-04-02T17:50:33.146087Z", "event": "SUBMITTED", "symbol": "LUNR", "order_id": 3476, "side": "SELL", "qty": 5000, "order_type": "LMT", "limit_price": 24.8, "fill_price": null}
+{"ts": "2026-04-02T17:50:33.162429Z", "event": "SUBMITTED", "symbol": "LUNR", "order_id": 3480, "side": "BUY", "qty": 486, "order_type": "LMT", "limit_price": 0.98, "fill_price": 0.98}
+{"ts": "2026-04-02T17:50:33.177724Z", "event": "SUBMITTED", "symbol": "LUNR", "order_id": 3475, "side": "SELL", "qty": 5000, "order_type": "STP", "limit_price": 22.74, "fill_price": null}
+{"ts": "2026-04-02T17:50:33.236722Z", "event": "SUBMITTED", "symbol": "GSAT", "order_id": 3638, "side": "SELL", "qty": 801, "order_type": "LMT", "limit_price": 76.42, "fill_price": null}
+{"ts": "2026-04-02T17:50:33.252928Z", "event": "SUBMITTED", "symbol": "GSAT", "order_id": 3637, "side": "SELL", "qty": 801, "order_type": "STP", "limit_price": 72.94, "fill_price": null}
+{"ts": "2026-04-02T17:50:33.277844Z", "event": "CANCELLED", "symbol": "FLY", "order_id": 3766, "side": "BUY", "qty": 227, "order_type": "LMT", "limit_price": 2.07, "fill_price": null}
+{"ts": "2026-04-02T17:50:33.299593Z", "event": "SUBMITTED", "symbol": "KOS", "order_id": 3814, "side": "BUY", "qty": 2628, "order_type": "LMT", "limit_price": 0.18, "fill_price": 0.18}
+{"ts": "2026-04-02T17:50:33.318508Z", "event": "CANCELLED", "symbol": "PLUG", "order_id": 3966, "side": "BUY", "qty": 5351, "order_type": "LMT", "limit_price": 0.09, "fill_price": null}
+{"ts": "2026-04-02T18:12:24.916283Z", "event": "SUBMITTED", "symbol": "ALAB", "order_id": 4104, "side": "BUY", "qty": 94, "order_type": "LMT", "limit_price": 4.9, "fill_price": null}
+{"ts": "2026-04-02T19:51:21.500515Z", "event": "SUBMITTED", "symbol": "INTC", "order_id": 4515, "side": "SELL", "qty": 295, "order_type": "LMT", "limit_price": 2.79, "fill_price": null}
+{"ts": "2026-04-02T19:57:53.038958Z", "event": "SUBMITTED", "symbol": "AAPL", "order_id": 4542, "side": "SELL", "qty": 157, "order_type": "LMT", "limit_price": 1.39, "fill_price": null}
+{"ts": "2026-04-02T19:57:56.393464Z", "event": "SUBMITTED", "symbol": "INTC", "order_id": 4545, "side": "SELL", "qty": 295, "order_type": "LMT", "limit_price": 2.8, "fill_price": null}
+{"ts": "2026-04-02T19:58:01.002624Z", "event": "CANCELLED", "symbol": "ONDS", "order_id": 4548, "side": "SELL", "qty": 1017, "order_type": "LMT", "limit_price": 0.07, "fill_price": null}
+{"ts": "2026-04-03T14:27:40.215367Z", "event": "SUBMITTED", "symbol": "MSFT", "order_id": 1942, "side": "SELL", "qty": 112, "order_type": "LMT", "limit_price": 1.43, "fill_price": null}
+{"ts": "2026-04-03T14:27:57.736186Z", "event": "SUBMITTED", "symbol": "ONDS", "order_id": 1945, "side": "SELL", "qty": 1017, "order_type": "LMT", "limit_price": 0.07, "fill_price": null}
+{"ts": "2026-04-03T14:34:19.699931Z", "event": "SUBMITTED", "symbol": "MSFT", "order_id": 1978, "side": "SELL", "qty": 112, "order_type": "LMT", "limit_price": 1.43, "fill_price": null}
+{"ts": "2026-04-03T14:34:37.122531Z", "event": "SUBMITTED", "symbol": "ONDS", "order_id": 1981, "side": "SELL", "qty": 1017, "order_type": "LMT", "limit_price": 0.07, "fill_price": null}
+{"ts": "2026-04-03T14:40:53.680733Z", "event": "SUBMITTED", "symbol": "MSFT", "order_id": 2006, "side": "SELL", "qty": 112, "order_type": "LMT", "limit_price": 1.43, "fill_price": null}
+{"ts": "2026-04-03T14:41:11.097642Z", "event": "SUBMITTED", "symbol": "ONDS", "order_id": 2009, "side": "SELL", "qty": 1017, "order_type": "LMT", "limit_price": 0.07, "fill_price": null}
+{"ts": "2026-04-03T14:52:50.662619Z", "event": "SUBMITTED", "symbol": "MSFT", "order_id": 2052, "side": "SELL", "qty": 112, "order_type": "LMT", "limit_price": 1.43, "fill_price": null}
+{"ts": "2026-04-03T14:53:08.063253Z", "event": "SUBMITTED", "symbol": "ONDS", "order_id": 2055, "side": "SELL", "qty": 1017, "order_type": "LMT", "limit_price": 0.07, "fill_price": null}
+{"ts": "2026-04-03T14:58:49.753509Z", "event": "SUBMITTED", "symbol": "MSFT", "order_id": 2078, "side": "SELL", "qty": 112, "order_type": "LMT", "limit_price": 1.43, "fill_price": null}
+{"ts": "2026-04-03T14:59:07.185756Z", "event": "SUBMITTED", "symbol": "ONDS", "order_id": 2081, "side": "SELL", "qty": 1017, "order_type": "LMT", "limit_price": 0.07, "fill_price": null}
+{"ts": "2026-04-03T15:04:52.525830Z", "event": "SUBMITTED", "symbol": "MSFT", "order_id": 2104, "side": "SELL", "qty": 112, "order_type": "LMT", "limit_price": 1.43, "fill_price": null}
+{"ts": "2026-04-03T15:05:09.923569Z", "event": "SUBMITTED", "symbol": "ONDS", "order_id": 2107, "side": "SELL", "qty": 1017, "order_type": "LMT", "limit_price": 0.07, "fill_price": null}
+{"ts": "2026-04-03T15:07:08.179234Z", "event": "SUBMITTED", "symbol": "MSFT", "order_id": 2133, "side": "SELL", "qty": 112, "order_type": "LMT", "limit_price": 1.39, "fill_price": null}
+{"ts": "2026-04-03T15:07:25.798754Z", "event": "SUBMITTED", "symbol": "ONDS", "order_id": 2136, "side": "SELL", "qty": 1017, "order_type": "LMT", "limit_price": 0.07, "fill_price": null}
