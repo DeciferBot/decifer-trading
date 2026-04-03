@@ -517,6 +517,21 @@ def main():
     except Exception as e:
         clog("ERROR", f"ML engine startup error: {e}")
 
+    # ── iCloud backup sync (every 5 min, runs in this process so FDA inherited) ─
+    _ICLOUD_SYNC_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts", "icloud-sync.sh")
+
+    def _run_icloud_sync():
+        if os.path.exists(_ICLOUD_SYNC_SCRIPT):
+            import subprocess
+            subprocess.Popen(
+                ["bash", _ICLOUD_SYNC_SCRIPT],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
+    schedule.every(5).minutes.do(_run_icloud_sync)
+    _run_icloud_sync()  # run immediately on startup
+
     clog("INFO", f"<> Decifer running. Dashboard → http://localhost:{CONFIG['dashboard_port']}")
     clog("INFO", "Press Ctrl+C to stop.")
 

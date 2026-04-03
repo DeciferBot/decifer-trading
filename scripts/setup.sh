@@ -35,10 +35,18 @@ else
     echo "  ✓ Homebrew already installed"
 fi
 
-# ── Step 2: System dependencies ───────────────────────────────────────────────
+# ── Step 2: System dependencies (read from scripts/brew-deps.txt) ─────────────
 echo "[2/8] Installing system dependencies..."
-brew install python@3.11 ta-lib node git 2>/dev/null | grep -E "Installing|Already|✓" || true
-echo "  ✓ python@3.11, ta-lib, node, git"
+BREW_DEPS_FILE="$(dirname "$0")/brew-deps.txt"
+if [ -f "$BREW_DEPS_FILE" ]; then
+    while IFS= read -r dep || [ -n "$dep" ]; do
+        [[ "$dep" =~ ^#.*$ || -z "$dep" ]] && continue  # skip comments/blanks
+        brew install "$dep" 2>/dev/null | grep -E "Installing|Already installed|✓" || true
+        echo "  ✓ $dep"
+    done < "$BREW_DEPS_FILE"
+else
+    brew install python@3.11 ta-lib node git 2>/dev/null | grep -E "Installing|Already|✓" || true
+fi
 
 # ── Step 3: Clone or update repo ──────────────────────────────────────────────
 echo "[3/8] Cloning/updating repo..."
