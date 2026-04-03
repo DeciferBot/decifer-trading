@@ -45,11 +45,17 @@ from learning import (log_trade, load_trades, load_orders,
 from signal_types import Signal, SIGNALS_LOG
 from signal_dispatcher import dispatch_signals as _dispatch_signals
 from signal_pipeline import run_signal_pipeline, SignalPipelineResult
+from portfolio_manager import run_portfolio_review
 
 log = logging.getLogger("decifer.bot")
 
 # ── EOD options review state ──────────────────────────────────────────────────
 _eod_options_review_done: bool = False
+
+# ── Portfolio manager state ───────────────────────────────────────────────────
+_portfolio_review_done_today: bool = False
+_last_known_regime: str = ""
+_session_stop_count: int = 0
 
 # ── Session-scoped options attempt ledger ────────────────────────────────────
 # Tracks which (symbol, direction) pairs have already been attempted today.
@@ -453,6 +459,8 @@ def check_external_closes(regime: dict):
                 else:
                     from risk import record_loss
                     record_loss(source="external")
+                    global _session_stop_count
+                    _session_stop_count += 1
 
     except Exception as e:
         clog("ERROR", f"External close check error: {e}")
@@ -689,10 +697,94 @@ def _maybe_eod_options_review(regime: dict):
         _eod_options_review_done = False
         # Ledger auto-expires by date — no explicit clear needed.
         # Pruning of stale entries happens inside _record_options_attempt.
+        global _portfolio_review_done_today, _session_stop_count
+        _portfolio_review_done_today = False
+        _session_stop_count = 0
     # Fire once in the pre-close window
     if dtime(15, 30) <= t < dtime(15, 55) and not _eod_options_review_done:
         _eod_options_review_done = True
         _eod_options_review(regime)
+
+
+# ── Portfolio review trigger detection ───────────────────────────────────────
+
+def _should_run_portfolio_review(
+    session: str,
+    regime: dict,
+    open_positions: list,
+    all_scored: list,
+    news_sentiment: dict,
+    daily_pnl: float,
+    portfolio_value: float,
+) -> tuple:
+    """
+    Return (bool, trigger_name) indicating whether a portfolio review should fire.
+
+    Triggers (checked in priority order):
+      pre_market    — once per day before session open
+      regime_change — current regime differs from last known
+      score_collapse — any held position dropped 15+ pts from entry score
+      news_hit      — keyword_score |magnitude| >= 3 on a held symbol
+      earnings_risk — any held symbol has earnings within 48 hours
+      cascade       — 2+ stop losses hit this session
+      drawdown      — daily PnL / portfolio < -1.5%
+    """
+    global _portfolio_review_done_today, _last_known_regime
+    pm_cfg = CONFIG.get("portfolio_manager", {})
+    if not pm_cfg.get("enabled", True):
+        return False, ""
+
+    # 1. Pre-market: once per day
+    if session == "PRE_MARKET" and not _portfolio_review_done_today:
+        return True, "pre_market"
+
+    # 2. Regime change
+    current_regime = regime.get("regime", "")
+    if _last_known_regime and current_regime and current_regime != _last_known_regime:
+        return True, "regime_change"
+
+    if not open_positions:
+        return False, ""
+
+    # 3. Score collapse: entry_score - current_score >= threshold
+    collapse_thresh = pm_cfg.get("score_collapse_threshold", 15)
+    scored_map = {s["symbol"]: s.get("score", 0) for s in all_scored}
+    for pos in open_positions:
+        sym = pos.get("symbol", "")
+        entry_sc = pos.get("entry_score", pos.get("score", 0))
+        current_sc = scored_map.get(sym)
+        if current_sc is not None and (entry_sc - current_sc) >= collapse_thresh:
+            return True, "score_collapse"
+
+    # 4. News hit on held position
+    news_thresh = pm_cfg.get("news_hit_threshold", 3)
+    for pos in open_positions:
+        sym = pos.get("symbol", "")
+        kw = news_sentiment.get(sym, {}).get("keyword_score", 0)
+        if abs(kw) >= news_thresh:
+            return True, "news_hit"
+
+    # 5. Earnings within 48 hours
+    try:
+        from portfolio_manager import _check_earnings_within_hours
+        held_syms = [p["symbol"] for p in open_positions]
+        lookahead = pm_cfg.get("earnings_lookahead_hours", 48)
+        if _check_earnings_within_hours(held_syms, hours=lookahead):
+            return True, "earnings_risk"
+    except Exception:
+        pass
+
+    # 6. Cascade: 2+ stops this session
+    cascade_thresh = pm_cfg.get("cascade_stop_count", 2)
+    if _session_stop_count >= cascade_thresh:
+        return True, "cascade"
+
+    # 7. Daily drawdown threshold
+    drawdown_thresh = pm_cfg.get("drawdown_trigger_pct", -0.015)
+    if portfolio_value > 0 and (daily_pnl / portfolio_value) < drawdown_thresh:
+        return True, "drawdown"
+
+    return False, ""
 
 
 # ── Main scan ─────────────────────────────────────────────────────────────────
@@ -875,8 +967,83 @@ def run_scan():
         return
     _process_close_queue()
 
-    clog("ANALYSIS", "Running 6-agent analysis pipeline...")
+    clog("ANALYSIS", "Running agent analysis pipeline...")
     open_pos = get_open_positions()
+
+    # ── Portfolio manager review (event-triggered) ────────────────────────────
+    global _portfolio_review_done_today, _last_known_regime
+    should_review, pm_trigger = _should_run_portfolio_review(
+        session=get_session(),
+        regime=regime,
+        open_positions=open_pos,
+        all_scored=scored,
+        news_sentiment=news_sentiment,
+        daily_pnl=pnl,
+        portfolio_value=pv,
+    )
+    if should_review and open_pos:
+        clog("ANALYSIS", f"Portfolio review triggered: {pm_trigger}")
+        try:
+            pm_actions = run_portfolio_review(
+                open_positions=open_pos,
+                all_scored=scored,
+                regime=regime,
+                news_sentiment=news_sentiment,
+                portfolio_value=pv,
+                trigger=pm_trigger,
+            )
+            for action in pm_actions:
+                sym_pm    = action.get("symbol", "")
+                act_pm    = action.get("action", "HOLD")
+                reason_pm = action.get("reasoning", "portfolio manager")
+                if act_pm == "EXIT" and sym_pm:
+                    clog("TRADE", f"Portfolio manager EXIT: {sym_pm} — {reason_pm}")
+                    pos_pm = next((p for p in open_pos if p["symbol"] == sym_pm), None)
+                    ep_pm  = pos_pm["current"] if pos_pm else 0
+                    execute_sell(ib, sym_pm, reason=f"portfolio_manager:{pm_trigger}")
+                    if pos_pm:
+                        pnl_pm = (ep_pm - pos_pm["entry"]) * pos_pm["qty"] if pos_pm.get("direction", "LONG") == "LONG" else (pos_pm["entry"] - ep_pm) * pos_pm["qty"]
+                        from learning import log_trade as _log_trade_pm
+                        _log_trade_pm(
+                            trade=pos_pm,
+                            agent_outputs={},
+                            regime=regime,
+                            action="CLOSE",
+                            outcome={
+                                "exit_price": round(ep_pm, 4),
+                                "pnl":        round(pnl_pm, 2),
+                                "reason":     f"portfolio_manager:{pm_trigger}",
+                            },
+                        )
+                elif act_pm in ("TRIM", "ADD"):
+                    clog("INFO", f"Portfolio manager {act_pm}: {sym_pm} — {reason_pm} (manual review)")
+                else:
+                    clog("INFO", f"Portfolio manager HOLD: {sym_pm} — {reason_pm}")
+            # Log all actions to audit log
+            from bot_state import clog as _clog
+            import json as _json
+            _audit_path = pathlib.Path("data/audit_log.jsonl")
+            try:
+                with _audit_path.open("a") as _af:
+                    _af.write(_json.dumps({
+                        "type":    "portfolio_review",
+                        "trigger": pm_trigger,
+                        "actions": pm_actions,
+                        "ts":      datetime.now().isoformat(),
+                    }) + "\n")
+            except Exception:
+                pass
+        except Exception as _pm_err:
+            clog("ERROR", f"Portfolio review error: {_pm_err}")
+        finally:
+            if pm_trigger == "pre_market":
+                _portfolio_review_done_today = True
+            _last_known_regime = regime.get("regime", _last_known_regime)
+    else:
+        _last_known_regime = regime.get("regime", _last_known_regime)
+
+    open_pos = get_open_positions()  # refresh after any PM exits
+    dash["positions"] = open_pos
 
     positions_to_reconsider = check_thesis_validity(open_pos, regime["regime"])
     if positions_to_reconsider:
