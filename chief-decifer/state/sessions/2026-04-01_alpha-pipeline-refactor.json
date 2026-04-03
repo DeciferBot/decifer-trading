@@ -1,0 +1,60 @@
+{
+  "date": "2026-04-01",
+  "topic": "alpha-pipeline-v2",
+  "status": "complete",
+  "approved_by": "Amit",
+  "summary": "Refactored the 9-dimension signal pipeline to 10 active dimensions, targeting genuine alpha generation across four categories: information edges, behavioral edges, execution discipline, and signal decay awareness.",
+  "decisions": [
+    {
+      "decision": "Merge TREND + MTF → DIRECTIONAL",
+      "rationale": "Both measured directional agreement (EMA alignment vs. timeframe consensus). Correlated dimensions split IC weight unnecessarily. Merged score_directional() frees a slot for higher-quality signal with no information loss."
+    },
+    {
+      "decision": "Disable SOCIAL by default (dimension_flags.social = False)",
+      "rationale": "Reddit mention velocity is meme-prone. Setting to False rather than deleting preserves the code for IC auto-re-enable if 60-trade IC proves alpha. Short-circuits Reddit API call to save 2-5s per scan."
+    },
+    {
+      "decision": "Add PEAD (Post-Earnings Announcement Drift)",
+      "rationale": "Most documented behavioral finance anomaly. Analysts underreact to earnings surprises; drift continues 20-60 days. Uses yf.get_earnings_dates() — no new dependencies. Long-only, 6-hour cache."
+    },
+    {
+      "decision": "Add SHORT_SQUEEZE (replaces SOCIAL slot)",
+      "rationale": "High short float + volume surge + price above Donchian resistance = asymmetric upside. Finviz scrape for short float (already in news_sentinel.py). Long-only, 4-hour cache."
+    },
+    {
+      "decision": "Add OVERNIGHT_DRIFT (new Dim 10)",
+      "rationale": "Equity risk premium accrues disproportionately overnight — one of the most persistent anomalies. Computed from df_1d already fetched in compute_indicators(), stored in sig_1d. Zero extra API calls."
+    },
+    {
+      "decision": "IC auto-disable logic in ic_calculator.py",
+      "rationale": "Eliminates manual dimension flag management. IC < -0.02 for 3 weeks triggers disable; IC > +0.01 for 2 weeks re-enables. Writes to data/settings_override.json. Appends to audit_log.jsonl."
+    },
+    {
+      "decision": "Small/micro cap universe track ($50M-$2B)",
+      "rationale": "Institutions cannot play small caps at scale. Less efficient markets = exploitable anomalies persist longer. Separate score threshold (22 vs 18) and position sizing (5% vs 10%). Stage 4b in pipeline."
+    },
+    {
+      "decision": "Lower min_valid_records from 20 to 10",
+      "rationale": "IC history resets on dimension refactor (old 'trend'/'mtf' keys excluded by DIMENSIONS guard). Lower threshold speeds recovery of IC-weighted scoring on the new dimension set."
+    }
+  ],
+  "what_alpha_this_captures": {
+    "information_edge": "DIRECTIONAL (fast structure processing), PEAD (faster than manual traders on earnings), SMALL_CAP (institutional blindspot)",
+    "behavioral_edge": "PEAD (underreaction anomaly), SHORT_SQUEEZE (forced covering), OVERNIGHT_DRIFT (persistent overnight premium)",
+    "execution_discipline": "IC auto-disable prevents riding dead signals, small cap sizing respects risk, social short-circuit reduces noise",
+    "signal_decay_awareness": "IC auto-disable/re-enable makes decay tracking automatic, audit trail tracks every dimension state change"
+  },
+  "files_changed": [
+    "config.py", "signals.py", "ic_calculator.py", "signal_pipeline.py", "scanner.py"
+  ],
+  "files_created": [
+    "chief-decifer/state/specs/feat-alpha-pipeline-v2.json"
+  ],
+  "next_steps": [
+    "Monitor PEAD scoring on first scan cycle — check signals_log.jsonl for pead > 0 entries after earnings events",
+    "Monitor SHORT_SQUEEZE — if Finviz blocks (403), disable via dimension_flags.short_squeeze = False",
+    "After 60+ new trades: run ic_calculator.update_ic_weights() and review dimension weights for new dims",
+    "Phase 2 gate (200+ trades): raise ic_min_threshold to 0.03 to suppress residual noise",
+    "Consider adding OVERNIGHT_DRIFT to theme_tracker themes (overnight drift varies by sector)"
+  ]
+}

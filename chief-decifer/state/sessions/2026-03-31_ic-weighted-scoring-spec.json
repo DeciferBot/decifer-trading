@@ -1,0 +1,59 @@
+{
+  "date": "2026-03-31",
+  "topic": "IC-Weighted Dynamic Signal Scoring — Spec Consolidation",
+  "session_type": "product/spec",
+  "status": "awaiting_amit_approval",
+
+  "context": "Two near-duplicate pipeline items (BACK-005 and BACK-006) had been sitting in the backlog with no detailed spec, while Phase 1 of the work they described had already shipped on 2026-03-30 (commit 36f9166, ic_calculator.py). This session audited both items, documented what was built, defined the remaining phases precisely, and consolidated everything into a single authoritative spec.",
+
+  "findings": {
+    "duplicate_analysis": "BACK-005 (Alphalens IC analysis) and BACK-006 (walk-forward weight calibration) were always sequential phases of one feature, not independent items. BACK-005 was the diagnostic pre-cursor; BACK-006's own documentation said 'start with IC-proportional weights before attempting full optimization.' Phase 1 IS that simpler alternative.",
+    "phase_1_already_shipped": {
+      "commit": "36f9166",
+      "date": "2026-03-30",
+      "files": ["ic_calculator.py (418 lines)", "signals.py (+39 lines)", "bot.py (+90 lines)", "dashboard.py (+112 lines)", "tests/test_ic_calculator.py (407 lines, 26 tests)"],
+      "what_it_does": "Rolling 60-trade Spearman IC per dimension, weight proportional to positive IC, equal-weight fallback below 20 valid records, weekly Sunday update cycle, dashboard IC weights panel"
+    },
+    "remaining_work": {
+      "phase_2": "IC noise floor (0.03), HHI concentration cap (40% max), Alphalens quantile/decay/turnover analysis — needs 200+ closed trades",
+      "phase_3": "Walk-forward HMM-conditioned per-regime IC weights — needs BACK-003 + 600+ regime-labeled trades"
+    }
+  },
+
+  "deliverables": [
+    {
+      "file": "chief-decifer/state/specs/feat-ic-weighted-scoring.json",
+      "action": "created",
+      "description": "Complete 3-phase spec: IC definition, weight derivation, data requirements, Signal object integration, success metrics, open questions, risks, references, backlog disposition"
+    },
+    {
+      "file": "chief-decifer/state/backlog.json",
+      "action": "updated",
+      "changes": [
+        "BACK-005: status pending -> superseded, added superseded_by, resolution, resolved",
+        "BACK-006: status pending -> superseded, added superseded_by, resolution, resolved",
+        "BACK-011: new Phase C item — IC Phase 2 (noise floor + Alphalens), blocks BACK-003",
+        "BACK-003: dependency BACK-005 -> BACK-011 (superseded item replaced with active successor)",
+        "last_updated: 2026-03-29 -> 2026-03-31"
+      ]
+    }
+  ],
+
+  "spec_highlights": {
+    "ic_definition": "Spearman rank correlation between Z-scored dimension score and 5-trading-day forward return (first close >= T+7 calendar days). Rolling 60-trade window, min 20 valid records.",
+    "weight_rule_phase_1": "weight_i = max(IC_i, 0); normalize to sum=1; equal-weight fallback if all IC <= 0 or insufficient data",
+    "weight_rule_phase_2": "weight_i = IC_i if IC_i >= 0.03 else 0; HHI cap 40% per dimension; normalize; equal-weight fallback",
+    "weight_rule_phase_3": "Per-regime IC vectors blended by HMM regime probabilities: sum(P(regime_r) * IC_weights_r), renormalized",
+    "primary_success_metric": ">=5 percentage point win rate improvement over equal-weight baseline on rolling 60 trades",
+    "phase_2_gate": "200+ closed trades",
+    "phase_3_gate": "Phase 2 complete + BACK-003 (HMM) + 600+ regime-labeled trades"
+  },
+
+  "open_questions_for_amit": [
+    "Should IC_MIN_THRESHOLD (0.03) live in config.py['ic_calculator'] or be hard-coded in ic_calculator.py? (Recommendation: config.py for operational tunability)",
+    "Should the VIX regime router be disabled when Phase 3 HMM weights go live? (Recommendation: yes, to avoid double-counting)",
+    "Should HHI concentration cap (40% max weight) be enforced in code or only monitored in Phase 2? (Recommendation: enforce — clip and renormalize)"
+  ],
+
+  "next_session_trigger": "Pull BACK-011 (Phase 2) when trade count reaches 200 closed trades. Check /api/trade_count or alpha_gate status before starting."
+}

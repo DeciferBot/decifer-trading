@@ -1,0 +1,48 @@
+{
+  "id": "spec-data-fallback",
+  "title": "Data Provider Fallback Chain",
+  "status": "implemented",
+  "phase": "A",
+  "priority": "P0",
+  "is_live_trading_gate": false,
+  "version": "1.0",
+  "date": "2026-03-30",
+
+  "summary": "Defines the data provider priority chain for signal generation, per-symbol and per-batch failure handling, and the abort threshold that prevents low-confidence scan results from driving order submissions.",
+
+  "provider_chain": {
+    "primary": "yfinance — via _safe_download() with 3 retries and cache clear on auth failure",
+    "secondary": "None — there is no secondary provider for signal data",
+    "note": "The mentions of alphavantage and stooq in the test suite relate to historical backtester data only, not live signal scoring."
+  },
+
+  "per_symbol_failure_modes": {
+    "yfinance_auth_failure": "Retry 3× with yf.cache.clear() between attempts. If all 3 fail → return None → symbol skipped for this scan cycle.",
+    "data_contamination": "Price cross-validation: if 5m price and daily price differ by >50%, data is corrupt → return None → symbol skipped. Logged at WARNING level.",
+    "insufficient_bars": "< 30 bars on 5m or < 20 bars on daily → fetch_multi_timeframe returns None → symbol skipped.",
+    "process_timeout": "future.result(timeout=60) raises TimeoutError → counted as failure → symbol skipped."
+  },
+
+  "per_symbol_skip_policy": "If fetch_multi_timeframe returns None (for any reason), that symbol is excluded from the current scan cycle entirely. No partial scoring. Logged silently.",
+
+  "batch_abort_policy": {
+    "threshold": 0.8,
+    "condition": "If failures / total_symbols > 0.8 after completing the scan batch",
+    "action": "Log CRITICAL; return ([], []) immediately — empty above_threshold and all_scored",
+    "rationale": "A scan on 5 symbols when 45 were requested is statistically meaningless. Proceeding could produce false-positive signals from a survivorship-biased subset."
+  },
+
+  "sequential_fallback": {
+    "trigger": "If ProcessPoolExecutor.submit() or as_completed() raises any exception",
+    "behaviour": "Fall back to sequential fetch_multi_timeframe() calls. Same per-symbol failure handling. Same batch abort check applies.",
+    "log_level": "WARNING — 'Process pool failed, falling back to sequential scoring'"
+  },
+
+  "no_dimension_level_fallback": "If a symbol fails, the entire symbol is skipped. There is no partial scoring where some dimensions succeed and others are zeroed. This maintains score comparability across symbols.",
+
+  "files": [
+    "signals.py — _safe_download(), fetch_multi_timeframe(), score_universe()"
+  ],
+
+  "tests": ["tests/test_data_collector.py"]
+}

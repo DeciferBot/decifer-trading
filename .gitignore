@@ -5,12 +5,7 @@
 *.pem
 *.key
 
-# Data files (large, regenerable)
-data/trades.json
-data/equity_history.json
-data/orders.json
-data/orders.json.bak*
-data/settings_override.json
+# Data files (large or regenerable — small critical files are tracked)
 data/*.csv
 data/*.parquet
 data/historical/
@@ -34,9 +29,6 @@ build/
 # Jupyter
 .ipynb_checkpoints/
 
-# Chief Decifer (separate project, will get its own repo)
-chief-decifer/
-
 # Old git backup (leftover)
 .git_old/
 
@@ -45,9 +37,8 @@ chief-decifer/
 Thumbs.db
 .~lock.*
 
-# macOS app bundles and launch scripts (machine-specific)
+# macOS app bundles (machine-specific binaries)
 *.app/
-*.command
 
 # Generated docs (can be regenerated)
 chief-decifer-dashboard-preview.html
@@ -55,5 +46,3 @@ chief_icon.png
 
 # Office temp files
 ~$*
-.claude/memory/checkpoint.json
-.claude/memory/session-history.jsonl

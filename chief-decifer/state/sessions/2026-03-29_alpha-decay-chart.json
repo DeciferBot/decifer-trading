@@ -1,0 +1,53 @@
+{
+  "date": "2026-03-29",
+  "topic": "Alpha Decay Chart — Phase B P1",
+  "status": "complete",
+  "branch": "master",
+  "summary": "Built the Alpha Decay Chart feature end-to-end. Added alpha_decay.py (new module), tests/test_alpha_decay.py (30 tests, all passing), a new '📉 Alpha Decay' dashboard tab with Chart.js visualisation, and the /api/alpha_decay GET endpoint in bot.py.",
+  "what_was_built": {
+    "alpha_decay.py": {
+      "purpose": "Compute per-trade forward return distributions at T+1, T+3, T+5, T+10 bars after entry",
+      "key_functions": [
+        "_parse_entry_date(trade) — handles entry_time/open_time/timestamp in multiple formats",
+        "fetch_forward_returns(symbol, entry_dt, horizons) — yfinance Ticker.history() per call, 3 retries",
+        "compute_alpha_decay(trades, horizons) — enriches closed trades with fwd returns + direction-adj returns",
+        "_aggregate(records, horizons) — pure-Python median/p25/p75 per horizon",
+        "get_alpha_decay_stats(trades, horizons) — public API: groups by score band, regime, direction"
+      ],
+      "direction_normalisation": "SHORT trades: raw return sign inverted so positive always = favourable outcome"
+    },
+    "tests/test_alpha_decay.py": {
+      "tests": 30,
+      "passing": 30,
+      "coverage": "date parsing edge cases, percentile math, aggregation with missing horizons, segment counts, custom horizons, file loading, SHORT sign inversion, open-trade skipping"
+    },
+    "dashboard.py": {
+      "changes": [
+        "Added '📉 Alpha Decay' tab button",
+        "Added #view-alpha HTML: KPI strip (n, optimal hold, T+1, T+10), Chart.js line chart with P25–P75 band, segment breakdown table",
+        "Added loadAlphaDecay() / renderAlphaDecay(d) JS functions",
+        "switchTab('alpha') triggers chart destroy + reload with 50ms DOM layout delay",
+        "alphaDecayChart state variable added"
+      ]
+    },
+    "bot.py": {
+      "changes": ["GET /api/alpha_decay — imports get_alpha_decay_stats(), returns JSON with error fallback"]
+    }
+  },
+  "data_state": {
+    "trades_available": 65,
+    "agent_scored": 13,
+    "backfilled": 52,
+    "note": "52 backfilled trades lack signal_scores — forward returns computable but per-dimension IC not yet possible. T+10 results sparse for entries after 2026-03-19."
+  },
+  "tests_run": "pytest tests/test_alpha_decay.py — 30 passed in 0.14s",
+  "files_changed": [
+    "alpha_decay.py (new, 242 lines)",
+    "tests/test_alpha_decay.py (new, 30 tests)",
+    "dashboard.py (tab, view HTML, ~180 lines JS)",
+    "bot.py (+12 lines, /api/alpha_decay endpoint)",
+    "chief-decifer/state/specs/feat-alpha-decay.json (new)",
+    "chief-decifer/state/sessions/2026-03-29_alpha-decay-chart.json (this file)"
+  ],
+  "pending_approval": true
+}

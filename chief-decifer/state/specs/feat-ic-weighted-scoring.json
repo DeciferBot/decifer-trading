@@ -1,0 +1,314 @@
+{
+  "id": "feat-ic-weighted-scoring",
+  "title": "IC-Weighted Dynamic Signal Scoring",
+  "status": "phase_1_shipped",
+  "phase": "C",
+  "priority": "P1",
+  "created": "2026-03-31",
+  "shipped_phase_1": "2026-03-30",
+  "commit_phase_1": "36f9166",
+  "supersedes": ["BACK-005", "BACK-006"],
+  "roadmap_refs": [
+    "roadmap/05-signal-validation.md",
+    "roadmap/06-weight-calibration.md"
+  ],
+
+  "summary": "Replace static equal-weight signal scoring with a data-driven IC-weighted composite. Each of the 9 signal dimensions is weighted proportional to its recent Spearman IC (rank correlation against 5-day forward returns), computed on a rolling 60-trade window. Dimensions with no predictive power receive zero weight; the composite falls back to equal weighting until data is sufficient. Three progressive phases: Phase 1 (shipped — basic IC weights, no noise floor), Phase 2 (IC noise floor + Alphalens validation), Phase 3 (walk-forward optimization with HMM regime conditioning).",
+
+  "definition_of_ic": {
+    "method": "Spearman rank correlation",
+    "rationale": "Rank-based rather than Pearson — robust to non-normal return distributions and outlier scores, which are common in short-window equity signals",
+    "x_variable": "Z-scored dimension score at time of signal (zero mean / unit variance across the rolling window)",
+    "y_variable": "5-trading-day forward return: (price_at_T+5_trading_days - scan_price) / scan_price",
+    "forward_price_source": "yfinance 1d OHLCV — first available close >= 7 calendar days after scan date, which covers exactly 5 trading days in a standard week",
+    "rolling_window": 60,
+    "min_valid_records": 20,
+    "staleness_guard": "Records < 6 calendar days old excluded — forward return not yet available",
+    "library": "scipy.stats.spearmanr (primary); numpy argsort approximation (fallback if scipy unavailable)",
+    "ic_thresholds": {
+      "gt_0_05": "Useful signal — weight assigned proportional to IC",
+      "0_03_to_0_05": "Marginal — included in Phase 1 (any positive IC passes); suppressed in Phase 2+ by noise floor",
+      "lt_0_03": "Noise floor — zero weight in Phase 2+",
+      "negative": "Anti-predictive — zero weight in all phases (not inverted)"
+    }
+  },
+
+  "dimensions": [
+    "trend",
+    "momentum",
+    "squeeze",
+    "flow",
+    "breakout",
+    "mtf",
+    "news",
+    "social",
+    "reversion"
+  ],
+
+  "phases": [
+    {
+      "phase": 1,
+      "label": "Basic IC Weighting",
+      "status": "shipped",
+      "shipped_date": "2026-03-30",
+      "commit": "36f9166",
+      "ic_noise_floor": null,
+      "ic_noise_floor_note": "No minimum threshold. Any positive IC receives proportional weight. Negative IC is clamped to zero.",
+      "weight_rule": "weight_i = max(IC_i, 0); normalize so sum(weights) = 1.0",
+      "fallback_rule": "If all IC <= 0 or fewer than 20 valid records: equal weights (1/9 per dimension)",
+      "update_cadence": "Weekly — bot.py Sunday review cycle (weekday() == 6) calls ic_calculator.update_ic_weights()",
+      "files": [
+        "ic_calculator.py — core IC computation, weight normalization, cache I/O (418 lines)",
+        "signals.py — compute_confluence() applies IC weights before MTF penalty",
+        "bot.py — GET /api/ic_weights endpoint; Sunday update trigger",
+        "dashboard.py — IC weights panel with per-dim bars, raw IC, 4-week trend arrows",
+        "tests/test_ic_calculator.py — 26 tests"
+      ],
+      "deliverables_done": [
+        "Rolling Spearman IC per dimension (60-trade window, min 20 valid)",
+        "Z-score normalization of dimension scores before IC calculation",
+        "weight_i = max(IC_i, 0), normalized to sum 1.0",
+        "Equal-weight fallback when data insufficient",
+        "data/ic_weights.json — current weights cache (atomic write)",
+        "data/ic_weights_history.jsonl — weekly snapshots (append-only)",
+        "GET /api/ic_weights endpoint for dashboard consumption",
+        "Dashboard IC weights panel: per-dim bars, raw IC, 4-week trend arrows, equal-weight fallback indicator",
+        "Backward-compatible: equal weights produce identical score to prior equal-weight sum on 0-50 scale"
+      ],
+      "known_gaps": [
+        "No IC noise floor — any positive IC (even 0.001) receives weight, including noise",
+        "No Alphalens quantile/decay/turnover analysis",
+        "No per-regime IC calculation",
+        "No HHI concentration cap enforcement"
+      ]
+    },
+    {
+      "phase": 2,
+      "label": "IC Noise Floor + Alphalens Validation",
+      "status": "pending",
+      "min_trades_required": 200,
+      "min_trades_rationale": "200+ closed trades required for statistically meaningful IC estimates across at least 2 market regimes. At 5-10 paper trades per day, approximately 20-40 trading days of data.",
+      "ic_noise_floor": 0.03,
+      "ic_noise_floor_rationale": "IC < 0.03 is indistinguishable from noise per Grinold & Kahn (Active Portfolio Management, 2000). Suppressing noise-level dimensions reduces overfitting in the weight vector.",
+      "weight_rule": "weight_i = IC_i if IC_i >= 0.03 else 0; normalize so sum(weights) = 1.0",
+      "fallback_rule": "If all dimensions below noise floor or < 20 valid records: equal weights (1/9 per dimension)",
+      "hhi_cap": "If any dimension weight > 0.40 after normalization: clip to 0.40, renormalize remaining. Log WARNING.",
+      "deliverables": [
+        "Add IC_MIN_THRESHOLD = 0.03 constant to ic_calculator.py (or config.py['ic_calculator']['ic_min_threshold'] — see open questions)",
+        "Modify normalize_ic_weights() to apply noise floor: weight_i = IC_i if IC_i >= IC_MIN_THRESHOLD else 0",
+        "Add HHI concentration cap: clip any weight > 0.40, renormalize, log warning",
+        "Add 'noise_floor_applied' flag and 'dimensions_suppressed' list to ic_weights.json cache record",
+        "Run alphalens-reloaded analysis: quantile returns, IC decay at T+1/T+5/T+20, turnover per dimension",
+        "Produce validation report: KEEP / REDUCE WEIGHT / REMOVE recommendation per dimension",
+        "Dimension-flag integration: auto-suggest dimension_flags[dim] = false for persistent IC < 0.03",
+        "Update test_ic_calculator.py to cover noise floor suppression and HHI cap cases"
+      ],
+      "new_file": "notebooks/signal_validation.ipynb or validation.py",
+      "new_dependency": "alphalens-reloaded (pip install alphalens-reloaded)"
+    },
+    {
+      "phase": 3,
+      "label": "Walk-Forward Optimization with HMM Regime Conditioning",
+      "status": "pending",
+      "dependencies": ["BACK-003 (HMM regime detection)", "Phase 2 complete"],
+      "min_trades_required": 600,
+      "min_trades_rationale": "6+ months of regime-labeled trade data needed for walk-forward. ~200 trades per regime bucket (bull/bear/choppy) for stable per-regime IC estimates.",
+      "ic_noise_floor": 0.03,
+      "weight_rule": "final_weights = P(bull)*IC_weights_bull + P(bear)*IC_weights_bear + P(choppy)*IC_weights_choppy; apply noise floor per regime; renormalize",
+      "walk_forward": {
+        "training_window": "6 months of trades",
+        "test_window": "1 month forward",
+        "cadence": "Roll monthly",
+        "overfitting_guard": "If out-of-sample IC degradation > 50% of in-sample: widen training window or constrain weights to [0.5x, 2.0x] around equal weight"
+      },
+      "regime_router_interaction": "Phase 3 per-regime IC weights subsume the VIX-based regime router (feat-regime-router). Disable regime_routing_enabled once Phase 3 HMM weights are stable for 4+ consecutive weekly snapshots with out-of-sample IC retention > 50%. Running both creates double-counting.",
+      "deliverables": [
+        "Per-regime IC calculation: separate Spearman IC windows for bull / bear / choppy regime labels",
+        "HMM regime probabilities from BACK-003 (hmmlearn) as blending coefficients",
+        "Blended weight vector: sum over regimes of P(regime_r) * IC_weights_r, renormalized",
+        "Walk-forward validation: 6-month training window, 1-month test window, roll monthly",
+        "Overfitting guard: if out-of-sample IC degradation > 50%, widen window or constrain weights to [0.5x, 2.0x] around equal",
+        "Weight stability monitor: flag if any weight changes by > 50% week-over-week",
+        "Extend ic_weights.json schema with per_regime_ic and regime_probs fields",
+        "Extend ic_weights_history.jsonl with walk-forward validation metrics per snapshot"
+      ],
+      "new_file": "weight_optimizer.py",
+      "new_dependency": "hmmlearn (already roadmapped in BACK-003)"
+    }
+  ],
+
+  "data_requirements": {
+    "primary_input": {
+      "file": "data/signals_log.jsonl",
+      "required_fields_per_record": [
+        "ts (ISO 8601 UTC timestamp)",
+        "symbol (ticker)",
+        "price (scan-time price for forward return calculation — NOT entry price)",
+        "score_breakdown (dict with all 9 dimension scores keyed by dimension name)"
+      ],
+      "minimum_for_phase_1": "20 records with valid forward returns (equal weights fallback below this)",
+      "minimum_for_phase_2": "200 closed trades",
+      "minimum_for_phase_3": "600 closed trades across at least 2 market regimes"
+    },
+    "forward_return_source": {
+      "provider": "yfinance",
+      "method": "_fetch_forward_returns_batch() in ic_calculator.py — batched by symbol to minimize API calls",
+      "horizon": "5 trading days (first available close >= 7 calendar days after scan date)",
+      "staleness_guard": "Records < 6 calendar days old excluded — forward return not yet available",
+      "fallback": "None — records without forward returns are excluded from IC calculation (not imputed)"
+    },
+    "cache_files": {
+      "ic_weights_json": "data/ic_weights.json — current weight vector, raw IC per dimension, n_records, using_equal_weights flag, updated timestamp",
+      "ic_weights_history_jsonl": "data/ic_weights_history.jsonl — append-only weekly snapshots of same schema"
+    },
+    "phase_3_additional": {
+      "regime_labels": "HMM regime probabilities per signal record (added by BACK-003)",
+      "historical_data": "5yr OHLCV for SPY/QQQ for HMM training via yfinance"
+    },
+    "survivorship_bias_note": "signals_log.jsonl captures all scored candidates above the conviction threshold, not only entered trades. This provides conditional-on-threshold IC (not unconditional). To reduce selection bias further, Phase 2 should evaluate whether logging below-threshold candidates is feasible."
+  },
+
+  "integration_points": {
+    "signal_object": {
+      "type": "signal_types.Signal (signal_types.py)",
+      "field_read_by_ic": "dimension_scores (dict) — same as score_breakdown logged to signals_log.jsonl",
+      "field_written_by_ic": "conviction_score (float 0–10) — output of compute_confluence() / 5",
+      "compute_confluence_location": "signals.py, compute_confluence()"
+    },
+    "composite_scoring_formula": {
+      "formula": "score = sum(weight_i * N_dims * dim_score_i for each dim) + candle_bonus",
+      "n_dims": 9,
+      "scaling_rationale": "Factor of N_dims (9) ensures backward-compatibility: with equal weights (1/9 each), sum = sum(dim_scores), identical to pre-IC baseline on 0-50 scale",
+      "candle_bonus_note": "Candlestick pattern bonus (0-3 points) is not a dimension — added on top of IC-weighted sum, not subject to IC weighting",
+      "mtf_penalty_note": "MTF soft penalty applied after IC sum — order unchanged from Phase 1"
+    },
+    "weight_fetch": {
+      "function": "ic_calculator.get_current_weights()",
+      "reads_from": "data/ic_weights.json (on-disk cache)",
+      "fallback": "equal weights dict if file missing, malformed, or weights do not sum to ~1.0",
+      "latency": "File read only — no network call on hot path"
+    },
+    "weight_update": {
+      "function": "ic_calculator.update_ic_weights()",
+      "triggered_by": "bot.py Sunday review cycle (weekday() == 6)",
+      "side_effects": [
+        "Atomic write to data/ic_weights.json",
+        "Append to data/ic_weights_history.jsonl"
+      ]
+    },
+    "dimension_flags_interaction": "Disabled dimensions (dimension_flags[dim] = false in config.py) receive score = 0 before IC weighting. In Phase 2, ic_weights.json 'dimensions_suppressed' field should union disabled_by_flag and suppressed_by_ic_floor for clear diagnostics."
+  },
+
+  "success_metrics": {
+    "primary": {
+      "metric": "Win rate of IC-weighted scoring vs equal-weight baseline",
+      "target": ">=5 percentage point improvement in win rate over a rolling 60-trade window",
+      "measurement": "Log ic_weights snapshot key with each trade in signals_log.jsonl. Compare win rates for trades executed during equal-weight fallback periods vs IC-weighted periods."
+    },
+    "secondary": [
+      {
+        "metric": "IC stability",
+        "target": "Rolling standard deviation of each dimension IC < 0.10 over 4 consecutive weekly snapshots",
+        "rationale": "Unstable IC indicates noisy or regime-dependent predictive power that a single window cannot capture reliably"
+      },
+      {
+        "metric": "Out-of-sample IC retention (Phase 3 only)",
+        "target": "Walk-forward out-of-sample IC degradation < 50% of in-sample IC per dimension",
+        "rationale": "Degradation > 50% signals overfitting; widen training window or constrain weights per roadmap/06"
+      },
+      {
+        "metric": "Weight concentration (HHI guard, Phase 2+)",
+        "target": "No single dimension exceeds 40% of total weight",
+        "rationale": "Extreme weight concentration amplifies single-factor risk and is typically a transient IC spike artifact"
+      },
+      {
+        "metric": "Equal-weight fallback rate",
+        "target": "using_equal_weights = false in >= 80% of weekly snapshots once 60+ trades accumulated",
+        "rationale": "Persistent fallback indicates data pipeline issue — signals_log.jsonl not accumulating sufficient records with resolved forward returns"
+      }
+    ],
+    "backtesting_comparison": {
+      "baseline": "Equal weights (1/9 per dimension) — the pre-36f9166 scoring",
+      "comparison_1": "IC-weighted without noise floor (Phase 1 — current)",
+      "comparison_2": "IC-weighted with 0.03 noise floor + HHI cap (Phase 2)",
+      "comparison_3": "Walk-forward HMM-conditioned IC weights (Phase 3)",
+      "expected_ordering": "Phase 3 >= Phase 2 > Phase 1 > equal weights on out-of-sample Sharpe ratio",
+      "min_sample_for_comparison": "200 trades per comparison for statistical significance"
+    }
+  },
+
+  "open_questions": [
+    {
+      "question": "Should the IC noise floor (0.03) be a configurable constant in config.py or hard-coded in ic_calculator.py?",
+      "recommendation": "Add to config.py['ic_calculator']['ic_min_threshold']. Allows operational tuning without a code deploy, and signals it is a policy decision rather than a mathematical constant.",
+      "phase": 2,
+      "decision_needed_before": "Phase 2 implementation begins"
+    },
+    {
+      "question": "Should the VIX-based regime router (feat-regime-router) be disabled when Phase 3 HMM weights go live?",
+      "recommendation": "Yes. Both systems modulate dimension weights by regime — running both double-counts the regime signal. Disable regime_routing_enabled after Phase 3 weights are stable for 4+ consecutive weekly snapshots.",
+      "phase": 3,
+      "decision_needed_before": "Phase 3 goes to production"
+    },
+    {
+      "question": "Should the HHI concentration cap (40% max weight) be enforced in normalize_ic_weights() or only monitored?",
+      "recommendation": "Enforce in Phase 2: clip any weight > 0.40, renormalize, log WARNING. Monitoring alone risks letting a transient IC spike silently distort the composite.",
+      "phase": 2,
+      "decision_needed_before": "Phase 2 implementation begins"
+    }
+  ],
+
+  "risks": [
+    {
+      "risk": "Overfitting on small trade sample",
+      "severity": "HIGH",
+      "mitigation": "Phase 1 requires min_valid=20. Phase 2 requires 200+ trades. Phase 3 requires 600+ with regularization constraints (weight bounds [0.5x, 2.0x] around equal weight)."
+    },
+    {
+      "risk": "Selection bias in signals_log.jsonl",
+      "severity": "MEDIUM",
+      "mitigation": "signals_log.jsonl captures all candidates above the scoring threshold, not only entered trades. Log scan-time price (not entry price) for forward return. Phase 2 to evaluate logging below-threshold candidates."
+    },
+    {
+      "risk": "yfinance rate limits during batch forward return fetching",
+      "severity": "LOW",
+      "mitigation": "_fetch_forward_returns_batch() groups by symbol. update_ic_weights() called once per week (not hot path). Records without forward returns excluded, not imputed."
+    },
+    {
+      "risk": "IC non-stationarity — weights from Q1 2026 may not generalise to Q3 2026",
+      "severity": "MEDIUM",
+      "mitigation": "Rolling 60-trade window naturally downweights stale observations. Phase 3 monthly walk-forward retraining provides explicit adaptation. Weight stability monitor flags > 50% week-over-week changes."
+    },
+    {
+      "risk": "Phase 3 HMM regime mislabelling corrupts per-regime IC training",
+      "severity": "HIGH",
+      "mitigation": "Validate BACK-003 (HMM) independently before Phase 3. Phase 3 is explicitly blocked on BACK-003 completion and validation."
+    }
+  ],
+
+  "references": [
+    "Grinold & Kahn, Active Portfolio Management (2000) — IC methodology and noise floor thresholds",
+    "Di Mascio, Lines, Naik, Alpha Decay (SSRN) — signal decay research",
+    "Stefan Jansen, Machine Learning for Algorithmic Trading (2020) — Chapter 4, factor validation",
+    "Dynamic Factor Allocation Leveraging Regime-Switching Signals (arXiv 2410.14841, 2024) — ML-based factor weight allocation; shows IR improvement from 0.05 (equal-weight) to ~0.40 (dynamic)",
+    "Pardo, The Evaluation and Optimization of Trading Strategies (2008) — walk-forward optimization methodology"
+  ],
+
+  "backlog_disposition": {
+    "BACK-005": {
+      "original_title": "Signal validation via Alphalens IC analysis",
+      "action": "superseded",
+      "rationale": "Phase 1 has already shipped the core IC computation. Alphalens full analysis (quantile returns, IC decay, turnover) is now Phase 2 of this spec. Keeping BACK-005 as a standalone item creates the false impression that no IC work has been done and obscures the phase sequencing."
+    },
+    "BACK-006": {
+      "original_title": "Walk-forward weight calibration",
+      "action": "superseded",
+      "rationale": "roadmap/06 explicitly recommended starting with IC-proportional weights before walk-forward optimization. Phase 1 IS that simpler alternative. Walk-forward + HMM conditioning is Phase 3 of this spec. All Phase 3 deliverables and dependencies from BACK-006 are preserved here."
+    },
+    "BACK-011": {
+      "title": "IC-Weighted Dynamic Scoring — Phase 2 (noise floor + Alphalens)",
+      "action": "add to backlog Phase C",
+      "rationale": "Superseding BACK-005 leaves Phase C empty. BACK-011 fills that gap and maintains Phase C as the active validation phase."
+    }
+  }
+}

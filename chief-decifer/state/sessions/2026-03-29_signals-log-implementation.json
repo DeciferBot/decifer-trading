@@ -1,0 +1,26 @@
+{
+  "session_id": "2026-03-29T_signals-log",
+  "date": "2026-03-29",
+  "work_items": [
+    {
+      "type": "feature",
+      "component": "learning.py, bot.py, config.py, tests/test_learning.py, tests/test_bot.py",
+      "summary": "Implemented signals_log.jsonl — a JSONL file that appends every scored symbol's 9-dimension breakdown after each scan cycle. Fixes the critical data gap identified in the baseline performance audit: per-dimension IC was uncomputable because dimension scores were never persisted.",
+      "root_cause": "signals.py already produced score_breakdown (9 dimensions). bot.py already passed it as signal_scores to execute_buy. But no code ever wrote scored symbols to a persistent log. trades.json only records the aggregate score on traded symbols; it never captured all scanned symbols or their dimension breakdowns.",
+      "resolution": "Added SIGNALS_LOG_FILE constant to learning.py. Added log_signal_scan(scored, regime) function that appends one JSONL line per symbol per scan (ts, scan_id, symbol, score, price, regime, vix, score_breakdown, disabled_dims). Added signals_log path to config.py. Called log_signal_scan in bot.py immediately after score_universe(). Added 7 tests in TestSignalScanLogging. Added log_signal_scan stub to test_bot.py learning stub.",
+      "files_changed": [
+        "learning.py",
+        "bot.py",
+        "config.py",
+        "tests/test_learning.py",
+        "tests/test_bot.py"
+      ],
+      "tests_added": ["tests/test_learning.py::TestSignalScanLogging (7 tests)"],
+      "tests_passing": true,
+      "total_tests": 1084,
+      "notes": "Selection bias: signals_log.jsonl only captures above-threshold symbols (score_universe filters before returning). Below-threshold scores are not logged. Document this in any IC analysis — the observable distribution is right-truncated. To fix this properly, score_universe would need to return all scored symbols, not just those above threshold."
+    }
+  ],
+  "git_commits": [],
+  "approved_by": null
+}

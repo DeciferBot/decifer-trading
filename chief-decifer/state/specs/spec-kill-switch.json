@@ -1,0 +1,86 @@
+{
+  "id": "spec-kill-switch",
+  "title": "Emergency Stop / Kill Switch",
+  "status": "implemented",
+  "phase": "A",
+  "priority": "P0",
+  "is_live_trading_gate": true,
+  "backlog_ref": "BACK-000",
+  "version": "1.0",
+  "date": "2026-03-30",
+
+  "summary": "Defines the exact semantics of a kill command — what is cancelled, what is flattened, what is halted, and in what order. The kill switch is a hard safety requirement before any live capital is deployed.",
+
+  "kill_levels": {
+    "level_1_halt_signals": {
+      "description": "Block all new scan results from producing orders. Open positions are held. Pending orders are left in place.",
+      "how": "Set dash['killed'] = True. Signal dispatcher checks this flag before submitting any order.",
+      "reversible": true,
+      "trigger": "Not exposed directly — Level 3 always used from external triggers"
+    },
+    "level_2_cancel_pending": {
+      "description": "Cancel all open (unfilled) orders that have been submitted to IBKR but not yet filled.",
+      "how": "ib.reqGlobalCancel() — cancels all open orders on the active account.",
+      "reversible": true,
+      "trigger": "Called as part of Level 3 sequence"
+    },
+    "level_3_flatten": {
+      "description": "Market-sell all open long positions. Market-buy to close all open short positions. Then cancel pending orders. Then halt signals.",
+      "how": "Iterate active_trades, submit market close order per position, then reqGlobalCancel(), then set dash['killed'] = True.",
+      "reversible": false,
+      "trigger": "Default action for all external kill triggers"
+    }
+  },
+
+  "default_kill_action": "level_3",
+  "kill_sequence_order": [
+    "1. Submit market close orders for all open positions (flatten)",
+    "2. Call ib.reqGlobalCancel() to cancel all pending unfilled orders",
+    "3. Set dash['killed'] = True to block new signal-driven orders",
+    "4. Log KILL_ACTIVATED event with positions_flattened and orders_cancelled counts",
+    "5. Send confirmation back to triggering channel (Telegram or dashboard)"
+  ],
+
+  "triggers": [
+    {
+      "source": "Telegram",
+      "command": "/kill",
+      "authorized": "authorized_chat_ids only (config['telegram']['authorized_chat_ids'])",
+      "handler": "telegram_bot.py on_kill() callback"
+    },
+    {
+      "source": "Web Dashboard",
+      "command": "POST /api/kill (red KILL SWITCH button)",
+      "authorized": "localhost only (dashboard is not externally exposed)",
+      "handler": "bot.py /api/kill route"
+    }
+  ],
+
+  "resume_path": {
+    "telegram": "/resume command from authorized chat",
+    "dashboard": "Resume button (clears dash['killed'] = False)",
+    "note": "Resume clears the halt flag only. It does NOT re-open flattened positions. Positions must be re-entered by normal signal flow."
+  },
+
+  "status_command": {
+    "telegram": "/status — reports dash['killed'], open position count, current PnL",
+    "dashboard": "Status visible on main dashboard header"
+  },
+
+  "state_managed_in": "bot.py dash dict — dash['killed'] (bool)",
+
+  "files": [
+    "telegram_bot.py — long-poll daemon, command dispatch",
+    "bot.py — dash['killed'] flag, /api/kill route, on_kill/on_status/on_resume callbacks",
+    "orders.py — flatten logic, reqGlobalCancel"
+  ],
+
+  "tests": ["tests/test_telegram_kill_switch.py"],
+
+  "open_questions": [],
+
+  "known_limitations": [
+    "If IBKR is disconnected when /kill is received, flatten orders cannot be submitted. The halt flag (level_1) is still set. Manual intervention required to close positions.",
+    "Market-close orders during pre/post market may not fill at expected prices."
+  ]
+}

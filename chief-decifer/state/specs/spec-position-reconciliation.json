@@ -1,0 +1,52 @@
+{
+  "id": "spec-position-reconciliation",
+  "title": "Position Reconciliation on Restart",
+  "status": "implemented",
+  "phase": "A",
+  "priority": "P0",
+  "is_live_trading_gate": true,
+  "version": "1.0",
+  "date": "2026-03-30",
+
+  "summary": "Defines how Decifer reconciles its in-memory position state with IBKR on bot startup or after a crash-restart, preventing duplicate orders or missed exits.",
+
+  "source_of_truth": "IBKR portfolio (ib.portfolio(account)) — always wins over in-memory active_trades dict.",
+
+  "triggers": [
+    "bot.py startup — reconcile_with_ibkr() called once before first scan cycle",
+    "After successful reconnect — reconcile_with_ibkr() called in _reconnect_worker() on_success path"
+  ],
+
+  "reconciliation_steps": [
+    "1. Fetch current IBKR positions: ib.portfolio(CONFIG['active_account'])",
+    "2. Build composite keys: symbol for stocks; symbol_right_strike_expiry for options",
+    "3. For each IBKR position NOT in active_trades: validate price (3-way: IBKR + yfinance + TradingView), then add to active_trades",
+    "4. For each active_trades entry NOT in IBKR: remove from active_trades (assumed manually closed or liquidated during downtime)",
+    "5. Log all additions and removals at WARNING level"
+  ],
+
+  "trade_history_reconciliation": {
+    "function": "backfill_trades_from_ibkr() in bot.py",
+    "trigger": "bot.py startup only",
+    "strategy": "Group IBKR execution fills by (symbol, orderId); consolidate partial fills using weighted-average price",
+    "deduplication": "Check exec_id first; then fuzzy match (symbol, side, qty, fill_price, fill_time within 1 min); skip if already logged",
+    "output": "Completed trades written to data/trades.json"
+  },
+
+  "thread_safety": "_trades_lock (RLock) guards all reads and writes to active_trades. Network calls (ib.portfolio, price validation) happen outside the lock to prevent blocking.",
+
+  "options_handling": "IBKR reports option averageCost per-contract (×100 multiplier). Reconciliation converts to per-share. marketPrice is already per-share. Composite key includes right (C/P), strike, and expiry to prevent symbol collisions.",
+
+  "known_gaps": [
+    "If bot crashes mid-fill of a partial order, the fill may be double-counted. Dedup logic mitigates but does not eliminate this for options with complex fill sequences.",
+    "Reconciliation runs at startup and after reconnect — not continuously. A position opened between reconnect and next reconciliation could be missed until the next startup.",
+    "3-way price validation can fail if all three providers are down simultaneously — in that case, the position is added with a 0 price and flagged for manual review."
+  ],
+
+  "files": [
+    "orders.py — reconcile_with_ibkr()",
+    "bot.py — backfill_trades_from_ibkr(), _reconnect_worker() (calls reconcile on reconnect)"
+  ],
+
+  "tests": ["tests/test_reconnect.py"]
+}

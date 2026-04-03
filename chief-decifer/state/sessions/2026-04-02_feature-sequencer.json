@@ -1,0 +1,69 @@
+{
+  "date": "2026-04-02",
+  "topic": "feature-sequencer",
+  "status": "complete",
+  "approved_by": "pending_amit",
+  "branch": "master",
+
+  "risk_addressed": {
+    "severity": "high",
+    "description": "9 active features shipping simultaneously with overlapping position-sizing logic made paper trading results unattributable to any specific change.",
+    "root_cause": "feat-ic-weighted-scoring and feat-regime-router both activated on 2026-03-30 (same day), followed by feat-alpha-pipeline-v2 on 2026-04-01 (2 days later). No observation window enforcement existed. All three features simultaneously affect the signal score, which feeds the conviction multiplier in risk.py Layer 2. Additionally, VIX is consumed twice: Kelly fraction (risk.py Layer 1) AND regime router dimension multipliers (signals.py). A +/-week of paper trading results cannot be attributed to any single change."
+  },
+
+  "deliverables": [
+    {
+      "file": "feature_sequencer.py",
+      "type": "new_module",
+      "description": "Observation-window enforcer. SIZING_AFFECTING_FEATURES frozenset classifies features by sizing impact. can_activate() blocks new activations within 7-day window. record_activation() persists to data/feature_activation_log.json (atomic write). get_status() for dashboard injection. ANALYTICS_ONLY_FEATURES exempt from constraint."
+    },
+    {
+      "file": "data/feature_activation_log.json",
+      "type": "new_data",
+      "description": "Backfilled activation history: feat-vix-kelly (2026-03-29), feat-ic-weighted-scoring (2026-03-30), feat-regime-router (2026-03-30), feat-alpha-pipeline-v2 (2026-04-01). Each record notes the violation where it occurred."
+    },
+    {
+      "file": "tests/test_feature_sequencer.py",
+      "type": "new_tests",
+      "description": "32 tests across 5 classes: TestCanActivate (10), TestRecordActivation (7), TestGetStatus (5), TestAnalyticsOnlyExempt (3), TestBackfillIntegrity (7). All passing. TestBackfillIntegrity.test_regime_router_and_ic_shipped_same_day documents the root-cause violation as a permanent test."
+    },
+    {
+      "file": "chief-decifer/state/backlog.json",
+      "type": "updated",
+      "description": "wip_policy extended with observation_window block: 7-day minimum between sizing-affecting activations, enforcement pointer to feature_sequencer.py, next_allowed_sizing_activation: 2026-04-08, lists of sizing-affecting and analytics-only features."
+    },
+    {
+      "file": "chief-decifer/state/specs/feat-alpha-decay.json",
+      "type": "updated",
+      "description": "Added sequencer_status: analytics_only_no_constraint and note confirming feat-alpha-decay is exempt from the observation window (read-only, no sizing path)."
+    }
+  ],
+
+  "current_state": {
+    "last_sizing_activation": "feat-alpha-pipeline-v2",
+    "last_activation_date": "2026-04-01",
+    "next_allowed_sizing_activation": "2026-04-08",
+    "days_remaining_in_window": 6,
+    "features_currently_live_and_interacting": [
+      "feat-vix-kelly (risk.py Layer 1 — Kelly fraction from VIX rank)",
+      "feat-ic-weighted-scoring Phase 1 (IC weights → signal score)",
+      "feat-regime-router (VIX → dimension multipliers → signal score + regime mult)",
+      "feat-alpha-pipeline-v2 (10 dims including PEAD/SHORT_SQUEEZE/OVERNIGHT_DRIFT)"
+    ],
+    "known_interaction": "VIX double-counted: Kelly fraction AND regime router both read VIX independently. Phase 3 of feat-ic-weighted-scoring will disable regime_routing_enabled when HMM weights are stable. No earlier fix needed — the interaction is documented and bounded."
+  },
+
+  "what_does_not_change": [
+    "feat-alpha-decay (in_progress) — analytics-only, may continue",
+    "feat-dim-flags (shipped) — gating mechanism, not a new sizing path, exempt",
+    "No live trades blocked — paper account only",
+    "No existing config keys changed"
+  ],
+
+  "next_steps": [
+    "Observe feat-alpha-pipeline-v2 results until 2026-04-08",
+    "On 2026-04-08: run feature_sequencer.can_activate() before enabling any next sizing feature",
+    "Call record_activation() when a new sizing feature is turned on",
+    "Phase 3 of feat-ic-weighted-scoring (BACK-003 HMM): disable regime_routing_enabled to resolve VIX double-counting"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "symbol": "ALAB",
+  "company_name": "Astera Labs, Inc.",
+  "direction": "BUY",
+  "allocation_pct": 10.5,
+  "price": 114.27,
+  "qty": 1120,
+  "stop_loss": 113.79,
+  "take_profit": 115.36,
+  "score": 38,
+  "thesis": "** ALAB is a direct beneficiary of NVIDIA's NVLink Fusion ecosystem expansion \u2014 a multi-year structural buildout where ALAB manufactures the connectivity silicon at the core of heterogeneous AI accelerator architecture. This is not cyclical AI sentiment; it's a specific architectural dependency that scales with NVIDIA's data center TAM expansion.\n\n**",
+  "edge_why_now": "** ALAB is trading +6.77% above VWAP with ADX=27 (strong trending condition) and OBV rising into a 38/50 signal score in a bear regime \u2014 this suggests institutional accumulation ahead of a known catalyst window, making the tight 0.4% stop defensible against noise.\n\n**",
+  "risk": "** In a bear-trending macro regime (SPY below 200d MA, down 1.7% today, VIX 25.7), any broad risk-off shock will drag speculative semiconductor names downward regardless of their structural merit \u2014 the NVLink thesis does not insulate ALAB from a systematic equity selloff.",
+  "price_targets": {
+    "target_pct": 1.0,
+    "stop_pct": -0.4,
+    "rr_ratio": 2.5,
+    "target_price": 115.36,
+    "stop_price": 113.79
+  },
+  "agents_agreed": 4,
+  "timestamp": "2026-04-02T22:12:29"
+}

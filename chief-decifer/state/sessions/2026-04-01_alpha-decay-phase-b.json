@@ -1,0 +1,42 @@
+{
+  "date": "2026-04-01",
+  "topic": "alpha-decay-phase-b",
+  "phase": "B",
+  "priority": "P1",
+  "status": "complete",
+  "summary": "Phase B Alpha Decay Chart — Per-Trade Forward Return Distribution Tracker. All three sub-features landed and tests pass 55/55.",
+
+  "changes": [
+    {
+      "file": "alpha_decay.py",
+      "type": "feat",
+      "description": "Added 1-hour disk cache (data/alpha_decay_cache.json). Cache key is (closed-trade count | latest entry date) so a new trade arriving automatically invalidates. Cache is only used for file-sourced calls — explicit-trades callers (tests, backtest) bypass it. Tab switches are now instant after the first load."
+    },
+    {
+      "file": "dashboard.py",
+      "type": "feat",
+      "description": "Three UI improvements: (1) T+3 column added to Segment Breakdown table alongside T+1, T+5, T+10 — all four horizons from the research spec are now visible. (2) 'All / Regime' vs 'By Dimension' toggle button pair above the chart — the dimension view plots one line per active signal type (Trend, Momentum, Squeeze, Flow, Breakout, MTF, News, Social, Reversion), enabling half-life comparison per signal type. (3) Optimal-horizon vertical dashed line (yellow) drawn directly on the chart canvas via an inline Chart.js plugin; the x-axis tick for that horizon also renders in yellow, making the exit sweet-spot immediately obvious."
+    },
+    {
+      "file": "tests/test_alpha_decay.py",
+      "type": "test",
+      "description": "Added TestCaching class (11 new tests): cache key stability, closed-trade-only counting, save/load roundtrip, wrong-key miss, missing-file miss, TTL expiry, stats cache-hit integration, explicit-trades bypass. Fixed 4 pre-existing tests that mock compute_alpha_decay without patching the cache — they now also patch _load_cache/_save_cache/_TRADE_LOG_FILE so mock return values are actually used."
+    }
+  ],
+
+  "research_basis": [
+    "Timothy Masters / markrbest.github.io: alpha decay charts measure return distribution over a trade's lifetime. A clean upward trajectory from entry beats a dip-and-recover even if final PnL is identical.",
+    "MicroAlphas (2025): swing-trade signal effectiveness diminishes after 3–10 days. Optimal exit identified by peak of the median forward-return curve before mean-reversion inflects."
+  ],
+
+  "test_results": {
+    "suite": "tests/test_alpha_decay.py",
+    "passed": 55,
+    "failed": 0,
+    "duration_s": 0.32
+  },
+
+  "paper_trade_path": "Dashboard → Alpha tab → alpha_decay API endpoint → get_alpha_decay_stats() (caching applied). Verified module imports cleanly. yfinance fetches are unchanged; cache makes subsequent tab switches instant.",
+
+  "approved_by": "Amit"
+}

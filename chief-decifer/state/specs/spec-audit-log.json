@@ -1,0 +1,77 @@
+{
+  "id": "spec-audit-log",
+  "title": "Audit Log / Compliance Trail",
+  "status": "implemented",
+  "phase": "A",
+  "priority": "P0",
+  "is_live_trading_gate": true,
+  "version": "1.0",
+  "date": "2026-03-30",
+
+  "summary": "Defines the immutable, append-only audit log that captures every order decision and risk event. For a platform serving friends and family with real money, this is the primary evidence of what the system decided vs what IBKR executed.",
+
+  "audit_log_path": "data/audit_log.jsonl",
+  "format": "Newline-delimited JSON (JSONL). One JSON object per line. File opened in append mode ('a') only. Never overwritten, truncated, or deleted.",
+
+  "events_captured": [
+    {
+      "event": "SUBMITTED",
+      "description": "Order submitted to IBKR",
+      "fields": ["ts", "event", "symbol", "order_id", "side", "qty", "order_type", "limit_price", "fill_price"]
+    },
+    {
+      "event": "FILLED",
+      "description": "Order confirmed filled by IBKR",
+      "fields": ["ts", "event", "symbol", "order_id", "side", "qty", "order_type", "limit_price", "fill_price"]
+    },
+    {
+      "event": "CANCELLED",
+      "description": "Order cancelled (by bot or manually)",
+      "fields": ["ts", "event", "symbol", "order_id", "side", "qty", "order_type", "limit_price", "fill_price"]
+    },
+    {
+      "event": "REJECTED",
+      "description": "Order rejected by IBKR",
+      "fields": ["ts", "event", "symbol", "order_id", "side", "qty", "order_type", "limit_price", "fill_price"]
+    }
+  ],
+
+  "planned_events_session_3": [
+    {
+      "event": "RISK_BLOCK",
+      "description": "Order blocked by risk manager before submission",
+      "fields": ["ts", "event", "symbol", "reason", "risk_param_hit"]
+    },
+    {
+      "event": "KILL_ACTIVATED",
+      "description": "Kill switch triggered",
+      "fields": ["ts", "event", "trigger", "positions_flattened", "orders_cancelled"]
+    },
+    {
+      "event": "PHASE_GATE_VIOLATION",
+      "description": "Feature blocked by phase gate",
+      "fields": ["ts", "event", "feature", "required_phase", "current_phase"]
+    }
+  ],
+
+  "implementation": {
+    "writer_function": "_append_audit_event(event_type, **fields) in learning.py",
+    "called_from": "log_order() — fires once per order status change",
+    "immutability_guarantee": "open(AUDIT_LOG_FILE, 'a') — OS-level append mode; no seek, no truncate",
+    "timestamp_format": "ISO 8601 UTC with Z suffix — datetime.utcnow().isoformat() + 'Z'"
+  },
+
+  "relationship_to_other_logs": {
+    "data/orders.json": "Mutable JSON array — updated in place when order status changes. Use for dashboard and analysis.",
+    "data/trades.json": "Mutable JSON array — closed trade records. Use for PnL analysis and gate counting.",
+    "data/audit_log.jsonl": "Immutable append-only. Use for compliance, dispute resolution, and order reconstruction."
+  },
+
+  "compliance_note": "For friends-and-family accounts using real capital, audit_log.jsonl is the primary evidence that: (a) the system intended to submit an order before it was executed, and (b) risk decisions were made in a documented, reproducible way. It is not sufficient to rely on IBKR's own records because those do not capture risk blocks, kill events, or system decisions that did not reach the broker.",
+
+  "retention_policy": "Retained indefinitely. Not deleted on user offboarding. Archived to data/export/ on offboarding but original remains.",
+
+  "files": [
+    "learning.py — AUDIT_LOG_FILE constant, _append_audit_event(), log_order() (caller)"
+  ]
+}

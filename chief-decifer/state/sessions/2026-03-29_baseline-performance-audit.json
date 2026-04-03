@@ -1,0 +1,73 @@
+{
+  "session_id": "2026-03-29T_baseline-perf",
+  "date": "2026-03-29",
+  "work_items": [
+    {
+      "type": "research",
+      "component": "data/trades.json, data/equity_history.json, data/historical/daily/",
+      "summary": "Full baseline performance audit of the paper trading system. Computed win rate, P&L curve, drawdown, aggregate score IC, and documented the per-dimension IC data gap.",
+      "findings": {
+        "total_trades": 65,
+        "agent_scored_trades": 13,
+        "ibkr_backfill_trades": 52,
+        "win_rate_pct": 20.0,
+        "total_pnl": 84023.46,
+        "return_on_capital_pct": 8.4,
+        "avg_win": 11271.35,
+        "avg_loss": -1275.59,
+        "win_loss_ratio": 8.84,
+        "profit_factor": 2.34,
+        "expectancy_per_trade": 1292.67,
+        "max_drawdown_dollar": 35844.84,
+        "max_drawdown_pct": 3.58,
+        "aggregate_score_pearson_ic": -0.03,
+        "aggregate_score_spearman_ic": 0.10,
+        "ic_pvalue": 0.93,
+        "pnl_ex_top2_outliers": -27164.0,
+        "phase1_agent_trades": 13,
+        "phase1_target": 200,
+        "days_running": 5,
+        "days_target": 30
+      },
+      "critical_data_gaps": [
+        "signals_log.jsonl does not exist — per-dimension scores not logged at trade time",
+        "Per-dimension IC (TREND, MOMENTUM, SQUEEZE, FLOW, BREAKOUT, CONFLUENCE, NEWS, SOCIAL, REVERSION) not computable",
+        "5-day forward IC not computable — parquet data too recent and most symbols missing daily files",
+        "equity_history.json is stale — only covers 2026-03-23 to 2026-03-24"
+      ],
+      "verdict": "NO-GO for adding signal complexity. System has zero demonstrated edge. Returns driven entirely by 2 outlier trades (NAVN, KOD). N=13 agent trades is statistically meaningless.",
+      "files_changed": ["baseline_performance.md"],
+      "output_file": "baseline_performance.md"
+    }
+  ],
+  "priority_actions": [
+    {
+      "priority": "P0",
+      "action": "Add per-dimension score logging to every trade in trades.json",
+      "why": "Cannot compute dimension IC without this. This is the most urgent data infrastructure gap."
+    },
+    {
+      "priority": "P0",
+      "action": "Continue running paper system for 30+ days to accumulate N>=200 agent trades",
+      "why": "Phase 1 exit criteria. Current: 13 agent trades, target: 200."
+    },
+    {
+      "priority": "P1",
+      "action": "Fix equity_history.json staleness — stopped updating after 2026-03-24",
+      "why": "No live equity curve for Chief Decifer monitoring."
+    },
+    {
+      "priority": "P1",
+      "action": "Audit NAVN trade — $69,676 win from score-38 entry needs position-sizing review",
+      "why": "Result may indicate a position sizing bug rather than signal edge."
+    },
+    {
+      "priority": "P2",
+      "action": "Add a 'source' field to exit records distinguishing system exits from manual Amit closes",
+      "why": "agent_sell conflates both. Cannot evaluate autonomous exit logic without clean separation."
+    }
+  ],
+  "git_commits": [],
+  "approved_by": null,
+  "notes": "Pending Amit approval before commit. baseline_performance.md is in the repo root as requested. No code was changed — this is a read-only audit session."
+}

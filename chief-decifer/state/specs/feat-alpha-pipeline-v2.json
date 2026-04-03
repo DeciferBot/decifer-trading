@@ -1,0 +1,102 @@
+{
+  "id": "feat-alpha-pipeline-v2",
+  "title": "Alpha Pipeline v2 — 10-Dimension Signal Refactor",
+  "status": "shipped",
+  "created": "2026-04-01",
+  "approved_by": "Amit",
+  "tier": 3,
+  "summary": "Merged correlated dimensions (TREND+MTF→DIRECTIONAL), disabled noise source (SOCIAL), added three alpha dimensions grounded in documented market anomalies (PEAD, SHORT_SQUEEZE, OVERNIGHT_DRIFT), added IC auto-disable, and added small/micro cap universe track.",
+  "alpha_categories": {
+    "information_edge": [
+      "DIRECTIONAL: EMA alignment + ADX + multi-timeframe vote — fast processing of price structure",
+      "PEAD: yfinance earnings dates — faster reaction to post-earnings drift than manual traders",
+      "SMALL_CAP_UNIVERSE: $50M-$2B market cap track — institutional blindspot"
+    ],
+    "behavioral_edge": [
+      "PEAD: Post-Earnings Announcement Drift — analysts systematically underreact to earnings surprises, drift 20-60 days",
+      "SHORT_SQUEEZE: High short float + volume surge — shorts forced to cover above stop levels (asymmetric)",
+      "OVERNIGHT_DRIFT: 90-day close-to-open statistics — equity risk premium accrues disproportionately overnight"
+    ],
+    "execution_discipline": [
+      "IC auto-disable: dimensions with 3 consecutive weeks negative IC are automatically disabled",
+      "Small cap position sizing: 5% max vs 10% for large cap (wider spreads, more risk)",
+      "Social short-circuit: saves 2-5s per scan cycle when dimension disabled"
+    ],
+    "signal_decay_awareness": [
+      "IC auto-disable: _check_ic_auto_disable() runs after every weekly IC update",
+      "IC auto-re-enable: recovers dimensions when IC > +0.01 for 2 consecutive weeks",
+      "Audit trail: IC_AUTO_DISABLE / IC_AUTO_ENABLE events logged to data/audit_log.jsonl"
+    ]
+  },
+  "dimensions": {
+    "v1_9dim": ["trend", "momentum", "squeeze", "flow", "breakout", "mtf", "news", "social", "reversion"],
+    "v2_10dim": ["directional", "momentum", "squeeze", "flow", "breakout", "pead", "news", "short_squeeze", "reversion", "overnight_drift"],
+    "changes": {
+      "merged": "TREND + MTF → DIRECTIONAL (eliminates correlated IC weight splitting)",
+      "disabled": "SOCIAL set False in config.dimension_flags (IC auto-enable will re-activate if proven)",
+      "added": ["PEAD (Dim 6)", "SHORT_SQUEEZE (Dim 8)", "OVERNIGHT_DRIFT (Dim 10)"]
+    }
+  },
+  "new_dimensions": {
+    "DIRECTIONAL": {
+      "replaces": ["TREND", "MTF"],
+      "score": "EMA alignment×ADX (0-5 pts) + MACD accel (0-2 pts) + TF vote (0-3 pts)",
+      "direction": "Majority vote across 5m/1d/1w, EMA tiebreak",
+      "function": "score_directional() in signals.py"
+    },
+    "PEAD": {
+      "anomaly": "Post-Earnings Announcement Drift",
+      "data": "yf.Ticker(symbol).get_earnings_dates(limit=8) — no new dependencies",
+      "score": "surprise_tier (0-6) × recency_decay + momentum_confirmation (0-2) + volume (0-2)",
+      "direction": "LONG only",
+      "gate": "surprise < 3% or days_since > 60 → score=0",
+      "cache_ttl": "6 hours",
+      "function": "score_pead() in signals.py"
+    },
+    "SHORT_SQUEEZE": {
+      "anomaly": "Short interest + forced covering asymmetry",
+      "data": "Finviz quote.ashx scrape for short float %; yfinance for Donchian/volume",
+      "score": "short_float_tier (0-4) + volume_surge (0-3) + price_vs_resistance (0-3)",
+      "direction": "LONG only",
+      "gate": "short_float < 10% → score=0",
+      "cache_ttl": "4 hours",
+      "function": "score_short_squeeze() in signals.py"
+    },
+    "OVERNIGHT_DRIFT": {
+      "anomaly": "Equity risk premium accrues overnight (persistent anomaly)",
+      "data": "Derived from df_1d already fetched — zero extra API calls",
+      "score": "mean_return_tier (0-5) × sharpe_consistency_mult",
+      "direction": "+1 if mean>0, -1 if mean<0",
+      "computation": "Inside compute_indicators() for 1d timeframe, stored in sig_1d",
+      "function": "score_overnight_drift() in signals.py"
+    }
+  },
+  "ic_auto_disable": {
+    "disable_rule": "IC < -0.02 for 3 consecutive weekly updates → auto-disable via settings_override.json",
+    "enable_rule": "IC > +0.01 for 2 consecutive weekly updates → auto-re-enable",
+    "audit": "IC_AUTO_DISABLE / IC_AUTO_ENABLE events to data/audit_log.jsonl",
+    "function": "_check_ic_auto_disable() in ic_calculator.py"
+  },
+  "small_cap_universe": {
+    "market_cap": "$50M–$2B",
+    "filters": "volume > 200K, price $2–$50, rel_vol > 1.5×, TV recommendation > 0.2",
+    "threshold": "small_cap_min_score: 22 (vs 18 large cap)",
+    "position_sizing": "small_cap_max_position: 5% (vs 10% large cap)",
+    "function": "get_small_cap_universe() in scanner.py",
+    "pipeline": "Stage 4b in signal_pipeline.run_signal_pipeline()"
+  },
+  "files_modified": [
+    "config.py — dimension_flags, overnight/small-cap/IC-auto keys, settings_override loader",
+    "signals.py — 5 new scoring functions, compute_confluence(), _regime_multipliers()",
+    "ic_calculator.py — DIMENSIONS list (9→10), _check_ic_auto_disable()",
+    "signal_pipeline.py — social short-circuit, small cap track (Stage 4b)",
+    "scanner.py — get_small_cap_universe()"
+  ],
+  "risks_mitigated": {
+    "ic_history_invalidation": "Expected. min_valid_records lowered to 10 to recover faster. Falls back to equal weights.",
+    "pead_latency": "6-hour earnings cache per symbol; broad try/except → (0,0) on failure",
+    "finviz_blocked": "Graceful None return → score=0; 4h cache reduces call frequency",
+    "overnight_multiprocess": "Computed inside compute_indicators() per worker; no cross-process cache needed",
+    "score_scale": "10 dims × 0.1 weight each = same 0-50 composite scale as 9-dim (IC normalisation handles it)"
+  }
+}

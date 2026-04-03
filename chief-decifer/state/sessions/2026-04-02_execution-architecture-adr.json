@@ -1,0 +1,45 @@
+{
+  "date": "2026-04-02",
+  "topic": "Execution Architecture — ADR-001",
+  "goal": "Clarify whether the AI Execution Agent replaces or supplements the rule-based FillWatcher. Document the decision as an Architecture Decision Record.",
+  "findings": {
+    "execution_agent": {
+      "file": "execution_agent.py",
+      "role": "Pre-trade configurator",
+      "timing": "Runs ONCE before order placement in execute_buy()",
+      "decisions": [
+        "order_type: LIMIT | MKT | MIDPOINT",
+        "limit_price: agent-suggested entry price",
+        "aggression: patient | normal | aggressive",
+        "fill_watcher_params: per-trade overrides for the FillWatcher (timing, step, ceiling)"
+      ],
+      "fallback": "_fallback_plan() returns static CONFIG['fill_watcher'] values on any error — execution agent failure never blocks a trade"
+    },
+    "fill_watcher": {
+      "file": "fill_watcher.py",
+      "role": "Mechanical executor",
+      "timing": "Runs CONTINUOUSLY after order placement until filled or cancelled",
+      "decisions": "None — it executes the plan set by the execution agent",
+      "params_source": "FillWatcher(watcher_params=exec_plan.fill_watcher_params) — AI-configured, not static config"
+    },
+    "call_sequence": [
+      "1. get_execution_plan() → ExecutionPlan",
+      "2. Place IBKR order using exec_plan.order_type + exec_plan.limit_price",
+      "3. Start FillWatcher(watcher_params=exec_plan.fill_watcher_params)"
+    ],
+    "race_condition": "None possible — execution agent finishes before order is placed; FillWatcher starts after"
+  },
+  "decision": {
+    "option": "C — Hybrid",
+    "rationale": "The two systems are not alternatives — they are sequential stages of the same pipeline. The execution agent is the brain (strategic, one-shot); the FillWatcher is the mechanical arms (procedural, ongoing). Disabling either would break order execution.",
+    "active_systems": "Both active. Execution Agent configures; FillWatcher executes."
+  },
+  "changes": [
+    "ADR-001 comment block added to execution_agent.py (after module docstring)",
+    "Architecture note cross-referencing ADR-001 added to fill_watcher.py (after module docstring)",
+    "BACK-015 resolved entry added to backlog.json documenting the decision",
+    "Note: no duplicate 'Execution Agent' entries found in current backlog.json — the session goal assumed they existed, but they do not. BACK-015 is the definitive single entry."
+  ],
+  "status": "complete",
+  "approved_by": "Amit"
+}

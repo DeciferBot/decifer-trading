@@ -1,0 +1,78 @@
+{
+  "id": "feat-dim-flags",
+  "title": "Feature Flag System for Signal Dimensions",
+  "roadmap_phase": "Phase 1 — Paper Trading Profitability Proof",
+  "status": "in_progress",
+  "priority": "high",
+  "created": "2026-03-29",
+  "author": "Cowork",
+
+  "problem": "When the Signal Decay Monitor (or manual analysis) identifies a dimension as decayed or harmful, there is no clean way to disable it without a code change and redeploy. This creates risk: either a bad dimension keeps corrupting scores, or a hot-fix deployment introduces new bugs under pressure.",
+
+  "solution": "A per-dimension boolean flag in config.py. Setting a flag to false zeroes that dimension's score and removes its direction vote from compute_confluence(). No code change required — only a config edit. Restoring the flag re-enables the dimension instantly.",
+
+  "scope": "Tier 2 — Standard. Two-file change: config.py + signals.py. Fully backward-compatible (all flags default to true).",
+
+  "dimensions": [
+    "trend",
+    "momentum",
+    "squeeze",
+    "flow",
+    "breakout",
+    "mtf",
+    "news",
+    "social",
+    "reversion"
+  ],
+
+  "config_key": "dimension_flags",
+
+  "config_example": {
+    "dimension_flags": {
+      "trend":     true,
+      "momentum":  true,
+      "squeeze":   true,
+      "flow":      true,
+      "breakout":  true,
+      "mtf":       true,
+      "news":      true,
+      "social":    true,
+      "reversion": true
+    }
+  },
+
+  "behaviour_when_disabled": [
+    "Dimension score is 0 — does not contribute to total",
+    "No direction vote added to dim_directions — does not influence LONG/SHORT decision",
+    "Candlestick bonus is still applied (it is not a named dimension)",
+    "MTF gate (hard/soft penalty) is unaffected — it runs before dimension scoring",
+    "Candle gate is unaffected",
+    "Disabled dimensions are logged at DEBUG level once per compute_confluence() call"
+  ],
+
+  "use_cases": [
+    "SOCIAL dimension shows consistent negative alpha during earnings season → disable it",
+    "REVERSION dimension fires false positives in trending bull market → disable it",
+    "NEWS dimension latency spikes due to upstream RSS issues → disable to reduce noise",
+    "Rapid A/B testing: disable one dimension per paper session, compare PnL",
+    "Signal Decay Monitor identifies dimension IC < 0.03 → flag it disabled in config"
+  ],
+
+  "files_changed": [
+    "config.py",
+    "signals.py",
+    "tests/test_dim_flags.py",
+    "chief-decifer/state/specs/feat-dim-flags.json",
+    "chief-decifer/state/backlog.json"
+  ],
+
+  "acceptance_criteria": [
+    "Setting any flag to false produces score=0 for that dimension in unit tests",
+    "All flags false still returns a valid (score=0) result without exceptions",
+    "All flags true produces identical results to pre-flag behaviour",
+    "compute_confluence() result dict includes 'disabled_dimensions' key listing which were skipped",
+    "Tests pass in existing pytest suite"
+  ],
+
+  "notes": "Candlestick bonus is intentionally excluded from the flag system — it is a trade confirmation overlay, not a signal dimension. The MTF gate and candle gate are also excluded as they are filters, not scoring dimensions."
+}

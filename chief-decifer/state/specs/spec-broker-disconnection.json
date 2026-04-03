@@ -1,0 +1,53 @@
+{
+  "id": "spec-broker-disconnection",
+  "title": "Broker Disconnection Behaviour",
+  "status": "implemented",
+  "phase": "A",
+  "priority": "P0",
+  "is_live_trading_gate": true,
+  "version": "1.0",
+  "date": "2026-03-30",
+
+  "summary": "Defines the expected behaviour of Decifer when the IBKR connection drops mid-session. Covers what happens to new signals, open positions, and pending orders during the reconnection gap, and what triggers manual intervention.",
+
+  "behaviour_during_gap": {
+    "new_signals": "BLOCKED — _on_disconnected() sets dash['ibkr_disconnected']=True; _check_kill() treats this the same as a kill flag, blocking all order submission cleanly.",
+    "open_positions": "HELD — no auto-exit on disconnect. Positions remain open in IBKR. IBKR itself holds GTC stops independently.",
+    "pending_orders": "LEFT IN PLACE — IBKR holds DAY and GTC orders independently of the bot connection. No cancel-on-disconnect.",
+    "dashboard": "dash['status'] set to 'disconnected' or 'reconnecting (N/10)' — visible on dashboard header.",
+    "alert_on_exhaustion": "_send_reconnect_exhausted_alert() fires after all 10 reconnect attempts fail."
+  },
+
+  "reconnect_protocol": {
+    "max_attempts": 10,
+    "backoff_start_secs": 1,
+    "backoff_cap_secs": 60,
+    "backoff_sequence": "1s, 2s, 4s, 8s, 16s, 32s, 60s, 60s...",
+    "on_attempt": "ib.connect(host, port, clientId, readonly=False)",
+    "on_success": "dash['ibkr_disconnected']=False; dash['status']='connected'; _restore_subscriptions()",
+    "on_exhaustion": "_send_reconnect_exhausted_alert(max_attempts); bot stays alive but ibkr_disconnected=True indefinitely"
+  },
+
+  "manual_recovery": "If reconnect exhausts, Amit restarts bot.py manually. reconcile_with_ibkr() runs automatically on startup to re-sync in-memory state with IBKR positions.",
+
+  "signal_block_implementation": {
+    "flag": "dash['ibkr_disconnected'] (bool, default False)",
+    "set_in": "_on_disconnected() — immediately when disconnect callback fires",
+    "cleared_in": "_reconnect_worker() — on successful ib.connect()",
+    "checked_in": "_check_kill() — returns True (blocking) when either killed OR ibkr_disconnected is True",
+    "coverage": "All 3 downstream order submission guards (agent sell, buy execution, sentinel) call _check_kill() — single check point covers all paths"
+  },
+
+  "known_limitations": [
+    "If IBKR disconnects while a market order is mid-fill, the fill may or may not complete — reconcile_with_ibkr() on restart resolves this.",
+    "Pending stop-loss orders in IBKR continue to be active during disconnect (IBKR-side) — positions are protected but the bot cannot modify them until reconnected.",
+    "If reconnect exhausts and Amit does not restart the bot, new signals are permanently blocked for that session."
+  ],
+
+  "files": [
+    "bot.py — _on_disconnected(), _reconnect_worker(), _check_kill(), dash['ibkr_disconnected']",
+    "orders.py — reconcile_with_ibkr() (called on startup after crash/restart)"
+  ],
+
+  "tests": ["tests/test_reconnect.py"]
+}

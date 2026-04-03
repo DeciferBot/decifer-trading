@@ -52,8 +52,16 @@ logging.basicConfig(
 )
 log = logging.getLogger("decifer.bot")
 
+# ── Version ───────────────────────────────────────────────────────────────────
+from version import __version__, __codename__
+log.info(f"Decifer Trading v{__version__} ({__codename__}) — starting up")
+
 # ── Dashboard HTML ────────────────────────────────────────────────────────────
 from dashboard import DASHBOARD_HTML
+DASHBOARD_HTML = DASHBOARD_HTML.replace(
+    'Autonomous AI Trading',
+    f'Autonomous AI Trading &nbsp;·&nbsp; v{__version__}'
+)
 
 # ── Persistence ───────────────────────────────────────────────────────────────
 FAVOURITES_FILE = "favourites.json"

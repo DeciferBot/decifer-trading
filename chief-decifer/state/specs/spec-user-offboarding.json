@@ -1,0 +1,97 @@
+{
+  "id": "spec-user-offboarding",
+  "title": "User Offboarding Flow",
+  "status": "pending",
+  "phase": "E",
+  "phase_required": 5,
+  "priority": "P2",
+  "is_live_trading_gate": false,
+  "version": "1.0",
+  "date": "2026-03-30",
+
+  "summary": "Defines the complete teardown process when a beta/multi-user account holder disconnects from Decifer. Covers position management, credential removal, data export, and Docker container teardown. This spec is intentionally written now so the design is locked before Phase 5 build begins.",
+
+  "preconditions": [
+    "User has explicitly requested to be offboarded (verbal or written confirmation from Amit)",
+    "Market is closed OR user has agreed to force-close any open positions",
+    "Amit has been notified and is available to supervise"
+  ],
+
+  "teardown_steps": [
+    {
+      "step": 1,
+      "action": "Flatten all open positions",
+      "how": "User (or Amit on their behalf) sends /kill via Telegram or clicks KILL SWITCH on dashboard",
+      "wait_for": "All positions confirmed closed — poll ib.portfolio(account) until empty or timeout 10 min",
+      "on_timeout": "Escalate to Amit — may require manual close via IBKR Trader Workstation"
+    },
+    {
+      "step": 2,
+      "action": "Cancel all pending orders",
+      "how": "ib.reqGlobalCancel() — already triggered by /kill at Level 2",
+      "verify": "ib.openOrders() returns empty list"
+    },
+    {
+      "step": 3,
+      "action": "Export user trade history",
+      "how": "Copy data/trades.json, data/orders.json, data/signals_log.jsonl to user-named archive: data/export/<user-id>_<date>.tar.gz",
+      "retention": "Archive retained for 7 years for compliance. Not deleted on request.",
+      "note": "Immutable audit_log.jsonl (when implemented) is always retained regardless of user request"
+    },
+    {
+      "step": 4,
+      "action": "Remove Telegram authorization",
+      "how": "Remove user's chat_id from config['telegram']['authorized_chat_ids']. Commit change.",
+      "verify": "Send /status from removed chat_id — should receive 'Unauthorized' response"
+    },
+    {
+      "step": 5,
+      "action": "Remove IBKR account from config",
+      "how": "Set config['accounts'][user_account_key] = '' or remove key. Commit change.",
+      "note": "If this was the active_account, Amit must designate a new active_account before restarting bot"
+    },
+    {
+      "step": 6,
+      "action": "Remove per-user settings override",
+      "how": "Delete or archive data/settings_override_<user-id>.json if per-user settings exist in Phase 5",
+      "note": "In current single-user design, data/settings_override.json is global. Phase 5 must implement per-user scoping before this step is meaningful."
+    },
+    {
+      "step": 7,
+      "action": "Stop Docker container",
+      "how": "docker stop decifer-<user-id> && docker rm decifer-<user-id>",
+      "note": "Only applicable in Phase 5 multi-user Docker deployment. No Docker exists yet."
+    },
+    {
+      "step": 8,
+      "action": "Confirm capital withdrawal",
+      "how": "Amit verbally confirms with the user that their capital has been returned to their brokerage account",
+      "this_is_not_automated": true
+    },
+    {
+      "step": 9,
+      "action": "Write offboarding session log",
+      "how": "Cowork writes to chief-decifer/state/sessions/YYYY-MM-DD_offboarding-<user-id>.json confirming all steps completed",
+      "approved_by": "Amit"
+    }
+  ],
+
+  "open_questions": [
+    "Are open positions force-closed by Decifer, or handed to user to close manually via their own IBKR login?",
+    "Is trade history deleted on user request, or retained indefinitely for compliance? (Current answer: retained.)",
+    "In Phase 5 multi-user design, is each user's data isolated in separate files, or merged into shared logs?"
+  ],
+
+  "data_retention_policy": {
+    "trades": "Retained permanently — immutable audit requirement",
+    "orders": "Retained permanently — immutable audit requirement",
+    "signals_log": "Retained permanently — needed for IC analysis",
+    "settings_override": "Can be deleted after offboarding",
+    "docker_image": "Can be deleted after offboarding"
+  },
+
+  "files_to_build_in_phase_5": [
+    "scripts/offboard_user.py — automates steps 1-7 with dry-run mode",
+    "Per-user data isolation design (separate data/ subdirs or user_id fields in JSON)"
+  ]
+}

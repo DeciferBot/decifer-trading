@@ -1,0 +1,30 @@
+{
+  "date": "2026-04-01",
+  "phase": "B",
+  "priority": "P1",
+  "feature": "Alpha Decay Chart — Per-Trade Forward Return Distribution Tracker",
+  "status": "complete",
+  "modules_changed": [
+    "alpha_decay.py",
+    "dashboard.py",
+    "tests/test_alpha_decay.py"
+  ],
+  "summary": "Closed three gaps in the alpha decay chart feature: (1) fixed a direction-inference bug where IBKR-backfilled trades with action=SELL and no explicit direction field were incorrectly classified as LONG — they now correctly resolve to SHORT via action→direction fallback; (2) added per-dimension segmentation — a new _dominant_dimension() helper identifies which of the 9 signal dimensions had the highest score for each trade, and get_alpha_decay_stats() now produces 9 additional dim_<name> groups (one per dimension) populated from trades that carry signal_scores; (3) extended the dashboard segment table to render dimension rows under a 'by dominant dimension' sub-header whenever at least one dimension has n > 0.",
+  "research_basis": "Timothy Masters / markrbest.github.io alpha decay charts; MicroAlphas 2025 — swing-trade signal effectiveness diminishes after 3–10 days. Per-dimension segmentation reveals which specific signal types have the most persistent forward alpha.",
+  "test_results": {
+    "file": "tests/test_alpha_decay.py",
+    "total": 44,
+    "passed": 44,
+    "failed": 0,
+    "new_tests_added": 11,
+    "new_test_classes": ["TestDominantDimension", "TestDimensionSegments"],
+    "new_methods_in_TestComputeAlphaDecay": [
+      "test_direction_inferred_long_from_buy_action",
+      "test_direction_inferred_short_from_sell_action",
+      "test_signal_scores_preserved_in_output",
+      "test_signal_scores_defaults_to_empty_dict"
+    ]
+  },
+  "data_notes": "Existing backfilled trades have empty signal_scores so all dim_* segments start at n=0. They will populate as live bot trades accumulate — signal_scores is already stored in open_trades via signal_dispatcher.py (line 96) and persisted by log_trade.",
+  "approved_by": "Amit"
+}

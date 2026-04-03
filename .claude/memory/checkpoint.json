@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-04-01T16:34:33.951Z",
+  "branch": "master",
+  "lastCommit": "ae385a3 fix(dashboard): repair empty HTML + execute_buy candle_gate TypeError",
+  "roadmapPhase": null,
+  "lastFilesTouched": [
+    "lpha_decay.py",
+    "dashboard.py",
+    "data/orders.json",
+    "equity_history.json",
+    "tests/test_alpha_decay.py",
+    "CLAUDE.md.bak",
+    "data/alpha_decay_cache.json",
+    "data/audit_log.jsonl",
+    "data/hwm_state.json",
+    "data/sec_tickers.json"
+  ],
+  "openTodos": [],
+  "notes": null,
+  "sessionCount": 71
+}

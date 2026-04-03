@@ -1,0 +1,37 @@
+{
+  "session_id": "2026-03-29T23:00",
+  "date": "2026-03-29",
+  "work_items": [
+    {
+      "type": "housekeeping",
+      "component": "wip_tracker.py, tests/test_wip_tracker.py",
+      "summary": "Feature deduplication audit — root-cause investigation + structural safeguard + regression tests",
+      "root_cause": "A high-severity risk was raised: IC-Weighted Dynamic Signal Scoring appeared twice in the active feature list under slightly different formulations (C P2), and ~10 other features (Connection Manager, AccountDecisionAgent, Per-Account Config Profiles, WebSocket Signal Broadcaster, etc.) appeared duplicated across active and backlog lists.\n\nInvestigation: Checked backlog.json (8 items, clean), Decifer_Feature_Plan.xlsx (25 items across Phases 1–5, none of the flagged features present), docs/PRODUCT_DEFINITION.md (clean Phase B/C/D roadmap), roadmap/ (8 markdown files, no duplicates), and full git history. Finding: the duplicated features existed in a previous planning era (pre-a7528b8), specifically the multi-account Phase 4 planning documents. The backlog.json introduced in commit a7528b8 was a clean rebuild from scratch — none of those duplicate entries were carried forward. The current state is already clean.\n\nGap identified: validate_wip() had no structural guard against duplicate IDs or duplicate titles being re-introduced into backlog.json. This is the live regression risk.",
+      "resolution": "Added DUPLICATE_ID and DUPLICATE_TITLE checks inside validate_wip() in wip_tracker.py. Duplicate ID detection counts occurrences of each item ID and fires if any appear more than once. Duplicate title detection normalises case and whitespace before comparison, so reformulations like 'IC-Weighted Signal Scoring' vs 'ic-weighted signal scoring' are caught. Added 11 new unit tests covering: exact duplicate ID, count in violation message, unique IDs clean, exact duplicate title, case-insensitive title match, whitespace-normalised title match, violation includes both IDs, unique titles clean, both violation types coexisting. Added 2 real-backlog compliance tests: test_real_backlog_has_no_duplicate_ids and test_real_backlog_has_no_duplicate_titles. These run against the live backlog.json on every test run.",
+      "files_changed": [
+        "wip_tracker.py",
+        "tests/test_wip_tracker.py",
+        "chief-decifer/state/sessions/2026-03-29_feature-deduplication-audit.json"
+      ],
+      "tests_added": [
+        "TestValidateWIP::test_duplicate_id_triggers_violation",
+        "TestValidateWIP::test_duplicate_id_violation_includes_count",
+        "TestValidateWIP::test_unique_ids_no_duplicate_id_violation",
+        "TestValidateWIP::test_duplicate_title_triggers_violation",
+        "TestValidateWIP::test_duplicate_title_case_insensitive",
+        "TestValidateWIP::test_duplicate_title_whitespace_normalised",
+        "TestValidateWIP::test_duplicate_title_violation_includes_both_ids",
+        "TestValidateWIP::test_unique_titles_no_duplicate_title_violation",
+        "TestValidateWIP::test_duplicate_id_and_duplicate_title_both_reported",
+        "TestRealBacklogCompliance::test_real_backlog_has_no_duplicate_ids",
+        "TestRealBacklogCompliance::test_real_backlog_has_no_duplicate_titles"
+      ],
+      "test_count_before": 36,
+      "test_count_after": 47,
+      "tests_passing": true
+    }
+  ],
+  "git_commits": [],
+  "approved_by": null,
+  "notes": "Pending Amit approval before commit. The duplicate features flagged in the risk report are not present in the current codebase — the risk was from a previous planning era that was superseded by the clean 8-item roadmap in backlog.json. The structural safeguard added today ensures that if duplicates are accidentally reintroduced, validate_wip() will catch them and the real-backlog compliance tests will fail fast."
+}

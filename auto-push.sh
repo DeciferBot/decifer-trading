@@ -5,8 +5,8 @@
 # ║   Writes JSON status for Chief Decifer dashboard              ║
 # ╚══════════════════════════════════════════════════════════════╝
 
-REPO_DIR="$HOME/Documents/claude/projects/decifer-trading"
-LOG_FILE="$REPO_DIR/logs/auto-push.log"
+REPO_DIR="$HOME/Documents/Claude/Projects/decifer trading"
+LOG_FILE="/tmp/decifer-auto-push.log"
 STATUS_FILE="$REPO_DIR/chief-decifer/state/git-push-status.json"
 
 # Make sure dirs exist

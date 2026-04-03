@@ -1,0 +1,38 @@
+{
+  "date": "2026-04-01",
+  "topic": "Unified Regime Detection Architecture",
+  "status": "complete — approved by Amit",
+
+  "context": "Four fragmented regime-related items existed without a unified spec: VIX-rank adaptive Kelly (shipped), Hurst Exponent Regime Filter (proposed but ambiguously defined), Regime-Conditional Signal Weighting (shipped as feat-regime-router), and HMM (deferred). The commit message 'lock VIX-proxy as sole regime detector, defer HMM' had not been formally documented.",
+
+  "work_completed": [
+    "Audited all three live regime layers: scanner.get_market_regime() (4-state), signals.get_market_regime_vix() (2-state routing), risk.get_kelly_fraction() (continuous VIX-rank sizing)",
+    "Identified documentation bug: signals.py line 1349 still references 'Hurst exponent' — actual implementation uses Variance Ratio + ADF gate + OU half-life (Hurst was rejected for per-stock use on 60-bar windows)",
+    "Deconflicted two distinct Hurst concepts: R/S Hurst per-stock (permanently rejected) vs DFA Hurst of SPY as market-level regime signal (new proposal, not yet built)",
+    "Defined consensus rule for Hurst + VIX Layer 2 extension: multipliers only fire when both signals agree; disagreement falls back to equal-weight",
+    "Formalised HMM deferral with explicit multi-factor gate: 200+ trades across 2+ regimes, IC Phase 2 complete, A/B routing lift < 5%, Hurst extension built first",
+    "Identified and resolved three conflicts between Hurst regime filter and REVERSION dimension",
+    "Defined 4-step sequenced build order",
+    "Wrote spec to chief-decifer/state/specs/spec-regime-architecture.md"
+  ],
+
+  "key_decisions": [
+    "VIX proxy remains sole committed regime detector — config['regime_detector'] = 'vix_proxy' unchanged",
+    "Hurst R/S is permanently rejected from REVERSION dimension — stale comment in signals.py:1349 needs fixing (Step 1)",
+    "DFA Hurst of SPY (63-day daily) is a valid market-level regime signal — to be shipped disabled with validation gate before enabling",
+    "HMM gate requires IC Phase 2 data proving VIX-proxy routing lift < 5% — do not build HMM speculatively",
+    "PANIC (VIX > 35) remains a hard VIX rule regardless of any future regime architecture",
+    "REVERSION dimension ADF/VR/OU gates must never be conditioned on regime state — they are per-stock statistical evidence"
+  ],
+
+  "files_produced": [
+    "chief-decifer/state/specs/spec-regime-architecture.md — unified architecture spec (v1.0, approved)"
+  ],
+
+  "open_items": [
+    "Step 1: fix stale Hurst comment in signals.py:1349 (next session, ~15 min)",
+    "Step 2: build Hurst DFA Layer 2 extension — ship disabled, validate on SPY historical before enabling",
+    "Step 3: IC Phase 2 — blocked on 200+ closed trades",
+    "Step 4: HMM — gated, conditional on IC Phase 2 results"
+  ]
+}
