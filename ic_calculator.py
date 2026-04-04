@@ -465,6 +465,46 @@ def update_ic_weights(signals_log_path: str = None) -> dict:
     return weights
 
 
+def get_system_ic_health() -> float:
+    """
+    Return a single float representing the current predictive health of the
+    whole signal engine.
+
+    Computed as the mean of all non-None IC values from the most recent
+    ic_weights.json cache entry. Only positive ICs are included (negative IC
+    means the dimension is actively misleading — already zeroed in weights,
+    and shouldn't inflate the health score).
+
+    Returns
+    -------
+    float — mean positive IC across active dimensions.
+             0.0 if cache is absent, corrupt, or all IC values are negative.
+             Typically 0.01–0.08 for a working system; < 0.0 means the system
+             has lost edge and the deployment gate should activate.
+
+    Note: reads from the cached ic_weights.json (updated weekly). Does not
+    trigger a live recomputation — safe to call every scan cycle.
+    """
+    if not os.path.exists(IC_WEIGHTS_FILE):
+        return 0.0
+    try:
+        with open(IC_WEIGHTS_FILE) as f:
+            data = json.load(f)
+        raw_ic = data.get("raw_ic", {})
+        if not raw_ic:
+            return 0.0
+        positive_ics = [
+            float(v) for v in raw_ic.values()
+            if v is not None and np.isfinite(float(v)) and float(v) > 0.0
+        ]
+        if not positive_ics:
+            return 0.0
+        return float(np.mean(positive_ics))
+    except Exception as e:
+        log.debug("get_system_ic_health: read error: %s", e)
+        return 0.0
+
+
 def get_ic_weight_history(last_n: int = 4) -> list:
     """
     Return the last `last_n` weekly IC weight snapshots for trend display.

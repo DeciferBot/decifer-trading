@@ -185,31 +185,83 @@ def _fetch_social(universe: list, session: str) -> dict:
         return {}
 
 
+def _get_edge_gate_adj() -> tuple:
+    """
+    Return (score_adj: int, state: str) from the IC edge gate.
+
+    Reads system IC health from cached ic_weights.json (no live API call).
+    state is one of: "healthy" | "degraded" | "broken" | "disabled" | "no_data"
+    """
+    try:
+        from config import CONFIG
+        ic_cfg = CONFIG.get("ic_calculator", {})
+        if not ic_cfg.get("edge_gate_enabled", True):
+            return 0, "disabled"
+        from ic_calculator import get_system_ic_health
+        health = get_system_ic_health()
+        if health == 0.0:
+            return 0, "no_data"
+        off_thresh  = ic_cfg.get("edge_gate_off_threshold", 0.005)
+        warn_thresh = ic_cfg.get("edge_gate_warn_threshold", 0.02)
+        off_adj     = ic_cfg.get("edge_gate_off_adj", 12)
+        warn_adj    = ic_cfg.get("edge_gate_warn_adj", 5)
+        if health < off_thresh:
+            return off_adj, "broken"
+        if health < warn_thresh:
+            return warn_adj, "degraded"
+        return 0, "healthy"
+    except Exception as e:
+        log.debug(f"Edge gate check failed (non-critical): {e}")
+        return 0, "no_data"
+
+
 def _apply_strategy_threshold(
     scored: list, strategy_mode: dict, regime_name: str
 ) -> list:
     """
     Filter the scored list by the effective score threshold.
 
-    The effective threshold = base regime threshold + strategy_mode adjustment.
-    When adjustment is zero the list is returned unchanged (no copy).
+    The effective threshold = base regime threshold
+                             + strategy_mode adjustment
+                             + IC edge gate adjustment (system health)
+
+    Edge gate raises the bar when the signal engine's rolling IC health drops,
+    protecting capital when signals are less predictive than usual.
     """
-    adj = strategy_mode.get("score_threshold_adj", 0)
+    mode_adj = strategy_mode.get("score_threshold_adj", 0)
+    edge_adj, edge_state = _get_edge_gate_adj()
+    adj = mode_adj + edge_adj
+
     used_threshold = get_regime_threshold(regime_name)
     effective = used_threshold + adj
+
+    parts = []
+    if mode_adj:
+        parts.append(f"mode={strategy_mode.get('mode','?')}+{mode_adj}")
+    if edge_adj:
+        parts.append(f"edge_gate={edge_state}+{edge_adj}")
 
     if adj > 0:
         pre = len(scored)
         filtered = [s for s in scored if s["score"] >= effective]
+        reason = " | ".join(parts)
         log.info(
-            f"Scored: {pre} → {len(filtered)} after strategy mode filter "
-            f"(threshold raised {used_threshold}→{effective}/50 in "
-            f"{strategy_mode.get('mode', '?')} mode)"
+            f"Scored: {pre} → {len(filtered)} after threshold filter "
+            f"(raised {used_threshold}→{effective}/50 [{reason}])"
         )
+        if edge_adj:
+            log.warning(
+                f"EDGE GATE [{edge_state.upper()}]: system IC health low — "
+                f"score bar raised +{edge_adj} (need {effective}/50 to trade)"
+            )
         return filtered
 
+    if edge_state not in ("healthy", "disabled", "no_data"):
+        log.warning(f"EDGE GATE [{edge_state.upper()}]: system IC health low (adj={edge_adj})")
+
     log.info(
-        f"Scored: {len(scored)} above threshold ({used_threshold}/50) [{regime_name}]"
+        f"Scored: {len(scored)} above threshold ({used_threshold}/50) "
+        f"[{regime_name}] edge={edge_state}"
     )
     return scored
 

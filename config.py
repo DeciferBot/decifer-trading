@@ -31,10 +31,21 @@ CONFIG = {
     #   ["DUP481326", "U3059777"]
     "aggregate_accounts": [],
 
+    # ── FINNHUB (free tier: 60 calls/min) ────────────────────
+    # Sign up at https://finnhub.io — free API key, no credit card required.
+    # Free tier covers: stock quotes + company news articles (/company-news).
+    # Used for: supplementing Yahoo RSS with a second news feed per symbol.
+    # Set to "" (or omit FINNHUB_API_KEY env var) to disable all Finnhub calls.
+    "finnhub_api_key":          os.environ.get("FINNHUB_API_KEY", ""),
+    "use_finnhub":              True,   # Master switch; also gated by finnhub_api_key
+
     # ── AI BRAIN ──────────────────────────────────────────────
-    "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", "YOUR_API_KEY_HERE"),
-    "claude_model":      "claude-sonnet-4-6",   # Latest Sonnet
-    "claude_max_tokens": 800,                    # Per agent call
+    "anthropic_api_key":        os.environ.get("ANTHROPIC_API_KEY", "YOUR_API_KEY_HERE"),
+    "claude_model":             "claude-sonnet-4-6",  # Default model
+    "claude_max_tokens":        800,                  # Default token cap
+    # Alpha agents (Trading Analyst, Portfolio Manager) use Opus — best model, no arbitrary cap.
+    "claude_model_alpha":       "claude-opus-4-6",    # Opus for alpha-generating agents
+    "claude_max_tokens_alpha":  4096,                 # Unconstrained — let Opus reason fully
 
     # ── IBKR RECONNECT & HEARTBEAT ────────────────────────────
     "reconnect_max_attempts":   10,     # Retry attempts before giving up
@@ -153,6 +164,17 @@ CONFIG = {
         "auto_disable_weeks":       3,     # Consecutive weeks before disable fires
         "auto_enable_threshold":    0.01,  # IC above this triggers re-enable countdown
         "auto_enable_weeks":        2,     # Consecutive weeks before re-enable fires
+
+        # ── EDGE GATE (deployment throttle based on system-level IC health) ──
+        # get_system_ic_health() returns mean positive IC across all active
+        # dimensions. When this falls below the warn/off thresholds, the score
+        # bar is raised systemwide — fewer trades, higher quality only.
+        # This stacks on top of strategy_mode score_threshold_adj.
+        "edge_gate_enabled":        True,
+        "edge_gate_warn_threshold": 0.02,  # mean IC below this → degraded, raise bar +5
+        "edge_gate_warn_adj":       5,     # score points added in degraded state
+        "edge_gate_off_threshold":  0.005, # mean IC below this → broken, raise bar +12
+        "edge_gate_off_adj":        12,    # score points added in broken state
     },
 
     # ── OVERNIGHT DRIFT CACHE ────────────────────────────────────
@@ -548,13 +570,26 @@ CONFIG = {
     },
 
     # ── EXECUTION AGENT ───────────────────────────────────────────────────────
-    # 7th Claude agent — decides HOW to execute a trade (order type, aggression,
-    # fill watcher params). Runs once synchronously per trade, before order
-    # placement. Falls back to static fill_watcher config on any error.
+    # Decides HOW to execute a trade (order type, aggression, fill watcher params).
+    # Now deterministic — same rules encoded in Python, not LLM.
+    # Falls back to static fill_watcher config on any exception.
     "execution_agent": {
-        "enabled":           True,   # Master switch — False = always use static config
-        "max_tokens":        350,    # Compact JSON response; 350 well above minimum
-        "fallback_on_error": True,   # Never block a trade if Claude fails
+        "enabled":           True,   # Master switch — False = always use static fill_watcher config
+        "fallback_on_error": True,   # Never block a trade on any exception
+    },
+
+    # ── PORTFOLIO MANAGER ─────────────────────────────────────────────────────
+    # LLM agent that reviews open positions for thesis drift.
+    # Fires: (1) pre-market once per day, (2) on any of 6 event triggers.
+    # Does NOT run every scan cycle — only when information has actually changed.
+    "portfolio_manager": {
+        "enabled":                  True,
+        "score_collapse_threshold": 15,     # pts drop from entry_score → trigger review
+        "news_hit_threshold":       3,      # |keyword_score| on held symbol → trigger
+        "cascade_stop_count":       2,      # stops hit this session → trigger
+        "drawdown_trigger_pct":    -0.015,  # daily_pnl / portfolio_value → trigger
+        "earnings_lookahead_hours": 48,     # flag earnings within this window
+        "max_tokens":               600,
     },
 }
 
