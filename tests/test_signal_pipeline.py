@@ -414,7 +414,8 @@ class TestApplyStrategyThreshold(unittest.TestCase):
         """adj=5, base=20 → effective=25; scores below 25 removed."""
         scored = self._scored_list([10, 20, 25, 30])
         mode = {"mode": "DEFENSIVE", "score_threshold_adj": 5}
-        with patch.object(signal_pipeline, "get_regime_threshold", return_value=20):
+        with patch.object(signal_pipeline, "get_regime_threshold", return_value=20), \
+             patch.object(signal_pipeline, "_get_edge_gate_adj", return_value=(0, "no_data")):
             result = _apply_strategy_threshold(scored, mode, "BULL_TRENDING")
         scores_in = [s["score"] for s in result]
         self.assertTrue(all(s >= 25 for s in scores_in))
