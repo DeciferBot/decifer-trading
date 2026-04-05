@@ -9,6 +9,7 @@ import logging
 import os
 from collections import defaultdict
 from datetime import datetime, time, timedelta, timezone
+from typing import Optional, Tuple
 import pytz
 import pandas_market_calendars as mcal
 from config import CONFIG
@@ -33,7 +34,7 @@ _BASE          = os.path.dirname(os.path.abspath(__file__))
 HWM_STATE_FILE = os.path.join(_BASE, "data", "hwm_state.json")
 
 
-def load_hwm_state() -> float | None:
+def load_hwm_state() -> Optional[float]:
     """
     Load the persisted all-time HWM from data/hwm_state.json.
     Returns the stored float, or None if the file is missing or corrupt.
@@ -63,13 +64,13 @@ def save_hwm_state(hwm: float) -> None:
         log.error(f"save_hwm_state: failed to write {HWM_STATE_FILE} — {e}")
 
 # ── Intraday adaptive strategy state ───────────────────────────
-_session_opening_regime: str | None = None  # Regime at session open (set on first scan)
+_session_opening_regime: Optional[str] = None  # Regime at session open (set on first scan)
 _session_regime_set:     bool       = False  # Guard: only set once per trading day
 _strategy_size_multiplier: float    = 1.0   # Applied inside calculate_position_size()
 
 # ── VIX-rank Kelly state ────────────────────────────────────────
-_vix_rank_cache:      float | None    = None
-_vix_rank_cache_ts:   datetime | None = None
+_vix_rank_cache:      Optional[float]    = None
+_vix_rank_cache_ts:   Optional[datetime] = None
 _last_vix_rank:       float           = 0.5  # Latest computed rank (for dashboard)
 _last_kelly_fraction: float           = 0.5  # Latest computed fraction (for dashboard)
 
@@ -122,7 +123,7 @@ def record_win():
     _consecutive_losses = 0
 
 
-def _get_ibkr_cash(ib, account: str) -> float | None:
+def _get_ibkr_cash(ib, account: str) -> Optional[float]:
     """
     Get actual cash from IBKR account.
     Uses TotalCashValue — the real USD cash in the account.
@@ -186,7 +187,7 @@ def _count_day_trades_remaining_local() -> int:
     return max(0, max_dt - used)
 
 
-def _get_day_trades_remaining(ib, account: str) -> int | None:
+def _get_day_trades_remaining(ib, account: str) -> Optional[int]:
     """
     Return how many day trades remain in the rolling 5-day window.
     Primary: IBKR's DayTradesRemaining account value tag.
@@ -207,7 +208,7 @@ def _get_day_trades_remaining(ib, account: str) -> int | None:
 
 
 def check_risk_conditions(portfolio_value: float, daily_pnl: float, regime: dict,
-              open_positions: list = None, ib=None) -> tuple[bool, str]:
+              open_positions: list = None, ib=None) -> Tuple[bool, str]:
     """
     Master check — can we take new trades right now?
     Returns (bool, reason_if_not).
@@ -456,7 +457,7 @@ def get_scan_interval() -> int:
 # VIX-RANK ADAPTIVE KELLY FRACTION
 # ══════════════════════════════════════════════════════════════════
 
-def get_vix_rank(vix_override: float | None = None) -> float:
+def get_vix_rank(vix_override: Optional[float] = None) -> float:
     """
     Returns the percentile (0.0–1.0) of the current ^VIX reading within
     its trailing 252-day range. Caches the result for cache_ttl_seconds.
@@ -498,7 +499,7 @@ def get_vix_rank(vix_override: float | None = None) -> float:
         return 0.5
 
 
-def get_kelly_fraction(vix_rank_override: float | None = None) -> tuple[float, float]:
+def get_kelly_fraction(vix_rank_override: Optional[float] = None) -> Tuple[float, float]:
     """
     Returns (kelly_fraction, vix_rank).
     Formula: kelly = base_kelly * (1 - vix_rank * max_reduction)
@@ -581,7 +582,7 @@ def calculate_position_size(portfolio_value: float, price: float,
     # ── ATR volatility cap ─────────────────────────────────────
     # Cap qty so that a 1-ATR adverse move costs at most atr_vol_target_pct of portfolio.
     # More conservative of Kelly path vs ATR cap wins.
-    atr_capped_qty: int | None = None
+    atr_capped_qty: Optional[int] = None
     if CONFIG.get("atr_vol_cap_enabled") and atr > 0:
         atr_target     = portfolio_value * CONFIG["atr_vol_target_pct"]
         atr_capped_qty = max(1, int(atr_target / atr))
@@ -626,7 +627,7 @@ def get_short_size_multiplier() -> float:
         return 1.0  # fail-open: don't block shorts on IC calculator errors
 
 
-def calculate_stops(price: float, atr: float, direction: str) -> tuple[float, float]:
+def calculate_stops(price: float, atr: float, direction: str) -> Tuple[float, float]:
     """
     Calculate stop loss and first take profit using ATR.
     Returns (stop_loss, take_profit_1).
@@ -644,7 +645,7 @@ def calculate_stops(price: float, atr: float, direction: str) -> tuple[float, fl
     return sl, tp
 
 
-def check_correlation(new_symbol: str, open_positions: list) -> tuple[bool, str]:
+def check_correlation(new_symbol: str, open_positions: list) -> Tuple[bool, str]:
     """
     Basic correlation check — avoid highly correlated positions.
     Returns (ok_to_add, reason).
@@ -714,7 +715,7 @@ def get_underlying_exposure(symbol: str, open_positions: list) -> dict:
 
 def check_combined_exposure(symbol: str, new_exposure_value: float,
                             open_positions: list, portfolio_value: float,
-                            instrument: str = "stock") -> tuple[bool, str]:
+                            instrument: str = "stock") -> Tuple[bool, str]:
     """
     FIX #1 + #3: Check whether adding a new position would create
     excessive combined exposure to the same underlying.
@@ -831,7 +832,7 @@ def update_equity_high_water_mark(current_equity: float) -> bool:
     return False
 
 
-def check_drawdown() -> tuple[bool, str]:
+def check_drawdown() -> Tuple[bool, str]:
     """
     Returns (ok_to_trade, reason). Called from can_trade().
     """

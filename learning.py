@@ -221,6 +221,7 @@ def log_signal_scan(scored: list, regime: dict) -> None:
                     "symbol":          sig.get("symbol"),
                     "score":           sig.get("score"),
                     "price":           sig.get("price"),
+                    "direction":       sig.get("direction", "LONG"),
                     "regime":          regime.get("regime"),
                     "vix":             regime.get("vix"),
                     "score_breakdown": sig.get("score_breakdown", {}),

@@ -939,6 +939,14 @@ def run_scan():
     regime_name    = pipeline.regime_name
 
     dash["news_data"] = news_sentiment
+
+    # BACK-007 — update directional skew display each scan
+    try:
+        from learning import get_directional_skew_multi
+        dash["skew"] = get_directional_skew_multi()
+    except Exception as _skew_err:
+        log.debug(f"Skew update skipped: {_skew_err}")
+
     clog("SCAN", f"Pipeline: {len(universe)} symbols → {len(scored)} scored "
          f"→ {len(signals)} signals [{regime_name}]")
 

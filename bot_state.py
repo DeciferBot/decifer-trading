@@ -82,6 +82,8 @@ dash = {
     # ── Catalyst Sentinel state ────────────────────────────────────────────
     "catalyst_triggers":         [],
     "catalyst_sentinel_stats":   {},
+    # ── Directional skew (BACK-007) ─────────────────────────────────────────
+    "skew":                      {},
 }
 
 # ── Persistent file paths ─────────────────────────────────────────────────────
