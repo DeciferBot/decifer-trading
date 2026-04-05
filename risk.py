@@ -4,6 +4,8 @@
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
+from __future__ import annotations
+
 import json
 import logging
 import os
@@ -910,7 +912,7 @@ def _get_sector_monitor():
 
 def check_sector_concentration(new_symbol: str, open_positions: list,
                                 portfolio_value: float,
-                                regime: str = "NORMAL") -> tuple[bool, str]:
+                                regime: str = "NORMAL") -> Tuple[bool, str]:
     """
     FIX #2: Check if adding new_symbol would breach sector concentration limits.
     Uses SectorMonitor from portfolio_optimizer.py (was built but never wired in).

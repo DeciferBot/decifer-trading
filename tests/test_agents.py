@@ -185,13 +185,14 @@ class TestVoteCounting:
         syms = [b["symbol"] for b in result["buys"]]
         assert "AAPL" in syms
 
-    def test_strong_veto_blocks_trade(self):
-        """STRONG VETO subtracts 1 vote; if below threshold, no buy."""
-        devils_veto = "For AAPL: VETO RATING: STRONG VETO -- earnings binary risk."
-        # votes: tech+1 macro+1 opp+1 risk+1 veto-1 = 3; required=4 -> blocked
+    def test_risk_rejection_blocks_at_high_threshold(self):
+        """REJECT from risk manager subtracts 1 vote; if below threshold, no buy."""
+        # Devil's Advocate removed — risk manager is now the blocking mechanism.
+        # votes: tech+1 macro+1 opp+1 risk-1 = 2; required=4 -> blocked
+        risk_reject = "AAPL:\n  DECISION: REJECT\n  REASON: Position limit reached."
         with patch.dict(agents.CONFIG, dict(_AGENTS_CFG, agents_required_to_agree=4)):
             result = agents.agent_final_decision(
-                **_final_kwargs(devils=devils_veto, agents_required=4)
+                **_final_kwargs(risk=risk_reject, agents_required=4)
             )
         syms = [b["symbol"] for b in result["buys"]]
         assert "AAPL" not in syms
@@ -277,15 +278,23 @@ class TestRunAllAgentsStructure:
             assert key in result, f"Missing key: {key}"
 
     def test_agent_outputs_attached(self):
-        """run_all_agents attaches _agent_outputs with all 5 specialist reports."""
-        with patch.object(agents, "_call_claude", return_value="macro/opp/devils text"):
-            with patch.dict(agents.CONFIG, _AGENTS_CFG):
+        """run_all_agents attaches _agent_outputs with all specialist reports."""
+        # Must pass a qualifying signal (score >= min_score_to_trade=18) so the
+        # early-exit guard doesn't fire before agents run.
+        qualifying_signal = {
+            "symbol": "AAPL", "score": 30, "price": 150.0, "atr": 2.5,
+            "signal": "BUY", "direction": "LONG",
+        }
+        with patch.object(agents, "_call_claude", return_value="MACRO: BULLISH\nAAPL — strong setup"), \
+             patch.object(agents, "_call_claude_alpha", return_value="MACRO: BULLISH\nAAPL — strong setup"):
+            with patch.dict(agents.CONFIG, dict(_AGENTS_CFG, min_score_to_trade=18)):
                 result = _REAL_RUN_ALL_AGENTS(
-                    signals=[], regime=_REGIME_BULL, news=[], fx_data={},
+                    signals=[qualifying_signal], regime=_REGIME_BULL, news=[], fx_data={},
                     open_positions=[], portfolio_value=100_000.0, daily_pnl=0.0,
                 )
         outputs = result.get("_agent_outputs", {})
-        for key in ("technical", "macro", "opportunity", "devils", "risk"):
+        # New architecture: technical + trading_analyst (replaces macro/opp/devils) + risk
+        for key in ("technical", "trading_analyst", "risk"):
             assert key in outputs, f"Missing agent output key: {key}"
 
 

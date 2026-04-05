@@ -15,6 +15,8 @@ and reliability. Falls back to static CONFIG["fill_watcher"] values
 on any exception — a failed execution planner must never block a trade.
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
 

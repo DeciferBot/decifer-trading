@@ -4,9 +4,12 @@
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
+from __future__ import annotations
+
 import logging
 import threading
 from datetime import datetime, timezone, time as dtime
+from typing import Optional, Tuple
 import zoneinfo
 from ib_async import IB, Stock, Forex, Option, Future
 from ib_async import LimitOrder, StopOrder, MarketOrder
@@ -194,7 +197,7 @@ def _check_ibkr_open_order(
     ib: IB,
     symbol: str,
     side: str = "BUY",
-    option_key: str | None = None,
+    option_key: Optional[str] = None,
 ) -> bool:
     """Query IBKR directly for a live open order (used as belt-and-suspenders check).
 
@@ -268,7 +271,7 @@ def _get_ibkr_price(ib: IB, contract, fallback: float = 0) -> float:
     return fallback
 
 
-def _get_ibkr_bid_ask(ib: IB, contract) -> tuple[float, float]:
+def _get_ibkr_bid_ask(ib: IB, contract) -> Tuple[float, float]:
     """
     Fetch current bid/ask for execution agent context. Returns (0.0, 0.0) on failure.
     Reuses the same delayed market data subscription already active for _get_ibkr_price.
@@ -346,7 +349,7 @@ def _ibkr_item_to_key(item) -> str:
     return c.symbol
 
 
-def _validate_position_price(symbol: str, ibkr_price: float, entry: float) -> tuple[float, str]:
+def _validate_position_price(symbol: str, ibkr_price: float, entry: float) -> Tuple[float, str]:
     """
     3-way price consensus for position monitoring (IBKR + yfinance + TV).
     Same logic used at order entry — now applied to ongoing updates and closes.
@@ -1177,7 +1180,7 @@ def _flatten_all_inner(ib_fallback: IB = None):
     log.warning(f"🚨 FLATTEN ALL complete — {closed} orders placed, tracker cleared")
 
 
-def close_position(ib_unused, trade_key: str) -> str | None:
+def close_position(ib_unused, trade_key: str) -> Optional[str]:
     """
     Close a single position by trade_key IMMEDIATELY via emergency IB connection.
     trade_key can be a plain symbol (e.g. "KOD") for stocks, or a composite key
