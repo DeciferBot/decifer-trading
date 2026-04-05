@@ -1,10 +1,19 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║   <>  DECIFER  —  agents.py                                  ║
-# ║   The 6-agent multi-perspective trading intelligence system  ║
+# ║   Trading intelligence pipeline                              ║
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
+#
+# Architecture (post-redesign):
+#   Agent 1 — Technical Analyst     deterministic  (parallel with Trading Analyst)
+#   Agent 2 — Trading Analyst       LLM/Opus       (replaces Macro + Opportunity + Devil)
+#   Agent 3 — Risk Manager          deterministic
+#   Agent 4 — Final Decision Maker  deterministic
+#
+# LLM calls per scan: 1 (Trading Analyst, Opus, uncapped tokens)
+# LLM calls per trade: 0 (Execution Agent is deterministic — execution_agent.py)
+# Portfolio review: event-triggered, separate module (portfolio_manager.py)
 
-import json
 import logging
 import re
 import anthropic
@@ -16,7 +25,7 @@ client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
 
 
 def _call_claude(system_prompt: str, user_message: str) -> str:
-    """Single Claude API call with prompt caching on system prompt (~90% cost reduction)."""
+    """Standard Claude call (Sonnet, default token cap)."""
     try:
         resp = client.messages.create(
             model=CONFIG["claude_model"],
@@ -30,10 +39,24 @@ def _call_claude(system_prompt: str, user_message: str) -> str:
         return ""
 
 
+def _call_claude_alpha(system_prompt: str, user_message: str) -> str:
+    """Alpha-agent call — Opus, uncapped tokens, full reasoning depth.
+    Used for Trading Analyst and Portfolio Manager only."""
+    try:
+        resp = client.messages.create(
+            model=CONFIG.get("claude_model_alpha", "claude-opus-4-6"),
+            max_tokens=CONFIG.get("claude_max_tokens_alpha", 4096),
+            system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
+            messages=[{"role": "user", "content": user_message}]
+        )
+        return resp.content[0].text.strip()
+    except Exception as e:
+        log.error(f"Claude alpha API error: {e}")
+        return ""
+
+
 # ══════════════════════════════════════════════════════════════
 # AGENT 1 — TECHNICAL ANALYST  (deterministic)
-# Replaces LLM call: signals already carry all indicator data;
-# conviction thresholds and divergence rules are fully known.
 # ══════════════════════════════════════════════════════════════
 
 def agent_technical(signals: list, regime: dict) -> str:
@@ -104,7 +127,6 @@ def agent_technical(signals: list, regime: dict) -> str:
             f"TF={tf_agree} | Dims={aligned_dims} aligned"
         )
 
-        # News overlay
         news = s.get("news") or {}
         kw = news.get("keyword_score", 0)
         sent = news.get("claude_sentiment", "")
@@ -115,7 +137,6 @@ def agent_technical(signals: list, regime: dict) -> str:
                 + (f" | {cat[:80]}" if cat else "")
             )
 
-        # Divergence flags (rules stated explicitly in original prompt)
         if sig == "BUY" and obv_slope < 0 and mfi < 40:
             divergences.append(
                 f"  ! {sym}: DISTRIBUTION TRAP -- BUY signal but OBV falling + MFI={mfi:.0f}")
@@ -143,171 +164,120 @@ def agent_technical(signals: list, regime: dict) -> str:
 
 
 # ══════════════════════════════════════════════════════════════
-# AGENT 2 — MACRO ANALYST  (LLM — genuine cross-asset synthesis)
+# AGENT 2 — TRADING ANALYST  (LLM / Opus / uncapped)
+# Single call replacing Macro + Opportunity + Devil's Advocate chain.
+# Sees all inputs simultaneously — no anchoring from prior agent outputs.
 # ══════════════════════════════════════════════════════════════
-MACRO_SYSTEM = """You are the Macro Analyst for Decifer, an autonomous trading system.
-Your ONLY job is to assess the macro environment — market regime, cross-asset dynamics,
-FX moves, geopolitical context, and news flow.
-You do NOT look at individual stock charts. You look at the big picture.
-Output structured analysis only."""
+
+_TRADING_ANALYST_SYSTEM = """You are the Trading Analyst for Decifer, an autonomous US equity trading system.
+
+Your job is to simultaneously assess the macro environment AND identify the best trading opportunities. \
+You receive all data in one pass — you are not reading summaries from other agents.
+
+OUTPUT FORMAT — produce exactly these sections in this order:
+
+MACRO: [BULLISH | BEARISH | NEUTRAL | UNCERTAIN]
+<2-3 sentences on the macro environment: regime, VIX trajectory, cross-asset signals, risk-on/off verdict>
+
+OPPORTUNITIES:
+For each opportunity (up to 3; fewer if genuine setups are scarce — never force trades):
+
+SYMBOL: <ticker>
+DIRECTION: LONG | SHORT
+CONVICTION: HIGH | MEDIUM | LOW
+RATIONALE: <Lead with the real-world reason — catalyst, sector move, earnings, breakout from base. \
+Do NOT lead with indicator values. A human must understand the trade without knowing what ADX means.>
+INSTRUMENT: stock | call | put
+  (prefer call/put when: options_score > 20 AND IVR < 30% AND stock also signals)
+COUNTER-ARGUMENT: <The single strongest reason this trade fails. Be honest. One sentence.>
+KEY RISK: <Binary events, crowding, macro headwind>
+
+RULES:
+- If fewer than 3 genuine setups exist, say so. Cash is a valid output.
+- Options flow: CALL_BUYER = smart money bullish. PUT_BUYER = smart money bearish. Low IVR = cheap premium.
+- In PANIC regime: output MACRO: BEARISH and no OPPORTUNITIES. Capital preservation.
+- CHOPPY regime: raise your conviction bar — only HIGH conviction setups.
+- Keep each section tight. No padding."""
 
 
-def agent_macro(regime: dict, news_headlines: list, fx_data: dict) -> str:
-    """Assess macro environment and risk-on/risk-off positioning."""
+def agent_trading_analyst(
+    signals: list,
+    regime: dict,
+    news_headlines: list,
+    fx_data: dict,
+    options_signals: list,
+    strategy_mode: dict,
+) -> str:
+    """
+    Single Opus LLM call replacing Macro Analyst + Opportunity Finder + Devil's Advocate.
+    Receives all inputs simultaneously — eliminates anchoring bias from the old serial chain.
+    """
+    regime_name = regime.get("regime", "UNKNOWN")
+    vix = regime.get("vix", 0)
+    vix_1h = regime.get("vix_1h_change", 0)
+    spy = regime.get("spy_price", "?")
+    qqq = regime.get("qqq_price", "?")
+    spy_above = regime.get("spy_above_200d", regime.get("spy_above_ema", False))
+    qqq_above = regime.get("qqq_above_200d", regime.get("qqq_above_ema", False))
+    size_mult = regime.get("position_size_multiplier", 1.0)
 
-    headlines_text = "\n".join([f"- {h}" for h in news_headlines[:15]]) if news_headlines else "No headlines available"
+    sig_lines = []
+    for s in signals[:10]:
+        sym = s["symbol"]
+        score = s["score"]
+        sig = s.get("signal", "?")
+        bd = s.get("score_breakdown", {})
+        bd_str = " ".join(f"{k[:3]}={v:.0f}" for k, v in bd.items() if v > 0)
+        news = s.get("news") or {}
+        kw = news.get("keyword_score", 0)
+        sent = news.get("claude_sentiment", "")
+        news_str = f" | news={sent}(kw={kw:+d})" if sent else (f" | kw={kw:+d}" if kw else "")
+        sig_lines.append(f"  {sym}: {score}/50 {sig} [{bd_str}]{news_str}")
 
-    fx_text = "\n".join([
-        f"{pair}: {data.get('price', 'N/A')} (change: {data.get('change_pct', 'N/A')}%)"
-        for pair, data in fx_data.items()
-    ]) if fx_data else "FX data unavailable"
+    opts_lines = []
+    for o in (options_signals or [])[:8]:
+        ivr_str = f"IVR={o['iv_rank']:.0f}%" if o.get("iv_rank") is not None else "IVR=n/a"
+        earn_str = f" earnings_in={o['earnings_days']}d" if o.get("earnings_days") else ""
+        opts_lines.append(
+            f"  [{o['options_score']:>2}/30] {o['signal']:<14} {o['symbol']:<6} "
+            f"${o['price']:.2f} C/P={o['cp_ratio']:.1f}x {ivr_str} {o['dte']}DTE{earn_str}"
+        )
 
-    prompt = f"""Current market regime data:
+    fx_lines = [
+        f"  {pair}: {d.get('price','?')} ({d.get('change_pct','?')}%)"
+        for pair, d in (fx_data or {}).items()
+    ]
 
-REGIME CLASSIFICATION: {regime['regime']}
-VIX: {regime['vix']} ({regime['vix_1h_change']:+.1f}% in last hour)
-SPY: ${regime['spy_price']} (above 200d MA: {regime.get('spy_above_200d', regime.get('spy_above_ema'))})
-QQQ: ${regime['qqq_price']} (above 200d MA: {regime.get('qqq_above_200d', regime.get('qqq_above_ema'))})
+    hl_lines = [f"  - {h}" for h in (news_headlines or [])[:5]]
+    sm_ctx = (strategy_mode or {}).get("context", "")
+
+    prompt = f"""REGIME: {regime_name} | VIX={vix:.1f} ({vix_1h:+.1f}%/1h) | size_mult={size_mult:.1f}x
+SPY=${spy} ({'above' if spy_above else 'below'} 200d MA) | QQQ=${qqq} ({'above' if qqq_above else 'below'} 200d MA)
+
+SCORED SIGNALS (top 10):
+{chr(10).join(sig_lines) or '  None above threshold'}
+
+OPTIONS FLOW:
+{chr(10).join(opts_lines) or '  No options data'}
 
 FX MARKETS:
-{fx_text}
+{chr(10).join(fx_lines) or '  No FX data'}
 
-RECENT NEWS HEADLINES:
-{headlines_text}
+RECENT HEADLINES (top 5):
+{chr(10).join(hl_lines) or '  No headlines'}
+{(chr(10) + 'TRADING CONTEXT: ' + sm_ctx) if sm_ctx else ''}
 
-Assess:
-1. Is the regime classification correct? Any nuance to add?
-2. Is this risk-ON or risk-OFF environment right now?
-3. Which sectors/asset classes benefit from current macro?
-4. Any geopolitical or macro risks that should limit position sizes?
-5. Cross-asset signals: what are bonds, gold, oil, and FX saying?
-6. Overall verdict: BULLISH / BEARISH / NEUTRAL / UNCERTAIN"""
+Produce your analysis now."""
 
-    return _call_claude(MACRO_SYSTEM, prompt)
+    return _call_claude_alpha(_TRADING_ANALYST_SYSTEM, prompt)
 
 
 # ══════════════════════════════════════════════════════════════
-# AGENT 3 — OPPORTUNITY FINDER  (LLM — genuine synthesis)
-# ══════════════════════════════════════════════════════════════
-OPPORTUNITY_SYSTEM = """You are the Opportunity Finder for Decifer, an autonomous trading system.
-Your job is to synthesise technical and macro analysis to identify the 3 best trading
-opportunities available RIGHT NOW across ANY asset class IBKR supports.
-You have NO bias toward stocks, FX, options, commodities, or any other instrument.
-You go where the opportunity is. Be decisive and specific.
-For any unfamiliar symbol, reason about it from first principles using the data provided.
-Do not dismiss a symbol just because it is unfamiliar — analyse the data."""
-
-
-def agent_opportunity(technical_report: str, macro_report: str,
-                      signals: list, options_signals: list = None,
-                      strategy_mode: dict = None) -> str:
-    """Identify top 3 opportunities by synthesising technical, macro, and options flow."""
-
-    available = ", ".join([s["symbol"] for s in signals]) if signals else "None above threshold"
-
-    if options_signals:
-        opts_lines = []
-        for o in options_signals[:10]:
-            ivr_str = f"IVR={o['iv_rank']:.0f}%" if o.get("iv_rank") is not None else "IVR=n/a"
-            earn_str = f" | earnings in {o['earnings_days']}d" if o.get("earnings_days") else ""
-            opts_lines.append(
-                f"  [{o['options_score']:>2}/30] {o['signal']:<14} {o['symbol']:<6} "
-                f"${o['price']:.2f} | C/P={o['cp_ratio']:.1f}x | {ivr_str} | "
-                f"{o['dte']}DTE {o['expiry']}{earn_str}"
-            )
-        options_section = "OPTIONS FLOW DATA (yfinance live scanner):\n" + "\n".join(opts_lines)
-        options_note = (
-            "\n\nOPTIONS FLOW INSTRUCTIONS:\n"
-            "- When a stock symbol appears in BOTH the stock signals AND the options flow, "
-            "strongly consider recommending the OPTION as the instrument (call for LONG, put for SHORT).\n"
-            "- CALL_BUYER signal = smart money buying calls = bullish.\n"
-            "- PUT_BUYER signal = smart money buying puts = bearish.\n"
-            "- EARNINGS_PLAY = catalyst upcoming -- options are often the better instrument.\n"
-            "- Low IVR (<30%) = options cheap = good risk/reward to buy premium.\n"
-            "- High options score (20+/30) = strong conviction signal from options market."
-        )
-    else:
-        options_section = "OPTIONS FLOW DATA: Not available this cycle."
-        options_note = ""
-
-    _sm = strategy_mode or {}
-    _sm_context = _sm.get("context", "")
-    if _sm_context:
-        strategy_block = f"\n=== TRADING CONTEXT ===\n{_sm_context}\n=======================\n"
-    else:
-        strategy_block = ""
-
-    prompt = f"""TECHNICAL ANALYST REPORT:
-{technical_report}
-
-MACRO ANALYST REPORT:
-{macro_report}
-
-SYMBOLS CURRENTLY SCORING ABOVE THRESHOLD: {available}
-
-{options_section}{options_note}
-{strategy_block}
-Based on all reports, identify the TOP 3 trading opportunities right now.
-For each opportunity provide:
-1. SYMBOL and ASSET CLASS
-2. DIRECTION: LONG or SHORT
-3. CONVICTION: HIGH / MEDIUM / LOW
-4. ENTRY RATIONALE: Why this, why now? (reference options flow if relevant)
-   IMPORTANT: Lead with the REAL WORLD reason -- a news catalyst, earnings event, sector rotation,
-   fundamental change, or a clear chart pattern (e.g. "breaking out of 3-month base on 2x volume").
-   Do NOT lead with indicator values. A human reading this should understand the trade thesis
-   without knowing what ADX or MFI means.
-5. KEY RISK: What could make this wrong?
-6. SUGGESTED INSTRUMENT: Stock / Call option / Put option / Inverse ETF / FX pair
-   -- If options flow data supports the trade and IVR is low, PREFER options over stock.
-
-If fewer than 3 genuine opportunities exist, say so clearly. Do not force trades.
-Quality over quantity. A good reason to stay in cash is a valid output."""
-
-    return _call_claude(OPPORTUNITY_SYSTEM, prompt)
-
-
-# ══════════════════════════════════════════════════════════════
-# AGENT 4 — DEVIL'S ADVOCATE  (LLM — adversarial reasoning)
-# ══════════════════════════════════════════════════════════════
-DEVILS_SYSTEM = """You are the Devil's Advocate for Decifer, an autonomous trading system.
-Your ONLY job is to find reasons NOT to take each proposed trade.
-You are adversarial by design. You protect capital by being skeptical.
-For every proposed opportunity, argue against it as strongly as you can.
-Flag anything that could cause a loss. Be ruthless but fair.
-If a trade is genuinely strong, you may acknowledge it -- but still find the weaknesses."""
-
-
-def agent_devils_advocate(opportunity_report: str, regime: dict) -> str:
-    """Challenge every proposed opportunity."""
-
-    prompt = f"""PROPOSED OPPORTUNITIES:
-{opportunity_report}
-
-CURRENT REGIME: {regime['regime']} | VIX: {regime['vix']}
-
-For each proposed trade, provide a devil's advocate counter-argument:
-1. What technical or macro evidence argues AGAINST this trade?
-2. What recent news or events could invalidate this thesis?
-3. Is there a crowded trade risk? (everyone already positioned this way)
-4. Are there upcoming events (earnings, Fed, economic data) that create binary risk?
-5. VETO RATING: STRONG VETO / MODERATE CONCERN / MINOR CONCERN / NO VETO
-
-A STRONG VETO means: do not take this trade under any circumstances.
-Be specific. Generic concerns are not useful."""
-
-    return _call_claude(DEVILS_SYSTEM, prompt)
-
-
-# ══════════════════════════════════════════════════════════════
-# PRIVATE HELPERS — deterministic vote parsing for Agent 6
+# PRIVATE HELPERS — deterministic vote parsing
 # ══════════════════════════════════════════════════════════════
 
 def _extract_proposed_symbols(opportunity_text: str, signals: list) -> list:
-    """
-    Return signal dicts for symbols proposed in opportunity_text that are
-    also present in the scored signals list.  Order = first mention.
-    """
+    """Return signal dicts for symbols proposed in analyst text, in mention order."""
     if not opportunity_text or not signals:
         return []
     sig_map = {s["symbol"]: s for s in signals}
@@ -323,35 +293,24 @@ def _extract_proposed_symbols(opportunity_text: str, signals: list) -> list:
     return result
 
 
-def _extract_macro_vote(macro_text: str) -> int:
-    """+1 BULLISH/risk-ON | -1 BEARISH/risk-OFF/UNCERTAIN | 0 neutral."""
-    if not macro_text:
+def _extract_macro_vote(analyst_text: str) -> int:
+    """+1 BULLISH | -1 BEARISH/UNCERTAIN | 0 NEUTRAL. Parses Trading Analyst output."""
+    if not analyst_text:
         return 0
-    upper = macro_text.upper()
-    if any(kw in upper for kw in ("BULLISH", "RISK-ON", "RISK ON", "BULL_TRENDING")):
+    m = re.search(r"MACRO:\s*(BULLISH|BEARISH|NEUTRAL|UNCERTAIN)", analyst_text.upper())
+    if m:
+        verdict = m.group(1)
+        if verdict == "BULLISH":
+            return 1
+        if verdict in ("BEARISH", "UNCERTAIN"):
+            return -1
+        return 0
+    upper = analyst_text.upper()
+    if any(kw in upper for kw in ("BULLISH", "RISK-ON", "RISK ON")):
         return 1
     if any(kw in upper for kw in ("BEARISH", "RISK-OFF", "RISK OFF", "UNCERTAIN")):
         return -1
     return 0
-
-
-def _extract_devils_vetoes(devils_text: str, symbols: list) -> set:
-    """Return set of symbols where the devil's advocate issued a STRONG VETO."""
-    if not devils_text:
-        return set()
-    upper = devils_text.upper()
-    vetoed = set()
-    for sym in symbols:
-        idx = upper.find(sym)
-        while idx != -1:
-            window = upper[max(0, idx - 50):idx + 300]
-            if "STRONG VETO" in window:
-                vetoed.add(sym)
-                break
-            idx = upper.find(sym, idx + 1)
-    if "STRONG VETO" in upper and len(symbols) == 1:
-        vetoed.update(symbols)
-    return vetoed
 
 
 def _extract_technical_conviction(tech_text: str, symbol: str) -> int:
@@ -369,10 +328,7 @@ def _extract_technical_conviction(tech_text: str, symbol: str) -> int:
 
 
 def _extract_risk_approval(risk_text: str, symbol: str) -> int:
-    """
-    +1 APPROVE | -1 REJECT/BLOCK | 1 default when symbol not mentioned.
-    Also returns -1 on global gate closure signals in the text.
-    """
+    """+1 APPROVE | -1 REJECT/BLOCK | 1 default when symbol not mentioned."""
     if not risk_text:
         return 1
     upper = risk_text.upper()
@@ -386,11 +342,11 @@ def _extract_risk_approval(risk_text: str, symbol: str) -> int:
         if "REJECT" in window or "BLOCK" in window:
             return -1
         idx = upper.find(symbol, idx + len(symbol))
-    return 1  # Not specifically mentioned -> approved by default
+    return 1
 
 
 def _extract_opportunity_reasoning(opportunity_text: str, symbol: str) -> str:
-    """Pull the entry rationale sentence for a symbol from the opportunity report."""
+    """Pull the entry rationale for a symbol from the analyst report."""
     if not opportunity_text:
         return ""
     idx = opportunity_text.upper().find(symbol)
@@ -409,7 +365,7 @@ def _extract_opportunity_reasoning(opportunity_text: str, symbol: str) -> str:
 
 
 def _extract_instrument(opportunity_text: str, symbol: str) -> str:
-    """Derive suggested instrument (stock/call/put/inverse_etf/fx) from opportunity text."""
+    """Derive suggested instrument from analyst text."""
     if not opportunity_text:
         return "stock"
     idx = opportunity_text.upper().find(symbol)
@@ -426,10 +382,7 @@ def _extract_instrument(opportunity_text: str, symbol: str) -> str:
 
 
 # ══════════════════════════════════════════════════════════════
-# AGENT 5 — RISK MANAGER  (deterministic)
-# Replaces LLM call: all rules are in config.py and risk.py.
-# The original prompt had CRITICAL INSTRUCTION "do NOT invent a
-# lower number" -- a clear signal the LLM added no value here.
+# AGENT 3 — RISK MANAGER  (deterministic)
 # ══════════════════════════════════════════════════════════════
 
 def agent_risk_manager(opportunity_report: str, devils_report: str,
@@ -439,8 +392,7 @@ def agent_risk_manager(opportunity_report: str, devils_report: str,
                        signals: list = None) -> str:
     """
     Deterministic risk assessment via risk.py functions.
-    Returns human-readable text (same format as before) for logging.
-    Added `signals` keyword arg (backward-compatible, defaults to None).
+    `devils_report` retained for API compatibility (unused — Devil's Advocate removed).
     """
     from risk import check_risk_conditions, calculate_position_size, calculate_stops
 
@@ -510,10 +462,7 @@ def agent_risk_manager(opportunity_report: str, devils_report: str,
 
 
 # ══════════════════════════════════════════════════════════════
-# AGENT 6 — FINAL DECISION MAKER  (deterministic)
-# Replaces LLM call: vote counting + JSON assembly are pure logic.
-# LLM agents 2, 3, 4 still contribute text; votes are extracted
-# via lightweight keyword parsing on their outputs.
+# AGENT 4 — FINAL DECISION MAKER  (deterministic)
 # ══════════════════════════════════════════════════════════════
 
 def agent_final_decision(technical: str, macro: str, opportunity: str,
@@ -526,9 +475,9 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
                          portfolio_value: float = 0.0,
                          daily_pnl: float = 0.0) -> dict:
     """
-    Deterministic final synthesis -- vote counting + JSON assembly.
-    Added `portfolio_value` and `daily_pnl` keyword args for accurate sizing;
-    both default to 0.0 for backward compatibility with existing callers.
+    Deterministic final synthesis — vote counting + JSON assembly.
+    `macro` and `opportunity` are both the Trading Analyst output.
+    `devils` is empty string (Devil's Advocate removed).
     """
     from risk import calculate_position_size, calculate_stops
 
@@ -538,7 +487,6 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
     _reconsider = positions_to_reconsider or []
     max_pos = CONFIG["max_positions"]
 
-    # PANIC override
     if regime.get("regime") == "PANIC":
         return {
             "buys": [], "sells": [], "hold": [], "cash": True,
@@ -547,10 +495,7 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
             "claude_reasoning": "Regime is PANIC. No new trades. Capital preservation mode.",
         }
 
-    # Identify proposed symbols from opportunity report
     proposed = _extract_proposed_symbols(opportunity, signals)
-
-    # Macro vote applies to all trades equally
     macro_vote = _extract_macro_vote(macro)
 
     open_syms = [p["symbol"] for p in open_positions]
@@ -560,19 +505,12 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
     for s in proposed:
         sym = s["symbol"]
 
-        # Vote tally per symbol
-        # Technical: +1 if HIGH conviction for this symbol
-        # Macro: +1 / 0 / -1
-        # Opportunity: +1 (the agent proposed this symbol)
-        # Risk: +1 APPROVE / -1 REJECT
-        # Devil: -1 STRONG VETO (only penalty; MODERATE CONCERN has no vote impact)
+        # Votes: Technical (+1) + Macro (+1/-1/0) + Opportunity (+1) + Risk (+1/-1)
         votes = 0
         votes += _extract_technical_conviction(technical, sym)
         votes += macro_vote
-        votes += 1  # Opportunity Finder proposed this symbol
+        votes += 1  # Trading Analyst proposed this symbol
         votes += _extract_risk_approval(risk, sym)
-        if sym in _extract_devils_vetoes(devils, [sym]):
-            votes -= 1
 
         if votes < agents_required:
             log.debug(f"Final: {sym} skipped -- {votes} votes < {agents_required} required")
@@ -581,7 +519,6 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
         if slots_available <= 0 or len(buys) >= _sm_max_trades:
             break
 
-        # Sizing
         price = s.get("price", 0)
         atr = s.get("atr", price * 0.02 if price > 0 else 1.0)
         score = s.get("score", 20)
@@ -596,7 +533,7 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
 
         reasoning = (
             _extract_opportunity_reasoning(opportunity, sym)
-            or f"{sym} selected by opportunity agent"
+            or f"{sym} selected by Trading Analyst"
         )
         instrument = _extract_instrument(opportunity, sym)
 
@@ -610,7 +547,6 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
         })
         slots_available -= 1
 
-    # Sells from positions to reconsider
     sells = [
         p["symbol"] for p in _reconsider
         if p.get("reason", "").upper() != "HOLD" and p["symbol"] in open_syms
@@ -618,20 +554,17 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
 
     hold = [sym for sym in open_syms if sym not in sells]
 
-    # agents_agreed = vote count for the first accepted buy (or 0)
     if buys:
         first_sym = buys[0]["symbol"]
-        agents_agreed = max(0, min(6,
+        agents_agreed = max(0, min(4,
             _extract_technical_conviction(technical, first_sym)
             + macro_vote
             + 1
             + _extract_risk_approval(risk, first_sym)
-            + (-1 if first_sym in _extract_devils_vetoes(devils, [first_sym]) else 0)
         ))
     else:
         agents_agreed = 0
 
-    # Summary and reasoning templates
     regime_label = regime.get("regime", "UNKNOWN")
     macro_str = "bullish" if macro_vote > 0 else ("bearish" if macro_vote < 0 else "neutral")
 
@@ -666,16 +599,17 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
 
 
 # ══════════════════════════════════════════════════════════════
-# ORCHESTRATOR — Run all 6 agents in sequence
+# ORCHESTRATOR
 # ══════════════════════════════════════════════════════════════
+
 def load_weekly_review() -> str:
-    """Load most recent weekly review to inject into agents as memory."""
-    review_file = "weekly_review.txt"
+    """Load most recent weekly review to inject as memory."""
     import os
+    review_file = "weekly_review.txt"
     if os.path.exists(review_file):
         try:
             with open(review_file) as f:
-                return f.read()[-2000:]  # Last 2000 chars
+                return f.read()[-2000:]
         except Exception:
             pass
     return ""
@@ -688,54 +622,88 @@ def run_all_agents(signals: list, regime: dict, news: list,
                    strategy_mode: dict = None,
                    positions_to_reconsider: list = None) -> dict:
     """
-    Run all 6 agents sequentially and return final decision.
-    Each agent output feeds into the next.
-    options_signals: live options flow data from options_scanner.py
-    """
-    weekly_memory = load_weekly_review()
+    Run agent pipeline and return final decision.
 
+    Pipeline:
+      Agent 1 (Technical) + Agent 2 (Trading Analyst/Opus) run in parallel.
+      Agent 3 (Risk Manager) runs deterministically.
+      Agent 4 (Final Decision) runs deterministically.
+
+    Early-exit gates (no LLM calls):
+      - No position slots available
+      - No signals above min_score_to_trade threshold
+    """
     if strategy_mode is None:
         strategy_mode = {"mode": "NORMAL", "context": "", "size_multiplier": 1.0,
                          "max_new_trades": 3, "score_threshold_adj": 0, "regime_changed": False}
     if positions_to_reconsider is None:
         positions_to_reconsider = []
 
-    log.info("Agents 1+2: Technical + Macro (parallel)...")
+    max_pos = CONFIG["max_positions"]
+    open_syms = [p["symbol"] for p in open_positions]
+    slots_remaining = max_pos - len(open_positions)
+
+    if slots_remaining <= 0 and not positions_to_reconsider:
+        log.info("Agents: No position slots available — skipping LLM calls")
+        return {
+            "buys": [], "sells": [], "hold": open_syms, "cash": False,
+            "agents_agreed": 0,
+            "summary": f"No slots ({len(open_positions)}/{max_pos}) — agents skipped",
+            "claude_reasoning": "All position slots filled. No LLM agents called.",
+            "_agent_outputs": {},
+        }
+
+    threshold = CONFIG.get("min_score_to_trade", 18)
+    qualified = [s for s in signals if s.get("score", 0) >= threshold]
+    if not qualified and not positions_to_reconsider:
+        log.info("Agents: No signals above threshold — skipping LLM calls")
+        return {
+            "buys": [], "sells": [], "hold": open_syms, "cash": False,
+            "agents_agreed": 0,
+            "summary": f"No signals >= {threshold} — agents skipped",
+            "claude_reasoning": "No qualifying signals this cycle. No LLM agents called.",
+            "_agent_outputs": {},
+        }
+
+    # ── Agents 1+2: Technical (deterministic) + Trading Analyst (Opus) in parallel ──
+    log.info("Agents 1+2: Technical + Trading Analyst/Opus (parallel)...")
     with ThreadPoolExecutor(max_workers=2) as pool:
-        tech_future = pool.submit(agent_technical, signals, regime)
-        macro_future = pool.submit(agent_macro, regime, news, fx_data)
+        tech_future = pool.submit(agent_technical, qualified, regime)
+        analyst_future = pool.submit(
+            agent_trading_analyst,
+            qualified, regime, news, fx_data,
+            options_signals or [], strategy_mode
+        )
         tech = tech_future.result()
-        macro = macro_future.result()
+        analyst = analyst_future.result()
 
-    log.info("Agent 3: Opportunity Finder (with options flow)...")
-    opp = agent_opportunity(tech, macro, signals, options_signals=options_signals or [],
-                            strategy_mode=strategy_mode)
+    # ── Agent 3: Risk Manager (deterministic) ────────────────────────────────
+    log.info("Agent 3: Risk Manager (deterministic)...")
+    risk = agent_risk_manager(
+        analyst, "",
+        open_positions, portfolio_value, daily_pnl, regime,
+        strategy_mode=strategy_mode,
+        signals=qualified
+    )
 
-    log.info("Agent 4: Devil\'s Advocate...")
-    devils = agent_devils_advocate(opp, regime)
-
-    log.info("Agent 5: Risk Manager (deterministic)...")
-    risk = agent_risk_manager(opp, devils, open_positions,
-                              portfolio_value, daily_pnl, regime,
-                              strategy_mode=strategy_mode,
-                              signals=signals)
-
-    log.info("Agent 6: Final Decision Maker (deterministic)...")
-    final = agent_final_decision(tech, macro, opp, devils, risk,
-                                 signals, open_positions, regime,
-                                 CONFIG["agents_required_to_agree"],
-                                 weekly_memory=weekly_memory,
-                                 strategy_mode=strategy_mode,
-                                 positions_to_reconsider=positions_to_reconsider,
-                                 portfolio_value=portfolio_value,
-                                 daily_pnl=daily_pnl)
+    # ── Agent 4: Final Decision Maker (deterministic) ────────────────────────
+    log.info("Agent 4: Final Decision Maker (deterministic)...")
+    final = agent_final_decision(
+        tech, analyst, analyst,  # macro=analyst, opportunity=analyst (same source)
+        "",                      # devils="" (removed)
+        risk, qualified, open_positions, regime,
+        CONFIG["agents_required_to_agree"],
+        weekly_memory=load_weekly_review(),
+        strategy_mode=strategy_mode,
+        positions_to_reconsider=positions_to_reconsider,
+        portfolio_value=portfolio_value,
+        daily_pnl=daily_pnl,
+    )
 
     final["_agent_outputs"] = {
-        "technical": tech,
-        "macro": macro,
-        "opportunity": opp,
-        "devils": devils,
-        "risk": risk,
+        "technical":       tech,
+        "trading_analyst": analyst,
+        "risk":            risk,
     }
 
     return final

@@ -1351,11 +1351,49 @@ def score_pead(symbol: str, sig_1d: dict | None, vol_ratio: float = 0.0) -> tupl
         return (0, 0)
 
 
-def _fetch_short_float(symbol: str) -> float | None:
+def _parse_finviz_short_float(html: str) -> "float | None":
     """
-    Scrape short float % from finviz.com/quote.ashx?t=SYMBOL.
-    Returns float (e.g. 15.2 for 15.2%) or None on failure.
+    Extract short float % from Finviz HTML.
+
+    Finviz wraps the value in nested tags:
+      Short Float</a></td><td ...><a href="..."><b>15.76%</b></a></td>
+
+    Method 1: find the <b> tag within ~350 chars after the "Short Float" label.
+    Method 2: broader regex (any chars, DOTALL) as final fallback.
+    """
+    import re as _re
+
+    idx = html.find("Short Float")
+    if idx == -1:
+        return None
+
+    window = html[idx:idx + 400]
+
+    # ── Method 1: value is inside <b>…%</b> near the label ────
+    m = _re.search(r"<b>(\d{1,3}(?:\.\d{1,2})?)\s*%\s*</b>", window)
+    if m:
+        try:
+            return float(m.group(1))
+        except ValueError:
+            pass
+
+    # ── Method 2: bare text %  (e.g. plain <td>15.76%</td>) ───
+    m = _re.search(r">(\d{1,3}(?:\.\d{1,2})?)\s*%\s*<", window)
+    if m:
+        try:
+            return float(m.group(1))
+        except ValueError:
+            pass
+
+    return None
+
+
+def _fetch_short_float(symbol: str) -> "float | None":
+    """
+    Fetch short float % for a symbol.
+    Source: Finviz quote page (DOM + regex backup for resilience).
     Cached per symbol with 4-hour TTL.
+    Returns float (e.g. 15.2 for 15.2%) or None on failure.
     """
     import requests as _requests
 
@@ -1369,26 +1407,15 @@ def _fetch_short_float(symbol: str) -> float | None:
         url = f"https://finviz.com/quote.ashx?t={symbol}"
         headers = {"User-Agent": "Mozilla/5.0 (compatible; Decifer/1.0)"}
         resp = _requests.get(url, headers=headers, timeout=5)
-        if resp.status_code != 200:
-            return None
-
-        html = resp.text
-        # Find "Short Float" label in fundamentals table
-        idx = html.find("Short Float")
-        if idx == -1:
-            return None
-        # The value is in the next <td> tag
-        td_start = html.find("<td", idx + 1)
-        td_content_start = html.find(">", td_start) + 1
-        td_content_end = html.find("<", td_content_start)
-        raw_val = html[td_content_start:td_content_end].strip().rstrip("%")
-        if raw_val in ("", "-", "N/A"):
-            return None
-        val = float(raw_val)
-        _SHORT_FLOAT_CACHE[symbol] = (val, now)
-        return val
+        if resp.status_code == 200:
+            val = _parse_finviz_short_float(resp.text)
+            if val is not None:
+                _SHORT_FLOAT_CACHE[symbol] = (val, now)
+                return val
     except Exception:
-        return None
+        pass
+
+    return None
 
 
 def score_short_squeeze(symbol: str, sig_5m: dict) -> tuple:

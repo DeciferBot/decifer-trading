@@ -505,6 +505,76 @@ def get_system_ic_health() -> float:
         return 0.0
 
 
+def get_short_quality_score() -> float:
+    """
+    Return the predictive IC quality of short-direction signals.
+
+    Reads signals_log.jsonl, filters to records where direction == "SHORT",
+    and returns the mean positive raw IC across dimensions for that subset.
+
+    Returns 0.0 when:
+    - Fewer than 20 short records exist (insufficient data — Phase 1)
+    - No ic_weights.json cache exists
+    - Any error occurs (fail-safe: caller interprets 0.0 as "unproven")
+
+    Used by signal_pipeline.py and risk.py to gate / size SHORT entries until
+    short-side IC is demonstrated. The proven threshold is 0.03.
+    """
+    try:
+        records = _load_signal_records()
+        short_records = [r for r in records if r.get("direction", "").upper() == "SHORT"]
+        if len(short_records) < MIN_VALID:
+            log.debug(
+                "get_short_quality_score: %d short records (need %d) — returning 0.0",
+                len(short_records), MIN_VALID,
+            )
+            return 0.0
+
+        fwd_map = _fetch_forward_returns_batch(short_records)
+
+        dim_raw: dict[str, list] = {d: [] for d in DIMENSIONS}
+        fwd_returns: list = []
+
+        for idx, rec in enumerate(short_records):
+            fwd = fwd_map.get(idx)
+            if fwd is None or not np.isfinite(fwd):
+                continue
+            # For shorts, a negative return is a win — invert the sign so
+            # positive IC means the signal correctly predicted the price drop.
+            bd = rec.get("score_breakdown", {})
+            fwd_returns.append(-fwd)
+            for d in DIMENSIONS:
+                dim_raw[d].append(float(bd.get(d, 0.0)))
+
+        n = len(fwd_returns)
+        if n < MIN_VALID:
+            return 0.0
+
+        fwd_arr = np.array(fwd_returns)
+        positive_ics = []
+        for d in DIMENSIONS:
+            scores_arr = np.array(dim_raw[d])
+            if len(scores_arr) != n:
+                continue
+            z = _zscore_array(scores_arr)
+            if np.all(z == 0.0):
+                continue
+            ic = _spearman(z, fwd_arr)
+            if np.isfinite(ic) and ic > 0.0:
+                positive_ics.append(ic)
+
+        if not positive_ics:
+            return 0.0
+
+        quality = float(np.mean(positive_ics))
+        log.debug("get_short_quality_score: n=%d, quality=%.4f", n, quality)
+        return quality
+
+    except Exception as e:
+        log.debug("get_short_quality_score: error (%s) — returning 0.0", e)
+        return 0.0
+
+
 def get_ic_weight_history(last_n: int = 4) -> list:
     """
     Return the last `last_n` weekly IC weight snapshots for trend display.

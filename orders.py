@@ -874,6 +874,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                     "sl":               sl,
                     "tp":               tp,
                     "score":            score,
+                    "entry_score":      score,   # immutable snapshot for portfolio manager
                     "reasoning":        reasoning,
                     "direction":        "LONG",
                     "pnl":              0.0,

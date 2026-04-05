@@ -279,6 +279,33 @@ def get_news_sentiment(symbol: str, direction: str = "",
     if abs(kw["score"]) >= keyword_threshold and headlines:
         claude = claude_sentiment(symbol, headlines, direction)
 
+    # Tier 2b: Finnhub company news — supplements Yahoo RSS with a second
+    # news feed.  Uses the same keyword_score() pipeline on combined headlines.
+    # Only fires when Finnhub key is present AND Yahoo RSS is empty or weak.
+    finnhub_contrib = 0
+    if CONFIG.get("use_finnhub") and CONFIG.get("finnhub_api_key"):
+        if not headlines or abs(kw["score"]) < keyword_threshold:
+            try:
+                import finnhub_client as _fh
+                fh_articles = _fh.get_company_news(symbol, lookback_days=2)
+                if fh_articles:
+                    # Use headline + first 120 chars of summary for richer context
+                    fh_headlines = [
+                        f"{a.get('headline', '')} {a.get('summary', '')[:120]}".strip()
+                        for a in fh_articles
+                    ]
+                    fh_kw = keyword_score(fh_headlines)
+                    if abs(fh_kw["score"]) >= keyword_threshold:
+                        # Finnhub has a clear signal where Yahoo RSS was ambiguous
+                        raw_contrib = fh_kw["score"]
+                        finnhub_contrib = max(-2, min(+2, raw_contrib // 2))
+                        log.debug(
+                            "Finnhub news %s: %d articles, kw_score=%+d → contrib=%+d",
+                            symbol, len(fh_articles), fh_kw["score"], finnhub_contrib,
+                        )
+            except Exception as _e:
+                log.debug("Finnhub company news error for %s: %s", symbol, _e)
+
     # ── Compute final news_score (0-10) ──────────────────────
     news_score = 0
 
@@ -290,6 +317,13 @@ def get_news_sentiment(symbol: str, direction: str = "",
     else:
         kw_contrib = 0
     news_score += kw_contrib
+
+    # Finnhub contribution (±2, direction-aware, only when keyword signal is weak)
+    if finnhub_contrib != 0:
+        if direction in ("LONG", ""):
+            news_score = max(0, min(10, news_score + finnhub_contrib))
+        elif direction == "SHORT":
+            news_score = max(0, min(10, news_score - finnhub_contrib))
 
     # Claude contribution (0-5)
     if claude["sentiment"] != "NEUTRAL":
