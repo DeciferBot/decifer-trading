@@ -1,0 +1,96 @@
+{
+  "date": "2026-04-05",
+  "topic": "weekend-sprint",
+  "status": "complete",
+  "approved_by": "pending_amit",
+  "branch": "master",
+
+  "objective": "Close all open bugs and uncommitted work. Complete BACK-002 and BACK-007. Arrive Monday with a clean, smoke-tested system ready to trade and ready to activate BACK-001.",
+
+  "commits": [
+    {
+      "sha": "f04f36b",
+      "message": "feat(core): 4-agent pipeline + IC short gate fix + finnhub + portfolio manager + correlation tool",
+      "description": "Committed 8 files that were in-flight but uncommitted. Key fix: get_short_quality_score() was imported by signal_pipeline.py and risk.py but missing from ic_calculator.py (ImportError on any short candidate). Added the function with correct Phase 1 behavior (returns 0.0 when < 20 short records, inverts forward-return sign for shorts). Also committed finnhub_client.py, portfolio_manager.py, tools/signal_correlation.py, and the 4-agent pipeline redesign in agents.py."
+    },
+    {
+      "sha": "7bcddd9",
+      "message": "feat(learning/skew/risk): BACK-002 direction tracking + BACK-007 directional skew display",
+      "description": "BACK-002: Added direction field to log_signal_scan() records so short IC can be tracked separately once 20+ short trades accumulate. BACK-007: Wired get_directional_skew_multi() into bot_trading.py scan loop and initialized dash['skew'] in bot_state.py — the dashboard skew bar was already built but never populated. Risk.py type annotation fixes for Python 3.9 compat."
+    },
+    {
+      "sha": "71d4dd5",
+      "message": "fix(tests): patch _get_edge_gate_adj in threshold test to avoid data-state dependency",
+      "description": "test_raised_threshold_filters_below was reading the real data/ic_weights.json (IC=0.01, degraded) which triggered the edge gate (+5) and caused a wrong expected count. Patched the function directly for deterministic tests."
+    }
+  ],
+
+  "deliverables": [
+    {
+      "file": "ic_calculator.py",
+      "type": "bug_fix",
+      "description": "Added get_short_quality_score(). Filters signals_log to direction='SHORT' records, computes mean positive Spearman IC across dimensions with inverted forward returns (price drop = win for shorts). Returns 0.0 when < 20 short records (correct Phase 1 behavior). Was causing ImportError crash on any short candidate."
+    },
+    {
+      "file": "learning.py",
+      "type": "enhancement",
+      "description": "Added direction field to log_signal_scan() records. Enables future short IC computation by ic_calculator once 20+ short trades accumulate. Previously the IC audit records had no direction — get_short_quality_score() would have always returned 0.0 even with many short trades."
+    },
+    {
+      "file": "bot_state.py",
+      "type": "enhancement",
+      "description": "Added dash['skew'] = {} initialization. The dashboard already had skew bar UI (skew-bar, skew-val, skew-detail, skew-alert elements) but the data key was never initialized or populated."
+    },
+    {
+      "file": "bot_trading.py",
+      "type": "enhancement",
+      "description": "Wire get_directional_skew_multi() call into scan loop (runs each scan, after pipeline). Populates dash['skew'] with {48h, 7d} windows so the dashboard skew bar now works. Also confirmed portfolio_manager.py was already fully wired (lines 48-1043) — no further wiring needed."
+    },
+    {
+      "file": "agents.py (committed)",
+      "type": "redesign",
+      "description": "4-agent deterministic pipeline: Technical Analyst + Trading Analyst (Opus, 1 call) + Risk Manager + Final Decision. Replaces old 6-agent serial chain. 1 LLM call per scan."
+    },
+    {
+      "file": "finnhub_client.py (new)",
+      "type": "new_module",
+      "description": "Thin Finnhub REST wrapper (free tier). Rate limited to 55/min. Endpoints: /quote and /company-news. Used as Tier 2b fallback in news.py."
+    },
+    {
+      "file": "portfolio_manager.py (new)",
+      "type": "new_module",
+      "description": "Thesis drift detection via Opus. Event-triggered (pre_market, regime_change, score_collapse, news_hit, earnings_risk, cascade, drawdown). Actions: HOLD/TRIM/EXIT/ADD. Already wired into bot_trading.py."
+    },
+    {
+      "file": "tools/signal_correlation.py (new)",
+      "type": "new_tool",
+      "description": "Read-only Pearson correlation + PCA analysis tool for signals_log.jsonl. CLI: python3 tools/signal_correlation.py --threshold 0.6. Diagnoses redundant dimensions and effective signal count."
+    }
+  ],
+
+  "discovery": {
+    "portfolio_manager_already_wired": "portfolio_manager.py was listed as P2 (wire into agents.py) but was already fully imported and wired in bot_trading.py lines 48-1043 with all 7 trigger types implemented. No additional wiring needed.",
+    "back002_mostly_done": "BACK-002 short scanner had its TV scan components (scans 4-8: breakdown, volume_distribution, bearish_momentum, intraday_breakdown, gap_down) already in scanner.py, and the short quality gate already wired in signal_pipeline.py. The only missing piece was direction not being recorded in IC audit records — fixed in learning.py.",
+    "back007_mostly_done": "BACK-007 directional skew had get_directional_skew() and get_directional_skew_multi() already implemented in learning.py, and the dashboard UI already had the skew bar. Only the wiring (bot_state init + bot_trading.py call) was missing.",
+    "test_gap": "test_raised_threshold_filters_below was reading real data/ic_weights.json from disk, making it sensitive to system state. Fixed with targeted mock patch."
+  },
+
+  "monday_readiness": {
+    "observation_window": "feat-alpha-pipeline-v2 activated 2026-04-01. Window expires 2026-04-08 (Monday). Next sizing activation allowed then.",
+    "back001_status": "BACK-001 (direction-agnostic signal engine, ~4 days) not in SIZING_AFFECTING_FEATURES — can start any time. Recommended for Monday morning after reviewing the spec.",
+    "system_health": "148 tests passing, 0 failures. Short gate live (returns 0.0 = unproven, correctly blocks shorts below score 28). Skew dashboard now live. All previously uncommitted files committed.",
+    "open_items": [
+      "data/ic_weights.json, data/hwm_state.json, data/alpha_decay_cache.json are unstaged runtime state — do not commit",
+      "VIX double-counting (Kelly + regime router) — documented, will resolve in feat-ic-weighted-scoring Phase 3",
+      "Short IC learning active from now: direction field logged, will accumulate data for future get_short_quality_score() improvement"
+    ]
+  },
+
+  "next_steps": [
+    "Monday 2026-04-08: run system dry-scan before market open",
+    "Monday 2026-04-08: observe window expires — can activate BACK-001 (direction-agnostic signal engine)",
+    "Review BACK-001 spec before starting implementation",
+    "Continue accumulating agent-scored trades toward Phase 2 IC gate (200 trades target)",
+    "Run tools/signal_correlation.py after 50+ agent-scored trades to check dimension redundancy"
+  ]
+}
