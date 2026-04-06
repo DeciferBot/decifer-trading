@@ -178,7 +178,9 @@ def load_orders() -> list:
 
 
 def _save_orders(orders: list):
-    """Write orders list to disk atomically, sanitising corrupt float values first."""
+    """Write orders list to disk atomically, sanitising corrupt float values first.
+    Falls back to a direct write if the directory does not support temp files (e.g. /dev/null in tests).
+    """
     import math, tempfile
     # Sanitise any inf/nan prices that may have slipped through in existing records
     for o in orders:
@@ -187,19 +189,24 @@ def _save_orders(orders: list):
             o["price"] = 0
     target = ORDER_LOG_FILE
     dir_ = os.path.dirname(os.path.abspath(target)) or "."
-    os.makedirs(dir_, exist_ok=True)
-    # Atomic write: write to a temp file then rename so the file is never half-written
-    fd, tmp = tempfile.mkstemp(dir=dir_, suffix=".tmp")
     try:
-        with os.fdopen(fd, "w") as f:
-            json.dump(orders, f, indent=2)
-        os.replace(tmp, target)
-    except Exception:
+        os.makedirs(dir_, exist_ok=True)
+        # Atomic write: write to a temp file then rename so the file is never half-written
+        fd, tmp = tempfile.mkstemp(dir=dir_, suffix=".tmp")
         try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
+            with os.fdopen(fd, "w") as f:
+                json.dump(orders, f, indent=2)
+            os.replace(tmp, target)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+    except Exception:
+        # Fallback: direct write (e.g. target is /dev/null in test environments)
+        with open(target, "w") as f:
+            json.dump(orders, f, indent=2)
 
 
 def log_signal_scan(scored: list, regime: dict) -> None:
@@ -232,6 +239,20 @@ def log_signal_scan(scored: list, regime: dict) -> None:
                 f.write(json.dumps(record) + "\n")
     except Exception as e:
         log.warning(f"signals_log write failed: {e}")
+
+
+def _compute_ic_weighted_score(signal_scores, ic_weights):
+    """Weighted sum of signal_scores by ic_weights across all IC dimensions."""
+    if not signal_scores or not ic_weights:
+        return None
+    try:
+        from ic_calculator import DIMENSIONS, EQUAL_WEIGHTS
+        return sum(
+            float(signal_scores.get(d, 0.0)) * ic_weights.get(d, EQUAL_WEIGHTS[d])
+            for d in DIMENSIONS
+        )
+    except Exception:
+        return None
 
 
 def log_trade(trade: dict, agent_outputs: dict, regime: dict,
@@ -275,6 +296,11 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
             "risk":        agent_outputs.get("risk",        "")[:500],
         },
         "signal_scores":   trade.get("signal_scores", {}),
+        "score_breakdown": trade.get("signal_scores", {}),  # IC learning loop alias
+        "ic_weights_at_entry": trade.get("ic_weights_at_entry"),
+        "ic_weighted_score":   _compute_ic_weighted_score(
+            trade.get("signal_scores"), trade.get("ic_weights_at_entry")
+        ),
         "candle_gate":     trade.get("candle_gate", "UNKNOWN"),
         # Sanitise to JSON-safe types — orderId can be a MagicMock in test environments
         "tranche_id":      trade.get("tranche_id") if isinstance(trade.get("tranche_id"), (int, type(None))) else None,

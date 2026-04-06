@@ -986,7 +986,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         return False
 
 
-def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal") -> bool:
+def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override: int = None) -> bool:
     """
     Close an existing position at market.
     Returns True if order placed.
@@ -1021,6 +1021,9 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal") -> bool:
             return False
         _safe_update_trade(_trade_key, {"status": "EXITING"})
 
+    _is_partial = qty_override is not None and qty_override < info["qty"]
+    sell_qty = qty_override if _is_partial else info["qty"]
+
     # Stop any active fill watcher so it doesn't race the sell
     from fill_watcher import stop_watcher as _stop_watcher
     _stop_watcher(symbol)
@@ -1050,7 +1053,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal") -> bool:
         # Direction-aware close: LONG positions close with SELL, SHORT positions close with BUY
         direction = info.get("direction", "LONG")
         close_action = "BUY" if direction == "SHORT" else "SELL"
-        close_order = MarketOrder(close_action, info["qty"], account=CONFIG["active_account"])
+        close_order = MarketOrder(close_action, sell_qty, account=CONFIG["active_account"])
         close_order.outsideRth = True
         sell_trade = ib.placeOrder(contract, close_order)
         ib.sleep(1)
@@ -1061,7 +1064,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal") -> bool:
             "symbol":     symbol,
             "side":       close_action,
             "order_type": "MKT",
-            "qty":        info["qty"],
+            "qty":        sell_qty,
             "price":      info["current"],
             "status":     "SUBMITTED",
             "instrument": "stock",
@@ -1071,22 +1074,27 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal") -> bool:
         })
 
         if direction == "SHORT":
-            pnl = (info["entry"] - info["current"]) * info["qty"]  # SHORT profits when price drops
+            pnl = (info["entry"] - info["current"]) * sell_qty  # SHORT profits when price drops
         else:
-            pnl = (info["current"] - info["entry"]) * info["qty"]
+            pnl = (info["current"] - info["entry"]) * sell_qty
         if pnl >= 0:
             record_win()
         else:
             record_loss()
 
         log.info(f"{'✅' if pnl >= 0 else '❌'} CLOSE {direction} {symbol} ({close_action}) | P&L ${pnl:+.2f} | Reason: {reason}")
-        with _trades_lock:
-            recently_closed[symbol] = datetime.now(timezone.utc).isoformat()
-            del active_trades[_trade_key]
+        if _is_partial:
+            _safe_update_trade(_trade_key, {"qty": info["qty"] - sell_qty, "status": "ACTIVE"})
+            log.info(f"[TRIM] {symbol}: sold {sell_qty}, {info['qty'] - sell_qty} remaining")
+        else:
+            with _trades_lock:
+                recently_closed[symbol] = datetime.now(timezone.utc).isoformat()
+                del active_trades[_trade_key]
         return True
 
     except Exception as e:
         log.error(f"Sell failed {symbol}: {e}")
+        _safe_update_trade(_trade_key, {"status": "ACTIVE"})
         try:
             from learning import _append_audit_event
             _append_audit_event(
@@ -1525,6 +1533,38 @@ def reconcile_with_ibkr(ib: IB):
                             "status":    "ACTIVE",
                             "_price_sources": src_desc,
                         })
+
+                        # Reattach or re-submit SL bracket order for the recovered position
+                        close_action = "BUY" if direction == "SHORT" else "SELL"
+                        try:
+                            sl_id = None
+                            for open_trade in ib.openTrades():
+                                if (open_trade.contract.symbol != sym or
+                                        open_trade.orderStatus.status not in ("Submitted", "PreSubmitted")):
+                                    continue
+                                ot = open_trade.order.orderType
+                                oa = open_trade.order.action.upper()
+                                if ot in ("STP", "TRAIL") and oa == close_action:
+                                    sl_id = open_trade.order.orderId
+                                    break
+                            if sl_id:
+                                _safe_update_trade(key, {"sl_order_id": sl_id})
+                                log.info(f"Reconcile {key}: reattached SL order {sl_id}")
+                            else:
+                                rc = get_contract(sym)
+                                ib.qualifyContracts(rc)
+                                new_sl = StopOrder(close_action, qty, sl,
+                                                   account=CONFIG["active_account"],
+                                                   tif="GTC", outsideRth=True)
+                                sl_trade = ib.placeOrder(rc, new_sl)
+                                ib.sleep(0.2)
+                                _safe_update_trade(key, {"sl_order_id": sl_trade.order.orderId})
+                                log.warning(
+                                    f"Reconcile {key}: re-submitted orphaned SL @ ${sl:.2f} "
+                                    f"(id={sl_trade.order.orderId})"
+                                )
+                        except Exception as _e:
+                            log.warning(f"Reconcile {key}: could not restore bracket orders: {_e}")
                 else:
                     # Update prices for existing tracked positions (prop-014: under lock)
                     mult = 100 if is_option else 1
@@ -1924,19 +1964,27 @@ _option_sell_attempts: dict = {}   # opt_key → {"count": int, "last_try": date
 _MAX_OPTION_SELL_RETRIES = 3       # after this many failures, pause retries for cooldown
 _OPTION_SELL_COOLDOWN = 600        # seconds (10 min) before retrying after max failures
 
+# Exits requested while the options market was closed — flushed on next open cycle
+_pending_option_exits: dict = {}   # opt_key → original reason string
 
-def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
+
+def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_override: int = None) -> bool:
     """
     Close an open options position using a limit order at the current bid.
-    IBKR (especially paper) rejects MKT orders on illiquid options, so we use
-    an aggressive LMT at the bid price (or mid if bid unavailable).
+    IBKR rejects MKT and midpoint LMT orders on illiquid/falling options, so we
+    always start at the bid price. On repeated failures we step 5% below bid per
+    retry to chase the market (bid → bid*0.95 → bid*0.90 ...).
     opt_key format: SYMBOL_RIGHT_STRIKE_EXPIRY  (e.g. NVDA_C_180_2026-04-01)
     Returns True if order filled.
     """
     # Options only trade during regular market hours (9:30–16:00 ET)
     if not is_options_market_open():
         now_et = datetime.now(_ET)
-        log.warning(f"Options market closed ({now_et.strftime('%H:%M ET')}) — cannot sell {opt_key}")
+        log.warning(
+            f"Options market closed ({now_et.strftime('%H:%M ET')}) — "
+            f"deferring exit for {opt_key} until next open"
+        )
+        _pending_option_exits[opt_key] = reason
         return False
 
     if opt_key not in active_trades:
@@ -1951,9 +1999,12 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
     if pos.get("status") == "EXITING":
         log.info(f"Exit already in flight for {opt_key} — skipping duplicate")
         return False
-    _safe_update_trade(opt_key, {"status": "EXITING"})
+
+    _is_partial = contracts_override is not None and contracts_override < pos["contracts"]
+    sell_contracts = contracts_override if _is_partial else pos["contracts"]
 
     # ── Retry gating: don't spam IBKR with the same failing order ──
+    # Check BEFORE setting EXITING so we don't lock the position on a cooldown skip
     attempts = _option_sell_attempts.get(opt_key, {"count": 0, "last_try": datetime.min})
     if attempts["count"] >= _MAX_OPTION_SELL_RETRIES:
         elapsed = (datetime.now(timezone.utc) - attempts["last_try"]).total_seconds()
@@ -1970,9 +2021,13 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
                 reason=reason,
                 note="Position stuck — max retries hit. Manual review required.",
             )
-            return False
-        # Cooldown expired — reset counter and retry
-        attempts["count"] = 0
+            return False  # status is still ACTIVE — not stuck
+
+        # Cooldown expired — reset to 1 (not 0) so we stay on the bid path
+        # rather than falling back to a midpoint-style first attempt
+        attempts["count"] = 1
+
+    _safe_update_trade(opt_key, {"status": "EXITING"})
 
     try:
         option_contract = Option(
@@ -1995,39 +2050,55 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
         ask = getattr(ticker, 'ask', None)
         last = getattr(ticker, 'last', None)
 
-        # Determine limit price: mid → bid → last → current_premium
+        # Determine order direction: SHORT positions close with BUY, LONG with SELL
+        _is_short = pos.get("direction", "LONG").upper() == "SHORT"
+        _close_action = "BUY" if _is_short else "SELL"
+
+        # Determine limit price.
+        # SELL-to-close (long position): price at bid and step down aggressively.
+        # BUY-to-close (short position): price at ask and step up aggressively to ensure fill.
         import math as _m
         _bid_ok = bid is not None and not _m.isnan(bid) and bid > 0
         _ask_ok = ask is not None and not _m.isnan(ask) and ask > 0
         _retry_count = attempts["count"]  # 0 on first attempt, 1+ on retries
-        if _bid_ok and _ask_ok:
-            if _retry_count == 0:
-                limit_price = round((bid + ask) / 2, 2)  # first attempt: mid
+        _step = _retry_count
+        if _is_short:
+            # BUY-to-close: offer at ask, step 5% ABOVE ask each retry to chase fills
+            _premium = round(1.0 + (_step * 0.05), 2)  # 1.00, 1.05, 1.10 ...
+            if _ask_ok:
+                limit_price = round(ask * _premium, 2)
+            elif last and not _m.isnan(last) and last > 0:
+                limit_price = round(last * 1.03 * _premium, 2)
             else:
-                limit_price = round(bid, 2)               # retry: bid to match buyers
-        elif _bid_ok:
-            limit_price = round(bid, 2)
-        elif last and not _m.isnan(last) and last > 0:
-            limit_price = round(last * 0.97, 2)  # 3% below last as safety
+                limit_price = round(pos.get("current_premium", 0.10) * 1.10, 2)
         else:
-            limit_price = round(pos.get("current_premium", 0.01) * 0.95, 2)
+            # SELL-to-close (long position): price at bid and step down aggressively.
+            _discount = round(1.0 - (_step * 0.05), 2)  # 1.00, 0.95, 0.90 ...
+            if _bid_ok:
+                limit_price = round(bid * _discount, 2)
+            elif last and not _m.isnan(last) and last > 0:
+                limit_price = round(last * 0.97 * _discount, 2)
+            else:
+                limit_price = round(pos.get("current_premium", 0.01) * 0.95, 2)
 
-        # On final attempt, if bid is near-zero accept $0.01 for near-worthless options
-        if _retry_count >= _MAX_OPTION_SELL_RETRIES - 1 and _bid_ok and bid <= 0.02:
-            limit_price = 0.01
-        # Floor at $0.01 — can't send a zero-price limit
-        limit_price = max(limit_price, 0.01)
+            # On final attempt, if bid is near-zero accept $0.01 for near-worthless options
+            if _retry_count >= _MAX_OPTION_SELL_RETRIES - 1 and _bid_ok and bid <= 0.02:
+                limit_price = 0.01
+            # Floor at $0.05 — IBKR minimum tick for US equity options (below $3)
+            # Do NOT apply floor when bid is itself below $0.05 (near-worthless option)
+            if not (_bid_ok and bid < 0.05):
+                limit_price = max(limit_price, 0.05)
 
         ib.cancelMktData(option_contract)
 
-        sell_order = LimitOrder("SELL", pos["contracts"], limit_price,
+        sell_order = LimitOrder(_close_action, sell_contracts, limit_price,
                                 account=CONFIG["active_account"],
                                 tif="DAY")
         sell_order.outsideRth = False
         opt_sell_trade = ib.placeOrder(option_contract, sell_order)
 
-        log.info(f"Option LMT sell placed: {opt_key} x{pos['contracts']} @ ${limit_price:.2f} "
-                 f"(bid={bid}, ask={ask})")
+        log.info(f"Option LMT {_close_action} placed: {opt_key} x{sell_contracts} @ ${limit_price:.2f} "
+                 f"(bid={bid}, ask={ask}, direction={pos.get('direction', 'LONG')})")
 
         # Wait for fill confirmation — options can take a moment
         # On retries, use 25s to give the more-aggressive price more time to fill
@@ -2040,6 +2111,19 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
 
         order_status = opt_sell_trade.orderStatus.status
         if order_status != "Filled":
+            # Handle partial fills: IBKR reports "Cancelled" even when some contracts filled
+            filled_qty = int(opt_sell_trade.orderStatus.filled or 0)
+            if filled_qty > 0:
+                remaining = pos["contracts"] - filled_qty
+                log.info(f"[PARTIAL FILL] {opt_key}: {filled_qty} contracts filled, {remaining} remaining")
+                if remaining <= 0:
+                    # All contracts filled despite non-Filled status (paper account quirk)
+                    _option_sell_attempts.pop(opt_key, None)
+                    del active_trades[opt_key]
+                    log.info(f"[PARTIAL→FULL] {opt_key} fully closed via partial fills")
+                    return True
+                _safe_update_trade(opt_key, {"contracts": remaining})
+
             # Track failed attempt
             attempts["count"] += 1
             attempts["last_try"] = datetime.now(timezone.utc)
@@ -2056,19 +2140,35 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
             _safe_update_trade(opt_key, {"status": "ACTIVE"})
             return False
 
+        # Guard against paper-account false fills: status can briefly show "Filled"
+        # before settling as "Cancelled", but avgFillPrice stays 0 in that case.
+        # A real fill always has avgFillPrice > 0.
+        fill_price = opt_sell_trade.orderStatus.avgFillPrice
+        if not fill_price or fill_price <= 0:
+            log.warning(
+                f"Option sell {opt_key}: status=Filled but avgFillPrice=0 — "
+                f"treating as failed (paper account false positive)."
+            )
+            attempts["count"] += 1
+            attempts["last_try"] = datetime.now(timezone.utc)
+            _option_sell_attempts[opt_key] = attempts
+            try:
+                ib.cancelOrder(opt_sell_trade.order)
+            except Exception:
+                pass
+            _safe_update_trade(opt_key, {"status": "ACTIVE"})
+            return False
+
         # Success — clear retry counter
         _option_sell_attempts.pop(opt_key, None)
 
-        # Get actual fill price from the trade object
-        fill_price = opt_sell_trade.orderStatus.avgFillPrice or limit_price
-
-        # Log the option sell order
+        # Log the option close order
         log_order({
             "order_id":   opt_sell_trade.order.orderId,
             "symbol":     pos["symbol"],
-            "side":       "SELL",
+            "side":       _close_action,
             "order_type": "LMT",
-            "qty":        pos["contracts"],
+            "qty":        sell_contracts,
             "price":      limit_price,
             "status":     "FILLED",
             "instrument": "option",
@@ -2083,16 +2183,21 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
 
         entry   = pos["entry_premium"]
         current = fill_price  # use actual fill price, not stale current_premium
-        pnl     = (current - entry) * pos["contracts"] * 100
+        # Direction-aware P&L: SHORT profits when price falls (BUY-to-close at lower price)
+        if _is_short:
+            pnl = (entry - current) * sell_contracts * 100
+        else:
+            pnl = (current - entry) * sell_contracts * 100
 
         # ── Check commission report for IBKR realizedPNL (most accurate) ──
         try:
             import math as _math
             _fills = ib.fills()
+            _close_sides = ("SLD", "SELL") if _close_action == "SELL" else ("BOT", "BUY")
             opt_sell_fills = [
                 f for f in _fills
                 if f.contract.symbol == pos["symbol"]
-                and f.execution.side.upper() in ("SLD", "SELL")
+                and f.execution.side.upper() in _close_sides
                 and _is_option_contract(f.contract)
             ]
             for f in opt_sell_fills:
@@ -2127,16 +2232,44 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
         )
 
         log.info(
-            f"{'✅' if pnl >= 0 else '❌'} SELL {pos['right']} {pos['symbol']} "
+            f"{'✅' if pnl >= 0 else '❌'} {_close_action} {pos['right']} {pos['symbol']} "
             f"${pos['strike']:.0f} | P&L ${pnl:+.2f} | {reason}"
         )
-        recently_closed[pos["symbol"]] = datetime.now(timezone.utc).isoformat()
-        del active_trades[opt_key]
+        if _is_partial:
+            remaining_c = pos["contracts"] - sell_contracts
+            _safe_update_trade(opt_key, {"contracts": remaining_c, "qty": remaining_c, "status": "ACTIVE"})
+            log.info(f"[TRIM] {opt_key}: sold {sell_contracts} contracts, {remaining_c} remaining")
+        else:
+            recently_closed[pos["symbol"]] = datetime.now(timezone.utc).isoformat()
+            del active_trades[opt_key]
         return True
 
     except Exception as e:
         log.error(f"Option sell failed {opt_key}: {e}")
+        # Count exception failures so the retry/cooldown system still gates them
+        _exc_att = _option_sell_attempts.get(opt_key, {"count": 0, "last_try": datetime.now(timezone.utc)})
+        _exc_att["count"] += 1
+        _exc_att["last_try"] = datetime.now(timezone.utc)
+        _option_sell_attempts[opt_key] = _exc_att
+        _safe_update_trade(opt_key, {"status": "ACTIVE"})
         return False
+
+
+def flush_pending_option_exits(ib: IB) -> None:
+    """
+    Execute any option exits that were deferred because the market was closed.
+    Called at the top of each scan cycle — safe to call always, no-ops if nothing pending.
+    """
+    if not _pending_option_exits or not is_options_market_open():
+        return
+    for opt_key, reason in list(_pending_option_exits.items()):
+        if opt_key not in active_trades:
+            log.info(f"Deferred exit {opt_key} dropped — position no longer tracked")
+            _pending_option_exits.pop(opt_key, None)
+            continue
+        log.info(f"Flushing deferred option exit: {opt_key} (original reason: {reason})")
+        _pending_option_exits.pop(opt_key, None)
+        execute_sell_option(ib, opt_key, reason=f"deferred:{reason}")
 
 
 # ── DUAL-TRANCHE STATUS ───────────────────────────────────────────────────────

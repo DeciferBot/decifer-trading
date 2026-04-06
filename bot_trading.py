@@ -30,7 +30,7 @@ from orders import (execute_buy, execute_sell, flatten_all,
                     get_open_positions, update_position_prices,
                     update_positions_from_ibkr, execute_buy_option,
                     execute_sell_option, update_trailing_stops,
-                    update_tranche_status)
+                    update_tranche_status, flush_pending_option_exits)
 from options import find_best_contract, check_options_exits
 from options_scanner import scan_options_universe
 from risk import (check_risk_conditions, get_session, get_scan_interval,
@@ -485,7 +485,20 @@ def check_options_positions():
             if sold:
                 dash["positions"] = get_open_positions()
             else:
-                clog("WARN", f"Option sell failed for {opt_key} — will retry next cycle (with backoff)")
+                from orders import (_pending_option_exits, _option_sell_attempts,
+                                    _MAX_OPTION_SELL_RETRIES, _OPTION_SELL_COOLDOWN)
+                if opt_key in _pending_option_exits:
+                    clog("INFO", f"Options market closed — {opt_key} queued for next open")
+                else:
+                    _att = _option_sell_attempts.get(opt_key, {})
+                    _cnt = _att.get("count", 0)
+                    if _cnt >= _MAX_OPTION_SELL_RETRIES:
+                        from datetime import timezone as _tz
+                        _elapsed = (datetime.now(_tz.utc) - _att.get("last_try", datetime.min.replace(tzinfo=_tz.utc))).total_seconds()
+                        _remaining = max(0, int(_OPTION_SELL_COOLDOWN - _elapsed))
+                        clog("WARN", f"Option sell cooling down for {opt_key} — {_cnt} failures, {_remaining}s remaining")
+                    else:
+                        clog("WARN", f"Option sell failed for {opt_key} — will retry next cycle (attempt {_cnt}/{_MAX_OPTION_SELL_RETRIES})")
     except Exception as e:
         clog("ERROR", f"Options position check error: {e}")
 
@@ -843,6 +856,7 @@ def run_scan():
     update_positions_from_ibkr(ib)
     update_tranche_status(ib)
     update_trailing_stops(ib)
+    flush_pending_option_exits(ib)
     dash["positions"] = get_open_positions()
 
     if get_session() == "OVERNIGHT":
@@ -1045,8 +1059,32 @@ def run_scan():
                                 "reason":     f"portfolio_manager:{pm_trigger}",
                             },
                         )
-                elif act_pm in ("TRIM", "ADD"):
-                    clog("INFO", f"Portfolio manager {act_pm}: {sym_pm} — {reason_pm} (manual review)")
+                elif act_pm == "TRIM" and sym_pm:
+                    from orders import open_trades as _pm_trades, _trades_lock as _pm_lock
+                    _opt_keys_pm = [k for k in _pm_trades
+                                    if k.startswith(sym_pm + "_") and _pm_trades[k].get("instrument") == "option"]
+                    _has_pos = bool(_opt_keys_pm) or sym_pm in _pm_trades
+                    if not _has_pos:
+                        clog("WARN", f"PM TRIM: no active position found for {sym_pm}")
+                    else:
+                        clog("TRADE", f"Portfolio manager TRIM: {sym_pm} — {reason_pm}")
+                        if _opt_keys_pm:
+                            for _ok in _opt_keys_pm:
+                                with _pm_lock:
+                                    _c = _pm_trades.get(_ok, {}).get("contracts", 0)
+                                _trim_c = max(1, _c // 2)
+                                execute_sell_option(ib, _ok,
+                                                    reason=f"portfolio_manager_trim:{pm_trigger}",
+                                                    contracts_override=_trim_c if _trim_c < _c else None)
+                        if sym_pm in _pm_trades:
+                            with _pm_lock:
+                                _q = _pm_trades.get(sym_pm, {}).get("qty", 0)
+                            _trim_q = max(1, _q // 2)
+                            execute_sell(ib, sym_pm,
+                                         reason=f"portfolio_manager_trim:{pm_trigger}",
+                                         qty_override=_trim_q if _trim_q < _q else None)
+                elif act_pm == "ADD":
+                    clog("INFO", f"Portfolio manager ADD: {sym_pm} — {reason_pm} (manual review)")
                 else:
                     clog("INFO", f"Portfolio manager HOLD: {sym_pm} — {reason_pm}")
             # Log all actions to audit log

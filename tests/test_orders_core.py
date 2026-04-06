@@ -1082,3 +1082,121 @@ class TestReconcileWithIbkr:
 
             assert "MSFT" not in orders.active_trades
             ib.openTrades.assert_not_called()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TESTS: execute_sell_option — bid pricing + retry discount
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestExecuteSellOptionPricing:
+    """Test that execute_sell_option uses bid on attempt 0 and steps down on retries."""
+
+    OPT_KEY = "GSAT_C_35.0_2026-06-20"
+
+    def _opt_pos(self):
+        return {
+            "symbol":          "GSAT",
+            "instrument":      "option",
+            "right":           "C",
+            "strike":          35.0,
+            "expiry_ibkr":     "20260620",
+            "expiry_str":      "2026-06-20",
+            "contracts":       99,
+            "entry":           3.50,
+            "entry_premium":   3.50,
+            "current_premium": 2.50,
+            "direction":       "LONG",
+        }
+
+    def _make_ib(self, bid=2.00, ask=2.20, fill=False):
+        """Return a minimal IB mock. fill=True simulates a filled order."""
+        ib = MagicMock()
+        ticker = MagicMock()
+        ticker.bid  = bid
+        ticker.ask  = ask
+        ticker.last = bid
+        ib.reqMktData.return_value = ticker
+
+        trade = MagicMock()
+        trade.orderStatus.status = "Filled" if fill else "Cancelled"
+        trade.orderStatus.avgFillPrice = bid if fill else None
+        ib.placeOrder.return_value = trade
+        return ib
+
+    def _run_sell(self, mock_config, ib, retry_count=0, elapsed_past_cooldown=False):
+        """Helper: set up state, patch heavy deps, run execute_sell_option, return limit price.
+
+        Uses sys.modules["orders"] rather than the module-level `orders` reference so that
+        test_orders_guard.py's importlib.reload(orders) — which replaces sys.modules["orders"]
+        with a new object — doesn't cause patch() to target a different module than the one
+        execute_sell_option runs in.
+        """
+        import sys as _sys
+        from datetime import timedelta
+
+        # Always work with the live module — guards against post-reload stale references
+        _om = _sys.modules["orders"]
+
+        _om.active_trades.clear()
+        _om._option_sell_attempts.clear()
+
+        if elapsed_past_cooldown:
+            _om._option_sell_attempts[self.OPT_KEY] = {
+                "count": _om._MAX_OPTION_SELL_RETRIES,
+                "last_try": datetime.now(timezone.utc) - timedelta(seconds=_om._OPTION_SELL_COOLDOWN + 1),
+            }
+        elif retry_count > 0:
+            _om._option_sell_attempts[self.OPT_KEY] = {
+                "count": retry_count,
+                "last_try": datetime.now(timezone.utc),
+            }
+
+        _om.active_trades[self.OPT_KEY] = self._opt_pos()
+
+        captured = {}
+
+        def fake_limit_order(side, qty, price, **kwargs):
+            captured["price"] = price
+            obj = MagicMock()
+            obj.lmtPrice = price
+            return obj
+
+        with patch("orders.is_options_market_open", return_value=True), \
+             patch("orders.log_order"), \
+             patch("learning.log_order"), \
+             patch("learning._save_orders"), \
+             patch("learning._save_trades"), \
+             patch("orders.record_win"), \
+             patch("orders.record_loss"), \
+             patch("orders.CONFIG") as mock_cfg, \
+             patch("orders.LimitOrder", side_effect=fake_limit_order), \
+             patch("learning.log_trade"):
+            mock_cfg.__getitem__.side_effect = lambda k: mock_config[k]
+            mock_cfg.get = lambda k, d=None: mock_config.get(k, d)
+            _om.execute_sell_option(ib, self.OPT_KEY, reason="test")
+
+        return captured.get("price")
+
+    def test_attempt_0_uses_bid(self, mock_config):
+        """First attempt must place the order at bid (not midpoint)."""
+        ib = self._make_ib(bid=2.00, ask=2.20, fill=True)
+        limit = self._run_sell(mock_config, ib, retry_count=0)
+        assert limit == 2.00, f"Expected bid 2.00, got {limit}"
+
+    def test_retry_1_steps_to_bid_95(self, mock_config):
+        """Second attempt (retry_count=1) must use bid * 0.95."""
+        ib = self._make_ib(bid=2.00, ask=2.20, fill=True)
+        limit = self._run_sell(mock_config, ib, retry_count=1)
+        assert limit == round(2.00 * 0.95, 2), f"Expected 1.90, got {limit}"
+
+    def test_retry_2_steps_to_bid_90(self, mock_config):
+        """Third attempt (retry_count=2) must use bid * 0.90."""
+        ib = self._make_ib(bid=2.00, ask=2.20, fill=True)
+        limit = self._run_sell(mock_config, ib, retry_count=2)
+        assert limit == round(2.00 * 0.90, 2), f"Expected 1.80, got {limit}"
+
+    def test_cooldown_reset_stays_on_bid_path(self, mock_config):
+        """After cooldown expires, count resets to 1 — stays on bid*0.95 path, not midpoint."""
+        ib = self._make_ib(bid=2.00, ask=2.20, fill=True)
+        limit = self._run_sell(mock_config, ib, elapsed_past_cooldown=True)
+        assert limit == round(2.00 * 0.95, 2), f"Expected 1.90 after cooldown reset, got {limit}"
