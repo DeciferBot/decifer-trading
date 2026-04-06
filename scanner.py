@@ -421,21 +421,36 @@ def get_market_regime(ib: IB) -> dict:
             df.columns = df.columns.get_level_values(0)
         return df
 
+    def _regime_download(symbol, **kwargs):
+        """Isolated yfinance download for regime detection — uses its own session
+        so concurrent bulk downloads (61 tickers via shared _YF_SESSION) don't
+        starve these calls and cause None returns."""
+        import requests as _req
+        _session = _req.Session()
+        for attempt in range(3):
+            try:
+                import yfinance as _yf
+                df = _yf.download(symbol, session=_session, progress=False, **kwargs)
+                if df is not None and len(df) > 0:
+                    return _flat(df)
+            except Exception:
+                pass
+            if attempt < 2:
+                import time as _t; _t.sleep(1)
+        return None
+
     try:
-        spy = _flat(_safe_download("SPY",  period="5d", interval="1h", progress=False, auto_adjust=True))
-        qqq = _flat(_safe_download("QQQ",  period="5d", interval="1h", progress=False, auto_adjust=True))
+        spy = _regime_download("SPY",  period="5d", interval="1h", auto_adjust=True)
+        qqq = _regime_download("QQQ",  period="5d", interval="1h", auto_adjust=True)
 
         vix = None
         for vix_ticker in ["^VIX", "VIX", "VIXY"]:
-            try:
-                vix = _flat(_safe_download(vix_ticker, period="5d", interval="1h", progress=False, auto_adjust=True))
-                if vix is not None and len(vix) > 0:
-                    break
-            except Exception:
-                continue
+            vix = _regime_download(vix_ticker, period="5d", interval="1h", auto_adjust=True)
+            if vix is not None and len(vix) > 0:
+                break
 
         if vix is None or len(vix) == 0:
-            vix = _flat(_safe_download("VIXY", period="5d", interval="1d", progress=False, auto_adjust=True))
+            vix = _regime_download("VIXY", period="5d", interval="1d", auto_adjust=True)
 
         if spy is None or len(spy) == 0:
             log.warning("get_market_regime: SPY 1h fetch returned None — using last good regime")
@@ -503,10 +518,8 @@ def get_market_regime(ib: IB) -> dict:
         spy_200d_ma    = None
         qqq_200d_ma    = None
         try:
-            spy_daily = _flat(_safe_download("SPY", period="1y", interval="1d",
-                                             progress=False, auto_adjust=True))
-            qqq_daily = _flat(_safe_download("QQQ", period="1y", interval="1d",
-                                             progress=False, auto_adjust=True))
+            spy_daily = _regime_download("SPY", period="1y", interval="1d", auto_adjust=True)
+            qqq_daily = _regime_download("QQQ", period="1y", interval="1d", auto_adjust=True)
             if spy_daily is not None and len(spy_daily) >= 50:
                 spy_d_close   = spy_daily["Close"].squeeze().dropna()
                 spy_200d_ma   = float(spy_d_close.rolling(min(200, len(spy_d_close))).mean().iloc[-1])
@@ -534,8 +547,7 @@ def get_market_regime(ib: IB) -> dict:
         if breadth_cfg.get("enabled", True):
             try:
                 _bt = breadth_cfg.get("ticker", "^MMTH")
-                _bd = _flat(_safe_download(_bt, period="5d", interval="1d",
-                                           progress=False, auto_adjust=True))
+                _bd = _regime_download(_bt, period="5d", interval="1d", auto_adjust=True)
                 if _bd is not None and len(_bd) > 0:
                     breadth_pct = float(_bd["Close"].squeeze().dropna().iloc[-1])
             except Exception as _be:
