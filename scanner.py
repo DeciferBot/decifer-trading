@@ -421,22 +421,20 @@ def get_market_regime(ib: IB) -> dict:
             df.columns = df.columns.get_level_values(0)
         return df
 
-    def _regime_download(symbol, **kwargs):
-        """Isolated yfinance download for regime detection — uses its own session
-        so concurrent bulk downloads (61 tickers via shared _YF_SESSION) don't
-        starve these calls and cause None returns."""
-        import requests as _req
-        _session = _req.Session()
+    def _regime_download(symbol, period="5d", interval="1h", auto_adjust=True, **_ignored):
+        """Download via Ticker.history() — completely separate code path from
+        yf.download(), avoids shared session / crumb contention with bulk downloads."""
+        import yfinance as _yf, time as _t
         for attempt in range(3):
             try:
-                import yfinance as _yf
-                df = _yf.download(symbol, session=_session, progress=False, **kwargs)
+                df = _yf.Ticker(symbol).history(period=period, interval=interval,
+                                                auto_adjust=auto_adjust)
                 if df is not None and len(df) > 0:
-                    return _flat(df)
-            except Exception:
-                pass
+                    return df  # Ticker.history() already returns flat columns
+            except Exception as _e:
+                log.debug(f"_regime_download {symbol} attempt {attempt+1} failed: {_e}")
             if attempt < 2:
-                import time as _t; _t.sleep(1)
+                _t.sleep(2)
         return None
 
     try:
