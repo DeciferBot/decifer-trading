@@ -437,6 +437,18 @@ def get_market_regime(ib: IB) -> dict:
         if vix is None or len(vix) == 0:
             vix = _flat(_safe_download("VIXY", period="5d", interval="1d", progress=False, auto_adjust=True))
 
+        if spy is None or len(spy) == 0:
+            log.warning("get_market_regime: SPY 1h fetch returned None — using last good regime")
+            if _last_good_regime:
+                return _last_good_regime
+            raise ValueError("SPY data unavailable and no cached regime")
+
+        if qqq is None or len(qqq) == 0:
+            log.warning("get_market_regime: QQQ 1h fetch returned None — using last good regime")
+            if _last_good_regime:
+                return _last_good_regime
+            raise ValueError("QQQ data unavailable and no cached regime")
+
         spy_close = spy["Close"].squeeze()
         qqq_close = qqq["Close"].squeeze()
         vix_close = vix["Close"].squeeze() if vix is not None and len(vix) > 0 else None
