@@ -1,0 +1,49 @@
+{
+  "date": "2026-04-06",
+  "title": "Bug fixes: order lifecycle + options exit + alpha validation investigation",
+  "branch": "master",
+  "commit": "5a4662a",
+  "session_type": "bug_fix + investigation",
+  "approved_by": "Amit",
+
+  "strategic_gate_check": {
+    "ic_computing_real_values": "CLEARED — reversion=+0.12, breakout=+0.08, momentum=+0.06 leading. HHI cap applied.",
+    "win_rate_trend_understood": "IN PROGRESS — score=0 anomaly explained (IBKR historical imports). Gate kept until 40+ signal-driven closed trades available for IC correlation."
+  },
+
+  "deliverables": [
+    {
+      "item": "IC test regression fix",
+      "detail": "test_positive_correlation_detected and test_negative_correlation_detected failed because 30 records used a single symbol on a single date. The cross-sectional IC methodology requires ≥10 symbols per trading date. Fixed: 30 distinct symbols, min_valid=1. 1,617 tests passing."
+    },
+    {
+      "item": "execute_sell() options composite key fix",
+      "detail": "Portfolio manager EXIT for options positions (GSAT, LUNR) was silently returning False. execute_sell() did a direct active_trades[symbol] lookup but options are stored under composite keys like 'GSAT_C_35.0_2026-04-17'. Fixed: search by symbol field when direct key misses; reconstruct option contract from stored expiry/strike/right."
+    },
+    {
+      "item": "Position lifecycle state machine",
+      "detail": "No EXITING state existed. PM was issuing EXIT 11+ times for the same symbol (ONDS) while the signal pipeline immediately re-entered. Added: EXITING status to active_trades (set atomically before order placement, reset on failed option sells), recently_closed TTL dict, reentry_cooldown_minutes=30 config, early-exit gates in execute_buy(), execute_sell(), execute_sell_option(), signal_dispatcher, and bot_trading PM handler."
+    },
+    {
+      "item": "Alpha validation investigation",
+      "detail": "Score=0 anomaly: 87/108 closed trades are IBKR historical imports (activity statements March 23-25) with no signal pipeline involvement — not a bug. Win rate 33.3% is mechanically explained by 2:1 SL:TP ratio. Gate kept — insufficient signal-driven closed trades (~13) for IC correlation."
+    }
+  ],
+
+  "system_state": {
+    "tests_passing": 1617,
+    "tests_failing": 0,
+    "win_rate": "33.3% (36W/72L, 108 closed)",
+    "signal_driven_closed_trades": "~13 (need 40 for IC validation)",
+    "ic_status": "live — reversion dominant (0.40 weight)",
+    "open_options_bleeding": "GSAT (-42% from entry, stop at -50%), LUNR (-22% from entry, stop at -50%) — stops not yet hit, holding correctly per config",
+    "portfolio_equity": "$1,218,044"
+  },
+
+  "bugs_found_not_fixed": [
+    "execute_sell_option() returns False outside options market hours — PM EXIT calls at non-market hours are silently discarded. To investigate.",
+    "Stop orders on GSAT/LUNR may have been cancelled by close_position() called from dashboard — no mechanism to re-submit orphaned stops."
+  ],
+
+  "gate_decision": "KEEP — alpha validation gate remains. No new features. Bug fixes allowed. Next check when signal-driven closed trades reach 40."
+}

@@ -1,0 +1,65 @@
+{
+  "id": "feat-alpha-validation",
+  "title": "Alpha Validation Gate — prove edge before any new features",
+  "status": "in_progress",
+  "created": "2026-04-05",
+  "updated": "2026-04-06",
+  "owner": "Amit",
+  "priority": "P0",
+
+  "decision": "The system is in paper trading. The only work that matters right now is proving the signal has edge. No new features, data sources, or infrastructure changes until the two validation conditions below are met.",
+
+  "why": "Every session was finding a new problem and patching it tactically. Data sources, APIs, scrapers, IC weights — none of it compounds if the core signal has no predictive power. Better data does not fix a bad signal.",
+
+  "validation_conditions": [
+    {
+      "condition": "IC is computing real values",
+      "status": "cleared",
+      "cleared_date": "2026-04-06",
+      "detail": "IC unblocked ahead of the April 9 estimate. ic_weights.json now shows real non-null values: reversion=+0.12, breakout=+0.08, momentum=+0.06, trend=-0.02, flow=-0.02, news=-0.04, squeeze=-0.10, mtf=-0.11. HHI cap applied. reversion is dominant weight (0.40). 60 records used.",
+      "metric": "raw_ic in ic_weights.json shows non-null values for at least trend, momentum, flow, mtf — MET"
+    },
+    {
+      "condition": "Win rate trend is understood",
+      "status": "in_progress",
+      "detail": "2026-04-06 investigation: Score=0 anomaly explained — 87 of 108 closed trades are IBKR historical imports (activity statements from March 23-25), predating the signal pipeline. They have no signal_scores by design. Only ~13 internally-logged signal-driven trades are closed — insufficient for IC→outcome correlation. Win rate is 33.3% (36W/72L across all 108 closed). Breakdown: TP hits = 100% win (31 trades), SL hits = 0% win (64 trades), PM exits = 20% win. The 33% rate is mechanically explained by the 2:1 SL:TP ratio in bracket orders — not obviously a signal quality failure. Gate kept until we have 40-50 signal-driven closed trades for IC correlation analysis.",
+      "metric": "40+ signal-driven closed trades with non-empty signal_scores; can show IC weight correlation with outcome. Currently ~13."
+    }
+  ],
+
+  "what_is_blocked_until_done": [
+    "New data sources (Alpha Vantage sentiment, ApexVol IV rank, etc.)",
+    "Infrastructure changes beyond what is already in",
+    "Signal dimension tuning",
+    "Options strategy changes",
+    "Any new features"
+  ],
+
+  "what_is_allowed": [
+    "Bug fixes in existing order execution, position lifecycle, IC pipeline",
+    "Reading and analysing existing data",
+    "Session logs and spec updates"
+  ],
+
+  "findings_log": [
+    {
+      "date": "2026-04-05",
+      "finding": "IC never computed real values — forward return horizon (6 days) exceeded available record age. Score=0 anomaly observed. Win rate 34% across 103 closed trades."
+    },
+    {
+      "date": "2026-04-06",
+      "finding": "IC cleared ahead of schedule — 60 mature records now available. Score=0 anomaly fully explained: 87/108 closed trades are IBKR historical imports with no signal pipeline involvement. Win rate 33.3%, dominated by 2:1 SL:TP ratio. Gate kept — need 40+ signal-driven closed trades for IC validation."
+    },
+    {
+      "date": "2026-04-06",
+      "finding": "Bugs fixed this session: (1) execute_sell() now finds options positions under composite keys — PM EXIT was silently failing for GSAT/LUNR. (2) Position lifecycle state machine added — EXITING status, recently_closed TTL, re-entry cooldown. (3) IC tests fixed after cross-sectional IC methodology change."
+    }
+  ],
+
+  "next_actions": [
+    "Let signal-driven trades accumulate — check again at 40 closed signal-driven trades",
+    "When 40 closed trades reached: correlate entry IC weight bucket vs win/loss outcome",
+    "Monitor reversion dimension (dominant weight 0.40) — verify it's predicting correctly",
+    "Track: are higher-score entries producing better outcomes?"
+  ]
+}
