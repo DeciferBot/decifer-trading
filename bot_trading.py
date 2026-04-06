@@ -168,8 +168,8 @@ def _synthesize_trade_card(symbol: str, company_name: str,
 def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
                          portfolio_value: float) -> None:
     """
-    Write data/last_decision.json after a successful BUY so Chief Decifer
-    can display a rich trade card on its home page.
+    Write data/last_decision.json after a successful trade so Chief Decifer
+    can display a rich trade card on its home page. Works for LONG and SHORT.
     """
     import json, os, re
     from pathlib import Path
@@ -254,16 +254,22 @@ def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
     if not risk:
         risk = "No specific risk identified by devil's advocate this cycle."
 
+    direction = buy.get("direction", "LONG")
+
     # ── Price targets — honest representation of stops ────────────────────────
-    # Labelled as targets, not forecasts. BUY requires tp > price to be valid.
+    # Labelled as targets, not forecasts. Validated per direction.
     price_targets: dict = {}
-    if price > 0 and tp > price and sl > 0 and sl < price:
-        tp_pct = round((tp - price) / price * 100, 1)
-        sl_pct = round((price - sl) / price * 100, 1)
+    if direction == "LONG":
+        valid_targets = price > 0 and tp > price and sl > 0 and sl < price
+    else:  # SHORT
+        valid_targets = price > 0 and tp < price and sl > 0 and sl > price
+    if valid_targets:
+        tp_pct = round(abs(tp - price) / price * 100, 1)
+        sl_pct = round(abs(price - sl) / price * 100, 1)
         rr     = round(tp_pct / sl_pct, 1) if sl_pct else 0
         price_targets = {
-            "target_pct": tp_pct,
-            "stop_pct":   -sl_pct,
+            "target_pct": tp_pct if direction == "LONG" else -tp_pct,
+            "stop_pct":   -sl_pct if direction == "LONG" else sl_pct,
             "rr_ratio":   rr,
             "target_price": round(tp, 2),
             "stop_price":   round(sl, 2),
@@ -272,7 +278,7 @@ def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
     payload = {
         "symbol":          symbol,
         "company_name":    company_name,
-        "direction":       "BUY",
+        "direction":       direction,
         "allocation_pct":  alloc,
         "price":           round(price, 2),
         "qty":             qty,
@@ -1274,7 +1280,7 @@ def run_scan():
                 atr=sig["atr"],
                 candle_gate=sig.get("candle_gate", "UNKNOWN"),
             )
-        buy_signal.direction     = "LONG"   # agents decided to buy — override pipeline direction
+        buy_signal.direction     = buy.get("direction", "LONG")  # use agent-recommended direction
         buy_signal.rationale     = reason
         buy_signal.source_agents = list(range(decision.get("agents_agreed", 0)))
 
@@ -1288,8 +1294,9 @@ def run_scan():
         )
         stock_success = any(r["success"] for r in dispatch_results)
         if stock_success:
+            trade_side = "SHORT" if buy.get("direction") == "SHORT" else "BUY"
             dash["trades"].insert(0, {
-                "side": "BUY", "symbol": sym,
+                "side": trade_side, "symbol": sym,
                 "price": str(sig["price"]),
                 "time": datetime.now().strftime("%H:%M:%S")
             })

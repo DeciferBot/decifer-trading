@@ -634,6 +634,15 @@ def calculate_stops(price: float, atr: float, direction: str) -> Tuple[float, fl
     Calculate stop loss and first take profit using ATR.
     Returns (stop_loss, take_profit_1).
     """
+    # Guard against near-zero ATR (yfinance data contamination or flat tape).
+    # 0.3% of price is the minimum viable stop distance for any liquid US equity.
+    min_atr = price * 0.003
+    if atr < min_atr:
+        log.warning(
+            f"calculate_stops: ATR {atr:.4f} below floor {min_atr:.4f} "
+            f"(0.3%% of {price}) — using floor to prevent hair-trigger stop"
+        )
+        atr = min_atr
     sl_distance = atr * CONFIG["atr_stop_multiplier"]
     tp_distance = sl_distance * CONFIG["min_reward_risk_ratio"] * 1.5
 
