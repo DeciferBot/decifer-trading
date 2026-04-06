@@ -1,12 +1,13 @@
 {
-  "version": "1.1",
-  "last_updated": "2026-03-31",
+  "version": "1.2",
+  "last_updated": "2026-04-06",
   "wip_policy": {
     "max_active": 3,
     "rationale": "Strict WIP limit prevents engineering focus dilution. No more than 3 features may be in_progress simultaneously. Pull a new feature into active only after a current one reaches shipped+tested.",
     "status_lifecycle": ["pending", "ready", "in_progress", "shipped", "validated", "resolved"],
     "active_statuses": ["in_progress"],
-    "terminal_statuses": ["shipped", "validated", "resolved"],
+    "terminal_statuses": ["shipped", "validated", "resolved", "superseded"],
+    "dependency_rule": "No feature may move to ready or in_progress while any item in its depends_on list has a non-terminal status. Enforced by tools/validate_backlog.py.",
     "phases": {
       "A": {
         "label": "Immediate — no dependencies",
@@ -24,6 +25,11 @@
       "D": {
         "label": "Regime intelligence — needs Phase C results",
         "feature_ids": ["BACK-003", "BACK-006", "BACK-014"]
+      },
+      "E": {
+        "label": "ML intelligence — needs Phase C IC validation + Phase D HMM regime detection",
+        "feature_ids": ["BACK-016", "BACK-017", "BACK-018", "BACK-019"],
+        "gate_condition": "BACK-011 (IC Phase 2) and BACK-003 (HMM) must both be shipped before any Phase E feature moves to ready"
       }
     }
   },
@@ -34,6 +40,7 @@
       "roadmap_phase": "pre-A",
       "priority": "critical",
       "status": "resolved",
+      "depends_on": [],
       "is_live_trading_gate": true,
       "gate_condition": "Must be complete and verified before Phase 4 (live trading) is permitted. phase_gate.validate() will block Phase 4 if telegram is not configured.",
       "description": "Full emergency stop accessible from web dashboard AND Telegram. Closes all open positions, cancels all pending orders, halts the bot.",
@@ -62,8 +69,8 @@
       "roadmap_phase": "A",
       "priority": "high",
       "status": "shipped",
+      "depends_on": [],
       "description": "config['agents_required_to_agree'] raised from 2 to 3. 2/6 was rubber-stamping; 3/6 requires real consensus. 5-minute config change.",
-      "dependencies": [],
       "estimated_days": 0.1,
       "created": "2026-03-29",
       "resolution": "Done — config.py agents_required_to_agree = 3"
@@ -74,8 +81,8 @@
       "roadmap_phase": "A",
       "priority": "critical",
       "status": "ready",
+      "depends_on": [],
       "description": "Scanner currently feeds only long candidates — agents never see short opportunities. Build a parallel short-side scan using TradingView Screener bearish filters + Finviz short float data.",
-      "dependencies": [],
       "estimated_days": 3,
       "files_to_modify": ["scanner.py"],
       "created": "2026-03-29"
@@ -86,8 +93,8 @@
       "roadmap_phase": "A",
       "priority": "medium",
       "status": "ready",
+      "depends_on": [],
       "description": "Track the ratio of LONG vs SHORT signals over time. Display on dashboard so bullish/bearish drift is visible at a glance.",
-      "dependencies": [],
       "estimated_days": 1,
       "files_to_modify": ["dashboard.py", "signals.py"],
       "created": "2026-03-29"
@@ -98,8 +105,8 @@
       "roadmap_phase": "B",
       "priority": "critical",
       "status": "ready",
+      "depends_on": [],
       "description": "Refactor signals.py so each dimension returns (score, direction) instead of a single bullish-biased score. Conviction and direction become separate fields.",
-      "dependencies": [],
       "estimated_days": 4,
       "files_to_modify": ["signals.py", "agents.py", "ml_engine.py", "dashboard.py"],
       "created": "2026-03-29"
@@ -109,9 +116,9 @@
       "title": "Mean-reversion dimension (roadmap #04)",
       "roadmap_phase": "B",
       "priority": "high",
-      "status": "ready",
+      "status": "pending",
+      "depends_on": ["BACK-001-signals"],
       "description": "Add a mean-reversion scoring dimension (Bollinger deviation, RSI extremes, Z-score vs 52-week range) as an 8th signal dimension.",
-      "dependencies": ["BACK-001-signals"],
       "estimated_days": 4,
       "files_to_modify": ["signals.py"],
       "created": "2026-03-29"
@@ -123,8 +130,8 @@
       "priority": "high",
       "status": "superseded",
       "superseded_by": "feat-ic-weighted-scoring",
+      "depends_on": ["BACK-001-signals", "BACK-002", "BACK-004"],
       "description": "Run Alphalens information coefficient analysis on historical signals to verify predictive power. Requires 200+ closed trades across regimes.",
-      "dependencies": ["BACK-001-signals", "BACK-002", "BACK-004"],
       "min_closed_trades_required": 200,
       "estimated_days": 4,
       "created": "2026-03-29",
@@ -137,9 +144,10 @@
       "roadmap_phase": "C",
       "priority": "high",
       "status": "pending",
-      "description": "Add IC_MIN_THRESHOLD = 0.03 noise floor to normalize_ic_weights(). Add HHI concentration cap (max 40% per dimension). Run alphalens-reloaded analysis: quantile returns, IC decay, turnover per dimension. Produce KEEP/REDUCE/REMOVE recommendation per dimension. See chief-decifer/state/specs/feat-ic-weighted-scoring.json Phase 2 for full deliverables.",
-      "depends_on_spec": "feat-ic-weighted-scoring",
+      "depends_on": [],
+      "spec_ref": "feat-ic-weighted-scoring",
       "min_closed_trades_required": 200,
+      "description": "Add IC_MIN_THRESHOLD = 0.03 noise floor to normalize_ic_weights(). Add HHI concentration cap (max 40% per dimension). Run alphalens-reloaded analysis: quantile returns, IC decay, turnover per dimension. Produce KEEP/REDUCE/REMOVE recommendation per dimension. See chief-decifer/state/specs/feat-ic-weighted-scoring.json Phase 2 for full deliverables.",
       "estimated_days": 3,
       "created": "2026-03-31"
     },
@@ -149,8 +157,8 @@
       "roadmap_phase": "D",
       "priority": "high",
       "status": "pending",
+      "depends_on": ["BACK-011"],
       "description": "Hidden Markov Model regime classifier (bull/bear/choppy) using hmmlearn. Requires 5yr historical data via yfinance. Validate after BACK-011 (Phase 2 IC validation). Feeds Phase 3 of feat-ic-weighted-scoring.",
-      "dependencies": ["BACK-011"],
       "estimated_days": 10,
       "created": "2026-03-29"
     },
@@ -161,8 +169,8 @@
       "priority": "high",
       "status": "superseded",
       "superseded_by": "feat-ic-weighted-scoring",
+      "depends_on": ["BACK-003", "BACK-005"],
       "description": "Dynamically calibrate per-dimension signal weights using walk-forward optimization. Requires HMM regime probs + Alphalens IC per dimension.",
-      "dependencies": ["BACK-003", "BACK-005"],
       "estimated_days": 10,
       "created": "2026-03-29",
       "resolved": "2026-03-31",
@@ -174,6 +182,7 @@
       "roadmap_phase": "pre-A",
       "priority": "critical",
       "status": "shipped",
+      "depends_on": [],
       "is_live_trading_gate": true,
       "gate_condition": "No new signal dimensions, no infrastructure work, and no live trading gate opens until 50 closed paper trades with positive expectancy are on the board. Enforced by phase_gate.assert_alpha_gate_passed(). See LIVE_TRADING_GATE.md.",
       "description": "Signal model has no demonstrated alpha — paper trading validation just began and no results confirmed positive. All downstream work (Phase B signal dimensions, Phase C Alphalens, Phase D HMM, infrastructure) is built on an unvalidated foundation. Added hard gate enforced in code.",
@@ -201,14 +210,36 @@
       ]
     },
     {
+      "id": "BACK-015",
+      "title": "Execution Agent — deterministic pre-trade order configurator",
+      "roadmap_phase": "pre-4",
+      "priority": "critical",
+      "status": "resolved",
+      "depends_on": [],
+      "is_live_trading_gate": false,
+      "description": "Deterministic execution planner that runs once before IBKR order placement in execute_buy(). Selects order_type (LIMIT/MKT), limit_price, aggression tier, tranche count, timeout, fallback_strategy, and per-trade FillWatcher overrides. Falls back to static CONFIG['fill_watcher'] on any exception — fallback_on_error=True means a failed execution planner never blocks a trade. Sequential stages with FillWatcher (EA configures; FW executes), not alternatives.",
+      "resolution": "execution_agent.py created 2026-04-01. Wired into orders.py execute_buy(). ADR-001 comment block added to execution_agent.py and cross-reference added to fill_watcher.py. Architecture decision documented in chief-decifer/state/sessions/2026-04-02_execution-architecture-adr.json.",
+      "created": "2026-04-01",
+      "resolved": "2026-04-02",
+      "approved_by": "Amit",
+      "adr": "chief-decifer/state/sessions/2026-04-02_execution-architecture-adr.json",
+      "files_changed": [
+        "execution_agent.py",
+        "orders.py",
+        "fill_watcher.py",
+        "tests/test_execution_agent.py",
+        "chief-decifer/state/backlog.json"
+      ]
+    },
+    {
       "id": "BACK-009",
       "title": "Feature Flag System for Signal Dimensions",
       "roadmap_phase": "A",
       "priority": "high",
       "status": "shipped",
+      "depends_on": [],
       "description": "Per-dimension boolean flags in config.py['dimension_flags']. Disabling a flag zeroes that dimension's score and removes its direction vote from compute_confluence(). Enables rapid response to decay findings without code deploys.",
       "motivation": "Signal Decay Monitor can identify a harmful dimension but had no clean way to disable it without a code change. This closes the gap.",
-      "dependencies": [],
       "estimated_days": 0.5,
       "files_changed": [
         "config.py",
@@ -226,6 +257,9 @@
       "roadmap_phase": "B",
       "priority": "medium",
       "status": "pending",
+      "depends_on": [],
+      "notes": "Requires ATR trailing stop (shipped 2026-03-31)",
+      "spec_ref": "feat-position-management",
       "description": "After a LONG position has moved +1 ATR in favour and is ACTIVE, allow the scan's agent pipeline to approve a 2nd (smaller) entry into the same symbol. Classic sizing: 50% initial, 30% 2nd layer, 20% 3rd layer. Each new layer must be funded entirely by unrealised profit so net cost basis risk never increases. Trail the full position stop up with each layer. Only applicable to trending regimes (BULL/MOMENTUM); blocked in CHOPPY/BEAR/PANIC.",
       "requirements": [
         "Min price move before 2nd entry: +1 ATR from entry",
@@ -235,10 +269,8 @@
         "Only in BULL or MOMENTUM regime",
         "Trailing stop updates to cover the entire stacked position"
       ],
-      "dependencies": ["ATR trailing stop (shipped 2026-03-31)"],
       "estimated_days": 3,
       "files_to_modify": ["orders.py", "bot.py", "config.py", "risk.py"],
-      "depends_on_spec": "feat-position-management",
       "created": "2026-03-31"
     },
     {
@@ -247,6 +279,9 @@
       "roadmap_phase": "B",
       "priority": "medium",
       "status": "pending",
+      "depends_on": [],
+      "notes": "Requires ATR trailing stop (shipped 2026-03-31)",
+      "spec_ref": "feat-position-management",
       "description": "Extend the current single-TP bracket into a 3-stage exit: TP1 closes 33% at +4% (already implemented), TP2 closes another 33% at +8%, and the final 34% rides with the ATR trailing stop to capture extended trend moves. Improves Sharpe by locking in gains at two tiers while leaving a 'free carry' tranche on the runner.",
       "requirements": [
         "TP1: close 33% at partial_exit_1_pct (existing, already in OCO bracket)",
@@ -255,10 +290,8 @@
         "All three legs must be in an OCA group so fills are mutually exclusive",
         "Config keys: partial_exit_2_pct (already defined at 0.08)"
       ],
-      "dependencies": ["ATR trailing stop (shipped 2026-03-31)"],
       "estimated_days": 2,
       "files_to_modify": ["orders.py", "config.py"],
-      "depends_on_spec": "feat-position-management",
       "created": "2026-03-31"
     },
     {
@@ -267,6 +300,9 @@
       "roadmap_phase": "D",
       "priority": "low",
       "status": "pending",
+      "depends_on": ["BACK-012", "BACK-013"],
+      "spec_ref": "feat-position-management",
+      "gate_condition": "Phase C IC validation complete AND ≥200 closed trades logged",
       "description": "A lightweight agent loop that runs every 60 seconds (independent of the main scan) to re-evaluate open positions against fresh price data and regime. Could trigger: (a) thesis invalidation close if a key support level breaks, (b) voluntary exit if macro regime shifts to PANIC mid-hold. NOT for entry decisions — entry remains scan-only. Requires tick or 1-min OHLCV data feed upgrade beyond current TV cache.",
       "requirements": [
         "Independent daemon thread, 60s polling interval",
@@ -275,12 +311,57 @@
         "Must not conflict with main scan's agent pipeline",
         "Requires 1-min data feed (yfinance download interval=1m has IBKR rate limits)"
       ],
-      "dependencies": ["BACK-012", "BACK-013", "Phase C results (IC validation)"],
       "estimated_days": 5,
       "files_to_modify": ["bot.py", "agents.py", "config.py"],
-      "depends_on_spec": "feat-position-management",
-      "created": "2026-03-31",
-      "gate_condition": "Phase C IC validation complete AND ≥200 closed trades logged"
+      "created": "2026-03-31"
+    },
+    {
+      "id": "BACK-016",
+      "title": "LightGBM signal model",
+      "roadmap_phase": "E",
+      "priority": "high",
+      "status": "pending",
+      "depends_on": ["BACK-011", "BACK-003"],
+      "description": "Gradient-boosted tree model using the IC-validated signal dimensions as features. Requires IC-validated dimension weights from BACK-011 (Phase 2) and HMM regime labels from BACK-003. Produces a per-scan probability score for 5-day positive return. Keystone for Phase E ML stack — SHAP Pruner, LSTM, and GT-Score all depend on this model being trained and validated first.",
+      "estimated_days": 7,
+      "files_to_modify": ["ml_engine.py", "signals.py", "config.py"],
+      "created": "2026-04-06"
+    },
+    {
+      "id": "BACK-017",
+      "title": "SHAP Pruner — dimension importance via SHAP values",
+      "roadmap_phase": "E",
+      "priority": "high",
+      "status": "pending",
+      "depends_on": ["BACK-016"],
+      "description": "Use SHAP (SHapley Additive exPlanations) on the trained LightGBM model to rank dimension importance. Prune dimensions whose mean |SHAP| falls below a threshold. Feeds pruned feature set back into signal engine. Depends on BACK-016 (trained LightGBM model) — cannot evaluate feature importance without a fitted model.",
+      "estimated_days": 3,
+      "files_to_modify": ["ml_engine.py", "signals.py"],
+      "created": "2026-04-06"
+    },
+    {
+      "id": "BACK-018",
+      "title": "LSTM sequence model — temporal signal patterns",
+      "roadmap_phase": "E",
+      "priority": "medium",
+      "status": "pending",
+      "depends_on": ["BACK-016"],
+      "description": "LSTM recurrent model trained on sequences of signal dimensions across scan intervals. Captures temporal momentum and decay patterns invisible to the stateless LightGBM model. Depends on BACK-016 (LightGBM baseline) for training data alignment, feature engineering conventions, and comparison baseline.",
+      "estimated_days": 10,
+      "files_to_modify": ["ml_engine.py", "config.py"],
+      "created": "2026-04-06"
+    },
+    {
+      "id": "BACK-019",
+      "title": "GT-Score composite — ensemble of SHAP-pruned LightGBM + LSTM",
+      "roadmap_phase": "E",
+      "priority": "high",
+      "status": "pending",
+      "depends_on": ["BACK-017", "BACK-018"],
+      "description": "Weighted ensemble combining the SHAP-pruned LightGBM signal (BACK-017 output) and LSTM sequence signal (BACK-018) into a single GT-Score. Replaces the current static composite score as the primary agent conviction input. Requires both upstream models to be trained and individually validated before ensemble blending.",
+      "estimated_days": 4,
+      "files_to_modify": ["ml_engine.py", "agents.py", "signals.py", "dashboard.py"],
+      "created": "2026-04-06"
     }
   ]
 }

@@ -46,7 +46,14 @@ def _base_backlog(max_active: int = 3, items: list | None = None) -> dict:
 
 def _item(id: str, status: str, deps: list | None = None) -> dict:
     return {"id": id, "title": f"Feature {id}", "status": status,
-            "dependencies": deps or []}
+            "depends_on": deps or []}
+
+
+def _backlog_with_phases(phases: dict, items: list | None = None) -> dict:
+    """Backlog dict with a wip_policy.phases section for orphaned-ref tests."""
+    bl = _base_backlog(items=items)
+    bl["wip_policy"]["phases"] = phases
+    return bl
 
 
 # ── load_backlog ──────────────────────────────────────────────────────────────
@@ -248,8 +255,8 @@ class TestValidateWIP:
     def test_duplicate_id_triggers_violation(self):
         """IC-001 regression: same ID on two items must be caught."""
         bl = _base_backlog(items=[
-            {"id": "F1", "title": "Feature One", "status": "ready", "dependencies": []},
-            {"id": "F1", "title": "Feature One (copy)", "status": "pending", "dependencies": []},
+            {"id": "F1", "title": "Feature One", "status": "ready", "depends_on": []},
+            {"id": "F1", "title": "Feature One (copy)", "status": "pending", "depends_on": []},
         ])
         violations = validate_wip(bl)
         assert any("DUPLICATE_ID" in v for v in violations)
@@ -257,8 +264,8 @@ class TestValidateWIP:
 
     def test_duplicate_id_violation_includes_count(self):
         bl = _base_backlog(items=[
-            {"id": "DUP", "title": "Alpha", "status": "ready", "dependencies": []},
-            {"id": "DUP", "title": "Beta", "status": "pending", "dependencies": []},
+            {"id": "DUP", "title": "Alpha", "status": "ready", "depends_on": []},
+            {"id": "DUP", "title": "Beta", "status": "pending", "depends_on": []},
         ])
         violations = validate_wip(bl)
         dup = next(v for v in violations if "DUPLICATE_ID" in v)
@@ -276,8 +283,8 @@ class TestValidateWIP:
     def test_duplicate_title_triggers_violation(self):
         """IC-001 regression: same title on two items must be caught."""
         bl = _base_backlog(items=[
-            {"id": "F1", "title": "IC-Weighted Signal Scoring", "status": "ready", "dependencies": []},
-            {"id": "F2", "title": "IC-Weighted Signal Scoring", "status": "pending", "dependencies": []},
+            {"id": "F1", "title": "IC-Weighted Signal Scoring", "status": "ready", "depends_on": []},
+            {"id": "F2", "title": "IC-Weighted Signal Scoring", "status": "pending", "depends_on": []},
         ])
         violations = validate_wip(bl)
         assert any("DUPLICATE_TITLE" in v for v in violations)
@@ -285,8 +292,8 @@ class TestValidateWIP:
     def test_duplicate_title_case_insensitive(self):
         """Title dedup is case-insensitive to catch reformulations."""
         bl = _base_backlog(items=[
-            {"id": "F1", "title": "Connection Manager", "status": "ready", "dependencies": []},
-            {"id": "F2", "title": "connection manager", "status": "pending", "dependencies": []},
+            {"id": "F1", "title": "Connection Manager", "status": "ready", "depends_on": []},
+            {"id": "F2", "title": "connection manager", "status": "pending", "depends_on": []},
         ])
         violations = validate_wip(bl)
         assert any("DUPLICATE_TITLE" in v for v in violations)
@@ -294,16 +301,16 @@ class TestValidateWIP:
     def test_duplicate_title_whitespace_normalised(self):
         """Extra whitespace should not allow duplicate titles to slip through."""
         bl = _base_backlog(items=[
-            {"id": "F1", "title": "Account Decision Agent", "status": "ready", "dependencies": []},
-            {"id": "F2", "title": "Account  Decision  Agent", "status": "pending", "dependencies": []},
+            {"id": "F1", "title": "Account Decision Agent", "status": "ready", "depends_on": []},
+            {"id": "F2", "title": "Account  Decision  Agent", "status": "pending", "depends_on": []},
         ])
         violations = validate_wip(bl)
         assert any("DUPLICATE_TITLE" in v for v in violations)
 
     def test_duplicate_title_violation_includes_both_ids(self):
         bl = _base_backlog(items=[
-            {"id": "F1", "title": "Telegram Bot", "status": "ready", "dependencies": []},
-            {"id": "F2", "title": "Telegram Bot", "status": "pending", "dependencies": []},
+            {"id": "F1", "title": "Telegram Bot", "status": "ready", "depends_on": []},
+            {"id": "F2", "title": "Telegram Bot", "status": "pending", "depends_on": []},
         ])
         violations = validate_wip(bl)
         dup = next(v for v in violations if "DUPLICATE_TITLE" in v)
@@ -312,9 +319,9 @@ class TestValidateWIP:
 
     def test_unique_titles_no_duplicate_title_violation(self):
         bl = _base_backlog(items=[
-            {"id": "A1", "title": "Scanner", "status": "ready", "dependencies": []},
-            {"id": "A2", "title": "Risk Engine", "status": "ready", "dependencies": []},
-            {"id": "A3", "title": "Dashboard", "status": "pending", "dependencies": []},
+            {"id": "A1", "title": "Scanner", "status": "ready", "depends_on": []},
+            {"id": "A2", "title": "Risk Engine", "status": "ready", "depends_on": []},
+            {"id": "A3", "title": "Dashboard", "status": "pending", "depends_on": []},
         ])
         violations = validate_wip(bl)
         assert not any("DUPLICATE_TITLE" in v for v in violations)
@@ -322,12 +329,83 @@ class TestValidateWIP:
     def test_duplicate_id_and_duplicate_title_both_reported(self):
         """Both violation types can coexist in a single bad backlog."""
         bl = _base_backlog(items=[
-            {"id": "F1", "title": "Same Title", "status": "ready", "dependencies": []},
-            {"id": "F1", "title": "Same Title", "status": "pending", "dependencies": []},
+            {"id": "F1", "title": "Same Title", "status": "ready", "depends_on": []},
+            {"id": "F1", "title": "Same Title", "status": "pending", "depends_on": []},
         ])
         violations = validate_wip(bl)
         assert any("DUPLICATE_ID" in v for v in violations)
         assert any("DUPLICATE_TITLE" in v for v in violations)
+
+
+# ── TestOrphanedPhaseRef ──────────────────────────────────────────────────────
+
+
+class TestOrphanedPhaseRef:
+    """Unit tests for the ORPHANED_PHASE_REF validation added to validate_wip()."""
+
+    def test_orphaned_phase_ref_triggers_violation(self):
+        """A feature_id in phases that has no matching item must raise ORPHANED_PHASE_REF."""
+        bl = _backlog_with_phases(
+            phases={"A": {"feature_ids": ["BACK-001"]}},
+            items=[_item("BACK-002", "ready")],  # BACK-001 not in items
+        )
+        violations = validate_wip(bl)
+        assert any("ORPHANED_PHASE_REF" in v for v in violations)
+
+    def test_orphaned_phase_ref_includes_feature_id_and_phase(self):
+        """Violation message must name the missing feature_id and the phase label."""
+        bl = _backlog_with_phases(
+            phases={"B": {"feature_ids": ["MISSING-99"]}},
+            items=[_item("BACK-001", "ready")],
+        )
+        violations = validate_wip(bl)
+        orphan = next(v for v in violations if "ORPHANED_PHASE_REF" in v)
+        assert "MISSING-99" in orphan
+        assert "'B'" in orphan
+
+    def test_valid_phase_refs_no_orphan_violation(self):
+        """All feature_ids present in items must produce no ORPHANED_PHASE_REF."""
+        bl = _backlog_with_phases(
+            phases={"A": {"feature_ids": ["BACK-001", "BACK-002"]}},
+            items=[_item("BACK-001", "ready"), _item("BACK-002", "shipped")],
+        )
+        violations = validate_wip(bl)
+        assert not any("ORPHANED_PHASE_REF" in v for v in violations)
+
+    def test_empty_phases_no_orphan_violation(self):
+        """A backlog with no phases defined must produce no ORPHANED_PHASE_REF."""
+        bl = _backlog_with_phases(phases={}, items=[_item("BACK-001", "ready")])
+        violations = validate_wip(bl)
+        assert not any("ORPHANED_PHASE_REF" in v for v in violations)
+
+    def test_multiple_orphaned_refs_all_reported(self):
+        """Each orphaned ref across multiple phases must appear as a separate violation."""
+        bl = _backlog_with_phases(
+            phases={
+                "A": {"feature_ids": ["MISSING-01"]},
+                "B": {"feature_ids": ["MISSING-02"]},
+            },
+            items=[_item("BACK-001", "ready")],
+        )
+        violations = validate_wip(bl)
+        orphans = [v for v in violations if "ORPHANED_PHASE_REF" in v]
+        assert len(orphans) == 2
+
+    def test_orphaned_phase_ref_coexists_with_other_violations(self):
+        """ORPHANED_PHASE_REF and WIP_LIMIT_EXCEEDED can appear in the same result."""
+        bl = _backlog_with_phases(
+            phases={"A": {"feature_ids": ["GHOST-01"]}},
+            items=[
+                _item("F1", "in_progress"),
+                _item("F2", "in_progress"),
+                _item("F3", "in_progress"),
+                _item("F4", "in_progress"),
+            ],
+        )
+        bl["wip_policy"]["max_active"] = 2
+        violations = validate_wip(bl)
+        assert any("WIP_LIMIT_EXCEEDED" in v for v in violations)
+        assert any("ORPHANED_PHASE_REF" in v for v in violations)
 
 
 # ── check_wip_limit ───────────────────────────────────────────────────────────
@@ -470,4 +548,43 @@ class TestRealBacklogCompliance:
         dup_title_violations = [v for v in violations if v.startswith("DUPLICATE_TITLE")]
         assert dup_title_violations == [], (
             "backlog.json contains duplicate feature titles:\n" + "\n".join(dup_title_violations)
+        )
+
+
+# ── Integration: BACK-015 regression guard ───────────────────────────────────
+
+
+class TestRealBacklogBack015:
+    """
+    Regression guard: BACK-015 must exist in backlog.json as a resolved entry,
+    and no wip_policy.phases reference may point to a missing item.
+    """
+
+    def test_back_015_exists(self):
+        """BACK-015 must be present in backlog.json items."""
+        bl = load_backlog()
+        ids = [item.get("id") for item in bl.get("items", [])]
+        assert "BACK-015" in ids, (
+            "BACK-015 (Execution Agent) is missing from backlog.json items. "
+            "Add the resolved entry as documented in 2026-04-02_execution-architecture-adr.json."
+        )
+
+    def test_back_015_is_resolved(self):
+        """BACK-015 must have status='resolved'."""
+        bl = load_backlog()
+        item = next(
+            (i for i in bl.get("items", []) if i.get("id") == "BACK-015"), None
+        )
+        assert item is not None, "BACK-015 not found — cannot check status."
+        assert item.get("status") == "resolved", (
+            f"BACK-015 has status='{item.get('status')}', expected 'resolved'."
+        )
+
+    def test_no_orphaned_phase_refs_in_real_backlog(self):
+        """Every feature_id in wip_policy.phases must exist in items."""
+        bl = load_backlog()
+        violations = validate_wip(bl)
+        orphan_violations = [v for v in violations if v.startswith("ORPHANED_PHASE_REF")]
+        assert orphan_violations == [], (
+            "backlog.json has orphaned phase references:\n" + "\n".join(orphan_violations)
         )
