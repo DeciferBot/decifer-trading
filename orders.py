@@ -45,6 +45,10 @@ open_trades = active_trades  # backward-compat alias (both names point to same d
 # In-memory open-order tracker keyed by symbol (updated by execute_buy/sell)
 open_orders: dict = {}
 
+# Post-close cooldown registry: symbol → ISO timestamp of close.
+# Blocks re-entry for reentry_cooldown_minutes after a position is closed.
+recently_closed: dict = {}
+
 # Default: duplicate check is enabled. Set ORDER_DUPLICATE_CHECK_ENABLED=False
 # in config to disable (e.g. for paper trading environments or unit tests).
 # Fail-safe orientation: when in doubt, the check is ON.
@@ -91,6 +95,16 @@ def _safe_del_trade(key: str):
     """Thread-safe delete from active_trades dict."""
     with _trades_lock:
         active_trades.pop(key, None)
+
+
+def _is_recently_closed(symbol: str) -> bool:
+    """Return True if symbol was closed within reentry_cooldown_minutes."""
+    ts_str = recently_closed.get(symbol)
+    if not ts_str:
+        return False
+    cooldown = CONFIG.get("reentry_cooldown_minutes", 30)
+    closed_at = datetime.fromisoformat(ts_str)
+    return (datetime.now(timezone.utc) - closed_at).total_seconds() < cooldown * 60
 
 
 def _cancel_ibkr_order_by_id(ib, order_id: int) -> None:
@@ -498,7 +512,14 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         # ── Guard: check active_trades under lock (prop-003/014) ──────────
         with _trades_lock:
             if symbol in active_trades:
+                if active_trades[symbol].get("status") == "EXITING":
+                    log.info(f"Skipping {symbol} — exit in flight")
+                    return False
                 log.warning(f"Already in {symbol} — skipping buy")
+                return False
+            if _is_recently_closed(symbol):
+                cooldown = CONFIG.get("reentry_cooldown_minutes", 30)
+                log.info(f"Skipping {symbol} — re-entry cooldown ({cooldown} min after recent close)")
                 return False
             if len(active_trades) >= CONFIG["max_positions"]:
                 log.warning(f"Max positions ({CONFIG['max_positions']}) reached — skipping {symbol}")
@@ -867,25 +888,31 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         # record the trade as FAILED rather than silently losing track of it.
         try:
             _open_time = open_time or datetime.now(timezone.utc).isoformat()
+            try:
+                from ic_calculator import get_current_weights as _get_icw
+                _icw_at_entry = _get_icw()
+            except Exception:
+                _icw_at_entry = None
             with _trades_lock:
                 active_trades[symbol] = {
-                    "symbol":           symbol,
-                    "instrument":       "stock",
-                    "entry":            price,
-                    "current":          price,
-                    "qty":              qty,
-                    "sl":               sl,
-                    "tp":               tp,
-                    "score":            score,
-                    "entry_score":      score,   # immutable snapshot for portfolio manager
-                    "reasoning":        reasoning,
-                    "direction":        "LONG",
-                    "pnl":              0.0,
-                    "status":           "PENDING",   # Submitted to IBKR but not yet filled
-                    "order_id":         parent_id,
-                    "open_time":        _open_time,
-                    "signal_scores":    signal_scores or {},
-                    "agent_outputs":    agent_outputs or {},
+                    "symbol":              symbol,
+                    "instrument":          "stock",
+                    "entry":               price,
+                    "current":             price,
+                    "qty":                 qty,
+                    "sl":                  sl,
+                    "tp":                  tp,
+                    "score":               score,
+                    "entry_score":         score,   # immutable snapshot for portfolio manager
+                    "reasoning":           reasoning,
+                    "direction":           "LONG",
+                    "pnl":                 0.0,
+                    "status":              "PENDING",   # Submitted to IBKR but not yet filled
+                    "order_id":            parent_id,
+                    "open_time":           _open_time,
+                    "signal_scores":       signal_scores or {},
+                    "ic_weights_at_entry": _icw_at_entry,
+                    "agent_outputs":       agent_outputs or {},
                     "atr":              atr,
                     "sl_order_id":      _sl_order_id,
                     "high_water_mark":  price,
@@ -976,17 +1003,35 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal") -> bool:
     record_loss = _om.record_loss                                # noqa: F841
 
     with _trades_lock:
-        if symbol not in active_trades:
-            log.warning(f"No open position in {symbol} — skipping sell")
+        if symbol in active_trades:
+            _trade_key = symbol
+        else:
+            # Options positions are stored under composite keys (e.g. "GSAT_C_35.0_2026-04-17").
+            # Search by the "symbol" field so execute_sell("GSAT") finds them.
+            _matches = [k for k, v in active_trades.items() if v.get("symbol") == symbol]
+            if not _matches:
+                log.warning(f"No open position in {symbol} — skipping sell")
+                return False
+            _trade_key = _matches[0]
+            if len(_matches) > 1:
+                log.warning(f"Multiple {symbol} positions: {_matches} — closing {_trade_key}")
+        info = active_trades[_trade_key]
+        if info.get("status") == "EXITING":
+            log.info(f"Exit already in flight for {symbol} ({_trade_key}) — skipping duplicate")
             return False
-        info = active_trades[symbol]
+        _safe_update_trade(_trade_key, {"status": "EXITING"})
 
     # Stop any active fill watcher so it doesn't race the sell
     from fill_watcher import stop_watcher as _stop_watcher
     _stop_watcher(symbol)
 
     try:
-        contract = get_contract(symbol)
+        if info.get("instrument") == "option":
+            from ib_async import Option as _OptContract
+            contract = _OptContract(symbol, info["expiry_ibkr"], info["strike"], info["right"],
+                                    exchange="SMART", currency="USD")
+        else:
+            contract = get_contract(symbol)
         ib.qualifyContracts(contract)
 
         # 3-way price validation for accurate exit P&L logging
@@ -1036,11 +1081,23 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal") -> bool:
 
         log.info(f"{'✅' if pnl >= 0 else '❌'} CLOSE {direction} {symbol} ({close_action}) | P&L ${pnl:+.2f} | Reason: {reason}")
         with _trades_lock:
-            del active_trades[symbol]
+            recently_closed[symbol] = datetime.now(timezone.utc).isoformat()
+            del active_trades[_trade_key]
         return True
 
     except Exception as e:
         log.error(f"Sell failed {symbol}: {e}")
+        try:
+            from learning import _append_audit_event
+            _append_audit_event(
+                "sell_exception",
+                symbol=symbol,
+                error=str(e),
+                reason=reason,
+                note="execute_sell raised an exception — position may still be open in IBKR.",
+            )
+        except Exception:
+            pass
         return False
 
 
@@ -1813,33 +1870,39 @@ def execute_buy_option(ib: IB, contract_info: dict,
             "timestamp":  datetime.now(timezone.utc).isoformat(),
         })
 
+        try:
+            from ic_calculator import get_current_weights as _get_icw_opt
+            _icw_at_entry_opt = _get_icw_opt()
+        except Exception:
+            _icw_at_entry_opt = None
         active_trades[opt_key] = {
-            "symbol":          symbol,
-            "instrument":      "option",
-            "right":           contract_info["right"],
-            "strike":          contract_info["strike"],
-            "expiry_str":      contract_info["expiry_str"],
-            "expiry_ibkr":     contract_info["expiry_ibkr"],
-            "dte":             contract_info["dte"],
-            "contracts":       n_contracts,
-            "entry_premium":   mid_price,
-            "current_premium": mid_price,
-            "entry":           mid_price,          # unified field for dashboard
-            "current":         mid_price,
-            "qty":             n_contracts,
-            "sl":              round(mid_price * (1 - CONFIG.get("options_stop_loss", 0.50)), 4),
-            "tp":              round(mid_price * (1 + CONFIG.get("options_profit_target", 0.75)), 4),
-            "delta":           contract_info.get("delta"),
-            "theta":           contract_info.get("theta"),
-            "iv":              contract_info.get("iv"),
-            "iv_rank":         contract_info.get("iv_rank"),
-            "underlying_price": contract_info.get("underlying_price"),
-            "pnl":             0.0,
-            "score":           0,
-            "direction":       "LONG",
-            "reasoning":       reasoning,
-            "status":          "PENDING",
-            "order_id":        trade.order.orderId,
+            "symbol":              symbol,
+            "instrument":          "option",
+            "right":               contract_info["right"],
+            "strike":              contract_info["strike"],
+            "expiry_str":          contract_info["expiry_str"],
+            "expiry_ibkr":         contract_info["expiry_ibkr"],
+            "dte":                 contract_info["dte"],
+            "contracts":           n_contracts,
+            "entry_premium":       mid_price,
+            "current_premium":     mid_price,
+            "entry":               mid_price,          # unified field for dashboard
+            "current":             mid_price,
+            "qty":                 n_contracts,
+            "sl":                  round(mid_price * (1 - CONFIG.get("options_stop_loss", 0.50)), 4),
+            "tp":                  round(mid_price * (1 + CONFIG.get("options_profit_target", 0.75)), 4),
+            "delta":               contract_info.get("delta"),
+            "theta":               contract_info.get("theta"),
+            "iv":                  contract_info.get("iv"),
+            "iv_rank":             contract_info.get("iv_rank"),
+            "underlying_price":    contract_info.get("underlying_price"),
+            "pnl":                 0.0,
+            "score":               0,
+            "direction":           "LONG",
+            "reasoning":           reasoning,
+            "status":              "PENDING",
+            "order_id":            trade.order.orderId,
+            "ic_weights_at_entry": _icw_at_entry_opt,
         }
 
         log.info(
@@ -1885,6 +1948,11 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
         log.warning(f"{opt_key} is not an options position")
         return False
 
+    if pos.get("status") == "EXITING":
+        log.info(f"Exit already in flight for {opt_key} — skipping duplicate")
+        return False
+    _safe_update_trade(opt_key, {"status": "EXITING"})
+
     # ── Retry gating: don't spam IBKR with the same failing order ──
     attempts = _option_sell_attempts.get(opt_key, {"count": 0, "last_try": datetime.min})
     if attempts["count"] >= _MAX_OPTION_SELL_RETRIES:
@@ -1892,6 +1960,16 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
         if elapsed < _OPTION_SELL_COOLDOWN:
             log.warning(f"Option sell for {opt_key} failed {attempts['count']}x — "
                         f"cooling down ({int(_OPTION_SELL_COOLDOWN - elapsed)}s remaining)")
+            from learning import _append_audit_event
+            _append_audit_event(
+                "option_sell_stuck",
+                opt_key=opt_key,
+                symbol=pos.get("symbol"),
+                attempts=attempts["count"],
+                cooldown_remaining_s=int(_OPTION_SELL_COOLDOWN - elapsed),
+                reason=reason,
+                note="Position stuck — max retries hit. Manual review required.",
+            )
             return False
         # Cooldown expired — reset counter and retry
         attempts["count"] = 0
@@ -1921,8 +1999,12 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
         import math as _m
         _bid_ok = bid is not None and not _m.isnan(bid) and bid > 0
         _ask_ok = ask is not None and not _m.isnan(ask) and ask > 0
+        _retry_count = attempts["count"]  # 0 on first attempt, 1+ on retries
         if _bid_ok and _ask_ok:
-            limit_price = round((bid + ask) / 2, 2)
+            if _retry_count == 0:
+                limit_price = round((bid + ask) / 2, 2)  # first attempt: mid
+            else:
+                limit_price = round(bid, 2)               # retry: bid to match buyers
         elif _bid_ok:
             limit_price = round(bid, 2)
         elif last and not _m.isnan(last) and last > 0:
@@ -1930,6 +2012,9 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
         else:
             limit_price = round(pos.get("current_premium", 0.01) * 0.95, 2)
 
+        # On final attempt, if bid is near-zero accept $0.01 for near-worthless options
+        if _retry_count >= _MAX_OPTION_SELL_RETRIES - 1 and _bid_ok and bid <= 0.02:
+            limit_price = 0.01
         # Floor at $0.01 — can't send a zero-price limit
         limit_price = max(limit_price, 0.01)
 
@@ -1945,7 +2030,8 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
                  f"(bid={bid}, ask={ask})")
 
         # Wait for fill confirmation — options can take a moment
-        max_wait = 15  # seconds
+        # On retries, use 25s to give the more-aggressive price more time to fill
+        max_wait = 15 if attempts["count"] == 0 else 25  # seconds
         for _ in range(max_wait * 2):
             ib.sleep(0.5)
             status = opt_sell_trade.orderStatus.status
@@ -1966,6 +2052,8 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
                 ib.cancelOrder(opt_sell_trade.order)
             except Exception:
                 pass
+            # Reset EXITING status so the next retry attempt can proceed
+            _safe_update_trade(opt_key, {"status": "ACTIVE"})
             return False
 
         # Success — clear retry counter
@@ -2042,6 +2130,7 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal") -> bool:
             f"{'✅' if pnl >= 0 else '❌'} SELL {pos['right']} {pos['symbol']} "
             f"${pos['strike']:.0f} | P&L ${pnl:+.2f} | {reason}"
         )
+        recently_closed[pos["symbol"]] = datetime.now(timezone.utc).isoformat()
         del active_trades[opt_key]
         return True
 

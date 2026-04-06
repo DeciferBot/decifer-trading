@@ -97,7 +97,7 @@ class TestComputeRollingIC:
         for i in range(30):
             bd = {d: 5.0 for d in DIMS}
             bd["trend"] = float(i)       # monotone → perfect rank correlation
-            records.append(_make_record(breakdown=bd))
+            records.append(_make_record(symbol=f"SYM{i:02d}", breakdown=bd))
 
         log_file = tmp_path / "signals_log.jsonl"
         with open(log_file, "w") as f:
@@ -112,7 +112,7 @@ class TestComputeRollingIC:
             raw = ic.compute_rolling_ic(
                 signals_log_path=str(log_file),
                 window=30,
-                min_valid=20,
+                min_valid=1,
             )
 
         assert raw["trend"] is not None
@@ -129,7 +129,7 @@ class TestComputeRollingIC:
         for i in range(30):
             bd = {d: 5.0 for d in DIMS}
             bd["momentum"] = float(i)
-            records.append(_make_record(breakdown=bd))
+            records.append(_make_record(symbol=f"SYM{i:02d}", breakdown=bd))
 
         log_file = tmp_path / "signals_log.jsonl"
         with open(log_file, "w") as f:
@@ -144,7 +144,7 @@ class TestComputeRollingIC:
             raw = ic.compute_rolling_ic(
                 signals_log_path=str(log_file),
                 window=30,
-                min_valid=20,
+                min_valid=1,
             )
 
         assert raw["momentum"] is not None

@@ -71,6 +71,7 @@ CONFIG = {
     "max_single_position":      0.06,   # 6% per position — keeps 14 positions before hitting floor
     "max_sector_exposure":      0.40,   # 40% sector cap
     "consecutive_loss_pause":   5,      # Pause after 5 consecutive losses
+    "reentry_cooldown_minutes": 30,     # Block re-entry after close (lifecycle gate)
 
     # ── INTRADAY ADAPTIVE STRATEGY ────────────────────────────────
     # When the day is going badly, the bot shifts posture rather than trading normally
@@ -149,8 +150,12 @@ CONFIG = {
     # Phase 1 (current): ic_min_threshold = 0.0 — any positive IC gets weight.
     # Phase 2 (needs 200+ trades): raise ic_min_threshold to 0.03 to suppress noise.
     "ic_calculator": {
-        "rolling_window":    60,    # Trades in rolling IC window
-        "min_valid_records": 10,    # Lowered from 20: IC history resets on dim refactor; recover faster
+        "rolling_window":    60,    # Number of trading *dates* in rolling IC window
+        "min_valid_records": 10,    # Legacy — kept for backward compat
+        "min_valid_dates":   3,     # Min trading dates with IC before weights diverge from equal
+        "forward_horizon_days": 1,  # Forward return horizon (trading days). 1 = next close.
+                                    #   Phase 1: 1 day (fast bootstrap, noisier IC)
+                                    #   Phase 2: raise to 5 once 60+ dates accumulated
         "ic_min_threshold":  0.0,   # Noise floor — dimensions below this get zero weight
                                     #   Phase 1: 0.0 (any positive IC passes)
                                     #   Phase 2: raise to 0.03 once 200+ trades available

@@ -234,6 +234,7 @@ class TestExecuteBuy:
     def setup(self, mock_config, mock_ib):
         """Reset open_trades before each test."""
         orders.open_trades.clear()
+        orders.recently_closed.clear()
         self.mock_config = mock_config
         self.mock_ib = mock_ib
 
@@ -557,6 +558,7 @@ class TestExecuteSell:
     def setup(self, mock_config, mock_ib):
         """Reset open_trades before each test."""
         orders.open_trades.clear()
+        orders.recently_closed.clear()
         self.mock_config = mock_config
         self.mock_ib = mock_ib
 
@@ -639,6 +641,41 @@ class TestExecuteSell:
         )
 
         assert result is True
+        mock_record_loss.assert_called_once()
+
+    @patch('orders.CONFIG')
+    @patch('orders._validate_position_price')
+    @patch('orders._get_ibkr_price')
+    @patch('orders.log_order')
+    @patch('orders.record_loss')
+    def test_execute_sell_options_composite_key(
+        self, mock_record_loss, mock_log_order, mock_ibkr_price,
+        mock_validate_price, mock_config_obj, mock_config, mock_ib
+    ):
+        """execute_sell("GSAT") must find options position stored under composite key."""
+        mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
+        mock_config_obj.get = lambda k, d=None: mock_config.get(k, d)
+
+        option_key = "GSAT_C_35.0_2026-04-17"
+        orders.open_trades[option_key] = {
+            "symbol":      "GSAT",
+            "instrument":  "option",
+            "right":       "C",
+            "strike":      35.0,
+            "expiry_ibkr": "20260417",
+            "qty":         10,
+            "entry":       2.0,
+            "current":     2.0,
+            "direction":   "LONG",
+        }
+
+        mock_ibkr_price.return_value = 1.5
+        mock_validate_price.return_value = (1.5, "IBKR=$1.50")
+
+        result = orders.execute_sell(ib=mock_ib, symbol="GSAT", reason="pm:exit")
+
+        assert result is True
+        assert option_key not in orders.open_trades
         mock_record_loss.assert_called_once()
 
 
@@ -850,6 +887,7 @@ class TestEdgeCases:
     def setup(self, mock_config, mock_ib):
         """Reset open_trades before each test."""
         orders.open_trades.clear()
+        orders.recently_closed.clear()
 
     @patch('orders.CONFIG')
     @patch('orders.calculate_position_size')

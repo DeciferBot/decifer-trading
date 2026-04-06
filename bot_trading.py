@@ -1005,10 +1005,32 @@ def run_scan():
                 act_pm    = action.get("action", "HOLD")
                 reason_pm = action.get("reasoning", "portfolio manager")
                 if act_pm == "EXIT" and sym_pm:
-                    clog("TRADE", f"Portfolio manager EXIT: {sym_pm} — {reason_pm}")
+                    from orders import open_trades as _pm_trades, _trades_lock as _pm_lock
+                    # Dedup: skip if exit already in flight for this symbol
+                    with _pm_lock:
+                        _already_exiting = (
+                            _pm_trades.get(sym_pm, {}).get("status") == "EXITING"
+                            or any(v.get("status") == "EXITING"
+                                   for k, v in _pm_trades.items()
+                                   if v.get("symbol") == sym_pm)
+                        )
+                    if _already_exiting:
+                        clog("INFO", f"Portfolio manager EXIT: {sym_pm} already exiting — skipping duplicate")
+                    else:
+                        clog("TRADE", f"Portfolio manager EXIT: {sym_pm} — {reason_pm}")
                     pos_pm = next((p for p in open_pos if p["symbol"] == sym_pm), None)
                     ep_pm  = pos_pm["current"] if pos_pm else 0
-                    execute_sell(ib, sym_pm, reason=f"portfolio_manager:{pm_trigger}")
+                    _opt_keys_pm = [k for k in _pm_trades
+                                    if k.startswith(sym_pm + "_") and _pm_trades[k].get("instrument") == "option"]
+                    if not _already_exiting:
+                        if _opt_keys_pm:
+                            for _ok in _opt_keys_pm:
+                                clog("TRADE", f"PM EXIT routing to option sell: {_ok}")
+                                execute_sell_option(ib, _ok, reason=f"portfolio_manager:{pm_trigger}")
+                        if sym_pm in _pm_trades:
+                            execute_sell(ib, sym_pm, reason=f"portfolio_manager:{pm_trigger}")
+                    if not _already_exiting and not _opt_keys_pm and sym_pm not in _pm_trades:
+                        clog("WARN", f"PM EXIT: no active position found for {sym_pm} — not in tracker as stock or option")
                     if pos_pm:
                         pnl_pm = (ep_pm - pos_pm["entry"]) * pos_pm["qty"] if pos_pm.get("direction", "LONG") == "LONG" else (pos_pm["entry"] - ep_pm) * pos_pm["qty"]
                         from learning import log_trade as _log_trade_pm

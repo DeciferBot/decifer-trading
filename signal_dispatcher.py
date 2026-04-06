@@ -83,6 +83,16 @@ def dispatch_signals(
             "price":   signal.price,
         }
 
+        # Early exit: skip symbols whose position is currently being exited
+        # or that are in the post-close re-entry cooldown window.
+        import orders as _ord
+        with _ord._trades_lock:
+            _existing = _ord.active_trades.get(signal.symbol, {})
+        if _existing.get("status") == "EXITING" or _ord._is_recently_closed(signal.symbol):
+            log.debug(f"dispatch: skipping {signal.symbol} — exiting or in cooldown")
+            results.append(result)
+            continue
+
         if signal.direction == "LONG" and "LONG" in allowed_dirs:
             try:
                 success = execute_buy(
