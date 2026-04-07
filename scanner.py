@@ -501,6 +501,7 @@ def get_market_regime(ib: IB) -> dict:
                     "spy_price": 0, "spy_above_200d": False,
                     "qqq_price": 0, "qqq_above_200d": False,
                     "position_size_multiplier": 0.5,
+                    "regime_router": "unknown",
                 }
 
         vix_prev      = float(vix_close.iloc[-2]) if vix_close is not None and len(vix_close) > 1 else vix_now
@@ -572,6 +573,13 @@ def get_market_regime(ib: IB) -> dict:
         else:
             regime = "CHOPPY"
 
+        # ── SIGNAL ROUTING REGIME — uses VIX already fetched above ──────────
+        # Avoids a duplicate VIX fetch in score_universe(). The routing regime
+        # determines dimension score multipliers (momentum vs mean_reversion tilt).
+        # Passed through signal_pipeline → score_universe via regime["regime_router"].
+        _vix_routing_threshold = CONFIG.get("regime_router_vix_threshold", 20)
+        _regime_router = "momentum" if vix_now < _vix_routing_threshold else "mean_reversion"
+
         result = {
             "regime":                   regime,
             "vix":                      round(vix_now, 2),
@@ -584,6 +592,7 @@ def get_market_regime(ib: IB) -> dict:
             "qqq_200d_ma":              round(qqq_200d_ma, 2) if qqq_200d_ma else None,
             "breadth_pct":              round(breadth_pct, 1) if breadth_pct is not None else None,
             "position_size_multiplier": _regime_size_mult(regime),
+            "regime_router":            _regime_router,
         }
 
         # Cache this as last known good regime
@@ -607,6 +616,7 @@ def get_market_regime(ib: IB) -> dict:
             "qqq_200d_ma": None,
             "breadth_pct": None,
             "position_size_multiplier": 0.5,
+            "regime_router": "unknown",
         }
 
 
