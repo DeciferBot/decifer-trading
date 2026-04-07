@@ -84,6 +84,22 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
     LimitOrder  = _om.LimitOrder                             # noqa: F841
     StopOrder   = _om.StopOrder                              # noqa: F841
 
+    # ── Alpaca real-time guards (fast path — no lock needed) ──────────────
+    try:
+        from alpaca_stream import HALT_CACHE, QUOTE_CACHE
+        if HALT_CACHE.is_halted(symbol):
+            log.warning(f"execute_buy {symbol}: trading halted (Alpaca status feed) — aborting")
+            return False
+        spread = QUOTE_CACHE.get_spread_pct(symbol)
+        max_spread = CONFIG.get("max_spread_pct", 0.003)
+        if spread is not None and spread > max_spread:
+            log.warning(
+                f"execute_buy {symbol}: spread {spread:.4%} > max {max_spread:.4%} — aborting"
+            )
+            return False
+    except ImportError:
+        pass  # alpaca_stream not wired — checks skipped
+
     # ── Guard: per-symbol lock closes TOCTOU gap between check and submission ──
     sym_lock = _get_symbol_lock(symbol)
     with sym_lock:
@@ -599,6 +615,22 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
     MarketOrder = _om.MarketOrder                            # noqa: F841
     LimitOrder  = _om.LimitOrder                             # noqa: F841
     StopOrder   = _om.StopOrder                              # noqa: F841
+
+    # ── Alpaca real-time guards (fast path — no lock needed) ──────────────
+    try:
+        from alpaca_stream import HALT_CACHE, QUOTE_CACHE
+        if HALT_CACHE.is_halted(symbol):
+            log.warning(f"execute_short {symbol}: trading halted (Alpaca status feed) — aborting")
+            return False
+        spread = QUOTE_CACHE.get_spread_pct(symbol)
+        max_spread = CONFIG.get("max_spread_pct", 0.003)
+        if spread is not None and spread > max_spread:
+            log.warning(
+                f"execute_short {symbol}: spread {spread:.4%} > max {max_spread:.4%} — aborting"
+            )
+            return False
+    except ImportError:
+        pass  # alpaca_stream not wired — checks skipped
 
     sym_lock = _get_symbol_lock(symbol)
     with sym_lock:

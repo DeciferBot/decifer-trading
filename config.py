@@ -32,18 +32,23 @@ CONFIG = {
     "aggregate_accounts": [],
 
     # ── ALPHA VANTAGE (free tier: 25 calls/day) ──────────────
-    # Used for: earnings calendar → PEAD dimension.
+    # Used for: earnings calendar (primary source) + news sentiment (Tier 3 enrichment).
     # Sign up at https://www.alphavantage.co/support/#api-key (free, no credit card).
     # Key stored in ~/.bash_profile as ALPHA_VANTAGE_KEY — never commit the value.
+    # If key is absent, AV calls are silently skipped and fallbacks take over.
     "alpha_vantage_key":        os.environ.get("ALPHA_VANTAGE_KEY", ""),
+    "alpha_vantage_daily_limit": 25,   # Free tier cap. Upgrade plan → increase this.
 
     # ── ALPACA MARKETS (Algo Trader Plus — $99/mo) ────────────
     # Paper trading base URL: https://paper-api.alpaca.markets
-    # Used for: WebSocket bar streaming (live FLOW signals) — wired in when ready.
     # Keys stored in ~/.bash_profile — never commit values here.
     "alpaca_api_key":           os.environ.get("ALPACA_API_KEY", ""),
     "alpaca_secret_key":        os.environ.get("ALPACA_SECRET_KEY", ""),
     "alpaca_base_url":          os.environ.get("ALPACA_BASE_URL", "https://paper-api.alpaca.markets"),
+    # Stream switches — disable individually without touching keys
+    "alpaca_news_enabled":      True,   # AlpacaNewsStream (Benzinga push feed)
+    # Order protection gates sourced from the live Alpaca stream
+    "max_spread_pct":           0.003,  # 0.30% bid-ask spread cap (skip wider markets)
 
     # ── IBKR HISTORICAL DATA PACING ───────────────────────────
     # IBKR enforces a soft limit of 60 reqHistoricalData requests per 10 minutes.
