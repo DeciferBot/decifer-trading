@@ -720,17 +720,34 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
     Returns None if insufficient data.
     """
     try:
-        # 5-minute (primary trading timeframe) — IBKR primary, yfinance fallback
+        # 5-minute bars — three-layer priority:
+        #   1. Alpaca bar cache  (event-driven WebSocket, freshest — market hours)
+        #   2. IBKR historical   (reqHistoricalData, free, thread-safe)
+        #   3. yfinance fallback (market closed / both above unavailable)
         df_5m = None
-        if ib is not None and ib.isConnected():
-            df_5m = fetch_ibkr_historical(symbol, ib, bar_size="5 mins", duration="5 D")
+
+        # Layer 1: Alpaca bar cache
+        try:
+            from alpaca_stream import BAR_CACHE
+            df_5m = BAR_CACHE.get_5m(symbol)
+            if df_5m is not None:
+                log.debug(f"fetch_multi_timeframe: {symbol} 5m from Alpaca cache ({len(df_5m)} bars)")
+        except ImportError:
+            pass
+
+        # Layer 2: IBKR historical
         if df_5m is None or len(df_5m) < 5:
-            # Fallback to yfinance (TWS disconnected or symbol not found via IBKR)
+            if ib is not None and ib.isConnected():
+                _ibkr_df = fetch_ibkr_historical(symbol, ib, bar_size="5 mins", duration="5 D")
+                if _ibkr_df is not None:
+                    df_5m = normalize_bars(_ibkr_df)
+                    log.debug(f"fetch_multi_timeframe: {symbol} 5m from IBKR ({len(df_5m)} bars)")
+
+        # Layer 3: yfinance fallback
+        if df_5m is None or len(df_5m) < 5:
             df_5m = normalize_bars(_flatten_columns(
                 _safe_download(symbol, period="5d", interval="5m", progress=False, auto_adjust=True)
             ))
-        else:
-            df_5m = normalize_bars(df_5m)
 
         # Daily (trend confirmation) — yfinance, stable at this frequency
         df_1d = normalize_bars(_flatten_columns(
@@ -976,13 +993,22 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
             squeeze_intensity = 0.0
 
         # ── VWAP — institutional anchor (intraday only) ─────
-        # VWAP = cumulative(price × volume) / cumulative(volume)
+        # Use Alpaca's exchange-calculated VWAP if present (more accurate than
+        # reconstructed VWAP from OHLCV). Fall back to cumulative calculation.
         if tf == "5m" and volume.sum() > 0:
-            typical_price = (high + low + close) / 3
-            cum_tp_vol = (typical_price * volume).cumsum()
-            cum_vol = volume.cumsum()
-            vwap_series = cum_tp_vol / cum_vol.replace(0, 1e-9)
-            vwap_val = float(vwap_series.iloc[-1])
+            native_vwap = df.get("vwap") if hasattr(df, "get") else None
+            if native_vwap is not None and hasattr(native_vwap, 'iloc'):
+                last_native = native_vwap.iloc[-1]
+                if pd.notna(last_native) and float(last_native) > 0:
+                    vwap_val = float(last_native)
+                else:
+                    native_vwap = None
+            if native_vwap is None:
+                typical_price = (high + low + close) / 3
+                cum_tp_vol = (typical_price * volume).cumsum()
+                cum_vol = volume.cumsum()
+                vwap_series = cum_tp_vol / cum_vol.replace(0, 1e-9)
+                vwap_val = float(vwap_series.iloc[-1])
             # Distance from VWAP as % of price — positive = above VWAP (bullish)
             vwap_dist = ((p - vwap_val) / vwap_val) * 100 if vwap_val > 0 else 0.0
         else:
