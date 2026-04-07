@@ -118,8 +118,9 @@ _catalyst_sentinel     = None
 _catalyst_trades_today = 0
 _catalyst_trade_date   = ""
 
-# ── Alpaca bar stream ─────────────────────────────────────────────────────────
-_bar_stream = None   # AlpacaBarStream instance — started in bot.py main()
+# ── Alpaca streams ───────────────────────────────────────────────────────────
+_bar_stream        = None   # AlpacaBarStream instance — started in bot.py main()
+_alpaca_news_stream = None  # AlpacaNewsStream instance — started in bot.py main()
 
 # ── IBKR account / position ground truth ─────────────────────────────────────
 # Populated by _on_account_value() when reqAccountUpdates is active.

@@ -371,6 +371,21 @@ def start_news_sentinel(ib):
     return sentinel
 
 
+def start_alpaca_news_stream():
+    """
+    Initialise and start the AlpacaNewsStream (push-based Benzinga feed).
+    Returns the running stream instance; caller stores it in bot_state._alpaca_news_stream.
+    No ib argument — Alpaca news stream is independent of IBKR.
+    """
+    from alpaca_news import AlpacaNewsStream
+    stream = AlpacaNewsStream(
+        get_universe_fn=_get_sentinel_universe,
+        on_trigger_fn=handle_news_trigger,
+    )
+    stream.start()
+    return stream
+
+
 def start_catalyst_sentinel(ib):
     """
     Initialise and start the CatalystSentinel background thread.

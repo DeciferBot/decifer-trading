@@ -206,6 +206,7 @@ def main():
         _get_sentinel_universe, handle_news_trigger,
         handle_catalyst_trigger, countdown_tick,
         start_news_sentinel, start_catalyst_sentinel,
+        start_alpaca_news_stream,
     )
     from risk import (
         reset_daily_state, get_scan_interval,
@@ -329,12 +330,22 @@ def main():
     dash["next_scan_seconds"] = interval
     schedule.every(interval).seconds.do(scheduled_scan).tag("scan")
 
-    # ── Start News Sentinel (independent background thread) ───────────────────
+    # ── Start Alpaca News Stream (primary real-time push feed) ───────────────
+    # Push-based Benzinga feed — no polling, symbols pre-tagged.
+    # Replaces Yahoo RSS + Finviz scraping. Runs independently of sentinel_enabled.
+    if CONFIG.get("alpaca_news_enabled", True):
+        try:
+            bot_state._alpaca_news_stream = start_alpaca_news_stream()
+            clog("INFO", "📰 Alpaca news stream active (Benzinga real-time push feed)")
+        except Exception as _ane_err:
+            clog("INFO", f"📰 Alpaca news stream skipped: {_ane_err}")
+
+    # ── Start News Sentinel (IBKR news poller — secondary source) ────────────
     if CONFIG.get("sentinel_enabled", True):
         bot_state._sentinel = start_news_sentinel(bot_state.ib)
         dash["sentinel_status"] = "running"
         dash["sentinel_stats"]  = bot_state._sentinel.stats
-        clog("INFO", f"📡 News Sentinel active | polling every {CONFIG.get('sentinel_poll_seconds', 45)}s")
+        clog("INFO", f"📡 News Sentinel active (IBKR) | polling every {CONFIG.get('sentinel_poll_seconds', 45)}s")
     else:
         clog("INFO", "📡 News Sentinel disabled (sentinel_enabled=False in config)")
 
@@ -466,6 +477,8 @@ def main():
             bot_state.ib.sleep(1)
     except KeyboardInterrupt:
         dash["status"] = "stopped"
+        if bot_state._alpaca_news_stream:
+            bot_state._alpaca_news_stream.stop()
         if bot_state._sentinel:
             bot_state._sentinel.stop()
         if bot_state._catalyst_sentinel:
