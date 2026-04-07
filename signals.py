@@ -44,8 +44,7 @@ except ImportError:
     STATSMODELS_AVAILABLE = False
 from config import CONFIG
 
-# Force requests backend for yfinance — avoids curl_cffi SIGSEGV in threads.
-_YF_SESSION = _requests.Session()
+# yfinance now requires its own curl_cffi session — do not pass requests.Session.
 
 # ── REGIME SIGNAL ROUTER ─────────────────────────────────────────────────────
 
@@ -560,20 +559,24 @@ _SHORT_FLOAT_CACHE_TTL = 4 * 3600  # 4 hours (short float updates daily)
 
 
 def _safe_download(symbol: str, **kwargs) -> pd.DataFrame | None:
-    """Download with retry + session refresh on yfinance auth failures."""
+    """
+    Download OHLCV data with retry using yf.Ticker().history().
+
+    Uses Ticker.history() instead of yf.download() because yfinance 1.2.0's
+    shared global curl_cffi session causes cross-symbol data contamination when
+    yf.download() is called concurrently from multiple threads.  Ticker objects
+    maintain isolated per-instance state, making them thread-safe.
+    """
+    # progress= is a yf.download() param; Ticker.history() doesn't accept it
+    kwargs.pop("progress", None)
     for attempt in range(3):
         try:
-            df = yf.download(symbol, session=_YF_SESSION, **kwargs)
+            df = yf.Ticker(symbol).history(**kwargs)
             if df is not None and len(df) > 0:
                 return df
         except Exception:
             pass
-        # On retry: clear yfinance cache/session to fix Invalid Crumb errors
         if attempt < 2:
-            try:
-                yf.cache.clear()
-            except Exception:
-                pass
             _time.sleep(1)
     return None
 
