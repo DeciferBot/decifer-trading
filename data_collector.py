@@ -298,7 +298,7 @@ def download_daily_alphavantage(symbol: str, api_key: str = None) -> Optional[pd
 # 5. ALPHA VANTAGE — Earnings Calendar (PEAD dimension)
 # ═════════════════════════════════════════════════════════════════
 
-def fetch_earnings_calendar(symbol: str, api_key: str = None) -> dict | None:
+def fetch_earnings_calendar(symbol: str, api_key: str = None) -> "dict | None":
     """
     Fetch the next earnings date for a symbol from Alpha Vantage.
 
