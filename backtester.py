@@ -41,7 +41,8 @@ logging.basicConfig(
 
 EST = pytz.timezone("America/New_York")
 BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = BASE_DIR / "data" / "historical"
+DATA_DIR = BASE_DIR / "data" / "historical"        # legacy — kept for utility functions
+FEATURES_DIR = BASE_DIR / "data" / "features"     # tiered store — primary read source
 RESULTS_DIR = BASE_DIR / "backtest_results"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -362,47 +363,52 @@ class Backtester:
                  f"ATR trail mult: {self.atr_trail_mult}")
 
     def load_data(self):
-        """Load historical Parquet files for all symbols."""
+        """Load feature-enriched Parquet files for all symbols.
+
+        Load order (first match wins):
+          1. data/features/daily/{symbol}_1d.parquet   — tiered store (preferred)
+          2. data/features/intraday/{symbol}_5m.parquet
+          3. data/historical/daily/{symbol}_1d.parquet  — legacy fallback
+          4. data/historical/intraday/{symbol}_5m.parquet
+        """
         log.info("Loading historical data...")
-        daily_dir = DATA_DIR / "daily"
-        intraday_dir = DATA_DIR / "intraday"
+
+        feat_daily = FEATURES_DIR / "daily"
+        feat_intraday = FEATURES_DIR / "intraday"
+        legacy_daily = DATA_DIR / "daily"
+        legacy_intraday = DATA_DIR / "intraday"
+
+        candidates = [
+            (feat_daily,    "{symbol}_1d.parquet",  "daily (features)"),
+            (feat_intraday, "{symbol}_5m.parquet",  "5m (features)"),
+            (legacy_daily,  "{symbol}_1d.parquet",  "daily (legacy)"),
+            (legacy_intraday, "{symbol}_5m.parquet", "5m (legacy)"),
+        ]
 
         for symbol in self.symbols:
-            # Try daily first (we'll use daily bars for walk-forward)
-            daily_file = daily_dir / f"{symbol}.parquet"
-            if daily_file.exists():
+            loaded = False
+            for base_dir, pattern, label in candidates:
+                path = base_dir / pattern.format(symbol=symbol)
+                if not path.exists():
+                    continue
                 try:
-                    df = pd.read_parquet(daily_file)
-                    if not df.empty:
-                        # Ensure datetime index
-                        if not isinstance(df.index, pd.DatetimeIndex):
-                            df.index = pd.to_datetime(df.index)
-                        # Filter to date range
-                        df = df[(df.index >= self.start_date) & (df.index <= self.end_date)]
-                        if not df.empty:
-                            self.data[symbol] = df.sort_index()
-                            log.info(f"Loaded {symbol}: {len(df)} daily bars")
-                            continue
+                    df = pd.read_parquet(path)
+                    if df.empty:
+                        continue
+                    if not isinstance(df.index, pd.DatetimeIndex):
+                        df.index = pd.to_datetime(df.index)
+                    df = df[(df.index >= self.start_date) & (df.index <= self.end_date)]
+                    if df.empty:
+                        continue
+                    self.data[symbol] = df.sort_index()
+                    log.info(f"Loaded {symbol}: {len(df)} bars ({label})")
+                    loaded = True
+                    break
                 except Exception as e:
-                    log.warning(f"Failed to load daily {symbol}: {e}")
+                    log.warning(f"Failed to load {label} {symbol}: {e}")
 
-            # Fallback to intraday (5m)
-            intraday_file = intraday_dir / f"{symbol}_5m.parquet"
-            if intraday_file.exists():
-                try:
-                    df = pd.read_parquet(intraday_file)
-                    if not df.empty:
-                        if not isinstance(df.index, pd.DatetimeIndex):
-                            df.index = pd.to_datetime(df.index)
-                        df = df[(df.index >= self.start_date) & (df.index <= self.end_date)]
-                        if not df.empty:
-                            self.data[symbol] = df.sort_index()
-                            log.info(f"Loaded {symbol}: {len(df)} 5m bars")
-                            continue
-                except Exception as e:
-                    log.warning(f"Failed to load intraday {symbol}: {e}")
-
-            log.warning(f"No data found for {symbol}")
+            if not loaded:
+                log.warning(f"No data found for {symbol}")
 
         if not self.data:
             raise ValueError("No data loaded for any symbol")

@@ -1387,9 +1387,11 @@ function esc(s) {
 }
 
 // ── Render positions ───────────────────────────────────────
-function closePosition(symbol) {
-  if (confirm('Close ' + symbol + '? Executes immediately via aggressive limit order.')) {
-    fetch('/api/close', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({symbol})})
+function closePosition(idx) {
+  const p = lastPositions[idx];
+  const key = p ? (p._trade_key || p.symbol) : String(idx);
+  if (confirm('Close ' + key + '? Executes immediately via aggressive limit order.')) {
+    fetch('/api/close', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({symbol: key})})
       .then(r => r.json())
       .then(d => {
         if (d.ok) alert('✅ ' + d.detail);
@@ -1399,8 +1401,10 @@ function closePosition(symbol) {
   }
 }
 
-function cancelOrder(orderId, symbol) {
-  if (confirm('Cancel pending order #' + orderId + ' (' + symbol + ')?')) {
+function cancelOrder(orderId, idx) {
+  const p = lastPositions[idx];
+  const sym = p ? p.symbol : String(idx);
+  if (confirm('Cancel pending order #' + orderId + ' (' + sym + ')?')) {
     fetch('/api/cancel-order', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({order_id: orderId})})
       .then(r => r.json())
       .then(d => {
@@ -1466,8 +1470,8 @@ function renderPositions(positions) {
       : '';
     // Action button: Cancel for pending, Close for active
     const actionBtn = isPending && p.order_id
-      ? `<button onclick="event.stopPropagation();cancelOrder(${p.order_id},${JSON.stringify(p.symbol)})" style="background:rgba(255,214,0,.12);border:1px solid var(--yellow);color:var(--yellow);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Cancel pending order">CANCEL</button>`
-      : `<button onclick="event.stopPropagation();closePosition(${JSON.stringify(p._trade_key || p.symbol)})" style="background:rgba(255,23,68,.12);border:1px solid var(--red);color:var(--red);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Close this position">✕</button>`;
+      ? `<button onclick="event.stopPropagation();cancelOrder(${p.order_id},${p._idx})" style="background:rgba(255,214,0,.12);border:1px solid var(--yellow);color:var(--yellow);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Cancel pending order">CANCEL</button>`
+      : `<button onclick="event.stopPropagation();closePosition(${p._idx})" style="background:rgba(255,23,68,.12);border:1px solid var(--red);color:var(--red);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Close this position">✕</button>`;
     return `<div class="pos-card" onclick="showPositionDetail(${p._idx})" title="Click for details" style="${cardOpacity}">
       <div class="pos-hdr">
         <span class="pos-sym">${p.symbol}${p.instrument === 'option' ? ' <span style="font-size:9px;color:var(--cyan);font-weight:600">OPT</span>' : ''}${pendingBadge}${trancheBadge} <span style="font-size:10px;color:var(--muted2);font-weight:400">${p.dir} ×${Math.abs(p.qty)}</span></span>
@@ -2700,7 +2704,26 @@ function showPositionDetail(idx) {
   const badge = isOpt ? ' <span style="color:var(--cyan);font-size:12px">OPT</span>' : '';
   const dirBadge = `<span style="font-size:11px;color:${dir==='LONG'?'var(--green)':'var(--red)'};font-weight:600;background:${dir==='LONG'?'rgba(0,200,83,.1)':'rgba(255,23,68,.1)'};padding:2px 8px;border-radius:10px">${dir}</span>`;
 
-  const reasoning = p.reasoning || 'No reasoning recorded for this position.';
+  const RECONCILED_MARKER = 'Reconciled from IBKR on startup';
+  let reasoningText;
+  if (!p.reasoning) {
+    reasoningText = 'No reasoning recorded for this position.';
+  } else if (p.reasoning === RECONCILED_MARKER) {
+    reasoningText = 'Position loaded from broker at startup \u2014 entry reasoning not available.';
+  } else {
+    reasoningText = p.reasoning;
+  }
+
+  let agentSection = '';
+  if (p.agent_outputs && p.agent_outputs.opportunity) {
+    const raw = String(p.agent_outputs.opportunity);
+    const truncated = raw.length > 300 ? raw.slice(0, 300) + '\u2026' : raw;
+    agentSection = `
+      <div class="pos-modal-section">
+        <h4>Agent Analysis</h4>
+        <div class="pos-modal-reasoning" style="font-size:11px;color:var(--muted2)">${esc(truncated)}</div>
+      </div>`;
+  }
 
   document.getElementById('pos-modal-content').innerHTML = `
     <div class="pos-modal-hdr">
@@ -2720,8 +2743,9 @@ function showPositionDetail(idx) {
       ${p._price_sources ? `<div class="pos-modal-row"><span class="pos-modal-label">Price Source</span><span class="pos-modal-val" style="font-size:10px">${p._price_sources}</span></div>` : ''}
       <div class="pos-modal-section">
         <h4>Why Decifer Took This Position</h4>
-        <div class="pos-modal-reasoning">${reasoning}</div>
+        <div class="pos-modal-reasoning">${esc(reasoningText)}</div>
       </div>
+      ${agentSection}
     </div>
   `;
   document.getElementById('pos-modal-overlay').classList.add('active');

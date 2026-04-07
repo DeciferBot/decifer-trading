@@ -104,6 +104,10 @@ _pnl_subscription                               = None
 scan_count         = 0
 last_sunday_review = None
 
+# ── SL fill event flags (set by fillEvent handler, consumed by check_external_closes) ──
+# Symbols whose native IBKR stop-loss order just filled — processed on next scan.
+_sl_fill_events: set = set()
+
 # ── News Sentinel state ───────────────────────────────────────────────────────
 _sentinel                  = None
 _sentinel_trades_this_hour = 0
@@ -113,6 +117,24 @@ _sentinel_hour_start       = None
 _catalyst_sentinel     = None
 _catalyst_trades_today = 0
 _catalyst_trade_date   = ""
+
+# ── IBKR account / position ground truth ─────────────────────────────────────
+# Populated by _on_account_value() when reqAccountUpdates is active.
+# Keys mirror IBKR Account Value Keys: NetLiquidation, BuyingPower,
+# DayTradesRemaining, ExcessLiquidity, Cushion, HighestSeverity, etc.
+account_values: dict  = {}
+
+# Populated by _on_position() on connect and after every reconnect.
+# Keyed by symbol; value is the ib_async Position object.
+ibkr_positions: dict  = {}
+
+# Set to False when IBKR sends accountReady=false (server mid-reset).
+# Callers should suppress account-value reads while this is False.
+_account_ready: bool  = True
+
+# Symbols with an active regulatory or volatility halt (tick-type 49).
+# Orders to these symbols are blocked until the halt clears.
+_halted_symbols: set  = set()
 
 
 # ── Utility: coloured terminal log ───────────────────────────────────────────

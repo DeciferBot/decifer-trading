@@ -489,16 +489,19 @@ class TestFillWatcherParamsWired:
 
 
 # ===========================================================================
-# 4. ATR=0 aborts a non-tranche trade (zero-R:R guard).
+# 4. ATR=0 uses the ATR floor and still executes the trade.
 # ===========================================================================
 
 class TestAtrZeroDefensiveBehaviour:
-    """When atr=0, calculate_stops produces sl=price, risk=0.
-    execute_buy must reject the trade in non-tranche mode rather than
-    submitting an order with an undefined stop loss distance."""
+    """When atr=0, calculate_stops applies a 0.3%-of-price floor so the stop
+    distance is non-zero.  The trade is allowed through with a valid stop rather
+    than being rejected with a hair-trigger (sl == price) stop.
 
-    def test_atr_zero_aborts_non_tranche_trade(self):
-        """execute_buy with atr=0, tranche_mode=False must return False."""
+    This behaviour was introduced in commit 98f4d90 ("fix(agents): enforce
+    scanner direction alignment + ATR stop floor")."""
+
+    def test_atr_zero_uses_floor_and_proceeds(self):
+        """execute_buy with atr=0 must proceed — the ATR floor produces a valid stop."""
         ib = _make_ib()
         ib.placeOrder.reset_mock()
 
@@ -507,26 +510,31 @@ class TestAtrZeroDefensiveBehaviour:
             atr=0.0,
             tranche_mode=False,
             extra_patches={
-                # Real calculate_stops so zero-R:R fires
+                # Real calculate_stops so the ATR floor logic runs
                 "orders.calculate_stops":         _real_calculate_stops,
                 "orders.calculate_position_size": MagicMock(return_value=10),
             },
         )
 
-        assert result is False, (
-            "execute_buy with atr=0 and tranche_mode=False must return False; "
-            "zero ATR means undefined stop distance — trade should be aborted"
+        assert result is True, (
+            "execute_buy with atr=0 must succeed: the ATR floor (0.3%% of price) "
+            "produces a viable stop distance, so there is no reason to abort"
         )
-        assert not ib.placeOrder.called, (
-            "ib.placeOrder was called despite atr=0 and zero stop distance"
+        assert ib.placeOrder.called, (
+            "ib.placeOrder must be called — the ATR floor gives a valid stop distance"
         )
 
-    def test_calculate_stops_with_zero_atr_produces_zero_risk(self):
-        """Direct unit: calculate_stops(price, 0, 'LONG') → sl == price → risk == 0."""
-        sl, tp = _real_calculate_stops(100.0, 0.0, "LONG")
-        assert (100.0 - sl) == pytest.approx(0.0), (
-            f"Expected zero risk distance when atr=0, got sl={sl}"
+    def test_calculate_stops_with_zero_atr_uses_floor(self):
+        """Direct unit: calculate_stops(price, 0, 'LONG') applies the 0.3%-of-price
+        ATR floor so sl < price (non-zero risk distance)."""
+        price = 100.0
+        sl, tp = _real_calculate_stops(price, 0.0, "LONG")
+        risk_distance = price - sl
+        expected_floor = price * 0.003 * CONFIG.get("atr_stop_multiplier", 1.5)
+        assert risk_distance == pytest.approx(expected_floor), (
+            f"Expected risk distance={expected_floor:.4f} (ATR floor), got sl={sl}"
         )
+        assert sl < price, "Stop must be below entry for a LONG position"
 
 
 # ===========================================================================

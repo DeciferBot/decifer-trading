@@ -290,13 +290,23 @@ class TestApplyTvPrefilter(unittest.TestCase):
         result = _apply_tv_prefilter(["FAV"], cache, favourites=["FAV"])
         self.assertEqual(result.count("FAV"), 1)
 
-    def test_all_symbols_killed_returns_only_favourites(self):
+    def test_all_symbols_killed_returns_favourites_and_core(self):
+        # SPY is both a favourite and a CORE_SYMBOL; SPXS is a CORE_SYMBOL but not a
+        # favourite; X/Y have neutral TV signal and are not core.
+        # After the fix, CORE_SYMBOLS in the input universe are also preserved.
         cache = {
             "X": _tv_entry(tv_recommend=0.0),
             "Y": _tv_entry(tv_recommend=0.0),
         }
-        result = _apply_tv_prefilter(["X", "Y", "SPY"], cache, favourites=["SPY"])
-        self.assertEqual(set(result), {"SPY"})
+        result = _apply_tv_prefilter(["X", "Y", "SPY", "SPXS"], cache, favourites=["SPY"])
+        result_set = set(result)
+        # Favourite must be present
+        self.assertIn("SPY", result_set)
+        # CORE_SYMBOL in universe must be preserved
+        self.assertIn("SPXS", result_set)
+        # X and Y should be excluded (neutral TV signal, not core, not favourite)
+        self.assertNotIn("X", result_set)
+        self.assertNotIn("Y", result_set)
 
     def test_empty_favourites_list_no_error(self):
         cache = {"A": _tv_entry()}

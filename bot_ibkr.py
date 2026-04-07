@@ -68,6 +68,13 @@ def _restore_subscriptions() -> None:
                 account = params.get("account", CONFIG.get("active_account", ""))
                 ib.reqPnL(account)
                 log.info(f"  ✔ Re-subscribed PnL for account {account}")
+            elif sub_type == "account":
+                account = params.get("account", CONFIG.get("active_account", ""))
+                ib.reqAccountUpdates(True, account)
+                log.info(f"  ✔ Re-subscribed account updates for {account}")
+            elif sub_type == "positions":
+                ib.reqPositions()
+                log.info("  ✔ Re-requested positions")
             elif sub_type == "ticker":
                 from ib_async import Stock
                 contract = Stock(key, "SMART", "USD")
@@ -77,6 +84,117 @@ def _restore_subscriptions() -> None:
                 log.warning(f"  ⚠ Unknown subscription type '{sub_type}' for key '{key}' — skipped")
         except Exception as exc:
             log.error(f"  ✗ Failed to restore subscription '{key}': {exc}")
+
+
+# ── ExecId correction helper ─────────────────────────────────────────────────
+
+def _exec_id_prefix(eid: str) -> str:
+    """
+    Strip IBKR correction suffix to get the base execution ID.
+    IBKR sends corrected executions with the same prefix but a new numeric
+    suffix (e.g. '0001234.01' → corrected as '0001234.02').  Deduplication
+    must use the prefix so that both the original and its correction resolve
+    to the same execution record.
+    """
+    parts = eid.rsplit(".", 1)
+    return parts[0] if len(parts) > 1 else eid
+
+
+# ── IBKR error / message handler ─────────────────────────────────────────────
+
+# Codes that IBKR sends as informational system messages — not real errors.
+_INFORMATIONAL_CODES = frozenset({
+    2100, 2101, 2102, 2103, 2104, 2105, 2106, 2107, 2108,
+    2119, 2158, 10167,
+})
+
+def _on_ibkr_error(req_id: int, error_code: int, error_string: str, contract) -> None:
+    """
+    Handles all messages from ib.errorEvent.
+
+    Routing by code range:
+    - Informational (2104, 2106, 2158 …) → debug-level log only
+    - 1100  → TWS lost IB servers — pause order awareness
+    - 1101  → reconnected, data LOST — must re-subscribe
+    - 1102  → reconnected, data maintained — nothing to do
+    - 507   → socket EOF — trigger reconnect
+    - 326   → duplicate clientId — fatal, abort bot
+    - 200   → ambiguous/unknown contract
+    - 201   → order rejected — log advancedOrderRejectJson if present
+    - 202   → order cancelled by TWS
+    - 154   → order to a halted symbol — mark halted in bot_state
+    """
+    sym = getattr(contract, "symbol", None) if contract else None
+    tag = f"[{sym}] " if sym else ""
+
+    if error_code in _INFORMATIONAL_CODES:
+        log.debug(f"IBKR info {error_code}: {tag}{error_string}")
+        return
+
+    if error_code == 1100:
+        log.warning(f"IBKR error 1100: TWS lost IB servers — {error_string}")
+        clog("ERROR", "IBKR: TWS lost connection to IB servers — orders paused")
+        dash["ibkr_disconnected"] = True
+        return
+
+    if error_code == 1101:
+        # Reconnected but market data subscriptions were lost — must re-subscribe.
+        log.warning(f"IBKR error 1101: reconnected, data LOST — re-subscribing")
+        clog("INFO", "IBKR: reconnected (data lost) — restoring subscriptions")
+        dash["ibkr_disconnected"] = False
+        try:
+            _restore_subscriptions()
+        except Exception as exc:
+            log.error(f"_restore_subscriptions after 1101 failed: {exc}")
+        return
+
+    if error_code == 1102:
+        # Reconnected and market data maintained — nothing to restore.
+        log.info(f"IBKR error 1102: reconnected, data maintained — no re-subscribe needed")
+        clog("INFO", "IBKR: reconnected (data maintained)")
+        dash["ibkr_disconnected"] = False
+        return
+
+    if error_code == 507:
+        log.error(f"IBKR error 507: socket EOF — triggering reconnect")
+        clog("ERROR", "IBKR: socket EOF — reconnecting")
+        _on_disconnected()
+        return
+
+    if error_code == 326:
+        log.critical(f"IBKR error 326: duplicate clientId — another session is connected. Aborting bot.")
+        clog("ERROR", "IBKR FATAL: duplicate clientId 326 — another session already connected. Bot must be restarted with a unique clientId.")
+        import os
+        os._exit(1)
+
+    if error_code == 200:
+        log.error(f"IBKR error 200: {tag}ambiguous/unknown contract — {error_string}")
+        clog("ERROR", f"IBKR: ambiguous contract {tag.strip()}: {error_string}")
+        return
+
+    if error_code == 201:
+        log.error(f"IBKR error 201 (reqId={req_id}): {tag}order rejected — {error_string}")
+        clog("ERROR", f"IBKR: order rejected {tag.strip()}: {error_string}")
+        return
+
+    if error_code == 202:
+        log.warning(f"IBKR error 202 (reqId={req_id}): {tag}order cancelled — {error_string}")
+        clog("INFO", f"IBKR: order cancelled {tag.strip()}: {error_string}")
+        return
+
+    if error_code == 154:
+        if sym:
+            bot_state._halted_symbols.add(sym)
+            log.warning(f"IBKR error 154: {sym} is halted — added to halt set, future orders blocked")
+            clog("ERROR", f"IBKR: {sym} halted — orders blocked until halt clears")
+        return
+
+    if error_code == 354:
+        log.debug(f"IBKR error 354: {tag}market data not subscribed (delayed active) — {error_string}")
+        return
+
+    # Default: log as warning with full details
+    log.warning(f"IBKR error {error_code} (reqId={req_id}): {tag}{error_string}")
 
 
 # ── Alert & reconnect workers ─────────────────────────────────────────────────
@@ -146,6 +264,11 @@ def _reconnect_worker() -> None:
             _bot = sys.modules.get("bot")
             restore_fn = getattr(_bot, "_restore_subscriptions", _restore_subscriptions) if _bot else _restore_subscriptions
             restore_fn()
+            # Re-fetch today's completed orders that arrived while we were disconnected.
+            try:
+                ib.reqCompletedOrders(False)
+            except Exception as _rco_exc:
+                log.warning(f"reqCompletedOrders after reconnect failed: {_rco_exc}")
             break
         except Exception as exc:
             log.error(f"Reconnect attempt {attempt} failed: {exc}")
@@ -210,6 +333,154 @@ def _heartbeat_worker() -> None:
             log.warning(f"IBKR heartbeat failed: {exc}")
 
 
+# ── SL fill event handler ─────────────────────────────────────────────────────
+
+def _on_ibkr_fill(trade, fill) -> None:  # noqa: ARG001
+    """
+    Called by ib.execDetailsEvent for every order fill.
+    If the fill matches a known bot stop-loss order, flag the symbol so
+    check_external_closes() processes it on the very next scan cycle instead
+    of waiting up to 3-5 min for the position to disappear from the portfolio.
+    No ib calls here — event callbacks must not block the ib event loop.
+    """
+    try:
+        from orders import open_trades, _trades_lock
+        oid = getattr(fill.execution, "orderId", None)
+        if oid is None:
+            return
+        with _trades_lock:
+            for sym, t in open_trades.items():
+                sl_oid = t.get("sl_order_id")
+                if sl_oid and int(sl_oid) == int(oid):
+                    bot_state._sl_fill_events.add(sym)
+                    log.info(f"[SL-FILL] Stop-loss fill detected for {sym} (orderId={oid}) — flagged for immediate processing")
+                    break
+    except Exception as exc:
+        log.warning(f"_on_ibkr_fill error: {exc}")
+
+
+# ── Account / position callbacks ─────────────────────────────────────────────
+
+# IBKR account-value tags we care about — anything not in this set is silently ignored
+# to keep bot_state.account_values lean.
+_ACCOUNT_KEYS_OF_INTEREST = frozenset({
+    "NetLiquidation", "BuyingPower", "AvailableFunds",
+    "ExcessLiquidity", "Cushion", "HighestSeverity",
+    "DayTradesRemaining",
+    "DayTradesRemainingT+1", "DayTradesRemainingT+2",
+    "DayTradesRemainingT+3", "DayTradesRemainingT+4",
+    "MaintMarginReq", "InitMarginReq",
+    "GrossPositionValue",
+})
+
+
+def _on_account_value(account_value) -> None:
+    """
+    Callback for ib.accountValueEvent (fired by reqAccountUpdates).
+    Stores selected account metrics in bot_state.account_values and mirrors
+    NetLiquidation into dash['portfolio_value'].
+    """
+    try:
+        tag = account_value.tag
+        val = account_value.value
+
+        if tag == "accountReady":
+            bot_state._account_ready = (val.lower() == "true")
+            if not bot_state._account_ready:
+                log.warning("IBKR accountReady=false — account data suppressed during server reset")
+            return
+
+        if not bot_state._account_ready:
+            return
+
+        if tag not in _ACCOUNT_KEYS_OF_INTEREST:
+            return
+
+        try:
+            numeric = float(val)
+        except (ValueError, TypeError):
+            numeric = val
+
+        bot_state.account_values[tag] = numeric
+
+        if tag == "NetLiquidation":
+            dash["portfolio_value"] = numeric
+
+    except Exception as exc:
+        log.warning(f"_on_account_value error: {exc}")
+
+
+def _on_position(position) -> None:
+    """
+    Callback for ib.positionEvent (fired by reqPositions).
+    Builds bot_state.ibkr_positions keyed by symbol for ground-truth reconciliation.
+    """
+    try:
+        sym = position.contract.symbol
+        bot_state.ibkr_positions[sym] = position
+    except Exception as exc:
+        log.warning(f"_on_position error: {exc}")
+
+
+# ── Commission report + order-bound callbacks ─────────────────────────────────
+
+def _on_commission_report(trade, fill, report) -> None:
+    """
+    Fires after a fill is confirmed with its commission details.
+    Updates the matching orders.json record with real commission and realized P&L.
+    No ib calls here — must not block the event loop.
+    """
+    try:
+        from learning import load_orders as _load_orders, _save_orders
+        order_id = getattr(fill.execution, "orderId", None)
+        if order_id is None:
+            return
+
+        commission   = getattr(report, "commission",   None)
+        realized_pnl = getattr(report, "realizedPNL",  None)
+
+        import math
+        def _safe_float(v):
+            if v is None:
+                return None
+            try:
+                f = float(v)
+                return None if math.isnan(f) else f
+            except (TypeError, ValueError):
+                return None
+
+        commission   = _safe_float(commission)
+        realized_pnl = _safe_float(realized_pnl)
+
+        if commission is None and realized_pnl is None:
+            return
+
+        orders  = _load_orders()
+        changed = False
+        for o in orders:
+            if o.get("order_id") == order_id:
+                if commission is not None:
+                    o["commission"]   = commission
+                if realized_pnl is not None:
+                    o["realized_pnl"] = realized_pnl
+                changed = True
+                break
+
+        if changed:
+            _save_orders(orders)
+
+    except Exception as exc:
+        log.warning(f"_on_commission_report error: {exc}")
+
+
+def _on_order_bound(order_id: int, api_client_id: int, api_order_id: int) -> None:
+    """
+    Fires when a manual TWS order is auto-bound to the API (via reqAutoOpenOrders).
+    Logs the permId ↔ API order ID mapping for audit purposes.
+    """
+    log.info(f"IBKR orderBound: permId={order_id} ↔ apiClientId={api_client_id} apiOrderId={api_order_id}")
+
+
 # ── Connect / subscribe ───────────────────────────────────────────────────────
 
 def connect_ibkr() -> bool:
@@ -223,9 +494,29 @@ def connect_ibkr() -> bool:
         ib.reqMarketDataType(3)
         if _on_disconnected not in ib.disconnectedEvent:
             ib.disconnectedEvent += _on_disconnected
+        if _on_ibkr_error not in ib.errorEvent:
+            ib.errorEvent += _on_ibkr_error
+        if _on_ibkr_fill not in ib.execDetailsEvent:
+            ib.execDetailsEvent += _on_ibkr_fill
+        if _on_order_status_event not in ib.orderStatusEvent:
+            ib.orderStatusEvent += _on_order_status_event
+        if _on_account_value not in ib.accountValueEvent:
+            ib.accountValueEvent += _on_account_value
+        if _on_position not in ib.positionEvent:
+            ib.positionEvent += _on_position
+        if _on_commission_report not in ib.commissionReportEvent:
+            ib.commissionReportEvent += _on_commission_report
+        if _on_order_bound not in ib.orderBoundEvent:
+            ib.orderBoundEvent += _on_order_bound
         ht = threading.Thread(target=_heartbeat_worker, name="ibkr-heartbeat", daemon=True)
         ht.start()
-        _register_subscription("__pnl__", {"type": "pnl", "account": CONFIG.get("active_account", "")})
+        account = CONFIG.get("active_account", "")
+        _register_subscription("__pnl__", {"type": "pnl", "account": account})
+        _register_subscription("__account__", {"type": "account", "account": account})
+        _register_subscription("__positions__", {"type": "positions"})
+        ib.reqAccountUpdates(True, account)
+        ib.reqPositions()
+        ib.reqAutoOpenOrders(True)
         clog("INFO", f"IBKR connected — port {CONFIG['ibkr_port']} | Account: {CONFIG.get('active_account', '')} | Market data: DELAYED (free)")
         reconcile_with_ibkr(ib)
         dash["status"] = "running"
@@ -300,7 +591,7 @@ def backfill_trades_from_ibkr():
                 price      = float(fill.execution.price)
                 shares     = float(fill.execution.shares)
                 etime      = fill.execution.time.strftime("%Y-%m-%d %H:%M:%S") if fill.execution.time else ""
-                eid        = fill.execution.execId
+                eid        = _exec_id_prefix(fill.execution.execId)
                 order_id   = fill.execution.orderId
 
                 pnl = 0.0
@@ -357,7 +648,8 @@ def backfill_trades_from_ibkr():
                         g["latest_time"] = etime
                     if not g["earliest_time"] or etime < g["earliest_time"]:
                         g["earliest_time"] = etime
-            except Exception:
+            except Exception as fill_exc:
+                log.warning(f"backfill: skipping fill (execId={getattr(getattr(fill, 'execution', None), 'execId', '?')}): {fill_exc}")
                 continue
 
         buy_orders  = defaultdict(list)
@@ -762,6 +1054,9 @@ def sync_orders_from_ibkr():
                 mapped_status = "CANCELLED"
             elif ibkr_status in ("INACTIVE",):
                 mapped_status = "CANCELLED"
+            elif ibkr_status in ("PENDINGCANCEL",):
+                # Order can still fill in this state — do NOT mark as CANCELLED.
+                mapped_status = "PENDING_CANCEL"
             elif ibkr_status in ("SUBMITTED", "PRESUBMITTED", "PENDINGSUBMIT"):
                 mapped_status = "SUBMITTED"
             else:
@@ -776,6 +1071,7 @@ def sync_orders_from_ibkr():
 
             _log_order({
                 "order_id":   order.orderId,
+                "perm_id":    getattr(order, "permId", None) or None,
                 "symbol":     contract.symbol,
                 "side":       order.action,
                 "order_type": order.orderType,
@@ -813,6 +1109,8 @@ def sync_orders_from_ibkr():
         for o in orders:
             oid    = o.get("order_id")
             status = (o.get("status") or "").upper()
+            # PENDING_CANCEL: IBKR cancel request acknowledged but fill still possible.
+            # Do not mark as CANCELLED until IBKR confirms with "Cancelled" status.
             if not oid or status not in ("SUBMITTED", "PRESUBMITTED", "PENDING"):
                 continue
             if oid in ibkr_open_ids:
@@ -848,6 +1146,9 @@ def _on_order_status_event(trade):
             mapped_status = "FILLED"
         elif ibkr_status in ("CANCELLED", "APICANCELED", "APICANCELLED", "INACTIVE"):
             mapped_status = "CANCELLED"
+        elif ibkr_status in ("PENDINGCANCEL",):
+            # Order can still fill in this state — do NOT mark as CANCELLED.
+            mapped_status = "PENDING_CANCEL"
         elif ibkr_status in ("SUBMITTED", "PRESUBMITTED", "PENDINGSUBMIT"):
             mapped_status = "SUBMITTED"
         else:
@@ -859,6 +1160,7 @@ def _on_order_status_event(trade):
 
         _log_order({
             "order_id":   order.orderId,
+            "perm_id":    getattr(order, "permId", None) or None,
             "symbol":     contract.symbol,
             "side":       order.action,
             "order_type": order.orderType,

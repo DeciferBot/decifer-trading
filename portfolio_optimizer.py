@@ -79,7 +79,7 @@ class CorrelationTracker:
                 start=start_date,
                 end=end_date,
                 progress=False,
-                threads=True
+                threads=False
             )
 
             # Handle single symbol case

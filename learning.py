@@ -425,7 +425,10 @@ def get_performance_summary(trades: list = None) -> dict:
     if trades is None:
         trades = load_trades()
 
-    closed = [t for t in trades if t.get("exit_price") is not None and t.get("pnl") is not None]
+    closed = [t for t in trades
+              if t.get("exit_price") is not None
+              and t.get("pnl") is not None
+              and t.get("exit_reason") != "manual"]
 
     if not closed:
         return {

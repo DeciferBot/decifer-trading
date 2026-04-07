@@ -3,7 +3,7 @@
 # ║   Rolling IC-weighted signal composite                       ║
 # ║                                                              ║
 # ║   Information Coefficient (IC) = Spearman rank correlation  ║
-# ║   between each dimension's Z-score and the 5-day forward    ║
+# ║   between each dimension's Z-score and the N-day forward    ║
 # ║   return.  Dimensions with higher recent IC get more weight. ║
 # ║                                                              ║
 # ║   Weight derivation:                                         ║
@@ -91,15 +91,24 @@ def _zscore_array(arr: np.ndarray) -> np.ndarray:
 
 # ── Signal log loading ─────────────────────────────────────────────────────────
 
-def _load_signal_records(signals_log_path: str = None, window: int = ROLLING_WINDOW) -> list:
+def _load_signal_records(
+    signals_log_path: str = None,
+    window: int = ROLLING_WINDOW,
+    min_age_days: int = 0,
+) -> list:
     """
     Load the most recent `window` records that have a fully-populated
     score_breakdown (all 9 dimensions present).
+
+    If *min_age_days* > 0, only records at least that many calendar days old
+    are included.  This ensures forward-return data can actually be fetched
+    before a record enters the IC computation window.
     """
     path = signals_log_path or SIGNALS_LOG_FILE
     if not os.path.exists(path):
         return []
     records = []
+    today = datetime.now(timezone.utc).date()
     try:
         with open(path) as f:
             for line in f:
@@ -109,8 +118,18 @@ def _load_signal_records(signals_log_path: str = None, window: int = ROLLING_WIN
                 try:
                     rec = json.loads(line)
                     bd = rec.get("score_breakdown", {})
-                    if bd and all(d in bd for d in DIMENSIONS):
-                        records.append(rec)
+                    if not (bd and all(d in bd for d in DIMENSIONS)):
+                        continue
+                    if min_age_days > 0:
+                        ts_str = rec.get("ts", "")
+                        if not ts_str:
+                            continue
+                        scan_date = datetime.fromisoformat(
+                            ts_str.replace("Z", "+00:00")
+                        ).date()
+                        if (today - scan_date).days < min_age_days:
+                            continue
+                    records.append(rec)
                 except Exception:
                     continue
     except Exception as e:
@@ -182,6 +201,14 @@ def _fetch_forward_returns_batch(records: list) -> dict:
                 result[i] = None
             continue
 
+        fwd_horizon: int = int(_ic_cfg("forward_horizon_days", 1))
+        # Calendar-day offsets derived from the configured trading-day horizon:
+        #   min_age  = horizon + 1  (at least one extra day for settlement lag)
+        #   fwd_offset = horizon + 2  (adds a weekend buffer; e.g. horizon=1 → +3d,
+        #                              horizon=5 → +7d which matches the original value)
+        min_age_cal: int = fwd_horizon + 1
+        fwd_offset_cal: int = fwd_horizon + 2
+
         for i in idxs:
             rec = records[i]
             scan_price = rec.get("price")
@@ -189,12 +216,11 @@ def _fetch_forward_returns_batch(records: list) -> dict:
             try:
                 scan_dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                 scan_date = scan_dt.date()
-                # Records less than 6 days old cannot have a 5-day forward return yet
-                if (datetime.now(timezone.utc).date() - scan_date).days < 6:
+                if (datetime.now(timezone.utc).date() - scan_date).days < min_age_cal:
                     result[i] = None
                     continue
-                # Find the first trading day >= 5 business days after the scan date
-                future_date = scan_date + timedelta(days=7)  # ≥ 5 trading days
+                # Find the first trading close on or after fwd_offset_cal calendar days
+                future_date = scan_date + timedelta(days=fwd_offset_cal)
                 future_candidates = close_series[
                     close_series.index.date >= future_date  # type: ignore[operator]
                 ]
@@ -228,16 +254,19 @@ def compute_rolling_ic(
     """
     Compute Spearman IC per dimension using the most recent `window` records.
 
-    IC is computed between each dimension's Z-scored values and the 5-day
-    forward return.  Z-scoring normalises across the heterogeneous 0-10 ranges
-    before the correlation, so the resulting IC values are comparable.
+    IC is computed between each dimension's Z-scored values and the configured
+    forward return horizon (default: 1 trading day for Phase 1, 5 days for Phase 2+).
+    Z-scoring normalises across the heterogeneous 0-10 ranges before the
+    correlation, so the resulting IC values are comparable.
 
     Returns
     -------
     dict mapping dimension name → raw IC (float in [-1, 1]) or None if
     insufficient data is available for that dimension.
     """
-    records = _load_signal_records(signals_log_path, window)
+    fwd_horizon: int = int(_ic_cfg("forward_horizon_days", 1))
+    min_age_days: int = fwd_horizon + 1  # records must be old enough to have returns
+    records = _load_signal_records(signals_log_path, window, min_age_days=min_age_days)
     if len(records) < min_valid:
         log.info(
             "compute_rolling_ic: %d valid records (need %d) — returning None IC",

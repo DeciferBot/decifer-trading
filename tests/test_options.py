@@ -77,7 +77,7 @@ sys.modules.setdefault("config", config_stub)
 
 import pytest
 # Evict any hollow stub test_bot.py may have cached for 'options'
-for _decifer_mod in ("options", "orders", "risk", "scanner"):
+for _decifer_mod in ("options", "risk", "scanner"):
     # NOTE: do NOT pop "learning" — options.py doesn't import it, and test_learning.py
     # (l < o alphabetically) already installed the real module; evicting it here
     # would break test_learning.py's patch("learning.anthropic") calls.

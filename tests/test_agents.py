@@ -208,12 +208,24 @@ class TestVoteCounting:
         syms = [b["symbol"] for b in result["buys"]]
         assert "AAPL" not in syms
 
-    def test_bearish_macro_blocks_trade(self):
-        """BEARISH macro gives -1; tech+1 macro-1 opp+1 risk+1 = 2 < 3 required."""
+    def test_bearish_macro_no_longer_blocks_high_conviction(self):
+        """BEARISH macro gives 0 (softened); tech+1 macro+0 opp+1 risk+1 = 3 >= 3 required.
+        High-conviction setups in bear markets now pass — macro is informational, not a veto."""
         macro_bear = "Overall verdict: BEARISH -- risk-OFF, recession signals mounting."
         with patch.dict(agents.CONFIG, _AGENTS_CFG):
             result = agents.agent_final_decision(
                 **_final_kwargs(macro=macro_bear, agents_required=3)
+            )
+        syms = [b["symbol"] for b in result["buys"]]
+        assert "AAPL" in syms
+
+    def test_bearish_macro_blocks_low_conviction(self):
+        """BEARISH macro gives 0; no technical HIGH -> tech+0 macro+0 opp+1 risk+1 = 2 < 3."""
+        macro_bear = "Overall verdict: BEARISH -- risk-OFF, recession signals mounting."
+        tech_no_high = "[MEDIUM] AAPL: $190 | Score=25/50 | BUY"  # no HIGH keyword
+        with patch.dict(agents.CONFIG, _AGENTS_CFG):
+            result = agents.agent_final_decision(
+                **_final_kwargs(macro=macro_bear, technical=tech_no_high, agents_required=3)
             )
         syms = [b["symbol"] for b in result["buys"]]
         assert "AAPL" not in syms

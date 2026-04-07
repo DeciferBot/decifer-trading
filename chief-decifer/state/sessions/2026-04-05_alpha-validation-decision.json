@@ -1,0 +1,38 @@
+{
+  "date": "2026-04-05",
+  "topic": "Strategic reset — alpha validation only",
+  "status": "approved",
+
+  "decision": "Single focus until further notice: prove the signal has edge. No new features.",
+
+  "what_was_found": {
+    "ic_status": "IC has never computed real values. All dimensions null, equal weights (1/9 each) since day one. Root cause: IC calculator takes last 60 signals_log records which are always 1-2 days old. Forward returns need 6+ days. 185 eligible records exist (March 30th) but are not in the last-60 window. Resolves naturally — check April 9th.",
+    "win_rate": "34% across 103 closed trades (35 wins, 68 losses). Trend unknown.",
+    "score_anomaly": "102 of 143 trades have score=0 with empty signal_scores. Not yet explained.",
+    "dimension_observations": {
+      "social": "Disabled in config, always scores 0 — IC will always be undefined for this dimension",
+      "breakout": "95% zeros in IC-eligible window — near-zero variance, IC unreliable when computed",
+      "reversion": "97% zeros — same problem",
+      "news": "28% zeros — acceptable, but was partly broken during Finviz scraper bug period",
+      "short_squeeze": "Was silently returning None for all symbols due to Finviz HTML parser mismatch — now fixed"
+    }
+  },
+
+  "what_was_done_this_session": {
+    "finnhub_integration": "Added finnhub_client.py, wired company-news into news.py Tier 2b, added finnhub_api_key to config and .env. Free tier only covers stock quotes + company news — VIX/short-interest/sentiment are paywalled.",
+    "finviz_scraper_fix": "Fixed _fetch_short_float() — old DOM parser returned None for all symbols because Finviz wraps values in <b> tags. New parser handles actual HTML structure. Live tested: GME=15.76%, AAPL=0.85%, NVDA=0.98%.",
+    "strategic_decision": "Agreed: stop adding features. Alpha validation is the only gate that matters."
+  },
+
+  "what_to_do_next_session": [
+    "Check ic_weights.json — if April 9th or later, IC should have real values",
+    "Investigate score=0 on 102 trades — is it a logging bug?",
+    "Break down win rate by week and by exit_reason"
+  ],
+
+  "open_questions": [
+    "Is the 34% win rate improving or flat over time?",
+    "Are losses concentrated in options, specific regimes, or specific exit reasons?",
+    "What is the score=0 population — sentinel trades, options, logging bug?"
+  ]
+}

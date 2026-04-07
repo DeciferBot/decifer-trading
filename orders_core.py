@@ -275,6 +275,13 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             regime_name=regime.get("regime", "UNKNOWN"),
         )
 
+        # ── Halt guard ────────────────────────────────────────────
+        import bot_state as _bs
+        if symbol in _bs._halted_symbols:
+            log.warning(f"Skipping {symbol} — symbol is halted (IBKR error 154)")
+            _safe_del_trade(symbol)
+            return False
+
         # ── ATOMIC BRACKET ORDER ──────────────────────────────────
         # All 3 legs (entry + SL + TP) are submitted as one atomic bracket.
         # Parent transmit=False prevents it from filling before children are attached.
@@ -293,6 +300,8 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             _effective_limit = exec_plan.limit_price if exec_plan.limit_price > 0 else limit_price
             entry_order = LimitOrder("BUY", qty, _effective_limit,
                                      account=account, tif="DAY", outsideRth=True)
+        # Stamp signal source on the order — survives in IBKR execution history.
+        entry_order.orderRef = f"DEC:{score}"[:20]
         entry_order.transmit = False
         trade = ib.placeOrder(contract, entry_order)
         ib.sleep(0.2)  # brief pause for IBKR to assign orderId
@@ -694,6 +703,13 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
             _safe_del_trade(symbol)
             return False
 
+        # ── Halt guard ────────────────────────────────────────────
+        import bot_state as _bs
+        if symbol in _bs._halted_symbols:
+            log.warning(f"Skipping short {symbol} — symbol is halted (IBKR error 154)")
+            _safe_del_trade(symbol)
+            return False
+
         account = CONFIG["active_account"]
         # Sell slightly below bid to improve fill probability
         limit_price = round(price * 0.998, 2)
@@ -701,6 +717,7 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
         # Entry: sell short
         entry_order = LimitOrder("SELL", qty, limit_price,
                                  account=account, tif="DAY", outsideRth=True)
+        entry_order.orderRef = f"DEC:{score}"[:20]
         entry_order.transmit = False
         trade = ib.placeOrder(contract, entry_order)
         ib.sleep(0.2)

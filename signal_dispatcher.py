@@ -13,7 +13,7 @@ import logging
 from datetime import datetime, timezone
 
 from signal_types import Signal, SIGNALS_LOG
-from orders import execute_buy
+from orders import execute_buy, execute_short
 log = logging.getLogger("decifer.dispatcher")
 
 
@@ -116,13 +116,34 @@ def dispatch_signals(
             result["success"] = success
             result["side"] = "BUY"
 
+        elif signal.direction == "SHORT" and "SHORT" in allowed_dirs:
+            try:
+                success = execute_short(
+                    ib=ib,
+                    symbol=signal.symbol,
+                    price=signal.price,
+                    atr=signal.atr,
+                    score=int(round(signal.conviction_score * 5)),
+                    portfolio_value=portfolio_value,
+                    regime=regime,
+                    reasoning=signal.rationale,
+                    signal_scores=signal.dimension_scores,
+                    agent_outputs=agent_outputs,
+                    open_time=datetime.now(timezone.utc).isoformat(),
+                    candle_gate=signal.candle_gate,
+                )
+            except Exception as exc:
+                log.error(f"dispatch execute_short failed {signal.symbol}: {exc}")
+                success = False
+
+            result["success"] = success
+            result["side"] = "SHORT"
+
         else:
-            # NEUTRAL / SHORT signals are logged but not executed by the dispatcher.
-            # The sell path remains in run_scan() because it needs open-position
-            # context (entry price, qty) that the Signal does not carry.
+            # NEUTRAL signals are logged but not executed.
             log.debug(
                 f"dispatch: skipping {signal.symbol} direction={signal.direction} "
-                f"(not a dispatchable LONG)"
+                f"(not a dispatchable LONG or SHORT)"
             )
 
         results.append(result)
