@@ -123,11 +123,10 @@ def write(symbol: str, timeframe: str, df: pd.DataFrame) -> Path:
         overlap = incoming.index.intersection(existing.index)
         if len(overlap) > 0:
             shared_cols = [c for c in store_cols if c in existing.columns]
-            conflicts = (
-                existing.loc[overlap, shared_cols].round(4)
-                != incoming.loc[overlap, shared_cols].round(4)
-            ).any(axis=1)
-            n_conflicts = conflicts.sum()
+            ex_slice = existing.loc[overlap, shared_cols].sort_index().round(4)
+            in_slice = incoming.loc[overlap, shared_cols].sort_index().round(4)
+            conflicts = (ex_slice.values != in_slice.values).any(axis=1)
+            n_conflicts = int(conflicts.sum())
             if n_conflicts > 0:
                 log.warning(
                     f"[{symbol}] {n_conflicts} overlapping bar(s) have different values "

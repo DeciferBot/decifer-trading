@@ -70,7 +70,7 @@ def _restore_subscriptions() -> None:
                 log.info(f"  ✔ Re-subscribed PnL for account {account}")
             elif sub_type == "account":
                 account = params.get("account", CONFIG.get("active_account", ""))
-                ib.reqAccountUpdates(True, account)
+                ib.reqAccountUpdates(account)
                 log.info(f"  ✔ Re-subscribed account updates for {account}")
             elif sub_type == "positions":
                 ib.reqPositions()
@@ -506,15 +506,13 @@ def connect_ibkr() -> bool:
             ib.positionEvent += _on_position
         if _on_commission_report not in ib.commissionReportEvent:
             ib.commissionReportEvent += _on_commission_report
-        if _on_order_bound not in ib.orderBoundEvent:
-            ib.orderBoundEvent += _on_order_bound
         ht = threading.Thread(target=_heartbeat_worker, name="ibkr-heartbeat", daemon=True)
         ht.start()
         account = CONFIG.get("active_account", "")
         _register_subscription("__pnl__", {"type": "pnl", "account": account})
         _register_subscription("__account__", {"type": "account", "account": account})
         _register_subscription("__positions__", {"type": "positions"})
-        ib.reqAccountUpdates(True, account)
+        ib.reqAccountUpdates(account)
         ib.reqPositions()
         ib.reqAutoOpenOrders(True)
         clog("INFO", f"IBKR connected — port {CONFIG['ibkr_port']} | Account: {CONFIG.get('active_account', '')} | Market data: DELAYED (free)")

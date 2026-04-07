@@ -681,7 +681,7 @@ def fetch_ibkr_historical(symbol: str, ib, bar_size: str = "5 mins",
         _IBKR_REQUEST_TIMES.append(_t.time())
 
     try:
-        from ib_insync import Stock
+        from ib_async import Stock
         contract = Stock(symbol, 'SMART', 'USD')
         bars = ib.reqHistoricalData(
             contract,

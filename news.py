@@ -461,6 +461,19 @@ def batch_news_sentiment(symbols: list[str],
                 sym, claude_res = future.result()
                 claude_results[sym] = claude_res
 
+    # ── Phase 2b: Alpha Vantage Tier 3 — structured NLP from professional sources ──
+    # One call covers the whole batch. Cached 4 hours (25 call/day free tier).
+    # AV aggregates Reuters, Bloomberg, AP etc. — higher quality than Yahoo RSS keywords.
+    av_results: dict[str, dict] = {}
+    try:
+        from alpha_vantage_client import get_news_sentiment as _av_news
+        av_results = _av_news(to_fetch)
+        hits = sum(1 for v in av_results.values() if abs(v.get("sentiment_score", 0)) > 0.15)
+        if av_results:
+            log.info("AV news tier: %d/%d symbols with meaningful sentiment", hits, len(to_fetch))
+    except Exception as _av_e:
+        log.debug("AV news tier skipped: %s", _av_e)
+
     # ── Phase 3: Assemble final scores ─────────────────────────
     for sym in to_fetch:
         if sym not in rss_results:
@@ -470,6 +483,7 @@ def batch_news_sentiment(symbols: list[str],
         headlines, recency, kw = rss_results[sym]
         direction = directions.get(sym, "")
         claude = claude_results.get(sym, {"sentiment": "NEUTRAL", "confidence": 0, "summary": ""})
+        av     = av_results.get(sym.upper(), {})
 
         # Compute news_score (same logic as get_news_sentiment)
         news_score = 0
@@ -492,6 +506,20 @@ def batch_news_sentiment(symbols: list[str],
             else:
                 news_score = max(0, news_score - min(3, claude["confidence"] // 3))
 
+        # ── AV Tier 3 contribution (±3, direction-aware) ───────
+        # Only fires when AV has meaningful relevance (>= 0.15) for this ticker.
+        # sentiment_score is -1 to +1; scaled by relevance; max contribution ±3.
+        av_sentiment_score = av.get("sentiment_score", 0.0)
+        av_relevance       = av.get("relevance", 0.0)
+        av_contrib = 0.0
+        if av_relevance >= 0.15 and abs(av_sentiment_score) > 0.05:
+            raw = av_sentiment_score * av_relevance * 3.0   # max ±3
+            if direction in ("LONG", ""):
+                av_contrib = raw
+            elif direction == "SHORT":
+                av_contrib = -raw   # bearish AV signal = positive for shorts
+        news_score = max(0, min(10, news_score + av_contrib))
+
         if recency < 2:
             news_score = min(10, news_score + 2)
         elif recency < 4:
@@ -511,6 +539,10 @@ def batch_news_sentiment(symbols: list[str],
             "claude_sentiment": claude["sentiment"],
             "claude_confidence": claude["confidence"],
             "claude_catalyst": claude.get("summary", ""),
+            "av_sentiment_score": round(av_sentiment_score, 4),
+            "av_sentiment_label": av.get("sentiment_label", ""),
+            "av_relevance":       round(av_relevance, 4),
+            "av_topics":          av.get("topics", []),
             "news_score": min(10, max(0, news_score)),
         }
 
