@@ -61,7 +61,8 @@ class TestHasOpenOrderFor:
         """has_open_order_for returns True when symbol is in open_orders."""
         mock_trade = MagicMock()
         mock_trade.orderStatus.status = "Submitted"
-        with patch("orders.open_orders", {"AAPL": mock_trade}), \
+        import orders_guards
+        with patch("orders_guards.open_orders", {"AAPL": mock_trade}), \
              patch("orders.TRADES_FILE", str(tmp_path / "trades.json")), \
              patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")):
             import orders
