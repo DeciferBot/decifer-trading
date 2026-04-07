@@ -32,14 +32,26 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 
+import raw_store
+import feature_pipeline
+from raw_store import DataQualityError  # re-export for callers
+from feature_pipeline import FeatureError  # re-export for callers
+
 log = logging.getLogger("decifer.data_collector")
 
 # ── PATHS ────────────────────────────────────────────────────────
 BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
+
+# Legacy paths — existing parquets remain readable during migration
 DATA_DIR = BASE_DIR / "data" / "historical"
 INTRADAY_DIR = DATA_DIR / "intraday"
 DAILY_DIR = DATA_DIR / "daily"
 META_FILE = DATA_DIR / "collection_meta.json"
+
+# Tiered storage — new writes go here
+FEATURES_DIR = BASE_DIR / "data" / "features"
+FEATURES_INTRADAY_DIR = FEATURES_DIR / "intraday"
+FEATURES_DAILY_DIR = FEATURES_DIR / "daily"
 
 # ── DEFAULT UNIVERSE ─────────────────────────────────────────────
 # Broad coverage across sectors + high-volume names for robust training data
@@ -90,6 +102,9 @@ def ensure_dirs():
     """Create data directories if they don't exist."""
     INTRADAY_DIR.mkdir(parents=True, exist_ok=True)
     DAILY_DIR.mkdir(parents=True, exist_ok=True)
+    FEATURES_INTRADAY_DIR.mkdir(parents=True, exist_ok=True)
+    FEATURES_DAILY_DIR.mkdir(parents=True, exist_ok=True)
+    raw_store.ensure_dirs()
 
 
 def load_meta() -> dict:
@@ -97,8 +112,11 @@ def load_meta() -> dict:
     if META_FILE.exists():
         try:
             return json.loads(META_FILE.read_text())
-        except Exception:
-            pass
+        except Exception as exc:
+            log.error(
+                f"Failed to parse {META_FILE.name}: {exc} — "
+                "resetting metadata to defaults. Previous collection state is lost."
+            )
     return {"last_run": None, "symbols": {}, "total_rows": 0}
 
 
@@ -277,134 +295,136 @@ def download_daily_alphavantage(symbol: str, api_key: str = None) -> Optional[pd
 
 
 # ═════════════════════════════════════════════════════════════════
+# 5. ALPHA VANTAGE — Earnings Calendar (PEAD dimension)
+# ═════════════════════════════════════════════════════════════════
+
+def fetch_earnings_calendar(symbol: str, api_key: str = None) -> dict | None:
+    """
+    Fetch the next earnings date for a symbol from Alpha Vantage.
+
+    Free tier: 25 calls/day — sufficient since earnings dates change quarterly.
+    Returns a dict with 'symbol', 'report_date', 'fiscal_end', 'estimate', 'currency'
+    or None if unavailable or no API key set.
+
+    Callers: signals.py PEAD dimension caches this via _PEAD_CACHE.
+    """
+    from config import CONFIG
+    key = api_key or CONFIG.get("alpha_vantage_key") or os.environ.get("ALPHA_VANTAGE_KEY")
+    if not key:
+        return None
+
+    try:
+        url = (f"https://www.alphavantage.co/query"
+               f"?function=EARNINGS_CALENDAR&symbol={symbol}&horizon=3month&apikey={key}")
+        resp = _fetch_with_retry(
+            lambda u: __import__('requests').get(u, timeout=10),
+            url,
+            label=f"[earnings] {symbol}"
+        )
+        if resp is None or resp.status_code != 200:
+            return None
+
+        lines = resp.text.strip().splitlines()
+        # Response is CSV: symbol,name,reportDate,fiscalDateEnding,estimate,currency
+        if len(lines) < 2:
+            return None
+
+        import csv
+        reader = csv.DictReader(lines)
+        for row in reader:
+            if row.get("symbol", "").upper() == symbol.upper():
+                return {
+                    "symbol":      symbol,
+                    "report_date": row.get("reportDate", ""),
+                    "fiscal_end":  row.get("fiscalDateEnding", ""),
+                    "estimate":    row.get("estimate", ""),
+                    "currency":    row.get("currency", "USD"),
+                    "source":      "alphavantage",
+                }
+        return None
+
+    except Exception as e:
+        log.debug(f"[earnings] {symbol} failed: {e}")
+        return None
+
+
+# ═════════════════════════════════════════════════════════════════
 # ENRICHMENT — Add technical features for ML training
 # ═════════════════════════════════════════════════════════════════
 
 def add_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Add commonly used ML training features to OHLCV data.
-    These match the dimensions Decifer's signal engine uses.
+    Add ML training features to OHLCV data.
+    Backward-compatible wrapper around feature_pipeline.run().
+    Direct callers (tests, legacy code) continue to work unchanged.
     """
-    if df is None or df.empty or len(df) < 50:
-        return df
+    return feature_pipeline.run(df)
 
-    c = df["close"].values.astype(float)
-    h = df["high"].values.astype(float)
-    l = df["low"].values.astype(float)
-    v = df["volume"].values.astype(float)
 
-    # Returns
-    df["return_1"] = df["close"].pct_change(1)
-    df["return_5"] = df["close"].pct_change(5)
-    df["return_10"] = df["close"].pct_change(10)
-
-    # Volatility
-    df["atr_14"] = _atr(h, l, c, 14)
-    df["volatility_20"] = df["return_1"].rolling(20).std()
-
-    # Trend
-    df["ema_9"] = pd.Series(c).ewm(span=9).mean().values
-    df["ema_21"] = pd.Series(c).ewm(span=21).mean().values
-    df["ema_50"] = pd.Series(c).ewm(span=50).mean().values
-    df["ema_trend"] = np.where(df["ema_9"] > df["ema_21"], 1, -1)
-
-    # Momentum
-    df["rsi_14"] = _rsi(c, 14)
-    df["mfi_14"] = _mfi(h, l, c, v, 14)
-
-    # Volume
-    df["vol_sma_20"] = pd.Series(v).rolling(20).mean().values
-    df["vol_ratio"] = np.where(df["vol_sma_20"] > 0, v / df["vol_sma_20"], 1.0)
-
-    # Bollinger Bands
-    sma20 = pd.Series(c).rolling(20).mean()
-    std20 = pd.Series(c).rolling(20).std()
-    df["bb_upper"] = (sma20 + 2 * std20).values
-    df["bb_lower"] = (sma20 - 2 * std20).values
-    bb_range = df["bb_upper"] - df["bb_lower"]
-    df["bb_position"] = np.where(bb_range > 0, (c - df["bb_lower"].values) / bb_range.values, 0.5)
-
-    # VWAP (intraday only — approximated for daily as typical price × volume cumsum)
-    tp = (h + l + c) / 3
-    cum_tpv = np.cumsum(tp * v)
-    cum_v = np.cumsum(v)
-    df["vwap"] = np.where(cum_v > 0, cum_tpv / cum_v, c)
-    df["vwap_dist"] = np.where(df["vwap"] > 0, (c - df["vwap"]) / df["vwap"] * 100, 0)
-
-    # Regime labels (for ML target classification)
-    df["regime"] = _label_regime(df)
-
-    return df
-
+# ── Internal indicator shims — kept for test backward compatibility ──
 
 def _atr(high, low, close, period=14):
-    """Average True Range."""
-    tr = np.maximum(high - low,
-                    np.maximum(abs(high - np.roll(close, 1)),
-                               abs(low - np.roll(close, 1))))
-    tr[0] = high[0] - low[0]
-    atr = pd.Series(tr).rolling(period).mean().values
-    return atr
+    """Shim: delegates to feature_pipeline.atr()."""
+    return feature_pipeline.atr(high, low, close, period)
 
 
 def _rsi(close, period=14):
-    """Relative Strength Index."""
-    delta = np.diff(close, prepend=close[0])
-    gain = np.where(delta > 0, delta, 0)
-    loss = np.where(delta < 0, -delta, 0)
-    avg_gain = pd.Series(gain).rolling(period).mean().values
-    avg_loss = pd.Series(loss).rolling(period).mean().values
-    with np.errstate(divide="ignore", invalid="ignore"):
-        rs = np.where(avg_loss > 0, avg_gain / avg_loss, 100)
-    return 100 - (100 / (1 + rs))
+    """Shim: delegates to feature_pipeline.rsi()."""
+    return feature_pipeline.rsi(close, period)
 
 
 def _mfi(high, low, close, volume, period=14):
-    """Money Flow Index (volume-weighted RSI)."""
-    tp = (high + low + close) / 3
-    mf = tp * volume
-    delta = np.diff(tp, prepend=tp[0])
-    pos_mf = np.where(delta > 0, mf, 0)
-    neg_mf = np.where(delta < 0, mf, 0)
-    pos_sum = pd.Series(pos_mf).rolling(period).sum().values
-    neg_sum = pd.Series(neg_mf).rolling(period).sum().values
-    with np.errstate(divide="ignore", invalid="ignore"):
-        ratio = np.where(neg_sum > 0, pos_sum / neg_sum, 100)
-    return 100 - (100 / (1 + ratio))
+    """Shim: delegates to feature_pipeline.mfi()."""
+    return feature_pipeline.mfi(high, low, close, volume, period)
 
 
 def _label_regime(df: pd.DataFrame) -> pd.Series:
-    """
-    Label each bar with a market regime for ML training targets.
-    Uses simple lookback return + volatility bucketing.
-    """
-    ret_20 = df["close"].pct_change(20)
-    vol_20 = df["return_1"].rolling(20).std() if "return_1" in df.columns else pd.Series(0, index=df.index)
-
-    conditions = [
-        (ret_20 > 0.03) & (vol_20 < 0.02),    # Bull trending
-        (ret_20 < -0.03) & (vol_20 < 0.02),    # Bear trending
-        (vol_20 >= 0.03),                        # High volatility / panic
-        (ret_20.abs() <= 0.03) & (vol_20 < 0.03),  # Choppy / range-bound
-    ]
-    labels = ["BULL_TRENDING", "BEAR_TRENDING", "PANIC", "CHOPPY"]
-    return pd.Series(np.select(conditions, labels, default="UNKNOWN"), index=df.index)
+    """Shim: delegates to feature_pipeline.regime_label()."""
+    return feature_pipeline.regime_label(df)
 
 
 # ═════════════════════════════════════════════════════════════════
 # ORCHESTRATOR — Run full collection pipeline
 # ═════════════════════════════════════════════════════════════════
 
+def _write_features(df: pd.DataFrame, symbol: str, timeframe: str) -> int:
+    """
+    Compute features and write to the features store.
+    Returns the number of rows written, or 0 on failure.
+    Raises FeatureError so the caller can decide whether to continue or abort.
+    """
+    feat_dir = FEATURES_INTRADAY_DIR if timeframe == "5m" else FEATURES_DAILY_DIR
+    feat_path = feat_dir / f"{symbol}_{timeframe}.parquet"
+
+    enriched = feature_pipeline.run(df)  # raises FeatureError on bad input
+
+    # Append to existing features file if present
+    if feat_path.exists():
+        existing = pd.read_parquet(feat_path)
+        enriched = pd.concat([existing, enriched])
+        enriched = enriched[~enriched.index.duplicated(keep="last")]
+        enriched = enriched.sort_index()
+
+    enriched.to_parquet(feat_path)
+    return len(enriched)
+
+
 def collect_all(symbols: list = None, intraday: bool = True, daily: bool = True,
                 add_ml_features: bool = True) -> dict:
     """
     Main entry point: download historical data for all symbols.
 
+    Pipeline per symbol:
+      1. Download raw OHLCV from provider
+      2. Validate and write to data/raw/  (raises on failure — no silent pass)
+      3. Compute features via feature_pipeline.run()
+      4. Write enriched data to data/features/
+
     Args:
         symbols: List of tickers (default: DEFAULT_UNIVERSE)
         intraday: Download 5m bars (last 60 days)
         daily: Download daily bars (max history)
-        add_ml_features: Compute technical features for ML training
+        add_ml_features: Compute and store ML features (default: True)
 
     Returns:
         Summary dict with counts and paths.
@@ -423,50 +443,40 @@ def collect_all(symbols: list = None, intraday: bool = True, daily: bool = True,
         if intraday:
             df_5m = download_intraday_yf(sym, "5m")
             if df_5m is not None and not df_5m.empty:
-                if add_ml_features:
-                    df_5m = add_features(df_5m)
-                path = INTRADAY_DIR / f"{sym}_5m.parquet"
-                # Append to existing data if present
-                if path.exists():
-                    try:
-                        existing = pd.read_parquet(path)
-                        df_5m = pd.concat([existing, df_5m])
-                        df_5m = df_5m[~df_5m.index.duplicated(keep="last")]
-                        df_5m = df_5m.sort_index()
-                    except Exception:
-                        pass
-                df_5m.to_parquet(path)
-                results["intraday"][sym] = len(df_5m)
-                total_rows += len(df_5m)
+                try:
+                    raw_store.write(sym, "5m", df_5m)
+                    raw_df = raw_store.read(sym, "5m")
+                    if add_ml_features:
+                        n = _write_features(raw_df, sym, "5m")
+                    else:
+                        n = len(raw_df)
+                    results["intraday"][sym] = n
+                    total_rows += n
+                except (DataQualityError, FeatureError) as exc:
+                    log.error(f"[{sym}] intraday collection failed: {exc}")
+                    results["errors"].append(f"{sym}/5m")
 
-            # Brief pause to avoid yfinance rate limits
             time.sleep(0.5)
 
         # ── Daily ──
         if daily:
-            # Primary: yfinance
             df_daily = download_daily_yf(sym)
-
-            # Backup: Stooq (if yfinance fails or for cross-validation)
             if df_daily is None or df_daily.empty:
                 df_daily = download_daily_stooq(sym)
 
             if df_daily is not None and not df_daily.empty:
-                if add_ml_features:
-                    df_daily = add_features(df_daily)
-                path = DAILY_DIR / f"{sym}_1d.parquet"
-                # Append
-                if path.exists():
-                    try:
-                        existing = pd.read_parquet(path)
-                        df_daily = pd.concat([existing, df_daily])
-                        df_daily = df_daily[~df_daily.index.duplicated(keep="last")]
-                        df_daily = df_daily.sort_index()
-                    except Exception:
-                        pass
-                df_daily.to_parquet(path)
-                results["daily"][sym] = len(df_daily)
-                total_rows += len(df_daily)
+                try:
+                    raw_store.write(sym, "1d", df_daily)
+                    raw_df = raw_store.read(sym, "1d")
+                    if add_ml_features:
+                        n = _write_features(raw_df, sym, "1d")
+                    else:
+                        n = len(raw_df)
+                    results["daily"][sym] = n
+                    total_rows += n
+                except (DataQualityError, FeatureError) as exc:
+                    log.error(f"[{sym}] daily collection failed: {exc}")
+                    results["errors"].append(f"{sym}/1d")
             else:
                 results["errors"].append(sym)
 
@@ -488,17 +498,21 @@ def collect_all(symbols: list = None, intraday: bool = True, daily: bool = True,
         "daily_symbols": len(results["daily"]),
         "total_rows": total_rows,
         "errors": results["errors"],
-        "data_dir": str(DATA_DIR),
+        "data_dir": str(FEATURES_DIR),
     }
 
-    log.info(f"Collection complete: {summary['symbols_processed']} symbols, "
-             f"{total_rows:,} total rows, {len(results['errors'])} errors")
+    log.info(
+        f"Collection complete: {summary['symbols_processed']} symbols, "
+        f"{total_rows:,} total rows, {len(results['errors'])} errors"
+    )
     return summary
 
 
 def get_training_dataset(symbols: list = None, interval: str = "1d") -> pd.DataFrame:
     """
-    Load collected data as a single DataFrame ready for ML training.
+    Load feature-enriched data as a single DataFrame ready for ML training.
+    Reads from data/features/ (tiered store). Falls back to data/historical/
+    for symbols not yet migrated to the new store.
 
     Args:
         symbols: Filter to specific symbols (default: all available)
@@ -507,27 +521,46 @@ def get_training_dataset(symbols: list = None, interval: str = "1d") -> pd.DataF
     Returns:
         Combined DataFrame with all features.
     """
-    data_dir = INTRADAY_DIR if interval != "1d" else DAILY_DIR
-    suffix = "_5m.parquet" if interval != "1d" else "_1d.parquet"
+    feat_dir = FEATURES_INTRADAY_DIR if interval != "1d" else FEATURES_DAILY_DIR
+    legacy_dir = INTRADAY_DIR if interval != "1d" else DAILY_DIR
+    suffix = f"_{interval}.parquet"
 
     frames = []
-    for f in data_dir.glob(f"*{suffix}"):
-        sym = f.stem.replace(suffix.replace(".parquet", ""), "")
+
+    # Prefer features/ store; fall back to historical/ for unmigrated symbols
+    for f in sorted(feat_dir.glob(f"*{suffix}")):
+        sym = f.stem[: -len(f"_{interval}")]
         if symbols and sym not in symbols:
             continue
         try:
-            df = pd.read_parquet(f)
-            frames.append(df)
+            frames.append(pd.read_parquet(f))
         except Exception as e:
-            log.warning(f"Failed to load {f}: {e}")
+            log.warning(f"Failed to load features/{f.name}: {e}")
+
+    # Legacy fallback — symbols not yet in features/ store
+    migrated = {f.stem[: -len(f"_{interval}")] for f in feat_dir.glob(f"*{suffix}")}
+    remaining = set(symbols or []) - migrated if symbols else set()
+    for sym in remaining:
+        legacy_path = legacy_dir / f"{sym}{suffix}"
+        if legacy_path.exists():
+            try:
+                frames.append(pd.read_parquet(legacy_path))
+                log.debug(f"[{sym}] loaded from legacy historical/ store")
+            except Exception as e:
+                log.warning(f"Failed to load legacy {legacy_path.name}: {e}")
 
     if not frames:
-        log.warning("No training data found. Run collect_all() first.")
+        log.warning(
+            "No training data found in features/ or historical/. "
+            "Run collect_all() first."
+        )
         return pd.DataFrame()
 
     combined = pd.concat(frames)
-    log.info(f"Training dataset: {len(combined):,} rows, "
-             f"{combined['symbol'].nunique()} symbols")
+    log.info(
+        f"Training dataset: {len(combined):,} rows, "
+        f"{combined['symbol'].nunique() if 'symbol' in combined.columns else '?'} symbols"
+    )
     return combined
 
 

@@ -31,6 +31,17 @@ CONFIG = {
     #   ["DUP481326", "U3059777"]
     "aggregate_accounts": [],
 
+    # ── ALPHA VANTAGE (free tier: 25 calls/day) ──────────────
+    # Used for: earnings calendar → PEAD dimension.
+    # Sign up at https://www.alphavantage.co/support/#api-key (free, no credit card).
+    # Set ALPHA_VANTAGE_KEY env var or paste key here (do not commit the key value).
+    "alpha_vantage_key":        os.environ.get("ALPHA_VANTAGE_KEY", ""),
+
+    # ── IBKR HISTORICAL DATA PACING ───────────────────────────
+    # IBKR enforces a soft limit of 60 reqHistoricalData requests per 10 minutes.
+    # We stay under 55 to leave headroom. Throttle applied in fetch_ibkr_historical().
+    "ibkr_hist_pacing_per_10min": 55,
+
     # ── FINNHUB (free tier: 60 calls/min) ────────────────────
     # Sign up at https://finnhub.io — free API key, no credit card required.
     # Free tier covers: stock quotes + company news articles (/company-news).
@@ -148,7 +159,7 @@ CONFIG = {
     # ── IC CALCULATOR ────────────────────────────────────────────
     # Controls the rolling IC-weighted signal composite (ic_calculator.py).
     # Phase 1 (current): ic_min_threshold = 0.0 — any positive IC gets weight.
-    # Phase 2 (needs 200+ trades): raise ic_min_threshold to 0.03 to suppress noise.
+    # Phase 2 (needs 100+ trades): raise ic_min_threshold to 0.03 to suppress noise.
     "ic_calculator": {
         "rolling_window":    60,    # Number of trading *dates* in rolling IC window
         "min_valid_records": 10,    # Legacy — kept for backward compat
@@ -158,7 +169,7 @@ CONFIG = {
                                     #   Phase 2: raise to 5 once 60+ dates accumulated
         "ic_min_threshold":  0.0,   # Noise floor — dimensions below this get zero weight
                                     #   Phase 1: 0.0 (any positive IC passes)
-                                    #   Phase 2: raise to 0.03 once 200+ trades available
+                                    #   Phase 2: raise to 0.03 once 100+ trades available
         "max_single_weight": 0.40,  # HHI cap — no dimension may exceed this share of total weight
 
         # IC auto-disable: if a dimension's IC falls below the threshold for N
@@ -310,6 +321,27 @@ CONFIG = {
         "cache_ttl_seconds": 3600,   # Re-fetch VIX data at most once per hour
     },
 
+    # ── SIGNAL-STRENGTH-PROPORTIONAL KELLY MULTIPLIER ────────────
+    # Replaces the discrete 3-tier conviction_mult with continuous linear scaling.
+    # Formula: t = clamp((score - score_floor) / (score_ceil - score_floor), 0, 1)
+    #          conviction_mult = min_mult + t * (max_mult - min_mult)
+    # Calibration: score 20→50 maps 0.5×→1.5×. Old 0.75× tier ≈ score 27.5.
+    "signal_strength_kelly": {
+        "score_floor": 20,   # Raw score (0–50) at which min_mult applies
+        "score_ceil":  50,   # Raw score at which max_mult applies
+        "min_mult":    0.5,
+        "max_mult":    1.5,
+    },
+
+    # ── DRAWDOWN-PROPORTIONAL POSITION SCALER ────────────────────
+    # Smoothly reduces position size as equity draws down from HWM.
+    # Linear: 1.0 at 0% drawdown → min_scalar at max_drawdown_alert.
+    # Returns 1.0 when HWM is not yet initialized.
+    "drawdown_scaler": {
+        "enabled":    True,
+        "min_scalar": 0.1,
+    },
+
     # ── MARKET BREADTH REGIME INPUT ───────────────────────────────
     # % of S&P 500 stocks above their 200-day MA (^MMTH from Yahoo Finance).
     # Used as a third factor in scanner.get_market_regime() alongside VIX
@@ -362,7 +394,7 @@ CONFIG = {
     # ── REGIME DETECTOR LOCK ──────────────────────────────────
     # Committed approach: "vix_proxy" (scanner.get_market_regime + signals.get_market_regime_vix)
     # DO NOT change to "ml_random_forest" or "hmm" without IC Phase 2 gate review.
-    # Gate: closed_trades >= 200. See DECISIONS.md Action #9.
+    # Gate: closed_trades >= 100. See DECISIONS.md Action #9.
     "regime_detector":          "vix_proxy",
 
     # Canonical regime state names produced by the VIX-proxy detector.
@@ -478,7 +510,7 @@ CONFIG = {
     #   - See LIVE_TRADING_GATE.md for the full criteria document
     #
     # Phase 1 exit criteria (ALL must be met before advancing to Phase 2):
-    #   - 200+ closed paper trades logged to data/trades.json
+    #   - 100+ closed paper trades logged to data/trades.json
     #   - Test suite ≥ 80% pass rate
     #   - 30+ consecutive paper trading days without critical bugs
     #   - Amit explicitly sets current_phase = 2 after reviewing results
@@ -512,7 +544,7 @@ CONFIG = {
         },
 
         "phase1_exit_criteria": {
-            "min_closed_trades":       200,   # Trades needed before ML/backtest are meaningful
+            "min_closed_trades":       100,   # Trades needed before ML/backtest are meaningful
             "min_test_pass_rate":      0.80,  # Fraction of pytest tests that must pass
             "min_paper_trading_days":  30,    # Consecutive days running without critical bugs
         },

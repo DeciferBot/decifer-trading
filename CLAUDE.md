@@ -27,7 +27,7 @@ Every session must follow this sequence:
 
 1. LOAD CONTEXT — read checkpoint, last 2 session logs, active specs, latest research
 2. REVIEW PENDING — confirm what branch is active, what feature is in flight
-3. BUILD ON BRANCH — all code changes on a `feat/...` or `fix/...` branch, never main
+3. COMMIT TO MASTER — push directly to master unless this is a Tier 3 multi-session rewrite
 4. TEST — run relevant tests before declaring anything done
 5. DRAFT SUMMARY — write session log entry for Amit to approve (do not commit without approval)
 6. COMMIT & PUSH — only after Amit approves the summary
@@ -36,10 +36,9 @@ Every session must follow this sequence:
 
 ## Branching Rules
 
-- Never commit directly to `main`
-- Feature branches: `feat/<feature-name>`
-- Bug fix branches: `fix/<bug-description>`
-- Merge only after: tests pass AND Amit explicitly approves
+- Push directly to `master` by default — solo developer, no PRs, no feature branches
+- Exception: Tier 3 architectural rewrites that span multiple sessions use a `feat/<feature-name>` branch to keep master stable while the work is incomplete
+- Merge a Tier 3 branch only after: tests pass AND Amit explicitly approves
 
 ---
 
@@ -98,11 +97,69 @@ Do not create files in the root unless they are core Python modules. No stray te
 
 ## Constraints (hard limits)
 
-- Free data only: yfinance (thread-safety workaround required), TradingView Screener, Yahoo RSS, Finviz
+- Data sources: IBKR TWS (primary — reqHistoricalData for 5m bars, free), Alpha Vantage (free, earnings calendar), yfinance (daily bars, indices, fallback only), TradingView Screener, Yahoo RSS, Finviz
+- Streaming: deferred — Alpaca ($99/mo) or IBKR Streaming Bundle ($135/mo) to be added once provider research complete
 - Paper account only: IBKR paper (DUP...). No live order submission
 - TA-Lib requires system C library — always check availability before using
 - No secrets, credentials, or .env file content in any commit
 - Never run `git reset --hard`, `git push --force`, or `git clean -f` without explicit Amit instruction
+
+---
+
+## Architecture & Vision Integrity (paramount)
+
+The Decifer project has a deliberate vision. All code must serve and sustain that vision — not diverge from it, not compromise it for short-term convenience.
+
+**Build from first principles, not patches.**
+- The simplest correct design is the first-principles answer. First principles does not mean thorough or complex — it means understanding the problem clearly enough to solve it simply.
+- Every change must be designed correctly from the ground up. If the existing implementation is wrong, rewrite it properly — do not layer fixes on top of broken foundations.
+- Patching is prohibited. A patch that makes broken code "work" is worse than no code, because it hides the structural problem and accumulates debt.
+- If a component needs to change, understand why it exists first, then replace it with something architecturally sound.
+
+**Simplicity is correctness.**
+- The simpler the code, the fewer the errors. Complexity is where bugs live.
+- If two implementations solve the same problem, always choose the simpler one — without exception.
+- A function that does one thing clearly is better than a function that does three things cleverly.
+- If a solution feels complicated, it is a signal the problem is not fully understood yet. Stop and rethink before writing.
+
+**Sustainability over speed.**
+- Code must be maintainable long-term. Clarity, modularity, and correct separation of concerns are non-negotiable.
+- Do not introduce complexity that cannot be explained. If a design requires a long comment to justify it, the design is probably wrong.
+- Prefer fewer, well-designed abstractions over many small ones. Every layer of indirection must earn its place.
+
+**Acceptance of the vision.**
+- Before writing any code, Claude must understand how the change fits the Decifer system architecture and trading logic.
+- If a request conflicts with the project's architecture or vision, Claude must flag the conflict to Amit before proceeding — not silently work around it.
+- No component should be built in isolation. Every module must fit cleanly into the existing data flow, signal pipeline, and execution model.
+
+**No monoliths.**
+- Every module has one clearly defined responsibility. If you cannot state what a module does in one sentence, it is doing too much.
+- A function longer than 30 lines is a signal it is doing more than one thing. Stop and split it.
+- A module longer than 200 lines is a signal it has grown beyond its scope. Before adding more, ask whether the new logic belongs elsewhere.
+- Never add a parameter to an existing function to handle a new case. If a new case arises, create a new function or a new module.
+- Never add logic to a module because it is "close enough" to what that module already does. Proximity is not ownership.
+- State belongs in dedicated state modules. A module that accumulates state it was not originally designed to hold must be refactored, not extended.
+- When a module starts importing from many other modules, it is a sign it has taken on too much. Dependencies should flow in one direction.
+
+**Before adding to any existing module, ask:**
+1. Is this genuinely this module's responsibility, or am I adding here out of convenience?
+2. Will this make the module harder to understand or test?
+3. Should this be a new module instead?
+
+If the answer to 1 is no, or 2 is yes — create a new module.
+
+**Structural questions to ask before any implementation:**
+1. Does this belong in the existing architecture, or does it require a design decision first?
+2. Am I patching something broken, or building something correct?
+3. Does this change sustain or erode the long-term vision of the system?
+
+---
+
+## Code Fix Integrity (mandatory)
+
+- **No hallucination.** Never invent function names, method signatures, module paths, variable names, or API behaviours that have not been confirmed by reading the actual source. If unsure, read the file first.
+- **Suggestive fixes must be validated.** Any code change proposed without first reading the target file is speculative. Before writing or editing code, always read the relevant file(s) to confirm current implementation. Do not suggest a fix based on assumption alone.
+- If a fix cannot be confirmed by reading existing code, state the uncertainty explicitly and ask Amit before proceeding.
 
 ---
 
