@@ -148,9 +148,12 @@ class AlpacaBarStream:
 
     def update_symbols(self, symbols: list[str]) -> None:
         """
-        Update the subscription list. Restarts the stream with new symbols.
-        Called when the active universe changes between scan cycles.
+        Update the subscription list. No-op if the symbol set is unchanged —
+        avoids disconnecting the WebSocket every scan when the universe is stable.
         """
+        if set(symbols) == self.symbols():
+            log.debug("AlpacaBarStream: universe unchanged — skipping stream restart")
+            return
         if self._running:
             self.stop()
         self.start(symbols)
@@ -168,8 +171,9 @@ class AlpacaBarStream:
 
         try:
             from alpaca.data.live import StockDataStream
+            from alpaca.data.enums import DataFeed
 
-            self._stream = StockDataStream(api_key, secret_key)
+            self._stream = StockDataStream(api_key, secret_key, feed=DataFeed.SIP)
 
             async def on_bar(bar) -> None:
                 BAR_CACHE.update(bar.symbol, {

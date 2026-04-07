@@ -560,14 +560,31 @@ _SHORT_FLOAT_CACHE_TTL = 4 * 3600  # 4 hours (short float updates daily)
 
 def _safe_download(symbol: str, **kwargs) -> pd.DataFrame | None:
     """
-    Download OHLCV data with retry using yf.Ticker().history().
+    Download OHLCV data.
 
-    Uses Ticker.history() instead of yf.download() because yfinance 1.2.0's
-    shared global curl_cffi session causes cross-symbol data contamination when
-    yf.download() is called concurrently from multiple threads.  Ticker objects
-    maintain isolated per-instance state, making them thread-safe.
+    Priority:
+      1. Alpaca REST  — SIP consolidated tape, 10k req/min, split-adjusted.
+                        Primary source for all timeframes.
+      2. yfinance     — Emergency fallback only (Alpaca keys not set or API
+                        unreachable). Retained because it covers market-closed
+                        periods where Alpaca may return no recent bars.
+
+    yfinance is NOT the primary source. Do not promote it.
     """
-    # progress= is a yf.download() param; Ticker.history() doesn't accept it
+    interval = kwargs.get("interval", "1d")
+    period   = kwargs.get("period", "60d")
+
+    # ── Layer 1: Alpaca REST (reliable, SIP-accurate) ──────────────────────
+    try:
+        from alpaca_data import fetch_bars
+        df = fetch_bars(symbol, period=period, interval=interval)
+        if df is not None and len(df) > 0:
+            return df
+    except Exception:
+        pass
+
+    # ── Layer 2: yfinance (emergency fallback) ─────────────────────────────
+    # Uses Ticker.history() — thread-safe in yfinance 1.2.0+ unlike yf.download()
     kwargs.pop("progress", None)
     for attempt in range(3):
         try:
