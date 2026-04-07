@@ -473,14 +473,6 @@ def _on_commission_report(trade, fill, report) -> None:
         log.warning(f"_on_commission_report error: {exc}")
 
 
-def _on_order_bound(order_id: int, api_client_id: int, api_order_id: int) -> None:
-    """
-    Fires when a manual TWS order is auto-bound to the API (via reqAutoOpenOrders).
-    Logs the permId ↔ API order ID mapping for audit purposes.
-    """
-    log.info(f"IBKR orderBound: permId={order_id} ↔ apiClientId={api_client_id} apiOrderId={api_order_id}")
-
-
 # ── Connect / subscribe ───────────────────────────────────────────────────────
 
 def connect_ibkr() -> bool:
@@ -512,9 +504,14 @@ def connect_ibkr() -> bool:
         _register_subscription("__pnl__", {"type": "pnl", "account": account})
         _register_subscription("__account__", {"type": "account", "account": account})
         _register_subscription("__positions__", {"type": "positions"})
-        ib.reqAccountUpdates(account)
-        ib.reqPositions()
-        ib.reqAutoOpenOrders(True)
+        # Note: ib.reqAccountUpdates() intentionally omitted — in ib_async 0.9.x it is
+        # a blocking call that waits for a "accountValues done" signal TWS never sends
+        # (it streams continuously), causing the main thread to hang forever.
+        # accountValueEvent is already registered above and receives values as they arrive.
+        #
+        # Note: reqAutoOpenOrders(True) intentionally omitted — requires clientId=0
+        # and triggers ib_async.orderBoundEvent which does not exist in ib_async 0.9.x,
+        # crashing the asyncio thread.
         clog("INFO", f"IBKR connected — port {CONFIG['ibkr_port']} | Account: {CONFIG.get('active_account', '')} | Market data: DELAYED (free)")
         reconcile_with_ibkr(ib)
         dash["status"] = "running"

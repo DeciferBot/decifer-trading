@@ -508,14 +508,12 @@ def get_directional_skew(window_hours: int = 48, regime: str = None) -> dict:
                 f"Directional skew {skew:+.2f} (heavy LONG) in {regime} regime. "
                 f"Short scanner may not be surfacing enough candidates."
             )
-            log.warning(f"SKEW ALERT: {alert}")
         elif regime == "BULL_TRENDING" and skew < -0.8:
             regime_aligned = False
             alert = (
                 f"Directional skew {skew:+.2f} (heavy SHORT) in {regime} regime. "
                 f"Unusual bearish positioning in a bull market."
             )
-            log.warning(f"SKEW ALERT: {alert}")
         elif regime == "BULL_TRENDING" and skew > 0.5:
             regime_aligned = True
         elif regime == "BEAR_TRENDING" and skew < -0.5:
