@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import logging
 import threading
 from datetime import datetime, timezone, time as dtime
 from typing import Optional, Tuple
@@ -20,91 +19,23 @@ from risk import (calculate_position_size, calculate_stops, check_correlation,
 from learning import log_order
 from scanner import get_tv_signal_cache
 
-# Per-symbol lock registry to close TOCTOU gap between openOrders check and submission
-_symbol_locks: dict = {}
-_symbol_locks_mutex = threading.Lock()
-
-
-def _get_symbol_lock(symbol: str) -> threading.Lock:
-    """Return a per-symbol lock, creating it if necessary."""
-    with _symbol_locks_mutex:
-        if symbol not in _symbol_locks:
-            _symbol_locks[symbol] = threading.Lock()
-        return _symbol_locks[symbol]
-
-log = logging.getLogger("decifer.orders")
-
-# File paths derived from config (patchable in tests)
-TRADES_FILE: str = CONFIG.get("trade_log", "/tmp/trades.json")
-ORDERS_FILE: str = CONFIG.get("order_log", "/tmp/orders.json")
-
-# In-memory position tracker (source of truth = IBKR, this is a cache)
-active_trades: dict = {}
-open_trades = active_trades  # backward-compat alias (both names point to same dict)
-
-# In-memory open-order tracker keyed by symbol (updated by execute_buy/sell)
-open_orders: dict = {}
-
-# Post-close cooldown registry: symbol → ISO timestamp of close.
-# Blocks re-entry for reentry_cooldown_minutes after a position is closed.
-recently_closed: dict = {}
-
-# Default: duplicate check is enabled. Set ORDER_DUPLICATE_CHECK_ENABLED=False
-# in config to disable (e.g. for paper trading environments or unit tests).
-# Fail-safe orientation: when in doubt, the check is ON.
-ORDER_DUPLICATE_CHECK_ENABLED_DEFAULT = True
-
-# ── Thread-safe guard for active_trades dictionary ─────────────────────────
-# Audit (prop-014): execute_buy/execute_sell run on the main async event loop,
-# reconcile_with_ibkr and update_positions_from_ibkr run from background threads.
-# Both contexts read+write active_trades. An RLock is safe from both threaded and
-# async-sync contexts; the lock scope is narrowed to ONLY the dictionary
-# read/modify/write lines — never around broker network calls — so a slow
-# reconcile never blocks a live order submission.
-_trades_lock = threading.RLock()
-
-# ── Re-entrancy guard for flatten_all ────────────────────────────────────────
-# flatten_all is called from the kill-switch and drawdown threads. If two callers
-# race (e.g. drawdown fires while kill-switch is already running), only the first
-# should proceed — the second must bail immediately to avoid double-closing and
-# conflicting cancellation orders.
-_flatten_lock = threading.Lock()
-_flatten_in_progress: bool = False
+# ── Shared state (all mutable state lives in orders_state) ───────────────────
+from orders_state import (
+    log,
+    TRADES_FILE, ORDERS_FILE,
+    active_trades, open_trades, open_orders, recently_closed,
+    ORDER_DUPLICATE_CHECK_ENABLED_DEFAULT,
+    _trades_lock, _flatten_lock, _flatten_in_progress,
+    _symbol_locks, _symbol_locks_mutex, _get_symbol_lock,
+    _safe_set_trade, _safe_update_trade, _safe_del_trade,
+    _is_recently_closed,
+)
 
 # ── flatten_all order-book wait constants ─────────────────────────────────────
 # After reqGlobalCancel, IBKR processes cancellations asynchronously.  We poll
 # until the book is clear (or we time out) before placing closing orders.
 _GLOBAL_CANCEL_WAIT_SECS: float = 5.0   # maximum wait before we proceed anyway
 _GLOBAL_CANCEL_POLL_INTERVAL: float = 0.5  # seconds between each openOrders poll
-
-
-def _safe_set_trade(key: str, value: dict):
-    """Thread-safe write to active_trades dict."""
-    with _trades_lock:
-        active_trades[key] = value
-
-
-def _safe_update_trade(key: str, updates: dict):
-    """Thread-safe partial update of an active_trades entry."""
-    with _trades_lock:
-        if key in active_trades:
-            active_trades[key].update(updates)
-
-
-def _safe_del_trade(key: str):
-    """Thread-safe delete from active_trades dict."""
-    with _trades_lock:
-        active_trades.pop(key, None)
-
-
-def _is_recently_closed(symbol: str) -> bool:
-    """Return True if symbol was closed within reentry_cooldown_minutes."""
-    ts_str = recently_closed.get(symbol)
-    if not ts_str:
-        return False
-    cooldown = CONFIG.get("reentry_cooldown_minutes", 30)
-    closed_at = datetime.fromisoformat(ts_str)
-    return (datetime.now(timezone.utc) - closed_at).total_seconds() < cooldown * 60
 
 
 def _cancel_ibkr_order_by_id(ib, order_id: int) -> None:
@@ -986,6 +917,270 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         return False
 
 
+def execute_short(ib: IB, symbol: str, price: float, atr: float,
+                  score: int, portfolio_value: float, regime: dict,
+                  reasoning: str = "",
+                  signal_scores: dict = None,
+                  agent_outputs: dict = None,
+                  open_time: str = None,
+                  candle_gate: str = None) -> bool:
+    """
+    Place a short-sell order with OCO bracket (sell-to-open + buy-to-cover SL + TP).
+    Entry: Limit order at IBKR real-time price.
+    Stop loss: Stop order ABOVE entry (buy to cover if price rises).
+    Take profit: Limit order BELOW entry (buy to cover when price falls).
+    Returns True if order placed successfully.
+    """
+    import sys as _sys; _om = _sys.modules.get('orders', _sys.modules[__name__])
+    CONFIG = _om.CONFIG                                      # noqa: F841
+    check_correlation = _om.check_correlation                # noqa: F841
+    check_combined_exposure = _om.check_combined_exposure    # noqa: F841
+    check_sector_concentration = _om.check_sector_concentration  # noqa: F841
+    calculate_position_size = _om.calculate_position_size    # noqa: F841
+    calculate_stops = _om.calculate_stops                    # noqa: F841
+    log_order = _om.log_order                                # noqa: F841
+    get_tv_signal_cache = _om.get_tv_signal_cache            # noqa: F841
+    _get_yf_price = _om._get_yf_price                        # noqa: F841
+    MarketOrder = _om.MarketOrder                            # noqa: F841
+    LimitOrder  = _om.LimitOrder                             # noqa: F841
+    StopOrder   = _om.StopOrder                              # noqa: F841
+
+    sym_lock = _get_symbol_lock(symbol)
+    with sym_lock:
+        with _trades_lock:
+            if symbol in active_trades:
+                if active_trades[symbol].get("status") == "EXITING":
+                    log.info(f"Skipping {symbol} — exit in flight")
+                    return False
+                log.warning(f"Already in {symbol} — skipping short")
+                return False
+            if _is_recently_closed(symbol):
+                cooldown = CONFIG.get("reentry_cooldown_minutes", 30)
+                log.info(f"Skipping {symbol} — re-entry cooldown ({cooldown} min after recent close)")
+                return False
+            if len(active_trades) >= CONFIG["max_positions"]:
+                log.warning(f"Max positions ({CONFIG['max_positions']}) reached — skipping {symbol}")
+                return False
+            ok, reason = check_correlation(symbol, list(active_trades.values()))
+            if not ok:
+                log.warning(f"Correlation block for {symbol}: {reason}")
+                return False
+            est_value = portfolio_value * CONFIG.get("max_single_position", 0.10)
+            exp_ok, exp_reason = check_combined_exposure(
+                symbol, est_value, list(active_trades.values()),
+                portfolio_value, instrument="stock"
+            )
+            if not exp_ok:
+                log.warning(f"Combined exposure block for {symbol}: {exp_reason}")
+                return False
+            sec_ok, sec_reason = check_sector_concentration(
+                symbol, list(active_trades.values()),
+                portfolio_value, regime.get("regime", "NORMAL")
+            )
+            if not sec_ok:
+                log.warning(f"Sector block for {symbol}: {sec_reason}")
+                return False
+            active_trades[symbol] = {"status": "RESERVED", "symbol": symbol}
+
+        if _is_duplicate_check_enabled():
+            if has_open_order_for(symbol) or _check_ibkr_open_order(ib, symbol, side="SELL"):
+                log.warning(f"Skipping duplicate short order for {symbol} — open order already exists")
+                _safe_del_trade(symbol)
+                return False
+
+    try:
+        contract = get_contract(symbol)
+        ib.qualifyContracts(contract)
+
+        yf_price = price
+        ibkr_price = _get_ibkr_price(ib, contract, fallback=0)
+        ibkr_bid, ibkr_ask = _get_ibkr_bid_ask(ib, contract)
+
+        tv_cache = get_tv_signal_cache()
+        tv_data = tv_cache.get(symbol) if tv_cache else None
+        tv_close = float(tv_data.get("tv_close")) if tv_data and tv_data.get("tv_close") else 0
+
+        prices = {}
+        if ibkr_price > 0:
+            prices["IBKR"] = ibkr_price
+        if yf_price > 0:
+            prices["yfinance"] = yf_price
+        if tv_close > 0:
+            prices["TV"] = tv_close
+
+        if not prices:
+            log.error(f"No price data for {symbol} — aborting short")
+            _safe_del_trade(symbol)
+            return False
+
+        price_vals = list(prices.values())
+        for i in range(len(price_vals)):
+            for j in range(i + 1, len(price_vals)):
+                div = abs(price_vals[i] - price_vals[j]) / max(price_vals[i], price_vals[j])
+                if div > 0.50:
+                    log.error(f"PRICE CONTAMINATION {symbol}: {prices} — aborting short")
+                    _safe_del_trade(symbol)
+                    return False
+
+        # For shorts, use the LOWEST confirmed price (best short entry)
+        best_price = min(price_vals)
+        price = best_price
+
+        if price < 1.0 or price > 10000:
+            log.error(f"Price out of range for short {symbol}: ${price:.2f} — aborting")
+            _safe_del_trade(symbol)
+            return False
+
+        qty = calculate_position_size(portfolio_value, price, score, regime, atr=atr)
+        MAX_SHARES = 5000
+        if qty > MAX_SHARES:
+            qty = MAX_SHARES
+        max_order_value = portfolio_value * 0.20
+        if qty * price > max_order_value:
+            qty = max(1, int(max_order_value / price))
+
+        sl, tp = calculate_stops(price, atr, "SHORT")  # sl > price, tp < price
+
+        reward = price - tp
+        risk   = sl - price
+        if risk <= 0 or (reward / risk) < CONFIG["min_reward_risk_ratio"]:
+            log.warning(f"Poor R:R on short {symbol}: reward={reward:.2f} risk={risk:.2f} — skipping")
+            _safe_del_trade(symbol)
+            return False
+
+        account = CONFIG["active_account"]
+        # Sell slightly below bid to improve fill probability
+        limit_price = round(price * 0.998, 2)
+
+        # Entry: sell short
+        entry_order = LimitOrder("SELL", qty, limit_price,
+                                 account=account, tif="DAY", outsideRth=True)
+        entry_order.transmit = False
+        trade = ib.placeOrder(contract, entry_order)
+        ib.sleep(0.2)
+
+        parent_id = trade.order.orderId
+
+        # Stop loss: buy to cover if price rises
+        sl_order = StopOrder("BUY", qty, sl, account=account, tif="GTC", outsideRth=True)
+        sl_order.parentId = parent_id
+        sl_order.transmit = False
+        sl_trade = ib.placeOrder(contract, sl_order)
+        ib.sleep(0.1)
+        _sl_order_id = sl_trade.order.orderId
+
+        # Take profit: buy to cover when price falls to target
+        tp_order = LimitOrder("BUY", qty, tp, account=account, tif="GTC", outsideRth=True)
+        tp_order.parentId = parent_id
+        tp_order.transmit = True
+        tp_trade = ib.placeOrder(contract, tp_order)
+
+        ib.sleep(1.5)
+
+        order_status = trade.orderStatus.status
+        if order_status in ('Cancelled', 'Inactive', 'ApiCancelled', 'ValidationError'):
+            log.error(f"Short entry immediately rejected by IBKR for {symbol}: {order_status}")
+            _safe_del_trade(symbol)
+            return False
+
+        log_order({
+            "order_id":   parent_id,
+            "symbol":     symbol,
+            "side":       "SELL",
+            "order_type": "LMT",
+            "qty":        qty,
+            "price":      limit_price,
+            "status":     "SUBMITTED",
+            "instrument": "stock",
+            "direction":  "SHORT",
+            "sl":         sl,
+            "tp":         tp,
+            "score":       score,
+            "reasoning":   reasoning,
+            "candle_gate": candle_gate or "UNKNOWN",
+            "timestamp":   datetime.now(timezone.utc).isoformat(),
+        })
+        log_order({
+            "order_id":  sl_trade.order.orderId,
+            "parent_id": parent_id,
+            "symbol":    symbol,
+            "side":      "BUY",
+            "order_type": "STP",
+            "qty":       qty,
+            "price":     sl,
+            "status":    "SUBMITTED",
+            "instrument": "stock",
+            "role":      "stop_loss",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+        log_order({
+            "order_id":  tp_trade.order.orderId,
+            "parent_id": parent_id,
+            "symbol":    symbol,
+            "side":      "BUY",
+            "order_type": "LMT",
+            "qty":       qty,
+            "price":     tp,
+            "status":    "SUBMITTED",
+            "instrument": "stock",
+            "role":      "take_profit",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+
+        try:
+            _open_time = open_time or datetime.now(timezone.utc).isoformat()
+            try:
+                from ic_calculator import get_current_weights as _get_icw
+                _icw_at_entry = _get_icw()
+            except Exception:
+                _icw_at_entry = None
+            with _trades_lock:
+                active_trades[symbol] = {
+                    "symbol":              symbol,
+                    "instrument":          "stock",
+                    "entry":               price,
+                    "current":             price,
+                    "qty":                 qty,
+                    "sl":                  sl,
+                    "tp":                  tp,
+                    "score":               score,
+                    "entry_score":         score,
+                    "reasoning":           reasoning,
+                    "direction":           "SHORT",
+                    "pnl":                 0.0,
+                    "status":              "PENDING",
+                    "order_id":            parent_id,
+                    "open_time":           _open_time,
+                    "signal_scores":       signal_scores or {},
+                    "ic_weights_at_entry": _icw_at_entry,
+                    "agent_outputs":       agent_outputs or {},
+                    "atr":                 atr,
+                    "sl_order_id":         _sl_order_id,
+                    "high_water_mark":     price,
+                    "tranche_mode":        False,
+                }
+            from learning import log_trade
+            log_trade(
+                trade=active_trades[symbol],
+                agent_outputs=agent_outputs or {},
+                regime=regime,
+                action="OPEN",
+            )
+        except Exception as record_err:
+            log.error(f"GHOST POSITION RISK {symbol}: short order submitted (id={parent_id}) but "
+                       f"failed to record: {record_err}")
+            raise
+
+        _rr = (price - tp) / (sl - price) if (sl - price) > 0 else 0
+        log.info(f"✅ SHORT {symbol} qty={qty} @ ${price:.2f} | SL=${sl:.2f} TP=${tp:.2f} | R:R={_rr:.1f}")
+        return True
+
+    except Exception as e:
+        _safe_del_trade(symbol)
+        log.error(f"Short failed {symbol}: {e}")
+        return False
+
+
 def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override: int = None) -> bool:
     """
     Close an existing position at market.
@@ -1310,7 +1505,7 @@ def close_position(ib_unused, trade_key: str) -> Optional[str]:
     except Exception as e:
         log.warning(f"Close {trade_key}: Error cancelling related orders: {e}")
 
-    # 3) Place aggressive limit order
+    # 3) Place market order for immediate fill
     contract = target.contract
     contract.exchange = "SMART"
     try:
@@ -1318,21 +1513,9 @@ def close_position(ib_unused, trade_key: str) -> Optional[str]:
     except Exception:
         pass  # Proceed with exchange='SMART' even if qualify fails
 
-    if mkt > 0:
-        if action == "SELL":
-            limit_price = round(mkt * 0.98, 2)  # 2% below for fast fill
-        else:
-            limit_price = round(mkt * 1.02, 2)  # 2% above for fast fill
-    else:
-        avg = float(target.averageCost)
-        if action == "SELL":
-            limit_price = round(avg * 0.95, 2)
-        else:
-            limit_price = round(avg * 1.05, 2)
-
-    order = LimitOrder(action, qty, limit_price,
-                       account=CONFIG["active_account"],
-                       tif="GTC", outsideRth=True)
+    order = MarketOrder(action, qty,
+                        account=CONFIG["active_account"],
+                        outsideRth=True)
     close_trade = eib.placeOrder(contract, order)
     eib.sleep(0.3)
 
@@ -1341,9 +1524,9 @@ def close_position(ib_unused, trade_key: str) -> Optional[str]:
         "order_id":   close_trade.order.orderId,
         "symbol":     sym,
         "side":       action,
-        "order_type": "LMT",
+        "order_type": "MKT",
         "qty":        qty,
-        "price":      limit_price,
+        "price":      mkt,
         "status":     "SUBMITTED",
         "instrument": instrument,
         "role":       "close",
@@ -1351,7 +1534,7 @@ def close_position(ib_unused, trade_key: str) -> Optional[str]:
         "timestamp":  datetime.now(timezone.utc).isoformat(),
     })
 
-    detail = f"{action} {qty} {sym} {'OPT' if is_option else ''} LIMIT @${limit_price:.2f} (mkt=${mkt:.2f})"
+    detail = f"{action} {qty} {sym} {'OPT' if is_option else ''} MKT (mkt=${mkt:.2f})"
     log.warning(f"📤 INSTANT close: {detail}")
 
     # 4) Remove from bot tracker — try composite key first, then plain symbol

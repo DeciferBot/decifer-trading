@@ -96,22 +96,24 @@ class TestSafeTradeHelpers:
 
     def test_safe_set_and_del_trade(self, tmp_path):
         """_safe_set_trade and _safe_del_trade correctly mutate active_trades."""
+        import orders_state
         with patch("orders.TRADES_FILE", str(tmp_path / "trades.json")), \
              patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")), \
-             patch("orders.active_trades", {}) as mock_trades:
+             patch("orders_state.active_trades", {}) as mock_trades:
             import orders
             orders._safe_set_trade("AAPL", {"qty": 10})
-            assert "AAPL" in orders.active_trades
+            assert "AAPL" in orders_state.active_trades
             orders._safe_del_trade("AAPL")
-            assert "AAPL" not in orders.active_trades
+            assert "AAPL" not in orders_state.active_trades
 
     def test_safe_update_trade_merges(self, tmp_path):
         """_safe_update_trade merges keys into an existing trade entry."""
         initial = {"AAPL": {"qty": 10, "entry": 150.0}}
+        import orders_state
         with patch("orders.TRADES_FILE", str(tmp_path / "trades.json")), \
              patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")), \
-             patch("orders.active_trades", initial):
+             patch("orders_state.active_trades", initial):
             import orders
             orders._safe_update_trade("AAPL", {"stop": 140.0})
-            assert orders.active_trades["AAPL"]["stop"] == 140.0
-            assert orders.active_trades["AAPL"]["qty"] == 10
+            assert orders_state.active_trades["AAPL"]["stop"] == 140.0
+            assert orders_state.active_trades["AAPL"]["qty"] == 10
