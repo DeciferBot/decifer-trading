@@ -1,0 +1,623 @@
+"""
+test_orders_regression.py — Regression tests for orders.py critical bug fixes.
+
+Covers the bugs fixed in commits 62078f6 and 5a4662a:
+  1. Orphaned SL reattachment on reconcile_with_ibkr (62078f6)
+     - Reattach existing live SL order after reconnect
+     - Re-submit new SL when none found in IBKR
+  2. Deferred option exits never drained (62078f6)
+     - execute_sell_option defers to _pending_option_exits when market closed
+     - flush_pending_option_exits drains the queue on market open
+     - flush_pending_option_exits is a no-op when market is closed
+  3. execute_sell_option state machine EXITING lock (62078f6)
+     - Status resets to ACTIVE on unfilled order (not stuck as EXITING)
+     - Status resets to ACTIVE on paper-account false fill (avgFillPrice=0)
+     - Duplicate exit blocked when status is already EXITING
+  4. execute_sell_option SHORT direction pricing (62078f6)
+     - SHORT uses ask on attempt 0 (not bid)
+     - SHORT steps up on retry (not down)
+  5. execute_sell finds option by composite key (5a4662a)
+     - execute_sell("GSAT") finds "GSAT_C_35.0_2026-04-17" via symbol field
+
+Each test is a direct regression for a specific code path added in the fix.
+"""
+import os, sys, types
+from unittest.mock import MagicMock, patch, call
+
+# Add project root to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+# Stub heavy deps BEFORE importing any Decifer module
+for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance",
+             "praw", "feedparser", "tvDatafeed", "requests_html"]:
+    sys.modules.setdefault(_mod, MagicMock())
+
+# Stub config with required keys
+import config as _config_mod
+_cfg = {"log_file": "/dev/null", "trade_log": "/dev/null",
+        "order_log": "/dev/null", "anthropic_api_key": "test-key",
+        "model": "claude-sonnet-4-20250514", "max_tokens": 1000,
+        "mongo_uri": "", "db_name": "test"}
+if hasattr(_config_mod, "CONFIG"):
+    for _k, _v in _cfg.items():
+        _config_mod.CONFIG.setdefault(_k, _v)
+else:
+    _config_mod.CONFIG = _cfg
+
+import pytest
+from datetime import datetime, timezone, timedelta
+
+# Evict any hollow stubs planted by earlier test files (e.g. test_bot.py
+# installs bare types.ModuleType() for "orders" which lacks all attributes)
+for _decifer_mod in ("orders", "risk", "scanner", "signals", "news", "agents"):
+    sys.modules.pop(_decifer_mod, None)
+
+# Import the REAL orders module (conftest has already patched all heavy deps)
+import orders
+import orders_options
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SHARED CONFIG FIXTURE  (mirrors test_orders_core.py mock_config)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@pytest.fixture
+def mock_config():
+    return {
+        "ibkr_host": "127.0.0.1",
+        "ibkr_port": 7496,
+        "ibkr_client_id": 10,
+        "active_account": "DUP481326",
+        "accounts": {"paper": "DUP481326", "live_1": "U3059777"},
+        "risk_pct_per_trade": 0.03,
+        "max_positions": 5,
+        "daily_loss_limit": 0.10,
+        "max_drawdown_alert": 0.25,
+        "min_cash_reserve": 0.05,
+        "max_single_position": 0.10,
+        "max_sector_exposure": 0.50,
+        "consecutive_loss_pause": 8,
+        "max_portfolio_allocation": 1.0,
+        "starting_capital": 100_000,
+        "atr_stop_multiplier": 1.5,
+        "atr_trail_multiplier": 2.0,
+        "partial_exit_1_pct": 0.04,
+        "partial_exit_2_pct": 0.08,
+        "min_reward_risk_ratio": 1.5,
+        "gap_protection_pct": 0.03,
+        "agents_required_to_agree": 2,
+        "scan_interval_prime": 3,
+        "min_score_to_trade": 18,
+        "high_conviction_score": 30,
+        "pre_market_start": "04:00",
+        "market_open": "09:30",
+        "prime_start": "09:45",
+        "lunch_start": "11:30",
+        "afternoon_start": "14:00",
+        "close_buffer": "15:55",
+        "market_close": "16:00",
+        "after_hours_end": "20:00",
+        "ema_fast": 9, "ema_slow": 21, "ema_trend": 50,
+        "rsi_period": 14, "macd_fast": 12, "macd_slow": 26,
+        "macd_signal": 9, "atr_period": 14,
+        "volume_surge_multiplier": 1.5,
+        "keltner_period": 20, "keltner_atr_period": 10,
+        "keltner_multiplier": 1.5, "donchian_period": 20,
+        "dashboard_port": 8080,
+        "vix_bull_max": 15, "vix_choppy_max": 25,
+        "vix_panic_min": 35, "vix_spike_pct": 0.20,
+        "inverse_etfs": {"market_short": "SPXS", "tech_short": "SQQQ", "vix_long": "UVXY"},
+        "log_file": "logs/decifer.log",
+        "trade_log": "data/trades.json",
+        "order_log": "data/orders.json",
+        "options_enabled": True,
+        "options_min_score": 35,
+        "options_max_ivr": 65,
+        "options_target_delta": 0.50,
+        "options_delta_range": 0.35,
+        "options_min_dte": 5,
+        "options_max_dte": 45,
+        "options_min_volume": 25,
+        "options_min_oi": 100,
+        "options_max_spread_pct": 0.35,
+        "options_max_risk_pct": 0.025,
+        "reentry_cooldown_minutes": 30,
+        "trailing_stop_enabled": True,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLASS 1: Orphaned Stop-Loss Reattachment  (commit 62078f6, lines 1801–1831)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestOrphanedStopLoss:
+    """
+    reconcile_with_ibkr must reattach or re-submit the stop-loss bracket after
+    a reconnect. Before the fix, both paths were missing: positions recovered
+    from IBKR had no SL protection until they were manually closed.
+    """
+
+    def _make_stock_portfolio_item(self, symbol="TSLA", position=10,
+                                   avg_cost=100.0, mkt_price=102.0):
+        """Build a minimal MagicMock that looks like an ib_insync portfolio item."""
+        item = MagicMock()
+        item.position = position
+        item.averageCost = avg_cost
+        item.marketPrice = mkt_price
+        item.contract.symbol = symbol
+        item.contract.secType = "STK"
+        item.contract.right = ""    # empty → _is_option_contract returns False
+        item.contract.strike = 0
+        return item
+
+    def _make_ib(self, portfolio_items, open_trades_list, sl_order_id=8888):
+        ib = MagicMock()
+        ib.isConnected.return_value = True
+        ib.portfolio.return_value = portfolio_items
+        ib.openTrades.return_value = open_trades_list
+        ib.sleep.return_value = None
+        # placeOrder returns a trade whose order has a known orderId
+        new_sl_trade = MagicMock()
+        new_sl_trade.order.orderId = sl_order_id
+        ib.placeOrder.return_value = new_sl_trade
+        return ib
+
+    def _make_sl_open_trade(self, symbol="TSLA", order_id=9999,
+                             order_type="STP", action="SELL"):
+        """Simulate an existing stop-loss order live in IBKR."""
+        t = MagicMock()
+        t.contract.symbol = symbol
+        t.order.orderType = order_type
+        t.order.action = action
+        t.order.orderId = order_id
+        t.orderStatus.status = "Submitted"
+        return t
+
+    def test_reconcile_reattaches_existing_sl_order(self, mock_config):
+        """
+        Regression: when IBKR already has a live STP order for the recovered
+        position, reconcile must reattach its ID — NOT place a duplicate order.
+
+        Before fix: sl_order_id was never set after reconnect recovery.
+        After fix:  sl_order_id = existing IBKR stop order ID (9999).
+        """
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+
+        item = self._make_stock_portfolio_item()
+        sl_trade = self._make_sl_open_trade(symbol="TSLA", order_id=9999)
+        ib = self._make_ib([item], [sl_trade])
+
+        with patch("orders.CONFIG", mock_config), \
+             patch("orders._validate_position_price", return_value=(102.0, "IBKR")):
+            _om.reconcile_with_ibkr(ib)
+
+        assert "TSLA" in _om.active_trades, "Position must be added by reconcile"
+        assert _om.active_trades["TSLA"].get("sl_order_id") == 9999, \
+            "sl_order_id must be reattached from existing IBKR stop order"
+        ib.placeOrder.assert_not_called()  # no duplicate SL placed
+
+    def test_reconcile_resubmits_sl_when_none_found_in_ibkr(self, mock_config):
+        """
+        Regression: when IBKR has the position but NO matching stop order,
+        reconcile must place a NEW GTC StopOrder as fallback protection.
+
+        Before fix: no SL was ever placed — position unprotected.
+        After fix:  new StopOrder placed, sl_order_id set to its orderId.
+        """
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+
+        item = self._make_stock_portfolio_item()
+        ib = self._make_ib([item], [], sl_order_id=8888)  # no open SL in IBKR
+
+        with patch("orders.CONFIG", mock_config), \
+             patch("orders._validate_position_price", return_value=(102.0, "IBKR")):
+            _om.reconcile_with_ibkr(ib)
+
+        assert "TSLA" in _om.active_trades, "Position must be added by reconcile"
+        ib.placeOrder.assert_called_once()  # new SL placed exactly once
+        assert _om.active_trades["TSLA"].get("sl_order_id") == 8888, \
+            "sl_order_id must be set to newly placed stop order"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLASS 2: Deferred Option Exits  (commit 62078f6, lines 2244–2252, 2510–2524)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestDeferredOptionExits:
+    """
+    execute_sell_option defers exits to _pending_option_exits when the options
+    market is closed. flush_pending_option_exits drains that queue on next open.
+
+    Before fix: _pending_option_exits was populated but NEVER drained — exits
+    were silently dropped each scan cycle.
+    After fix: flush_pending_option_exits is called at scan start and drains
+    the queue by re-calling execute_sell_option with reason="deferred:<orig>".
+    """
+
+    OPT_KEY = "GSAT_C_35.0_2026-06-20"
+
+    def _opt_pos(self, direction="LONG"):
+        return {
+            "symbol": "GSAT", "instrument": "option",
+            "right": "C", "strike": 35.0,
+            "expiry_ibkr": "20260620", "expiry_str": "2026-06-20",
+            "contracts": 2, "qty": 2,
+            "entry": 3.50, "entry_premium": 3.50, "current_premium": 2.50,
+            "direction": direction, "status": "ACTIVE",
+        }
+
+    def test_execute_sell_option_defers_when_market_closed(self):
+        """
+        Regression: when is_options_market_open() is False, execute_sell_option
+        must add opt_key to _pending_option_exits and return False without
+        touching IBKR.
+
+        Before fix: this path existed but the queue was never consumed.
+        This test pins that the deferral itself is correct.
+        """
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        _om._pending_option_exits.clear()
+
+        ib = MagicMock()
+
+        with patch("orders_options.is_options_market_open", return_value=False):
+            result = _om.execute_sell_option(ib, self.OPT_KEY, reason="signal")
+
+        assert result is False
+        assert _om._pending_option_exits.get(self.OPT_KEY) == "signal", \
+            "Deferred exit must be stored in _pending_option_exits"
+        ib.placeOrder.assert_not_called()
+
+    def test_flush_pending_option_exits_drains_on_market_open(self):
+        """
+        Regression: flush_pending_option_exits must call execute_sell_option
+        for every entry in _pending_option_exits when the market is open.
+
+        Before fix: this function did not exist — queue never drained.
+        After fix: each pending key is consumed with reason="deferred:<orig>".
+        """
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        _om._pending_option_exits.clear()
+
+        _om._pending_option_exits[self.OPT_KEY] = "signal"
+        _om.active_trades[self.OPT_KEY] = self._opt_pos()
+
+        ib = MagicMock()
+
+        with patch("orders_options.is_options_market_open", return_value=True), \
+             patch("orders_options.execute_sell_option") as mock_sell:
+            _om.flush_pending_option_exits(ib)
+
+        mock_sell.assert_called_once_with(
+            ib, self.OPT_KEY, reason="deferred:signal"
+        )
+        assert self.OPT_KEY not in _om._pending_option_exits, \
+            "Processed entry must be removed from _pending_option_exits"
+
+    def test_flush_pending_option_exits_noop_when_market_closed(self):
+        """
+        flush_pending_option_exits must not process the queue when the market
+        is closed — it will be retried on the next scan cycle when open.
+        """
+        _om = sys.modules["orders"]
+        _om._pending_option_exits.clear()
+        _om._pending_option_exits[self.OPT_KEY] = "signal"
+
+        ib = MagicMock()
+
+        with patch("orders_options.is_options_market_open", return_value=False), \
+             patch("orders_options.execute_sell_option") as mock_sell:
+            _om.flush_pending_option_exits(ib)
+
+        mock_sell.assert_not_called()
+        assert self.OPT_KEY in _om._pending_option_exits, \
+            "Deferred exit must still be in queue when market is closed"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLASS 3: Option Sell State Machine  (commit 62078f6, lines 2294, 2404, 2423)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestOptionSellStateMachine:
+    """
+    execute_sell_option must reset status to ACTIVE on all failure paths so
+    the position is never stuck as EXITING and can be retried.
+
+    Before fix: status was set to EXITING before the cooldown check. Any
+    exception or unfilled order left the position permanently locked.
+    After fix: EXITING is set after cooldown check; all failure paths call
+    _safe_update_trade(opt_key, {"status": "ACTIVE"}).
+    """
+
+    OPT_KEY = "NVDA_C_900.0_2026-06-20"
+
+    def _opt_pos(self):
+        return {
+            "symbol": "NVDA", "instrument": "option",
+            "right": "C", "strike": 900.0,
+            "expiry_ibkr": "20260620", "expiry_str": "2026-06-20",
+            "contracts": 1, "qty": 1,
+            "entry": 10.00, "entry_premium": 10.00, "current_premium": 8.00,
+            "direction": "LONG", "status": "ACTIVE",
+        }
+
+    def _make_ib(self, order_status="Cancelled", filled=0, avg_fill_price=None):
+        """Build IB mock that returns a trade with the given fill status."""
+        ib = MagicMock()
+        ticker = MagicMock()
+        ticker.bid = 8.00
+        ticker.ask = 8.20
+        ticker.last = 8.00
+        ib.reqMktData.return_value = ticker
+
+        trade = MagicMock()
+        trade.orderStatus.status = order_status
+        trade.orderStatus.filled = filled
+        trade.orderStatus.avgFillPrice = avg_fill_price
+        ib.placeOrder.return_value = trade
+        return ib
+
+    def _run(self, mock_config, ib):
+        """Run execute_sell_option with standard patches; return the result."""
+        import sys as _sys
+        _om = _sys.modules["orders"]
+        _om.active_trades.clear()
+        _om._option_sell_attempts.clear()
+        _om.active_trades[self.OPT_KEY] = self._opt_pos()
+
+        with patch("orders_options.is_options_market_open", return_value=True), \
+             patch("orders_options.CONFIG") as mock_cfg, \
+             patch("orders_options.log_order"), \
+             patch("orders_options.record_win"), \
+             patch("orders_options.record_loss"), \
+             patch("learning.log_order"), \
+             patch("learning._save_orders"), \
+             patch("learning._save_trades"), \
+             patch("learning.log_trade"):
+            mock_cfg.__getitem__.side_effect = lambda k: mock_config[k]
+            mock_cfg.get = lambda k, d=None: mock_config.get(k, d)
+            return _om.execute_sell_option(ib, self.OPT_KEY, reason="test")
+
+    def test_status_resets_to_active_on_unfilled_order(self, mock_config):
+        """
+        Regression: if the limit order is Cancelled without a fill, the
+        position status must return to ACTIVE so the next scan can retry.
+
+        Before fix: status was left as EXITING — position permanently locked.
+        After fix:  _safe_update_trade(opt_key, {"status": "ACTIVE"}) on line 2404.
+        """
+        _om = sys.modules["orders"]
+        ib = self._make_ib(order_status="Cancelled", filled=0, avg_fill_price=0)
+
+        result = self._run(mock_config, ib)
+
+        assert result is False
+        assert _om.active_trades.get(self.OPT_KEY, {}).get("status") == "ACTIVE", \
+            "Status must reset to ACTIVE after unfilled order (not stuck as EXITING)"
+
+    def test_status_resets_to_active_on_false_fill(self, mock_config):
+        """
+        Regression: paper accounts can report status=Filled with avgFillPrice=0.
+        This is a false fill — the position must reset to ACTIVE and be retried.
+
+        Before fix: status was left as EXITING on this false-fill path.
+        After fix:  _safe_update_trade(opt_key, {"status": "ACTIVE"}) on line 2423.
+        """
+        _om = sys.modules["orders"]
+        ib = self._make_ib(order_status="Filled", filled=0, avg_fill_price=0.0)
+
+        result = self._run(mock_config, ib)
+
+        assert result is False
+        assert _om.active_trades.get(self.OPT_KEY, {}).get("status") == "ACTIVE", \
+            "Status must reset to ACTIVE after paper-account false fill"
+
+    def test_duplicate_exit_blocked_when_already_exiting(self, mock_config):
+        """
+        Regression: if status is already EXITING (exit in flight), a second
+        call must return False immediately without placing another order.
+
+        This prevents double-close race conditions during parallel scan cycles.
+        """
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        _om._option_sell_attempts.clear()
+
+        pos = self._opt_pos()
+        pos["status"] = "EXITING"
+        _om.active_trades[self.OPT_KEY] = pos
+
+        ib = MagicMock()
+
+        with patch("orders_options.is_options_market_open", return_value=True), \
+             patch("orders_options.CONFIG") as mock_cfg:
+            mock_cfg.__getitem__.side_effect = lambda k: mock_config[k]
+            mock_cfg.get = lambda k, d=None: mock_config.get(k, d)
+            result = _om.execute_sell_option(ib, self.OPT_KEY, reason="test")
+
+        assert result is False
+        ib.placeOrder.assert_not_called()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLASS 4: SHORT Option Exit Pricing  (commit 62078f6, lines 2329–2337)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestShortOptionExit:
+    """
+    SHORT option positions (e.g. sold calls/puts) close via BUY-to-close.
+    The limit price must be at the ASK (not bid) and step UP on retries to
+    ensure the buy-to-close fills.
+
+    Before fix: SHORT exits used bid pricing and stepped DOWN, making them
+    unlikely to fill — the position remained open.
+    After fix:  SHORT uses ask × (1 + retry*0.05) on each attempt.
+    """
+
+    OPT_KEY = "GSAT_C_35.0_2026-06-20"
+
+    def _short_pos(self):
+        return {
+            "symbol": "GSAT", "instrument": "option",
+            "right": "C", "strike": 35.0,
+            "expiry_ibkr": "20260620", "expiry_str": "2026-06-20",
+            "contracts": 2, "qty": 2,
+            "entry": 3.50, "entry_premium": 3.50, "current_premium": 2.50,
+            "direction": "SHORT",  # BUY-to-close
+            "status": "ACTIVE",
+        }
+
+    def _make_ib(self, bid=2.00, ask=2.50):
+        ib = MagicMock()
+        ticker = MagicMock()
+        ticker.bid = bid
+        ticker.ask = ask
+        ticker.last = bid
+        ib.reqMktData.return_value = ticker
+        # Return Cancelled so we don't need to mock the full success path
+        trade = MagicMock()
+        trade.orderStatus.status = "Cancelled"
+        trade.orderStatus.filled = 0
+        trade.orderStatus.avgFillPrice = 0
+        ib.placeOrder.return_value = trade
+        return ib
+
+    def _run(self, mock_config, ib, retry_count=0):
+        """Run execute_sell_option and return (captured_action, captured_price)."""
+        import sys as _sys
+        _om = _sys.modules["orders"]
+        _om.active_trades.clear()
+        _om._option_sell_attempts.clear()
+
+        if retry_count > 0:
+            _om._option_sell_attempts[self.OPT_KEY] = {
+                "count": retry_count,
+                "last_try": datetime.now(timezone.utc),
+            }
+
+        _om.active_trades[self.OPT_KEY] = self._short_pos()
+
+        captured = {}
+
+        def fake_limit_order(side, qty, price, **kwargs):
+            captured["action"] = side
+            captured["price"] = price
+            obj = MagicMock()
+            obj.lmtPrice = price
+            return obj
+
+        with patch("orders_options.is_options_market_open", return_value=True), \
+             patch("orders_options.CONFIG") as mock_cfg, \
+             patch("orders_options.LimitOrder", side_effect=fake_limit_order), \
+             patch("orders_options.log_order"), \
+             patch("orders_options.record_win"), \
+             patch("orders_options.record_loss"), \
+             patch("learning.log_order"), \
+             patch("learning._save_orders"), \
+             patch("learning._save_trades"), \
+             patch("learning.log_trade"):
+            mock_cfg.__getitem__.side_effect = lambda k: mock_config[k]
+            mock_cfg.get = lambda k, d=None: mock_config.get(k, d)
+            _om.execute_sell_option(ib, self.OPT_KEY, reason="test")
+
+        return captured.get("action"), captured.get("price")
+
+    def test_short_option_exit_uses_ask_on_attempt_0(self, mock_config):
+        """
+        Regression: SHORT position BUY-to-close must use ask price on first attempt.
+
+        Before fix: SHORT exits used bid pricing — orders rarely filled because
+        bid < ask, meaning the buy was below the market offer.
+        After fix:  limit_price = round(ask * 1.0, 2)  (lines 2332–2333).
+        """
+        ib = self._make_ib(bid=2.00, ask=2.50)
+        action, price = self._run(mock_config, ib, retry_count=0)
+
+        assert action == "BUY", f"SHORT close must use BUY action, got {action}"
+        assert price == 2.50, f"Attempt 0 must use ask=2.50, got {price}"
+
+    def test_short_option_exit_steps_up_on_retry(self, mock_config):
+        """
+        Regression: SHORT retries must step UP (ask × 1.05 per retry) so that
+        the BUY-to-close offer increases aggressively to chase fills.
+
+        Before fix: retries stepped DOWN (bid × 0.95), making fills even less likely.
+        After fix:  _premium = 1.0 + (retry * 0.05) applied to ask (lines 2331–2333).
+        """
+        ib = self._make_ib(bid=2.00, ask=2.50)
+        action, price = self._run(mock_config, ib, retry_count=1)
+
+        expected = round(2.50 * 1.05, 2)  # ask × (1 + 1×0.05)
+        assert action == "BUY", f"SHORT close must use BUY action, got {action}"
+        assert price == expected, f"Retry 1 must use ask*1.05={expected}, got {price}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLASS 5: execute_sell Composite Key Lookup  (commit 5a4662a, lines 1269–1282)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestExecuteSellCompositeKey:
+    """
+    Options are stored in active_trades under composite keys such as
+    "GSAT_C_35.0_2026-04-17". Before the fix, execute_sell("GSAT") did a
+    direct dict lookup that failed — the sell signal was silently ignored.
+
+    After fix: on a direct key miss, execute_sell searches active_trades by
+    the "symbol" field and closes the first match.
+    """
+
+    OPT_KEY = "GSAT_C_35.0_2026-04-17"
+
+    def _opt_pos(self):
+        return {
+            "symbol": "GSAT",           # plain symbol — the search key
+            "instrument": "option",
+            "right": "C",
+            "strike": 35.0,
+            "expiry_ibkr": "20260417",
+            "expiry_str": "2026-04-17",
+            "qty": 2,
+            "entry": 3.50,
+            "current": 3.50,
+            "direction": "LONG",
+            "status": "ACTIVE",
+        }
+
+    def test_execute_sell_finds_option_by_symbol_field(self, mock_config):
+        """
+        Regression: execute_sell("GSAT") must find the option position stored
+        under the composite key "GSAT_C_35.0_2026-04-17" and initiate its exit.
+
+        Before fix: active_trades["GSAT"] KeyError → function returned False
+        with "No open position" warning — the option was never closed.
+        After fix:  symbol-field search (line 1275) finds the composite key;
+        status is set to EXITING to initiate closure.
+        """
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        _om.recently_closed.clear()
+        _om.active_trades[self.OPT_KEY] = self._opt_pos()
+
+        ib = MagicMock()
+
+        with patch("orders.CONFIG", mock_config), \
+             patch("orders._validate_position_price", return_value=(3.50, "IBKR")), \
+             patch("orders._get_ibkr_price", return_value=3.50), \
+             patch("orders.record_win"), \
+             patch("orders.record_loss"), \
+             patch("orders.log_order"), \
+             patch("learning.log_order"), \
+             patch("learning._save_orders"), \
+             patch("learning._save_trades"), \
+             patch("learning.log_trade"), \
+             patch("fill_watcher.stop_watcher"):
+            result = _om.execute_sell(ib, "GSAT", reason="signal")
+
+        # A True return proves the option was found via the composite key search.
+        # False with "No open position" would mean the bug regressed.
+        assert result is True, \
+            "execute_sell('GSAT') must find and close the option stored under composite key"

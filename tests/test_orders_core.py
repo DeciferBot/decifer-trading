@@ -54,6 +54,7 @@ for _decifer_mod in ("orders", "risk", "scanner", "signals", "news", "agents"):
 
 # Import the REAL orders module (conftest has already patched all heavy deps)
 import orders
+import orders_options
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1161,15 +1162,15 @@ class TestExecuteSellOptionPricing:
             obj.lmtPrice = price
             return obj
 
-        with patch("orders.is_options_market_open", return_value=True), \
-             patch("orders.log_order"), \
+        with patch("orders_options.is_options_market_open", return_value=True), \
+             patch("orders_options.log_order"), \
              patch("learning.log_order"), \
              patch("learning._save_orders"), \
              patch("learning._save_trades"), \
-             patch("orders.record_win"), \
-             patch("orders.record_loss"), \
-             patch("orders.CONFIG") as mock_cfg, \
-             patch("orders.LimitOrder", side_effect=fake_limit_order), \
+             patch("orders_options.record_win"), \
+             patch("orders_options.record_loss"), \
+             patch("orders_options.CONFIG") as mock_cfg, \
+             patch("orders_options.LimitOrder", side_effect=fake_limit_order), \
              patch("learning.log_trade"):
             mock_cfg.__getitem__.side_effect = lambda k: mock_config[k]
             mock_cfg.get = lambda k, d=None: mock_config.get(k, d)
