@@ -315,58 +315,92 @@ def find_best_contract(symbol: str,
              f"max_risk=${max_risk:,.0f} (base=${base_risk:,.0f})")
 
     try:
-        ticker = yf.Ticker(symbol)
+        today = date.today()
 
-        # Current underlying price
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            hist = ticker.history(period="1d", interval="1m")
-        if hist is None or hist.empty:
-            log.info(f"Options: no price data for {symbol} — cannot evaluate")
-            return None
-        S = float(hist["Close"].iloc[-1])
-
-        # Filter expiry dates to DTE window
-        today     = date.today()
-        all_exps  = ticker.options
-        valid_exp = []
-        for exp in all_exps:
-            exp_date = datetime.strptime(exp, "%Y-%m-%d").date()
-            dte      = (exp_date - today).days
-            if min_dte <= dte <= max_dte:
-                valid_exp.append((exp, exp_date, dte))
-
-        if not valid_exp:
-            all_dtes = [(exp, (datetime.strptime(exp, "%Y-%m-%d").date() - today).days) for exp in all_exps[:6]]
-            log.info(f"Options: no expiry in {min_dte}-{max_dte} DTE window for {symbol} — "
-                     f"available: {all_dtes}")
+        # ── Underlying price: Alpaca first, yfinance fallback ─────────
+        S = None
+        try:
+            from alpaca_options import get_underlying_price as _alpaca_price
+            S = _alpaca_price(symbol)
+        except Exception:
+            pass
+        if S is None or S <= 0:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                hist = yf.Ticker(symbol).history(period="1d", interval="1m")
+            if hist is None or hist.empty:
+                log.info(f"Options: no price data for {symbol} — cannot evaluate")
+                return None
+            S = float(hist["Close"].iloc[-1])
+        if S is None or S <= 0:
+            log.info(f"Options: zero/invalid price for {symbol}")
             return None
 
-        # Try each valid expiry, take the first good contract
+        # ── Options chain: Alpaca primary (real-time OPRA), yfinance fallback ──
         best_contract = None
-        for exp_str, exp_date, dte in valid_exp:
-            try:
-                calls_df, puts_df = _fetch_chain(symbol, exp_str)
-                df = calls_df if flag == "c" else puts_df
+
+        try:
+            from alpaca_options import get_all_chains as _alpaca_chains
+            chains = _alpaca_chains(symbol, min_dte, max_dte)
+            for chain in chains:
+                df = chain["calls"] if flag == "c" else chain["puts"]
                 if df.empty:
                     continue
-
+                exp_str  = chain["expiry_str"]
+                exp_date = datetime.strptime(exp_str, "%Y-%m-%d").date()
+                dte      = chain["dte"]
                 contract = _select_strike(df, flag, S, dte, t_delta, d_range)
                 if contract is None:
                     continue
-
                 contract["expiry_str"]  = exp_str
                 contract["expiry_ibkr"] = exp_date.strftime("%Y%m%d")
                 best_contract = contract
                 break
-
-            except Exception as e:
-                log.info(f"Options chain error {symbol} {exp_str}: {e}")
-                continue
+        except Exception as _ae:
+            log.debug(f"Options Alpaca chain fetch skipped for {symbol}: {_ae}")
+            chains = []
 
         if best_contract is None:
-            log.info(f"Options: no suitable contract found for {symbol} after checking "
-                     f"{len(valid_exp)} expiries — all filtered out by liquidity/delta")
+            # yfinance fallback — iterate valid expiries
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    ticker    = yf.Ticker(symbol)
+                    all_exps  = ticker.options
+                valid_exp = []
+                for exp in all_exps:
+                    exp_date = datetime.strptime(exp, "%Y-%m-%d").date()
+                    dte      = (exp_date - today).days
+                    if min_dte <= dte <= max_dte:
+                        valid_exp.append((exp, exp_date, dte))
+                if not valid_exp:
+                    all_dtes = [(e, (datetime.strptime(e, "%Y-%m-%d").date() - today).days)
+                                for e in all_exps[:6]]
+                    log.info(f"Options: no expiry in {min_dte}-{max_dte} DTE window for "
+                             f"{symbol} — available: {all_dtes}")
+                    return None
+                for exp_str, exp_date, dte in valid_exp:
+                    try:
+                        calls_df, puts_df = _fetch_chain(symbol, exp_str)
+                        df = calls_df if flag == "c" else puts_df
+                        if df.empty:
+                            continue
+                        contract = _select_strike(df, flag, S, dte, t_delta, d_range)
+                        if contract is None:
+                            continue
+                        contract["expiry_str"]  = exp_str
+                        contract["expiry_ibkr"] = exp_date.strftime("%Y%m%d")
+                        best_contract = contract
+                        break
+                    except Exception as e:
+                        log.info(f"Options chain error {symbol} {exp_str}: {e}")
+                        continue
+            except Exception as e:
+                log.debug(f"Options yfinance chain fallback error {symbol}: {e}")
+
+        if best_contract is None:
+            log.info(f"Options: no suitable contract found for {symbol} — "
+                     f"all expiries filtered out by liquidity/delta")
             return None
 
         # IV Rank check — bail if options too expensive
@@ -376,16 +410,39 @@ def find_best_contract(symbol: str,
             log.info(f"Options: {symbol} IVR={iv_rank:.0f} > {max_ivr} — too expensive, skipping")
             return None
 
-        # Upgrade to IBKR real-time Greeks if bot is connected
-        ibkr_greeks = get_ibkr_greeks(
-            ib, symbol,
-            best_contract["expiry_ibkr"],
-            best_contract["strike"],
-            best_contract["right"],
-        )
-        if ibkr_greeks:
-            best_contract.update(ibkr_greeks)
-            log.debug(f"Options: used IBKR live Greeks for {symbol}")
+        # ── Greeks upgrade: Alpaca live (OPRA) → IBKR → py_vollib ────
+        upgraded = False
+        try:
+            from alpaca_options import build_option_symbol, get_snapshot_greeks
+            occ_sym       = build_option_symbol(
+                symbol, best_contract["expiry_ibkr"],
+                best_contract["right"], best_contract["strike"],
+            )
+            alpaca_greeks = get_snapshot_greeks(occ_sym)
+            if alpaca_greeks:
+                for k in ("delta", "gamma", "theta", "vega", "iv"):
+                    if alpaca_greeks.get(k) is not None:
+                        best_contract[k] = alpaca_greeks[k]
+                if alpaca_greeks.get("mid"):
+                    best_contract["mid"] = alpaca_greeks["mid"]
+                    best_contract["bid"] = alpaca_greeks.get("bid", best_contract["bid"])
+                    best_contract["ask"] = alpaca_greeks.get("ask", best_contract["ask"])
+                best_contract["greeks_source"] = "alpaca_live"
+                log.debug(f"Options: used Alpaca live Greeks for {symbol}")
+                upgraded = True
+        except Exception as _ae:
+            log.debug(f"Options Alpaca Greeks upgrade skipped for {symbol}: {_ae}")
+
+        if not upgraded:
+            ibkr_greeks = get_ibkr_greeks(
+                ib, symbol,
+                best_contract["expiry_ibkr"],
+                best_contract["strike"],
+                best_contract["right"],
+            )
+            if ibkr_greeks:
+                best_contract.update(ibkr_greeks)
+                log.debug(f"Options: used IBKR live Greeks for {symbol}")
 
         # Position sizing: max_risk / (mid × 100 shares per contract)
         premium_per_contract = best_contract["mid"] * 100
@@ -448,12 +505,31 @@ def check_options_exits(open_options: dict, ib=None) -> list[str]:
         entry_premium = pos.get("entry_premium", 0)
         curr_premium  = pos.get("current_premium")
 
-        # Always fetch a fresh live premium — IBKR first, yfinance if IBKR returns nothing.
+        # Always fetch a fresh live premium.
+        # Priority: Alpaca OPRA (best) → IBKR → yfinance.
         # Do NOT rely solely on pos["current_premium"]: on paper accounts IBKR's
         # portfolio() marketPrice for options is frequently 0, leaving current_premium
         # stale at the entry value and making the P&L check always read ~0%.
+
+        # Layer 1 — Alpaca OPRA real-time quote
+        alpaca_live_ok = False
+        try:
+            from alpaca_options import build_option_symbol, get_snapshot_greeks
+            _occ = build_option_symbol(
+                pos.get("symbol", sym), pos.get("expiry_ibkr", ""),
+                pos.get("right", "C"), pos.get("strike", 0),
+            )
+            _snap = get_snapshot_greeks(_occ)
+            if _snap and _snap.get("mid") and _snap["mid"] > 0:
+                curr_premium = float(_snap["mid"])
+                pos["current_premium"] = curr_premium
+                alpaca_live_ok = True
+                log.debug(f"Options price (Alpaca OPRA): {sym} premium=${curr_premium:.4f}")
+        except Exception:
+            pass
+
         ibkr_live_ok = False
-        if ib:
+        if not alpaca_live_ok and ib:
             try:
                 from ib_async import Option as IBOption
                 contract = IBOption(
@@ -487,8 +563,8 @@ def check_options_exits(open_options: dict, ib=None) -> list[str]:
             except Exception:
                 pass
 
-        # yfinance fallback — always run if IBKR snapshot returned nothing valid
-        if not ibkr_live_ok:
+        # yfinance fallback — only if both Alpaca and IBKR returned nothing valid
+        if not alpaca_live_ok and not ibkr_live_ok:
             try:
                 exp_str = pos.get("expiry_str", "")
                 strike  = pos.get("strike", 0)
