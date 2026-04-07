@@ -743,8 +743,8 @@ class TestValidatePositionPrice:
         assert price > 0
         assert price in (100.0, 100.5) or price == round((100.0 + 100.5) / 2, 4)
 
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_yf_price')
+    @patch('orders_contracts.get_tv_signal_cache')
+    @patch('orders_contracts._get_yf_price')
     def test_validate_position_price_two_sources_diverging(
         self, mock_yf_price, mock_tv_cache
     ):
@@ -757,8 +757,8 @@ class TestValidatePositionPrice:
         assert price == 0
         assert "divergence" in src.lower()
 
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_yf_price')
+    @patch('orders_contracts.get_tv_signal_cache')
+    @patch('orders_contracts._get_yf_price')
     def test_validate_position_price_three_sources_consensus(
         self, mock_yf_price, mock_tv_cache
     ):
