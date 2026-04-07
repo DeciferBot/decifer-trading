@@ -946,7 +946,21 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
         close_order = MarketOrder(close_action, sell_qty, account=CONFIG["active_account"])
         close_order.outsideRth = True
         sell_trade = ib.placeOrder(contract, close_order)
-        ib.sleep(1)
+        ib.sleep(2)
+
+        # Cancel any orphaned bracket children (SL + TP legs) that remain open
+        # after the position is closed. IBKR OCA only fires when one child fills —
+        # it does not fire when the position is closed externally (e.g. manually).
+        _entry_order_id = info.get("order_id")
+        if _entry_order_id:
+            try:
+                for _t in ib.openTrades():
+                    if getattr(_t.order, "parentId", None) == _entry_order_id:
+                        ib.cancelOrder(_t.order)
+                        log.info(f"Cancelled orphaned bracket child for {symbol} "
+                                 f"(orderId={_t.order.orderId}, parentId={_entry_order_id})")
+            except Exception as _e:
+                log.warning(f"Bracket child cleanup for {symbol} failed: {_e}")
 
         # Log the close order
         log_order({
