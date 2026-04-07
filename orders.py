@@ -68,8 +68,28 @@ from orders_options import (
     _pending_option_exits,
     execute_buy_option, execute_sell_option, flush_pending_option_exits,
     update_tranche_status, update_trailing_stops,
+    # Options attempt ledger (session-scoped DAY-order dedup)
+    _OPTIONS_LEDGER_PATH, _load_options_ledger, _save_options_ledger,
+    _options_attempted_today, _record_options_attempt, _options_ledger,
 )
 
 
 # ── Core order execution ──────────────────────────────────────────────────────
 from orders_core import execute_buy, execute_short, execute_sell
+
+
+# ── Order lifecycle utilities ─────────────────────────────────────────────────
+
+def cancel_order_by_id(ib, order_id) -> bool:
+    """
+    Cancel an open IBKR order by orderId.
+    Returns True if the order was found and cancellation was requested.
+    Callers should call sync_orders_from_ibkr() and update open_trades
+    after a successful cancel.
+    """
+    for t in ib.openTrades():
+        if t.order.orderId == order_id:
+            ib.cancelOrder(t.order)
+            ib.sleep(1)
+            return True
+    return False

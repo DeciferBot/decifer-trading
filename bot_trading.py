@@ -39,6 +39,8 @@ from risk import (check_risk_conditions, get_session, get_scan_interval,
                   init_equity_high_water_mark_from_history,
                   get_intraday_strategy_mode, set_session_opening_regime,
                   check_thesis_validity, get_consecutive_losses)
+from risk_gates import auto_rebalance_cash
+from orders import _options_attempted_today, _record_options_attempt
 from learning import (log_trade, load_trades, load_orders,
                       get_performance_summary, run_weekly_review,
                       TRADE_LOG_FILE, get_effective_capital)
@@ -56,63 +58,6 @@ _eod_options_review_done: bool = False
 _portfolio_review_done_today: bool = False
 _last_known_regime: str = ""
 _session_stop_count: int = 0
-
-# ── Session-scoped options attempt ledger ────────────────────────────────────
-# Tracks which (symbol, direction) pairs have already been attempted today.
-# Key  : "{symbol}_{direction}"  e.g. "NKE_LONG"
-# Value: ISO date string         e.g. "2026-04-02"
-#
-# Design rationale (industry standard for DAY orders):
-#   A cancelled DAY order is TERMINAL for that signal instance.  Retrying the
-#   same symbol+direction on the same session date is almost always wrong —
-#   if IBKR couldn't fill it once, market conditions (spread, liquidity) haven't
-#   changed enough in 5 minutes to justify another attempt.
-#   The natural retry boundary is the NEXT session, when a fresh signal fires.
-#
-# This survives bot restarts (disk-persisted) and auto-expires by date — no
-# manual clearing needed.  A new trading day generates new signal dates, new
-# keys, and allows fresh attempts automatically.
-_OPTIONS_LEDGER_PATH = pathlib.Path("data/options_attempt_ledger.json")
-
-
-def _load_options_ledger() -> dict:
-    """Load ledger from disk.  Returns {} on any error."""
-    try:
-        if _OPTIONS_LEDGER_PATH.exists():
-            return json.loads(_OPTIONS_LEDGER_PATH.read_text())
-    except Exception:
-        pass
-    return {}
-
-
-def _save_options_ledger(ledger: dict) -> None:
-    """Persist ledger to disk.  Silently ignores write errors."""
-    try:
-        _OPTIONS_LEDGER_PATH.write_text(json.dumps(ledger))
-    except Exception:
-        pass
-
-
-def _options_attempted_today(symbol: str, direction: str) -> bool:
-    """Return True if we already attempted options on this symbol+direction today."""
-    key   = f"{symbol}_{direction}"
-    today = datetime.now().strftime("%Y-%m-%d")
-    return _options_ledger.get(key) == today
-
-
-def _record_options_attempt(symbol: str, direction: str) -> None:
-    """Mark this symbol+direction as attempted today and persist."""
-    key   = f"{symbol}_{direction}"
-    today = datetime.now().strftime("%Y-%m-%d")
-    _options_ledger[key] = today
-    # Prune stale entries (any date != today) to keep the file tidy
-    stale = [k for k, v in _options_ledger.items() if v != today]
-    for k in stale:
-        del _options_ledger[k]
-    _save_options_ledger(_options_ledger)
-
-
-_options_ledger: dict = _load_options_ledger()
 
 # ── Last-decision writer (for Chief Decifer trade card) ───────────────────────
 
@@ -381,8 +326,11 @@ def check_external_closes(regime: dict):
                     if sell_fills:
                         sell_fills.sort(key=lambda f: f.execution.time or datetime.min)
                         exit_price = float(sell_fills[-1].execution.price)
+                        _fill_order_id = getattr(sell_fills[-1].execution, "orderId", None)
+                    else:
+                        _fill_order_id = None
                 except Exception:
-                    pass
+                    _fill_order_id = None
 
                 rpnl_key = underlying if is_opt_pos else sym
                 if exit_price is None and rpnl_key in realized_pnl_map:
@@ -429,7 +377,11 @@ def check_external_closes(regime: dict):
                     else:
                         pnl = (exit_price - trade["entry"]) * trade["qty"] * mult
 
-                exit_reason = "stop_loss" if pnl < 0 else "take_profit"
+                sl_order_id = trade.get("sl_order_id")
+                if sl_order_id and _fill_order_id and int(_fill_order_id) == int(sl_order_id):
+                    exit_reason = "sl_hit"
+                else:
+                    exit_reason = "manual"
                 clog("TRADE", f"External close detected: {sym} | Exit ${exit_price:.2f} | P&L ${pnl:+.2f} | {exit_reason}")
 
                 log_trade(
@@ -457,6 +409,7 @@ def check_external_closes(regime: dict):
                 dash["performance"] = get_performance_summary(lt())
 
                 del open_trades[sym]
+                bot_state._sl_fill_events.discard(sym)
                 dash["positions"] = get_open_positions()
 
                 if pnl >= 0:
@@ -464,7 +417,7 @@ def check_external_closes(regime: dict):
                     record_win()
                 else:
                     from risk import record_loss
-                    record_loss(source="external")
+                    record_loss(source="external" if exit_reason != "sl_hit" else "sl")
                     global _session_stop_count
                     _session_stop_count += 1
 
@@ -534,84 +487,6 @@ def _process_close_queue():
                 clog("ERROR", f"❌ Could not close {sym} — not found in portfolio")
         except Exception as e:
             clog("ERROR", f"❌ Close {sym} failed: {e}")
-
-
-def _auto_rebalance_cash(portfolio_value: float, regime: dict):
-    """
-    Auto-close the weakest position(s) to bring cash reserve back above
-    min_cash_reserve.  Closes positions one by one (worst P&L first) until
-    cash is restored or no positions remain.
-    """
-    ib = bot_state.ib
-    min_reserve = CONFIG.get("min_cash_reserve", 0.10)
-    positions   = get_open_positions()
-
-    if not positions:
-        clog("RISK", "Auto-rebalance: No positions to close")
-        return
-
-    from risk import _get_ibkr_cash
-    from orders import close_position
-
-    def _current_cash_pct():
-        cash = _get_ibkr_cash(ib, CONFIG.get("active_account", ""))
-        if cash is not None:
-            return cash / portfolio_value if portfolio_value > 0 else 1.0
-        open_pos = get_open_positions()
-        deployed = sum(p.get("current", p.get("entry", 0)) * p.get("qty", 0) for p in open_pos)
-        return (portfolio_value - deployed) / portfolio_value if portfolio_value > 0 else 1.0
-
-    cash_pct = _current_cash_pct()
-    cash_deficit = (min_reserve - cash_pct) * portfolio_value
-    clog("RISK", f"Auto-rebalance: cash={cash_pct*100:.1f}% (need {min_reserve*100:.0f}%) "
-         f"— need to free ~${cash_deficit:,.0f}")
-
-    ranked = []
-    for p in positions:
-        if p.get("instrument") == "option":
-            continue  # Options can't close outside regular hours — stocks only
-        entry   = p.get("entry", 0)
-        current = p.get("current", entry)
-        qty     = p.get("qty", 0)
-        if entry > 0 and qty != 0:
-            pnl_pct        = (current - entry) / entry
-            position_value = abs(current * qty)
-            ranked.append({
-                "symbol":         p.get("_trade_key", p.get("symbol")),
-                "pnl_pct":        pnl_pct,
-                "position_value": position_value,
-            })
-
-    if not ranked:
-        clog("RISK", "Auto-rebalance: Could not evaluate positions")
-        return
-
-    ranked.sort(key=lambda x: x["pnl_pct"])
-
-    for candidate in ranked:
-        if cash_pct >= min_reserve:
-            break
-        sym = candidate["symbol"]
-        clog("RISK", f"Auto-rebalance: Closing {sym} (P&L: {candidate['pnl_pct']:+.1%}, "
-             f"value: ${candidate['position_value']:,.0f}) to free cash")
-        try:
-            result = close_position(ib, sym)
-            if result:
-                clog("RISK", f"Auto-rebalance: {result}")
-                ib.sleep(2)
-                cash_pct = _current_cash_pct()
-                clog("RISK", f"Auto-rebalance: cash now at {cash_pct*100:.1f}%")
-            else:
-                clog("ERROR", f"Auto-rebalance: Could not close {sym} (not in IBKR — phantom entry?), purging and trying next")
-                from orders import reconcile_with_ibkr
-                reconcile_with_ibkr(ib)
-                continue
-        except Exception as e:
-            clog("ERROR", f"Auto-rebalance: Failed to close {sym}: {e}, trying next")
-            continue
-
-    if cash_pct < min_reserve:
-        clog("RISK", f"Auto-rebalance: cash still at {cash_pct*100:.1f}% after closing all eligible positions")
 
 
 # ── Pre-close options review ──────────────────────────────────────────────────
@@ -806,6 +681,26 @@ def _should_run_portfolio_review(
     return False, ""
 
 
+# ── Scan helpers ──────────────────────────────────────────────────────────────
+
+def _print_score_table(scored: list, n: int = 10) -> None:
+    """Print a ranked score table to terminal after each scan."""
+    if not scored:
+        return
+    top = sorted(scored, key=lambda s: s.get("score", 0), reverse=True)[:n]
+    clog("SCAN", f"── Top {len(top)} Signals {'─' * 40}")
+    for i, s in enumerate(top, 1):
+        sym       = s.get("symbol", "?")
+        direction = s.get("direction", "?")
+        score     = s.get("score", 0)
+        breakdown = s.get("score_breakdown") or {}
+        top_dims  = sorted(breakdown.items(), key=lambda x: x[1], reverse=True)
+        top_dims  = [(k, v) for k, v in top_dims if v > 0][:3]
+        dims_str  = "  ".join(f"{k}:{v}" for k, v in top_dims) if top_dims else "—"
+        dir_short = {"LONG": "L", "SHORT": "S"}.get(direction, direction)
+        clog("SIGNAL", f"#{i:<2} {sym:<8} {dir_short:<5} {score:>2}/50  │ {dims_str}")
+
+
 # ── Main scan ─────────────────────────────────────────────────────────────────
 
 def run_scan():
@@ -909,7 +804,7 @@ def run_scan():
     if not tradeable:
         if "Cash reserve too low" in reason:
             clog("RISK", f"Cash reserve below minimum — auto-rebalancing to free up cash")
-            _auto_rebalance_cash(pv, regime)
+            auto_rebalance_cash(ib, pv, regime)
             pv, pnl = get_account_data()
             dash["portfolio_value"] = pv
             dash["daily_pnl"]       = pnl
@@ -943,13 +838,26 @@ def run_scan():
         clog("INFO", f"Favourites: {len(favs)} tickers ({new_count} new additions to universe)")
     clog("INFO", f"Universe: {len(universe)} symbols to score")
 
+    # Pull open positions BEFORE the pipeline so held symbols are always scored.
+    # This prevents the portfolio manager from seeing "not_in_universe" on reboot
+    # simply because today's TV screener didn't surface a still-valid position.
+    open_pos  = get_open_positions()
+    held_syms = [p["symbol"] for p in open_pos if p.get("instrument") != "option"]
+    if held_syms:
+        universe = list(set(universe + held_syms))
+        new_held = [s for s in held_syms if s not in favs]
+        if new_held:
+            clog("INFO", f"Held positions pinned into pipeline universe: {new_held}")
+    # Merge held symbols into the protected set so _apply_tv_prefilter never drops them
+    pipeline_favs = list(set(favs + held_syms))
+
     clog("SCAN", "Running signal pipeline (TV pre-filter → sentiment → 9-dim score)...")
     pipeline = run_signal_pipeline(
         universe=universe,
         regime=regime,
         strategy_mode=strategy_mode,
         session=get_session(),
-        favourites=favs,
+        favourites=pipeline_favs,
         tv_cache=get_tv_signal_cache(),
     )
     signals        = pipeline.signals
@@ -969,6 +877,7 @@ def run_scan():
 
     clog("SCAN", f"Pipeline: {len(universe)} symbols → {len(scored)} scored "
          f"→ {len(signals)} signals [{regime_name}]")
+    _print_score_table(scored)
 
     update_position_prices(pipeline.scored)
 
@@ -996,7 +905,8 @@ def run_scan():
     _process_close_queue()
 
     clog("ANALYSIS", "Running agent analysis pipeline...")
-    open_pos = get_open_positions()
+    # open_pos already fetched above (before pipeline) so held positions were included in scoring
+    open_pos = get_open_positions()  # refresh after any close-queue processing
 
     # ── Portfolio manager review (event-triggered) ────────────────────────────
     global _portfolio_review_done_today, _last_known_regime
@@ -1004,7 +914,7 @@ def run_scan():
         session=get_session(),
         regime=regime,
         open_positions=open_pos,
-        all_scored=scored,
+        all_scored=pipeline.all_scored,
         news_sentiment=news_sentiment,
         daily_pnl=pnl,
         portfolio_value=pv,
@@ -1014,7 +924,7 @@ def run_scan():
         try:
             pm_actions = run_portfolio_review(
                 open_positions=open_pos,
-                all_scored=scored,
+                all_scored=pipeline.all_scored,
                 regime=regime,
                 news_sentiment=news_sentiment,
                 portfolio_value=pv,
@@ -1309,7 +1219,7 @@ def run_scan():
             if not is_options_market_open():
                 clog("INFO", f"Score {sig['score']} qualifies for options — market closed until 9:30 ET. Stock trade executed.")
             else:
-                _sig_dir = sig.get("direction", "LONG")
+                _sig_dir = buy.get("direction", "LONG")  # use agent direction (matches scanner via hard gate)
                 if _sig_dir not in ("LONG", "SHORT"):
                     clog("INFO", f"Score {sig['score']} qualifies for options but direction={_sig_dir!r} — skipping (no clear conviction)")
                 else:

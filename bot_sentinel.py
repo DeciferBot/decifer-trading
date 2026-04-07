@@ -353,6 +353,39 @@ def handle_catalyst_trigger(trigger: dict):
 
 
 
+# ── Sentinel factory functions ────────────────────────────────────────────────
+
+def start_news_sentinel(ib):
+    """
+    Initialise and start the NewsSentinel background thread.
+    Returns the running sentinel instance; caller should store in bot_state._sentinel.
+    """
+    from news_sentinel import NewsSentinel
+    sentinel = NewsSentinel(
+        get_universe_fn=_get_sentinel_universe,
+        on_trigger_fn=handle_news_trigger,
+        ib=ib,
+        poll_interval=CONFIG.get("sentinel_poll_seconds", 45),
+    )
+    sentinel.start()
+    return sentinel
+
+
+def start_catalyst_sentinel(ib):
+    """
+    Initialise and start the CatalystSentinel background thread.
+    Returns the running sentinel instance; caller should store in bot_state._catalyst_sentinel.
+    """
+    from catalyst_sentinel import CatalystSentinel
+    sentinel = CatalystSentinel(
+        get_universe_fn=_get_sentinel_universe,
+        on_trigger_fn=handle_catalyst_trigger,
+        ib=ib,
+    )
+    sentinel.start()
+    return sentinel
+
+
 # ── Scan countdown ────────────────────────────────────────────────────────────
 
 def countdown_tick():

@@ -16,7 +16,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from config import CONFIG
 import bot_state
 from bot_state import dash, clog
-from orders import flatten_all, get_open_positions
+from orders import flatten_all, get_open_positions, cancel_order_by_id
 from bot_account import get_account_details
 from bot_ibkr import sync_orders_from_ibkr
 from bot_trading import run_scan
@@ -249,14 +249,9 @@ class DashHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"ok": False, "error": "No order_id provided"}).encode())
             else:
                 try:
-                    cancelled = False
-                    for t in ib.openTrades():
-                        if t.order.orderId == order_id:
-                            ib.cancelOrder(t.order)
-                            ib.sleep(1)
-                            cancelled = True
-                            clog("TRADE", f"❌ Cancelled order #{order_id} ({t.contract.symbol}) via dashboard")
-                            break
+                    cancelled = cancel_order_by_id(ib, order_id)
+                    if cancelled:
+                        clog("TRADE", f"❌ Cancelled order #{order_id} via dashboard")
                     if cancelled:
                         # Update orders.json
                         from learning import update_order_status
