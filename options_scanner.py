@@ -92,6 +92,7 @@ def _get_nearest_expiry(ticker_obj) -> tuple[str | None, int | None]:
 def _get_earnings_days(ticker_obj) -> int | None:
     """
     Return days until next earnings announcement, or None.
+    Takes a pre-fetched yfinance Ticker object to avoid duplicate network calls.
     Handles the various shapes yfinance.calendar returns.
     """
     try:
@@ -111,13 +112,11 @@ def _get_earnings_days(ticker_obj) -> int | None:
         if ed is None:
             return None
 
-        # Handle list / series
         if isinstance(ed, (list, pd.Series)):
             ed = ed[0] if len(ed) > 0 else None
         if ed is None:
             return None
 
-        # Normalise to date
         if hasattr(ed, "date"):
             ed = ed.date()
         elif isinstance(ed, str):

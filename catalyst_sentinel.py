@@ -33,6 +33,7 @@ from pathlib import Path
 
 import requests
 from config import CONFIG
+from news_infrastructure import HeadlineDeduplicator, SymbolCooldown
 
 log = logging.getLogger("decifer.catalyst")
 
@@ -73,29 +74,19 @@ MA_NEGATIVE_KEYWORDS = {
 # ═══════════════════════════════════════════════════════════════
 # DEDUP TRACKING
 # ═══════════════════════════════════════════════════════════════
-_seen_catalyst_headlines: set[str] = set()
+_headline_dedup  = HeadlineDeduplicator(max_size=5000)
 _seen_edgar_events: set[str] = set()     # (form_type, cik, date) keys
 _recent_triggers: deque = deque(maxlen=100)
 
 # Cooldowns: per-symbol, prevents re-firing on the same event
-_symbol_cooldowns: dict[str, datetime] = {}
-COOLDOWN_MINUTES = CONFIG.get("catalyst_cooldown_minutes", 60)
+_cooldown = SymbolCooldown(cooldown_minutes=CONFIG.get("catalyst_cooldown_minutes", 60))
 
-
-def _headline_hash(text: str) -> str:
-    clean = re.sub(r'[^a-z0-9 ]', '', text.lower().strip())
-    return clean[:120]
-
-
+# Thin compatibility aliases — used internally below
 def _is_on_cooldown(symbol: str) -> bool:
-    last = _symbol_cooldowns.get(symbol)
-    if not last:
-        return False
-    return (datetime.now(timezone.utc) - last).total_seconds() < COOLDOWN_MINUTES * 60
+    return _cooldown.is_on_cooldown(symbol)
 
-
-def _set_cooldown(symbol: str):
-    _symbol_cooldowns[symbol] = datetime.now(timezone.utc)
+def _set_cooldown(symbol: str) -> None:
+    _cooldown.set_cooldown(symbol)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -171,8 +162,7 @@ def _fetch_ma_news(symbols: list[str]) -> list[dict]:
                 if not title:
                     continue
 
-                h = _headline_hash(title)
-                if h in _seen_catalyst_headlines:
+                if not _headline_dedup.add_if_new(title):
                     continue
 
                 pub_date = item.findtext("pubDate", "")
@@ -191,7 +181,6 @@ def _fetch_ma_news(symbols: list[str]) -> list[dict]:
                 if not is_match:
                     continue
 
-                _seen_catalyst_headlines.add(h)
                 hits.append({
                     "symbol":        sym,
                     "headline":      title,

@@ -28,6 +28,7 @@ from typing import Optional
 import anthropic
 
 from config import CONFIG
+from earnings_calendar import get_earnings_within_hours
 
 log = logging.getLogger("decifer.portfolio_manager")
 
@@ -62,6 +63,8 @@ DECISION FRAMEWORK — reason through these in order for each position:
    - Drop of 15+ points → strong EXIT signal
    - Drop of 8–14 points → TRIM or EXIT depending on other factors
    - Within 7 points → HOLD unless other factors override
+   - "unscored_today" means the scanner did not produce a fresh score this cycle (e.g. low volume pre-market).
+     Treat it as neutral — do NOT treat it as a drop. Use P&L, regime, and news to decide.
 
 2. NEWS: If a significant negative/positive catalyst has emerged on this symbol, update accordingly.
    - Negative catalyst on a LONG → EXIT or TRIM
@@ -90,46 +93,6 @@ RULES:
 - HOLD is the correct answer when the thesis is intact. Do not manufacture action.
 - Be decisive. Vague answers ("maybe trim", "consider exiting") are not allowed.
 - Do not recommend new symbols or comment on market conditions generally."""
-
-
-# ══════════════════════════════════════════════════════════════
-# EARNINGS DETECTION
-# ══════════════════════════════════════════════════════════════
-
-def _check_earnings_within_hours(symbols: list, hours: int = 48) -> set:
-    """
-    Return set of symbols with earnings scheduled within `hours` hours.
-    Uses yfinance calendar — returns empty set on any failure (non-blocking).
-    Caches nothing — called infrequently (event-triggered only).
-    """
-    flagged = set()
-    if not symbols:
-        return flagged
-    try:
-        import yfinance as yf
-        now_utc = datetime.now(timezone.utc)
-        cutoff = now_utc + timedelta(hours=hours)
-        for sym in symbols:
-            try:
-                cal = yf.Ticker(sym).calendar
-                if cal is None or cal.empty:
-                    continue
-                # calendar has columns like 'Earnings Date'
-                for col in cal.columns:
-                    if "earnings" in col.lower():
-                        for val in cal[col].dropna():
-                            if hasattr(val, "to_pydatetime"):
-                                val = val.to_pydatetime()
-                            if isinstance(val, datetime):
-                                if val.tzinfo is None:
-                                    val = val.replace(tzinfo=timezone.utc)
-                                if now_utc <= val <= cutoff:
-                                    flagged.add(sym)
-            except Exception:
-                continue
-    except Exception as exc:
-        log.debug(f"portfolio_manager: earnings check failed ({exc})")
-    return flagged
 
 
 # ══════════════════════════════════════════════════════════════
@@ -175,7 +138,7 @@ def run_portfolio_review(
     # Check earnings
     stock_syms = [p["symbol"] for p in open_positions if p.get("instrument") != "option"]
     earnings_lookahead = pm_cfg.get("earnings_lookahead_hours", 48)
-    earnings_flagged = _check_earnings_within_hours(stock_syms, earnings_lookahead)
+    earnings_flagged = get_earnings_within_hours(stock_syms, earnings_lookahead)
 
     # Build position summaries for the prompt
     now_utc = datetime.now(timezone.utc)
@@ -221,7 +184,7 @@ def run_portfolio_review(
             delta = current_score - entry_score
             score_line += f" → current={current_score}/50 (delta={delta:+d})"
         else:
-            score_line += " → current=not_in_universe"
+            score_line += " → current=unscored_today (scanner did not rescore this cycle)"
 
         earnings_str = f"  *** EARNINGS WITHIN {earnings_lookahead}h ***" if sym in earnings_flagged else ""
 

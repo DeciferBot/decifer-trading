@@ -22,21 +22,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 from config import CONFIG
 from news import keyword_score, claude_sentiment, BULLISH_STRONG, BEARISH_STRONG
+from news_infrastructure import HeadlineDeduplicator, SymbolCooldown, headline_hash
 
 log = logging.getLogger("decifer.sentinel")
 
 # ═══════════════════════════════════════════════════════════════
-# HEADLINE DEDUP — track seen headlines to avoid re-triggering
+# SHARED INFRASTRUCTURE INSTANCES
 # ═══════════════════════════════════════════════════════════════
-_seen_headlines: set[str] = set()          # hash of headline text
-_seen_max = 5000                            # cap memory usage
+_dedup    = HeadlineDeduplicator(max_size=5000)
+_cooldown = SymbolCooldown(cooldown_minutes=CONFIG.get("sentinel_cooldown_minutes", 10))
 _headline_history: deque = deque(maxlen=200)  # recent triggers for dashboard
-
-# ═══════════════════════════════════════════════════════════════
-# TRIGGER COOLDOWN — don't fire on the same symbol twice in N min
-# ═══════════════════════════════════════════════════════════════
-_symbol_cooldowns: dict[str, datetime] = {}
-COOLDOWN_MINUTES = CONFIG.get("sentinel_cooldown_minutes", 10)
 
 # ═══════════════════════════════════════════════════════════════
 # MATERIALITY THRESHOLDS — what qualifies as "material news"
@@ -48,23 +43,15 @@ KEYWORD_THRESHOLD = CONFIG.get("sentinel_keyword_threshold", 3)
 CLAUDE_CONFIDENCE_THRESHOLD = CONFIG.get("sentinel_claude_confidence", 7)
 
 
+# Thin compatibility aliases — used internally below
 def _headline_hash(headline: str) -> str:
-    """Normalize and hash a headline for dedup."""
-    clean = re.sub(r'[^a-z0-9 ]', '', headline.lower().strip())
-    return clean[:120]  # first 120 chars is enough for dedup
-
+    return headline_hash(headline)
 
 def _is_on_cooldown(symbol: str) -> bool:
-    """Check if a symbol triggered recently."""
-    last = _symbol_cooldowns.get(symbol)
-    if not last:
-        return False
-    return (datetime.now(timezone.utc) - last).total_seconds() < COOLDOWN_MINUTES * 60
+    return _cooldown.is_on_cooldown(symbol)
 
-
-def _set_cooldown(symbol: str):
-    """Mark a symbol as recently triggered."""
-    _symbol_cooldowns[symbol] = datetime.now(timezone.utc)
+def _set_cooldown(symbol: str) -> None:
+    _cooldown.set_cooldown(symbol)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -261,17 +248,8 @@ def scan_all_sources(symbols: list[str], ib=None,
     # ── DEDUP: only keep headlines we haven't seen before ────
     new_articles = []
     for art in all_articles:
-        h = _headline_hash(art["title"])
-        if h not in _seen_headlines and h:
-            _seen_headlines.add(h)
+        if _dedup.add_if_new(art["title"]):
             new_articles.append(art)
-
-    # Cap dedup set to avoid memory bloat
-    if len(_seen_headlines) > _seen_max:
-        # Remove oldest half
-        to_remove = list(_seen_headlines)[:_seen_max // 2]
-        for r in to_remove:
-            _seen_headlines.discard(r)
 
     return new_articles
 
