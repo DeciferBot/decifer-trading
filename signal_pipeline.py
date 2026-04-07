@@ -380,6 +380,7 @@ def run_signal_pipeline(
     favourites: list,
     tv_cache: dict,
     signals_log_path: str = SIGNALS_LOG,
+    ib=None,
 ) -> SignalPipelineResult:
     """
     Execute the full signal data pipeline for one scan cycle.
@@ -437,6 +438,7 @@ def run_signal_pipeline(
         news_data=news_sentiment,
         social_data=social_sentiment,
         regime_router=regime.get("regime_router", "unknown"),
+        ib=ib,
     )
     log.info(f"score_universe: {len(scored)} above threshold, {len(all_scored)} total")
 
@@ -454,6 +456,7 @@ def run_signal_pipeline(
                     news_data=news_sentiment,
                     social_data=social_sentiment,
                     regime_router=regime.get("regime_router", "unknown"),
+                    ib=ib,
                 )
                 # Tag small cap results so downstream can apply tighter position sizing
                 for s in sc_scored:

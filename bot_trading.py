@@ -851,6 +851,15 @@ def run_scan():
     # Merge held symbols into the protected set so _apply_tv_prefilter never drops them
     pipeline_favs = list(set(favs + held_syms))
 
+    # Refresh Alpaca stream subscriptions to match the finalised universe.
+    # update_symbols() is a no-op if the symbol list hasn't changed.
+    try:
+        import bot_state as _bs
+        if _bs._bar_stream is not None:
+            _bs._bar_stream.update_symbols(universe)
+    except Exception:
+        pass
+
     clog("SCAN", "Running signal pipeline (TV pre-filter → sentiment → 9-dim score)...")
     pipeline = run_signal_pipeline(
         universe=universe,
@@ -859,6 +868,7 @@ def run_scan():
         session=get_session(),
         favourites=pipeline_favs,
         tv_cache=get_tv_signal_cache(),
+        ib=ib,
     )
     signals        = pipeline.signals
     scored         = pipeline.scored

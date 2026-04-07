@@ -360,6 +360,20 @@ def main():
     except Exception as e:
         clog("ERROR", f"Social sentiment startup error: {e}")
 
+    # ── Start Alpaca bar stream (pre-warms cache before first scan) ───────────
+    # Stream subscribes to 1-minute bars for the initial universe.
+    # fetch_multi_timeframe() reads from BAR_CACHE on every scan — no further
+    # wiring needed. Universe subscriptions refresh each scan in run_scan().
+    try:
+        from alpaca_stream import AlpacaBarStream
+        from scanner import get_dynamic_universe
+        _initial_universe = get_dynamic_universe(bot_state.ib, {})
+        bot_state._bar_stream = AlpacaBarStream()
+        bot_state._bar_stream.start(_initial_universe)
+        clog("INFO", f"📶 Alpaca bar stream active | {len(_initial_universe)} symbols subscribed")
+    except Exception as _as_err:
+        clog("INFO", f"📶 Alpaca bar stream skipped: {_as_err}")
+
     # ── Start Telegram Kill Switch ────────────────────────────────────────────
     _tg_cfg      = CONFIG.get("telegram", {})
     _tg_token    = _tg_cfg.get("bot_token", "")
