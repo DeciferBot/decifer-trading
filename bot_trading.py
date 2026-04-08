@@ -14,7 +14,10 @@ import pathlib
 import sys
 import time
 import threading
+import zoneinfo
 from datetime import datetime, timezone
+
+_ET = zoneinfo.ZoneInfo("America/New_York")
 
 from config import CONFIG
 import bot_state
@@ -58,6 +61,8 @@ _eod_options_review_done: bool = False
 _portfolio_review_done_today: bool = False
 _last_known_regime: str = ""
 _session_stop_count: int = 0
+_cascade_reviewed_this_session: bool = False   # prevent cascade from re-firing every loop
+_last_trim_ts: dict = {}                        # symbol → datetime of last TRIM execution
 
 # ── Last-decision writer (for Chief Decifer trade card) ───────────────────────
 
@@ -235,7 +240,7 @@ def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
         "risk":            risk,
         "price_targets":   price_targets,
         "agents_agreed":   decision.get("agents_agreed", 0),
-        "timestamp":       datetime.now().isoformat(timespec="seconds"),
+        "timestamp":       datetime.now(_ET).isoformat(timespec="seconds"),
     }
 
     out_path = Path(__file__).parent / "data" / "last_decision.json"
@@ -389,7 +394,7 @@ def check_external_closes(regime: dict):
                     "side":   "SELL",
                     "symbol": sym,
                     "price":  str(round(exit_price, 2)),
-                    "time":   datetime.now().strftime("%H:%M:%S"),
+                    "time":   datetime.now(_ET).strftime("%H:%M:%S"),
                     "pnl":    round(pnl, 2),
                 })
 
@@ -580,9 +585,11 @@ def _maybe_eod_options_review(regime: dict):
         _eod_options_review_done = False
         # Ledger auto-expires by date — no explicit clear needed.
         # Pruning of stale entries happens inside _record_options_attempt.
-        global _portfolio_review_done_today, _session_stop_count
+        global _portfolio_review_done_today, _session_stop_count, _cascade_reviewed_this_session, _last_trim_ts
         _portfolio_review_done_today = False
         _session_stop_count = 0
+        _cascade_reviewed_this_session = False
+        _last_trim_ts = {}
     # Fire once in the pre-close window
     if dtime(15, 30) <= t < dtime(15, 55) and not _eod_options_review_done:
         _eod_options_review_done = True
@@ -657,9 +664,9 @@ def _should_run_portfolio_review(
     except Exception:
         pass
 
-    # 6. Cascade: 2+ stops this session
+    # 6. Cascade: 2+ stops this session — fire once per session only
     cascade_thresh = pm_cfg.get("cascade_stop_count", 2)
-    if _session_stop_count >= cascade_thresh:
+    if _session_stop_count >= cascade_thresh and not _cascade_reviewed_this_session:
         return True, "cascade"
 
     # 7. Daily drawdown threshold
@@ -712,13 +719,13 @@ def run_scan():
 
     bot_state.scan_count += 1
     dash["scan_count"]  = bot_state.scan_count
-    dash["last_scan"]   = datetime.now().strftime("%H:%M:%S")
+    dash["last_scan"]   = datetime.now(_ET).strftime("%H:%M:%S")
     dash["scanning"]    = True
     dash["session"]     = get_session()
 
     dash["recent_orders"] = []
     dash["trades"]        = []
-    dash["_scan_start"]   = datetime.now().isoformat()
+    dash["_scan_start"]   = datetime.now(_ET).isoformat()
 
     clog("SCAN", f"Scan #{bot_state.scan_count} started | Session: {dash['session']}")
 
@@ -908,7 +915,7 @@ def run_scan():
     open_pos = get_open_positions()  # refresh after any close-queue processing
 
     # ── Portfolio manager review (event-triggered) ────────────────────────────
-    global _portfolio_review_done_today, _last_known_regime
+    global _portfolio_review_done_today, _last_known_regime, _cascade_reviewed_this_session, _last_trim_ts
     should_review, pm_trigger = _should_run_portfolio_review(
         session=get_session(),
         regime=regime,
@@ -976,6 +983,12 @@ def run_scan():
                         )
                 elif act_pm == "TRIM" and sym_pm:
                     from orders import open_trades as _pm_trades, _trades_lock as _pm_lock
+                    _trim_cooldown_mins = CONFIG.get("portfolio_manager", {}).get("trim_cooldown_minutes", 30)
+                    _last_trim = _last_trim_ts.get(sym_pm)
+                    _trim_age = (datetime.now(_ET) - _last_trim).total_seconds() / 60 if _last_trim else None
+                    if _trim_age is not None and _trim_age < _trim_cooldown_mins:
+                        clog("INFO", f"PM TRIM: {sym_pm} cooldown active ({_trim_age:.0f}m ago, {_trim_cooldown_mins}m required) — skipping")
+                        continue
                     _opt_keys_pm = [k for k in _pm_trades
                                     if k.startswith(sym_pm + "_") and _pm_trades[k].get("instrument") == "option"]
                     _has_pos = bool(_opt_keys_pm) or sym_pm in _pm_trades
@@ -983,6 +996,7 @@ def run_scan():
                         clog("WARN", f"PM TRIM: no active position found for {sym_pm}")
                     else:
                         clog("TRADE", f"Portfolio manager TRIM: {sym_pm} — {reason_pm}")
+                        _last_trim_ts[sym_pm] = datetime.now(_ET)
                         if _opt_keys_pm:
                             for _ok in _opt_keys_pm:
                                 with _pm_lock:
@@ -1012,7 +1026,7 @@ def run_scan():
                         "type":    "portfolio_review",
                         "trigger": pm_trigger,
                         "actions": pm_actions,
-                        "ts":      datetime.now().isoformat(),
+                        "ts":      datetime.now(_ET).isoformat(),
                     }) + "\n")
             except Exception:
                 pass
@@ -1021,6 +1035,8 @@ def run_scan():
         finally:
             if pm_trigger == "pre_market":
                 _portfolio_review_done_today = True
+            if pm_trigger == "cascade":
+                _cascade_reviewed_this_session = True
             _last_known_regime = regime.get("regime", _last_known_regime)
     else:
         _last_known_regime = regime.get("regime", _last_known_regime)
@@ -1052,7 +1068,7 @@ def run_scan():
     dash["agent_outputs"]      = decision.get("_agent_outputs", {})
     dash["last_agents_agreed"] = decision.get("agents_agreed", 0)
 
-    now_str    = datetime.now().strftime("%H:%M:%S")
+    now_str    = datetime.now(_ET).strftime("%H:%M:%S")
     agent_convo = []
     agent_names = [
         ("technical",   "Technical Analyst",  "Analyses price action, volume, and all 7 indicator dimensions"),
@@ -1116,7 +1132,7 @@ def run_scan():
         dash["trades"].insert(0, {
             "side": "SELL", "symbol": sym,
             "price": str(exit_price),
-            "time": datetime.now().strftime("%H:%M:%S")
+            "time": datetime.now(_ET).strftime("%H:%M:%S")
         })
         if pos:
             pnl_val = (exit_price - pos["entry"]) * pos["qty"] if pos.get("direction", "LONG") == "LONG" else (pos["entry"] - exit_price) * pos["qty"]
@@ -1208,7 +1224,7 @@ def run_scan():
             dash["trades"].insert(0, {
                 "side": trade_side, "symbol": sym,
                 "price": str(sig["price"]),
-                "time": datetime.now().strftime("%H:%M:%S")
+                "time": datetime.now(_ET).strftime("%H:%M:%S")
             })
             _write_last_decision(sym, buy, sig, decision, pv)
 
@@ -1238,7 +1254,7 @@ def run_scan():
                                         "side":   f"BUY {contract_info['right']} OPT",
                                         "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
                                         "price":  str(contract_info["mid"]),
-                                        "time":   datetime.now().strftime("%H:%M:%S")
+                                        "time":   datetime.now(_ET).strftime("%H:%M:%S")
                                     })
                                     clog("TRADE", f"Options trade executed for {sym} (independent of stock)")
                                     if not stock_success:
@@ -1280,7 +1296,7 @@ def run_scan():
                     dash["trades"].insert(0, {
                         "side": _fxs.direction, "symbol": _fxs.symbol,
                         "price": str(round(_fxs.price, 5)),
-                        "time": datetime.now().strftime("%H:%M:%S"),
+                        "time": datetime.now(_ET).strftime("%H:%M:%S"),
                     })
         except Exception as _fxe:
             clog("ERROR", f"FX dispatch: {_fxe}")
@@ -1309,15 +1325,15 @@ def run_scan():
     dash["performance"]["total_pnl"] = round(dash.get("portfolio_value", 0) - get_effective_capital(), 2)
 
     dash["equity_history"].append({
-        "date":  datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "date":  datetime.now(_ET).strftime("%Y-%m-%d %H:%M ET"),
         "value": pv
     })
     if len(dash["equity_history"]) > 2000:
         dash["equity_history"] = dash["equity_history"][-2000:]
     save_equity_history(dash["equity_history"])
 
-    today = datetime.now().weekday()
-    if today == 6 and bot_state.last_sunday_review != datetime.now().date():
+    today = datetime.now(_ET).weekday()
+    if today == 6 and bot_state.last_sunday_review != datetime.now(_ET).date():
         clog("ANALYSIS", "Running weekly performance review...")
         review = run_weekly_review()
         clog("ANALYSIS", f"Weekly review: {review[:200]}...")
@@ -1330,7 +1346,7 @@ def run_scan():
         except Exception as _ic_exc:
             log.warning("IC weight update failed: %s", _ic_exc)
 
-        bot_state.last_sunday_review = datetime.now().date()
+        bot_state.last_sunday_review = datetime.now(_ET).date()
 
     dash["scanning"] = False
     clog("SCAN", f"Scan #{bot_state.scan_count} complete")
