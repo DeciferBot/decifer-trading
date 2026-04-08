@@ -34,16 +34,18 @@ from orders_contracts import (
 )
 
 # ── Module-level options tracking state ─────────────────────────────────────
-_option_sell_attempts: dict = {}   # opt_key → {"count": int, "last_try": datetime}
+_option_sell_attempts: dict = {}   # opt_key → {"count": int, "last_try": datetime, "had_partial": bool}
 _MAX_OPTION_SELL_RETRIES = 3       # after this many failures, pause retries for cooldown
 _OPTION_SELL_COOLDOWN = 600        # seconds (10 min) before retrying after max failures
+_MIN_SELL_RETRY_INTERVAL_S = 90    # min seconds between any two sell attempts (prevents PM+check_options double-fire)
 
 # Exits requested while the options market was closed — flushed on next open cycle
 _pending_option_exits: dict = {}   # opt_key → original reason string
 
 
 def execute_buy_option(ib: IB, contract_info: dict,
-                       portfolio_value: float, reasoning: str = "") -> bool:
+                       portfolio_value: float, reasoning: str = "",
+                       score: int = 0) -> bool:
     """
     Buy an options contract (call or put).
     contract_info is the dict returned by options.find_best_contract().
@@ -174,7 +176,8 @@ def execute_buy_option(ib: IB, contract_info: dict,
             "iv_rank":             contract_info.get("iv_rank"),
             "underlying_price":    contract_info.get("underlying_price"),
             "pnl":                 0.0,
-            "score":               0,
+            "score":               score,
+            "entry_score":         score,   # immutable snapshot for portfolio manager
             "direction":           "LONG",
             "reasoning":           reasoning,
             "status":              "PENDING",
@@ -233,7 +236,7 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
     sell_contracts = contracts_override if _is_partial else pos["contracts"]
 
     # ── Retry gating: don't spam IBKR with the same failing order ──
-    attempts = _option_sell_attempts.get(opt_key, {"count": 0, "last_try": datetime.min})
+    attempts = _option_sell_attempts.get(opt_key, {"count": 0, "last_try": datetime.min, "had_partial": False})
     if attempts["count"] >= _MAX_OPTION_SELL_RETRIES:
         elapsed = (datetime.now(timezone.utc) - attempts["last_try"]).total_seconds()
         if elapsed < _OPTION_SELL_COOLDOWN:
@@ -253,6 +256,15 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
 
         # Cooldown expired — reset to 1 (not 0) so we stay on the bid path
         attempts["count"] = 1
+        attempts["had_partial"] = False
+
+    # ── Min interval guard: prevent PM + check_options double-firing in the same cycle ──
+    if attempts["count"] > 0 and attempts["last_try"] != datetime.min:
+        elapsed_since_last = (datetime.now(timezone.utc) - attempts["last_try"]).total_seconds()
+        if elapsed_since_last < _MIN_SELL_RETRY_INTERVAL_S:
+            log.debug(f"Option sell {opt_key}: retry interval not elapsed "
+                      f"({int(elapsed_since_last)}s / {_MIN_SELL_RETRY_INTERVAL_S}s) — skipping")
+            return False
 
     _safe_update_trade(opt_key, {"status": "EXITING"})
 
@@ -283,7 +295,9 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
         _bid_ok = bid is not None and not _m.isnan(bid) and bid > 0
         _ask_ok = ask is not None and not _m.isnan(ask) and ask > 0
         _retry_count = attempts["count"]
-        _step = _retry_count
+        # Only step price if the last attempt had ZERO fills (market rejected the price).
+        # Partial fills mean the market IS trading at the current level — don't step further.
+        _step = 0 if attempts.get("had_partial") else _retry_count
         if _is_short:
             # BUY-to-close: offer at ask, step 5% ABOVE ask each retry to chase fills
             _premium = round(1.0 + (_step * 0.05), 2)
@@ -342,10 +356,17 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
                     log.info(f"[PARTIAL→FULL] {opt_key} fully closed via partial fills")
                     return True
                 _safe_update_trade(opt_key, {"contracts": remaining})
-
-            attempts["count"] += 1
-            attempts["last_try"] = datetime.now(timezone.utc)
-            _option_sell_attempts[opt_key] = attempts
+                # Partial fill: market IS trading at this level — don't step price down,
+                # just record the timestamp so the min-interval guard prevents immediate re-fire.
+                attempts["had_partial"] = True
+                attempts["last_try"] = datetime.now(timezone.utc)
+                _option_sell_attempts[opt_key] = attempts
+            else:
+                # Zero fill: market rejected this price — step down next attempt.
+                attempts["count"] += 1
+                attempts["had_partial"] = False
+                attempts["last_try"] = datetime.now(timezone.utc)
+                _option_sell_attempts[opt_key] = attempts
             log.error(f"Option sell for {opt_key} not filled — status={order_status}, "
                       f"limit=${limit_price:.2f}. Attempt {attempts['count']}/{_MAX_OPTION_SELL_RETRIES}. "
                       f"Keeping position in tracker (IBKR still holds it).")

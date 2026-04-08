@@ -26,7 +26,7 @@ from bot_ibkr import sync_orders_from_ibkr, connect_ibkr
 from scanner import get_dynamic_universe, get_market_regime, get_tv_signal_cache
 from signals import fetch_multi_timeframe
 from agents import run_all_agents
-from orders import (execute_buy, execute_sell, flatten_all,
+from orders import (execute_buy, execute_sell, execute_short, flatten_all,
                     get_open_positions, update_position_prices,
                     update_positions_from_ibkr, execute_buy_option,
                     execute_sell_option, update_trailing_stops,
@@ -44,7 +44,7 @@ from orders import _options_attempted_today, _record_options_attempt
 from learning import (log_trade, load_trades, load_orders,
                       get_performance_summary, run_weekly_review,
                       TRADE_LOG_FILE, get_effective_capital)
-from signal_types import Signal, SIGNALS_LOG
+from signal_types import Signal
 from signal_dispatcher import dispatch_signals as _dispatch_signals
 from signal_pipeline import run_signal_pipeline, SignalPipelineResult
 from portfolio_manager import run_portfolio_review
@@ -281,21 +281,22 @@ def check_external_closes(regime: dict):
                 except (ValueError, TypeError):
                     pass
 
+        # Fetch open IBKR orders once — avoids N IPC calls (one per PENDING trade)
+        try:
+            _active_order_ids = {t.order.orderId for t in ib.openTrades()}
+        except Exception:
+            _active_order_ids = None  # fail safe: assume all orders still active
+
         for sym in list(open_trades.keys()):
             if sym not in ibkr_syms:
                 trade = open_trades[sym]
 
                 if trade.get("status") == "PENDING":
-                    order_id     = trade.get("order_id")
-                    still_active = False
-                    if order_id:
-                        try:
-                            for t in ib.openTrades():
-                                if t.order.orderId == order_id:
-                                    still_active = True
-                                    break
-                        except Exception:
-                            still_active = True
+                    order_id = trade.get("order_id")
+                    if _active_order_ids is None:
+                        still_active = True  # can't confirm — play safe
+                    else:
+                        still_active = order_id is not None and order_id in _active_order_ids
                     if still_active:
                         continue
                     else:
@@ -357,25 +358,13 @@ def check_external_closes(regime: dict):
                     del open_trades[sym]
                     continue
 
-                is_short   = trade.get("direction", "LONG") == "SHORT"
+                import math as _math
+                is_short    = trade.get("direction", "LONG") == "SHORT"
                 rpnl_lookup = underlying if is_opt_pos else sym
-                if rpnl_lookup in realized_pnl_map and realized_pnl_map[rpnl_lookup] != 0.0:
-                    import math as _math
-                    rpnl = realized_pnl_map[rpnl_lookup]
-                    if not _math.isnan(rpnl):
-                        pnl = rpnl
-                    else:
-                        mult = 100 if is_opt_pos else 1
-                        if is_short:
-                            pnl = (trade["entry"] - exit_price) * trade["qty"] * mult
-                        else:
-                            pnl = (exit_price - trade["entry"]) * trade["qty"] * mult
-                else:
-                    mult = 100 if is_opt_pos else 1
-                    if is_short:
-                        pnl = (trade["entry"] - exit_price) * trade["qty"] * mult
-                    else:
-                        pnl = (exit_price - trade["entry"]) * trade["qty"] * mult
+                mult        = 100 if is_opt_pos else 1
+                manual_pnl  = ((trade["entry"] - exit_price) if is_short else (exit_price - trade["entry"])) * trade["qty"] * mult
+                rpnl        = realized_pnl_map.get(rpnl_lookup, 0.0)
+                pnl         = rpnl if (rpnl != 0.0 and not _math.isnan(rpnl)) else manual_pnl
 
                 sl_order_id = trade.get("sl_order_id")
                 if sl_order_id and _fill_order_id and int(_fill_order_id) == int(sl_order_id):
@@ -1185,7 +1174,7 @@ def run_scan():
                 clog("INFO", f"No signal data for {sym} after 3 attempts — skipping")
                 continue
 
-        clog("TRADE", f"Buying {sym} | Score={sig['score']}/50 | {reason[:80]}")
+        clog("INFO", f"Evaluating {sym} | Score={sig['score']}/50 | {reason[:80]}")
 
         buy_signal = next((s for s in signals if s.symbol == sym), None)
         if buy_signal is None:
@@ -1215,6 +1204,7 @@ def run_scan():
         stock_success = any(r["success"] for r in dispatch_results)
         if stock_success:
             trade_side = "SHORT" if buy.get("direction") == "SHORT" else "BUY"
+            clog("TRADE", f"{trade_side} {sym} | Score={sig['score']}/50 | {reason[:80]}")
             dash["trades"].insert(0, {
                 "side": trade_side, "symbol": sym,
                 "price": str(sig["price"]),
@@ -1242,7 +1232,7 @@ def run_scan():
                         try:
                             contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
                             if contract_info:
-                                opt_success = execute_buy_option(ib, contract_info, pv, reasoning=reason)
+                                opt_success = execute_buy_option(ib, contract_info, pv, reasoning=reason, score=sig["score"])
                                 if opt_success:
                                     dash["trades"].insert(0, {
                                         "side":   f"BUY {contract_info['right']} OPT",
@@ -1257,6 +1247,43 @@ def run_scan():
                                 clog("INFO", f"No suitable options contract for {sym}")
                         except Exception as _opt_err:
                             clog("ERROR", f"Options evaluation failed for {sym}: {_opt_err}")
+
+    # ── FX direct dispatch ────────────────────────────────────────────────────────
+    # FX signals bypass the equity intelligence gate — the fx_signals scorer is the
+    # complete decision; no agent classification needed.
+    if CONFIG.get("fx_enabled") and result:
+        try:
+            from fx_signals import FX_PAIRS
+            _fx_sigs = [s for s in result.signals if s.symbol in FX_PAIRS]
+            _fx_min  = CONFIG.get("fx_min_score", 20)
+            for _fxs in _fx_sigs:
+                _fxs_score = int(round(_fxs.conviction_score * 5))
+                if _fxs_score < _fx_min or _fxs.direction not in ("LONG", "SHORT"):
+                    continue
+                _fxs_reasoning = f"FX-direct {_fxs.symbol}: {_fxs.dimension_scores}"
+                if _fxs.direction == "LONG":
+                    _fx_ok = execute_buy(
+                        ib=ib, symbol=_fxs.symbol, price=_fxs.price, atr=_fxs.atr,
+                        score=_fxs_score, portfolio_value=pv, regime=regime,
+                        reasoning=_fxs_reasoning, signal_scores=_fxs.dimension_scores,
+                        open_time=datetime.now(timezone.utc).isoformat(),
+                    )
+                else:
+                    _fx_ok = execute_short(
+                        ib=ib, symbol=_fxs.symbol, price=_fxs.price, atr=_fxs.atr,
+                        score=_fxs_score, portfolio_value=pv, regime=regime,
+                        reasoning=_fxs_reasoning, signal_scores=_fxs.dimension_scores,
+                        open_time=datetime.now(timezone.utc).isoformat(),
+                    )
+                if _fx_ok:
+                    clog("TRADE", f"FX {_fxs.direction} {_fxs.symbol} | Score={_fxs_score}/50")
+                    dash["trades"].insert(0, {
+                        "side": _fxs.direction, "symbol": _fxs.symbol,
+                        "price": str(round(_fxs.price, 5)),
+                        "time": datetime.now().strftime("%H:%M:%S"),
+                    })
+        except Exception as _fxe:
+            clog("ERROR", f"FX dispatch: {_fxe}")
 
     dash["positions"] = get_open_positions()
     _seen_dash = {}
