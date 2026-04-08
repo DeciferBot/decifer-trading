@@ -115,6 +115,21 @@ def dispatch_signals(
             results.append(result)
             continue
 
+        # ── Straddle guard — block before intelligence gate ────
+        # If an active position already exists for this symbol in the opposite
+        # direction, block here. This prevents unintentional straddles and saves
+        # the Opus classification call for a signal that would be rejected anyway
+        # by execute_buy/execute_short.
+        _existing_dir = _existing.get("direction") if _existing else None
+        if _existing_dir and _existing_dir != signal.direction:
+            log.warning(
+                f"dispatch: {signal.symbol} straddle blocked — "
+                f"open={_existing_dir} new={signal.direction}"
+            )
+            result["side"] = "BLOCKED_STRADDLE"
+            results.append(result)
+            continue
+
         # ── Intelligence gate ──────────────────────────────────
         cls = class_map.get(signal.symbol.upper())
         if cls is None:

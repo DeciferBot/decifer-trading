@@ -76,7 +76,9 @@ DECISION FRAMEWORK — apply in order, weighted by trade_type:
 
 2. NEWS: Significant catalyst on the symbol.
    - Negative catalyst on a LONG → EXIT (all types) or TRIM (HOLD if thesis survives news)
-   - Positive catalyst → HOLD or ADD if pulling back to entry zone
+   - Positive catalyst on a LONG → HOLD or ADD if pulling back to entry zone
+   - Positive catalyst on a SHORT → EXIT or TRIM (news is against the thesis)
+   - Negative catalyst on a SHORT → HOLD or ADD (news supports the thesis)
 
 3. REGIME SHIFT: Has the market environment changed since entry?
    - SCALP/SWING: Regime shift against position direction → EXIT or TRIM

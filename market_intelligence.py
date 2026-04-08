@@ -52,6 +52,10 @@ _SIGNIFICANCE_KEYWORDS = {
     "earnings", "guidance", "miss", "beat", "downgrade", "upgrade",
     "halt", "bankruptcy", "merger", "acquisition", "tariff", "sanction",
     "default", "recession", "gdp", "inflation", "surprise",
+    # Geopolitical — unscheduled overnight events that move markets
+    "ceasefire", "peace deal", "peace agreement", "war", "invasion",
+    "military", "conflict", "nuclear", "sanctions lifted", "trade deal",
+    "trade agreement", "embargo", "coup", "assassination",
 }
 
 # ── Dataclasses ───────────────────────────────────────────────────────────────
