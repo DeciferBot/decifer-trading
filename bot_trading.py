@@ -50,7 +50,7 @@ from learning import (log_trade, load_trades, load_orders,
 from signal_types import Signal
 from signal_dispatcher import dispatch_signals as _dispatch_signals
 from signal_pipeline import run_signal_pipeline, SignalPipelineResult
-from portfolio_manager import run_portfolio_review
+from portfolio_manager import run_portfolio_review, lightweight_cycle_check
 
 log = logging.getLogger("decifer.bot")
 
@@ -372,10 +372,40 @@ def check_external_closes(regime: dict):
                 pnl         = rpnl if (rpnl != 0.0 and not _math.isnan(rpnl)) else manual_pnl
 
                 sl_order_id = trade.get("sl_order_id")
+                # ── Determine mechanical exit type ─────────────────────────
                 if sl_order_id and _fill_order_id and int(_fill_order_id) == int(sl_order_id):
-                    exit_reason = "sl_hit"
+                    exit_type = "sl_hit"
+                elif pnl > 0 and trade.get("tp"):
+                    tp       = trade.get("tp")
+                    hit_tp   = (not is_short and exit_price >= tp * 0.99) or \
+                               (is_short and exit_price <= tp * 1.01)
+                    exit_type = "tp_hit" if hit_tp else "manual"
                 else:
-                    exit_reason = "manual"
+                    exit_type = "manual"
+                # ── Build thesis-level reason (GAP-002) ────────────────────
+                entry_regime  = trade.get("entry_regime", "UNKNOWN")
+                exit_regime   = regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN"
+                trade_type_ex = trade.get("trade_type", "SCALP")
+                try:
+                    held_mins = int(
+                        (datetime.now(timezone.utc) -
+                         datetime.fromisoformat(trade["open_time"].replace("Z", "+00:00")))
+                        .total_seconds() / 60
+                    )
+                except Exception:
+                    held_mins = 0
+                if exit_type == "tp_hit":
+                    thesis_class = "confirmed"
+                elif entry_regime != "UNKNOWN" and entry_regime != exit_regime:
+                    thesis_class = "breached_regime_shift"
+                elif trade_type_ex == "SCALP" and held_mins > CONFIG.get("scalp_max_hold_minutes", 90):
+                    thesis_class = "breached_stale_scalp"
+                else:
+                    thesis_class = "noise_stop"
+                exit_reason = (
+                    f"{exit_type} | {trade_type_ex} | regime:{entry_regime}→{exit_regime}"
+                    f" | held:{held_mins}min | thesis:{thesis_class}"
+                )
                 clog("TRADE", f"External close detected: {sym} | Exit ${exit_price:.2f} | P&L ${pnl:+.2f} | {exit_reason}")
 
                 log_trade(
@@ -386,6 +416,7 @@ def check_external_closes(regime: dict):
                     outcome={
                         "exit_price": round(exit_price, 2),
                         "pnl":        round(pnl, 2),
+                        "pnl_pct":    round(pnl / ((trade.get("entry") or 1) * (trade.get("qty") or 1)), 4),
                         "reason":     exit_reason,
                     }
                 )
@@ -914,6 +945,49 @@ def run_scan():
     # open_pos already fetched above (before pipeline) so held positions were included in scoring
     open_pos = get_open_positions()  # refresh after any close-queue processing
 
+    # ── Lightweight per-cycle position check (every scan, no LLM) ───────────
+    _force_pm_review = False
+    if open_pos:
+        cycle_actions = lightweight_cycle_check(open_pos, regime, pipeline.all_scored)
+        for _ca in cycle_actions:
+            _sym_ca = _ca.get("symbol", "")
+            _act_ca = _ca.get("action", "")
+            _rsn_ca = _ca.get("reasoning", "")
+            if _act_ca == "EXIT" and _sym_ca:
+                from orders import open_trades as _ce_trades, _trades_lock as _ce_lock
+                with _ce_lock:
+                    _already_ce = _ce_trades.get(_sym_ca, {}).get("status") == "EXITING"
+                if _already_ce:
+                    clog("INFO", f"Cycle check EXIT: {_sym_ca} already exiting — skipping")
+                else:
+                    clog("TRADE", f"Cycle check EXIT: {_sym_ca} — {_rsn_ca}")
+                    execute_sell(ib, _sym_ca, reason="cycle_check")
+                    _pos_ce = next((p for p in open_pos if p["symbol"] == _sym_ca), None)
+                    if _pos_ce:
+                        _ep_ce = _pos_ce.get("current", _pos_ce.get("entry", 0))
+                        _dir_ce = _pos_ce.get("direction", "LONG")
+                        _pnl_ce = (
+                            (_ep_ce - _pos_ce["entry"]) * _pos_ce["qty"]
+                            if _dir_ce == "LONG"
+                            else (_pos_ce["entry"] - _ep_ce) * _pos_ce["qty"]
+                        )
+                        from learning import log_trade as _log_trade_ce
+                        _log_trade_ce(
+                            trade=_pos_ce,
+                            agent_outputs={},
+                            regime=regime,
+                            action="CLOSE",
+                            outcome={
+                                "exit_price": round(_ep_ce, 4),
+                                "pnl":        round(_pnl_ce, 2),
+                                "pnl_pct":    round(_pnl_ce / ((_pos_ce.get("entry") or 1) * (_pos_ce.get("qty") or 1)), 4),
+                                "reason":     f"cycle_check:{_rsn_ca[:120]}",
+                            },
+                        )
+            elif _act_ca == "REVIEW":
+                clog("ANALYSIS", f"Cycle check queued PM review: {_sym_ca} — {_rsn_ca}")
+                _force_pm_review = True
+
     # ── Portfolio manager review (event-triggered) ────────────────────────────
     global _portfolio_review_done_today, _last_known_regime, _cascade_reviewed_this_session, _last_trim_ts
     should_review, pm_trigger = _should_run_portfolio_review(
@@ -925,6 +999,9 @@ def run_scan():
         daily_pnl=pnl,
         portfolio_value=pv,
     )
+    if not should_review and _force_pm_review:
+        should_review = True
+        pm_trigger = "cycle_regime_shift"
     if should_review and open_pos:
         clog("ANALYSIS", f"Portfolio review triggered: {pm_trigger}")
         try:
@@ -978,6 +1055,7 @@ def run_scan():
                             outcome={
                                 "exit_price": round(ep_pm, 4),
                                 "pnl":        round(pnl_pm, 2),
+                                "pnl_pct":    round(pnl_pm / ((pos_pm.get("entry") or 1) * (pos_pm.get("qty") or 1)), 4),
                                 "reason":     f"portfolio_manager:{pm_trigger}",
                             },
                         )
@@ -1145,6 +1223,7 @@ def run_scan():
                 outcome={
                     "exit_price": round(exit_price, 4),
                     "pnl":        round(pnl_val, 2),
+                    "pnl_pct":    round(pnl_val / ((pos.get("entry") or 1) * (pos.get("qty") or 1)), 4),
                     "reason":     "agent_sell",
                 }
             )
@@ -1283,6 +1362,7 @@ def run_scan():
                         score=_fxs_score, portfolio_value=pv, regime=regime,
                         reasoning=_fxs_reasoning, signal_scores=_fxs.dimension_scores,
                         open_time=datetime.now(timezone.utc).isoformat(),
+                        instrument="fx",
                     )
                 else:
                     _fx_ok = execute_short(
@@ -1290,6 +1370,7 @@ def run_scan():
                         score=_fxs_score, portfolio_value=pv, regime=regime,
                         reasoning=_fxs_reasoning, signal_scores=_fxs.dimension_scores,
                         open_time=datetime.now(timezone.utc).isoformat(),
+                        instrument="fx",
                     )
                 if _fx_ok:
                     clog("TRADE", f"FX {_fxs.direction} {_fxs.symbol} | Score={_fxs_score}/50")

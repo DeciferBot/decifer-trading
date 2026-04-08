@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import logging
 import time
+import zoneinfo
 from datetime import datetime, timezone
+
+_ET = zoneinfo.ZoneInfo("America/New_York")
 
 from config import CONFIG
 import bot_state
@@ -55,9 +58,9 @@ def handle_news_trigger(trigger: dict):
     """
     sym = trigger.get("symbol", "?")
 
-    now = datetime.now()
+    now = datetime.now(_ET)
     if (bot_state._sentinel_hour_start is None or
-            (now - bot_state._sentinel_hour_start).seconds > 3600):
+            (now - bot_state._sentinel_hour_start).total_seconds() > 3600):
         bot_state._sentinel_trades_this_hour = 0
         bot_state._sentinel_hour_start       = now
 
@@ -104,7 +107,7 @@ def handle_news_trigger(trigger: dict):
             "confidence": decision.get("confidence", 0),
             "reasoning": decision.get("reasoning", "")[:100],
             "catalyst":  trigger.get("claude_catalyst", "")[:80],
-            "time":      datetime.now().strftime("%H:%M:%S"),
+            "time":      datetime.now(_ET).strftime("%H:%M:%S"),
         })
         dash["sentinel_triggers"] = dash["sentinel_triggers"][:50]
 
@@ -201,7 +204,7 @@ def _execute_trigger_buy(decision: dict, portfolio_value: float,
                     "side":   f"⚡ {label} BUY",
                     "symbol": sym,
                     "price":  str(sig["price"]),
-                    "time":   datetime.now().strftime("%H:%M:%S"),
+                    "time":   datetime.now(_ET).strftime("%H:%M:%S"),
                 })
                 clog("TRADE", f"⚡ {label} BUY {sym} executed successfully")
         else:
@@ -231,7 +234,7 @@ def _execute_sentinel_sell(decision: dict, open_positions: list,
             "side":   "⚡ SELL",
             "symbol": sym,
             "price":  str(exit_price),
-            "time":   datetime.now().strftime("%H:%M:%S"),
+            "time":   datetime.now(_ET).strftime("%H:%M:%S"),
         })
         pnl_val = (exit_price - pos.get("entry", 0)) * pos.get("qty", 0)
         from learning import log_trade as _log_trade
@@ -243,6 +246,7 @@ def _execute_sentinel_sell(decision: dict, open_positions: list,
             outcome={
                 "exit_price": round(exit_price, 4),
                 "pnl":        round(pnl_val, 2),
+                "pnl_pct":    round(pnl_val / ((pos.get("entry") or 1) * (pos.get("qty") or 1)), 4),
                 "reason":     f"sentinel_{trigger.get('direction', 'news').lower()}",
             }
         )
@@ -261,7 +265,7 @@ def handle_catalyst_trigger(trigger: dict):
     sym          = trigger.get("symbol", "?")
     trigger_type = trigger.get("trigger_type", "unknown")
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(_ET).strftime("%Y-%m-%d")
     if bot_state._catalyst_trade_date != today:
         bot_state._catalyst_trades_today = 0
         bot_state._catalyst_trade_date   = today
@@ -287,7 +291,7 @@ def handle_catalyst_trigger(trigger: dict):
             "action":       "LOG",
             "trigger_type": trigger_type,
             "catalyst":     trigger.get("claude_catalyst", "")[:80],
-            "time":         datetime.now().strftime("%H:%M:%S"),
+            "time":         datetime.now(_ET).strftime("%H:%M:%S"),
         })
         return
 
@@ -322,7 +326,7 @@ def handle_catalyst_trigger(trigger: dict):
             "confidence":   decision.get("confidence", 0),
             "reasoning":    decision.get("reasoning", "")[:100],
             "catalyst":     trigger.get("claude_catalyst", "")[:80],
-            "time":         datetime.now().strftime("%H:%M:%S"),
+            "time":         datetime.now(_ET).strftime("%H:%M:%S"),
         })
         dash["catalyst_triggers"] = dash["catalyst_triggers"][:50]
 

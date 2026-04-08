@@ -116,8 +116,8 @@ def _get_ibkr_price(ib: IB, contract, fallback: float = 0) -> float:
         close = ticker.close
         if close and close > 0:
             return float(close)
-    except Exception:
-        pass
+    except Exception as _e:
+        log.warning("_get_ibkr_price: reqTickers failed for %s — %s (using fallback=%s)", getattr(contract, 'symbol', '?'), _e, fallback)
     return fallback
 
 
@@ -132,23 +132,23 @@ def _get_ibkr_bid_ask(ib: IB, contract) -> Tuple[float, float]:
         bid = float(ticker.bid) if getattr(ticker, "bid", None) and ticker.bid > 0 else 0.0
         ask = float(ticker.ask) if getattr(ticker, "ask", None) and ticker.ask > 0 else 0.0
         return bid, ask
-    except Exception:
+    except Exception as _e:
+        log.warning("_get_ibkr_bid_ask: reqTickers failed for %s — %s", getattr(contract, 'symbol', '?'), _e)
         return 0.0, 0.0
 
 
-def _get_yf_price(symbol: str) -> float:
+def _get_alpaca_price(symbol: str) -> float:
     """
-    Quick yfinance price fetch for a single symbol.
-    Used by 3-way validation — NOT for scanning/scoring.
-    Returns 0 if unavailable.
+    Quick price fetch for a single symbol for price validation.
+    Uses Alpaca latest daily bar. Returns 0 if unavailable.
     """
     try:
-        import yfinance as yf
-        t = yf.Ticker(symbol)
-        info = t.fast_info
-        price = getattr(info, "last_price", None) or getattr(info, "previous_close", None)
-        if price and price > 0:
-            return round(float(price), 4)
+        from alpaca_data import fetch_bars
+        df = fetch_bars(symbol, period="2d", interval="1d")
+        if df is not None and not df.empty and "Close" in df.columns:
+            price = float(df["Close"].iloc[-1])
+            if price > 0:
+                return round(price, 4)
     except Exception:
         pass
     return 0
@@ -201,7 +201,7 @@ def _ibkr_item_to_key(item) -> str:
 
 def _validate_position_price(symbol: str, ibkr_price: float, entry: float) -> Tuple[float, str]:
     """
-    3-way price consensus for position monitoring (IBKR + yfinance + TV).
+    3-way price consensus for position monitoring (IBKR + Alpaca + TV).
     Same logic used at order entry — now applied to ongoing updates and closes.
 
     Returns (validated_price, source_description).
@@ -221,19 +221,19 @@ def _validate_position_price(symbol: str, ibkr_price: float, entry: float) -> Tu
     import sys as _sys
     _om = _sys.modules.get('orders_contracts', _sys.modules[__name__])
     _gtsc = _om.get_tv_signal_cache
-    _gyf = _om._get_yf_price
+    _gap = _om._get_alpaca_price
 
     tv_cache = _gtsc()
     tv_data = tv_cache.get(symbol) if tv_cache else None
     tv_close = float(tv_data.get("tv_close")) if tv_data and tv_data.get("tv_close") else 0
 
-    yf_price = _gyf(symbol)
+    alpaca_price = _gap(symbol)
 
     prices = {}
     if ibkr_price > 0:
         prices["IBKR"] = ibkr_price
-    if yf_price > 0:
-        prices["yfinance"] = yf_price
+    if alpaca_price > 0:
+        prices["Alpaca"] = alpaca_price
     if tv_close > 0:
         prices["TV"] = tv_close
 

@@ -29,7 +29,9 @@ try:
 except Exception:
     pass
 
+import zoneinfo
 from datetime import datetime, timezone
+_ET = zoneinfo.ZoneInfo("America/New_York")
 from colorama import Fore, Style, init as colorama_init
 
 from config import CONFIG
@@ -208,7 +210,7 @@ def main():
     from bot_dashboard import start_dashboard
     from bot_ibkr import (
         connect_ibkr, subscribe_pnl, backfill_trades_from_ibkr,
-        sync_orders_from_ibkr, _on_order_status_event,
+        sync_orders_from_ibkr, cancel_orphan_stop_orders, _on_order_status_event,
     )
     from bot_account import get_account_data, load_equity_history
     from bot_trading import run_scan, _check_kill, _process_close_queue
@@ -282,7 +284,7 @@ def main():
 
     # Reset daily risk state — only once per calendar day
     pv, _ = get_account_data()
-    today = datetime.now().date()
+    today = datetime.now(_ET).date()
     if not hasattr(main, '_last_reset_date') or main._last_reset_date != today:
         reset_daily_state(pv)
         main._last_reset_date = today
@@ -301,9 +303,9 @@ def main():
     bot_state.ib.sleep(2)  # Ensure commissionReports are linked to fills before backfill
     backfill_trades_from_ibkr()
     sync_orders_from_ibkr()
+    cancel_orphan_stop_orders()  # Cancel stale exit orders with no corresponding active position
 
-    # Initialise hot reload file hashes
-    _init_hashes()
+    # Hot reload hashes intentionally not initialised — check_and_reload() is not called in the main loop
 
     # Load persistent data
     load_settings_overrides()   # Apply saved dashboard settings on top of config.py defaults
@@ -474,15 +476,32 @@ def main():
 
     def _run_icloud_sync():
         if os.path.exists(_ICLOUD_SYNC_SCRIPT):
-            import subprocess
-            subprocess.Popen(
-                ["bash", _ICLOUD_SYNC_SCRIPT],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            try:
+                import subprocess
+                subprocess.Popen(
+                    ["bash", _ICLOUD_SYNC_SCRIPT],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except Exception as _sync_err:
+                clog("WARN", f"iCloud sync failed: {_sync_err}")
 
     schedule.every(5).minutes.do(_run_icloud_sync)
     _run_icloud_sync()  # run immediately on startup
+
+    # ── Startup health check — warn if any enabled real-time subsystem failed ──
+    _failed = []
+    if CONFIG.get("alpaca_news_enabled", True) and getattr(bot_state, "_alpaca_news_stream", None) is None:
+        _failed.append("Alpaca news stream")
+    if getattr(bot_state, "_bar_stream", None) is None:
+        _failed.append("Alpaca bar stream (real-time price data)")
+    if CONFIG.get("sentinel_enabled", True) and getattr(bot_state, "_sentinel", None) is None:
+        _failed.append("News sentinel (IBKR)")
+    if _failed:
+        clog("WARN", "⚠️  STARTUP WARNING — the following subsystems failed to start:")
+        for _f in _failed:
+            clog("WARN", f"   ✗ {_f}")
+        clog("WARN", "⚠️  Bot is running with degraded signal coverage.")
 
     clog("INFO", f"<> Decifer running. Dashboard → http://localhost:{CONFIG['dashboard_port']}")
     clog("INFO", "Press Ctrl+C to stop.")

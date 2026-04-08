@@ -8,12 +8,15 @@
 import json
 import os
 import sys
+import zoneinfo
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
+_ET = zoneinfo.ZoneInfo("America/New_York")
+
 TRADE_FILE = "data/trades.json"
 ORDER_FILE = "data/orders.json"
-EQUITY_FILE = "equity_history.json"
+EQUITY_FILE = "data/equity_history.json"
 JOURNAL_DIR = "journals"
 LOG_FILE = "logs/decifer.log"
 
@@ -71,7 +74,7 @@ def analyse_trades(trades):
     pnls = [t["pnl"] for t in closed]
 
     gross_win = sum(t["pnl"] for t in wins) if wins else 0
-    gross_loss = abs(sum(t["pnl"] for t in losses)) if losses else 0.01
+    gross_loss = abs(sum(t["pnl"] for t in losses)) if losses else 0
 
     # By exit reason
     by_reason = defaultdict(lambda: {"count": 0, "pnl": 0})
@@ -122,7 +125,7 @@ def analyse_trades(trades):
         "avg_loss": round(-gross_loss / len(losses), 2) if losses else 0,
         "best": max(pnls),
         "worst": min(pnls),
-        "profit_factor": round(gross_win / gross_loss, 2) if gross_loss > 0 else 0,
+        "profit_factor": round(gross_win / gross_loss, 2) if gross_loss > 0 else None,
         "by_reason": dict(by_reason),
         "by_regime": dict(by_regime),
         "by_direction": dict(by_dir),
@@ -371,7 +374,7 @@ def render_journal(target_date, today_analysis, cumulative_analysis, patterns, d
     lines.append("")
 
     lines.append("---")
-    lines.append(f"*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} by daily_journal.py*")
+    lines.append(f"*Generated: {datetime.now(_ET).strftime('%Y-%m-%d %H:%M:%S')} by daily_journal.py*")
 
     return "\n".join(lines)
 
@@ -381,7 +384,7 @@ def render_journal(target_date, today_analysis, cumulative_analysis, patterns, d
 def generate_journal(target_date=None, day_number=None):
     """Generate journal for a specific date. Defaults to today."""
     if target_date is None:
-        target_date = datetime.now().strftime("%Y-%m-%d")
+        target_date = datetime.now(_ET).strftime("%Y-%m-%d")
 
     trades = load_json(TRADE_FILE)
     orders = load_json(ORDER_FILE)

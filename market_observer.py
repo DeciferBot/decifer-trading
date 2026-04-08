@@ -33,7 +33,7 @@ from typing import Optional
 
 import pandas as pd
 
-from alpaca_data import fetch_bars
+from alpaca_data import fetch_bars, fetch_snapshots
 from config import CONFIG
 
 log = logging.getLogger("decifer.market_observer")
@@ -160,16 +160,25 @@ def _fetch_vix() -> tuple[float, float, float]:
     VIX is not available via Alpaca stock API; yfinance is the fallback source.
     """
     try:
-        import yfinance as yf
-        df = yf.download("^VIX", period="10d", interval="1d",
-                         progress=False, auto_adjust=True)
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FTE
+        def _fetch():
+            import yfinance as yf
+            return yf.Ticker("^VIX").history(period="10d", interval="1d", auto_adjust=True)
+        with ThreadPoolExecutor(max_workers=1) as _pool:
+            try:
+                df = _pool.submit(_fetch).result(timeout=8)
+            except _FTE:
+                log.debug("market_observer: VIX fetch timed out (8s)")
+                return 0.0, 0.0, 0.0
         if df is None or df.empty or len(df) < 2:
             return 0.0, 0.0, 0.0
         closes = df["Close"].dropna()
-        current  = float(closes.iloc[-1])
-        prev     = float(closes.iloc[-2])
-        change   = current - prev
-        avg5     = float(closes.tail(5).mean())
+        if len(closes) < 2:
+            return 0.0, 0.0, 0.0
+        current = float(closes.iloc[-1].item())
+        prev    = float(closes.iloc[-2].item())
+        change  = current - prev
+        avg5    = float(closes.tail(5).mean().item())
         return current, change, avg5
     except Exception as exc:
         log.debug(f"market_observer: VIX fetch failed — {exc}")
@@ -188,13 +197,28 @@ def _fetch_all_bars() -> dict[str, pd.DataFrame]:
     return results
 
 
-def _build_snapshot(sym: str, df: pd.DataFrame) -> AssetSnapshot:
+def _build_snapshot(
+    sym: str,
+    df: pd.DataFrame,
+    live_price: float | None = None,
+    live_change_1d: float | None = None,
+) -> AssetSnapshot:
+    """
+    Build an AssetSnapshot from daily bars, optionally overriding price and
+    change_1d with live snapshot values (for intraday accuracy during market hours).
+    MA and 5d calculations always use daily bars.
+    """
     closes = df["Close"].dropna()
-    price    = float(closes.iloc[-1])
-    change_1 = float((closes.iloc[-1] / closes.iloc[-2] - 1) * 100) if len(closes) >= 2 else 0.0
-    change_5 = float((closes.iloc[-1] / closes.iloc[-6] - 1) * 100) if len(closes) >= 6 else change_1
-    ma20     = float(closes.tail(20).mean()) if len(closes) >= 20 else price
-    ma50     = float(closes.tail(50).mean()) if len(closes) >= 50 else price
+    bar_price = float(closes.iloc[-1].item())
+    change_1  = float(((closes.iloc[-1] / closes.iloc[-2] - 1) * 100).item()) if len(closes) >= 2 else 0.0
+    change_5  = float(((closes.iloc[-1] / closes.iloc[-6] - 1) * 100).item()) if len(closes) >= 6 else change_1
+    ma20      = float(closes.tail(20).mean().item()) if len(closes) >= 20 else bar_price
+    ma50      = float(closes.tail(50).mean().item()) if len(closes) >= 50 else bar_price
+
+    # Use live snapshot price/change if available — fixes stale daily bar during market hours
+    price    = live_price    if live_price    is not None else bar_price
+    change_1 = live_change_1d if live_change_1d is not None else change_1
+
     return AssetSnapshot(
         symbol=sym, label=UNIVERSE[sym],
         price=price, change_1d=change_1, change_5d=change_5,
@@ -269,7 +293,22 @@ def get_market_observation(force_refresh: bool = False) -> MarketObservation:
     if errors:
         log.debug(f"market_observer: no data for {errors}")
 
-    assets = {sym: _build_snapshot(sym, df) for sym, df in bars.items()}
+    # Fetch live snapshots for all universe symbols in one API call.
+    # Overrides price and change_1d from daily bars — fixes stale data during market hours.
+    live_snaps = fetch_snapshots(list(UNIVERSE.keys()))
+    if live_snaps:
+        log.debug(f"market_observer: live snapshots for {len(live_snaps)} symbols")
+    else:
+        log.debug("market_observer: live snapshots unavailable — using daily bar prices")
+
+    assets = {
+        sym: _build_snapshot(
+            sym, df,
+            live_price=live_snaps.get(sym, {}).get("price"),
+            live_change_1d=live_snaps.get(sym, {}).get("change_1d"),
+        )
+        for sym, df in bars.items()
+    }
     correlations   = _compute_correlations(bars)
     sector_vs_spy  = _compute_sector_vs_spy(bars, assets)
     vix, vix_1d, vix_avg5 = _fetch_vix()

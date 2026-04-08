@@ -15,7 +15,7 @@ from config import CONFIG
 
 log = logging.getLogger("decifer.learning")
 
-TRADE_LOG_FILE   = CONFIG["trade_log"]
+TRADE_LOG_FILE   = CONFIG.get("trade_log", "data/trades.json")
 ORDER_LOG_FILE   = CONFIG.get("order_log", "data/orders.json")
 SIGNALS_LOG_FILE = CONFIG.get("signals_log", "data/signals_log.jsonl")
 AUDIT_LOG_FILE   = CONFIG.get("audit_log", "data/audit_log.jsonl")
@@ -305,6 +305,7 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
         # Sanitise to JSON-safe types — orderId can be a MagicMock in test environments
         "tranche_id":      trade.get("tranche_id") if isinstance(trade.get("tranche_id"), (int, type(None))) else None,
         "parent_trade_id": trade.get("parent_trade_id") if isinstance(trade.get("parent_trade_id"), (int, str, type(None))) else None,
+        "pattern_id":      trade.get("pattern_id"),
     }
 
     # ── Options metadata — store if present so dashboard can display correctly ──

@@ -364,8 +364,16 @@ def get_vix_rank(vix_override: Optional[float] = None) -> float:
         return _vix_rank_cache
 
     try:
-        import yfinance as yf
-        hist = yf.Ticker("^VIX").history(period=f"{lookback + 15}d")["Close"].dropna()
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FTE
+        def _fetch():
+            import yfinance as yf
+            return yf.Ticker("^VIX").history(period=f"{lookback + 15}d")["Close"].dropna()
+        with ThreadPoolExecutor(max_workers=1) as _pool:
+            try:
+                hist = _pool.submit(_fetch).result(timeout=10)
+            except _FTE:
+                log.warning("get_vix_rank: ^VIX fetch timed out (10s) — defaulting to 0.5")
+                return 0.5
         if len(hist) < 20:
             log.warning("get_vix_rank: insufficient VIX history — defaulting to 0.5")
             return 0.5
@@ -843,9 +851,9 @@ def get_intraday_strategy_mode(portfolio_value: float,
     global _strategy_size_multiplier
 
     _MODE_PARAMS = {
-        "NORMAL":    {"score_threshold_adj": 0,  "size_multiplier": 1.0, "max_new_trades": 3},
-        "DEFENSIVE": {"score_threshold_adj": 5,  "size_multiplier": 0.7, "max_new_trades": 2},
-        "RECOVERY":  {"score_threshold_adj": 10, "size_multiplier": 0.5, "max_new_trades": 1},
+        "NORMAL":    {"score_threshold_adj": 0,  "size_multiplier": 1.0, "max_new_trades": 6},  # Paper: raised from 3
+        "DEFENSIVE": {"score_threshold_adj": 5,  "size_multiplier": 0.7, "max_new_trades": 4},  # Paper: raised from 2
+        "RECOVERY":  {"score_threshold_adj": 10, "size_multiplier": 0.5, "max_new_trades": 2},  # Paper: raised from 1
     }
 
     daily_pnl_pct = (daily_pnl / portfolio_value) if portfolio_value > 0 else 0.0
