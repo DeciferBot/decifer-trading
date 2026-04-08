@@ -46,7 +46,7 @@ from orders_guards import (
 )
 from orders_contracts import (
     get_contract,
-    _get_ibkr_price, _get_ibkr_bid_ask, _get_yf_price,
+    _get_ibkr_price, _get_ibkr_bid_ask, _get_alpaca_price,
     _is_option_contract,
     _validate_position_price,
 )
@@ -60,6 +60,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 open_time: str = None,
                 candle_gate: str = None,
                 tranche_mode: bool = True,
+                instrument: str = "stock",
                 # Trade advisor kwargs — override ATR formula when provided
                 advice_pt: float = 0.0,
                 advice_sl: float = 0.0,
@@ -89,7 +90,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
     calculate_stops = _om.calculate_stops                    # noqa: F841
     log_order = _om.log_order                                # noqa: F841
     get_tv_signal_cache = _om.get_tv_signal_cache            # noqa: F841
-    _get_yf_price = _om._get_yf_price                        # noqa: F841
+    _get_alpaca_price = _om._get_alpaca_price                        # noqa: F841
     MarketOrder = _om.MarketOrder                            # noqa: F841
     LimitOrder  = _om.LimitOrder                             # noqa: F841
     StopOrder   = _om.StopOrder                              # noqa: F841
@@ -175,7 +176,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 return False
 
     try:
-        contract = get_contract(symbol)
+        contract = get_contract(symbol, instrument)
         ib.qualifyContracts(contract)
 
         # ── GET REAL-TIME IBKR PRICE — this is the execution price ──
@@ -284,6 +285,11 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             log.warning(f"[TRANCHE] qty={qty} too small for dual-tranche — falling back to legacy for {symbol}")
             tranche_mode = False
 
+        # Non-SCALP trades are managed by Portfolio Manager — no mechanical TP.
+        # Tranche mode relies on a T1 TP bracket; without it there is no reason to split.
+        if trade_type and trade_type != "SCALP":
+            tranche_mode = False
+
         if tranche_mode:
             t1_qty = qty // 2
             t2_qty = qty - t1_qty          # handles odd qty — T2 gets the extra share
@@ -352,16 +358,19 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         sl_limit = round(sl * 0.99, 2)
         sl_order = StopLimitOrder("SELL", qty, sl, sl_limit, account=account, tif="GTC", outsideRth=True)
         sl_order.parentId = parent_id
-        sl_order.transmit = False
+        place_tp = (trade_type == "SCALP")
+        sl_order.transmit = not place_tp  # SCALP: False (TP follows); SWING/HOLD: True (transmit entry+SL)
         sl_trade = ib.placeOrder(contract, sl_order)
         ib.sleep(0.1)
         _sl_order_id = sl_trade.order.orderId  # captured for trailing stop modifications
 
-        # Leg 3: Take profit — attached to parent, transmit=True sends ALL 3 legs together
-        tp_order = LimitOrder("SELL", tp_qty, tp, account=account, tif="GTC", outsideRth=True)
-        tp_order.parentId = parent_id
-        tp_order.transmit = True
-        tp_trade = ib.placeOrder(contract, tp_order)
+        tp_trade = None
+        if place_tp:
+            # Leg 3: Take profit — SCALP only; transmit=True sends ALL 3 legs together
+            tp_order = LimitOrder("SELL", tp_qty, tp, account=account, tif="GTC", outsideRth=True)
+            tp_order.parentId = parent_id
+            tp_order.transmit = True
+            tp_trade = ib.placeOrder(contract, tp_order)
 
         # Wait for IBKR to process the full bracket
         ib.sleep(1.5)
@@ -397,19 +406,20 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             "role":       "stop_loss",
             "timestamp":  datetime.now(timezone.utc).isoformat(),
         })
-        log_order({
-            "order_id":   tp_trade.order.orderId,
-            "parent_id":  parent_id,
-            "symbol":     symbol,
-            "side":       "SELL",
-            "order_type": "LMT",
-            "qty":        tp_qty,
-            "price":      tp,
-            "status":     "SUBMITTED",
-            "instrument": "stock",
-            "role":       "take_profit",
-            "timestamp":  datetime.now(timezone.utc).isoformat(),
-        })
+        if place_tp and tp_trade is not None:
+            log_order({
+                "order_id":   tp_trade.order.orderId,
+                "parent_id":  parent_id,
+                "symbol":     symbol,
+                "side":       "SELL",
+                "order_type": "LMT",
+                "qty":        tp_qty,
+                "price":      tp,
+                "status":     "SUBMITTED",
+                "instrument": "stock",
+                "role":       "take_profit",
+                "timestamp":  datetime.now(timezone.utc).isoformat(),
+            })
 
         # ── VERIFY BRACKET — fallback if children got rejected ────
         # (duplicate-check guard runs before this block, so we are inside sym_lock)
@@ -422,10 +432,10 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             return False
 
         sl_status = sl_trade.orderStatus.status
-        tp_status = tp_trade.orderStatus.status
-
         _child_reject = ('Inactive', 'Cancelled', 'ApiCancelled', 'ValidationError')
-        if sl_status in _child_reject or tp_status in _child_reject:
+        tp_status = tp_trade.orderStatus.status if tp_trade is not None else "N/A"
+
+        if sl_status in _child_reject or (tp_trade is not None and tp_status in _child_reject):
             log.warning(
                 f"Bracket child rejected for {symbol} (SL={sl_status}, TP={tp_status}) "
                 f"— placing standalone SL/TP orders as fallback"
@@ -545,6 +555,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                     "advice_id":        advice_id,
                     "trade_type":       trade_type or "SCALP",
                     "conviction":       conviction,
+                    "entry_regime":     regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
                     "pattern_id":       pattern_id,
                     "sl_order_id":      _sl_order_id,
                     "high_water_mark":  price,
@@ -625,6 +636,7 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
                   agent_outputs: dict = None,
                   open_time: str = None,
                   candle_gate: str = None,
+                  instrument: str = "stock",
                   # Trade advisor kwargs — override ATR formula when provided
                   advice_pt: float = 0.0,
                   advice_sl: float = 0.0,
@@ -651,7 +663,7 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
     calculate_stops = _om.calculate_stops                    # noqa: F841
     log_order = _om.log_order                                # noqa: F841
     get_tv_signal_cache = _om.get_tv_signal_cache            # noqa: F841
-    _get_yf_price = _om._get_yf_price                        # noqa: F841
+    _get_alpaca_price = _om._get_alpaca_price                        # noqa: F841
     MarketOrder = _om.MarketOrder                            # noqa: F841
     LimitOrder  = _om.LimitOrder                             # noqa: F841
     StopOrder   = _om.StopOrder                              # noqa: F841
@@ -716,7 +728,7 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
                 return False
 
     try:
-        contract = get_contract(symbol)
+        contract = get_contract(symbol, instrument)
         ib.qualifyContracts(contract)
 
         yf_price = price
@@ -906,6 +918,7 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
                     "advice_id":           advice_id,
                     "trade_type":          trade_type or "SCALP",
                     "conviction":          conviction,
+                    "entry_regime":        regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
                     "pattern_id":          pattern_id,
                     "sl_order_id":         _sl_order_id,
                     "high_water_mark":     price,
@@ -981,7 +994,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             contract = _OptContract(symbol, info["expiry_ibkr"], info["strike"], info["right"],
                                     exchange="SMART", currency="USD")
         else:
-            contract = get_contract(symbol)
+            contract = get_contract(symbol, info.get("instrument", "stock"))
         ib.qualifyContracts(contract)
 
         # 3-way price validation for accurate exit P&L logging

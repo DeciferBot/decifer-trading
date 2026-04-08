@@ -1,0 +1,118 @@
+{
+  "id": "feat-north-star",
+  "title": "North Star — Reasoning-Based Auto Trader",
+  "version": "1.0",
+  "created": "2026-04-08",
+  "approved_by": "Amit",
+  "immutable": true,
+  "_note": "This document defines WHAT we are building. It does not change. Individual gaps close as work ships. The definition itself is fixed.",
+
+  "definition": {
+    "north_star": "A reasoning-based auto trader: a system that enters with a stated thesis, monitors that thesis against evolving market conditions, exits when the thesis breaks (not when a price level is crossed), records the reason for every decision, and learns from the correlation between its reasoning and outcomes.",
+    "five_pillars": [
+      {
+        "id": 1,
+        "name": "Entry with thesis",
+        "description": "Every entry is accompanied by a stated, falsifiable thesis: what condition is being traded, what catalyst supports it, and what would prove it wrong. Not a score threshold crossing — a reason."
+      },
+      {
+        "id": 2,
+        "name": "Hold with monitoring",
+        "description": "Open positions are re-evaluated every scan cycle. Not just price vs stop — the thesis is checked against current market conditions. A position that was right to open can be wrong to hold."
+      },
+      {
+        "id": 3,
+        "name": "Exit with reason",
+        "description": "Exits are driven by thesis breach, not price levels. Hard stops exist only as circuit breakers (catastrophic loss prevention), not as the primary exit mechanism. The agent decides when to exit based on whether the story is still true."
+      },
+      {
+        "id": 4,
+        "name": "Record everything",
+        "description": "Every decision — entry, hold, trim, exit — has a logged reason in a consistent format. The reason is not the outcome. 'Stopped out at -2%' is not a reason. 'Regime shifted to BEAR before momentum fired on a SCALP thesis' is a reason."
+      },
+      {
+        "id": 5,
+        "name": "Learn from outcomes",
+        "description": "Logged reasons are compared against outcomes. Reasoning patterns that predict good outcomes are reinforced. Patterns that precede losses are deprioritised. This is the feedback loop that separates a reasoning system from a rule system."
+      }
+    ]
+  },
+
+  "completion_status": {
+    "entry_with_thesis": {
+      "status": "PARTIAL",
+      "what_exists": "Agent voting gate (3/4 votes required), AVOID classification blocks signals, SCALP/SWING/HOLD tag assigned at entry, trade_type + conviction stored on position",
+      "what_is_missing": "The entry thesis is a classification tag, not a falsifiable statement. No explicit 'what would prove this wrong' is stored at entry."
+    },
+    "hold_with_monitoring": {
+      "status": "SHIPPED",
+      "what_exists": "lightweight_cycle_check() runs every scan cycle — SCALP stale exits, SWING regime-shift review queuing. Event-triggered full Opus PM review for score collapse, news, earnings, cascade, drawdown.",
+      "what_is_missing": "HOLD trade type has no cycle-level monitoring yet — thesis integrity check for multi-day holds is still event-only.",
+      "shipped_date": "2026-04-08"
+    },
+    "exit_with_reason": {
+      "status": "PARTIAL",
+      "what_exists": "Portfolio Manager fires on events and can EXIT/TRIM with a logged reason. Cycle check exits now log reasons. Bracket exits (stop-loss, take-profit) detected by check_external_closes() now log thesis-level reasons: '{exit_type} | {trade_type} | regime:{entry}→{exit} | held:{N}min | thesis:{class}'. thesis:class is one of confirmed, breached_regime_shift, breached_stale_scalp, or noise_stop.",
+      "what_is_missing": "TP hits that do not match the tp field exactly are still classified as 'manual'. No thesis-level reason for exits initiated directly by portfolio_manager (TRIM/EXIT) — those use PM's freeform reason strings which are not schema-structured.",
+      "shipped_date": "2026-04-08"
+    },
+    "record_everything": {
+      "status": "PARTIAL",
+      "what_exists": "learning.py logs trades with exit_price, pnl, exit_reason, regime at entry. PM and cycle check exits include reason strings. entry_regime now stored on every position at open time. Bracket exit reasons are now structured and include entry_regime→exit_regime comparison.",
+      "what_is_missing": "No structured reason schema across all exit types — PM reasons remain freeform strings. No 'thesis_stated_at_entry' field (falsifiable statement per-trade) — GAP-003 still open."
+    },
+    "learn_from_outcomes": {
+      "status": "PARTIAL",
+      "what_exists": "pattern_library.py surfaces similar historical trades as context for new signal classification. learning.py aggregates trade outcomes.",
+      "what_is_missing": "No feedback loop from exit_reason → entry reasoning. The pattern library informs classification but does not adjust agent reasoning weights or flag specific thesis patterns as high/low quality."
+    }
+  },
+
+  "gap_register": [
+    {
+      "gap_id": "GAP-001",
+      "pillar": 2,
+      "title": "HOLD position cycle monitoring",
+      "description": "HOLD trade type has no cycle-level check. Multi-day holds are only reviewed on events. Needs a lightweight thesis-integrity check: is the macro backdrop that supported the HOLD still intact?",
+      "priority": "medium",
+      "status": "open"
+    },
+    {
+      "gap_id": "GAP-002",
+      "pillar": 3,
+      "title": "Mechanical bracket exits log no thesis reason",
+      "description": "When IBKR fires a stop-loss or take-profit bracket, the bot detects it via check_external_closes() and logs it as 'external'. No thesis-level reason is attached. The learning system cannot distinguish 'stopped out because thesis was wrong' from 'stopped out by noise on a correct thesis'.",
+      "priority": "high",
+      "status": "shipped",
+      "shipped_date": "2026-04-08",
+      "resolution": "orders_core.py now stores entry_regime on every open position. check_external_closes() classifies each bracket exit as one of: sl_hit, tp_hit, or manual, then appends thesis classification (confirmed | breached_regime_shift | breached_stale_scalp | noise_stop) based on entry_regime vs current regime comparison. Full exit_reason format: '{exit_type} | {trade_type} | regime:{entry}→{exit} | held:{N}min | thesis:{class}'."
+    },
+    {
+      "gap_id": "GAP-003",
+      "pillar": 1,
+      "title": "Entry thesis is a tag, not a falsifiable statement",
+      "description": "trade_type (SCALP/SWING/HOLD) is stored at entry but no explicit thesis string is stored. 'What would prove this wrong' is implicit in the trade type rules, not recorded per trade. Needed for the learning loop to correlate stated thesis vs outcome.",
+      "priority": "medium",
+      "status": "open"
+    },
+    {
+      "gap_id": "GAP-004",
+      "pillar": 5,
+      "title": "No feedback from exit_reason to entry reasoning",
+      "description": "The pattern library surfaces similar trades as context but does not adjust future reasoning based on which entry thesis types led to profitable vs losing exits. The loop between 'why we entered' and 'why we exited' is not closed.",
+      "priority": "low",
+      "status": "open"
+    }
+  ],
+
+  "what_is_not_the_north_star": [
+    "Adding more signal dimensions",
+    "More complex regime classification",
+    "ML models (LightGBM, LSTM) — these are downstream of a validated foundation",
+    "Lower stop losses or tighter take profits",
+    "More conservative position sizing",
+    "New infrastructure layers that don't serve one of the five pillars"
+  ],
+
+  "session_protocol_rule": "Every session, before any work, read this document. Work through the gap_register in priority order. Do not propose new architectural layers. Do not re-derive the north star from the user's description — it is already defined here. If a session request conflicts with this document, flag the conflict to Amit before proceeding."
+}

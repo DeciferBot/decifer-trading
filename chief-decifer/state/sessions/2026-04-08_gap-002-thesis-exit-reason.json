@@ -1,0 +1,27 @@
+{
+  "date": "2026-04-08",
+  "topic": "gap-002-thesis-exit-reason",
+  "phase": "North Star — GAP-002 (Pillar 3: Exit with Reason)",
+  "status": "complete",
+  "summary": "Closed GAP-002: mechanical bracket exits now log thesis-level reasons instead of bare 'sl_hit'/'manual' strings. The learning system can now distinguish 'stopped out because thesis was wrong' from 'stopped out by noise on a correct thesis'.",
+  "changes": {
+    "orders_core.py": "Added 'entry_regime' field to active_trades dict in both execute_buy (LONG) and execute_short (SHORT). Sourced from regime.get('regime', 'UNKNOWN'). Stored at trade open time so check_external_closes() can compare entry vs exit regime.",
+    "bot_trading.py": "Replaced 5-line exit_reason detection in check_external_closes() with thesis-level reason building. Now detects 3 exit types (sl_hit, tp_hit, manual) and appends thesis classification. TP detection: pnl > 0 AND exit_price >= tp * 0.99 (LONG) or <= tp * 1.01 (SHORT). Thesis classes: confirmed (tp_hit), breached_regime_shift (entry_regime != exit_regime and neither is UNKNOWN), breached_stale_scalp (SCALP held > scalp_max_hold_minutes), noise_stop (all others). Full format: '{exit_type} | {trade_type} | regime:{entry}→{exit} | held:{N}min | thesis:{class}'.",
+    "tests/test_orders_core.py": "Added 2 new tests: test_execute_buy_stores_entry_regime (verifies entry_regime='BULL' stored on open_trades after execute_buy with regime={'regime':'BULL'}), test_execute_buy_entry_regime_unknown_when_regime_missing (verifies fallback to 'UNKNOWN' when regime dict has no 'regime' key). Fixed pre-existing test failure: test_retry_1_steps_to_bid_95 and test_retry_2_steps_to_bid_90 were setting last_try=now which hit the 90-second min retry interval guard and returned False before placing an order. Fixed by setting last_try to (now - _MIN_SELL_RETRY_INTERVAL_S - 1 seconds)."
+  },
+  "pre_existing_errors_fixed": [
+    "tests/test_orders_core.py::TestExecuteSellOptionPricing::test_retry_1_steps_to_bid_95 — test was setting last_try=now for retry_count>0, causing the _MIN_SELL_RETRY_INTERVAL_S=90s guard in execute_sell_option to return False before placing the order. Captured price was None instead of 1.90.",
+    "tests/test_orders_core.py::TestExecuteSellOptionPricing::test_retry_2_steps_to_bid_90 — same root cause as above."
+  ],
+  "side_effects": [
+    "TP hits previously classified as 'manual' (and excluded from get_performance_summary) are now classified as 'tp_hit | ...' and included in performance stats. This is a correctness improvement — TP hits are winning trades and should count.",
+    "exit_reason strings in learning.py/trades.json are now structured (pipe-delimited) not bare keywords. Downstream consumers that compare exit_reason == 'sl_hit' will no longer match. Only known consumer doing exact string comparison is get_performance_summary(exit_reason != 'manual') — still works correctly."
+  ],
+  "north_star_update": {
+    "gap_register.GAP-002.status": "open → shipped",
+    "completion_status.exit_with_reason.shipped_date": "2026-04-08",
+    "completion_status.record_everything.what_exists": "updated to reflect entry_regime storage and structured bracket exit reasons"
+  },
+  "test_results": "40 passed, 0 failed (test_orders_core.py). Full suite: 1769 passed, 111 failed (111 pre-existing, unrelated to this session).",
+  "approved_by": "pending"
+}
