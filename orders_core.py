@@ -358,7 +358,8 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         sl_limit = round(sl * 0.99, 2)
         sl_order = StopLimitOrder("SELL", qty, sl, sl_limit, account=account, tif="GTC", outsideRth=True)
         sl_order.parentId = parent_id
-        place_tp = (trade_type == "SCALP")
+        # Empty trade_type falls back to SCALP behaviour (legacy callers, tests)
+        place_tp = (not trade_type or trade_type == "SCALP")
         sl_order.transmit = not place_tp  # SCALP: False (TP follows); SWING/HOLD: True (transmit entry+SL)
         sl_trade = ib.placeOrder(contract, sl_order)
         ib.sleep(0.1)
@@ -490,35 +491,36 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             except Exception as e:
                 log.error(f"CRITICAL: Failed to place standalone SL for {symbol}: {e}")
 
-            try:
-                standalone_tp = LimitOrder("SELL", tp_qty, tp, account=account, tif="GTC", outsideRth=True)
-                standalone_tp.ocaGroup = oca_group
-                standalone_tp.ocaType = 1  # Cancel remaining on fill
-                standalone_tp.transmit = True
-                tp_trade2 = ib.placeOrder(contract, standalone_tp)
-                ib.sleep(0.3)
-                log.info(f"Standalone TP placed for {symbol} @ ${tp:.2f} OCA={oca_group} (orderId={tp_trade2.order.orderId})")
-                log_order({
-                    "order_id":   tp_trade2.order.orderId,
-                    "parent_id":  parent_id,
-                    "symbol":     symbol,
-                    "side":       "SELL",
-                    "order_type": "LMT",
-                    "qty":        tp_qty,
-                    "price":      tp,
-                    "status":     "SUBMITTED",
-                    "instrument": "stock",
-                    "role":       "take_profit_standalone",
-                    "oca_group":  oca_group,
-                    "timestamp":  datetime.now(timezone.utc).isoformat(),
-                })
-                # Update t1_order_id to the standalone TP so update_tranche_status tracks it
-                if tranche_mode:
-                    with _trades_lock:
-                        if symbol in active_trades:
-                            active_trades[symbol]["t1_order_id"] = tp_trade2.order.orderId
-            except Exception as e:
-                log.error(f"CRITICAL: Failed to place standalone TP for {symbol}: {e}")
+            if place_tp:
+                try:
+                    standalone_tp = LimitOrder("SELL", tp_qty, tp, account=account, tif="GTC", outsideRth=True)
+                    standalone_tp.ocaGroup = oca_group
+                    standalone_tp.ocaType = 1  # Cancel remaining on fill
+                    standalone_tp.transmit = True
+                    tp_trade2 = ib.placeOrder(contract, standalone_tp)
+                    ib.sleep(0.3)
+                    log.info(f"Standalone TP placed for {symbol} @ ${tp:.2f} OCA={oca_group} (orderId={tp_trade2.order.orderId})")
+                    log_order({
+                        "order_id":   tp_trade2.order.orderId,
+                        "parent_id":  parent_id,
+                        "symbol":     symbol,
+                        "side":       "SELL",
+                        "order_type": "LMT",
+                        "qty":        tp_qty,
+                        "price":      tp,
+                        "status":     "SUBMITTED",
+                        "instrument": "stock",
+                        "role":       "take_profit_standalone",
+                        "oca_group":  oca_group,
+                        "timestamp":  datetime.now(timezone.utc).isoformat(),
+                    })
+                    # Update t1_order_id to the standalone TP so update_tranche_status tracks it
+                    if tranche_mode:
+                        with _trades_lock:
+                            if symbol in active_trades:
+                                active_trades[symbol]["t1_order_id"] = tp_trade2.order.orderId
+                except Exception as e:
+                    log.error(f"CRITICAL: Failed to place standalone TP for {symbol}: {e}")
 
         # ── Record position under lock (prop-003/014) ────────────────
         # Ghost position fix (prop-010): wrap in try/finally so that if any
@@ -791,6 +793,9 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
         else:
             sl, tp = calculate_stops(price, atr, "SHORT")  # sl > price, tp < price
 
+        # Empty trade_type falls back to SCALP behaviour (legacy callers, tests)
+        place_tp = (not trade_type or trade_type == "SCALP")
+
         reward = price - tp
         risk   = sl - price
         if risk <= 0 or (reward / risk) < CONFIG["min_reward_risk_ratio"]:
@@ -824,16 +829,18 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
         sl_limit = round(sl * 1.01, 2)
         sl_order = StopLimitOrder("BUY", qty, sl, sl_limit, account=account, tif="GTC", outsideRth=True)
         sl_order.parentId = parent_id
-        sl_order.transmit = False
+        sl_order.transmit = not place_tp  # SCALP: False (TP follows); SWING/HOLD: True (transmit entry+SL)
         sl_trade = ib.placeOrder(contract, sl_order)
         ib.sleep(0.1)
         _sl_order_id = sl_trade.order.orderId
 
-        # Take profit: buy to cover when price falls to target
-        tp_order = LimitOrder("BUY", qty, tp, account=account, tif="GTC", outsideRth=True)
-        tp_order.parentId = parent_id
-        tp_order.transmit = True
-        tp_trade = ib.placeOrder(contract, tp_order)
+        tp_trade = None
+        if place_tp:
+            # Take profit: buy to cover when price falls to target — SCALP only
+            tp_order = LimitOrder("BUY", qty, tp, account=account, tif="GTC", outsideRth=True)
+            tp_order.parentId = parent_id
+            tp_order.transmit = True
+            tp_trade = ib.placeOrder(contract, tp_order)
 
         ib.sleep(1.5)
 
@@ -873,19 +880,20 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
             "role":      "stop_loss",
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
-        log_order({
-            "order_id":  tp_trade.order.orderId,
-            "parent_id": parent_id,
-            "symbol":    symbol,
-            "side":      "BUY",
-            "order_type": "LMT",
-            "qty":       qty,
-            "price":     tp,
-            "status":    "SUBMITTED",
-            "instrument": "stock",
-            "role":      "take_profit",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        if place_tp and tp_trade is not None:
+            log_order({
+                "order_id":  tp_trade.order.orderId,
+                "parent_id": parent_id,
+                "symbol":    symbol,
+                "side":      "BUY",
+                "order_type": "LMT",
+                "qty":       qty,
+                "price":     tp,
+                "status":    "SUBMITTED",
+                "instrument": "stock",
+                "role":      "take_profit",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
 
         try:
             _open_time = open_time or datetime.now(timezone.utc).isoformat()
