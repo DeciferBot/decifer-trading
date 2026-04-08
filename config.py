@@ -524,7 +524,7 @@ CONFIG = {
     # Set options_enabled to True to activate options trading.
     # When enabled, high-conviction stock signals (score >= options_min_score)
     # are evaluated for an options trade instead of (or alongside) the stock.
-    "options_enabled":        True,    # OPTIONS ACTIVE
+    "options_enabled":        False,   # DISABLED — options sizing bug caused catastrophic losses (LEVI -$14.5K, SPIR -$13K, AAPL -$17K); re-enable only after sizing fix is validated
 
     # Entry filters
     "options_min_score":      35,      # Minimum stock score to consider options

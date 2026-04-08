@@ -776,11 +776,11 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
                 _safe_download(symbol, period="5d", interval="5m", progress=False, auto_adjust=True)
             ))
 
-        # Daily (trend confirmation) — yfinance, stable at this frequency
+        # Daily (trend confirmation) — Alpaca primary via _safe_download
         df_1d = normalize_bars(_flatten_columns(
             _safe_download(symbol, period="60d", interval="1d", progress=False, auto_adjust=True)
         ))
-        # Weekly (big picture) — yfinance
+        # Weekly (big picture) — Alpaca primary via _safe_download
         df_1w = normalize_bars(_flatten_columns(
             _safe_download(symbol, period="1y", interval="1wk", progress=False, auto_adjust=True)
         ))
@@ -857,6 +857,8 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
             # Per-dimension score breakdown (for IC calculator + feedback loop)
             "score_breakdown":     confluence.get("score_breakdown", {}),
             "disabled_dimensions": confluence.get("disabled_dimensions", []),
+            # Candlestick gate result — must be propagated so signal_pipeline doesn't default to UNKNOWN
+            "candle_gate":         confluence.get("candle_gate", "PASS"),
             # Regime router state (for logging / dashboard)
             "regime_router":  regime_router,
         }

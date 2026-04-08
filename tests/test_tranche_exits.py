@@ -155,7 +155,7 @@ class TestT1LimitPlacement:
         orders_state.active_trades.clear()
 
     def test_t1_limit_price_is_entry_plus_1_5_atr(self):
-        """T1 TP LimitOrder is constructed with price = entry + 1.5*ATR and qty = t1_qty."""
+        """T1 TP LimitOrder is constructed with the calculate_stops TP price and qty = t1_qty."""
         ib = _make_ib()
         price, atr = 100.0, 1.0
         mock_limit = MagicMock(side_effect=lambda *a, **kw: MagicMock(
@@ -170,9 +170,11 @@ class TestT1LimitPlacement:
         assert result is True
 
         # LimitOrder calls: [0] = entry BUY, [1] = T1 TP SELL
+        # T1 TP uses calculate_stops output directly (no fixed-ATR override in tranche mode).
+        # _run_execute_buy mocks calculate_stops to return (price - atr*1.5, price + atr*3.375).
+        expected_tp_price = round(price + atr * 3.375, 2)  # 103.375
         assert mock_limit.call_count >= 2
         tp_args = mock_limit.call_args_list[1][0]   # positional args of 2nd call
-        expected_tp_price = round(price + atr * 1.5, 2)  # 101.5
         assert tp_args[1] == 50          # qty = t1_qty = 100 // 2
         assert tp_args[2] == pytest.approx(expected_tp_price, abs=0.01)
 

@@ -22,7 +22,7 @@ from typing import Optional, Tuple
 import zoneinfo
 
 from ib_async import IB, Stock, Forex, Option, Future
-from ib_async import LimitOrder, StopOrder, MarketOrder
+from ib_async import LimitOrder, StopOrder, StopLimitOrder, MarketOrder
 
 from config import CONFIG
 from risk import (calculate_position_size, calculate_stops, check_correlation,
@@ -287,7 +287,8 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         if tranche_mode:
             t1_qty = qty // 2
             t2_qty = qty - t1_qty          # handles odd qty — T2 gets the extra share
-            tp     = round(price + atr * CONFIG["atr_stop_multiplier"], 2)  # T1 target: +1.5×ATR
+            # tp is already set from the advisor or calculate_stops above — do not override.
+            # T1 exits at the full advisor/formula TP; T2 runs open-ended past it.
             tp_qty = t1_qty
         else:
             tp_qty = qty if qty < 3 else max(1, qty // 3)
@@ -345,7 +346,11 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         parent_id = trade.order.orderId
 
         # Leg 2: Stop loss — attached to parent, DO NOT transmit yet
-        sl_order = StopOrder("SELL", qty, sl, account=account, tif="GTC", outsideRth=True)
+        # StopLimitOrder is used instead of StopOrder: IBKR paper trading rejects pure
+        # StopOrder bracket children with ValidationError on many small/mid-cap stocks.
+        # Limit price = 1% below stop gives a reasonable fill window while being accepted.
+        sl_limit = round(sl * 0.99, 2)
+        sl_order = StopLimitOrder("SELL", qty, sl, sl_limit, account=account, tif="GTC", outsideRth=True)
         sl_order.parentId = parent_id
         sl_order.transmit = False
         sl_trade = ib.placeOrder(contract, sl_order)
@@ -384,7 +389,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             "parent_id":  parent_id,
             "symbol":     symbol,
             "side":       "SELL",
-            "order_type": "STP",
+            "order_type": "STPLMT",
             "qty":        qty,
             "price":      sl,
             "status":     "SUBMITTED",
@@ -442,7 +447,8 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             oca_group = f"decifer_{symbol}_{parent_id}"
 
             try:
-                standalone_sl = StopOrder("SELL", qty, sl, account=account, tif="GTC", outsideRth=True)
+                _sl_limit2 = round(sl * 0.99, 2)
+                standalone_sl = StopLimitOrder("SELL", qty, sl, _sl_limit2, account=account, tif="GTC", outsideRth=True)
                 standalone_sl.ocaGroup = oca_group
                 standalone_sl.ocaType = 1  # Cancel remaining on fill
                 standalone_sl.transmit = True
@@ -802,7 +808,9 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
         parent_id = trade.order.orderId
 
         # Stop loss: buy to cover if price rises
-        sl_order = StopOrder("BUY", qty, sl, account=account, tif="GTC", outsideRth=True)
+        # StopLimitOrder: limit 1% above stop so IBKR accepts it reliably in paper trading.
+        sl_limit = round(sl * 1.01, 2)
+        sl_order = StopLimitOrder("BUY", qty, sl, sl_limit, account=account, tif="GTC", outsideRth=True)
         sl_order.parentId = parent_id
         sl_order.transmit = False
         sl_trade = ib.placeOrder(contract, sl_order)
@@ -845,7 +853,7 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
             "parent_id": parent_id,
             "symbol":    symbol,
             "side":      "BUY",
-            "order_type": "STP",
+            "order_type": "STPLMT",
             "qty":       qty,
             "price":     sl,
             "status":    "SUBMITTED",

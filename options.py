@@ -447,6 +447,18 @@ def find_best_contract(symbol: str,
         # Position sizing: max_risk / (mid × 100 shares per contract)
         premium_per_contract = best_contract["mid"] * 100
         contracts = max(1, int(max_risk // premium_per_contract))
+
+        # Sanity cap: ensure the actual outlay at ask price never exceeds 2× max_risk.
+        # This prevents catastrophic over-sizing when mid is stale/lower than the actual
+        # ask (e.g. yfinance returns last-traded vs current mid, causing 10-15x overshoot).
+        ask = best_contract.get("ask", 0.0)
+        if ask > 0 and contracts * ask * 100 > max_risk * 2:
+            contracts = max(1, int(max_risk / (ask * 100)))
+            log.warning(
+                f"Options {symbol}: contracts capped by ask-sanity to {contracts} "
+                f"(mid={best_contract['mid']:.3f} ask={ask:.3f} max_risk=${max_risk:,.0f})"
+            )
+
         best_contract["contracts"]        = contracts
         best_contract["max_risk_dollars"] = round(contracts * premium_per_contract, 2)
         best_contract["symbol"]           = symbol
