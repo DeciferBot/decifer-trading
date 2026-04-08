@@ -106,6 +106,12 @@ CONFIG = {
     "consecutive_loss_pause":   5,      # Pause after 5 consecutive losses
     "reentry_cooldown_minutes": 30,     # Block re-entry after close (lifecycle gate)
 
+    # ── MACRO EVENT GATE ──────────────────────────────────────────
+    # Halve position sizing within 24 hours of FOMC, CPI, or NFP.
+    # Controlled by macro_calendar.get_macro_size_multiplier().
+    "macro_event_size_mult":    0.5,    # Multiplier applied when event is within window
+    "macro_event_hours_window": 24.0,   # Hours before event to apply the multiplier
+
     # ── INTRADAY ADAPTIVE STRATEGY ────────────────────────────────
     # When the day is going badly, the bot shifts posture rather than trading normally
     # until a hard circuit breaker fires. Three modes: NORMAL → DEFENSIVE → RECOVERY.
@@ -175,7 +181,28 @@ CONFIG = {
         "short_squeeze":  True,   # Dim 8  — Short float + volume surge + price vs resistance
         "reversion":      True,   # Dim 9  — Variance Ratio + OU half-life + z-score
         "overnight_drift":True,   # Dim 10 — 90-day close-to-open drift statistics
-        "social":         False,  # Disabled — Reddit velocity (meme-prone, IC auto-enable if proven)
+        "social":         True,   # Reddit velocity + VADER — IC auto-disable if harmful
+        "iv_skew":        False,  # Dim 11 — OTM put / ATM call IV skew (Alpaca, disabled until IC proven)
+    },
+
+    # ── IV SKEW (Alpaca options chain) ────────────────────────────
+    # Requires Algo Trader Plus ($99/mo) for OPRA real-time options data.
+    # Keys: alpaca_api_key / alpaca_secret_key (already set above).
+    # Enable via dimension_flags["iv_skew"] = True once IC proves predictive value.
+    # Wu & Tian (2024, Management Science): high put-call skew predicts negative
+    # next-period returns — reflects both structural risk and informed order flow.
+    "iv_skew": {
+        "dte_min":         7,      # Earliest expiry to consider (days out)
+        "dte_max":         60,     # Latest expiry to consider
+        "target_dte":      30,     # Preferred expiry (closest to this wins)
+        "otm_put_delta":  -0.25,   # Target delta for OTM put selection
+        "atm_call_delta":  0.50,   # Target delta for ATM call selection
+        # Scoring thresholds (raw skew = otm_put_IV - atm_call_IV)
+        "skew_bearish_hi":  0.15,  # > 0.15 → score 10, bearish
+        "skew_bearish_mid": 0.10,  # > 0.10 → score 7,  bearish
+        "skew_bearish_lo":  0.05,  # > 0.05 → score 4,  bearish
+        "skew_bullish_lo": -0.03,  # < -0.03 → score 3, bullish (complacency)
+        # [neutral band: -0.03 to 0.05 → score 0]
     },
 
     # ── IC CALCULATOR ────────────────────────────────────────────
@@ -222,6 +249,25 @@ CONFIG = {
     # Supplemental universe track for market caps $50M–$2B.
     # Smaller companies are less efficiently priced — fewer institutional
     # participants means exploitable anomalies persist longer.
+    # ── SECTOR ROTATION ───────────────────────────────────────────
+    "sector_rotation_enabled":    True,   # Score SPDR sector ETFs vs SPY; add leaders to universe
+
+    # ── SYMPATHY SCANNER ──────────────────────────────────────────
+    "sympathy_scanner_enabled":   True,   # Add sector peers when a leader has earnings within 48h
+
+    # ── FX TRADING ────────────────────────────────────────────────
+    # Disabled by default — enable after paper validation (2+ weeks).
+    # IBKR Forex contract support already present in orders_contracts.py.
+    "fx_enabled":    False,              # Master switch for FX scanning + trading
+    "fx_pairs":      ["EURUSD", "GBPUSD", "USDJPY"],  # Active pairs
+    "fx_min_score":  20,                 # Min composite score to generate FX signal (0-50)
+
+    # ── CROSS-ASSET REGIME SIGNALS ────────────────────────────────
+    # DXY (dollar) and HYG/LQD (credit spread) as early risk-off indicators.
+    # credit_stress overrides momentum regime router → mean_reversion.
+    "cross_asset_regime_enabled": True,
+    "credit_stress_threshold":    0.4,   # % spread between HYG/LQD 3d returns that triggers stress flag
+
     "small_cap_enabled":      True,
     "small_cap_min_score":    22,   # Slightly higher threshold (wider spreads, more risk)
     "small_cap_max_position": 0.05, # 5% max per position (vs 10% for large cap)

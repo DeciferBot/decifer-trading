@@ -85,9 +85,10 @@ def _regime_multipliers(regime_router: str) -> dict:
     NEWS and SOCIAL are regime-neutral (fundamental/event-driven).
     """
     _all_ones = {
-        "trend":    1.0, "momentum": 1.0, "squeeze": 1.0,
-        "flow":     1.0, "breakout": 1.0, "mtf":     1.0,
-        "news":     1.0, "social":   1.0, "reversion": 1.0,
+        "trend":    1.0, "momentum": 1.0, "squeeze":       1.0,
+        "flow":     1.0, "breakout": 1.0, "mtf":           1.0,
+        "news":     1.0, "social":   1.0, "reversion":     1.0,
+        "iv_skew":  1.0, "pead":     1.0, "short_squeeze": 1.0,
     }
 
     if not CONFIG.get("regime_routing_enabled", True):
@@ -98,15 +99,17 @@ def _regime_multipliers(regime_router: str) -> dict:
 
     if regime_router == "momentum":
         return {
-            "trend":    mom_up,  "momentum": mom_up,  "squeeze": mom_up,
-            "flow":     mom_up,  "breakout": mom_up,  "mtf":     mom_up,
-            "news":     1.0,     "social":   1.0,     "reversion": rev_down,
+            "trend":    mom_up,  "momentum": mom_up,  "squeeze":       mom_up,
+            "flow":     mom_up,  "breakout": mom_up,  "mtf":           mom_up,
+            "news":     1.0,     "social":   1.0,     "reversion":     rev_down,
+            "iv_skew":  1.0,     "pead":     1.0,     "short_squeeze": 1.0,
         }
     if regime_router == "mean_reversion":
         return {
-            "trend":    rev_down, "momentum": rev_down, "squeeze": rev_down,
-            "flow":     rev_down, "breakout": rev_down, "mtf":     rev_down,
-            "news":     1.0,      "social":   1.0,      "reversion": mom_up,
+            "trend":    rev_down, "momentum": rev_down, "squeeze":       rev_down,
+            "flow":     rev_down, "breakout": rev_down, "mtf":           rev_down,
+            "news":     1.0,      "social":   1.0,      "reversion":     mom_up,
+            "iv_skew":  1.0,      "pead":     1.0,      "short_squeeze": 1.0,
         }
     return _all_ones
 
@@ -809,10 +812,29 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
                     )
                     return None
 
-        # Multi-timeframe confluence score (with news + social as 7th/8th dimensions)
+        # ── IV Skew (Alpaca options chain, daily TTL) ─────────────────
+        # Fetched per-symbol before calling compute_confluence so the result
+        # flows cleanly into the dimension block. Silently skipped when Alpaca
+        # keys are absent, alpaca-py is not installed, or the symbol has no options.
+        _iv_skew_score = 0
+        _iv_skew_dir   = 0
+        try:
+            if CONFIG.get("dimension_flags", {}).get("iv_skew", False):
+                from iv_skew import get_iv_skew as _get_iv_skew
+                _skew_data = _get_iv_skew(symbol)
+                if _skew_data:
+                    _iv_skew_score = _skew_data.get("iv_skew_score", 0)
+                    _iv_skew_dir   = _skew_data.get("iv_skew_dir",   0)
+        except Exception:
+            pass
+
+        # Multi-timeframe confluence score (with news + social + iv_skew dimensions)
         confluence = compute_confluence(sig_5m, sig_1d, sig_1w,
                                         news_score=news_score, social_score=social_score,
-                                        regime_router=regime_router)
+                                        regime_router=regime_router,
+                                        iv_skew_score=_iv_skew_score,
+                                        iv_skew_dir=_iv_skew_dir,
+                                        symbol=symbol)
 
         return {
             "symbol":       symbol,
@@ -1691,7 +1713,9 @@ def score_overnight_drift(sig_1d: dict | None) -> tuple:
 
 def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
                        news_score: int = 0, social_score: int = 0,
-                       regime_router: str = "unknown") -> dict:
+                       regime_router: str = "unknown",
+                       iv_skew_score: int = 0, iv_skew_dir: int = 0,
+                       symbol: str | None = None) -> dict:
     """
     Decifer 2.0 — 10-dimension scoring engine (alpha-pipeline-v2).
 
@@ -1744,6 +1768,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             "score_breakdown": {
                 "trend": 0, "momentum": 0, "squeeze": 0, "flow": 0,
                 "breakout": 0, "mtf": 0, "news": 0, "social": 0, "reversion": 0,
+                "iv_skew": 0,
             },
             "disabled_dimensions": [],
         }
@@ -2043,6 +2068,44 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         rev_dir = -1 if _zscore > 0.5 else (+1 if _zscore < -0.5 else 0)
         dim_directions.append((rev_dir, rev_score_capped))
 
+    # ── 11. IV SKEW (0-10) — OTM put / ATM call implied volatility skew ──
+    # Positive skew = puts priced above calls = informed downside hedging.
+    # Wu & Tian (2024, Management Science): large put-call skew predicts
+    # negative next-period returns — directional signal, not just vol level.
+    # Pre-computed by fetch_multi_timeframe (Alpaca options chain, daily TTL).
+    # Default 0 when Alpaca keys absent or symbol has no options.
+    iv_skew_pts = 0
+    _iv_skew_dir = 0
+    if _enabled("iv_skew"):
+        iv_skew_pts  = int(round(min(10, max(0, iv_skew_score)) * _rmult.get("iv_skew", 1.0)))
+        _iv_skew_dir = iv_skew_dir
+        score += iv_skew_pts
+        dim_directions.append((_iv_skew_dir, iv_skew_pts))
+
+    # ── 12. PEAD (0-10) — Post-Earnings Announcement Drift ──────────────────────
+    # Scores based on EPS surprise magnitude and recency. The PEAD anomaly
+    # (Fama 1996, Bernard & Thomas 1989) shows analysts systematically underreact
+    # to earnings beats, causing drift that persists 20-60 days post-announcement.
+    pead_pts = 0
+    pead_dir = 0
+    if _enabled("pead") and symbol is not None:
+        vol_ratio_for_pead = sig_5m.get("vol_ratio", 0)
+        pead_pts, pead_dir = score_pead(symbol, sig_1d, vol_ratio_for_pead)
+        pead_pts = int(round(min(pead_pts, 10) * _rmult.get("pead", 1.0)))
+        score += pead_pts
+        dim_directions.append((pead_dir, pead_pts))
+
+    # ── 13. SHORT_SQUEEZE (0-10) — High short float + volume surge ───────────────
+    # High short interest + volume surge drives price above short stop levels,
+    # forcing mechanical covering. Asymmetric upside, uncorrelated with trend.
+    ss_pts = 0
+    ss_dir = 0
+    if _enabled("short_squeeze") and symbol is not None:
+        ss_pts, ss_dir = score_short_squeeze(symbol, sig_5m)
+        ss_pts = int(round(min(ss_pts, 10) * _rmult.get("short_squeeze", 1.0)))
+        score += ss_pts
+        dim_directions.append((ss_dir, ss_pts))
+
     # ── BONUS: Candlestick confirmation (+3 max) ────────
     # Direction-agnostic: both bull and bear candles add bonus points.
     # Direction already captured in dim_directions.
@@ -2079,15 +2142,18 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         _icw = _get_ic_weights()
         _N_DIMS = len(_IC_DIMS)
         _ic_breakdown = {
-            "trend":     trend_pts,
-            "momentum":  momentum,
-            "squeeze":   squeeze_score,
-            "flow":      flow_score,
-            "breakout":  breakout_score,
-            "mtf":       mtf_score,
-            "news":      ns,
-            "social":    social_pts,
-            "reversion": rev_score_capped,
+            "trend":         trend_pts,
+            "momentum":      momentum,
+            "squeeze":       squeeze_score,
+            "flow":          flow_score,
+            "breakout":      breakout_score,
+            "mtf":           mtf_score,
+            "news":          ns,
+            "social":        social_pts,
+            "reversion":     rev_score_capped,
+            "iv_skew":       iv_skew_pts,
+            "pead":          pead_pts,
+            "short_squeeze": ss_pts,
         }
         _ic_sum = sum(
             _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v
@@ -2102,15 +2168,18 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         # contribution above.  With equal weights this produces the same result as
         # the raw score-weighted sum, so no behaviour change before IC data exists.
         _dim_dirs = {
-            "trend":     trend_dir,
-            "momentum":  mom_dir,
-            "squeeze":   squeeze_dir,
-            "flow":      flow_dir,
-            "breakout":  breakout_dir,
-            "mtf":       mtf_dir,
-            "news":      (+1 if news_score > 0 else (-1 if news_score < 0 else 0)),
-            "social":    social_dir,
-            "reversion": rev_dir,
+            "trend":         trend_dir,
+            "momentum":      mom_dir,
+            "squeeze":       squeeze_dir,
+            "flow":          flow_dir,
+            "breakout":      breakout_dir,
+            "mtf":           mtf_dir,
+            "news":          (+1 if news_score > 0 else (-1 if news_score < 0 else 0)),
+            "social":        social_dir,
+            "reversion":     rev_dir,
+            "iv_skew":       _iv_skew_dir,
+            "pead":          pead_dir,
+            "short_squeeze": ss_dir,
         }
         _ic_dir_sum = (
             sum(
@@ -2218,15 +2287,18 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         # Per-dimension score breakdown (for trade logging / IC feedback loop)
         # Keys must exactly match ic_calculator.DIMENSIONS for IC computation.
         "score_breakdown": {
-            "trend":     trend_pts,
-            "momentum":  momentum,
-            "squeeze":   squeeze_score,
-            "flow":      flow_score,
-            "breakout":  breakout_score,
-            "mtf":       mtf_score,
-            "news":      ns,
-            "social":    social_pts,
-            "reversion": rev_score_capped,
+            "trend":         trend_pts,
+            "momentum":      momentum,
+            "squeeze":       squeeze_score,
+            "flow":          flow_score,
+            "breakout":      breakout_score,
+            "mtf":           mtf_score,
+            "news":          ns,
+            "social":        social_pts,
+            "reversion":     rev_score_capped,
+            "iv_skew":       iv_skew_pts,
+            "pead":          pead_pts,
+            "short_squeeze": ss_pts,
         },
         # Dimensions that were zeroed by a False flag (for diagnostics / dashboard)
         "disabled_dimensions": disabled_dimensions,

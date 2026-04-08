@@ -1,0 +1,31 @@
+{
+  "date": "2026-04-08",
+  "topic": "iv-skew-signal",
+  "phase": "Phase A — Priority P1",
+  "status": "complete",
+  "summary": "Implemented Implied Volatility Skew as dimension 11 in the Decifer signal engine. Based on Wu & Tian (2024, Management Science): OTM put IV − ATM call IV reflects both structural risk characteristics and short-term informed order flow, predicting next-period returns.",
+  "files_changed": [
+    "iv_skew.py (new) — standalone module: Alpaca OptionHistoricalDataClient, ATM call / OTM put selection by delta, skew = otm_put_IV - atm_call_IV, day-keyed cache, scored 0-10",
+    "signals.py — compute_confluence: added iv_skew_score/iv_skew_dir params, dim 11 scoring block, _ic_breakdown, _dim_dirs, score_breakdown, MTF hard-gate return. fetch_multi_timeframe: calls get_iv_skew when flag enabled. _regime_multipliers: iv_skew=1.0 (regime-neutral).",
+    "config.py — dimension_flags[iv_skew]=False (disabled until IC proven), iv_skew config block with DTE range, delta targets, and skew scoring thresholds.",
+    "ic_calculator.py — added iv_skew to DIMENSIONS list (now 10 dims, equal weight = 0.10)",
+    "tests/test_iv_skew.py (new) — 21 tests: scoring logic, client gating, chain parsing, result structure, caching",
+    "tests/test_ic_calculator.py — updated hardcoded 9-dim assertions to use len(DIMENSIONS)",
+    "tests/test_ic_weighted_direction.py — updated N_DIMS, _equal_weights, and EXPECTED_DIMS to include iv_skew"
+  ],
+  "design_decisions": [
+    "Disabled by default (dimension_flags.iv_skew=False) — IC must prove predictive value before enabling. Consistent with social dim pattern.",
+    "Fetched inside fetch_multi_timeframe per-symbol (not batch), guarded by the flag check. Zero-cost no-op when disabled.",
+    "Expiry selection: closest to 30 DTE from [7,60] day window — avoids gamma-dominated near-term noise.",
+    "ATM call: delta closest to 0.50. OTM put: delta closest to -0.25.",
+    "Scoring: skew>0.15→10 bearish, >0.10→7, >0.05→4, [-0.03,0.05]→0 neutral, <-0.03→3 bullish (complacency).",
+    "Regime-neutral multiplier (1.0 in both routing states) — structural options signal, not momentum-specific."
+  ],
+  "test_results": "154 passed, 0 failed",
+  "next_steps": [
+    "Enable dimension_flags.iv_skew=True on paper account once ALPACA_API_KEY is confirmed working.",
+    "Monitor IC accumulation — expect 30-60 days before meaningful weight assignment.",
+    "After 100+ trades, check if iv_skew IC > 0.03 (Phase 2 noise floor). If yes, weight confirmed."
+  ],
+  "approved_by": "pending"
+}

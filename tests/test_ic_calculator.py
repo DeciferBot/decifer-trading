@@ -490,19 +490,21 @@ class TestICInitializationEdgeCases:
             f"EQUAL_WEIGHTS sums to {total}, not 1.0"
         )
 
-    def test_equal_weights_contains_all_nine_dimensions(self):
-        """EQUAL_WEIGHTS must contain exactly the 9 canonical dimension keys."""
-        expected = {"trend", "momentum", "squeeze", "flow", "breakout",
-                    "mtf", "news", "social", "reversion"}
+    def test_equal_weights_contains_all_dimensions(self):
+        """EQUAL_WEIGHTS must contain exactly the canonical dimension keys (one per DIMENSIONS entry)."""
+        from ic_calculator import DIMENSIONS
+        expected = set(DIMENSIONS)
         assert set(ic.EQUAL_WEIGHTS.keys()) == expected, (
             f"EQUAL_WEIGHTS has wrong keys: {set(ic.EQUAL_WEIGHTS.keys())}"
         )
 
-    def test_equal_weights_each_dimension_is_one_ninth(self):
-        """Each dimension's weight must be 1/9 (equal share)."""
+    def test_equal_weights_each_dimension_is_equal_share(self):
+        """Each dimension's weight must equal 1/N where N = len(DIMENSIONS)."""
+        from ic_calculator import DIMENSIONS
+        n = len(DIMENSIONS)
         for dim, w in ic.EQUAL_WEIGHTS.items():
-            assert abs(w - 1.0 / 9) < 1e-9, (
-                f"EQUAL_WEIGHTS[{dim!r}] = {w}, expected {1/9}"
+            assert abs(w - 1.0 / n) < 1e-9, (
+                f"EQUAL_WEIGHTS[{dim!r}] = {w}, expected {1.0/n}"
             )
 
     def test_get_current_weights_consistent_across_two_calls(self, tmp_path, monkeypatch):
