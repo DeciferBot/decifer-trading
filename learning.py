@@ -394,6 +394,19 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
         except Exception as _e:
             log.debug(f"advisor record_outcome failed (non-critical): {_e}")
 
+    # ── Close pattern library loop — record outcome against market observation ──
+    if action == "CLOSE" and trade.get("pattern_id") and outcome:
+        try:
+            from pattern_library import record_outcome as _pl_record_outcome
+            _pl_record_outcome(
+                pattern_id=trade["pattern_id"],
+                pnl=outcome.get("pnl", 0.0),
+                pnl_pct=outcome.get("pnl_pct", 0.0),
+                exit_reason=outcome.get("reason", ""),
+            )
+        except Exception as _e:
+            log.debug(f"pattern_library record_outcome failed (non-critical): {_e}")
+
 
 def _save_trades(trades: list) -> None:
     """Write trades list to disk atomically (tempfile + rename) so a crash never corrupts the file.

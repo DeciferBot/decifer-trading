@@ -65,7 +65,11 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 advice_sl: float = 0.0,
                 advice_size_mult: float = 1.0,
                 advice_instrument: str = "COMMON",
-                advice_id: str = "") -> bool:
+                advice_id: str = "",
+                # Intelligence layer classification
+                trade_type: str = "",
+                conviction: float = 0.0,
+                pattern_id: str = "") -> bool:
     """
     Place a buy order with full OCO bracket.
     Entry: Limit order at IBKR real-time price (yfinance price is only a fallback)
@@ -533,6 +537,9 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                     "agent_outputs":       agent_outputs or {},
                     "atr":              atr,
                     "advice_id":        advice_id,
+                    "trade_type":       trade_type or "SCALP",
+                    "conviction":       conviction,
+                    "pattern_id":       pattern_id,
                     "sl_order_id":      _sl_order_id,
                     "high_water_mark":  price,
                     # ── Tranche tracking ──────────────────────────────────
@@ -617,7 +624,11 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
                   advice_sl: float = 0.0,
                   advice_size_mult: float = 1.0,
                   advice_instrument: str = "COMMON",
-                  advice_id: str = "") -> bool:
+                  advice_id: str = "",
+                  # Intelligence layer classification
+                  trade_type: str = "",
+                  conviction: float = 0.0,
+                  pattern_id: str = "") -> bool:
     """
     Place a short-sell order with OCO bracket (sell-to-open + buy-to-cover SL + TP).
     Entry: Limit order at IBKR real-time price.
@@ -885,6 +896,9 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
                     "agent_outputs":       agent_outputs or {},
                     "atr":                 atr,
                     "advice_id":           advice_id,
+                    "trade_type":          trade_type or "SCALP",
+                    "conviction":          conviction,
+                    "pattern_id":          pattern_id,
                     "sl_order_id":         _sl_order_id,
                     "high_water_mark":     price,
                     "tranche_mode":        False,

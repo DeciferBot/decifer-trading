@@ -54,6 +54,7 @@ _cfg.CONFIG = {
     "active_account": "DUP00000",
     "trade_log": "/tmp/test_trades.json",
     "order_log": "/tmp/test_orders.json",
+    "ic_calculator": {"edge_gate_enabled": False},  # match paper learning mode default
 }
 sys.modules.setdefault("config", _cfg)
 
@@ -73,6 +74,7 @@ sys.modules.setdefault("news", _news)
 _learn = types.ModuleType("learning")
 _learn.log_signal_scan = MagicMock()
 _learn.log_trade = MagicMock()
+_learn.log_order = MagicMock()
 _learn.load_trades = MagicMock(return_value=[])
 _learn.load_orders = MagicMock(return_value=[])
 _learn.TRADE_LOG_FILE = "/tmp/trades.json"

@@ -71,10 +71,21 @@ CONFIG = {
     "claude_model_alpha":       "claude-opus-4-6",    # Opus for alpha-generating agents
     "claude_max_tokens_alpha":  4096,                 # Unconstrained — let Opus reason fully
 
-    # ── TRADE ADVISOR (Opus intelligence layer) ───────────────
-    # When enabled, Opus decides PT, SL, position size multiplier, and instrument
-    # (common vs options) before each order is placed. Falls back to ATR formula
-    # if the API call fails or output fails validation.
+    # ── INTELLIGENCE LAYER ────────────────────────────────────
+    # Classifies every signal with trade_type (SCALP/SWING/HOLD/AVOID) and
+    # evidence-based conviction before dispatch. Always fires — Tier 2
+    # evidence fallback used when Opus is unavailable.
+    "use_intelligence_layer":        True,
+    "intelligence_model":            "claude-opus-4-6",
+    "intelligence_max_tokens":       1024,
+    "intelligence_cache_minutes":    30,    # session context cache window
+    "intelligence_pattern_lookback": 20,    # similar patterns shown to Opus per call
+    "intelligence_news_mode":        "full_on_open_headlines_thereafter",
+
+    # ── TRADE ADVISOR (execution layer) ──────────────────────
+    # Opus decides PT, SL, position size multiplier, and instrument
+    # per signal. Separate from the intelligence layer.
+    # Falls back to ATR formula if the API call fails.
     "use_llm_advisor":          True,
     "llm_advisor_model":        "claude-opus-4-6",
     "llm_advisor_max_tokens":   512,

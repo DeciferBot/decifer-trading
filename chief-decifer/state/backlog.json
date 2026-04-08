@@ -352,6 +352,7 @@
       "created": "2026-04-06"
     },
     {
+    {
       "id": "BACK-019",
       "title": "GT-Score composite — ensemble of SHAP-pruned LightGBM + LSTM",
       "roadmap_phase": "E",

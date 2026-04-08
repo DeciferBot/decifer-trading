@@ -97,8 +97,13 @@ Do not create files in the root unless they are core Python modules. No stray te
 
 ## Constraints (hard limits)
 
-- Data sources: IBKR TWS (primary — reqHistoricalData for 5m bars, free), Alpha Vantage (free, earnings calendar), yfinance (daily bars, indices, fallback only), TradingView Screener, Yahoo RSS, Finviz
-- Streaming: deferred — Alpaca ($99/mo) or IBKR Streaming Bundle ($135/mo) to be added once provider research complete
+- Data sources (priority order):
+  1. **Alpaca Algo Trader Plus** (PRIMARY — paid, active, $99/mo): real-time quotes, historical bars, streaming, options Greeks, snapshots, market calendar, corporate actions. Use this first for ALL market data needs. Exploit the full subscription — do not default to free alternatives when Alpaca can do the job.
+  2. **Alpha Vantage** (paid, active): earnings calendar, fundamentals, macroeconomic data not covered by Alpaca.
+  3. **IBKR TWS**: execution and order management only. Use `reqHistoricalData` only when Alpaca data is unavailable or insufficient.
+  4. **yfinance**: daily bars and index data, fallback only — never preferred over Alpaca.
+  5. TradingView Screener, Yahoo RSS, Finviz — supplementary screening and news.
+- Streaming: ACTIVE via Alpaca Algo Trader Plus — real-time data and streaming unlocked. Use it.
 - Paper account only: IBKR paper (DUP...). No live order submission
 - TA-Lib requires system C library — always check availability before using
 - No secrets, credentials, or .env file content in any commit
@@ -160,6 +165,43 @@ If the answer to 1 is no, or 2 is yes — create a new module.
 - **No hallucination.** Never invent function names, method signatures, module paths, variable names, or API behaviours that have not been confirmed by reading the actual source. If unsure, read the file first.
 - **Suggestive fixes must be validated.** Any code change proposed without first reading the target file is speculative. Before writing or editing code, always read the relevant file(s) to confirm current implementation. Do not suggest a fix based on assumption alone.
 - If a fix cannot be confirmed by reading existing code, state the uncertainty explicitly and ask Amit before proceeding.
+
+---
+
+## Pre-Existing Errors — Fix Without Fail (mandatory)
+
+When implementing any change, Claude must identify and fix all pre-existing errors in the affected code, not just the ones directly relevant to the task.
+
+- **Do not ignore errors encountered while reading or editing.** If a file contains broken logic, incorrect imports, stale references, or known bugs unrelated to the current task — fix them in the same session. Do not silently work around them.
+- **Never suppress or hide a pre-existing error to make new code compile or pass tests.** A green test that papers over a real error is worse than a failing test.
+- **Pre-existing errors must be fixed before the session is closed.** Flagging verbally or noting in a response is not compliance. The error must be resolved in code.
+- **Pre-existing errors must be listed in the session summary** so Amit has a full record of what was fixed.
+- Only if a pre-existing error requires a Tier 3 architectural decision that cannot be resolved in the current session may it be deferred — and only with explicit Amit approval to defer. In that case it must be logged to `chief-decifer/state/backlog.json` immediately, not at end of session.
+
+---
+
+## Change Validation & Backtesting (mandatory)
+
+No change is complete until it has been correlated against the existing codebase and verified not to break any functioning behaviour.
+
+**Before writing any new code:**
+1. Read all modules the change will touch or that depend on the changed module.
+2. Identify every call site, data consumer, and downstream effect of the change.
+3. If the change touches signal generation, scoring, filtering, position sizing, or order submission — trace the full path from signal origin to order execution and confirm nothing breaks.
+
+**After writing new code:**
+1. Run all tests in `tests/` that cover the affected modules. Do not declare done until they pass.
+2. For signal pipeline changes: verify that existing signal dimensions still fire correctly and that IC tracking is not disrupted.
+3. For order/execution changes: verify that bracket logic, position sizing, and risk gates still function as designed.
+4. If a new feature cannot be traced end-to-end through the existing bot flow (`bot_trading.py` → `signal_pipeline.py` → `position_sizing.py` → `bot_ibkr.py`), it is not ready to commit.
+
+**Do not commit a change that:**
+- Has not been run against existing tests
+- Has not been traced through its downstream effects in the live bot flow
+- Adds a feature that could silently override or conflict with existing logic without Amit's explicit sign-off
+- Has only been tested in isolation without confirming integration with dependent modules
+
+**When in doubt, do not commit.** Present the analysis to Amit and ask for explicit approval before proceeding.
 
 ---
 
