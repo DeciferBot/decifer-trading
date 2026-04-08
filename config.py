@@ -182,7 +182,7 @@ CONFIG = {
         "reversion":      True,   # Dim 9  — Variance Ratio + OU half-life + z-score
         "overnight_drift":True,   # Dim 10 — 90-day close-to-open drift statistics
         "social":         True,   # Reddit velocity + VADER — IC auto-disable if harmful
-        "iv_skew":        False,  # Dim 11 — OTM put / ATM call IV skew (Alpaca, disabled until IC proven)
+        "iv_skew":        True,   # Dim 11 — OTM put / ATM call IV skew (Alpaca, enabled)
     },
 
     # ── IV SKEW (Alpaca options chain) ────────────────────────────
