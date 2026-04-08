@@ -59,7 +59,13 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 agent_outputs: dict = None,
                 open_time: str = None,
                 candle_gate: str = None,
-                tranche_mode: bool = True) -> bool:
+                tranche_mode: bool = True,
+                # Trade advisor kwargs — override ATR formula when provided
+                advice_pt: float = 0.0,
+                advice_sl: float = 0.0,
+                advice_size_mult: float = 1.0,
+                advice_instrument: str = "COMMON",
+                advice_id: str = "") -> bool:
     """
     Place a buy order with full OCO bracket.
     Entry: Limit order at IBKR real-time price (yfinance price is only a fallback)
@@ -233,6 +239,11 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         # Now calculate sizing and stops with the IBKR-sourced price
         qty = calculate_position_size(portfolio_value, price, score, regime, atr=atr)
 
+        # ── Advisor size multiplier ───────────────────────────────────
+        if advice_size_mult != 1.0 and 0.25 <= advice_size_mult <= 2.0:
+            qty = max(1, int(qty * advice_size_mult))
+            log.info(f"[advisor] {symbol} size_mult={advice_size_mult} → qty={qty}")
+
         # ── HARD CAPS — last line of defense against contaminated data ──
         # Max 5,000 shares per order (prevents 10,000+ share orders from bad prices)
         MAX_SHARES = 5000
@@ -246,7 +257,12 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             qty = max(1, int(max_order_value / price))
             log.warning(f"Order value ${old_qty * price:,.0f} exceeds 20% cap ${max_order_value:,.0f} for {symbol} — reduced qty {old_qty}→{qty}")
 
-        sl, tp = calculate_stops(price, atr, "LONG")
+        # ── PT / SL — use advisor levels if provided, otherwise ATR formula ──
+        if advice_sl > 0 and advice_pt > 0:
+            sl, tp = advice_sl, advice_pt
+            log.info(f"[advisor] {symbol} PT=${tp:.2f} SL=${sl:.2f} (Opus)")
+        else:
+            sl, tp = calculate_stops(price, atr, "LONG")
 
         # Validate R:R — skip in tranche mode (T2 open-ended upside lifts combined R:R above threshold)
         reward = tp - price
@@ -516,6 +532,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                     "ic_weights_at_entry": _icw_at_entry,
                     "agent_outputs":       agent_outputs or {},
                     "atr":              atr,
+                    "advice_id":        advice_id,
                     "sl_order_id":      _sl_order_id,
                     "high_water_mark":  price,
                     # ── Tranche tracking ──────────────────────────────────
@@ -594,7 +611,13 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
                   signal_scores: dict = None,
                   agent_outputs: dict = None,
                   open_time: str = None,
-                  candle_gate: str = None) -> bool:
+                  candle_gate: str = None,
+                  # Trade advisor kwargs — override ATR formula when provided
+                  advice_pt: float = 0.0,
+                  advice_sl: float = 0.0,
+                  advice_size_mult: float = 1.0,
+                  advice_instrument: str = "COMMON",
+                  advice_id: str = "") -> bool:
     """
     Place a short-sell order with OCO bracket (sell-to-open + buy-to-cover SL + TP).
     Entry: Limit order at IBKR real-time price.
@@ -719,6 +742,12 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
             return False
 
         qty = calculate_position_size(portfolio_value, price, score, regime, atr=atr)
+
+        # ── Advisor size multiplier ───────────────────────────────────
+        if advice_size_mult != 1.0 and 0.25 <= advice_size_mult <= 2.0:
+            qty = max(1, int(qty * advice_size_mult))
+            log.info(f"[advisor] {symbol} size_mult={advice_size_mult} → qty={qty}")
+
         MAX_SHARES = 5000
         if qty > MAX_SHARES:
             qty = MAX_SHARES
@@ -726,7 +755,12 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
         if qty * price > max_order_value:
             qty = max(1, int(max_order_value / price))
 
-        sl, tp = calculate_stops(price, atr, "SHORT")  # sl > price, tp < price
+        # ── PT / SL — use advisor levels if provided, otherwise ATR formula ──
+        if advice_sl > 0 and advice_pt > 0:
+            sl, tp = advice_sl, advice_pt
+            log.info(f"[advisor] {symbol} PT=${tp:.2f} SL=${sl:.2f} (Opus)")
+        else:
+            sl, tp = calculate_stops(price, atr, "SHORT")  # sl > price, tp < price
 
         reward = price - tp
         risk   = sl - price
@@ -850,6 +884,7 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
                     "ic_weights_at_entry": _icw_at_entry,
                     "agent_outputs":       agent_outputs or {},
                     "atr":                 atr,
+                    "advice_id":           advice_id,
                     "sl_order_id":         _sl_order_id,
                     "high_water_mark":     price,
                     "tranche_mode":        False,

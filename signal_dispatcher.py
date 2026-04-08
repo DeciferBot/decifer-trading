@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 
 from signal_types import Signal, SIGNALS_LOG
 from orders import execute_buy, execute_short
+from trade_advisor import advise_trade
 log = logging.getLogger("decifer.dispatcher")
 
 
@@ -95,6 +96,17 @@ def dispatch_signals(
 
         if signal.direction == "LONG" and "LONG" in allowed_dirs:
             try:
+                advice = advise_trade(
+                    symbol=signal.symbol,
+                    direction="LONG",
+                    entry_price=signal.price,
+                    atr_5m=signal.atr,
+                    atr_daily=signal.atr_daily,
+                    conviction_score=signal.conviction_score,
+                    dimension_scores=signal.dimension_scores,
+                    rationale=signal.rationale,
+                    regime_context=signal.regime_context,
+                )
                 success = execute_buy(
                     ib=ib,
                     symbol=signal.symbol,
@@ -108,6 +120,11 @@ def dispatch_signals(
                     agent_outputs=agent_outputs,
                     open_time=datetime.now(timezone.utc).isoformat(),
                     candle_gate=signal.candle_gate,
+                    advice_pt=advice.profit_target,
+                    advice_sl=advice.stop_loss,
+                    advice_size_mult=advice.size_multiplier,
+                    advice_instrument=advice.instrument,
+                    advice_id=advice.advice_id,
                 )
             except Exception as exc:
                 log.error(f"dispatch execute_buy failed {signal.symbol}: {exc}")
@@ -118,6 +135,17 @@ def dispatch_signals(
 
         elif signal.direction == "SHORT" and "SHORT" in allowed_dirs:
             try:
+                advice = advise_trade(
+                    symbol=signal.symbol,
+                    direction="SHORT",
+                    entry_price=signal.price,
+                    atr_5m=signal.atr,
+                    atr_daily=signal.atr_daily,
+                    conviction_score=signal.conviction_score,
+                    dimension_scores=signal.dimension_scores,
+                    rationale=signal.rationale,
+                    regime_context=signal.regime_context,
+                )
                 success = execute_short(
                     ib=ib,
                     symbol=signal.symbol,
@@ -131,6 +159,11 @@ def dispatch_signals(
                     agent_outputs=agent_outputs,
                     open_time=datetime.now(timezone.utc).isoformat(),
                     candle_gate=signal.candle_gate,
+                    advice_pt=advice.profit_target,
+                    advice_sl=advice.stop_loss,
+                    advice_size_mult=advice.size_multiplier,
+                    advice_instrument=advice.instrument,
+                    advice_id=advice.advice_id,
                 )
             except Exception as exc:
                 log.error(f"dispatch execute_short failed {signal.symbol}: {exc}")

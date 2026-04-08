@@ -182,8 +182,12 @@ def compute_hurst_dfa(series) -> float:
             return 0.5
 
         # Step 4: fit log F(n) ~ H * log(n) → slope is H
+        # Guard against zero fluctuations before log to prevent RuntimeWarning.
+        fluct_arr = np.array(fluctuations, dtype=float)
+        if not np.all(fluct_arr > 0):
+            return 0.5
         log_n = np.log(np.array(valid_scales, dtype=float))
-        log_f = np.log(np.array(fluctuations, dtype=float))
+        log_f = np.log(fluct_arr)
         if not np.all(np.isfinite(log_f)):
             return 0.5
         h, _ = np.polyfit(log_n, log_f, 1)
@@ -739,8 +743,8 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
     try:
         # 5-minute bars — three-layer priority:
         #   1. Alpaca bar cache  (event-driven WebSocket, freshest — market hours)
-        #   2. IBKR historical   (reqHistoricalData, free, thread-safe)
-        #   3. yfinance fallback (market closed / both above unavailable)
+        #   2. Alpaca REST       (historical, no pacing constraints)
+        #   3. yfinance fallback (Alpaca unavailable)
         df_5m = None
 
         # Layer 1: Alpaca bar cache
@@ -752,13 +756,16 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
         except ImportError:
             pass
 
-        # Layer 2: IBKR historical
+        # Layer 2: Alpaca REST historical
         if df_5m is None or len(df_5m) < 5:
-            if ib is not None and ib.isConnected():
-                _ibkr_df = fetch_ibkr_historical(symbol, ib, bar_size="5 mins", duration="5 D")
-                if _ibkr_df is not None:
-                    df_5m = normalize_bars(_ibkr_df)
-                    log.debug(f"fetch_multi_timeframe: {symbol} 5m from IBKR ({len(df_5m)} bars)")
+            try:
+                from alpaca_data import fetch_bars
+                _alpaca_df = fetch_bars(symbol, period="5d", interval="5m")
+                if _alpaca_df is not None and len(_alpaca_df) >= 5:
+                    df_5m = normalize_bars(_alpaca_df)
+                    log.debug(f"fetch_multi_timeframe: {symbol} 5m from Alpaca REST ({len(df_5m)} bars)")
+            except Exception:
+                pass
 
         # Layer 3: yfinance fallback
         if df_5m is None or len(df_5m) < 5:
@@ -819,6 +826,7 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
                 "1w":  sig_1w,
             },
             "atr":          sig_5m["atr"],
+            "atr_daily":    sig_1d["atr"] if sig_1d else 0.0,
             "vol_ratio":    sig_5m["vol_ratio"],
             # MTF alignment gate results (for dashboard + logging)
             "mtf_gate":       confluence.get("mtf_gate", "PASS"),

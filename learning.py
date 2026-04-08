@@ -381,6 +381,19 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
     _save_trades(trades)
     log.info(f"Trade logged: {action} {trade.get('symbol')} | P&L: {outcome.get('pnl') if outcome else 'open'}")
 
+    # ── Close Opus learning loop — record outcome against the advisor decision ──
+    if action == "CLOSE" and trade.get("advice_id") and outcome:
+        try:
+            from trade_advisor import record_outcome as _record_outcome
+            _record_outcome(
+                advice_id=trade["advice_id"],
+                exit_price=outcome.get("exit_price", 0.0),
+                pnl=outcome.get("pnl", 0.0),
+                exit_reason=outcome.get("reason", ""),
+            )
+        except Exception as _e:
+            log.debug(f"advisor record_outcome failed (non-critical): {_e}")
+
 
 def _save_trades(trades: list) -> None:
     """Write trades list to disk atomically (tempfile + rename) so a crash never corrupts the file.

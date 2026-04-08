@@ -71,6 +71,15 @@ CONFIG = {
     "claude_model_alpha":       "claude-opus-4-6",    # Opus for alpha-generating agents
     "claude_max_tokens_alpha":  4096,                 # Unconstrained — let Opus reason fully
 
+    # ── TRADE ADVISOR (Opus intelligence layer) ───────────────
+    # When enabled, Opus decides PT, SL, position size multiplier, and instrument
+    # (common vs options) before each order is placed. Falls back to ATR formula
+    # if the API call fails or output fails validation.
+    "use_llm_advisor":          True,
+    "llm_advisor_model":        "claude-opus-4-6",
+    "llm_advisor_max_tokens":   512,
+    "llm_advisor_history":      15,   # last N completed decisions passed to Opus as learning context
+
     # ── IBKR RECONNECT & HEARTBEAT ────────────────────────────
     "reconnect_max_attempts":   10,     # Retry attempts before giving up
     "reconnect_max_wait_secs":  60,     # Cap on exponential backoff delay (secs)
@@ -132,7 +141,7 @@ CONFIG = {
     # 4 = conservative (default), 3 = standard, 2 = aggressive
     # NOTE: Raised from 2→3 to filter low-conviction trades (roadmap #08).
     # 2/6 was rubber-stamping; 3/6 requires real consensus. (live: 4)
-    "agents_required_to_agree": 3,
+    "agents_required_to_agree": 2,
 
     # ── SCANNING ──────────────────────────────────────────────
     # NOTE: Faster scans for paper trading data generation (live values in comments)
@@ -145,7 +154,7 @@ CONFIG = {
 
     # ── SCORING THRESHOLD ─────────────────────────────────────
     # NOTE: Lowered for paper trading to capture more setups for ML training (live values in comments)
-    "min_score_to_trade":       18,     # Out of 50 — lower = more trades for training (live: 28)
+    "min_score_to_trade":       14,     # Out of 50 — lower = more trades for training (live: 28)
     "high_conviction_score":    36,     # Above this = 1.5x position size — narrower band, fewer bloated positions
 
     # ── DIMENSION FLAGS ───────────────────────────────────────────
