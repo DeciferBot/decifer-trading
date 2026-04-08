@@ -15,9 +15,19 @@ import sys
 import os
 import json
 import logging
+import resource
 import threading
 import types as _types
 import schedule
+
+# Raise the fd soft limit to match the hard limit so the bot never hits
+# "[Errno 24] Too many open files" from accumulated CLOSE_WAIT sockets.
+try:
+    _soft, _hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    if _soft < 4096:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (min(4096, _hard), _hard))
+except Exception:
+    pass
 
 from datetime import datetime, timezone
 from colorama import Fore, Style, init as colorama_init
@@ -326,6 +336,9 @@ def main():
         schedule.clear("scan")
         schedule.every(interval).seconds.do(scheduled_scan).tag("scan")
 
+    # Store reference so the main loop can call scheduled_scan() on momentum interrupt
+    bot_state._scheduled_scan_fn = scheduled_scan
+
     interval = get_scan_interval()
     dash["next_scan_seconds"] = interval
     schedule.every(interval).seconds.do(scheduled_scan).tag("scan")
@@ -384,6 +397,24 @@ def main():
         clog("INFO", f"📶 Alpaca bar stream active | {len(_initial_universe)} symbols subscribed")
     except Exception as _as_err:
         clog("INFO", f"📶 Alpaca bar stream skipped: {_as_err}")
+
+    # ── Start Momentum Sentinel (SPY fast-move scan bypass) ───────────────────
+    # Monitors live SPY 1m bars; fires an immediate scan when SPY moves fast.
+    # Requires BAR_CACHE to be warm (bar stream started above).
+    if CONFIG.get("momentum_sentinel_enabled", True):
+        try:
+            from momentum_sentinel import start_momentum_sentinel
+            bot_state._momentum_sentinel = start_momentum_sentinel()
+            dash["momentum_sentinel_stats"] = bot_state._momentum_sentinel.stats
+            clog(
+                "INFO",
+                f"⚡ Momentum Sentinel active | "
+                f"fast {CONFIG.get('momentum_sentinel_fast_pct', 0.3)}% / "
+                f"slow {CONFIG.get('momentum_sentinel_slow_pct', 0.6)}% | "
+                f"cooldown {CONFIG.get('momentum_sentinel_cooldown_m', 15)}m",
+            )
+        except Exception as _ms_err:
+            clog("INFO", f"⚡ Momentum Sentinel skipped: {_ms_err}")
 
     # ── Start Telegram Kill Switch ────────────────────────────────────────────
     _tg_cfg      = CONFIG.get("telegram", {})
@@ -472,6 +503,22 @@ def main():
             # ── Sync catalyst sentinel state to dashboard ──
             if bot_state._catalyst_sentinel:
                 dash["catalyst_sentinel_stats"] = bot_state._catalyst_sentinel.stats
+
+            # ── Sync momentum sentinel state to dashboard ──
+            if bot_state._momentum_sentinel:
+                dash["momentum_sentinel_stats"] = bot_state._momentum_sentinel.stats
+
+            # ── Momentum interrupt: fire immediate scan if sentinel triggered ──
+            # The sentinel sets this event when SPY moves fast (background thread).
+            # We clear it and call scheduled_scan() on the main thread — safe for IBKR.
+            if (bot_state._momentum_scan_requested.is_set()
+                    and bot_state._scheduled_scan_fn is not None
+                    and not dash.get("paused")
+                    and not dash.get("killed")):
+                bot_state._momentum_scan_requested.clear()
+                clog("SIGNAL", "⚡ MOMENTUM INTERRUPT — bypassing scheduler, scanning now")
+                schedule.clear("scan")
+                bot_state._scheduled_scan_fn()
 
             schedule.run_pending()
             bot_state.ib.sleep(1)

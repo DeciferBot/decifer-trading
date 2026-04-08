@@ -25,6 +25,11 @@ log = logging.getLogger("decifer.alpaca_stream")
 # Maximum 1-minute bars kept per symbol (~3 trading days at 1m = ~1170 bars)
 _MAX_1M_BARS = 1200
 
+# Regime anchor symbols — always subscribed regardless of trading universe.
+# BAR_CACHE for these symbols is used by get_market_regime() for real-time
+# intraday momentum detection (rally/sell-off override of the signal router).
+STREAM_ANCHORS: frozenset[str] = frozenset(["SPY", "QQQ"])
+
 
 # ═══════════════════════════════════════════════════════════════
 # BAR CACHE — 1-minute OHLCV, aggregated to 5m on demand
@@ -261,23 +266,27 @@ class AlpacaBarStream:
         self._running = False
 
     def start(self, symbols: list[str]) -> None:
-        """Start streaming for symbols. Non-blocking."""
+        """Start streaming for symbols. Non-blocking.
+        STREAM_ANCHORS (SPY, QQQ) are always included regardless of what is passed.
+        """
         if self._running:
             log.debug("AlpacaBarStream: already running")
             return
-        if not symbols:
+        full_symbols = list(set(symbols) | STREAM_ANCHORS)
+        if not full_symbols:
             log.warning("AlpacaBarStream: no symbols provided — stream not started")
             return
 
         self._running = True
         self._thread = threading.Thread(
             target=self._run,
-            args=(list(symbols),),
+            args=(full_symbols,),
             daemon=True,
             name="alpaca-bar-stream",
         )
         self._thread.start()
-        log.info(f"AlpacaBarStream: started for {len(symbols)} symbols")
+        log.info(f"AlpacaBarStream: started for {len(full_symbols)} symbols "
+                 f"(anchors: {sorted(STREAM_ANCHORS)})")
 
     def stop(self) -> None:
         """Stop the stream gracefully."""
@@ -293,13 +302,15 @@ class AlpacaBarStream:
         """
         Update the subscription list. No-op if the symbol set is unchanged —
         avoids disconnecting the WebSocket every scan when the universe is stable.
+        STREAM_ANCHORS are always merged in before the comparison.
         """
-        if set(symbols) == self.symbols():
+        full_symbols = list(set(symbols) | STREAM_ANCHORS)
+        if set(full_symbols) == self.symbols():
             log.debug("AlpacaBarStream: universe unchanged — skipping stream restart")
             return
         if self._running:
             self.stop()
-        self.start(symbols)
+        self.start(full_symbols)
 
     def symbols(self) -> set:
         """Return the set of symbols currently in BAR_CACHE (proxy for subscriptions)."""

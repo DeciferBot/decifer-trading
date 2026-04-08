@@ -103,7 +103,7 @@ CONFIG = {
     "min_cash_reserve":         0.10,   # 10% cash floor — hard stop on new entries
     "max_single_position":      0.06,   # 6% per position — keeps 14 positions before hitting floor
     "max_sector_exposure":      0.40,   # 40% sector cap
-    "consecutive_loss_pause":   5,      # Pause after 5 consecutive losses
+    "consecutive_loss_pause":   999,    # Paper learning mode: effectively disabled (live: 5)
     "reentry_cooldown_minutes": 30,     # Block re-entry after close (lifecycle gate)
 
     # ── MACRO EVENT GATE ──────────────────────────────────────────
@@ -115,10 +115,10 @@ CONFIG = {
     # ── INTRADAY ADAPTIVE STRATEGY ────────────────────────────────
     # When the day is going badly, the bot shifts posture rather than trading normally
     # until a hard circuit breaker fires. Three modes: NORMAL → DEFENSIVE → RECOVERY.
-    "strategy_pivot_loss_pct":           0.015,  # -1.5% daily PnL → DEFENSIVE mode
-    "strategy_recovery_loss_pct":        0.030,  # -3.0% daily PnL → RECOVERY mode
-    "strategy_defensive_streak":         3,       # 3 consecutive losses → DEFENSIVE
-    "strategy_recovery_streak":          6,       # 6 consecutive losses → RECOVERY (before 8-loss hard pause)
+    "strategy_pivot_loss_pct":           0.050,  # -5.0% daily PnL → DEFENSIVE mode (paper: raised from 1.5%)
+    "strategy_recovery_loss_pct":        0.100,  # -10.0% daily PnL → RECOVERY mode (paper: raised from 3.0%)
+    "strategy_defensive_streak":         10,      # Paper: raised from 3 — don't tighten on paper losses
+    "strategy_recovery_streak":          20,      # Paper: raised from 6 — don't tighten on paper losses
     "thesis_invalidation_regime_change": True,    # Re-evaluate open positions on significant regime shift
 
     "max_portfolio_allocation": 1.0,    # 1.0 = full account, 0.2 = 20% of account
@@ -148,6 +148,16 @@ CONFIG = {
     # NOTE: Raised from 2→3 to filter low-conviction trades (roadmap #08).
     # 2/6 was rubber-stamping; 3/6 requires real consensus. (live: 4)
     "agents_required_to_agree": 2,
+
+    # ── MOMENTUM SENTINEL ──────────────────────────────────────
+    # Background thread monitoring SPY 1m bars via BAR_CACHE (live Alpaca stream).
+    # When SPY moves fast, immediately bypasses the scan scheduler and triggers a scan.
+    # Follows same pattern as News/Catalyst sentinels.
+    "momentum_sentinel_enabled":    True,
+    "momentum_sentinel_fast_pct":   0.3,   # SPY moves > 0.3% in last 3 bars (~3 min) → fire
+    "momentum_sentinel_slow_pct":   0.6,   # SPY moves > 0.6% in last 10 bars (~10 min) → fire
+    "momentum_sentinel_cooldown_m": 15,    # Minutes between triggers (avoid chasing chop)
+    "momentum_sentinel_poll_s":     10,    # Seconds between BAR_CACHE checks
 
     # ── SCANNING ──────────────────────────────────────────────
     # NOTE: Faster scans for paper trading data generation (live values in comments)
@@ -235,7 +245,16 @@ CONFIG = {
         # dimensions. When this falls below the warn/off thresholds, the score
         # bar is raised systemwide — fewer trades, higher quality only.
         # This stacks on top of strategy_mode score_threshold_adj.
-        "edge_gate_enabled":        True,
+        # ── PAPER LEARNING MODE ───────────────────────────────────────
+        # force_equal_weights: True → ignore IC weights, score all 12 dimensions equally.
+        # Fixes the cold-start trap: dimensions with IC=0 (no data) get zero weight →
+        # never generate trades → never build IC → permanently stuck at 0.
+        # Enable in paper mode. Disable once all dimensions have ≥20 trades of IC data.
+        "force_equal_weights":      True,
+
+        "edge_gate_enabled":        False, # Paper learning mode: gate prevents data accumulation.
+                                           # Circular: low IC → gate raises bar → fewer trades → lower IC.
+                                           # Re-enable when system has proven IC > 0.02 across dims.
         "edge_gate_warn_threshold": 0.02,  # mean IC below this → degraded, raise bar +5
         "edge_gate_warn_adj":       5,     # score points added in degraded state
         "edge_gate_off_threshold":  0.005, # mean IC below this → broken, raise bar +12
@@ -258,7 +277,7 @@ CONFIG = {
     # ── FX TRADING ────────────────────────────────────────────────
     # Disabled by default — enable after paper validation (2+ weeks).
     # IBKR Forex contract support already present in orders_contracts.py.
-    "fx_enabled":    False,              # Master switch for FX scanning + trading
+    "fx_enabled":    True,               # Master switch for FX scanning + trading
     "fx_pairs":      ["EURUSD", "GBPUSD", "USDJPY"],  # Active pairs
     "fx_min_score":  20,                 # Min composite score to generate FX signal (0-50)
 
@@ -326,10 +345,17 @@ CONFIG = {
     # Layered as a multiplier — set regime_routing_enabled: False for equal-weight
     # A/B baseline without code changes.
     "regime_routing_enabled":       True,   # A/B flag: False = equal weights
-    "regime_router_vix_threshold":  20,     # VIX < 20 → "momentum"; >= 20 → "mean_reversion"
+    "regime_router_vix_threshold":  25,     # VIX < 25 → "momentum"; >= 25 → "mean_reversion"
+    # Raised 20→25: VIX 20-25 is "mild/transitional", not true fear. Momentum scoring
+    # should stay active in this band so relief rallies and directional days score correctly.
     "regime_router_momentum_mult":  1.3,    # Momentum dim multiplier in momentum regime
     "regime_router_reversion_mult": 0.7,    # Reversion dim multiplier in momentum regime
     #                                         (roles invert in mean_reversion regime)
+    # Intraday SPY move override — two triggers, either one switches the router to momentum:
+    #   open-to-now: SPY up/down > 1.5% from today's open (sustained trend)
+    #   2-bar ROC:   SPY moved > 0.4% in last 2 hourly bars (fast acceleration ~30-60 min)
+    "regime_router_rally_override_pct": 1.5,
+    "regime_router_roc_override_pct":   0.4,
 
     # ── CANDLESTICK CONFIRMATION GATE ────────────────────────
     # When True, a BUY or SELL signal must have at least one confirming

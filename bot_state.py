@@ -87,7 +87,7 @@ dash = {
 }
 
 # ── Persistent file paths ─────────────────────────────────────────────────────
-EQUITY_FILE  = "equity_history.json"
+EQUITY_FILE  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "equity_history.json")
 PROMPTS_FILE = "prompt_versions.json"
 
 # ── IBKR connection object (single instance shared by all modules) ────────────
@@ -119,8 +119,13 @@ _catalyst_trades_today = 0
 _catalyst_trade_date   = ""
 
 # ── Alpaca streams ───────────────────────────────────────────────────────────
-_bar_stream        = None   # AlpacaBarStream instance — started in bot.py main()
-_alpaca_news_stream = None  # AlpacaNewsStream instance — started in bot.py main()
+_bar_stream         = None   # AlpacaBarStream instance — started in bot.py main()
+_alpaca_news_stream = None   # AlpacaNewsStream instance — started in bot.py main()
+
+# ── Momentum Sentinel ────────────────────────────────────────────────────────
+_momentum_sentinel        = None             # MomentumSentinel instance
+_momentum_scan_requested  = threading.Event()  # Set by sentinel; cleared by main loop
+_scheduled_scan_fn        = None             # Reference to bot.py's scheduled_scan closure
 
 # ── IBKR account / position ground truth ─────────────────────────────────────
 # Populated by _on_account_value() when reqAccountUpdates is active.
