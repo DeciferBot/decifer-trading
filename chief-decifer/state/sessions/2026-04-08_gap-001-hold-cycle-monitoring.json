@@ -1,0 +1,23 @@
+{
+  "date": "2026-04-08",
+  "topic": "gap-001-hold-cycle-monitoring",
+  "phase": "North Star — GAP-001 (Pillar 2: Hold with Monitoring)",
+  "status": "complete",
+  "summary": "Closed GAP-001: HOLD positions now have a cycle-level thesis-integrity check. When the macro polarity flips (BULL→BEAR or BEAR→BULL) since entry, the position is queued for full Opus PM review. Previously, HOLD positions were only reviewed on events (score collapse, news, earnings, etc.).",
+  "strategic_gate_check": {
+    "ic_values": "CLEARED — non-null values present: mtf=0.032, flow=0.025, breakout=0.024, trend=-0.022 (n=60)",
+    "win_rate_trend": "WARNING — W13: 29% WR (+$124k), W14: 43% WR (+$19k), W15: 21% WR (-$29k). Overall 30.3% on 145 closed trades. W15 is deteriorating. Flagged to Amit before proceeding."
+  },
+  "changes": {
+    "portfolio_manager.py": "Added _regime_polarity() helper that extracts BULL/BEAR/'' from a regime label string. Added HOLD branch in lightweight_cycle_check(): if entry polarity != current polarity (and both are non-empty), appends REVIEW action. Logic: BULL→BEAR or BEAR→BULL is a macro backdrop flip; BULL_TRENDING→BULL, BULL→NEUTRAL, or UNKNOWN entries/exits do not trigger.",
+    "tests/test_cycle_check.py": "New file — 13 tests covering: _regime_polarity() all cases, HOLD polar flip BULL→BEAR (REVIEW), HOLD polar flip BEAR→BULL (REVIEW), same polarity (no action), UNKNOWN/empty entry or current regime (no action), NEUTRAL shift (no action), regression tests for SCALP and SWING unchanged behaviour."
+  },
+  "pre_existing_errors_fixed": [],
+  "north_star_update": {
+    "gap_register.GAP-001.status": "open → shipped",
+    "completion_status.hold_with_monitoring.what_missing": "cleared (null)",
+    "completion_status.hold_with_monitoring.what_exists": "updated to include HOLD polar-flip review"
+  },
+  "test_results": "13/13 new tests passed. Full suite: 1781 passed, 112 failed (all pre-existing).",
+  "approved_by": "pending"
+}

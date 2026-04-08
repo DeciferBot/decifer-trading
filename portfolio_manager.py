@@ -247,6 +247,101 @@ Review each position and output SYMBOL / ACTION / REASON for every one."""
 # RESPONSE PARSER
 # ══════════════════════════════════════════════════════════════
 
+def _regime_polarity(regime_str: str) -> str:
+    """Return 'BULL', 'BEAR', or '' from a regime label string."""
+    r = (regime_str or "").upper()
+    if "BULL" in r:
+        return "BULL"
+    if "BEAR" in r:
+        return "BEAR"
+    return ""
+
+
+def lightweight_cycle_check(
+    open_positions: list,
+    regime: dict,
+    all_scored: list,
+) -> list:
+    """
+    Fast in-process check run every scan cycle for all open positions.
+    No LLM call. Returns only positions that need action — callers treat
+    missing symbols as HOLD (no change).
+
+    Rules by trade_type:
+      SCALP — time_in_trade > scalp_max_hold_minutes AND pnl < scalp_min_pnl_pct
+               → EXIT: momentum thesis did not fire; free the capital.
+      SWING — regime changed since entry (entry_regime != current_regime)
+               → REVIEW: queue for full Opus PM review this cycle.
+      HOLD  — polar regime flip (BULL→BEAR or BEAR→BULL) since entry
+               → REVIEW: macro backdrop has shifted; thesis integrity check required.
+    """
+    pm_cfg = CONFIG.get("portfolio_manager", {})
+    if not pm_cfg.get("enabled", True):
+        return []
+    if not open_positions:
+        return []
+
+    current_regime   = regime.get("regime", "UNKNOWN")
+    scalp_max_mins   = pm_cfg.get("scalp_max_hold_minutes", 90)
+    scalp_min_pnl    = pm_cfg.get("scalp_min_pnl_pct", 0.003)   # 0.3%
+
+    now_utc = datetime.now(timezone.utc)
+    actions = []
+
+    for pos in open_positions:
+        sym           = pos.get("symbol", "")
+        trade_type    = pos.get("trade_type", "SCALP")
+        entry_price   = pos.get("entry", 0)
+        current_price = pos.get("current", entry_price)
+        entry_regime  = pos.get("regime", "")
+
+        try:
+            open_dt   = datetime.fromisoformat(pos.get("open_time", "")).replace(tzinfo=timezone.utc)
+            mins_held = (now_utc - open_dt).total_seconds() / 60
+        except Exception:
+            mins_held = 0
+
+        pnl_pct = ((current_price - entry_price) / entry_price) if entry_price > 0 else 0
+
+        if trade_type == "SCALP":
+            if mins_held > scalp_max_mins and pnl_pct < scalp_min_pnl:
+                actions.append({
+                    "symbol":    sym,
+                    "action":    "EXIT",
+                    "reasoning": (
+                        f"SCALP thesis stale: {mins_held:.0f}m elapsed, "
+                        f"pnl={pnl_pct * 100:+.2f}% (target >{scalp_min_pnl * 100:.1f}%) — "
+                        "momentum did not materialise; exit to free capital"
+                    ),
+                })
+
+        elif trade_type == "SWING":
+            if entry_regime and current_regime and entry_regime != current_regime:
+                actions.append({
+                    "symbol":    sym,
+                    "action":    "REVIEW",
+                    "reasoning": (
+                        f"SWING regime shifted: entry={entry_regime} → now={current_regime}; "
+                        "thesis context changed — full Opus review required"
+                    ),
+                })
+
+        elif trade_type == "HOLD":
+            entry_polarity   = _regime_polarity(entry_regime)
+            current_polarity = _regime_polarity(current_regime)
+            if entry_polarity and current_polarity and entry_polarity != current_polarity:
+                actions.append({
+                    "symbol":    sym,
+                    "action":    "REVIEW",
+                    "reasoning": (
+                        f"HOLD macro backdrop flipped: entry={entry_regime} → now={current_regime}; "
+                        "polar regime shift — thesis integrity check required"
+                    ),
+                })
+
+    return actions
+
+
 def _parse_actions(text: str, open_positions: list) -> list:
     """
     Parse SYMBOL/ACTION/REASON blocks from Portfolio Manager output.

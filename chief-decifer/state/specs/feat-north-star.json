@@ -46,8 +46,8 @@
     },
     "hold_with_monitoring": {
       "status": "SHIPPED",
-      "what_exists": "lightweight_cycle_check() runs every scan cycle — SCALP stale exits, SWING regime-shift review queuing. Event-triggered full Opus PM review for score collapse, news, earnings, cascade, drawdown.",
-      "what_is_missing": "HOLD trade type has no cycle-level monitoring yet — thesis integrity check for multi-day holds is still event-only.",
+      "what_exists": "lightweight_cycle_check() runs every scan cycle — SCALP stale exits, SWING regime-shift review queuing, HOLD polar-flip review (BULL→BEAR or BEAR→BULL triggers full Opus PM review). Event-triggered full Opus PM review for score collapse, news, earnings, cascade, drawdown.",
+      "what_is_missing": null,
       "shipped_date": "2026-04-08"
     },
     "exit_with_reason": {
@@ -75,7 +75,9 @@
       "title": "HOLD position cycle monitoring",
       "description": "HOLD trade type has no cycle-level check. Multi-day holds are only reviewed on events. Needs a lightweight thesis-integrity check: is the macro backdrop that supported the HOLD still intact?",
       "priority": "medium",
-      "status": "open"
+      "status": "shipped",
+      "shipped_date": "2026-04-08",
+      "resolution": "portfolio_manager.py: added _regime_polarity() helper and HOLD branch in lightweight_cycle_check(). If entry_regime polarity (BULL/BEAR) differs from current_regime polarity, queues REVIEW for full Opus PM review. No action on same polarity, NEUTRAL, or UNKNOWN. 13 new tests in tests/test_cycle_check.py."
     },
     {
       "gap_id": "GAP-002",
