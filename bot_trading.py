@@ -64,6 +64,11 @@ _session_stop_count: int = 0
 _cascade_reviewed_this_session: bool = False   # prevent cascade from re-firing every loop
 _last_trim_ts: dict = {}                        # symbol → datetime of last TRIM execution
 _pm_reviewed_regime: dict = {}                  # symbol → regime label when PM last reviewed it
+_last_pm_review_ts: datetime | None = None      # when the last PM review completed (any trigger)
+# Edge-trigger dedup: track what value last fired each state-based trigger so that
+# persistent conditions (e.g. GLD news never clears) don't re-fire every cooldown cycle.
+_last_news_scores: dict = {}    # symbol → keyword_score at last news_hit review
+_last_collapse_scores: dict = {}  # symbol → current_score at last score_collapse review
 
 # ── Last-decision writer (for Chief Decifer trade card) ───────────────────────
 
@@ -634,12 +639,15 @@ def _maybe_eod_options_review(regime: dict):
         _eod_options_review_done = False
         # Ledger auto-expires by date — no explicit clear needed.
         # Pruning of stale entries happens inside _record_options_attempt.
-        global _portfolio_review_done_today, _session_stop_count, _cascade_reviewed_this_session, _last_trim_ts, _pm_reviewed_regime
+        global _portfolio_review_done_today, _session_stop_count, _cascade_reviewed_this_session, _last_trim_ts, _pm_reviewed_regime, _last_pm_review_ts, _last_news_scores, _last_collapse_scores
         _portfolio_review_done_today = False
         _session_stop_count = 0
         _cascade_reviewed_this_session = False
         _last_trim_ts = {}
         _pm_reviewed_regime = {}
+        _last_pm_review_ts = None
+        _last_news_scores = {}
+        _last_collapse_scores = {}
     # Fire once in the pre-close window
     if dtime(15, 30) <= t < dtime(15, 55) and not _eod_options_review_done:
         _eod_options_review_done = True
@@ -663,13 +671,20 @@ def _should_run_portfolio_review(
     Triggers (checked in priority order):
       pre_market    — once per day before session open
       regime_change — current regime differs from last known
-      score_collapse — any held position dropped 15+ pts from entry score
-      news_hit      — keyword_score |magnitude| >= 3 on a held symbol
+      score_collapse — any held position score collapsed further since last review
+      news_hit      — keyword_score on a held symbol changed materially since last review
       earnings_risk — any held symbol has earnings within 48 hours
       cascade       — 2+ stop losses hit this session
       drawdown      — daily PnL / portfolio < -1.5%
+
+    news_hit and score_collapse are EDGE triggers: they only fire when the
+    underlying value has changed materially since the last review, not simply
+    because the condition persists. This prevents a single persistent news event
+    (e.g. tariff headlines keeping GLD keyword_score elevated) from re-triggering
+    the PM on every scan cycle.
     """
-    global _portfolio_review_done_today, _last_known_regime
+    global _portfolio_review_done_today, _last_known_regime, _last_pm_review_ts
+    global _last_news_scores, _last_collapse_scores
     pm_cfg = CONFIG.get("portfolio_manager", {})
     if not pm_cfg.get("enabled", True):
         return False, ""
@@ -678,7 +693,7 @@ def _should_run_portfolio_review(
     if session == "PRE_MARKET" and not _portfolio_review_done_today:
         return True, "pre_market"
 
-    # 2. Regime change
+    # 2. Regime change — edge trigger: fires only when regime label changes
     current_regime = regime.get("regime", "")
     if _last_known_regime and current_regime and current_regime != _last_known_regime:
         return True, "regime_change"
@@ -686,30 +701,47 @@ def _should_run_portfolio_review(
     if not open_positions:
         return False, ""
 
-    # 3. Score collapse: entry_score - current_score >= threshold
+    # 3. Score collapse — edge trigger: fires only when score has collapsed
+    #    FURTHER (by >= re_collapse_delta) since the last review.
+    #    Once reviewed at a collapsed score, don't re-fire just because it stays collapsed.
     collapse_thresh = pm_cfg.get("score_collapse_threshold", 15)
+    re_collapse_delta = pm_cfg.get("score_collapse_redfire_delta", 5)
     scored_map = {s["symbol"]: s.get("score", 0) for s in all_scored}
     for pos in open_positions:
         sym = pos.get("symbol", "")
         entry_sc = pos.get("entry_score", pos.get("score", 0))
         current_sc = scored_map.get(sym)
-        if current_sc is not None and (entry_sc - current_sc) >= collapse_thresh:
+        if current_sc is None:
+            continue
+        if (entry_sc - current_sc) < collapse_thresh:
+            continue
+        # Score is collapsed. Only fire if it's dropped further than last review.
+        last_sc = _last_collapse_scores.get(sym)
+        if last_sc is None or (last_sc - current_sc) >= re_collapse_delta:
             return True, "score_collapse"
 
-    # 4. News hit on held position
+    # 4. News hit — edge trigger: fires only when keyword_score has changed
+    #    materially since the last review for that symbol.
+    #    Prevents persistent headlines (e.g. GLD tariff news) from re-triggering
+    #    the PM on every scan cycle.
     news_thresh = pm_cfg.get("news_hit_threshold", 3)
+    news_redfire_delta = pm_cfg.get("news_hit_redfire_delta", 2)
     for pos in open_positions:
         sym = pos.get("symbol", "")
         kw = news_sentiment.get(sym, {}).get("keyword_score", 0)
-        if abs(kw) >= news_thresh:
+        if abs(kw) < news_thresh:
+            continue
+        # Score meets threshold. Only fire if score has changed since last review.
+        last_kw = _last_news_scores.get(sym)
+        if last_kw is None or abs(kw - last_kw) >= news_redfire_delta:
             return True, "news_hit"
 
     # 5. Earnings within 48 hours
     try:
-        from portfolio_manager import _check_earnings_within_hours
+        from earnings_calendar import get_earnings_within_hours as _gew
         held_syms = [p["symbol"] for p in open_positions]
         lookahead = pm_cfg.get("earnings_lookahead_hours", 48)
-        if _check_earnings_within_hours(held_syms, hours=lookahead):
+        if _gew(held_syms, lookahead):
             return True, "earnings_risk"
     except Exception:
         pass
@@ -1019,7 +1051,7 @@ def run_scan():
                     _force_pm_review = True
 
     # ── Portfolio manager review (event-triggered) ────────────────────────────
-    global _portfolio_review_done_today, _last_known_regime, _cascade_reviewed_this_session, _last_trim_ts
+    global _portfolio_review_done_today, _last_known_regime, _cascade_reviewed_this_session, _last_trim_ts, _last_pm_review_ts, _last_news_scores, _last_collapse_scores
     should_review, pm_trigger = _should_run_portfolio_review(
         session=get_session(),
         regime=regime,
@@ -1030,8 +1062,18 @@ def run_scan():
         portfolio_value=pv,
     )
     if not should_review and _force_pm_review:
-        should_review = True
-        pm_trigger = "cycle_regime_shift"
+        # Respect the same cooldown as event-triggered reviews so that a
+        # persistent regime-shift condition doesn't fire Opus every cycle.
+        _force_cooldown_mins = CONFIG.get("portfolio_manager", {}).get("trim_cooldown_minutes", 30)
+        _force_age_mins = (
+            (datetime.now(_ET) - _last_pm_review_ts).total_seconds() / 60
+            if _last_pm_review_ts is not None else None
+        )
+        if _force_age_mins is None or _force_age_mins >= _force_cooldown_mins:
+            should_review = True
+            pm_trigger = "cycle_regime_shift"
+        else:
+            clog("INFO", f"Cycle check REVIEW suppressed: last PM review {_force_age_mins:.0f}m ago (cooldown {_force_cooldown_mins}m)")
     if should_review and open_pos:
         clog("ANALYSIS", f"Portfolio review triggered: {pm_trigger}")
         try:
@@ -1146,6 +1188,17 @@ def run_scan():
             if pm_trigger == "cascade":
                 _cascade_reviewed_this_session = True
             _last_known_regime = regime.get("regime", _last_known_regime)
+            _last_pm_review_ts = datetime.now(_ET)
+            # Snapshot the news scores and collapse scores seen at this review so that
+            # news_hit and score_collapse don't re-fire unless values change materially.
+            _scored_map_snap = {s["symbol"]: s.get("score", 0) for s in (pipeline.all_scored or [])}
+            for _rp in open_pos:
+                _rsym = _rp["symbol"]
+                _kw = news_sentiment.get(_rsym, {}).get("keyword_score", 0)
+                _last_news_scores[_rsym] = _kw
+                _cs = _scored_map_snap.get(_rsym)
+                if _cs is not None:
+                    _last_collapse_scores[_rsym] = _cs
             # Record which regime each reviewed position was reviewed under so cycle_check
             # does not re-queue the same REVIEW on subsequent cycles for the same regime state.
             _reviewed_regime_label = regime.get("session_character") or regime.get("regime", "UNKNOWN")
@@ -1357,10 +1410,10 @@ def run_scan():
                         clog("INFO", f"Options attempt already recorded for {sym} {direction} today — skipping (DAY order terminal)")
                     else:
                         clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
-                        _record_options_attempt(sym, direction)  # mark BEFORE submit (survives crash)
                         try:
                             contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
                             if contract_info:
+                                _record_options_attempt(sym, direction)  # mark after contract found, before IBKR submit (survives crash)
                                 opt_success = execute_buy_option(ib, contract_info, pv, reasoning=reason, score=sig["score"])
                                 if opt_success:
                                     dash["trades"].insert(0, {

@@ -131,12 +131,20 @@ def _snapshots_to_df(snapshots: dict, opt_type: str) -> pd.DataFrame:
         spread_pct = (ask - bid) / mid if mid > 0 else 1.0
 
         # ── Volume ─────────────────────────────────────────────────
+        # Alpaca options snapshot doesn't expose daily volume.
+        # Use bid_size + ask_size as a liquidity proxy — small quoted
+        # sizes indicate nobody is trading this strike; large sizes
+        # indicate active market-maker interest.
         volume = 0
-        if snap.day is not None:
-            volume = int(snap.day.volume or 0)
+        if snap.latest_quote is not None:
+            volume = int((snap.latest_quote.bid_size or 0) +
+                         (snap.latest_quote.ask_size or 0))
 
         # ── OI and IV ──────────────────────────────────────────────
-        oi = int(snap.open_interest or 0)
+        # Alpaca snapshot also doesn't expose open interest — use the
+        # same quoted-size proxy scaled up (OI is always >> single-day size).
+        # The spread filter is the primary liquidity gate for Alpaca chains.
+        oi = volume * 5
         iv = float(snap.implied_volatility or 0) if snap.implied_volatility else 0.0
 
         # ── Greeks ─────────────────────────────────────────────────
@@ -194,15 +202,17 @@ def get_all_chains(symbol: str, min_dte: int,
     try:
         from alpaca.data.requests import OptionChainRequest
         request   = OptionChainRequest(
-            symbol_or_symbols=symbol,
+            underlying_symbol=symbol,
             expiration_date_gte=date_min,
             expiration_date_lte=date_max,
         )
         snapshots = client.get_option_chain(request)
         if not snapshots:
+            log.warning(f"alpaca_options.get_all_chains {symbol}: Alpaca returned empty chain "
+                        f"(DTE window {min_dte}-{max_dte}, dates {date_min}–{date_max})")
             return []
     except Exception as exc:
-        log.debug(f"alpaca_options.get_all_chains {symbol}: {exc}")
+        log.warning(f"alpaca_options.get_all_chains {symbol}: API call failed — {exc}")
         return []
 
     # Group snapshots by expiry date

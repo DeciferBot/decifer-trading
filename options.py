@@ -12,8 +12,6 @@ import numpy as np
 import warnings
 from datetime import datetime, date, timedelta
 
-import yfinance as yf
-
 from config import CONFIG
 
 log = logging.getLogger("decifer.options")
@@ -156,38 +154,6 @@ def get_iv_rank(symbol: str, current_iv: float) -> float | None:
         return None
 
 
-# ── Chain fetching ────────────────────────────────────────────────────
-
-def _fetch_chain(symbol: str, expiry: str) -> tuple:
-    """
-    Fetch calls and puts for one expiry.
-    Returns (calls_df, puts_df) — both filtered for basic liquidity.
-    """
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        chain = yf.Ticker(symbol).option_chain(expiry)
-    calls = chain.calls.copy()
-    puts  = chain.puts.copy()
-
-    for df in (calls, puts):
-        df["mid"]        = (df["bid"] + df["ask"]) / 2
-        df["spread_pct"] = (df["ask"] - df["bid"]) / df["mid"].replace(0, np.nan)
-
-    # Basic liquidity filters — generous at this stage, tighter in select_contract
-    min_vol = max(CONFIG.get("options_min_volume", 50) // 4, 5)
-    min_oi  = max(CONFIG.get("options_min_oi", 200) // 4, 25)
-    calls = calls[
-        (calls["bid"] > 0.03) &
-        (calls["volume"].fillna(0) > min_vol) &
-        (calls["openInterest"].fillna(0) > min_oi)
-    ]
-    puts = puts[
-        (puts["bid"] > 0.03) &
-        (puts["volume"].fillna(0) > min_vol) &
-        (puts["openInterest"].fillna(0) > min_oi)
-    ]
-    return calls, puts
-
 
 # ── Contract selection ────────────────────────────────────────────────
 
@@ -317,7 +283,7 @@ def find_best_contract(symbol: str,
     try:
         today = date.today()
 
-        # ── Underlying price: Alpaca first, yfinance fallback ─────────
+        # ── Underlying price: Alpaca (no fallback — we pay for it) ──────
         S = None
         try:
             from alpaca_options import get_underlying_price as _alpaca_price
@@ -325,15 +291,7 @@ def find_best_contract(symbol: str,
         except Exception:
             pass
         if S is None or S <= 0:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                hist = yf.Ticker(symbol).history(period="1d", interval="1m")
-            if hist is None or hist.empty:
-                log.info(f"Options: no price data for {symbol} — cannot evaluate")
-                return None
-            S = float(hist["Close"].iloc[-1])
-        if S is None or S <= 0:
-            log.info(f"Options: zero/invalid price for {symbol}")
+            log.info(f"Options: no Alpaca price for {symbol} — cannot evaluate")
             return None
 
         # ── Options chain: Alpaca primary (real-time OPRA), yfinance fallback ──
@@ -357,50 +315,16 @@ def find_best_contract(symbol: str,
                 best_contract = contract
                 break
         except Exception as _ae:
-            log.debug(f"Options Alpaca chain fetch skipped for {symbol}: {_ae}")
+            log.warning(f"Options Alpaca chain fetch failed for {symbol}: {_ae}")
             chains = []
 
         if best_contract is None:
-            # yfinance fallback — iterate valid expiries
-            try:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    ticker    = yf.Ticker(symbol)
-                    all_exps  = ticker.options
-                valid_exp = []
-                for exp in all_exps:
-                    exp_date = datetime.strptime(exp, "%Y-%m-%d").date()
-                    dte      = (exp_date - today).days
-                    if min_dte <= dte <= max_dte:
-                        valid_exp.append((exp, exp_date, dte))
-                if not valid_exp:
-                    all_dtes = [(e, (datetime.strptime(e, "%Y-%m-%d").date() - today).days)
-                                for e in all_exps[:6]]
-                    log.info(f"Options: no expiry in {min_dte}-{max_dte} DTE window for "
-                             f"{symbol} — available: {all_dtes}")
-                    return None
-                for exp_str, exp_date, dte in valid_exp:
-                    try:
-                        calls_df, puts_df = _fetch_chain(symbol, exp_str)
-                        df = calls_df if flag == "c" else puts_df
-                        if df.empty:
-                            continue
-                        contract = _select_strike(df, flag, S, dte, t_delta, d_range)
-                        if contract is None:
-                            continue
-                        contract["expiry_str"]  = exp_str
-                        contract["expiry_ibkr"] = exp_date.strftime("%Y%m%d")
-                        best_contract = contract
-                        break
-                    except Exception as e:
-                        log.info(f"Options chain error {symbol} {exp_str}: {e}")
-                        continue
-            except Exception as e:
-                log.debug(f"Options yfinance chain fallback error {symbol}: {e}")
-
-        if best_contract is None:
-            log.info(f"Options: no suitable contract found for {symbol} — "
-                     f"all expiries filtered out by liquidity/delta")
+            if not chains:
+                log.info(f"Options: no contract for {symbol} — "
+                         f"Alpaca returned no chains in {min_dte}-{max_dte} DTE window")
+            else:
+                log.info(f"Options: no suitable contract for {symbol} — "
+                         f"all {len(chains)} expiries filtered out by liquidity/delta")
             return None
 
         # IV Rank check — bail if options too expensive
@@ -444,23 +368,18 @@ def find_best_contract(symbol: str,
                 best_contract.update(ibkr_greeks)
                 log.debug(f"Options: used IBKR live Greeks for {symbol}")
 
-        # Position sizing: max_risk / (mid × 100 shares per contract)
-        premium_per_contract = best_contract["mid"] * 100
-        contracts = max(1, int(max_risk // premium_per_contract))
-
-        # Sanity cap: ensure the actual outlay at ask price never exceeds 2× max_risk.
-        # This prevents catastrophic over-sizing when mid is stale/lower than the actual
-        # ask (e.g. yfinance returns last-traded vs current mid, causing 10-15x overshoot).
+        # Position sizing: use ask as the conservative worst-case fill price.
+        # Mid is unreliable — stale or from a different session. Ask is what
+        # we actually pay. Sizing on ask eliminates the overshoot that caused
+        # the LEVI/SPIR/AAPL catastrophic losses.
         ask = best_contract.get("ask", 0.0)
-        if ask > 0 and contracts * ask * 100 > max_risk * 2:
-            contracts = max(1, int(max_risk / (ask * 100)))
-            log.warning(
-                f"Options {symbol}: contracts capped by ask-sanity to {contracts} "
-                f"(mid={best_contract['mid']:.3f} ask={ask:.3f} max_risk=${max_risk:,.0f})"
-            )
+        if ask <= 0:
+            log.info(f"Options: no valid ask price for {symbol} — cannot size")
+            return None
+        contracts = max(1, int(max_risk / (ask * 100)))
 
         best_contract["contracts"]        = contracts
-        best_contract["max_risk_dollars"] = round(contracts * premium_per_contract, 2)
+        best_contract["max_risk_dollars"] = round(contracts * ask * 100, 2)
         best_contract["symbol"]           = symbol
         best_contract["direction"]        = direction
         best_contract["underlying_price"] = round(S, 4)
@@ -572,27 +491,6 @@ def check_options_exits(open_options: dict, ib=None) -> list[str]:
                     curr_premium = float(mid)
                     pos["current_premium"] = curr_premium
                     ibkr_live_ok = True
-            except Exception:
-                pass
-
-        # yfinance fallback — only if both Alpaca and IBKR returned nothing valid
-        if not alpaca_live_ok and not ibkr_live_ok:
-            try:
-                exp_str = pos.get("expiry_str", "")
-                strike  = pos.get("strike", 0)
-                right   = pos.get("right", "C")
-                if exp_str:
-                    chain = yf.Ticker(sym).option_chain(exp_str)
-                    df    = chain.calls if right == "C" else chain.puts
-                    row   = df[df["strike"] == strike]
-                    if not row.empty:
-                        _bid = row.iloc[0]["bid"]
-                        _ask = row.iloc[0]["ask"]
-                        _mid = (_bid + _ask) / 2 if _bid > 0 and _ask > 0 else row.iloc[0].get("lastPrice", 0)
-                        if _mid and _mid > 0:
-                            curr_premium = float(_mid)
-                            pos["current_premium"] = curr_premium
-                            log.debug(f"Options price fallback (yfinance): {sym} premium=${curr_premium:.4f}")
             except Exception:
                 pass
 
