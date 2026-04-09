@@ -73,6 +73,8 @@ DASHBOARD_HTML = DASHBOARD_HTML.replace(
     f'Autonomous AI Trading &nbsp;·&nbsp; v{__version__}'
 )
 
+from dashboard_v2 import DASHBOARD_HTML_V2
+
 # ── Persistence ───────────────────────────────────────────────────────────────
 FAVOURITES_FILE = "favourites.json"
 SETTINGS_FILE   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "settings_override.json")

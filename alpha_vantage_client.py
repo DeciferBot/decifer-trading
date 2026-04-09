@@ -135,11 +135,12 @@ def get_news_sentiment(tickers: list[str]) -> dict[str, dict]:
 
     try:
         resp = requests.get(url, timeout=10, headers={"User-Agent": "Decifer/2.0"})
-        if resp.status_code != 200:
-            log.warning("AV NEWS_SENTIMENT HTTP %d", resp.status_code)
+        status = resp.status_code
+        data = resp.json() if status == 200 else {}
+        resp.close()
+        if status != 200:
+            log.warning("AV NEWS_SENTIMENT HTTP %d", status)
             return {}
-
-        data = resp.json()
 
         # AV returns rate-limit messages as JSON keys rather than HTTP errors
         if "Note" in data or "Information" in data:
@@ -200,6 +201,81 @@ def get_news_sentiment(tickers: list[str]) -> dict[str, dict]:
 
 # ── Earnings calendar ──────────────────────────────────────────────────────────
 
+def get_sector_performance() -> dict[str, dict]:
+    """
+    Fetch sector performance across multiple timeframes using Alpha Vantage SECTOR function.
+
+    Returns {timeframe: {sector_name: "+X.XX%"}} for timeframes:
+      "1D", "5D", "1M", "3M", "YTD"
+
+    Cached daily to data/sector_performance.json — one call per trading day.
+    Returns {} when: no API key configured, rate limit exhausted, or AV returns an error.
+    """
+    import os as _os
+    _cache_path = _os.path.join(_os.path.dirname(__file__), "data", "sector_performance.json")
+    today = date.today().isoformat()
+
+    # Try daily cache first
+    try:
+        with open(_cache_path) as f:
+            cached = json.load(f)
+        if cached.get("date") == today and cached.get("data"):
+            log.debug("AV sector performance: cache hit for %s", today)
+            return cached["data"]
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        pass
+
+    key = _api_key()
+    if not key:
+        return {}
+
+    if not _consume_call():
+        return {}
+
+    url = f"{_BASE_URL}?function=SECTOR&apikey={key}"
+
+    try:
+        resp = requests.get(url, timeout=10, headers={"User-Agent": "Decifer/2.0"})
+        status = resp.status_code
+        data = resp.json() if status == 200 else {}
+        resp.close()
+        if status != 200:
+            log.warning("AV SECTOR HTTP %d", status)
+            return {}
+
+        if "Note" in data or "Information" in data:
+            msg = (data.get("Note") or data.get("Information", ""))[:150]
+            log.warning("AV API message: %s", msg)
+            return {}
+
+        # AV SECTOR returns keys like "Rank A: Real-Time Performance", "Rank B: 1 Day Performance", etc.
+        timeframe_map = {
+            "Rank B: 1 Day Performance":   "1D",
+            "Rank C: 5 Day Performance":   "5D",
+            "Rank D: 1 Month Performance": "1M",
+            "Rank E: 3 Month Performance": "3M",
+            "Rank F: Year-to-Date (YTD) Performance": "YTD",
+        }
+        result: dict[str, dict] = {}
+        for av_key, tf_label in timeframe_map.items():
+            if av_key in data:
+                result[tf_label] = data[av_key]
+
+        if result:
+            try:
+                with open(_cache_path, "w") as f:
+                    json.dump({"date": today, "data": result}, f)
+            except Exception:
+                pass
+            log.info("AV sector performance: fetched %d timeframes", len(result))
+
+        return result
+
+    except Exception as exc:
+        log.error("AV get_sector_performance error: %s", exc)
+        return {}
+
+
 def get_earnings_calendar(horizon_months: int = 3) -> dict[str, str]:
     """
     Fetch the upcoming earnings calendar for all US stocks (1 API call).
@@ -228,12 +304,15 @@ def get_earnings_calendar(horizon_months: int = 3) -> dict[str, str]:
 
     try:
         resp = requests.get(url, timeout=10, headers={"User-Agent": "Decifer/2.0"})
-        if resp.status_code != 200:
-            log.warning("AV EARNINGS_CALENDAR HTTP %d", resp.status_code)
+        status = resp.status_code
+        text = resp.text if status == 200 else ""
+        resp.close()
+        if status != 200:
+            log.warning("AV EARNINGS_CALENDAR HTTP %d", status)
             return {}
 
         # AV returns CSV for this endpoint
-        reader = csv.DictReader(io.StringIO(resp.text))
+        reader = csv.DictReader(io.StringIO(text))
         result: dict[str, str] = {}
         for row in reader:
             sym         = (row.get("symbol")     or "").strip().upper()

@@ -19,9 +19,12 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import zoneinfo
 from datetime import datetime
 
 from colorama import Fore, Style
+
+_ET = zoneinfo.ZoneInfo("America/New_York")
 from ib_async import IB
 
 from config import CONFIG
@@ -84,6 +87,8 @@ dash = {
     "catalyst_sentinel_stats":   {},
     # ── Directional skew (BACK-007) ─────────────────────────────────────────
     "skew":                      {},
+    # ── Sector rotation bias (updated each scan cycle) ───────────────────────
+    "sector_bias":               {},
 }
 
 # ── Persistent file paths ─────────────────────────────────────────────────────
@@ -153,7 +158,7 @@ def clog(type_: str, msg: str):
     print(f"{color}[{type_}]{Style.RESET_ALL}  {msg}")
     log.info(f"[{type_}] {msg}")
     dash["logs"].insert(0, {
-        "time": datetime.now().strftime("%H:%M:%S"),
+        "time": datetime.now(_ET).strftime("%H:%M:%S"),
         "type": type_,
         "msg":  msg,
     })

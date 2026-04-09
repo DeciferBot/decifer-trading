@@ -874,6 +874,12 @@ def run_scan():
 
     clog("SCAN", "Building dynamic universe from TradingView screener...")
     universe = get_dynamic_universe(ib, regime)
+    # Sector bias is cached inside get_dynamic_universe — fetch the cached result for the dashboard.
+    try:
+        from scanner import get_sector_rotation_bias as _get_sbias
+        dash["sector_bias"] = _get_sbias()
+    except Exception:
+        pass
     favs     = dash.get("favourites", [])
     if favs:
         before   = len(universe)
@@ -1166,11 +1172,9 @@ def run_scan():
     now_str    = datetime.now(_ET).strftime("%H:%M:%S")
     agent_convo = []
     agent_names = [
-        ("technical",   "Technical Analyst",  "Analyses price action, volume, and all 7 indicator dimensions"),
-        ("macro",       "Macro Analyst",      "Assesses market regime, VIX, cross-asset dynamics, and news flow"),
-        ("opportunity", "Opportunity Finder",  "Synthesises technical + macro to find the top 3 trades"),
-        ("devils",      "Devil's Advocate",    "Argues against every proposed trade to protect capital"),
-        ("risk",        "Risk Manager",        "Sizes positions and flags portfolio-level risk"),
+        ("technical",       "Technical Analyst",  "Analyses price action, volume, and all indicator dimensions"),
+        ("trading_analyst", "Trading Analyst",    "Macro context, opportunity synthesis, devil's advocate (Opus)"),
+        ("risk",            "Risk Manager",        "Sizes positions and flags portfolio-level risk"),
     ]
     outputs = decision.get("_agent_outputs", {})
     for key, name, role_desc in agent_names:
@@ -1199,13 +1203,14 @@ def run_scan():
     _final_output = "\n".join(_action_lines) if _action_lines else "No trades this cycle."
     agent_convo.append({
         "agent":  "Final Decision Maker",
-        "role":   "Synthesises all 5 reports into executable trade instructions",
+        "role":   "Synthesises all agent reports into executable trade instructions",
         "time":   now_str,
         "output": _final_output,
     })
     dash["agent_conversation"] = agent_convo
 
-    clog("ANALYSIS", f"Agents agreed: {decision.get('agents_agreed',0)}/6 | {decision.get('summary','')}")
+    _max_votes = len(agent_names) + 1  # 3 agents + final decision
+    clog("ANALYSIS", f"Agents agreed: {decision.get('agents_agreed',0)}/{_max_votes} | {decision.get('summary','')}")
 
     if dash.get("killed"):
         clog("RISK", "🚨 Kill switch active — skipping all trade execution")
