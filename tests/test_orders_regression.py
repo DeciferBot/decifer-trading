@@ -496,7 +496,8 @@ class TestShortOptionExit:
         if retry_count > 0:
             _om._option_sell_attempts[self.OPT_KEY] = {
                 "count": retry_count,
-                "last_try": datetime.now(timezone.utc),
+                # Use a past timestamp so the min-retry-interval guard (90s) is already elapsed.
+                "last_try": datetime.now(timezone.utc) - timedelta(seconds=200),
             }
 
         _om.active_trades[self.OPT_KEY] = self._short_pos()

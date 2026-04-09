@@ -37,7 +37,29 @@ config_stub.CONFIG = {
         "skew_bullish_lo": -0.03,
     },
 }
-sys.modules["config"] = config_stub
+sys.modules.setdefault("config", config_stub)
+# If the real config is already loaded (full suite), point config_stub at it
+# and ensure the iv_skew section exists so tests don't need a separate module.
+config_stub = sys.modules["config"]
+if not hasattr(config_stub, "CONFIG"):
+    config_stub.CONFIG = {}
+_iv_defaults = {
+    "alpaca_api_key":    "test_key",
+    "alpaca_secret_key": "test_secret",
+    "iv_skew": {
+        "dte_min":         7,
+        "dte_max":         60,
+        "target_dte":      30,
+        "otm_put_delta":  -0.25,
+        "atm_call_delta":  0.50,
+        "skew_bearish_hi":  0.15,
+        "skew_bearish_mid": 0.10,
+        "skew_bearish_lo":  0.05,
+        "skew_bullish_lo": -0.03,
+    },
+}
+for _k, _v in _iv_defaults.items():
+    config_stub.CONFIG.setdefault(_k, _v)
 
 import pytest
 
