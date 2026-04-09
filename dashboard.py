@@ -171,20 +171,59 @@ canvas{display:block;width:100% !important}
 .rm-meta{display:flex;justify-content:space-between;font-size:10px;color:var(--muted2)}
 
 /* ── VIEW 7: NEWS ── */
-.news-view{flex-direction:column;overflow-y:auto;height:calc(100vh - 46px - 66px - 34px)}
-.news-list{flex:1;overflow-y:auto;padding:0}
-.news-item{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);transition:.1s;cursor:pointer;text-decoration:none;color:inherit}
-.news-item:hover{background:var(--bg3)}
-.news-badge{flex-shrink:0;padding:3px 8px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:.5px;min-width:65px;text-align:center}
+.news-view{flex-direction:column;height:calc(100vh - 46px - 66px - 34px);overflow:hidden}
+.news-hdr{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.news-feed{flex:1;overflow-y:auto;padding:12px 14px;min-height:0}
+.news-badge{flex-shrink:0;padding:3px 8px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:.5px;text-align:center}
 .badge-bullish{background:rgba(0,200,83,.15);color:var(--green);border:1px solid rgba(0,200,83,.3)}
 .badge-bearish{background:rgba(255,23,68,.12);color:var(--red);border:1px solid rgba(255,23,68,.3)}
 .badge-neutral{background:rgba(85,85,85,.15);color:var(--muted2);border:1px solid var(--border2)}
-.news-content{flex:1;min-width:0}
-.news-headline{font-size:12px;color:var(--text);line-height:1.5;margin-bottom:3px}
-.news-meta{font-size:10px;color:var(--muted2);display:flex;gap:12px}
-.news-kw{font-size:9px;color:var(--orange);margin-top:2px}
-.news-refresh{padding:7px 14px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
-.news-refresh span{font-size:10px;color:var(--muted2)}
+/* Hero card */
+.news-hero{position:relative;border-radius:8px;overflow:hidden;margin-bottom:14px;cursor:pointer;border:1px solid var(--border);transition:border-color .2s,transform .2s}
+.news-hero:hover{border-color:var(--orange);transform:translateY(-1px)}
+.news-hero-bg{width:100%;height:200px;display:flex;align-items:flex-end;padding:20px 18px 14px}
+.news-hero-bg.bull{background:linear-gradient(135deg,#0a2e1a 0%,#0d3b22 50%,#051a0f 100%)}
+.news-hero-bg.bear{background:linear-gradient(135deg,#2e0a0a 0%,#3b0d0d 50%,#1a0505 100%)}
+.news-hero-bg.neut{background:linear-gradient(135deg,#141414 0%,#1c1c1c 50%,#0e0e0e 100%)}
+.news-hero-inner{width:100%}
+.news-hero-tag{font-size:9px;letter-spacing:2px;font-weight:700;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.news-hero-macro{color:var(--orange)}
+.news-hero-hl{font-family:'Syne',sans-serif;font-size:16px;font-weight:900;color:#fff;line-height:1.3;margin-bottom:8px}
+.news-hero-cat{font-size:11px;color:rgba(255,255,255,.7);line-height:1.5;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.news-hero-foot{display:flex;align-items:center;gap:10px}
+.news-hero-sym{font-size:10px;color:var(--orange);font-weight:700}
+.news-hero-age{font-size:9px;color:rgba(255,255,255,.45)}
+.news-hero-score{font-size:9px;color:rgba(255,255,255,.5)}
+/* 2-col grid */
+.news-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.news-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .15s;display:flex;flex-direction:column}
+.news-card:hover{border-color:var(--orange);transform:translateY(-1px)}
+.news-card-top{padding:10px 12px;flex:1;display:flex;flex-direction:column;gap:5px}
+.news-card-tag{display:flex;align-items:center;gap:6px}
+.news-card-sym{font-size:10px;color:var(--orange);font-weight:700}
+.news-card-hl{font-size:11px;color:var(--text);line-height:1.45;flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.news-card-foot{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;border-top:1px solid var(--border);background:var(--bg3)}
+.news-card-age{font-size:9px;color:var(--muted2)}
+.news-card-score{font-size:9px;color:var(--muted2)}
+/* Article drawer */
+.news-drawer{position:fixed;top:0;right:-54%;width:54%;height:100vh;background:var(--bg2);border-left:1px solid var(--border);z-index:5000;display:flex;flex-direction:column;transition:right .3s cubic-bezier(.4,0,.2,1)}
+.news-drawer.open{right:0}
+.news-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:4999;display:none}
+.news-overlay.open{display:block}
+.news-drawer-hdr{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.news-drawer-sym{font-size:11px;color:var(--orange);font-weight:700;min-width:48px}
+.news-drawer-title{flex:1;font-size:11px;color:var(--muted2);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.news-drawer-open{font-size:10px;color:var(--orange);text-decoration:none;padding:3px 8px;border:1px solid var(--orange);border-radius:3px;white-space:nowrap}
+.news-drawer-open:hover{background:rgba(255,140,0,.1)}
+.news-drawer-close{background:none;border:none;color:var(--muted2);font-size:18px;cursor:pointer;padding:0 2px;line-height:1}
+.news-drawer-close:hover{color:var(--text)}
+.news-drawer-body{flex:1;overflow-y:auto;padding:20px}
+.news-drawer-badge-row{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.news-drawer-hl{font-family:'Syne',sans-serif;font-size:18px;font-weight:900;color:var(--text);line-height:1.3;margin-bottom:12px}
+.news-drawer-meta{font-size:10px;color:var(--muted2);margin-bottom:14px;display:flex;gap:14px}
+.news-drawer-catalyst{background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:4px;padding:10px 14px;margin-bottom:14px}
+.news-drawer-catalyst-lbl{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--orange);margin-bottom:5px}
+.news-drawer-catalyst-txt{font-size:12px;color:var(--text);line-height:1.6}
 
 /* ── AGENT CONVERSATION ── */
 .convo-panel{border-top:1px solid var(--border);background:var(--bg2);flex:1;min-height:120px;overflow:hidden;display:flex;flex-direction:column}
@@ -554,24 +593,45 @@ canvas{display:block;width:100% !important}
 
 <!-- VIEW 7: NEWS -->
 <div class="view news-view" id="view-news">
-  <div class="news-refresh" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border)">
-    <span id="news-count" style="font-weight:600;color:var(--orange)">0 headlines</span>
-    <input type="text" id="news-keyword" placeholder="Filter by keyword..." oninput="filterNews()" style="background:var(--bg1);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:11px;font-family:'JetBrains Mono',monospace;width:160px">
-    <input type="text" id="news-ticker" placeholder="Filter by ticker..." oninput="filterNews()" style="background:var(--bg1);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:11px;font-family:'JetBrains Mono',monospace;width:100px">
+  <div class="news-hdr">
+    <span id="news-count" style="font-weight:600;color:var(--orange)">0 stories</span>
+    <input type="text" id="news-keyword" placeholder="Filter keyword..." oninput="filterNews()" style="background:var(--bg1);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:11px;font-family:'JetBrains Mono',monospace;width:140px">
+    <input type="text" id="news-ticker" placeholder="Ticker..." oninput="filterNews()" style="background:var(--bg1);border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:4px;font-size:11px;font-family:'JetBrains Mono',monospace;width:80px">
     <select id="news-sort" onchange="filterNews()" style="background:var(--bg1);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:11px;font-family:'JetBrains Mono',monospace">
-      <option value="time">Sort: Newest</option>
-      <option value="score">Sort: Score</option>
-      <option value="ticker">Sort: Ticker</option>
+      <option value="time">Newest</option>
+      <option value="score">Score</option>
+      <option value="macro">Macro Impact</option>
     </select>
     <select id="news-sentiment-filter" onchange="filterNews()" style="background:var(--bg1);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:11px;font-family:'JetBrains Mono',monospace">
-      <option value="all">All Sentiment</option>
-      <option value="BULLISH">Bullish Only</option>
-      <option value="BEARISH">Bearish Only</option>
+      <option value="all">All</option>
+      <option value="BULLISH">Bullish</option>
+      <option value="BEARISH">Bearish</option>
     </select>
-    <span id="news-updated" style="color:var(--muted2);font-size:10px;margin-left:auto">Updates every scan cycle</span>
+    <span id="news-updated" style="color:var(--muted2);font-size:10px;margin-left:auto">Updates each scan</span>
   </div>
-  <div class="news-list" id="news-list" style="overflow-y:auto;flex:1">
+  <div class="news-feed" id="news-feed">
     <div class="empty">News headlines will appear here after the first scan.</div>
+  </div>
+</div>
+<!-- News article drawer -->
+<div class="news-overlay" id="news-overlay" onclick="closeNewsDrawer()"></div>
+<div class="news-drawer" id="news-drawer">
+  <div class="news-drawer-hdr">
+    <span class="news-drawer-sym" id="nd-sym">—</span>
+    <span class="news-drawer-title" id="nd-title">—</span>
+    <a id="nd-link" href="#" target="_blank" rel="noopener" class="news-drawer-open">Open ↗</a>
+    <button class="news-drawer-close" onclick="closeNewsDrawer()">×</button>
+  </div>
+  <div class="news-drawer-body">
+    <div class="news-drawer-badge-row" id="nd-badge-row"></div>
+    <div class="news-drawer-hl" id="nd-hl"></div>
+    <div class="news-drawer-meta" id="nd-meta"></div>
+    <div id="nd-catalyst-wrap" style="display:none">
+      <div class="news-drawer-catalyst">
+        <div class="news-drawer-catalyst-lbl">AI Analysis</div>
+        <div class="news-drawer-catalyst-txt" id="nd-catalyst"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1740,10 +1800,11 @@ function buildTradeExplanation(t) {
   // ── MARKET CONTEXT ──
   if (t.regime && t.regime !== 'UNKNOWN') {
     const regimeMap = {
-      'BULL_TRENDING': 'bullish, trending up',
-      'BEAR_TRENDING': 'bearish, trending down',
-      'CHOPPY': 'choppy, no clear direction',
-      'PANIC': 'panic — extreme fear'
+      'TRENDING_UP':   'trending up — broad participation',
+      'TRENDING_DOWN': 'trending down — broad selling',
+      'RELIEF_RALLY':  'relief rally — bear-market bounce',
+      'RANGE_BOUND':   'range bound — no clear direction',
+      'CAPITULATION':  'capitulation — extreme fear'
     };
     const regimeDesc = regimeMap[t.regime] || t.regime;
     story += `Market regime: <strong>${regimeDesc}</strong>`;
@@ -2068,8 +2129,8 @@ function updateRegime(regime) {
   const pill  = document.getElementById('regime-pill');
 
   const classMap = {
-    'BULL_TRENDING':'bull','BEAR_TRENDING':'bear',
-    'CHOPPY':'choppy','PANIC':'panic','UNKNOWN':'unknown'
+    'TRENDING_UP':'bull','TRENDING_DOWN':'bear',
+    'RELIEF_RALLY':'choppy','RANGE_BOUND':'choppy','CAPITULATION':'panic','UNKNOWN':'unknown'
   };
   box.className = 'regime-box ' + (classMap[regime.regime] || 'unknown');
   label.textContent = regime.regime || 'UNKNOWN';
@@ -2344,81 +2405,158 @@ setInterval(async () => {
 
 // ── News rendering ─────────────────────────────────────────
 let _allNewsItems = [];
+window._newsItems  = [];  // filtered set, used by drawer
+
+const _MACRO_KW = ['fed','fomc','federal reserve','interest rate','rate cut','rate hike',
+  'inflation','cpi','pce','gdp','recession','yield','treasury','tariff','trade war',
+  'geopolit','china','russia','iran','war','sanction','imf','ecb','boj','central bank',
+  'powell','yellen','lagarde','economy','jobs report','nonfarm','payroll','unemployment',
+  'opec','oil price','gas price','nuclear','nato','ukraine','taiwan','debt ceiling',
+  'fiscal','deficit','earnings','guidance','merger','acquisition','ipo'];
+
+function _macroScore(item) {
+  const txt = ((item.headline||'')+' '+(item.catalyst||'')).toLowerCase();
+  return _MACRO_KW.filter(kw => txt.includes(kw)).length * 2 + (item.news_score || 0);
+}
+
+function _ageStr(h) {
+  if (h < 1)  return 'Just now';
+  if (h < 24) return Math.round(h) + 'h ago';
+  return Math.round(h / 24) + 'd ago';
+}
+
+function _renderHero(item, idx) {
+  const bgCls = item.sentiment === 'BULLISH' ? 'bull' : item.sentiment === 'BEARISH' ? 'bear' : 'neut';
+  const badgeCls = item.sentiment === 'BULLISH' ? 'badge-bullish' : item.sentiment === 'BEARISH' ? 'badge-bearish' : 'badge-neutral';
+  const badgeTxt = item.sentiment === 'BULLISH' ? '▲ BULL' : item.sentiment === 'BEARISH' ? '▼ BEAR' : '— NEUTRAL';
+  const ms = _macroScore(item);
+  const macroTag = ms >= 4 ? `<span class="news-hero-macro">● MACRO</span>` : '';
+  return `<div class="news-hero" onclick="openNewsDrawer(${idx})">
+    <div class="news-hero-bg ${bgCls}">
+      <div class="news-hero-inner">
+        <div class="news-hero-tag">${macroTag}<span class="news-badge ${badgeCls}">${badgeTxt}</span><span style="font-size:9px;color:rgba(255,255,255,.4)">Score ${item.news_score}/10</span></div>
+        <div class="news-hero-hl">${esc(item.headline)}</div>
+        ${item.catalyst ? `<div class="news-hero-cat">${esc(item.catalyst)}</div>` : ''}
+        <div class="news-hero-foot">
+          <span class="news-hero-sym">${esc(item.symbol)}</span>
+          <span class="news-hero-age">${_ageStr(item.recency)}</span>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function _renderCard(item, idx) {
+  const badgeCls = item.sentiment === 'BULLISH' ? 'badge-bullish' : item.sentiment === 'BEARISH' ? 'badge-bearish' : 'badge-neutral';
+  const badgeTxt = item.sentiment === 'BULLISH' ? '▲ BULL' : item.sentiment === 'BEARISH' ? '▼ BEAR' : '— NEUT';
+  return `<div class="news-card" onclick="openNewsDrawer(${idx})">
+    <div class="news-card-top">
+      <div class="news-card-tag">
+        <span class="news-card-sym">${esc(item.symbol)}</span>
+        <span class="news-badge ${badgeCls}" style="font-size:8px;padding:2px 6px">${badgeTxt}</span>
+      </div>
+      <div class="news-card-hl">${esc(item.headline)}</div>
+    </div>
+    <div class="news-card-foot">
+      <span class="news-card-age">${_ageStr(item.recency)}</span>
+      <span class="news-card-score">Score ${item.news_score}/10</span>
+    </div>
+  </div>`;
+}
 
 function renderNews(newsData) {
   if (!newsData || !Object.keys(newsData).length) return;
-
   _allNewsItems = [];
   for (const [sym, nd] of Object.entries(newsData)) {
     if (!nd.headlines || !nd.headlines.length) continue;
-    for (const headline of nd.headlines) {
-      _allNewsItems.push({
-        symbol: sym,
-        headline: headline,
-        sentiment: nd.claude_sentiment || 'NEUTRAL',
-        keyword_score: nd.keyword_score || 0,
-        catalyst: nd.claude_catalyst || '',
-        recency: nd.recency_hours || 999,
-        news_score: nd.news_score || 0,
-      });
-    }
+    // One entry per symbol using the first (most recent) headline
+    _allNewsItems.push({
+      symbol: sym,
+      headline: nd.headlines[0],
+      sentiment: nd.claude_sentiment || 'NEUTRAL',
+      keyword_score: nd.keyword_score || 0,
+      catalyst: nd.claude_catalyst || '',
+      recency: nd.recency_hours || 999,
+      news_score: nd.news_score || 0,
+      url: 'https://finance.yahoo.com/quote/' + encodeURIComponent(sym) + '/news/',
+    });
   }
   filterNews();
 }
 
 function filterNews() {
-  const list = document.getElementById('news-list');
+  const feed    = document.getElementById('news-feed');
   const keyword = (document.getElementById('news-keyword').value || '').toLowerCase();
   const ticker  = (document.getElementById('news-ticker').value || '').toUpperCase().trim();
   const sortBy  = document.getElementById('news-sort').value;
   const sentFilter = document.getElementById('news-sentiment-filter').value;
 
   let items = [..._allNewsItems];
-
-  // Keyword filter
-  if (keyword) items = items.filter(i => i.headline.toLowerCase().includes(keyword) || i.catalyst.toLowerCase().includes(keyword));
-  // Ticker filter
-  if (ticker)  items = items.filter(i => i.symbol.includes(ticker));
-  // Sentiment filter
+  if (keyword)            items = items.filter(i => i.headline.toLowerCase().includes(keyword) || i.catalyst.toLowerCase().includes(keyword));
+  if (ticker)             items = items.filter(i => i.symbol.includes(ticker));
   if (sentFilter !== 'all') items = items.filter(i => i.sentiment === sentFilter);
 
-  // Sort
-  if (sortBy === 'time')   items.sort((a, b) => a.recency - b.recency);
-  if (sortBy === 'score')  items.sort((a, b) => b.news_score - a.news_score);
-  if (sortBy === 'ticker') items.sort((a, b) => a.symbol.localeCompare(b.symbol));
+  if (sortBy === 'time')  items.sort((a, b) => a.recency - b.recency);
+  if (sortBy === 'score') items.sort((a, b) => b.news_score - a.news_score);
+  if (sortBy === 'macro') items.sort((a, b) => _macroScore(b) - _macroScore(a));
 
-  document.getElementById('news-count').textContent = items.length + ' / ' + _allNewsItems.length + ' headlines';
+  document.getElementById('news-count').textContent = items.length + ' stories';
+  window._newsItems = items;
 
   if (!items.length) {
-    list.innerHTML = '<div class="empty">No matching headlines.</div>';
+    feed.innerHTML = '<div class="empty">No matching stories.</div>';
     return;
   }
 
-  list.innerHTML = items.map(item => {
-    const badgeClass = item.sentiment === 'BULLISH' ? 'badge-bullish' :
-                       item.sentiment === 'BEARISH' ? 'badge-bearish' : 'badge-neutral';
-    const badgeText  = item.sentiment === 'BULLISH' ? '▲ BULL' :
-                       item.sentiment === 'BEARISH' ? '▼ BEAR' : '— NEUTRAL';
-    const kwText = item.keyword_score !== 0 ? `kw: ${item.keyword_score > 0 ? '+' : ''}${item.keyword_score}` : '';
-    const ageText = item.recency < 1 ? 'Just now' :
-                    item.recency < 24 ? Math.round(item.recency) + 'h ago' :
-                    Math.round(item.recency / 24) + 'd ago';
-    const url = 'https://finance.yahoo.com/quote/' + encodeURIComponent(item.symbol) + '/news/';
+  // Pick hero: highest macro score among top items
+  let heroIdx = 0, bestScore = -1;
+  items.forEach((item, i) => {
+    const s = _macroScore(item);
+    if (s > bestScore) { bestScore = s; heroIdx = i; }
+  });
 
-    return `<a class="news-item" href="${url}" target="_blank" rel="noopener" style="display:flex;align-items:flex-start;gap:8px">
-      <span class="news-badge ${badgeClass}" style="flex-shrink:0">${badgeText}</span>
-      <span style="color:var(--orange);font-weight:600;font-size:11px;min-width:48px;flex-shrink:0">${esc(item.symbol)}</span>
-      <div class="news-content" style="flex:1;min-width:0">
-        <div class="news-headline" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(item.headline)}</div>
-        <div class="news-meta">
-          <span>${esc(ageText)}</span>
-          <span>Score: ${item.news_score}/10</span>
-          ${kwText ? `<span class="news-kw">${esc(kwText)}</span>` : ''}
-          ${item.catalyst ? `<span style="color:var(--orange)">${esc(item.catalyst)}</span>` : ''}
-        </div>
-      </div>
-    </a>`;
-  }).join('');
+  const hero = items[heroIdx];
+  const rest = items.filter((_, i) => i !== heroIdx);
+  // grid indices must map back into window._newsItems, hero is at heroIdx
+  const gridHtml = rest.length
+    ? '<div class="news-grid">' + rest.map((item, i) => {
+        const origIdx = i < heroIdx ? i : i + 1;
+        return _renderCard(item, origIdx);
+      }).join('') + '</div>'
+    : '';
+
+  feed.innerHTML = _renderHero(hero, heroIdx) + gridHtml;
+}
+
+function openNewsDrawer(idx) {
+  const item = (window._newsItems || [])[idx];
+  if (!item) return;
+  const badgeCls = item.sentiment === 'BULLISH' ? 'badge-bullish' : item.sentiment === 'BEARISH' ? 'badge-bearish' : 'badge-neutral';
+  const badgeTxt = item.sentiment === 'BULLISH' ? '▲ BULLISH' : item.sentiment === 'BEARISH' ? '▼ BEARISH' : '— NEUTRAL';
+  document.getElementById('nd-sym').textContent  = item.symbol;
+  document.getElementById('nd-title').textContent = item.headline;
+  document.getElementById('nd-link').href = item.url || '#';
+  document.getElementById('nd-hl').textContent   = item.headline;
+  document.getElementById('nd-badge-row').innerHTML =
+    `<span class="news-badge ${badgeCls}">${badgeTxt}</span>
+     <span style="font-size:10px;color:var(--muted2)">Score ${item.news_score}/10</span>
+     ${item.keyword_score !== 0 ? `<span style="font-size:10px;color:var(--orange)">kw ${item.keyword_score > 0 ? '+' : ''}${item.keyword_score}</span>` : ''}`;
+  document.getElementById('nd-meta').innerHTML =
+    `<span>${_ageStr(item.recency)}</span><span>Via Yahoo Finance</span>`;
+  const cw = document.getElementById('nd-catalyst-wrap');
+  if (item.catalyst) {
+    document.getElementById('nd-catalyst').textContent = item.catalyst;
+    cw.style.display = '';
+  } else {
+    cw.style.display = 'none';
+  }
+  document.getElementById('news-overlay').classList.add('open');
+  document.getElementById('news-drawer').classList.add('open');
+}
+
+function closeNewsDrawer() {
+  document.getElementById('news-overlay').classList.remove('open');
+  document.getElementById('news-drawer').classList.remove('open');
 }
 
 // ── Agent Conversation ─────────────────────────────────────
