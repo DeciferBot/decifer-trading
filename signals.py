@@ -1044,6 +1044,7 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
         # ── VWAP — institutional anchor (intraday only) ─────
         # Use Alpaca's exchange-calculated VWAP if present (more accurate than
         # reconstructed VWAP from OHLCV). Fall back to cumulative calculation.
+        vwap_sd_pct = 1.0  # default: 1% if insufficient data
         if tf == "5m" and volume.sum() > 0:
             native_vwap = df.get("vwap") if hasattr(df, "get") else None
             if native_vwap is not None and hasattr(native_vwap, 'iloc'):
@@ -1060,6 +1061,10 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
                 vwap_val = float(vwap_series.iloc[-1])
             # Distance from VWAP as % of price — positive = above VWAP (bullish)
             vwap_dist = ((p - vwap_val) / vwap_val) * 100 if vwap_val > 0 else 0.0
+            # SD of close deviations from rolling VWAP — used for dynamic overextension threshold
+            if vwap_val > 0 and len(close) > 1:
+                devs = (close - vwap_series) / vwap_series * 100
+                vwap_sd_pct = max(0.1, float(devs.std()))
         else:
             vwap_val = p
             vwap_dist = 0.0
@@ -1242,6 +1247,7 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
             # Flow
             "vwap":             round(vwap_val, 4),
             "vwap_dist":        round(vwap_dist, 2),
+            "vwap_sd_pct":      round(vwap_sd_pct, 3),
             "obv_slope":        round(obv_slope, 0),
             # Breakout
             "donch_high":       round(donch_high, 4),
