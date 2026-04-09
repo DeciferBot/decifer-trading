@@ -384,7 +384,12 @@ def check_external_closes(regime: dict):
                     exit_type = "manual"
                 # ── Build thesis-level reason (GAP-002) ────────────────────
                 entry_regime  = trade.get("entry_regime", "UNKNOWN")
-                exit_regime   = regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN"
+                # Prefer session_character in regime dict (set by dispatcher) so the
+                # exit label uses the same vocabulary as the entry label.
+                exit_regime   = (
+                    (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
+                    if isinstance(regime, dict) else "UNKNOWN"
+                )
                 trade_type_ex = trade.get("trade_type", "SCALP")
                 try:
                     held_mins = int(
@@ -394,9 +399,21 @@ def check_external_closes(regime: dict):
                     )
                 except Exception:
                     held_mins = 0
+                # Compare polarities (BULL/BEAR) rather than exact strings so that
+                # mixed-vocabulary comparisons (e.g. RELIEF_RALLY vs BULL_TRENDING)
+                # don't spuriously trigger breached_regime_shift.
+                def _polarity(s: str) -> str:
+                    r = (s or "").upper()
+                    if r in ("MOMENTUM_BULL", "RELIEF_RALLY") or "BULL" in r:
+                        return "BULL"
+                    if r in ("TRENDING_BEAR", "DISTRIBUTION") or "BEAR" in r:
+                        return "BEAR"
+                    return ""
+                entry_pol = _polarity(entry_regime)
+                exit_pol  = _polarity(exit_regime)
                 if exit_type == "tp_hit":
                     thesis_class = "confirmed"
-                elif entry_regime != "UNKNOWN" and entry_regime != exit_regime:
+                elif entry_pol and exit_pol and entry_pol != exit_pol:
                     thesis_class = "breached_regime_shift"
                 elif trade_type_ex == "SCALP" and held_mins > CONFIG.get("scalp_max_hold_minutes", 90):
                     thesis_class = "breached_stale_scalp"

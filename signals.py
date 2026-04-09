@@ -2313,27 +2313,21 @@ def get_regime_threshold(regime: str) -> int:
     """
     Return the minimum score threshold for the given market regime.
 
-    Thresholds are relative to config's min_score_to_trade (base) so that
-    paper trading vs live configs automatically scale together.
-    Offsets and floors are configurable in config.py.
+    All non-circuit-breaker regimes use the same base threshold.
+    Quality filtering is the Opus reasoning layer's job — a uniform bar
+    means Opus sees the same candidate quality regardless of regime label.
+
+    The only special case is the extreme circuit breaker (PANIC / EXTREME_STRESS):
+    threshold 99 blocks all mechanically-scored signals, consistent with the
+    hard gate in check_risk_conditions().
 
     Returns an int score threshold (0-99).
     """
-    base         = CONFIG["min_score_to_trade"]
-    bear_offset  = CONFIG.get("regime_threshold_bear_offset",   -3)
-    choppy_offset= CONFIG.get("regime_threshold_choppy_offset", -6)
-    panic        = CONFIG.get("regime_threshold_panic",          99)
-    bear_min     = CONFIG.get("regime_threshold_bear_min",       15)
-    choppy_min   = CONFIG.get("regime_threshold_choppy_min",     12)
-
-    thresholds = {
-        "BULL_TRENDING": base,
-        "BEAR_TRENDING": max(bear_min,   base + bear_offset),
-        "CHOPPY":        max(choppy_min, base + choppy_offset),
-        "PANIC":         panic,
-        "UNKNOWN":       max(bear_min,   base + bear_offset),
-    }
-    return thresholds.get(regime, base)
+    base  = CONFIG["min_score_to_trade"]
+    panic = CONFIG.get("regime_threshold_panic", 99)
+    if regime in ("PANIC", "EXTREME_STRESS"):
+        return panic
+    return base
 
 
 def score_universe(symbols: list, regime: str = "UNKNOWN",

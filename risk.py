@@ -753,12 +753,12 @@ def check_sector_concentration(new_symbol: str, open_positions: list,
         sector_weights = monitor.calculate_sector_weights(portfolio_dict)
         current_sector_pct = sector_weights.get(new_sector, 0.0)
 
-        regime_limits = {
-            "NORMAL": min(max_sector, 0.30),
-            "CHOPPY": min(max_sector, 0.20),
-            "PANIC":  min(max_sector, 0.15),
-        }
-        limit = regime_limits.get(regime, max_sector)
+        # Single limit for all regimes; circuit breaker tighter.
+        # Regime-label-based limits removed — Opus handles what to trade.
+        if regime in ("PANIC", "EXTREME_STRESS"):
+            limit = min(max_sector, 0.15)
+        else:
+            limit = min(max_sector, 0.30)
 
         if current_sector_pct >= limit:
             return False, (
@@ -873,24 +873,13 @@ def get_intraday_strategy_mode(portfolio_value: float,
         mode = "DEFENSIVE"
         log.info(f"Strategy mode escalated to DEFENSIVE from consecutive losses ({_consecutive_losses})")
 
-    regime_changed = get_regime_changed(current_regime)
-    if regime_changed and mode == "NORMAL":
-        mode = "DEFENSIVE"
-        log.info(f"Strategy mode escalated to DEFENSIVE — regime changed from "
-                 f"{_session_opening_regime} to {current_regime}")
-
     if mode == "DEFENSIVE":
         context = (
             f"STRATEGY MODE: DEFENSIVE — We have lost {abs(daily_pnl_pct * 100):.1f}% today "
             f"({_consecutive_losses} consecutive losses). "
             "Entry bar is ELEVATED. Only trade exceptional setups — no marginal trades. "
-            f"Reduce all recommended position sizes to 70% of normal. Max 2 new positions this scan."
+            "Reduce all recommended position sizes to 70% of normal. Max 2 new positions this scan."
         )
-        if regime_changed:
-            context += (
-                f" NOTE: Market regime has shifted from {_session_opening_regime} to {current_regime} "
-                "since session open — validate every proposed setup against the new environment."
-            )
     elif mode == "RECOVERY":
         context = (
             f"STRATEGY MODE: RECOVERY — We have lost {abs(daily_pnl_pct * 100):.1f}% today "
@@ -899,18 +888,8 @@ def get_intraday_strategy_mode(portfolio_value: float,
             "outstanding with high conviction. Position sizes at 50% of normal. "
             "If there is any doubt, the answer is NO TRADE. Cash is a valid and preferred position."
         )
-        if regime_changed:
-            context += (
-                f" NOTE: Market regime has shifted from {_session_opening_regime} to {current_regime} "
-                "since session open — re-evaluate everything against current conditions."
-            )
     else:
         context = ""
-        if regime_changed:
-            context = (
-                f"NOTE: Market regime has changed from {_session_opening_regime} to {current_regime} "
-                "since session open. Validate all proposed setups against the new environment."
-            )
 
     params = _MODE_PARAMS[mode]
     _strategy_size_multiplier = params["size_multiplier"]
@@ -925,7 +904,6 @@ def get_intraday_strategy_mode(portfolio_value: float,
         "size_multiplier":      params["size_multiplier"],
         "max_new_trades":       params["max_new_trades"],
         "context":              context,
-        "regime_changed":       regime_changed,
         "daily_pnl_pct":        daily_pnl_pct,
     }
 

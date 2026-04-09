@@ -1,13 +1,11 @@
 """Tests for signals.get_regime_threshold().
 
-Covers:
-- BULL_TRENDING uses base threshold unchanged
-- BEAR_TRENDING applies negative offset with floor
-- CHOPPY applies larger negative offset with floor
-- PANIC returns configured panic value (blocks all trades)
-- UNKNOWN treated same as BEAR_TRENDING
-- Offsets and floors are config-driven, not hardcoded
-- Unknown regime name falls back to base
+New behaviour (post north-star regime-as-reasoning-input):
+- All non-circuit-breaker regimes return the same base threshold.
+  Quality filtering is the Opus reasoning layer's job — a uniform bar
+  means Opus sees the same candidate quality regardless of regime label.
+- PANIC and EXTREME_STRESS return the configured panic value (blocks all trades).
+- Unknown regime names fall back to base.
 """
 from __future__ import annotations
 import os
@@ -28,92 +26,65 @@ if "signals" in sys.modules and not hasattr(sys.modules["signals"], "__file__"):
 from signals import get_regime_threshold
 
 
-class TestRegimeThresholdDefaults:
-    """Default config values (as shipped in config.py)."""
+class TestRegimeThresholdFlat:
+    """All non-circuit-breaker regimes return base — no regime-specific offsets."""
 
     def test_bull_trending_uses_base(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 20)
         assert get_regime_threshold("BULL_TRENDING") == 20
 
-    def test_bear_trending_applies_offset(self, monkeypatch):
+    def test_bear_trending_uses_base(self, monkeypatch):
+        """BEAR_TRENDING no longer gets a lowered threshold — same bar as BULL."""
         monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 20)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_bear_offset", -3)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_bear_min", 15)
-        assert get_regime_threshold("BEAR_TRENDING") == 17  # max(15, 20-3)
+        assert get_regime_threshold("BEAR_TRENDING") == 20
 
-    def test_choppy_applies_offset(self, monkeypatch):
+    def test_choppy_uses_base(self, monkeypatch):
+        """CHOPPY no longer gets a lowered threshold — Opus filters instead."""
         monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 20)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_choppy_offset", -6)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_choppy_min", 12)
-        assert get_regime_threshold("CHOPPY") == 14  # max(12, 20-6)
+        assert get_regime_threshold("CHOPPY") == 20
 
-    def test_panic_blocks_all(self, monkeypatch):
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_panic", 99)
-        assert get_regime_threshold("PANIC") == 99
-
-    def test_unknown_treated_like_bear(self, monkeypatch):
+    def test_unknown_uses_base(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 20)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_bear_offset", -3)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_bear_min", 15)
-        assert get_regime_threshold("UNKNOWN") == get_regime_threshold("BEAR_TRENDING")
+        assert get_regime_threshold("UNKNOWN") == 20
 
     def test_unrecognised_regime_falls_back_to_base(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 22)
         assert get_regime_threshold("SIDEWAYS_MOON") == 22
 
+    def test_all_non_circuit_breaker_regimes_equal(self, monkeypatch):
+        """Core invariant: every non-circuit-breaker regime returns the same threshold."""
+        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 18)
+        base = 18
+        for regime in ("BULL_TRENDING", "BEAR_TRENDING", "CHOPPY", "UNKNOWN",
+                       "MOMENTUM_BULL", "RELIEF_RALLY", "FEAR_ELEVATED",
+                       "DISTRIBUTION", "TRENDING_BEAR"):
+            assert get_regime_threshold(regime) == base, \
+                f"Expected {base} for {regime}, got {get_regime_threshold(regime)}"
 
-class TestRegimeThresholdConfigurable:
-    """Offsets and floors drive the threshold — not hardcoded magic numbers."""
 
-    def test_bear_offset_configurable(self, monkeypatch):
-        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 20)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_bear_offset", -5)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_bear_min", 10)
-        assert get_regime_threshold("BEAR_TRENDING") == 15  # max(10, 20-5)
+class TestCircuitBreakerThreshold:
+    """PANIC and EXTREME_STRESS block all mechanically-scored signals."""
 
-    def test_choppy_offset_configurable(self, monkeypatch):
-        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 20)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_choppy_offset", -10)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_choppy_min", 8)
-        assert get_regime_threshold("CHOPPY") == 10  # max(8, 20-10)
+    def test_panic_blocks_all(self, monkeypatch):
+        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_panic", 99)
+        assert get_regime_threshold("PANIC") == 99
+
+    def test_extreme_stress_blocks_all(self, monkeypatch):
+        """EXTREME_STRESS (new session_character label) also triggers the circuit breaker."""
+        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_panic", 99)
+        assert get_regime_threshold("EXTREME_STRESS") == 99
 
     def test_panic_threshold_configurable(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_panic", 50)
         assert get_regime_threshold("PANIC") == 50
 
-    def test_bear_floor_respected(self, monkeypatch):
-        """When base - offset goes below the floor, floor wins."""
-        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 16)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_bear_offset", -3)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_bear_min", 15)
-        # 16 - 3 = 13, but floor is 15 → should return 15
-        assert get_regime_threshold("BEAR_TRENDING") == 15
+    def test_base_changes_scale_all_non_circuit_breaker(self, monkeypatch):
+        """Changing min_score_to_trade scales all non-panic thresholds together."""
+        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 14)
+        assert get_regime_threshold("BULL_TRENDING") == 14
+        assert get_regime_threshold("CHOPPY") == 14
+        assert get_regime_threshold("FEAR_ELEVATED") == 14
 
-    def test_choppy_floor_respected(self, monkeypatch):
-        """When base - offset goes below the floor, floor wins."""
-        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 16)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_choppy_offset", -6)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_choppy_min", 12)
-        # 16 - 6 = 10, but floor is 12 → should return 12
-        assert get_regime_threshold("CHOPPY") == 12
-
-    def test_zero_offset_leaves_threshold_unchanged(self, monkeypatch):
-        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 25)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_bear_offset", 0)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_bear_min", 0)
-        assert get_regime_threshold("BEAR_TRENDING") == 25
-
-    def test_scales_with_paper_vs_live_base(self, monkeypatch):
-        """Paper (base=18) and live (base=28) both scale correctly."""
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_bear_offset", -3)
-        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_bear_min", 15)
-
-        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 18)  # paper
-        paper_threshold = get_regime_threshold("BEAR_TRENDING")
-
-        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 28)  # live
-        live_threshold = get_regime_threshold("BEAR_TRENDING")
-
-        assert live_threshold > paper_threshold
-        assert live_threshold == 25   # max(15, 28-3)
-        assert paper_threshold == 15  # max(15, 18-3)
+        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 28)
+        assert get_regime_threshold("BULL_TRENDING") == 28
+        assert get_regime_threshold("CHOPPY") == 28

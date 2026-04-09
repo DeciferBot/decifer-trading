@@ -88,7 +88,11 @@ def dispatch_signals(
     # Convert signals to candidate dicts, classify the full batch in one call.
     # classify_signals always returns a classification for every candidate.
     candidates    = [_signal_to_candidate(s) for s in signals]
-    market_read, classifications = classify_signals(candidates)
+    session_character, market_read, classifications = classify_signals(candidates, regime=regime)
+    # Propagate session_character into the regime dict so orders_core and
+    # check_external_closes can read it without a separate import.
+    if isinstance(regime, dict):
+        regime["session_character"] = session_character
 
     # Build lookup: symbol → SignalClassification
     # If a symbol appears more than once (shouldn't), last entry wins.
@@ -197,6 +201,7 @@ def dispatch_signals(
                     agent_outputs=agent_outputs,
                     open_time=datetime.now(timezone.utc).isoformat(),
                     candle_gate=signal.candle_gate,
+                    instrument=signal.instrument,
                     advice_pt=advice.profit_target,
                     advice_sl=advice.stop_loss,
                     advice_size_mult=advice.size_multiplier,
@@ -239,6 +244,7 @@ def dispatch_signals(
                     agent_outputs=agent_outputs,
                     open_time=datetime.now(timezone.utc).isoformat(),
                     candle_gate=signal.candle_gate,
+                    instrument=signal.instrument,
                     advice_pt=advice.profit_target,
                     advice_sl=advice.stop_loss,
                     advice_size_mult=advice.size_multiplier,

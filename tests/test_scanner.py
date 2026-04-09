@@ -165,15 +165,17 @@ class TestScannerFilters:
     """Tests get_dynamic_universe filtering behaviour by regime and TV availability."""
 
     def test_filter_by_volume_removes_low_volume(self):
-        """PANIC regime runs only the 2 always-on scans; result contains CORE + FALLBACK."""
+        """EXTREME_STRESS circuit breaker (VIX > panic_min) runs only the 2 always-on scans."""
         ib = MagicMock()
         mock_df = _tv_df(["TVSPY", "TVQQQ"])
+        # Trigger circuit breaker via raw VIX value, not the regime label
+        extreme_regime = {"regime": "PANIC", "vix": 40.0, "vix_1h_change": 0.05}
         # col may not be importable when tradingview-screener is absent — inject a stub
         with patch.object(scanner, "col", _FAKE_COL, create=True):
             with patch.object(scanner, "_TV_AVAILABLE", True):
                 with patch.object(scanner, "_query", return_value=(2, mock_df)) as mock_q:
-                    result = scanner.get_dynamic_universe(ib, regime={"regime": "PANIC"})
-        # Only volume_leaders + rel_vol_surge are not gated by is_panic
+                    result = scanner.get_dynamic_universe(ib, regime=extreme_regime)
+        # Only volume_leaders + rel_vol_surge run when circuit breaker fires
         assert mock_q.call_count == 2, f"Expected 2 always-on scans, got {mock_q.call_count}"
         for sym in scanner.CORE_SYMBOLS:
             assert sym in result
@@ -223,20 +225,27 @@ class TestScannerRanking:
     """Tests get_market_regime regime classification via mocked _safe_download."""
 
     def test_rank_candidates_returns_sorted_list(self):
-        """Low VIX + SPY/QQQ above 20-EMA → BULL_TRENDING."""
+        """Low VIX + SPY/QQQ above 200d MA → BULL_TRENDING."""
+        scanner._last_good_regime = None  # clear state from prior tests
         ib = MagicMock()
-        # Prices start low then spike so last value is above EMA
+        # Intraday prices: last value 510 is above the 200d MA (490)
         above_prices = [490.0] * 38 + [510.0, 510.0]
         spy_df = _price_df(above_prices)
         qqq_df = _price_df(above_prices)
         vix_df = _price_df(14.0)
+        # Daily DataFrame: 200 bars all at 490 → 200d MA = 490, current 510 > 490
+        daily_dates = pd.date_range(end=pd.Timestamp.today(), periods=200, freq="D")
+        daily_df = pd.DataFrame({"Close": [490.0] * 200}, index=daily_dates)
 
         def mock_dl(ticker, **kw):
+            if kw.get("interval") == "1d":
+                if ticker in ("SPY", "QQQ"): return daily_df
+                return pd.DataFrame()
             if ticker == "SPY": return spy_df
             if ticker == "QQQ": return qqq_df
             return vix_df
 
-        with patch("scanner._safe_download", side_effect=mock_dl):
+        with patch("scanner._regime_download", side_effect=mock_dl):
             with patch.dict(scanner.CONFIG, _VIX_CFG):
                 result = scanner.get_market_regime(ib)
         assert result["regime"] == "BULL_TRENDING"
@@ -253,7 +262,7 @@ class TestScannerRanking:
             if ticker == "QQQ": return qqq_df
             return vix_df
 
-        with patch("scanner._safe_download", side_effect=mock_dl):
+        with patch("scanner._regime_download", side_effect=mock_dl):
             with patch.dict(scanner.CONFIG, _VIX_CFG):
                 result = scanner.get_market_regime(ib)
         assert result["regime"] == "PANIC"
@@ -265,13 +274,18 @@ class TestScannerRanking:
         spy_df = _price_df(above_prices)
         qqq_df = _price_df(above_prices)
         vix_df = _price_df(14.0)
+        daily_dates = pd.date_range(end=pd.Timestamp.today(), periods=200, freq="D")
+        daily_df = pd.DataFrame({"Close": [490.0] * 200}, index=daily_dates)
 
         def mock_dl(ticker, **kw):
+            if kw.get("interval") == "1d":
+                if ticker in ("SPY", "QQQ"): return daily_df
+                return pd.DataFrame()
             if ticker == "SPY": return spy_df
             if ticker == "QQQ": return qqq_df
             return vix_df
 
-        with patch("scanner._safe_download", side_effect=mock_dl):
+        with patch("scanner._regime_download", side_effect=mock_dl):
             with patch.dict(scanner.CONFIG, _VIX_CFG):
                 result = scanner.get_market_regime(ib)
         for key in ("regime", "vix", "spy_price", "spy_above_200d",

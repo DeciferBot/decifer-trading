@@ -305,10 +305,10 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
       ALWAYS:
         1. Volume leaders        — most active by raw volume
         2. Relative vol surge    — rel_vol > 1.5×, momentum confirmation
-      DIRECTIONAL (regime-weighted):
+      DIRECTIONAL (always, at fixed limits):
         3. Momentum longs        — RSI 1h 45–68, MACD positive
         4. Momentum shorts       — RSI 1h 32–55, MACD negative
-      SHORT-CANDIDATE PIPELINE (roadmap #02 — all non-PANIC regimes):
+      SHORT-CANDIDATE PIPELINE:
         5. Breakdown             — price below EMA20/50, bearish alignment
         6. Volume distribution   — heavy selling on 2x+ volume
         7. Bearish momentum      — RSI < 40, MACD bearish crossover
@@ -317,11 +317,14 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
         9. Gap & go + gap-down   — overnight gaps > 3%
        10. Pre-market movers     — pm_change > 3%
 
-    Regime scaling:
-      BULL_TRENDING → long scans full, short/breakdown scans reduced
-      BEAR_TRENDING → short/breakdown scans full, long scans reduced
-      CHOPPY        → breakdown + distribution scans run (fixes old blind spot)
-      PANIC         → core + fallback only
+    All scans run every cycle at fixed limits — regime is not a behavioral gate.
+    Regime context is passed to the Opus reasoning layer which decides signal by
+    signal what to trade.
+
+    Circuit breaker: if VIX is in extreme panic territory (> vix_panic_min or
+    +20% spike), only the non-directional watchlist scans run (volume_leaders,
+    rel_vol_surge). Directional scans are skipped — this is a safety stop, not
+    a reasoning gate.
 
     The `ib` parameter is retained for API compatibility.
     """
@@ -337,11 +340,16 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
             symbols.add(etf)
             log.debug("Sector rotation: adding leader %s to universe", etf)
 
-    regime_name = (regime or {}).get("regime", "UNKNOWN")
-    is_panic    = regime_name == "PANIC"
-    is_bull     = regime_name == "BULL_TRENDING"
-    is_bear     = regime_name == "BEAR_TRENDING"
-    is_choppy   = regime_name in ("CHOPPY", "UNKNOWN")
+    # ── Circuit breaker — extreme VIX only ────────────────────
+    _vix      = (regime or {}).get("vix", 0)
+    _vix_1h   = (regime or {}).get("vix_1h_change", 0)
+    _is_extreme = (
+        _vix > CONFIG.get("vix_panic_min", 35) or
+        _vix_1h > CONFIG.get("vix_spike_pct", 0.20)
+    )
+    if _is_extreme:
+        log.warning(f"Universe: EXTREME_STRESS circuit breaker — VIX={_vix:.1f} spike={_vix_1h:.1%}. "
+                    "Directional scans skipped.")
 
     total_from_tv = 0
 
@@ -351,7 +359,7 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
         log.info(f"Universe (fallback): {len(symbols)} symbols")
         return list(symbols)
 
-    # ── Build query list (regime-conditional) ─────────────────────────────────
+    # ── Build query list ──────────────────────────────────────────────────────
     # Each entry: (name, _query kwargs).  Queries are independent — run in parallel.
     # _extract() modifies shared state so it runs serially after all fetches.
     _scan_tasks: list[tuple[str, dict]] = []
@@ -368,32 +376,28 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
         sort_by="relative_volume_10d_calc", ascending=False, limit=25,
     )))
 
-    # 3. Momentum longs — skip in CHOPPY/PANIC
-    if not is_panic and not is_choppy:
-        long_limit = 25 if is_bull else 12
+    if not _is_extreme:
+        # 3. Momentum longs
         _scan_tasks.append(("momentum_long", dict(
             extra_filters=[
                 col("RSI|60").between(45, 68),
                 col("MACD.macd|60") > col("MACD.signal|60"),
                 col("relative_volume_10d_calc") > 1.2,
             ],
-            sort_by="relative_volume_10d_calc", ascending=False, limit=long_limit,
+            sort_by="relative_volume_10d_calc", ascending=False, limit=20,
         )))
 
-    if not is_panic:
         # 4. Momentum shorts
-        short_limit = 25 if is_bear else 12
         _scan_tasks.append(("momentum_short", dict(
             extra_filters=[
                 col("RSI|60").between(32, 55),
                 col("MACD.macd|60") < col("MACD.signal|60"),
                 col("relative_volume_10d_calc") > 1.2,
             ],
-            sort_by="relative_volume_10d_calc", ascending=False, limit=short_limit,
+            sort_by="relative_volume_10d_calc", ascending=False, limit=20,
         )))
 
-        # 5. Breakdown — below EMA20/50 (all non-PANIC regimes, including CHOPPY)
-        breakdown_limit = 25 if is_bear else (15 if is_choppy else 10)
+        # 5. Breakdown — below EMA20/50
         _scan_tasks.append(("breakdown", dict(
             extra_filters=[
                 col("close") < col("EMA20"),
@@ -401,21 +405,19 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
                 col("change") < -1.0,
                 col("relative_volume_10d_calc") > 1.2,
             ],
-            sort_by="change", ascending=True, limit=breakdown_limit,
+            sort_by="change", ascending=True, limit=15,
         )))
 
         # 6. Volume distribution — heavy selling
-        dist_limit = 20 if is_bear else 10
         _scan_tasks.append(("volume_distribution", dict(
             extra_filters=[
                 col("relative_volume_10d_calc") > 2.0,
                 col("change") < -2.0,
             ],
-            sort_by="relative_volume_10d_calc", ascending=False, limit=dist_limit,
+            sort_by="relative_volume_10d_calc", ascending=False, limit=12,
         )))
 
         # 7. Bearish momentum
-        bear_mom_limit = 20 if is_bear else (12 if is_choppy else 8)
         _scan_tasks.append(("bearish_momentum", dict(
             extra_filters=[
                 col("RSI|60") < 40,
@@ -423,7 +425,7 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
                 col("change") < -0.5,
                 col("relative_volume_10d_calc") > 1.0,
             ],
-            sort_by="RSI|60", ascending=True, limit=bear_mom_limit,
+            sort_by="RSI|60", ascending=True, limit=12,
         )))
 
         # 8. Intraday breakdown
@@ -441,7 +443,7 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
         # 9b. Gap down — short candidates
         _scan_tasks.append(("gap_down", dict(
             extra_filters=[col("gap").between(-50.0, -3.0), col("volume") > 1_000_000],
-            sort_by="gap", ascending=True, limit=10,
+            sort_by="gap", ascending=True, limit=15,
         )))
 
         # 10. Pre-market movers
@@ -479,7 +481,7 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
     log.info(
         f"Universe: {len(symbols)} symbols | "
         f"{total_from_tv} TV hits | "
-        f"regime={regime_name}"
+        f"vix={_vix:.1f} extreme={_is_extreme}"
     )
     return list(symbols)
 
@@ -585,8 +587,8 @@ def get_market_regime(ib: IB) -> dict:
         spy_200d_ma    = None
         qqq_200d_ma    = None
         try:
-            spy_daily = _regime_download("SPY", period="1y", interval="1d", auto_adjust=True)
-            qqq_daily = _regime_download("QQQ", period="1y", interval="1d", auto_adjust=True)
+            spy_daily = _dl("SPY", period="1y", interval="1d", auto_adjust=True)
+            qqq_daily = _dl("QQQ", period="1y", interval="1d", auto_adjust=True)
             if spy_daily is not None and len(spy_daily) >= 50:
                 spy_d_close   = spy_daily["Close"].squeeze().dropna()
                 spy_200d_ma   = float(spy_d_close.rolling(min(200, len(spy_d_close))).mean().iloc[-1])
@@ -617,7 +619,7 @@ def get_market_regime(ib: IB) -> dict:
         if breadth_cfg.get("enabled", True):
             try:
                 _bt = breadth_cfg.get("ticker", "^MMTH")
-                _bd = _regime_download(_bt, period="5d", interval="1d", auto_adjust=True)
+                _bd = _dl(_bt, period="5d", interval="1d", auto_adjust=True)
                 if _bd is not None and len(_bd) > 0:
                     breadth_pct = float(_bd["Close"].squeeze().dropna().iloc[-1])
             except Exception as _be:
@@ -660,7 +662,7 @@ def get_market_regime(ib: IB) -> dict:
         credit_spread = None
         if CONFIG.get("cross_asset_regime_enabled", True):
             try:
-                _dxy = _regime_download("DX-Y.NYB", period="5d", interval="1d", auto_adjust=True)
+                _dxy = _dl("DX-Y.NYB", period="5d", interval="1d", auto_adjust=True)
                 if _dxy is not None and len(_dxy) >= 3:
                     _dxy_c = _dxy["Close"].squeeze().dropna()
                     _dxy_3d = float(_dxy_c.iloc[-1]) - float(_dxy_c.iloc[-3])
@@ -669,8 +671,8 @@ def get_market_regime(ib: IB) -> dict:
                 log.debug("DXY fetch failed: %s", _de)
 
             try:
-                _hyg = _regime_download("HYG", period="5d", interval="1d", auto_adjust=True)
-                _lqd = _regime_download("LQD", period="5d", interval="1d", auto_adjust=True)
+                _hyg = _dl("HYG", period="5d", interval="1d", auto_adjust=True)
+                _lqd = _dl("LQD", period="5d", interval="1d", auto_adjust=True)
                 if _hyg is not None and _lqd is not None and len(_hyg) >= 3 and len(_lqd) >= 3:
                     _hyg_c = _hyg["Close"].squeeze().dropna()
                     _lqd_c = _lqd["Close"].squeeze().dropna()

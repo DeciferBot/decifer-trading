@@ -248,8 +248,17 @@ Review each position and output SYMBOL / ACTION / REASON for every one."""
 # ══════════════════════════════════════════════════════════════
 
 def _regime_polarity(regime_str: str) -> str:
-    """Return 'BULL', 'BEAR', or '' from a regime label string."""
+    """Return 'BULL', 'BEAR', or '' from a regime label string.
+    Handles both legacy mechanical labels (BULL_TRENDING, BEAR_TRENDING) and
+    the new session_character vocab (MOMENTUM_BULL, RELIEF_RALLY, etc.).
+    """
     r = (regime_str or "").upper()
+    # New session_character vocab — explicit mapping
+    if r in ("MOMENTUM_BULL", "RELIEF_RALLY"):
+        return "BULL"
+    if r in ("TRENDING_BEAR", "DISTRIBUTION"):
+        return "BEAR"
+    # Legacy mechanical labels — substring match
     if "BULL" in r:
         return "BULL"
     if "BEAR" in r:
@@ -281,7 +290,9 @@ def lightweight_cycle_check(
     if not open_positions:
         return []
 
-    current_regime   = regime.get("regime", "UNKNOWN")
+    # Prefer session_character (Opus-generated) over mechanical label so that
+    # the cycle check compares the same vocabulary as entry_regime.
+    current_regime   = regime.get("session_character") or regime.get("regime", "UNKNOWN")
     scalp_max_mins   = pm_cfg.get("scalp_max_hold_minutes", 90)
     scalp_min_pnl    = pm_cfg.get("scalp_min_pnl_pct", 0.003)   # 0.3%
 

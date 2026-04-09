@@ -52,6 +52,40 @@ from orders_contracts import (
 )
 
 
+def _build_entry_thesis(
+    trade_type: str,
+    symbol: str,
+    direction: str,
+    conviction: float,
+    score: int,
+    entry_regime: str,
+) -> str:
+    """
+    Build a falsifiable entry thesis string for a new position.
+    Records what would prove the thesis wrong — not a price level, a condition.
+    Format: "{type} {dir} {sym} | wrong_if: {condition} | regime={regime} conv={conv:.2f} score={score}"
+    """
+    pm = CONFIG.get("portfolio_manager", {})
+    scalp_mins = pm.get("scalp_max_hold_minutes", 90)
+    scalp_pnl  = pm.get("scalp_min_pnl_pct", 0.003) * 100
+
+    tt = (trade_type or "SCALP").upper()
+    if tt == "SCALP":
+        condition = f"momentum does not produce >{scalp_pnl:.1f}% move within {scalp_mins}min"
+    elif tt == "SWING":
+        condition = "regime shifts against entry direction"
+    elif tt == "HOLD":
+        condition = "macro polarity flips (BULL/BEAR) against entry"
+    else:
+        condition = "score collapses or regime contradicts entry direction"
+
+    return (
+        f"{tt} {direction} {symbol} | "
+        f"wrong_if: {condition} | "
+        f"regime={entry_regime} conv={conviction:.2f} score={score}"
+    )
+
+
 def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 score: int, portfolio_value: float, regime: dict,
                 reasoning: str = "",
@@ -557,7 +591,12 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                     "advice_id":        advice_id,
                     "trade_type":       trade_type or "SCALP",
                     "conviction":       conviction,
-                    "entry_regime":     regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
+                    "entry_regime":     (regime.get("session_character") or regime.get("regime", "UNKNOWN")) if isinstance(regime, dict) else "UNKNOWN",
+                    "entry_thesis":     _build_entry_thesis(
+                                            trade_type or "SCALP", symbol, "LONG",
+                                            conviction, score,
+                                            regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
+                                        ),
                     "pattern_id":       pattern_id,
                     "sl_order_id":      _sl_order_id,
                     "high_water_mark":  price,
@@ -926,7 +965,12 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
                     "advice_id":           advice_id,
                     "trade_type":          trade_type or "SCALP",
                     "conviction":          conviction,
-                    "entry_regime":        regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
+                    "entry_regime":        (regime.get("session_character") or regime.get("regime", "UNKNOWN")) if isinstance(regime, dict) else "UNKNOWN",
+                    "entry_thesis":        _build_entry_thesis(
+                                               trade_type or "SCALP", symbol, "SHORT",
+                                               conviction, score,
+                                               regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
+                                           ),
                     "pattern_id":          pattern_id,
                     "sl_order_id":         _sl_order_id,
                     "high_water_mark":     price,
