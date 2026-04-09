@@ -297,6 +297,7 @@ CONFIG = {
     "fx_enabled":    True,               # Master switch for FX scanning + trading
     "fx_pairs":      ["EURUSD", "GBPUSD", "USDJPY"],  # Active pairs
     "fx_min_score":  20,                 # Min composite score to generate FX signal (0-50)
+    "fx_min_lot_size": 20000,            # Minimum lot size for FX orders (units of base currency)
 
     # ── CROSS-ASSET REGIME SIGNALS ────────────────────────────────
     # DXY (dollar) and HYG/LQD (credit spread) as early risk-off indicators.

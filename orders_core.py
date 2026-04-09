@@ -296,6 +296,13 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             qty = max(1, int(max_order_value / price))
             log.warning(f"Order value ${old_qty * price:,.0f} exceeds 20% cap ${max_order_value:,.0f} for {symbol} — reduced qty {old_qty}→{qty}")
 
+        # ── FX minimum lot size ───────────────────────────────────────────
+        if instrument == "fx":
+            fx_min_lot = CONFIG.get("fx_min_lot_size", 20000)
+            if qty < fx_min_lot:
+                log.info(f"FX {symbol}: qty {qty} below min lot {fx_min_lot} — raising to {fx_min_lot}")
+                qty = fx_min_lot
+
         # ── PT / SL — use advisor levels if provided, otherwise ATR formula ──
         if advice_sl > 0 and advice_pt > 0:
             sl, tp = advice_sl, advice_pt
@@ -824,6 +831,13 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
         max_order_value = portfolio_value * 0.20
         if qty * price > max_order_value:
             qty = max(1, int(max_order_value / price))
+
+        # ── FX minimum lot size ───────────────────────────────────────────
+        if instrument == "fx":
+            fx_min_lot = CONFIG.get("fx_min_lot_size", 20000)
+            if qty < fx_min_lot:
+                log.info(f"FX {symbol}: qty {qty} below min lot {fx_min_lot} — raising to {fx_min_lot}")
+                qty = fx_min_lot
 
         # ── PT / SL — use advisor levels if provided, otherwise ATR formula ──
         if advice_sl > 0 and advice_pt > 0:
