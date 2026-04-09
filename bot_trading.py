@@ -1368,10 +1368,10 @@ def run_scan():
     # ── FX direct dispatch ────────────────────────────────────────────────────────
     # FX signals bypass the equity intelligence gate — the fx_signals scorer is the
     # complete decision; no agent classification needed.
-    if CONFIG.get("fx_enabled") and result:
+    if CONFIG.get("fx_enabled") and pipeline:
         try:
             from fx_signals import FX_PAIRS
-            _fx_sigs = [s for s in result.signals if s.symbol in FX_PAIRS]
+            _fx_sigs = [s for s in pipeline.signals if s.symbol in FX_PAIRS]
             _fx_min  = CONFIG.get("fx_min_score", 20)
             for _fxs in _fx_sigs:
                 _fxs_score = int(round(_fxs.conviction_score * 5))
