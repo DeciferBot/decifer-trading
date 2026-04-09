@@ -92,6 +92,7 @@ def _get_nearest_expiry(ticker_obj) -> tuple[str | None, int | None]:
 def _get_earnings_days(ticker_obj) -> int | None:
     """
     Return days until next earnings announcement, or None.
+    Takes a pre-fetched yfinance Ticker object to avoid duplicate network calls.
     Handles the various shapes yfinance.calendar returns.
     """
     try:
@@ -111,13 +112,11 @@ def _get_earnings_days(ticker_obj) -> int | None:
         if ed is None:
             return None
 
-        # Handle list / series
         if isinstance(ed, (list, pd.Series)):
             ed = ed[0] if len(ed) > 0 else None
         if ed is None:
             return None
 
-        # Normalise to date
         if hasattr(ed, "date"):
             ed = ed.date()
         elif isinstance(ed, str):
@@ -173,30 +172,54 @@ def _analyse_symbol(symbol: str, regime: dict = None) -> dict | None:
     Returns an options signal dict or None if nothing notable.
     """
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            ticker = yf.Ticker(symbol)
+        # ── Price + chain: Alpaca OPRA primary, yfinance fallback ─────
+        S = calls = puts = exp_str = dte = None
 
-        # ── Current underlying price ──────────────────────────────────
-        hist = ticker.history(period="2d", interval="1d")
-        if hist is None or hist.empty:
-            return None
-        S = float(hist["Close"].iloc[-1])
-        if S <= 0:
-            return None
+        try:
+            from alpaca_options import (
+                get_underlying_price as _alpaca_price,
+                get_chain            as _alpaca_chain,
+            )
+            _s     = _alpaca_price(symbol)
+            _chain = _alpaca_chain(symbol, _SCAN_MIN_DTE, _SCAN_MAX_DTE)
+            if _s and _s > 0 and _chain:
+                S       = _s
+                calls   = _chain["calls"]
+                puts    = _chain["puts"]
+                exp_str = _chain["expiry_str"]
+                dte     = _chain["dte"]
+        except Exception:
+            pass
 
-        # ── Find nearest expiry in scan window ────────────────────────
-        exp_str, dte = _get_nearest_expiry(ticker)
-        if exp_str is None:
-            return None
+        if S is None or calls is None:
+            # yfinance fallback
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                ticker = yf.Ticker(symbol)
+            hist = ticker.history(period="2d", interval="1d")
+            if hist is None or hist.empty:
+                return None
+            S = float(hist["Close"].iloc[-1])
+            if S <= 0:
+                return None
+            exp_str, dte = _get_nearest_expiry(ticker)
+            if exp_str is None:
+                return None
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                _chain_yf = ticker.option_chain(exp_str)
+            calls = _chain_yf.calls.copy()
+            puts  = _chain_yf.puts.copy()
 
-        # ── Fetch options chain ───────────────────────────────────────
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            chain = ticker.option_chain(exp_str)
-
-        calls = chain.calls.copy()
-        puts  = chain.puts.copy()
+        # ── Earnings calendar (yfinance — lightweight, no chain needed) ──
+        earnings_days = None
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                _ticker_cal = yf.Ticker(symbol)
+            earnings_days = _get_earnings_days(_ticker_cal)
+        except Exception:
+            pass
 
         if calls.empty and puts.empty:
             return None
@@ -241,8 +264,7 @@ def _analyse_symbol(symbol: str, regime: dict = None) -> dict | None:
         # ── IV Rank (uses options.py proxy) ───────────────────────────
         iv_rank = get_iv_rank(symbol, dom_iv)
 
-        # ── Earnings catalyst ─────────────────────────────────────────
-        earnings_days = _get_earnings_days(ticker)
+        # ── Earnings catalyst (already fetched at top of function) ───
 
         # ── Max pain ──────────────────────────────────────────────────
         max_pain = _compute_max_pain(calls, puts)

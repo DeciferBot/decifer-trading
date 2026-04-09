@@ -28,6 +28,7 @@ from typing import Optional
 import anthropic
 
 from config import CONFIG
+from earnings_calendar import get_earnings_within_hours
 
 log = logging.getLogger("decifer.portfolio_manager")
 
@@ -45,7 +46,7 @@ def _get_client() -> anthropic.Anthropic:
 # SYSTEM PROMPT
 # ══════════════════════════════════════════════════════════════
 
-_PM_SYSTEM = """You are the Portfolio Manager for Decifer, an autonomous US equity trading system.
+_PM_SYSTEM = """You are the Portfolio Manager for Decifer, an autonomous trading system.
 
 Your ONLY job is to review currently open positions and decide whether each should be held, \
 trimmed, exited early, or added to. You do NOT enter new trades — that is the Trading Analyst's job.
@@ -56,28 +57,41 @@ ACTIONS (use exactly one per position):
   EXIT  — exit the full position immediately; thesis is broken; do not wait for stop
   ADD   — add to position; signal strengthening, price pulling back to a good level
 
-DECISION FRAMEWORK — reason through these in order for each position:
+TRADE TYPES — each position has a type that determines the right review lens:
+  SCALP — pure technical, short hold. Score drift > 5 points or any regime/news deterioration → EXIT fast.
+          These are meant to be quick. Do not hold a SCALP hoping for recovery.
+  SWING — technical entry with a backing thesis. Moderate tolerance for drift.
+          Score drift 8–14 → TRIM. Drop 15+ → EXIT. News and regime are primary factors.
+  HOLD  — thesis-driven, longer time horizon. Score drift is largely irrelevant.
+          Technical noise should be ignored. EXIT only if the original backing thesis has broken.
+          These are meant to be held through noise. Do not exit a HOLD on a bad day alone.
 
-1. SIGNAL DRIFT: If current score is significantly below entry score, the technical thesis has weakened.
-   - Drop of 15+ points → strong EXIT signal
-   - Drop of 8–14 points → TRIM or EXIT depending on other factors
-   - Within 7 points → HOLD unless other factors override
+DECISION FRAMEWORK — apply in order, weighted by trade_type:
 
-2. NEWS: If a significant negative/positive catalyst has emerged on this symbol, update accordingly.
-   - Negative catalyst on a LONG → EXIT or TRIM
-   - Positive catalyst on a LONG → HOLD or ADD (if price is pulling back)
+1. SIGNAL DRIFT (primary for SCALP/SWING, secondary for HOLD):
+   - SCALP: Drop of 5+ points → EXIT immediately
+   - SWING: Drop of 15+ points → EXIT. Drop 8–14 → TRIM or EXIT on other factors.
+   - HOLD: Score drift alone is not sufficient to exit. Assess thesis integrity instead.
+   - "unscored_today" = scanner did not rescore this cycle. Treat as neutral, not a drop.
 
-3. REGIME SHIFT: If regime has changed since entry, reassess whether the entry thesis still holds.
-   - Entered BULL_TRENDING, now CHOPPY or PANIC → TRIM or EXIT longs
-   - Entered BEAR_TRENDING, now BULL_TRENDING → TRIM or EXIT shorts
+2. NEWS: Significant catalyst on the symbol.
+   - Negative catalyst on a LONG → EXIT (all types) or TRIM (HOLD if thesis survives news)
+   - Positive catalyst on a LONG → HOLD or ADD if pulling back to entry zone
+   - Positive catalyst on a SHORT → EXIT or TRIM (news is against the thesis)
+   - Negative catalyst on a SHORT → HOLD or ADD (news supports the thesis)
 
-4. EARNINGS RISK: If earnings are within 48 hours, make a deliberate hold-or-exit decision.
-   - High conviction position with strong thesis → HOLD through earnings is a choice, not a default
-   - Low conviction or thesis already weakening → EXIT before binary event
+3. REGIME SHIFT: Has the market environment changed since entry?
+   - SCALP/SWING: Regime shift against position direction → EXIT or TRIM
+   - HOLD: Regime shift alone is not sufficient — assess whether the original thesis is broken
 
-5. P&L CONTEXT: Profitable positions get more benefit of the doubt. Losers need a stronger thesis.
-   - Position up >3% with intact signal → HOLD or ADD
-   - Position flat/down with weakening signal → EXIT
+4. EARNINGS RISK: Earnings within 48 hours.
+   - SCALP → EXIT before binary event (no reason to hold through earnings on a scalp)
+   - SWING → Deliberate choice: high conviction intact thesis = HOLD; weakening = EXIT
+   - HOLD → HOLD through earnings is the default if thesis is intact
+
+5. P&L CONTEXT: Profitable positions get more benefit of the doubt. Losers need stronger thesis.
+   - Up >3% with intact signal → HOLD or ADD
+   - Flat/down with weakening signal → EXIT (SCALP/SWING) or TRIM (HOLD)
 
 OUTPUT FORMAT — produce exactly this for every position provided, no exceptions:
 
@@ -90,46 +104,6 @@ RULES:
 - HOLD is the correct answer when the thesis is intact. Do not manufacture action.
 - Be decisive. Vague answers ("maybe trim", "consider exiting") are not allowed.
 - Do not recommend new symbols or comment on market conditions generally."""
-
-
-# ══════════════════════════════════════════════════════════════
-# EARNINGS DETECTION
-# ══════════════════════════════════════════════════════════════
-
-def _check_earnings_within_hours(symbols: list, hours: int = 48) -> set:
-    """
-    Return set of symbols with earnings scheduled within `hours` hours.
-    Uses yfinance calendar — returns empty set on any failure (non-blocking).
-    Caches nothing — called infrequently (event-triggered only).
-    """
-    flagged = set()
-    if not symbols:
-        return flagged
-    try:
-        import yfinance as yf
-        now_utc = datetime.now(timezone.utc)
-        cutoff = now_utc + timedelta(hours=hours)
-        for sym in symbols:
-            try:
-                cal = yf.Ticker(sym).calendar
-                if cal is None or cal.empty:
-                    continue
-                # calendar has columns like 'Earnings Date'
-                for col in cal.columns:
-                    if "earnings" in col.lower():
-                        for val in cal[col].dropna():
-                            if hasattr(val, "to_pydatetime"):
-                                val = val.to_pydatetime()
-                            if isinstance(val, datetime):
-                                if val.tzinfo is None:
-                                    val = val.replace(tzinfo=timezone.utc)
-                                if now_utc <= val <= cutoff:
-                                    flagged.add(sym)
-            except Exception:
-                continue
-    except Exception as exc:
-        log.debug(f"portfolio_manager: earnings check failed ({exc})")
-    return flagged
 
 
 # ══════════════════════════════════════════════════════════════
@@ -175,7 +149,7 @@ def run_portfolio_review(
     # Check earnings
     stock_syms = [p["symbol"] for p in open_positions if p.get("instrument") != "option"]
     earnings_lookahead = pm_cfg.get("earnings_lookahead_hours", 48)
-    earnings_flagged = _check_earnings_within_hours(stock_syms, earnings_lookahead)
+    earnings_flagged = get_earnings_within_hours(stock_syms, earnings_lookahead)
 
     # Build position summaries for the prompt
     now_utc = datetime.now(timezone.utc)
@@ -221,12 +195,15 @@ def run_portfolio_review(
             delta = current_score - entry_score
             score_line += f" → current={current_score}/50 (delta={delta:+d})"
         else:
-            score_line += " → current=not_in_universe"
+            score_line += " → current=unscored_today (scanner did not rescore this cycle)"
 
         earnings_str = f"  *** EARNINGS WITHIN {earnings_lookahead}h ***" if sym in earnings_flagged else ""
 
+        trade_type = p.get("trade_type", "SCALP")
+        conviction = p.get("conviction", 0.0)
+
         pos_lines.append(
-            f"POSITION: {sym} ({instrument}) {direction}\n"
+            f"POSITION: {sym} ({instrument}) {direction}  trade_type={trade_type}  conviction={conviction:.2f}\n"
             f"  entry=${entry_price:.2f} current=${current_price:.2f} "
             f"qty={qty} pnl={pnl_pct:+.1f}%\n"
             f"  {score_line}\n"
@@ -269,6 +246,112 @@ Review each position and output SYMBOL / ACTION / REASON for every one."""
 # ══════════════════════════════════════════════════════════════
 # RESPONSE PARSER
 # ══════════════════════════════════════════════════════════════
+
+def _regime_polarity(regime_str: str) -> str:
+    """Return 'BULL', 'BEAR', or '' from a regime label string.
+    Handles both legacy mechanical labels (BULL_TRENDING, BEAR_TRENDING) and
+    the new session_character vocab (MOMENTUM_BULL, RELIEF_RALLY, etc.).
+    """
+    r = (regime_str or "").upper()
+    # New session_character vocab — explicit mapping
+    if r in ("MOMENTUM_BULL", "RELIEF_RALLY"):
+        return "BULL"
+    if r in ("TRENDING_BEAR", "DISTRIBUTION"):
+        return "BEAR"
+    # Legacy mechanical labels — substring match
+    if "BULL" in r:
+        return "BULL"
+    if "BEAR" in r:
+        return "BEAR"
+    return ""
+
+
+def lightweight_cycle_check(
+    open_positions: list,
+    regime: dict,
+    all_scored: list,
+) -> list:
+    """
+    Fast in-process check run every scan cycle for all open positions.
+    No LLM call. Returns only positions that need action — callers treat
+    missing symbols as HOLD (no change).
+
+    Rules by trade_type:
+      SCALP — time_in_trade > scalp_max_hold_minutes AND pnl < scalp_min_pnl_pct
+               → EXIT: momentum thesis did not fire; free the capital.
+      SWING — regime changed since entry (entry_regime != current_regime)
+               → REVIEW: queue for full Opus PM review this cycle.
+      HOLD  — polar regime flip (BULL→BEAR or BEAR→BULL) since entry
+               → REVIEW: macro backdrop has shifted; thesis integrity check required.
+    """
+    pm_cfg = CONFIG.get("portfolio_manager", {})
+    if not pm_cfg.get("enabled", True):
+        return []
+    if not open_positions:
+        return []
+
+    # Prefer session_character (Opus-generated) over mechanical label so that
+    # the cycle check compares the same vocabulary as entry_regime.
+    current_regime   = regime.get("session_character") or regime.get("regime", "UNKNOWN")
+    scalp_max_mins   = pm_cfg.get("scalp_max_hold_minutes", 90)
+    scalp_min_pnl    = pm_cfg.get("scalp_min_pnl_pct", 0.003)   # 0.3%
+
+    now_utc = datetime.now(timezone.utc)
+    actions = []
+
+    for pos in open_positions:
+        sym           = pos.get("symbol", "")
+        trade_type    = pos.get("trade_type", "SCALP")
+        entry_price   = pos.get("entry", 0)
+        current_price = pos.get("current", entry_price)
+        entry_regime  = pos.get("regime", "")
+
+        try:
+            open_dt   = datetime.fromisoformat(pos.get("open_time", "")).replace(tzinfo=timezone.utc)
+            mins_held = (now_utc - open_dt).total_seconds() / 60
+        except Exception:
+            mins_held = 0
+
+        pnl_pct = ((current_price - entry_price) / entry_price) if entry_price > 0 else 0
+
+        if trade_type == "SCALP":
+            if mins_held > scalp_max_mins and pnl_pct < scalp_min_pnl:
+                actions.append({
+                    "symbol":    sym,
+                    "action":    "EXIT",
+                    "reasoning": (
+                        f"SCALP thesis stale: {mins_held:.0f}m elapsed, "
+                        f"pnl={pnl_pct * 100:+.2f}% (target >{scalp_min_pnl * 100:.1f}%) — "
+                        "momentum did not materialise; exit to free capital"
+                    ),
+                })
+
+        elif trade_type == "SWING":
+            if entry_regime and current_regime and entry_regime != current_regime:
+                actions.append({
+                    "symbol":    sym,
+                    "action":    "REVIEW",
+                    "reasoning": (
+                        f"SWING regime shifted: entry={entry_regime} → now={current_regime}; "
+                        "thesis context changed — full Opus review required"
+                    ),
+                })
+
+        elif trade_type == "HOLD":
+            entry_polarity   = _regime_polarity(entry_regime)
+            current_polarity = _regime_polarity(current_regime)
+            if entry_polarity and current_polarity and entry_polarity != current_polarity:
+                actions.append({
+                    "symbol":    sym,
+                    "action":    "REVIEW",
+                    "reasoning": (
+                        f"HOLD macro backdrop flipped: entry={entry_regime} → now={current_regime}; "
+                        "polar regime shift — thesis integrity check required"
+                    ),
+                })
+
+    return actions
+
 
 def _parse_actions(text: str, open_positions: list) -> list:
     """

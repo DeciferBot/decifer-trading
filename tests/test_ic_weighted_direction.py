@@ -81,13 +81,13 @@ import signals
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-N_DIMS = 9  # canonical dimension count
+N_DIMS = 12  # canonical dimension count
 
 
 def _equal_weights() -> dict:
-    """Return the 9-dimension equal-weight dict (1/9 each)."""
+    """Return the equal-weight dict (1/N_DIMS each) for all canonical dimensions."""
     dims = ["trend", "momentum", "squeeze", "flow", "breakout", "mtf",
-            "news", "social", "reversion"]
+            "news", "social", "reversion", "iv_skew", "pead", "short_squeeze"]
     return {d: 1.0 / N_DIMS for d in dims}
 
 
@@ -312,10 +312,11 @@ class TestICModuleFailureFallback:
 class TestScoreBreakdownPresent:
 
     EXPECTED_DIMS = {"trend", "momentum", "squeeze", "flow", "breakout",
-                     "mtf", "news", "social", "reversion"}
+                     "mtf", "news", "social", "reversion", "iv_skew",
+                     "pead", "short_squeeze"}
 
     def test_score_breakdown_keys_present_bullish(self):
-        """score_breakdown must contain all 9 canonical dimension keys."""
+        """score_breakdown must contain all canonical dimension keys."""
         sig = _bullish_sig_5m()
         with patch("ic_calculator.get_current_weights", return_value=_equal_weights()):
             result = signals.compute_confluence(sig, None, None)

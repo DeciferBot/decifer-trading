@@ -14,7 +14,10 @@ import pathlib
 import sys
 import time
 import threading
+import zoneinfo
 from datetime import datetime, timezone
+
+_ET = zoneinfo.ZoneInfo("America/New_York")
 
 from config import CONFIG
 import bot_state
@@ -26,11 +29,11 @@ from bot_ibkr import sync_orders_from_ibkr, connect_ibkr
 from scanner import get_dynamic_universe, get_market_regime, get_tv_signal_cache
 from signals import fetch_multi_timeframe
 from agents import run_all_agents
-from orders import (execute_buy, execute_sell, flatten_all,
+from orders import (execute_buy, execute_sell, execute_short, flatten_all,
                     get_open_positions, update_position_prices,
                     update_positions_from_ibkr, execute_buy_option,
                     execute_sell_option, update_trailing_stops,
-                    update_tranche_status)
+                    update_tranche_status, flush_pending_option_exits)
 from options import find_best_contract, check_options_exits
 from options_scanner import scan_options_universe
 from risk import (check_risk_conditions, get_session, get_scan_interval,
@@ -39,13 +42,15 @@ from risk import (check_risk_conditions, get_session, get_scan_interval,
                   init_equity_high_water_mark_from_history,
                   get_intraday_strategy_mode, set_session_opening_regime,
                   check_thesis_validity, get_consecutive_losses)
+from risk_gates import auto_rebalance_cash
+from orders import _options_attempted_today, _record_options_attempt
 from learning import (log_trade, load_trades, load_orders,
                       get_performance_summary, run_weekly_review,
                       TRADE_LOG_FILE, get_effective_capital)
-from signal_types import Signal, SIGNALS_LOG
+from signal_types import Signal
 from signal_dispatcher import dispatch_signals as _dispatch_signals
 from signal_pipeline import run_signal_pipeline, SignalPipelineResult
-from portfolio_manager import run_portfolio_review
+from portfolio_manager import run_portfolio_review, lightweight_cycle_check
 
 log = logging.getLogger("decifer.bot")
 
@@ -56,63 +61,14 @@ _eod_options_review_done: bool = False
 _portfolio_review_done_today: bool = False
 _last_known_regime: str = ""
 _session_stop_count: int = 0
-
-# ── Session-scoped options attempt ledger ────────────────────────────────────
-# Tracks which (symbol, direction) pairs have already been attempted today.
-# Key  : "{symbol}_{direction}"  e.g. "NKE_LONG"
-# Value: ISO date string         e.g. "2026-04-02"
-#
-# Design rationale (industry standard for DAY orders):
-#   A cancelled DAY order is TERMINAL for that signal instance.  Retrying the
-#   same symbol+direction on the same session date is almost always wrong —
-#   if IBKR couldn't fill it once, market conditions (spread, liquidity) haven't
-#   changed enough in 5 minutes to justify another attempt.
-#   The natural retry boundary is the NEXT session, when a fresh signal fires.
-#
-# This survives bot restarts (disk-persisted) and auto-expires by date — no
-# manual clearing needed.  A new trading day generates new signal dates, new
-# keys, and allows fresh attempts automatically.
-_OPTIONS_LEDGER_PATH = pathlib.Path("data/options_attempt_ledger.json")
-
-
-def _load_options_ledger() -> dict:
-    """Load ledger from disk.  Returns {} on any error."""
-    try:
-        if _OPTIONS_LEDGER_PATH.exists():
-            return json.loads(_OPTIONS_LEDGER_PATH.read_text())
-    except Exception:
-        pass
-    return {}
-
-
-def _save_options_ledger(ledger: dict) -> None:
-    """Persist ledger to disk.  Silently ignores write errors."""
-    try:
-        _OPTIONS_LEDGER_PATH.write_text(json.dumps(ledger))
-    except Exception:
-        pass
-
-
-def _options_attempted_today(symbol: str, direction: str) -> bool:
-    """Return True if we already attempted options on this symbol+direction today."""
-    key   = f"{symbol}_{direction}"
-    today = datetime.now().strftime("%Y-%m-%d")
-    return _options_ledger.get(key) == today
-
-
-def _record_options_attempt(symbol: str, direction: str) -> None:
-    """Mark this symbol+direction as attempted today and persist."""
-    key   = f"{symbol}_{direction}"
-    today = datetime.now().strftime("%Y-%m-%d")
-    _options_ledger[key] = today
-    # Prune stale entries (any date != today) to keep the file tidy
-    stale = [k for k, v in _options_ledger.items() if v != today]
-    for k in stale:
-        del _options_ledger[k]
-    _save_options_ledger(_options_ledger)
-
-
-_options_ledger: dict = _load_options_ledger()
+_cascade_reviewed_this_session: bool = False   # prevent cascade from re-firing every loop
+_last_trim_ts: dict = {}                        # symbol → datetime of last TRIM execution
+_pm_reviewed_regime: dict = {}                  # symbol → regime label when PM last reviewed it
+_last_pm_review_ts: datetime | None = None      # when the last PM review completed (any trigger)
+# Edge-trigger dedup: track what value last fired each state-based trigger so that
+# persistent conditions (e.g. GLD news never clears) don't re-fire every cooldown cycle.
+_last_news_scores: dict = {}    # symbol → keyword_score at last news_hit review
+_last_collapse_scores: dict = {}  # symbol → current_score at last score_collapse review
 
 # ── Last-decision writer (for Chief Decifer trade card) ───────────────────────
 
@@ -168,8 +124,8 @@ def _synthesize_trade_card(symbol: str, company_name: str,
 def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
                          portfolio_value: float) -> None:
     """
-    Write data/last_decision.json after a successful BUY so Chief Decifer
-    can display a rich trade card on its home page.
+    Write data/last_decision.json after a successful trade so Chief Decifer
+    can display a rich trade card on its home page. Works for LONG and SHORT.
     """
     import json, os, re
     from pathlib import Path
@@ -254,16 +210,22 @@ def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
     if not risk:
         risk = "No specific risk identified by devil's advocate this cycle."
 
+    direction = buy.get("direction", "LONG")
+
     # ── Price targets — honest representation of stops ────────────────────────
-    # Labelled as targets, not forecasts. BUY requires tp > price to be valid.
+    # Labelled as targets, not forecasts. Validated per direction.
     price_targets: dict = {}
-    if price > 0 and tp > price and sl > 0 and sl < price:
-        tp_pct = round((tp - price) / price * 100, 1)
-        sl_pct = round((price - sl) / price * 100, 1)
+    if direction == "LONG":
+        valid_targets = price > 0 and tp > price and sl > 0 and sl < price
+    else:  # SHORT
+        valid_targets = price > 0 and tp < price and sl > 0 and sl > price
+    if valid_targets:
+        tp_pct = round(abs(tp - price) / price * 100, 1)
+        sl_pct = round(abs(price - sl) / price * 100, 1)
         rr     = round(tp_pct / sl_pct, 1) if sl_pct else 0
         price_targets = {
-            "target_pct": tp_pct,
-            "stop_pct":   -sl_pct,
+            "target_pct": tp_pct if direction == "LONG" else -tp_pct,
+            "stop_pct":   -sl_pct if direction == "LONG" else sl_pct,
             "rr_ratio":   rr,
             "target_price": round(tp, 2),
             "stop_price":   round(sl, 2),
@@ -272,7 +234,7 @@ def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
     payload = {
         "symbol":          symbol,
         "company_name":    company_name,
-        "direction":       "BUY",
+        "direction":       direction,
         "allocation_pct":  alloc,
         "price":           round(price, 2),
         "qty":             qty,
@@ -284,7 +246,7 @@ def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
         "risk":            risk,
         "price_targets":   price_targets,
         "agents_agreed":   decision.get("agents_agreed", 0),
-        "timestamp":       datetime.now().isoformat(timespec="seconds"),
+        "timestamp":       datetime.now(_ET).isoformat(timespec="seconds"),
     }
 
     out_path = Path(__file__).parent / "data" / "last_decision.json"
@@ -330,21 +292,22 @@ def check_external_closes(regime: dict):
                 except (ValueError, TypeError):
                     pass
 
+        # Fetch open IBKR orders once — avoids N IPC calls (one per PENDING trade)
+        try:
+            _active_order_ids = {t.order.orderId for t in ib.openTrades()}
+        except Exception:
+            _active_order_ids = None  # fail safe: assume all orders still active
+
         for sym in list(open_trades.keys()):
             if sym not in ibkr_syms:
                 trade = open_trades[sym]
 
                 if trade.get("status") == "PENDING":
-                    order_id     = trade.get("order_id")
-                    still_active = False
-                    if order_id:
-                        try:
-                            for t in ib.openTrades():
-                                if t.order.orderId == order_id:
-                                    still_active = True
-                                    break
-                        except Exception:
-                            still_active = True
+                    order_id = trade.get("order_id")
+                    if _active_order_ids is None:
+                        still_active = True  # can't confirm — play safe
+                    else:
+                        still_active = order_id is not None and order_id in _active_order_ids
                     if still_active:
                         continue
                     else:
@@ -375,8 +338,11 @@ def check_external_closes(regime: dict):
                     if sell_fills:
                         sell_fills.sort(key=lambda f: f.execution.time or datetime.min)
                         exit_price = float(sell_fills[-1].execution.price)
+                        _fill_order_id = getattr(sell_fills[-1].execution, "orderId", None)
+                    else:
+                        _fill_order_id = None
                 except Exception:
-                    pass
+                    _fill_order_id = None
 
                 rpnl_key = underlying if is_opt_pos else sym
                 if exit_price is None and rpnl_key in realized_pnl_map:
@@ -403,27 +369,66 @@ def check_external_closes(regime: dict):
                     del open_trades[sym]
                     continue
 
-                is_short   = trade.get("direction", "LONG") == "SHORT"
+                import math as _math
+                is_short    = trade.get("direction", "LONG") == "SHORT"
                 rpnl_lookup = underlying if is_opt_pos else sym
-                if rpnl_lookup in realized_pnl_map and realized_pnl_map[rpnl_lookup] != 0.0:
-                    import math as _math
-                    rpnl = realized_pnl_map[rpnl_lookup]
-                    if not _math.isnan(rpnl):
-                        pnl = rpnl
-                    else:
-                        mult = 100 if is_opt_pos else 1
-                        if is_short:
-                            pnl = (trade["entry"] - exit_price) * trade["qty"] * mult
-                        else:
-                            pnl = (exit_price - trade["entry"]) * trade["qty"] * mult
-                else:
-                    mult = 100 if is_opt_pos else 1
-                    if is_short:
-                        pnl = (trade["entry"] - exit_price) * trade["qty"] * mult
-                    else:
-                        pnl = (exit_price - trade["entry"]) * trade["qty"] * mult
+                mult        = 100 if is_opt_pos else 1
+                manual_pnl  = ((trade["entry"] - exit_price) if is_short else (exit_price - trade["entry"])) * trade["qty"] * mult
+                rpnl        = realized_pnl_map.get(rpnl_lookup, 0.0)
+                pnl         = rpnl if (rpnl != 0.0 and not _math.isnan(rpnl)) else manual_pnl
 
-                exit_reason = "stop_loss" if pnl < 0 else "take_profit"
+                sl_order_id = trade.get("sl_order_id")
+                # ── Determine mechanical exit type ─────────────────────────
+                if sl_order_id and _fill_order_id and int(_fill_order_id) == int(sl_order_id):
+                    exit_type = "sl_hit"
+                elif pnl > 0 and trade.get("tp"):
+                    tp       = trade.get("tp")
+                    hit_tp   = (not is_short and exit_price >= tp * 0.99) or \
+                               (is_short and exit_price <= tp * 1.01)
+                    exit_type = "tp_hit" if hit_tp else "manual"
+                else:
+                    exit_type = "manual"
+                # ── Build thesis-level reason (GAP-002) ────────────────────
+                entry_regime  = trade.get("entry_regime", "UNKNOWN")
+                # Prefer session_character in regime dict (set by dispatcher) so the
+                # exit label uses the same vocabulary as the entry label.
+                exit_regime   = (
+                    (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
+                    if isinstance(regime, dict) else "UNKNOWN"
+                )
+                trade_type_ex = trade.get("trade_type", "SCALP")
+                try:
+                    held_mins = int(
+                        (datetime.now(timezone.utc) -
+                         datetime.fromisoformat(trade["open_time"].replace("Z", "+00:00")))
+                        .total_seconds() / 60
+                    )
+                except Exception:
+                    held_mins = 0
+                # Compare polarities (BULL/BEAR) rather than exact strings so that
+                # mixed-vocabulary comparisons (e.g. RELIEF_RALLY vs BULL_TRENDING)
+                # don't spuriously trigger breached_regime_shift.
+                def _polarity(s: str) -> str:
+                    r = (s or "").upper()
+                    if r in ("MOMENTUM_BULL", "RELIEF_RALLY") or "BULL" in r:
+                        return "BULL"
+                    if r in ("TRENDING_BEAR", "DISTRIBUTION") or "BEAR" in r:
+                        return "BEAR"
+                    return ""
+                entry_pol = _polarity(entry_regime)
+                exit_pol  = _polarity(exit_regime)
+                if exit_type == "tp_hit":
+                    thesis_class = "confirmed"
+                elif entry_pol and exit_pol and entry_pol != exit_pol:
+                    thesis_class = "breached_regime_shift"
+                elif trade_type_ex == "SCALP" and held_mins > CONFIG.get("scalp_max_hold_minutes", 90):
+                    thesis_class = "breached_stale_scalp"
+                else:
+                    thesis_class = "noise_stop"
+                exit_reason = (
+                    f"{exit_type} | {trade_type_ex} | regime:{entry_regime}→{exit_regime}"
+                    f" | held:{held_mins}min | thesis:{thesis_class}"
+                )
                 clog("TRADE", f"External close detected: {sym} | Exit ${exit_price:.2f} | P&L ${pnl:+.2f} | {exit_reason}")
 
                 log_trade(
@@ -434,6 +439,7 @@ def check_external_closes(regime: dict):
                     outcome={
                         "exit_price": round(exit_price, 2),
                         "pnl":        round(pnl, 2),
+                        "pnl_pct":    round(pnl / ((trade.get("entry") or 1) * (trade.get("qty") or 1)), 4),
                         "reason":     exit_reason,
                     }
                 )
@@ -442,7 +448,7 @@ def check_external_closes(regime: dict):
                     "side":   "SELL",
                     "symbol": sym,
                     "price":  str(round(exit_price, 2)),
-                    "time":   datetime.now().strftime("%H:%M:%S"),
+                    "time":   datetime.now(_ET).strftime("%H:%M:%S"),
                     "pnl":    round(pnl, 2),
                 })
 
@@ -451,6 +457,7 @@ def check_external_closes(regime: dict):
                 dash["performance"] = get_performance_summary(lt())
 
                 del open_trades[sym]
+                bot_state._sl_fill_events.discard(sym)
                 dash["positions"] = get_open_positions()
 
                 if pnl >= 0:
@@ -458,7 +465,7 @@ def check_external_closes(regime: dict):
                     record_win()
                 else:
                     from risk import record_loss
-                    record_loss(source="external")
+                    record_loss(source="external" if exit_reason != "sl_hit" else "sl")
                     global _session_stop_count
                     _session_stop_count += 1
 
@@ -485,7 +492,20 @@ def check_options_positions():
             if sold:
                 dash["positions"] = get_open_positions()
             else:
-                clog("WARN", f"Option sell failed for {opt_key} — will retry next cycle (with backoff)")
+                from orders import (_pending_option_exits, _option_sell_attempts,
+                                    _MAX_OPTION_SELL_RETRIES, _OPTION_SELL_COOLDOWN)
+                if opt_key in _pending_option_exits:
+                    clog("INFO", f"Options market closed — {opt_key} queued for next open")
+                else:
+                    _att = _option_sell_attempts.get(opt_key, {})
+                    _cnt = _att.get("count", 0)
+                    if _cnt >= _MAX_OPTION_SELL_RETRIES:
+                        from datetime import timezone as _tz
+                        _elapsed = (datetime.now(_tz.utc) - _att.get("last_try", datetime.min.replace(tzinfo=_tz.utc))).total_seconds()
+                        _remaining = max(0, int(_OPTION_SELL_COOLDOWN - _elapsed))
+                        clog("WARN", f"Option sell cooling down for {opt_key} — {_cnt} failures, {_remaining}s remaining")
+                    else:
+                        clog("WARN", f"Option sell failed for {opt_key} — will retry next cycle (attempt {_cnt}/{_MAX_OPTION_SELL_RETRIES})")
     except Exception as e:
         clog("ERROR", f"Options position check error: {e}")
 
@@ -515,84 +535,6 @@ def _process_close_queue():
                 clog("ERROR", f"❌ Could not close {sym} — not found in portfolio")
         except Exception as e:
             clog("ERROR", f"❌ Close {sym} failed: {e}")
-
-
-def _auto_rebalance_cash(portfolio_value: float, regime: dict):
-    """
-    Auto-close the weakest position(s) to bring cash reserve back above
-    min_cash_reserve.  Closes positions one by one (worst P&L first) until
-    cash is restored or no positions remain.
-    """
-    ib = bot_state.ib
-    min_reserve = CONFIG.get("min_cash_reserve", 0.10)
-    positions   = get_open_positions()
-
-    if not positions:
-        clog("RISK", "Auto-rebalance: No positions to close")
-        return
-
-    from risk import _get_ibkr_cash
-    from orders import close_position
-
-    def _current_cash_pct():
-        cash = _get_ibkr_cash(ib, CONFIG.get("active_account", ""))
-        if cash is not None:
-            return cash / portfolio_value if portfolio_value > 0 else 1.0
-        open_pos = get_open_positions()
-        deployed = sum(p.get("current", p.get("entry", 0)) * p.get("qty", 0) for p in open_pos)
-        return (portfolio_value - deployed) / portfolio_value if portfolio_value > 0 else 1.0
-
-    cash_pct = _current_cash_pct()
-    cash_deficit = (min_reserve - cash_pct) * portfolio_value
-    clog("RISK", f"Auto-rebalance: cash={cash_pct*100:.1f}% (need {min_reserve*100:.0f}%) "
-         f"— need to free ~${cash_deficit:,.0f}")
-
-    ranked = []
-    for p in positions:
-        if p.get("instrument") == "option":
-            continue  # Options can't close outside regular hours — stocks only
-        entry   = p.get("entry", 0)
-        current = p.get("current", entry)
-        qty     = p.get("qty", 0)
-        if entry > 0 and qty != 0:
-            pnl_pct        = (current - entry) / entry
-            position_value = abs(current * qty)
-            ranked.append({
-                "symbol":         p.get("_trade_key", p.get("symbol")),
-                "pnl_pct":        pnl_pct,
-                "position_value": position_value,
-            })
-
-    if not ranked:
-        clog("RISK", "Auto-rebalance: Could not evaluate positions")
-        return
-
-    ranked.sort(key=lambda x: x["pnl_pct"])
-
-    for candidate in ranked:
-        if cash_pct >= min_reserve:
-            break
-        sym = candidate["symbol"]
-        clog("RISK", f"Auto-rebalance: Closing {sym} (P&L: {candidate['pnl_pct']:+.1%}, "
-             f"value: ${candidate['position_value']:,.0f}) to free cash")
-        try:
-            result = close_position(ib, sym)
-            if result:
-                clog("RISK", f"Auto-rebalance: {result}")
-                ib.sleep(2)
-                cash_pct = _current_cash_pct()
-                clog("RISK", f"Auto-rebalance: cash now at {cash_pct*100:.1f}%")
-            else:
-                clog("ERROR", f"Auto-rebalance: Could not close {sym} (not in IBKR — phantom entry?), purging and trying next")
-                from orders import reconcile_with_ibkr
-                reconcile_with_ibkr(ib)
-                continue
-        except Exception as e:
-            clog("ERROR", f"Auto-rebalance: Failed to close {sym}: {e}, trying next")
-            continue
-
-    if cash_pct < min_reserve:
-        clog("RISK", f"Auto-rebalance: cash still at {cash_pct*100:.1f}% after closing all eligible positions")
 
 
 # ── Pre-close options review ──────────────────────────────────────────────────
@@ -697,9 +639,15 @@ def _maybe_eod_options_review(regime: dict):
         _eod_options_review_done = False
         # Ledger auto-expires by date — no explicit clear needed.
         # Pruning of stale entries happens inside _record_options_attempt.
-        global _portfolio_review_done_today, _session_stop_count
+        global _portfolio_review_done_today, _session_stop_count, _cascade_reviewed_this_session, _last_trim_ts, _pm_reviewed_regime, _last_pm_review_ts, _last_news_scores, _last_collapse_scores
         _portfolio_review_done_today = False
         _session_stop_count = 0
+        _cascade_reviewed_this_session = False
+        _last_trim_ts = {}
+        _pm_reviewed_regime = {}
+        _last_pm_review_ts = None
+        _last_news_scores = {}
+        _last_collapse_scores = {}
     # Fire once in the pre-close window
     if dtime(15, 30) <= t < dtime(15, 55) and not _eod_options_review_done:
         _eod_options_review_done = True
@@ -723,13 +671,20 @@ def _should_run_portfolio_review(
     Triggers (checked in priority order):
       pre_market    — once per day before session open
       regime_change — current regime differs from last known
-      score_collapse — any held position dropped 15+ pts from entry score
-      news_hit      — keyword_score |magnitude| >= 3 on a held symbol
+      score_collapse — any held position score collapsed further since last review
+      news_hit      — keyword_score on a held symbol changed materially since last review
       earnings_risk — any held symbol has earnings within 48 hours
       cascade       — 2+ stop losses hit this session
       drawdown      — daily PnL / portfolio < -1.5%
+
+    news_hit and score_collapse are EDGE triggers: they only fire when the
+    underlying value has changed materially since the last review, not simply
+    because the condition persists. This prevents a single persistent news event
+    (e.g. tariff headlines keeping GLD keyword_score elevated) from re-triggering
+    the PM on every scan cycle.
     """
-    global _portfolio_review_done_today, _last_known_regime
+    global _portfolio_review_done_today, _last_known_regime, _last_pm_review_ts
+    global _last_news_scores, _last_collapse_scores
     pm_cfg = CONFIG.get("portfolio_manager", {})
     if not pm_cfg.get("enabled", True):
         return False, ""
@@ -738,7 +693,7 @@ def _should_run_portfolio_review(
     if session == "PRE_MARKET" and not _portfolio_review_done_today:
         return True, "pre_market"
 
-    # 2. Regime change
+    # 2. Regime change — edge trigger: fires only when regime label changes
     current_regime = regime.get("regime", "")
     if _last_known_regime and current_regime and current_regime != _last_known_regime:
         return True, "regime_change"
@@ -746,37 +701,54 @@ def _should_run_portfolio_review(
     if not open_positions:
         return False, ""
 
-    # 3. Score collapse: entry_score - current_score >= threshold
+    # 3. Score collapse — edge trigger: fires only when score has collapsed
+    #    FURTHER (by >= re_collapse_delta) since the last review.
+    #    Once reviewed at a collapsed score, don't re-fire just because it stays collapsed.
     collapse_thresh = pm_cfg.get("score_collapse_threshold", 15)
+    re_collapse_delta = pm_cfg.get("score_collapse_redfire_delta", 5)
     scored_map = {s["symbol"]: s.get("score", 0) for s in all_scored}
     for pos in open_positions:
         sym = pos.get("symbol", "")
         entry_sc = pos.get("entry_score", pos.get("score", 0))
         current_sc = scored_map.get(sym)
-        if current_sc is not None and (entry_sc - current_sc) >= collapse_thresh:
+        if current_sc is None:
+            continue
+        if (entry_sc - current_sc) < collapse_thresh:
+            continue
+        # Score is collapsed. Only fire if it's dropped further than last review.
+        last_sc = _last_collapse_scores.get(sym)
+        if last_sc is None or (last_sc - current_sc) >= re_collapse_delta:
             return True, "score_collapse"
 
-    # 4. News hit on held position
+    # 4. News hit — edge trigger: fires only when keyword_score has changed
+    #    materially since the last review for that symbol.
+    #    Prevents persistent headlines (e.g. GLD tariff news) from re-triggering
+    #    the PM on every scan cycle.
     news_thresh = pm_cfg.get("news_hit_threshold", 3)
+    news_redfire_delta = pm_cfg.get("news_hit_redfire_delta", 2)
     for pos in open_positions:
         sym = pos.get("symbol", "")
         kw = news_sentiment.get(sym, {}).get("keyword_score", 0)
-        if abs(kw) >= news_thresh:
+        if abs(kw) < news_thresh:
+            continue
+        # Score meets threshold. Only fire if score has changed since last review.
+        last_kw = _last_news_scores.get(sym)
+        if last_kw is None or abs(kw - last_kw) >= news_redfire_delta:
             return True, "news_hit"
 
     # 5. Earnings within 48 hours
     try:
-        from portfolio_manager import _check_earnings_within_hours
+        from earnings_calendar import get_earnings_within_hours as _gew
         held_syms = [p["symbol"] for p in open_positions]
         lookahead = pm_cfg.get("earnings_lookahead_hours", 48)
-        if _check_earnings_within_hours(held_syms, hours=lookahead):
+        if _gew(held_syms, lookahead):
             return True, "earnings_risk"
     except Exception:
         pass
 
-    # 6. Cascade: 2+ stops this session
+    # 6. Cascade: 2+ stops this session — fire once per session only
     cascade_thresh = pm_cfg.get("cascade_stop_count", 2)
-    if _session_stop_count >= cascade_thresh:
+    if _session_stop_count >= cascade_thresh and not _cascade_reviewed_this_session:
         return True, "cascade"
 
     # 7. Daily drawdown threshold
@@ -785,6 +757,26 @@ def _should_run_portfolio_review(
         return True, "drawdown"
 
     return False, ""
+
+
+# ── Scan helpers ──────────────────────────────────────────────────────────────
+
+def _print_score_table(scored: list, n: int = 10) -> None:
+    """Print a ranked score table to terminal after each scan."""
+    if not scored:
+        return
+    top = sorted(scored, key=lambda s: s.get("score", 0), reverse=True)[:n]
+    clog("SCAN", f"── Top {len(top)} Signals {'─' * 40}")
+    for i, s in enumerate(top, 1):
+        sym       = s.get("symbol", "?")
+        direction = s.get("direction", "?")
+        score     = s.get("score", 0)
+        breakdown = s.get("score_breakdown") or {}
+        top_dims  = sorted(breakdown.items(), key=lambda x: x[1], reverse=True)
+        top_dims  = [(k, v) for k, v in top_dims if v > 0][:3]
+        dims_str  = "  ".join(f"{k}:{v}" for k, v in top_dims) if top_dims else "—"
+        dir_short = {"LONG": "L", "SHORT": "S"}.get(direction, direction)
+        clog("SIGNAL", f"#{i:<2} {sym:<8} {dir_short:<5} {score:>2}/50  │ {dims_str}")
 
 
 # ── Main scan ─────────────────────────────────────────────────────────────────
@@ -809,13 +801,13 @@ def run_scan():
 
     bot_state.scan_count += 1
     dash["scan_count"]  = bot_state.scan_count
-    dash["last_scan"]   = datetime.now().strftime("%H:%M:%S")
+    dash["last_scan"]   = datetime.now(_ET).strftime("%H:%M:%S")
     dash["scanning"]    = True
     dash["session"]     = get_session()
 
     dash["recent_orders"] = []
     dash["trades"]        = []
-    dash["_scan_start"]   = datetime.now().isoformat()
+    dash["_scan_start"]   = datetime.now(_ET).isoformat()
 
     clog("SCAN", f"Scan #{bot_state.scan_count} started | Session: {dash['session']}")
 
@@ -843,6 +835,7 @@ def run_scan():
     update_positions_from_ibkr(ib)
     update_tranche_status(ib)
     update_trailing_stops(ib)
+    flush_pending_option_exits(ib)
     dash["positions"] = get_open_positions()
 
     if get_session() == "OVERNIGHT":
@@ -889,7 +882,7 @@ def run_scan():
     if not tradeable:
         if "Cash reserve too low" in reason:
             clog("RISK", f"Cash reserve below minimum — auto-rebalancing to free up cash")
-            _auto_rebalance_cash(pv, regime)
+            auto_rebalance_cash(ib, pv, regime)
             pv, pnl = get_account_data()
             dash["portfolio_value"] = pv
             dash["daily_pnl"]       = pnl
@@ -915,6 +908,12 @@ def run_scan():
 
     clog("SCAN", "Building dynamic universe from TradingView screener...")
     universe = get_dynamic_universe(ib, regime)
+    # Sector bias is cached inside get_dynamic_universe — fetch the cached result for the dashboard.
+    try:
+        from scanner import get_sector_rotation_bias as _get_sbias
+        dash["sector_bias"] = _get_sbias()
+    except Exception:
+        pass
     favs     = dash.get("favourites", [])
     if favs:
         before   = len(universe)
@@ -923,14 +922,37 @@ def run_scan():
         clog("INFO", f"Favourites: {len(favs)} tickers ({new_count} new additions to universe)")
     clog("INFO", f"Universe: {len(universe)} symbols to score")
 
+    # Pull open positions BEFORE the pipeline so held symbols are always scored.
+    # This prevents the portfolio manager from seeing "not_in_universe" on reboot
+    # simply because today's TV screener didn't surface a still-valid position.
+    open_pos  = get_open_positions()
+    held_syms = [p["symbol"] for p in open_pos if p.get("instrument") != "option"]
+    if held_syms:
+        universe = list(set(universe + held_syms))
+        new_held = [s for s in held_syms if s not in favs]
+        if new_held:
+            clog("INFO", f"Held positions pinned into pipeline universe: {new_held}")
+    # Merge held symbols into the protected set so _apply_tv_prefilter never drops them
+    pipeline_favs = list(set(favs + held_syms))
+
+    # Refresh Alpaca stream subscriptions to match the finalised universe.
+    # update_symbols() is a no-op if the symbol list hasn't changed.
+    try:
+        import bot_state as _bs
+        if _bs._bar_stream is not None:
+            _bs._bar_stream.update_symbols(universe)
+    except Exception:
+        pass
+
     clog("SCAN", "Running signal pipeline (TV pre-filter → sentiment → 9-dim score)...")
     pipeline = run_signal_pipeline(
         universe=universe,
         regime=regime,
         strategy_mode=strategy_mode,
         session=get_session(),
-        favourites=favs,
+        favourites=pipeline_favs,
         tv_cache=get_tv_signal_cache(),
+        ib=ib,
     )
     signals        = pipeline.signals
     scored         = pipeline.scored
@@ -949,6 +971,7 @@ def run_scan():
 
     clog("SCAN", f"Pipeline: {len(universe)} symbols → {len(scored)} scored "
          f"→ {len(signals)} signals [{regime_name}]")
+    _print_score_table(scored)
 
     update_position_prices(pipeline.scored)
 
@@ -976,25 +999,87 @@ def run_scan():
     _process_close_queue()
 
     clog("ANALYSIS", "Running agent analysis pipeline...")
-    open_pos = get_open_positions()
+    # open_pos already fetched above (before pipeline) so held positions were included in scoring
+    open_pos = get_open_positions()  # refresh after any close-queue processing
+
+    # ── Lightweight per-cycle position check (every scan, no LLM) ───────────
+    global _pm_reviewed_regime
+    _force_pm_review = False
+    if open_pos:
+        cycle_actions = lightweight_cycle_check(open_pos, regime, pipeline.all_scored)
+        for _ca in cycle_actions:
+            _sym_ca = _ca.get("symbol", "")
+            _act_ca = _ca.get("action", "")
+            _rsn_ca = _ca.get("reasoning", "")
+            if _act_ca == "EXIT" and _sym_ca:
+                from orders import open_trades as _ce_trades, _trades_lock as _ce_lock
+                with _ce_lock:
+                    _already_ce = _ce_trades.get(_sym_ca, {}).get("status") == "EXITING"
+                if _already_ce:
+                    clog("INFO", f"Cycle check EXIT: {_sym_ca} already exiting — skipping")
+                else:
+                    clog("TRADE", f"Cycle check EXIT: {_sym_ca} — {_rsn_ca}")
+                    execute_sell(ib, _sym_ca, reason="cycle_check")
+                    _pos_ce = next((p for p in open_pos if p["symbol"] == _sym_ca), None)
+                    if _pos_ce:
+                        _ep_ce = _pos_ce.get("current", _pos_ce.get("entry", 0))
+                        _dir_ce = _pos_ce.get("direction", "LONG")
+                        _pnl_ce = (
+                            (_ep_ce - _pos_ce["entry"]) * _pos_ce["qty"]
+                            if _dir_ce == "LONG"
+                            else (_pos_ce["entry"] - _ep_ce) * _pos_ce["qty"]
+                        )
+                        from learning import log_trade as _log_trade_ce
+                        _log_trade_ce(
+                            trade=_pos_ce,
+                            agent_outputs={},
+                            regime=regime,
+                            action="CLOSE",
+                            outcome={
+                                "exit_price": round(_ep_ce, 4),
+                                "pnl":        round(_pnl_ce, 2),
+                                "pnl_pct":    round(_pnl_ce / ((_pos_ce.get("entry") or 1) * (_pos_ce.get("qty") or 1)), 4),
+                                "reason":     f"cycle_check:{_rsn_ca[:120]}",
+                            },
+                        )
+            elif _act_ca == "REVIEW":
+                _cur_regime_cc = regime.get("session_character") or regime.get("regime", "UNKNOWN")
+                if _pm_reviewed_regime.get(_sym_ca) == _cur_regime_cc:
+                    clog("INFO", f"Cycle check REVIEW suppressed for {_sym_ca}: already reviewed under regime {_cur_regime_cc}")
+                else:
+                    clog("ANALYSIS", f"Cycle check queued PM review: {_sym_ca} — {_rsn_ca}")
+                    _force_pm_review = True
 
     # ── Portfolio manager review (event-triggered) ────────────────────────────
-    global _portfolio_review_done_today, _last_known_regime
+    global _portfolio_review_done_today, _last_known_regime, _cascade_reviewed_this_session, _last_trim_ts, _last_pm_review_ts, _last_news_scores, _last_collapse_scores
     should_review, pm_trigger = _should_run_portfolio_review(
         session=get_session(),
         regime=regime,
         open_positions=open_pos,
-        all_scored=scored,
+        all_scored=pipeline.all_scored,
         news_sentiment=news_sentiment,
         daily_pnl=pnl,
         portfolio_value=pv,
     )
+    if not should_review and _force_pm_review:
+        # Respect the same cooldown as event-triggered reviews so that a
+        # persistent regime-shift condition doesn't fire Opus every cycle.
+        _force_cooldown_mins = CONFIG.get("portfolio_manager", {}).get("trim_cooldown_minutes", 30)
+        _force_age_mins = (
+            (datetime.now(_ET) - _last_pm_review_ts).total_seconds() / 60
+            if _last_pm_review_ts is not None else None
+        )
+        if _force_age_mins is None or _force_age_mins >= _force_cooldown_mins:
+            should_review = True
+            pm_trigger = "cycle_regime_shift"
+        else:
+            clog("INFO", f"Cycle check REVIEW suppressed: last PM review {_force_age_mins:.0f}m ago (cooldown {_force_cooldown_mins}m)")
     if should_review and open_pos:
         clog("ANALYSIS", f"Portfolio review triggered: {pm_trigger}")
         try:
             pm_actions = run_portfolio_review(
                 open_positions=open_pos,
-                all_scored=scored,
+                all_scored=pipeline.all_scored,
                 regime=regime,
                 news_sentiment=news_sentiment,
                 portfolio_value=pv,
@@ -1042,11 +1127,43 @@ def run_scan():
                             outcome={
                                 "exit_price": round(ep_pm, 4),
                                 "pnl":        round(pnl_pm, 2),
+                                "pnl_pct":    round(pnl_pm / ((pos_pm.get("entry") or 1) * (pos_pm.get("qty") or 1)), 4),
                                 "reason":     f"portfolio_manager:{pm_trigger}",
                             },
                         )
-                elif act_pm in ("TRIM", "ADD"):
-                    clog("INFO", f"Portfolio manager {act_pm}: {sym_pm} — {reason_pm} (manual review)")
+                elif act_pm == "TRIM" and sym_pm:
+                    from orders import open_trades as _pm_trades, _trades_lock as _pm_lock
+                    _trim_cooldown_mins = CONFIG.get("portfolio_manager", {}).get("trim_cooldown_minutes", 30)
+                    _last_trim = _last_trim_ts.get(sym_pm)
+                    _trim_age = (datetime.now(_ET) - _last_trim).total_seconds() / 60 if _last_trim else None
+                    if _trim_age is not None and _trim_age < _trim_cooldown_mins:
+                        clog("INFO", f"PM TRIM: {sym_pm} cooldown active ({_trim_age:.0f}m ago, {_trim_cooldown_mins}m required) — skipping")
+                        continue
+                    _opt_keys_pm = [k for k in _pm_trades
+                                    if k.startswith(sym_pm + "_") and _pm_trades[k].get("instrument") == "option"]
+                    _has_pos = bool(_opt_keys_pm) or sym_pm in _pm_trades
+                    if not _has_pos:
+                        clog("WARN", f"PM TRIM: no active position found for {sym_pm}")
+                    else:
+                        clog("TRADE", f"Portfolio manager TRIM: {sym_pm} — {reason_pm}")
+                        _last_trim_ts[sym_pm] = datetime.now(_ET)
+                        if _opt_keys_pm:
+                            for _ok in _opt_keys_pm:
+                                with _pm_lock:
+                                    _c = _pm_trades.get(_ok, {}).get("contracts", 0)
+                                _trim_c = max(1, _c // 2)
+                                execute_sell_option(ib, _ok,
+                                                    reason=f"portfolio_manager_trim:{pm_trigger}",
+                                                    contracts_override=_trim_c if _trim_c < _c else None)
+                        if sym_pm in _pm_trades:
+                            with _pm_lock:
+                                _q = _pm_trades.get(sym_pm, {}).get("qty", 0)
+                            _trim_q = max(1, _q // 2)
+                            execute_sell(ib, sym_pm,
+                                         reason=f"portfolio_manager_trim:{pm_trigger}",
+                                         qty_override=_trim_q if _trim_q < _q else None)
+                elif act_pm == "ADD":
+                    clog("INFO", f"Portfolio manager ADD: {sym_pm} — {reason_pm} (manual review)")
                 else:
                     clog("INFO", f"Portfolio manager HOLD: {sym_pm} — {reason_pm}")
             # Log all actions to audit log
@@ -1059,7 +1176,7 @@ def run_scan():
                         "type":    "portfolio_review",
                         "trigger": pm_trigger,
                         "actions": pm_actions,
-                        "ts":      datetime.now().isoformat(),
+                        "ts":      datetime.now(_ET).isoformat(),
                     }) + "\n")
             except Exception:
                 pass
@@ -1068,7 +1185,25 @@ def run_scan():
         finally:
             if pm_trigger == "pre_market":
                 _portfolio_review_done_today = True
+            if pm_trigger == "cascade":
+                _cascade_reviewed_this_session = True
             _last_known_regime = regime.get("regime", _last_known_regime)
+            _last_pm_review_ts = datetime.now(_ET)
+            # Snapshot the news scores and collapse scores seen at this review so that
+            # news_hit and score_collapse don't re-fire unless values change materially.
+            _scored_map_snap = {s["symbol"]: s.get("score", 0) for s in (pipeline.all_scored or [])}
+            for _rp in open_pos:
+                _rsym = _rp["symbol"]
+                _kw = news_sentiment.get(_rsym, {}).get("keyword_score", 0)
+                _last_news_scores[_rsym] = _kw
+                _cs = _scored_map_snap.get(_rsym)
+                if _cs is not None:
+                    _last_collapse_scores[_rsym] = _cs
+            # Record which regime each reviewed position was reviewed under so cycle_check
+            # does not re-queue the same REVIEW on subsequent cycles for the same regime state.
+            _reviewed_regime_label = regime.get("session_character") or regime.get("regime", "UNKNOWN")
+            for _rp in open_pos:
+                _pm_reviewed_regime[_rp["symbol"]] = _reviewed_regime_label
     else:
         _last_known_regime = regime.get("regime", _last_known_regime)
 
@@ -1099,14 +1234,12 @@ def run_scan():
     dash["agent_outputs"]      = decision.get("_agent_outputs", {})
     dash["last_agents_agreed"] = decision.get("agents_agreed", 0)
 
-    now_str    = datetime.now().strftime("%H:%M:%S")
+    now_str    = datetime.now(_ET).strftime("%H:%M:%S")
     agent_convo = []
     agent_names = [
-        ("technical",   "Technical Analyst",  "Analyses price action, volume, and all 7 indicator dimensions"),
-        ("macro",       "Macro Analyst",      "Assesses market regime, VIX, cross-asset dynamics, and news flow"),
-        ("opportunity", "Opportunity Finder",  "Synthesises technical + macro to find the top 3 trades"),
-        ("devils",      "Devil's Advocate",    "Argues against every proposed trade to protect capital"),
-        ("risk",        "Risk Manager",        "Sizes positions and flags portfolio-level risk"),
+        ("technical",       "Technical Analyst",  "Analyses price action, volume, and all indicator dimensions"),
+        ("trading_analyst", "Trading Analyst",    "Macro context, opportunity synthesis, devil's advocate (Opus)"),
+        ("risk",            "Risk Manager",        "Sizes positions and flags portfolio-level risk"),
     ]
     outputs = decision.get("_agent_outputs", {})
     for key, name, role_desc in agent_names:
@@ -1135,13 +1268,14 @@ def run_scan():
     _final_output = "\n".join(_action_lines) if _action_lines else "No trades this cycle."
     agent_convo.append({
         "agent":  "Final Decision Maker",
-        "role":   "Synthesises all 5 reports into executable trade instructions",
+        "role":   "Synthesises all agent reports into executable trade instructions",
         "time":   now_str,
         "output": _final_output,
     })
     dash["agent_conversation"] = agent_convo
 
-    clog("ANALYSIS", f"Agents agreed: {decision.get('agents_agreed',0)}/6 | {decision.get('summary','')}")
+    _max_votes = len(agent_names) + 1  # 3 agents + final decision
+    clog("ANALYSIS", f"Agents agreed: {decision.get('agents_agreed',0)}/{_max_votes} | {decision.get('summary','')}")
 
     if dash.get("killed"):
         clog("RISK", "🚨 Kill switch active — skipping all trade execution")
@@ -1163,7 +1297,7 @@ def run_scan():
         dash["trades"].insert(0, {
             "side": "SELL", "symbol": sym,
             "price": str(exit_price),
-            "time": datetime.now().strftime("%H:%M:%S")
+            "time": datetime.now(_ET).strftime("%H:%M:%S")
         })
         if pos:
             pnl_val = (exit_price - pos["entry"]) * pos["qty"] if pos.get("direction", "LONG") == "LONG" else (pos["entry"] - exit_price) * pos["qty"]
@@ -1176,6 +1310,7 @@ def run_scan():
                 outcome={
                     "exit_price": round(exit_price, 4),
                     "pnl":        round(pnl_val, 2),
+                    "pnl_pct":    round(pnl_val / ((pos.get("entry") or 1) * (pos.get("qty") or 1)), 4),
                     "reason":     "agent_sell",
                 }
             )
@@ -1221,7 +1356,7 @@ def run_scan():
                 clog("INFO", f"No signal data for {sym} after 3 attempts — skipping")
                 continue
 
-        clog("TRADE", f"Buying {sym} | Score={sig['score']}/50 | {reason[:80]}")
+        clog("INFO", f"Evaluating {sym} | Score={sig['score']}/50 | {reason[:80]}")
 
         buy_signal = next((s for s in signals if s.symbol == sym), None)
         if buy_signal is None:
@@ -1236,7 +1371,7 @@ def run_scan():
                 atr=sig["atr"],
                 candle_gate=sig.get("candle_gate", "UNKNOWN"),
             )
-        buy_signal.direction     = "LONG"   # agents decided to buy — override pipeline direction
+        buy_signal.direction     = buy.get("direction", "LONG")  # use agent-recommended direction
         buy_signal.rationale     = reason
         buy_signal.source_agents = list(range(decision.get("agents_agreed", 0)))
 
@@ -1250,10 +1385,12 @@ def run_scan():
         )
         stock_success = any(r["success"] for r in dispatch_results)
         if stock_success:
+            trade_side = "SHORT" if buy.get("direction") == "SHORT" else "BUY"
+            clog("TRADE", f"{trade_side} {sym} | Score={sig['score']}/50 | {reason[:80]}")
             dash["trades"].insert(0, {
-                "side": "BUY", "symbol": sym,
+                "side": trade_side, "symbol": sym,
                 "price": str(sig["price"]),
-                "time": datetime.now().strftime("%H:%M:%S")
+                "time": datetime.now(_ET).strftime("%H:%M:%S")
             })
             _write_last_decision(sym, buy, sig, decision, pv)
 
@@ -1264,7 +1401,7 @@ def run_scan():
             if not is_options_market_open():
                 clog("INFO", f"Score {sig['score']} qualifies for options — market closed until 9:30 ET. Stock trade executed.")
             else:
-                _sig_dir = sig.get("direction", "LONG")
+                _sig_dir = buy.get("direction", "LONG")  # use agent direction (matches scanner via hard gate)
                 if _sig_dir not in ("LONG", "SHORT"):
                     clog("INFO", f"Score {sig['score']} qualifies for options but direction={_sig_dir!r} — skipping (no clear conviction)")
                 else:
@@ -1273,17 +1410,17 @@ def run_scan():
                         clog("INFO", f"Options attempt already recorded for {sym} {direction} today — skipping (DAY order terminal)")
                     else:
                         clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
-                        _record_options_attempt(sym, direction)  # mark BEFORE submit (survives crash)
                         try:
                             contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
                             if contract_info:
-                                opt_success = execute_buy_option(ib, contract_info, pv, reasoning=reason)
+                                _record_options_attempt(sym, direction)  # mark after contract found, before IBKR submit (survives crash)
+                                opt_success = execute_buy_option(ib, contract_info, pv, reasoning=reason, score=sig["score"])
                                 if opt_success:
                                     dash["trades"].insert(0, {
                                         "side":   f"BUY {contract_info['right']} OPT",
                                         "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
                                         "price":  str(contract_info["mid"]),
-                                        "time":   datetime.now().strftime("%H:%M:%S")
+                                        "time":   datetime.now(_ET).strftime("%H:%M:%S")
                                     })
                                     clog("TRADE", f"Options trade executed for {sym} (independent of stock)")
                                     if not stock_success:
@@ -1292,6 +1429,45 @@ def run_scan():
                                 clog("INFO", f"No suitable options contract for {sym}")
                         except Exception as _opt_err:
                             clog("ERROR", f"Options evaluation failed for {sym}: {_opt_err}")
+
+    # ── FX direct dispatch ────────────────────────────────────────────────────────
+    # FX signals bypass the equity intelligence gate — the fx_signals scorer is the
+    # complete decision; no agent classification needed.
+    if CONFIG.get("fx_enabled") and pipeline:
+        try:
+            from fx_signals import FX_PAIRS
+            _fx_sigs = [s for s in pipeline.signals if s.symbol in FX_PAIRS]
+            _fx_min  = CONFIG.get("fx_min_score", 20)
+            for _fxs in _fx_sigs:
+                _fxs_score = int(round(_fxs.conviction_score * 5))
+                if _fxs_score < _fx_min or _fxs.direction not in ("LONG", "SHORT"):
+                    continue
+                _fxs_reasoning = f"FX-direct {_fxs.symbol}: {_fxs.dimension_scores}"
+                if _fxs.direction == "LONG":
+                    _fx_ok = execute_buy(
+                        ib=ib, symbol=_fxs.symbol, price=_fxs.price, atr=_fxs.atr,
+                        score=_fxs_score, portfolio_value=pv, regime=regime,
+                        reasoning=_fxs_reasoning, signal_scores=_fxs.dimension_scores,
+                        open_time=datetime.now(timezone.utc).isoformat(),
+                        instrument="fx",
+                    )
+                else:
+                    _fx_ok = execute_short(
+                        ib=ib, symbol=_fxs.symbol, price=_fxs.price, atr=_fxs.atr,
+                        score=_fxs_score, portfolio_value=pv, regime=regime,
+                        reasoning=_fxs_reasoning, signal_scores=_fxs.dimension_scores,
+                        open_time=datetime.now(timezone.utc).isoformat(),
+                        instrument="fx",
+                    )
+                if _fx_ok:
+                    clog("TRADE", f"FX {_fxs.direction} {_fxs.symbol} | Score={_fxs_score}/50")
+                    dash["trades"].insert(0, {
+                        "side": _fxs.direction, "symbol": _fxs.symbol,
+                        "price": str(round(_fxs.price, 5)),
+                        "time": datetime.now(_ET).strftime("%H:%M:%S"),
+                    })
+        except Exception as _fxe:
+            clog("ERROR", f"FX dispatch: {_fxe}")
 
     dash["positions"] = get_open_positions()
     _seen_dash = {}
@@ -1317,15 +1493,15 @@ def run_scan():
     dash["performance"]["total_pnl"] = round(dash.get("portfolio_value", 0) - get_effective_capital(), 2)
 
     dash["equity_history"].append({
-        "date":  datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "date":  datetime.now(_ET).strftime("%Y-%m-%d %H:%M ET"),
         "value": pv
     })
     if len(dash["equity_history"]) > 2000:
         dash["equity_history"] = dash["equity_history"][-2000:]
     save_equity_history(dash["equity_history"])
 
-    today = datetime.now().weekday()
-    if today == 6 and bot_state.last_sunday_review != datetime.now().date():
+    today = datetime.now(_ET).weekday()
+    if today == 6 and bot_state.last_sunday_review != datetime.now(_ET).date():
         clog("ANALYSIS", "Running weekly performance review...")
         review = run_weekly_review()
         clog("ANALYSIS", f"Weekly review: {review[:200]}...")
@@ -1338,7 +1514,7 @@ def run_scan():
         except Exception as _ic_exc:
             log.warning("IC weight update failed: %s", _ic_exc)
 
-        bot_state.last_sunday_review = datetime.now().date()
+        bot_state.last_sunday_review = datetime.now(_ET).date()
 
     dash["scanning"] = False
     clog("SCAN", f"Scan #{bot_state.scan_count} complete")

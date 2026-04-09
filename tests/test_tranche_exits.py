@@ -28,6 +28,8 @@ for _mod in ("orders", "risk", "scanner", "signals", "news", "agents"):
     sys.modules.pop(_mod, None)
 
 import orders
+import orders_state
+import orders_options
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -133,13 +135,13 @@ class TestTrancheSizeCalc:
 
     def test_qty_1_falls_back_to_legacy(self):
         """qty=1 is too small — execute_buy falls back to tranche_mode=False."""
-        orders.active_trades = {}
+        orders_state.active_trades.clear()
         ib = _make_ib()
         result = _run_execute_buy(ib, qty=1, tranche_mode=True)
         assert result is True
         # In legacy mode, t1_status should be "N/A"
-        assert orders.active_trades.get("AAPL", {}).get("t1_status") == "N/A"
-        orders.active_trades = {}
+        assert orders_state.active_trades.get("AAPL", {}).get("t1_status") == "N/A"
+        orders_state.active_trades.clear()
 
 
 # ── Test 3: T1 limit placed at entry + 1.5×ATR ────────────────────────────────
@@ -147,13 +149,13 @@ class TestTrancheSizeCalc:
 class TestT1LimitPlacement:
 
     def setup_method(self):
-        orders.active_trades = {}
+        orders_state.active_trades.clear()
 
     def teardown_method(self):
-        orders.active_trades = {}
+        orders_state.active_trades.clear()
 
     def test_t1_limit_price_is_entry_plus_1_5_atr(self):
-        """T1 TP LimitOrder is constructed with price = entry + 1.5*ATR and qty = t1_qty."""
+        """T1 TP LimitOrder is constructed with the calculate_stops TP price and qty = t1_qty."""
         ib = _make_ib()
         price, atr = 100.0, 1.0
         mock_limit = MagicMock(side_effect=lambda *a, **kw: MagicMock(
@@ -168,9 +170,11 @@ class TestT1LimitPlacement:
         assert result is True
 
         # LimitOrder calls: [0] = entry BUY, [1] = T1 TP SELL
+        # T1 TP uses calculate_stops output directly (no fixed-ATR override in tranche mode).
+        # _run_execute_buy mocks calculate_stops to return (price - atr*1.5, price + atr*3.375).
+        expected_tp_price = round(price + atr * 3.375, 2)  # 103.375
         assert mock_limit.call_count >= 2
         tp_args = mock_limit.call_args_list[1][0]   # positional args of 2nd call
-        expected_tp_price = round(price + atr * 1.5, 2)  # 101.5
         assert tp_args[1] == 50          # qty = t1_qty = 100 // 2
         assert tp_args[2] == pytest.approx(expected_tp_price, abs=0.01)
 
@@ -237,7 +241,8 @@ class TestUpdateTrancheStatus:
 
     def test_t2_stop_placed_when_t1_not_in_open_trades(self):
         """T1 order absent from IBKR open trades → T2 stop placed with correct qty and price."""
-        orders.active_trades = {"AAPL": self._make_trade(t1_order_id=200)}
+        orders_state.active_trades.clear()
+        orders_state.active_trades["AAPL"] = self._make_trade(t1_order_id=200)
 
         new_stop_trade = MagicMock()
         new_stop_trade.order.orderId = 999
@@ -251,10 +256,10 @@ class TestUpdateTrancheStatus:
         captured_stop_args = []
         mock_stop = MagicMock(side_effect=lambda *a, **kw: captured_stop_args.append(a) or MagicMock(transmit=False))
 
-        with patch("orders.get_contract", return_value=MagicMock()), \
-             patch("orders._cancel_ibkr_order_by_id"), \
-             patch("orders.CONFIG", {"active_account": "DU_TEST"}), \
-             patch.object(orders, "StopOrder", mock_stop), \
+        with patch("orders_options.get_contract", return_value=MagicMock()), \
+             patch("orders_options._cancel_ibkr_order_by_id"), \
+             patch("orders_options.CONFIG", {"active_account": "DU_TEST"}), \
+             patch.object(orders_options, "StopOrder", mock_stop), \
              patch("learning.log_trade"):
             orders.update_tranche_status(ib)
 
@@ -265,7 +270,7 @@ class TestUpdateTrancheStatus:
         assert _qty == 50                           # t2_qty
         assert _price == pytest.approx(98.5)        # sl_price
 
-        trade = orders.active_trades["AAPL"]
+        trade = orders_state.active_trades["AAPL"]
         assert trade["t1_status"] == "FILLED"
         assert trade["t2_sl_order_id"] == 999
         assert trade["sl_order_id"] == 999          # updated for trailing stop
@@ -273,7 +278,8 @@ class TestUpdateTrancheStatus:
 
     def test_no_action_when_t1_still_live(self):
         """T1 order still in IBKR open trades → no changes made."""
-        orders.active_trades = {"AAPL": self._make_trade(t1_order_id=200)}
+        orders_state.active_trades.clear()
+        orders_state.active_trades["AAPL"] = self._make_trade(t1_order_id=200)
 
         live_order = MagicMock()
         live_order.order.orderId = 200
@@ -282,30 +288,31 @@ class TestUpdateTrancheStatus:
         ib.isConnected.return_value = True
         ib.openTrades.return_value = [live_order]
 
-        with patch("orders.get_contract", return_value=MagicMock()), \
+        with patch("orders_options.get_contract", return_value=MagicMock()), \
              patch("learning.log_trade"), \
-             patch("orders.CONFIG", {"active_account": "DU_TEST"}):
+             patch("orders_options.CONFIG", {"active_account": "DU_TEST"}):
             orders.update_tranche_status(ib)
 
         assert not ib.placeOrder.called
-        assert orders.active_trades["AAPL"]["t1_status"] == "OPEN"
+        assert orders_state.active_trades["AAPL"]["t1_status"] == "OPEN"
 
     def test_skips_already_filled_tranches(self):
         """Positions with t1_status='FILLED' are skipped."""
-        orders.active_trades = {"AAPL": self._make_trade(t1_status="FILLED")}
+        orders_state.active_trades.clear()
+        orders_state.active_trades["AAPL"] = self._make_trade(t1_status="FILLED")
 
         ib = MagicMock()
         ib.isConnected.return_value = True
         ib.openTrades.return_value = []
 
-        with patch("orders.CONFIG", {"active_account": "DU_TEST"}), \
+        with patch("orders_options.CONFIG", {"active_account": "DU_TEST"}), \
              patch("learning.log_trade"):
             orders.update_tranche_status(ib)
 
         assert not ib.placeOrder.called
 
     def teardown_method(self):
-        orders.active_trades = {}
+        orders_state.active_trades.clear()
 
 
 # ── Test 5: Two log_trade OPEN calls with distinct tranche_ids ─────────────────
@@ -313,10 +320,10 @@ class TestUpdateTrancheStatus:
 class TestJournalAtOpen:
 
     def setup_method(self):
-        orders.active_trades = {}
+        orders_state.active_trades.clear()
 
     def teardown_method(self):
-        orders.active_trades = {}
+        orders_state.active_trades.clear()
 
     def test_two_log_trade_open_calls_with_distinct_tranche_ids(self):
         """execute_buy with tranche_mode=True calls log_trade twice: tranche_id=1 and 2."""
@@ -377,23 +384,22 @@ class TestJournalAtOpen:
 class TestJournalAtT1Close:
 
     def teardown_method(self):
-        orders.active_trades = {}
+        orders_state.active_trades.clear()
 
     def test_log_trade_close_for_t1_on_fill(self):
         """update_tranche_status logs CLOSE with tranche_id=1 and reason='tranche_1_tp'."""
-        orders.active_trades = {
-            "AAPL": {
-                "symbol": "AAPL", "instrument": "stock", "status": "ACTIVE",
-                "direction": "LONG", "entry": 100.0, "current": 101.5,
-                "qty": 100, "t1_qty": 50, "t2_qty": 50,
-                "sl": 98.5, "tp": 101.5, "atr": 1.0,
-                "sl_order_id": 100, "t1_order_id": 200,
-                "t2_sl_order_id": None, "t1_status": "OPEN",
-                "tranche_mode": True, "order_id": 99,
-                "agent_outputs": {}, "score": 25, "reasoning": "test",
-                "open_time": "2026-04-01T09:30:00+00:00",
-                "high_water_mark": 101.5,
-            }
+        orders_state.active_trades.clear()
+        orders_state.active_trades["AAPL"] = {
+            "symbol": "AAPL", "instrument": "stock", "status": "ACTIVE",
+            "direction": "LONG", "entry": 100.0, "current": 101.5,
+            "qty": 100, "t1_qty": 50, "t2_qty": 50,
+            "sl": 98.5, "tp": 101.5, "atr": 1.0,
+            "sl_order_id": 100, "t1_order_id": 200,
+            "t2_sl_order_id": None, "t1_status": "OPEN",
+            "tranche_mode": True, "order_id": 99,
+            "agent_outputs": {}, "score": 25, "reasoning": "test",
+            "open_time": "2026-04-01T09:30:00+00:00",
+            "high_water_mark": 101.5,
         }
 
         new_stop = MagicMock()
@@ -407,9 +413,9 @@ class TestJournalAtT1Close:
 
         close_calls = []
 
-        with patch("orders.get_contract", return_value=MagicMock()), \
-             patch("orders._cancel_ibkr_order_by_id"), \
-             patch("orders.CONFIG", {"active_account": "DU_TEST"}), \
+        with patch("orders_options.get_contract", return_value=MagicMock()), \
+             patch("orders_options._cancel_ibkr_order_by_id"), \
+             patch("orders_options.CONFIG", {"active_account": "DU_TEST"}), \
              patch("learning.log_trade", side_effect=lambda **kw: close_calls.append(kw)):
             orders.update_tranche_status(ib)
 
@@ -427,10 +433,10 @@ class TestJournalAtT1Close:
 class TestLegacyMode:
 
     def setup_method(self):
-        orders.active_trades = {}
+        orders_state.active_trades.clear()
 
     def teardown_method(self):
-        orders.active_trades = {}
+        orders_state.active_trades.clear()
 
     def test_legacy_tp_qty_is_qty_over_3(self):
         """tranche_mode=False: TP qty = qty//3, t1_status='N/A'."""
@@ -464,6 +470,6 @@ class TestLegacyMode:
         tp_args = mock_limit.call_args_list[1][0]
         assert tp_args[1] == 33   # 99 // 3 = 33
 
-        trade = orders.active_trades.get("AAPL", {})
+        trade = orders_state.active_trades.get("AAPL", {})
         assert trade.get("tranche_mode") is False
         assert trade.get("t1_status") == "N/A"

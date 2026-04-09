@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import logging
 import time
+import zoneinfo
 from datetime import datetime, timezone
+
+_ET = zoneinfo.ZoneInfo("America/New_York")
 
 from config import CONFIG
 import bot_state
@@ -55,9 +58,9 @@ def handle_news_trigger(trigger: dict):
     """
     sym = trigger.get("symbol", "?")
 
-    now = datetime.now()
+    now = datetime.now(_ET)
     if (bot_state._sentinel_hour_start is None or
-            (now - bot_state._sentinel_hour_start).seconds > 3600):
+            (now - bot_state._sentinel_hour_start).total_seconds() > 3600):
         bot_state._sentinel_trades_this_hour = 0
         bot_state._sentinel_hour_start       = now
 
@@ -104,7 +107,7 @@ def handle_news_trigger(trigger: dict):
             "confidence": decision.get("confidence", 0),
             "reasoning": decision.get("reasoning", "")[:100],
             "catalyst":  trigger.get("claude_catalyst", "")[:80],
-            "time":      datetime.now().strftime("%H:%M:%S"),
+            "time":      datetime.now(_ET).strftime("%H:%M:%S"),
         })
         dash["sentinel_triggers"] = dash["sentinel_triggers"][:50]
 
@@ -117,7 +120,8 @@ def handle_news_trigger(trigger: dict):
             return
 
         if action == "BUY":
-            _execute_sentinel_buy(decision, pv, regime, trigger)
+            decision["_trigger_size_mult"] = CONFIG.get("sentinel_risk_multiplier", 0.75)
+            _execute_trigger_buy(decision, pv, regime, trigger, label="SENTINEL")
             bot_state._sentinel_trades_this_hour += 1
         elif action == "SELL":
             _execute_sentinel_sell(decision, open_pos, regime, trigger)
@@ -131,15 +135,20 @@ def handle_news_trigger(trigger: dict):
         log.error(f"Sentinel trigger handler error for {sym}: {e}")
 
 
-def _execute_sentinel_buy(decision: dict, portfolio_value: float,
-                          regime: dict, trigger: dict):
-    """Execute a sentinel-triggered buy order."""
+def _execute_trigger_buy(decision: dict, portfolio_value: float,
+                         regime: dict, trigger: dict, *, label: str = "SENTINEL"):
+    """
+    Execute a sentinel or catalyst-triggered buy order.
+    Caller must set decision["_trigger_size_mult"] before calling.
+    label: "SENTINEL" or "CATALYST" — used in log messages and trade card.
+    """
     sym        = decision.get("symbol", "")
     qty        = decision.get("qty", 0)
     sl         = decision.get("sl", 0)
     tp         = decision.get("tp", 0)
     instrument = decision.get("instrument", "stock")
     reasoning  = decision.get("reasoning", "")
+    size_mult  = decision.get("_trigger_size_mult", CONFIG.get("sentinel_risk_multiplier", 0.75))
     ib         = bot_state.ib
 
     if qty <= 0:
@@ -147,26 +156,30 @@ def _execute_sentinel_buy(decision: dict, portfolio_value: float,
             from signals import fetch_multi_timeframe
             sig = fetch_multi_timeframe(sym)
             if sig:
-                price          = sig.get("price", 0)
-                atr            = sig.get("atr", 0)
-                score          = max(sig.get("score", 0), 30)
-                sentinel_mult  = CONFIG.get("sentinel_risk_multiplier", 0.75)
-                qty            = calculate_position_size(portfolio_value, price, score, regime, external_mult=sentinel_mult)
+                price = sig.get("price", 0)
+                atr   = sig.get("atr", 0)
+                score = max(sig.get("score", 0), 30)
+                qty   = calculate_position_size(portfolio_value, price, score, regime, external_mult=size_mult)
                 if sl <= 0 and atr > 0:
                     sl, tp = calculate_stops(price, atr, "LONG")
         except Exception as e:
-            log.error(f"Sentinel position sizing error for {sym}: {e}")
+            log.error(f"{label} position sizing error for {sym}: {e}")
             return
 
     if qty <= 0:
-        clog("INFO", f"Sentinel BUY {sym}: calculated qty=0, skipping")
+        clog("INFO", f"{label} BUY {sym}: calculated qty=0, skipping")
         return
 
     if instrument == "inverse_etf" and decision.get("inverse_symbol"):
         sym = decision["inverse_symbol"]
-        clog("TRADE", f"⚡ Sentinel SHORT via {sym} (inverse ETF)")
+        clog("TRADE", f"⚡ {label} SHORT via {sym} (inverse ETF)")
 
-    clog("TRADE", f"⚡ Sentinel BUY {sym} | qty={qty} | SL=${sl:.2f} | TP=${tp:.2f} | {reasoning[:60]}")
+    trigger_type = trigger.get("trigger_type", "")
+    tag          = f"[{label}:{trigger_type}]" if trigger_type else f"[{label}]"
+    type_part    = f" | type={trigger_type}" if trigger_type and label == "CATALYST" else ""
+    clog("TRADE",
+         f"⚡ {label} BUY {sym} | qty={qty} | SL=${sl:.2f} | TP=${tp:.2f}"
+         f"{type_part} | {reasoning[:60]}")
 
     try:
         from signals import fetch_multi_timeframe
@@ -181,23 +194,23 @@ def _execute_sentinel_buy(decision: dict, portfolio_value: float,
                 score=max(sig.get("score", 0), 30),
                 portfolio_value=portfolio_value,
                 regime=regime,
-                reasoning=f"[SENTINEL] {reasoning}",
+                reasoning=f"{tag} {reasoning}",
                 signal_scores=sig.get("score_breakdown", {}),
                 agent_outputs={},
                 open_time=datetime.now(timezone.utc).isoformat(),
             )
             if success:
                 dash["trades"].insert(0, {
-                    "side":   "⚡ BUY",
+                    "side":   f"⚡ {label} BUY",
                     "symbol": sym,
                     "price":  str(sig["price"]),
-                    "time":   datetime.now().strftime("%H:%M:%S"),
+                    "time":   datetime.now(_ET).strftime("%H:%M:%S"),
                 })
-                clog("TRADE", f"⚡ Sentinel BUY {sym} executed successfully")
+                clog("TRADE", f"⚡ {label} BUY {sym} executed successfully")
         else:
-            clog("ERROR", f"Sentinel BUY {sym}: failed to fetch signal data")
+            clog("ERROR", f"{label} BUY {sym}: failed to fetch signal data")
     except Exception as e:
-        clog("ERROR", f"Sentinel BUY execution error for {sym}: {e}")
+        clog("ERROR", f"{label} BUY execution error for {sym}: {e}")
 
 
 def _execute_sentinel_sell(decision: dict, open_positions: list,
@@ -221,7 +234,7 @@ def _execute_sentinel_sell(decision: dict, open_positions: list,
             "side":   "⚡ SELL",
             "symbol": sym,
             "price":  str(exit_price),
-            "time":   datetime.now().strftime("%H:%M:%S"),
+            "time":   datetime.now(_ET).strftime("%H:%M:%S"),
         })
         pnl_val = (exit_price - pos.get("entry", 0)) * pos.get("qty", 0)
         from learning import log_trade as _log_trade
@@ -233,6 +246,7 @@ def _execute_sentinel_sell(decision: dict, open_positions: list,
             outcome={
                 "exit_price": round(exit_price, 4),
                 "pnl":        round(pnl_val, 2),
+                "pnl_pct":    round(pnl_val / ((pos.get("entry") or 1) * (pos.get("qty") or 1)), 4),
                 "reason":     f"sentinel_{trigger.get('direction', 'news').lower()}",
             }
         )
@@ -251,7 +265,7 @@ def handle_catalyst_trigger(trigger: dict):
     sym          = trigger.get("symbol", "?")
     trigger_type = trigger.get("trigger_type", "unknown")
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(_ET).strftime("%Y-%m-%d")
     if bot_state._catalyst_trade_date != today:
         bot_state._catalyst_trades_today = 0
         bot_state._catalyst_trade_date   = today
@@ -277,7 +291,7 @@ def handle_catalyst_trigger(trigger: dict):
             "action":       "LOG",
             "trigger_type": trigger_type,
             "catalyst":     trigger.get("claude_catalyst", "")[:80],
-            "time":         datetime.now().strftime("%H:%M:%S"),
+            "time":         datetime.now(_ET).strftime("%H:%M:%S"),
         })
         return
 
@@ -312,7 +326,7 @@ def handle_catalyst_trigger(trigger: dict):
             "confidence":   decision.get("confidence", 0),
             "reasoning":    decision.get("reasoning", "")[:100],
             "catalyst":     trigger.get("claude_catalyst", "")[:80],
-            "time":         datetime.now().strftime("%H:%M:%S"),
+            "time":         datetime.now(_ET).strftime("%H:%M:%S"),
         })
         dash["catalyst_triggers"] = dash["catalyst_triggers"][:50]
 
@@ -327,8 +341,8 @@ def handle_catalyst_trigger(trigger: dict):
         if action == "BUY":
             catalyst_mult = CONFIG.get("catalyst_risk_multiplier", 0.50)
             sentinel_mult = CONFIG.get("sentinel_risk_multiplier", 0.75)
-            decision["_catalyst_size_multiplier"] = catalyst_mult * sentinel_mult
-            _execute_catalyst_buy(decision, pv, regime, trigger)
+            decision["_trigger_size_mult"] = catalyst_mult * sentinel_mult
+            _execute_trigger_buy(decision, pv, regime, trigger, label="CATALYST")
             bot_state._catalyst_trades_today += 1
         elif action == "SELL":
             _execute_sentinel_sell(decision, open_pos, regime, trigger)
@@ -342,73 +356,53 @@ def handle_catalyst_trigger(trigger: dict):
         log.error(f"Catalyst trigger handler error for {sym}: {e}")
 
 
-def _execute_catalyst_buy(decision: dict, portfolio_value: float,
-                          regime: dict, trigger: dict):
-    """Execute a catalyst-triggered buy order (mirrors _execute_sentinel_buy with reduced sizing)."""
-    sym        = decision.get("symbol", "")
-    qty        = decision.get("qty", 0)
-    sl         = decision.get("sl", 0)
-    tp         = decision.get("tp", 0)
-    reasoning  = decision.get("reasoning", "")
-    size_mult  = decision.get("_catalyst_size_multiplier",
-                              CONFIG.get("catalyst_risk_multiplier", 0.50) *
-                              CONFIG.get("sentinel_risk_multiplier", 0.75))
-    ib         = bot_state.ib
 
-    if qty <= 0:
-        try:
-            from signals import fetch_multi_timeframe
-            sig = fetch_multi_timeframe(sym)
-            if sig:
-                price = sig.get("price", 0)
-                atr   = sig.get("atr", 0)
-                score = max(sig.get("score", 0), 30)
-                qty   = calculate_position_size(portfolio_value, price, score, regime, external_mult=size_mult)
-                if sl <= 0 and atr > 0:
-                    sl, tp = calculate_stops(price, atr, "LONG")
-        except Exception as e:
-            log.error(f"Catalyst position sizing error for {sym}: {e}")
-            return
+# ── Sentinel factory functions ────────────────────────────────────────────────
 
-    if qty <= 0:
-        clog("INFO", f"Catalyst BUY {sym}: calculated qty=0, skipping")
-        return
+def start_news_sentinel(ib):
+    """
+    Initialise and start the NewsSentinel background thread.
+    Returns the running sentinel instance; caller should store in bot_state._sentinel.
+    """
+    from news_sentinel import NewsSentinel
+    sentinel = NewsSentinel(
+        get_universe_fn=_get_sentinel_universe,
+        on_trigger_fn=handle_news_trigger,
+        ib=ib,
+        poll_interval=CONFIG.get("sentinel_poll_seconds", 45),
+    )
+    sentinel.start()
+    return sentinel
 
-    trigger_type = trigger.get("trigger_type", "catalyst")
-    clog("TRADE",
-         f"⚡ Catalyst BUY {sym} | qty={qty} | SL=${sl:.2f} | TP=${tp:.2f} | "
-         f"type={trigger_type} | {reasoning[:60]}")
 
-    try:
-        from signals import fetch_multi_timeframe
-        sig = fetch_multi_timeframe(sym)
-        if sig:
-            success = execute_buy(
-                ib=ib,
-                symbol=sym,
-                price=sig["price"],
-                atr=sig["atr"],
-                candle_gate=sig.get("candle_gate", "UNKNOWN"),
-                score=max(sig.get("score", 0), 30),
-                portfolio_value=portfolio_value,
-                regime=regime,
-                reasoning=f"[CATALYST:{trigger_type}] {reasoning}",
-                signal_scores=sig.get("score_breakdown", {}),
-                agent_outputs={},
-                open_time=datetime.now(timezone.utc).isoformat(),
-            )
-            if success:
-                dash["trades"].insert(0, {
-                    "side":   "⚡ CATALYST BUY",
-                    "symbol": sym,
-                    "price":  str(sig["price"]),
-                    "time":   datetime.now().strftime("%H:%M:%S"),
-                })
-                clog("TRADE", f"⚡ Catalyst BUY {sym} executed successfully")
-        else:
-            clog("ERROR", f"Catalyst BUY {sym}: failed to fetch signal data")
-    except Exception as e:
-        clog("ERROR", f"Catalyst BUY execution error for {sym}: {e}")
+def start_alpaca_news_stream():
+    """
+    Initialise and start the AlpacaNewsStream (push-based Benzinga feed).
+    Returns the running stream instance; caller stores it in bot_state._alpaca_news_stream.
+    No ib argument — Alpaca news stream is independent of IBKR.
+    """
+    from alpaca_news import AlpacaNewsStream
+    stream = AlpacaNewsStream(
+        get_universe_fn=_get_sentinel_universe,
+        on_trigger_fn=handle_news_trigger,
+    )
+    stream.start()
+    return stream
+
+
+def start_catalyst_sentinel(ib):
+    """
+    Initialise and start the CatalystSentinel background thread.
+    Returns the running sentinel instance; caller should store in bot_state._catalyst_sentinel.
+    """
+    from catalyst_sentinel import CatalystSentinel
+    sentinel = CatalystSentinel(
+        get_universe_fn=_get_sentinel_universe,
+        on_trigger_fn=handle_catalyst_trigger,
+        ib=ib,
+    )
+    sentinel.start()
+    return sentinel
 
 
 # ── Scan countdown ────────────────────────────────────────────────────────────

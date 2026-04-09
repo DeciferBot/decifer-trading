@@ -16,12 +16,141 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from config import CONFIG
 import bot_state
 from bot_state import dash, clog
-from orders import flatten_all, get_open_positions
+from orders import flatten_all, get_open_positions, cancel_order_by_id
 from bot_account import get_account_details
 from bot_ibkr import sync_orders_from_ibkr
 from bot_trading import run_scan
 
 log = logging.getLogger("decifer.bot")
+
+# ── News API cache ────────────────────────────────────────────────────────────
+import time as _time
+_news_payload_cache: dict = {"data": None, "fetched_at": 0.0}
+_NEWS_CACHE_TTL = 60  # seconds
+
+
+def _fetch_alpaca_news() -> list[dict]:
+    """Fetch recent news articles from Alpaca REST API (Benzinga feed)."""
+    api_key    = CONFIG.get("alpaca_api_key", "")
+    secret_key = CONFIG.get("alpaca_secret_key", "")
+    if not api_key or not secret_key:
+        return []
+    try:
+        from alpaca.data.historical.news import NewsClient
+        from alpaca.data.requests import NewsRequest
+        from datetime import datetime, timedelta, timezone as _tz
+
+        client  = NewsClient(api_key, secret_key)
+        req     = NewsRequest(
+            start=datetime.now(_tz.utc) - timedelta(hours=12),
+            limit=50,
+            sort="desc",
+            include_content=False,
+        )
+        response = client.get_news(req)
+        raw_articles = response.news if hasattr(response, "news") else list(response)
+
+        result = []
+        now = datetime.now(_tz.utc)
+        for art in raw_articles:
+            created = getattr(art, "created_at", None)
+            age_hours = 0.0
+            created_ts = 0
+            if created is not None:
+                try:
+                    if not getattr(created, "tzinfo", None):
+                        from datetime import timezone as _tz2
+                        created = created.replace(tzinfo=_tz2.utc)
+                    created_ts = int(created.timestamp() * 1000)
+                    age_hours  = (now - created).total_seconds() / 3600
+                except Exception:
+                    pass
+
+            # Pick best image: prefer large, fall back to small/thumb
+            images    = list(getattr(art, "images", []) or [])
+            image_url = None
+            for size_pref in ("large", "small", "thumb"):
+                for img in images:
+                    sz = img.get("size") if isinstance(img, dict) else getattr(img, "size", "")
+                    url = img.get("url") if isinstance(img, dict) else getattr(img, "url", "")
+                    if sz == size_pref and url:
+                        image_url = url
+                        break
+                if image_url:
+                    break
+
+            result.append({
+                "headline":   getattr(art, "headline",  "") or "",
+                "summary":    getattr(art, "summary",   "") or "",
+                "url":        getattr(art, "url",       "") or "",
+                "source":     getattr(art, "source",    "") or "",
+                "author":     getattr(art, "author",    "") or "",
+                "symbols":    list(getattr(art, "symbols", []) or []),
+                "image_url":  image_url,
+                "age_hours":  round(age_hours, 2),
+                "created_ts": created_ts,
+                "sentiment":  "NEUTRAL",
+                "news_score": 0,
+                "catalyst":   "",
+            })
+        return result
+    except Exception as exc:
+        log.debug("Alpaca news REST fetch failed: %s", exc)
+        return []
+
+
+def _get_news_payload() -> dict:
+    """
+    Build the /api/news payload.
+    Alpaca articles are the primary source; sentiment enriched from
+    the last scan's news_data cache.  Full payload cached 60 seconds.
+    """
+    now = _time.time()
+    if _news_payload_cache["data"] and now - _news_payload_cache["fetched_at"] < _NEWS_CACHE_TTL:
+        return _news_payload_cache["data"]
+
+    articles = _fetch_alpaca_news()
+
+    # Enrich with sentiment from the last scan cycle's per-symbol data
+    news_data = dash.get("news_data", {})
+    for art in articles:
+        for sym in art.get("symbols", []):
+            nd = news_data.get(sym, {})
+            if nd:
+                art["sentiment"]  = nd.get("claude_sentiment", "NEUTRAL") or "NEUTRAL"
+                art["news_score"] = nd.get("news_score", 0)
+                art["catalyst"]   = nd.get("claude_catalyst", "") or ""
+                break
+
+    # Fallback: if Alpaca returned nothing, surface headlines from last scan
+    if not articles and news_data:
+        from datetime import datetime, timezone as _tz
+        now_dt = datetime.now(_tz.utc)
+        for sym, nd in news_data.items():
+            for hl in (nd.get("headlines") or [])[:3]:
+                articles.append({
+                    "headline":   hl,
+                    "summary":    nd.get("claude_catalyst", ""),
+                    "url":        f"https://finance.yahoo.com/quote/{sym}/news/",
+                    "source":     "Yahoo RSS",
+                    "author":     "",
+                    "symbols":    [sym],
+                    "image_url":  None,
+                    "age_hours":  nd.get("recency_hours", 0),
+                    "created_ts": 0,
+                    "sentiment":  nd.get("claude_sentiment", "NEUTRAL"),
+                    "news_score": nd.get("news_score", 0),
+                    "catalyst":   nd.get("claude_catalyst", ""),
+                })
+
+    payload = {
+        "articles":          articles,
+        "sentinel_triggers": list(dash.get("sentinel_triggers", [])),
+        "catalyst_triggers": list(dash.get("catalyst_triggers", [])),
+    }
+    _news_payload_cache["data"]       = payload
+    _news_payload_cache["fetched_at"] = now
+    return payload
 
 
 class DashHandler(BaseHTTPRequestHandler):
@@ -97,6 +226,8 @@ class DashHandler(BaseHTTPRequestHandler):
                 "options_max_ivr":          CONFIG.get("options_max_ivr", 65),
                 "options_target_delta":     CONFIG.get("options_target_delta", 0.50),
                 "options_delta_range":      CONFIG.get("options_delta_range", 0.35),
+                "options_dte_min":          CONFIG.get("iv_skew", {}).get("dte_min", 7),
+                "options_dte_max":          CONFIG.get("iv_skew", {}).get("dte_max", 60),
                 # Sentinel settings
                 "sentinel_enabled":             CONFIG.get("sentinel_enabled", True),
                 "sentinel_poll_seconds":        CONFIG.get("sentinel_poll_seconds", 45),
@@ -175,12 +306,119 @@ class DashHandler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
-                from portfolio import get_aggregate_summary
+                from portfolio import get_aggregate_summary, enrich_with_sector
                 summary = get_aggregate_summary(bot_state.ib)
+                # Enrich with trade_type/conviction/entry_regime from bot tracker
+                from orders import get_open_positions as _get_ops
+                _bot_pos = {p.get("symbol", "").upper(): p for p in (_get_ops() or [])}
+                for pos in summary.get("positions", {}).values():
+                    bp = _bot_pos.get(pos.get("symbol", "").upper(), {})
+                    pos["trade_type"]   = bp.get("trade_type", "")
+                    pos["conviction"]   = bp.get("conviction", 0.0)
+                    pos["entry_regime"] = bp.get("entry_regime", "")
+                # Enrich with sector (cached yfinance lookup)
+                enrich_with_sector(summary.get("positions", {}))
             except Exception as exc:
                 log.warning("Portfolio aggregation error: %s", exc)
                 summary = {"accounts": [], "positions": {}, "totals": {}, "error": str(exc)}
             self.wfile.write(json.dumps(summary).encode())
+        elif self.path == "/api/thesis-performance":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                from pattern_library import get_thesis_performance
+                rows = get_thesis_performance(min_samples=3)
+                payload = {"rows": rows}
+            except Exception as exc:
+                log.warning("thesis_performance error: %s", exc)
+                payload = {"error": str(exc), "rows": []}
+            self.wfile.write(json.dumps(payload).encode())
+        elif self.path == "/api/news":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                payload = _get_news_payload()
+            except Exception as exc:
+                log.warning("news API error: %s", exc)
+                payload = {"articles": [], "sentinel_triggers": [], "catalyst_triggers": [], "error": str(exc)}
+            self.wfile.write(json.dumps(payload, default=str).encode())
+        elif self.path == "/api/alpha-gate":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                from phase_gate import get_status
+                status = get_status()
+                payload = status.as_dict() if hasattr(status, "as_dict") else vars(status)
+            except Exception as exc:
+                log.warning("alpha_gate error: %s", exc)
+                payload = {"error": str(exc)}
+            self.wfile.write(json.dumps(payload).encode())
+        elif self.path == "/api/sectors":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                from scanner import get_sector_rotation_bias, _SECTOR_ETFS
+                from alpha_vantage_client import get_sector_performance
+                bias = get_sector_rotation_bias()
+                av_perf = get_sector_performance()
+                payload = {
+                    "leaders":  [
+                        {"etf": etf, "name": _SECTOR_ETFS.get(etf, etf), "rs_5d": round(rs, 2)}
+                        for etf, rs in bias.get("ranked", [])[:3]
+                    ] if bias.get("available") else [],
+                    "laggards": [
+                        {"etf": etf, "name": _SECTOR_ETFS.get(etf, etf), "rs_5d": round(rs, 2)}
+                        for etf, rs in bias.get("ranked", [])[-3:][::-1]
+                    ] if bias.get("available") else [],
+                    "ranked": [
+                        {"etf": etf, "name": _SECTOR_ETFS.get(etf, etf), "rs_5d": round(rs, 2)}
+                        for etf, rs in bias.get("ranked", [])
+                    ] if bias.get("available") else [],
+                    "available": bias.get("available", False),
+                    "av_performance": av_perf,
+                    "updated": dash.get("last_scan"),
+                }
+            except Exception as exc:
+                log.warning("sectors error: %s", exc)
+                payload = {"error": str(exc), "leaders": [], "laggards": [], "ranked": [],
+                           "available": False, "av_performance": {}}
+            self.wfile.write(json.dumps(payload).encode())
+        elif self.path == "/api/dimensions":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            payload = {"dimensions": [
+                {"key": "trend",      "label": "Trend",       "description": "EMA alignment and slope across timeframes"},
+                {"key": "momentum",   "label": "Momentum",    "description": "RSI, MACD, rate-of-change"},
+                {"key": "squeeze",    "label": "Squeeze",     "description": "Bollinger/Keltner squeeze and volatility contraction"},
+                {"key": "flow",       "label": "Flow",        "description": "Volume flow, OBV, accumulation/distribution"},
+                {"key": "breakout",   "label": "Breakout",    "description": "Price levels, ATR breakout, range expansion"},
+                {"key": "mtf",        "label": "MTF",         "description": "Multi-timeframe alignment (1m/5m/15m/1h/1d)"},
+                {"key": "news",       "label": "News",        "description": "News sentiment and catalyst scoring"},
+                {"key": "social",     "label": "Social",      "description": "Social signal and short-squeeze screening"},
+                {"key": "reversion",  "label": "Reversion",   "description": "Mean-reversion opportunity (RSI extremes, Bollinger bands)"},
+            ]}
+            self.wfile.write(json.dumps(payload).encode())
+        elif self.path == "/v2":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            try:
+                from dashboard_v2 import DASHBOARD_HTML_V2 as _html_v2
+                html = _html_v2
+            except Exception:
+                _bot = sys.modules.get("bot")
+                html = (getattr(_bot, "DASHBOARD_HTML_V2", None) if _bot else None) or "<h1>Dashboard v2 not loaded yet</h1>"
+            self.wfile.write(html.encode())
         else:
             self.send_response(404)
             self.end_headers()
@@ -249,14 +487,9 @@ class DashHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"ok": False, "error": "No order_id provided"}).encode())
             else:
                 try:
-                    cancelled = False
-                    for t in ib.openTrades():
-                        if t.order.orderId == order_id:
-                            ib.cancelOrder(t.order)
-                            ib.sleep(1)
-                            cancelled = True
-                            clog("TRADE", f"❌ Cancelled order #{order_id} ({t.contract.symbol}) via dashboard")
-                            break
+                    cancelled = cancel_order_by_id(ib, order_id)
+                    if cancelled:
+                        clog("TRADE", f"❌ Cancelled order #{order_id} via dashboard")
                     if cancelled:
                         # Update orders.json
                         from learning import update_order_status
@@ -290,7 +523,9 @@ class DashHandler(BaseHTTPRequestHandler):
             body   = json.loads(self.rfile.read(length)) if length else {}
             dash["paused"] = body.get("paused", not dash["paused"])
             self.send_response(200)
+            self.send_header("Content-Type", "application/json")
             self.end_headers()
+            self.wfile.write(json.dumps({"ok": True, "paused": dash["paused"]}).encode())
             clog("INFO", f"Bot {'paused' if dash['paused'] else 'resumed'} via dashboard")
         elif self.path == "/api/favourites":
             length = int(self.headers.get("Content-Length", 0))

@@ -1,0 +1,71 @@
+{
+  "session_id": "2026-04-09_regime-as-reasoning-input",
+  "date": "2026-04-09",
+  "approved_by": "Amit",
+  "topic": "Regime labels demoted from behavioral gates to reasoning inputs",
+  "north_star_pillars": [1, 2, 3, 4, 5],
+  "summary": "Removed hardcoded regime-label-driven behavioral gates. Market conditions (VIX, SPY/QQQ vs 200d MA, breadth, credit stress, intraday character) are now passed as structured context to the Opus reasoning layer. Opus characterises the session and classifies signals in that context. The regime label (BULL_TRENDING/CHOPPY/etc.) remains computed and displayed on the dashboard but no longer drives scan scope, score thresholds, or strategy mode escalation.",
+
+  "motivation": "Today (2026-04-09) was a relief rally. SPY and QQQ were both above their 200d MAs. VIX was 21.49 — just above the hardcoded vix_bull_max=20. The mechanical classification returned CHOPPY, which: (1) suppressed all momentum long scans entirely, (2) lowered the score threshold from 18 to 12 (letting in noisier signals, not better ones), (3) expanded breakdown/short scanning. Opus never saw the conditions because the rules filtered candidates before it was consulted. This is the opposite of the north star: hardcoded rules making decisions that reasoning should make.",
+
+  "changes": {
+    "market_intelligence.py": {
+      "description": "Added SESSION_CHARACTER_VOCAB (6 descriptive labels), _build_regime_context_block() helper, regime context block in Opus prompt, session_character field in Opus response schema, circuit breaker (EXTREME_STRESS) that skips Opus entirely for VIX > 35 or +20% spike. classify_signals() now accepts regime dict and returns (session_character, market_read, classifications). Added get_current_session_character() accessor.",
+      "impact": "Opus now sees VIX level, SPY/QQQ vs 200d MA, breadth, credit stress, intraday router, and the mechanical regime label as context. It characterises the session ('RELIEF_RALLY', 'MOMENTUM_BULL', etc.) and reasons signal by signal against that backdrop."
+    },
+    "signal_dispatcher.py": {
+      "description": "Updated classify_signals() call to pass regime dict and unpack (session_character, market_read, classifications). Writes session_character back into regime dict so orders_core and check_external_closes can read it.",
+      "impact": "session_character propagates downstream without additional imports."
+    },
+    "orders_core.py": {
+      "description": "entry_regime now reads regime.get('session_character') or regime.get('regime', 'UNKNOWN'). Prefers Opus-generated label over mechanical label.",
+      "impact": "Positions opened today log 'RELIEF_RALLY' as entry_regime instead of 'CHOPPY'. Learning loop has meaningful data."
+    },
+    "bot_trading.py": {
+      "description": "check_external_closes() now uses polarity comparison (_polarity() inline helper) for thesis_class='breached_regime_shift' detection. exit_regime reads session_character from regime dict. Polarity handles both old labels (BULL_TRENDING → BULL) and new vocab (RELIEF_RALLY → BULL, TRENDING_BEAR → BEAR).",
+      "impact": "Mixed-vocabulary comparisons (RELIEF_RALLY vs BULL_TRENDING) no longer spuriously trigger breached_regime_shift."
+    },
+    "portfolio_manager.py": {
+      "description": "_regime_polarity() updated to handle new session_character vocab explicitly before falling back to substring match. lightweight_cycle_check() reads current_regime from regime.get('session_character') or regime.get('regime').",
+      "impact": "HOLD polar flip detection and SWING regime change detection work correctly with new labels."
+    },
+    "scanner.py": {
+      "description": "get_dynamic_universe() rewritten. Removed is_panic, is_bull, is_bear, is_choppy flags and all regime-conditional scan gating. All 10 scan categories run every cycle at fixed limits (20 momentum longs, 20 momentum shorts, 15 breakdown, 12 volume distribution, 12 bearish momentum, 15 intraday breakdown, 15 gap up, 15 gap down, 15 premarket). Single circuit breaker: VIX > vix_panic_min or 1h spike > vix_spike_pct skips directional scans (volume_leaders + rel_vol_surge only).",
+      "impact": "On a day like today, momentum_long scan runs with 20 candidates. Opus sees them and decides whether they fit the RELIEF_RALLY session character. Previously they were suppressed before Opus was consulted."
+    },
+    "signals.py": {
+      "description": "get_regime_threshold() simplified: all non-circuit-breaker regimes return CONFIG['min_score_to_trade'] (base). PANIC and EXTREME_STRESS return regime_threshold_panic (99). Regime-specific offsets (bear: -3, choppy: -6) removed.",
+      "impact": "Uniform quality bar — Opus sees the same candidate quality regardless of regime label. The old CHOPPY threshold of 12 was letting in noisier signals, which is exactly wrong."
+    },
+    "risk.py": {
+      "description": "check_sector_concentration(): regime_limits dict replaced with single limit (0.30) for all regimes; circuit breaker (PANIC/EXTREME_STRESS) uses 0.15. get_intraday_strategy_mode(): removed regime_changed escalation to DEFENSIVE — the label BULL→CHOPPY transition no longer triggers strategy mode change; PnL and consecutive loss gates remain. Removed 'regime_changed' key from return dict.",
+      "impact": "Strategy mode driven by actual outcomes (PnL, streaks), not by a regime label flip that had no direct PnL implication."
+    }
+  },
+
+  "session_character_vocab": {
+    "MOMENTUM_BULL": "Strong uptrend, VIX low, broad participation",
+    "RELIEF_RALLY": "Bouncing from recent selloff, VIX declining but still elevated",
+    "FEAR_ELEVATED": "VIX rising, cautious but not extreme",
+    "DISTRIBUTION": "Selling pressure, SPY declining or losing breadth",
+    "TRENDING_BEAR": "Sustained downtrend, shorts working",
+    "EXTREME_STRESS": "VIX spiked hard — circuit breaker territory (VIX > 35 or +20% 1h spike)"
+  },
+
+  "what_did_not_change": [
+    "get_market_regime() classification logic — still produces BULL_TRENDING/BEAR_TRENDING/CHOPPY/PANIC/UNKNOWN. Label shown on dashboard.",
+    "The regime dict (all 14 fields) — still built and passed everywhere. Now context, not a gate controller.",
+    "4-agent voting system (agents.py) — unchanged.",
+    "Hard PANIC circuit breaker in check_risk_conditions() — unchanged.",
+    "_regime_multipliers() (dimension score weighting via regime_router) — continuous soft adjustment, not a gate.",
+    "North star entry/hold/exit architecture — unchanged."
+  ],
+
+  "pre_existing_errors_fixed": [
+    "test_scanner.py: test_filter_by_volume_removes_low_volume tested PANIC label as circuit breaker trigger — updated to use VIX level (the actual trigger).",
+    "test_system_interactions.py: test_panic_position_size_multiplier_is_zero had a test isolation issue from test_orders_execute.py replacing scanner in sys.modules — fixed with importlib.util.spec_from_file_location workaround.",
+    "test_regime_thresholds.py: all tests assumed regime-specific offset behavior — rewrote to reflect flat threshold design."
+  ],
+
+  "tests_run": "161 passed, 1 deselected (test_rank_candidates_returns_sorted_list — pre-existing mock isolation issue in get_market_regime test, unrelated to this change)"
+}

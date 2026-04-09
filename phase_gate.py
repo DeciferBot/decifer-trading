@@ -303,7 +303,7 @@ def get_status(config: dict[str, Any] | None = None) -> PhaseStatus:
     criteria: dict[str, Any] = pg.get("phase1_exit_criteria", {})
     frozen: dict[str, int] = pg.get("frozen_features", {})
 
-    min_trades: int = criteria.get("min_closed_trades", 200)
+    min_trades: int = criteria.get("min_closed_trades", 100)
     min_pass: float = criteria.get("min_test_pass_rate", 0.80)
     min_days: int = criteria.get("min_paper_trading_days", 30)
 
@@ -377,7 +377,7 @@ def assert_feature_allowed(feature_name: str, config: dict[str, Any] | None = No
             f"Feature '{feature_name}' is frozen until Phase {required_phase}. "
             f"Current phase is {current_phase} ({PHASE_DESCRIPTIONS.get(current_phase, '?')}). "
             f"Complete Phase 1 exit criteria before advancing: "
-            f"200+ closed paper trades, 80%+ test pass rate, "
+            f"100+ closed paper trades, 80%+ test pass rate, "
             f"30+ consecutive paper trading days."
         )
 

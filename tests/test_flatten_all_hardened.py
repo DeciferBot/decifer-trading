@@ -47,6 +47,7 @@ for _decifer_mod in ("orders", "risk", "learning", "scanner", "signals",
                      "news", "agents", "options", "options_scanner"):
     sys.modules.pop(_decifer_mod, None)
 import orders
+import orders_portfolio
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -91,7 +92,7 @@ def _clear_trades():
 def _reset_flatten_flag():
     """Ensure _flatten_in_progress is False before / after a test."""
     with orders._flatten_lock:
-        orders._flatten_in_progress = False
+        orders_portfolio._flatten_in_progress = False
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -103,11 +104,11 @@ class TestModuleLevelAttributes:
 
     def test_flatten_in_progress_exists(self):
         assert hasattr(orders, "_flatten_in_progress"), \
-            "orders._flatten_in_progress not found — patch may not have been applied"
+            "orders_portfolio._flatten_in_progress not found — patch may not have been applied"
 
     def test_flatten_in_progress_starts_false(self):
         _reset_flatten_flag()
-        assert orders._flatten_in_progress is False
+        assert orders_portfolio._flatten_in_progress is False
 
     def test_flatten_lock_exists(self):
         assert hasattr(orders, "_flatten_lock")
@@ -212,10 +213,10 @@ class TestFlattenAllGlobalCancel:
         })
         ib = _make_mock_ib()
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "get_contract", return_value=MagicMock()), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0), \
-             patch.object(orders, "_safe_del_trade"):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "get_contract", return_value=MagicMock()), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0), \
+             patch.object(orders_portfolio, "_safe_del_trade"):
             orders.flatten_all(None)
 
         ib.reqGlobalCancel.assert_called_once()
@@ -225,8 +226,8 @@ class TestFlattenAllGlobalCancel:
         _clear_trades()
         ib = _make_mock_ib()
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0):
             orders.flatten_all(None)
 
         ib.reqGlobalCancel.assert_called_once()
@@ -253,10 +254,10 @@ class TestFlattenAllGlobalCancel:
         ib.reqGlobalCancel = _cancel
         ib.placeOrder = _place
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "get_contract", return_value=MagicMock()), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0), \
-             patch.object(orders, "_safe_del_trade"):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "get_contract", return_value=MagicMock()), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0), \
+             patch.object(orders_portfolio, "_safe_del_trade"):
             orders.flatten_all(None)
 
         if "placeOrder" in call_order:
@@ -271,10 +272,10 @@ class TestFlattenAllGlobalCancel:
         ib = _make_mock_ib()
         ib.openOrders.side_effect = RuntimeError("network error")
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "get_contract", return_value=MagicMock()), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0), \
-             patch.object(orders, "_safe_del_trade"):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "get_contract", return_value=MagicMock()), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0), \
+             patch.object(orders_portfolio, "_safe_del_trade"):
             # Should not raise
             orders.flatten_all(None)
 
@@ -289,10 +290,10 @@ class TestFlattenAllGlobalCancel:
         ib = _make_mock_ib()
         ib.reqGlobalCancel.side_effect = RuntimeError("TWS rejected global cancel")
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "get_contract", return_value=MagicMock()), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0), \
-             patch.object(orders, "_safe_del_trade"):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "get_contract", return_value=MagicMock()), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0), \
+             patch.object(orders_portfolio, "_safe_del_trade"):
             orders.flatten_all(None)  # must not propagate the exception
 
 
@@ -315,9 +316,9 @@ class TestFlattenAllReentrancyGuard:
         """Manually set the flag to simulate an ongoing flatten."""
         ib = _make_mock_ib()
         with orders._flatten_lock:
-            orders._flatten_in_progress = True
+            orders_portfolio._flatten_in_progress = True
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib):
             orders.flatten_all(None)  # should return immediately
 
         # No IBKR calls should have been made
@@ -331,20 +332,20 @@ class TestFlattenAllReentrancyGuard:
         })
         ib = _make_mock_ib()
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "get_contract", return_value=MagicMock()), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0), \
-             patch.object(orders, "_safe_del_trade"):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "get_contract", return_value=MagicMock()), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0), \
+             patch.object(orders_portfolio, "_safe_del_trade"):
             orders.flatten_all(None)
 
-        assert orders._flatten_in_progress is False
+        assert orders_portfolio._flatten_in_progress is False
 
     def test_flag_reset_after_ib_connection_failure(self):
         """_flatten_in_progress must be False even when IB connection fails."""
-        with patch.object(orders, "_get_emergency_ib", return_value=None):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=None):
             orders.flatten_all(None)
 
-        assert orders._flatten_in_progress is False
+        assert orders_portfolio._flatten_in_progress is False
 
     def test_flag_reset_after_exception_in_close_loop(self):
         """_flatten_in_progress must be False even when a position close raises."""
@@ -353,13 +354,13 @@ class TestFlattenAllReentrancyGuard:
         })
         ib = _make_mock_ib(raise_on_place=RuntimeError("fill error"))
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "get_contract", return_value=MagicMock()), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0), \
-             patch.object(orders, "_safe_del_trade"):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "get_contract", return_value=MagicMock()), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0), \
+             patch.object(orders_portfolio, "_safe_del_trade"):
             orders.flatten_all(None)  # should not raise
 
-        assert orders._flatten_in_progress is False
+        assert orders_portfolio._flatten_in_progress is False
 
     def test_concurrent_calls_only_one_proceeds(self):
         """Two threads calling flatten_all — only one should issue real orders."""
@@ -383,10 +384,10 @@ class TestFlattenAllReentrancyGuard:
 
         def _run():
             barrier.wait()
-            with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-                 patch.object(orders, "get_contract", return_value=MagicMock()), \
-                 patch.object(orders, "_wait_for_order_book_clear", return_value=0), \
-                 patch.object(orders, "_safe_del_trade"):
+            with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+                 patch.object(orders_portfolio, "get_contract", return_value=MagicMock()), \
+                 patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0), \
+                 patch.object(orders_portfolio, "_safe_del_trade"):
                 orders.flatten_all(None)
 
         t1 = threading.Thread(target=_run)
@@ -401,7 +402,7 @@ class TestFlattenAllReentrancyGuard:
             f"reqGlobalCancel called {results.count('cancel')} times; expected 1"
 
         # Flag must be cleared after both threads finish
-        assert orders._flatten_in_progress is False
+        assert orders_portfolio._flatten_in_progress is False
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -429,10 +430,10 @@ class TestFlattenAllFailureIsolation:
         # First call raises, second succeeds
         ib.placeOrder.side_effect = [RuntimeError("order rejected"), MagicMock()]
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "get_contract", return_value=MagicMock()), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0), \
-             patch.object(orders, "_safe_del_trade"):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "get_contract", return_value=MagicMock()), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0), \
+             patch.object(orders_portfolio, "_safe_del_trade"):
             orders.flatten_all(None)  # must not raise
 
         # placeOrder should have been attempted at least twice
@@ -449,13 +450,13 @@ class TestFlattenAllFailureIsolation:
         ib = _make_mock_ib()
         ib.placeOrder.side_effect = RuntimeError("catastrophic failure")
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "get_contract", return_value=MagicMock()), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0), \
-             patch.object(orders, "_safe_del_trade"):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "get_contract", return_value=MagicMock()), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0), \
+             patch.object(orders_portfolio, "_safe_del_trade"):
             orders.flatten_all(None)  # must not propagate
 
-        assert orders._flatten_in_progress is False
+        assert orders_portfolio._flatten_in_progress is False
 
     def test_qualify_contracts_failure_isolated(self):
         """If qualifyContracts raises for one symbol, others still proceed."""
@@ -466,13 +467,13 @@ class TestFlattenAllFailureIsolation:
         ib = _make_mock_ib()
         ib.qualifyContracts.side_effect = [RuntimeError("bad contract"), None]
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "get_contract", return_value=MagicMock()), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0), \
-             patch.object(orders, "_safe_del_trade"):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "get_contract", return_value=MagicMock()), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0), \
+             patch.object(orders_portfolio, "_safe_del_trade"):
             orders.flatten_all(None)
 
-        assert orders._flatten_in_progress is False
+        assert orders_portfolio._flatten_in_progress is False
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -491,16 +492,16 @@ class TestFlattenAllEmptyPortfolio:
 
     def test_no_error_when_no_positions(self):
         ib = _make_mock_ib()
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0):
             orders.flatten_all(None)
 
         ib.placeOrder.assert_not_called()
 
     def test_global_cancel_still_fires_with_no_positions(self):
         ib = _make_mock_ib()
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0):
             orders.flatten_all(None)
 
         ib.reqGlobalCancel.assert_called_once()
@@ -521,13 +522,13 @@ class TestFlattenAllNoIBConnection:
         _reset_flatten_flag()
 
     def test_returns_cleanly_when_ib_unavailable(self):
-        with patch.object(orders, "_get_emergency_ib", return_value=None):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=None):
             orders.flatten_all(None)  # must not raise
 
     def test_flag_cleared_when_ib_unavailable(self):
-        with patch.object(orders, "_get_emergency_ib", return_value=None):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=None):
             orders.flatten_all(None)
-        assert orders._flatten_in_progress is False
+        assert orders_portfolio._flatten_in_progress is False
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -553,8 +554,8 @@ class TestFlattenAllOrderBookWait:
             wait_calls.append(("wait", timeout))
             return 0
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "_wait_for_order_book_clear", side_effect=fake_wait):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", side_effect=fake_wait):
             orders.flatten_all(None)
 
         assert len(wait_calls) == 1, "_wait_for_order_book_clear should be called exactly once"
@@ -566,10 +567,10 @@ class TestFlattenAllOrderBookWait:
         })
         ib = _make_mock_ib()
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "get_contract", return_value=MagicMock()), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=3), \
-             patch.object(orders, "_safe_del_trade"):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "get_contract", return_value=MagicMock()), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=3), \
+             patch.object(orders_portfolio, "_safe_del_trade"):
             orders.flatten_all(None)
 
         # placeOrder should still have been called
@@ -594,8 +595,8 @@ class TestFlattenAllLogging:
     def test_critical_log_at_start(self, caplog):
         import logging
         ib = _make_mock_ib()
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0), \
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0), \
              caplog.at_level(logging.DEBUG):
             orders.flatten_all(None)
 
@@ -608,10 +609,10 @@ class TestFlattenAllLogging:
         import logging
         # Simulate in-progress state
         with orders._flatten_lock:
-            orders._flatten_in_progress = True
+            orders_portfolio._flatten_in_progress = True
 
         ib = _make_mock_ib()
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
              caplog.at_level(logging.WARNING):
             orders.flatten_all(None)
 
@@ -645,10 +646,10 @@ class TestFlattenAllMultiplePositions:
         })
         ib = _make_mock_ib()
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "get_contract", return_value=MagicMock()), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0), \
-             patch.object(orders, "_safe_del_trade"):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "get_contract", return_value=MagicMock()), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0), \
+             patch.object(orders_portfolio, "_safe_del_trade"):
             orders.flatten_all(None)
 
         assert ib.placeOrder.call_count == len(symbols), \
@@ -669,10 +670,10 @@ class TestFlattenAllMultiplePositions:
 
         ib.placeOrder = capture_place
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "get_contract", return_value=MagicMock()), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0), \
-             patch.object(orders, "_safe_del_trade"):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "get_contract", return_value=MagicMock()), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0), \
+             patch.object(orders_portfolio, "_safe_del_trade"):
             orders.flatten_all(None)
 
         for o in submitted_orders:
@@ -687,10 +688,10 @@ class TestFlattenAllMultiplePositions:
         })
         ib = _make_mock_ib()
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "get_contract", return_value=MagicMock()), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0), \
-             patch.object(orders, "_safe_del_trade"):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "get_contract", return_value=MagicMock()), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0), \
+             patch.object(orders_portfolio, "_safe_del_trade"):
             orders.flatten_all(None)
 
         ib.placeOrder.assert_not_called()
@@ -713,8 +714,8 @@ class TestFlattenAllIdempotency:
     def test_second_call_after_first_completes_does_not_raise(self):
         ib = _make_mock_ib()
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0):
             orders.flatten_all(None)
             # Flag should now be False — second call should also work
             orders.flatten_all(None)
@@ -722,8 +723,8 @@ class TestFlattenAllIdempotency:
     def test_second_call_also_issues_global_cancel(self):
         ib = _make_mock_ib()
 
-        with patch.object(orders, "_get_emergency_ib", return_value=ib), \
-             patch.object(orders, "_wait_for_order_book_clear", return_value=0):
+        with patch.object(orders_portfolio, "_get_emergency_ib", return_value=ib), \
+             patch.object(orders_portfolio, "_wait_for_order_book_clear", return_value=0):
             orders.flatten_all(None)
             orders.flatten_all(None)
 

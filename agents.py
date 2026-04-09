@@ -312,7 +312,7 @@ def _extract_proposed_symbols(opportunity_text: str, signals: list) -> list:
 
 
 def _extract_macro_vote(analyst_text: str) -> int:
-    """+1 BULLISH | -1 BEARISH/UNCERTAIN | 0 NEUTRAL. Parses Trading Analyst output."""
+    """+1 BULLISH | -1 BEARISH | 0 NEUTRAL/UNCERTAIN. Parses Trading Analyst output."""
     if not analyst_text:
         return 0
     m = re.search(r"MACRO:\s*(BULLISH|BEARISH|NEUTRAL|UNCERTAIN)", analyst_text.upper())
@@ -320,13 +320,13 @@ def _extract_macro_vote(analyst_text: str) -> int:
         verdict = m.group(1)
         if verdict == "BULLISH":
             return 1
-        if verdict in ("BEARISH", "UNCERTAIN"):
+        if verdict == "BEARISH":
             return -1
-        return 0
+        return 0  # NEUTRAL or UNCERTAIN
     upper = analyst_text.upper()
     if any(kw in upper for kw in ("BULLISH", "RISK-ON", "RISK ON")):
         return 1
-    if any(kw in upper for kw in ("BEARISH", "RISK-OFF", "RISK OFF", "UNCERTAIN")):
+    if any(kw in upper for kw in ("BEARISH", "RISK-OFF", "RISK OFF")):
         return -1
     return 0
 
@@ -522,11 +522,32 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
 
     for s in proposed:
         sym = s["symbol"]
+        direction = "LONG" if s.get("direction", "LONG") == "LONG" else "SHORT"
 
-        # Votes: Technical (+1) + Macro (+1/-1/0) + Opportunity (+1) + Risk (+1/-1)
+        # Hard gate: reject if agent direction contradicts scanner direction.
+        # A mismatch means the LLM latched onto bullish/bearish indicators and
+        # flipped the direction — executing both trades would immediately close one.
+        scanner_signal = s.get("signal", "")
+        if scanner_signal in ("BUY", "STRONG_BUY"):
+            scanner_dir = "LONG"
+        elif scanner_signal in ("SELL", "STRONG_SELL"):
+            scanner_dir = "SHORT"
+        else:
+            scanner_dir = None  # HOLD/NEUTRAL — no hard constraint
+
+        if scanner_dir and direction != scanner_dir:
+            log.warning(
+                f"Final: {sym} skipped — agent({direction}) contradicts scanner({scanner_dir}). "
+                f"Thesis would justify {direction} but execution would go {scanner_dir}."
+            )
+            continue
+
+        # Votes: Technical (+1) + Macro (+1/0) + Opportunity (+1) + Risk (+1/-1)
+        # Macro is direction-aware: BULLISH helps LONGs, BEARISH helps SHORTs.
+        # max(0, ...) means the off-direction macro is neutral (no penalty), not a blocker.
         votes = 0
         votes += _extract_technical_conviction(technical, sym)
-        votes += macro_vote
+        votes += max(0, macro_vote if direction == "LONG" else -macro_vote)
         votes += 1  # Trading Analyst proposed this symbol
         votes += _extract_risk_approval(risk, sym)
 
@@ -540,7 +561,6 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
         price = s.get("price", 0)
         atr = s.get("atr", price * 0.02 if price > 0 else 1.0)
         score = s.get("score", 20)
-        direction = "LONG" if s.get("signal", "BUY") == "BUY" else "SHORT"
 
         if price > 0 and portfolio_value > 0:
             qty = calculate_position_size(portfolio_value, price, score, regime, atr=atr)
@@ -557,6 +577,7 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
 
         buys.append({
             "symbol": sym,
+            "direction": direction,
             "qty": qty,
             "sl": sl,
             "tp": tp,

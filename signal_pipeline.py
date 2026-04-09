@@ -21,6 +21,16 @@ from learning import log_signal_scan
 
 log = logging.getLogger("decifer.pipeline")
 
+# Symbols always preserved through the TV pre-filter regardless of TV data.
+# Keep in sync with scanner.CORE_SYMBOLS.
+_PREFILTER_CORE = frozenset([
+    "SPY", "QQQ", "IWM", "VXX",   # Macro ETFs
+    "UVXY", "SVXY",                # Volatility
+    "SPXS", "SQQQ",               # Inverse ETFs
+    "IBIT", "BITO", "MSTR",       # Crypto proxies
+    "GLD", "SLV", "USO", "COPX",  # Commodities
+])
+
 
 # ── Result type ────────────────────────────────────────────────────────────────
 
@@ -137,6 +147,14 @@ def _apply_tv_prefilter(universe: list, tv_cache: dict, favourites: list) -> lis
     if missed_favs:
         result = list(set(result) | missed_favs)
         log.info(f"Favourites preserved through TV pre-filter: {sorted(missed_favs)}")
+
+    # Always preserve CORE_SYMBOLS that were in the input universe — these include
+    # inverse ETFs (SPXS/SQQQ/UVXY) and macro ETFs that must be scored every cycle
+    # regardless of TV data availability or rank score.
+    missed_core = (_PREFILTER_CORE & set(universe)) - set(result)
+    if missed_core:
+        result = list(set(result) | missed_core)
+        log.info(f"CORE_SYMBOLS preserved through TV pre-filter: {sorted(missed_core)}")
 
     log.info(
         f"TV pre-filter: {pre_universe} → {len(result)} symbols "
@@ -335,6 +353,7 @@ def _scored_to_signals(scored: list, regime_name: str) -> list:
             regime_context=regime_name,
             price=s.get("price", 0.0),
             atr=s.get("atr", 0.0),
+            atr_daily=s.get("atr_daily", 0.0),
             candle_gate=s.get("candle_gate", "UNKNOWN"),
         ))
     return signals
@@ -362,6 +381,7 @@ def run_signal_pipeline(
     favourites: list,
     tv_cache: dict,
     signals_log_path: str = SIGNALS_LOG,
+    ib=None,
 ) -> SignalPipelineResult:
     """
     Execute the full signal data pipeline for one scan cycle.
@@ -419,6 +439,7 @@ def run_signal_pipeline(
         news_data=news_sentiment,
         social_data=social_sentiment,
         regime_router=regime.get("regime_router", "unknown"),
+        ib=ib,
     )
     log.info(f"score_universe: {len(scored)} above threshold, {len(all_scored)} total")
 
@@ -436,6 +457,7 @@ def run_signal_pipeline(
                     news_data=news_sentiment,
                     social_data=social_sentiment,
                     regime_router=regime.get("regime_router", "unknown"),
+                    ib=ib,
                 )
                 # Tag small cap results so downstream can apply tighter position sizing
                 for s in sc_scored:

@@ -14,14 +14,24 @@
 import sys
 import os
 import json
-import importlib
-import hashlib
 import logging
+import resource
 import threading
 import types as _types
 import schedule
 
+# Raise the fd soft limit to match the hard limit so the bot never hits
+# "[Errno 24] Too many open files" from accumulated CLOSE_WAIT sockets.
+try:
+    _soft, _hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    if _soft < 4096:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (min(4096, _hard), _hard))
+except Exception:
+    pass
+
+import zoneinfo
 from datetime import datetime, timezone
+_ET = zoneinfo.ZoneInfo("America/New_York")
 from colorama import Fore, Style, init as colorama_init
 
 from config import CONFIG
@@ -62,6 +72,8 @@ DASHBOARD_HTML = DASHBOARD_HTML.replace(
     'Autonomous AI Trading',
     f'Autonomous AI Trading &nbsp;·&nbsp; v{__version__}'
 )
+
+from dashboard_v2 import DASHBOARD_HTML_V2
 
 # ── Persistence ───────────────────────────────────────────────────────────────
 FAVOURITES_FILE = "favourites.json"
@@ -140,103 +152,13 @@ def save_settings_overrides(settings: dict):
         clog("ERROR", f"Failed to save settings: {e}")
 
 
-# ── HOT RELOAD SYSTEM ─────────────────────────────────────────────────────────
-# Watches all .py files and reloads modules when they change.
-# Bot keeps running — positions, state, and IBKR connection are preserved.
-
-WATCHED_MODULES = {
-    "signals":          "signals",
-    "scanner":          "scanner",
-    "agents":           "agents",
-    "risk":             "risk",
-    "orders":           "orders",
-    "learning":         "learning",
-    "dashboard":        "dashboard",
-    "news":             "news",
-    "news_sentinel":    "news_sentinel",
-    "theme_tracker":    "theme_tracker",
-    "sentinel_agents":  "sentinel_agents",
-}
-
-_file_hashes = {}
-
-
-def _file_hash(path: str) -> str:
-    """Return MD5 hash of file contents."""
-    try:
-        with open(path, "rb") as f:
-            return hashlib.md5(f.read()).hexdigest()
-    except Exception:
-        return ""
-
-
-def _init_hashes():
-    """Record initial file hashes on startup."""
-    base = os.path.dirname(os.path.abspath(__file__))
-    for name in list(WATCHED_MODULES.keys()) + ["bot", "config"]:
-        path = os.path.join(base, f"{name}.py")
-        _file_hashes[name] = _file_hash(path)
-
-
-def check_and_reload():
-    """
-    Check all watched files for changes.
-    If changed: reload the module, update the dashboard HTML, log the reload.
-    Called at the start of every scan — zero overhead when nothing changed.
-    """
-    global DASHBOARD_HTML
-    base    = os.path.dirname(os.path.abspath(__file__))
-    changed = []
-
-    for mod_name, import_name in WATCHED_MODULES.items():
-        path    = os.path.join(base, f"{mod_name}.py")
-        current = _file_hash(path)
-        if current and current != _file_hashes.get(mod_name, ""):
-            try:
-                if import_name in sys.modules:
-                    importlib.reload(sys.modules[import_name])
-                    _file_hashes[mod_name] = current
-                    changed.append(mod_name)
-                    clog("INFO", f"🔄 Hot reload: {mod_name}.py updated and reloaded")
-            except Exception as e:
-                clog("ERROR", f"Hot reload failed for {mod_name}: {e}")
-
-    # Special case: dashboard.py — update the HTML served to browser
-    dash_path    = os.path.join(base, "dashboard.py")
-    dash_current = _file_hash(dash_path)
-    if dash_current and dash_current != _file_hashes.get("dashboard", ""):
-        try:
-            import dashboard as _dash
-            importlib.reload(_dash)
-            DASHBOARD_HTML = _dash.DASHBOARD_HTML
-            _file_hashes["dashboard"] = dash_current
-            changed.append("dashboard")
-            clog("INFO", "🔄 Hot reload: dashboard.py updated — refresh browser to see changes")
-        except Exception as e:
-            clog("ERROR", f"Hot reload failed for dashboard: {e}")
-
-    # Special case: config.py — reload config and apply new settings
-    config_path    = os.path.join(base, "config.py")
-    config_current = _file_hash(config_path)
-    if config_current and config_current != _file_hashes.get("config", ""):
-        try:
-            import config as _config
-            importlib.reload(_config)
-            CONFIG.update(_config.CONFIG)
-            # Re-apply dashboard overrides so they aren't wiped by config.py defaults
-            load_settings_overrides()
-            _file_hashes["config"] = config_current
-            changed.append("config")
-            clog("INFO", "🔄 Hot reload: config.py updated — new settings active immediately (dashboard overrides preserved)")
-        except Exception as e:
-            clog("ERROR", f"Hot reload failed for config: {e}")
-
-    if changed:
-        dash["hot_reload_count"] = dash.get("hot_reload_count", 0) + 1
-        dash["last_reload"]      = datetime.now().strftime("%H:%M:%S")
-        dash["last_reload_files"] = changed
-
-    return changed
+# ── Hot reload (extracted to bot_hot_reload.py) ───────────────────────────────
+# Re-exported here so that callers using `bot.check_and_reload()`,
+# `bot._file_hash()`, etc. continue to work unchanged.
+# Tests access `bot._file_hashes` as a dict mutation — shared by reference.
+from bot_hot_reload import (
+    WATCHED_MODULES, _file_hashes, _file_hash, _init_hashes, check_and_reload,
+)
 
 
 # ── Module __class__ shim ─────────────────────────────────────────────────────
@@ -290,13 +212,15 @@ def main():
     from bot_dashboard import start_dashboard
     from bot_ibkr import (
         connect_ibkr, subscribe_pnl, backfill_trades_from_ibkr,
-        sync_orders_from_ibkr, _on_order_status_event,
+        sync_orders_from_ibkr, cancel_orphan_stop_orders, _on_order_status_event,
     )
     from bot_account import get_account_data, load_equity_history
     from bot_trading import run_scan, _check_kill, _process_close_queue
     from bot_sentinel import (
         _get_sentinel_universe, handle_news_trigger,
         handle_catalyst_trigger, countdown_tick,
+        start_news_sentinel, start_catalyst_sentinel,
+        start_alpaca_news_stream,
     )
     from risk import (
         reset_daily_state, get_scan_interval,
@@ -306,8 +230,6 @@ def main():
         load_trades, load_orders, get_performance_summary,
     )
     from theme_tracker import load_custom_themes, get_all_themes
-    from news_sentinel import NewsSentinel
-    from catalyst_sentinel import CatalystSentinel
 
     print(f"""
 {Fore.YELLOW}
@@ -364,7 +286,7 @@ def main():
 
     # Reset daily risk state — only once per calendar day
     pv, _ = get_account_data()
-    today = datetime.now().date()
+    today = datetime.now(_ET).date()
     if not hasattr(main, '_last_reset_date') or main._last_reset_date != today:
         reset_daily_state(pv)
         main._last_reset_date = today
@@ -383,9 +305,9 @@ def main():
     bot_state.ib.sleep(2)  # Ensure commissionReports are linked to fills before backfill
     backfill_trades_from_ibkr()
     sync_orders_from_ibkr()
+    cancel_orphan_stop_orders()  # Cancel stale exit orders with no corresponding active position
 
-    # Initialise hot reload file hashes
-    _init_hashes()
+    # Hot reload hashes intentionally not initialised — check_and_reload() is not called in the main loop
 
     # Load persistent data
     load_settings_overrides()   # Apply saved dashboard settings on top of config.py defaults
@@ -418,33 +340,35 @@ def main():
         schedule.clear("scan")
         schedule.every(interval).seconds.do(scheduled_scan).tag("scan")
 
+    # Store reference so the main loop can call scheduled_scan() on momentum interrupt
+    bot_state._scheduled_scan_fn = scheduled_scan
+
     interval = get_scan_interval()
     dash["next_scan_seconds"] = interval
     schedule.every(interval).seconds.do(scheduled_scan).tag("scan")
 
-    # ── Start News Sentinel (independent background thread) ───────────────────
+    # ── Start Alpaca News Stream (primary real-time push feed) ───────────────
+    # Push-based Benzinga feed — no polling, symbols pre-tagged.
+    # Replaces Yahoo RSS + Finviz scraping. Runs independently of sentinel_enabled.
+    if CONFIG.get("alpaca_news_enabled", True):
+        try:
+            bot_state._alpaca_news_stream = start_alpaca_news_stream()
+            clog("INFO", "📰 Alpaca news stream active (Benzinga real-time push feed)")
+        except Exception as _ane_err:
+            clog("INFO", f"📰 Alpaca news stream skipped: {_ane_err}")
+
+    # ── Start News Sentinel (IBKR news poller — secondary source) ────────────
     if CONFIG.get("sentinel_enabled", True):
-        bot_state._sentinel = NewsSentinel(
-            get_universe_fn=_get_sentinel_universe,
-            on_trigger_fn=handle_news_trigger,
-            ib=bot_state.ib,
-            poll_interval=CONFIG.get("sentinel_poll_seconds", 45),
-        )
-        bot_state._sentinel.start()
+        bot_state._sentinel = start_news_sentinel(bot_state.ib)
         dash["sentinel_status"] = "running"
         dash["sentinel_stats"]  = bot_state._sentinel.stats
-        clog("INFO", f"📡 News Sentinel active | polling every {CONFIG.get('sentinel_poll_seconds', 45)}s")
+        clog("INFO", f"📡 News Sentinel active (IBKR) | polling every {CONFIG.get('sentinel_poll_seconds', 45)}s")
     else:
         clog("INFO", "📡 News Sentinel disabled (sentinel_enabled=False in config)")
 
     # ── Start Catalyst Sentinel (M&A / acquisition monitor) ──────────────────
     if CONFIG.get("catalyst_sentinel_enabled", True):
-        bot_state._catalyst_sentinel = CatalystSentinel(
-            get_universe_fn=_get_sentinel_universe,
-            on_trigger_fn=handle_catalyst_trigger,
-            ib=bot_state.ib,
-        )
-        bot_state._catalyst_sentinel.start()
+        bot_state._catalyst_sentinel = start_catalyst_sentinel(bot_state.ib)
         dash["catalyst_triggers"]       = []
         dash["catalyst_sentinel_stats"] = bot_state._catalyst_sentinel.stats
         clog("INFO",
@@ -463,6 +387,38 @@ def main():
         clog("INFO", "Social sentiment module not installed — skipping background polling")
     except Exception as e:
         clog("ERROR", f"Social sentiment startup error: {e}")
+
+    # ── Start Alpaca bar stream (pre-warms cache before first scan) ───────────
+    # Stream subscribes to 1-minute bars for the initial universe.
+    # fetch_multi_timeframe() reads from BAR_CACHE on every scan — no further
+    # wiring needed. Universe subscriptions refresh each scan in run_scan().
+    try:
+        from alpaca_stream import AlpacaBarStream
+        from scanner import get_dynamic_universe
+        _initial_universe = get_dynamic_universe(bot_state.ib, {})
+        bot_state._bar_stream = AlpacaBarStream()
+        bot_state._bar_stream.start(_initial_universe)
+        clog("INFO", f"📶 Alpaca bar stream active | {len(_initial_universe)} symbols subscribed")
+    except Exception as _as_err:
+        clog("INFO", f"📶 Alpaca bar stream skipped: {_as_err}")
+
+    # ── Start Momentum Sentinel (SPY fast-move scan bypass) ───────────────────
+    # Monitors live SPY 1m bars; fires an immediate scan when SPY moves fast.
+    # Requires BAR_CACHE to be warm (bar stream started above).
+    if CONFIG.get("momentum_sentinel_enabled", True):
+        try:
+            from momentum_sentinel import start_momentum_sentinel
+            bot_state._momentum_sentinel = start_momentum_sentinel()
+            dash["momentum_sentinel_stats"] = bot_state._momentum_sentinel.stats
+            clog(
+                "INFO",
+                f"⚡ Momentum Sentinel active | "
+                f"fast {CONFIG.get('momentum_sentinel_fast_pct', 0.3)}% / "
+                f"slow {CONFIG.get('momentum_sentinel_slow_pct', 0.6)}% | "
+                f"cooldown {CONFIG.get('momentum_sentinel_cooldown_m', 15)}m",
+            )
+        except Exception as _ms_err:
+            clog("INFO", f"⚡ Momentum Sentinel skipped: {_ms_err}")
 
     # ── Start Telegram Kill Switch ────────────────────────────────────────────
     _tg_cfg      = CONFIG.get("telegram", {})
@@ -522,15 +478,32 @@ def main():
 
     def _run_icloud_sync():
         if os.path.exists(_ICLOUD_SYNC_SCRIPT):
-            import subprocess
-            subprocess.Popen(
-                ["bash", _ICLOUD_SYNC_SCRIPT],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            try:
+                import subprocess
+                subprocess.Popen(
+                    ["bash", _ICLOUD_SYNC_SCRIPT],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except Exception as _sync_err:
+                clog("WARN", f"iCloud sync failed: {_sync_err}")
 
     schedule.every(5).minutes.do(_run_icloud_sync)
     _run_icloud_sync()  # run immediately on startup
+
+    # ── Startup health check — warn if any enabled real-time subsystem failed ──
+    _failed = []
+    if CONFIG.get("alpaca_news_enabled", True) and getattr(bot_state, "_alpaca_news_stream", None) is None:
+        _failed.append("Alpaca news stream")
+    if getattr(bot_state, "_bar_stream", None) is None:
+        _failed.append("Alpaca bar stream (real-time price data)")
+    if CONFIG.get("sentinel_enabled", True) and getattr(bot_state, "_sentinel", None) is None:
+        _failed.append("News sentinel (IBKR)")
+    if _failed:
+        clog("WARN", "⚠️  STARTUP WARNING — the following subsystems failed to start:")
+        for _f in _failed:
+            clog("WARN", f"   ✗ {_f}")
+        clog("WARN", "⚠️  Bot is running with degraded signal coverage.")
 
     clog("INFO", f"<> Decifer running. Dashboard → http://localhost:{CONFIG['dashboard_port']}")
     clog("INFO", "Press Ctrl+C to stop.")
@@ -552,14 +525,37 @@ def main():
             if bot_state._catalyst_sentinel:
                 dash["catalyst_sentinel_stats"] = bot_state._catalyst_sentinel.stats
 
+            # ── Sync momentum sentinel state to dashboard ──
+            if bot_state._momentum_sentinel:
+                dash["momentum_sentinel_stats"] = bot_state._momentum_sentinel.stats
+
+            # ── Momentum interrupt: fire immediate scan if sentinel triggered ──
+            # The sentinel sets this event when SPY moves fast (background thread).
+            # We clear it and call scheduled_scan() on the main thread — safe for IBKR.
+            if (bot_state._momentum_scan_requested.is_set()
+                    and bot_state._scheduled_scan_fn is not None
+                    and not dash.get("paused")
+                    and not dash.get("killed")):
+                bot_state._momentum_scan_requested.clear()
+                clog("SIGNAL", "⚡ MOMENTUM INTERRUPT — bypassing scheduler, scanning now")
+                schedule.clear("scan")
+                bot_state._scheduled_scan_fn()
+
             schedule.run_pending()
             bot_state.ib.sleep(1)
     except KeyboardInterrupt:
         dash["status"] = "stopped"
+        if bot_state._alpaca_news_stream:
+            bot_state._alpaca_news_stream.stop()
         if bot_state._sentinel:
             bot_state._sentinel.stop()
         if bot_state._catalyst_sentinel:
             bot_state._catalyst_sentinel.stop()
+        try:
+            from social_sentiment import stop_sentiment_polling
+            stop_sentiment_polling()
+        except Exception:
+            pass
         clog("INFO", "<> Decifer stopped.")
         bot_state.ib.disconnect()
 

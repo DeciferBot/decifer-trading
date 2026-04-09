@@ -25,6 +25,7 @@ from __future__ import annotations
 import time as _time
 from datetime import datetime, timezone
 import zoneinfo as _zoneinfo
+import requests as _requests
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -42,6 +43,8 @@ try:
 except ImportError:
     STATSMODELS_AVAILABLE = False
 from config import CONFIG
+
+# yfinance now requires its own curl_cffi session — do not pass requests.Session.
 
 # ── REGIME SIGNAL ROUTER ─────────────────────────────────────────────────────
 
@@ -82,9 +85,10 @@ def _regime_multipliers(regime_router: str) -> dict:
     NEWS and SOCIAL are regime-neutral (fundamental/event-driven).
     """
     _all_ones = {
-        "trend":    1.0, "momentum": 1.0, "squeeze": 1.0,
-        "flow":     1.0, "breakout": 1.0, "mtf":     1.0,
-        "news":     1.0, "social":   1.0, "reversion": 1.0,
+        "trend":    1.0, "momentum": 1.0, "squeeze":       1.0,
+        "flow":     1.0, "breakout": 1.0, "mtf":           1.0,
+        "news":     1.0, "social":   1.0, "reversion":     1.0,
+        "iv_skew":  1.0, "pead":     1.0, "short_squeeze": 1.0,
     }
 
     if not CONFIG.get("regime_routing_enabled", True):
@@ -95,15 +99,17 @@ def _regime_multipliers(regime_router: str) -> dict:
 
     if regime_router == "momentum":
         return {
-            "trend":    mom_up,  "momentum": mom_up,  "squeeze": mom_up,
-            "flow":     mom_up,  "breakout": mom_up,  "mtf":     mom_up,
-            "news":     1.0,     "social":   1.0,     "reversion": rev_down,
+            "trend":    mom_up,  "momentum": mom_up,  "squeeze":       mom_up,
+            "flow":     mom_up,  "breakout": mom_up,  "mtf":           mom_up,
+            "news":     1.0,     "social":   1.0,     "reversion":     rev_down,
+            "iv_skew":  1.0,     "pead":     1.0,     "short_squeeze": 1.0,
         }
     if regime_router == "mean_reversion":
         return {
-            "trend":    rev_down, "momentum": rev_down, "squeeze": rev_down,
-            "flow":     rev_down, "breakout": rev_down, "mtf":     rev_down,
-            "news":     1.0,      "social":   1.0,      "reversion": mom_up,
+            "trend":    rev_down, "momentum": rev_down, "squeeze":       rev_down,
+            "flow":     rev_down, "breakout": rev_down, "mtf":           rev_down,
+            "news":     1.0,      "social":   1.0,      "reversion":     mom_up,
+            "iv_skew":  1.0,      "pead":     1.0,      "short_squeeze": 1.0,
         }
     return _all_ones
 
@@ -179,8 +185,12 @@ def compute_hurst_dfa(series) -> float:
             return 0.5
 
         # Step 4: fit log F(n) ~ H * log(n) → slope is H
+        # Guard against zero fluctuations before log to prevent RuntimeWarning.
+        fluct_arr = np.array(fluctuations, dtype=float)
+        if not np.all(fluct_arr > 0):
+            return 0.5
         log_n = np.log(np.array(valid_scales, dtype=float))
-        log_f = np.log(np.array(fluctuations, dtype=float))
+        log_f = np.log(fluct_arr)
         if not np.all(np.isfinite(log_f)):
             return 0.5
         h, _ = np.polyfit(log_n, log_f, 1)
@@ -520,36 +530,24 @@ def _resolve_regime_router(vix_regime: str, hurst_regime: str = "unknown",
     return "neutral"
 
 
-# ── PROCESS POOL for score_universe() ───────────────────────────
-# yfinance.download() is NOT thread-safe (GitHub issue #2557): concurrent
-# threads share a global dict (_DFS) causing cross-symbol data contamination.
-# multiprocessing.Pool sidesteps this entirely — each worker is a separate
-# process with its own memory space, so yfinance globals never collide.
-# This cuts score_universe() from ~180-240s (sequential) to ~30-60s (parallel).
-_SCORE_POOL = None
-_SCORE_WORKERS = min(6, max(2, (_mp.cpu_count() or 4) - 1))
+# ── THREAD POOL for score_universe() ────────────────────────────
+# IBKR reqHistoricalData is thread-safe — no shared global state.
+# ThreadPoolExecutor replaces ProcessPoolExecutor, eliminating:
+#   - OS process spawn overhead (was 30–60s per scan, now ~5–10s)
+#   - yfinance cross-symbol data contamination risk
+#   - multiprocessing fork issues on some platforms
+# 5m bar fetches go to IBKR; 1d/1w stay on yfinance (no thread-safety issue at daily freq).
+_SCORE_WORKERS = min(8, max(2, (_mp.cpu_count() or 4)))
 
 
-def _get_score_pool():
-    """Lazily create a reusable process pool for scoring."""
-    global _SCORE_POOL
-    if _SCORE_POOL is None:
-        _SCORE_POOL = ProcessPoolExecutor(max_workers=_SCORE_WORKERS)
-    return _SCORE_POOL
-
-
-def _fetch_one_process(args):
-    """
-    Top-level function for ProcessPoolExecutor (must be picklable).
-    Each process gets its own yfinance globals — no contamination.
-    """
-    symbol, news_score, social_score, regime_router = args
+def _fetch_one_thread(args):
+    """Worker function for ThreadPoolExecutor. Thread-safe via IBKR client."""
+    symbol, news_score, social_score, regime_router, ib = args
     try:
         return fetch_multi_timeframe(symbol, news_score=news_score, social_score=social_score,
-                                     regime_router=regime_router)
+                                     regime_router=regime_router, ib=ib)
     except Exception as exc:
-        import logging as _logging
-        _logging.getLogger("decifer.signals").debug(f"_fetch_one_process failed for {symbol}: {exc}")
+        log.debug(f"_fetch_one_thread failed for {symbol}: {exc}")
         return None
 
 log = logging.getLogger("decifer.signals")
@@ -568,22 +566,158 @@ _SHORT_FLOAT_CACHE_TTL = 4 * 3600  # 4 hours (short float updates daily)
 
 
 def _safe_download(symbol: str, **kwargs) -> pd.DataFrame | None:
-    """Download with retry + session refresh on yfinance auth failures."""
+    """
+    Download OHLCV data.
+
+    Priority:
+      1. Alpaca REST  — SIP consolidated tape, 10k req/min, split-adjusted.
+                        Primary source for all timeframes.
+      2. yfinance     — Emergency fallback only (Alpaca keys not set or API
+                        unreachable). Retained because it covers market-closed
+                        periods where Alpaca may return no recent bars.
+
+    yfinance is NOT the primary source. Do not promote it.
+    """
+    interval = kwargs.get("interval", "1d")
+    period   = kwargs.get("period", "60d")
+
+    # ── Layer 1: Alpaca REST (reliable, SIP-accurate) ──────────────────────
+    try:
+        from alpaca_data import fetch_bars
+        df = fetch_bars(symbol, period=period, interval=interval)
+        if df is not None and len(df) > 0:
+            return df
+    except Exception:
+        pass
+
+    # ── Layer 2: yfinance (emergency fallback) ─────────────────────────────
+    # Uses Ticker.history() — thread-safe in yfinance 1.2.0+ unlike yf.download()
+    kwargs.pop("progress", None)
     for attempt in range(3):
         try:
-            df = yf.download(symbol, **kwargs)
+            df = yf.Ticker(symbol).history(**kwargs)
             if df is not None and len(df) > 0:
                 return df
         except Exception:
             pass
-        # On retry: clear yfinance cache/session to fix Invalid Crumb errors
         if attempt < 2:
-            try:
-                yf.cache.clear()
-            except Exception:
-                pass
             _time.sleep(1)
     return None
+
+
+def normalize_bars(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalise OHLCV bar data from any provider into the canonical pipeline shape.
+
+    Canonical form: columns Open, High, Low, Close, Volume (exact capitalisation)
+                    index: DatetimeIndex
+
+    Handles:
+    - yfinance: already capitalised, may have multi-level columns
+    - IBKR (ib_insync BarData): lowercase open/high/low/close/volume
+    - Any provider with single or multi-level column names
+    """
+    if df is None or df.empty:
+        return df
+
+    # Flatten multi-level columns (yfinance sometimes returns ('Close','AAPL'))
+    if hasattr(df.columns, 'nlevels') and df.columns.nlevels > 1:
+        df = df.copy()
+        df.columns = df.columns.get_level_values(0)
+        df = df.loc[:, ~df.columns.duplicated()]
+
+    # Map any case variation to canonical capitalised names
+    rename = {}
+    for col in df.columns:
+        col_lower = col.lower()
+        if col_lower == 'open'   and col != 'Open':   rename[col] = 'Open'
+        if col_lower == 'high'   and col != 'High':   rename[col] = 'High'
+        if col_lower == 'low'    and col != 'Low':    rename[col] = 'Low'
+        if col_lower == 'close'  and col != 'Close':  rename[col] = 'Close'
+        if col_lower == 'volume' and col != 'Volume': rename[col] = 'Volume'
+    if rename:
+        df = df.rename(columns=rename)
+
+    # Ensure DatetimeIndex
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index)
+
+    return df
+
+
+# ── IBKR pacing state ────────────────────────────────────────────────────────
+# Tracks request timestamps to enforce IBKR's 55-req/10-min soft limit.
+_IBKR_REQUEST_TIMES: list = []
+_IBKR_PACING_LOCK = _mp.Manager().Lock() if False else None  # replaced by threading.Lock below
+
+import threading as _threading
+_IBKR_PACING_LOCK = _threading.Lock()
+
+
+def fetch_ibkr_historical(symbol: str, ib, bar_size: str = "5 mins",
+                          duration: str = "5 D") -> pd.DataFrame | None:
+    """
+    Fetch historical bars from IBKR reqHistoricalData.
+
+    Thread-safe. Enforces IBKR pacing limit (CONFIG ibkr_hist_pacing_per_10min).
+    Returns a DataFrame with canonical columns (Open, High, Low, Close, Volume)
+    and DatetimeIndex, or None on failure.
+
+    Args:
+        symbol:    Ticker string e.g. "AAPL"
+        ib:        Connected ib_insync IB instance
+        bar_size:  IBKR bar size string e.g. "5 mins", "1 min"
+        duration:  IBKR duration string e.g. "5 D", "60 D"
+    """
+    from config import CONFIG
+    import time as _t
+
+    max_per_10min = CONFIG.get("ibkr_hist_pacing_per_10min", 55)
+    window = 600  # 10 minutes in seconds
+
+    # Enforce pacing: block if we've hit the request limit in the last 10 minutes
+    with _IBKR_PACING_LOCK:
+        now = _t.time()
+        _IBKR_REQUEST_TIMES[:] = [t for t in _IBKR_REQUEST_TIMES if now - t < window]
+        if len(_IBKR_REQUEST_TIMES) >= max_per_10min:
+            oldest = _IBKR_REQUEST_TIMES[0]
+            wait = window - (now - oldest) + 1
+            log.debug(f"fetch_ibkr_historical: pacing wait {wait:.1f}s for {symbol}")
+            _t.sleep(wait)
+            _IBKR_REQUEST_TIMES[:] = [t for t in _IBKR_REQUEST_TIMES if _t.time() - t < window]
+        _IBKR_REQUEST_TIMES.append(_t.time())
+
+    try:
+        from ib_async import Stock
+        contract = Stock(symbol, 'SMART', 'USD')
+        bars = ib.reqHistoricalData(
+            contract,
+            endDateTime='',
+            durationStr=duration,
+            barSizeSetting=bar_size,
+            whatToShow='TRADES',
+            useRTH=True,
+            formatDate=1,
+        )
+        if not bars:
+            log.debug(f"fetch_ibkr_historical: no bars returned for {symbol}")
+            return None
+
+        df = pd.DataFrame([{
+            'time':   bar.date,
+            'Open':   bar.open,
+            'High':   bar.high,
+            'Low':    bar.low,
+            'Close':  bar.close,
+            'Volume': bar.volume,
+        } for bar in bars])
+        df = df.set_index('time')
+        df.index = pd.to_datetime(df.index)
+        return df
+
+    except Exception as exc:
+        log.debug(f"fetch_ibkr_historical: {symbol} failed — {exc}")
+        return None
 
 
 def _flatten_columns(df):
@@ -597,19 +731,59 @@ def _flatten_columns(df):
 
 
 def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 0,
-                          regime_router: str = "unknown") -> dict | None:
+                          regime_router: str = "unknown",
+                          ib=None) -> dict | None:
     """
     Fetch data across 3 timeframes for confluence scoring.
     Weekly → Daily → 5-minute
+
+    5m bars: IBKR reqHistoricalData (primary, thread-safe, no auth issues).
+             Falls back to yfinance if ib is None or IBKR call fails.
+    1d/1w bars: yfinance (stable, no thread-safety issues at daily frequency).
+
     Returns None if insufficient data.
     """
     try:
-        # 5-minute (primary trading timeframe)
-        df_5m = _flatten_columns(_safe_download(symbol, period="5d",  interval="5m",  progress=False, auto_adjust=True))
-        # Daily (trend confirmation)
-        df_1d = _flatten_columns(_safe_download(symbol, period="60d", interval="1d",  progress=False, auto_adjust=True))
-        # Weekly (big picture)
-        df_1w = _flatten_columns(_safe_download(symbol, period="1y",  interval="1wk", progress=False, auto_adjust=True))
+        # 5-minute bars — three-layer priority:
+        #   1. Alpaca bar cache  (event-driven WebSocket, freshest — market hours)
+        #   2. Alpaca REST       (historical, no pacing constraints)
+        #   3. yfinance fallback (Alpaca unavailable)
+        df_5m = None
+
+        # Layer 1: Alpaca bar cache
+        try:
+            from alpaca_stream import BAR_CACHE
+            df_5m = BAR_CACHE.get_5m(symbol)
+            if df_5m is not None:
+                log.debug(f"fetch_multi_timeframe: {symbol} 5m from Alpaca cache ({len(df_5m)} bars)")
+        except ImportError:
+            pass
+
+        # Layer 2: Alpaca REST historical
+        if df_5m is None or len(df_5m) < 5:
+            try:
+                from alpaca_data import fetch_bars
+                _alpaca_df = fetch_bars(symbol, period="5d", interval="5m")
+                if _alpaca_df is not None and len(_alpaca_df) >= 5:
+                    df_5m = normalize_bars(_alpaca_df)
+                    log.debug(f"fetch_multi_timeframe: {symbol} 5m from Alpaca REST ({len(df_5m)} bars)")
+            except Exception:
+                pass
+
+        # Layer 3: yfinance fallback
+        if df_5m is None or len(df_5m) < 5:
+            df_5m = normalize_bars(_flatten_columns(
+                _safe_download(symbol, period="5d", interval="5m", progress=False, auto_adjust=True)
+            ))
+
+        # Daily (trend confirmation) — Alpaca primary via _safe_download
+        df_1d = normalize_bars(_flatten_columns(
+            _safe_download(symbol, period="60d", interval="1d", progress=False, auto_adjust=True)
+        ))
+        # Weekly (big picture) — Alpaca primary via _safe_download
+        df_1w = normalize_bars(_flatten_columns(
+            _safe_download(symbol, period="1y", interval="1wk", progress=False, auto_adjust=True)
+        ))
 
         if df_5m is None or len(df_5m) < 30:
             return None
@@ -638,10 +812,29 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
                     )
                     return None
 
-        # Multi-timeframe confluence score (with news + social as 7th/8th dimensions)
+        # ── IV Skew (Alpaca options chain, daily TTL) ─────────────────
+        # Fetched per-symbol before calling compute_confluence so the result
+        # flows cleanly into the dimension block. Silently skipped when Alpaca
+        # keys are absent, alpaca-py is not installed, or the symbol has no options.
+        _iv_skew_score = 0
+        _iv_skew_dir   = 0
+        try:
+            if CONFIG.get("dimension_flags", {}).get("iv_skew", False):
+                from iv_skew import get_iv_skew as _get_iv_skew
+                _skew_data = _get_iv_skew(symbol)
+                if _skew_data:
+                    _iv_skew_score = _skew_data.get("iv_skew_score", 0)
+                    _iv_skew_dir   = _skew_data.get("iv_skew_dir",   0)
+        except Exception:
+            pass
+
+        # Multi-timeframe confluence score (with news + social + iv_skew dimensions)
         confluence = compute_confluence(sig_5m, sig_1d, sig_1w,
                                         news_score=news_score, social_score=social_score,
-                                        regime_router=regime_router)
+                                        regime_router=regime_router,
+                                        iv_skew_score=_iv_skew_score,
+                                        iv_skew_dir=_iv_skew_dir,
+                                        symbol=symbol)
 
         return {
             "symbol":       symbol,
@@ -655,6 +848,7 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
                 "1w":  sig_1w,
             },
             "atr":          sig_5m["atr"],
+            "atr_daily":    sig_1d["atr"] if sig_1d else 0.0,
             "vol_ratio":    sig_5m["vol_ratio"],
             # MTF alignment gate results (for dashboard + logging)
             "mtf_gate":       confluence.get("mtf_gate", "PASS"),
@@ -663,6 +857,8 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
             # Per-dimension score breakdown (for IC calculator + feedback loop)
             "score_breakdown":     confluence.get("score_breakdown", {}),
             "disabled_dimensions": confluence.get("disabled_dimensions", []),
+            # Candlestick gate result — must be propagated so signal_pipeline doesn't default to UNKNOWN
+            "candle_gate":         confluence.get("candle_gate", "PASS"),
             # Regime router state (for logging / dashboard)
             "regime_router":  regime_router,
         }
@@ -846,14 +1042,23 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
             squeeze_intensity = 0.0
 
         # ── VWAP — institutional anchor (intraday only) ─────
-        # VWAP = cumulative(price × volume) / cumulative(volume)
+        # Use Alpaca's exchange-calculated VWAP if present (more accurate than
+        # reconstructed VWAP from OHLCV). Fall back to cumulative calculation.
         vwap_sd_pct = 1.0  # default: 1% if insufficient data
         if tf == "5m" and volume.sum() > 0:
-            typical_price = (high + low + close) / 3
-            cum_tp_vol = (typical_price * volume).cumsum()
-            cum_vol = volume.cumsum()
-            vwap_series = cum_tp_vol / cum_vol.replace(0, 1e-9)
-            vwap_val = float(vwap_series.iloc[-1])
+            native_vwap = df.get("vwap") if hasattr(df, "get") else None
+            if native_vwap is not None and hasattr(native_vwap, 'iloc'):
+                last_native = native_vwap.iloc[-1]
+                if pd.notna(last_native) and float(last_native) > 0:
+                    vwap_val = float(last_native)
+                else:
+                    native_vwap = None
+            if native_vwap is None:
+                typical_price = (high + low + close) / 3
+                cum_tp_vol = (typical_price * volume).cumsum()
+                cum_vol = volume.cumsum()
+                vwap_series = cum_tp_vol / cum_vol.replace(0, 1e-9)
+                vwap_val = float(vwap_series.iloc[-1])
             # Distance from VWAP as % of price — positive = above VWAP (bullish)
             vwap_dist = ((p - vwap_val) / vwap_val) * 100 if vwap_val > 0 else 0.0
             # SD of close deviations from rolling VWAP — used for dynamic overextension threshold
@@ -1516,7 +1721,9 @@ def score_overnight_drift(sig_1d: dict | None) -> tuple:
 
 def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
                        news_score: int = 0, social_score: int = 0,
-                       regime_router: str = "unknown") -> dict:
+                       regime_router: str = "unknown",
+                       iv_skew_score: int = 0, iv_skew_dir: int = 0,
+                       symbol: str | None = None) -> dict:
     """
     Decifer 2.0 — 10-dimension scoring engine (alpha-pipeline-v2).
 
@@ -1569,6 +1776,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             "score_breakdown": {
                 "trend": 0, "momentum": 0, "squeeze": 0, "flow": 0,
                 "breakout": 0, "mtf": 0, "news": 0, "social": 0, "reversion": 0,
+                "iv_skew": 0,
             },
             "disabled_dimensions": [],
         }
@@ -1868,6 +2076,44 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         rev_dir = -1 if _zscore > 0.5 else (+1 if _zscore < -0.5 else 0)
         dim_directions.append((rev_dir, rev_score_capped))
 
+    # ── 11. IV SKEW (0-10) — OTM put / ATM call implied volatility skew ──
+    # Positive skew = puts priced above calls = informed downside hedging.
+    # Wu & Tian (2024, Management Science): large put-call skew predicts
+    # negative next-period returns — directional signal, not just vol level.
+    # Pre-computed by fetch_multi_timeframe (Alpaca options chain, daily TTL).
+    # Default 0 when Alpaca keys absent or symbol has no options.
+    iv_skew_pts = 0
+    _iv_skew_dir = 0
+    if _enabled("iv_skew"):
+        iv_skew_pts  = int(round(min(10, max(0, iv_skew_score)) * _rmult.get("iv_skew", 1.0)))
+        _iv_skew_dir = iv_skew_dir
+        score += iv_skew_pts
+        dim_directions.append((_iv_skew_dir, iv_skew_pts))
+
+    # ── 12. PEAD (0-10) — Post-Earnings Announcement Drift ──────────────────────
+    # Scores based on EPS surprise magnitude and recency. The PEAD anomaly
+    # (Fama 1996, Bernard & Thomas 1989) shows analysts systematically underreact
+    # to earnings beats, causing drift that persists 20-60 days post-announcement.
+    pead_pts = 0
+    pead_dir = 0
+    if _enabled("pead") and symbol is not None:
+        vol_ratio_for_pead = sig_5m.get("vol_ratio", 0)
+        pead_pts, pead_dir = score_pead(symbol, sig_1d, vol_ratio_for_pead)
+        pead_pts = int(round(min(pead_pts, 10) * _rmult.get("pead", 1.0)))
+        score += pead_pts
+        dim_directions.append((pead_dir, pead_pts))
+
+    # ── 13. SHORT_SQUEEZE (0-10) — High short float + volume surge ───────────────
+    # High short interest + volume surge drives price above short stop levels,
+    # forcing mechanical covering. Asymmetric upside, uncorrelated with trend.
+    ss_pts = 0
+    ss_dir = 0
+    if _enabled("short_squeeze") and symbol is not None:
+        ss_pts, ss_dir = score_short_squeeze(symbol, sig_5m)
+        ss_pts = int(round(min(ss_pts, 10) * _rmult.get("short_squeeze", 1.0)))
+        score += ss_pts
+        dim_directions.append((ss_dir, ss_pts))
+
     # ── BONUS: Candlestick confirmation (+3 max) ────────
     # Direction-agnostic: both bull and bear candles add bonus points.
     # Direction already captured in dim_directions.
@@ -1904,15 +2150,18 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         _icw = _get_ic_weights()
         _N_DIMS = len(_IC_DIMS)
         _ic_breakdown = {
-            "trend":     trend_pts,
-            "momentum":  momentum,
-            "squeeze":   squeeze_score,
-            "flow":      flow_score,
-            "breakout":  breakout_score,
-            "mtf":       mtf_score,
-            "news":      ns,
-            "social":    social_pts,
-            "reversion": rev_score_capped,
+            "trend":         trend_pts,
+            "momentum":      momentum,
+            "squeeze":       squeeze_score,
+            "flow":          flow_score,
+            "breakout":      breakout_score,
+            "mtf":           mtf_score,
+            "news":          ns,
+            "social":        social_pts,
+            "reversion":     rev_score_capped,
+            "iv_skew":       iv_skew_pts,
+            "pead":          pead_pts,
+            "short_squeeze": ss_pts,
         }
         _ic_sum = sum(
             _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v
@@ -1927,15 +2176,18 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         # contribution above.  With equal weights this produces the same result as
         # the raw score-weighted sum, so no behaviour change before IC data exists.
         _dim_dirs = {
-            "trend":     trend_dir,
-            "momentum":  mom_dir,
-            "squeeze":   squeeze_dir,
-            "flow":      flow_dir,
-            "breakout":  breakout_dir,
-            "mtf":       mtf_dir,
-            "news":      (+1 if news_score > 0 else (-1 if news_score < 0 else 0)),
-            "social":    social_dir,
-            "reversion": rev_dir,
+            "trend":         trend_dir,
+            "momentum":      mom_dir,
+            "squeeze":       squeeze_dir,
+            "flow":          flow_dir,
+            "breakout":      breakout_dir,
+            "mtf":           mtf_dir,
+            "news":          (+1 if news_score > 0 else (-1 if news_score < 0 else 0)),
+            "social":        social_dir,
+            "reversion":     rev_dir,
+            "iv_skew":       _iv_skew_dir,
+            "pead":          pead_dir,
+            "short_squeeze": ss_dir,
         }
         _ic_dir_sum = (
             sum(
@@ -2043,15 +2295,18 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         # Per-dimension score breakdown (for trade logging / IC feedback loop)
         # Keys must exactly match ic_calculator.DIMENSIONS for IC computation.
         "score_breakdown": {
-            "trend":     trend_pts,
-            "momentum":  momentum,
-            "squeeze":   squeeze_score,
-            "flow":      flow_score,
-            "breakout":  breakout_score,
-            "mtf":       mtf_score,
-            "news":      ns,
-            "social":    social_pts,
-            "reversion": rev_score_capped,
+            "trend":         trend_pts,
+            "momentum":      momentum,
+            "squeeze":       squeeze_score,
+            "flow":          flow_score,
+            "breakout":      breakout_score,
+            "mtf":           mtf_score,
+            "news":          ns,
+            "social":        social_pts,
+            "reversion":     rev_score_capped,
+            "iv_skew":       iv_skew_pts,
+            "pead":          pead_pts,
+            "short_squeeze": ss_pts,
         },
         # Dimensions that were zeroed by a False flag (for diagnostics / dashboard)
         "disabled_dimensions": disabled_dimensions,
@@ -2064,32 +2319,27 @@ def get_regime_threshold(regime: str) -> int:
     """
     Return the minimum score threshold for the given market regime.
 
-    Thresholds are relative to config's min_score_to_trade (base) so that
-    paper trading vs live configs automatically scale together.
-    Offsets and floors are configurable in config.py.
+    All non-circuit-breaker regimes use the same base threshold.
+    Quality filtering is the Opus reasoning layer's job — a uniform bar
+    means Opus sees the same candidate quality regardless of regime label.
+
+    The only special case is the extreme circuit breaker (PANIC / EXTREME_STRESS):
+    threshold 99 blocks all mechanically-scored signals, consistent with the
+    hard gate in check_risk_conditions().
 
     Returns an int score threshold (0-99).
     """
-    base         = CONFIG["min_score_to_trade"]
-    bear_offset  = CONFIG.get("regime_threshold_bear_offset",   -3)
-    choppy_offset= CONFIG.get("regime_threshold_choppy_offset", -6)
-    panic        = CONFIG.get("regime_threshold_panic",          99)
-    bear_min     = CONFIG.get("regime_threshold_bear_min",       15)
-    choppy_min   = CONFIG.get("regime_threshold_choppy_min",     12)
-
-    thresholds = {
-        "BULL_TRENDING": base,
-        "BEAR_TRENDING": max(bear_min,   base + bear_offset),
-        "CHOPPY":        max(choppy_min, base + choppy_offset),
-        "PANIC":         panic,
-        "UNKNOWN":       max(bear_min,   base + bear_offset),
-    }
-    return thresholds.get(regime, base)
+    base  = CONFIG["min_score_to_trade"]
+    panic = CONFIG.get("regime_threshold_panic", 99)
+    if regime in ("PANIC", "EXTREME_STRESS"):
+        return panic
+    return base
 
 
 def score_universe(symbols: list, regime: str = "UNKNOWN",
                    news_data: dict = None, social_data: dict = None,
-                   regime_router: str | None = None) -> tuple:
+                   regime_router: str | None = None,
+                   ib=None) -> tuple:
     """
     Score all symbols in the universe.
 
@@ -2129,42 +2379,43 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
         else:
             regime_router = "unknown"
 
-    # ── PARALLEL SCORING via ProcessPoolExecutor ────────────────
-    # Each worker is a separate process with its own yfinance globals,
-    # completely avoiding the thread-safety bug (GitHub issue #2557).
-    # Falls back to sequential if multiprocessing fails (e.g. fork issues).
+    # ── PARALLEL SCORING via ThreadPoolExecutor ────────────────
+    # IBKR reqHistoricalData is thread-safe — threads share one IB connection,
+    # each making independent reqHistoricalData calls. No shared mutable globals.
+    # 1d/1w still use yfinance but at daily frequency (no thread-safety issue there).
     all_results = []
     failures = 0
     args_list = [
         (sym,
          news_data.get(sym, {}).get("news_score", 0),
          int(social_data.get(sym, {}).get("social_score", 0)),
-         regime_router)
+         regime_router,
+         ib)
         for sym in symbols
     ]
 
     try:
-        pool = _get_score_pool()
-        futures = {pool.submit(_fetch_one_process, args): args[0] for args in args_list}
-        for future in as_completed(futures, timeout=300):
-            sym = futures[future]
-            try:
-                data = future.result(timeout=60)
-                if data:
-                    if sym in news_data:
-                        data["news"] = news_data[sym]
-                    all_results.append(data)
-                else:
+        with ThreadPoolExecutor(max_workers=_SCORE_WORKERS) as pool:
+            futures = {pool.submit(_fetch_one_thread, args): args[0] for args in args_list}
+            for future in as_completed(futures, timeout=300):
+                sym = futures[future]
+                try:
+                    data = future.result(timeout=60)
+                    if data:
+                        if sym in news_data:
+                            data["news"] = news_data[sym]
+                        all_results.append(data)
+                    else:
+                        failures += 1
+                except Exception:
                     failures += 1
-            except Exception:
-                failures += 1
     except Exception as e:
-        # Fallback: sequential scoring if process pool fails
-        logging.warning(f"Process pool failed ({e}), falling back to sequential scoring")
-        for sym, ns, ss, rr in args_list:
+        # Fallback: sequential scoring if thread pool fails
+        logging.warning(f"Thread pool failed ({e}), falling back to sequential scoring")
+        for sym, ns, ss, rr, _ib in args_list:
             try:
                 data = fetch_multi_timeframe(sym, news_score=ns, social_score=ss,
-                                             regime_router=rr)
+                                             regime_router=rr, ib=_ib)
                 if data:
                     if sym in news_data:
                         data["news"] = news_data[sym]

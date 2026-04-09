@@ -15,7 +15,7 @@ from config import CONFIG
 
 log = logging.getLogger("decifer.learning")
 
-TRADE_LOG_FILE   = CONFIG["trade_log"]
+TRADE_LOG_FILE   = CONFIG.get("trade_log", "data/trades.json")
 ORDER_LOG_FILE   = CONFIG.get("order_log", "data/orders.json")
 SIGNALS_LOG_FILE = CONFIG.get("signals_log", "data/signals_log.jsonl")
 AUDIT_LOG_FILE   = CONFIG.get("audit_log", "data/audit_log.jsonl")
@@ -178,7 +178,9 @@ def load_orders() -> list:
 
 
 def _save_orders(orders: list):
-    """Write orders list to disk atomically, sanitising corrupt float values first."""
+    """Write orders list to disk atomically, sanitising corrupt float values first.
+    Falls back to a direct write if the directory does not support temp files (e.g. /dev/null in tests).
+    """
     import math, tempfile
     # Sanitise any inf/nan prices that may have slipped through in existing records
     for o in orders:
@@ -187,19 +189,24 @@ def _save_orders(orders: list):
             o["price"] = 0
     target = ORDER_LOG_FILE
     dir_ = os.path.dirname(os.path.abspath(target)) or "."
-    os.makedirs(dir_, exist_ok=True)
-    # Atomic write: write to a temp file then rename so the file is never half-written
-    fd, tmp = tempfile.mkstemp(dir=dir_, suffix=".tmp")
     try:
-        with os.fdopen(fd, "w") as f:
-            json.dump(orders, f, indent=2)
-        os.replace(tmp, target)
-    except Exception:
+        os.makedirs(dir_, exist_ok=True)
+        # Atomic write: write to a temp file then rename so the file is never half-written
+        fd, tmp = tempfile.mkstemp(dir=dir_, suffix=".tmp")
         try:
-            os.unlink(tmp)
-        except OSError:
-            pass
-        raise
+            with os.fdopen(fd, "w") as f:
+                json.dump(orders, f, indent=2)
+            os.replace(tmp, target)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+    except Exception:
+        # Fallback: direct write (e.g. target is /dev/null in test environments)
+        with open(target, "w") as f:
+            json.dump(orders, f, indent=2)
 
 
 def log_signal_scan(scored: list, regime: dict) -> None:
@@ -232,6 +239,20 @@ def log_signal_scan(scored: list, regime: dict) -> None:
                 f.write(json.dumps(record) + "\n")
     except Exception as e:
         log.warning(f"signals_log write failed: {e}")
+
+
+def _compute_ic_weighted_score(signal_scores, ic_weights):
+    """Weighted sum of signal_scores by ic_weights across all IC dimensions."""
+    if not signal_scores or not ic_weights:
+        return None
+    try:
+        from ic_calculator import DIMENSIONS, EQUAL_WEIGHTS
+        return sum(
+            float(signal_scores.get(d, 0.0)) * ic_weights.get(d, EQUAL_WEIGHTS[d])
+            for d in DIMENSIONS
+        )
+    except Exception:
+        return None
 
 
 def log_trade(trade: dict, agent_outputs: dict, regime: dict,
@@ -275,10 +296,16 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
             "risk":        agent_outputs.get("risk",        "")[:500],
         },
         "signal_scores":   trade.get("signal_scores", {}),
+        "score_breakdown": trade.get("signal_scores", {}),  # IC learning loop alias
+        "ic_weights_at_entry": trade.get("ic_weights_at_entry"),
+        "ic_weighted_score":   _compute_ic_weighted_score(
+            trade.get("signal_scores"), trade.get("ic_weights_at_entry")
+        ),
         "candle_gate":     trade.get("candle_gate", "UNKNOWN"),
         # Sanitise to JSON-safe types — orderId can be a MagicMock in test environments
         "tranche_id":      trade.get("tranche_id") if isinstance(trade.get("tranche_id"), (int, type(None))) else None,
         "parent_trade_id": trade.get("parent_trade_id") if isinstance(trade.get("parent_trade_id"), (int, str, type(None))) else None,
+        "pattern_id":      trade.get("pattern_id"),
     }
 
     # ── Options metadata — store if present so dashboard can display correctly ──
@@ -355,6 +382,32 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
     _save_trades(trades)
     log.info(f"Trade logged: {action} {trade.get('symbol')} | P&L: {outcome.get('pnl') if outcome else 'open'}")
 
+    # ── Close Opus learning loop — record outcome against the advisor decision ──
+    if action == "CLOSE" and trade.get("advice_id") and outcome:
+        try:
+            from trade_advisor import record_outcome as _record_outcome
+            _record_outcome(
+                advice_id=trade["advice_id"],
+                exit_price=outcome.get("exit_price", 0.0),
+                pnl=outcome.get("pnl", 0.0),
+                exit_reason=outcome.get("reason", ""),
+            )
+        except Exception as _e:
+            log.debug(f"advisor record_outcome failed (non-critical): {_e}")
+
+    # ── Close pattern library loop — record outcome against market observation ──
+    if action == "CLOSE" and trade.get("pattern_id") and outcome:
+        try:
+            from pattern_library import record_outcome as _pl_record_outcome
+            _pl_record_outcome(
+                pattern_id=trade["pattern_id"],
+                pnl=outcome.get("pnl", 0.0),
+                pnl_pct=outcome.get("pnl_pct", 0.0),
+                exit_reason=outcome.get("reason", ""),
+            )
+        except Exception as _e:
+            log.debug(f"pattern_library record_outcome failed (non-critical): {_e}")
+
 
 def _save_trades(trades: list) -> None:
     """Write trades list to disk atomically (tempfile + rename) so a crash never corrupts the file.
@@ -399,7 +452,10 @@ def get_performance_summary(trades: list = None) -> dict:
     if trades is None:
         trades = load_trades()
 
-    closed = [t for t in trades if t.get("exit_price") is not None and t.get("pnl") is not None]
+    closed = [t for t in trades
+              if t.get("exit_price") is not None
+              and t.get("pnl") is not None
+              and t.get("exit_reason") != "manual"]
 
     if not closed:
         return {
@@ -479,14 +535,12 @@ def get_directional_skew(window_hours: int = 48, regime: str = None) -> dict:
                 f"Directional skew {skew:+.2f} (heavy LONG) in {regime} regime. "
                 f"Short scanner may not be surfacing enough candidates."
             )
-            log.warning(f"SKEW ALERT: {alert}")
         elif regime == "BULL_TRENDING" and skew < -0.8:
             regime_aligned = False
             alert = (
                 f"Directional skew {skew:+.2f} (heavy SHORT) in {regime} regime. "
                 f"Unusual bearish positioning in a bull market."
             )
-            log.warning(f"SKEW ALERT: {alert}")
         elif regime == "BULL_TRENDING" and skew > 0.5:
             regime_aligned = True
         elif regime == "BEAR_TRENDING" and skew < -0.5:

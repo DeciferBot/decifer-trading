@@ -106,6 +106,7 @@ _ib_insync = _fake_module(
     MarketOrder=_FakeMarketOrder,
     LimitOrder=MagicMock(),
     StopOrder=MagicMock(),
+    StopLimitOrder=MagicMock(),
     Ticker=MagicMock(),
     BarData=MagicMock(),
     util=MagicMock(),
@@ -126,6 +127,7 @@ _anthropic = _fake_module("anthropic", Anthropic=MagicMock, AsyncAnthropic=Magic
 
 def _make_ohlcv(rows=60):
     """Return a realistic-looking OHLCV DataFrame."""
+    np.random.seed(42)
     idx = pd.date_range(end=pd.Timestamp.today(), periods=rows, freq='B')
     close = 100.0 + np.cumsum(np.random.randn(rows) * 0.5)
     high = close + np.abs(np.random.randn(rows) * 0.3)

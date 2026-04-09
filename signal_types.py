@@ -50,7 +50,8 @@ class Signal:
     rationale: str = ""
     # Routing metadata — populated from raw scored dict, needed by execute_buy
     price: float = 0.0
-    atr: float = 0.0
+    atr: float = 0.0         # 5-minute ATR (bar noise — used for stop sizing)
+    atr_daily: float = 0.0   # Daily ATR (session range — used by trade advisor for PT sizing)
     candle_gate: str = "UNKNOWN"
 
     def to_dict(self) -> dict:
@@ -66,6 +67,7 @@ class Signal:
             "rationale":        self.rationale,
             "price":            self.price,
             "atr":              self.atr,
+            "atr_daily":        self.atr_daily,
         }
 
     def to_json(self) -> str:

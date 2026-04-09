@@ -54,6 +54,7 @@ _cfg.CONFIG = {
     "active_account": "DUP00000",
     "trade_log": "/tmp/test_trades.json",
     "order_log": "/tmp/test_orders.json",
+    "ic_calculator": {"edge_gate_enabled": False},  # match paper learning mode default
 }
 sys.modules.setdefault("config", _cfg)
 
@@ -73,6 +74,7 @@ sys.modules.setdefault("news", _news)
 _learn = types.ModuleType("learning")
 _learn.log_signal_scan = MagicMock()
 _learn.log_trade = MagicMock()
+_learn.log_order = MagicMock()
 _learn.load_trades = MagicMock(return_value=[])
 _learn.load_orders = MagicMock(return_value=[])
 _learn.TRADE_LOG_FILE = "/tmp/trades.json"
@@ -290,13 +292,23 @@ class TestApplyTvPrefilter(unittest.TestCase):
         result = _apply_tv_prefilter(["FAV"], cache, favourites=["FAV"])
         self.assertEqual(result.count("FAV"), 1)
 
-    def test_all_symbols_killed_returns_only_favourites(self):
+    def test_all_symbols_killed_returns_favourites_and_core(self):
+        # SPY is both a favourite and a CORE_SYMBOL; SPXS is a CORE_SYMBOL but not a
+        # favourite; X/Y have neutral TV signal and are not core.
+        # After the fix, CORE_SYMBOLS in the input universe are also preserved.
         cache = {
             "X": _tv_entry(tv_recommend=0.0),
             "Y": _tv_entry(tv_recommend=0.0),
         }
-        result = _apply_tv_prefilter(["X", "Y", "SPY"], cache, favourites=["SPY"])
-        self.assertEqual(set(result), {"SPY"})
+        result = _apply_tv_prefilter(["X", "Y", "SPY", "SPXS"], cache, favourites=["SPY"])
+        result_set = set(result)
+        # Favourite must be present
+        self.assertIn("SPY", result_set)
+        # CORE_SYMBOL in universe must be preserved
+        self.assertIn("SPXS", result_set)
+        # X and Y should be excluded (neutral TV signal, not core, not favourite)
+        self.assertNotIn("X", result_set)
+        self.assertNotIn("Y", result_set)
 
     def test_empty_favourites_list_no_error(self):
         cache = {"A": _tv_entry()}

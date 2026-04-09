@@ -197,7 +197,7 @@ def validate_wip(backlog: dict[str, Any] | None = None,
     for item in backlog.get("items", []):
         if item.get("status") not in active_statuses:
             continue
-        for dep_id in item.get("dependencies", []):
+        for dep_id in item.get("depends_on", []):
             dep = items_by_id.get(dep_id)
             if dep is None:
                 violations.append(
@@ -209,6 +209,19 @@ def validate_wip(backlog: dict[str, Any] | None = None,
                     f"UNMET_DEPENDENCY: '{item['id']}' is in_progress but its "
                     f"dependency '{dep_id}' has status='{dep.get('status')}' "
                     f"(must be one of {sorted(terminal_statuses)} first)."
+                )
+
+    # Check for phase refs that point to non-existent items
+    item_ids: set[str] = {
+        item["id"] for item in backlog.get("items", []) if "id" in item
+    }
+    phases = backlog.get("wip_policy", {}).get("phases", {})
+    for phase_label, phase_data in phases.items():
+        for fid in phase_data.get("feature_ids", []):
+            if fid not in item_ids:
+                violations.append(
+                    f"ORPHANED_PHASE_REF: '{fid}' listed in phase '{phase_label}' "
+                    f"of wip_policy.phases but not found in items array."
                 )
 
     return violations

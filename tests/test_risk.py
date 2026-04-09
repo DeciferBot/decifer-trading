@@ -201,6 +201,9 @@ class TestPDTRule:
         original_accounts = cfg.get("accounts", {}).copy()
 
         cfg["pdt"] = {"enabled": pdt_enabled, "threshold": 25_000, "max_day_trades": 3}
+        # Ensure required keys exist regardless of which config stub was loaded
+        cfg.setdefault("daily_loss_limit", 0.06)
+        cfg.setdefault("min_cash_reserve", 0.10)
         if is_live:
             cfg["active_account"] = "DUL123"
             cfg["accounts"] = {"paper": "DUP999", "live_1": "DUL123"}
@@ -208,9 +211,43 @@ class TestPDTRule:
             cfg["active_account"] = "DUP999"
             cfg["accounts"] = {"paper": "DUP999", "live_1": "DUL123"}
 
+        # Freeze time to 10:00 EST (market hours) so the market-hours gate
+        # doesn't block calls running overnight in CI or local dev.
+        import pytz
+        from datetime import datetime as _real_dt
+        _market_time = _real_dt(2026, 4, 9, 10, 0, 0,
+                                tzinfo=pytz.timezone("America/New_York"))
+
+        class _FakeDatetime(_real_dt):
+            @classmethod
+            def now(cls, tz=None):
+                return _market_time if tz else _market_time.replace(tzinfo=None)
+
+        # Reset module-level risk globals that other tests may have contaminated
+        # (e.g. test_system_interactions sets _drawdown_halt=True deliberately)
+        risk._drawdown_halt  = False
+        risk._daily_loss_hit = False
+        risk._pause_until    = None
+
+        # Build a clean CONFIG dict for risk's module-level reference.
+        # risk.CONFIG may point to a stub dict (injected by test_backtester.py or
+        # test_dashboard.py) that is missing required keys; patching it directly
+        # ensures check_risk_conditions() always sees the right values regardless
+        # of which config stub was loaded at import time.
+        _safe_config = dict(risk.CONFIG)
+        _safe_config.update({
+            "daily_loss_limit": 0.06,
+            "min_cash_reserve": 0.10,
+            "pdt": {"enabled": pdt_enabled, "threshold": 25_000, "max_day_trades": 3},
+            "active_account": "DUL123" if is_live else "DUP999",
+            "accounts": {"paper": "DUP999", "live_1": "DUL123"},
+        })
+
         try:
             with patch.object(risk, "_get_day_trades_remaining",
-                              return_value=day_trades_remaining):
+                              return_value=day_trades_remaining), \
+                 patch.object(risk, "datetime", _FakeDatetime), \
+                 patch.object(risk, "CONFIG", _safe_config):
                 # Pass a safe daily_pnl to avoid triggering other layers
                 return risk.check_risk_conditions(
                     portfolio_value=portfolio_value,
@@ -233,7 +270,7 @@ class TestPDTRule:
     def test_pdt_allows_when_trades_remain(self):
         """Live account under $25K but day trades remain — allow entries."""
         ok, _reason = self._run_check(portfolio_value=15_000, day_trades_remaining=2)
-        assert ok is True
+        assert ok is True, f"check_risk_conditions blocked with reason: {_reason!r}"
 
     def test_pdt_skipped_above_threshold(self):
         """Account above $25K — PDT gate is never checked."""
@@ -261,6 +298,19 @@ class TestPDTRule:
 
 class TestPositionSize:
     """risk.position_size() must return sensible share counts."""
+
+    @pytest.fixture(autouse=True)
+    def _no_macro_discount(self, monkeypatch):
+        """
+        Neutralise the macro-event gate so tests don't depend on real calendar state.
+        Without this, a live FOMC/CPI/NFP event halves position sizes and breaks
+        any test that asserts an exact share count.
+        """
+        try:
+            import macro_calendar
+            monkeypatch.setattr(macro_calendar, "get_macro_size_multiplier", lambda: 1.0)
+        except Exception:
+            pass  # macro_calendar not installed — gate already inactive
 
     def _call_position_size(self, config, account_value, entry_price, stop_price):
         """Call risk.position_size() handling both possible signatures."""

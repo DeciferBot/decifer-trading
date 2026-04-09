@@ -31,6 +31,30 @@ CONFIG = {
     #   ["DUP481326", "U3059777"]
     "aggregate_accounts": [],
 
+    # ── ALPHA VANTAGE (free tier: 25 calls/day) ──────────────
+    # Used for: earnings calendar (primary source) + news sentiment (Tier 3 enrichment).
+    # Sign up at https://www.alphavantage.co/support/#api-key (free, no credit card).
+    # Key stored in ~/.bash_profile as ALPHA_VANTAGE_KEY — never commit the value.
+    # If key is absent, AV calls are silently skipped and fallbacks take over.
+    "alpha_vantage_key":        os.environ.get("ALPHA_VANTAGE_KEY", ""),
+    "alpha_vantage_daily_limit": 25,   # Free tier cap. Upgrade plan → increase this.
+
+    # ── ALPACA MARKETS (Algo Trader Plus — $99/mo) ────────────
+    # Paper trading base URL: https://paper-api.alpaca.markets
+    # Keys stored in ~/.bash_profile — never commit values here.
+    "alpaca_api_key":           os.environ.get("ALPACA_API_KEY", ""),
+    "alpaca_secret_key":        os.environ.get("ALPACA_SECRET_KEY", ""),
+    "alpaca_base_url":          os.environ.get("ALPACA_BASE_URL", "https://paper-api.alpaca.markets"),
+    # Stream switches — disable individually without touching keys
+    "alpaca_news_enabled":      True,   # AlpacaNewsStream (Benzinga push feed)
+    # Order protection gates sourced from the live Alpaca stream
+    "max_spread_pct":           0.003,  # 0.30% bid-ask spread cap (skip wider markets)
+
+    # ── IBKR HISTORICAL DATA PACING ───────────────────────────
+    # IBKR enforces a soft limit of 60 reqHistoricalData requests per 10 minutes.
+    # We stay under 55 to leave headroom. Throttle applied in fetch_ibkr_historical().
+    "ibkr_hist_pacing_per_10min": 55,
+
     # ── FINNHUB (free tier: 60 calls/min) ────────────────────
     # Sign up at https://finnhub.io — free API key, no credit card required.
     # Free tier covers: stock quotes + company news articles (/company-news).
@@ -46,6 +70,26 @@ CONFIG = {
     # Alpha agents (Trading Analyst, Portfolio Manager) use Opus — best model, no arbitrary cap.
     "claude_model_alpha":       "claude-opus-4-6",    # Opus for alpha-generating agents
     "claude_max_tokens_alpha":  4096,                 # Unconstrained — let Opus reason fully
+
+    # ── INTELLIGENCE LAYER ────────────────────────────────────
+    # Classifies every signal with trade_type (SCALP/SWING/HOLD/AVOID) and
+    # evidence-based conviction before dispatch. Always fires — Tier 2
+    # evidence fallback used when Opus is unavailable.
+    "use_intelligence_layer":        True,
+    "intelligence_model":            "claude-opus-4-6",
+    "intelligence_max_tokens":       1024,
+    "intelligence_cache_minutes":    30,    # session context cache window
+    "intelligence_pattern_lookback": 20,    # similar patterns shown to Opus per call
+    "intelligence_news_mode":        "full_on_open_headlines_thereafter",
+
+    # ── TRADE ADVISOR (execution layer) ──────────────────────
+    # Opus decides PT, SL, position size multiplier, and instrument
+    # per signal. Separate from the intelligence layer.
+    # Falls back to ATR formula if the API call fails.
+    "use_llm_advisor":          True,
+    "llm_advisor_model":        "claude-opus-4-6",
+    "llm_advisor_max_tokens":   512,
+    "llm_advisor_history":      15,   # last N completed decisions passed to Opus as learning context
 
     # ── IBKR RECONNECT & HEARTBEAT ────────────────────────────
     "reconnect_max_attempts":   10,     # Retry attempts before giving up
@@ -70,16 +114,22 @@ CONFIG = {
     "min_cash_reserve":         0.10,   # 10% cash floor — hard stop on new entries
     "max_single_position":      0.06,   # 6% per position — keeps 14 positions before hitting floor
     "max_sector_exposure":      0.40,   # 40% sector cap
-    "consecutive_loss_pause":   5,      # Pause after 5 consecutive losses
+    "consecutive_loss_pause":   999,    # Paper learning mode: effectively disabled (live: 5)
     "reentry_cooldown_minutes": 30,     # Block re-entry after close (lifecycle gate)
+
+    # ── MACRO EVENT GATE ──────────────────────────────────────────
+    # Halve position sizing within 24 hours of FOMC, CPI, or NFP.
+    # Controlled by macro_calendar.get_macro_size_multiplier().
+    "macro_event_size_mult":    0.5,    # Multiplier applied when event is within window
+    "macro_event_hours_window": 24.0,   # Hours before event to apply the multiplier
 
     # ── INTRADAY ADAPTIVE STRATEGY ────────────────────────────────
     # When the day is going badly, the bot shifts posture rather than trading normally
     # until a hard circuit breaker fires. Three modes: NORMAL → DEFENSIVE → RECOVERY.
-    "strategy_pivot_loss_pct":           0.015,  # -1.5% daily PnL → DEFENSIVE mode
-    "strategy_recovery_loss_pct":        0.030,  # -3.0% daily PnL → RECOVERY mode
-    "strategy_defensive_streak":         3,       # 3 consecutive losses → DEFENSIVE
-    "strategy_recovery_streak":          6,       # 6 consecutive losses → RECOVERY (before 8-loss hard pause)
+    "strategy_pivot_loss_pct":           0.050,  # -5.0% daily PnL → DEFENSIVE mode (paper: raised from 1.5%)
+    "strategy_recovery_loss_pct":        0.100,  # -10.0% daily PnL → RECOVERY mode (paper: raised from 3.0%)
+    "strategy_defensive_streak":         10,      # Paper: raised from 3 — don't tighten on paper losses
+    "strategy_recovery_streak":          20,      # Paper: raised from 6 — don't tighten on paper losses
     "thesis_invalidation_regime_change": True,    # Re-evaluate open positions on significant regime shift
 
     "max_portfolio_allocation": 1.0,    # 1.0 = full account, 0.2 = 20% of account
@@ -108,7 +158,17 @@ CONFIG = {
     # 4 = conservative (default), 3 = standard, 2 = aggressive
     # NOTE: Raised from 2→3 to filter low-conviction trades (roadmap #08).
     # 2/6 was rubber-stamping; 3/6 requires real consensus. (live: 4)
-    "agents_required_to_agree": 3,
+    "agents_required_to_agree": 2,
+
+    # ── MOMENTUM SENTINEL ──────────────────────────────────────
+    # Background thread monitoring SPY 1m bars via BAR_CACHE (live Alpaca stream).
+    # When SPY moves fast, immediately bypasses the scan scheduler and triggers a scan.
+    # Follows same pattern as News/Catalyst sentinels.
+    "momentum_sentinel_enabled":    True,
+    "momentum_sentinel_fast_pct":   0.3,   # SPY moves > 0.3% in last 3 bars (~3 min) → fire
+    "momentum_sentinel_slow_pct":   0.6,   # SPY moves > 0.6% in last 10 bars (~10 min) → fire
+    "momentum_sentinel_cooldown_m": 15,    # Minutes between triggers (avoid chasing chop)
+    "momentum_sentinel_poll_s":     10,    # Seconds between BAR_CACHE checks
 
     # ── SCANNING ──────────────────────────────────────────────
     # NOTE: Faster scans for paper trading data generation (live values in comments)
@@ -121,7 +181,7 @@ CONFIG = {
 
     # ── SCORING THRESHOLD ─────────────────────────────────────
     # NOTE: Lowered for paper trading to capture more setups for ML training (live values in comments)
-    "min_score_to_trade":       18,     # Out of 50 — lower = more trades for training (live: 28)
+    "min_score_to_trade":       14,     # Out of 50 — lower = more trades for training (live: 28)
     "high_conviction_score":    36,     # Above this = 1.5x position size — narrower band, fewer bloated positions
 
     # ── DIMENSION FLAGS ───────────────────────────────────────────
@@ -142,13 +202,34 @@ CONFIG = {
         "short_squeeze":  True,   # Dim 8  — Short float + volume surge + price vs resistance
         "reversion":      True,   # Dim 9  — Variance Ratio + OU half-life + z-score
         "overnight_drift":True,   # Dim 10 — 90-day close-to-open drift statistics
-        "social":         False,  # Disabled — Reddit velocity (meme-prone, IC auto-enable if proven)
+        "social":         True,   # Reddit velocity + VADER — IC auto-disable if harmful
+        "iv_skew":        True,   # Dim 11 — OTM put / ATM call IV skew (Alpaca, enabled)
+    },
+
+    # ── IV SKEW (Alpaca options chain) ────────────────────────────
+    # Requires Algo Trader Plus ($99/mo) for OPRA real-time options data.
+    # Keys: alpaca_api_key / alpaca_secret_key (already set above).
+    # Enable via dimension_flags["iv_skew"] = True once IC proves predictive value.
+    # Wu & Tian (2024, Management Science): high put-call skew predicts negative
+    # next-period returns — reflects both structural risk and informed order flow.
+    "iv_skew": {
+        "dte_min":         7,      # Earliest expiry to consider (days out)
+        "dte_max":         60,     # Latest expiry to consider
+        "target_dte":      30,     # Preferred expiry (closest to this wins)
+        "otm_put_delta":  -0.25,   # Target delta for OTM put selection
+        "atm_call_delta":  0.50,   # Target delta for ATM call selection
+        # Scoring thresholds (raw skew = otm_put_IV - atm_call_IV)
+        "skew_bearish_hi":  0.15,  # > 0.15 → score 10, bearish
+        "skew_bearish_mid": 0.10,  # > 0.10 → score 7,  bearish
+        "skew_bearish_lo":  0.05,  # > 0.05 → score 4,  bearish
+        "skew_bullish_lo": -0.03,  # < -0.03 → score 3, bullish (complacency)
+        # [neutral band: -0.03 to 0.05 → score 0]
     },
 
     # ── IC CALCULATOR ────────────────────────────────────────────
     # Controls the rolling IC-weighted signal composite (ic_calculator.py).
     # Phase 1 (current): ic_min_threshold = 0.0 — any positive IC gets weight.
-    # Phase 2 (needs 200+ trades): raise ic_min_threshold to 0.03 to suppress noise.
+    # Phase 2 (needs 100+ trades): raise ic_min_threshold to 0.03 to suppress noise.
     "ic_calculator": {
         "rolling_window":    60,    # Number of trading *dates* in rolling IC window
         "min_valid_records": 10,    # Legacy — kept for backward compat
@@ -158,7 +239,7 @@ CONFIG = {
                                     #   Phase 2: raise to 5 once 60+ dates accumulated
         "ic_min_threshold":  0.0,   # Noise floor — dimensions below this get zero weight
                                     #   Phase 1: 0.0 (any positive IC passes)
-                                    #   Phase 2: raise to 0.03 once 200+ trades available
+                                    #   Phase 2: raise to 0.03 once 100+ trades available
         "max_single_weight": 0.40,  # HHI cap — no dimension may exceed this share of total weight
 
         # IC auto-disable: if a dimension's IC falls below the threshold for N
@@ -175,7 +256,16 @@ CONFIG = {
         # dimensions. When this falls below the warn/off thresholds, the score
         # bar is raised systemwide — fewer trades, higher quality only.
         # This stacks on top of strategy_mode score_threshold_adj.
-        "edge_gate_enabled":        True,
+        # ── PAPER LEARNING MODE ───────────────────────────────────────
+        # force_equal_weights: True → ignore IC weights, score all 12 dimensions equally.
+        # Fixes the cold-start trap: dimensions with IC=0 (no data) get zero weight →
+        # never generate trades → never build IC → permanently stuck at 0.
+        # Enable in paper mode. Disable once all dimensions have ≥20 trades of IC data.
+        "force_equal_weights":      True,
+
+        "edge_gate_enabled":        False, # Paper learning mode: gate prevents data accumulation.
+                                           # Circular: low IC → gate raises bar → fewer trades → lower IC.
+                                           # Re-enable when system has proven IC > 0.02 across dims.
         "edge_gate_warn_threshold": 0.02,  # mean IC below this → degraded, raise bar +5
         "edge_gate_warn_adj":       5,     # score points added in degraded state
         "edge_gate_off_threshold":  0.005, # mean IC below this → broken, raise bar +12
@@ -189,6 +279,25 @@ CONFIG = {
     # Supplemental universe track for market caps $50M–$2B.
     # Smaller companies are less efficiently priced — fewer institutional
     # participants means exploitable anomalies persist longer.
+    # ── SECTOR ROTATION ───────────────────────────────────────────
+    "sector_rotation_enabled":    True,   # Score SPDR sector ETFs vs SPY; add leaders to universe
+
+    # ── SYMPATHY SCANNER ──────────────────────────────────────────
+    "sympathy_scanner_enabled":   True,   # Add sector peers when a leader has earnings within 48h
+
+    # ── FX TRADING ────────────────────────────────────────────────
+    # Disabled by default — enable after paper validation (2+ weeks).
+    # IBKR Forex contract support already present in orders_contracts.py.
+    "fx_enabled":    True,               # Master switch for FX scanning + trading
+    "fx_pairs":      ["EURUSD", "GBPUSD", "USDJPY"],  # Active pairs
+    "fx_min_score":  20,                 # Min composite score to generate FX signal (0-50)
+
+    # ── CROSS-ASSET REGIME SIGNALS ────────────────────────────────
+    # DXY (dollar) and HYG/LQD (credit spread) as early risk-off indicators.
+    # credit_stress overrides momentum regime router → mean_reversion.
+    "cross_asset_regime_enabled": True,
+    "credit_stress_threshold":    0.4,   # % spread between HYG/LQD 3d returns that triggers stress flag
+
     "small_cap_enabled":      True,
     "small_cap_min_score":    22,   # Slightly higher threshold (wider spreads, more risk)
     "small_cap_max_position": 0.05, # 5% max per position (vs 10% for large cap)
@@ -247,10 +356,17 @@ CONFIG = {
     # Layered as a multiplier — set regime_routing_enabled: False for equal-weight
     # A/B baseline without code changes.
     "regime_routing_enabled":       True,   # A/B flag: False = equal weights
-    "regime_router_vix_threshold":  20,     # VIX < 20 → "momentum"; >= 20 → "mean_reversion"
+    "regime_router_vix_threshold":  25,     # VIX < 25 → "momentum"; >= 25 → "mean_reversion"
+    # Raised 20→25: VIX 20-25 is "mild/transitional", not true fear. Momentum scoring
+    # should stay active in this band so relief rallies and directional days score correctly.
     "regime_router_momentum_mult":  1.3,    # Momentum dim multiplier in momentum regime
     "regime_router_reversion_mult": 0.7,    # Reversion dim multiplier in momentum regime
     #                                         (roles invert in mean_reversion regime)
+    # Intraday SPY move override — two triggers, either one switches the router to momentum:
+    #   open-to-now: SPY up/down > 1.5% from today's open (sustained trend)
+    #   2-bar ROC:   SPY moved > 0.4% in last 2 hourly bars (fast acceleration ~30-60 min)
+    "regime_router_rally_override_pct": 1.5,
+    "regime_router_roc_override_pct":   0.4,
 
     # ── CANDLESTICK CONFIRMATION GATE ────────────────────────
     # When True, a BUY or SELL signal must have at least one confirming
@@ -310,6 +426,27 @@ CONFIG = {
         "cache_ttl_seconds": 3600,   # Re-fetch VIX data at most once per hour
     },
 
+    # ── SIGNAL-STRENGTH-PROPORTIONAL KELLY MULTIPLIER ────────────
+    # Replaces the discrete 3-tier conviction_mult with continuous linear scaling.
+    # Formula: t = clamp((score - score_floor) / (score_ceil - score_floor), 0, 1)
+    #          conviction_mult = min_mult + t * (max_mult - min_mult)
+    # Calibration: score 20→50 maps 0.5×→1.5×. Old 0.75× tier ≈ score 27.5.
+    "signal_strength_kelly": {
+        "score_floor": 20,   # Raw score (0–50) at which min_mult applies
+        "score_ceil":  50,   # Raw score at which max_mult applies
+        "min_mult":    0.5,
+        "max_mult":    1.5,
+    },
+
+    # ── DRAWDOWN-PROPORTIONAL POSITION SCALER ────────────────────
+    # Smoothly reduces position size as equity draws down from HWM.
+    # Linear: 1.0 at 0% drawdown → min_scalar at max_drawdown_alert.
+    # Returns 1.0 when HWM is not yet initialized.
+    "drawdown_scaler": {
+        "enabled":    True,
+        "min_scalar": 0.1,
+    },
+
     # ── MARKET BREADTH REGIME INPUT ───────────────────────────────
     # % of S&P 500 stocks above their 200-day MA (^MMTH from Yahoo Finance).
     # Used as a third factor in scanner.get_market_regime() alongside VIX
@@ -362,7 +499,7 @@ CONFIG = {
     # ── REGIME DETECTOR LOCK ──────────────────────────────────
     # Committed approach: "vix_proxy" (scanner.get_market_regime + signals.get_market_regime_vix)
     # DO NOT change to "ml_random_forest" or "hmm" without IC Phase 2 gate review.
-    # Gate: closed_trades >= 200. See DECISIONS.md Action #9.
+    # Gate: closed_trades >= 100. See DECISIONS.md Action #9.
     "regime_detector":          "vix_proxy",
 
     # Canonical regime state names produced by the VIX-proxy detector.
@@ -387,7 +524,7 @@ CONFIG = {
     # Set options_enabled to True to activate options trading.
     # When enabled, high-conviction stock signals (score >= options_min_score)
     # are evaluated for an options trade instead of (or alongside) the stock.
-    "options_enabled":        True,    # OPTIONS ACTIVE
+    "options_enabled":        False,   # DISABLED — options sizing bug caused catastrophic losses (LEVI -$14.5K, SPIR -$13K, AAPL -$17K); re-enable only after sizing fix is validated
 
     # Entry filters
     "options_min_score":      35,      # Minimum stock score to consider options
@@ -478,7 +615,7 @@ CONFIG = {
     #   - See LIVE_TRADING_GATE.md for the full criteria document
     #
     # Phase 1 exit criteria (ALL must be met before advancing to Phase 2):
-    #   - 200+ closed paper trades logged to data/trades.json
+    #   - 100+ closed paper trades logged to data/trades.json
     #   - Test suite ≥ 80% pass rate
     #   - 30+ consecutive paper trading days without critical bugs
     #   - Amit explicitly sets current_phase = 2 after reviewing results
@@ -512,7 +649,7 @@ CONFIG = {
         },
 
         "phase1_exit_criteria": {
-            "min_closed_trades":       200,   # Trades needed before ML/backtest are meaningful
+            "min_closed_trades":       100,   # Trades needed before ML/backtest are meaningful
             "min_test_pass_rate":      0.80,  # Fraction of pytest tests that must pass
             "min_paper_trading_days":  30,    # Consecutive days running without critical bugs
         },

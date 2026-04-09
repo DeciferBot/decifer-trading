@@ -1,42 +1,33 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║   <>  DECIFER 2.0  —  news_sentinel.py                     ║
-# ║   Real-time news monitoring engine — runs independently     ║
-# ║   of the scan loop. Polls Yahoo RSS, Finviz, and IBKR      ║
-# ║   news every 30-60 seconds. When material news is detected  ║
-# ║   for a holding, watchlist symbol, or theme-tracked stock,  ║
-# ║   it fires the mini agent pipeline immediately.             ║
+# ║   IBKR news feed + materiality analysis + Claude deep-read. ║
+# ║   Real-time Alpaca/Benzinga feed is handled by              ║
+# ║   alpaca_news.AlpacaNewsStream (primary source).            ║
+# ║   This module owns: IBKR news, assess_materiality,          ║
+# ║   deep_read_trigger, and the NewsSentinel polling class.    ║
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
-import re
 import json
 import logging
 import threading
 import time
-import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
-from email.utils import parsedate_to_datetime
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import requests
 from config import CONFIG
 from news import keyword_score, claude_sentiment, BULLISH_STRONG, BEARISH_STRONG
+from news_infrastructure import HeadlineDeduplicator, SymbolCooldown, headline_hash
 
 log = logging.getLogger("decifer.sentinel")
 
 # ═══════════════════════════════════════════════════════════════
-# HEADLINE DEDUP — track seen headlines to avoid re-triggering
+# SHARED INFRASTRUCTURE INSTANCES
 # ═══════════════════════════════════════════════════════════════
-_seen_headlines: set[str] = set()          # hash of headline text
-_seen_max = 5000                            # cap memory usage
+_dedup    = HeadlineDeduplicator(max_size=5000)
+_cooldown = SymbolCooldown(cooldown_minutes=CONFIG.get("sentinel_cooldown_minutes", 10))
 _headline_history: deque = deque(maxlen=200)  # recent triggers for dashboard
-
-# ═══════════════════════════════════════════════════════════════
-# TRIGGER COOLDOWN — don't fire on the same symbol twice in N min
-# ═══════════════════════════════════════════════════════════════
-_symbol_cooldowns: dict[str, datetime] = {}
-COOLDOWN_MINUTES = CONFIG.get("sentinel_cooldown_minutes", 10)
 
 # ═══════════════════════════════════════════════════════════════
 # MATERIALITY THRESHOLDS — what qualifies as "material news"
@@ -48,121 +39,19 @@ KEYWORD_THRESHOLD = CONFIG.get("sentinel_keyword_threshold", 3)
 CLAUDE_CONFIDENCE_THRESHOLD = CONFIG.get("sentinel_claude_confidence", 7)
 
 
+# Thin compatibility aliases — used internally below
 def _headline_hash(headline: str) -> str:
-    """Normalize and hash a headline for dedup."""
-    clean = re.sub(r'[^a-z0-9 ]', '', headline.lower().strip())
-    return clean[:120]  # first 120 chars is enough for dedup
-
+    return headline_hash(headline)
 
 def _is_on_cooldown(symbol: str) -> bool:
-    """Check if a symbol triggered recently."""
-    last = _symbol_cooldowns.get(symbol)
-    if not last:
-        return False
-    return (datetime.now(timezone.utc) - last).total_seconds() < COOLDOWN_MINUTES * 60
+    return _cooldown.is_on_cooldown(symbol)
 
-
-def _set_cooldown(symbol: str):
-    """Mark a symbol as recently triggered."""
-    _symbol_cooldowns[symbol] = datetime.now(timezone.utc)
+def _set_cooldown(symbol: str) -> None:
+    _cooldown.set_cooldown(symbol)
 
 
 # ═══════════════════════════════════════════════════════════════
-# SOURCE 1: YAHOO RSS (enhanced — faster polling, broader)
-# ═══════════════════════════════════════════════════════════════
-def fetch_yahoo_rss_fast(symbol: str) -> list[dict]:
-    """
-    Fetch Yahoo Finance RSS — optimized for speed (1.5s timeout).
-    Returns list of {title, published, link, age_hours, symbol}.
-    """
-    url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}&region=US&lang=en-US"
-    try:
-        resp = requests.get(url, timeout=1.5, headers={
-            "User-Agent": "Decifer/2.0 NewsSentinel"
-        })
-        if resp.status_code != 200:
-            return []
-
-        root = ET.fromstring(resp.content)
-        articles = []
-        now = datetime.now(timezone.utc)
-
-        for item in root.findall(".//item")[:8]:
-            title = item.findtext("title", "").strip()
-            pub_date = item.findtext("pubDate", "")
-            link = item.findtext("link", "")
-
-            age_hours = 999
-            if pub_date:
-                try:
-                    pub_dt = parsedate_to_datetime(pub_date)
-                    age_hours = (now - pub_dt).total_seconds() / 3600
-                except Exception:
-                    pass
-
-            if title:
-                articles.append({
-                    "title": title,
-                    "published": pub_date,
-                    "link": link,
-                    "age_hours": round(age_hours, 1),
-                    "symbol": symbol,
-                    "source": "yahoo_rss",
-                })
-
-        return articles
-    except Exception as e:
-        log.debug(f"Yahoo RSS sentinel error for {symbol}: {e}")
-        return []
-
-
-# ═══════════════════════════════════════════════════════════════
-# SOURCE 2: FINVIZ NEWS SCRAPE (free, no API key)
-# ═══════════════════════════════════════════════════════════════
-def fetch_finviz_news(symbol: str) -> list[dict]:
-    """
-    Scrape Finviz news table for a symbol.
-    Returns list of {title, published, link, age_hours, symbol}.
-    """
-    url = f"https://finviz.com/quote.ashx?t={symbol}&ty=c&p=d&b=1"
-    try:
-        resp = requests.get(url, timeout=2.5, headers={
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/120.0.0.0 Safari/537.36"
-        })
-        if resp.status_code != 200:
-            return []
-
-        articles = []
-        now = datetime.now(timezone.utc)
-
-        # Parse news table rows — Finviz uses class="news-link-left" for headlines
-        # Quick regex extraction to avoid BS4 dependency
-        pattern = r'class="tab-link-news"[^>]*>([^<]+)</a>'
-        matches = re.findall(pattern, resp.text)
-
-        for title in matches[:8]:
-            title = title.strip()
-            if title and len(title) > 10:
-                h = _headline_hash(title)
-                articles.append({
-                    "title": title,
-                    "published": "",
-                    "link": "",
-                    "age_hours": 0.5,  # Finviz doesn't give exact timestamps; assume recent
-                    "symbol": symbol,
-                    "source": "finviz",
-                })
-
-        return articles
-    except Exception as e:
-        log.debug(f"Finviz sentinel error for {symbol}: {e}")
-        return []
-
-
-# ═══════════════════════════════════════════════════════════════
-# SOURCE 3: IBKR NEWS API (via ib_async)
+# SOURCE: IBKR NEWS API (via ib_async)
 # ═══════════════════════════════════════════════════════════════
 def fetch_ibkr_news(ib, symbol: str) -> list[dict]:
     """
@@ -224,54 +113,31 @@ def fetch_ibkr_news(ib, symbol: str) -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════════
-# CORE: SCAN ALL SOURCES FOR A BATCH OF SYMBOLS
+# CORE: SCAN IBKR NEWS FOR A BATCH OF SYMBOLS
 # ═══════════════════════════════════════════════════════════════
-def scan_all_sources(symbols: list[str], ib=None,
-                     use_finviz: bool = True,
-                     use_ibkr: bool = True) -> list[dict]:
+def scan_all_sources(symbols: list[str], ib=None) -> list[dict]:
     """
-    Parallel scan of all news sources for a batch of symbols.
+    Parallel IBKR news fetch for a batch of symbols.
     Returns only NEW headlines (not seen before).
-    Each result: {symbol, title, source, age_hours, keyword_score, ...}
+    Yahoo RSS and Finviz removed — replaced by AlpacaNewsStream.
     """
     all_articles = []
 
-    def _fetch_one(sym):
-        arts = []
-        # Yahoo RSS (always)
-        arts.extend(fetch_yahoo_rss_fast(sym))
-        # Finviz
-        if use_finviz:
-            arts.extend(fetch_finviz_news(sym))
-        # IBKR
-        if use_ibkr and ib is not None:
-            arts.extend(fetch_ibkr_news(ib, sym))
-        return arts
+    if ib is None:
+        return []
 
-    # Parallel fetch across symbols
     with ThreadPoolExecutor(max_workers=8) as pool:
-        futures = {pool.submit(_fetch_one, sym): sym for sym in symbols}
+        futures = {pool.submit(fetch_ibkr_news, ib, sym): sym for sym in symbols}
         for future in as_completed(futures):
             try:
-                arts = future.result()
-                all_articles.extend(arts)
+                all_articles.extend(future.result())
             except Exception as e:
-                log.debug(f"Sentinel fetch error: {e}")
+                log.debug(f"Sentinel IBKR fetch error: {e}")
 
-    # ── DEDUP: only keep headlines we haven't seen before ────
     new_articles = []
     for art in all_articles:
-        h = _headline_hash(art["title"])
-        if h not in _seen_headlines and h:
-            _seen_headlines.add(h)
+        if _dedup.add_if_new(art["title"]):
             new_articles.append(art)
-
-    # Cap dedup set to avoid memory bloat
-    if len(_seen_headlines) > _seen_max:
-        # Remove oldest half
-        to_remove = list(_seen_headlines)[:_seen_max // 2]
-        for r in to_remove:
-            _seen_headlines.discard(r)
 
     return new_articles
 
@@ -498,16 +364,9 @@ class NewsSentinel:
                 batch = list(dict.fromkeys(batch))
 
                 # ── Scan all sources ──────────────────────────────
-                use_ibkr = CONFIG.get("sentinel_use_ibkr", True)
-                use_finviz = CONFIG.get("sentinel_use_finviz", True)
-                new_articles = scan_all_sources(
-                    batch,
-                    ib=self.ib if use_ibkr else None,
-                    use_finviz=use_finviz,
-                    use_ibkr=use_ibkr
-                )
+                new_articles = scan_all_sources(batch, ib=self.ib)
 
-                self.stats["headlines_seen"] = len(_seen_headlines)
+                self.stats["headlines_seen"] = len(_dedup)
                 self.stats["polls"] += 1
                 self.stats["last_poll"] = datetime.now().strftime("%H:%M:%S")
                 self._last_poll = datetime.now()

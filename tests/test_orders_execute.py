@@ -291,8 +291,8 @@ class TestValidatePrice:
         """When ibkr_price=0 (excluded), yfinance provides the fallback price."""
         fn = self._fn()
         fallback = 123.45
-        with patch("orders._get_yf_price", return_value=fallback), \
-             patch("orders.get_tv_signal_cache", return_value={}):
+        with patch("orders_contracts._get_yf_price", return_value=fallback), \
+             patch("orders_contracts.get_tv_signal_cache", return_value={}):
             price, desc = fn("MSFT", 0.0, 0.0)
         assert price == pytest.approx(fallback), (
             f"Expected yfinance fallback {fallback}, got {price!r} ({desc})"

@@ -19,9 +19,12 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import zoneinfo
 from datetime import datetime
 
 from colorama import Fore, Style
+
+_ET = zoneinfo.ZoneInfo("America/New_York")
 from ib_async import IB
 
 from config import CONFIG
@@ -84,10 +87,12 @@ dash = {
     "catalyst_sentinel_stats":   {},
     # ── Directional skew (BACK-007) ─────────────────────────────────────────
     "skew":                      {},
+    # ── Sector rotation bias (updated each scan cycle) ───────────────────────
+    "sector_bias":               {},
 }
 
 # ── Persistent file paths ─────────────────────────────────────────────────────
-EQUITY_FILE  = "equity_history.json"
+EQUITY_FILE  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "equity_history.json")
 PROMPTS_FILE = "prompt_versions.json"
 
 # ── IBKR connection object (single instance shared by all modules) ────────────
@@ -104,6 +109,10 @@ _pnl_subscription                               = None
 scan_count         = 0
 last_sunday_review = None
 
+# ── SL fill event flags (set by fillEvent handler, consumed by check_external_closes) ──
+# Symbols whose native IBKR stop-loss order just filled — processed on next scan.
+_sl_fill_events: set = set()
+
 # ── News Sentinel state ───────────────────────────────────────────────────────
 _sentinel                  = None
 _sentinel_trades_this_hour = 0
@@ -114,6 +123,33 @@ _catalyst_sentinel     = None
 _catalyst_trades_today = 0
 _catalyst_trade_date   = ""
 
+# ── Alpaca streams ───────────────────────────────────────────────────────────
+_bar_stream         = None   # AlpacaBarStream instance — started in bot.py main()
+_alpaca_news_stream = None   # AlpacaNewsStream instance — started in bot.py main()
+
+# ── Momentum Sentinel ────────────────────────────────────────────────────────
+_momentum_sentinel        = None             # MomentumSentinel instance
+_momentum_scan_requested  = threading.Event()  # Set by sentinel; cleared by main loop
+_scheduled_scan_fn        = None             # Reference to bot.py's scheduled_scan closure
+
+# ── IBKR account / position ground truth ─────────────────────────────────────
+# Populated by _on_account_value() when reqAccountUpdates is active.
+# Keys mirror IBKR Account Value Keys: NetLiquidation, BuyingPower,
+# DayTradesRemaining, ExcessLiquidity, Cushion, HighestSeverity, etc.
+account_values: dict  = {}
+
+# Populated by _on_position() on connect and after every reconnect.
+# Keyed by symbol; value is the ib_async Position object.
+ibkr_positions: dict  = {}
+
+# Set to False when IBKR sends accountReady=false (server mid-reset).
+# Callers should suppress account-value reads while this is False.
+_account_ready: bool  = True
+
+# Symbols with an active regulatory or volatility halt (tick-type 49).
+# Orders to these symbols are blocked until the halt clears.
+_halted_symbols: set  = set()
+
 
 # ── Utility: coloured terminal log ───────────────────────────────────────────
 def clog(type_: str, msg: str):
@@ -122,7 +158,7 @@ def clog(type_: str, msg: str):
     print(f"{color}[{type_}]{Style.RESET_ALL}  {msg}")
     log.info(f"[{type_}] {msg}")
     dash["logs"].insert(0, {
-        "time": datetime.now().strftime("%H:%M:%S"),
+        "time": datetime.now(_ET).strftime("%H:%M:%S"),
         "type": type_,
         "msg":  msg,
     })

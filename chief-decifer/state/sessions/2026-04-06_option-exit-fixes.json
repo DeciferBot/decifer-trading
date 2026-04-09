@@ -1,0 +1,44 @@
+{
+  "date": "2026-04-06",
+  "title": "Bug fixes: deferred option exits + orphaned SL reattachment + test isolation",
+  "branch": "master",
+  "session_type": "bug_fix",
+  "approved_by": "pending",
+
+  "strategic_gate_check": {
+    "ic_computing_real_values": "CLEARED — reversion=+0.12 dominant (0.40 weight)",
+    "win_rate_trend_understood": "IN PROGRESS — need 40+ signal-driven closed trades for IC correlation"
+  },
+
+  "deliverables": [
+    {
+      "item": "Deferred option exit flush (Fix 1)",
+      "detail": "execute_sell_option() was deferring exits to _pending_option_exits when the options market was closed, but flush_pending_option_exits(ib) was never called — deferred exits were silently abandoned. Fixed: added flush_pending_option_exits(ib) call in bot_trading.py run_scan() after update_trailing_stops(). The function was already fully implemented; only the call site was missing."
+    },
+    {
+      "item": "Orphaned SL bracket reattachment (Fix 2)",
+      "detail": "Stop-loss orders on positions (e.g. GSAT, LUNR) could be cancelled by dashboard close_position() with no mechanism to re-submit them. Fixed: added SL reattachment logic in reconcile_with_ibkr() — on startup/reconnect, for any recovered stock position, the bot now scans ib.openTrades() for a live STP/TRAIL order (reattaches its ID) or submits a new GTC outsideRth StopOrder if none is found."
+    },
+    {
+      "item": "execute_sell_option() hardening",
+      "detail": "Added: (1) market hours gate at top defers to _pending_option_exits, (2) EXITING status check to skip duplicate exit attempts, (3) retry gating BEFORE setting EXITING (not after) so a cooldown skip doesn't lock the position, (4) status reset to ACTIVE in except block on all failure paths."
+    },
+    {
+      "item": "_save_orders fallback in learning.py",
+      "detail": "learning._save_orders() lacked the /dev/null fallback that _save_trades() already had. tempfile.mkstemp(dir='/dev/') fails with [Errno 1] on macOS. Added the same fallback pattern: catch exception, fall back to direct open(target, 'w') write. This unblocked test isolation in the full suite."
+    },
+    {
+      "item": "TestExecuteSellOptionPricing test suite (4 tests)",
+      "detail": "Added 4 tests verifying execute_sell_option bid-pricing and retry-discount logic: attempt 0 uses bid, retry 1 uses bid*0.95, retry 2 uses bid*0.90, cooldown reset stays on bid path. Root cause of full-suite isolation failure: test_orders_guard.py::test_no_syntax_errors_at_import calls importlib.reload(orders), replacing sys.modules['orders'] with a fresh module object. test_orders_core.py's module-level `orders` reference became stale, so patch('orders.LimitOrder') targeted the wrong module. Fixed by using sys.modules['orders'] directly in _run_sell() to always operate on the live module."
+    }
+  ],
+
+  "system_state": {
+    "tests_passing": 1621,
+    "tests_failing": 0,
+    "ic_status": "live — reversion dominant (0.40 weight)",
+    "gate": "KEEP — alpha validation gate unchanged"
+  },
+
+  "gate_decision": "KEEP — no new features. Bug fixes only. Next check at 40 signal-driven closed trades."
+}
