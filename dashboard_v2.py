@@ -1408,6 +1408,7 @@ let S = {
 };
 
 let _prevValues = {};       // for flash detection
+let _booted     = false;    // suppress flashes on first render
 let _currentTab = 'live';
 let _posSort    = 'recency';
 let _orderFilter= 'all';
@@ -1477,7 +1478,7 @@ function setVal(id, newVal, fmt) {
   const displayed = fmt ? fmt(newVal) : newVal;
   if (el.textContent === displayed) return;
   const prev = _prevValues[id];
-  if (prev !== undefined) {
+  if (_booted && prev !== undefined) {
     const pn = parseFloat(prev), nn = parseFloat(newVal);
     if (!isNaN(pn) && !isNaN(nn) && pn !== nn) {
       el.classList.remove('flash-pos', 'flash-neg', 'flash-neu');
@@ -2996,10 +2997,9 @@ setInterval(animateScan, 1000);
 
 // ── BOOT ───────────────────────────────────────────────────────
 (async () => {
-  await fetchDimensions();
-  await fetchState();
-  await fetchSectors();
-  await fetchGate();
+  // Fetch everything in parallel — single render pass, no flash storm
+  await Promise.all([fetchDimensions(), fetchState(), fetchSectors(), fetchGate()]);
+  _booted = true;  // only flash on changes AFTER first paint
   setInterval(poll, POLL_MS);
 })();
 </script>

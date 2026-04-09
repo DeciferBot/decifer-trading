@@ -905,6 +905,7 @@ def get_intraday_strategy_mode(portfolio_value: float,
         "max_new_trades":       params["max_new_trades"],
         "context":              context,
         "daily_pnl_pct":        daily_pnl_pct,
+        "regime_changed":       get_regime_changed(current_regime),
     }
 
 
