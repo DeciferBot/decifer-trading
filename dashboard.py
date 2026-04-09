@@ -425,7 +425,13 @@ canvas{display:block;width:100% !important}
       <div class="trade-card-panel">
         <div class="col-title" style="flex-shrink:0">
           <span>Last Decision</span>
-          <span id="trade-card-age" style="color:var(--muted2);font-size:9px"></span>
+          <span style="display:flex;align-items:center;gap:6px">
+            <span id="trade-card-age" style="color:var(--muted2);font-size:9px"></span>
+            <button id="tc-copy-btn" onclick="copyDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0;letter-spacing:1px" title="Copy to clipboard">Copy</button>
+            <button id="tc-prev-btn" onclick="prevDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;padding:0;line-height:1" title="Previous decision">&#8592;</button>
+            <span id="tc-nav-pos" style="color:var(--muted2);font-size:9px"></span>
+            <button id="tc-next-btn" onclick="nextDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;padding:0;line-height:1" title="Next decision">&#8594;</button>
+          </span>
         </div>
         <div class="trade-card-body" id="trade-card-body">
           <div style="color:var(--muted2);font-size:11px">No trades taken yet.</div>
@@ -872,6 +878,8 @@ canvas{display:block;width:100% !important}
 // ── State ──────────────────────────────────────────────────
 let allTrades = [];
 let equityHistory = [];
+let _decisionHistory = [];
+let _decisionIdx = 0;
 let currentFilter = 'all';
 let scanTotal = 300; // seconds
 let scanElapsed = 0;
@@ -2297,8 +2305,16 @@ async function poll() {
     // Agents view
     if (d.agent_outputs) renderAgents({...d.agent_outputs, last_scan: d.last_scan});
 
-    // Trade card — last decision (always refresh, even when null)
-    renderTradeCard(d.last_decision || null);
+    // Trade card — last decision with history navigation
+    const incoming = d.decision_history && d.decision_history.length
+      ? d.decision_history.slice().reverse()   // most-recent first
+      : (d.last_decision ? [d.last_decision] : []);
+    if (incoming.length && (!_decisionHistory.length ||
+        (incoming[0] && _decisionHistory[0] && incoming[0].timestamp !== _decisionHistory[0].timestamp))) {
+      _decisionIdx = 0;
+    }
+    _decisionHistory = incoming;
+    renderTradeCard(_decisionHistory[_decisionIdx] || null);
 
     // Agent conversation (full agents view only — live panel replaced by trade card)
     if (d.agent_conversation && d.agent_conversation.length) {
@@ -2590,11 +2606,49 @@ function annotateIndicators(text) {
   return result;
 }
 
+function prevDecision() {
+  if (_decisionIdx < _decisionHistory.length - 1) {
+    _decisionIdx++;
+    renderTradeCard(_decisionHistory[_decisionIdx] || null);
+  }
+}
+
+function nextDecision() {
+  if (_decisionIdx > 0) {
+    _decisionIdx--;
+    renderTradeCard(_decisionHistory[_decisionIdx] || null);
+  }
+}
+
+function copyDecision() {
+  const ld = _decisionHistory[_decisionIdx];
+  if (!ld) return;
+  const lines = [];
+  if (ld.symbol)        lines.push((ld.symbol) + (ld.company_name ? ' — ' + ld.company_name : '') + (ld.direction ? ' | ' + ld.direction : ''));
+  if (ld.thesis)        lines.push('Thesis: ' + ld.thesis);
+  if (ld.edge_why_now)  lines.push('Edge: ' + ld.edge_why_now);
+  if (ld.risk)          lines.push('Risk: ' + ld.risk);
+  if (ld.timestamp)     lines.push(ld.timestamp.replace('T',' ').slice(0,16));
+  navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    const btn = document.getElementById('tc-copy-btn');
+    if (btn) { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); }
+  });
+}
+
 function renderTradeCard(ld) {
   // Render the rich last-decision trade card (thesis / edge / risk / returns).
   const body = document.getElementById('trade-card-body');
   const ageEl = document.getElementById('trade-card-age');
   if (!body) return;
+
+  // Nav counter + arrow colour
+  const navPos  = document.getElementById('tc-nav-pos');
+  const prevBtn = document.getElementById('tc-prev-btn');
+  const nextBtn = document.getElementById('tc-next-btn');
+  const total   = _decisionHistory.length;
+  if (navPos)  navPos.textContent  = total ? (_decisionIdx + 1) + ' / ' + total : '';
+  if (prevBtn) prevBtn.style.color = _decisionIdx < total - 1 ? 'var(--text)' : 'var(--muted)';
+  if (nextBtn) nextBtn.style.color = _decisionIdx > 0          ? 'var(--text)' : 'var(--muted)';
 
   if (!ld || !ld.symbol) {
     body.innerHTML = '<div style="color:var(--muted2);font-size:11px">No trades taken yet.</div>';
