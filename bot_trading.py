@@ -63,6 +63,7 @@ _last_known_regime: str = ""
 _session_stop_count: int = 0
 _cascade_reviewed_this_session: bool = False   # prevent cascade from re-firing every loop
 _last_trim_ts: dict = {}                        # symbol → datetime of last TRIM execution
+_pm_reviewed_regime: dict = {}                  # symbol → regime label when PM last reviewed it
 
 # ── Last-decision writer (for Chief Decifer trade card) ───────────────────────
 
@@ -633,11 +634,12 @@ def _maybe_eod_options_review(regime: dict):
         _eod_options_review_done = False
         # Ledger auto-expires by date — no explicit clear needed.
         # Pruning of stale entries happens inside _record_options_attempt.
-        global _portfolio_review_done_today, _session_stop_count, _cascade_reviewed_this_session, _last_trim_ts
+        global _portfolio_review_done_today, _session_stop_count, _cascade_reviewed_this_session, _last_trim_ts, _pm_reviewed_regime
         _portfolio_review_done_today = False
         _session_stop_count = 0
         _cascade_reviewed_this_session = False
         _last_trim_ts = {}
+        _pm_reviewed_regime = {}
     # Fire once in the pre-close window
     if dtime(15, 30) <= t < dtime(15, 55) and not _eod_options_review_done:
         _eod_options_review_done = True
@@ -969,6 +971,7 @@ def run_scan():
     open_pos = get_open_positions()  # refresh after any close-queue processing
 
     # ── Lightweight per-cycle position check (every scan, no LLM) ───────────
+    global _pm_reviewed_regime
     _force_pm_review = False
     if open_pos:
         cycle_actions = lightweight_cycle_check(open_pos, regime, pipeline.all_scored)
@@ -1008,8 +1011,12 @@ def run_scan():
                             },
                         )
             elif _act_ca == "REVIEW":
-                clog("ANALYSIS", f"Cycle check queued PM review: {_sym_ca} — {_rsn_ca}")
-                _force_pm_review = True
+                _cur_regime_cc = regime.get("session_character") or regime.get("regime", "UNKNOWN")
+                if _pm_reviewed_regime.get(_sym_ca) == _cur_regime_cc:
+                    clog("INFO", f"Cycle check REVIEW suppressed for {_sym_ca}: already reviewed under regime {_cur_regime_cc}")
+                else:
+                    clog("ANALYSIS", f"Cycle check queued PM review: {_sym_ca} — {_rsn_ca}")
+                    _force_pm_review = True
 
     # ── Portfolio manager review (event-triggered) ────────────────────────────
     global _portfolio_review_done_today, _last_known_regime, _cascade_reviewed_this_session, _last_trim_ts
@@ -1139,6 +1146,11 @@ def run_scan():
             if pm_trigger == "cascade":
                 _cascade_reviewed_this_session = True
             _last_known_regime = regime.get("regime", _last_known_regime)
+            # Record which regime each reviewed position was reviewed under so cycle_check
+            # does not re-queue the same REVIEW on subsequent cycles for the same regime state.
+            _reviewed_regime_label = regime.get("session_character") or regime.get("regime", "UNKNOWN")
+            for _rp in open_pos:
+                _pm_reviewed_regime[_rp["symbol"]] = _reviewed_regime_label
     else:
         _last_known_regime = regime.get("regime", _last_known_regime)
 
