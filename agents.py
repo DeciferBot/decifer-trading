@@ -120,7 +120,7 @@ def agent_technical(signals: list, regime: dict) -> str:
         ])
 
         lines.append(
-            f"[{conviction}] {sym}: ${s['price']} | Score={score}/50 | {sig} | "
+            f"[{conviction}] {sym}: ${s['price']} | Score={score}pt | {sig} | "
             f"ADX={adx:.0f} | MFI={mfi:.0f} | EMA={ema_str} | {sq_str} | "
             f"Vol={vol_ratio:.1f}x | VWAP_dist={vwap_dist:+.2f}% | {donch_str} | "
             f"OBV={'UP' if obv_slope > 0 else 'DOWN' if obv_slope < 0 else 'FLAT'} | "
@@ -146,6 +146,20 @@ def agent_technical(signals: list, regime: dict) -> str:
         elif donch == 1 and vol_ratio < 1.5:
             divergences.append(
                 f"  ! {sym}: LOW-VOLUME BREAKOUT -- Donchian breach but Vol={vol_ratio:.1f}x (suspect fakeout)")
+        vwap_sd_pct = tf5.get("vwap_sd_pct", 1.0)
+        sd_threshold = 2.0 * vwap_sd_pct
+        regime_name = regime.get("regime", "")
+        if (score >= 45
+                and regime_name in ("RANGE_BOUND", "CHOPPY")
+                and abs(vwap_dist) >= sd_threshold):
+            direction_word = "SHORT" if sig in ("SELL", "STRONG_SELL") else "LONG"
+            contra = "LONG" if direction_word == "SHORT" else "SHORT"
+            divergences.append(
+                f"  ! {sym}: OVEREXTENDED IN RANGE -- score={score}pt + "
+                f"VWAP={vwap_dist:+.1f}% ({abs(vwap_dist)/vwap_sd_pct:.1f}x SD, threshold=2.0x) "
+                f"in {regime_name}. Move already expressed — mean reversion {contra} "
+                f"more probable than {direction_word} continuation."
+            )
 
     lines.append("")
     lines.append(
@@ -196,7 +210,9 @@ RULES:
 - If fewer than 3 genuine setups exist, say so. Cash is a valid output.
 - Options flow: CALL_BUYER = smart money bullish. PUT_BUYER = smart money bearish. Low IVR = cheap premium.
 - In PANIC regime: output MACRO: BEARISH and no OPPORTUNITIES. Capital preservation.
-- CHOPPY regime: raise your conviction bar — only HIGH conviction setups.
+- CHOPPY or RANGE_BOUND regime: raise your conviction bar — only HIGH conviction setups.
+- You determine direction from first principles using all data provided. SELL/STRONG_SELL signals are SHORT candidates; BUY/STRONG_BUY are LONG candidates — but these are starting points, not instructions. If price structure contradicts the signal direction, trust your read and either flip or omit the symbol.
+- Vol=Xx ADV means today's volume vs the 20-day average. Vol>2x = unusual conviction. Vol<0.5x = low participation, treat setups with scepticism. VWAP=+/-X% = how far price is from today's VWAP. A short candidate already sitting far below VWAP in a RANGE_BOUND or CHOPPY regime is a mean-reversion long setup, not a short continuation — recognise this and act accordingly.
 - Keep each section tight. No padding."""
 
 
@@ -232,7 +248,9 @@ def agent_trading_analyst(
         kw = news.get("keyword_score", 0)
         sent = news.get("claude_sentiment", "")
         news_str = f" | news={sent}(kw={kw:+d})" if sent else (f" | kw={kw:+d}" if kw else "")
-        sig_lines.append(f"  {sym}: {score}/50 {sig} [{bd_str}]{news_str}")
+        vol_ratio = s.get("vol_ratio") or s.get("timeframes", {}).get("5m", {}).get("vol_ratio", 1.0)
+        vwap_dist = s.get("timeframes", {}).get("5m", {}).get("vwap_dist", 0)
+        sig_lines.append(f"  {sym}: {score}pt {sig} [{bd_str}]{news_str} | Vol={vol_ratio:.1f}x ADV | VWAP={vwap_dist:+.1f}%")
 
     opts_lines = []
     for o in (options_signals or [])[:8]:
