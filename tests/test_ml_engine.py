@@ -62,7 +62,7 @@ def _make_trade_record(
     exit_price=101.5,
     shares=10,
     score=7.0,
-    regime="BULL_TRENDING",
+    regime="TRENDING_UP",
     vix=14.0,
     entry_time="2024-01-15T10:30:00",
     exit_time="2024-01-15T14:00:00",
@@ -92,7 +92,7 @@ def _make_sufficient_trades(n=60):
     trades = []
     for i in range(n):
         pnl = 100.0 if i % 3 != 0 else -50.0
-        regime = ["BULL_TRENDING", "BEAR_TRENDING", "CHOPPY"][i % 3]
+        regime = ["TRENDING_UP", "TRENDING_DOWN", "RANGE_BOUND"][i % 3]
         t = _make_trade_record(
             symbol=f"SYM{i % 10}",
             pnl=pnl,
@@ -341,7 +341,7 @@ class TestDeciferML:
     def test_predict_returns_defaults_without_models(self):
         """predict returns neutral defaults when models are not trained."""
         ml = self._fresh_ml()
-        result = ml.predict({"score": 7.0, "regime": "BULL_TRENDING", "vix": 14.0})
+        result = ml.predict({"score": 7.0, "regime": "TRENDING_UP", "vix": 14.0})
         assert result["win_prob"] == 0.5
         assert result["expected_return"] == 0.0
         assert result["confidence"] == 0.0
@@ -358,7 +358,7 @@ class TestDeciferML:
 
         features = {
             "score": 7.0,
-            "regime": "BULL_TRENDING",
+            "regime": "TRENDING_UP",
             "vix": 14.0,
             "holding_minutes": 120,
             "time_of_day": 10,
@@ -401,7 +401,7 @@ class TestSignalEnhancer:
         symbol_data = {
             "symbol": "AAPL",
             "base_score": 7.0,
-            "regime": "BULL_TRENDING",
+            "regime": "TRENDING_UP",
             "vix": 14.0,
             "score": 7.0,
         }
@@ -413,7 +413,7 @@ class TestSignalEnhancer:
         """adjusted_score is a number."""
         enhancer = self._enhancer()
         symbol_data = {"symbol": "TSLA", "base_score": 6.0, "score": 6.0,
-                       "regime": "CHOPPY", "vix": 20.0}
+                       "regime": "RANGE_BOUND", "vix": 20.0}
         result = enhancer.enhance_score(symbol_data)
         assert isinstance(result["adjusted_score"], (int, float))
 
@@ -423,7 +423,7 @@ class TestSignalEnhancer:
         # Ensure no model is loaded
         enhancer.model = None
         symbol_data = {"symbol": "NVDA", "base_score": 8.5, "score": 8.5,
-                       "regime": "BULL_TRENDING", "vix": 12.0}
+                       "regime": "TRENDING_UP", "vix": 12.0}
         result = enhancer.enhance_score(symbol_data)
         # adjusted_score should be a reasonable number (not NaN/None)
         assert result["adjusted_score"] is not None
@@ -433,7 +433,7 @@ class TestSignalEnhancer:
     def test_module_level_enhance_score_works(self):
         """Module-level enhance_score function is callable and returns dict."""
         symbol_data = {"symbol": "AMD", "base_score": 5.0, "score": 5.0,
-                       "regime": "BEAR_TRENDING", "vix": 25.0}
+                       "regime": "TRENDING_DOWN", "vix": 25.0}
         result = enhance_score(symbol_data)
         assert isinstance(result, dict)
 
@@ -490,9 +490,9 @@ class TestWeeklyReportGenerator:
     def test_generate_report_with_trades_returns_nonempty_string(self):
         """generate_report with closed trades returns a nonempty report."""
         trades = [
-            _make_trade_record(pnl=200.0, regime="BULL_TRENDING"),
-            _make_trade_record(pnl=-80.0, regime="CHOPPY", symbol="MSFT"),
-            _make_trade_record(pnl=120.0, regime="BULL_TRENDING", symbol="NVDA"),
+            _make_trade_record(pnl=200.0, regime="TRENDING_UP"),
+            _make_trade_record(pnl=-80.0, regime="RANGE_BOUND", symbol="MSFT"),
+            _make_trade_record(pnl=120.0, regime="TRENDING_UP", symbol="NVDA"),
         ]
         self._write_trades(trades)
         gen = WeeklyReportGenerator()

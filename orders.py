@@ -45,7 +45,7 @@ from orders_contracts import (
     _cancel_ibkr_order_by_id,
     is_options_market_open,
     get_contract,
-    _get_ibkr_price, _get_ibkr_bid_ask, _get_yf_price,
+    _get_ibkr_price, _get_ibkr_bid_ask, _get_alpaca_price,
     _is_option_contract, _ibkr_item_to_key,
     _validate_position_price,
 )

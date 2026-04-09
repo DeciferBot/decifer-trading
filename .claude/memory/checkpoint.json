@@ -1,21 +1,21 @@
 {
-  "timestamp": "2026-04-01T16:34:33.951Z",
+  "timestamp": "2026-04-09T19:53:11.584Z",
   "branch": "master",
-  "lastCommit": "ae385a3 fix(dashboard): repair empty HTML + execute_buy candle_gate TypeError",
+  "lastCommit": "fccc627 fix(agents): direction autonomy, vol/VWAP context, calibrated overextension warning",
   "roadmapPhase": null,
   "lastFilesTouched": [
-    "lpha_decay.py",
+    "claude/memory/checkpoint.json",
+    ".claude/memory/session-history.jsonl",
+    "agents.py",
+    "alpha_decay.py",
+    "auto-push.sh",
+    "config.py",
+    "daily_journal.py",
     "dashboard.py",
-    "data/orders.json",
-    "equity_history.json",
-    "tests/test_alpha_decay.py",
-    "CLAUDE.md.bak",
     "data/alpha_decay_cache.json",
-    "data/audit_log.jsonl",
-    "data/hwm_state.json",
-    "data/sec_tickers.json"
+    "data/audit_log.jsonl"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 71
+  "sessionCount": 73
 }

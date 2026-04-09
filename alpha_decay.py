@@ -329,8 +329,8 @@ def get_alpha_decay_stats(trades: list = None, horizons: list = None) -> dict:
       all         — every closed trade with price data
       high_score  — conviction score ≥ 38 (high-conviction threshold)
       low_score   — conviction score < 38
-      bull        — BULL_TRENDING regime
-      bear        — BEAR_TRENDING or BEAR regime
+      bull        — TRENDING_UP regime
+      bear        — TRENDING_DOWN or BEAR regime
       long_only   — LONG direction trades
       short_only  — SHORT direction trades
 
@@ -379,8 +379,8 @@ def get_alpha_decay_stats(trades: list = None, horizons: list = None) -> dict:
         "all":        records,
         "high_score": [r for r in records if (r.get("score") or 0) >= 38],
         "low_score":  [r for r in records if (r.get("score") or 0) < 38],
-        "bull":       [r for r in records if str(r.get("regime") or "").startswith("BULL")],
-        "bear":       [r for r in records if str(r.get("regime") or "").startswith("BEAR")],
+        "bull":       [r for r in records if str(r.get("regime") or "") in ("TRENDING_UP", "BULL_TRENDING") or str(r.get("regime") or "").startswith("BULL")],
+        "bear":       [r for r in records if str(r.get("regime") or "") in ("TRENDING_DOWN", "RELIEF_RALLY", "CAPITULATION", "BEAR_TRENDING") or str(r.get("regime") or "").startswith("BEAR")],
         "long_only":  [r for r in records if r.get("direction") == "LONG"],
         "short_only": [r for r in records if r.get("direction") == "SHORT"],
     }

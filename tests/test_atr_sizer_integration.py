@@ -59,7 +59,7 @@ from risk   import get_vix_rank            as _real_get_vix_rank            # no
 # ---------------------------------------------------------------------------
 
 _REGIME_BULL: dict = {
-    "regime":                  "BULL_TRENDING",
+    "regime":                  "TRENDING_UP",
     "position_size_multiplier": 1.0,
     "vix":                     15.0,
     "spy_price":               500.0,

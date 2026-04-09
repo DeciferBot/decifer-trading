@@ -389,7 +389,7 @@ class TestAddFeatures:
         """Regime column should only contain valid label values."""
         df = make_ohlcv(150)
         result = add_features(df.copy())
-        valid_regimes = {"BULL_TRENDING", "BEAR_TRENDING", "PANIC", "CHOPPY", "UNKNOWN"}
+        valid_regimes = {"TRENDING_UP", "TRENDING_DOWN", "RELIEF_RALLY", "RANGE_BOUND", "CAPITULATION", "UNKNOWN"}
         unique_regimes = set(result["regime"].unique())
         assert unique_regimes.issubset(valid_regimes)
 

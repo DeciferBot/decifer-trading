@@ -9,6 +9,12 @@ from __future__ import annotations
 
 import os
 
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    _load_dotenv(os.path.join(os.path.dirname(__file__), ".env"), override=False)
+except ImportError:
+    pass  # python-dotenv not installed — fall back to shell environment
+
 CONFIG = {
 
     # ── IBKR CONNECTION ────────────────────────────────────────
@@ -402,8 +408,8 @@ CONFIG = {
     # stable than 20h EMA), VIX < 20 in an uptrend is a genuine bull regime.
     # Lowered vix_choppy_max 25→20: VIX > 20 while both SPY and QQQ are below
     # their 200d MA is a bear market, not merely choppy.
-    "vix_bull_max":             20,     # VIX below this + above 200d MA = BULL_TRENDING
-    "vix_choppy_max":           20,     # VIX above this + below 200d MA = BEAR_TRENDING
+    "vix_bull_max":             20,     # VIX below this + above 200d MA = TRENDING_UP
+    "vix_choppy_max":           20,     # VIX above this + below 200d MA = TRENDING_DOWN
     "vix_panic_min":            35,     # VIX above = panic — no trades
     "vix_spike_pct":            0.20,   # 20% VIX spike in 1 hour = exit all
 
@@ -505,7 +511,7 @@ CONFIG = {
     # Canonical regime state names produced by the VIX-proxy detector.
     # Any function that produces or consumes regime strings must use only these values.
     # "UNKNOWN" is the safe fallback when data is unavailable.
-    "regime_states":            ("BULL_TRENDING", "BEAR_TRENDING", "CHOPPY", "PANIC", "UNKNOWN"),
+    "regime_states":            ("TRENDING_UP", "TRENDING_DOWN", "RELIEF_RALLY", "RANGE_BOUND", "CAPITULATION", "UNKNOWN"),
 
     # ── INVERSE ETFs FOR SHORT EXPOSURE ───────────────────────
     "inverse_etfs": {

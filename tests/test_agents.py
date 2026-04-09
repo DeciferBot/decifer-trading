@@ -55,7 +55,7 @@ pytestmark = pytest.mark.skipif(
 # ---------------------------------------------------------------------------
 
 _REGIME_BULL = {
-    "regime": "BULL_TRENDING",
+    "regime": "TRENDING_UP",
     "vix": 15.0,
     "vix_1h_change": 0.0,
     "spy_price": 500.0,
@@ -65,7 +65,7 @@ _REGIME_BULL = {
     "position_size_multiplier": 1.0,
 }
 
-_REGIME_PANIC = dict(_REGIME_BULL, regime="PANIC", vix=45.0)
+_REGIME_PANIC = dict(_REGIME_BULL, regime="CAPITULATION", vix=45.0)
 
 _AAPL_SIGNAL = {
     "symbol": "AAPL",

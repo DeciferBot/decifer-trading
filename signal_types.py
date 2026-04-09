@@ -33,7 +33,7 @@ class Signal:
     conviction_score: 0–10 float (raw engine score 0–50 divided by 5)
     dimension_scores: per-dimension breakdown {"trend": x, "momentum": y, ...} each 0–10
     timestamp       : UTC datetime when the signal was generated
-    regime_context  : market regime label at time of signal ("BULL_TRENDING" etc.)
+    regime_context  : market regime label at time of signal ("TRENDING_UP" etc.)
     source_agents   : list of agent IDs that agreed on this signal (populated post-agents)
     rationale       : human-readable summary from the agent layer (optional)
     price           : last price at scoring time (needed by dispatcher for order sizing)

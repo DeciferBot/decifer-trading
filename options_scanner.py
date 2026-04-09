@@ -434,11 +434,11 @@ def scan_options_universe(extra_symbols: list = None,
 
             # Regime-aware filtering
             # In a BULL regime, suppress weak put signals (noise > signal)
-            if regime_name == "BULL_TRENDING" and result["signal"] == "PUT_BUYER":
+            if regime_name == "TRENDING_UP" and result["signal"] == "PUT_BUYER":
                 if result["options_score"] < 20:
                     continue
             # In PANIC, ignore call-buyer signals — only hedging/put flow matters
-            if regime_name == "PANIC" and result["signal"] == "CALL_BUYER":
+            if regime_name == "CAPITULATION" and result["signal"] == "CALL_BUYER":
                 continue
 
             results.append(result)

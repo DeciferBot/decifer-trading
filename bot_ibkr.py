@@ -1124,6 +1124,43 @@ def sync_orders_from_ibkr():
         clog("ERROR", f"Order sync error: {e}")
 
 
+def cancel_orphan_stop_orders():
+    """
+    Cancel any open stop/stop-limit orders in IBKR that have no corresponding
+    active position. Runs once at startup after sync_orders_from_ibkr().
+    Protects against stale exit orders left over from a crashed session.
+    """
+    from orders import get_open_positions
+    ib = bot_state.ib
+    try:
+        active_symbols = {p["symbol"] for p in get_open_positions()}
+        cancelled = 0
+        for t in ib.openTrades():
+            order    = t.order
+            contract = t.contract
+            sym      = contract.symbol
+            otype    = (order.orderType or "").upper()
+            action   = (order.action or "").upper()
+            # Only target sell-side stop orders (STP, STP LMT, TRAIL) — these are exits
+            if otype not in ("STP", "STP LMT", "TRAIL", "TRAILLMT"):
+                continue
+            if action not in ("SELL",):
+                continue
+            if sym in active_symbols:
+                continue
+            # No position — this stop is orphaned
+            try:
+                ib.cancelOrder(order)
+                clog("WARNING", f"cancel_orphan_stop_orders: cancelled stale {otype} for {sym} (no active position)")
+                cancelled += 1
+            except Exception as exc:
+                clog("ERROR", f"cancel_orphan_stop_orders: failed to cancel {otype} for {sym} — {exc}")
+        if cancelled == 0:
+            clog("INFO", "cancel_orphan_stop_orders: no orphan stop orders found")
+    except Exception as exc:
+        clog("ERROR", f"cancel_orphan_stop_orders: {exc}")
+
+
 def _on_order_status_event(trade):
     """
     Real-time callback: fires whenever an order's status changes in IBKR.

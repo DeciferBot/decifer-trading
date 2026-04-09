@@ -171,8 +171,8 @@ def check_risk_conditions(portfolio_value: float, daily_pnl: float, regime: dict
         return False, dd_reason
 
     # ── Layer 5: Panic regime ─────────────────────────────────
-    if regime.get("regime") == "PANIC":
-        return False, "PANIC regime — VIX too high or spiking. No new trades."
+    if regime.get("regime") == "CAPITULATION":
+        return False, "CAPITULATION regime — VIX too high or spiking. No new trades."
 
     # ── Layer 5.5: PDT Rule (Pattern Day Trader) ──────────────
     pdt_cfg = CONFIG.get("pdt", {})
@@ -825,12 +825,13 @@ def set_session_opening_regime(regime_name: str) -> None:
 
 
 _SIGNIFICANT_REGIME_CHANGES = {
-    ("BULL_TRENDING", "BEAR_TRENDING"),
-    ("BULL_TRENDING", "CHOPPY"),
-    ("BULL_TRENDING", "PANIC"),
-    ("BEAR_TRENDING", "BULL_TRENDING"),
-    ("BEAR_TRENDING", "PANIC"),
-    ("CHOPPY",        "PANIC"),
+    ("TRENDING_UP",   "TRENDING_DOWN"),
+    ("TRENDING_UP",   "RELIEF_RALLY"),
+    ("TRENDING_UP",   "CAPITULATION"),
+    ("TRENDING_DOWN", "TRENDING_UP"),
+    ("TRENDING_DOWN", "CAPITULATION"),
+    ("RANGE_BOUND",   "CAPITULATION"),
+    ("RELIEF_RALLY",  "CAPITULATION"),
 }
 
 

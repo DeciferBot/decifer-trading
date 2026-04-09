@@ -234,6 +234,50 @@ def get_relevant_patterns(
         return []
 
 
+def get_thesis_performance(min_samples: int = 3) -> list[dict]:
+    """
+    Aggregate completed pattern outcomes by (trade_type, thesis_class).
+
+    Returns a list of dicts — one per combination that has at least
+    min_samples completed trades — sorted by count descending:
+        [{"trade_type": str, "thesis_class": str,
+          "count": int, "win_rate": float, "avg_pnl_pct": float}, ...]
+    """
+    try:
+        with _lock:
+            data = _load()
+
+        buckets: dict[tuple, dict] = {}
+        for r in data.values():
+            if r.get("pnl_pct") is None:
+                continue
+            key = (r.get("trade_type", "UNKNOWN"), r.get("thesis_class", "UNKNOWN"))
+            if key not in buckets:
+                buckets[key] = {"count": 0, "wins": 0, "pnl_pct_sum": 0.0}
+            buckets[key]["count"] += 1
+            buckets[key]["pnl_pct_sum"] += float(r["pnl_pct"])
+            if float(r["pnl_pct"]) > 0:
+                buckets[key]["wins"] += 1
+
+        result = []
+        for (trade_type, thesis_class), b in buckets.items():
+            if b["count"] < min_samples:
+                continue
+            result.append({
+                "trade_type":   trade_type,
+                "thesis_class": thesis_class,
+                "count":        b["count"],
+                "win_rate":     round(b["wins"] / b["count"], 3),
+                "avg_pnl_pct":  round(b["pnl_pct_sum"] / b["count"], 2),
+            })
+
+        return sorted(result, key=lambda x: x["count"], reverse=True)
+
+    except Exception as exc:
+        log.warning(f"pattern_library: get_thesis_performance failed: {exc}")
+        return []
+
+
 def get_summary_stats() -> dict:
     """
     High-level stats for dashboard / logging.

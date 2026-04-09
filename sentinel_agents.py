@@ -168,9 +168,9 @@ def agent_risk_gate(catalyst_report: str, trigger: dict,
     reg = regime.get("regime", "UNKNOWN")
     dir_upper = direction.upper()
     q3 = True
-    if reg == "PANIC":
+    if reg == "CAPITULATION":
         q3 = False
-    elif reg == "BEAR_TRENDING" and dir_upper == "BULLISH":
+    elif reg in ("TRENDING_DOWN", "RELIEF_RALLY") and dir_upper == "BULLISH":
         q3 = False
     lines.append(f"  3. Regime aligned with trade direction: {'YES' if q3 else 'NO'} ({reg} / {direction})")
 

@@ -116,7 +116,7 @@ def main():
     high_pairs = print_matrix(df, "ALL REGIMES", args.threshold)
 
     # --- Regime split ---
-    for regime in ["BULL_TRENDING", "BEAR_TRENDING", "CHOPPY", "NEUTRAL"]:
+    for regime in ["TRENDING_UP", "TRENDING_DOWN", "RELIEF_RALLY", "RANGE_BOUND"]:
         sub = df[df["regime"] == regime]
         if len(sub) >= 30:
             print_matrix(sub, regime, args.threshold)

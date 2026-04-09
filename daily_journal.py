@@ -145,12 +145,12 @@ def identify_patterns(today, cumulative):
         long_data = today["by_direction"]["LONG"]
         total = today["total"]
         long_pct = long_data["count"] / total * 100 if total else 0
-        bear_trades = today.get("by_regime", {}).get("BEAR_TRENDING", {}).get("count", 0)
+        bear_trades = today.get("by_regime", {}).get("TRENDING_DOWN", {}).get("count", 0)
         if long_pct > 75 and bear_trades > 0:
             patterns.append({
                 "type": "CRITICAL",
                 "name": "Long Bias in Bear Market",
-                "detail": f"{long_pct:.0f}% of trades were LONG but {bear_trades} trades occurred in BEAR_TRENDING regime. "
+                "detail": f"{long_pct:.0f}% of trades were LONG but {bear_trades} trades occurred in TRENDING_DOWN regime. "
                           f"Longs lost ${long_data['pnl']:+,.2f} today.",
                 "action": "Prioritize building direction-agnostic signals (roadmap #01) and short-candidate scanner (#02)."
             })

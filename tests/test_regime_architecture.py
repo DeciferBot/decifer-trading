@@ -51,7 +51,7 @@ def test_canonical_regime_states_declared_in_config():
     """config['regime_states'] must declare the full canonical state set."""
     states = REAL_CONFIG["regime_states"]
     assert isinstance(states, (tuple, list, frozenset))
-    required = {"BULL_TRENDING", "BEAR_TRENDING", "CHOPPY", "PANIC", "UNKNOWN"}
+    required = {"TRENDING_UP", "TRENDING_DOWN", "RELIEF_RALLY", "RANGE_BOUND", "CAPITULATION", "UNKNOWN"}
     assert required.issubset(set(states)), (
         f"Missing canonical regime states: {required - set(states)}"
     )

@@ -149,3 +149,40 @@ def fetch_bars(symbol: str, period: str = "60d",
     except Exception as exc:
         log.debug(f"fetch_bars: {symbol} {interval}/{period} failed — {exc}")
         return None
+
+
+def fetch_snapshots(symbols: list[str]) -> dict[str, dict]:
+    """
+    Fetch live price + 1-day change for a batch of symbols via Alpaca snapshots.
+
+    Returns:
+        {symbol: {"price": float, "change_1d": float}} for each symbol that
+        succeeded. Missing or failed symbols are simply absent from the dict.
+        Returns {} if Alpaca is unavailable.
+    """
+    if not symbols:
+        return {}
+    client = _get_client()
+    if client is None:
+        return {}
+
+    try:
+        from alpaca.data.requests import StockSnapshotRequest
+        request = StockSnapshotRequest(symbol_or_symbols=symbols, feed="sip")
+        raw = client.get_stock_snapshot(request)
+        result: dict[str, dict] = {}
+        for sym, snap in raw.items():
+            try:
+                price = float(snap.latest_trade.price)
+                prev_close = float(snap.daily_bar.previous_close) if snap.daily_bar and snap.daily_bar.previous_close else None
+                change_1d = ((price - prev_close) / prev_close) if prev_close else None
+                result[sym] = {"price": price, "change_1d": change_1d}
+            except Exception as exc:
+                log.debug(f"fetch_snapshots: parse failed for {sym} — {exc}")
+        return result
+    except ImportError:
+        log.debug("fetch_snapshots: alpaca-py not installed")
+        return {}
+    except Exception as exc:
+        log.debug(f"fetch_snapshots: batch request failed — {exc}")
+        return {}

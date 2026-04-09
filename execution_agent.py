@@ -163,10 +163,11 @@ def _determine_aggression(
 
     # 4. Regime
     regime_map = {
-        "PANIC":         "patient",
-        "CHOPPY":        "patient",
-        "BEAR_TRENDING": "normal",
-        "BULL_TRENDING": "normal",
+        "CAPITULATION":  "patient",
+        "RANGE_BOUND":   "patient",
+        "RELIEF_RALLY":  "patient",
+        "TRENDING_DOWN": "normal",
+        "TRENDING_UP":   "normal",
     }
     tiers.append(regime_map.get(regime_name, "normal"))
 
