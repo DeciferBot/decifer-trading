@@ -2781,7 +2781,7 @@ function renderNews(articles) {
   };
   const tickerBadge = (syms) => (syms||[]).map(sym => {
     const held = heldSyms.has(sym.toUpperCase());
-    return `<span class="news-ticker ${held?'held'}">${sym}${held?' ●':''}</span>`;
+    return `<span class="news-ticker ${held?'held':''}">${sym}${held?' ●':''}</span>`;
   }).join('');
   const watchLink = (syms) => (syms||[]).length
     ? `<button class="news-watch" onclick="watchFromNews(${JSON.stringify(syms||[])})">+ Watch</button>`
