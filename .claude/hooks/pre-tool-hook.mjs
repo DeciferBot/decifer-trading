@@ -95,6 +95,14 @@ function evaluate(hookData) {
         return { block: true, reason: rule.reason };
       }
     }
+
+    // Discipline gate: remind Claude of read-before-write rule on Python files
+    if (/\.py$/.test(path)) {
+      return {
+        warn: true,
+        warning: `DISCIPLINE GATE — editing ${path}\nBefore this edit you must have stated:\n  1. "I read [file] lines [X–Y]"\n  2. "Current implementation does: [...]"\n  3. "This change is safe because: [...]"\nIf you have not done this, stop and read the file first.`,
+      };
+    }
   }
 
   // Check file reads

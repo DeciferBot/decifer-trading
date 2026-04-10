@@ -152,6 +152,10 @@ class TestCandleGateAllowing:
         """When gate passes due to candle, the candle bonus is also in the score."""
         monkeypatch.setitem(_config_mod.CONFIG, "candle_required", True)
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "off")
+        # Pin equal IC weights so live data/ic_weights.json cannot push the base
+        # score to the 50-cap before the candle bonus is applied.
+        import ic_calculator as _ic
+        monkeypatch.setattr(_ic, "get_current_weights", lambda: _ic.EQUAL_WEIGHTS)
 
         no_candle = compute_confluence(
             _make_sig(signal="BUY", candle_bull=0), None, None)

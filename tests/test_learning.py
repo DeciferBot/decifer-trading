@@ -268,7 +268,7 @@ class TestTradeLogging:
         _clear_files()
 
     def _regime(self):
-        return {"regime": "BULL_TRENDING", "vix": 15.0}
+        return {"regime": "TRENDING_UP", "vix": 15.0}
 
     def _agents(self):
         return {"technical": "bullish", "macro": "neutral",
@@ -361,7 +361,7 @@ class TestSignalScanLogging:
             os.remove(self._TMP)
 
     def _regime(self):
-        return {"regime": "BEAR_TRENDING", "vix": 22.5}
+        return {"regime": "TRENDING_DOWN", "vix": 22.5}
 
     def _sig(self, symbol="AAPL", score=35, price=150.0):
         return {
@@ -581,7 +581,7 @@ class TestWeeklyReview:
             "pnl": 100,
             "exit_price": 155,
             "direction": "LONG",
-            "regime": "BULL_TRENDING",
+            "regime": "TRENDING_UP",
             "reasoning": "test",
         }
         with open("/tmp/test_trades.json", "w") as f:
@@ -602,7 +602,7 @@ class TestWeeklyReview:
             "exit_price": 260.0,
             "entry_price": 250.0,
             "direction": "LONG",
-            "regime": "BULL_TRENDING",
+            "regime": "TRENDING_UP",
             "reasoning": "good setup",
         }
         with open("/tmp/test_trades.json", "w") as f:

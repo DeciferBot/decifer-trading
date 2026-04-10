@@ -9,12 +9,13 @@
 
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
 
-# Canonical path for the typed signals audit log — single source of truth
-SIGNALS_LOG = "signals_log.jsonl"
+# Canonical path for the typed signals audit log — stored in data/, not root
+SIGNALS_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "signals_typed.jsonl")
 
 
 @dataclass
@@ -33,7 +34,7 @@ class Signal:
     conviction_score: 0–10 float (raw engine score 0–50 divided by 5)
     dimension_scores: per-dimension breakdown {"trend": x, "momentum": y, ...} each 0–10
     timestamp       : UTC datetime when the signal was generated
-    regime_context  : market regime label at time of signal ("BULL_TRENDING" etc.)
+    regime_context  : market regime label at time of signal ("TRENDING_UP" etc.)
     source_agents   : list of agent IDs that agreed on this signal (populated post-agents)
     rationale       : human-readable summary from the agent layer (optional)
     price           : last price at scoring time (needed by dispatcher for order sizing)
@@ -53,6 +54,7 @@ class Signal:
     atr: float = 0.0         # 5-minute ATR (bar noise — used for stop sizing)
     atr_daily: float = 0.0   # Daily ATR (session range — used by trade advisor for PT sizing)
     candle_gate: str = "UNKNOWN"
+    instrument: str = "stock"   # "stock", "fx", "option" — routes get_contract()
 
     def to_dict(self) -> dict:
         """Serialise to a JSON-safe dict (timestamp as ISO string)."""

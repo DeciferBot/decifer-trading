@@ -23,8 +23,9 @@ import risk
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-_BASE_KELLY     = CONFIG["vix_kelly"]["base_kelly"]      # 0.50
-_MAX_REDUCTION  = CONFIG["vix_kelly"]["max_reduction"]   # 0.80
+_VIX_KELLY      = CONFIG.get("vix_kelly", {"base_kelly": 0.50, "max_reduction": 0.80})
+_BASE_KELLY     = _VIX_KELLY["base_kelly"]               # 0.50
+_MAX_REDUCTION  = _VIX_KELLY["max_reduction"]            # 0.80
 _REGIME_NEUTRAL = {"position_size_multiplier": 1.0}
 
 

@@ -48,7 +48,7 @@ PRICE      = 50.0
 ATR        = 2.0          # typical ATR for a $50 stock; stop_dollars = 2.0 × 1.5 = $3.00
 SCORE_LOW  = 20           # → conviction_mult = 0.75
 SCORE_MID  = 32           # → conviction_mult = 1.0
-SCORE_HIGH = CONFIG["high_conviction_score"]  # → conviction_mult = 1.5
+SCORE_HIGH = CONFIG.get("high_conviction_score", 40)  # → conviction_mult = 1.5
 
 REGIME_NEUTRAL = {"position_size_multiplier": 1.0}
 REGIME_PANIC   = {"position_size_multiplier": 0.0}

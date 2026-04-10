@@ -61,6 +61,9 @@ def position_size(account_value: float, entry_price: float,
 
     Capped at max_position_size × account_value / entry_price.
     Returns 0 when entry_price == stop_price (zero stop distance).
+
+    Applies a macro-event size multiplier (default 0.5) when a FOMC, CPI,
+    or NFP event is within 24 hours — reducing exposure before high-vol events.
     """
     if config is None:
         config = CONFIG
@@ -77,6 +80,15 @@ def position_size(account_value: float, entry_price: float,
     if entry_price > 0:
         max_shares = int((account_value * max_pos_pct) / entry_price)
         shares = min(shares, max_shares)
+
+    # Macro-event gate: halve size within 24h of FOMC / CPI / NFP
+    try:
+        from macro_calendar import get_macro_size_multiplier
+        macro_mult = get_macro_size_multiplier()
+        if macro_mult < 1.0:
+            shares = int(shares * macro_mult)
+    except Exception:
+        pass  # fail-open: never block sizing on calendar errors
 
     return max(0, shares)
 

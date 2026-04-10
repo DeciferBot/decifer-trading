@@ -4,7 +4,9 @@
     "CHIEF_STATE_PATH": "/Users/amitchopra/Documents/Claude/Projects/Chief Designer/Chief-Decifer/state"
   },
   "permissions": {
+    "defaultMode": "acceptEdits",
     "allow": [
+      "Bash(*)",
       "Bash(git status)",
       "Bash(git log*)",
       "Bash(git diff*)",

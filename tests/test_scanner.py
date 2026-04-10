@@ -186,7 +186,7 @@ class TestScannerFilters:
         """TV unavailable → universe equals CORE + MOMENTUM_FALLBACK."""
         ib = MagicMock()
         with patch.object(scanner, "_TV_AVAILABLE", False):
-            result = scanner.get_dynamic_universe(ib, regime={"regime": "BULL_TRENDING"})
+            result = scanner.get_dynamic_universe(ib, regime={"regime": "TRENDING_UP"})
         assert set(result) == set(scanner.CORE_SYMBOLS) | set(scanner.MOMENTUM_FALLBACK)
 
     def test_empty_symbol_list_returns_empty(self, config):
@@ -195,7 +195,7 @@ class TestScannerFilters:
         with patch.object(scanner, "col", _FAKE_COL, create=True):
             with patch.object(scanner, "_TV_AVAILABLE", True):
                 with patch.object(scanner, "_query", side_effect=Exception("TV offline")):
-                    result = scanner.get_dynamic_universe(ib, regime={"regime": "BEAR_TRENDING"})
+                    result = scanner.get_dynamic_universe(ib, regime={"regime": "TRENDING_DOWN"})
         expected = set(scanner.CORE_SYMBOLS) | set(scanner.MOMENTUM_FALLBACK)
         assert set(result) == expected
 
@@ -225,7 +225,7 @@ class TestScannerRanking:
     """Tests get_market_regime regime classification via mocked _safe_download."""
 
     def test_rank_candidates_returns_sorted_list(self):
-        """Low VIX + SPY/QQQ above 200d MA → BULL_TRENDING."""
+        """Low VIX + SPY/QQQ above 200d MA → TRENDING_UP (renamed from BULL_TRENDING)."""
         scanner._last_good_regime = None  # clear state from prior tests
         ib = MagicMock()
         # Intraday prices: last value 510 is above the 200d MA (490)
@@ -248,10 +248,10 @@ class TestScannerRanking:
         with patch("scanner._regime_download", side_effect=mock_dl):
             with patch.dict(scanner.CONFIG, _VIX_CFG):
                 result = scanner.get_market_regime(ib)
-        assert result["regime"] == "BULL_TRENDING"
+        assert result["regime"] == "TRENDING_UP"
 
     def test_rank_empty_returns_empty(self):
-        """VIX above panic threshold → PANIC regardless of price action."""
+        """VIX above panic threshold → CAPITULATION (renamed from PANIC) regardless of price action."""
         ib = MagicMock()
         spy_df = _price_df(480.0)
         qqq_df = _price_df(390.0)
@@ -265,7 +265,7 @@ class TestScannerRanking:
         with patch("scanner._regime_download", side_effect=mock_dl):
             with patch.dict(scanner.CONFIG, _VIX_CFG):
                 result = scanner.get_market_regime(ib)
-        assert result["regime"] == "PANIC"
+        assert result["regime"] == "CAPITULATION"
 
     def test_rank_single_candidate_returns_one(self):
         """Regime result dict always contains all required output keys."""

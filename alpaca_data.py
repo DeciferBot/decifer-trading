@@ -149,3 +149,127 @@ def fetch_bars(symbol: str, period: str = "60d",
     except Exception as exc:
         log.debug(f"fetch_bars: {symbol} {interval}/{period} failed — {exc}")
         return None
+
+
+def fetch_snapshots(symbols: list[str]) -> dict[str, dict]:
+    """
+    Fetch live snapshots for a list of symbols in one API call.
+
+    Returns {symbol: {"price": float, "change_1d": float}} using the latest
+    trade price and today's day bar vs previous close. During market hours this
+    gives the true current price and intraday % change — not yesterday's close.
+
+    Symbols with no data are omitted from the result.
+    """
+    client = _get_client()
+    if client is None:
+        return {}
+    if not symbols:
+        return {}
+
+    try:
+        from alpaca.data.requests import StockSnapshotRequest
+
+        request = StockSnapshotRequest(symbol_or_symbols=symbols, feed="sip")
+        snapshots = client.get_stock_snapshot(request)
+
+        result: dict[str, dict] = {}
+        for sym, snap in snapshots.items():
+            try:
+                price = float(snap.latest_trade.price)
+                prev_close = float(snap.previous_daily_bar.close)
+                change_1d = ((price - prev_close) / prev_close * 100) if prev_close else 0.0
+                result[sym] = {"price": price, "change_1d": round(change_1d, 4)}
+            except Exception:
+                pass  # skip symbols where snapshot fields are incomplete
+        return result
+
+    except ImportError:
+        log.debug("fetch_snapshots: alpaca-py not installed")
+        return {}
+    except Exception as exc:
+        log.debug(f"fetch_snapshots: failed — {exc}")
+        return {}
+
+
+def fetch_bars_range(symbol: str, start, end,
+                     interval: str = "1d") -> "pd.DataFrame | None":
+    """
+    Fetch historical OHLCV bars for a specific date range from Alpaca REST.
+
+    Args:
+        symbol:   Ticker e.g. "AAPL"
+        start:    Start date (date, datetime, or ISO string — inclusive)
+        end:      End date (date, datetime, or ISO string — exclusive)
+        interval: Bar size: "1d", "1wk", "1h", "5m", "1m"
+
+    Returns:
+        DataFrame with columns [Open, High, Low, Close, Volume] and UTC
+        DatetimeIndex, or None if Alpaca is unavailable or request fails.
+    """
+    client = _get_client()
+    if client is None:
+        return None
+
+    try:
+        from alpaca.data.requests import StockBarsRequest
+        from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+        from datetime import date as _date
+
+        tf_map = {
+            "1d":  TimeFrame.Day,
+            "1wk": TimeFrame.Week,
+            "1h":  TimeFrame.Hour,
+            "5m":  TimeFrame(5,  TimeFrameUnit.Minute),
+            "1m":  TimeFrame.Minute,
+        }
+        tf = tf_map.get(interval)
+        if tf is None:
+            log.debug(f"fetch_bars_range: unsupported interval '{interval}'")
+            return None
+
+        def _to_dt(d):
+            if isinstance(d, datetime):
+                return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+            if isinstance(d, _date):
+                return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+            return datetime.fromisoformat(str(d)).replace(tzinfo=timezone.utc)
+
+        request = StockBarsRequest(
+            symbol_or_symbols=symbol,
+            timeframe=tf,
+            start=_to_dt(start),
+            end=_to_dt(end),
+            feed="sip",
+            adjustment="split",
+        )
+        bars = client.get_stock_bars(request)
+        df   = bars.df
+
+        if df is None or df.empty:
+            return None
+
+        if isinstance(df.index, pd.MultiIndex):
+            df = df.xs(symbol, level=0)
+
+        rename = {
+            "open":   "Open",
+            "high":   "High",
+            "low":    "Low",
+            "close":  "Close",
+            "volume": "Volume",
+        }
+        df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
+
+        if not isinstance(df.index, pd.DatetimeIndex):
+            df.index = pd.to_datetime(df.index)
+
+        cols = [c for c in ("Open", "High", "Low", "Close", "Volume") if c in df.columns]
+        return df[cols]
+
+    except ImportError:
+        log.debug("fetch_bars_range: alpaca-py not installed")
+        return None
+    except Exception as exc:
+        log.debug(f"fetch_bars_range: {symbol} {interval} {start}→{end} failed — {exc}")
+        return None

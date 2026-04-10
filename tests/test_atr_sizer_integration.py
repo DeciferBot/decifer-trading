@@ -59,7 +59,7 @@ from risk   import get_vix_rank            as _real_get_vix_rank            # no
 # ---------------------------------------------------------------------------
 
 _REGIME_BULL: dict = {
-    "regime":                  "BULL_TRENDING",
+    "regime":                  "TRENDING_UP",
     "position_size_multiplier": 1.0,
     "vix":                     15.0,
     "spy_price":               500.0,
@@ -151,7 +151,7 @@ def _run_execute_buy(
     base_patches = {
         "orders._get_ibkr_price":            MagicMock(return_value=price),
         "orders._get_ibkr_bid_ask":          MagicMock(return_value=(price - 0.1, price + 0.1)),
-        "orders._get_yf_price":              MagicMock(return_value=price),
+        "orders._get_alpaca_price":              MagicMock(return_value=price),
         "orders.get_tv_signal_cache":        MagicMock(return_value={}),
         "orders._is_duplicate_check_enabled": MagicMock(return_value=False),
         "orders.has_open_order_for":         MagicMock(return_value=False),
@@ -401,7 +401,7 @@ def _build_fw_patches(plan, fw_mock) -> dict:
         "orders.calculate_stops":             MagicMock(return_value=(_PRICE - 1, _PRICE + 2)),
         "orders._get_ibkr_price":             MagicMock(return_value=_PRICE),
         "orders._get_ibkr_bid_ask":           MagicMock(return_value=(_PRICE - 0.1, _PRICE + 0.1)),
-        "orders._get_yf_price":               MagicMock(return_value=_PRICE),
+        "orders._get_alpaca_price":               MagicMock(return_value=_PRICE),
         "orders.get_tv_signal_cache":         MagicMock(return_value={}),
         "orders._is_duplicate_check_enabled": MagicMock(return_value=False),
         "orders.has_open_order_for":          MagicMock(return_value=False),

@@ -45,7 +45,7 @@ def _make_trade(**kwargs):
         "symbol":      "AAPL",
         "direction":   "LONG",
         "score":       35,
-        "regime":      "BULL_TRENDING",
+        "regime":      "TRENDING_UP",
         "entry_time":  "2026-03-20 10:00:00",
         "exit_price":  155.0,
         "pnl":         500.0,
@@ -54,7 +54,7 @@ def _make_trade(**kwargs):
     return base
 
 
-def _make_record(direction="LONG", score=35, regime="BULL_TRENDING",
+def _make_record(direction="LONG", score=35, regime="TRENDING_UP",
                  returns=None):
     """Build a pre-computed decay record (as returned by compute_alpha_decay)."""
     fwd = returns or {1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005}
@@ -176,20 +176,25 @@ class TestGetAlphaDecayStats:
 
     def _mock_records(self):
         return [
-            _make_record(direction="LONG", score=40, regime="BULL_TRENDING",
+            _make_record(direction="LONG", score=40, regime="TRENDING_UP",
                          returns={1: 0.02, 3: 0.03, 5: 0.025, 10: 0.01}),
-            _make_record(direction="LONG", score=30, regime="BULL_TRENDING",
+            _make_record(direction="LONG", score=30, regime="TRENDING_UP",
                          returns={1: 0.01, 3: 0.015, 5: 0.01, 10: -0.005}),
-            _make_record(direction="SHORT", score=42, regime="BEAR_TRENDING",
+            _make_record(direction="SHORT", score=42, regime="TRENDING_DOWN",
                          returns={1: -0.02, 3: -0.03, 5: -0.025, 10: -0.01}),
-            _make_record(direction="LONG", score=25, regime="CHOPPY",
+            _make_record(direction="LONG", score=25, regime="RANGE_BOUND",
                          returns={1: -0.005, 3: -0.01, 5: -0.015, 10: -0.02}),
         ]
 
-    def test_output_shape(self):
+    def _patched_stats(self):
+        """Run get_alpha_decay_stats with mocked compute_alpha_decay and no cache."""
         with patch.object(alpha_decay, "compute_alpha_decay",
-                          return_value=self._mock_records()):
-            stats = get_alpha_decay_stats()
+                          return_value=self._mock_records()), \
+             patch.object(alpha_decay, "_load_cache", return_value=None):
+            return get_alpha_decay_stats()
+
+    def test_output_shape(self):
+        stats = self._patched_stats()
 
         assert "horizons" in stats
         assert "groups" in stats
@@ -199,9 +204,7 @@ class TestGetAlphaDecayStats:
         assert stats["trade_count"] == 4
 
     def test_all_expected_groups_present(self):
-        with patch.object(alpha_decay, "compute_alpha_decay",
-                          return_value=self._mock_records()):
-            stats = get_alpha_decay_stats()
+        stats = self._patched_stats()
 
         groups = stats["groups"]
         for g in ("all", "high_score", "low_score", "bull", "bear",
@@ -209,23 +212,19 @@ class TestGetAlphaDecayStats:
             assert g in groups, f"Missing group: {g}"
 
     def test_group_counts(self):
-        with patch.object(alpha_decay, "compute_alpha_decay",
-                          return_value=self._mock_records()):
-            stats = get_alpha_decay_stats()
+        stats = self._patched_stats()
 
         g = stats["groups"]
         assert g["all"]["n"]        == 4
         assert g["high_score"]["n"] == 2  # score 40, 42
         assert g["low_score"]["n"]  == 2  # score 30, 25
-        assert g["bull"]["n"]       == 2  # BULL_TRENDING × 2
-        assert g["bear"]["n"]       == 1  # BEAR_TRENDING × 1
+        assert g["bull"]["n"]       == 2  # TRENDING_UP × 2
+        assert g["bear"]["n"]       == 1  # TRENDING_DOWN × 1
         assert g["long_only"]["n"]  == 3
         assert g["short_only"]["n"] == 1
 
     def test_optimal_horizon_is_set(self):
-        with patch.object(alpha_decay, "compute_alpha_decay",
-                          return_value=self._mock_records()):
-            stats = get_alpha_decay_stats()
+        stats = self._patched_stats()
 
         # Should be one of the configured horizons
         assert stats["optimal_horizon"] in HORIZONS

@@ -82,10 +82,12 @@ def _apply_tv_prefilter(universe: list, tv_cache: dict, favourites: list) -> lis
 
     pre_universe = len(universe)
     ranked = []
+    rejected = {"no_tv_data": 0, "price": 0, "rec": 0, "rel_vol": 0, "rsi_dead": 0, "flat": 0, "no_structure": 0}
 
     for sym in universe:
         tv = tv_cache.get(sym)
         if not tv:
+            rejected["no_tv_data"] += 1
             continue  # No TV data → skip (CORE_SYMBOLS without TV hits)
 
         close   = tv.get("tv_close")
@@ -101,14 +103,19 @@ def _apply_tv_prefilter(universe: list, tv_cache: dict, favourites: list) -> lis
 
         # ── Hard kills — no edge, don't waste yfinance calls ──────────────
         if close is None or close <= 0:
+            rejected["price"] += 1
             continue
         if rec is None or abs(rec) < 0.05:
+            rejected["rec"] += 1
             continue  # Dead neutral
         if rel_vol is not None and rel_vol < 0.5:
+            rejected["rel_vol"] += 1
             continue  # Very low volume
         if rsi is not None and 47 < rsi < 53:
+            rejected["rsi_dead"] += 1
             continue  # RSI dead zone
         if change is not None and abs(change) < 0.1:
+            rejected["flat"] += 1
             continue  # Truly flat
 
         # ── EMA alignment — need some trend structure ──────────────────────
@@ -125,6 +132,7 @@ def _apply_tv_prefilter(universe: list, tv_cache: dict, favourites: list) -> lis
         )
 
         if not ema_aligned and not macd_thrust:
+            rejected["no_structure"] += 1
             continue
 
         # ── Rank score: |signal| × unusual volume, VWAP-confirmed ─────────
@@ -156,9 +164,10 @@ def _apply_tv_prefilter(universe: list, tv_cache: dict, favourites: list) -> lis
         result = list(set(result) | missed_core)
         log.info(f"CORE_SYMBOLS preserved through TV pre-filter: {sorted(missed_core)}")
 
+    kills_summary = ", ".join(f"{k}={v}" for k, v in rejected.items() if v > 0)
     log.info(
         f"TV pre-filter: {pre_universe} → {len(result)} symbols "
-        f"(top by |signal| × rel_vol, VWAP-confirmed)"
+        f"(top by |signal| × rel_vol, VWAP-confirmed) | kills: {kills_summary}"
     )
     return result
 
@@ -284,7 +293,6 @@ def _apply_strategy_threshold(
     return scored
 
 
-_SHORT_QUALITY_MIN_SCORE = 28   # raised bar for shorts when IC is unproven (vs 18 for longs)
 _SHORT_IC_PROVEN_THRESHOLD = 0.03  # IC quality score above which shorts are treated equally
 
 
@@ -293,16 +301,11 @@ def _apply_short_quality_gate(scored: list, regime_name: str) -> list:
     Gate SHORT-direction signals when short IC is unproven.
 
     When get_short_quality_score() < _SHORT_IC_PROVEN_THRESHOLD (not yet proven),
-    require SHORT signals to have score >= _SHORT_QUALITY_MIN_SCORE (28) instead of
-    the standard 18. This prevents the system from taking short positions before the
-    IC data confirms that the signal engine has edge on the short side.
+    require SHORT signals to have score >= min_score_to_trade (same floor as longs).
+    This removes the previous asymmetry where shorts needed 20 while longs needed 14,
+    which created a circular trap: shorts couldn't trade → short IC stayed at 0.0.
 
-    Regime context: in BULL_TRENDING regimes, shorts are naturally harder — this gate
-    is applied regardless of regime but the threshold could be tightened further in
-    future versions.
-
-    Does NOT block shorts entirely. Proven shorts (IC >= threshold) or high-conviction
-    shorts (score >= 28) still pass.
+    Once short IC is proven (>= _SHORT_IC_PROVEN_THRESHOLD), the gate relaxes entirely.
     """
     try:
         from ic_calculator import get_short_quality_score
@@ -315,13 +318,16 @@ def _apply_short_quality_gate(scored: list, regime_name: str) -> list:
         log.debug(f"Short quality gate: IC proven (quality={short_quality:.3f}) — no extra filter")
         return scored
 
+    from config import CONFIG as _cfg
+    short_min = _cfg.get("min_score_to_trade", 14)  # Match the long floor — no asymmetry
+
     pre = len(scored)
     result = []
     for s in scored:
-        if s.get("direction") == "SHORT" and s.get("score", 0) < _SHORT_QUALITY_MIN_SCORE:
+        if s.get("direction") == "SHORT" and s.get("score", 0) < short_min:
             log.info(
                 f"Short quality gate: {s['symbol']} score={s['score']}/50 below "
-                f"SHORT threshold {_SHORT_QUALITY_MIN_SCORE} "
+                f"SHORT threshold {short_min} "
                 f"(IC_short unproven: quality={short_quality:.3f})"
             )
             continue
@@ -355,6 +361,7 @@ def _scored_to_signals(scored: list, regime_name: str) -> list:
             atr=s.get("atr", 0.0),
             atr_daily=s.get("atr_daily", 0.0),
             candle_gate=s.get("candle_gate", "UNKNOWN"),
+            instrument=s.get("instrument", "stock"),
         ))
     return signals
 
@@ -423,6 +430,16 @@ def run_signal_pipeline(
     filtered = _apply_tv_prefilter(universe, tv_cache, favourites)
     log.info(f"Universe after TV pre-filter: {len(filtered)} symbols")
 
+    # 1b. Sympathy scanner — add sector peers when a leader has earnings within 48h
+    try:
+        from sympathy_scanner import get_sympathy_candidates
+        sympathy_peers = get_sympathy_candidates(filtered)
+        if sympathy_peers:
+            filtered = filtered + sympathy_peers
+            log.info("Sympathy scanner: %d peer(s) added to universe", len(sympathy_peers))
+    except Exception as _sy_e:
+        log.debug("Sympathy scanner skipped: %s", _sy_e)
+
     # 2. News sentiment (always)
     log.info("Fetching news sentiment (Yahoo RSS + keyword scoring)...")
     news_sentiment = _fetch_news(filtered)
@@ -474,6 +491,22 @@ def run_signal_pipeline(
                 log.info(f"Small cap track: {len(sc_above)} new candidates above {sc_threshold}/50")
     except Exception as _sc_e:
         log.debug(f"Small cap track skipped: {_sc_e}")
+
+    # 4c. FX track — score major currency pairs (disabled by default)
+    try:
+        from config import CONFIG as _cfg
+        if _cfg.get("fx_enabled", False):
+            from fx_signals import score_fx_universe
+            fx_scored = score_fx_universe(regime)
+            if fx_scored:
+                existing_syms = {s["symbol"] for s in scored}
+                new_fx = [s for s in fx_scored if s["symbol"] not in existing_syms]
+                scored.extend(new_fx)
+                new_fx_all = [s for s in fx_scored if s["symbol"] not in {x["symbol"] for x in all_scored}]
+                all_scored.extend(new_fx_all)
+                log.info("FX track: %d pair(s) above threshold", len(new_fx))
+    except Exception as _fx_e:
+        log.debug("FX track skipped: %s", _fx_e)
 
     # 5. Strategy-mode threshold adjustment
     scored = _apply_strategy_threshold(scored, strategy_mode, regime_name)

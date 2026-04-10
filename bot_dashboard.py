@@ -7,11 +7,15 @@ Covers: DashHandler(BaseHTTPRequestHandler) and start_dashboard().
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import os
 import sys
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
+import websockets
 
 from config import CONFIG
 import bot_state
@@ -23,10 +27,159 @@ from bot_trading import run_scan
 
 log = logging.getLogger("decifer.bot")
 
-# ── News API cache ────────────────────────────────────────────────────────────
+# ── Caches ───────────────────────────────────────────────────────────────────
 import time as _time
+
 _news_payload_cache: dict = {"data": None, "fetched_at": 0.0}
 _NEWS_CACHE_TTL = 60  # seconds
+
+# Mtime-based: only re-read when the file actually changes.
+# _build_state_payload() is called every 1s by the WS pusher so this matters.
+_state_file_cache: dict = {
+    "last_decision":        None,
+    "last_decision_mtime":  -1.0,
+    "decision_history":     [],
+    "history_mtime":        -1.0,
+}
+
+_sectors_cache: dict    = {"data": None, "fetched_at": 0.0}
+_SECTORS_CACHE_TTL      = 30  # seconds
+
+_thesis_cache: dict     = {"data": None, "fetched_at": 0.0}
+_THESIS_CACHE_TTL       = 30  # seconds
+
+_DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# ── WebSocket server ──────────────────────────────────────────────────────────
+_ws_loop: asyncio.AbstractEventLoop | None = None
+_ws_clients: set = set()
+
+
+async def _ws_handler(websocket):
+    _ws_clients.add(websocket)
+    try:
+        await websocket.wait_closed()
+    finally:
+        _ws_clients.discard(websocket)
+
+
+async def _ws_state_pusher():
+    while True:
+        await asyncio.sleep(1)
+        if not _ws_clients:
+            continue
+        try:
+            payload = json.dumps(_build_state_payload())
+            dead = set()
+            for ws in list(_ws_clients):
+                try:
+                    await ws.send(payload)
+                except Exception:
+                    dead.add(ws)
+            _ws_clients.difference_update(dead)
+        except Exception as exc:
+            log.debug("WS push error: %s", exc)
+
+
+async def _run_ws_server(port: int):
+    async with websockets.serve(_ws_handler, "", port):
+        await _ws_state_pusher()
+
+
+def _start_ws_thread(port: int):
+    global _ws_loop
+    _ws_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(_ws_loop)
+    _ws_loop.run_until_complete(_run_ws_server(port))
+
+
+def _build_state_payload() -> dict:
+    """Build the state dict served by /api/state and pushed over WebSocket."""
+    state = dict(dash)
+    from learning import get_effective_capital
+    eff_cap = get_effective_capital()
+    state["effective_capital"] = eff_cap
+    state["account_details"] = get_account_details()
+    if state.get("performance"):
+        state["performance"] = dict(state["performance"])
+        state["performance"]["total_pnl"] = round(state.get("portfolio_value", 0) - eff_cap, 2)
+    try:
+        regime_name = (state.get("regime") or {}).get("regime", "UNKNOWN")
+        from learning import get_directional_skew
+        state["skew"] = {
+            "48h": get_directional_skew(window_hours=48, regime=regime_name),
+            "7d":  get_directional_skew(window_hours=168, regime=regime_name),
+        }
+    except Exception:
+        state["skew"] = None
+    state["last_decision"]    = _read_last_decision()
+    state["decision_history"] = _read_decision_history()
+    try:
+        from risk import get_consecutive_losses
+        state["consecutive_losses"] = get_consecutive_losses()
+    except Exception:
+        state["consecutive_losses"] = 0
+    state["settings"] = {
+        "risk_pct_per_trade":           CONFIG.get("risk_pct_per_trade", 0.04),
+        "daily_loss_limit":             CONFIG.get("daily_loss_limit", 0.06),
+        "max_positions":                CONFIG.get("max_positions", 12),
+        "min_cash_reserve":             CONFIG.get("min_cash_reserve", 0.10),
+        "max_single_position":          CONFIG.get("max_single_position", 0.15),
+        "min_score_to_trade":           CONFIG.get("min_score_to_trade", 28),
+        "high_conviction_score":        CONFIG.get("high_conviction_score", 38),
+        "agents_required_to_agree":     CONFIG.get("agents_required_to_agree", 3),
+        "max_consecutive_losses":       CONFIG.get("consecutive_loss_pause", 5),
+        "options_min_score":            CONFIG.get("options_min_score", 35),
+        "options_max_risk_pct":         CONFIG.get("options_max_risk_pct", 0.025),
+        "options_max_ivr":              CONFIG.get("options_max_ivr", 65),
+        "options_target_delta":         CONFIG.get("options_target_delta", 0.50),
+        "options_delta_range":          CONFIG.get("options_delta_range", 0.35),
+        "options_dte_min":              CONFIG.get("iv_skew", {}).get("dte_min", 7),
+        "options_dte_max":              CONFIG.get("iv_skew", {}).get("dte_max", 60),
+        "sentinel_enabled":             CONFIG.get("sentinel_enabled", True),
+        "sentinel_poll_seconds":        CONFIG.get("sentinel_poll_seconds", 45),
+        "sentinel_cooldown_minutes":    CONFIG.get("sentinel_cooldown_minutes", 10),
+        "sentinel_max_trades_per_hour": CONFIG.get("sentinel_max_trades_per_hour", 3),
+        "sentinel_risk_multiplier":     CONFIG.get("sentinel_risk_multiplier", 0.75),
+        "sentinel_keyword_threshold":   CONFIG.get("sentinel_keyword_threshold", 3),
+        "sentinel_min_confidence":      CONFIG.get("sentinel_min_confidence", 5),
+        "sentinel_use_ibkr":            CONFIG.get("sentinel_use_ibkr", True),
+        "sentinel_use_finviz":          CONFIG.get("sentinel_use_finviz", True),
+    }
+    return state
+
+
+def _read_last_decision() -> dict | None:
+    """Read last_decision.json; returns cached value when mtime is unchanged."""
+    path = os.path.join(_DATA_DIR, "data", "last_decision.json")
+    try:
+        mtime = os.path.getmtime(path)
+        if mtime == _state_file_cache["last_decision_mtime"]:
+            return _state_file_cache["last_decision"]
+        with open(path) as f:
+            data = json.load(f)
+        _state_file_cache["last_decision"]       = data
+        _state_file_cache["last_decision_mtime"] = mtime
+        return data
+    except Exception:
+        return None
+
+
+def _read_decision_history() -> list:
+    """Read last 50 entries from decision_history.jsonl; cached by mtime."""
+    path = os.path.join(_DATA_DIR, "data", "decision_history.jsonl")
+    try:
+        mtime = os.path.getmtime(path)
+        if mtime == _state_file_cache["history_mtime"]:
+            return _state_file_cache["decision_history"]
+        with open(path) as f:
+            lines = [ln.strip() for ln in f if ln.strip()]
+        data = [json.loads(ln) for ln in lines[-50:]]
+        _state_file_cache["decision_history"] = data
+        _state_file_cache["history_mtime"]    = mtime
+        return data
+    except Exception:
+        return []
 
 
 def _fetch_alpaca_news() -> list[dict]:
@@ -48,7 +201,12 @@ def _fetch_alpaca_news() -> list[dict]:
             include_content=False,
         )
         response = client.get_news(req)
-        raw_articles = response.news if hasattr(response, "news") else list(response)
+        # NewsSet iterates as ('data', {'news': [News, ...]}) tuples
+        # Other tuples like ('next_page_token', None) must be skipped
+        raw_articles = []
+        for _key, _val in response:
+            if isinstance(_val, dict):
+                raw_articles.extend(_val.get("news", []))
 
         result = []
         now = datetime.now(_tz.utc)
@@ -167,79 +325,7 @@ class DashHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
-            # Include current settings so dashboard form can show live values
-            state = dict(dash)
-            # Total P&L = NetLiquidation - effective capital (starting + deposits - withdrawals)
-            from learning import get_effective_capital
-            eff_cap = get_effective_capital()
-            state["effective_capital"] = eff_cap
-            # Extended account metrics for KPI row
-            state["account_details"] = get_account_details()
-            if state.get("performance"):
-                state["performance"] = dict(state["performance"])
-                state["performance"]["total_pnl"] = round(state.get("portfolio_value", 0) - eff_cap, 2)
-            # Directional skew (roadmap #07)
-            try:
-                regime_name = (state.get("regime") or {}).get("regime", "UNKNOWN")
-                from learning import get_directional_skew
-                state["skew"] = {
-                    "48h": get_directional_skew(window_hours=48, regime=regime_name),
-                    "7d":  get_directional_skew(window_hours=168, regime=regime_name),
-                }
-            except Exception:
-                state["skew"] = None
-            # Last decision — for trade card on home page
-            try:
-                import os as _os
-                _ld_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
-                                         "data", "last_decision.json")
-                if _os.path.exists(_ld_path):
-                    with open(_ld_path) as _ldf:
-                        state["last_decision"] = json.load(_ldf)
-                else:
-                    state["last_decision"] = None
-            except Exception:
-                state["last_decision"] = None
-            # Decision history — last 50 entries for trade card navigation
-            try:
-                _hist_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
-                                           "data", "decision_history.jsonl")
-                if _os.path.exists(_hist_path):
-                    with open(_hist_path) as _hf:
-                        _lines = [l.strip() for l in _hf if l.strip()]
-                        state["decision_history"] = [json.loads(l) for l in _lines[-50:]]
-                else:
-                    state["decision_history"] = []
-            except Exception:
-                state["decision_history"] = []
-            state["settings"] = {
-                "risk_pct_per_trade":       CONFIG.get("risk_pct_per_trade", 0.04),
-                "daily_loss_limit":         CONFIG.get("daily_loss_limit", 0.06),
-                "max_positions":            CONFIG.get("max_positions", 12),
-                "min_cash_reserve":         CONFIG.get("min_cash_reserve", 0.10),
-                "max_single_position":      CONFIG.get("max_single_position", 0.15),
-                "min_score_to_trade":       CONFIG.get("min_score_to_trade", 28),
-                "high_conviction_score":    CONFIG.get("high_conviction_score", 38),
-                "agents_required_to_agree": CONFIG.get("agents_required_to_agree", 3),
-                "options_min_score":        CONFIG.get("options_min_score", 35),
-                "options_max_risk_pct":     CONFIG.get("options_max_risk_pct", 0.025),
-                "options_max_ivr":          CONFIG.get("options_max_ivr", 65),
-                "options_target_delta":     CONFIG.get("options_target_delta", 0.50),
-                "options_delta_range":      CONFIG.get("options_delta_range", 0.35),
-                "options_dte_min":          CONFIG.get("iv_skew", {}).get("dte_min", 7),
-                "options_dte_max":          CONFIG.get("iv_skew", {}).get("dte_max", 60),
-                # Sentinel settings
-                "sentinel_enabled":             CONFIG.get("sentinel_enabled", True),
-                "sentinel_poll_seconds":        CONFIG.get("sentinel_poll_seconds", 45),
-                "sentinel_cooldown_minutes":    CONFIG.get("sentinel_cooldown_minutes", 10),
-                "sentinel_max_trades_per_hour": CONFIG.get("sentinel_max_trades_per_hour", 3),
-                "sentinel_risk_multiplier":     CONFIG.get("sentinel_risk_multiplier", 0.75),
-                "sentinel_keyword_threshold":   CONFIG.get("sentinel_keyword_threshold", 3),
-                "sentinel_min_confidence":      CONFIG.get("sentinel_min_confidence", 5),
-                "sentinel_use_ibkr":            CONFIG.get("sentinel_use_ibkr", True),
-                "sentinel_use_finviz":          CONFIG.get("sentinel_use_finviz", True),
-            }
-            self.wfile.write(json.dumps(state).encode())
+            self.wfile.write(json.dumps(_build_state_payload()).encode())
         elif self.path == "/api/favourites":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -254,20 +340,18 @@ class DashHandler(BaseHTTPRequestHandler):
                 from ic_calculator import (
                     get_current_weights, get_ic_weight_history, EQUAL_WEIGHTS,
                 )
-                import json as _json, os as _os
                 weights = get_current_weights()
                 history = get_ic_weight_history(last_n=4)
                 # Read raw_ic and metadata from cache file if available
-                _wf = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
-                                    "data", "ic_weights.json")
+                _wf = os.path.join(_DATA_DIR, "data", "ic_weights.json")
                 raw_ic = {}
                 updated = None
                 n_records = 0
                 using_equal = True
-                if _os.path.exists(_wf):
+                if os.path.exists(_wf):
                     try:
                         with open(_wf) as _f:
-                            _d = _json.load(_f)
+                            _d = json.load(_f)
                         raw_ic      = _d.get("raw_ic", {})
                         updated     = _d.get("updated")
                         n_records   = _d.get("n_records", 0)
@@ -327,13 +411,19 @@ class DashHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
-            try:
-                from pattern_library import get_thesis_performance
-                rows = get_thesis_performance(min_samples=3)
-                payload = {"rows": rows}
-            except Exception as exc:
-                log.warning("thesis_performance error: %s", exc)
-                payload = {"error": str(exc), "rows": []}
+            now = _time.time()
+            if _thesis_cache["data"] and now - _thesis_cache["fetched_at"] < _THESIS_CACHE_TTL:
+                payload = _thesis_cache["data"]
+            else:
+                try:
+                    from pattern_library import get_thesis_performance
+                    rows = get_thesis_performance(min_samples=3)
+                    payload = {"rows": rows}
+                except Exception as exc:
+                    log.warning("thesis_performance error: %s", exc)
+                    payload = {"error": str(exc), "rows": []}
+                _thesis_cache["data"]       = payload
+                _thesis_cache["fetched_at"] = now
             self.wfile.write(json.dumps(payload).encode())
         elif self.path == "/api/news":
             self.send_response(200)
@@ -364,32 +454,57 @@ class DashHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
-            try:
-                from scanner import get_sector_rotation_bias, _SECTOR_ETFS
-                from alpha_vantage_client import get_sector_performance
-                bias = get_sector_rotation_bias()
-                av_perf = get_sector_performance()
-                payload = {
-                    "leaders":  [
-                        {"etf": etf, "name": _SECTOR_ETFS.get(etf, etf), "rs_5d": round(rs, 2)}
-                        for etf, rs in bias.get("ranked", [])[:3]
-                    ] if bias.get("available") else [],
-                    "laggards": [
-                        {"etf": etf, "name": _SECTOR_ETFS.get(etf, etf), "rs_5d": round(rs, 2)}
-                        for etf, rs in bias.get("ranked", [])[-3:][::-1]
-                    ] if bias.get("available") else [],
-                    "ranked": [
-                        {"etf": etf, "name": _SECTOR_ETFS.get(etf, etf), "rs_5d": round(rs, 2)}
-                        for etf, rs in bias.get("ranked", [])
-                    ] if bias.get("available") else [],
-                    "available": bias.get("available", False),
-                    "av_performance": av_perf,
-                    "updated": dash.get("last_scan"),
-                }
-            except Exception as exc:
-                log.warning("sectors error: %s", exc)
-                payload = {"error": str(exc), "leaders": [], "laggards": [], "ranked": [],
-                           "available": False, "av_performance": {}}
+            now = _time.time()
+            if _sectors_cache["data"] and now - _sectors_cache["fetched_at"] < _SECTORS_CACHE_TTL:
+                payload = _sectors_cache["data"]
+            else:
+                try:
+                    from scanner import get_sector_rotation_bias, _SECTOR_ETFS
+                    from alpha_vantage_client import get_sector_performance
+                    bias = get_sector_rotation_bias()
+                    av_perf = get_sector_performance()
+                    payload = {
+                        "leaders":  [
+                            {"etf": etf, "name": _SECTOR_ETFS.get(etf, etf), "rs_5d": round(rs, 2)}
+                            for etf, rs in bias.get("ranked", [])[:3]
+                        ] if bias.get("available") else [],
+                        "laggards": [
+                            {"etf": etf, "name": _SECTOR_ETFS.get(etf, etf), "rs_5d": round(rs, 2)}
+                            for etf, rs in bias.get("ranked", [])[-3:][::-1]
+                        ] if bias.get("available") else [],
+                        "ranked": [
+                            {"etf": etf, "name": _SECTOR_ETFS.get(etf, etf), "rs_5d": round(rs, 2)}
+                            for etf, rs in bias.get("ranked", [])
+                        ] if bias.get("available") else [],
+                        "available": bias.get("available", False),
+                        "av_performance": av_perf,
+                        "updated": dash.get("last_scan"),
+                    }
+                except Exception as exc:
+                    log.warning("sectors error: %s", exc)
+                    payload = {"error": str(exc), "leaders": [], "laggards": [], "ranked": [],
+                               "available": False, "av_performance": {}}
+                _sectors_cache["data"]       = payload
+                _sectors_cache["fetched_at"] = now
+            self.wfile.write(json.dumps(payload).encode())
+        elif self.path == "/api/config":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            payload = {
+                "ic_dimensions":          CONFIG.get("ic_dimensions", []),
+                "conviction_high":        CONFIG.get("conviction_high_threshold", 38),
+                "conviction_mid":         CONFIG.get("conviction_mid_threshold", 28),
+                "fx_pairs":               CONFIG.get("fx_pairs", []),
+                "regime_descriptions":    CONFIG.get("regime_descriptions", {}),
+                "exit_labels":            CONFIG.get("exit_labels", {}),
+                "exit_descriptions":      CONFIG.get("exit_descriptions", {}),
+                "ws_port":                CONFIG.get("ws_port", 8182),
+                "agents_required":        CONFIG.get("agents_required_to_agree", 2),
+                "max_positions":          CONFIG.get("max_positions", 15),
+                "scan_interval_seconds":  CONFIG.get("scan_interval_prime", 3) * 60,
+            }
             self.wfile.write(json.dumps(payload).encode())
         elif self.path == "/api/dimensions":
             self.send_response(200)
@@ -408,17 +523,6 @@ class DashHandler(BaseHTTPRequestHandler):
                 {"key": "reversion",  "label": "Reversion",   "description": "Mean-reversion opportunity (RSI extremes, Bollinger bands)"},
             ]}
             self.wfile.write(json.dumps(payload).encode())
-        elif self.path == "/v2":
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html")
-            self.end_headers()
-            try:
-                from dashboard_v2 import DASHBOARD_HTML_V2 as _html_v2
-                html = _html_v2
-            except Exception:
-                _bot = sys.modules.get("bot")
-                html = (getattr(_bot, "DASHBOARD_HTML_V2", None) if _bot else None) or "<h1>Dashboard v2 not loaded yet</h1>"
-            self.wfile.write(html.encode())
         else:
             self.send_response(404)
             self.end_headers()
@@ -490,7 +594,6 @@ class DashHandler(BaseHTTPRequestHandler):
                     cancelled = cancel_order_by_id(ib, order_id)
                     if cancelled:
                         clog("TRADE", f"❌ Cancelled order #{order_id} via dashboard")
-                    if cancelled:
                         # Update orders.json
                         from learning import update_order_status
                         update_order_status(order_id, "CANCELLED")
@@ -606,4 +709,7 @@ class DashHandler(BaseHTTPRequestHandler):
 def start_dashboard():
     server = HTTPServer(("", CONFIG["dashboard_port"]), DashHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
+    ws_port = CONFIG.get("ws_port", 8182)
+    threading.Thread(target=_start_ws_thread, args=(ws_port,), daemon=True).start()
     clog("INFO", f"Dashboard live → http://localhost:{CONFIG['dashboard_port']}")
+    clog("INFO", f"WebSocket live → ws://localhost:{ws_port}")

@@ -899,13 +899,13 @@ class TestEdgeCases:
     @patch('orders.get_tv_signal_cache')
     @patch('orders._get_alpaca_price')
     @patch('orders.log_order')
-    def test_execute_buy_qty_capped_at_5000(
+    def test_execute_buy_qty_capped_at_20pct_portfolio(
         self, mock_log_order, mock_yf_price, mock_tv_cache,
         mock_sector, mock_exposure, mock_correlation,
         mock_stops, mock_position_size, mock_config_obj,
         mock_config, mock_ib
     ):
-        """execute_buy should cap qty at 5000 shares."""
+        """execute_buy should cap order value at 20% of portfolio (no fixed share cap)."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
 
@@ -915,7 +915,7 @@ class TestEdgeCases:
         mock_exposure.return_value = (True, "OK")
         mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (95.0, 115.0)  # Reasonable stops for $100 price
-        mock_position_size.return_value = 10000  # Exceeds 5000 hard cap
+        mock_position_size.return_value = 10000  # Large qty
 
         result = orders.execute_buy(
             ib=mock_ib,
@@ -923,13 +923,13 @@ class TestEdgeCases:
             price=100.0,  # Must match IBKR mock price to avoid contamination check
             atr=2.0,
             score=30,
-            portfolio_value=5_000_000,  # Very large portfolio to avoid 20% cap conflict
+            portfolio_value=5_000_000,  # 20% cap = $1M → 10000 shares * $100 = $1M, fits
             regime={"regime": "bull"},
         )
 
-        # Should still succeed but qty should be capped at 5000
+        # 10000 shares * $100 = $1M = exactly 20% of $5M — should succeed
         assert result is True
-        assert orders.open_trades["CHEAP"]["qty"] <= 5000
+        assert orders.open_trades["CHEAP"]["qty"] == 10000
 
     @patch('orders.CONFIG')
     @patch('orders.calculate_position_size')
@@ -1103,6 +1103,90 @@ class TestEdgeCases:
 
         assert result is True
         assert orders.open_trades["AAPL"]["entry_regime"] == "UNKNOWN"
+
+    @patch('orders.CONFIG')
+    @patch('orders.calculate_position_size')
+    @patch('orders.calculate_stops')
+    @patch('orders.check_correlation')
+    @patch('orders.check_combined_exposure')
+    @patch('orders.check_sector_concentration')
+    @patch('orders.get_tv_signal_cache')
+    @patch('orders._get_alpaca_price')
+    @patch('orders.log_order')
+    def test_execute_buy_stores_tp_order_id_for_scalp(
+        self, mock_log_order, mock_yf_price, mock_tv_cache,
+        mock_sector, mock_exposure, mock_correlation,
+        mock_stops, mock_position_size, mock_config_obj,
+        mock_config, mock_ib
+    ):
+        """execute_buy must store tp_order_id for SCALP trades so check_external_closes
+        can detect TP fills via order ID rather than price tolerance."""
+        mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
+        mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
+
+        mock_tv_cache.return_value = {}
+        mock_yf_price.return_value = 100.0
+        mock_correlation.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK")
+        mock_sector.return_value = (True, "OK")
+        mock_stops.return_value = (98.0, 105.0)
+        mock_position_size.return_value = 100
+
+        result = orders.execute_buy(
+            ib=mock_ib,
+            symbol="AAPL",
+            price=100.0,
+            atr=2.0,
+            score=30,
+            portfolio_value=100_000,
+            regime={"regime": "BULL"},
+            trade_type="SCALP",
+        )
+
+        assert result is True
+        # tp_order_id must be set for SCALP (bracket includes TP leg)
+        assert orders.open_trades["AAPL"]["tp_order_id"] is not None
+
+    @patch('orders.CONFIG')
+    @patch('orders.calculate_position_size')
+    @patch('orders.calculate_stops')
+    @patch('orders.check_correlation')
+    @patch('orders.check_combined_exposure')
+    @patch('orders.check_sector_concentration')
+    @patch('orders.get_tv_signal_cache')
+    @patch('orders._get_alpaca_price')
+    @patch('orders.log_order')
+    def test_execute_buy_tp_order_id_none_for_swing(
+        self, mock_log_order, mock_yf_price, mock_tv_cache,
+        mock_sector, mock_exposure, mock_correlation,
+        mock_stops, mock_position_size, mock_config_obj,
+        mock_config, mock_ib
+    ):
+        """SWING/HOLD trades have no TP bracket — tp_order_id must be None."""
+        mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
+        mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
+
+        mock_tv_cache.return_value = {}
+        mock_yf_price.return_value = 100.0
+        mock_correlation.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK")
+        mock_sector.return_value = (True, "OK")
+        mock_stops.return_value = (98.0, 105.0)
+        mock_position_size.return_value = 100
+
+        result = orders.execute_buy(
+            ib=mock_ib,
+            symbol="AAPL",
+            price=100.0,
+            atr=2.0,
+            score=30,
+            portfolio_value=100_000,
+            regime={"regime": "BULL"},
+            trade_type="SWING",
+        )
+
+        assert result is True
+        assert orders.open_trades["AAPL"]["tp_order_id"] is None
 
 
 # ─────────────────────────────────────────────────────────────────────────────

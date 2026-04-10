@@ -268,7 +268,7 @@ class TestValidatePrice:
 
     Signature: _validate_position_price(symbol, ibkr_price, entry) -> (float, str)
     Returns (0, reason) when no valid price; (price, description) when valid.
-    Internal sources: ibkr_price param + _get_yf_price() + get_tv_signal_cache().
+    Internal sources: ibkr_price param + _get_alpaca_price() + get_tv_signal_cache().
     """
 
     def _fn(self):
@@ -280,7 +280,7 @@ class TestValidatePrice:
         the function must return a zero price rather than silently passing
         bad data downstream."""
         fn = self._fn()
-        with patch("orders._get_yf_price", return_value=0.0), \
+        with patch("orders._get_alpaca_price", return_value=0.0), \
              patch("orders.get_tv_signal_cache", return_value={}):
             price, desc = fn("AAPL", 0.0, 150.0)
         assert price == 0, (
@@ -291,7 +291,7 @@ class TestValidatePrice:
         """When ibkr_price=0 (excluded), yfinance provides the fallback price."""
         fn = self._fn()
         fallback = 123.45
-        with patch("orders_contracts._get_yf_price", return_value=fallback), \
+        with patch("orders_contracts._get_alpaca_price", return_value=fallback), \
              patch("orders_contracts.get_tv_signal_cache", return_value={}):
             price, desc = fn("MSFT", 0.0, 0.0)
         assert price == pytest.approx(fallback), (
@@ -302,7 +302,7 @@ class TestValidatePrice:
         """Negative ibkr_price and negative yfinance price are both excluded;
         result must be a zero price, never a negative value."""
         fn = self._fn()
-        with patch("orders._get_yf_price", return_value=-1.0), \
+        with patch("orders._get_alpaca_price", return_value=-1.0), \
              patch("orders.get_tv_signal_cache", return_value={}):
             price, desc = fn("TSLA", -5.0, 200.0)
         assert price == 0 or price > 0, (
@@ -314,7 +314,7 @@ class TestValidatePrice:
         """When ibkr and yfinance agree on a healthy price, it passes through."""
         fn = self._fn()
         expected = 250.00
-        with patch("orders._get_yf_price", return_value=expected), \
+        with patch("orders._get_alpaca_price", return_value=expected), \
              patch("orders.get_tv_signal_cache", return_value={}):
             price, desc = fn("NVDA", expected, expected)
         assert price == pytest.approx(expected), (

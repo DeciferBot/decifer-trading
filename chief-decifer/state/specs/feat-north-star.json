@@ -40,9 +40,10 @@
 
   "completion_status": {
     "entry_with_thesis": {
-      "status": "PARTIAL",
-      "what_exists": "Agent voting gate (3/4 votes required), AVOID classification blocks signals, SCALP/SWING/HOLD tag assigned at entry, trade_type + conviction stored on position",
-      "what_is_missing": "The entry thesis is a classification tag, not a falsifiable statement. No explicit 'what would prove this wrong' is stored at entry."
+      "status": "SHIPPED",
+      "what_exists": "Agent voting gate (3/4 votes required), AVOID classification blocks signals, SCALP/SWING/HOLD tag assigned at entry, trade_type + conviction stored on position. entry_thesis stored on every position at open: falsifiable string stating what would prove the thesis wrong, conditioned on trade_type + entry_regime + conviction + score. Logged in trades.json via learning.py.",
+      "what_is_missing": null,
+      "shipped_date": "2026-04-08"
     },
     "hold_with_monitoring": {
       "status": "SHIPPED",
@@ -51,20 +52,22 @@
       "shipped_date": "2026-04-08"
     },
     "exit_with_reason": {
-      "status": "PARTIAL",
-      "what_exists": "Portfolio Manager fires on events and can EXIT/TRIM with a logged reason. Cycle check exits now log reasons. Bracket exits (stop-loss, take-profit) detected by check_external_closes() now log thesis-level reasons: '{exit_type} | {trade_type} | regime:{entry}→{exit} | held:{N}min | thesis:{class}'. thesis:class is one of confirmed, breached_regime_shift, breached_stale_scalp, or noise_stop.",
-      "what_is_missing": "TP hits that do not match the tp field exactly are still classified as 'manual'. No thesis-level reason for exits initiated directly by portfolio_manager (TRIM/EXIT) — those use PM's freeform reason strings which are not schema-structured.",
-      "shipped_date": "2026-04-08"
+      "status": "SHIPPED",
+      "what_exists": "All exit paths produce structured thesis-level reasons in the schema '{exit_type} | {trade_type} | regime:{entry}→{exit} | held:{N}min | thesis:{class}'. Bracket SL/TP: check_external_closes() uses tp_order_id (exact order-ID match) with ±1% price fallback for legacy positions. PM EXIT: _build_pm_exit_reason() derives thesis_class from polarity comparison and includes pm_trigger + LLM reasoning (truncated to 120 chars). PM TRIM: same structured format with pm_trim exit_tag. thesis:class is one of confirmed, breached_regime_shift, breached_stale_scalp, or noise_stop.",
+      "what_is_missing": null,
+      "shipped_date": "2026-04-10"
     },
     "record_everything": {
-      "status": "PARTIAL",
-      "what_exists": "learning.py logs trades with exit_price, pnl, exit_reason, regime at entry. PM and cycle check exits include reason strings. entry_regime now stored on every position at open time. Bracket exit reasons are now structured and include entry_regime→exit_regime comparison.",
-      "what_is_missing": "No structured reason schema across all exit types — PM reasons remain freeform strings. No 'thesis_stated_at_entry' field (falsifiable statement per-trade) — GAP-003 still open."
+      "status": "SHIPPED",
+      "what_exists": "Every exit path (bracket SL/TP, PM EXIT, PM TRIM, cycle check) logs a structured reason to trades.json. PM TRIM exits now call log_trade() — previously unlogged. tp_order_id stored on every new position so bracket TP fills are reliably identified even if fill price deviates from stored tp. entry_thesis (falsifiable statement) stored at open via _build_entry_thesis().",
+      "what_is_missing": null,
+      "shipped_date": "2026-04-10"
     },
     "learn_from_outcomes": {
-      "status": "PARTIAL",
-      "what_exists": "pattern_library.py surfaces similar historical trades as context for new signal classification. learning.py aggregates trade outcomes.",
-      "what_is_missing": "No feedback loop from exit_reason → entry reasoning. The pattern library informs classification but does not adjust agent reasoning weights or flag specific thesis patterns as high/low quality."
+      "status": "SHIPPED",
+      "what_exists": "pattern_library.py surfaces similar historical trades and thesis performance aggregates. get_thesis_performance() computes win rate and avg PnL per (trade_type, thesis_class) combination extracted from structured exit_reason strings. market_intelligence.py feeds this into the classification prompt each session — Opus sees 'SCALP/noise_stop: 30% WR' and reasons accordingly. learning.py aggregates trade outcomes.",
+      "what_is_missing": null,
+      "shipped_date": "2026-04-08"
     }
   },
 
@@ -95,7 +98,9 @@
       "title": "Entry thesis is a tag, not a falsifiable statement",
       "description": "trade_type (SCALP/SWING/HOLD) is stored at entry but no explicit thesis string is stored. 'What would prove this wrong' is implicit in the trade type rules, not recorded per trade. Needed for the learning loop to correlate stated thesis vs outcome.",
       "priority": "medium",
-      "status": "open"
+      "status": "shipped",
+      "shipped_date": "2026-04-08",
+      "resolution": "orders_core.py: added _build_entry_thesis() that derives a falsifiable statement from trade_type, symbol, direction, conviction, score, entry_regime. Stored as entry_thesis on every new position (both execute_buy and execute_short). Added to log_trade() record in learning.py so it persists in trades.json. 7 new tests in tests/test_entry_thesis.py."
     },
     {
       "gap_id": "GAP-004",
@@ -103,7 +108,9 @@
       "title": "No feedback from exit_reason to entry reasoning",
       "description": "The pattern library surfaces similar trades as context but does not adjust future reasoning based on which entry thesis types led to profitable vs losing exits. The loop between 'why we entered' and 'why we exited' is not closed.",
       "priority": "low",
-      "status": "open"
+      "status": "shipped",
+      "shipped_date": "2026-04-08",
+      "resolution": "pattern_library.py: added get_thesis_performance(min_samples=3) — aggregates completed patterns by (trade_type, thesis_class) extracted from structured exit_reason 'thesis:...' token. market_intelligence.py: added _format_thesis_performance(), new thesis_perf_text field on SessionContext, included in classification prompt so Opus sees historical win rates per thesis type at classification time. 9 new tests in tests/test_thesis_performance.py."
     }
   ],
 

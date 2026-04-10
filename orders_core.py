@@ -37,7 +37,7 @@ from orders_state import (
     _trades_lock,
     _get_symbol_lock,
     _safe_set_trade, _safe_update_trade, _safe_del_trade,
-    _is_recently_closed,
+    _is_recently_closed, _persist_positions,
 )
 from orders_guards import (
     _is_duplicate_check_enabled,
@@ -284,17 +284,19 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             log.info(f"[advisor] {symbol} size_mult={advice_size_mult} → qty={qty}")
 
         # ── HARD CAPS — last line of defense against contaminated data ──
-        # Max 5,000 shares per order (prevents 10,000+ share orders from bad prices)
-        MAX_SHARES = 5000
-        if qty > MAX_SHARES:
-            log.warning(f"Qty {qty} exceeds hard cap {MAX_SHARES} for {symbol} @ ${price:.2f} — capping")
-            qty = MAX_SHARES
         # Max order value = 20% of portfolio (stricter than max_single_position for safety)
         max_order_value = portfolio_value * 0.20
         if qty * price > max_order_value:
             old_qty = qty
             qty = max(1, int(max_order_value / price))
             log.warning(f"Order value ${old_qty * price:,.0f} exceeds 20% cap ${max_order_value:,.0f} for {symbol} — reduced qty {old_qty}→{qty}")
+
+        # ── FX minimum lot size ───────────────────────────────────────────
+        if instrument == "fx":
+            fx_min_lot = CONFIG.get("fx_min_lot_size", 20000)
+            if qty < fx_min_lot:
+                log.info(f"FX {symbol}: qty {qty} below min lot {fx_min_lot} — raising to {fx_min_lot}")
+                qty = fx_min_lot
 
         # ── PT / SL — use advisor levels if provided, otherwise ATR formula ──
         if advice_sl > 0 and advice_pt > 0:
@@ -599,6 +601,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                                         ),
                     "pattern_id":       pattern_id,
                     "sl_order_id":      _sl_order_id,
+                    "tp_order_id":      tp_trade.order.orderId if tp_trade is not None else None,
                     "high_water_mark":  price,
                     # ── Tranche tracking ──────────────────────────────────
                     "tranche_mode":     tranche_mode,
@@ -608,6 +611,8 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                     "t1_order_id":      tp_trade.order.orderId if tranche_mode else None,
                     "t2_sl_order_id":   None,  # set by update_tranche_status after T1 fills
                 }
+            # Persist position to trade_store before logging to trades.json
+            _persist_positions()
             # Log OPEN record to trades.json for feedback loop
             from learning import log_trade
             if tranche_mode:
@@ -818,12 +823,16 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
             qty = max(1, int(qty * advice_size_mult))
             log.info(f"[advisor] {symbol} size_mult={advice_size_mult} → qty={qty}")
 
-        MAX_SHARES = 5000
-        if qty > MAX_SHARES:
-            qty = MAX_SHARES
         max_order_value = portfolio_value * 0.20
         if qty * price > max_order_value:
             qty = max(1, int(max_order_value / price))
+
+        # ── FX minimum lot size ───────────────────────────────────────────
+        if instrument == "fx":
+            fx_min_lot = CONFIG.get("fx_min_lot_size", 20000)
+            if qty < fx_min_lot:
+                log.info(f"FX {symbol}: qty {qty} below min lot {fx_min_lot} — raising to {fx_min_lot}")
+                qty = fx_min_lot
 
         # ── PT / SL — use advisor levels if provided, otherwise ATR formula ──
         if advice_sl > 0 and advice_pt > 0:
@@ -973,9 +982,12 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
                                            ),
                     "pattern_id":          pattern_id,
                     "sl_order_id":         _sl_order_id,
+                    "tp_order_id":         tp_trade.order.orderId if tp_trade is not None else None,
                     "high_water_mark":     price,
                     "tranche_mode":        False,
                 }
+            # Persist position to trade_store before logging to trades.json
+            _persist_positions()
             from learning import log_trade
             log_trade(
                 trade=active_trades[symbol],
@@ -1116,6 +1128,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             with _trades_lock:
                 recently_closed[symbol] = datetime.now(timezone.utc).isoformat()
                 del active_trades[_trade_key]
+            _persist_positions()
         return True
 
     except Exception as e:

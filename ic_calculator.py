@@ -39,9 +39,11 @@ _N = len(DIMENSIONS)
 EQUAL_WEIGHTS: dict = {d: 1.0 / _N for d in DIMENSIONS}
 
 _BASE = os.path.dirname(os.path.abspath(__file__))
-IC_WEIGHTS_FILE  = os.path.join(_BASE, "data", "ic_weights.json")
-IC_HISTORY_FILE  = os.path.join(_BASE, "data", "ic_weights_history.jsonl")
-SIGNALS_LOG_FILE = os.path.join(_BASE, "data", "signals_log.jsonl")
+IC_WEIGHTS_FILE      = os.path.join(_BASE, "data", "ic_weights.json")
+IC_HISTORY_FILE      = os.path.join(_BASE, "data", "ic_weights_history.jsonl")
+SIGNALS_LOG_FILE     = os.path.join(_BASE, "data", "signals_log.jsonl")
+IC_LIVE_FILE         = os.path.join(_BASE, "data", "ic_weights_live.json")
+IC_LIVE_HISTORY_FILE = os.path.join(_BASE, "data", "ic_weights_live_history.jsonl")
 
 ROLLING_WINDOW = 60   # records to use for IC calculation
 MIN_VALID      = 20   # minimum records with forward returns before IC is trusted
@@ -287,15 +289,11 @@ def compute_rolling_ic(
     # Merge live and historical records when a historical log is provided
     if historical_log_path and os.path.exists(historical_log_path):
         live_records = _load_signal_records(signals_log_path, window, min_age_days=min_age_days)
-        # Historical records already have fwd_return — no age gate needed
-        hist_records = _load_signal_records(historical_log_path, window=100_000, min_age_days=0)
-        # Sort combined pool by timestamp; take the most recent effective_window records
-        effective_window = max(window, 500, len(live_records) + len(hist_records))
-        all_records = sorted(
-            live_records + hist_records,
-            key=lambda r: r.get("ts", ""),
-        )
-        records = all_records[-effective_window:]
+        # Historical records carry pre-computed fwd_return — load ALL of them,
+        # no window cap and no age gate.
+        hist_records = _load_signal_records(historical_log_path, window=10_000_000, min_age_days=0)
+        # Use all records — no further slicing; the full corpus is the training set
+        records = live_records + hist_records
         log.info(
             "compute_rolling_ic: merged %d live + %d historical = %d records",
             len(live_records), len(hist_records), len(records),
@@ -375,11 +373,25 @@ def normalize_ic_weights(raw_ic: dict) -> tuple:
     - Remaining positives normalised to sum to 1.0
     - HHI cap: if any weight > max_single_weight, clip and renormalize (logged as WARNING)
 
+    Paper learning mode (force_equal_weights=True):
+    - Returns equal weights for all dimensions, bypassing IC weighting entirely.
+    - Fixes the cold-start trap: dimensions with IC=0 (no trade data yet) would
+      otherwise get zero weight, never generate trades, and never build IC.
+      Equal weights ensures all dimensions are sampled so IC can converge.
+
     Returns
     -------
     (weights dict, metadata dict) where metadata contains:
       noise_floor_applied, dimensions_suppressed, hhi_capped
     """
+    if _ic_cfg("force_equal_weights", False):
+        log.info("normalize_ic_weights: force_equal_weights=True — returning equal weights (paper learning mode)")
+        return dict(EQUAL_WEIGHTS), {
+            "noise_floor_applied": False,
+            "dimensions_suppressed": [],
+            "hhi_capped": False,
+        }
+
     ic_min  = _ic_cfg("ic_min_threshold", 0.0)
     hhi_cap = _ic_cfg("max_single_weight", 0.40)
 
@@ -646,6 +658,149 @@ def get_short_quality_score() -> float:
     except Exception as e:
         log.debug("get_short_quality_score: error (%s) — returning 0.0", e)
         return 0.0
+
+
+def update_live_ic(signals_log_path: str = None) -> dict:
+    """
+    Compute IC from live trades only and write to ic_weights_live.json.
+
+    This is intentionally separate from update_ic_weights() which uses the
+    historical corpus. Live IC is a small-sample real-time signal:
+      - n < MIN_VALID  → raw_ic all None (not enough data yet)
+      - n >= MIN_VALID → real Spearman IC from actual closed trades
+
+    Written to:
+      data/ic_weights_live.json          — latest live IC snapshot
+      data/ic_weights_live_history.jsonl — append-only history for trend tracking
+
+    Call this on the same weekly cycle as update_ic_weights().
+    """
+    raw_ic = compute_rolling_ic(signals_log_path)   # live-only (no historical_log_path)
+    n_records = len(_load_signal_records(signals_log_path))
+
+    record = {
+        "updated":    datetime.now(timezone.utc).isoformat(),
+        "raw_ic":     {d: (raw_ic.get(d) if raw_ic.get(d) is not None else None)
+                       for d in DIMENSIONS},
+        "n_records":  n_records,
+        "source":     "live_trades_only",
+    }
+
+    os.makedirs(os.path.dirname(IC_LIVE_FILE), exist_ok=True)
+
+    import tempfile
+    dir_ = os.path.dirname(IC_LIVE_FILE)
+    fd, tmp = tempfile.mkstemp(dir=dir_, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(record, f, indent=2)
+        os.replace(tmp, IC_LIVE_FILE)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+    with open(IC_LIVE_HISTORY_FILE, "a") as f:
+        f.write(json.dumps(record) + "\n")
+
+    log.info(
+        "Live IC updated (n=%d): %s",
+        n_records,
+        ", ".join(
+            f"{d}={raw_ic[d]:.3f}" if raw_ic.get(d) is not None else f"{d}=None"
+            for d in DIMENSIONS
+        ),
+    )
+    return record
+
+
+def check_ic_divergence(divergence_threshold: float = 0.03) -> list:
+    """
+    Compare live IC vs historical IC per dimension.
+
+    A dimension is flagged when:
+      abs(live_ic - historical_ic) >= divergence_threshold
+      AND both values are non-None (live has enough data)
+
+    Returns a list of warning dicts, one per flagged dimension:
+      { dimension, live_ic, historical_ic, delta, direction }
+
+    direction = "live_better"  — live IC exceeds historical (signal improving)
+                "live_worse"   — live IC below historical (signal degrading)
+                "sign_flip"    — live and historical have opposite signs (regime shift)
+
+    Logs a WARNING for each flagged dimension. Returns [] if data is
+    insufficient or no divergence found.
+    """
+    if not os.path.exists(IC_LIVE_FILE) or not os.path.exists(IC_WEIGHTS_FILE):
+        return []
+
+    try:
+        with open(IC_LIVE_FILE) as f:
+            live_data = json.load(f)
+        with open(IC_WEIGHTS_FILE) as f:
+            hist_data = json.load(f)
+    except Exception as e:
+        log.debug("check_ic_divergence: load error — %s", e)
+        return []
+
+    live_ic = live_data.get("raw_ic", {})
+    hist_ic = hist_data.get("raw_ic", {})
+    live_n  = live_data.get("n_records", 0)
+
+    if live_n < MIN_VALID:
+        log.debug(
+            "check_ic_divergence: only %d live records (need %d) — skipping",
+            live_n, MIN_VALID,
+        )
+        return []
+
+    warnings = []
+    for d in DIMENSIONS:
+        l = live_ic.get(d)
+        h = hist_ic.get(d)
+        if l is None or h is None:
+            continue
+        if not (np.isfinite(float(l)) and np.isfinite(float(h))):
+            continue
+        l, h = float(l), float(h)
+        delta = l - h
+        if abs(delta) < divergence_threshold:
+            continue
+
+        if l > 0 and h < 0:
+            direction = "sign_flip"
+        elif l < 0 and h > 0:
+            direction = "sign_flip"
+        elif delta > 0:
+            direction = "live_better"
+        else:
+            direction = "live_worse"
+
+        entry = {
+            "dimension":    d,
+            "live_ic":      round(l, 4),
+            "historical_ic": round(h, 4),
+            "delta":        round(delta, 4),
+            "direction":    direction,
+            "live_n":       live_n,
+        }
+        warnings.append(entry)
+
+        log.warning(
+            "IC_DIVERGENCE [%s] live=%.4f hist=%.4f delta=%+.4f (%s) n_live=%d",
+            d, l, h, delta, direction, live_n,
+        )
+
+    if not warnings:
+        log.info(
+            "check_ic_divergence: no significant divergence (threshold=%.3f, n_live=%d)",
+            divergence_threshold, live_n,
+        )
+
+    return warnings
 
 
 def get_ic_weight_history(last_n: int = 4) -> list:

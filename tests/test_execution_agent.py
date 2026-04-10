@@ -47,7 +47,7 @@ _COMMON_KWARGS = dict(
     symbol="AAPL", direction="LONG", size=100,
     conviction_score=28, bid=149.90, ask=150.10,
     spread_pct=0.13, rel_volume=1.2, vwap_dist_pct=0.1,
-    time_of_day_str="10:30", regime_name="BULL_TRENDING",
+    time_of_day_str="10:30", regime_name="TRENDING_UP",
 )
 
 
@@ -63,7 +63,7 @@ class TestPatientPlan:
                 symbol="AAPL", direction="LONG", size=100, conviction_score=18,
                 bid=149.95, ask=150.00, spread_pct=0.03,
                 rel_volume=0.4, vwap_dist_pct=0.1,
-                time_of_day_str="12:00", regime_name="BULL_TRENDING",
+                time_of_day_str="12:00", regime_name="TRENDING_UP",
             )
         assert plan.aggression == "patient"
         assert plan.order_type == "LIMIT"
@@ -76,7 +76,7 @@ class TestPatientPlan:
             plan = ea.get_execution_plan(
                 **{**_COMMON_KWARGS,
                    "spread_pct": 0.6, "rel_volume": 2.5,
-                   "regime_name": "PANIC", "conviction_score": 40},
+                   "regime_name": "CAPITULATION", "conviction_score": 40},
             )
         # PANIC regime votes patient → most conservative wins
         assert plan.aggression == "patient"
@@ -102,7 +102,7 @@ class TestAggressivePlan:
                 symbol="TSLA", direction="LONG", size=50, conviction_score=40,
                 bid=200.00, ask=201.20, spread_pct=0.6,
                 rel_volume=2.5, vwap_dist_pct=0.1,
-                time_of_day_str="14:30", regime_name="BULL_TRENDING",
+                time_of_day_str="14:30", regime_name="TRENDING_UP",
             )
         assert plan.aggression == "aggressive"
         assert plan.fill_watcher_params["initial_wait_secs"] == 15
@@ -121,7 +121,7 @@ class TestMarketOrderGate:
                 symbol="NVDA", direction="LONG", size=30, conviction_score=40,
                 bid=500.00, ask=503.00, spread_pct=0.6,
                 rel_volume=2.5, vwap_dist_pct=0.2,
-                time_of_day_str="14:30", regime_name="BULL_TRENDING",
+                time_of_day_str="14:30", regime_name="TRENDING_UP",
             )
         assert plan.order_type == "MKT"
 
@@ -132,7 +132,7 @@ class TestMarketOrderGate:
                 symbol="XYZ", direction="LONG", size=30, conviction_score=38,
                 bid=50.00, ask=50.35, spread_pct=0.7,
                 rel_volume=0.8, vwap_dist_pct=0.2,
-                time_of_day_str="14:00", regime_name="BULL_TRENDING",
+                time_of_day_str="14:00", regime_name="TRENDING_UP",
             )
         assert plan.order_type == "LIMIT"
 
@@ -143,7 +143,7 @@ class TestMarketOrderGate:
                 symbol="AMZN", direction="LONG", size=10, conviction_score=38,
                 bid=180.00, ask=180.05, spread_pct=0.03,
                 rel_volume=3.0, vwap_dist_pct=0.1,
-                time_of_day_str="14:00", regime_name="BULL_TRENDING",
+                time_of_day_str="14:00", regime_name="TRENDING_UP",
             )
         assert plan.order_type == "LIMIT"
 

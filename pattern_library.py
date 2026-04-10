@@ -234,6 +234,60 @@ def get_relevant_patterns(
         return []
 
 
+def get_thesis_performance(min_samples: int = 3) -> list[dict]:
+    """
+    Aggregate completed patterns by (trade_type, thesis_class) and return
+    win rate and avg PnL percentage for each combination with at least
+    min_samples records.
+
+    thesis_class is extracted from structured exit_reason strings that contain
+    a 'thesis:...' token (e.g. 'sl_hit | SCALP | ... | thesis:noise_stop').
+    Falls back to the raw exit_reason if no thesis token is present.
+
+    Used by the intelligence layer to feed historical reasoning quality back
+    into the classification prompt — closing the entry→exit feedback loop.
+    """
+    import re
+
+    try:
+        with _lock:
+            data = _load()
+
+        completed = [r for r in data.values() if r.get("pnl") is not None]
+        if not completed:
+            return []
+
+        groups: dict[tuple, list] = {}
+        for r in completed:
+            tt          = r.get("trade_type", "UNKNOWN")
+            exit_reason = r.get("exit_reason") or ""
+            m           = re.search(r"thesis:(\w+)", exit_reason)
+            thesis_cls  = m.group(1) if m else (exit_reason[:30] or "unknown")
+            key = (tt, thesis_cls)
+            groups.setdefault(key, []).append(r)
+
+        result = []
+        for (tt, thesis_cls), records in groups.items():
+            if len(records) < min_samples:
+                continue
+            wins        = [r for r in records if (r.get("pnl") or 0) > 0]
+            avg_pnl_pct = sum(r.get("pnl_pct") or 0.0 for r in records) / len(records) * 100
+            result.append({
+                "trade_type":   tt,
+                "thesis_class": thesis_cls,
+                "count":        len(records),
+                "win_rate":     round(len(wins) / len(records), 2),
+                "avg_pnl_pct":  round(avg_pnl_pct, 2),
+            })
+
+        result.sort(key=lambda x: -x["count"])
+        return result
+
+    except Exception as exc:
+        log.warning(f"pattern_library: get_thesis_performance failed: {exc}")
+        return []
+
+
 def get_summary_stats() -> dict:
     """
     High-level stats for dashboard / logging.

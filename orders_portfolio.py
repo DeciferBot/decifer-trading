@@ -293,7 +293,7 @@ def reconcile_with_ibkr(ib: IB):
     """
     On startup or reconnect: sync bot's position tracker with IBKR reality.
     Uses ib.portfolio() which includes marketPrice and unrealizedPNL.
-    All prices are cross-checked via 3-way validation (IBKR + yfinance + TV)
+    All prices are cross-checked via 3-way validation (IBKR + Alpaca + TV)
     to prevent stale/bad IBKR data from corrupting the tracker.
 
     IMPORTANT: Uses composite keys (symbol for stocks, symbol_right_strike_expiry
@@ -371,9 +371,9 @@ def reconcile_with_ibkr(ib: IB):
                     ibkr_price_for_validation = ibkr_mkt if ibkr_mkt > 0 else 0
 
                 # 3-way validate — for options, use per-share premium values
-                # Skip yfinance/TV cross-check for options (they return stock price, not premium)
+                # Skip Alpaca/TV cross-check for options (they return stock price, not premium)
                 if is_option:
-                    # Options: trust IBKR premium directly (yfinance/TV don't have option prices)
+                    # Options: trust IBKR premium directly (Alpaca/TV don't have option prices)
                     if ibkr_price_for_validation > 0:
                         validated_price = ibkr_price_for_validation
                         src_desc = f"IBKR_OPT=${ibkr_price_for_validation:.2f}"
@@ -523,12 +523,12 @@ def reconcile_with_ibkr(ib: IB):
 def update_positions_from_ibkr(ib: IB):
     """
     Refresh current price and P&L for all tracked positions using 3-way price
-    validation (IBKR + yfinance + TV). Called on every scan so dashboard always
+    validation (IBKR + Alpaca + TV). Called on every scan so dashboard always
     shows live P&L even when no symbols score.
 
     Uses composite keys to match IBKR portfolio items to the correct active_trades
     entry (preventing stock/option collision). Stock prices are 3-way validated;
-    option premiums use IBKR only (yfinance/TV don't have option pricing).
+    option premiums use IBKR only (Alpaca/TV don't have option pricing).
     """
     try:
         portfolio_items = ib.portfolio(CONFIG["active_account"])
@@ -674,7 +674,7 @@ def update_positions_from_ibkr(ib: IB):
                     else:
                         ibkr_price = mkt_price
 
-            # Options: trust IBKR premium (yfinance/TV return stock price, not premium)
+            # Options: trust IBKR premium (Alpaca/TV return stock price, not premium)
             if is_option:
                 if ibkr_price > 0:
                     validated_price = ibkr_price

@@ -248,6 +248,10 @@ class TestComputeConfluenceSoftGate:
         """Soft gate: misaligned → score reduced by penalty, but not blocked."""
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "soft")
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_penalty_points", 8)
+        # Pin equal IC weights so live data/ic_weights.json cannot inflate the
+        # pre-cap score above 50, which would mask the penalty after capping.
+        import ic_calculator as _ic
+        monkeypatch.setattr(_ic, "get_current_weights", lambda: _ic.EQUAL_WEIGHTS)
 
         # Get aligned score for comparison
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "off")

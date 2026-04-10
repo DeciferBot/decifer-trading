@@ -29,19 +29,19 @@ from signals import get_regime_threshold
 class TestRegimeThresholdFlat:
     """All non-circuit-breaker regimes return base — no regime-specific offsets."""
 
-    def test_bull_trending_uses_base(self, monkeypatch):
+    def test_trending_up_uses_base(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 20)
-        assert get_regime_threshold("BULL_TRENDING") == 20
+        assert get_regime_threshold("TRENDING_UP") == 20
 
-    def test_bear_trending_uses_base(self, monkeypatch):
-        """BEAR_TRENDING no longer gets a lowered threshold — same bar as BULL."""
+    def test_trending_down_uses_base(self, monkeypatch):
+        """TRENDING_DOWN no longer gets a lowered threshold — Opus filters instead."""
         monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 20)
-        assert get_regime_threshold("BEAR_TRENDING") == 20
+        assert get_regime_threshold("TRENDING_DOWN") == 20
 
-    def test_choppy_uses_base(self, monkeypatch):
-        """CHOPPY no longer gets a lowered threshold — Opus filters instead."""
+    def test_range_bound_uses_base(self, monkeypatch):
+        """RANGE_BOUND no longer gets a lowered threshold — Opus filters instead."""
         monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 20)
-        assert get_regime_threshold("CHOPPY") == 20
+        assert get_regime_threshold("RANGE_BOUND") == 20
 
     def test_unknown_uses_base(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 20)
@@ -55,8 +55,8 @@ class TestRegimeThresholdFlat:
         """Core invariant: every non-circuit-breaker regime returns the same threshold."""
         monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 18)
         base = 18
-        for regime in ("BULL_TRENDING", "BEAR_TRENDING", "CHOPPY", "UNKNOWN",
-                       "MOMENTUM_BULL", "RELIEF_RALLY", "FEAR_ELEVATED",
+        for regime in ("TRENDING_UP", "TRENDING_DOWN", "RANGE_BOUND", "RELIEF_RALLY", "UNKNOWN",
+                       "MOMENTUM_BULL", "FEAR_ELEVATED",
                        "DISTRIBUTION", "TRENDING_BEAR"):
             assert get_regime_threshold(regime) == base, \
                 f"Expected {base} for {regime}, got {get_regime_threshold(regime)}"
@@ -65,26 +65,26 @@ class TestRegimeThresholdFlat:
 class TestCircuitBreakerThreshold:
     """PANIC and EXTREME_STRESS block all mechanically-scored signals."""
 
-    def test_panic_blocks_all(self, monkeypatch):
+    def test_capitulation_blocks_all(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_panic", 99)
-        assert get_regime_threshold("PANIC") == 99
+        assert get_regime_threshold("CAPITULATION") == 99
 
     def test_extreme_stress_blocks_all(self, monkeypatch):
         """EXTREME_STRESS (new session_character label) also triggers the circuit breaker."""
         monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_panic", 99)
         assert get_regime_threshold("EXTREME_STRESS") == 99
 
-    def test_panic_threshold_configurable(self, monkeypatch):
+    def test_capitulation_threshold_configurable(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_panic", 50)
-        assert get_regime_threshold("PANIC") == 50
+        assert get_regime_threshold("CAPITULATION") == 50
 
     def test_base_changes_scale_all_non_circuit_breaker(self, monkeypatch):
         """Changing min_score_to_trade scales all non-panic thresholds together."""
         monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 14)
-        assert get_regime_threshold("BULL_TRENDING") == 14
-        assert get_regime_threshold("CHOPPY") == 14
+        assert get_regime_threshold("TRENDING_UP") == 14
+        assert get_regime_threshold("RANGE_BOUND") == 14
         assert get_regime_threshold("FEAR_ELEVATED") == 14
 
         monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 28)
-        assert get_regime_threshold("BULL_TRENDING") == 28
-        assert get_regime_threshold("CHOPPY") == 28
+        assert get_regime_threshold("TRENDING_UP") == 28
+        assert get_regime_threshold("RANGE_BOUND") == 28

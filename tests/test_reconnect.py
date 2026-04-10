@@ -405,8 +405,10 @@ class TestReconnectWorkerBackoff(unittest.TestCase):
             with patch.object(bot, "_send_reconnect_exhausted_alert"):
                 with patch("time.sleep", side_effect=lambda s: sleep_calls.append(s)):
                     bot._reconnect_worker()
-        # One sleep per attempt
-        self.assertEqual(len(sleep_calls), 3)
+        # One sleep per attempt — filter out heartbeat tick (60 s) which a concurrent
+        # daemon thread may inject when time.sleep is globally patched.
+        backoff_sleeps = [s for s in sleep_calls if s != 60]
+        self.assertEqual(len(backoff_sleeps), 3)
 
 
 # ═════════════════════════════════════════════════════════════════════════════

@@ -26,19 +26,21 @@ def _pos(symbol="AAPL", trade_type="HOLD", entry_regime="BULL_TRENDING",
     }
 
 
-def _regime(label="BULL_TRENDING"):
+def _regime(label="TRENDING_UP"):
     return {"regime": label}
 
 
 # ── _regime_polarity ──────────────────────────────────────────────────────────
 
 def test_polarity_bull():
-    assert _regime_polarity("BULL_TRENDING") == "BULL"
+    assert _regime_polarity("TRENDING_UP") == "BULL"
     assert _regime_polarity("BULL") == "BULL"
 
 def test_polarity_bear():
     assert _regime_polarity("BEAR") == "BEAR"
-    assert _regime_polarity("BEAR_TRENDING") == "BEAR"
+    assert _regime_polarity("TRENDING_DOWN") == "BEAR"
+    assert _regime_polarity("RELIEF_RALLY") == "BEAR"
+    assert _regime_polarity("CAPITULATION") == "BEAR"
 
 def test_polarity_neutral_and_unknown():
     assert _regime_polarity("NEUTRAL") == ""
@@ -50,20 +52,20 @@ def test_polarity_neutral_and_unknown():
 # ── HOLD: polar flip triggers REVIEW ─────────────────────────────────────────
 
 def test_hold_review_on_bull_to_bear():
-    pos = _pos(trade_type="HOLD", entry_regime="BULL_TRENDING")
+    pos = _pos(trade_type="HOLD", entry_regime="TRENDING_UP")
     actions = lightweight_cycle_check([pos], _regime("BEAR"), [])
     assert len(actions) == 1
     a = actions[0]
     assert a["symbol"] == "AAPL"
     assert a["action"] == "REVIEW"
-    assert "BULL_TRENDING" in a["reasoning"]
+    assert "TRENDING_UP" in a["reasoning"]
     assert "BEAR" in a["reasoning"]
     assert "polar" in a["reasoning"].lower()
 
 
 def test_hold_review_on_bear_to_bull():
     pos = _pos(trade_type="HOLD", entry_regime="BEAR")
-    actions = lightweight_cycle_check([pos], _regime("BULL_TRENDING"), [])
+    actions = lightweight_cycle_check([pos], _regime("TRENDING_UP"), [])
     assert len(actions) == 1
     assert actions[0]["action"] == "REVIEW"
 
@@ -71,8 +73,8 @@ def test_hold_review_on_bear_to_bull():
 # ── HOLD: same polarity — no action ──────────────────────────────────────────
 
 def test_hold_no_action_same_polarity():
-    # BULL_TRENDING → BULL is same polarity, not a flip
-    pos = _pos(trade_type="HOLD", entry_regime="BULL_TRENDING")
+    # TRENDING_UP → BULL is same polarity, not a flip
+    pos = _pos(trade_type="HOLD", entry_regime="TRENDING_UP")
     actions = lightweight_cycle_check([pos], _regime("BULL"), [])
     assert actions == []
 
@@ -90,8 +92,8 @@ def test_hold_no_action_when_current_regime_unknown():
 
 
 def test_hold_no_action_when_current_regime_neutral():
-    # BULL → NEUTRAL is not a polar flip (no BEAR signal)
-    pos = _pos(trade_type="HOLD", entry_regime="BULL_TRENDING")
+    # TRENDING_UP → NEUTRAL is not a polar flip (no BEAR signal)
+    pos = _pos(trade_type="HOLD", entry_regime="TRENDING_UP")
     actions = lightweight_cycle_check([pos], _regime("NEUTRAL"), [])
     assert actions == []
 

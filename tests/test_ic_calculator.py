@@ -203,6 +203,11 @@ class TestComputeRollingIC:
 # ---------------------------------------------------------------------------
 
 class TestNegativeICZeroWeight:
+    """
+    These tests verify normalize_ic_weights() logic directly.
+    The force_equal_weights flag (a paper-trading gate in config) is patched
+    to False so the weighting algorithm is exercised rather than bypassed.
+    """
 
     def test_negative_ic_gives_zero_weight(self):
         """Negative IC must produce zero weight, not inverted."""
@@ -210,7 +215,8 @@ class TestNegativeICZeroWeight:
         raw["trend"]    = -0.5  # strongly negative → must be zeroed
         raw["momentum"] = -0.2  # negative → zero
 
-        weights, _ = ic.normalize_ic_weights(raw)
+        with patch.object(ic, "_ic_cfg", side_effect=lambda k, d: False if k == "force_equal_weights" else d):
+            weights, _ = ic.normalize_ic_weights(raw)
 
         assert weights["trend"]    == 0.0, "Negative IC must produce zero weight"
         assert weights["momentum"] == 0.0, "Negative IC must produce zero weight"
@@ -220,19 +226,22 @@ class TestNegativeICZeroWeight:
         raw = {d: 0.1 for d in DIMS}
         raw["squeeze"] = 0.0
 
-        weights, _ = ic.normalize_ic_weights(raw)
+        with patch.object(ic, "_ic_cfg", side_effect=lambda k, d: False if k == "force_equal_weights" else d):
+            weights, _ = ic.normalize_ic_weights(raw)
         assert weights["squeeze"] == 0.0
 
     def test_all_positive_ic_all_nonzero_weights(self):
         """All positive IC → every dimension gets a positive weight."""
         raw = {d: 0.1 for d in DIMS}
-        weights, _ = ic.normalize_ic_weights(raw)
+        with patch.object(ic, "_ic_cfg", side_effect=lambda k, d: False if k == "force_equal_weights" else d):
+            weights, _ = ic.normalize_ic_weights(raw)
         for d, w in weights.items():
             assert w > 0, f"Expected positive weight for {d}, got {w}"
 
     def test_mixed_ic_only_positive_dims_get_weight(self):
         """Only the positive-IC dimensions should have non-zero weights."""
-        raw = {
+        raw = {d: 0.0 for d in DIMS}
+        raw.update({
             "trend":     0.3,
             "momentum":  0.2,
             "squeeze":  -0.1,
@@ -242,8 +251,9 @@ class TestNegativeICZeroWeight:
             "news":      0.1,
             "social":   -0.05,
             "reversion": 0.05,
-        }
-        weights, _ = ic.normalize_ic_weights(raw)
+        })
+        with patch.object(ic, "_ic_cfg", side_effect=lambda k, d: False if k == "force_equal_weights" else d):
+            weights, _ = ic.normalize_ic_weights(raw)
 
         assert weights["squeeze"]  == 0.0
         assert weights["flow"]     == 0.0

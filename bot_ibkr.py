@@ -178,8 +178,25 @@ def _on_ibkr_error(req_id: int, error_code: int, error_string: str, contract) ->
         return
 
     if error_code == 202:
-        log.warning(f"IBKR error 202 (reqId={req_id}): {tag}order cancelled — {error_string}")
-        clog("INFO", f"IBKR: order cancelled {tag.strip()}: {error_string}")
+        # If IBKR didn't pass a contract, try to resolve the symbol from active_trades
+        if not sym and req_id:
+            try:
+                from orders_state import active_trades, _trades_lock
+                _ORDER_ID_FIELDS = ("order_id", "sl_order_id", "t1_order_id", "t2_sl_order_id")
+                with _trades_lock:
+                    for _s, _t in active_trades.items():
+                        if any(int(_t.get(f) or 0) == req_id for f in _ORDER_ID_FIELDS if _t.get(f)):
+                            sym = _s
+                            tag = f"[{sym}] "
+                            break
+            except Exception:
+                pass
+        # Strip IBKR's trailing "reason:" with no value — it adds noise
+        reason_str = error_string.rstrip()
+        if reason_str.endswith("reason:"):
+            reason_str = reason_str[: reason_str.rfind("reason:")].rstrip(" -–—") or "no reason given"
+        log.warning(f"IBKR error 202 (reqId={req_id}): {tag}order cancelled — {reason_str}")
+        clog("INFO", f"IBKR: order cancelled {tag.strip() or f'orderId={req_id}'}: {reason_str}")
         return
 
     if error_code == 154:
@@ -528,7 +545,7 @@ def subscribe_pnl():
             bot_state._pnl_subscription = ib.reqPnL(CONFIG["active_account"])
             clog("INFO", "P&L subscription active")
     except Exception as e:
-        clog("ERROR", f"P&L subscription failed: {e}")
+        clog("ERROR", f"P&L subscription failed: {type(e).__name__}: {e}")
 
 
 # ── Trade backfill ────────────────────────────────────────────────────────────
@@ -1122,6 +1139,54 @@ def sync_orders_from_ibkr():
         clog("INFO", f"Order sync complete — {len(orders)} orders tracked")
     except Exception as e:
         clog("ERROR", f"Order sync error: {e}")
+
+
+def cancel_orphan_stop_orders():
+    """
+    Cancel any live SELL stop/limit orders in IBKR for symbols that have no
+    corresponding active position in active_trades.
+
+    Called once on startup after backfill and sync_orders_from_ibkr().
+    Prevents stale bracket children (from crashed sessions or position closes
+    that happened outside the bot) from triggering ghost sells.
+    """
+    from orders_contracts import _cancel_ibkr_order_by_id
+    from orders import active_trades
+
+    ib = bot_state.ib
+    if not ib.isConnected():
+        log.warning("[orphan_cleanup] IBKR disconnected — skipping orphan stop cancellation")
+        return
+
+    try:
+        active_symbols = set(active_trades.keys())
+        cancelled = 0
+        for t in ib.openTrades():
+            order    = t.order
+            contract = t.contract
+            sym      = getattr(contract, "symbol", "")
+            if not sym:
+                continue
+            is_sell_exit = (
+                order.action == "SELL"
+                and order.orderType in ("STP", "LMT", "TRAIL")
+                and getattr(contract, "secType", "STK") == "STK"
+            )
+            if is_sell_exit and sym not in active_symbols:
+                log.warning(
+                    f"[orphan_cleanup] Cancelling orphan {order.orderType} SELL "
+                    f"order #{order.orderId} for {sym} (qty={int(order.totalQuantity)} "
+                    f"@ {order.auxPrice or order.lmtPrice}) — no active position"
+                )
+                _cancel_ibkr_order_by_id(ib, order.orderId)
+                cancelled += 1
+
+        if cancelled:
+            clog("INFO", f"Orphan cleanup: cancelled {cancelled} stale exit order(s)")
+        else:
+            log.info("[orphan_cleanup] No orphan stop orders found")
+    except Exception as e:
+        log.error(f"[orphan_cleanup] Error during orphan stop cancellation: {e}")
 
 
 def _on_order_status_event(trade):

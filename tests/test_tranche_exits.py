@@ -52,7 +52,7 @@ _BASE_CONFIG = {
     "max_portfolio_allocation": 1.0,
 }
 
-_REGIME = {"regime": "BULL_TRENDING", "vix": 14.0}
+_REGIME = {"regime": "TRENDING_UP", "vix": 14.0}
 
 
 def _make_ib(entry_price=100.0):

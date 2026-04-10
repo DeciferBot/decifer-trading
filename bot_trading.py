@@ -62,7 +62,7 @@ _portfolio_review_done_today: bool = False
 _last_known_regime: str = ""
 _session_stop_count: int = 0
 _cascade_reviewed_this_session: bool = False   # prevent cascade from re-firing every loop
-_last_trim_ts: dict = {}                        # symbol → datetime of last TRIM execution
+_trimmed_today: set = set()                     # symbols already trimmed this session — TRIM fires once only
 _pm_reviewed_regime: dict = {}                  # symbol → regime label when PM last reviewed it
 _last_pm_review_ts: datetime | None = None      # when the last PM review completed (any trigger)
 # Edge-trigger dedup: track what value last fired each state-based trigger so that
@@ -266,6 +266,50 @@ def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict,
         clog("ERROR", f"Could not append to decision_history.jsonl: {e}")
 
 
+# ── Regime polarity + PM exit reason helpers ──────────────────────────────────
+
+def _polarity(s: str) -> str:
+    r = (s or "").upper()
+    if r in ("MOMENTUM_BULL", "RELIEF_RALLY") or "BULL" in r:
+        return "BULL"
+    if r in ("TRENDING_BEAR", "DISTRIBUTION") or "BEAR" in r:
+        return "BEAR"
+    return ""
+
+
+def _build_pm_exit_reason(
+    pos: dict, regime: dict, pm_trigger: str, reason_pm: str, exit_tag: str = "pm_exit"
+) -> str:
+    """Build a structured, thesis-level exit reason for PM-initiated exits/trims."""
+    entry_regime  = pos.get("entry_regime", "UNKNOWN")
+    exit_regime   = (
+        (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
+        if isinstance(regime, dict) else "UNKNOWN"
+    )
+    trade_type_ex = pos.get("trade_type", "SCALP")
+    try:
+        held_mins = int(
+            (datetime.now(timezone.utc) -
+             datetime.fromisoformat(pos["open_time"].replace("Z", "+00:00")))
+            .total_seconds() / 60
+        )
+    except Exception:
+        held_mins = 0
+    entry_pol = _polarity(entry_regime)
+    exit_pol  = _polarity(exit_regime)
+    if entry_pol and exit_pol and entry_pol != exit_pol:
+        thesis_class = "breached_regime_shift"
+    elif trade_type_ex == "SCALP" and held_mins > CONFIG.get("scalp_max_hold_minutes", 90):
+        thesis_class = "breached_stale_scalp"
+    else:
+        thesis_class = "noise_stop"
+    short_reason = (reason_pm or pm_trigger)[:120]
+    return (
+        f"{exit_tag} | {trade_type_ex} | regime:{entry_regime}→{exit_regime}"
+        f" | held:{held_mins}min | thesis:{thesis_class} | {pm_trigger}: {short_reason}"
+    )
+
+
 # ── Detect positions closed externally (stop loss / take profit) ──────────────
 
 def check_external_closes(regime: dict):
@@ -378,9 +422,12 @@ def check_external_closes(regime: dict):
                 pnl         = rpnl if (rpnl != 0.0 and not _math.isnan(rpnl)) else manual_pnl
 
                 sl_order_id = trade.get("sl_order_id")
+                tp_order_id = trade.get("tp_order_id")
                 # ── Determine mechanical exit type ─────────────────────────
                 if sl_order_id and _fill_order_id and int(_fill_order_id) == int(sl_order_id):
                     exit_type = "sl_hit"
+                elif tp_order_id and _fill_order_id and int(_fill_order_id) == int(tp_order_id):
+                    exit_type = "tp_hit"
                 elif pnl > 0 and trade.get("tp"):
                     tp       = trade.get("tp")
                     hit_tp   = (not is_short and exit_price >= tp * 0.99) or \
@@ -405,16 +452,6 @@ def check_external_closes(regime: dict):
                     )
                 except Exception:
                     held_mins = 0
-                # Compare polarities (BULL/BEAR) rather than exact strings so that
-                # mixed-vocabulary comparisons (e.g. RELIEF_RALLY vs BULL_TRENDING)
-                # don't spuriously trigger breached_regime_shift.
-                def _polarity(s: str) -> str:
-                    r = (s or "").upper()
-                    if r in ("MOMENTUM_BULL", "RELIEF_RALLY") or "BULL" in r:
-                        return "BULL"
-                    if r in ("TRENDING_BEAR", "DISTRIBUTION") or "BEAR" in r:
-                        return "BEAR"
-                    return ""
                 entry_pol = _polarity(entry_regime)
                 exit_pol  = _polarity(exit_regime)
                 if exit_type == "tp_hit":
@@ -639,11 +676,11 @@ def _maybe_eod_options_review(regime: dict):
         _eod_options_review_done = False
         # Ledger auto-expires by date — no explicit clear needed.
         # Pruning of stale entries happens inside _record_options_attempt.
-        global _portfolio_review_done_today, _session_stop_count, _cascade_reviewed_this_session, _last_trim_ts, _pm_reviewed_regime, _last_pm_review_ts, _last_news_scores, _last_collapse_scores
+        global _portfolio_review_done_today, _session_stop_count, _cascade_reviewed_this_session, _trimmed_today, _pm_reviewed_regime, _last_pm_review_ts, _last_news_scores, _last_collapse_scores
         _portfolio_review_done_today = False
         _session_stop_count = 0
         _cascade_reviewed_this_session = False
-        _last_trim_ts = {}
+        _trimmed_today = set()
         _pm_reviewed_regime = {}
         _last_pm_review_ts = None
         _last_news_scores = {}
@@ -692,6 +729,18 @@ def _should_run_portfolio_review(
     # 1. Pre-market: once per day
     if session == "PRE_MARKET" and not _portfolio_review_done_today:
         return True, "pre_market"
+
+    # Global review cooldown — all non-pre_market triggers are suppressed if a
+    # review ran recently.  This prevents persistent conditions (earnings within 48h,
+    # sustained drawdown) from firing the PM — and executing another TRIM — on
+    # every scan cycle.  Uses the same trim_cooldown_minutes setting so the two
+    # guards are always in sync.
+    _review_cooldown = pm_cfg.get("review_cooldown_minutes",
+                                  pm_cfg.get("trim_cooldown_minutes", 30))
+    if _last_pm_review_ts is not None:
+        _review_age_mins = (datetime.now(_ET) - _last_pm_review_ts).total_seconds() / 60
+        if _review_age_mins < _review_cooldown:
+            return False, ""
 
     # 2. Regime change — edge trigger: fires only when regime label changes
     current_regime = regime.get("regime", "")
@@ -1051,7 +1100,7 @@ def run_scan():
                     _force_pm_review = True
 
     # ── Portfolio manager review (event-triggered) ────────────────────────────
-    global _portfolio_review_done_today, _last_known_regime, _cascade_reviewed_this_session, _last_trim_ts, _last_pm_review_ts, _last_news_scores, _last_collapse_scores
+    global _portfolio_review_done_today, _last_known_regime, _cascade_reviewed_this_session, _trimmed_today, _last_pm_review_ts, _last_news_scores, _last_collapse_scores
     should_review, pm_trigger = _should_run_portfolio_review(
         session=get_session(),
         regime=regime,
@@ -1111,9 +1160,11 @@ def run_scan():
                         if _opt_keys_pm:
                             for _ok in _opt_keys_pm:
                                 clog("TRADE", f"PM EXIT routing to option sell: {_ok}")
-                                execute_sell_option(ib, _ok, reason=f"portfolio_manager:{pm_trigger}")
+                                _exit_reason_pm = _build_pm_exit_reason(pos_pm or {}, regime, pm_trigger, reason_pm) if pos_pm else f"portfolio_manager:{pm_trigger}"
+                                execute_sell_option(ib, _ok, reason=_exit_reason_pm)
                         if sym_pm in _pm_trades:
-                            execute_sell(ib, sym_pm, reason=f"portfolio_manager:{pm_trigger}")
+                            _exit_reason_pm = _build_pm_exit_reason(pos_pm or {}, regime, pm_trigger, reason_pm) if pos_pm else f"portfolio_manager:{pm_trigger}"
+                            execute_sell(ib, sym_pm, reason=_exit_reason_pm)
                     if not _already_exiting and not _opt_keys_pm and sym_pm not in _pm_trades:
                         clog("WARN", f"PM EXIT: no active position found for {sym_pm} — not in tracker as stock or option")
                     if pos_pm:
@@ -1128,16 +1179,17 @@ def run_scan():
                                 "exit_price": round(ep_pm, 4),
                                 "pnl":        round(pnl_pm, 2),
                                 "pnl_pct":    round(pnl_pm / ((pos_pm.get("entry") or 1) * (pos_pm.get("qty") or 1)), 4),
-                                "reason":     f"portfolio_manager:{pm_trigger}",
+                                "reason":     _build_pm_exit_reason(pos_pm, regime, pm_trigger, reason_pm, exit_tag="pm_exit"),
                             },
                         )
                 elif act_pm == "TRIM" and sym_pm:
                     from orders import open_trades as _pm_trades, _trades_lock as _pm_lock
-                    _trim_cooldown_mins = CONFIG.get("portfolio_manager", {}).get("trim_cooldown_minutes", 30)
-                    _last_trim = _last_trim_ts.get(sym_pm)
-                    _trim_age = (datetime.now(_ET) - _last_trim).total_seconds() / 60 if _last_trim else None
-                    if _trim_age is not None and _trim_age < _trim_cooldown_mins:
-                        clog("INFO", f"PM TRIM: {sym_pm} cooldown active ({_trim_age:.0f}m ago, {_trim_cooldown_mins}m required) — skipping")
+                    # TRIM fires at most once per symbol per session.  A second TRIM on
+                    # the same position (same trigger condition, just time has passed)
+                    # is a loop artefact, not a new thesis event.  EXIT can still fire
+                    # at any time if the thesis genuinely breaks.
+                    if sym_pm in _trimmed_today:
+                        clog("INFO", f"PM TRIM: {sym_pm} already trimmed this session — skipping (thesis unchanged; EXIT will fire if thesis breaks)")
                         continue
                     _opt_keys_pm = [k for k in _pm_trades
                                     if k.startswith(sym_pm + "_") and _pm_trades[k].get("instrument") == "option"]
@@ -1146,7 +1198,7 @@ def run_scan():
                         clog("WARN", f"PM TRIM: no active position found for {sym_pm}")
                     else:
                         clog("TRADE", f"Portfolio manager TRIM: {sym_pm} — {reason_pm}")
-                        _last_trim_ts[sym_pm] = datetime.now(_ET)
+                        _trimmed_today.add(sym_pm)
                         if _opt_keys_pm:
                             for _ok in _opt_keys_pm:
                                 with _pm_lock:
@@ -1159,9 +1211,35 @@ def run_scan():
                             with _pm_lock:
                                 _q = _pm_trades.get(sym_pm, {}).get("qty", 0)
                             _trim_q = max(1, _q // 2)
+                            _trim_reason = _build_pm_exit_reason(
+                                pos_pm or {}, regime, pm_trigger, reason_pm, exit_tag="pm_trim"
+                            ) if pos_pm else f"portfolio_manager_trim:{pm_trigger}"
                             execute_sell(ib, sym_pm,
-                                         reason=f"portfolio_manager_trim:{pm_trigger}",
+                                         reason=_trim_reason,
                                          qty_override=_trim_q if _trim_q < _q else None)
+                            if pos_pm:
+                                _ep_trim = pos_pm.get("current", pos_pm.get("entry", 0))
+                                _entry   = pos_pm.get("entry", 0)
+                                _trim_pnl = (
+                                    (_entry - _ep_trim) * _trim_q
+                                    if pos_pm.get("direction") == "SHORT"
+                                    else (_ep_trim - _entry) * _trim_q
+                                )
+                                from learning import log_trade as _log_trade_trim
+                                _trim_pos = dict(pos_pm)
+                                _trim_pos["qty"] = _trim_q
+                                _log_trade_trim(
+                                    trade=_trim_pos,
+                                    agent_outputs={},
+                                    regime=regime,
+                                    action="CLOSE",
+                                    outcome={
+                                        "exit_price": round(_ep_trim, 4),
+                                        "pnl":        round(_trim_pnl, 2),
+                                        "pnl_pct":    round(_trim_pnl / (((_entry or 1) * _trim_q)), 4),
+                                        "reason":     _trim_reason,
+                                    },
+                                )
                 elif act_pm == "ADD":
                     clog("INFO", f"Portfolio manager ADD: {sym_pm} — {reason_pm} (manual review)")
                 else:

@@ -579,7 +579,7 @@ def get_market_regime(ib: IB) -> dict:
 
         # ── 200-DAY DAILY MA — more reliable trend signal than 20h EMA ──
         # The 20h EMA (~2.5 trading days) flipped on intraday noise, causing
-        # BULL↔CHOPPY oscillation mid-trend. The 200d daily MA is the standard
+        # TRENDING_UP↔RANGE_BOUND oscillation mid-trend. The 200d daily MA is the standard
         # institutional benchmark and is slow enough to reflect genuine regime.
         # Fallback: use short-term EMA if daily fetch fails.
         spy_above_200d = False
@@ -636,15 +636,18 @@ def get_market_regime(ib: IB) -> dict:
         _breadth_confirms_bear = (breadth_pct is None or breadth_pct < _bear_max)
 
         if vix_now > CONFIG["vix_panic_min"] or vix_1h_change > CONFIG["vix_spike_pct"]:
-            regime = "PANIC"
+            regime = "CAPITULATION"
         elif (vix_now < CONFIG["vix_bull_max"] and spy_above_200d and qqq_above_200d
               and _breadth_confirms_bull):
-            regime = "BULL_TRENDING"
+            regime = "TRENDING_UP"
         elif (not spy_above_200d and not qqq_above_200d and vix_now > CONFIG["vix_choppy_max"]
               and _breadth_confirms_bear):
-            regime = "BEAR_TRENDING"
+            regime = "TRENDING_DOWN"
+        elif (not spy_above_200d and not qqq_above_200d and vix_1h_change < -0.05):
+            # Both below 200d MA (structural bear) but VIX falling — intraday bounce within downtrend
+            regime = "RELIEF_RALLY"
         else:
-            regime = "CHOPPY"
+            regime = "RANGE_BOUND"
 
         # ── SIGNAL ROUTING REGIME — uses VIX already fetched above ──────────
         # Avoids a duplicate VIX fetch in score_universe(). The routing regime
@@ -799,10 +802,11 @@ def get_market_regime(ib: IB) -> dict:
 
 def _regime_size_mult(regime: str) -> float:
     return {
-        "BULL_TRENDING": 1.0,
-        "BEAR_TRENDING": 1.0,
-        "CHOPPY":        1.0,
-        "PANIC":         0.0,
+        "TRENDING_UP":   1.0,
+        "TRENDING_DOWN": 1.0,
+        "RELIEF_RALLY":  1.0,
+        "RANGE_BOUND":   1.0,
+        "CAPITULATION":  0.0,
         "UNKNOWN":       0.75,
     }.get(regime, 0.75)
 

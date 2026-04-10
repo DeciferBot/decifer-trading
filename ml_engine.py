@@ -54,7 +54,7 @@ TRADE_LOG_FILE = CONFIG.get("trade_log", "data/trades.json")
 MODELS_DIR = "data/models"
 MIN_TRADES_FOR_ML = CONFIG.get("ml_min_trades", 50)
 ML_CONFIDENCE_WEIGHT = CONFIG.get("ml_confidence_weight", 0.3)
-REGIME_OPTIONS = ["BULL_TRENDING", "BEAR_TRENDING", "CHOPPY", "PANIC", "BREAKOUT"]
+REGIME_OPTIONS = ["TRENDING_UP", "TRENDING_DOWN", "RANGE_BOUND", "CAPITULATION", "RELIEF_RALLY"]
 BREAKEVEN_THRESHOLD = 0.001  # Within 0.1% of entry price = breakeven
 
 

@@ -93,7 +93,7 @@ def _reset_risk():
 
 def _panic_regime(vix: float = 45.0) -> dict:
     return {
-        "regime":                  "PANIC",
+        "regime":                  "CAPITULATION",
         "vix":                     vix,
         "vix_1h_change":           25.0,
         "spy_price":               490.0,
@@ -107,7 +107,7 @@ def _panic_regime(vix: float = 45.0) -> dict:
 
 def _bull_regime(vix: float = 15.0) -> dict:
     return {
-        "regime":                  "BULL_TRENDING",
+        "regime":                  "TRENDING_UP",
         "vix":                     vix,
         "vix_1h_change":           -2.0,
         "spy_price":               550.0,
@@ -150,8 +150,8 @@ class TestPanicProducesZeroOrders:
         )
 
         assert ok is False
-        assert "PANIC" in reason.upper() or "panic" in reason.lower(), (
-            f"Expected PANIC in reason, got: {reason!r}"
+        assert "CAPITULATION" in reason.upper() or "capitulation" in reason.lower(), (
+            f"Expected CAPITULATION in reason, got: {reason!r}"
         )
 
     def test_panic_blocks_even_with_boosted_ic_weights(self, monkeypatch):
@@ -172,9 +172,9 @@ class TestPanicProducesZeroOrders:
         )
         assert ok is False
 
-    def test_panic_position_size_multiplier_is_zero(self):
+    def test_capitulation_position_size_multiplier_is_zero(self):
         """
-        _regime_size_mult('PANIC') must return 0.0.
+        _regime_size_mult('CAPITULATION') must return 0.0.
         Scanner-level enforcement independent of risk.py.
         """
         import importlib
@@ -186,19 +186,19 @@ class TestPanicProducesZeroOrders:
         _scanner_real = importlib.util.module_from_spec(spec)
         try:
             spec.loader.exec_module(_scanner_real)
-            assert _scanner_real._regime_size_mult("PANIC") == 0.0
+            assert _scanner_real._regime_size_mult("CAPITULATION") == 0.0
         except Exception:
             # If scanner can't load in isolation (missing deps), fall back to checking
             # the cached module, which passes when scanner is properly loaded.
             cached = sys.modules.get("scanner")
             if cached and hasattr(cached, "_regime_size_mult") and not isinstance(cached._regime_size_mult, type(MagicMock())):
-                assert cached._regime_size_mult("PANIC") == 0.0
+                assert cached._regime_size_mult("CAPITULATION") == 0.0
             else:
                 pytest.skip("scanner stub in sys.modules — pre-existing test isolation issue from test_orders_execute.py")
 
-    def test_bull_trending_is_not_blocked(self, monkeypatch):
+    def test_trending_up_is_not_blocked(self, monkeypatch):
         """
-        BULL_TRENDING with VIX=15 must not be blocked by the PANIC check.
+        TRENDING_UP with VIX=15 must not be blocked by the CAPITULATION check.
         Confirms the gate is not overly broad.
         """
         monkeypatch.setitem(_config_mod.CONFIG, "pdt", {"enabled": False})

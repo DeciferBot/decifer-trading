@@ -355,7 +355,8 @@ class TestPanicMomentumInconsistency:
         """
         monkeypatch.setitem(_config_mod.CONFIG, "regime_routing_enabled", True)
         _all_dims = {"trend", "momentum", "squeeze", "flow", "breakout",
-                     "mtf", "news", "social", "reversion"}
+                     "mtf", "news", "social", "reversion",
+                     "iv_skew", "pead", "short_squeeze"}
 
         for regime in ("momentum", "mean_reversion", "unknown"):
             mults = _regime_multipliers(regime)

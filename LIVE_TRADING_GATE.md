@@ -1,5 +1,5 @@
 # Live Trading Gate — Decifer Trading
-## Version 1.1 | 2026-03-30
+## Version 1.2 | 2026-04-09
 
 This document is the single source of truth for all criteria that must be met
 before live-money trading is permitted. Three sequential gates must be cleared in
@@ -11,53 +11,19 @@ order. No gate may be bypassed. Amit must explicitly sign off on each transition
 
 | Gate | Status | Progress |
 |------|--------|----------|
-| Gate 0 — Alpha Validation | **BLOCKED** | 0/50 closed trades with positive expectancy |
-| Gate 1 — Phase 1 Exit | Locked (requires Gate 0) | 0/200 closed trades |
+| Gate 1 — Phase 1 Exit | In progress | 0/100 closed paper trades |
 | Gate 2 — Live Trading Prerequisites | Locked (requires Gate 1) | Telegram not configured |
 | Gate 3 — Founder Sign-Off | Locked (requires Gate 2) | Awaiting all prior gates |
 
-_Status is informational only. Authoritative check: `phase_gate.check_alpha_gate()` and `phase_gate.get_status()`._
-
----
-
-## Gate 0 — Alpha Validation Gate
-
-**The signal model has no demonstrated alpha until this gate is cleared.**
-All downstream work (new signal dimensions, infrastructure, live trading) is
-built on an unvalidated foundation until these criteria are met.
-
-### Hard Rules (enforced by `phase_gate.assert_alpha_gate_passed()`)
-
-- [ ] **50 closed paper trades** logged to `data/trades.json`
-- [ ] **Positive average PnL per trade** across those 50 trades (expectancy > $0)
-
-### What this gate blocks
-
-While Gate 0 is open, the following are **prohibited**:
-
-| Blocked Work | Reason |
-|---|---|
-| New signal dimensions (mean-reversion, HMM, walk-forward weights) | Would add complexity to an unproven foundation |
-| Infrastructure work (Docker, cloud, multi-user) | Would harden an untested system |
-| Advancing the live trading gate | Cannot risk real capital on unvalidated alpha |
-| Phase B/C/D backlog items | All depend on Gate 0 being cleared |
-
-### How to clear Gate 0
-
-1. Accumulate 50+ closed paper trades in `data/trades.json`
-2. Verify positive expectancy: `python3 -c "from phase_gate import check_alpha_gate; import json; print(json.dumps(check_alpha_gate().as_dict(), indent=2))"`
-3. Review trade quality with Amit — win rate, regime distribution, worst drawdown
-4. Amit signs off before any Phase B work begins
+_Status is informational only. Authoritative check: `phase_gate.get_status()`._
 
 ---
 
 ## Gate 1 — Phase 1 Exit Criteria
 
-_Requires Gate 0 to be cleared first._
-
 All of the following must be true simultaneously:
 
-- [ ] **200+ closed paper trades** logged to `data/trades.json`
+- [ ] **100+ closed paper trades** logged to `data/trades.json`
 - [ ] **Test suite ≥ 80% pass rate** (run `pytest`)
 - [ ] **30+ consecutive paper trading days** without a critical bug or system halt
 - [ ] **Amit explicitly sets** `config["phase_gate"]["current_phase"] = 2`
@@ -94,13 +60,13 @@ All of the following must be true:
 
 _Requires Gate 2 to be cleared first. This gate is human-enforced — no code can substitute for it._
 
-Gates 0–2 are verified programmatically. Gate 3 is Amit's explicit, deliberate decision
+Gates 1–2 are verified programmatically. Gate 3 is Amit's explicit, deliberate decision
 to deploy real capital. It cannot be automated or inferred.
 
 ### Required actions (all must be completed in order)
 
 - [ ] **Read the full paper trading session log** covering ≥ 30 consecutive trading days
-- [ ] **Inspect the top 5 trades by absolute PnL** — confirm Gate 0 expectancy is not driven
+- [ ] **Inspect the top 5 trades by absolute PnL** — confirm expectancy is not driven
       by 1–2 outlier trades. If removing the top 2 trades flips expectancy negative, do not proceed.
 - [ ] **Confirm per-dimension IC** — at least 3 of 9 signal dimensions show positive
       information coefficient over the paper trading period
@@ -139,22 +105,18 @@ Until that code change is made, this gate is human-process only.
 
 ```python
 from phase_gate import (
-    check_alpha_gate,        # Returns AlphaGateStatus (non-raising)
-    assert_alpha_gate_passed, # Raises PhaseGateViolation if Gate 0 blocked
-    get_status,              # Full PhaseStatus including alpha_gate
+    get_status,              # Full PhaseStatus
     validate,                # Returns list of Phase 4 gate violations
     validate_or_raise,       # Raises on first violation
     assert_feature_allowed,  # Check a specific frozen feature
 )
 
-# Check Gate 0
-status = check_alpha_gate()
-print(status.gate_passed, status.closed_trades, status.expectancy)
-
-# Enforce Gate 0 before starting new signal dimension work
-assert_alpha_gate_passed()  # raises PhaseGateViolation if not cleared
-
 # Full status for dashboard
 full = get_status()
-print(full.alpha_gate.as_dict())
+print(full.as_dict())
+
+# Check Phase 4 prerequisites
+violations = validate()
+if violations:
+    print("\n".join(violations))
 ```

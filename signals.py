@@ -1044,13 +1044,17 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
         # ── VWAP — institutional anchor (intraday only) ─────
         # Use Alpaca's exchange-calculated VWAP if present (more accurate than
         # reconstructed VWAP from OHLCV). Fall back to cumulative calculation.
-        vwap_sd_pct = 1.0  # default: 1% if insufficient data
+        vwap_sd_pct = 1.0  # default: 1% if we can't compute
         if tf == "5m" and volume.sum() > 0:
             native_vwap = df.get("vwap") if hasattr(df, "get") else None
             if native_vwap is not None and hasattr(native_vwap, 'iloc'):
                 last_native = native_vwap.iloc[-1]
                 if pd.notna(last_native) and float(last_native) > 0:
                     vwap_val = float(last_native)
+                    # SD of close deviations from scalar VWAP (approximate for native path)
+                    if vwap_val > 0 and len(close) > 1:
+                        devs = (close - vwap_val) / vwap_val * 100
+                        vwap_sd_pct = max(0.1, float(devs.std()))
                 else:
                     native_vwap = None
             if native_vwap is None:
@@ -1059,6 +1063,10 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
                 cum_vol = volume.cumsum()
                 vwap_series = cum_tp_vol / cum_vol.replace(0, 1e-9)
                 vwap_val = float(vwap_series.iloc[-1])
+                # SD of close deviations from the rolling VWAP series (proper computation)
+                if vwap_val > 0 and len(close) > 1:
+                    devs = (close - vwap_series) / vwap_series * 100
+                    vwap_sd_pct = max(0.1, float(devs.std()))
             # Distance from VWAP as % of price — positive = above VWAP (bullish)
             vwap_dist = ((p - vwap_val) / vwap_val) * 100 if vwap_val > 0 else 0.0
             # SD of close deviations from rolling VWAP — used for dynamic overextension threshold
@@ -2323,7 +2331,7 @@ def get_regime_threshold(regime: str) -> int:
     Quality filtering is the Opus reasoning layer's job — a uniform bar
     means Opus sees the same candidate quality regardless of regime label.
 
-    The only special case is the extreme circuit breaker (PANIC / EXTREME_STRESS):
+    The only special case is the extreme circuit breaker (CAPITULATION / EXTREME_STRESS):
     threshold 99 blocks all mechanically-scored signals, consistent with the
     hard gate in check_risk_conditions().
 
@@ -2331,7 +2339,7 @@ def get_regime_threshold(regime: str) -> int:
     """
     base  = CONFIG["min_score_to_trade"]
     panic = CONFIG.get("regime_threshold_panic", 99)
-    if regime in ("PANIC", "EXTREME_STRESS"):
+    if regime in ("CAPITULATION", "EXTREME_STRESS"):
         return panic
     return base
 

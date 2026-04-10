@@ -22,6 +22,8 @@ config_mod.CONFIG = {
     "max_positions": 5,
     "risk_pct_per_trade": 0.02,
     "daily_loss_limit": 0.05,
+    "min_cash_reserve": 0.10,
+    "pdt": {"enabled": False},
     "min_score": 60,
     "log_file": "/tmp/test_decifer.log",
     "trade_log": "/tmp/test_trades.json",

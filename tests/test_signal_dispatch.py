@@ -96,7 +96,7 @@ def _make_signal(symbol: str, direction: str = "LONG") -> Signal:
         dimension_scores={"trend": 7, "momentum": 6, "squeeze": 5, "flow": 4,
                           "breakout": 3, "mtf": 6, "news": 4, "social": 2, "reversion": 1},
         timestamp=datetime(2026, 3, 29, 10, 0, 0, tzinfo=timezone.utc),
-        regime_context="BULL_TRENDING",
+        regime_context="TRENDING_UP",
         source_agents=[0, 1, 2, 3],
         rationale="Test rationale",
         price=100.0,
@@ -112,7 +112,7 @@ class TestSignalDataclass(unittest.TestCase):
         self.assertEqual(s.symbol, "AAPL")
         self.assertEqual(s.direction, "LONG")
         self.assertAlmostEqual(s.conviction_score, 7.0)
-        self.assertEqual(s.regime_context, "BULL_TRENDING")
+        self.assertEqual(s.regime_context, "TRENDING_UP")
         self.assertEqual(s.price, 100.0)
         self.assertEqual(s.atr, 2.5)
 
@@ -155,7 +155,7 @@ class TestDispatchSignals(unittest.TestCase):
 
     def setUp(self):
         self.ib = MagicMock()
-        self.regime = {"regime": "BULL_TRENDING", "vix": 15.0, "spy_price": 500.0}
+        self.regime = {"regime": "TRENDING_UP", "vix": 15.0, "spy_price": 500.0}
         self.pv = 100_000.0
 
     def test_five_long_signals_produce_five_results(self):

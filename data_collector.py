@@ -33,6 +33,14 @@ import pandas as pd
 import numpy as np
 
 import raw_store
+
+
+def _strip_tz(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize DatetimeIndex to tz-naive UTC so mixed sources can be concatenated."""
+    if hasattr(df.index, "tz") and df.index.tz is not None:
+        df = df.copy()
+        df.index = df.index.tz_convert("UTC").tz_localize(None)
+    return df
 import feature_pipeline
 from raw_store import DataQualityError  # re-export for callers
 from feature_pipeline import FeatureError  # re-export for callers
@@ -132,16 +140,34 @@ def save_meta(meta: dict):
 
 def download_intraday_yf(symbol: str, interval: str = "5m") -> Optional[pd.DataFrame]:
     """
-    Download intraday bars from yfinance.
-    5m bars: max 60 days lookback.
-    1m bars: max 7 days lookback.
-
+    Download intraday bars. Priority: Alpaca → yfinance (fallback only).
+    5m bars: 60 days lookback. 1m bars: 7 days lookback.
     Returns DataFrame or None on failure.
     """
+    period = "60d" if interval in ("5m", "15m") else "7d"
+
+    # Layer 1: Alpaca — primary source
+    try:
+        from alpaca_data import fetch_bars
+        df = fetch_bars(symbol, period=period, interval=interval)
+        if df is not None and not df.empty:
+            df = df.copy()
+            df.index.name = "datetime"
+            df = df.rename(columns={"Open": "open", "High": "high", "Low": "low",
+                                    "Close": "close", "Volume": "volume"})
+            df = df[[c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]]
+            df["symbol"] = symbol
+            df["source"] = "alpaca"
+            df["interval"] = interval
+            log.info(f"[alpaca-intraday] {symbol} {interval}: {len(df)} bars "
+                     f"({df.index.min()} → {df.index.max()})")
+            return df
+    except Exception as e:
+        log.debug(f"[alpaca-intraday] {symbol} failed: {e}")
+
+    # Layer 2: yfinance — fallback only
     try:
         ticker = yf.Ticker(symbol)
-        # 5m: "60d" is the max period yfinance allows
-        period = "60d" if interval in ("5m", "15m") else "7d"
         df = _fetch_with_retry(
             ticker.history,
             period=period, interval=interval, prepost=True,
@@ -152,35 +178,50 @@ def download_intraday_yf(symbol: str, interval: str = "5m") -> Optional[pd.DataF
             log.warning(f"[yf-intraday] No data for {symbol} ({interval})")
             return None
 
-        # Standardise columns
         df.index.name = "datetime"
-        df = df.rename(columns={
-            "Open": "open", "High": "high", "Low": "low",
-            "Close": "close", "Volume": "volume"
-        })
-        df = df[["open", "high", "low", "close", "volume"]]
+        df = df.rename(columns={"Open": "open", "High": "high", "Low": "low",
+                                "Close": "close", "Volume": "volume"})
+        df = df[[c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]]
         df["symbol"] = symbol
         df["source"] = "yfinance"
         df["interval"] = interval
-
         log.info(f"[yf-intraday] {symbol} {interval}: {len(df)} bars "
                  f"({df.index.min()} → {df.index.max()})")
         return df
 
     except Exception as e:
-        log.error(f"[yf-intraday] {symbol} failed: {e}")
+        log.error(f"[intraday] {symbol} failed: {e}")
         return None
 
 
 # ═════════════════════════════════════════════════════════════════
-# 2. YFINANCE — Daily (max history, typically 20+ years)
+# 2. Daily bars — Alpaca primary, yfinance fallback
 # ═════════════════════════════════════════════════════════════════
 
 def download_daily_yf(symbol: str) -> Optional[pd.DataFrame]:
     """
-    Download full daily history from yfinance.
-    Typically returns 20+ years for major stocks.
+    Download daily bars. Priority: Alpaca (Algo Trader Plus, ~5yr) → yfinance (max history).
+    yfinance is fallback only — used for long ML training history beyond Alpaca's range.
     """
+    # Layer 1: Alpaca — primary source
+    try:
+        from alpaca_data import fetch_bars
+        df = fetch_bars(symbol, period="5y", interval="1d")
+        if df is not None and not df.empty:
+            df = df.copy()
+            df.index.name = "date"
+            df = df.rename(columns={"Open": "open", "High": "high", "Low": "low",
+                                    "Close": "close", "Volume": "volume"})
+            df = df[[c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]]
+            df["symbol"] = symbol
+            df["source"] = "alpaca"
+            log.info(f"[alpaca-daily] {symbol}: {len(df)} bars "
+                     f"({df.index.min().date()} → {df.index.max().date()})")
+            return df
+    except Exception as e:
+        log.debug(f"[alpaca-daily] {symbol} failed: {e}")
+
+    # Layer 2: yfinance — fallback for long history (20+ years for ML training)
     try:
         ticker = yf.Ticker(symbol)
         df = _fetch_with_retry(
@@ -194,11 +235,8 @@ def download_daily_yf(symbol: str) -> Optional[pd.DataFrame]:
             return None
 
         df.index.name = "date"
-        df = df.rename(columns={
-            "Open": "open", "High": "high", "Low": "low",
-            "Close": "close", "Volume": "volume"
-        })
-        # Keep dividends/splits if available for adjusted price calc
+        df = df.rename(columns={"Open": "open", "High": "high", "Low": "low",
+                                "Close": "close", "Volume": "volume"})
         keep_cols = ["open", "high", "low", "close", "volume"]
         if "Dividends" in df.columns:
             df = df.rename(columns={"Dividends": "dividends"})
@@ -206,17 +244,15 @@ def download_daily_yf(symbol: str) -> Optional[pd.DataFrame]:
         if "Stock Splits" in df.columns:
             df = df.rename(columns={"Stock Splits": "splits"})
             keep_cols.append("splits")
-
-        df = df[keep_cols]
+        df = df[[c for c in keep_cols if c in df.columns]]
         df["symbol"] = symbol
         df["source"] = "yfinance"
-
         log.info(f"[yf-daily] {symbol}: {len(df)} bars "
                  f"({df.index.min().date()} → {df.index.max().date()})")
         return df
 
     except Exception as e:
-        log.error(f"[yf-daily] {symbol} failed: {e}")
+        log.error(f"[daily] {symbol} failed: {e}")
         return None
 
 
@@ -401,6 +437,9 @@ def _write_features(df: pd.DataFrame, symbol: str, timeframe: str) -> int:
     # Append to existing features file if present
     if feat_path.exists():
         existing = pd.read_parquet(feat_path)
+        # Normalize both to tz-naive UTC before concat to avoid tz comparison errors
+        existing = _strip_tz(existing)
+        enriched  = _strip_tz(enriched)
         enriched = pd.concat([existing, enriched])
         enriched = enriched[~enriched.index.duplicated(keep="last")]
         enriched = enriched.sort_index()

@@ -137,7 +137,7 @@ def _scored_dict(symbol="AAPL", score=35, direction="LONG") -> dict:
 
 
 def _default_regime() -> dict:
-    return {"regime": "BULL_TRENDING", "vix": 15.0, "spy_price": 500.0,
+    return {"regime": "TRENDING_UP", "vix": 15.0, "spy_price": 500.0,
             "regime_router": "momentum"}
 
 
@@ -323,7 +323,7 @@ class TestScoredToSignals(unittest.TestCase):
     def test_basic_conversion(self):
         scored = [_scored_dict("AAPL", score=35, direction="LONG"),
                   _scored_dict("NVDA", score=40, direction="SHORT")]
-        signals = _scored_to_signals(scored, "BULL_TRENDING")
+        signals = _scored_to_signals(scored, "TRENDING_UP")
         self.assertEqual(len(signals), 2)
         self.assertEqual(signals[0].symbol, "AAPL")
         self.assertAlmostEqual(signals[0].conviction_score, 7.0)
@@ -337,23 +337,23 @@ class TestScoredToSignals(unittest.TestCase):
 
     def test_regime_context_preserved(self):
         scored = [_scored_dict("SPY")]
-        signals = _scored_to_signals(scored, "BEAR_TRENDING")
-        self.assertEqual(signals[0].regime_context, "BEAR_TRENDING")
+        signals = _scored_to_signals(scored, "TRENDING_DOWN")
+        self.assertEqual(signals[0].regime_context, "TRENDING_DOWN")
 
     def test_price_and_atr_copied(self):
         s = _scored_dict("TSLA")
         s["price"] = 250.0
         s["atr"] = 8.0
-        signals = _scored_to_signals([s], "BULL_TRENDING")
+        signals = _scored_to_signals([s], "TRENDING_UP")
         self.assertAlmostEqual(signals[0].price, 250.0)
         self.assertAlmostEqual(signals[0].atr, 8.0)
 
     def test_empty_scored_returns_empty(self):
-        self.assertEqual(_scored_to_signals([], "BULL_TRENDING"), [])
+        self.assertEqual(_scored_to_signals([], "TRENDING_UP"), [])
 
     def test_returns_signal_instances(self):
         scored = [_scored_dict()]
-        signals = _scored_to_signals(scored, "BULL_TRENDING")
+        signals = _scored_to_signals(scored, "TRENDING_UP")
         self.assertIsInstance(signals[0], Signal)
 
 
@@ -365,7 +365,7 @@ class TestAppendSignalsLog(unittest.TestCase):
         return Signal(
             symbol=symbol, direction="LONG", conviction_score=7.0,
             dimension_scores={"trend": 7}, timestamp=datetime.now(timezone.utc),
-            regime_context="BULL_TRENDING", price=100.0, atr=2.5,
+            regime_context="TRENDING_UP", price=100.0, atr=2.5,
         )
 
     def test_writes_valid_jsonl_lines(self):
@@ -419,7 +419,7 @@ class TestApplyStrategyThreshold(unittest.TestCase):
         scored = self._scored_list([25, 30, 35, 10, 5])
         mode = {"mode": "NORMAL", "score_threshold_adj": 0}
         with patch.object(signal_pipeline, "get_regime_threshold", return_value=20):
-            result = _apply_strategy_threshold(scored, mode, "BULL_TRENDING")
+            result = _apply_strategy_threshold(scored, mode, "TRENDING_UP")
         self.assertEqual(len(result), 5)  # no filtering when adj=0
 
     def test_raised_threshold_filters_below(self):
@@ -428,7 +428,7 @@ class TestApplyStrategyThreshold(unittest.TestCase):
         mode = {"mode": "DEFENSIVE", "score_threshold_adj": 5}
         with patch.object(signal_pipeline, "get_regime_threshold", return_value=20), \
              patch.object(signal_pipeline, "_get_edge_gate_adj", return_value=(0, "no_data")):
-            result = _apply_strategy_threshold(scored, mode, "BULL_TRENDING")
+            result = _apply_strategy_threshold(scored, mode, "TRENDING_UP")
         scores_in = [s["score"] for s in result]
         self.assertTrue(all(s >= 25 for s in scores_in))
         self.assertEqual(len(result), 2)  # only score=25 and score=30
@@ -436,7 +436,7 @@ class TestApplyStrategyThreshold(unittest.TestCase):
     def test_empty_scored_returns_empty(self):
         mode = {"mode": "NORMAL", "score_threshold_adj": 0}
         with patch.object(signal_pipeline, "get_regime_threshold", return_value=20):
-            result = _apply_strategy_threshold([], mode, "BULL_TRENDING")
+            result = _apply_strategy_threshold([], mode, "TRENDING_UP")
         self.assertEqual(result, [])
 
 
@@ -477,7 +477,7 @@ class TestRunSignalPipeline(unittest.TestCase):
 
     def test_regime_name_extracted_correctly(self):
         result = self._patched_pipeline()
-        self.assertEqual(result.regime_name, "BULL_TRENDING")
+        self.assertEqual(result.regime_name, "TRENDING_UP")
 
     def test_score_universe_called_with_correct_regime(self):
         with patch.object(signal_pipeline, "score_universe", return_value=([], [])) as mock_su, \
@@ -485,7 +485,7 @@ class TestRunSignalPipeline(unittest.TestCase):
              patch.object(signal_pipeline, "log_signal_scan"):
             run_signal_pipeline(**self._base_kwargs())
         call_args = mock_su.call_args
-        self.assertEqual(call_args.args[1], "BULL_TRENDING")
+        self.assertEqual(call_args.args[1], "TRENDING_UP")
 
     def test_social_skipped_in_pre_market(self):
         kw = self._base_kwargs()

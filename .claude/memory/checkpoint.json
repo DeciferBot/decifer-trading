@@ -1,21 +1,21 @@
 {
-  "timestamp": "2026-04-01T16:34:33.951Z",
+  "timestamp": "2026-04-09T17:14:21.821Z",
   "branch": "master",
-  "lastCommit": "ae385a3 fix(dashboard): repair empty HTML + execute_buy candle_gate TypeError",
+  "lastCommit": "995c41d fix(options): repair Alpaca chain fetch — wrong field name, missing attributes, silent failures",
   "roadmapPhase": null,
   "lastFilesTouched": [
-    "lpha_decay.py",
-    "dashboard.py",
-    "data/orders.json",
-    "equity_history.json",
-    "tests/test_alpha_decay.py",
-    "CLAUDE.md.bak",
-    "data/alpha_decay_cache.json",
-    "data/audit_log.jsonl",
-    "data/hwm_state.json",
-    "data/sec_tickers.json"
+    "claude/hooks/pre-tool-hook.mjs",
+    ".claude/memory/checkpoint.json",
+    ".claude/memory/session-history.jsonl",
+    ".claude/settings.json",
+    ".env.example",
+    "CLAUDE.md",
+    "LIVE_TRADING_GATE.md",
+    "agents.py",
+    "alpaca_data.py",
+    "alpha_decay.py"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 71
+  "sessionCount": 155
 }
