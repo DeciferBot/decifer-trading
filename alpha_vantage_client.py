@@ -199,6 +199,128 @@ def get_news_sentiment(tickers: list[str]) -> dict[str, dict]:
         return {}
 
 
+# Cache for raw article feed (separate from sentiment cache)
+_articles_cache: tuple[list | None, float] = (None, 0.0)
+_ARTICLES_TTL = 15 * 60  # 15 minutes — more frequent than sentiment
+
+
+def get_news_articles(tickers: list[str], limit: int = 50) -> list[dict]:
+    """
+    Fetch news articles with images from Alpha Vantage NEWS_SENTIMENT feed.
+
+    Returns list of dicts:
+      {
+        "headline":   str,
+        "summary":    str,
+        "url":        str,
+        "source":     str,
+        "image_url":  str,   # banner_image from AV — actual article photo
+        "symbols":    list[str],
+        "sentiment":  str,   # "BULLISH" | "BEARISH" | "NEUTRAL"
+        "age_hours":  float,
+        "created_ts": int,   # ms epoch
+      }
+
+    Returns [] when: no key, rate limit hit, or API error.
+    """
+    if not tickers:
+        return []
+    key = _api_key()
+    if not key:
+        return []
+
+    global _articles_cache
+    cached_articles, cached_at = _articles_cache
+    now_mono = time.monotonic()
+    if cached_articles is not None and now_mono - cached_at < _ARTICLES_TTL:
+        log.debug("AV articles: cache hit (%d articles)", len(cached_articles))
+        return cached_articles
+
+    if not _consume_call():
+        return cached_articles or []
+
+    batch = tickers[:50]
+    ticker_str = ",".join(t.upper() for t in batch)
+    url = (f"{_BASE_URL}?function=NEWS_SENTIMENT"
+           f"&tickers={ticker_str}&apikey={key}&sort=LATEST&limit={limit}")
+
+    try:
+        resp = requests.get(url, timeout=10, headers={"User-Agent": "Decifer/2.0"})
+        status = resp.status_code
+        data = resp.json() if status == 200 else {}
+        resp.close()
+
+        if status != 200:
+            log.warning("AV articles HTTP %d", status)
+            return cached_articles or []
+
+        if "Note" in data or "Information" in data:
+            msg = (data.get("Note") or data.get("Information", ""))[:150]
+            log.warning("AV API message (articles): %s", msg)
+            return cached_articles or []
+
+        from datetime import datetime, timezone as _tz
+        now_utc = datetime.now(_tz.utc)
+
+        articles = []
+        for art in data.get("feed", []):
+            headline = (art.get("title") or "").strip()
+            if not headline:
+                continue
+
+            image_url = (art.get("banner_image") or "").strip()
+
+            # Parse published time: "20240101T120000"
+            time_str = art.get("time_published", "")
+            age_hours = 0.0
+            created_ts = 0
+            try:
+                dt = datetime.strptime(time_str, "%Y%m%dT%H%M%S").replace(tzinfo=_tz.utc)
+                age_hours  = (now_utc - dt).total_seconds() / 3600
+                created_ts = int(dt.timestamp() * 1000)
+            except Exception:
+                pass
+
+            # Derive dominant sentiment from overall score
+            score = float(art.get("overall_sentiment_score") or 0)
+            if score >= 0.15:
+                sentiment = "BULLISH"
+            elif score <= -0.15:
+                sentiment = "BEARISH"
+            else:
+                sentiment = "NEUTRAL"
+
+            # Collect symbols mentioned
+            symbols = [
+                (ts.get("ticker") or "").upper()
+                for ts in art.get("ticker_sentiment", [])
+                if (ts.get("ticker") or "").strip()
+            ]
+
+            articles.append({
+                "headline":   headline,
+                "summary":    (art.get("summary") or "").strip(),
+                "url":        (art.get("url") or "").strip(),
+                "source":     (art.get("source") or "").strip(),
+                "image_url":  image_url,
+                "symbols":    symbols,
+                "sentiment":  sentiment,
+                "age_hours":  round(age_hours, 2),
+                "created_ts": created_ts,
+                "news_score": 0,
+                "catalyst":   "",
+            })
+
+        log.info("AV news articles: %d articles fetched (%d with images)",
+                 len(articles), sum(1 for a in articles if a["image_url"]))
+        _articles_cache = (articles, now_mono)
+        return articles
+
+    except Exception as exc:
+        log.error("AV get_news_articles error: %s", exc)
+        return cached_articles or []
+
+
 # ── Earnings calendar ──────────────────────────────────────────────────────────
 
 def get_sector_performance() -> dict[str, dict]:

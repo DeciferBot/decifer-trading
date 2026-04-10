@@ -37,7 +37,8 @@ from orders_state import (
     _trades_lock,
     _get_symbol_lock,
     _safe_set_trade, _safe_update_trade, _safe_del_trade,
-    _is_recently_closed, _persist_positions,
+    _is_recently_closed,
+    _save_positions_file,
 )
 from orders_guards import (
     _is_duplicate_check_enabled,
@@ -611,8 +612,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                     "t1_order_id":      tp_trade.order.orderId if tranche_mode else None,
                     "t2_sl_order_id":   None,  # set by update_tranche_status after T1 fills
                 }
-            # Persist position to trade_store before logging to trades.json
-            _persist_positions()
+            _save_positions_file()
             # Log OPEN record to trades.json for feedback loop
             from learning import log_trade
             if tranche_mode:
@@ -986,8 +986,7 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
                     "high_water_mark":     price,
                     "tranche_mode":        False,
                 }
-            # Persist position to trade_store before logging to trades.json
-            _persist_positions()
+            _save_positions_file()
             from learning import log_trade
             log_trade(
                 trade=active_trades[symbol],
@@ -1128,7 +1127,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             with _trades_lock:
                 recently_closed[symbol] = datetime.now(timezone.utc).isoformat()
                 del active_trades[_trade_key]
-            _persist_positions()
+            _save_positions_file()
         return True
 
     except Exception as e:

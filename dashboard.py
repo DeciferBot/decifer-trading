@@ -194,17 +194,30 @@ canvas{display:block;width:100% !important}
 .news-hero-sym{font-size:10px;color:var(--orange);font-weight:700}
 .news-hero-age{font-size:9px;color:rgba(255,255,255,.45)}
 .news-hero-score{font-size:9px;color:rgba(255,255,255,.5)}
-/* 2-col grid */
-.news-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.news-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .15s;display:flex;flex-direction:column}
-.news-card:hover{border-color:var(--orange);transform:translateY(-1px)}
-.news-card-top{padding:10px 12px;flex:1;display:flex;flex-direction:column;gap:5px}
-.news-card-tag{display:flex;align-items:center;gap:6px}
+/* 3-col mosaic grid — hero spans 2 cols */
+.news-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.news-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .15s,box-shadow .15s;display:flex;flex-direction:column;text-decoration:none;color:inherit}
+.news-card:hover{border-color:var(--orange);transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.news-card-hero{grid-column:span 2;flex-direction:row;border-left:3px solid var(--orange)}
+.news-card-img{width:100%;aspect-ratio:3/2;overflow:hidden;flex-shrink:0;background:var(--bg3)}
+.news-card-hero .news-card-img{width:45%;aspect-ratio:3/2;flex-shrink:0}
+.news-card-img img{width:100%;height:100%;object-fit:cover;display:block}
+.news-card-img-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;font-family:'Syne',sans-serif;letter-spacing:-1px}
+.news-card-hero .news-card-img-ph{font-size:36px}
+.news-card-top{padding:10px 12px;flex:1;display:flex;flex-direction:column;gap:5px;min-width:0}
+.news-card-hero .news-card-top{padding:16px 18px;justify-content:space-between}
+.news-card-hero-label{font-size:9px;font-weight:700;letter-spacing:1.2px;color:var(--orange);text-transform:uppercase;margin-bottom:4px}
+.news-card-tag{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .news-card-sym{font-size:10px;color:var(--orange);font-weight:700}
 .news-card-hl{font-size:11px;color:var(--text);line-height:1.45;flex:1;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.news-card-foot{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;border-top:1px solid var(--border);background:var(--bg3)}
+.news-card-hero .news-card-hl{font-size:16px;font-weight:800;font-family:'Syne',sans-serif;-webkit-line-clamp:4;letter-spacing:-.2px}
+.news-card-foot{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;border-top:1px solid var(--border);background:var(--bg3);flex-shrink:0}
 .news-card-age{font-size:9px;color:var(--muted2)}
 .news-card-score{font-size:9px;color:var(--muted2)}
+.news-card-catalyst{font-size:10px;color:var(--orange);font-style:italic;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;margin-top:2px}
+.news-fetch-btn{background:rgba(255,107,0,.12);border:1px solid rgba(255,107,0,.35);color:var(--orange);padding:4px 10px;border-radius:4px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:.15s;white-space:nowrap}
+.news-fetch-btn:hover{background:rgba(255,107,0,.22)}
+.news-fetch-btn:disabled{opacity:.45;cursor:default}
 /* Article drawer */
 .news-drawer{position:fixed;top:0;right:-54%;width:54%;height:100vh;background:var(--bg2);border-left:1px solid var(--border);z-index:5000;display:flex;flex-direction:column;transition:right .3s cubic-bezier(.4,0,.2,1)}
 .news-drawer.open{right:0}
@@ -422,7 +435,7 @@ canvas{display:block;width:100% !important}
     <div class="col" style="border-right:1px solid var(--border);display:flex;flex-direction:column">
 
       <!-- OPUS MARKET VIEW — always visible -->
-      <div class="trade-card-panel" id="opus-view-panel" style="flex-shrink:0;border-bottom:1px solid var(--border)">
+      <div class="trade-card-panel" id="opus-view-panel">
         <div class="col-title" style="flex-shrink:0">
           <span>Opus Market View</span>
           <span id="opus-view-ts" style="color:var(--muted2);font-size:9px">—</span>
@@ -607,10 +620,15 @@ canvas{display:block;width:100% !important}
       <option value="BULLISH">Bullish</option>
       <option value="BEARISH">Bearish</option>
     </select>
-    <span id="news-updated" style="color:var(--muted2);font-size:10px;margin-left:auto">Updates each scan</span>
+    <span id="news-updated" style="color:var(--muted2);font-size:10px;margin-left:auto"></span>
+    <button class="news-fetch-btn" id="news-fetch-btn" onclick="loadNews()">⟳ Fetch News</button>
   </div>
   <div class="news-feed" id="news-feed">
-    <div class="empty">News headlines will appear here after the first scan.</div>
+    <div class="empty" style="padding:40px 0;text-align:center">
+      <div style="font-size:28px;opacity:.3;margin-bottom:12px">📰</div>
+      <div style="font-size:12px;color:var(--muted2);margin-bottom:14px">No stories loaded yet</div>
+      <button class="news-fetch-btn" onclick="loadNews()">Fetch News Now</button>
+    </div>
   </div>
 </div>
 <!-- News article drawer -->
@@ -650,7 +668,7 @@ canvas{display:block;width:100% !important}
         <button id="tc-next-btn" onclick="nextDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;padding:0;line-height:1" title="Next decision">&#8594;</button>
       </span>
     </div>
-    <div class="trade-card-body" id="trade-card-body" style="padding:10px 14px">
+    <div class="trade-card-body" id="trade-card-body" style="max-height:none">
       <div style="color:var(--muted2);font-size:11px">No trades taken yet.</div>
     </div>
   </div>
@@ -1385,6 +1403,9 @@ function switchTab(id, el) {
 
   // Load portfolio aggregation when switching to that tab
   if (id === 'portfolio') loadPortfolio();
+
+  // Load news when switching to news tab
+  if (id === 'news') loadNews();
 
   // Alpha decay + IC weights: load fresh data each time the tab opens
   if (id === 'alpha') {
@@ -2305,7 +2326,8 @@ async function poll() {
       document.getElementById('log-count').textContent = d.logs.length + ' events';
     }
 
-    // Opus Market View — MACRO verdict + reasoning from Trading Analyst
+    // AI box (element removed from LIVE view — no-op)
+    // if (d.claude_analysis) document.getElementById('ai-box').textContent = d.claude_analysis;
     renderOpusView(d);
 
     // Positions and today's results
@@ -2525,22 +2547,40 @@ function _ageStr(h) {
   return Math.round(h / 24) + 'd ago';
 }
 
+function _imgPh(sym, sentiment) {
+  let h = 0;
+  for (let i = 0; i < sym.length; i++) h = (h * 31 + sym.charCodeAt(i)) & 0xffff;
+  h = h % 360;
+  const tint = sentiment === 'BULLISH' ? '0,200,83' : sentiment === 'BEARISH' ? '255,23,68' : '255,107,0';
+  return `background:linear-gradient(135deg,hsl(${h},55%,14%) 0%,hsl(${h},35%,8%) 100%);box-shadow:inset 0 0 0 1000px rgba(${tint},.18);color:hsl(${h},75%,72%);text-shadow:0 1px 4px rgba(0,0,0,.6)`;
+}
+
+function _imgHtml(item, cls='news-card-img') {
+  const ph = `<div class="news-card-img-ph" style="${_imgPh(item.symbol||'?', item.sentiment)}">${esc(item.symbol||'?')}</div>`;
+  if (!item.image_url) return `<div class="${cls}">${ph}</div>`;
+  return `<div class="${cls}"><img src="${item.image_url}" alt="" loading="lazy" onerror="this.style.display='none';this.nextSibling.style.display='flex'">${ph}</div>`;
+}
+
 function _renderHero(item, idx) {
-  const bgCls = item.sentiment === 'BULLISH' ? 'bull' : item.sentiment === 'BEARISH' ? 'bear' : 'neut';
   const badgeCls = item.sentiment === 'BULLISH' ? 'badge-bullish' : item.sentiment === 'BEARISH' ? 'badge-bearish' : 'badge-neutral';
-  const badgeTxt = item.sentiment === 'BULLISH' ? '▲ BULL' : item.sentiment === 'BEARISH' ? '▼ BEAR' : '— NEUTRAL';
+  const badgeTxt = item.sentiment === 'BULLISH' ? '▲ BULLISH' : item.sentiment === 'BEARISH' ? '▼ BEARISH' : '— NEUTRAL';
   const ms = _macroScore(item);
-  const macroTag = ms >= 4 ? `<span class="news-hero-macro">● MACRO</span>` : '';
-  return `<div class="news-hero" onclick="openNewsDrawer(${idx})">
-    <div class="news-hero-bg ${bgCls}">
-      <div class="news-hero-inner">
-        <div class="news-hero-tag">${macroTag}<span class="news-badge ${badgeCls}">${badgeTxt}</span><span style="font-size:9px;color:rgba(255,255,255,.4)">Score ${item.news_score}/10</span></div>
-        <div class="news-hero-hl">${esc(item.headline)}</div>
-        ${item.catalyst ? `<div class="news-hero-cat">${esc(item.catalyst)}</div>` : ''}
-        <div class="news-hero-foot">
-          <span class="news-hero-sym">${esc(item.symbol)}</span>
-          <span class="news-hero-age">${_ageStr(item.recency)}</span>
+  const macroTag = ms >= 4 ? `<span class="news-card-hero-label">● MACRO IMPACT</span>` : `<span class="news-card-hero-label">Top Story</span>`;
+  return `<div class="news-card news-card-hero" onclick="openNewsDrawer(${idx})">
+    ${_imgHtml(item)}
+    <div class="news-card-top">
+      <div>
+        ${macroTag}
+        <div class="news-card-tag">
+          <span class="news-badge ${badgeCls}">${badgeTxt}</span>
+          <span class="news-card-sym">${esc(item.symbol)}</span>
         </div>
+        <div class="news-card-hl" style="margin-top:8px">${esc(item.headline)}</div>
+        ${item.catalyst ? `<div class="news-card-catalyst">${esc(item.catalyst)}</div>` : ''}
+      </div>
+      <div class="news-card-foot" style="border-top:1px solid var(--border);margin:0 -18px -18px;padding:6px 18px">
+        <span class="news-card-age">${_ageStr(item.recency)}</span>
+        <span class="news-card-score" style="color:${item.news_score>=7?'var(--green)':item.news_score>=4?'var(--orange)':'var(--muted2)'}">Score ${item.news_score}/10</span>
       </div>
     </div>
   </div>`;
@@ -2550,27 +2590,59 @@ function _renderCard(item, idx) {
   const badgeCls = item.sentiment === 'BULLISH' ? 'badge-bullish' : item.sentiment === 'BEARISH' ? 'badge-bearish' : 'badge-neutral';
   const badgeTxt = item.sentiment === 'BULLISH' ? '▲ BULL' : item.sentiment === 'BEARISH' ? '▼ BEAR' : '— NEUT';
   return `<div class="news-card" onclick="openNewsDrawer(${idx})">
+    ${_imgHtml(item)}
     <div class="news-card-top">
       <div class="news-card-tag">
         <span class="news-card-sym">${esc(item.symbol)}</span>
         <span class="news-badge ${badgeCls}" style="font-size:8px;padding:2px 6px">${badgeTxt}</span>
       </div>
       <div class="news-card-hl">${esc(item.headline)}</div>
+      ${item.catalyst ? `<div class="news-card-catalyst">${esc(item.catalyst)}</div>` : ''}
     </div>
     <div class="news-card-foot">
       <span class="news-card-age">${_ageStr(item.recency)}</span>
-      <span class="news-card-score">Score ${item.news_score}/10</span>
+      <span class="news-card-score" style="color:${item.news_score>=7?'var(--green)':item.news_score>=4?'var(--orange)':'var(--muted2)'}">Score ${item.news_score}/10</span>
     </div>
   </div>`;
 }
 
+async function loadNews() {
+  const btn = document.getElementById('news-fetch-btn');
+  const upd = document.getElementById('news-updated');
+  if (btn) { btn.disabled = true; btn.textContent = '⟳ Loading…'; }
+  try {
+    const r = await fetch('/api/news');
+    const j = await r.json();
+    const articles = j.articles || [];
+    _allNewsItems = articles.map(a => ({
+      symbol:        (a.symbols || [])[0] || '—',
+      headline:      a.headline || '',
+      summary:       a.summary  || '',
+      sentiment:     a.sentiment  || 'NEUTRAL',
+      keyword_score: a.keyword_score || 0,
+      catalyst:      a.catalyst  || '',
+      recency:       a.age_hours || 999,
+      news_score:    a.news_score || 0,
+      image_url:     a.image_url  || '',
+      url:           a.url        || '#',
+    }));
+    window._newsItems = _allNewsItems;
+    filterNews();
+    if (upd) upd.textContent = 'Updated ' + new Date().toTimeString().slice(0,8);
+  } catch(e) {
+    if (upd) upd.textContent = 'Fetch failed';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⟳ Fetch News'; }
+  }
+}
+
 function renderNews(newsData) {
+  // Called by poll() when scan data arrives — merge into existing items
   if (!newsData || !Object.keys(newsData).length) return;
-  _allNewsItems = [];
+  const scanItems = [];
   for (const [sym, nd] of Object.entries(newsData)) {
     if (!nd.headlines || !nd.headlines.length) continue;
-    // One entry per symbol using the first (most recent) headline
-    _allNewsItems.push({
+    scanItems.push({
       symbol: sym,
       headline: nd.headlines[0],
       sentiment: nd.claude_sentiment || 'NEUTRAL',
@@ -2578,9 +2650,16 @@ function renderNews(newsData) {
       catalyst: nd.claude_catalyst || '',
       recency: nd.recency_hours || 999,
       news_score: nd.news_score || 0,
+      image_url: nd.image_url || '',
       url: 'https://finance.yahoo.com/quote/' + encodeURIComponent(sym) + '/news/',
     });
   }
+  if (!scanItems.length) return;
+  // Merge: deduplicate by headline, scan items take precedence
+  const seen = new Set(scanItems.map(i => i.headline));
+  const merged = [...scanItems, ..._allNewsItems.filter(i => !seen.has(i.headline))];
+  _allNewsItems = merged;
+  window._newsItems = _allNewsItems;
   filterNews();
 }
 
@@ -2604,11 +2683,11 @@ function filterNews() {
   window._newsItems = items;
 
   if (!items.length) {
-    feed.innerHTML = '<div class="empty">No matching stories.</div>';
+    feed.innerHTML = '<div class="empty" style="padding:40px 0;text-align:center"><div style="font-size:24px;opacity:.3;margin-bottom:10px">📰</div><div style="font-size:12px;color:var(--muted2)">No matching stories</div></div>';
     return;
   }
 
-  // Pick hero: highest macro score among top items
+  // Hero = highest macro score; goes first in grid (spans 2 cols)
   let heroIdx = 0, bestScore = -1;
   items.forEach((item, i) => {
     const s = _macroScore(item);
@@ -2617,15 +2696,16 @@ function filterNews() {
 
   const hero = items[heroIdx];
   const rest = items.filter((_, i) => i !== heroIdx);
-  // grid indices must map back into window._newsItems, hero is at heroIdx
-  const gridHtml = rest.length
-    ? '<div class="news-grid">' + rest.map((item, i) => {
+  // All cards in one grid — hero spans 2 cols, rest are 1 col each
+  const gridHtml = '<div class="news-grid">'
+    + _renderHero(hero, heroIdx)
+    + rest.map((item, i) => {
         const origIdx = i < heroIdx ? i : i + 1;
         return _renderCard(item, origIdx);
-      }).join('') + '</div>'
-    : '';
+      }).join('')
+    + '</div>';
 
-  feed.innerHTML = _renderHero(hero, heroIdx) + gridHtml;
+  feed.innerHTML = gridHtml;
 }
 
 function openNewsDrawer(idx) {
@@ -2729,11 +2809,10 @@ function renderOpusView(d) {
   }
   if (tsEl) tsEl.textContent = d.last_scan || '—';
 
-  // Parse MACRO verdict
   const macroMatch   = analystText.match(/MACRO:\s*(BULLISH|BEARISH|NEUTRAL|UNCERTAIN)/i);
   const macroVerdict = macroMatch ? macroMatch[1].toUpperCase() : null;
 
-  // Extract reasoning lines after the MACRO: verdict, stopping before any section header
+
   let macroText = '';
   if (macroVerdict && analystText) {
     const after = analystText.split(/MACRO:\s*(?:BULLISH|BEARISH|NEUTRAL|UNCERTAIN)/i)[1] || '';

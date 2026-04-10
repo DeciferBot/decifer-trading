@@ -23,6 +23,7 @@ log = logging.getLogger("decifer.orders")
 # ── File paths (patchable in tests) ───────────────────────────────────────────
 TRADES_FILE: str = CONFIG.get("trade_log", "/tmp/trades.json")
 ORDERS_FILE: str = CONFIG.get("order_log", "/tmp/orders.json")
+POSITIONS_FILE: str = CONFIG.get("positions_file", "data/positions.json")
 
 # ── In-memory position tracker ────────────────────────────────────────────────
 # Source of truth = trade_store (data/positions.json).
@@ -114,6 +115,44 @@ def _safe_del_trade(key: str) -> None:
     with _trades_lock:
         active_trades.pop(key, None)
     _persist_positions()
+
+
+def _save_positions_file() -> None:
+    """Persist active_trades metadata to disk so it survives bot restarts.
+    Atomic write: snapshot under lock, then write outside lock."""
+    import json
+    import os
+    import tempfile
+    try:
+        with _trades_lock:
+            snapshot = {
+                k: v for k, v in active_trades.items()
+                if v.get("status") != "RESERVED"
+            }
+        dir_name = os.path.dirname(os.path.abspath(POSITIONS_FILE))
+        os.makedirs(dir_name, exist_ok=True)
+        with tempfile.NamedTemporaryFile("w", dir=dir_name, delete=False, suffix=".tmp") as f:
+            json.dump(snapshot, f, default=str)
+            tmp_path = f.name
+        os.replace(tmp_path, POSITIONS_FILE)
+    except Exception as e:
+        log.warning(f"_save_positions_file failed: {e}")
+
+
+def _load_positions_file() -> dict:
+    """Load persisted position metadata. Returns empty dict if file missing or corrupt."""
+    import json
+    import os
+    try:
+        if not os.path.exists(POSITIONS_FILE):
+            return {}
+        with open(POSITIONS_FILE) as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception as e:
+        log.warning(f"_load_positions_file failed: {e}")
+    return {}
 
 
 def _is_recently_closed(symbol: str) -> bool:
