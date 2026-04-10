@@ -421,17 +421,6 @@ class DashHandler(BaseHTTPRequestHandler):
                 log.warning("prices API error: %s", exc)
                 payload = {"ts": 0, "prices": {}}
             self.wfile.write(json.dumps(payload).encode())
-        elif self.path == "/v2":
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html")
-            self.end_headers()
-            try:
-                from dashboard_v2 import DASHBOARD_HTML_V2 as _html_v2
-                html = _html_v2
-            except Exception:
-                _bot = sys.modules.get("bot")
-                html = (getattr(_bot, "DASHBOARD_HTML_V2", None) if _bot else None) or "<h1>Dashboard v2 not loaded yet</h1>"
-            self.wfile.write(html.encode())
         else:
             self.send_response(404)
             self.end_headers()

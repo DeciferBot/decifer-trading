@@ -421,20 +421,14 @@ canvas{display:block;width:100% !important}
     <!-- CENTRE: Last Decision (top) + Activity Log (bottom) -->
     <div class="col" style="border-right:1px solid var(--border);display:flex;flex-direction:column">
 
-      <!-- LAST DECISION trade card — always at the top -->
-      <div class="trade-card-panel">
+      <!-- OPUS MARKET VIEW — always visible -->
+      <div class="trade-card-panel" id="opus-view-panel" style="flex-shrink:0;border-bottom:1px solid var(--border)">
         <div class="col-title" style="flex-shrink:0">
-          <span>Last Decision</span>
-          <span style="display:flex;align-items:center;gap:6px">
-            <span id="trade-card-age" style="color:var(--muted2);font-size:9px"></span>
-            <button id="tc-copy-btn" onclick="copyDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0;letter-spacing:1px" title="Copy to clipboard">Copy</button>
-            <button id="tc-prev-btn" onclick="prevDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;padding:0;line-height:1" title="Previous decision">&#8592;</button>
-            <span id="tc-nav-pos" style="color:var(--muted2);font-size:9px"></span>
-            <button id="tc-next-btn" onclick="nextDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;padding:0;line-height:1" title="Next decision">&#8594;</button>
-          </span>
+          <span>Opus Market View</span>
+          <span id="opus-view-ts" style="color:var(--muted2);font-size:9px">—</span>
         </div>
-        <div class="trade-card-body" id="trade-card-body">
-          <div style="color:var(--muted2);font-size:11px">No trades taken yet.</div>
+        <div id="opus-view-body" style="padding:8px 12px">
+          <div style="color:var(--muted2);font-size:11px">Waiting for agents to run…</div>
         </div>
       </div>
 
@@ -643,6 +637,23 @@ canvas{display:block;width:100% !important}
 
 <!-- VIEW 7: PORTFOLIO (multi-account aggregation) -->
 <div class="view" id="view-portfolio" style="flex-direction:column;overflow-y:auto;padding:16px;gap:14px">
+
+  <!-- Last Decision (full card with navigation) -->
+  <div class="setting-card" style="margin:0;padding:0;overflow:hidden">
+    <div class="col-title" style="flex-shrink:0">
+      <span>Last Decision</span>
+      <span style="display:flex;align-items:center;gap:6px">
+        <span id="trade-card-age" style="color:var(--muted2);font-size:9px"></span>
+        <button id="tc-copy-btn" onclick="copyDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:9px;padding:0;letter-spacing:1px" title="Copy to clipboard">Copy</button>
+        <button id="tc-prev-btn" onclick="prevDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;padding:0;line-height:1" title="Previous decision">&#8592;</button>
+        <span id="tc-nav-pos" style="color:var(--muted2);font-size:9px"></span>
+        <button id="tc-next-btn" onclick="nextDecision()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;padding:0;line-height:1" title="Next decision">&#8594;</button>
+      </span>
+    </div>
+    <div class="trade-card-body" id="trade-card-body" style="padding:10px 14px">
+      <div style="color:var(--muted2);font-size:11px">No trades taken yet.</div>
+    </div>
+  </div>
 
   <!-- Summary KPI strip -->
   <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px">
@@ -2294,8 +2305,8 @@ async function poll() {
       document.getElementById('log-count').textContent = d.logs.length + ' events';
     }
 
-    // AI box (element removed from LIVE view — no-op)
-    // if (d.claude_analysis) document.getElementById('ai-box').textContent = d.claude_analysis;
+    // Opus Market View — MACRO verdict + reasoning from Trading Analyst
+    renderOpusView(d);
 
     // Positions and today's results
     renderPositions(d.positions);
@@ -2702,6 +2713,52 @@ function copyDecision() {
     const btn = document.getElementById('tc-copy-btn');
     if (btn) { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); }
   });
+}
+
+function renderOpusView(d) {
+  const el   = document.getElementById('opus-view-body');
+  const tsEl = document.getElementById('opus-view-ts');
+  if (!el) return;
+
+  const analystText = (d.agent_outputs || {}).trading_analyst || '';
+  const summary     = d.claude_analysis || '';
+
+  if (!analystText && !summary) {
+    el.innerHTML = '<div style="color:var(--muted2);font-size:11px">Waiting for agents to run…</div>';
+    return;
+  }
+  if (tsEl) tsEl.textContent = d.last_scan || '—';
+
+  // Parse MACRO verdict
+  const macroMatch   = analystText.match(/MACRO:\s*(BULLISH|BEARISH|NEUTRAL|UNCERTAIN)/i);
+  const macroVerdict = macroMatch ? macroMatch[1].toUpperCase() : null;
+
+  // Extract reasoning lines after the MACRO: verdict, stopping before any section header
+  let macroText = '';
+  if (macroVerdict && analystText) {
+    const after = analystText.split(/MACRO:\s*(?:BULLISH|BEARISH|NEUTRAL|UNCERTAIN)/i)[1] || '';
+    macroText = after.split('\n')
+      .map(l => l.trim())
+      .filter(l => l && !/^(OPPORTUNITIES|SYMBOL|DIRECTION|CONVICTION|RATIONALE|INSTRUMENT|KEY RISK|COUNTER)/.test(l))
+      .slice(0, 3).join(' ').slice(0, 300);
+  }
+
+  const verdictColor = macroVerdict === 'BULLISH'   ? '#00C853' :
+                       macroVerdict === 'BEARISH'   ? '#FF1744' :
+                       macroVerdict === 'UNCERTAIN' ? '#FFD600' : 'var(--muted2)';
+
+  el.innerHTML =
+    (macroVerdict
+      ? `<span style="font-size:9px;font-weight:700;letter-spacing:1px;padding:2px 7px;border-radius:3px;` +
+        `background:${verdictColor}22;border:1px solid ${verdictColor};color:${verdictColor};` +
+        `display:inline-block;margin-bottom:5px">MACRO: ${macroVerdict}</span>`
+      : '') +
+    (macroText
+      ? `<div style="font-size:10px;color:var(--muted2);line-height:1.55;margin-bottom:4px">${esc(macroText)}</div>`
+      : '') +
+    (summary
+      ? `<div style="font-size:9px;color:var(--orange);letter-spacing:0.3px">${esc(summary)}</div>`
+      : '');
 }
 
 function renderTradeCard(ld) {

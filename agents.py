@@ -597,9 +597,10 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
 
     if buys:
         first_sym = buys[0]["symbol"]
+        first_dir = buys[0].get("direction", "LONG")
         agents_agreed = max(0, min(4,
             _extract_technical_conviction(technical, first_sym)
-            + macro_vote
+            + max(0, macro_vote if first_dir == "LONG" else -macro_vote)
             + 1
             + _extract_risk_approval(risk, first_sym)
         ))
