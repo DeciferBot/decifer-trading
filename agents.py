@@ -209,8 +209,10 @@ KEY RISK: <Binary events, crowding, macro headwind>
 RULES:
 - If fewer than 3 genuine setups exist, say so. Cash is a valid output.
 - Options flow: CALL_BUYER = smart money bullish. PUT_BUYER = smart money bearish. Low IVR = cheap premium.
-- In PANIC regime: output MACRO: BEARISH and no OPPORTUNITIES. Capital preservation.
-- CHOPPY or RANGE_BOUND regime: raise your conviction bar — only HIGH conviction setups.
+- In CAPITULATION regime: output MACRO: BEARISH and no OPPORTUNITIES. Capital preservation.
+- RANGE_BOUND regime: raise your conviction bar — only HIGH conviction setups.
+- TRENDING_DOWN regime: you MUST evaluate SHORT setups. If any SELL or STRONG_SELL signals appear in the scored list, include at least one SHORT opportunity. Do not default to cash or LONGs only — name the short candidates explicitly with DIRECTION: SHORT.
+- RELIEF_RALLY regime: treat as a bear-market bounce — favour shorts on failed breakouts, be sceptical of longs.
 - You determine direction from first principles using all data provided. SELL/STRONG_SELL signals are SHORT candidates; BUY/STRONG_BUY are LONG candidates — but these are starting points, not instructions. If price structure contradicts the signal direction, trust your read and either flip or omit the symbol.
 - Vol=Xx ADV means today's volume vs the 20-day average. Vol>2x = unusual conviction. Vol<0.5x = low participation, treat setups with scepticism. VWAP=+/-X% = how far price is from today's VWAP. A short candidate already sitting far below VWAP in a RANGE_BOUND or CHOPPY regime is a mean-reversion long setup, not a short continuation — recognise this and act accordingly.
 - Keep each section tight. No padding."""
@@ -505,12 +507,12 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
     _reconsider = positions_to_reconsider or []
     max_pos = CONFIG["max_positions"]
 
-    if regime.get("regime") == "PANIC":
+    if regime.get("regime") == "CAPITULATION":
         return {
             "buys": [], "sells": [], "hold": [], "cash": True,
             "agents_agreed": 0,
-            "summary": f"PANIC -- VIX={regime.get('vix', '?')}, all cash",
-            "claude_reasoning": "Regime is PANIC. No new trades. Capital preservation mode.",
+            "summary": f"CAPITULATION -- VIX={regime.get('vix', '?')}, all cash",
+            "claude_reasoning": "Regime is CAPITULATION. No new trades. Capital preservation mode.",
         }
 
     proposed = _extract_proposed_symbols(opportunity, signals)

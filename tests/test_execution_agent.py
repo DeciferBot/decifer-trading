@@ -78,7 +78,7 @@ class TestPatientPlan:
                    "spread_pct": 0.6, "rel_volume": 2.5,
                    "regime_name": "CAPITULATION", "conviction_score": 40},
             )
-        # PANIC regime votes patient → most conservative wins
+        # CAPITULATION regime votes patient → most conservative wins
         assert plan.aggression == "patient"
 
     def test_open_hour_forces_patient(self):

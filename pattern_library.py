@@ -236,52 +236,42 @@ def get_relevant_patterns(
 
 def get_thesis_performance(min_samples: int = 3) -> list[dict]:
     """
-    Aggregate completed patterns by (trade_type, thesis_class) and return
-    win rate and avg PnL percentage for each combination with at least
-    min_samples records.
+    Aggregate completed pattern outcomes by (trade_type, thesis_class).
 
-    thesis_class is extracted from structured exit_reason strings that contain
-    a 'thesis:...' token (e.g. 'sl_hit | SCALP | ... | thesis:noise_stop').
-    Falls back to the raw exit_reason if no thesis token is present.
-
-    Used by the intelligence layer to feed historical reasoning quality back
-    into the classification prompt — closing the entry→exit feedback loop.
+    Returns a list of dicts — one per combination that has at least
+    min_samples completed trades — sorted by count descending:
+        [{"trade_type": str, "thesis_class": str,
+          "count": int, "win_rate": float, "avg_pnl_pct": float}, ...]
     """
-    import re
-
     try:
         with _lock:
             data = _load()
 
-        completed = [r for r in data.values() if r.get("pnl") is not None]
-        if not completed:
-            return []
-
-        groups: dict[tuple, list] = {}
-        for r in completed:
-            tt          = r.get("trade_type", "UNKNOWN")
-            exit_reason = r.get("exit_reason") or ""
-            m           = re.search(r"thesis:(\w+)", exit_reason)
-            thesis_cls  = m.group(1) if m else (exit_reason[:30] or "unknown")
-            key = (tt, thesis_cls)
-            groups.setdefault(key, []).append(r)
+        buckets: dict[tuple, dict] = {}
+        for r in data.values():
+            if r.get("pnl_pct") is None:
+                continue
+            key = (r.get("trade_type", "UNKNOWN"), r.get("thesis_class", "UNKNOWN"))
+            if key not in buckets:
+                buckets[key] = {"count": 0, "wins": 0, "pnl_pct_sum": 0.0}
+            buckets[key]["count"] += 1
+            buckets[key]["pnl_pct_sum"] += float(r["pnl_pct"])
+            if float(r["pnl_pct"]) > 0:
+                buckets[key]["wins"] += 1
 
         result = []
-        for (tt, thesis_cls), records in groups.items():
-            if len(records) < min_samples:
+        for (trade_type, thesis_class), b in buckets.items():
+            if b["count"] < min_samples:
                 continue
-            wins        = [r for r in records if (r.get("pnl") or 0) > 0]
-            avg_pnl_pct = sum(r.get("pnl_pct") or 0.0 for r in records) / len(records) * 100
             result.append({
-                "trade_type":   tt,
-                "thesis_class": thesis_cls,
-                "count":        len(records),
-                "win_rate":     round(len(wins) / len(records), 2),
-                "avg_pnl_pct":  round(avg_pnl_pct, 2),
+                "trade_type":   trade_type,
+                "thesis_class": thesis_class,
+                "count":        b["count"],
+                "win_rate":     round(b["wins"] / b["count"], 3),
+                "avg_pnl_pct":  round(b["pnl_pct_sum"] / b["count"], 2),
             })
 
-        result.sort(key=lambda x: -x["count"])
-        return result
+        return sorted(result, key=lambda x: x["count"], reverse=True)
 
     except Exception as exc:
         log.warning(f"pattern_library: get_thesis_performance failed: {exc}")

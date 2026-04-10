@@ -187,10 +187,11 @@ class TestGetAlphaDecayStats:
         ]
 
     def _patched_stats(self):
-        """Run get_alpha_decay_stats with mocked compute_alpha_decay and no cache."""
+        """Get alpha decay stats with cache bypassed and compute_alpha_decay mocked."""
         with patch.object(alpha_decay, "compute_alpha_decay",
                           return_value=self._mock_records()), \
-             patch.object(alpha_decay, "_load_cache", return_value=None):
+             patch.object(alpha_decay, "_load_cache", return_value=None), \
+             patch.object(alpha_decay, "_save_cache"):
             return get_alpha_decay_stats()
 
     def test_output_shape(self):

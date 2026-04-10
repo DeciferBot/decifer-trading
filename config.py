@@ -10,10 +10,10 @@ from __future__ import annotations
 import os
 
 try:
-    from dotenv import load_dotenv
-    load_dotenv()
+    from dotenv import load_dotenv as _load_dotenv
+    _load_dotenv(os.path.join(os.path.dirname(__file__), ".env"), override=False)
 except ImportError:
-    pass
+    pass  # python-dotenv not installed — fall back to shell environment
 
 CONFIG = {
 
@@ -121,7 +121,7 @@ CONFIG = {
     "max_single_position":      0.06,   # 6% per position — keeps 14 positions before hitting floor
     "max_sector_exposure":      0.40,   # 40% sector cap
     "consecutive_loss_pause":   999,    # Paper learning mode: effectively disabled (live: 5)
-    "reentry_cooldown_minutes": 10,     # Paper learning: 10 min (more observations per session; live: 30)
+    "reentry_cooldown_minutes": 30,     # Block re-entry after close (lifecycle gate)
 
     # ── MACRO EVENT GATE ──────────────────────────────────────────
     # Halve position sizing within 24 hours of FOMC, CPI, or NFP.
@@ -267,7 +267,7 @@ CONFIG = {
         # Fixes the cold-start trap: dimensions with IC=0 (no data) get zero weight →
         # never generate trades → never build IC → permanently stuck at 0.
         # Enable in paper mode. Disable once all dimensions have ≥20 trades of IC data.
-        "force_equal_weights":      False,
+        "force_equal_weights":      True,
 
         "edge_gate_enabled":        False, # Paper learning mode: gate prevents data accumulation.
                                            # Circular: low IC → gate raises bar → fewer trades → lower IC.
@@ -342,20 +342,20 @@ CONFIG = {
 
     # ── REGIME-AWARE SCORE THRESHOLDS ────────────────────────
     # Score thresholds are adjusted per market regime, relative to
-    # min_score_to_trade (base). Offsets lower the bar in trending-down/range-bound
+    # min_score_to_trade (base). Offsets lower the bar in bear/choppy
     # regimes to capture more setups; floors prevent thresholds going
-    # too low. CAPITULATION blocks all entries (threshold set to 99).
+    # too low. PANIC blocks all entries (threshold set to 99).
     #
     # Effective thresholds (with default min_score_to_trade=18 for paper):
-    #   TRENDING_UP:   18  (base, no change)
-    #   TRENDING_DOWN: 15  (max(15, 18-3))
-    #   RANGE_BOUND:   12  (max(12, 18-6))
-    #   CAPITULATION:  99  (block all)
-    "regime_threshold_bear_offset":   -3,   # TRENDING_DOWN = base + offset
-    "regime_threshold_choppy_offset": -6,   # RANGE_BOUND = base + offset
-    "regime_threshold_panic":         99,   # Effectively infinite — no trades in capitulation
-    "regime_threshold_bear_min":      15,   # Floor for TRENDING_DOWN
-    "regime_threshold_choppy_min":    12,   # Floor for RANGE_BOUND
+    #   BULL_TRENDING: 18  (base, no change)
+    #   BEAR_TRENDING: 15  (max(15, 18-3))
+    #   CHOPPY:        12  (max(12, 18-6))
+    #   PANIC:         99  (block all)
+    "regime_threshold_bear_offset":   -3,   # BEAR_TRENDING = base + offset
+    "regime_threshold_choppy_offset": -6,   # CHOPPY = base + offset
+    "regime_threshold_panic":         99,   # Effectively infinite — no trades in panic
+    "regime_threshold_bear_min":      15,   # Floor for BEAR_TRENDING
+    "regime_threshold_choppy_min":    12,   # Floor for CHOPPY
 
     # ── REGIME SIGNAL ROUTER ──────────────────────────────────
     # Two-state VIX router: upweights momentum dims (TREND, MOMENTUM, SQUEEZE,
@@ -403,45 +403,6 @@ CONFIG = {
 
     # ── DASHBOARD ─────────────────────────────────────────────
     "dashboard_port":           8080,
-    "ws_port":                  8182,   # WebSocket push server (live state, replaces HTTP polling)
-
-    # IC dimensions in display order — key, full label, short abbreviation.
-    "ic_dimensions": [
-        {"key": "trend",     "label": "Trend",     "abbr": "TREND"},
-        {"key": "momentum",  "label": "Momentum",  "abbr": "MOM"},
-        {"key": "squeeze",   "label": "Squeeze",   "abbr": "SQZ"},
-        {"key": "flow",      "label": "Flow",      "abbr": "FLOW"},
-        {"key": "breakout",  "label": "Breakout",  "abbr": "BRK"},
-        {"key": "mtf",       "label": "MTF",       "abbr": "MTF"},
-        {"key": "news",      "label": "News",      "abbr": "NEWS"},
-        {"key": "social",    "label": "Social",    "abbr": "SOC"},
-        {"key": "reversion", "label": "Reversion", "abbr": "REV"},
-    ],
-    "conviction_high_threshold": 38,   # ≥ this = very high conviction (used in dashboard)
-    "conviction_mid_threshold":  28,   # ≥ this = moderate conviction (used in dashboard)
-    "fx_pairs": ["EUR", "GBP", "JPY", "CHF", "AUD", "NZD", "CAD"],
-    "regime_descriptions": {
-        "TRENDING_UP":   "trending up — broad participation",
-        "TRENDING_DOWN": "trending down — broad selling",
-        "RELIEF_RALLY":  "relief rally — bear-market bounce",
-        "RANGE_BOUND":   "range bound — no clear direction",
-        "CAPITULATION":  "capitulation — extreme fear",
-    },
-    "exit_labels": {
-        "stop_loss":     "SL",
-        "take_profit":   "TP",
-        "agent_sell":    "Exit",
-        "trailing_stop": "Trail",
-        "manual":        "Manual",
-        "kill":          "Kill",
-    },
-    "exit_descriptions": {
-        "stop_loss":     "stop-loss triggered",
-        "take_profit":   "take-profit hit",
-        "agent_sell":    "agents voted to exit",
-        "trailing_stop": "trailing stop triggered",
-        "manual":        "manually closed",
-    },
 
     # ── VIX REGIME THRESHOLDS ─────────────────────────────────
     # Raised vix_bull_max 15→20: with the 200d daily MA as trend filter (more
@@ -570,7 +531,7 @@ CONFIG = {
     # Set options_enabled to True to activate options trading.
     # When enabled, high-conviction stock signals (score >= options_min_score)
     # are evaluated for an options trade instead of (or alongside) the stock.
-    "options_enabled":        True,    # re-enabled: sizing now uses ask price directly; yfinance removed from all options pricing paths
+    "options_enabled":        False,   # DISABLED — options sizing bug caused catastrophic losses (LEVI -$14.5K, SPIR -$13K, AAPL -$17K); re-enable only after sizing fix is validated
 
     # Entry filters
     "options_min_score":      35,      # Minimum stock score to consider options
@@ -655,6 +616,11 @@ CONFIG = {
     #   4 — Advanced data & execution (multi-account, live accounts, cloud)
     #   5 — Infrastructure (Docker, multi-user, hosted deployment)
     #
+    # Alpha Validation Gate (must be cleared FIRST — before any of the below):
+    #   - 50+ closed paper trades with positive average PnL (positive expectancy)
+    #   - This gate blocks: new signal dimensions, infrastructure work, live trading
+    #   - See LIVE_TRADING_GATE.md for the full criteria document
+    #
     # Phase 1 exit criteria (ALL must be met before advancing to Phase 2):
     #   - 100+ closed paper trades logged to data/trades.json
     #   - Test suite ≥ 80% pass rate
@@ -664,6 +630,15 @@ CONFIG = {
     # DO NOT change current_phase without meeting all exit criteria above.
     "phase_gate": {
         "current_phase": 1,
+
+        # ── Alpha Validation Gate ──────────────────────────────────────────────
+        # Hard checkpoint before any new signal dimension, infrastructure work,
+        # or live trading gate. Signal model has no demonstrated alpha until this
+        # is cleared. See LIVE_TRADING_GATE.md.
+        "alpha_validation_gate": {
+            "min_closed_trades":          50,   # Minimum closed paper trades required
+            "require_positive_expectancy": True, # avg PnL/trade must be > 0
+        },
 
         # ── IC + Walk-Forward Validation Gate ─────────────────────────────────
         # Hard gate before Phase 4 / live trading. All three sub-gates must pass:
@@ -759,17 +734,11 @@ CONFIG = {
     "portfolio_manager": {
         "enabled":                  True,
         "score_collapse_threshold": 15,     # pts drop from entry_score → trigger review
-        "score_collapse_redfire_delta": 5,  # score must drop this many MORE pts to re-trigger
         "news_hit_threshold":       3,      # |keyword_score| on held symbol → trigger
-        "news_hit_redfire_delta":   2,      # score must change by this much to re-trigger
         "cascade_stop_count":       2,      # stops hit this session → trigger
         "drawdown_trigger_pct":    -0.015,  # daily_pnl / portfolio_value → trigger
         "earnings_lookahead_hours": 48,     # flag earnings within this window
         "max_tokens":               600,
-        # Lightweight per-cycle check (no LLM) — BACK-014
-        "scalp_max_hold_minutes":   90,     # SCALP: exit if held longer with pnl below target
-        "scalp_min_pnl_pct":        0.003,  # SCALP: 0.3% min pnl to hold past max_hold_minutes
-        "trim_cooldown_minutes":    30,     # min gap between TRIM actions on the same symbol
     },
 }
 
