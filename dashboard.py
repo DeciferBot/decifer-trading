@@ -881,7 +881,7 @@ let equityHistory = [];
 let _decisionHistory = [];
 let _decisionIdx = 0;
 let currentFilter = 'all';
-let scanTotal = 300; // seconds
+let _liveSettings = {}; // latest settings from /api/state — avoids hardcoded defaults
 let scanElapsed = 0;
 let scanTimer;
 let alphaDecayChart = null;
@@ -1540,7 +1540,7 @@ function renderPositions(positions) {
     const actionBtn = isPending && p.order_id
       ? `<button onclick="event.stopPropagation();cancelOrder(${p.order_id},${p._idx})" style="background:rgba(255,214,0,.12);border:1px solid var(--yellow);color:var(--yellow);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Cancel pending order">CANCEL</button>`
       : `<button onclick="event.stopPropagation();closePosition(${p._idx})" style="background:rgba(255,23,68,.12);border:1px solid var(--red);color:var(--red);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Close this position">✕</button>`;
-    return `<div class="pos-card" onclick="showPositionDetail(${p._idx})" title="Click for details" style="${cardOpacity}">
+    return `<div class="pos-card" data-symbol="${p.symbol||''}" data-entry="${p.entry||0}" data-qty="${p.qty||0}" data-direction="${p.dir||'LONG'}" onclick="showPositionDetail(${p._idx})" title="Click for details" style="${cardOpacity}">
       <div class="pos-hdr">
         <span class="pos-sym">${p.symbol}${p.instrument === 'option' ? ' <span style="font-size:9px;color:var(--cyan);font-weight:600">OPT</span>' : ''}${pendingBadge}${trancheBadge} <span style="font-size:10px;color:var(--muted2);font-weight:400">${p.dir} ×${Math.abs(p.qty)}</span></span>
         <span style="display:flex;align-items:center;gap:6px">
@@ -1805,7 +1805,9 @@ function buildTradeExplanation(t) {
 
   // ── CONVICTION ──
   if (t.score && t.score > 0) {
-    const convLabel = t.score >= 38 ? 'very high' : t.score >= 28 ? 'moderate' : 'borderline';
+    const hiConv  = _liveSettings.high_conviction_score || 38;
+    const minConv = _liveSettings.min_score_to_trade   || 28;
+    const convLabel = t.score >= hiConv ? 'very high' : t.score >= minConv ? 'moderate' : 'borderline';
     story += `Conviction: <strong>${convLabel}</strong> — scored ${t.score}/50. `;
   }
 
@@ -2241,11 +2243,11 @@ async function poll() {
     if (_agreed != null) agreeEl.style.color = _agreed >= _req ? 'var(--green)' : 'var(--red)';
     else agreeEl.style.color = '';
 
-    // Risk budget
+    // Risk budget — limit from settings, not hardcoded
     if (d.portfolio_value) {
-      const limit = d.portfolio_value * 0.04;
+      const limit = d.portfolio_value * (d.settings?.daily_loss_limit || 0);
       const used  = Math.abs(Math.min(pnl, 0));
-      const pct   = Math.min((used / limit) * 100, 100);
+      const pct   = limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
       document.getElementById('risk-bar').style.width     = pct + '%';
       document.getElementById('risk-bar').style.background = pct > 75 ? 'var(--red)' : pct > 50 ? 'var(--yellow)' : 'var(--green)';
       document.getElementById('risk-used').textContent    = fmt$(used) + ' used';
@@ -2324,10 +2326,10 @@ async function poll() {
     // News view
     if (d.news_data) renderNews(d.news_data);
 
-    // Risk view
+    // Risk view — daily limit from settings
     if (d.portfolio_value) {
       const pv   = d.portfolio_value;
-      const limit = pv * 0.04;
+      const limit = pv * (d.settings?.daily_loss_limit || 0);
       const used  = Math.abs(Math.min(pnl, 0));
       const expPct = ((d.positions||[]).length / 6) * 100;
       const deployed = (d.positions||[]).reduce((s, p) => {
@@ -2344,6 +2346,9 @@ async function poll() {
       document.getElementById('r-cash-bar').style.width    = Math.min(100 - deployed, 100) + '%';
       document.getElementById('r-cash-pct').textContent    = (100 - deployed).toFixed(1) + '% cash';
     }
+
+    // Cache latest settings so functions without `d` scope can read them
+    if (d.settings) _liveSettings = d.settings;
 
     // Settings — populate form inputs from live CONFIG values
     document.getElementById('cfg-account').textContent = d.account || '—';
@@ -2413,6 +2418,60 @@ async function poll() {
   }
 }
 
+// ── Live price polling (1s) ────────────────────────────────────
+// Hits /api/prices (QUOTE_CACHE mid-prices) every second.
+// Mutates position card price/P&L display without a full re-render.
+async function fetchPrices() {
+  try {
+    const r = await fetch('/api/prices');
+    if (!r.ok) return;
+    const data = await r.json();
+    if (data.prices) applyLivePrices(data.prices);
+  } catch(e) {}
+}
+
+function applyLivePrices(prices) {
+  document.querySelectorAll('.pos-card[data-symbol]').forEach(card => {
+    const sym = card.dataset.symbol;
+    const p   = prices[sym];
+    if (!p || p.source === 'stale' || p.mid <= 0) return;
+
+    const entry = parseFloat(card.dataset.entry) || 0;
+    const qty   = parseFloat(card.dataset.qty)   || 0;
+    const dir   = card.dataset.direction || 'LONG';
+    if (!entry || !qty) return;
+
+    const mid  = p.mid;
+    const pnl  = dir === 'SHORT' ? (entry - mid) * qty : (mid - entry) * qty;
+
+    // Update P&L display
+    const pnlEl = card.querySelector('.pos-pnl');
+    if (pnlEl) {
+      pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmt$(Math.abs(pnl));
+      pnlEl.style.color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    }
+
+    // Show live indicator dot next to symbol
+    let liveEl = card.querySelector('.live-dot');
+    if (!liveEl) {
+      liveEl = document.createElement('span');
+      liveEl.className = 'live-dot';
+      liveEl.style.cssText = 'font-size:7px;margin-left:4px;vertical-align:middle';
+      const symEl = card.querySelector('.pos-sym');
+      if (symEl) symEl.appendChild(liveEl);
+    }
+    liveEl.textContent = '●';
+    liveEl.style.color = p.source === 'stream' ? 'var(--green)' : 'var(--muted)';
+  });
+
+  // Update regime SPY price if present
+  const spyP = prices['SPY'];
+  if (spyP && spyP.mid > 0) {
+    const el = document.getElementById('regime-spy');
+    if (el) el.textContent = '$' + spyP.mid.toFixed(2);
+  }
+}
+
 // ── Poll guard: skip tick if previous fetch is still in flight ─
 let _pollInFlight = false;
 let _lastLogCount = 0;
@@ -2422,6 +2481,7 @@ setInterval(async () => {
   _pollInFlight = true;
   try { await poll(); } finally { _pollInFlight = false; }
 }, 2000);
+setInterval(fetchPrices, 1000);  // live price updates between full polls
 
 // ── News rendering ─────────────────────────────────────────
 let _allNewsItems = [];

@@ -402,6 +402,17 @@ def main():
     except Exception as _as_err:
         clog("INFO", f"📶 Alpaca bar stream skipped: {_as_err}")
 
+    # ── Start live price updater (QUOTE_CACHE → active_trades, 2s) ────────────
+    # Propagates real-time bid/ask mid-prices into position "current" field so
+    # /api/prices and the next dashboard poll both reflect live market prices.
+    try:
+        from price_updater import PriceUpdater
+        bot_state._price_updater = PriceUpdater()
+        bot_state._price_updater.start()
+        clog("INFO", "💹 Live price updater active (2s, QUOTE_CACHE → positions)")
+    except Exception as _pu_err:
+        clog("INFO", f"💹 Live price updater skipped: {_pu_err}")
+
     # ── Start Momentum Sentinel (SPY fast-move scan bypass) ───────────────────
     # Monitors live SPY 1m bars; fires an immediate scan when SPY moves fast.
     # Requires BAR_CACHE to be warm (bar stream started above).
@@ -545,6 +556,10 @@ def main():
             bot_state.ib.sleep(1)
     except KeyboardInterrupt:
         dash["status"] = "stopped"
+        if bot_state._bar_stream:
+            bot_state._bar_stream.stop()
+        if bot_state._price_updater:
+            bot_state._price_updater.stop()
         if bot_state._alpaca_news_stream:
             bot_state._alpaca_news_stream.stop()
         if bot_state._sentinel:

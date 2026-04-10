@@ -126,6 +126,7 @@ _catalyst_trade_date   = ""
 # ── Alpaca streams ───────────────────────────────────────────────────────────
 _bar_stream         = None   # AlpacaBarStream instance — started in bot.py main()
 _alpaca_news_stream = None   # AlpacaNewsStream instance — started in bot.py main()
+_price_updater      = None   # PriceUpdater instance — started in bot.py after bar stream
 
 # ── Momentum Sentinel ────────────────────────────────────────────────────────
 _momentum_sentinel        = None             # MomentumSentinel instance

@@ -408,6 +408,19 @@ class DashHandler(BaseHTTPRequestHandler):
                 {"key": "reversion",  "label": "Reversion",   "description": "Mean-reversion opportunity (RSI extremes, Bollinger bands)"},
             ]}
             self.wfile.write(json.dumps(payload).encode())
+        elif self.path == "/api/prices":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                from price_updater import get_live_prices
+                import time as _t
+                payload = {"ts": int(_t.time()), "prices": get_live_prices()}
+            except Exception as exc:
+                log.warning("prices API error: %s", exc)
+                payload = {"ts": 0, "prices": {}}
+            self.wfile.write(json.dumps(payload).encode())
         elif self.path == "/v2":
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
