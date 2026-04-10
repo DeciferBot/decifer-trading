@@ -24,6 +24,7 @@ from orders_state import (
     _trades_lock,
     _flatten_lock,
     _safe_set_trade, _safe_update_trade, _safe_del_trade,
+    _persist_positions,
 )
 from orders_contracts import (
     get_contract,
@@ -285,35 +286,52 @@ def close_position(ib_unused, trade_key: str) -> Optional[str]:
         del active_trades[tracker_key]
     elif trade_key in active_trades:
         del active_trades[trade_key]
+    _persist_positions()
 
     return detail
 
 
 def reconcile_with_ibkr(ib: IB):
     """
-    On startup or reconnect: sync bot's position tracker with IBKR reality.
-    Uses ib.portfolio() which includes marketPrice and unrealizedPNL.
-    All prices are cross-checked via 3-way validation (IBKR + Alpaca + TV)
-    to prevent stale/bad IBKR data from corrupting the tracker.
+    On startup or reconnect: restore positions from our own store, then reconcile
+    live price/fill-status with IBKR.
 
-    IMPORTANT: Uses composite keys (symbol for stocks, symbol_right_strike_expiry
-    for options) so stock and option positions for the same underlying never collide.
+    Source-of-truth hierarchy:
+      1. trade_store (data/positions.json) — all decision metadata:
+         entry price, trade_type, conviction, regime, signal scores, agent outputs,
+         entry thesis, pattern_id, SL/TP levels, tranche state.
+      2. IBKR — reconciles ONLY:
+         - current market price (3-way validated)
+         - unrealised P&L (derived from current price)
+         - fill status (was SL/TP triggered while bot was down?)
+         - qty (were there partial fills while bot was offline?)
+         - SL bracket order ID (reattach if present in openTrades)
+
+    Nothing IBKR returns ever overwrites stored metadata fields.
     """
-    log.info("Reconciling positions with IBKR (3-way price validation)...")
+    from trade_store import restore as _ts_restore
+    log.info("Loading positions from trade_store, then reconciling prices with IBKR...")
     try:
-        # portfolio() returns PortfolioItem with marketPrice + unrealizedPNL
-        # positions() only returns avgCost — never use it for reconciliation
+        # ── Step 1: restore our own position ledger ───────────────────────────
+        stored = _ts_restore()
+        if stored:
+            with _trades_lock:
+                active_trades.update(stored)
+            log.info(f"Restored {len(stored)} position(s) from trade_store.")
+
+        # ── Step 2: fetch IBKR portfolio ──────────────────────────────────────
+        # portfolio() returns PortfolioItem with marketPrice + unrealizedPNL.
+        # positions() only returns avgCost — never use it for reconciliation.
         portfolio_items = ib.portfolio(CONFIG["active_account"])
 
-        # Build set of IBKR keys using composite keys (stock vs option safe)
         ibkr_keys = set()
         for item in portfolio_items:
             if item.position != 0:
                 ibkr_keys.add(_ibkr_item_to_key(item))
 
-        # Remove from tracker if IBKR doesn't have it (under lock — prop-014)
-        # PENDING entries need special handling: they're not in portfolio yet (unfilled),
-        # so check ib.openTrades() before deciding whether to remove them.
+        # ── Step 3: detect positions closed while bot was down ────────────────
+        # In our store but not in IBKR → SL/TP was triggered or manually closed.
+        keys_to_remove = []
         with _trades_lock:
             for key in list(active_trades.keys()):
                 if key not in ibkr_keys:
@@ -339,12 +357,18 @@ def reconcile_with_ibkr(ib: IB):
                             )
                             if order_id:
                                 _cancel_ibkr_order_by_id(ib, order_id)
-                            del active_trades[key]
+                            keys_to_remove.append(key)
                     else:
-                        log.warning(f"Position {key} in bot memory but not in IBKR — removing")
-                        del active_trades[key]
+                        log.warning(
+                            f"Position {key} in our store but not in IBKR "
+                            f"— was closed while bot was down, removing"
+                        )
+                        keys_to_remove.append(key)
 
-        # Add to tracker if IBKR has it but we don't
+        for key in keys_to_remove:
+            _safe_del_trade(key)
+
+        # ── Step 4: process IBKR portfolio items ──────────────────────────────
         reconciled_count = 0
         failed_count = 0
         for item in portfolio_items:
@@ -356,7 +380,6 @@ def reconcile_with_ibkr(ib: IB):
                 key = _ibkr_item_to_key(item)
                 sym = item.contract.symbol
                 is_option = _is_option_contract(item.contract)
-
                 ibkr_mkt = float(item.marketPrice)
 
                 # For options, IBKR reports:
@@ -364,148 +387,110 @@ def reconcile_with_ibkr(ib: IB):
                 #   marketPrice = per-SHARE premium already, e.g. $4.30
                 # Our tracker stores per-SHARE premiums to match execute_buy_option.
                 if is_option:
-                    entry = round(float(item.averageCost) / 100, 4)  # convert per-contract to per-share
-                    ibkr_price_for_validation = round(ibkr_mkt, 4) if ibkr_mkt > 0 else 0  # already per-share
+                    ibkr_entry = round(float(item.averageCost) / 100, 4)
+                    ibkr_price_for_validation = round(ibkr_mkt, 4) if ibkr_mkt > 0 else 0
                 else:
-                    entry = round(float(item.averageCost), 4)
+                    ibkr_entry = round(float(item.averageCost), 4)
                     ibkr_price_for_validation = ibkr_mkt if ibkr_mkt > 0 else 0
 
-                # 3-way validate — for options, use per-share premium values
-                # Skip Alpaca/TV cross-check for options (they return stock price, not premium)
+                # 3-way validate current price (stocks only; options use IBKR premium directly)
                 if is_option:
-                    # Options: trust IBKR premium directly (Alpaca/TV don't have option prices)
                     if ibkr_price_for_validation > 0:
                         validated_price = ibkr_price_for_validation
                         src_desc = f"IBKR_OPT=${ibkr_price_for_validation:.2f}"
                     else:
-                        validated_price = entry
+                        validated_price = ibkr_entry
                         src_desc = "IBKR returned no option price — using entry"
                         log.warning(f"Reconcile {key}: {src_desc}")
                 else:
-                    validated_price, src_desc = _validate_position_price(sym, ibkr_price_for_validation, entry)
+                    validated_price, src_desc = _validate_position_price(sym, ibkr_price_for_validation, ibkr_entry)
                     if validated_price <= 0:
-                        log.warning(f"Reconcile {key}: no validated price ({src_desc}) — using entry ${entry:.2f} as current")
-                        validated_price = entry
+                        log.warning(f"Reconcile {key}: no validated price ({src_desc}) — using entry ${ibkr_entry:.2f} as current")
+                        validated_price = ibkr_entry
 
-                if key not in active_trades:
+                if key in active_trades:
+                    # ── Known position: update IBKR-owned fields only ─────────
+                    # Never touch entry, trade_type, conviction, reasoning,
+                    # signal_scores, agent_outputs, pattern_id, etc.
+                    stored_entry = active_trades[key].get("entry", ibkr_entry)
+                    stored_direction = active_trades[key].get("direction", "LONG")
+                    stored_qty = active_trades[key].get("qty", abs(int(item.position)))
+                    mult = 100 if is_option else 1
+                    if stored_direction == "SHORT":
+                        pnl = round((stored_entry - validated_price) * stored_qty * mult, 2)
+                    else:
+                        pnl = round((validated_price - stored_entry) * stored_qty * mult, 2)
+                    with _trades_lock:
+                        active_trades[key]["current"] = round(validated_price, 4)
+                        active_trades[key]["pnl"] = pnl
+                        active_trades[key]["status"] = "ACTIVE"
+                        active_trades[key]["_price_sources"] = src_desc
+                        if is_option:
+                            active_trades[key]["current_premium"] = round(validated_price, 4)
+                    log.debug(f"Reconcile {key}: price updated to ${validated_price:.4f} via {src_desc}")
+
+                    # Reattach SL bracket order ID if we didn't carry one
+                    if not active_trades[key].get("sl_order_id"):
+                        close_action = "BUY" if stored_direction == "SHORT" else "SELL"
+                        _reattach_sl_order(ib, key, sym, stored_qty,
+                                           active_trades[key].get("sl", 0),
+                                           close_action, is_option=is_option)
+
+                else:
+                    # ── Unknown position: genuinely external fill ─────────────
+                    # Warn loudly — this should rarely happen in normal operation.
                     direction = "SHORT" if item.position < 0 else "LONG"
                     qty = abs(int(item.position))
+                    log.warning(
+                        f"EXTERNAL POSITION: {key} found in IBKR but not in our store "
+                        f"({direction} {qty} @ ${ibkr_entry:.4f}) — adding with minimal metadata."
+                    )
+                    mult = 100 if is_option else 1
+                    if direction == "SHORT":
+                        sl = round(ibkr_entry * (1.02 if not is_option else (1 + CONFIG.get("options_stop_loss", 0.50))), 4)
+                        tp = round(ibkr_entry * (0.94 if not is_option else (1 - CONFIG.get("options_profit_target", 1.00))), 4)
+                        pnl = round((ibkr_entry - validated_price) * qty * mult, 2)
+                    else:
+                        sl = round(ibkr_entry * (0.98 if not is_option else (1 - CONFIG.get("options_stop_loss", 0.50))), 4)
+                        tp = round(ibkr_entry * (1.06 if not is_option else (1 + CONFIG.get("options_profit_target", 1.00))), 4)
+                        pnl = round((validated_price - ibkr_entry) * qty * mult, 2)
 
+                    base_entry: dict = {
+                        "symbol":         sym,
+                        "instrument":     "option" if is_option else "stock",
+                        "entry":          ibkr_entry,
+                        "current":        round(validated_price, 4),
+                        "qty":            qty,
+                        "sl":             sl,
+                        "tp":             tp,
+                        "direction":      direction,
+                        "score":          0,
+                        "reasoning":      "External position — not opened by this bot session",
+                        "trade_type":     "SCALP",
+                        "conviction":     0.0,
+                        "pnl":            pnl,
+                        "status":         "ACTIVE",
+                        "_price_sources": src_desc,
+                    }
                     if is_option:
-                        # Build option-specific entry matching execute_buy_option format
                         c = item.contract
                         raw_exp = str(c.lastTradeDateOrContractMonth)
-                        if len(raw_exp) == 8 and raw_exp.isdigit():
-                            expiry_str = f"{raw_exp[:4]}-{raw_exp[4:6]}-{raw_exp[6:]}"
-                        else:
-                            expiry_str = raw_exp
-                        right = "C" if c.right in ("C", "CALL") else "P"
-
-                        log.info(f"Option {key} in IBKR but not tracked — adding ({direction} {qty} contracts, premium ${entry:.2f}, validated ${validated_price:.2f} via {src_desc})")
-                        # Options P&L: per-share premium × qty × 100 (contract multiplier)
-                        if direction == "SHORT":
-                            pnl = round((entry - validated_price) * qty * 100, 2)
-                        else:
-                            pnl = round((validated_price - entry) * qty * 100, 2)
-                        _safe_set_trade(key, {
-                            "symbol":          sym,
-                            "instrument":      "option",
-                            "right":           right,
+                        expiry_str = f"{raw_exp[:4]}-{raw_exp[4:6]}-{raw_exp[6:]}" if (len(raw_exp) == 8 and raw_exp.isdigit()) else raw_exp
+                        base_entry.update({
+                            "right":           "C" if c.right in ("C", "CALL") else "P",
                             "strike":          c.strike,
                             "expiry_str":      expiry_str,
                             "expiry_ibkr":     raw_exp,
-                            "dte":             0,  # Unknown at reconciliation
+                            "dte":             0,
                             "contracts":       qty,
-                            "entry_premium":   entry,
-                            "current_premium": validated_price,
-                            "entry":           entry,
-                            "current":         round(validated_price, 4),
-                            "qty":             qty,
-                            "sl":              round(entry * (1 - CONFIG.get("options_stop_loss", 0.50)), 4),
-                            "tp":              round(entry * (1 + CONFIG.get("options_profit_target", 1.00)), 4),
-                            "direction":       direction,
-                            "score":           0,
-                            "reasoning":       "Reconciled from IBKR on startup",
-                            "pnl":             pnl,
-                            "status":          "ACTIVE",
-                            "_price_sources":  src_desc,
+                            "entry_premium":   ibkr_entry,
+                            "current_premium": round(validated_price, 4),
                         })
-                    else:
-                        # Stock position
-                        if direction == "SHORT":
-                            sl = round(entry * 1.02, 2)
-                            tp = round(entry * 0.94, 2)
-                        else:
-                            sl = round(entry * 0.98, 2)
-                            tp = round(entry * 1.06, 2)
-                        log.info(f"Position {key} in IBKR but not tracked — adding ({direction} {qty} shares @ ${entry:.2f}, validated price ${validated_price:.2f} via {src_desc})")
-                        if direction == "SHORT":
-                            pnl = round((entry - validated_price) * qty, 2)
-                        else:
-                            pnl = round((validated_price - entry) * qty, 2)
-                        _safe_set_trade(key, {
-                            "symbol":    sym,
-                            "instrument": "stock",
-                            "entry":     entry,
-                            "current":   round(validated_price, 4),
-                            "qty":       qty,
-                            "sl":        sl,
-                            "tp":        tp,
-                            "score":     0,
-                            "reasoning": "Reconciled from IBKR on startup",
-                            "direction": direction,
-                            "pnl":       pnl,
-                            "status":    "ACTIVE",
-                            "_price_sources": src_desc,
-                        })
+                    _safe_set_trade(key, base_entry)
 
-                        # Reattach or re-submit SL bracket order for the recovered position
+                    if not is_option:
                         close_action = "BUY" if direction == "SHORT" else "SELL"
-                        try:
-                            sl_id = None
-                            for open_trade in ib.openTrades():
-                                if (open_trade.contract.symbol != sym or
-                                        open_trade.orderStatus.status not in ("Submitted", "PreSubmitted")):
-                                    continue
-                                ot = open_trade.order.orderType
-                                oa = open_trade.order.action.upper()
-                                if ot in ("STP", "TRAIL") and oa == close_action:
-                                    sl_id = open_trade.order.orderId
-                                    break
-                            if sl_id:
-                                _safe_update_trade(key, {"sl_order_id": sl_id})
-                                log.info(f"Reconcile {key}: reattached SL order {sl_id}")
-                            else:
-                                rc = get_contract(sym)
-                                ib.qualifyContracts(rc)
-                                new_sl = StopOrder(close_action, qty, sl,
-                                                   account=CONFIG["active_account"],
-                                                   tif="GTC", outsideRth=True)
-                                sl_trade = ib.placeOrder(rc, new_sl)
-                                ib.sleep(0.2)
-                                _safe_update_trade(key, {"sl_order_id": sl_trade.order.orderId})
-                                log.warning(
-                                    f"Reconcile {key}: re-submitted orphaned SL @ ${sl:.2f} "
-                                    f"(id={sl_trade.order.orderId})"
-                                )
-                        except Exception as _e:
-                            log.warning(f"Reconcile {key}: could not restore bracket orders: {_e}")
-                else:
-                    # Update prices for existing tracked positions (prop-014: under lock)
-                    mult = 100 if is_option else 1
-                    with _trades_lock:
-                        if key in active_trades:
-                            active_trades[key]["current"] = round(validated_price, 4)
-                            direction = active_trades[key].get("direction", "LONG")
-                            qty = active_trades[key]["qty"]
-                            if direction == "SHORT":
-                                active_trades[key]["pnl"] = round((entry - validated_price) * qty * mult, 2)
-                            else:
-                                active_trades[key]["pnl"] = round((validated_price - entry) * qty * mult, 2)
-                            active_trades[key]["status"]  = "ACTIVE"
-                            active_trades[key]["_price_sources"] = src_desc
-                            if is_option:
-                                active_trades[key]["current_premium"] = round(validated_price, 4)
+                        _reattach_sl_order(ib, key, sym, qty, sl, close_action)
 
                 reconciled_count += 1
 
@@ -518,6 +503,40 @@ def reconcile_with_ibkr(ib: IB):
 
     except Exception as e:
         log.error(f"Reconciliation error: {e}")
+
+
+def _reattach_sl_order(ib: IB, key: str, sym: str, qty: int, sl: float,
+                       close_action: str, is_option: bool = False) -> None:
+    """
+    Find an existing SL order in IBKR openTrades and reattach its ID, or submit
+    a new stop if none exists. Options are skipped (no stock-style bracket).
+    """
+    if is_option:
+        return
+    try:
+        sl_id = None
+        for open_trade in ib.openTrades():
+            if (open_trade.contract.symbol != sym or
+                    open_trade.orderStatus.status not in ("Submitted", "PreSubmitted")):
+                continue
+            if open_trade.order.orderType in ("STP", "TRAIL") and open_trade.order.action.upper() == close_action:
+                sl_id = open_trade.order.orderId
+                break
+        if sl_id:
+            _safe_update_trade(key, {"sl_order_id": sl_id})
+            log.info(f"Reconcile {key}: reattached SL order {sl_id}")
+        elif sl > 0:
+            rc = get_contract(sym)
+            ib.qualifyContracts(rc)
+            new_sl = StopOrder(close_action, qty, sl,
+                               account=CONFIG["active_account"],
+                               tif="GTC", outsideRth=True)
+            sl_trade = ib.placeOrder(rc, new_sl)
+            ib.sleep(0.2)
+            _safe_update_trade(key, {"sl_order_id": sl_trade.order.orderId})
+            log.warning(f"Reconcile {key}: re-submitted orphaned SL @ ${sl:.2f} (id={sl_trade.order.orderId})")
+    except Exception as _e:
+        log.warning(f"Reconcile {key}: could not restore SL order: {_e}")
 
 
 def update_positions_from_ibkr(ib: IB):
@@ -539,11 +558,14 @@ def update_positions_from_ibkr(ib: IB):
                 price_map[_ibkr_item_to_key(item)] = item
 
         # Remove positions no longer in IBKR (closed externally via SL/TP/manual)
+        stale_keys = []
         with _trades_lock:
             stale_keys = [k for k in active_trades if k not in price_map and active_trades[k].get("status") != "PENDING"]
             for k in stale_keys:
                 log.warning(f"Position {k} no longer in IBKR portfolio — removing from tracker")
                 del active_trades[k]
+        if stale_keys:
+            _persist_positions()
 
         # ── Orphaned PENDING detection ────────────────────────────────────────
         # A PENDING entry with no active FillWatcher and past orphan_timeout_mins
