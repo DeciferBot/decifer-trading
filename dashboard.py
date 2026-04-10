@@ -1855,20 +1855,25 @@ function buildTradeExplanation(t) {
   return story || '<div style="color:var(--muted2)">No reasoning recorded for this trade.</div>';
 }
 
-// ── Render agents view ─────────────────────────────────────
-function renderAgents(agentData) {
-  if (!agentData) return;
-  const names = ['Technical Analyst','Macro Analyst','Opportunity Finder','Devil\'s Advocate','Risk Manager','Final Decision'];
-  const keys  = ['technical','macro','opportunity','devils','risk','final'];
+// ── Render agents view — dynamic from agent_conversation ───
+// agent_conversation is [{agent, role, time, output}] built by bot_trading.py.
+// No hardcoded agent names, count, or keys — all read from state.
+function renderAgents(convo) {
+  if (!convo || !convo.length) return;
   const el = document.getElementById('agents-grid');
-  el.innerHTML = keys.map((k, i) => `
-    <div class="agent-card">
+  if (!el) return;
+  el.innerHTML = convo.map((msg, i) => {
+    const isFinal = i === convo.length - 1;
+    const borderColor = isFinal ? 'var(--green)' : `hsl(${25 + i * 55}, 85%, 55%)`;
+    return `<div class="agent-card" style="border-left:3px solid ${borderColor}">
       <div class="agent-header">
-        <span class="agent-name">Agent ${i+1}: ${names[i]}</span>
-        <span class="agent-accuracy" style="color:var(--muted2)">Last run: ${agentData.last_scan || '—'}</span>
+        <span class="agent-name" style="color:${borderColor}">${esc(msg.agent || '—')}</span>
+        <span class="agent-accuracy" style="color:var(--muted2)">${esc(msg.time || '')}</span>
       </div>
-      <div class="agent-last">${(agentData[k] || 'No output yet').slice(0, 400)}</div>
-    </div>`).join('');
+      <div class="agent-role" style="font-size:10px;color:var(--muted2);margin-bottom:6px">${esc(msg.role || '')}</div>
+      <div class="agent-last">${(msg.output || 'No output yet').slice(0, 400)}</div>
+    </div>`;
+  }).join('');
 }
 
 // ── Chart instances ────────────────────────────────────────
@@ -2237,9 +2242,10 @@ async function poll() {
     window._agentsRequired   = _req;
     window._lastAgentsAgreed = _agreed;
     window._lastScanTime     = d.last_scan || '';
-    document.getElementById('agents-req').textContent = _req + '/6';
+    const _total = window._totalAgents || (d.agent_conversation || []).length || '';
+    document.getElementById('agents-req').textContent = _req + (_total ? '/' + _total : '');
     const agreeEl = document.getElementById('last-agree');
-    agreeEl.textContent = _agreed != null ? _agreed + '/6' : '—';
+    agreeEl.textContent = _agreed != null ? _agreed + (_total ? '/' + _total : '') : '—';
     if (_agreed != null) agreeEl.style.color = _agreed >= _req ? 'var(--green)' : 'var(--red)';
     else agreeEl.style.color = '';
 
@@ -2304,8 +2310,11 @@ async function poll() {
     // Growth view
     if (d.performance) renderGrowth(d.performance, d.equity_history);
 
-    // Agents view
-    if (d.agent_outputs) renderAgents({...d.agent_outputs, last_scan: d.last_scan});
+    // Agents view — rendered from conversation (dynamic, no hardcoded names)
+    if (d.agent_conversation && d.agent_conversation.length) {
+      window._totalAgents = d.agent_conversation.length;
+      renderAgents(d.agent_conversation);
+    }
 
     // Trade card — last decision with history navigation
     const incoming = d.decision_history && d.decision_history.length
@@ -2725,7 +2734,8 @@ function renderTradeCard(ld) {
   const edge    = esc(ld.edge_why_now || '');
   const risk    = esc(ld.risk || '');
   const exp     = ld.expected_returns || {};
-  const agents  = ld.agents_agreed != null ? ld.agents_agreed + '/6 agents agreed' : '';
+  const _tot    = window._totalAgents || '';
+  const agents  = ld.agents_agreed != null ? ld.agents_agreed + (_tot ? '/' + _tot : '') + ' agents agreed' : '';
   const ts      = ld.timestamp ? esc(ld.timestamp.replace('T', ' ').slice(0, 16)) : '';
 
   // Age label
