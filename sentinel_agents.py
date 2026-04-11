@@ -22,7 +22,7 @@ client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
 
 
 def _call_claude(system_prompt: str, user_message: str, max_tokens: int = 500) -> str:
-    """Single Claude API call with configurable token limit."""
+    """Sonnet call — structured data analysis (Catalyst Analyst)."""
     try:
         resp = client.messages.create(
             model=CONFIG["claude_model"],
@@ -33,6 +33,21 @@ def _call_claude(system_prompt: str, user_message: str, max_tokens: int = 500) -
         return resp.content[0].text.strip()
     except Exception as e:
         log.error(f"Sentinel Claude API error: {e}")
+        return ""
+
+
+def _call_claude_opus(system_prompt: str, user_message: str, max_tokens: int = 500) -> str:
+    """Opus call — nuanced trade decision synthesis (Instant Decision)."""
+    try:
+        resp = client.messages.create(
+            model=CONFIG.get("claude_model_alpha", "claude-opus-4-6"),
+            max_tokens=max_tokens,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}]
+        )
+        return resp.content[0].text.strip()
+    except Exception as e:
+        log.error(f"Sentinel Opus API error: {e}")
         return ""
 
 
@@ -288,7 +303,7 @@ Rules:
 - Set tight stops -- news-driven trades are volatile
 - confidence must honestly reflect your conviction (0-10)"""
 
-    raw = _call_claude(INSTANT_DECISION_SYSTEM, prompt, max_tokens=350)
+    raw = _call_claude_opus(INSTANT_DECISION_SYSTEM, prompt, max_tokens=350)
 
     try:
         clean = raw.replace("```json", "").replace("```", "").strip()

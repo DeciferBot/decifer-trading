@@ -120,8 +120,9 @@ def _generate_natural(event: str, fallback: str, **ctx) -> str:
         template = _prompts.get(event, "Describe this trading event naturally in one sentence: {event}")
         prompt   = template.format(event=event, **{k: (str(v) if v is not None else "unknown") for k, v in ctx.items()})
 
+        from config import CONFIG as _CONFIG
         resp = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model=_CONFIG.get("claude_model_haiku", "claude-haiku-4-5-20251001"),
             max_tokens=120,
             system=(
                 "You write very short, friendly, first-person spoken alerts for an autonomous trading bot called Decifer. "
@@ -239,7 +240,14 @@ def answer_voice_query(question: str, dash: dict) -> str:
             "Keep answers to 2-3 sentences max. No markdown, no bullet points, no preamble."
         )
 
-        answer = _call_claude(system, f"Context:\n{context}\n\nQuestion: {question}")
+        from config import CONFIG as _CONFIG
+        _resp = client.messages.create(
+            model=_CONFIG.get("claude_model_haiku", "claude-haiku-4-5-20251001"),
+            max_tokens=200,
+            system=system,
+            messages=[{"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}]
+        )
+        answer = _resp.content[0].text.strip()
         answer = answer or "I couldn't retrieve that right now."
         speak(answer)
         return answer

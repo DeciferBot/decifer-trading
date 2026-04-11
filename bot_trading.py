@@ -106,7 +106,7 @@ def _synthesize_trade_card(symbol: str, company_name: str,
 
     client = anthropic.Anthropic(api_key=api_key)
     msg = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model=CONFIG.get("claude_model_haiku", "claude-haiku-4-5-20251001"),
         max_tokens=350,
         messages=[{"role": "user", "content": prompt}],
     )

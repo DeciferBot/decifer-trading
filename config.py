@@ -71,11 +71,13 @@ CONFIG = {
 
     # ── AI BRAIN ──────────────────────────────────────────────
     "anthropic_api_key":        os.environ.get("ANTHROPIC_API_KEY", "YOUR_API_KEY_HERE"),
-    "claude_model":             "claude-sonnet-4-6",  # Default model
-    "claude_max_tokens":        800,                  # Default token cap
-    # Alpha agents (Trading Analyst, Portfolio Manager) use Opus — best model, no arbitrary cap.
-    "claude_model_alpha":       "claude-opus-4-6",    # Opus for alpha-generating agents
-    "claude_max_tokens_alpha":  4096,                 # Unconstrained — let Opus reason fully
+    "claude_model":             "claude-sonnet-4-6",       # Sonnet — number crunching, structured data
+    "claude_max_tokens":        800,                       # Default token cap
+    # Alpha agents use Opus — regime/sentiment judgment and nuanced trade decisions.
+    "claude_model_alpha":       "claude-opus-4-6",         # Opus for alpha-generating agents
+    "claude_max_tokens_alpha":  4096,                      # Unconstrained — let Opus reason fully
+    # Haiku — text generation for voice alerts, trade cards, speech.
+    "claude_model_haiku":       "claude-haiku-4-5-20251001",
 
     # ── INTELLIGENCE LAYER ────────────────────────────────────
     # Classifies every signal with trade_type (SCALP/SWING/HOLD/AVOID) and
