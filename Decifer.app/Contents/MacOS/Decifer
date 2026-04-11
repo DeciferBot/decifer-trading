@@ -1,14 +1,8 @@
 #!/bin/bash
 # Launch <> Decifer Trading Bot
-COMMAND_FILE="$HOME/Desktop/<> Decifer.command"
+COMMAND_FILE="$HOME/Desktop/Decifer.command"
 if [ -f "$COMMAND_FILE" ]; then
     open -a Terminal "$COMMAND_FILE"
 else
-    # Try alternate locations
-    ALT="$HOME/<> Decifer.command"
-    if [ -f "$ALT" ]; then
-        open -a Terminal "$ALT"
-    else
-        osascript -e 'display alert "Decifer" message "Could not find <> Decifer.command on Desktop or Home folder." as warning'
-    fi
+    osascript -e 'display alert "Decifer" message "Could not find Decifer.command on Desktop." as warning'
 fi
