@@ -306,6 +306,7 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
         "tranche_id":      trade.get("tranche_id") if isinstance(trade.get("tranche_id"), (int, type(None))) else None,
         "parent_trade_id": trade.get("parent_trade_id") if isinstance(trade.get("parent_trade_id"), (int, str, type(None))) else None,
         "pattern_id":      trade.get("pattern_id"),
+        "advice_id":       trade.get("advice_id", ""),
     }
 
     # ── Options metadata — store if present so dashboard can display correctly ──

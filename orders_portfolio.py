@@ -344,6 +344,7 @@ def reconcile_with_ibkr(ib: IB):
         # ── Step 3: detect positions closed while bot was down ────────────────
         # In our store but not in IBKR → SL/TP was triggered or manually closed.
         keys_to_remove = []
+        closed_while_down = []  # collect (advice_id, exit_price, pnl) to close Opus loop after lock
         with _trades_lock:
             for key in list(active_trades.keys()):
                 if key not in ibkr_keys:
@@ -376,9 +377,28 @@ def reconcile_with_ibkr(ib: IB):
                             f"— was closed while bot was down, removing"
                         )
                         keys_to_remove.append(key)
+                        if trade.get("advice_id"):
+                            closed_while_down.append({
+                                "advice_id":  trade["advice_id"],
+                                "exit_price": float(trade.get("current") or trade.get("entry", 0)),
+                                "pnl":        float(trade.get("pnl", 0.0)),
+                            })
 
         for key in keys_to_remove:
             _safe_del_trade(key)
+
+        # Close Opus learning loop for positions that were filled/stopped while the bot was offline
+        for item in closed_while_down:
+            try:
+                from trade_advisor import record_outcome as _record_outcome
+                _record_outcome(
+                    advice_id=item["advice_id"],
+                    exit_price=item["exit_price"],
+                    pnl=item["pnl"],
+                    exit_reason="closed_while_bot_down",
+                )
+            except Exception as _e:
+                log.debug(f"advisor record_outcome (offline close) failed: {_e}")
 
         # ── Step 4: process IBKR portfolio items ──────────────────────────────
         reconciled_count = 0
