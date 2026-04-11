@@ -18,7 +18,7 @@ from config import CONFIG
 import bot_state
 from bot_state import dash, clog
 
-from risk import check_risk_conditions, calculate_position_size, calculate_stops, get_scan_interval
+from risk import check_risk_conditions, calculate_position_size, calculate_stops, get_scan_interval, is_trading_day
 from orders import execute_buy, execute_sell, get_open_positions
 from sentinel_agents import run_sentinel_pipeline
 from theme_tracker import build_sentinel_universe
@@ -57,6 +57,10 @@ def handle_news_trigger(trigger: dict):
     This runs on the sentinel's background thread.
     """
     sym = trigger.get("symbol", "?")
+
+    if not is_trading_day():
+        clog("INFO", f"Sentinel trigger for {sym} — not a trading day, skipping")
+        return
 
     now = datetime.now(_ET)
     if (bot_state._sentinel_hour_start is None or

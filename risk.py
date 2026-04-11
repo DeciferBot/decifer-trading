@@ -304,6 +304,9 @@ def can_trade(symbol: str, config: dict) -> bool:
 
 def get_session() -> str:
     """Return current trading session name."""
+    if not is_trading_day():
+        now_et = datetime.now(EST)
+        return "WEEKEND" if now_et.weekday() >= 5 else "CLOSED"
     now_est  = datetime.now(EST).time()
     pre      = time(4, 0)
     open_    = time(9, 30)
@@ -314,7 +317,7 @@ def get_session() -> str:
     close    = time(16, 0)
     after    = time(20, 0)
 
-    if now_est < pre:          return "OVERNIGHT"
+    if now_est < pre:          return "CLOSED"
     elif now_est < open_:      return "PRE_MARKET"
     elif now_est < prime:      return "OPEN_BUFFER"
     elif now_est < lunch:      return "PRIME_AM"
@@ -322,7 +325,7 @@ def get_session() -> str:
     elif now_est < close_b:    return "PRIME_PM"
     elif now_est < close:      return "CLOSE_BUFFER"
     elif now_est < after:      return "AFTER_HOURS"
-    else:                      return "OVERNIGHT"
+    else:                      return "CLOSED"
 
 
 def get_scan_interval() -> int:
@@ -336,7 +339,8 @@ def get_scan_interval() -> int:
         "PRIME_PM":     CONFIG["scan_interval_prime"]        * 60,
         "CLOSE_BUFFER": CONFIG["scan_interval_extended"]     * 60,
         "AFTER_HOURS":  CONFIG["scan_interval_after_hours"]  * 60,
-        "OVERNIGHT":    CONFIG["scan_interval_overnight"]    * 60,
+        "CLOSED":       CONFIG["scan_interval_overnight"]    * 60,
+        "WEEKEND":      CONFIG["scan_interval_overnight"]    * 60,
     }
     return intervals.get(session, CONFIG["scan_interval_standard"] * 60)
 

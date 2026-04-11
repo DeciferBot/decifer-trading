@@ -34,6 +34,7 @@ from pathlib import Path
 import requests
 from config import CONFIG
 from news_infrastructure import HeadlineDeduplicator, SymbolCooldown
+from risk import is_trading_day
 
 log = logging.getLogger("decifer.catalyst")
 
@@ -595,6 +596,10 @@ class CatalystSentinel:
             f"urgency={trigger.get('urgency')} | "
             f"{trigger.get('claude_catalyst', '')[:60]}"
         )
+
+        if not is_trading_day():
+            log.info(f"Catalyst trigger for {sym} — not a trading day, skipping")
+            return
 
         try:
             self.on_trigger(trigger)

@@ -41,7 +41,8 @@ from risk import (check_risk_conditions, get_session, get_scan_interval,
                   update_equity_high_water_mark,
                   init_equity_high_water_mark_from_history,
                   get_intraday_strategy_mode, set_session_opening_regime,
-                  check_thesis_validity, get_consecutive_losses)
+                  check_thesis_validity, get_consecutive_losses,
+                  is_trading_day)
 from risk_gates import auto_rebalance_cash
 from orders import _options_attempted_today, _record_options_attempt
 from learning import (log_trade, load_trades, load_orders,
@@ -898,8 +899,12 @@ def run_scan():
     flush_pending_option_exits(ib)
     dash["positions"] = get_open_positions()
 
-    if get_session() == "OVERNIGHT":
-        clog("INFO", "Overnight — pipeline sleeping. Sentinel monitoring news.")
+    if not is_trading_day():
+        clog("INFO", "Not a trading day — pipeline sleeping. Sentinel monitoring news.")
+        return
+
+    if get_session() == "CLOSED":
+        clog("INFO", "Market closed — pipeline sleeping. Sentinel monitoring news.")
         return
 
     check_options_positions()

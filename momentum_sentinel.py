@@ -37,6 +37,7 @@ import time
 from datetime import datetime, timezone
 
 from config import CONFIG
+from risk import is_trading_day
 
 log = logging.getLogger("decifer.momentum_sentinel")
 
@@ -96,6 +97,10 @@ class MomentumSentinel:
             time.sleep(poll_s)
 
     def _check(self, fast_pct: float, slow_pct: float, cooldown_m: float) -> None:
+        # ── Trading day guard ──────────────────────────────────────────────────
+        if not is_trading_day():
+            return
+
         # ── Cooldown guard ─────────────────────────────────────────────────────
         if self._last_fire is not None:
             elapsed_m = (datetime.now() - self._last_fire).total_seconds() / 60
