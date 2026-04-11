@@ -101,6 +101,7 @@ ib = IB()
 # ── Reconnect / heartbeat state ───────────────────────────────────────────────
 _reconnect_lock:        threading.Lock          = threading.Lock()
 _reconnecting:          bool                    = False
+_manual_reconnect_evt:  threading.Event         = threading.Event()  # set by /api/reconnect
 _subscription_registry: dict                    = {}
 _heartbeat_thread:      threading.Thread | None = None
 _pnl_subscription                               = None

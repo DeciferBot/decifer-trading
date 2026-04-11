@@ -278,11 +278,24 @@ def main():
 
     threading.Thread(target=_background_data_collection, daemon=True, name="DataCollector").start()
 
-    # Connect to IBKR
+    # Connect to IBKR — retry loop so dashboard stays live when TWS is offline
     if not connect_ibkr():
-        print(f"{Fore.RED}ERROR: Could not connect to IBKR on port {CONFIG['ibkr_port']}.{Style.RESET_ALL}")
-        print(f"  Make sure TWS is running with API enabled on port {CONFIG['ibkr_port']}")
-        sys.exit(1)
+        port = CONFIG['ibkr_port']
+        clog("WARN", f"TWS not reachable on port {port} — dashboard is live at "
+             f"http://localhost:{CONFIG['dashboard_port']}")
+        clog("WARN", "Start TWS and click Reconnect in the dashboard, or wait for auto-retry (30s).")
+        dash["ibkr_disconnected"] = True
+        dash["status"] = "disconnected"
+        while not bot_state.ib.isConnected():
+            # Wait up to 30 s — woken early if user clicks Reconnect
+            bot_state._manual_reconnect_evt.wait(timeout=30)
+            bot_state._manual_reconnect_evt.clear()
+            if connect_ibkr():
+                dash["ibkr_disconnected"] = False
+                clog("INFO", "TWS connected — resuming startup")
+                break
+            clog("WARN", f"Still waiting for TWS on port {port}...")
+            dash["status"] = "disconnected"
 
     # Reset daily risk state — only once per calendar day
     pv, _ = get_account_data()

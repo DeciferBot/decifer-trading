@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from config import CONFIG
@@ -28,64 +31,68 @@ import time as _time
 _news_payload_cache: dict = {"data": None, "fetched_at": 0.0}
 _NEWS_CACHE_TTL = 60  # seconds
 
+# ── Macro event classifier cache ──────────────────────────────────────────────
+_macro_cache: dict = {}   # headline_hash → list of macro classifications
+
 
 def _fetch_alpaca_news() -> list[dict]:
-    """Fetch recent news articles from Alpaca REST API (Benzinga feed)."""
-    api_key    = CONFIG.get("alpaca_api_key", "")
-    secret_key = CONFIG.get("alpaca_secret_key", "")
+    """
+    Fetch recent news from Alpaca/Benzinga via direct REST API.
+    Uses requests instead of the SDK (avoids pydantic version conflicts).
+    Benzinga articles consistently include large CDN images.
+    """
+    import requests as _req
+    api_key    = CONFIG.get("alpaca_api_key", "")    or os.environ.get("ALPACA_API_KEY", "")
+    secret_key = CONFIG.get("alpaca_secret_key", "") or os.environ.get("ALPACA_SECRET_KEY", "")
     if not api_key or not secret_key:
         return []
     try:
-        from alpaca.data.historical.news import NewsClient
-        from alpaca.data.requests import NewsRequest
         from datetime import datetime, timedelta, timezone as _tz
-
-        client  = NewsClient(api_key, secret_key)
-        req     = NewsRequest(
-            start=datetime.now(_tz.utc) - timedelta(hours=12),
-            limit=50,
-            sort="desc",
-            include_content=False,
+        start = (datetime.now(_tz.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        resp = _req.get(
+            "https://data.alpaca.markets/v1beta1/news",
+            params={"limit": 50, "sort": "desc", "start": start, "include_content": "false"},
+            headers={"APCA-API-KEY-ID": api_key, "APCA-API-SECRET-KEY": secret_key},
+            timeout=10,
         )
-        response = client.get_news(req)
-        raw_articles = response.news if hasattr(response, "news") else list(response)
+        if resp.status_code != 200:
+            log.debug("Alpaca news HTTP %d", resp.status_code)
+            return []
 
-        result = []
-        now = datetime.now(_tz.utc)
-        for art in raw_articles:
-            created = getattr(art, "created_at", None)
-            age_hours = 0.0
-            created_ts = 0
-            if created is not None:
-                try:
-                    if not getattr(created, "tzinfo", None):
-                        from datetime import timezone as _tz2
-                        created = created.replace(tzinfo=_tz2.utc)
-                    created_ts = int(created.timestamp() * 1000)
-                    age_hours  = (now - created).total_seconds() / 3600
-                except Exception:
-                    pass
+        now_utc = datetime.now(_tz.utc)
+        result  = []
+        for art in resp.json().get("news", []):
+            headline = (art.get("headline") or "").strip()
+            if not headline:
+                continue
 
-            # Pick best image: prefer large, fall back to small/thumb
-            images    = list(getattr(art, "images", []) or [])
+            # Pick best image: large > small > thumb
             image_url = None
             for size_pref in ("large", "small", "thumb"):
-                for img in images:
-                    sz = img.get("size") if isinstance(img, dict) else getattr(img, "size", "")
-                    url = img.get("url") if isinstance(img, dict) else getattr(img, "url", "")
-                    if sz == size_pref and url:
-                        image_url = url
+                for img in (art.get("images") or []):
+                    if img.get("size") == size_pref and img.get("url"):
+                        image_url = img["url"]
                         break
                 if image_url:
                     break
 
+            # Parse created_at
+            age_hours, created_ts = 0.0, 0
+            ts_str = art.get("created_at", "")
+            try:
+                dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                age_hours  = (now_utc - dt).total_seconds() / 3600
+                created_ts = int(dt.timestamp() * 1000)
+            except Exception:
+                pass
+
             result.append({
-                "headline":   getattr(art, "headline",  "") or "",
-                "summary":    getattr(art, "summary",   "") or "",
-                "url":        getattr(art, "url",       "") or "",
-                "source":     getattr(art, "source",    "") or "",
-                "author":     getattr(art, "author",    "") or "",
-                "symbols":    list(getattr(art, "symbols", []) or []),
+                "headline":   headline,
+                "summary":    (art.get("summary")  or "").strip(),
+                "url":        (art.get("url")       or "").strip(),
+                "source":     (art.get("source")    or "").strip(),
+                "author":     (art.get("author")    or "").strip(),
+                "symbols":    [s.upper() for s in (art.get("symbols") or [])],
                 "image_url":  image_url,
                 "age_hours":  round(age_hours, 2),
                 "created_ts": created_ts,
@@ -93,10 +100,112 @@ def _fetch_alpaca_news() -> list[dict]:
                 "news_score": 0,
                 "catalyst":   "",
             })
+
+        log.info("Alpaca news: %d articles (%d with images)",
+                 len(result), sum(1 for a in result if a["image_url"]))
         return result
     except Exception as exc:
-        log.debug("Alpaca news REST fetch failed: %s", exc)
+        log.debug("Alpaca news fetch failed: %s", exc)
         return []
+
+
+_MACRO_TYPES = {
+    "FOMC":         ("FED",    "#ff6b35"),
+    "CPI":          ("CPI",    "#ff4444"),
+    "GDP":          ("GDP",    "#ff8c00"),
+    "JOBS":         ("JOBS",   "#ffd700"),
+    "WAR":          ("WAR",    "#cc0000"),
+    "GEOPOLITICAL": ("GEO",    "#e05c00"),
+    "LEGISLATION":  ("LAW",    "#7b2fff"),
+    "TARIFF":       ("TARIFF", "#ff6b35"),
+    "CREDIT":       ("CREDIT", "#cc0000"),
+    "OTHER_MACRO":  ("MACRO",  "#888"),
+}
+
+
+def _enrich_macro_events(articles: list) -> None:
+    """
+    Use Sonnet to identify macro market-moving events in the article feed.
+    Adds macro_event, macro_type, macro_label, macro_color, macro_impact,
+    macro_direction, macro_implication fields to qualifying articles.
+    Results cached by article fingerprint — won't call API if articles unchanged.
+    """
+    if not articles:
+        return
+
+    headlines = [a.get("headline", "") for a in articles[:30]]
+    cache_key = hash(tuple(headlines))
+    if cache_key in _macro_cache:
+        classifications = _macro_cache[cache_key]
+    else:
+        try:
+            import anthropic as _ant
+            items = [
+                {"i": i, "h": h, "s": (articles[i].get("summary") or "")[:120]}
+                for i, h in enumerate(headlines) if h
+            ]
+            prompt = (
+                "You are a macro market analyst. Identify which of these news headlines represent "
+                "MACRO MARKET-MOVING events — events likely to move S&P 500 or Nasdaq by ≥0.3%.\n\n"
+                "Macro events include: Fed/FOMC decisions, CPI/PPI/PCE prints, GDP data, non-farm "
+                "payrolls, major wars or military escalations, new trade tariffs/sanctions, landmark "
+                "legislation (tax, regulation), credit crises, central bank policy changes.\n\n"
+                "NOT macro: routine earnings of individual companies, typical M&A, product launches, "
+                "analyst upgrades/downgrades.\n\n"
+                "Headlines:\n"
+                + json.dumps(items, indent=2)
+                + "\n\nReturn a JSON array for qualifying macro events only:\n"
+                '[{"i":<index>,"type":"FOMC|CPI|GDP|JOBS|WAR|GEOPOLITICAL|LEGISLATION|TARIFF|CREDIT|OTHER_MACRO",'
+                '"impact":<1-10>,"direction":"BULLISH|BEARISH|NEUTRAL|MIXED",'
+                '"implication":"<one sentence: what this means for markets>"}]\n'
+                "Return [] if none qualify. JSON only, no other text."
+            )
+            api_key = CONFIG.get("anthropic_api_key") or ""
+            if not api_key or api_key == "YOUR_API_KEY_HERE":
+                # Fallback: read directly from .env (bypasses empty-string env var override)
+                try:
+                    from dotenv import dotenv_values as _dv
+                    api_key = _dv(os.path.join(os.path.dirname(__file__), ".env")).get("ANTHROPIC_API_KEY", "")
+                except Exception:
+                    pass
+            if not api_key:
+                log.debug("Macro classifier: no Anthropic API key available")
+                return
+            client = _ant.Anthropic(api_key=api_key)
+            msg = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = msg.content[0].text.strip()
+            # Strip markdown code fences if present
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            classifications = json.loads(raw)
+            _macro_cache[cache_key] = classifications
+            log.info("Macro classifier: %d macro events found in %d articles",
+                     len(classifications), len(articles))
+        except Exception as exc:
+            log.debug("Macro event classification error: %s", exc)
+            return
+
+    for item in (classifications or []):
+        idx = item.get("i")
+        if not isinstance(idx, int) or not (0 <= idx < len(articles)):
+            continue
+        mtype = item.get("type", "OTHER_MACRO")
+        label, color = _MACRO_TYPES.get(mtype, ("MACRO", "#888"))
+        articles[idx].update({
+            "macro_event":       True,
+            "macro_type":        mtype,
+            "macro_label":       label,
+            "macro_color":       color,
+            "macro_impact":      int(item.get("impact", 5)),
+            "macro_direction":   item.get("direction", "NEUTRAL"),
+            "macro_implication": item.get("implication", ""),
+        })
 
 
 def _get_news_payload() -> dict:
@@ -199,6 +308,9 @@ def _get_news_payload() -> dict:
     # Enrich articles that have no image_url with company logos (FMP)
     _enrich_images(articles)
 
+    # Identify macro market-moving events via Sonnet (cached by content hash)
+    _enrich_macro_events(articles)
+
     payload = {
         "articles":          articles,
         "sentinel_triggers": list(dash.get("sentinel_triggers", [])),
@@ -221,8 +333,62 @@ def _stock_logo(symbol: str) -> str:
     return f"https://financialmodelingprep.com/image-stock/{sym}.png"
 
 
+def _fetch_og_image(url: str) -> str:
+    """Fetch og:image from an article URL. Returns '' on any failure."""
+    if not url or not url.startswith("http"):
+        return ""
+    try:
+        import requests as _req
+        resp = _req.get(
+            url, timeout=3,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; Decifer/2.0)"},
+            allow_redirects=True,
+        )
+        if resp.status_code != 200:
+            return ""
+        # Match both attribute orderings of <meta property="og:image" content="...">
+        for pat in (
+            r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+        ):
+            m = re.search(pat, resp.text[:50_000], re.I)
+            if m:
+                img = m.group(1).strip()
+                if img.startswith("http"):
+                    return img
+        return ""
+    except Exception:
+        return ""
+
+
 def _enrich_images(articles: list) -> None:
-    """Fill image_url for articles missing one using company stock logos (FMP)."""
+    """
+    Fill image_url for articles missing one.
+    1. Try og:image from the article URL (parallel, capped at 4 s total).
+    2. Fall back to company logo from FMP.
+    """
+    needs = [
+        a for a in articles
+        if not a.get("image_url")
+        and a.get("url", "").startswith("http")
+        and "yahoo.com/quote" not in a.get("url", "")  # generic pages — skip
+    ]
+    if needs:
+        try:
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                futures = {pool.submit(_fetch_og_image, a["url"]): a for a in needs}
+                for fut in as_completed(futures, timeout=4):
+                    art = futures[fut]
+                    try:
+                        img = fut.result(timeout=0)
+                        if img:
+                            art["image_url"] = img
+                    except Exception:
+                        pass
+        except Exception:
+            pass  # timeout or pool error — proceed with whatever completed
+
+    # Final fallback: FMP company logo for anything still missing
     for art in articles:
         if art.get("image_url"):
             continue
@@ -416,6 +582,30 @@ class DashHandler(BaseHTTPRequestHandler):
                 log.warning("thesis_performance error: %s", exc)
                 payload = {"error": str(exc), "rows": []}
             self.wfile.write(json.dumps(payload).encode())
+        elif self.path.startswith("/api/img-proxy"):
+            from urllib.parse import urlparse as _urlparse, parse_qs as _parse_qs, unquote as _unquote
+            import requests as _req
+            qs = _parse_qs(_urlparse(self.path).query)
+            img_url = _unquote((qs.get("url") or [""])[0])
+            if not img_url or not img_url.startswith("http"):
+                self.send_response(400); self.end_headers(); return
+            try:
+                r = _req.get(img_url, timeout=5, allow_redirects=True, headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+                })
+                ct = r.headers.get("content-type", "image/jpeg")
+                if r.status_code == 200 and "image" in ct:
+                    self.send_response(200)
+                    self.send_header("Content-Type", ct)
+                    self.send_header("Cache-Control", "public, max-age=3600")
+                    self.send_header("Content-Length", str(len(r.content)))
+                    self.end_headers()
+                    self.wfile.write(r.content)
+                else:
+                    self.send_response(404); self.end_headers()
+            except Exception:
+                self.send_response(404); self.end_headers()
         elif self.path == "/api/news":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -508,7 +698,15 @@ class DashHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         ib = bot_state.ib
-        if self.path == "/api/kill":
+        if self.path == "/api/reconnect":
+            import bot_state as _bs
+            _bs._manual_reconnect_evt.set()   # wake the retry loop in main()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(json.dumps({"ok": True, "msg": "Reconnect attempt triggered"}).encode())
+        elif self.path == "/api/kill":
             dash["killed"] = True
             clog("RISK", "🚨 KILL SWITCH — executing FLATTEN ALL immediately...")
             # Execute immediately via emergency IB connection (separate clientId)

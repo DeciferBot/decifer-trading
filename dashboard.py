@@ -329,6 +329,13 @@ canvas{display:block;width:100% !important}
 </head>
 <body>
 
+<!-- TWS DISCONNECTED BANNER -->
+<div id="tws-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#1a0a00;border-bottom:2px solid var(--orange);padding:10px 20px;display:none;align-items:center;gap:12px">
+  <span style="color:var(--orange);font-size:12px;font-weight:700">⚠ TWS DISCONNECTED</span>
+  <span style="color:var(--muted2);font-size:11px">Dashboard is live but trading is paused. Start TWS and reconnect.</span>
+  <button id="tws-reconnect-btn" onclick="twsReconnect()" style="margin-left:auto;background:var(--orange);color:#000;border:none;padding:5px 14px;border-radius:4px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;cursor:pointer">↺ Reconnect</button>
+</div>
+
 <!-- HEADER -->
 <div class="hdr">
   <div class="logo">
@@ -623,6 +630,7 @@ canvas{display:block;width:100% !important}
     <span id="news-updated" style="color:var(--muted2);font-size:10px;margin-left:auto"></span>
     <button class="news-fetch-btn" id="news-fetch-btn" onclick="loadNews()">⟳ Fetch News</button>
   </div>
+  <div id="market-events-strip" style="display:none;padding:10px 14px 0"></div>
   <div class="news-feed" id="news-feed">
     <div class="empty" style="padding:40px 0;text-align:center">
       <div style="font-size:28px;opacity:.3;margin-bottom:12px">📰</div>
@@ -2198,10 +2206,21 @@ async function poll() {
   try {
     const d = await (await fetch('/api/state')).json();
 
+    // TWS disconnected banner
+    const twsBanner = document.getElementById('tws-banner');
+    if (d.ibkr_disconnected) {
+      twsBanner.style.display = 'flex';
+      document.body.style.paddingTop = '46px';
+    } else {
+      twsBanner.style.display = 'none';
+      document.body.style.paddingTop = '';
+    }
+
     // Header
     const pill = document.getElementById('bot-pill');
     const stat = document.getElementById('bot-status');
     if (d.status === 'running') { pill.className = 'pill pg'; stat.textContent = 'Running ●'; }
+    else if (d.ibkr_disconnected) { pill.className = 'pill pr'; stat.textContent = 'TWS Disconnected'; }
     else { pill.className = 'pill pr'; stat.textContent = 'Stopped'; }
     document.getElementById('upd-time').textContent = 'Updated ' + new Date().toTimeString().slice(0, 8);
 
@@ -2515,6 +2534,21 @@ function applyLivePrices(prices) {
 }
 
 // ── Poll guard: skip tick if previous fetch is still in flight ─
+async function twsReconnect() {
+  const btn = document.getElementById('tws-reconnect-btn');
+  btn.disabled = true; btn.textContent = '↺ Connecting…';
+  try {
+    const r = await fetch('/api/reconnect', {method:'POST'});
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.msg || 'failed');
+    btn.textContent = '✓ Signal sent';
+    setTimeout(() => { btn.disabled = false; btn.textContent = '↺ Reconnect'; }, 5000);
+  } catch(e) {
+    btn.textContent = '✗ Failed';
+    setTimeout(() => { btn.disabled = false; btn.textContent = '↺ Reconnect'; }, 3000);
+  }
+}
+
 let _pollInFlight = false;
 let _lastLogCount = 0;
 poll();
@@ -2524,6 +2558,8 @@ setInterval(async () => {
   try { await poll(); } finally { _pollInFlight = false; }
 }, 2000);
 setInterval(fetchPrices, 1000);  // live price updates between full polls
+setInterval(loadNews, 90_000);   // auto-refresh news every 90 s
+loadNews();                       // load immediately on page open
 
 // ── News rendering ─────────────────────────────────────────
 let _allNewsItems = [];
@@ -2558,7 +2594,9 @@ function _imgPh(sym, sentiment) {
 function _imgHtml(item, cls='news-card-img') {
   const ph = `<div class="news-card-img-ph" style="${_imgPh(item.symbol||'?', item.sentiment)}">${esc(item.symbol||'?')}</div>`;
   if (!item.image_url) return `<div class="${cls}">${ph}</div>`;
-  return `<div class="${cls}"><img src="${item.image_url}" alt="" loading="lazy" onerror="this.style.display='none';this.nextSibling.style.display='flex'">${ph}</div>`;
+  // Route through local proxy to avoid hotlink blocks and CORS issues
+  const src = '/api/img-proxy?url=' + encodeURIComponent(item.image_url);
+  return `<div class="${cls}"><img src="${src}" alt="" loading="lazy" onerror="this.style.display='none';this.nextSibling.style.display='flex'">${ph}</div>`;
 }
 
 function _renderHero(item, idx) {
@@ -2615,16 +2653,23 @@ async function loadNews() {
     const j = await r.json();
     const articles = j.articles || [];
     _allNewsItems = articles.map(a => ({
-      symbol:        (a.symbols || [])[0] || '—',
-      headline:      a.headline || '',
-      summary:       a.summary  || '',
-      sentiment:     a.sentiment  || 'NEUTRAL',
-      keyword_score: a.keyword_score || 0,
-      catalyst:      a.catalyst  || '',
-      recency:       a.age_hours || 999,
-      news_score:    a.news_score || 0,
-      image_url:     a.image_url  || '',
-      url:           a.url        || '#',
+      symbol:           (a.symbols || [])[0] || '—',
+      headline:         a.headline || '',
+      summary:          a.summary  || '',
+      sentiment:        a.sentiment  || 'NEUTRAL',
+      keyword_score:    a.keyword_score || 0,
+      catalyst:         a.catalyst  || '',
+      recency:          a.age_hours || 999,
+      news_score:       a.news_score || 0,
+      image_url:        a.image_url  || '',
+      url:              a.url        || '#',
+      macro_event:      a.macro_event      || false,
+      macro_type:       a.macro_type       || '',
+      macro_label:      a.macro_label      || '',
+      macro_color:      a.macro_color      || '',
+      macro_impact:     a.macro_impact     || 0,
+      macro_direction:  a.macro_direction  || '',
+      macro_implication:a.macro_implication|| '',
     }));
     window._newsItems = _allNewsItems;
     filterNews();
@@ -2663,6 +2708,49 @@ function renderNews(newsData) {
   filterNews();
 }
 
+function _renderMacroStrip(allItems) {
+  const strip = document.getElementById('market-events-strip');
+  const macroItems = allItems.filter(i => i.macro_event && i.macro_impact >= 3)
+                             .sort((a, b) => b.macro_impact - a.macro_impact);
+  if (!macroItems.length) {
+    strip.style.display = 'block';
+    strip.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+        <span style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--muted2)">⚡ MARKET EVENTS</span>
+        <span style="font-size:10px;color:var(--muted2);font-style:italic">— No market-moving events identified by Sonnet</span>
+      </div>`;
+    return;
+  }
+
+  const dirIcon = d => d === 'BULLISH' ? '▲' : d === 'BEARISH' ? '▼' : d === 'MIXED' ? '⇅' : '—';
+  const dirColor = d => d === 'BULLISH' ? 'var(--green)' : d === 'BEARISH' ? 'var(--red)' : d === 'MIXED' ? 'var(--orange)' : 'var(--muted2)';
+  const impactBar = n => {
+    const pct = Math.round((n / 10) * 100);
+    const c = n >= 8 ? '#ff2222' : n >= 6 ? 'var(--orange)' : 'var(--yellow,#ffd700)';
+    return `<div style="height:3px;background:var(--border);border-radius:2px;margin-top:6px"><div style="height:3px;width:${pct}%;background:${c};border-radius:2px"></div></div>`;
+  };
+
+  const cards = macroItems.map(item => `
+    <a href="${esc(item.url)}" target="_blank" rel="noopener" style="text-decoration:none;flex-shrink:0;width:240px;background:var(--bg1);border:1px solid ${item.macro_color};border-top:3px solid ${item.macro_color};border-radius:6px;padding:10px 12px;display:block;cursor:pointer">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <span style="background:${item.macro_color};color:#000;font-size:9px;font-weight:800;padding:2px 6px;border-radius:3px;letter-spacing:.05em">${esc(item.macro_label)}</span>
+        <span style="color:${dirColor(item.macro_direction)};font-size:11px;font-weight:700">${dirIcon(item.macro_direction)}</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--muted2)">Impact ${item.macro_impact}/10</span>
+      </div>
+      <div style="font-size:11px;color:var(--text);font-weight:600;line-height:1.35;margin-bottom:4px">${esc(item.headline)}</div>
+      <div style="font-size:10px;color:var(--muted2);line-height:1.4">${esc(item.macro_implication)}</div>
+      ${impactBar(item.macro_impact)}
+    </a>`).join('');
+
+  strip.style.display = 'block';
+  strip.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--orange)">⚡ MARKET EVENTS</span>
+      <span style="font-size:10px;color:var(--muted2)">${macroItems.length} identified by Sonnet</span>
+    </div>
+    <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin">${cards}</div>`;
+}
+
 function filterNews() {
   const feed    = document.getElementById('news-feed');
   const keyword = (document.getElementById('news-keyword').value || '').toLowerCase();
@@ -2678,6 +2766,9 @@ function filterNews() {
   if (sortBy === 'time')  items.sort((a, b) => a.recency - b.recency);
   if (sortBy === 'score') items.sort((a, b) => b.news_score - a.news_score);
   if (sortBy === 'macro') items.sort((a, b) => _macroScore(b) - _macroScore(a));
+
+  // Render macro events strip (always from full unfiltered set so events never disappear)
+  _renderMacroStrip(_allNewsItems);
 
   document.getElementById('news-count').textContent = items.length + ' stories';
   window._newsItems = items;

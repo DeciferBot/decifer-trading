@@ -42,56 +42,86 @@ _news_cache: dict[str, tuple[dict, float]] = {}  # cache_key → (result, monoto
 _earnings_cache: tuple[dict | None, float] = (None, 0.0)
 
 
+# ── API keys (multi-key rotation) ─────────────────────────────────────────────
+
+def _api_keys() -> list[str]:
+    """
+    Return all configured AV API keys.
+    Supports two formats in .env / CONFIG:
+      - Comma-separated:  ALPHA_VANTAGE_KEY=KEY1,KEY2,KEY3
+      - Indexed:          ALPHA_VANTAGE_KEY_1=KEY1
+                          ALPHA_VANTAGE_KEY_2=KEY2  (up to _9)
+    """
+    raw = CONFIG.get("alpha_vantage_key") or os.environ.get("ALPHA_VANTAGE_KEY", "")
+    keys = [k.strip() for k in raw.split(",") if k.strip()]
+    for i in range(1, 10):
+        k = os.environ.get(f"ALPHA_VANTAGE_KEY_{i}", "").strip()
+        if k and k not in keys:
+            keys.append(k)
+    return keys
+
+
+def _api_key() -> str:
+    """Return the first configured key (backwards-compat helper)."""
+    keys = _api_keys()
+    return keys[0] if keys else ""
+
+
 # ── Rate limiter ───────────────────────────────────────────────────────────────
 
-def _consume_call() -> bool:
+def _consume_call() -> str:
     """
-    Consume one API call from today's budget.
-    Returns True if the call may proceed; False if budget is exhausted.
+    Pick the next available API key and consume one call from its daily budget.
+    Rotates through all configured keys in order; returns the chosen key string,
+    or '' if every key is exhausted today.
     Fails open — tracking errors never block data fetches.
     """
+    keys = _api_keys()
+    if not keys:
+        return ""
+
     today = date.today().isoformat()
     try:
         try:
             with open(_RATE_LIMIT_PATH) as f:
                 state = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
-            state = {"date": today, "count": 0}
+            state = {}
 
         if state.get("date") != today:
-            state = {"date": today, "count": 0}
+            state = {"date": today}
 
         limit = CONFIG.get("alpha_vantage_daily_limit", 25)
-        if state["count"] >= limit:
-            log.debug("AV rate limit: %d/%d calls used today — skipping", state["count"], limit)
-            return False
+        for key in keys:
+            kid = key[-8:]  # last 8 chars as per-key ID
+            count = state.get(kid, 0)
+            if count < limit:
+                state[kid] = count + 1
+                with open(_RATE_LIMIT_PATH, "w") as f:
+                    json.dump(state, f)
+                log.debug("AV key ...%s: %d/%d calls today", kid, count + 1, limit)
+                return key
 
-        state["count"] += 1
-        with open(_RATE_LIMIT_PATH, "w") as f:
-            json.dump(state, f)
-
-        log.debug("AV rate limit: %d/%d calls used today", state["count"], limit)
-        return True
+        total = sum(state.get(k[-8:], 0) for k in keys)
+        log.debug("AV: all %d key(s) exhausted (%d calls today)", len(keys), total)
+        return ""
     except Exception as exc:
         log.debug("AV rate limit tracking error (fail-open): %s", exc)
-        return True
+        return keys[0]
 
 
 def get_calls_today() -> int:
-    """Return the number of AV API calls made today (for dashboard display)."""
+    """Return total AV API calls made today across all keys."""
     today = date.today().isoformat()
     try:
         with open(_RATE_LIMIT_PATH) as f:
             state = json.load(f)
-        return state["count"] if state.get("date") == today else 0
+        if state.get("date") != today:
+            return 0
+        keys = _api_keys()
+        return sum(state.get(k[-8:], 0) for k in keys) if keys else state.get("count", 0)
     except Exception:
         return 0
-
-
-# ── API key ────────────────────────────────────────────────────────────────────
-
-def _api_key() -> str:
-    return CONFIG.get("alpha_vantage_key") or os.environ.get("ALPHA_VANTAGE_KEY", "")
 
 
 # ── News sentiment ─────────────────────────────────────────────────────────────
@@ -113,10 +143,6 @@ def get_news_sentiment(tickers: list[str]) -> dict[str, dict]:
     """
     if not tickers:
         return {}
-    key = _api_key()
-    if not key:
-        return {}
-
     batch = tickers[:50]
     cache_key = ",".join(sorted(t.upper() for t in batch))
     now = time.monotonic()
@@ -126,7 +152,8 @@ def get_news_sentiment(tickers: list[str]) -> dict[str, dict]:
         log.debug("AV news: cache hit (%d tickers)", len(cached_result))
         return cached_result
 
-    if not _consume_call():
+    key = _consume_call()
+    if not key:
         return {}
 
     ticker_str = ",".join(t.upper() for t in batch)
@@ -201,7 +228,7 @@ def get_news_sentiment(tickers: list[str]) -> dict[str, dict]:
 
 # Cache for raw article feed (separate from sentiment cache)
 _articles_cache: tuple[list | None, float] = (None, 0.0)
-_ARTICLES_TTL = 15 * 60  # 15 minutes — more frequent than sentiment
+_ARTICLES_TTL = 4 * 60 * 60  # 4 hours — free key = 25 req/day, conserve calls
 
 
 def get_news_articles(tickers: list[str], limit: int = 50) -> list[dict]:
@@ -225,10 +252,6 @@ def get_news_articles(tickers: list[str], limit: int = 50) -> list[dict]:
     """
     if not tickers:
         return []
-    key = _api_key()
-    if not key:
-        return []
-
     global _articles_cache
     cached_articles, cached_at = _articles_cache
     now_mono = time.monotonic()
@@ -236,10 +259,11 @@ def get_news_articles(tickers: list[str], limit: int = 50) -> list[dict]:
         log.debug("AV articles: cache hit (%d articles)", len(cached_articles))
         return cached_articles
 
-    if not _consume_call():
+    key = _consume_call()
+    if not key:
         return cached_articles or []
 
-    batch = tickers[:50]
+    batch = tickers[:15]  # AV NEWS_SENTIMENT rejects > ~20 tickers; cap at 15
     ticker_str = ",".join(t.upper() for t in batch)
     url = (f"{_BASE_URL}?function=NEWS_SENTIMENT"
            f"&tickers={ticker_str}&apikey={key}&sort=LATEST&limit={limit}")
@@ -347,11 +371,8 @@ def get_sector_performance() -> dict[str, dict]:
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         pass
 
-    key = _api_key()
+    key = _consume_call()
     if not key:
-        return {}
-
-    if not _consume_call():
         return {}
 
     url = f"{_BASE_URL}?function=SECTOR&apikey={key}"
@@ -408,17 +429,14 @@ def get_earnings_calendar(horizon_months: int = 3) -> dict[str, str]:
     Returns {} when: no API key configured, rate limit exhausted, or AV returns an error.
     """
     global _earnings_cache
-    key = _api_key()
-    if not key:
-        return {}
-
     now = time.monotonic()
     cached_result, cached_at = _earnings_cache
     if cached_result is not None and now - cached_at < _EARNINGS_TTL:
         log.debug("AV earnings: cache hit (%d symbols)", len(cached_result))
         return cached_result
 
-    if not _consume_call():
+    key = _consume_call()
+    if not key:
         return {}
 
     horizon_str = f"{min(horizon_months, 3)}month"
