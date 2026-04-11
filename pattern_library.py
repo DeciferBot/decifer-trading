@@ -37,8 +37,9 @@ from typing import Optional
 
 log = logging.getLogger("decifer.pattern_library")
 
-LIBRARY_PATH = Path("data/pattern_library.json")
-_lock = threading.Lock()
+LIBRARY_PATH        = Path("data/pattern_library.json")
+_lock               = threading.Lock()
+_MAX_PATTERN_ENTRIES = 2000   # Hard cap: trim oldest pending-outcome entries first
 
 # ── Fingerprint ───────────────────────────────────────────────────────────────
 # A compact numeric vector derived from a MarketObservation.
@@ -119,6 +120,20 @@ def _load() -> dict:
 
 def _save(data: dict) -> None:
     LIBRARY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # Trim to _MAX_PATTERN_ENTRIES when the library grows too large.
+    # Strategy: always keep entries that already have outcomes (they are training data);
+    # trim the oldest pending-outcome entries (they haven't closed yet and are least
+    # likely to get outcomes the further back they go).
+    if len(data) > _MAX_PATTERN_ENTRIES:
+        with_outcome = {k: v for k, v in data.items() if v.get("pnl") is not None}
+        pending      = {k: v for k, v in data.items() if v.get("pnl") is None}
+        slots_left   = max(0, _MAX_PATTERN_ENTRIES - len(with_outcome))
+        keep_pending = dict(
+            sorted(pending.items(), key=lambda kv: kv[1].get("timestamp", ""), reverse=True)
+            [:slots_left]
+        )
+        data = {**with_outcome, **keep_pending}
+        log.debug(f"pattern_library: trimmed to {len(data)} entries ({len(with_outcome)} with outcomes)")
     LIBRARY_PATH.write_text(json.dumps(data, indent=2))
 
 

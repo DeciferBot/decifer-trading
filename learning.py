@@ -21,6 +21,11 @@ SIGNALS_LOG_FILE = CONFIG.get("signals_log", "data/signals_log.jsonl")
 AUDIT_LOG_FILE   = CONFIG.get("audit_log", "data/audit_log.jsonl")
 CAPITAL_FILE     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "capital_base.json")
 
+# Rotate signals_log.jsonl once it exceeds this size to prevent the file growing forever.
+# Archived files are named  data/signals_log_archive_YYYYMMDD_HHMMSS.jsonl  and kept
+# alongside the live file so ic_calculator can still read them if needed.
+_SIGNALS_LOG_ROTATE_BYTES = 50 * 1024 * 1024  # 50 MB
+
 
 # ── Immutable audit log ────────────────────────────────────────────────
 
@@ -209,6 +214,31 @@ def _save_orders(orders: list):
             json.dump(orders, f, indent=2)
 
 
+def _rotate_signals_log() -> None:
+    """
+    Archive signals_log.jsonl when it exceeds _SIGNALS_LOG_ROTATE_BYTES.
+    The live file is moved to data/signals_log_archive_YYYYMMDD_HHMMSS.jsonl so
+    ic_calculator can still reference it, and a fresh file starts immediately.
+    Errors are swallowed — log rotation must never block signal writing.
+    """
+    try:
+        if not os.path.exists(SIGNALS_LOG_FILE):
+            return
+        size = os.path.getsize(SIGNALS_LOG_FILE)
+        if size < _SIGNALS_LOG_ROTATE_BYTES:
+            return
+        import shutil
+        ts      = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        archive = SIGNALS_LOG_FILE.replace(".jsonl", f"_archive_{ts}.jsonl")
+        shutil.move(SIGNALS_LOG_FILE, archive)
+        log.info(
+            f"signals_log rotated: {os.path.basename(archive)} "
+            f"({size / 1_048_576:.1f} MB) — fresh log started"
+        )
+    except Exception as exc:
+        log.warning(f"signals_log rotation failed (non-fatal): {exc}")
+
+
 def log_signal_scan(scored: list, regime: dict) -> None:
     """
     Append one line per scored symbol to signals_log.jsonl after each scan cycle.
@@ -220,6 +250,7 @@ def log_signal_scan(scored: list, regime: dict) -> None:
     """
     if not scored:
         return
+    _rotate_signals_log()   # archive if file has grown past 50 MB
     scan_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
     try:
         with open(SIGNALS_LOG_FILE, "a") as f:

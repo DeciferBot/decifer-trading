@@ -12,6 +12,23 @@ data/historical/
 equity_history.json
 favourites.json
 
+# Large / regenerable data files that must never be committed
+data/signals_log.jsonl
+data/signals_log_historical.jsonl
+data/signals_log_archive_*.jsonl
+data/signals_typed.jsonl
+data/audit_log.jsonl
+data/sec_tickers.json
+data/*.bak
+data/raw/
+data/features/
+
+# Stray log that sometimes lands in the project root
+signals_log.jsonl
+
+# One-off recovery / debug scripts
+recover_equity_history.py
+
 # Logs
 logs/
 weekly_review.txt

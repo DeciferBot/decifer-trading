@@ -77,11 +77,15 @@ def _persist_positions() -> None:
     Called after every structural mutation (entry, exit, SL/TP update, status change).
     Price/pnl ticks are NOT persisted — IBKR re-provides them on reconciliation.
     Errors are logged but never raised so a disk problem never kills a live trade.
+
+    Lock discipline: snapshot is taken under the lock, but the actual I/O (persist)
+    runs OUTSIDE the lock so a slow disk write never blocks the order execution path.
     """
     try:
         from trade_store import persist
         with _trades_lock:
-            persist(dict(active_trades))
+            snapshot = dict(active_trades)   # O(n) copy, fast — lock scope ends here
+        persist(snapshot)                    # I/O outside lock
     except Exception as e:
         log.error(f"trade_store persist failed: {e}")
 
@@ -163,3 +167,23 @@ def _is_recently_closed(symbol: str) -> bool:
     cooldown = CONFIG.get("reentry_cooldown_minutes", 30)
     closed_at = datetime.fromisoformat(ts_str)
     return (datetime.now(timezone.utc) - closed_at).total_seconds() < cooldown * 60
+
+
+def cleanup_recently_closed() -> int:
+    """
+    Evict stale entries from recently_closed that are beyond 2× the cooldown window.
+    Called from the main scan loop to prevent unbounded dict growth over long sessions.
+    Returns the number of entries removed.
+    """
+    cooldown_secs = CONFIG.get("reentry_cooldown_minutes", 30) * 60
+    cutoff_secs   = cooldown_secs * 2
+    now           = datetime.now(timezone.utc)
+    expired = [
+        sym for sym, ts_str in recently_closed.items()
+        if (now - datetime.fromisoformat(ts_str)).total_seconds() > cutoff_secs
+    ]
+    for sym in expired:
+        recently_closed.pop(sym, None)
+    if expired:
+        log.debug(f"recently_closed: evicted {len(expired)} stale entries {expired}")
+    return len(expired)

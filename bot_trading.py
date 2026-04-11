@@ -888,6 +888,13 @@ def run_scan():
     dash["scanning"]    = True
     dash["session"]     = get_session()
 
+    # Housekeeping: evict stale recently_closed entries every scan to prevent unbounded growth
+    try:
+        from orders_state import cleanup_recently_closed
+        cleanup_recently_closed()
+    except Exception:
+        pass
+
     dash["recent_orders"] = []
     dash["trades"]        = []
     dash["_scan_start"]   = datetime.now(_ET).isoformat()

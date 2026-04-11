@@ -35,7 +35,8 @@ from position_sizing import calculate_stops
 
 log = logging.getLogger("decifer.advisor")
 
-ADVISOR_LOG_PATH = Path("data/advisor_log.json")
+ADVISOR_LOG_PATH      = Path("data/advisor_log.json")
+_MAX_ADVISOR_ENTRIES  = 500   # Trim to this many entries on every save to prevent unbounded growth
 
 # ── Dataclass ─────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,11 @@ def _load_log() -> dict:
 
 def _save_log(data: dict) -> None:
     ADVISOR_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # Trim to the newest _MAX_ADVISOR_ENTRIES by timestamp so the log never grows unbounded.
+    # Entries without outcomes are still kept — they may get outcomes soon.
+    if len(data) > _MAX_ADVISOR_ENTRIES:
+        items = sorted(data.items(), key=lambda kv: kv[1].get("timestamp", ""), reverse=True)
+        data  = dict(items[:_MAX_ADVISOR_ENTRIES])
     ADVISOR_LOG_PATH.write_text(json.dumps(data, indent=2))
 
 

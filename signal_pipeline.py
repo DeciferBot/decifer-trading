@@ -172,13 +172,24 @@ def _apply_tv_prefilter(universe: list, tv_cache: dict, favourites: list) -> lis
     return result
 
 
-def _fetch_news(universe: list) -> dict:
-    """Fetch news sentiment for up to 50 symbols. Returns empty dict on error."""
+def _fetch_news(universe: list, timeout_sec: int = 8) -> dict:
+    """
+    Fetch news sentiment for up to 50 symbols with a hard timeout.
+    Returns empty dict on error or if the fetch stalls past timeout_sec.
+    A stalled news fetch used to block the entire scan pipeline; the timeout
+    ensures at worst we skip news for one cycle rather than hanging indefinitely.
+    """
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FuturesTimeout
     try:
-        sentiment = batch_news_sentiment(universe[:50])
+        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="news_fetch") as pool:
+            future = pool.submit(batch_news_sentiment, universe[:50])
+            sentiment = future.result(timeout=timeout_sec)
         hits = sum(1 for v in sentiment.values() if v.get("news_score", 0) > 0)
         log.info(f"News: {len(sentiment)} symbols scanned, {hits} with sentiment signal")
         return sentiment
+    except _FuturesTimeout:
+        log.warning(f"News sentiment fetch timed out after {timeout_sec}s — skipping this cycle")
+        return {}
     except Exception as e:
         log.error(f"News sentiment error: {e}")
         return {}
