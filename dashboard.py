@@ -3166,5 +3166,121 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
 <div style="text-align:center;padding:18px 0 12px;font-size:11px;color:var(--muted2);border-top:1px solid var(--border);margin-top:32px;">
   <span style="color:var(--orange);font-weight:700;">DECIFER 2.0</span> &nbsp;|&nbsp; Invented &amp; built by <span style="color:#fff;font-weight:700;">AMIT CHOPRA</span>
 </div>
+
+<!-- VOICE ASSISTANT -->
+<style>
+#voice-btn{
+  position:fixed;bottom:28px;right:28px;z-index:10000;
+  width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
+  background:var(--bg3);border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;transition:all .2s;box-shadow:0 2px 12px rgba(0,0,0,.5);
+}
+#voice-btn:hover{border-color:var(--orange);background:var(--orange_dim);}
+#voice-btn.listening{background:rgba(255,23,68,.15);border-color:var(--red);animation:pulse-ring .8s ease infinite;}
+#voice-btn.waiting{opacity:.6;cursor:not-allowed;}
+@keyframes pulse-ring{0%{box-shadow:0 0 0 0 rgba(255,23,68,.5)}70%{box-shadow:0 0 0 10px rgba(255,23,68,0)}100%{box-shadow:0 0 0 0 rgba(255,23,68,0)}}
+#voice-toast{
+  position:fixed;bottom:92px;right:24px;z-index:10001;
+  max-width:320px;background:var(--bg3);border:1px solid var(--border2);
+  border-radius:10px;padding:12px 16px;font-size:12px;line-height:1.5;
+  display:none;box-shadow:0 4px 24px rgba(0,0,0,.6);
+}
+#voice-toast.show{display:block;}
+#voice-q{color:var(--muted2);margin-bottom:6px;font-size:11px;}
+#voice-a{color:var(--text);}
+</style>
+
+<button id="voice-btn" title="Ask Decifer a question">🎤</button>
+<div id="voice-toast">
+  <div id="voice-q"></div>
+  <div id="voice-a"></div>
+</div>
+
+<script>
+(function(){
+  const btn   = document.getElementById('voice-btn');
+  const toast = document.getElementById('voice-toast');
+  const qEl   = document.getElementById('voice-q');
+  const aEl   = document.getElementById('voice-a');
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    btn.title = 'Voice not supported in this browser (use Chrome)';
+    btn.style.opacity = '0.35';
+    btn.onclick = () => alert('Voice requires Chrome or Safari.');
+    return;
+  }
+
+  const rec = new SpeechRecognition();
+  rec.lang = 'en-US';
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
+
+  let busy = false;
+
+  function showToast(q, a) {
+    qEl.textContent = q ? '\u201C' + q + '\u201D' : '';
+    aEl.textContent = a || '';
+    toast.classList.add('show');
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => toast.classList.remove('show'), 12000);
+  }
+
+  btn.addEventListener('click', () => {
+    if (busy) return;
+    rec.start();
+  });
+
+  rec.onstart = () => {
+    busy = true;
+    btn.classList.add('listening');
+    btn.title = 'Listening…';
+    showToast('Listening…', '');
+  };
+
+  rec.onresult = (e) => {
+    const question = e.results[0][0].transcript;
+    btn.classList.remove('listening');
+    btn.classList.add('waiting');
+    btn.title = 'Thinking…';
+    showToast(question, 'Thinking…');
+
+    fetch('/api/ask', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question})
+    })
+    .then(r => r.json())
+    .then(d => {
+      const answer = d.answer || d.error || 'No response.';
+      showToast(question, answer);
+      btn.classList.remove('waiting');
+      btn.title = 'Ask Decifer a question';
+      busy = false;
+    })
+    .catch(err => {
+      showToast(question, 'Request failed.');
+      btn.classList.remove('waiting');
+      btn.title = 'Ask Decifer a question';
+      busy = false;
+    });
+  };
+
+  rec.onerror = (e) => {
+    btn.classList.remove('listening', 'waiting');
+    btn.title = 'Ask Decifer a question';
+    if (e.error !== 'no-speech') showToast('', 'Could not hear you. Try again.');
+    busy = false;
+  };
+
+  rec.onend = () => {
+    if (btn.classList.contains('listening')) {
+      btn.classList.remove('listening');
+      busy = false;
+    }
+  };
+})();
+</script>
 </body>
 </html>"""

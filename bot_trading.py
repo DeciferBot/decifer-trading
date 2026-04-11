@@ -51,6 +51,7 @@ from signal_types import Signal
 from signal_dispatcher import dispatch_signals as _dispatch_signals
 from signal_pipeline import run_signal_pipeline, SignalPipelineResult
 from portfolio_manager import run_portfolio_review, lightweight_cycle_check
+from bot_voice import speak, speak_natural
 
 log = logging.getLogger("decifer.bot")
 
@@ -467,6 +468,15 @@ def check_external_closes(regime: dict):
                     f" | held:{held_mins}min | thesis:{thesis_class}"
                 )
                 clog("TRADE", f"External close detected: {sym} | Exit ${exit_price:.2f} | P&L ${pnl:+.2f} | {exit_reason}")
+                _news_stop = (dash.get("news_data") or {}).get(sym, {})
+                speak_natural("exit_stop",
+                    fallback=f"{sym} was closed externally, {'up' if pnl >= 0 else 'down'} {abs(pnl):.0f} dollars.",
+                    symbol=sym,
+                    exit_type=(exit_type or "closed").replace("_", " "),
+                    pnl=f"{pnl:+.0f}",
+                    reason=exit_reason[:200] if exit_reason else "",
+                    news=_news_stop.get("claude_catalyst") or "none",
+                )
 
                 log_trade(
                     trade=trade,
@@ -875,6 +885,7 @@ def run_scan():
         newly_halted = update_equity_high_water_mark(pv)
         if newly_halted:
             clog("RISK", "⛔ DRAWDOWN BRAKE: drawdown limit exceeded — flattening all positions")
+            speak_natural("drawdown", fallback="I've hit the drawdown limit. Flattening all positions now.")
             flatten_all(ib)
             dash["scanning"] = False
             return
@@ -954,6 +965,11 @@ def run_scan():
                      f"MaxTrades={strategy_mode['max_new_trades']}")
     if strategy_mode["regime_changed"]:
         clog("RISK", "Regime changed since session open — thesis check active for open positions")
+        speak_natural("regime",
+            fallback="Heads up, the market regime has shifted.",
+            regime=regime.get("regime", "unknown"),
+            vix=regime.get("vix", "?"),
+        )
 
     clog("SCAN", "Building dynamic universe from TradingView screener...")
     universe = get_dynamic_universe(ib, regime)
@@ -1152,6 +1168,13 @@ def run_scan():
                         clog("INFO", f"Portfolio manager EXIT: {sym_pm} already exiting — skipping duplicate")
                     else:
                         clog("TRADE", f"Portfolio manager EXIT: {sym_pm} — {reason_pm}")
+                        _news_pm = (dash.get("news_data") or {}).get(sym_pm, {})
+                        speak_natural("exit_pm",
+                            fallback=f"I'm closing {sym_pm}.",
+                            symbol=sym_pm,
+                            reason=reason_pm or "portfolio review",
+                            news=_news_pm.get("claude_catalyst") or "none",
+                        )
                     pos_pm = next((p for p in open_pos if p["symbol"] == sym_pm), None)
                     ep_pm  = pos_pm["current"] if pos_pm else 0
                     _opt_keys_pm = [k for k in _pm_trades
@@ -1369,6 +1392,13 @@ def run_scan():
     from orders import open_trades as _open_trades
     for sym in decision.get("sells", []):
         clog("TRADE", f"Selling {sym} on agent signal")
+        _news_ctx = (dash.get("news_data") or {}).get(sym, {})
+        speak_natural("exit_agent",
+            fallback=f"I'm closing out {sym}.",
+            symbol=sym,
+            reason=decision.get("reasoning", "agent signal"),
+            news=_news_ctx.get("claude_catalyst") or _news_ctx.get("headlines", [""])[0] if _news_ctx else "none",
+        )
         pos        = next((p for p in open_pos if p["symbol"] == sym), None)
         exit_price = pos["current"] if pos else 0
         execute_sell(ib, sym, reason="Agent sell signal")
@@ -1465,6 +1495,15 @@ def run_scan():
         if stock_success:
             trade_side = "SHORT" if buy.get("direction") == "SHORT" else "BUY"
             clog("TRADE", f"{trade_side} {sym} | Score={sig['score']}/50 | {reason[:80]}")
+            _news_entry = (dash.get("news_data") or {}).get(sym, {})
+            speak_natural("entry",
+                fallback=f"I just {'shorted' if trade_side == 'SHORT' else 'went long on'} {sym}.",
+                symbol=sym,
+                direction="short" if trade_side == "SHORT" else "long",
+                score=sig["score"],
+                reason=reason[:200] if reason else "strong signal",
+                news=_news_entry.get("claude_catalyst") or "none",
+            )
             dash["trades"].insert(0, {
                 "side": trade_side, "symbol": sym,
                 "price": str(sig["price"]),
@@ -1501,6 +1540,14 @@ def run_scan():
                                         "time":   datetime.now(_ET).strftime("%H:%M:%S")
                                     })
                                     clog("TRADE", f"Options trade executed for {sym} (independent of stock)")
+                                    _opt_type = "call" if contract_info["right"] == "C" else "put"
+                                    speak_natural("options",
+                                        fallback=f"I just bought a {_opt_type} on {sym}.",
+                                        symbol=sym,
+                                        option_type=_opt_type,
+                                        strike=f"{contract_info['strike']:.0f}",
+                                        score=sig["score"],
+                                    )
                                     if not stock_success:
                                         _write_last_decision(sym, buy, sig, decision, pv)
                             else:

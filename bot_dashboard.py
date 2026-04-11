@@ -662,6 +662,28 @@ class DashHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"ok": True, "effective_capital": get_effective_capital()}).encode())
+        elif self.path == "/api/ask":
+            length   = int(self.headers.get("Content-Length", 0))
+            body     = json.loads(self.rfile.read(length)) if length else {}
+            question = (body.get("question") or "").strip()
+            if not question:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": False, "error": "No question provided"}).encode())
+            else:
+                try:
+                    from bot_voice import answer_voice_query
+                    answer = answer_voice_query(question, dash)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"ok": True, "answer": answer}).encode())
+                except Exception as e:
+                    self.send_response(500)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"ok": False, "error": str(e)}).encode())
         elif self.path == "/api/restart":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
