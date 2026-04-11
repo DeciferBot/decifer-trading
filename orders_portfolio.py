@@ -33,6 +33,7 @@ from orders_contracts import (
     _ibkr_item_to_key,
     _is_option_contract,
     _cancel_ibkr_order_by_id,
+    is_equities_extended_hours,
 )
 
 # ── flatten_all order-book wait constants ─────────────────────────────────────
@@ -198,6 +199,15 @@ def close_position(ib_unused, trade_key: str) -> Optional[str]:
     so it can execute instantly even while a scan is running.
     """
     trade_key = trade_key.upper().strip()
+
+    # Guard: IBKR cancels MKT orders outside 4 AM–8 PM ET extended hours.
+    # Options skip this check — they have their own 9:30–4 PM gate elsewhere.
+    if not is_equities_extended_hours():
+        import zoneinfo as _zi
+        _now_et = datetime.now(_zi.ZoneInfo("America/New_York")).strftime("%H:%M ET")
+        log.warning(f"close_position {trade_key}: market closed ({_now_et}) — deferring until extended hours open (4 AM–8 PM ET)")
+        return None
+
     eib = _get_emergency_ib()
     if not eib:
         log.error(f"Close {trade_key}: No emergency IB connection available")

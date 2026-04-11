@@ -50,6 +50,7 @@ from orders_contracts import (
     _get_ibkr_price, _get_ibkr_bid_ask, _get_alpaca_price,
     _is_option_contract,
     _validate_position_price,
+    is_equities_extended_hours,
 )
 
 
@@ -1024,6 +1025,14 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
     log_order = _om.log_order                                    # noqa: F841
     record_win = _om.record_win                                  # noqa: F841
     record_loss = _om.record_loss                                # noqa: F841
+
+    # Guard: IBKR cancels MKT orders outside 4 AM–8 PM ET extended hours.
+    # Defer rather than place-and-get-cancelled. The next scan cycle will retry.
+    if not is_equities_extended_hours():
+        import zoneinfo as _zi
+        _now_et = datetime.now(_zi.ZoneInfo("America/New_York")).strftime("%H:%M ET")
+        log.warning(f"execute_sell {symbol}: market closed ({_now_et}) — deferring until extended hours open (4 AM–8 PM ET)")
+        return False
 
     with _trades_lock:
         if symbol in active_trades:

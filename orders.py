@@ -44,6 +44,7 @@ from orders_contracts import (
     _emergency_ib, _emergency_lock, _get_emergency_ib,
     _cancel_ibkr_order_by_id,
     is_options_market_open,
+    is_equities_extended_hours,
     get_contract,
     _get_ibkr_price, _get_ibkr_bid_ask, _get_alpaca_price,
     _is_option_contract, _ibkr_item_to_key,

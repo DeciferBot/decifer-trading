@@ -86,6 +86,19 @@ def is_options_market_open() -> bool:
     return dtime(9, 30) <= t < dtime(16, 0)
 
 
+def is_equities_extended_hours() -> bool:
+    """Equity extended hours: 4:00 AM – 8:00 PM ET, Mon–Fri, trading days only.
+    Use this to gate MKT close orders — IBKR cancels them outside this window."""
+    from risk import is_trading_day
+    if not is_trading_day():
+        return False
+    now_et = datetime.now(_ET)
+    if now_et.weekday() >= 5:          # Saturday=5, Sunday=6
+        return False
+    t = now_et.time()
+    return dtime(4, 0) <= t < dtime(20, 0)
+
+
 def get_contract(symbol: str, instrument: str = "stock"):
     """Build the correct IBKR contract for any instrument type."""
     if instrument == "fx" or len(symbol) == 6 and symbol.isalpha():
