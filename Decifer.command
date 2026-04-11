@@ -18,9 +18,9 @@ echo ""
 # Find the project folder
 PROJ_DIR=""
 for d in \
-    "$HOME/Documents/Claude/Projects/decifer trading" \
-    "$(dirname "$0")" \
     "$HOME/Desktop/decifer trading" \
+    "$(dirname "$0")" \
+    "$HOME/Documents/Claude/Projects/decifer trading" \
     "$HOME/decifer trading" \
 ; do
     if [ -f "$d/bot.py" ]; then
