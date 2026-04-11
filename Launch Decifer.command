@@ -19,7 +19,6 @@ echo ""
 # ── Locate project directory ───────────────────────────────────────────────────
 PROJ_DIR=""
 for d in \
-    "$(dirname "$0")" \
     "$HOME/Desktop/decifer trading" \
     "$HOME/Documents/Claude/Projects/decifer trading" \
 ; do
