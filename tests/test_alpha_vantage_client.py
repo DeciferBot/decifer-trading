@@ -19,6 +19,11 @@ import pytest
 import alpha_vantage_client as av
 
 
+# ── Test key constants ─────────────────────────────────────────────────────────
+# _consume_call uses key[-8:] as the per-key state ID in the rate limit file.
+_TEST_KEY = "FAKE_TEST_KEY_12345678"
+_TEST_KID = _TEST_KEY[-8:]  # "12345678"
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _mock_news_response(ticker: str = "AAPL") -> dict:
@@ -89,28 +94,31 @@ def test_consume_call_respects_daily_limit(tmp_path, monkeypatch):
     monkeypatch.setattr(av, "_RATE_LIMIT_PATH", str(limit_file))
 
     today = date.today().isoformat()
-    limit_file.write_text(json.dumps({"date": today, "count": 25}))
+    # New format: per-key state using last 8 chars of key as ID
+    limit_file.write_text(json.dumps({"date": today, _TEST_KID: 25}))
 
-    with patch.dict(av.CONFIG, {"alpha_vantage_daily_limit": 25}):
+    with patch.object(av, "_api_keys", return_value=[_TEST_KEY]), \
+         patch.dict(av.CONFIG, {"alpha_vantage_daily_limit": 25}):
         result = av._consume_call()
 
-    assert result is False
+    assert result == ""
 
 
 def test_consume_call_resets_on_new_day(tmp_path, monkeypatch):
     limit_file = tmp_path / "av_rate_limit.json"
     monkeypatch.setattr(av, "_RATE_LIMIT_PATH", str(limit_file))
 
-    # Stale entry from yesterday
-    limit_file.write_text(json.dumps({"date": "2000-01-01", "count": 25}))
+    # Stale entry from yesterday — new per-key format
+    limit_file.write_text(json.dumps({"date": "2000-01-01", _TEST_KID: 25}))
 
-    with patch.dict(av.CONFIG, {"alpha_vantage_daily_limit": 25}):
+    with patch.object(av, "_api_keys", return_value=[_TEST_KEY]), \
+         patch.dict(av.CONFIG, {"alpha_vantage_daily_limit": 25}):
         result = av._consume_call()
 
-    assert result is True
+    assert result == _TEST_KEY
     state = json.loads(limit_file.read_text())
     assert state["date"] == date.today().isoformat()
-    assert state["count"] == 1
+    assert state[_TEST_KID] == 1
 
 
 def test_consume_call_increments_counter(tmp_path, monkeypatch):
@@ -118,13 +126,15 @@ def test_consume_call_increments_counter(tmp_path, monkeypatch):
     monkeypatch.setattr(av, "_RATE_LIMIT_PATH", str(limit_file))
 
     today = date.today().isoformat()
-    limit_file.write_text(json.dumps({"date": today, "count": 3}))
+    # New per-key format: use kid as the counter key
+    limit_file.write_text(json.dumps({"date": today, _TEST_KID: 3}))
 
-    with patch.dict(av.CONFIG, {"alpha_vantage_daily_limit": 25}):
+    with patch.object(av, "_api_keys", return_value=[_TEST_KEY]), \
+         patch.dict(av.CONFIG, {"alpha_vantage_daily_limit": 25}):
         av._consume_call()
 
     state = json.loads(limit_file.read_text())
-    assert state["count"] == 4
+    assert state[_TEST_KID] == 4
 
 
 # ── News sentiment ─────────────────────────────────────────────────────────────
@@ -270,5 +280,7 @@ def test_get_calls_today_returns_zero_when_no_file(tmp_path, monkeypatch):
 def test_get_calls_today_returns_count(tmp_path, monkeypatch):
     limit_file = tmp_path / "av_rate_limit.json"
     monkeypatch.setattr(av, "_RATE_LIMIT_PATH", str(limit_file))
-    limit_file.write_text(json.dumps({"date": date.today().isoformat(), "count": 7}))
-    assert av.get_calls_today() == 7
+    # New per-key format: get_calls_today() sums per-key counts
+    limit_file.write_text(json.dumps({"date": date.today().isoformat(), _TEST_KID: 7}))
+    with patch.object(av, "_api_keys", return_value=[_TEST_KEY]):
+        assert av.get_calls_today() == 7

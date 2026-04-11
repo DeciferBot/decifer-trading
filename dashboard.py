@@ -226,11 +226,12 @@ canvas{display:block;width:100% !important}
 .news-drawer-hdr{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
 .news-drawer-sym{font-size:11px;color:var(--orange);font-weight:700;min-width:48px}
 .news-drawer-title{flex:1;font-size:11px;color:var(--muted2);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.news-drawer-open{font-size:10px;color:var(--orange);text-decoration:none;padding:3px 8px;border:1px solid var(--orange);border-radius:3px;white-space:nowrap}
-.news-drawer-open:hover{background:rgba(255,140,0,.1)}
 .news-drawer-close{background:none;border:none;color:var(--muted2);font-size:18px;cursor:pointer;padding:0 2px;line-height:1}
 .news-drawer-close:hover{color:var(--text)}
-.news-drawer-body{flex:1;overflow-y:auto;padding:20px}
+.news-drawer-body{flex-shrink:0;overflow-y:auto;max-height:220px;padding:20px}
+.news-reader-wrap{flex:1;display:flex;flex-direction:column;border-top:1px solid var(--border);min-height:0;position:relative}
+.news-reader-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted2);background:var(--bg2);z-index:1;pointer-events:none}
+.news-reader-iframe{flex:1;width:100%;border:none;background:var(--bg2)}
 .news-drawer-badge-row{display:flex;align-items:center;gap:8px;margin-bottom:14px}
 .news-drawer-hl{font-family:'Syne',sans-serif;font-size:18px;font-weight:900;color:var(--text);line-height:1.3;margin-bottom:12px}
 .news-drawer-meta{font-size:10px;color:var(--muted2);margin-bottom:14px;display:flex;gap:14px}
@@ -645,7 +646,6 @@ canvas{display:block;width:100% !important}
   <div class="news-drawer-hdr">
     <span class="news-drawer-sym" id="nd-sym">—</span>
     <span class="news-drawer-title" id="nd-title">—</span>
-    <a id="nd-link" href="#" target="_blank" rel="noopener" class="news-drawer-open">Open ↗</a>
     <button class="news-drawer-close" onclick="closeNewsDrawer()">×</button>
   </div>
   <div class="news-drawer-body">
@@ -658,6 +658,12 @@ canvas{display:block;width:100% !important}
         <div class="news-drawer-catalyst-txt" id="nd-catalyst"></div>
       </div>
     </div>
+  </div>
+  <div class="news-reader-wrap" id="nd-reader-wrap">
+    <div class="news-reader-loading" id="nd-reader-loading">Loading article…</div>
+    <iframe id="nd-iframe" src="about:blank" class="news-reader-iframe"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+      onload="document.getElementById('nd-reader-loading').style.display='none'"></iframe>
   </div>
 </div>
 
@@ -2730,8 +2736,9 @@ function _renderMacroStrip(allItems) {
     return `<div style="height:3px;background:var(--border);border-radius:2px;margin-top:6px"><div style="height:3px;width:${pct}%;background:${c};border-radius:2px"></div></div>`;
   };
 
-  const cards = macroItems.map(item => `
-    <a href="${esc(item.url)}" target="_blank" rel="noopener" style="text-decoration:none;flex-shrink:0;width:240px;background:var(--bg1);border:1px solid ${item.macro_color};border-top:3px solid ${item.macro_color};border-radius:6px;padding:10px 12px;display:block;cursor:pointer">
+  window._macroDrawerItems = macroItems;
+  const cards = macroItems.map((item, i) => `
+    <div onclick="openMacroDrawerItem(${i})" style="flex-shrink:0;width:240px;background:var(--bg1);border:1px solid ${item.macro_color};border-top:3px solid ${item.macro_color};border-radius:6px;padding:10px 12px;display:block;cursor:pointer">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
         <span style="background:${item.macro_color};color:#000;font-size:9px;font-weight:800;padding:2px 6px;border-radius:3px;letter-spacing:.05em">${esc(item.macro_label)}</span>
         <span style="color:${dirColor(item.macro_direction)};font-size:11px;font-weight:700">${dirIcon(item.macro_direction)}</span>
@@ -2740,7 +2747,7 @@ function _renderMacroStrip(allItems) {
       <div style="font-size:11px;color:var(--text);font-weight:600;line-height:1.35;margin-bottom:4px">${esc(item.headline)}</div>
       <div style="font-size:10px;color:var(--muted2);line-height:1.4">${esc(item.macro_implication)}</div>
       ${impactBar(item.macro_impact)}
-    </a>`).join('');
+    </div>`).join('');
 
   strip.style.display = 'block';
   strip.innerHTML = `
@@ -2802,24 +2809,50 @@ function filterNews() {
 function openNewsDrawer(idx) {
   const item = (window._newsItems || [])[idx];
   if (!item) return;
+  _populateNewsDrawer(item);
+}
+
+function openNewsDrawerAll(idx) {
+  const item = _allNewsItems[idx];
+  if (!item) return;
+  _populateNewsDrawer(item);
+}
+
+function openMacroDrawerItem(i) {
+  const item = window._macroDrawerItems && window._macroDrawerItems[i];
+  if (!item) return;
+  const allIdx = _allNewsItems.findIndex(n => n.headline === item.headline);
+  if (allIdx >= 0) { _populateNewsDrawer(_allNewsItems[allIdx]); return; }
+  _populateNewsDrawer(item);
+}
+
+function _populateNewsDrawer(item) {
   const badgeCls = item.sentiment === 'BULLISH' ? 'badge-bullish' : item.sentiment === 'BEARISH' ? 'badge-bearish' : 'badge-neutral';
   const badgeTxt = item.sentiment === 'BULLISH' ? '▲ BULLISH' : item.sentiment === 'BEARISH' ? '▼ BEARISH' : '— NEUTRAL';
-  document.getElementById('nd-sym').textContent  = item.symbol;
+  document.getElementById('nd-sym').textContent   = item.symbol;
   document.getElementById('nd-title').textContent = item.headline;
-  document.getElementById('nd-link').href = item.url || '#';
-  document.getElementById('nd-hl').textContent   = item.headline;
+  document.getElementById('nd-hl').textContent    = item.headline;
   document.getElementById('nd-badge-row').innerHTML =
     `<span class="news-badge ${badgeCls}">${badgeTxt}</span>
      <span style="font-size:10px;color:var(--muted2)">Score ${item.news_score}/10</span>
      ${item.keyword_score !== 0 ? `<span style="font-size:10px;color:var(--orange)">kw ${item.keyword_score > 0 ? '+' : ''}${item.keyword_score}</span>` : ''}`;
   document.getElementById('nd-meta').innerHTML =
-    `<span>${_ageStr(item.recency)}</span><span>Via Yahoo Finance</span>`;
+    `<span>${_ageStr(item.recency)}</span><span>${esc(item.source || 'News')}</span>`;
   const cw = document.getElementById('nd-catalyst-wrap');
   if (item.catalyst) {
     document.getElementById('nd-catalyst').textContent = item.catalyst;
     cw.style.display = '';
   } else {
     cw.style.display = 'none';
+  }
+  const loading = document.getElementById('nd-reader-loading');
+  const iframe  = document.getElementById('nd-iframe');
+  if (item.url && item.url.startsWith('http')) {
+    loading.style.display = 'flex';
+    iframe.src = '/api/article-proxy?url=' + encodeURIComponent(item.url);
+  } else {
+    loading.style.display = 'none';
+    iframe.src = 'about:blank';
   }
   document.getElementById('news-overlay').classList.add('open');
   document.getElementById('news-drawer').classList.add('open');
@@ -2828,6 +2861,7 @@ function openNewsDrawer(idx) {
 function closeNewsDrawer() {
   document.getElementById('news-overlay').classList.remove('open');
   document.getElementById('news-drawer').classList.remove('open');
+  document.getElementById('nd-iframe').src = 'about:blank';
 }
 
 // ── Agent Conversation ─────────────────────────────────────

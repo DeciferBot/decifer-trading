@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import re
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -131,6 +132,7 @@ def record_entry(
     conviction:   float,
     market_read:  str,      # intelligence layer's free-form interpretation
     signal_score: float,
+    setup_type:   str = "", # dominant signal dimension (momentum, breakout, etc.)
 ) -> str:
     """
     Record a trade entry against the current market observation.
@@ -146,6 +148,7 @@ def record_entry(
         "trade_type":    trade_type,
         "conviction":    conviction,
         "signal_score":  signal_score,
+        "setup_type":    setup_type or "unknown",
         "market_read":   market_read[:500] if market_read else "",
         "fingerprint":   _build_fingerprint(observation),
         # Outcome fields — filled by record_outcome()
@@ -251,7 +254,10 @@ def get_thesis_performance(min_samples: int = 3) -> list[dict]:
         for r in data.values():
             if r.get("pnl_pct") is None:
                 continue
-            key = (r.get("trade_type", "UNKNOWN"), r.get("thesis_class", "UNKNOWN"))
+            exit_reason = r.get("exit_reason") or ""
+            m = re.search(r"\bthesis:(\w+)", exit_reason)
+            thesis_class = m.group(1) if m else (exit_reason or r.get("thesis_class", "UNKNOWN"))
+            key = (r.get("trade_type", "UNKNOWN"), thesis_class)
             if key not in buckets:
                 buckets[key] = {"count": 0, "wins": 0, "pnl_pct_sum": 0.0}
             buckets[key]["count"] += 1
@@ -267,7 +273,7 @@ def get_thesis_performance(min_samples: int = 3) -> list[dict]:
                 "trade_type":   trade_type,
                 "thesis_class": thesis_class,
                 "count":        b["count"],
-                "win_rate":     round(b["wins"] / b["count"], 3),
+                "win_rate":     round(b["wins"] / b["count"], 2),
                 "avg_pnl_pct":  round(b["pnl_pct_sum"] / b["count"], 2),
             })
 
@@ -275,6 +281,53 @@ def get_thesis_performance(min_samples: int = 3) -> list[dict]:
 
     except Exception as exc:
         log.warning(f"pattern_library: get_thesis_performance failed: {exc}")
+        return []
+
+
+def get_setup_performance(min_samples: int = 3) -> list[dict]:
+    """
+    Aggregate completed pattern outcomes by (trade_type, setup_type).
+    setup_type = dominant signal dimension at entry (momentum, breakout, etc.)
+    This tracks ENTRY thesis quality — which setups actually work — rather than
+    exit mechanism quality (thesis:confirmed = TP hit).
+
+    Returns list of dicts sorted by count desc:
+        [{"trade_type": str, "setup_type": str,
+          "count": int, "win_rate": float, "avg_pnl_pct": float}, ...]
+    """
+    try:
+        with _lock:
+            data = _load()
+
+        buckets: dict[tuple, dict] = {}
+        for r in data.values():
+            if r.get("pnl_pct") is None:
+                continue
+            setup_type = r.get("setup_type") or "unknown"
+            key = (r.get("trade_type", "UNKNOWN"), setup_type)
+            if key not in buckets:
+                buckets[key] = {"count": 0, "wins": 0, "pnl_pct_sum": 0.0}
+            buckets[key]["count"] += 1
+            buckets[key]["pnl_pct_sum"] += float(r["pnl_pct"])
+            if float(r["pnl_pct"]) > 0:
+                buckets[key]["wins"] += 1
+
+        result = []
+        for (trade_type, setup_type), b in buckets.items():
+            if b["count"] < min_samples:
+                continue
+            result.append({
+                "trade_type":  trade_type,
+                "setup_type":  setup_type,
+                "count":       b["count"],
+                "win_rate":    round(b["wins"] / b["count"], 2),
+                "avg_pnl_pct": round(b["pnl_pct_sum"] / b["count"], 2),
+            })
+
+        return sorted(result, key=lambda x: x["count"], reverse=True)
+
+    except Exception as exc:
+        log.warning(f"pattern_library: get_setup_performance failed: {exc}")
         return []
 
 

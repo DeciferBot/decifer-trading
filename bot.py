@@ -214,7 +214,7 @@ def main():
         connect_ibkr, subscribe_pnl, backfill_trades_from_ibkr,
         sync_orders_from_ibkr, cancel_orphan_stop_orders, _on_order_status_event,
     )
-    from bot_account import get_account_data, load_equity_history
+    from bot_account import get_account_data, load_equity_history, backfill_equity_history_if_needed
     from bot_trading import run_scan, _check_kill, _process_close_queue
     from bot_sentinel import (
         _get_sentinel_universe, handle_news_trigger,
@@ -326,6 +326,7 @@ def main():
     load_settings_overrides()   # Apply saved dashboard settings on top of config.py defaults
     dash["favourites"]     = load_favourites()
     dash["equity_history"] = load_equity_history()
+    backfill_equity_history_if_needed()           # extend history from IBKR Flex or trade reconstruction
     if dash["equity_history"]:
         init_equity_high_water_mark_from_history(dash["equity_history"])
     dash["all_trades"]  = load_trades()

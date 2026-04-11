@@ -67,6 +67,7 @@ _cascade_reviewed_this_session: bool = False   # prevent cascade from re-firing 
 _trimmed_today: set = set()                     # symbols already trimmed this session — TRIM fires once only
 _pm_reviewed_regime: dict = {}                  # symbol → regime label when PM last reviewed it
 _last_pm_review_ts: datetime | None = None      # when the last PM review completed (any trigger)
+_last_pm_review_ts_by_symbol: dict = {}         # symbol → datetime when that position was last Opus-reviewed
 # Edge-trigger dedup: track what value last fired each state-based trigger so that
 # persistent conditions (e.g. GLD news never clears) don't re-fire every cooldown cycle.
 _last_news_scores: dict = {}    # symbol → keyword_score at last news_hit review
@@ -687,7 +688,7 @@ def _maybe_eod_options_review(regime: dict):
         _eod_options_review_done = False
         # Ledger auto-expires by date — no explicit clear needed.
         # Pruning of stale entries happens inside _record_options_attempt.
-        global _portfolio_review_done_today, _session_stop_count, _cascade_reviewed_this_session, _trimmed_today, _pm_reviewed_regime, _last_pm_review_ts, _last_news_scores, _last_collapse_scores
+        global _portfolio_review_done_today, _session_stop_count, _cascade_reviewed_this_session, _trimmed_today, _pm_reviewed_regime, _last_pm_review_ts, _last_news_scores, _last_collapse_scores, _last_pm_review_ts_by_symbol
         _portfolio_review_done_today = False
         _session_stop_count = 0
         _cascade_reviewed_this_session = False
@@ -696,6 +697,7 @@ def _maybe_eod_options_review(regime: dict):
         _last_pm_review_ts = None
         _last_news_scores = {}
         _last_collapse_scores = {}
+        _last_pm_review_ts_by_symbol = {}
     # Fire once in the pre-close window
     if dtime(15, 30) <= t < dtime(15, 55) and not _eod_options_review_done:
         _eod_options_review_done = True
@@ -732,7 +734,7 @@ def _should_run_portfolio_review(
     the PM on every scan cycle.
     """
     global _portfolio_review_done_today, _last_known_regime, _last_pm_review_ts
-    global _last_news_scores, _last_collapse_scores
+    global _last_news_scores, _last_collapse_scores, _last_pm_review_ts_by_symbol
     pm_cfg = CONFIG.get("portfolio_manager", {})
     if not pm_cfg.get("enabled", True):
         return False, ""
@@ -815,6 +817,27 @@ def _should_run_portfolio_review(
     drawdown_thresh = pm_cfg.get("drawdown_trigger_pct", -0.015)
     if portfolio_value > 0 and (daily_pnl / portfolio_value) < drawdown_thresh:
         return True, "drawdown"
+
+    # 8. Stale position — any open position held > N hours without an Opus review
+    stale_hours = pm_cfg.get("stale_position_review_hours", 3)
+    stale_secs  = stale_hours * 3600
+    now_utc     = datetime.now(timezone.utc)
+    for pos in open_positions:
+        sym           = pos.get("symbol", "")
+        open_time_str = pos.get("open_time", "")
+        if not open_time_str:
+            continue
+        try:
+            open_dt   = datetime.fromisoformat(open_time_str).replace(tzinfo=timezone.utc)
+            secs_held = (now_utc - open_dt).total_seconds()
+        except Exception:
+            continue
+        if secs_held < stale_secs:
+            continue
+        last_reviewed = _last_pm_review_ts_by_symbol.get(sym)
+        since_last    = (now_utc - last_reviewed).total_seconds() if last_reviewed else secs_held
+        if since_last >= stale_secs:
+            return True, "stale_position"
 
     return False, ""
 
@@ -1121,7 +1144,7 @@ def run_scan():
                     _force_pm_review = True
 
     # ── Portfolio manager review (event-triggered) ────────────────────────────
-    global _portfolio_review_done_today, _last_known_regime, _cascade_reviewed_this_session, _trimmed_today, _last_pm_review_ts, _last_news_scores, _last_collapse_scores
+    global _portfolio_review_done_today, _last_known_regime, _cascade_reviewed_this_session, _trimmed_today, _last_pm_review_ts, _last_news_scores, _last_collapse_scores, _last_pm_review_ts_by_symbol
     should_review, pm_trigger = _should_run_portfolio_review(
         session=get_session(),
         regime=regime,
@@ -1188,10 +1211,10 @@ def run_scan():
                         if _opt_keys_pm:
                             for _ok in _opt_keys_pm:
                                 clog("TRADE", f"PM EXIT routing to option sell: {_ok}")
-                                _exit_reason_pm = _build_pm_exit_reason(pos_pm or {}, regime, pm_trigger, reason_pm) if pos_pm else f"portfolio_manager:{pm_trigger}"
+                                _exit_reason_pm = _build_pm_exit_reason(pos_pm or {}, regime, pm_trigger, reason_pm)
                                 execute_sell_option(ib, _ok, reason=_exit_reason_pm)
                         if sym_pm in _pm_trades:
-                            _exit_reason_pm = _build_pm_exit_reason(pos_pm or {}, regime, pm_trigger, reason_pm) if pos_pm else f"portfolio_manager:{pm_trigger}"
+                            _exit_reason_pm = _build_pm_exit_reason(pos_pm or {}, regime, pm_trigger, reason_pm)
                             execute_sell(ib, sym_pm, reason=_exit_reason_pm)
                     if not _already_exiting and not _opt_keys_pm and sym_pm not in _pm_trades:
                         clog("WARN", f"PM EXIT: no active position found for {sym_pm} — not in tracker as stock or option")
@@ -1241,7 +1264,7 @@ def run_scan():
                             _trim_q = max(1, _q // 2)
                             _trim_reason = _build_pm_exit_reason(
                                 pos_pm or {}, regime, pm_trigger, reason_pm, exit_tag="pm_trim"
-                            ) if pos_pm else f"portfolio_manager_trim:{pm_trigger}"
+                            )
                             execute_sell(ib, sym_pm,
                                          reason=_trim_reason,
                                          qty_override=_trim_q if _trim_q < _q else None)
@@ -1308,8 +1331,10 @@ def run_scan():
             # Record which regime each reviewed position was reviewed under so cycle_check
             # does not re-queue the same REVIEW on subsequent cycles for the same regime state.
             _reviewed_regime_label = regime.get("session_character") or regime.get("regime", "UNKNOWN")
+            _now_reviewed = datetime.now(timezone.utc)
             for _rp in open_pos:
                 _pm_reviewed_regime[_rp["symbol"]] = _reviewed_regime_label
+                _last_pm_review_ts_by_symbol[_rp["symbol"]] = _now_reviewed
     else:
         _last_known_regime = regime.get("regime", _last_known_regime)
 

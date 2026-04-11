@@ -71,9 +71,10 @@ risk_mod.check_combined_exposure = MagicMock(return_value=(True, "ok"))
 risk_mod.check_sector_concentration = MagicMock(return_value=(True, "ok"))
 sys.modules.setdefault("risk", risk_mod)
 
-# learning (stub)
+# learning (stub) — include all symbols consumed by signal_pipeline and signal_dispatcher
 learning_mod = types.ModuleType("learning")
 learning_mod.log_order = MagicMock()
+learning_mod.log_signal_scan = MagicMock()
 sys.modules.setdefault("learning", learning_mod)
 
 # scanner (stub for get_tv_signal_cache)
@@ -81,9 +82,34 @@ scanner_mod = types.ModuleType("scanner")
 scanner_mod.get_tv_signal_cache = MagicMock(return_value={})
 sys.modules.setdefault("scanner", scanner_mod)
 
+# trade_advisor (stub) — advise_trade is called inside dispatch before execute_buy
+_FakeAdvice = types.SimpleNamespace(
+    profit_target=110.0,
+    stop_loss=90.0,
+    size_multiplier=1.0,
+    instrument="stock",
+    advice_id="test-advice-id",
+)
+trade_advisor_mod = types.ModuleType("trade_advisor")
+trade_advisor_mod.advise_trade = MagicMock(return_value=_FakeAdvice)
+sys.modules.setdefault("trade_advisor", trade_advisor_mod)
+
 # ── Now import the modules under test ────────────────────────────────────────
 from signal_types import Signal
 import signal_dispatcher
+from market_intelligence import SignalClassification
+
+
+def _make_scalp_classify(candidates, regime=None):
+    """Stub for classify_signals: passes every signal as SCALP, no AVOID."""
+    return (
+        "TRENDING_UP",
+        "mock market read",
+        [SignalClassification(
+            symbol=c["symbol"], trade_type="SCALP",
+            conviction=0.8, reasoning="test", source="mock",
+        ) for c in candidates],
+    )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -157,6 +183,26 @@ class TestDispatchSignals(unittest.TestCase):
         self.ib = MagicMock()
         self.regime = {"regime": "TRENDING_UP", "vix": 15.0, "spy_price": 500.0}
         self.pv = 100_000.0
+
+        # Fix the orders MagicMock so dispatch's cooldown/straddle guards don't
+        # block signals before they reach execute_buy.
+        import orders as _ord_stub
+        _ord_stub._trades_lock = MagicMock()
+        # Clear in-place rather than replacing — replacing breaks the reference
+        # that orders_core.py holds, causing test_tranche_exits to see an empty dict.
+        if isinstance(getattr(_ord_stub, "active_trades", None), dict):
+            _ord_stub.active_trades.clear()
+            self.addCleanup(_ord_stub.active_trades.clear)
+        else:
+            _ord_stub.active_trades = {}
+        _ord_stub._is_recently_closed = MagicMock(return_value=False)
+
+        # Patch classify_signals so the intelligence gate passes every LONG signal
+        # as SCALP (no AVOID), allowing execute_buy to be reached.
+        patcher = patch.object(signal_dispatcher, "classify_signals",
+                               side_effect=_make_scalp_classify)
+        self.mock_classify = patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_five_long_signals_produce_five_results(self):
         """DOD: mock 5 Signal objects → dispatch_signals() produces 5 order results."""
@@ -249,17 +295,19 @@ class TestDispatchSignals(unittest.TestCase):
             _make_signal("SPY", "SHORT"),
         ]
 
-        with patch.object(signal_dispatcher, "execute_buy", return_value=True) as mock_buy:
+        with patch.object(signal_dispatcher, "execute_buy", return_value=True) as mock_buy, \
+             patch.object(signal_dispatcher, "execute_short", return_value=True) as mock_short:
             results = signal_dispatcher.dispatch_signals(
                 signals, ib=self.ib, portfolio_value=self.pv, regime=self.regime,
             )
 
-        # Only the LONG signal should trigger execute_buy
+        # execute_buy called once (LONG), execute_short called once (SHORT)
         mock_buy.assert_called_once()
+        mock_short.assert_called_once()
         self.assertEqual(len(results), 3)
-        self.assertTrue(results[0]["success"])   # LONG → executed
+        self.assertTrue(results[0]["success"])   # LONG → execute_buy
         self.assertFalse(results[1]["success"])  # NEUTRAL → skipped
-        self.assertFalse(results[2]["success"])  # SHORT → not dispatched (sell path is in run_scan)
+        self.assertTrue(results[2]["success"])   # SHORT → execute_short
 
 
 if __name__ == "__main__":

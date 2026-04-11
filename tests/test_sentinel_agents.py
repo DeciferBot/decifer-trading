@@ -252,7 +252,7 @@ class TestAgentInstantDecision:
     def test_returns_dict_on_valid_json(self, bullish_trigger):
         """Valid JSON from Claude should be parsed into a dict."""
         raw = self._make_valid_json(symbol="NVDA", action="BUY")
-        with patch.object(sa, "_call_claude", return_value=raw):
+        with patch.object(sa, "_call_claude_opus", return_value=raw):
             result = sa.agent_instant_decision("catalyst", "risk", bullish_trigger)
         assert isinstance(result, dict)
         assert result["action"] == "BUY"
@@ -260,7 +260,7 @@ class TestAgentInstantDecision:
 
     def test_returns_skip_on_json_parse_error(self, bullish_trigger):
         """Unparseable Claude response should return a safe SKIP decision."""
-        with patch.object(sa, "_call_claude", return_value="not valid json at all"):
+        with patch.object(sa, "_call_claude_opus", return_value="not valid json at all"):
             result = sa.agent_instant_decision("catalyst", "risk", bullish_trigger)
         assert result["action"] == "SKIP"
         assert result["symbol"] == "NVDA"
@@ -268,7 +268,7 @@ class TestAgentInstantDecision:
 
     def test_skip_decision_has_all_required_fields(self, bullish_trigger):
         """SKIP fallback must include all required fields for downstream safety."""
-        with patch.object(sa, "_call_claude", return_value="{invalid"):
+        with patch.object(sa, "_call_claude_opus", return_value="{invalid"):
             result = sa.agent_instant_decision("cat", "risk", bullish_trigger)
         for field in ["action", "symbol", "qty", "sl", "tp", "instrument",
                       "confidence", "reasoning", "trigger_type"]:
@@ -277,7 +277,7 @@ class TestAgentInstantDecision:
     def test_handles_markdown_wrapped_json(self, bullish_trigger):
         """Claude sometimes wraps JSON in ```json ... ``` — should still parse."""
         raw = "```json\n" + self._make_valid_json("NVDA", "BUY", 7) + "\n```"
-        with patch.object(sa, "_call_claude", return_value=raw):
+        with patch.object(sa, "_call_claude_opus", return_value=raw):
             result = sa.agent_instant_decision("cat", "risk", bullish_trigger)
         assert result["action"] == "BUY"
         assert result["confidence"] == 7
@@ -285,7 +285,7 @@ class TestAgentInstantDecision:
     def test_sets_default_fields_if_missing(self, bullish_trigger):
         """Partial JSON (missing some fields) should have defaults injected."""
         partial = json.dumps({"action": "HOLD", "symbol": "NVDA"})
-        with patch.object(sa, "_call_claude", return_value=partial):
+        with patch.object(sa, "_call_claude_opus", return_value=partial):
             result = sa.agent_instant_decision("cat", "risk", bullish_trigger)
         assert result.get("qty") == 0
         assert result.get("instrument") == "stock"
@@ -294,7 +294,7 @@ class TestAgentInstantDecision:
     def test_trigger_type_always_news_sentinel(self, bearish_trigger):
         """trigger_type must always be 'news_sentinel'."""
         raw = self._make_valid_json("AAPL", "SELL", 6)
-        with patch.object(sa, "_call_claude", return_value=raw):
+        with patch.object(sa, "_call_claude_opus", return_value=raw):
             result = sa.agent_instant_decision("cat", "risk", bearish_trigger)
         assert result["trigger_type"] == "news_sentinel"
 
@@ -302,7 +302,7 @@ class TestAgentInstantDecision:
     def test_all_valid_actions_accepted(self, bullish_trigger, action):
         """All four valid action types should parse correctly."""
         raw = self._make_valid_json("NVDA", action, 5)
-        with patch.object(sa, "_call_claude", return_value=raw):
+        with patch.object(sa, "_call_claude_opus", return_value=raw):
             result = sa.agent_instant_decision("cat", "risk", bullish_trigger)
         assert result["action"] == action
 

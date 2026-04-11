@@ -159,6 +159,8 @@ def clog(type_: str, msg: str):
     color = COLORS.get(type_, Fore.WHITE)
     print(f"{color}[{type_}]{Style.RESET_ALL}  {msg}")
     log.info(f"[{type_}] {msg}")
+    if "logs" not in dash:
+        dash["logs"] = []
     dash["logs"].insert(0, {
         "time": datetime.now(_ET).strftime("%H:%M:%S"),
         "type": type_,

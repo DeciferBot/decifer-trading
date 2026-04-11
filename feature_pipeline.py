@@ -148,7 +148,7 @@ def regime_label(df: pd.DataFrame) -> pd.Series:
         (vol_20 >= 0.03),
         (ret_20.abs() <= 0.03) & (vol_20 < 0.03),
     ]
-    labels = ["BULL_TRENDING", "BEAR_TRENDING", "PANIC", "CHOPPY"]
+    labels = ["TRENDING_UP", "TRENDING_DOWN", "CAPITULATION", "RANGE_BOUND"]
     return pd.Series(np.select(conditions, labels, default="UNKNOWN"), index=df.index)
 
 

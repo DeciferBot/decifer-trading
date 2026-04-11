@@ -556,6 +556,12 @@ class TestExecuteSell:
     """Test execute_sell order execution logic."""
 
     @pytest.fixture(autouse=True)
+    def mock_market_open(self):
+        """Simulate market open so execute_sell is not deferred by market-hours guard."""
+        with patch('orders_core.is_equities_extended_hours', return_value=True):
+            yield
+
+    @pytest.fixture(autouse=True)
     def setup(self, mock_config, mock_ib):
         """Reset open_trades before each test."""
         orders.open_trades.clear()
@@ -1207,7 +1213,8 @@ class TestReconcileWithIbkr:
 
     def test_reconcile_preserves_pending_with_live_ibkr_order(self, mock_config):
         """PENDING entry should survive reconcile when the order is still live in IBKR."""
-        with patch("orders.CONFIG", mock_config):
+        with patch("orders.CONFIG", mock_config), \
+             patch("orders_portfolio._ts_restore", return_value={}):
             orders.active_trades.clear()
             orders.active_trades["AAPL"] = {"status": "PENDING", "order_id": 42, "symbol": "AAPL"}
 
@@ -1222,7 +1229,8 @@ class TestReconcileWithIbkr:
 
     def test_reconcile_cancels_pending_when_order_gone_from_ibkr(self, mock_config):
         """PENDING entry with no matching IBKR open order should be cancelled and removed."""
-        with patch("orders.CONFIG", mock_config):
+        with patch("orders.CONFIG", mock_config), \
+             patch("orders_portfolio._ts_restore", return_value={}):
             orders.active_trades.clear()
             orders.active_trades["AAPL"] = {"status": "PENDING", "order_id": 42, "symbol": "AAPL"}
 
@@ -1237,7 +1245,8 @@ class TestReconcileWithIbkr:
 
     def test_reconcile_removes_active_position_not_in_portfolio(self, mock_config):
         """ACTIVE positions absent from IBKR portfolio should be removed without checking openTrades."""
-        with patch("orders.CONFIG", mock_config):
+        with patch("orders.CONFIG", mock_config), \
+             patch("orders_portfolio._ts_restore", return_value={}):
             orders.active_trades.clear()
             orders.active_trades["MSFT"] = {"status": "ACTIVE", "symbol": "MSFT"}
 

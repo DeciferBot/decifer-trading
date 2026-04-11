@@ -250,15 +250,17 @@ Review each position and output SYMBOL / ACTION / REASON for every one."""
 def _regime_polarity(regime_str: str) -> str:
     """Return 'BULL', 'BEAR', or '' from a regime label string.
     Handles both legacy mechanical labels (BULL_TRENDING, BEAR_TRENDING) and
-    the new session_character vocab (MOMENTUM_BULL, RELIEF_RALLY, etc.).
+    the current regime vocab (TRENDING_UP, TRENDING_DOWN, CAPITULATION, etc.).
     """
     r = (regime_str or "").upper()
-    # New session_character vocab — explicit mapping
-    if r in ("MOMENTUM_BULL", "RELIEF_RALLY"):
+    # Explicit BULL mappings — unambiguously bullish regimes
+    if r in ("TRENDING_UP", "MOMENTUM_BULL", "BULL", "BULL_TRENDING"):
         return "BULL"
-    if r in ("TRENDING_BEAR", "DISTRIBUTION"):
+    # Explicit BEAR mappings — bearish/risk-off regimes including relief rallies
+    if r in ("TRENDING_DOWN", "RELIEF_RALLY", "CAPITULATION", "DISTRIBUTION",
+             "TRENDING_BEAR", "BEAR", "BEAR_TRENDING"):
         return "BEAR"
-    # Legacy mechanical labels — substring match
+    # Legacy substring match for any other labels
     if "BULL" in r:
         return "BULL"
     if "BEAR" in r:
@@ -292,19 +294,32 @@ def lightweight_cycle_check(
 
     # Prefer session_character (Opus-generated) over mechanical label so that
     # the cycle check compares the same vocabulary as entry_regime.
-    current_regime   = regime.get("session_character") or regime.get("regime", "UNKNOWN")
-    scalp_max_mins   = pm_cfg.get("scalp_max_hold_minutes", 90)
-    scalp_min_pnl    = pm_cfg.get("scalp_min_pnl_pct", 0.003)   # 0.3%
+    current_regime        = regime.get("session_character") or regime.get("regime", "UNKNOWN")
+    scalp_max_mins        = pm_cfg.get("scalp_max_hold_minutes", 90)
+    scalp_min_pnl         = pm_cfg.get("scalp_min_pnl_pct", 0.003)   # 0.3%
+    score_collapse_delta  = pm_cfg.get("cycle_score_collapse_threshold", 10)
+
+    # Build current-score lookup from latest scan results (symbol → score)
+    scored_map: dict = {}
+    for s in (all_scored or []):
+        sym_key = s.get("symbol") or s.get("ticker")
+        score_val = s.get("score") or s.get("conviction_score", 0)
+        if sym_key:
+            try:
+                scored_map[sym_key] = float(score_val)
+            except (TypeError, ValueError):
+                pass
 
     now_utc = datetime.now(timezone.utc)
     actions = []
+    actioned_syms: set = set()
 
     for pos in open_positions:
         sym           = pos.get("symbol", "")
         trade_type    = pos.get("trade_type", "SCALP")
         entry_price   = pos.get("entry", 0)
         current_price = pos.get("current", entry_price)
-        entry_regime  = pos.get("regime", "")
+        entry_regime  = pos.get("regime", "") or pos.get("entry_regime", "")
 
         try:
             open_dt   = datetime.fromisoformat(pos.get("open_time", "")).replace(tzinfo=timezone.utc)
@@ -325,6 +340,7 @@ def lightweight_cycle_check(
                         "momentum did not materialise; exit to free capital"
                     ),
                 })
+                actioned_syms.add(sym)
 
         elif trade_type == "SWING":
             if entry_regime and current_regime and entry_regime != current_regime:
@@ -336,6 +352,7 @@ def lightweight_cycle_check(
                         "thesis context changed — full Opus review required"
                     ),
                 })
+                actioned_syms.add(sym)
 
         elif trade_type == "HOLD":
             entry_polarity   = _regime_polarity(entry_regime)
@@ -347,6 +364,28 @@ def lightweight_cycle_check(
                     "reasoning": (
                         f"HOLD macro backdrop flipped: entry={entry_regime} → now={current_regime}; "
                         "polar regime shift — thesis integrity check required"
+                    ),
+                })
+                actioned_syms.add(sym)
+
+        # Score collapse check — applies to all trade types not already actioned.
+        # If signal quality has materially deteriorated since entry, queue a review
+        # before the bracket fires so the exit can be thesis-driven, not price-driven.
+        if sym not in actioned_syms and sym in scored_map:
+            entry_sc   = pos.get("entry_score") or pos.get("score") or 0
+            current_sc = scored_map[sym]
+            try:
+                drop = float(entry_sc) - float(current_sc)
+            except (TypeError, ValueError):
+                drop = 0
+            if drop >= score_collapse_delta:
+                actions.append({
+                    "symbol":    sym,
+                    "action":    "REVIEW",
+                    "reasoning": (
+                        f"Signal quality collapsed: entry_score={entry_sc:.0f} → "
+                        f"current={current_sc:.0f} (drop={drop:.0f}pts ≥ threshold={score_collapse_delta}); "
+                        "original setup may no longer be valid — review thesis before bracket fires"
                     ),
                 })
 

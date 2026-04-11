@@ -35,6 +35,7 @@ from orders_contracts import (
     _cancel_ibkr_order_by_id,
     is_equities_extended_hours,
 )
+from trade_store import restore as _ts_restore
 
 # ── flatten_all order-book wait constants ─────────────────────────────────────
 # After reqGlobalCancel, IBKR processes cancellations asynchronously.  We poll
@@ -513,12 +514,12 @@ def reconcile_with_ibkr(ib: IB):
                             expiry_str = raw_exp
                         right = "C" if c.right in ("C", "CALL") else "P"
 
-                        log.info(f"Option {key} in IBKR but not tracked — adding ({direction} {qty} contracts, premium ${entry:.2f}, validated ${validated_price:.2f} via {src_desc})")
+                        log.info(f"Option {key} in IBKR but not tracked — adding ({direction} {qty} contracts, premium ${ibkr_entry:.2f}, validated ${validated_price:.2f} via {src_desc})")
                         # Options P&L: per-share premium × qty × 100 (contract multiplier)
                         if direction == "SHORT":
-                            pnl = round((entry - validated_price) * qty * 100, 2)
+                            pnl = round((ibkr_entry - validated_price) * qty * 100, 2)
                         else:
-                            pnl = round((validated_price - entry) * qty * 100, 2)
+                            pnl = round((validated_price - ibkr_entry) * qty * 100, 2)
                         _saved = saved_positions.get(key, {})
                         new_entry = {
                             "symbol":          sym,
@@ -529,13 +530,13 @@ def reconcile_with_ibkr(ib: IB):
                             "expiry_ibkr":     raw_exp,
                             "dte":             0,
                             "contracts":       qty,
-                            "entry_premium":   entry,
+                            "entry_premium":   ibkr_entry,
                             "current_premium": validated_price,
-                            "entry":           entry,
+                            "entry":           ibkr_entry,
                             "current":         round(validated_price, 4),
                             "qty":             qty,
-                            "sl":              round(entry * (1 - CONFIG.get("options_stop_loss", 0.50)), 4),
-                            "tp":              round(entry * (1 + CONFIG.get("options_profit_target", 1.00)), 4),
+                            "sl":              round(ibkr_entry * (1 - CONFIG.get("options_stop_loss", 0.50)), 4),
+                            "tp":              round(ibkr_entry * (1 + CONFIG.get("options_profit_target", 1.00)), 4),
                             "direction":       direction,
                             "score":           0,
                             "reasoning":       "Reconciled from IBKR on startup",
@@ -556,7 +557,7 @@ def reconcile_with_ibkr(ib: IB):
                             new_entry["entry_regime"]        = _saved.get("entry_regime", "UNKNOWN")
                             new_entry["entry_thesis"]        = _saved.get("entry_thesis", "")
                             new_entry["pattern_id"]          = _saved.get("pattern_id", "")
-                            new_entry["high_water_mark"]     = _saved.get("high_water_mark", entry)
+                            new_entry["high_water_mark"]     = _saved.get("high_water_mark", ibkr_entry)
                             new_entry["ic_weights_at_entry"] = _saved.get("ic_weights_at_entry")
                             new_entry["advice_id"]           = _saved.get("advice_id", "")
                             if _saved.get("score", 0) > 0:
@@ -566,21 +567,21 @@ def reconcile_with_ibkr(ib: IB):
                     else:
                         # Stock position
                         if direction == "SHORT":
-                            sl = round(entry * 1.02, 2)
-                            tp = round(entry * 0.94, 2)
+                            sl = round(ibkr_entry * 1.02, 2)
+                            tp = round(ibkr_entry * 0.94, 2)
                         else:
-                            sl = round(entry * 0.98, 2)
-                            tp = round(entry * 1.06, 2)
-                        log.info(f"Position {key} in IBKR but not tracked — adding ({direction} {qty} shares @ ${entry:.2f}, validated price ${validated_price:.2f} via {src_desc})")
+                            sl = round(ibkr_entry * 0.98, 2)
+                            tp = round(ibkr_entry * 1.06, 2)
+                        log.info(f"Position {key} in IBKR but not tracked — adding ({direction} {qty} shares @ ${ibkr_entry:.2f}, validated price ${validated_price:.2f} via {src_desc})")
                         if direction == "SHORT":
-                            pnl = round((entry - validated_price) * qty, 2)
+                            pnl = round((ibkr_entry - validated_price) * qty, 2)
                         else:
-                            pnl = round((validated_price - entry) * qty, 2)
+                            pnl = round((validated_price - ibkr_entry) * qty, 2)
                         _saved = saved_positions.get(key, {})
                         new_entry = {
                             "symbol":         sym,
                             "instrument":     "stock",
-                            "entry":          entry,
+                            "entry":          ibkr_entry,
                             "current":        round(validated_price, 4),
                             "qty":            qty,
                             "sl":             sl,
@@ -610,7 +611,7 @@ def reconcile_with_ibkr(ib: IB):
                             new_entry["t2_qty"]              = _saved.get("t2_qty")
                             new_entry["t1_status"]           = _saved.get("t1_status")
                             new_entry["t1_order_id"]         = _saved.get("t1_order_id")
-                            new_entry["high_water_mark"]     = _saved.get("high_water_mark", entry)
+                            new_entry["high_water_mark"]     = _saved.get("high_water_mark", ibkr_entry)
                             new_entry["ic_weights_at_entry"] = _saved.get("ic_weights_at_entry")
                             new_entry["advice_id"]           = _saved.get("advice_id", "")
                             if _saved.get("score", 0) > 0:

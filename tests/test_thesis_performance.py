@@ -25,9 +25,11 @@ def _record(
     pattern_id: str,
     trade_type: str = "SCALP",
     pnl: float = 100.0,
-    pnl_pct: float = 0.01,
+    pnl_pct: float = None,
     exit_reason: str = "sl_hit | SCALP | regime:BULL→BULL | held:30min | thesis:noise_stop",
 ) -> dict:
+    if pnl_pct is None:
+        pnl_pct = 0.01 if pnl >= 0 else -0.01
     return {
         "pattern_id":  pattern_id,
         "trade_type":  trade_type,

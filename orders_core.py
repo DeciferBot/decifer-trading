@@ -54,6 +54,17 @@ from orders_contracts import (
 )
 
 
+def _derive_setup_type(signal_scores: dict) -> str:
+    """Return the dominant signal dimension name from score breakdown."""
+    if not signal_scores:
+        return "unknown"
+    try:
+        best = max(signal_scores, key=lambda k: float(signal_scores.get(k, 0)))
+        return best.lower().replace(" ", "_")
+    except Exception:
+        return "unknown"
+
+
 def _build_entry_thesis(
     trade_type: str,
     symbol: str,
@@ -61,11 +72,14 @@ def _build_entry_thesis(
     conviction: float,
     score: int,
     entry_regime: str,
+    market_read: str = "",
+    rationale: str = "",
 ) -> str:
     """
     Build a falsifiable entry thesis string for a new position.
     Records what would prove the thesis wrong — not a price level, a condition.
-    Format: "{type} {dir} {sym} | wrong_if: {condition} | regime={regime} conv={conv:.2f} score={score}"
+    Incorporates per-trade Opus reasoning (market_read) when available so each
+    thesis describes THIS specific setup, not just the trade_type category.
     """
     pm = CONFIG.get("portfolio_manager", {})
     scalp_mins = pm.get("scalp_max_hold_minutes", 90)
@@ -81,9 +95,13 @@ def _build_entry_thesis(
     else:
         condition = "score collapses or regime contradicts entry direction"
 
+    # Use Opus market_read if available; fall back to agent synthesis rationale
+    setup_context = (market_read or rationale or "").strip()
+    setup_tag = f" | setup: {setup_context[:150]}" if len(setup_context) > 10 else ""
+
     return (
         f"{tt} {direction} {symbol} | "
-        f"wrong_if: {condition} | "
+        f"wrong_if: {condition}{setup_tag} | "
         f"regime={entry_regime} conv={conviction:.2f} score={score}"
     )
 
@@ -106,7 +124,8 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                 # Intelligence layer classification
                 trade_type: str = "",
                 conviction: float = 0.0,
-                pattern_id: str = "") -> bool:
+                pattern_id: str = "",
+                market_read: str = "") -> bool:
     """
     Place a buy order with full OCO bracket.
     Entry: Limit order at IBKR real-time price (yfinance price is only a fallback)
@@ -595,11 +614,14 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                     "advice_id":        advice_id,
                     "trade_type":       trade_type or "SCALP",
                     "conviction":       conviction,
+                    "setup_type":       _derive_setup_type(signal_scores or {}),
                     "entry_regime":     (regime.get("session_character") or regime.get("regime", "UNKNOWN")) if isinstance(regime, dict) else "UNKNOWN",
                     "entry_thesis":     _build_entry_thesis(
                                             trade_type or "SCALP", symbol, "LONG",
                                             conviction, score,
-                                            regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
+                                            (regime.get("session_character") or regime.get("regime", "UNKNOWN")) if isinstance(regime, dict) else "UNKNOWN",
+                                            market_read=market_read,
+                                            rationale=reasoning,
                                         ),
                     "pattern_id":       pattern_id,
                     "sl_order_id":      _sl_order_id,
@@ -693,7 +715,8 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
                   # Intelligence layer classification
                   trade_type: str = "",
                   conviction: float = 0.0,
-                  pattern_id: str = "") -> bool:
+                  pattern_id: str = "",
+                  market_read: str = "") -> bool:
     """
     Place a short-sell order with OCO bracket (sell-to-open + buy-to-cover SL + TP).
     Entry: Limit order at IBKR real-time price.
@@ -975,11 +998,14 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
                     "advice_id":           advice_id,
                     "trade_type":          trade_type or "SCALP",
                     "conviction":          conviction,
+                    "setup_type":          _derive_setup_type(signal_scores or {}),
                     "entry_regime":        (regime.get("session_character") or regime.get("regime", "UNKNOWN")) if isinstance(regime, dict) else "UNKNOWN",
                     "entry_thesis":        _build_entry_thesis(
                                                trade_type or "SCALP", symbol, "SHORT",
                                                conviction, score,
-                                               regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN",
+                                               (regime.get("session_character") or regime.get("regime", "UNKNOWN")) if isinstance(regime, dict) else "UNKNOWN",
+                                               market_read=market_read,
+                                               rationale=reasoning,
                                            ),
                     "pattern_id":          pattern_id,
                     "sl_order_id":         _sl_order_id,

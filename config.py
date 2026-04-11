@@ -61,6 +61,20 @@ CONFIG = {
     # We stay under 55 to leave headroom. Throttle applied in fetch_ibkr_historical().
     "ibkr_hist_pacing_per_10min": 55,
 
+    # ── IBKR FLEX WEB SERVICE (equity history backfill) ───────
+    # Used automatically at bot startup to recover/extend equity_history.json
+    # with accurate IBKR daily NAV when history is < 30 days deep.
+    # One-time setup (5 min):
+    #   1. IBKR Client Portal → Reports & Statements → Flex Queries → Create Query
+    #      • Section: Account Information → Net Asset Value
+    #      • Date range: all available, Period: Daily, Format: XML
+    #   2. Note the Query ID shown on the query card.
+    #   3. Same menu → "Flex Web Service" → Generate Token (valid 1 year).
+    #   4. Add to .env:  IBKR_FLEX_TOKEN=<token>  IBKR_FLEX_QUERY_ID=<id>
+    # Leave blank to skip (bot falls back to trade-based reconstruction).
+    "ibkr_flex_token":    os.environ.get("IBKR_FLEX_TOKEN", ""),
+    "ibkr_flex_query_id": os.environ.get("IBKR_FLEX_QUERY_ID", ""),
+
     # ── FINNHUB (free tier: 60 calls/min) ────────────────────
     # Sign up at https://finnhub.io — free API key, no credit card required.
     # Free tier covers: stock quotes + company news articles (/company-news).

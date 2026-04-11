@@ -189,7 +189,8 @@ class TestOrphanedStopLoss:
         ib = self._make_ib([item], [sl_trade])
 
         with patch("orders.CONFIG", mock_config), \
-             patch("orders._validate_position_price", return_value=(102.0, "IBKR")):
+             patch("orders._validate_position_price", return_value=(102.0, "IBKR")), \
+             patch("orders_portfolio._ts_restore", return_value={}):
             _om.reconcile_with_ibkr(ib)
 
         assert "TSLA" in _om.active_trades, "Position must be added by reconcile"
@@ -212,7 +213,8 @@ class TestOrphanedStopLoss:
         ib = self._make_ib([item], [], sl_order_id=8888)  # no open SL in IBKR
 
         with patch("orders.CONFIG", mock_config), \
-             patch("orders._validate_position_price", return_value=(102.0, "IBKR")):
+             patch("orders._validate_position_price", return_value=(102.0, "IBKR")), \
+             patch("orders_portfolio._ts_restore", return_value={}):
             _om.reconcile_with_ibkr(ib)
 
         assert "TSLA" in _om.active_trades, "Position must be added by reconcile"
@@ -606,6 +608,7 @@ class TestExecuteSellCompositeKey:
         ib = MagicMock()
 
         with patch("orders.CONFIG", mock_config), \
+             patch("orders_core.is_equities_extended_hours", return_value=True), \
              patch("orders._validate_position_price", return_value=(3.50, "IBKR")), \
              patch("orders._get_ibkr_price", return_value=3.50), \
              patch("orders.record_win"), \

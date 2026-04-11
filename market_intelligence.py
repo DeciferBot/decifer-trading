@@ -41,7 +41,7 @@ import anthropic
 
 from config import CONFIG
 from market_observer import get_market_observation, invalidate_cache, MarketObservation
-from pattern_library import get_relevant_patterns, get_thesis_performance
+from pattern_library import get_relevant_patterns, get_thesis_performance, get_setup_performance
 from macro_calendar import get_next_event, hours_to_next_event
 
 log = logging.getLogger("decifer.intelligence")
@@ -93,6 +93,7 @@ class SessionContext:
     pattern_text:      str           # formatted recent patterns for prompt inclusion
     macro_text:        str           # upcoming macro events
     thesis_perf_text:  str = ""      # formatted thesis performance for prompt inclusion
+    setup_perf_text:   str = ""      # formatted setup-type edge data for prompt inclusion
 
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
@@ -205,6 +206,27 @@ def _format_thesis_performance(perfs: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _format_setup_performance(perfs: list[dict]) -> str:
+    """
+    Format entry-thesis learning block for the classification prompt.
+    Shows which signal setup types (momentum, breakout, mean_reversion, etc.)
+    have historically generated positive expectancy — directly informs which
+    setups to classify as actionable vs AVOID.
+    """
+    if not perfs:
+        return "Setup-type edge data\nInsufficient data yet (need ≥3 completed trades per setup type)."
+    lines = ["Entry setup edge (by dominant signal dimension, ≥3 trades):"]
+    for p in perfs:
+        edge_label = "EDGE" if p["win_rate"] >= 0.55 and p["avg_pnl_pct"] > 0 else \
+                     "AVOID" if p["win_rate"] < 0.40 or p["avg_pnl_pct"] < -0.1 else "NEUTRAL"
+        lines.append(
+            f"  {p['trade_type']} / {p['setup_type']}: "
+            f"{p['win_rate'] * 100:.0f}% WR, avg {p['avg_pnl_pct']:+.2f}% "
+            f"({p['count']} trades) [{edge_label}]"
+        )
+    return "\n".join(lines)
+
+
 # ── Session context builder ───────────────────────────────────────────────────
 
 def _build_session_context(full_news: bool) -> SessionContext:
@@ -216,6 +238,8 @@ def _build_session_context(full_news: bool) -> SessionContext:
     pattern_text   = _format_patterns(patterns)
     thesis_perfs   = get_thesis_performance(min_samples=3)
     thesis_text    = _format_thesis_performance(thesis_perfs)
+    setup_perfs    = get_setup_performance(min_samples=3)
+    setup_text     = _format_setup_performance(setup_perfs)
 
     return SessionContext(
         timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
@@ -226,6 +250,7 @@ def _build_session_context(full_news: bool) -> SessionContext:
         pattern_text=pattern_text,
         macro_text=macro_text,
         thesis_perf_text=thesis_text,
+        setup_perf_text=setup_text,
     )
 
 
@@ -300,6 +325,8 @@ Before any trade is placed, you reason about the market and classify each signal
 ## {ctx.pattern_text}
 
 ## {ctx.thesis_perf_text}
+
+## {ctx.setup_perf_text}
 
 ## Signal candidates (technically scored by the scanner)
 {candidates_block}

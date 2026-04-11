@@ -161,6 +161,7 @@ def dispatch_signals(
         try:
             from market_observer import get_market_observation
             obs = get_market_observation()
+            from orders_core import _derive_setup_type
             pattern_id = record_entry(
                 observation=obs,
                 symbol=signal.symbol,
@@ -169,6 +170,7 @@ def dispatch_signals(
                 conviction=cls.conviction,
                 market_read=market_read,
                 signal_score=signal.conviction_score * 5,
+                setup_type=_derive_setup_type(signal.dimension_scores or {}),
             )
         except Exception as exc:
             log.debug(f"dispatch: pattern_library record_entry failed: {exc}")
@@ -210,6 +212,7 @@ def dispatch_signals(
                     trade_type=cls.trade_type,
                     conviction=cls.conviction,
                     pattern_id=pattern_id,
+                    market_read=market_read,
                 )
             except Exception as exc:
                 log.error(f"dispatch execute_buy failed {signal.symbol}: {exc}")
@@ -253,6 +256,7 @@ def dispatch_signals(
                     trade_type=cls.trade_type,
                     conviction=cls.conviction,
                     pattern_id=pattern_id,
+                    market_read=market_read,
                 )
             except Exception as exc:
                 log.error(f"dispatch execute_short failed {signal.symbol}: {exc}")

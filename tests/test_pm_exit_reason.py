@@ -28,11 +28,14 @@ _colorama_stub.Fore = MagicMock()
 _colorama_stub.Style = MagicMock()
 _colorama_stub.init = MagicMock()
 
-# Stub every Decifer module that bot_trading imports at module level
+# Stub every Decifer module that bot_trading imports at module level.
+# NOTE: signal_types, signal_dispatcher, signal_pipeline are intentionally
+# NOT stubbed here — they are the real modules under test in later test files
+# (test_signal_dispatch.py, test_signal_pipeline.py). Let them be imported
+# for real so those later tests receive the real implementations.
 for _decifer in [
     "bot_state", "bot_account", "bot_ibkr", "scanner", "signals", "agents",
     "orders", "options", "options_scanner", "risk", "risk_gates", "learning",
-    "signal_types", "signal_dispatcher", "signal_pipeline",
 ]:
     sys.modules.setdefault(_decifer, MagicMock())
 

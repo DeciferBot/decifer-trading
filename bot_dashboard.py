@@ -606,6 +606,50 @@ class DashHandler(BaseHTTPRequestHandler):
                     self.send_response(404); self.end_headers()
             except Exception:
                 self.send_response(404); self.end_headers()
+        elif self.path.startswith("/api/article-proxy"):
+            from urllib.parse import urlparse as _urlparse, parse_qs as _parse_qs, unquote as _unquote
+            import requests as _req
+            qs = _parse_qs(_urlparse(self.path).query)
+            art_url = _unquote((qs.get("url") or [""])[0])
+            if not art_url or not art_url.startswith("http"):
+                self.send_response(400); self.end_headers(); return
+            try:
+                r = _req.get(art_url, timeout=10, allow_redirects=True, headers={
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.5",
+                })
+                if r.status_code == 200:
+                    dark_css = (
+                        "<style>"
+                        "html,body{background:#0d0d14!important;color:#d8d8e0!important;"
+                        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important;"
+                        "margin:0;padding:16px!important;font-size:14px!important;line-height:1.7!important}"
+                        "a{color:#ff8c00!important}img{max-width:100%!important;height:auto!important}"
+                        "h1,h2,h3{color:#fff!important;font-weight:700!important}"
+                        "nav,header,footer,aside,[class*='ad'],[id*='ad'],[class*='sidebar'],"
+                        "[class*='related'],[class*='newsletter'],[class*='subscribe']"
+                        "{display:none!important}"
+                        "</style>"
+                    )
+                    html = r.text
+                    if "<head" in html:
+                        html = html.replace("<head>", "<head>" + dark_css, 1)
+                    elif "<HEAD" in html:
+                        html = html.replace("<HEAD>", "<HEAD>" + dark_css, 1)
+                    else:
+                        html = dark_css + html
+                    content = html.encode("utf-8", errors="replace")
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Content-Length", str(len(content)))
+                    self.end_headers()
+                    self.wfile.write(content)
+                else:
+                    self.send_response(r.status_code); self.end_headers()
+            except Exception as e:
+                log.warning("article-proxy error: %s", e)
+                self.send_response(502); self.end_headers()
         elif self.path == "/api/news":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

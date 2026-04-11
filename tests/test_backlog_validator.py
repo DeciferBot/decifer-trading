@@ -407,6 +407,9 @@ class TestValidateAll:
 # ── TestRealBacklogCompliance ─────────────────────────────────────────────
 
 
+_BACKLOG_FILE = os.path.join(PROJECT_ROOT, "chief-decifer", "state", "backlog.json")
+
+
 class TestRealBacklogCompliance:
     """
     Smoke tests against the actual chief-decifer/state/backlog.json.
@@ -414,7 +417,14 @@ class TestRealBacklogCompliance:
     All Phase E items start as `pending` — no enforcement fires at creation.
     These tests catch regressions if someone manually moves a feature to
     ready/in_progress before its upstream dependencies are terminal.
+
+    Skipped when chief-decifer/state/backlog.json does not exist.
     """
+
+    @pytest.fixture(autouse=True)
+    def require_backlog(self):
+        if not os.path.exists(_BACKLOG_FILE):
+            pytest.skip("chief-decifer/state/backlog.json not present — skipping real-backlog smoke tests")
 
     def test_real_backlog_loads_without_error(self):
         bl = load_backlog()
