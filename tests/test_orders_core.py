@@ -181,7 +181,8 @@ def mock_ib():
     # Mock placeOrder — returns a mock Trade with order info
     def place_order(contract, order):
         trade = MagicMock()
-        trade.order.orderId = getattr(order, 'orderId', 12345)
+        raw_id = getattr(order, 'orderId', None)
+        trade.order.orderId = raw_id if isinstance(raw_id, int) else 12345
         trade.orderStatus.status = "Submitted"
         return trade
     ib.placeOrder.side_effect = place_order
@@ -195,6 +196,8 @@ def mock_ib():
         ticker.marketPrice.return_value = 100.0
         ticker.last = 100.0
         ticker.close = 100.0
+        ticker.bid = 99.9
+        ticker.ask = 100.1
         return [ticker]
     ib.reqTickers.side_effect = req_tickers
 
@@ -491,12 +494,15 @@ class TestExecuteBuy:
         mock_correlation.return_value = (True, "OK")
         mock_exposure.return_value = (True, "OK")
         mock_sector.return_value = (True, "OK")
+        mock_stops.return_value = (98.0, 104.0)
+        mock_position_size.return_value = 10
 
         # All sources return 0
         mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 0
-        # Mock _get_ibkr_price to return 0
-        with patch('orders._get_ibkr_price', return_value=0):
+        # Patch at the call site (orders_core imports _get_ibkr_price directly)
+        with patch('orders_core._get_ibkr_price', return_value=0), \
+             patch('orders_core._get_ibkr_bid_ask', return_value=(0, 0)):
             result = orders.execute_buy(
                 ib=mock_ib,
                 symbol="NOPRICE",
@@ -531,10 +537,13 @@ class TestExecuteBuy:
         mock_correlation.return_value = (True, "OK")
         mock_exposure.return_value = (True, "OK")
         mock_sector.return_value = (True, "OK")
-        # Diverging sources: 100 vs 200 = 50% divergence
-        mock_tv_cache.return_value = {"SYM": {"tv_close": 200.0}}
+        mock_stops.return_value = (98.0, 104.0)
+        mock_position_size.return_value = 10
+        # Diverging sources: 100 vs 210 = >50% divergence (triggers contamination guard)
+        mock_tv_cache.return_value = {"SYM": {"tv_close": 210.0}}
         mock_yf_price.return_value = 100.0
-        with patch('orders._get_ibkr_price', return_value=100.0):
+        with patch('orders_core._get_ibkr_price', return_value=100.0), \
+             patch('orders_core._get_ibkr_bid_ask', return_value=(99.9, 100.1)):
             result = orders.execute_buy(
                 ib=mock_ib,
                 symbol="SYM",

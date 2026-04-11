@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 from pathlib import Path
 
 from config import CONFIG
@@ -31,6 +32,7 @@ from config import CONFIG
 log = logging.getLogger("decifer.trade_store")
 
 _POSITIONS_FILE = Path(CONFIG.get("positions_file", "data/positions.json"))
+_persist_lock = threading.Lock()
 
 # Fields that IBKR is allowed to update at reconciliation time.
 # Everything NOT in this set is owned by the bot and never overwritten.
@@ -69,16 +71,17 @@ def persist(snapshot: dict) -> None:
         k: v for k, v in snapshot.items()
         if isinstance(v, dict) and v.get("status") != "RESERVED" and "instrument" in v
     }
-    tmp = _POSITIONS_FILE.with_suffix(".tmp")
-    try:
-        tmp.write_text(json.dumps(clean, indent=2, default=str))
-        os.replace(str(tmp), str(_POSITIONS_FILE))
-    except Exception as e:
-        log.error(f"trade_store: failed to persist positions: {e}")
+    with _persist_lock:
+        tmp = _POSITIONS_FILE.with_suffix(".tmp")
         try:
-            tmp.unlink(missing_ok=True)
-        except Exception:
-            pass
+            tmp.write_text(json.dumps(clean, indent=2, default=str))
+            os.replace(str(tmp), str(_POSITIONS_FILE))
+        except Exception as e:
+            log.error(f"trade_store: failed to persist positions: {e}")
+            try:
+                tmp.unlink(missing_ok=True)
+            except Exception:
+                pass
 
 
 def restore() -> dict:

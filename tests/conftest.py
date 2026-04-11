@@ -220,6 +220,9 @@ class _FakeResponse:
     def raise_for_status(self):
         pass
 
+    def close(self):
+        pass
+
 
 _requests = _fake_module(
     "requests",
