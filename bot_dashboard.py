@@ -196,7 +196,7 @@ def _get_news_payload() -> dict:
                     "catalyst":   nd.get("claude_catalyst", ""),
                 })
 
-    # Enrich articles that have no image_url with company logos (Clearbit)
+    # Enrich articles that have no image_url with company logos (FMP)
     _enrich_images(articles)
 
     payload = {
@@ -209,49 +209,26 @@ def _get_news_payload() -> dict:
     return payload
 
 
-# Ticker → primary web domain for Clearbit logo lookup
-_TICKER_DOMAIN: dict = {
-    "AAPL": "apple.com", "MSFT": "microsoft.com", "NVDA": "nvidia.com",
-    "GOOGL": "google.com", "GOOG": "google.com", "META": "meta.com",
-    "AMZN": "amazon.com", "TSLA": "tesla.com", "NFLX": "netflix.com",
-    "AMD": "amd.com", "INTC": "intel.com", "QCOM": "qualcomm.com",
-    "AVGO": "broadcom.com", "CRM": "salesforce.com", "ORCL": "oracle.com",
-    "ADBE": "adobe.com", "NOW": "servicenow.com", "SNOW": "snowflake.com",
-    "PLTR": "palantir.com", "UBER": "uber.com", "LYFT": "lyft.com",
-    "ABNB": "airbnb.com", "SHOP": "shopify.com", "SQ": "block.xyz",
-    "PYPL": "paypal.com", "V": "visa.com", "MA": "mastercard.com",
-    "JPM": "jpmorganchase.com", "BAC": "bankofamerica.com", "WFC": "wellsfargo.com",
-    "GS": "goldmansachs.com", "MS": "morganstanley.com", "C": "citigroup.com",
-    "BRK": "berkshirehathaway.com", "BRK.B": "berkshirehathaway.com",
-    "JNJ": "jnj.com", "UNH": "unitedhealthgroup.com", "PFE": "pfizer.com",
-    "ABBV": "abbvie.com", "LLY": "lilly.com", "MRK": "merck.com",
-    "XOM": "exxonmobil.com", "CVX": "chevron.com", "COP": "conocophillips.com",
-    "WMT": "walmart.com", "COST": "costco.com", "TGT": "target.com",
-    "HD": "homedepot.com", "LOW": "lowes.com", "MCD": "mcdonalds.com",
-    "SBUX": "starbucks.com", "NKE": "nike.com", "DIS": "thewaltdisneycompany.com",
-    "CMCSA": "comcast.com", "T": "att.com", "VZ": "verizon.com",
-    "BA": "boeing.com", "GE": "ge.com", "CAT": "caterpillar.com",
-    "F": "ford.com", "GM": "gm.com", "RIVN": "rivian.com", "LCID": "lucidmotors.com",
-    "SPY": "ssga.com", "QQQ": "invesco.com", "IWM": "ishares.com",
-}
-
-
-def _clearbit_logo(symbol: str) -> str:
-    """Return a Clearbit logo URL for the given ticker, or empty string if unknown."""
-    domain = _TICKER_DOMAIN.get(symbol.upper(), "")
-    if not domain:
+def _stock_logo(symbol: str) -> str:
+    """
+    Return a company logo URL for the given ticker.
+    Uses Financial Modeling Prep image-stock API — free, no key, ticker-based.
+    Works for all US equities and major ETFs.
+    """
+    sym = (symbol or "").upper().strip()
+    if not sym:
         return ""
-    return f"https://logo.clearbit.com/{domain}?size=400"
+    return f"https://financialmodelingprep.com/image-stock/{sym}.png"
 
 
 def _enrich_images(articles: list) -> None:
-    """Fill image_url for articles missing one using company logos via Clearbit."""
+    """Fill image_url for articles missing one using company stock logos (FMP)."""
     for art in articles:
         if art.get("image_url"):
             continue
         symbols = art.get("symbols") or []
         for sym in symbols:
-            logo = _clearbit_logo(sym)
+            logo = _stock_logo(sym)
             if logo:
                 art["image_url"] = logo
                 break
