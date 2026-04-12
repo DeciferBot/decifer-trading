@@ -21,10 +21,19 @@ from enum import Enum
 from typing import Dict, List, Optional, Tuple, Any
 import statistics
 
-from ib_async import Contract, Order, OrderStatus
+from ib_async import Contract, Order
 
 
 logger = logging.getLogger(__name__)
+
+
+class SliceStatus(Enum):
+    """Status of an individual order slice."""
+    Pending   = "pending"
+    Submitted = "submitted"
+    Filled    = "filled"
+    Failed    = "failed"
+    Cancelled = "cancelled"
 
 
 class ExecutionStrategy(Enum):
@@ -77,7 +86,7 @@ class OrderSlice:
     scheduled_time: datetime
     created_time: datetime
     filled_quantity: int = 0
-    status: OrderStatus = OrderStatus.Pending
+    status: SliceStatus = SliceStatus.Pending
     price_adjustments: int = 0
     filled_prices: List[float] = field(default_factory=list)
 

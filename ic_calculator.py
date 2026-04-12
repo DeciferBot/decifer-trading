@@ -35,6 +35,13 @@ DIMENSIONS = [
     "mtf", "news", "social", "reversion", "iv_skew",
     "pead", "short_squeeze",
 ]
+# Core 9 dimensions that have always been logged — the minimum required to
+# admit a record into IC calculation.  Newer dimensions (iv_skew, pead,
+# short_squeeze) are backfilled with 0 for records that predate their addition.
+_CORE_DIMENSIONS = [
+    "trend", "momentum", "squeeze", "flow", "breakout",
+    "mtf", "news", "social", "reversion",
+]
 _N = len(DIMENSIONS)
 EQUAL_WEIGHTS: dict = {d: 1.0 / _N for d in DIMENSIONS}
 
@@ -121,8 +128,13 @@ def _load_signal_records(
                 try:
                     rec = json.loads(line)
                     bd = rec.get("score_breakdown", {})
-                    if not (bd and all(d in bd for d in DIMENSIONS)):
+                    # Accept records with at least the 9 core dimensions.
+                    # Newer dimensions (iv_skew, pead, short_squeeze) are
+                    # backfilled with 0 for records that predate their addition.
+                    if not (bd and all(d in bd for d in _CORE_DIMENSIONS)):
                         continue
+                    for d in DIMENSIONS:
+                        bd.setdefault(d, 0)
                     if min_age_days > 0:
                         ts_str = rec.get("ts", "")
                         if not ts_str:
@@ -161,7 +173,22 @@ def _fetch_forward_returns_batch(records: list) -> dict:
 
     result: dict[int, Optional[float]] = {}
 
+    fwd_horizon: int = int(_ic_cfg("forward_horizon_days", 1))
+    min_age_cal: int = fwd_horizon + 1
+    fwd_offset_cal: int = fwd_horizon + 2
+
     for sym, idxs in by_symbol.items():
+        # Fast path: if every record for this symbol already has a pre-computed
+        # fwd_return (e.g. historical replay records), skip the yfinance download
+        # entirely and just unpack the values.
+        if all(records[i].get("fwd_return") is not None for i in idxs):
+            for i in idxs:
+                try:
+                    result[i] = float(records[i]["fwd_return"])
+                except (TypeError, ValueError):
+                    result[i] = None
+            continue
+
         # Determine the date range to download
         ts_list = []
         for i in idxs:
@@ -203,14 +230,6 @@ def _fetch_forward_returns_batch(records: list) -> dict:
             for i in idxs:
                 result[i] = None
             continue
-
-        fwd_horizon: int = int(_ic_cfg("forward_horizon_days", 1))
-        # Calendar-day offsets derived from the configured trading-day horizon:
-        #   min_age  = horizon + 1  (at least one extra day for settlement lag)
-        #   fwd_offset = horizon + 2  (adds a weekend buffer; e.g. horizon=1 → +3d,
-        #                              horizon=5 → +7d which matches the original value)
-        min_age_cal: int = fwd_horizon + 1
-        fwd_offset_cal: int = fwd_horizon + 2
 
         for i in idxs:
             rec = records[i]
@@ -289,10 +308,10 @@ def compute_rolling_ic(
     # Merge live and historical records when a historical log is provided
     if historical_log_path and os.path.exists(historical_log_path):
         live_records = _load_signal_records(signals_log_path, window, min_age_days=min_age_days)
-        # Historical records carry pre-computed fwd_return — load ALL of them,
-        # no window cap and no age gate.
-        hist_records = _load_signal_records(historical_log_path, window=10_000_000, min_age_days=0)
-        # Use all records — no further slicing; the full corpus is the training set
+        # Historical records carry pre-computed fwd_return — cap at 5 000 most
+        # recent to keep Spearman computation fast while still dwarfing the live
+        # window.  No age gate needed (fwd_return is already embedded).
+        hist_records = _load_signal_records(historical_log_path, window=5_000, min_age_days=0)
         records = live_records + hist_records
         log.info(
             "compute_rolling_ic: merged %d live + %d historical = %d records",
@@ -935,3 +954,228 @@ def _check_ic_auto_disable(raw_ic: dict) -> None:
 
     except Exception as e:
         log.debug("_check_ic_auto_disable failed (non-critical): %s", e)
+
+
+# ── Live-trade IC vs historical comparison ────────────────────────────────────
+
+LIVE_IC_MILESTONE = 50          # trades needed before comparison runs
+_TRADES_FILE = os.path.join(_BASE, "data", "trades.json")
+_LIVE_IC_REPORT_FILE = os.path.join(_BASE, "data", "live_ic_report.json")
+
+
+def compute_live_trade_ic(trades_path: str = None) -> dict:
+    """
+    Compute IC from our own closed trades using actual PnL as the return proxy.
+
+    For each closed trade that has both ``signal_scores`` (non-empty) and a
+    numeric ``pnl``, we derive a return proxy:
+
+        pnl_pct = pnl / (entry_price * qty)
+
+    Then Spearman IC is computed per dimension exactly as in compute_rolling_ic.
+
+    Returns
+    -------
+    dict with keys:
+      "n_trades"  — number of eligible closed trades
+      "raw_ic"    — {dim: float or None}
+      "timestamp" — ISO timestamp
+    """
+    path = trades_path or _TRADES_FILE
+    try:
+        with open(path) as f:
+            raw = json.load(f)
+        items = list(raw.values()) if isinstance(raw, dict) else raw
+    except Exception as e:
+        log.warning("compute_live_trade_ic: cannot load trades: %s", e)
+        return {"n_trades": 0, "raw_ic": {d: None for d in DIMENSIONS}}
+
+    eligible = []
+    for t in items:
+        scores = t.get("signal_scores")
+        if not scores or not isinstance(scores, dict):
+            continue
+        pnl = t.get("pnl")
+        if pnl is None:
+            continue
+        try:
+            pnl = float(pnl)
+        except (TypeError, ValueError):
+            continue
+        entry = t.get("entry_price") or t.get("price") or 0.0
+        qty   = t.get("qty") or 1
+        try:
+            notional = float(entry) * float(qty)
+            pnl_pct  = pnl / notional if notional > 0 else None
+        except (TypeError, ValueError):
+            pnl_pct = None
+        if pnl_pct is None or not np.isfinite(pnl_pct):
+            continue
+        eligible.append((scores, pnl_pct))
+
+    n = len(eligible)
+    if n < 10:
+        log.info("compute_live_trade_ic: only %d eligible trades (need ≥10)", n)
+        return {"n_trades": n, "raw_ic": {d: None for d in DIMENSIONS},
+                "timestamp": datetime.now(timezone.utc).isoformat()}
+
+    dim_scores: dict = {d: [] for d in DIMENSIONS}
+    pnl_arr: list    = []
+    for scores, pnl_pct in eligible:
+        pnl_arr.append(pnl_pct)
+        for d in DIMENSIONS:
+            dim_scores[d].append(float(scores.get(d, 0)))
+
+    pnl_np = np.array(pnl_arr)
+    raw_ic: dict = {}
+    for d in DIMENSIONS:
+        arr = np.array(dim_scores[d])
+        if arr.std() < 1e-9:
+            raw_ic[d] = 0.0
+            continue
+        try:
+            raw_ic[d] = float(_spearman(_zscore_array(arr), pnl_np))
+        except Exception:
+            raw_ic[d] = None
+
+    result = {
+        "n_trades":  n,
+        "raw_ic":    raw_ic,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    log.info(
+        "compute_live_trade_ic: n=%d  IC=[%s]",
+        n,
+        ", ".join(f"{d}={raw_ic.get(d, 0):.3f}" for d in DIMENSIONS if raw_ic.get(d)),
+    )
+    return result
+
+
+def compare_live_vs_historical_ic(
+    trades_path: str = None,
+    historical_log_path: str = None,
+    milestone: int = LIVE_IC_MILESTONE,
+) -> dict:
+    """
+    Compare our live-trade IC profile against historical IC.
+
+    Returns a report dict with:
+      "n_live_trades"     — eligible live trades
+      "ready"             — True if n_live_trades >= milestone
+      "progress_pct"      — 0-100
+      "agreement_r"       — Spearman r between live IC vector and historical IC vector
+                            (computed over the 9 core dims; None if not ready)
+      "agreement_label"   — "STRONG" / "MODERATE" / "WEAK" / "DIVERGENT" / "PENDING"
+      "dim_comparison"    — {dim: {"live": float, "hist": float, "agree": bool}}
+      "recommend_disable" — True if ready and agreement_r >= 0.5
+      "live_ic"           — raw live IC dict
+      "hist_ic"           — raw historical IC dict
+      "timestamp"         — ISO
+    """
+    live_result = compute_live_trade_ic(trades_path)
+    n = live_result["n_trades"]
+    live_ic = live_result["raw_ic"]
+
+    # Always compute current historical IC for the comparison baseline
+    hist_log = historical_log_path or os.path.join(_BASE, "data", "signals_log_historical.jsonl")
+    hist_ic  = compute_rolling_ic(historical_log_path=hist_log)
+
+    report: dict = {
+        "n_live_trades":     n,
+        "ready":             n >= milestone,
+        "progress_pct":      round(min(n / milestone * 100, 100), 1),
+        "agreement_r":       None,
+        "agreement_label":   "PENDING",
+        "dim_comparison":    {},
+        "recommend_disable": False,
+        "live_ic":           live_ic,
+        "hist_ic":           hist_ic,
+        "timestamp":         datetime.now(timezone.utc).isoformat(),
+    }
+
+    # Always build per-dim comparison table (useful even before milestone)
+    for d in _CORE_DIMENSIONS:
+        lv = live_ic.get(d)
+        hv = hist_ic.get(d)
+        agree = (
+            lv is not None and hv is not None
+            and np.isfinite(lv) and np.isfinite(hv)
+            and ((lv >= 0) == (hv >= 0))   # same sign
+        )
+        report["dim_comparison"][d] = {
+            "live": round(lv, 4) if lv is not None else None,
+            "hist": round(hv, 4) if hv is not None else None,
+            "agree": agree,
+        }
+
+    if n < milestone:
+        log.info(
+            "compare_live_vs_historical_ic: %d/%d trades — %.0f%% to milestone",
+            n, milestone, report["progress_pct"],
+        )
+        _write_live_ic_report(report)
+        return report
+
+    # Compute vector correlation over core dims where both have finite values
+    pairs = [
+        (live_ic[d], hist_ic[d])
+        for d in _CORE_DIMENSIONS
+        if live_ic.get(d) is not None and hist_ic.get(d) is not None
+        and np.isfinite(live_ic[d]) and np.isfinite(hist_ic[d])
+    ]
+    if len(pairs) >= 3:
+        live_vec = np.array([p[0] for p in pairs])
+        hist_vec = np.array([p[1] for p in pairs])
+        r = float(_spearman(_zscore_array(live_vec), _zscore_array(hist_vec))) if live_vec.std() > 1e-9 and hist_vec.std() > 1e-9 else 0.0
+        report["agreement_r"] = round(r, 4)
+        if   r >= 0.70: label = "STRONG"
+        elif r >= 0.50: label = "MODERATE"
+        elif r >= 0.25: label = "WEAK"
+        else:           label = "DIVERGENT"
+        report["agreement_label"]   = label
+        report["recommend_disable"] = r >= 0.50
+
+    log.info(
+        "compare_live_vs_historical_ic: n=%d  r=%.3f  label=%s  recommend_disable=%s",
+        n,
+        report["agreement_r"] or 0.0,
+        report["agreement_label"],
+        report["recommend_disable"],
+    )
+    _write_live_ic_report(report)
+    return report
+
+
+def _write_live_ic_report(report: dict) -> None:
+    """Atomically write the live IC report to disk."""
+    import tempfile
+    dir_ = os.path.dirname(_LIVE_IC_REPORT_FILE)
+    os.makedirs(dir_, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=dir_, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(report, f, indent=2)
+        os.replace(tmp, _LIVE_IC_REPORT_FILE)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+
+
+def get_live_ic_progress() -> dict:
+    """
+    Quick read of the live IC report from disk (no computation).
+    Returns {"n_live_trades": int, "progress_pct": float, ...} or a
+    default stub if the report has never been written.
+    """
+    try:
+        with open(_LIVE_IC_REPORT_FILE) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"n_live_trades": 0, "progress_pct": 0.0, "ready": False,
+                "agreement_label": "PENDING", "recommend_disable": False}
+    except Exception as e:
+        log.warning("get_live_ic_progress: %s", e)
+        return {"n_live_trades": 0, "progress_pct": 0.0, "ready": False,
+                "agreement_label": "PENDING", "recommend_disable": False}
