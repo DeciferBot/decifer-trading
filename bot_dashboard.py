@@ -553,7 +553,7 @@ class DashHandler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
-                from portfolio import get_aggregate_summary, enrich_with_sector
+                from portfolio import get_aggregate_summary
                 summary = get_aggregate_summary(bot_state.ib)
                 # Enrich with trade_type/conviction/entry_regime from bot tracker
                 from orders import get_open_positions as _get_ops
@@ -563,8 +563,6 @@ class DashHandler(BaseHTTPRequestHandler):
                     pos["trade_type"]   = bp.get("trade_type", "")
                     pos["conviction"]   = bp.get("conviction", 0.0)
                     pos["entry_regime"] = bp.get("entry_regime", "")
-                # Enrich with sector (cached yfinance lookup)
-                enrich_with_sector(summary.get("positions", {}))
             except Exception as exc:
                 log.warning("Portfolio aggregation error: %s", exc)
                 summary = {"accounts": [], "positions": {}, "totals": {}, "error": str(exc)}
@@ -722,6 +720,18 @@ class DashHandler(BaseHTTPRequestHandler):
                 {"key": "social",     "label": "Social",      "description": "Social signal and short-squeeze screening"},
                 {"key": "reversion",  "label": "Reversion",   "description": "Mean-reversion opportunity (RSI extremes, Bollinger bands)"},
             ]}
+            self.wfile.write(json.dumps(payload).encode())
+        elif self.path == "/api/overnight-notes":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                from overnight_research import load_overnight_notes
+                notes = load_overnight_notes()
+                payload = {"notes": notes, "available": bool(notes)}
+            except Exception as exc:
+                payload = {"notes": "", "available": False, "error": str(exc)}
             self.wfile.write(json.dumps(payload).encode())
         elif self.path == "/api/prices":
             self.send_response(200)
