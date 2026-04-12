@@ -1032,8 +1032,8 @@ async function loadPortfolio() {
         </div>
         <div style="color:${dirColor};font-weight:600">${p.direction}</div>
         <div style="color:var(--text)">${p.net_position > 0 ? '+' : ''}${p.net_position}</div>
-        <div style="color:var(--orange)">$${fmt$(p.market_value)}</div>
-        <div style="color:${pnlColor2}">${pnlSign}$${fmt$(p.unrealized_pnl)}</div>
+        <div style="color:var(--orange)">${fmt$(p.market_value)}</div>
+        <div style="color:${pnlColor2}">${pnlSign}${fmt$(p.unrealized_pnl)}</div>
         <div style="color:var(--muted2);font-size:10px">${acctList}</div>
       </div>`;
     }).join('');

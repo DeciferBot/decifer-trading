@@ -1,5 +1,5 @@
 OVERNIGHT RESEARCH NOTES — 2026-04-12
-Generated: 2026-04-12 15:09 ET
+Generated: 2026-04-12 15:11 ET
 
 PRE-MARKET / AFTER-HOURS TONE:
   SPY  $679.46  -0.07% vs close  (flat)
@@ -11,9 +11,9 @@ Yesterday's performance: no closed trades on 2026-04-11
 ECONOMIC CALENDAR — Next 5 Days:
   Sun Apr 12: No high-impact events
   Mon Apr 13: No high-impact events
-  Tue Apr 14: No high-impact events
+  Tue Apr 14: PPI [HIGH]
   Wed Apr 15: No high-impact events
-  Thu Apr 16: No high-impact events
+  Thu Apr 16: Jobless Claims [MEDIUM]
   Fri Apr 17: No high-impact events
 
 Earnings calendar: unavailable (no data source connected)
