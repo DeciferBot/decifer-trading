@@ -13,8 +13,8 @@ Features:
 - Execution analytics: track slippage, implementation shortfall, and fill quality
 """
 
-import asyncio
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
@@ -182,7 +182,7 @@ class TWAPExecutor:
         self.slices: Dict[int, OrderSlice] = {}
         self.stats: Optional[ExecutionStats] = None
 
-    async def execute(
+    def execute(
         self,
         contract: Contract,
         action: str,
@@ -239,22 +239,13 @@ class TWAPExecutor:
 
         self.stats.total_slices = len(self.slices)
 
-        # Execute slices over time
-        tasks = [
-            self._execute_slice(contract, self.slices[i], i)
-            for i in range(len(self.slices))
-        ]
-
+        # Execute slices sequentially — each slice waits for its scheduled time internally
         try:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            for result in results:
-                if isinstance(result, Exception):
-                    logger.error(f"Slice execution error: {result}")
-
+            for i in range(len(self.slices)):
+                self._execute_slice(contract, self.slices[i], i)
         except Exception as e:
             logger.error(f"TWAP execution failed: {e}")
-            await self.cancel_all_slices()
+            self.cancel_all_slices()
             raise
 
         # Finalize stats
@@ -284,7 +275,7 @@ class TWAPExecutor:
 
         return execution_result, self.stats
 
-    async def _execute_slice(
+    def _execute_slice(
         self,
         contract: Contract,
         slice_obj: OrderSlice,
@@ -303,7 +294,7 @@ class TWAPExecutor:
                 slice_obj.scheduled_time - datetime.now()
             ).total_seconds()
             if wait_time > 0:
-                await asyncio.sleep(wait_time)
+                time.sleep(wait_time)
 
             # Submit initial order
             limit_price = slice_obj.limit_price
@@ -342,7 +333,7 @@ class TWAPExecutor:
                             )
                             # Cancel and retry with adjusted price
                             self.ib.cancelOrder(trade.order)
-                            await asyncio.sleep(0.5)
+                            self.ib.sleep(0.5)
 
                             # Adjust price (more aggressive)
                             if slice_obj.action == "BUY":
@@ -355,7 +346,7 @@ class TWAPExecutor:
 
                         # Check fill status
                         if trade.isAlive():
-                            await asyncio.sleep(1)
+                            self.ib.sleep(1)
                         else:
                             # Order complete
                             filled = trade.orderStatus.filled
@@ -381,15 +372,12 @@ class TWAPExecutor:
                     logger.error(f"Slice {slice_index} execution error: {e}")
                     attempt += 1
                     if attempt < max_attempts:
-                        await asyncio.sleep(1)
+                        self.ib.sleep(1)
 
-        except asyncio.CancelledError:
-            logger.info(f"Slice {slice_index} execution cancelled")
-            raise
         except Exception as e:
             logger.error(f"Slice {slice_index} unexpected error: {e}")
 
-    async def cancel_all_slices(self) -> None:
+    def cancel_all_slices(self) -> None:
         """Cancel all pending slices."""
         logger.info("Cancelling all pending slices")
         for slice_obj in self.slices.values():
@@ -451,7 +439,7 @@ class VWAPExecutor:
         total = sum(raw.values())
         return {hour: weight / total for hour, weight in raw.items()}
 
-    async def execute(
+    def execute(
         self,
         contract: Contract,
         action: str,
@@ -491,7 +479,7 @@ class VWAPExecutor:
         )
 
         # Execute using TWAP with volume adjustments
-        result, stats = await self.twap_executor.execute(
+        result, stats = self.twap_executor.execute(
             contract, action, quantity, current_price
         )
 
@@ -544,7 +532,7 @@ class IcebergOrder:
 
         return visible
 
-    async def execute(
+    def execute(
         self,
         contract: Contract,
         action: str,
@@ -627,7 +615,7 @@ class IcebergOrder:
                         logger.info(f"Iceberg: Order complete, {filled} filled")
                         break
 
-                await asyncio.sleep(1)
+                self.ib.sleep(1)
 
             stats.filled_quantity = self.filled_quantity
             stats.finalize(current_price)
@@ -721,7 +709,7 @@ class ExecutionAnalytics:
         }
 
 
-async def smart_execute(
+def smart_execute(
     ib_client,
     contract: Contract,
     action: str,
@@ -768,15 +756,15 @@ async def smart_execute(
     try:
         if strategy.lower() == ExecutionStrategy.TWAP.value:
             executor = TWAPExecutor(ib_client, config)
-            return await executor.execute(contract, action, quantity, current_price)
+            return executor.execute(contract, action, quantity, current_price)
 
         elif strategy.lower() == ExecutionStrategy.VWAP.value:
             executor = VWAPExecutor(ib_client, config)
-            return await executor.execute(contract, action, quantity, current_price)
+            return executor.execute(contract, action, quantity, current_price)
 
         elif strategy.lower() == ExecutionStrategy.ICEBERG.value:
             executor = IcebergOrder(ib_client, config)
-            return await executor.execute(contract, action, quantity, current_price)
+            return executor.execute(contract, action, quantity, current_price)
 
         elif strategy.lower() == ExecutionStrategy.SIMPLE.value:
             # Simple market/limit order without slicing

@@ -97,6 +97,7 @@ PROMPTS_FILE = "prompt_versions.json"
 
 # ── IBKR connection object (single instance shared by all modules) ────────────
 ib = IB()
+ibkr_data_manager = None   # IBKRDataManager — set by bot.py after connect_ibkr()
 
 # ── Reconnect / heartbeat state ───────────────────────────────────────────────
 _reconnect_lock:        threading.Lock          = threading.Lock()

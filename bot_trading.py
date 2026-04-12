@@ -1669,6 +1669,33 @@ def run_scan():
         clog("ANALYSIS", f"Weekly review: {review[:200]}...")
 
         try:
+            _tools = str(pathlib.Path(__file__).parent / "tools")
+            if _tools not in sys.path:
+                sys.path.insert(0, _tools)
+            from signal_correlation import load_signals, print_matrix, pca_dims
+            _df = load_signals(pathlib.Path(__file__).parent / "data" / "signals_log.jsonl")
+            if not _df.empty:
+                _high = print_matrix(_df, "ALL REGIMES", 0.75)
+                _n_eff, _ = pca_dims(_df)
+                if _high:
+                    log.warning("Signal correlation: %d high-corr pair(s) (|r|>=0.75): %s",
+                                len(_high), [(d1, d2, f"{r:.2f}") for d1, d2, r in _high])
+                clog("ANALYSIS", f"Signal dims: {_n_eff}/9 effective, {len(_high)} high-corr pair(s)")
+        except Exception as _corr_exc:
+            log.warning("Signal correlation check failed: %s", _corr_exc)
+
+        try:
+            from audit_candle_gate import run_audit as _run_gate_audit
+            _gate = _run_gate_audit()
+            if _gate["flagged_anomaly"] > 0:
+                log.error("Candle gate audit: %d ANOMALY trade(s) — blocked signal reached order layer",
+                          _gate["flagged_anomaly"])
+            clog("ANALYSIS", f"Candle gate: {_gate['valid']} valid, "
+                 f"{_gate['flagged_anomaly']} anomalies, {_gate['flagged_unknown']} unknown")
+        except Exception as _gate_exc:
+            log.warning("Candle gate audit failed: %s", _gate_exc)
+
+        try:
             from ic_calculator import update_ic_weights
             new_weights = update_ic_weights()
             clog("ANALYSIS", "IC weights updated: " +

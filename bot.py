@@ -73,8 +73,6 @@ DASHBOARD_HTML = DASHBOARD_HTML.replace(
     f'Autonomous AI Trading &nbsp;·&nbsp; v{__version__}'
 )
 
-from dashboard_v2 import DASHBOARD_HTML_V2
-
 # ── Persistence ───────────────────────────────────────────────────────────────
 FAVOURITES_FILE = "favourites.json"
 SETTINGS_FILE   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "settings_override.json")
@@ -296,6 +294,17 @@ def main():
                 break
             clog("WARN", f"Still waiting for TWS on port {port}...")
             dash["status"] = "disconnected"
+
+    # ── IBKR streaming data manager ───────────────────────────────────────────
+    # Provides real-time quotes + 5s→1m→5m bar aggregation via the live IB connection.
+    # signals.py reads from this before falling back to Alpaca / yfinance.
+    try:
+        from ibkr_streaming import IBKRDataManager
+        bot_state.ibkr_data_manager = IBKRDataManager(bot_state.ib)
+        clog("INFO", "IBKR streaming data manager ready")
+    except Exception as _e:
+        clog("WARN", f"IBKR streaming data manager unavailable: {_e}")
+        bot_state.ibkr_data_manager = None
 
     # Reset daily risk state — only once per calendar day
     pv, _ = get_account_data()

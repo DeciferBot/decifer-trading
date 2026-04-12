@@ -750,6 +750,18 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
         #   3. yfinance fallback (Alpaca unavailable)
         df_5m = None
 
+        # Layer 0: IBKR streaming (real-time, lowest latency — market hours only)
+        try:
+            import bot_state as _bs
+            _mgr = getattr(_bs, 'ibkr_data_manager', None)
+            if _mgr is not None:
+                _ibkr_df = _mgr.get_bars(symbol, "5m")
+                if _ibkr_df is not None and len(_ibkr_df) >= 5:
+                    df_5m = normalize_bars(_ibkr_df)
+                    log.debug(f"fetch_multi_timeframe: {symbol} 5m from IBKR streaming ({len(df_5m)} bars)")
+        except Exception:
+            pass
+
         # Layer 1: Alpaca bar cache
         try:
             from alpaca_stream import BAR_CACHE

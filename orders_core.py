@@ -382,6 +382,45 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             _safe_del_trade(symbol)
             return False
 
+        # ── SMART EXECUTION GATE ──────────────────────────────────
+        # For large orders (≥500 shares AND ≥$10k notional), use TWAP slicing
+        # to reduce market impact. SL/TP are placed as regular orders after all
+        # slices fill — not atomic, which is the accepted trade-off at this size.
+        _notional = qty * price
+        _smart_min_shares   = CONFIG.get("smart_execution_min_shares",   500)
+        _smart_min_notional = CONFIG.get("smart_execution_min_notional", 10000.0)
+        if qty >= _smart_min_shares and _notional >= _smart_min_notional:
+            try:
+                from smart_execution import smart_execute, ExecutionConfig
+                from ib_async import Stock as _SmartStock
+                _smart_cfg = ExecutionConfig()
+                _smart_contract = _SmartStock(symbol, "SMART", "USD")
+                ib.qualifyContracts(_smart_contract)
+                result, stats = smart_execute(
+                    ib, _smart_contract, "BUY", qty, price,
+                    strategy=CONFIG.get("smart_execution_strategy", "twap"),
+                    config=_smart_cfg,
+                )
+                log.info(
+                    f"execute_buy {symbol}: TWAP complete — "
+                    f"{stats.filled_quantity}/{qty} filled, "
+                    f"avg ${stats.average_execution_price:.2f}, "
+                    f"slippage {stats.slippage_bps:.1f}bps"
+                )
+                # Place SL as standalone order covering the filled quantity
+                if stats.filled_quantity > 0:
+                    _sl_order = StopLimitOrder(
+                        "SELL", stats.filled_quantity, sl, round(sl * 0.99, 2),
+                        account=account, tif="GTC", outsideRth=True
+                    )
+                    ib.placeOrder(_smart_contract, _sl_order)
+                return stats.filled_quantity > 0
+            except Exception as _se:
+                log.warning(
+                    f"execute_buy {symbol}: smart execution failed ({_se}), "
+                    f"falling through to atomic bracket"
+                )
+
         # ── ATOMIC BRACKET ORDER ──────────────────────────────────
         # All 3 legs (entry + SL + TP) are submitted as one atomic bracket.
         # Parent transmit=False prevents it from filling before children are attached.
