@@ -704,6 +704,43 @@ def _maybe_eod_options_review(regime: dict):
         _eod_options_review(regime)
 
 
+# ── Overnight research trigger ───────────────────────────────────────────────
+
+_overnight_research_done: bool = False
+
+
+def _maybe_generate_overnight_research():
+    """
+    Fire once per day in the AFTER_HOURS window (4:15–8:00 PM ET).
+    Generates data/overnight_notes.md — read by Opus at the start of next session.
+    Runs in a background thread so it doesn't block the scan loop.
+    """
+    global _overnight_research_done
+    import zoneinfo as _zi
+    import threading as _th
+    _ET = _zi.ZoneInfo("America/New_York")
+    from datetime import time as dtime
+    t = datetime.now(_ET).time()
+
+    if t < dtime(9, 30):
+        _overnight_research_done = False
+
+    if dtime(16, 15) <= t < dtime(20, 0) and not _overnight_research_done:
+        _overnight_research_done = True
+
+        def _run():
+            try:
+                from orders import get_open_positions
+                from overnight_research import generate_overnight_notes
+                universe = [p["symbol"] for p in get_open_positions()]
+                generate_overnight_notes(universe=universe or None)
+                clog("INFO", "Overnight research notes generated → data/overnight_notes.md")
+            except Exception as exc:
+                clog("WARNING", f"Overnight research failed: {exc}")
+
+        _th.Thread(target=_run, name="overnight-research", daemon=True).start()
+
+
 # ── Portfolio review trigger detection ───────────────────────────────────────
 
 def _should_run_portfolio_review(
@@ -970,6 +1007,7 @@ def run_scan():
     clog("INFO", f"Regime: {regime['regime']} | VIX: {_vix_val} | SPY: ${regime['spy_price']} | Router: {_router_state}")
     set_session_opening_regime(regime["regime"])
     _maybe_eod_options_review(regime)
+    _maybe_generate_overnight_research()
 
     check_external_closes(regime)
 

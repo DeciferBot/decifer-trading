@@ -174,7 +174,7 @@ def fetch_snapshots(symbols: list[str]) -> dict[str, dict]:
         for sym, snap in raw.items():
             try:
                 price = float(snap.latest_trade.price)
-                prev_close = float(snap.daily_bar.previous_close) if snap.daily_bar and snap.daily_bar.previous_close else None
+                prev_close = float(snap.previous_daily_bar.close) if snap.previous_daily_bar else None
                 change_1d = ((price - prev_close) / prev_close) if prev_close else None
                 result[sym] = {"price": price, "change_1d": change_1d}
             except Exception as exc:

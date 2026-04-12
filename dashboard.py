@@ -53,6 +53,8 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 /* VIEWS */
 .view{display:none;height:calc(100vh - 46px - 66px - 58px - 34px);overflow:hidden}
 .view.active{display:flex}
+#view-portfolio{height:calc(100vh - 46px - 66px - 58px - 34px);overflow-y:auto !important;overflow-x:hidden}
+#view-portfolio > *{flex-shrink:0}
 
 /* ── VIEW 1: LIVE ── */
 .live-grid{display:grid;grid-template-columns:210px 1fr 360px;width:100%;height:100%;overflow:hidden}
@@ -247,7 +249,7 @@ canvas{display:block;width:100% !important}
 
 /* ── TRADE CARD ── */
 .trade-card-panel{flex:0 0 auto;border-bottom:1px solid var(--border);background:var(--bg);display:flex;flex-direction:column}
-.trade-card-body{padding:10px 14px;overflow-y:auto;max-height:260px}
+.trade-card-body{padding:10px 14px}
 .tc-headline{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;line-height:1.3;margin-bottom:10px}
 .tc-ticker{color:#fff;font-size:15px}
 .tc-sep{color:var(--muted2)}
@@ -668,7 +670,18 @@ canvas{display:block;width:100% !important}
 </div>
 
 <!-- VIEW 7: PORTFOLIO (multi-account aggregation) -->
-<div class="view" id="view-portfolio" style="flex-direction:column;overflow-y:auto;padding:16px;gap:14px">
+<div class="view" id="view-portfolio" style="flex-direction:column;padding:16px;gap:14px">
+
+  <!-- Overnight Research Notes -->
+  <div class="setting-card" style="margin:0;padding:0;overflow:hidden">
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted2);display:flex;justify-content:space-between;align-items:center">
+      <span>OVERNIGHT RESEARCH</span>
+      <span id="overnight-meta" style="color:var(--muted2);font-size:9px;font-weight:400"></span>
+    </div>
+    <div id="overnight-body" style="padding:12px 16px;font-size:11px;font-family:'JetBrains Mono',monospace;white-space:pre-wrap;line-height:1.6;color:var(--text)">
+      <span style="color:var(--muted2)">Loading overnight research…</span>
+    </div>
+  </div>
 
   <!-- Last Decision (full card with navigation) -->
   <div class="setting-card" style="margin:0;padding:0;overflow:hidden">
@@ -737,10 +750,11 @@ canvas{display:block;width:100% !important}
       <span>AGGREGATED POSITIONS</span>
       <span id="pf-count" style="color:var(--orange)">0 positions</span>
     </div>
-    <div id="pf-table" style="overflow-y:auto;max-height:340px">
+    <div id="pf-table">
       <div class="empty" style="padding:20px;text-align:center;color:var(--muted2)">Click the Portfolio tab to load aggregated positions.</div>
     </div>
   </div>
+
 </div>
 
 <!-- VIEW 6: SETTINGS -->
@@ -995,6 +1009,7 @@ async function loadPortfolio() {
 
     if (!positions.length) {
       tableEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted2)">No open positions across all accounts.</div>';
+      loadOvernightNotes();
       return;
     }
 
@@ -1032,6 +1047,46 @@ async function loadPortfolio() {
 
   } catch (err) {
     tableEl.innerHTML = `<div style="padding:20px;color:var(--red)">⚠ Could not load portfolio data: ${esc(err.message)}</div>`;
+  }
+
+  // Load overnight research in parallel
+  loadOvernightNotes();
+}
+
+async function loadOvernightNotes() {
+  const body = document.getElementById('overnight-body');
+  const meta = document.getElementById('overnight-meta');
+  if (!body) return;
+  try {
+    const resp = await fetch('/api/overnight-notes');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const d = await resp.json();
+    if (!d.available || !d.notes) {
+      body.innerHTML = '<span style="color:var(--muted2)">No overnight notes yet — generated automatically at 4:15pm ET after market close.</span>';
+      if (meta) meta.textContent = '';
+      return;
+    }
+    // Extract generated timestamp from first lines
+    const lines = d.notes.split('\n');
+    const genLine = lines.find(l => l.startsWith('Generated:'));
+    if (meta && genLine) meta.textContent = genLine.replace('Generated:', '').trim();
+
+    // Colour-code key lines
+    const coloured = d.notes
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/(OVERNIGHT RESEARCH NOTES.*)/g,     '<span style="color:var(--orange);font-weight:700">$1</span>')
+      .replace(/(PRE-MARKET.*|YESTERDAY.*|ECONOMIC CALENDAR.*|EARNINGS.*|ANALYST CHANGES.*|MACRO INDICATORS.*)/g,
+               '<span style="color:var(--muted2);letter-spacing:1px;font-size:10px">$1</span>')
+      .replace(/(\[\bHIGH\b\])/g,  '<span style="color:var(--red)">$1</span>')
+      .replace(/(\[MEDIUM\])/g,    '<span style="color:var(--orange)">$1</span>')
+      .replace(/(\*\*\*.*?\*\*\*)/g,'<span style="color:var(--red);font-weight:700">$1</span>')
+      .replace(/(gap-up)/g,        '<span style="color:var(--green)">$1</span>')
+      .replace(/(gap-down)/g,      '<span style="color:var(--red)">$1</span>')
+      .replace(/(FLAG:.*)/g,       '<span style="color:var(--red)">$1</span>');
+
+    body.innerHTML = coloured;
+  } catch (err) {
+    body.innerHTML = `<span style="color:var(--red)">Could not load overnight notes: ${esc(err.message)}</span>`;
   }
 }
 

@@ -271,9 +271,18 @@ def agent_trading_analyst(
     hl_lines = [f"  - {h}" for h in (news_headlines or [])[:5]]
     sm_ctx = (strategy_mode or {}).get("context", "")
 
+    overnight_block = ""
+    try:
+        from overnight_research import load_overnight_notes
+        notes = load_overnight_notes()
+        if notes:
+            overnight_block = f"\nOVERNIGHT RESEARCH NOTES:\n{notes}\n"
+    except Exception:
+        pass
+
     prompt = f"""REGIME: {regime_name} | VIX={vix:.1f} ({vix_1h:+.1f}%/1h) | size_mult={size_mult:.1f}x
 SPY=${spy} ({'above' if spy_above else 'below'} 200d MA) | QQQ=${qqq} ({'above' if qqq_above else 'below'} 200d MA)
-
+{overnight_block}
 SCORED SIGNALS (top 10):
 {chr(10).join(sig_lines) or '  None above threshold'}
 

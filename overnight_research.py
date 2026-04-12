@@ -6,9 +6,11 @@
 # ║                                                              ║
 # ║   Sources:                                                   ║
 # ║     • Alpaca — pre-market / after-hours price gaps          ║
+# ║     • Alpaca News — last 16h headlines (Haiku interpretation)║
 # ║     • data/trades.json — yesterday's performance summary    ║
 # ║     • FMP — economic calendar + earnings with estimates     ║
 # ║     • FMP — analyst upgrades/downgrades (last 24h)          ║
+# ║     • FRED — macro snapshot (CPI, rates, spread, crude)     ║
 # ║     • macro_calendar — FOMC/CPI/NFP 5-day window            ║
 # ║                                                              ║
 # ║   Run automatically at ~4:15pm ET via bot_trading.py.       ║
@@ -334,6 +336,90 @@ def _format_earnings(items: list[dict], source: str = "") -> str:
     return "\n".join(lines)
 
 
+# ── Market news + AI interpretation ──────────────────────────────────────────
+
+def _get_market_news() -> str:
+    """
+    Fetch last 16h of headlines from Alpaca historical news REST API.
+    Claude Haiku interprets the top stories and flags geopolitical/macro risks.
+    Falls back to raw headlines if Haiku call fails. Never raises.
+    """
+    headlines: list[str] = []
+    try:
+        from alpaca.data.historical import NewsClient
+        from alpaca.data.requests import NewsRequest
+        from config import CONFIG
+
+        api_key    = CONFIG.get("alpaca_api_key", "")
+        secret_key = CONFIG.get("alpaca_secret_key", "")
+        if not api_key or not secret_key:
+            return "Market news: Alpaca credentials not set"
+
+        client   = NewsClient(api_key, secret_key)
+        start_dt = datetime.now(timezone.utc) - timedelta(hours=16)
+        req      = NewsRequest(start=start_dt, limit=30, include_content=False)
+        news     = client.get_news(req)
+        articles = (news.data or {}).get("news", [])
+        for a in articles:
+            h = getattr(a, "headline", "") or ""
+            if h:
+                headlines.append(h)
+    except Exception as exc:
+        log.debug("overnight: news fetch failed — %s", exc)
+        return "Market news: unavailable (Alpaca news fetch failed)"
+
+    if not headlines:
+        return "Market news: no headlines in last 16h"
+
+    # ── Claude Haiku interpretation ───────────────────────────────
+    try:
+        import anthropic
+        from config import CONFIG
+
+        # Config may hold the placeholder if .env was loaded after module import;
+        # always prefer the live env var for overnight standalone runs.
+        _cfg_key = CONFIG.get("anthropic_api_key", "")
+        api_key  = (
+            _cfg_key
+            if (_cfg_key and _cfg_key != "YOUR_API_KEY_HERE")
+            else os.environ.get("ANTHROPIC_API_KEY", "")
+        )
+        if not api_key:
+            raise ValueError("Anthropic API key not configured")
+        ai     = anthropic.Anthropic(api_key=api_key)
+        prompt = (
+            "You are a market analyst reviewing overnight news for an AI trading system.\n\n"
+            f"Below are {len(headlines)} headlines from the last 16 hours. Your job:\n"
+            "1. Identify the 3-5 most market-moving stories\n"
+            "2. For each: write the story in one line, then one line on price impact\n"
+            "3. Flag CRITICAL geopolitical/macro events with *** prefix\n"
+            "4. End with: 'Net bias: [bullish/bearish/neutral] — [one-line reason]'\n\n"
+            "Output plain text only. No markdown. Be direct and specific.\n"
+            "Format:\n"
+            "MARKET NEWS INTERPRETATION:\n"
+            "  [CRITICAL/HIGH/MEDIUM] <story summary>\n"
+            "    Impact: <sector/direction in one line>\n"
+            "  ...\n"
+            "Net bias: <bullish/bearish/neutral> — <brief reason>\n\n"
+            "HEADLINES:\n" +
+            "\n".join(f"- {h}" for h in headlines[:30])
+        )
+        resp = ai.messages.create(
+            model=CONFIG.get("claude_model_haiku", "claude-haiku-4-5-20251001"),
+            max_tokens=500,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return resp.content[0].text.strip()
+    except Exception as exc:
+        log.debug("overnight: Haiku news interpretation failed — %s", exc)
+
+    # ── Raw fallback (no AI) ──────────────────────────────────────
+    lines = ["MARKET NEWS (last 16h):"]
+    for h in headlines[:12]:
+        lines.append(f"  • {h}")
+    return "\n".join(lines)
+
+
 # ── Analyst changes ───────────────────────────────────────────────────────────
 
 def _get_analyst_changes(universe: list[str] | None) -> str:
@@ -399,6 +485,8 @@ def generate_overnight_notes(universe: list[str] | None = None) -> str:
         _get_earnings_calendar(universe),
         "",
         _get_analyst_changes(universe),
+        "",
+        _get_market_news(),
     ]
     if macro_snapshot:
         sections += ["", macro_snapshot]
@@ -426,8 +514,11 @@ def load_overnight_notes() -> str:
     try:
         mtime = os.path.getmtime(NOTES_PATH)
         import time as _t
-        if _t.time() - mtime > 20 * 3600:
-            log.debug("overnight: notes file is stale (> 20h), skipping")
+        # Weekend: Monday (0) or Sunday (6) — notes may be up to 80h old (Fri 4pm → Mon 8am)
+        weekday  = datetime.now(_ET).weekday()
+        max_age  = 80 * 3600 if weekday in (0, 6) else 20 * 3600
+        if _t.time() - mtime > max_age:
+            log.debug("overnight: notes file is stale (> %dh), skipping", max_age // 3600)
             return ""
         with open(NOTES_PATH) as f:
             return f.read()
@@ -440,4 +531,17 @@ def load_overnight_notes() -> str:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    # Load .env for standalone runs (bot sets env vars at startup)
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(override=True)
+    except ImportError:
+        _env_path = os.path.join(os.path.dirname(__file__), ".env")
+        if os.path.exists(_env_path):
+            for _line in open(_env_path):
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _k, _, _v = _line.partition("=")
+                    # Force-set: shell may export empty stubs; .env values are authoritative
+                    os.environ[_k.strip()] = _v.strip()
     print(generate_overnight_notes())

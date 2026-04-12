@@ -32,20 +32,18 @@ _CACHE_TTL = 6 * 3600   # 6 hours
 _cache: dict[str, tuple[object, float]] = {}
 
 # ── High-impact FRED release IDs → display names + impact tier ───────────────
+# Verified via FRED API: GET /fred/release?release_id=<id>
+# FOMC dates are NOT tracked here — macro_calendar.py owns FOMC/CPI/NFP with
+# hardcoded BLS/Fed calendar dates (more reliable than FRED release cadence).
 _HIGH_IMPACT_RELEASES: dict[int, dict] = {
-    10:  {"name": "CPI",                     "impact": "High"},
-    11:  {"name": "PPI",                     "impact": "High"},
-    50:  {"name": "Employment Situation (NFP)", "impact": "High"},
-    53:  {"name": "GDP",                     "impact": "High"},
-    20:  {"name": "PCE / Personal Income",   "impact": "High"},
-    15:  {"name": "Retail Sales",            "impact": "High"},
-    175: {"name": "Jobless Claims",          "impact": "Medium"},
-    25:  {"name": "Trade Balance",           "impact": "Medium"},
-    33:  {"name": "Housing Starts",          "impact": "Medium"},
-    82:  {"name": "ISM Manufacturing",       "impact": "Medium"},
-    517: {"name": "ISM Services",            "impact": "Medium"},
-    138: {"name": "FOMC / Federal Funds Target", "impact": "High"},
-    21:  {"name": "Consumer Confidence (Conference Board)", "impact": "Medium"},
+    10:  {"name": "CPI",                      "impact": "High"},    # Consumer Price Index
+    46:  {"name": "PPI",                      "impact": "High"},    # Producer Price Index (was 11=Employment Cost Index, wrong)
+    50:  {"name": "Employment Situation (NFP)","impact": "High"},   # Employment Situation
+    53:  {"name": "GDP",                       "impact": "High"},   # Gross Domestic Product
+    54:  {"name": "PCE / Personal Income",     "impact": "High"},   # Personal Income and Outlays (was 20=H.4.1 Fed Balance Sheet, wrong)
+    9:   {"name": "Retail Sales",              "impact": "High"},   # Advance Monthly Retail Sales (was 15=G.5 FX Rates, wrong)
+    180: {"name": "Jobless Claims",            "impact": "Medium"}, # Unemployment Insurance Weekly Claims (was 175=not found, wrong)
+    51:  {"name": "Trade Balance",             "impact": "Medium"}, # U.S. International Trade in Goods and Services (was 25=wrong)
 }
 
 # ── Key macro series for the snapshot ────────────────────────────────────────

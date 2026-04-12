@@ -42,7 +42,7 @@ import anthropic
 from config import CONFIG
 from market_observer import get_market_observation, invalidate_cache, MarketObservation
 from pattern_library import get_relevant_patterns, get_thesis_performance, get_setup_performance
-from macro_calendar import get_next_event, hours_to_next_event
+from macro_calendar import get_next_event, _ALL_EVENTS  # type: ignore[attr-defined]
 
 log = logging.getLogger("decifer.intelligence")
 
@@ -94,6 +94,7 @@ class SessionContext:
     macro_text:        str           # upcoming macro events
     thesis_perf_text:  str = ""      # formatted thesis performance for prompt inclusion
     setup_perf_text:   str = ""      # formatted setup-type edge data for prompt inclusion
+    overnight_text:    str = ""      # overnight research notes (pre-market tone, calendar, yesterday)
 
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
@@ -157,17 +158,37 @@ def _fetch_market_news(full: bool) -> tuple[str, bool]:
 
 
 def _format_macro_calendar() -> str:
-    """Format upcoming macro events for prompt context."""
+    """Format upcoming macro events — 5-day window — for prompt context."""
     try:
-        event = get_next_event()
-        if not event:
-            return "No high-impact macro events in the near term."
-        hours = hours_to_next_event()
-        name  = event.get("name", "unknown event")
-        date  = event.get("date", "")
-        if hours is not None and hours < 48:
-            return f"UPCOMING: {name} in {hours:.0f}h ({date}) — elevated event risk"
-        return f"Next macro event: {name} on {date}"
+        from datetime import date as _date
+        today  = _date.today()
+        cutoff = today + timedelta(days=5)
+
+        upcoming = [
+            e for e in _ALL_EVENTS
+            if today <= e["date"] <= cutoff
+        ]
+
+        if not upcoming:
+            # Fall back to just the next event if none in 5-day window
+            event = get_next_event()
+            if not event:
+                return "No high-impact macro events in the near term."
+            return f"Next macro event: {event['type']} on {event['date']}"
+
+        lines = []
+        for ev in upcoming:
+            label      = ev["date"].strftime("%a %b %-d")
+            delta_days = (ev["date"] - today).days
+            if delta_days == 0:
+                tag = "  *** TODAY ***"
+            elif delta_days == 1:
+                tag = "  *** TOMORROW — elevated event risk ***"
+            else:
+                tag = ""
+            lines.append(f"  {label}: {ev['type']}{tag}")
+
+        return "Macro events — next 5 days:\n" + "\n".join(lines)
     except Exception:
         return "Macro calendar unavailable."
 
@@ -241,6 +262,13 @@ def _build_session_context(full_news: bool) -> SessionContext:
     setup_perfs    = get_setup_performance(min_samples=3)
     setup_text     = _format_setup_performance(setup_perfs)
 
+    overnight_text = ""
+    try:
+        from overnight_research import load_overnight_notes
+        overnight_text = load_overnight_notes()
+    except Exception as exc:
+        log.debug("intelligence: overnight notes unavailable — %s", exc)
+
     return SessionContext(
         timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         market_read="",          # filled after Opus call in classify_signals
@@ -251,6 +279,7 @@ def _build_session_context(full_news: bool) -> SessionContext:
         macro_text=macro_text,
         thesis_perf_text=thesis_text,
         setup_perf_text=setup_text,
+        overnight_text=overnight_text,
     )
 
 
@@ -310,9 +339,14 @@ def _build_classification_prompt(
 
     vocab_str = " | ".join(sorted(SESSION_CHARACTER_VOCAB))
 
+    overnight_block = (
+        f"\n## Overnight research notes\n{ctx.overnight_text}\n"
+        if ctx.overnight_text else ""
+    )
+
     return f"""You are the intelligence layer for Decifer, an autonomous trading system. \
 Before any trade is placed, you reason about the market and classify each signal.
-
+{overnight_block}
 ## Market observation
 {ctx.observation.to_prompt_text()}
 {regime_block}
