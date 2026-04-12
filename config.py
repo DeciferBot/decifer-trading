@@ -25,7 +25,7 @@ CONFIG = {
 
     # ── ACCOUNT REGISTRY ──────────────────────────────────────
     "accounts": {
-        "paper":  os.environ.get("IBKR_PAPER_ACCOUNT", ""),
+        "paper":  os.environ.get("IBKR_PAPER_ACCOUNT", "DUP481326"),
         "live_1": os.environ.get("IBKR_LIVE_1_ACCOUNT", ""),
         "live_2": os.environ.get("IBKR_LIVE_2_ACCOUNT", ""),
     },
@@ -74,6 +74,18 @@ CONFIG = {
     # Leave blank to skip (bot falls back to trade-based reconstruction).
     "ibkr_flex_token":    os.environ.get("IBKR_FLEX_TOKEN", ""),
     "ibkr_flex_query_id": os.environ.get("IBKR_FLEX_QUERY_ID", ""),
+
+    # ── FRED (Federal Reserve Economic Data) — free, unlimited ──
+    # Economic release calendar + macro indicator snapshots (CPI, unemployment, etc.)
+    # Sign up: https://fred.stlouisfed.org/docs/api/api_key.html (free, instant)
+    "fred_api_key":             os.environ.get("FRED_API_KEY", ""),
+
+    # ── FINANCIAL MODELING PREP (free tier: 250 calls/day) ───
+    # Used for: overnight research — economic calendar, earnings with estimates,
+    # analyst upgrades/downgrades. Much richer than the hardcoded macro_calendar.
+    # Sign up at https://financialmodelingprep.com/register (free, no credit card).
+    # Set env var: FMP_API_KEY
+    "fmp_api_key":              os.environ.get("FMP_API_KEY", ""),
 
     # ── FINNHUB (free tier: 60 calls/min) ────────────────────
     # Sign up at https://finnhub.io — free API key, no credit card required.
