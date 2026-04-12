@@ -11,6 +11,8 @@ and orders_guards (duplicate checks).
 
 from __future__ import annotations
 
+import json
+import os
 from datetime import datetime, timezone
 
 from ib_async import IB, Option
@@ -40,7 +42,39 @@ _OPTION_SELL_COOLDOWN = 600        # seconds (10 min) before retrying after max 
 _MIN_SELL_RETRY_INTERVAL_S = 90    # min seconds between any two sell attempts (prevents PM+check_options double-fire)
 
 # Exits requested while the options market was closed — flushed on next open cycle
+_PENDING_EXITS_FILE = os.path.join(os.path.dirname(__file__), "data", "pending_option_exits.json")
 _pending_option_exits: dict = {}   # opt_key → original reason string
+
+
+def _load_pending_exits() -> None:
+    global _pending_option_exits
+    try:
+        if os.path.exists(_PENDING_EXITS_FILE):
+            with open(_PENDING_EXITS_FILE) as f:
+                _pending_option_exits = json.load(f)
+            if _pending_option_exits:
+                import logging as _logging
+                _logging.getLogger(__name__).info(
+                    f"orders_options: loaded {len(_pending_option_exits)} persisted pending exit(s): "
+                    + ", ".join(_pending_option_exits.keys())
+                )
+    except Exception:
+        _pending_option_exits = {}
+
+
+def _save_pending_exits() -> None:
+    try:
+        os.makedirs(os.path.dirname(_PENDING_EXITS_FILE), exist_ok=True)
+        tmp = _PENDING_EXITS_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(_pending_option_exits, f)
+        os.replace(tmp, _PENDING_EXITS_FILE)
+    except Exception as _e:
+        import logging as _logging
+        _logging.getLogger(__name__).warning(f"orders_options: failed to persist pending exits: {_e}")
+
+
+_load_pending_exits()
 
 
 def execute_buy_option(ib: IB, contract_info: dict,
@@ -217,6 +251,7 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
             f"deferring exit for {opt_key} until next open"
         )
         _pending_option_exits[opt_key] = reason
+        _save_pending_exits()
         return False
 
     if opt_key not in active_trades:
@@ -498,9 +533,11 @@ def flush_pending_option_exits(ib: IB) -> None:
         if opt_key not in active_trades:
             log.info(f"Deferred exit {opt_key} dropped — position no longer tracked")
             _pending_option_exits.pop(opt_key, None)
+            _save_pending_exits()
             continue
         log.info(f"Flushing deferred option exit: {opt_key} (original reason: {reason})")
         _pending_option_exits.pop(opt_key, None)
+        _save_pending_exits()
         execute_sell_option(ib, opt_key, reason=f"deferred:{reason}")
 
 

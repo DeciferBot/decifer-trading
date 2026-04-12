@@ -411,6 +411,13 @@ def _parse_actions(text: str, open_positions: list) -> list:
                 "action": act_m.group(1),
                 "reasoning": rea_m.group(1).strip() if rea_m else "",
             }
+        elif sym_m:
+            raw_act = re.search(r"ACTION:\s*(\S+)", block)
+            raw_val = raw_act.group(1) if raw_act else "<missing>"
+            log.warning(
+                f"portfolio_manager: {sym_m.group(1)} had unparseable "
+                f"ACTION '{raw_val}' — defaulting HOLD"
+            )
 
     # Ensure every open position has an entry
     output = []

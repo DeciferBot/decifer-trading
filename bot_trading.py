@@ -1696,10 +1696,40 @@ def run_scan():
             log.warning("Candle gate audit failed: %s", _gate_exc)
 
         try:
-            from ic_calculator import update_ic_weights
-            new_weights = update_ic_weights()
+            import pathlib as _pl
+            from ic_calculator import update_ic_weights, compare_live_vs_historical_ic
+            _hist_log = str(_pl.Path(__file__).parent / "data" / "signals_log_historical.jsonl")
+            new_weights = update_ic_weights(historical_log_path=_hist_log)
             clog("ANALYSIS", "IC weights updated: " +
                  ", ".join(f"{k}={v:.3f}" for k, v in new_weights.items()))
+
+            # ── Live vs historical IC comparison milestone ─────────────────
+            _ic_report = compare_live_vs_historical_ic(historical_log_path=_hist_log)
+            _n  = _ic_report["n_live_trades"]
+            _pct = _ic_report["progress_pct"]
+            if not _ic_report["ready"]:
+                clog("ANALYSIS", f"Live IC progress: {_n}/50 scored closed trades ({_pct:.0f}%) — "
+                     "keeping force_equal_weights until milestone")
+            else:
+                _r     = _ic_report.get("agreement_r") or 0.0
+                _label = _ic_report.get("agreement_label", "?")
+                _dims  = ", ".join(
+                    f"{d}(L={v['live']:.3f}/H={v['hist']:.3f})"
+                    for d, v in _ic_report.get("dim_comparison", {}).items()
+                    if v.get("live") is not None
+                )
+                clog("ANALYSIS",
+                     f"Live IC milestone reached ({_n} trades): "
+                     f"hist/live agreement r={_r:.3f} [{_label}]")
+                clog("ANALYSIS", f"Per-dim: {_dims}")
+                if _ic_report.get("recommend_disable"):
+                    clog("ANALYSIS",
+                         "IC profiles AGREE (r≥0.5) — "
+                         "consider disabling force_equal_weights in config.py")
+                else:
+                    clog("ANALYSIS",
+                         "IC profiles DIVERGE (r<0.5) — "
+                         "keep force_equal_weights; investigate dim disagreements")
         except Exception as _ic_exc:
             log.warning("IC weight update failed: %s", _ic_exc)
 

@@ -1200,7 +1200,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
         else:
             with _trades_lock:
                 recently_closed[symbol] = datetime.now(timezone.utc).isoformat()
-                del active_trades[_trade_key]
+                active_trades.pop(_trade_key, None)
             _save_positions_file()
         return True
 
