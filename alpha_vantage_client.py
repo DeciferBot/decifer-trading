@@ -35,8 +35,9 @@ _RATE_LIMIT_PATH = os.path.join(os.path.dirname(__file__), "data", "av_rate_limi
 
 # Aggressive caching — 25 calls/day free tier cannot support per-scan fetches.
 # Yahoo RSS handles freshness; AV enriches quality every 4 hours.
-_NEWS_TTL     = 4 * 3600   # seconds
-_EARNINGS_TTL = 4 * 3600   # seconds
+_NEWS_TTL       = 4 * 3600   # seconds — successful result TTL
+_NEWS_ERROR_TTL = 30 * 60    # seconds — error result TTL (retry after 30 min)
+_EARNINGS_TTL   = 4 * 3600   # seconds
 
 _news_cache: dict[str, tuple[dict, float]] = {}  # cache_key → (result, monotonic_time)
 _earnings_cache: tuple[dict | None, float] = (None, 0.0)
@@ -148,9 +149,11 @@ def get_news_sentiment(tickers: list[str]) -> dict[str, dict]:
     now = time.monotonic()
 
     cached_result, cached_at = _news_cache.get(cache_key, (None, 0.0))
-    if cached_result is not None and now - cached_at < _NEWS_TTL:
-        log.debug("AV news: cache hit (%d tickers)", len(cached_result))
-        return cached_result
+    if cached_result is not None:
+        ttl = _NEWS_ERROR_TTL if not cached_result else _NEWS_TTL
+        if now - cached_at < ttl:
+            log.debug("AV news: cache hit (%d tickers)", len(cached_result))
+            return cached_result
 
     key = _consume_call()
     if not key:
@@ -173,6 +176,10 @@ def get_news_sentiment(tickers: list[str]) -> dict[str, dict]:
         if "Note" in data or "Information" in data:
             msg = (data.get("Note") or data.get("Information", ""))[:150]
             log.warning("AV API message: %s", msg)
+            # Cache the empty result so we don't burn another API call on the
+            # next scan. Use a 30-min TTL so it retries later rather than
+            # hammering AV every 15 minutes with calls that also fail.
+            _news_cache[cache_key] = ({}, now)
             return {}
 
         feed = data.get("feed", [])
@@ -281,6 +288,9 @@ def get_news_articles(tickers: list[str], limit: int = 50) -> list[dict]:
         if "Note" in data or "Information" in data:
             msg = (data.get("Note") or data.get("Information", ""))[:150]
             log.warning("AV API message (articles): %s", msg)
+            # Cache empty list so repeated dashboard fetches don't burn API
+            # calls on errors. 30-min TTL so it retries after a cooldown.
+            _articles_cache = ([], time.monotonic())
             return cached_articles or []
 
         from datetime import datetime, timezone as _tz

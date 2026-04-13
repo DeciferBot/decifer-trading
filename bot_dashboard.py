@@ -67,12 +67,17 @@ def _fetch_alpaca_news() -> list[dict]:
                 continue
 
             # Pick best image: large > small > thumb
+            # Skip Benzinga branding/logo images — they are not article-specific content
+            _BZ_SKIP = ("/sites/default/", "benzinga-logo", "bz-logo",
+                        "/logo.", "/logos/", "default_image", "placeholder")
             image_url = None
             for size_pref in ("large", "small", "thumb"):
                 for img in (art.get("images") or []):
-                    if img.get("size") == size_pref and img.get("url"):
-                        image_url = img["url"]
-                        break
+                    u = (img.get("url") or "")
+                    if img.get("size") == size_pref and u:
+                        if not any(p in u.lower() for p in _BZ_SKIP):
+                            image_url = u
+                            break
                 if image_url:
                     break
 
@@ -169,7 +174,7 @@ def _enrich_macro_events(articles: list) -> None:
                 except Exception:
                     pass
             if not api_key:
-                log.debug("Macro classifier: no Anthropic API key available")
+                log.warning("Macro classifier: no Anthropic API key available — check ANTHROPIC_API_KEY in .env")
                 return
             client = _ant.Anthropic(api_key=api_key)
             msg = client.messages.create(
@@ -188,7 +193,7 @@ def _enrich_macro_events(articles: list) -> None:
             log.info("Macro classifier: %d macro events found in %d articles",
                      len(classifications), len(articles))
         except Exception as exc:
-            log.debug("Macro event classification error: %s", exc)
+            log.warning("Macro event classification error: %s", exc)
             return
 
     for item in (classifications or []):
@@ -305,10 +310,13 @@ def _get_news_payload() -> dict:
                     "catalyst":   nd.get("claude_catalyst", ""),
                 })
 
-    # Enrich articles that have no image_url with company logos (FMP)
+    # Fill in article images via og:image scraping
     _enrich_images(articles)
 
     # Identify macro market-moving events via Sonnet (cached by content hash)
+    # Evict stale cache entries older than 30 articles to prevent empty-list lock-in
+    if len(_macro_cache) > 30:
+        _macro_cache.clear()
     _enrich_macro_events(articles)
 
     payload = {
@@ -388,16 +396,8 @@ def _enrich_images(articles: list) -> None:
         except Exception:
             pass  # timeout or pool error — proceed with whatever completed
 
-    # Final fallback: FMP company logo for anything still missing
-    for art in articles:
-        if art.get("image_url"):
-            continue
-        symbols = art.get("symbols") or []
-        for sym in symbols:
-            logo = _stock_logo(sym)
-            if logo:
-                art["image_url"] = logo
-                break
+    # No logo fallback — articles without images show the gradient ticker placeholder
+    # in the frontend, which looks cleaner than a corporate logo thumbnail.
 
 
 class DashHandler(BaseHTTPRequestHandler):
@@ -486,6 +486,17 @@ class DashHandler(BaseHTTPRequestHandler):
                 "sentinel_use_ibkr":            CONFIG.get("sentinel_use_ibkr", True),
                 "sentinel_use_finviz":          CONFIG.get("sentinel_use_finviz", True),
             }
+            try:
+                from risk import get_consecutive_losses, get_strategy_mode, get_pause_until
+                state["consecutive_losses"]      = get_consecutive_losses()
+                state["consecutive_loss_pause"]  = CONFIG.get("consecutive_loss_pause", 5)
+                state["strategy_mode"]           = get_strategy_mode()
+                state["pause_until"]             = get_pause_until()
+            except Exception:
+                state["consecutive_losses"]      = 0
+                state["consecutive_loss_pause"]  = 5
+                state["strategy_mode"]           = "NORMAL"
+                state["pause_until"]             = None
             self.wfile.write(json.dumps(state).encode())
         elif self.path == "/api/favourites":
             self.send_response(200)

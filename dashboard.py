@@ -164,18 +164,23 @@ canvas{display:block;width:100% !important}
 .agent-last{font-size:11px;color:var(--muted2);line-height:1.6;max-height:80px;overflow-y:auto;white-space:pre-wrap}
 
 /* ── VIEW 5: RISK ── */
-.risk-view{flex-direction:column;overflow-y:auto;padding:14px;gap:12px}
+.risk-view{flex-direction:column;overflow-y:auto;overflow-x:hidden;padding:14px;gap:12px;height:calc(100vh - 46px - 66px - 58px - 34px)}
 .risk-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .risk-meter{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px}
 .rm-label{font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;margin-bottom:8px}
 .rm-bar-bg{height:8px;background:var(--border2);border-radius:4px;overflow:hidden;margin-bottom:4px}
 .rm-bar{height:100%;border-radius:4px;transition:width .5s}
 .rm-meta{display:flex;justify-content:space-between;font-size:10px;color:var(--muted2)}
+.risk-mode-banner{border-radius:6px;padding:10px 14px;font-size:11px;font-weight:600;display:none;align-items:center;justify-content:space-between;gap:8px;border:1px solid;flex-shrink:0}
+.risk-mode-banner.defensive{background:rgba(255,179,0,.08);border-color:var(--yellow);color:var(--yellow)}
+.risk-mode-banner.recovery{background:rgba(255,23,68,.08);border-color:var(--red);color:var(--red)}
+.r-pos-table-hdr{display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:0 0 6px;border-bottom:1px solid var(--border);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2)}
+.r-pos-total{display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:6px 0 0;border-top:1px solid var(--border);font-size:11px;font-weight:600}
 
 /* ── VIEW 7: NEWS ── */
 .news-view{flex-direction:column;height:calc(100vh - 46px - 66px - 34px);overflow:hidden}
 .news-hdr{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2)}
-.news-feed{flex:1;overflow-y:auto;padding:12px 14px;min-height:0}
+.news-body{flex:1;overflow-y:auto;padding:12px 14px;min-height:0}
 .news-badge{flex-shrink:0;padding:3px 8px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:.5px;text-align:center}
 .badge-bullish{background:rgba(0,200,83,.15);color:var(--green);border:1px solid rgba(0,200,83,.3)}
 .badge-bearish{background:rgba(255,23,68,.12);color:var(--red);border:1px solid rgba(255,23,68,.3)}
@@ -279,7 +284,7 @@ canvas{display:block;width:100% !important}
 .agent-convo-card{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:6px;padding:12px;margin-bottom:10px}
 .agent-convo-card .agent-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:var(--orange);margin-bottom:2px}
 .agent-convo-card .agent-role{font-size:10px;color:var(--muted2);margin-bottom:8px}
-.agent-convo-card .agent-output{font-size:11px;color:var(--text);line-height:1.65;white-space:pre-wrap;max-height:200px;overflow-y:auto}
+.agent-convo-card .agent-output{font-size:11px;color:var(--text);line-height:1.65;white-space:pre-wrap;overflow-wrap:break-word}
 .indicator-tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;margin:1px 2px}
 .tag-bull{background:rgba(0,200,83,.12);color:var(--green)}
 .tag-bear{background:rgba(255,23,68,.1);color:var(--red)}
@@ -384,8 +389,8 @@ canvas{display:block;width:100% !important}
   <div class="tab" onclick="switchTab('risk',this)">🛡 Risk</div>
   <div class="tab" onclick="switchTab('news',this)">📰 News</div>
   <div class="tab" onclick="switchTab('portfolio',this)">🏦 Portfolio</div>
-  <div class="tab" onclick="switchTab('settings',this)">⚙️ Settings</div>
   <div class="tab" onclick="switchTab('alpha',this)">📉 Alpha Decay</div>
+  <div class="tab" onclick="switchTab('settings',this)">⚙️ Settings</div>
 </div>
 
 <!-- VIEW 1: LIVE -->
@@ -497,7 +502,7 @@ canvas{display:block;width:100% !important}
     <button class="f-btn" onclick="filterOrders('options',this)">Options</button>
   </div>
   <div class="hist-table">
-    <div class="th"><span>Time</span><span>Symbol</span><span>Side</span><span>Type</span><span>Qty</span><span>Price</span><span>Fill Px</span><span>Status</span><span>Role</span><span></span></div>
+    <div class="th" style="grid-template-columns:85px 90px 48px 72px 80px 70px 105px 70px 52px 52px 40px"><span>Time</span><span>Symbol</span><span>Side</span><span>Qty</span><span>Notional</span><span>Limit</span><span>Fill / Slip</span><span>Status</span><span>Role</span><span>Score</span><span></span></div>
     <div id="orders-body"><div class="empty">No orders logged yet. Orders appear here when the bot places them.</div></div>
   </div>
 </div>
@@ -577,15 +582,19 @@ canvas{display:block;width:100% !important}
     <div class="empty" style="padding:30px">Agent conversation appears here after the first scan completes.</div>
   </div>
   <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
-    <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:10px">Raw Agent Outputs</div>
+    <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:10px">Trade Actions</div>
     <div id="agents-grid">
-      <div class="empty">Raw outputs appear here after the first scan.</div>
+      <div class="empty">Trade actions appear here after the first scan.</div>
     </div>
   </div>
 </div>
 
 <!-- VIEW 5: RISK -->
 <div class="view risk-view" id="view-risk">
+  <div class="risk-mode-banner" id="r-mode-banner">
+    <span id="r-mode-label">STRATEGY MODE</span>
+    <span id="r-mode-detail" style="font-size:10px;font-weight:400;opacity:.85"></span>
+  </div>
   <div class="risk-grid">
     <div class="risk-meter">
       <div class="rm-label">Daily Loss Budget Used</div>
@@ -596,16 +605,18 @@ canvas{display:block;width:100% !important}
       <div class="rm-label">Portfolio Exposure</div>
       <div class="rm-bar-bg"><div class="rm-bar" id="r-exp-bar" style="width:0%;background:var(--orange)"></div></div>
       <div class="rm-meta"><span id="r-exp-used">0 positions</span><span id="r-exp-pct">0% deployed</span></div>
+      <div class="rm-meta" style="margin-top:3px"><span id="r-exp-ls" style="color:var(--muted2)">—</span></div>
     </div>
     <div class="risk-meter">
       <div class="rm-label">Consecutive Losses</div>
       <div class="rm-bar-bg"><div class="rm-bar" id="r-loss-bar" style="width:0%;background:var(--red)"></div></div>
       <div class="rm-meta"><span id="r-loss-n">0 of 3</span><span id="r-loss-status">OK</span></div>
+      <div class="rm-meta" style="margin-top:3px"><span id="r-loss-resume" style="color:var(--muted2)"></span></div>
     </div>
     <div class="risk-meter">
       <div class="rm-label">Cash Reserve</div>
       <div class="rm-bar-bg"><div class="rm-bar" id="r-cash-bar" style="width:0%;background:var(--green)"></div></div>
-      <div class="rm-meta"><span id="r-cash-pct">100% cash</span><span>Min: 40%</span></div>
+      <div class="rm-meta"><span id="r-cash-pct">100% cash</span><span id="r-cash-min">Min: 10%</span></div>
     </div>
   </div>
   <div class="card">
@@ -633,12 +644,14 @@ canvas{display:block;width:100% !important}
     <span id="news-updated" style="color:var(--muted2);font-size:10px;margin-left:auto"></span>
     <button class="news-fetch-btn" id="news-fetch-btn" onclick="loadNews()">⟳ Fetch News</button>
   </div>
-  <div id="market-events-strip" style="display:none;padding:10px 14px 0"></div>
-  <div class="news-feed" id="news-feed">
-    <div class="empty" style="padding:40px 0;text-align:center">
-      <div style="font-size:28px;opacity:.3;margin-bottom:12px">📰</div>
-      <div style="font-size:12px;color:var(--muted2);margin-bottom:14px">No stories loaded yet</div>
-      <button class="news-fetch-btn" onclick="loadNews()">Fetch News Now</button>
+  <div class="news-body">
+    <div id="market-events-strip" style="display:none;padding-bottom:14px"></div>
+    <div id="news-feed">
+      <div class="empty" style="padding:40px 0;text-align:center">
+        <div style="font-size:28px;opacity:.3;margin-bottom:12px">📰</div>
+        <div style="font-size:12px;color:var(--muted2);margin-bottom:14px">No stories loaded yet</div>
+        <button class="news-fetch-btn" onclick="loadNews()">Fetch News Now</button>
+      </div>
     </div>
   </div>
 </div>
@@ -890,7 +903,7 @@ canvas{display:block;width:100% !important}
 
   <!-- Summary KPIs -->
   <div class="metric-grid" id="ad-kpi-row" style="grid-template-columns:repeat(4,1fr)">
-    <div class="metric"><div class="metric-label">Trades Analysed</div><div class="metric-val co" id="ad-count">—</div></div>
+    <div class="metric"><div class="metric-label">Complete / Total</div><div class="metric-val co" id="ad-count">—</div></div>
     <div class="metric"><div class="metric-label">Optimal Hold</div><div class="metric-val cg" id="ad-optimal">—</div></div>
     <div class="metric"><div class="metric-label">T+1 Median</div><div class="metric-val" id="ad-t1">—</div></div>
     <div class="metric"><div class="metric-label">T+10 Median</div><div class="metric-val" id="ad-t10">—</div></div>
@@ -906,8 +919,8 @@ canvas{display:block;width:100% !important}
       </div>
     </div>
     <div style="font-size:10px;color:var(--muted2);margin-bottom:10px">
-      Median direction-adjusted return (%) for closed trades at T+N bars after entry.
-      Positive = favourable outcome for the trade direction. Shaded band = P25–P75 for all trades.
+      Median direction-adjusted return (%) for closed trades at T+N bars after entry — cohort analysis
+      (only trades with data at every horizon; n shows cohort/total). Positive = favourable for trade direction.
     </div>
     <div style="position:relative;height:220px"><canvas id="alpha-decay-chart"></canvas></div>
   </div>
@@ -917,7 +930,7 @@ canvas{display:block;width:100% !important}
     <div class="card-title">Segment Breakdown</div>
     <div id="ad-segment-table" style="font-size:11px">
       <div style="display:grid;grid-template-columns:120px repeat(5,1fr);gap:4px;padding:5px 0;border-bottom:1px solid var(--border);font-size:9px;letter-spacing:1.2px;color:var(--muted2);text-transform:uppercase">
-        <div>Segment</div><div>n</div><div>T+1</div><div>T+3</div><div>T+5</div><div>T+10</div>
+        <div>Segment</div><div>n (coh/tot)</div><div>T+1</div><div>T+3</div><div>T+5</div><div>T+10</div>
       </div>
       <div id="ad-seg-rows" style="color:var(--muted2);padding:12px 0">Loading…</div>
     </div>
@@ -925,7 +938,7 @@ canvas{display:block;width:100% !important}
 
   <!-- Data quality note -->
   <div style="font-size:10px;color:var(--muted);padding:4px 2px">
-    ⚠ Forward returns fetched live via yfinance. Horizons not yet reached for recent trades are omitted.
+    ⚠ Forward returns fetched via yfinance. Chart uses cohort trades (those with data at every horizon) so all horizons reflect the same set of trades. Recent trades excluded until T+10 data is available.
     Signal half-life analysis requires ≥20 agent-scored trades for statistical significance.
   </div>
 
@@ -975,19 +988,19 @@ async function loadPortfolio() {
     // KPI strip
     const t = d.totals || {};
     const pnlColor = v => v >= 0 ? 'var(--green)' : 'var(--red)';
-    document.getElementById('pf-gross').textContent   = '$' + fmt$(t.gross_exposure   || 0);
+    document.getElementById('pf-gross').textContent   = fmt$(t.gross_exposure   || 0);
     document.getElementById('pf-gross').className     = 'sv co';
 
     const netEl = document.getElementById('pf-net');
-    netEl.textContent = (t.net_exposure >= 0 ? '+' : '') + '$' + fmt$(t.net_exposure || 0);
+    netEl.textContent = (t.net_exposure >= 0 ? '+' : '') + fmt$(t.net_exposure || 0);
     netEl.style.color = pnlColor(t.net_exposure || 0);
 
     const urEl = document.getElementById('pf-unreal');
-    urEl.textContent = (t.unrealized_pnl >= 0 ? '+' : '') + '$' + fmt$(t.unrealized_pnl || 0);
+    urEl.textContent = (t.unrealized_pnl >= 0 ? '+' : '') + fmt$(t.unrealized_pnl || 0);
     urEl.style.color = pnlColor(t.unrealized_pnl || 0);
 
     const rlEl = document.getElementById('pf-real');
-    rlEl.textContent = (t.realized_pnl >= 0 ? '+' : '') + '$' + fmt$(t.realized_pnl || 0);
+    rlEl.textContent = (t.realized_pnl >= 0 ? '+' : '') + fmt$(t.realized_pnl || 0);
     rlEl.style.color = pnlColor(t.realized_pnl || 0);
 
     document.getElementById('pf-ls').textContent =
@@ -1234,9 +1247,12 @@ function renderAlphaDecay(d) {
   const groups   = d.groups  || {};
   const all      = groups.all || {};
 
-  // KPI strip
+  // KPI strip — show cohort count (complete-horizon trades) / total
+  const cohortN = (d.complete_count != null && d.complete_count > 0)
+    ? d.complete_count : (d.trade_count || 0);
+  const totalN  = d.trade_count || 0;
   document.getElementById('ad-count').textContent =
-    d.trade_count > 0 ? d.trade_count : '0';
+    totalN > 0 ? `${cohortN} / ${totalN}` : '0';
   document.getElementById('ad-optimal').textContent =
     d.optimal_horizon != null ? `T+${d.optimal_horizon}d` : '—';
 
@@ -1294,8 +1310,10 @@ function renderAlphaDecay(d) {
     for (const key of visibleGroups) {
       const g = groups[key];
       if (!g || !g.n) continue;
+      const nLabel = g.n_total != null && g.n_total !== g.n
+        ? `n=${g.n}/${g.n_total}` : `n=${g.n}`;
       const ds = {
-        label:           `${groupLabels[key]} (n=${g.n})`,
+        label:           `${groupLabels[key]} (${nLabel})`,
         data:            (g.median || []).map(v => v != null ? parseFloat((v * 100).toFixed(4)) : null),
         borderColor:     COLORS[key],
         backgroundColor: 'transparent',
@@ -1335,8 +1353,10 @@ function renderAlphaDecay(d) {
     DIM_NAMES.forEach((k, i) => {
       const g = groups[k];
       if (!g || !g.n) return;
+      const nLabel = g.n_total != null && g.n_total !== g.n
+        ? `n=${g.n}/${g.n_total}` : `n=${g.n}`;
       const ds = {
-        label:           `${DIM_LABELS_SHORT[k]} (n=${g.n})`,
+        label:           `${DIM_LABELS_SHORT[k]} (${nLabel})`,
         data:            (g.median || []).map(v => v != null ? parseFloat((v * 100).toFixed(4)) : null),
         borderColor:     DIM_COLORS[i],
         backgroundColor: 'transparent',
@@ -1430,15 +1450,17 @@ function renderAlphaDecay(d) {
 
   function _segRow(label, g, indent) {
     if (!g || !g.n) return '';
-    const m   = g.median || [];
-    const v1  = hi1  >= 0 ? m[hi1]  : null;
-    const v3  = hi3  >= 0 ? m[hi3]  : null;
-    const v5  = hi5  >= 0 ? m[hi5]  : null;
-    const v10 = hi10 >= 0 ? m[hi10] : null;
-    const pl  = indent ? 'padding-left:10px' : '';
+    const m     = g.median || [];
+    const v1    = hi1  >= 0 ? m[hi1]  : null;
+    const v3    = hi3  >= 0 ? m[hi3]  : null;
+    const v5    = hi5  >= 0 ? m[hi5]  : null;
+    const v10   = hi10 >= 0 ? m[hi10] : null;
+    const pl    = indent ? 'padding-left:10px' : '';
+    const nText = g.n_total != null && g.n_total !== g.n
+      ? `${g.n}/${g.n_total}` : `${g.n}`;
     return `<div style="display:grid;grid-template-columns:120px repeat(5,1fr);gap:4px;padding:5px 0;border-bottom:1px solid var(--border)">
       <div style="color:var(--text);${pl}">${label}</div>
-      <div style="color:var(--muted2)">${g.n}</div>
+      <div style="color:var(--muted2)">${nText}</div>
       <div>${_fmtPct(v1)}</div>
       <div>${_fmtPct(v3)}</div>
       <div>${_fmtPct(v5)}</div>
@@ -1586,6 +1608,7 @@ function cancelOrder(orderId, idx) {
 
 let posSort = 'recency'; // 'recency' | 'size' | 'pnl'
 let lastPositions = [];
+let _lastPositionsFingerprint = '';
 
 function sortPositions(mode) {
   posSort = mode;
@@ -1593,6 +1616,7 @@ function sortPositions(mode) {
   document.querySelectorAll('.pos-sort-btn').forEach(b => b.style.color = 'var(--muted2)');
   const active = document.getElementById('pos-sort-' + mode);
   if (active) active.style.color = 'var(--orange)';
+  _lastPositionsFingerprint = ''; // force re-render on sort change
   renderPositions(lastPositions);
 }
 
@@ -1600,6 +1624,14 @@ function renderPositions(positions) {
   const el = document.getElementById('pos-list');
   if (!positions || !positions.length) { el.innerHTML = '<div class="empty">No open positions</div>'; return; }
   lastPositions = positions;
+
+  // Skip full DOM rebuild when only live prices changed — fetchPrices() handles those.
+  // Fingerprint covers structural fields only (symbol, qty, entry, status, SL, TP, tranche).
+  const fingerprint = positions.map(p =>
+    `${p.symbol}|${p.qty}|${p.direction}|${p.entry}|${p.status}|${p.sl}|${p.tp}|${p.tranche_mode}|${p.t1_status}`
+  ).join(',') + '|sort:' + posSort;
+  if (fingerprint === _lastPositionsFingerprint) return;
+  _lastPositionsFingerprint = fingerprint;
 
   // Enrich with computed fields
   let enriched = positions.map((p, idx) => {
@@ -1742,42 +1774,103 @@ function renderOrders() {
   if (currentOrderFilter === 'stocks')    filtered = filtered.filter(o => (o.instrument||'stock') === 'stock');
   if (currentOrderFilter === 'options')   filtered = filtered.filter(o => (o.instrument||'') === 'option');
 
-  // Sort newest first
   filtered.sort((a,b) => new Date(b.timestamp||0) - new Date(a.timestamp||0));
 
   if (!filtered.length) { el.innerHTML = '<div class="empty">No orders match this filter.</div>'; return; }
 
-  const sanitizePrice = p => (typeof p === 'number' && isFinite(p) && Math.abs(p) < 1e10) ? p : 0;
+  const sanitize = p => (typeof p === 'number' && isFinite(p) && Math.abs(p) < 1e10) ? p : 0;
+  const GRID = '85px 90px 48px 72px 80px 70px 105px 70px 52px 52px 40px';
 
   el.innerHTML = filtered.map(o => {
-    const ts = o.timestamp || '';
-    const side = o.side || '—';
-    const sideClass = side === 'BUY' ? 'tb' : 'ts2';
+    const sym    = o.symbol || '—';
+    const side   = o.side || '—';
     const status = (o.status || 'UNKNOWN').toUpperCase();
-    const statusColor = status === 'FILLED' ? 'var(--green)' :
-                        status === 'CANCELLED' ? 'var(--red)' :
+    const qty    = o.qty || 0;
+    const filledQty = o.filled_qty || 0;
+    const price  = sanitize(o.price);
+    const fillPx = o.fill_price ? sanitize(o.fill_price) : 0;
+    const role   = o.role || '';
+    const src    = o.source || '';
+
+    const optLabel = o.instrument === 'option' ? ` ${o.right||''}${o.strike ? ' $'+o.strike : ''}` : '';
+
+    // Source badge: SYNC = ibkr bracket/sync, EVT = ibkr fill event, BOT = agent-placed
+    const srcBadge = src === 'ibkr_sync'
+      ? `<span style="font-size:8px;padding:1px 4px;border-radius:2px;background:rgba(100,160,255,.12);color:rgba(100,160,255,.65);margin-left:3px">SYNC</span>`
+      : src === 'ibkr_event'
+      ? `<span style="font-size:8px;padding:1px 4px;border-radius:2px;background:rgba(160,160,160,.1);color:rgba(160,160,160,.55);margin-left:3px">EVT</span>`
+      : src
+      ? `<span style="font-size:8px;padding:1px 4px;border-radius:2px;background:rgba(255,107,0,.15);color:var(--orange);margin-left:3px">BOT</span>`
+      : '';
+
+    const sideClass = side === 'BUY' ? 'tb' : 'ts2';
+
+    // Qty: shows filled/ordered for partials, green when fully filled
+    let qtyHtml, qtyColor;
+    if (status === 'FILLED') {
+      qtyHtml  = (filledQty > 0 ? filledQty : qty).toLocaleString();
+      qtyColor = 'var(--green)';
+    } else if (filledQty > 0 && filledQty < qty) {
+      qtyHtml  = `${filledQty.toLocaleString()}<span style="color:var(--muted2);font-size:9px"> /${qty.toLocaleString()}</span>`;
+      qtyColor = 'var(--yellow)';
+    } else {
+      qtyHtml  = qty ? qty.toLocaleString() : '—';
+      qtyColor = status === 'CANCELLED' ? 'var(--muted2)' : 'var(--orange)';
+    }
+
+    // Notional: filled × fill_price for FILLED, else ordered × limit
+    const notionalQty = (status === 'FILLED' && filledQty > 0) ? filledQty : (filledQty > 0 ? filledQty : qty);
+    const notionalPx  = (status === 'FILLED' && fillPx > 0) ? fillPx : price;
+    const notional    = notionalQty * notionalPx;
+    const notionalStr = notional > 0 ? fmt$(notional) : '—';
+
+    // Fill price + slippage delta: green = better than limit, red = worse
+    let fillHtml = '—';
+    if (fillPx > 0) {
+      const slip     = fillPx - price;
+      const slipBad  = (side === 'BUY' && slip > 0.005) || (side === 'SELL' && slip < -0.005);
+      const slipGood = (side === 'BUY' && slip < -0.005) || (side === 'SELL' && slip > 0.005);
+      const slipColor = slipBad ? 'var(--red)' : slipGood ? 'var(--green)' : 'var(--muted2)';
+      const slipStr  = Math.abs(slip) >= 0.005
+        ? ` <span style="font-size:9px;color:${slipColor}">(${slip >= 0 ? '+' : ''}${fmt$(slip)})</span>`
+        : '';
+      fillHtml = fmt$(fillPx) + slipStr;
+    }
+
+    const statusColor = status === 'FILLED'   ? 'var(--green)'  :
+                        status === 'CANCELLED' ? 'var(--red)'    :
                         ['SUBMITTED','PRESUBMITTED'].includes(status) ? 'var(--yellow)' : 'var(--muted2)';
-    const role = o.role || '—';
+
     const roleLabel = role === 'stop_loss' ? 'SL' :
                       role === 'take_profit' ? 'TP' :
                       role === 'close' ? 'CLOSE' :
-                      role === 'emergency_flatten' ? 'KILL' : role === '—' ? 'ENTRY' : role.toUpperCase();
-    const fillPx = o.fill_price ? fmt$(sanitizePrice(o.fill_price)) : '—';
-    const sym = o.symbol || '—';
-    const optLabel = o.instrument === 'option' ? ` ${o.right||''}${o.strike ? ' $'+o.strike : ''}` : '';
-    const px = sanitizePrice(o.price);
+                      role === 'emergency_flatten' ? 'KILL' : !role ? 'ENTRY' : role.toUpperCase();
+    const roleColor = role === 'stop_loss' ? 'var(--red)' :
+                      role === 'take_profit' ? 'var(--green)' :
+                      role === 'emergency_flatten' ? 'var(--red)' : !role ? 'var(--text)' : 'var(--muted2)';
 
-    return `<div class="tr">
-      <span>${ts ? ts.slice(0,16).replace('T',' ') : '—'}</span>
-      <span>${sym}${optLabel}</span>
+    // Score: color-coded by signal strength (≥40 strong, ≥28 threshold, below = weak)
+    const sc = o.score != null ? o.score : null;
+    const scoreHtml = sc != null
+      ? `<span style="color:${sc >= 40 ? 'var(--green)' : sc >= 28 ? 'var(--orange)' : 'var(--muted2)'};font-weight:600">${sc}</span>`
+      : '—';
+
+    const cancelBtn = ['SUBMITTED','PRESUBMITTED'].includes(status) && o.order_id
+      ? `<button onclick="cancelOrder(${o.order_id}, '${sym}')" style="background:rgba(255,23,68,.15);border:1px solid var(--red);color:var(--red);border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 8px;font-weight:700" title="Cancel order #${o.order_id}">✕</button>`
+      : '';
+
+    return `<div class="tr" style="grid-template-columns:${GRID}">
+      <span style="color:var(--muted2)">${o.timestamp ? o.timestamp.slice(0,16).replace('T',' ') : '—'}</span>
+      <span>${sym}${optLabel}${srcBadge}</span>
       <span><span class="ts ${sideClass}">${side}</span></span>
-      <span style="color:var(--muted2)">${o.order_type || '—'}</span>
-      <span style="color:var(--orange)">${o.qty || '—'}</span>
-      <span>${px ? fmt$(px) : '—'}</span>
-      <span>${fillPx}</span>
+      <span style="color:${qtyColor}">${qtyHtml}</span>
+      <span style="color:var(--muted2)">${notionalStr}</span>
+      <span>${price ? fmt$(price) : '—'}</span>
+      <span>${fillHtml}</span>
       <span style="color:${statusColor};font-weight:700">${status}</span>
-      <span style="color:var(--muted2)">${roleLabel}</span>
-      <span>${['SUBMITTED','PRESUBMITTED'].includes(status) && o.order_id ? `<button onclick="cancelOrder(${o.order_id}, ${JSON.stringify(sym)})" style="background:rgba(255,23,68,.15);border:1px solid var(--red);color:var(--red);border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 8px;font-weight:700" title="Cancel order #${o.order_id}">✕</button>` : ''}</span>
+      <span style="color:${roleColor};font-weight:600">${roleLabel}</span>
+      <span>${scoreHtml}</span>
+      <span>${cancelBtn}</span>
     </div>`;
   }).join('');
 }
@@ -1963,18 +2056,28 @@ function renderAgents(convo) {
   if (!convo || !convo.length) return;
   const el = document.getElementById('agents-grid');
   if (!el) return;
-  el.innerHTML = convo.map((msg, i) => {
-    const isFinal = i === convo.length - 1;
-    const borderColor = isFinal ? 'var(--green)' : `hsl(${25 + i * 55}, 85%, 55%)`;
-    return `<div class="agent-card" style="border-left:3px solid ${borderColor}">
-      <div class="agent-header">
-        <span class="agent-name" style="color:${borderColor}">${esc(msg.agent || '—')}</span>
-        <span class="agent-accuracy" style="color:var(--muted2)">${esc(msg.time || '')}</span>
-      </div>
-      <div class="agent-role" style="font-size:10px;color:var(--muted2);margin-bottom:6px">${esc(msg.role || '')}</div>
-      <div class="agent-last">${(msg.output || 'No output yet').slice(0, 400)}</div>
-    </div>`;
-  }).join('');
+  const finalEntry = convo.find(m => m.agent === 'Final Decision Maker') || convo[convo.length - 1];
+  if (!finalEntry) return;
+  const lines = (finalEntry.output || '').split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length || lines[0] === 'No trades this cycle.') {
+    el.innerHTML = '<div style="color:var(--muted2);font-size:11px;padding:6px 0">No trades this cycle.</div>';
+    return;
+  }
+  const ACTION_COLOR = { BUY: 'var(--green)', SELL: 'var(--red)', HOLD: 'var(--orange)' };
+  const ACTION_BG    = { BUY: 'rgba(0,200,83,.12)', SELL: 'rgba(255,82,82,.12)', HOLD: 'rgba(255,107,0,.12)' };
+  el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 0">' +
+    lines.map(line => {
+      const parts  = line.split(/\s+/);
+      const action = (parts[0] || '').toUpperCase();
+      const ticker = parts.slice(1).join(' ');
+      const color  = ACTION_COLOR[action] || 'var(--muted2)';
+      const bg     = ACTION_BG[action]    || 'rgba(80,80,80,.1)';
+      return `<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:4px;border:1px solid ${color};background:${bg}">
+        <span style="font-size:10px;font-weight:700;color:${color};letter-spacing:1px">${esc(action)}</span>
+        <span style="font-size:13px;font-weight:700;color:var(--text)">${esc(ticker)}</span>
+      </div>`;
+    }).join('') +
+  '</div>';
 }
 
 // ── Chart instances ────────────────────────────────────────
@@ -2450,23 +2553,116 @@ async function poll() {
 
     // Risk view — daily limit from settings
     if (d.portfolio_value) {
-      const pv   = d.portfolio_value;
+      const pv    = d.portfolio_value;
       const limit = pv * (d.settings?.daily_loss_limit || 0);
       const used  = Math.abs(Math.min(pnl, 0));
-      const expPct = ((d.positions||[]).length / 6) * 100;
-      const deployed = (d.positions||[]).reduce((s, p) => {
+      const positions = d.positions || [];
+
+      // ── Strategy mode banner ───────────────────────────────────
+      const mode       = d.strategy_mode || 'NORMAL';
+      const modeBanner = document.getElementById('r-mode-banner');
+      if (mode === 'NORMAL') {
+        modeBanner.style.display = 'none';
+      } else {
+        modeBanner.style.display = 'flex';
+        modeBanner.className     = 'risk-mode-banner ' + mode.toLowerCase();
+        document.getElementById('r-mode-label').textContent  = mode + ' MODE';
+        const modeDetail = mode === 'DEFENSIVE'
+          ? 'Score threshold +5 · Size ×0.7 · Max 4 new trades'
+          : 'Score threshold +10 · Size ×0.5 · Max 2 new trades — capital preservation';
+        document.getElementById('r-mode-detail').textContent = modeDetail;
+      }
+
+      // ── Daily loss budget ──────────────────────────────────────
+      const dailyPct = limit > 0 ? Math.min(used / limit * 100, 100) : 0;
+      document.getElementById('r-daily-bar').style.width      = dailyPct + '%';
+      document.getElementById('r-daily-bar').style.background = dailyPct > 75 ? 'var(--red)' : dailyPct > 50 ? 'var(--yellow)' : 'var(--green)';
+      document.getElementById('r-daily-used').textContent     = `${fmt$(used)} of ${fmt$(limit)}`;
+      document.getElementById('r-daily-pct').textContent      = dailyPct.toFixed(1) + '%';
+
+      // ── Portfolio exposure + L/S split ────────────────────────
+      const longNotional  = positions.reduce((s, p) => {
+        if ((p.direction || 'LONG') !== 'LONG') return s;
         const mult = p.instrument === 'option' ? 100 : 1;
         return s + Math.abs(p.current * p.qty * mult);
-      }, 0) / pv * 100;
+      }, 0);
+      const shortNotional = positions.reduce((s, p) => {
+        if ((p.direction || 'LONG') !== 'SHORT') return s;
+        const mult = p.instrument === 'option' ? 100 : 1;
+        return s + Math.abs(p.current * p.qty * mult);
+      }, 0);
+      const deployed = (longNotional + shortNotional) / pv * 100;
+      const netNotional = longNotional - shortNotional;
+      document.getElementById('r-exp-bar').style.width    = Math.min(deployed, 100) + '%';
+      document.getElementById('r-exp-used').textContent   = positions.length + ' positions';
+      document.getElementById('r-exp-pct').textContent    = deployed.toFixed(1) + '% deployed';
+      document.getElementById('r-exp-ls').textContent     = longNotional || shortNotional
+        ? `${fmt$(longNotional)} L  /  ${fmt$(shortNotional)} S  ·  net ${netNotional >= 0 ? '+' : ''}${fmt$(netNotional)}`
+        : '—';
 
-      document.getElementById('r-daily-bar').style.width   = Math.min(used/limit*100,100) + '%';
-      document.getElementById('r-daily-used').textContent  = `${fmt$(used)} of ${fmt$(limit)}`;
-      document.getElementById('r-daily-pct').textContent   = (used/limit*100).toFixed(1) + '%';
-      document.getElementById('r-exp-bar').style.width     = Math.min(deployed,100) + '%';
-      document.getElementById('r-exp-used').textContent    = (d.positions||[]).length + ' positions';
-      document.getElementById('r-exp-pct').textContent     = deployed.toFixed(1) + '% deployed';
-      document.getElementById('r-cash-bar').style.width    = Math.min(100 - deployed, 100) + '%';
-      document.getElementById('r-cash-pct').textContent    = (100 - deployed).toFixed(1) + '% cash';
+      // ── Consecutive losses + pause-until ─────────────────────
+      const lossN     = d.consecutive_losses || 0;
+      const lossPause = d.consecutive_loss_pause || 5;
+      const lossPct   = Math.min(lossN / lossPause * 100, 100);
+      document.getElementById('r-loss-bar').style.width     = lossPct + '%';
+      document.getElementById('r-loss-n').textContent       = lossN + ' of ' + lossPause;
+      const lossStatus = lossN >= lossPause ? 'PAUSED' : lossN >= lossPause - 1 ? 'WARNING' : 'OK';
+      const lossColor  = lossN >= lossPause ? 'var(--red)' : lossN >= lossPause - 1 ? 'var(--yellow)' : 'var(--green)';
+      document.getElementById('r-loss-status').textContent  = lossStatus;
+      document.getElementById('r-loss-status').style.color  = lossColor;
+      const resumeEl = document.getElementById('r-loss-resume');
+      if (d.pause_until) {
+        resumeEl.textContent  = 'Resumes at ' + d.pause_until + ' EST';
+        resumeEl.style.color  = 'var(--red)';
+      } else {
+        resumeEl.textContent  = '';
+      }
+
+      // ── Cash reserve ──────────────────────────────────────────
+      const minCashPct = Math.round((d.settings?.min_cash_reserve || 0.10) * 100);
+      const cashPct    = Math.max(100 - deployed, 0);
+      document.getElementById('r-cash-bar').style.width      = Math.min(cashPct, 100) + '%';
+      document.getElementById('r-cash-bar').style.background = cashPct < minCashPct ? 'var(--red)' : 'var(--green)';
+      document.getElementById('r-cash-pct').textContent      = cashPct.toFixed(1) + '% cash';
+      document.getElementById('r-cash-min').textContent      = 'Min: ' + minCashPct + '%';
+
+      // ── Open position risk table ──────────────────────────────
+      const posDetail = document.getElementById('r-pos-detail');
+      if (!positions.length) {
+        posDetail.innerHTML = '<div class="empty">No open positions</div>';
+      } else {
+        let totalAtRisk = 0;
+        const rows = positions.map(p => {
+          const isOpt  = p.instrument === 'option';
+          const mult   = isOpt ? 100 : 1;
+          const dir    = p.direction || 'LONG';
+          const entry  = p.entry || p.current || 0;
+          const sl     = p.sl || 0;
+          const qty    = Math.abs(p.qty || 0);
+          const atRisk = sl > 0 ? Math.abs(entry - sl) * qty * mult : null;
+          const rPct   = (sl > 0 && entry > 0) ? (Math.abs(entry - sl) / entry * 100).toFixed(1) : null;
+          const dirCol = dir === 'LONG' ? 'var(--green)' : 'var(--red)';
+          const slCol  = sl > 0 ? 'var(--text)' : 'var(--muted2)';
+          if (atRisk != null) totalAtRisk += atRisk;
+          return `<div style="display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:6px 0;border-bottom:1px solid var(--border2);font-size:11px;align-items:center">
+            <span style="font-weight:700;color:${dirCol}">${p.symbol}${isOpt ? ' <span style="font-size:9px;color:var(--cyan)">OPT</span>' : ''} <span style="font-size:9px;font-weight:400;color:var(--muted2)">${dir}</span></span>
+            <span style="color:var(--muted2)">Entry: <span style="color:var(--text)">${fmt$(entry)}</span></span>
+            <span style="color:var(--muted2)">Stop: <span style="color:${slCol}">${sl > 0 ? fmt$(sl) : '—'}</span></span>
+            <span style="color:var(--muted2)">At risk: <span style="color:${atRisk != null ? 'var(--red)' : 'var(--muted2)'}">${atRisk != null ? fmt$(atRisk) : '—'}</span></span>
+            <span style="color:var(--muted2)">${rPct != null ? rPct + '% SL' : '—'}</span>
+          </div>`;
+        }).join('');
+        const totalPct = pv > 0 ? (totalAtRisk / pv * 100).toFixed(2) : '0.00';
+        const totalRow = `<div class="r-pos-total">
+          <span style="color:var(--muted2)">TOTAL</span>
+          <span></span><span></span>
+          <span style="color:var(--red)">${fmt$(totalAtRisk)}</span>
+          <span style="color:var(--muted2)">${totalPct}% of portfolio</span>
+        </div>`;
+        posDetail.innerHTML =
+          `<div class="r-pos-table-hdr"><span>Position</span><span>Entry</span><span>Stop</span><span>At Risk</span><span>SL %</span></div>` +
+          rows + totalRow;
+      }
     }
 
     // Cache latest settings so functions without `d` scope can read them
@@ -2771,7 +2967,7 @@ function renderNews(newsData) {
 
 function _renderMacroStrip(allItems) {
   const strip = document.getElementById('market-events-strip');
-  const macroItems = allItems.filter(i => i.macro_event && i.macro_impact >= 3)
+  const macroItems = allItems.filter(i => i.macro_event && i.macro_impact >= 1)
                              .sort((a, b) => b.macro_impact - a.macro_impact);
   if (!macroItems.length) {
     strip.style.display = 'block';
@@ -3105,13 +3301,41 @@ function renderAgentConvoFull(convo, lastScan) {
   document.getElementById('agents-scan-time').textContent = 'Last scan: ' + (lastScan || '—');
   if (!convo || !convo.length) return;
 
+  const ACTION_COLOR = { BUY: 'var(--green)', SELL: 'var(--red)', HOLD: 'var(--orange)' };
+  const ACTION_BG    = { BUY: 'rgba(0,200,83,.12)', SELL: 'rgba(255,82,82,.12)', HOLD: 'rgba(255,107,0,.12)' };
+
   el.innerHTML = convo.map((msg, i) => {
     const isFinal = msg.agent === 'Final Decision Maker';
     const borderColor = isFinal ? 'var(--green)' : `hsl(${25 + i * 40}, 85%, 55%)`;
+
+    let outputHtml;
+    if (isFinal) {
+      const lines = (msg.output || '').split('\n').map(l => l.trim()).filter(Boolean);
+      if (!lines.length || lines[0] === 'No trades this cycle.') {
+        outputHtml = '<div style="color:var(--muted2);font-size:11px">No trades this cycle.</div>';
+      } else {
+        outputHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">' +
+          lines.map(line => {
+            const parts  = line.split(/\s+/);
+            const action = (parts[0] || '').toUpperCase();
+            const ticker = parts.slice(1).join(' ');
+            const color  = ACTION_COLOR[action] || 'var(--muted2)';
+            const bg     = ACTION_BG[action]    || 'rgba(80,80,80,.1)';
+            return `<div style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:3px;border:1px solid ${color};background:${bg}">
+              <span style="font-size:9px;font-weight:700;color:${color};letter-spacing:1px">${esc(action)}</span>
+              <span style="font-size:12px;font-weight:700;color:var(--text)">${esc(ticker)}</span>
+            </div>`;
+          }).join('') +
+        '</div>';
+      }
+    } else {
+      outputHtml = `<div class="agent-output">${annotateIndicators(msg.output || '')}</div>`;
+    }
+
     return `<div class="agent-convo-card" style="border-left-color:${borderColor}">
       <div class="agent-name" style="color:${borderColor}">${isFinal ? '⚡' : 'Agent ' + (i+1) + ':'} ${esc(msg.agent)}</div>
       <div class="agent-role">${esc(msg.role)}</div>
-      <div class="agent-output">${annotateIndicators(msg.output || '')}</div>
+      ${outputHtml}
     </div>`;
   }).join('');
 }
