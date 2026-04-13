@@ -523,7 +523,7 @@ def update_ic_weights(
     # Tolerance-based comparison — exact float equality fails because 1/N
     # (0.08333…3) and round(1/N, 10) (0.08333333330) differ beyond ==.
     all_equal  = (
-        CONFIG.get("force_equal_weights", False)
+        _ic_cfg("force_equal_weights", False)
         or all(abs(weights.get(d, 0.0) - _eq_weight) < 1e-9 for d in DIMENSIONS)
     )
 

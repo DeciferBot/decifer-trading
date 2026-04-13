@@ -36,7 +36,10 @@ import pytest
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
-ALL_DIMS = ["trend", "momentum", "squeeze", "flow", "breakout", "mtf", "news", "social", "reversion"]
+ALL_DIMS = ["directional", "momentum", "squeeze", "flow", "breakout", "mtf", "news", "social", "reversion", "iv_skew", "pead", "short_squeeze", "overnight_drift"]
+
+# score_breakdown uses "trend" as the key for the directional dimension
+BREAKDOWN_KEYS = ["trend", "momentum", "squeeze", "flow", "breakout", "mtf", "news", "social", "reversion", "iv_skew", "pead", "short_squeeze", "overnight_drift"]
 
 
 def _base_sig(signal="BUY") -> dict:
@@ -132,7 +135,7 @@ def test_disabled_dimensions_list_populated():
     result = _run(_base_sig(), flags=flags)
     assert "news" in result["disabled_dimensions"]
     assert "social" in result["disabled_dimensions"]
-    assert "trend" not in result["disabled_dimensions"]
+    assert "directional" not in result["disabled_dimensions"]
 
 
 def test_disabled_dimensions_all_nine():
@@ -218,5 +221,5 @@ def test_missing_flags_config_all_enabled():
 
 def test_score_breakdown_always_has_all_keys():
     result = _run(_base_sig(), flags={d: False for d in ALL_DIMS})
-    for dim in ALL_DIMS:
+    for dim in BREAKDOWN_KEYS:
         assert dim in result["score_breakdown"], f"Missing key '{dim}' in score_breakdown"

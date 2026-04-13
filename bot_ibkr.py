@@ -1139,6 +1139,10 @@ def cancel_orphan_stop_orders():
             order    = t.order
             contract = t.contract
             sym      = contract.symbol
+            # FX: IBKR reports base currency ("EUR") but active_trades
+            # uses the 6-char pair ("EURUSD"). Reconstruct the pair.
+            if getattr(contract, 'secType', '') == 'CASH':
+                sym = contract.symbol + getattr(contract, 'currency', '')
             otype    = (order.orderType or "").upper()
             action   = (order.action or "").upper()
             # Only target sell-side stop orders (STP, STP LMT, TRAIL) — these are exits

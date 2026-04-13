@@ -29,6 +29,7 @@ from orders_state import (
 from orders_contracts import (
     get_contract,
     _get_emergency_ib,
+    _get_ibkr_price,
     _validate_position_price,
     _ibkr_item_to_key,
     _is_option_contract,
@@ -1138,6 +1139,16 @@ def update_positions_from_ibkr(ib: IB):
                         ibkr_price = round(mkt_price, 4)
                     else:
                         ibkr_price = mkt_price
+
+            # FX positions may be absent from ib.portfolio() — fetch live
+            # price directly via reqTickers so the dashboard stays current.
+            if ibkr_price == 0 and trade.get("instrument") == "fx":
+                try:
+                    _fx_contract = get_contract(sym, "fx")
+                    ib.qualifyContracts(_fx_contract)
+                    ibkr_price = _get_ibkr_price(ib, _fx_contract, fallback=0)
+                except Exception as _fx_err:
+                    log.debug(f"FX price fetch for {sym}: {_fx_err}")
 
             # Options: trust IBKR premium (Alpaca/TV return stock price, not premium)
             if is_option:
