@@ -1712,7 +1712,7 @@ function renderPositions(positions) {
       : `<button onclick="event.stopPropagation();closePosition(${p._idx})" style="background:rgba(255,23,68,.12);border:1px solid var(--red);color:var(--red);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Close this position">✕</button>`;
     return `<div class="pos-card" data-symbol="${p.symbol||''}" data-entry="${p.entry||0}" data-qty="${p.qty||0}" data-direction="${p.dir||'LONG'}" onclick="showPositionDetail(${p._idx})" title="Click for details" style="${cardOpacity}">
       <div class="pos-hdr">
-        <span class="pos-sym">${p.symbol}${p.instrument === 'option' ? ' <span style="font-size:9px;color:var(--cyan);font-weight:600">OPT</span>' : ''}${pendingBadge}${trancheBadge}${typePill} <span style="font-size:10px;color:var(--muted2);font-weight:400">${p.dir} ×${Math.abs(p.qty)}</span></span>
+        <span class="pos-sym">${p.symbol}${p.instrument === 'option' ? ' <span style="font-size:9px;color:var(--cyan);font-weight:600">OPT</span>' : p.instrument === 'fx' ? ' <span style="font-size:9px;color:var(--orange);font-weight:600">FX</span>' : ''}${pendingBadge}${trancheBadge}${typePill} <span style="font-size:10px;color:var(--muted2);font-weight:400">${p.dir} ×${Math.abs(p.qty)}</span></span>
         <span style="display:flex;align-items:center;gap:6px">
           ${isPending ? '<span style="font-size:10px;color:var(--yellow)">Awaiting fill</span>' : `<span class="pos-pnl" style="color:${col}">${p.pnl >= 0 ? '+' : ''}${fmt$(p.pnl)}</span>`}
           ${actionBtn}
