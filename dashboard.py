@@ -809,8 +809,8 @@ canvas{display:block;width:100% !important}
   </div>
   <div class="setting-card">
     <div class="setting-title">Scoring &amp; Agents</div>
-    <div class="setting-row"><span class="setting-label">Min score to trade (/50)</span><input class="setting-input" id="cfg-min-score" type="number" step="1" min="10" max="45"></div>
-    <div class="setting-row"><span class="setting-label">High conviction score</span><input class="setting-input" id="cfg-high-score" type="number" step="1" min="20" max="50"></div>
+    <div class="setting-row"><span class="setting-label">Min score to trade</span><input class="setting-input" id="cfg-min-score" type="number" step="1" min="10" max="100"></div>
+    <div class="setting-row"><span class="setting-label">High conviction score</span><input class="setting-input" id="cfg-high-score" type="number" step="1" min="20" max="100"></div>
     <div class="setting-row">
       <span class="setting-label">Agents required to agree</span>
       <select id="agree-select" class="setting-input" style="width:60px">
@@ -2038,7 +2038,7 @@ function buildTradeExplanation(t) {
     const convLabel = (hiConv != null && minConv != null)
       ? (t.score >= hiConv ? 'very high' : t.score >= minConv ? 'moderate' : 'borderline')
       : '—';
-    story += `Conviction: <strong>${convLabel}</strong> — scored ${t.score}/50. `;
+    story += `Conviction: <strong>${convLabel}</strong> — scored ${t.score}. `;
   }
 
   // ── MARKET CONTEXT ──

@@ -2228,7 +2228,28 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     except Exception:
         pass  # keep the incrementally-accumulated score if IC module unavailable
 
-    # ── SOFT GATE: MTF penalty (applied before cap) ──────
+    # ── DIRECTION AGREEMENT RATIO (DAR) ──────────────────────────────
+    # Lancaster & Grigoris (2024): factor disagreement predicts higher
+    # unexpected volatility.  DAR = |Σ(dir_i × w_i)| / Σ(|dir_i| × w_i)
+    # where w_i is the IC-weighted score contribution of dimension i.
+    # Perfect agreement → DAR=1.0 (full score preserved).
+    # Split directions → DAR→0 (score penalised proportionally).
+    # Neutral dimensions (dir=0) are agnostic, not conflicting.
+    if _ic_dir_sum is not None:
+        # IC-weighted path
+        _dar_num = abs(_ic_dir_sum)
+        _dar_den = sum(
+            abs(_dim_dirs.get(k, 0)) * _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v
+            for k, v in _ic_breakdown.items()
+        ) + abs(candle_dir) * candle_bonus
+    else:
+        # Equal-weight path
+        _dar_num = abs(sum(d * w for d, w in dim_directions))
+        _dar_den = sum(abs(d) * w for d, w in dim_directions)
+    dar = _dar_num / _dar_den if _dar_den > 0 else 1.0
+    score = int(round(score * dar))
+
+    # ── SOFT GATE: MTF penalty (applied after DAR) ──────
     mtf_gate_status = "PASS"
     mtf_conflict_msg = ""
     if gate_mode == "soft" and not mtf_alignment["aligned"] and mtf_alignment["gate_applies"]:
@@ -2237,12 +2258,12 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         mtf_gate_status = "PENALISED"
         mtf_conflict_msg = mtf_alignment["conflict"]
         log.info(
-            f"MTF GATE PENALTY {sig_5m.get('symbol','?')}: -{penalty}pts → {score}/50 | "
+            f"MTF GATE PENALTY {sig_5m.get('symbol','?')}: -{penalty}pts → {score} | "
             f"{mtf_alignment['conflict']}"
         )
 
-    # Cap at 50
-    score = min(score, 50)
+    # Cap removed — per-dimension 0-10 is the correct winsorisation
+    # (MSCI Barra standard).  Composite cap destroyed convergence info.
 
     # ── DIRECTION: Weighted majority vote of all dimensions ──────
     # Each dimension casts a vote (+1 long, -1 short) weighted by its
@@ -2313,6 +2334,8 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         "mtf_conflict":   mtf_conflict_msg,
         "mtf_daily_trend": mtf_alignment["daily_trend"],
         "mtf_weekly_trend": mtf_alignment.get("weekly_trend", "N/A"),
+        # Direction Agreement Ratio (1.0 = all dims agree, <1 = disagreement penalty)
+        "dar":            round(dar, 3),
         # Candlestick confirmation gate
         "candle_gate":    candle_gate_status,
         # Reversion metrics (for dashboard + agent consumption)

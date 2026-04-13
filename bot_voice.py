@@ -112,7 +112,7 @@ def _generate_natural(event: str, fallback: str, **ctx) -> str:
                 "Write a calm but serious spoken alert, 1 sentence."
             ),
             "options": (
-                "The bot just bought a {option_type} option on {symbol} at the {strike} strike. Score: {score}/50. "
+                "The bot just bought a {option_type} option on {symbol} at the {strike} strike. Score: {score}. "
                 "Write a friendly first-person spoken alert, 1 sentence."
             ),
         }

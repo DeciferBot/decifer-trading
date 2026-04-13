@@ -760,6 +760,21 @@ def update_positions_from_ibkr(ib: IB):
                     _has_watcher = _key in _active_watchers
                 if _has_watcher:
                     continue
+                # No watcher — check if the entry order is still live at IBKR.
+                # This prevents premature purging of watcherless orders (e.g. shorts,
+                # FX entries) whose entry is still pending in the IBKR order book.
+                _oid_check = active_trades.get(_key, {}).get("order_id")
+                if _oid_check:
+                    _order_still_live = False
+                    try:
+                        for _ot in ib.openTrades():
+                            if _ot.order.orderId == _oid_check:
+                                _order_still_live = True
+                                break
+                    except Exception:
+                        _order_still_live = True  # fail-closed: assume live
+                    if _order_still_live:
+                        continue
                 _effective_timeout = _orphan_mins
 
             with _trades_lock:

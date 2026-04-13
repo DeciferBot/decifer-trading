@@ -495,7 +495,7 @@ def agent_risk_manager(opportunity_report: str, devils_report: str,
         lines.append(f"  STOP LOSS: ${sl:.2f}")
         lines.append(f"  TAKE PROFIT: ${tp:.2f}")
         lines.append(
-            f"  REASON: Score={score}/50 | "
+            f"  REASON: Score={score} | "
             f"regime_mult={regime.get('position_size_multiplier', 1.0):.1f}x | "
             f"size_mult={size_mult:.1f}x"
         )

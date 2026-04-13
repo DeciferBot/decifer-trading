@@ -328,7 +328,7 @@ def _build_classification_prompt(
         dims  = c.get("score_breakdown", {})
         dim_str = ", ".join(f"{k}={v:.0f}" for k, v in dims.items() if v)
         candidate_lines.append(
-            f"  {sym} {dir_}  score={score}/50  dims=[{dim_str}]"
+            f"  {sym} {dir_}  score={score}  dims=[{dim_str}]"
         )
     candidates_block = "\n".join(candidate_lines) if candidate_lines else "  (no candidates)"
 
@@ -443,7 +443,7 @@ def _fallback_classify(
 
     return SignalClassification(
         symbol=sym, trade_type=trade_type, conviction=conviction,
-        reasoning=f"Fallback: score={score}/50",
+        reasoning=f"Fallback: score={score}",
         source="fallback",
     )
 

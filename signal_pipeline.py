@@ -285,12 +285,12 @@ def _apply_strategy_threshold(
         reason = " | ".join(parts)
         log.info(
             f"Scored: {pre} → {len(filtered)} after threshold filter "
-            f"(raised {used_threshold}→{effective}/50 [{reason}])"
+            f"(raised {used_threshold}→{effective} [{reason}])"
         )
         if edge_adj:
             log.warning(
                 f"EDGE GATE [{edge_state.upper()}]: system IC health low — "
-                f"score bar raised +{edge_adj} (need {effective}/50 to trade)"
+                f"score bar raised +{edge_adj} (need {effective} to trade)"
             )
         return filtered
 
@@ -298,7 +298,7 @@ def _apply_strategy_threshold(
         log.warning(f"EDGE GATE [{edge_state.upper()}]: system IC health low (adj={edge_adj})")
 
     log.info(
-        f"Scored: {len(scored)} above threshold ({used_threshold}/50) "
+        f"Scored: {len(scored)} above threshold ({used_threshold}) "
         f"[{regime_name}] edge={edge_state}"
     )
     return scored
@@ -337,7 +337,7 @@ def _apply_short_quality_gate(scored: list, regime_name: str) -> list:
     for s in scored:
         if s.get("direction") == "SHORT" and s.get("score", 0) < short_min:
             log.info(
-                f"Short quality gate: {s['symbol']} score={s['score']}/50 below "
+                f"Short quality gate: {s['symbol']} score={s['score']} below "
                 f"SHORT threshold {short_min} "
                 f"(IC_short unproven: quality={short_quality:.3f})"
             )
@@ -499,7 +499,7 @@ def run_signal_pipeline(
                 scored.extend(sc_above)
                 sc_all_new = [s for s in sc_all if s["symbol"] not in {x["symbol"] for x in all_scored}]
                 all_scored.extend(sc_all_new)
-                log.info(f"Small cap track: {len(sc_above)} new candidates above {sc_threshold}/50")
+                log.info(f"Small cap track: {len(sc_above)} new candidates above {sc_threshold}")
     except Exception as _sc_e:
         log.debug(f"Small cap track skipped: {_sc_e}")
 

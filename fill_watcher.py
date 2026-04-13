@@ -4,15 +4,19 @@
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 """
-Per-symbol background thread that monitors a PENDING buy limit order after
-placement and adjusts the price upward in small steps to chase a fill.
+Per-symbol background thread that monitors a PENDING limit order after
+placement and adjusts the price in small steps to chase a fill.
+
+Supports both BUY and SELL entries:
+  BUY  → chases price UP   (raises limit toward market ask)
+  SELL → chases price DOWN  (lowers limit toward market bid)
 
 State machine:
     PLACED → [initial_wait] → WATCHING → [interval] → ADJUSTING → WATCHING (loop)
                                     ↓ fill detected             ↓ ceiling or max_attempts
                                   FILLED                      CANCELLED
 
-Started by execute_buy() in orders.py.
+Started by execute_buy() and execute_short() in orders_core.py.
 Stopped (externally) by stop_watcher() — called from execute_sell() and
 _flatten_all_inner() before those functions cancel/close the position.
 """
@@ -59,22 +63,28 @@ def _interruptible_sleep(seconds: float, stop_event: threading.Event) -> None:
 
 class FillWatcher:
     """
-    Watches a single PENDING limit buy order and adjusts its price to chase a fill.
+    Watches a single PENDING limit order and adjusts its price to chase a fill.
+
+    Supports both BUY and SELL entries. For BUY orders the limit is chased
+    upward; for SELL orders (short entries) it is chased downward.
 
     Parameters
     ----------
-    ib          : IB connection from execute_buy (main connection, clientId=10)
-    symbol      : Ticker symbol (e.g. "AAPL")
+    ib          : IB connection (main connection, clientId=10)
+    symbol      : Ticker symbol (e.g. "AAPL", "USDJPY")
     order_id    : orderId of the entry leg (parent of the bracket)
     entry_trade : ib_async Trade object returned by ib.placeOrder() for the entry leg
     original_limit : Limit price at time of placement
     contract    : Already-qualified ib_async Contract object
-    qty         : Number of shares
+    qty         : Number of shares / units
+    side        : "BUY" or "SELL" — determines chase direction
+    instrument  : "stock", "fx", etc. — used for audit logging
     """
 
     def __init__(self, ib, symbol: str, order_id: int, entry_trade,
                  original_limit: float, contract, qty: int,
-                 watcher_params: dict = None):
+                 watcher_params: dict = None,
+                 side: str = "BUY", instrument: str = "stock"):
         self._ib             = ib
         self._symbol         = symbol
         self._order_id       = order_id
@@ -84,6 +94,10 @@ class FillWatcher:
         self._qty            = qty
         self._stop_event     = threading.Event()
         self._watcher_params = watcher_params  # per-trade overrides from execution_agent
+        self._side           = side.upper()
+        self._instrument     = instrument
+        # +1 for BUY (chase up), -1 for SELL (chase down)
+        self._chase_sign     = 1 if self._side == "BUY" else -1
 
     # ── Public entry point ─────────────────────────────────────────────────────
 
@@ -101,14 +115,17 @@ class FillWatcher:
         step_pct     = float(cfg.get("step_pct", 0.002))
         max_chase    = float(cfg.get("max_chase_pct", 0.01))
 
-        max_limit     = round(self._original_limit * (1 + max_chase), 2)
-        current_limit = self._original_limit
-        attempts      = 0
+        # BUY: ceiling above original (chase up).  SELL: floor below original (chase down).
+        price_boundary = round(self._original_limit * (1 + self._chase_sign * max_chase), 2)
+        current_limit  = self._original_limit
+        attempts       = 0
 
         self._log_audit("fill_watcher_started",
-                        original_limit=self._original_limit, max_limit=max_limit)
-        log.info(f"FillWatcher started: {self._symbol} limit=${self._original_limit:.2f} "
-                 f"ceiling=${max_limit:.2f} max_attempts={max_attempts}")
+                        original_limit=self._original_limit, price_boundary=price_boundary,
+                        side=self._side)
+        _boundary_label = "ceiling" if self._side == "BUY" else "floor"
+        log.info(f"FillWatcher started: {self._symbol} {self._side} limit=${self._original_limit:.2f} "
+                 f"{_boundary_label}=${price_boundary:.2f} max_attempts={max_attempts}")
 
         # Phase 1: initial wait — give the order a chance to fill naturally
         _interruptible_sleep(initial_wait, self._stop_event)
@@ -131,13 +148,16 @@ class FillWatcher:
                 self._remove_from_registry()
                 return
 
-            next_limit = round(current_limit * (1 + step_pct), 2)
+            next_limit = round(current_limit * (1 + self._chase_sign * step_pct), 2)
 
-            if next_limit > max_limit:
-                self._log_audit("fill_watcher_ceiling_reached",
-                                current_limit=current_limit, ceiling=max_limit,
-                                attempts=attempts)
-                log.warning(f"FillWatcher: {self._symbol} price ceiling ${max_limit:.2f} reached "
+            # BUY: next > ceiling means we've chased too high.
+            # SELL: next < floor means we've chased too low.
+            passed_boundary = (next_limit - price_boundary) * self._chase_sign > 0
+            if passed_boundary:
+                self._log_audit("fill_watcher_boundary_reached",
+                                current_limit=current_limit, price_boundary=price_boundary,
+                                attempts=attempts, side=self._side)
+                log.warning(f"FillWatcher: {self._symbol} price {_boundary_label} ${price_boundary:.2f} reached "
                             f"— cancelling unfilled order")
                 self._cancel_order("price_ceiling_reached")
                 return
@@ -212,7 +232,7 @@ class FillWatcher:
 
             # In ib_async, calling placeOrder with an existing orderId modifies the live order
             modified_order = LimitOrder(
-                "BUY", self._qty, new_limit,
+                self._side, self._qty, new_limit,
                 account=CONFIG["active_account"],
                 tif="DAY",
                 outsideRth=True,
@@ -265,12 +285,12 @@ class FillWatcher:
             log_order({
                 "order_id":   self._order_id,
                 "symbol":     self._symbol,
-                "side":       "BUY",
+                "side":       self._side,
                 "order_type": "LMT",
                 "qty":        self._qty,
                 "price":      self._original_limit,
                 "status":     "CANCELLED",
-                "instrument": "stock",
+                "instrument": self._instrument,
                 "reason":     reason,
                 "timestamp":  datetime.now(timezone.utc).isoformat(),
             })

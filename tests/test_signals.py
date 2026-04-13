@@ -136,10 +136,12 @@ def bearish_ohlcv():
 
 def _call_confluence(indicators, config=None):
     """Call compute_confluence() normalising to [0.0, 1.0] for assertions.
-    BUY/LONG  -> score/50       (high = bullish)
-    SELL/SHORT-> 1 - score/50   (low  = bearish)
+    BUY/LONG  -> score/NORM     (high = bullish)
+    SELL/SHORT-> 1 - score/NORM (low  = bearish)
     HOLD      -> 0.5            (neutral = mixed)
+    NORM=50 keeps practical scores (typically 20-50) in a usable 0-1 range.
     """
+    _NORM = 50.0
     try:
         result = signals.compute_confluence(indicators, None, None)
     except TypeError:
@@ -154,9 +156,9 @@ def _call_confluence(indicators, config=None):
     raw = result.get("score", 0)
     direction = str(result.get("direction", result.get("signal", "")))
     if "SELL" in direction or "SHORT" in direction:
-        return max(0.0, min(1.0, 1.0 - raw / 50.0))
+        return max(0.0, min(1.0, 1.0 - raw / _NORM))
     if "BUY" in direction or "LONG" in direction:
-        return max(0.0, min(1.0, raw / 50.0))
+        return max(0.0, min(1.0, raw / _NORM))
     return 0.5
 
 

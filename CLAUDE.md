@@ -9,6 +9,10 @@ Decifer is an autonomous paper-trading system that uses a 9-dimension signal eng
 
 **We are not building a live trading system yet. Every paper trade is a data point.**
 
+**The only objective of this project is building alpha. Every feature, fix, and decision must serve that objective. If it does not directly contribute to generating, measuring, or preserving alpha, it should not be built.**
+
+**No assumptions allowed. If something is unclear — about data, behavior, intent, or architecture — stop and ask Amit. Never fill gaps with guesses. Verify before building.**
+
 Three actors:
 | Actor | Role |
 |-------|------|

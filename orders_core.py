@@ -387,10 +387,12 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         # For large orders (≥500 shares AND ≥$10k notional), use TWAP slicing
         # to reduce market impact. SL/TP are placed as regular orders after all
         # slices fill — not atomic, which is the accepted trade-off at this size.
+        # FX is excluded: "qty" is currency units (e.g. 25,000 EUR), not shares,
+        # and smart_execution uses Stock() which IBKR rejects for Forex contracts.
         _notional = qty * price
         _smart_min_shares   = CONFIG.get("smart_execution_min_shares",   500)
         _smart_min_notional = CONFIG.get("smart_execution_min_notional", 10000.0)
-        if qty >= _smart_min_shares and _notional >= _smart_min_notional:
+        if instrument != "fx" and qty >= _smart_min_shares and _notional >= _smart_min_notional:
             try:
                 from smart_execution import smart_execute, ExecutionConfig
                 from ib_async import Stock as _SmartStock
@@ -1140,6 +1142,25 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
 
         _rr = (price - tp) / (sl - price) if (sl - price) > 0 else 0
         log.info(f"✅ SHORT {symbol} qty={qty} @ ${price:.2f} | SL=${sl:.2f} TP=${tp:.2f} | R:R={_rr:.1f}")
+
+        # ── Start fill watcher for this short entry ─────────────────────────
+        if CONFIG.get("fill_watcher", {}).get("enabled", True):
+            from fill_watcher import FillWatcher, _active_watchers, _watchers_lock
+            if symbol not in _active_watchers:
+                watcher = FillWatcher(
+                    ib=ib, symbol=symbol, order_id=parent_id,
+                    entry_trade=trade, original_limit=limit_price,
+                    contract=contract, qty=qty,
+                    side="SELL", instrument=instrument,
+                )
+                with _watchers_lock:
+                    _active_watchers[symbol] = watcher
+                import threading as _fw_threading
+                _fw_t = _fw_threading.Thread(
+                    target=watcher.run,
+                    name=f"fill_watcher_{symbol}", daemon=True)
+                _fw_t.start()
+
         return True
 
     except Exception as e:

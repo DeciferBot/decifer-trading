@@ -191,10 +191,10 @@ def run_portfolio_review(
             if cat:
                 news_str += f" | {cat[:60]}"
 
-        score_line = f"entry_score={entry_score}/50"
+        score_line = f"entry_score={entry_score}"
         if current_score is not None:
             delta = current_score - entry_score
-            score_line += f" → current={current_score}/50 (delta={delta:+d})"
+            score_line += f" → current={current_score} (delta={delta:+d})"
         else:
             score_line += " → current=unscored_today (scanner did not rescore this cycle)"
 

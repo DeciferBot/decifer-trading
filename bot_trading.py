@@ -92,7 +92,7 @@ def _synthesize_trade_card(symbol: str, company_name: str,
 
     prompt = (
         f"You are summarizing a live trading decision for {symbol} ({company_name}).\n\n"
-        f"Signal score: {score}/50  |  Entry: ${price:.2f}  |  "
+        f"Signal score: {score}  |  Entry: ${price:.2f}  |  "
         f"Stop: ${sl:.2f} (-{sl_pct}%)  |  Target: ${tp:.2f} (+{tp_pct}%)\n\n"
         f"OPPORTUNITY AGENT:\n{opp_text[:2500]}\n\n"
         f"DEVIL'S ADVOCATE:\n{dev_text[:1500]}\n\n"
@@ -896,7 +896,8 @@ def _print_score_table(scored: list, n: int = 10) -> None:
         top_dims  = [(k, v) for k, v in top_dims if v > 0][:3]
         dims_str  = "  ".join(f"{k}:{v}" for k, v in top_dims) if top_dims else "—"
         dir_short = {"LONG": "L", "SHORT": "S"}.get(direction, direction)
-        clog("SIGNAL", f"#{i:<2} {sym:<8} {dir_short:<5} {score:>2}/50  │ {dims_str}")
+        dar_val = s.get("dar", 1.0)
+        clog("SIGNAL", f"#{i:<2} {sym:<8} {dir_short:<5} {score:>3}  DAR={dar_val:.2f}  │ {dims_str}")
 
 
 # ── Main scan ─────────────────────────────────────────────────────────────────
@@ -1535,7 +1536,7 @@ def run_scan():
                 clog("INFO", f"No signal data for {sym} after 3 attempts — skipping")
                 continue
 
-        clog("INFO", f"Evaluating {sym} | Score={sig['score']}/50 | {reason[:80]}")
+        clog("INFO", f"Evaluating {sym} | Score={sig['score']} | {reason[:80]}")
 
         buy_signal = next((s for s in signals if s.symbol == sym), None)
         if buy_signal is None:
@@ -1565,7 +1566,7 @@ def run_scan():
         stock_success = any(r["success"] for r in dispatch_results)
         if stock_success:
             trade_side = "SHORT" if buy.get("direction") == "SHORT" else "BUY"
-            clog("TRADE", f"{trade_side} {sym} | Score={sig['score']}/50 | {reason[:80]}")
+            clog("TRADE", f"{trade_side} {sym} | Score={sig['score']} | {reason[:80]}")
             _news_entry = (dash.get("news_data") or {}).get(sym, {})
             speak_natural("entry",
                 fallback=f"I just {'shorted' if trade_side == 'SHORT' else 'went long on'} {sym}.",
@@ -1656,7 +1657,7 @@ def run_scan():
                         instrument="fx",
                     )
                 if _fx_ok:
-                    clog("TRADE", f"FX {_fxs.direction} {_fxs.symbol} | Score={_fxs_score}/50")
+                    clog("TRADE", f"FX {_fxs.direction} {_fxs.symbol} | Score={_fxs_score}")
                     dash["trades"].insert(0, {
                         "side": _fxs.direction, "symbol": _fxs.symbol,
                         "price": str(round(_fxs.price, 5)),

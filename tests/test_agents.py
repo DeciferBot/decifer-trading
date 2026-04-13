@@ -107,7 +107,7 @@ _AGENTS_CFG = {
 
 # Craft text inputs so AAPL clears the vote threshold (agents_required=3):
 # tech+1 (HIGH near AAPL), macro+1 (BULLISH), opp+1 (proposed), risk+1 (APPROVE) -> 4 >= 3
-_TECH_HIGH = "[HIGH] AAPL: $190 | Score=35/50 | BUY | ADX=35 | MFI=70"
+_TECH_HIGH = "[HIGH] AAPL: $190 | Score=35 | BUY | ADX=35 | MFI=70"
 _MACRO_BULL = "Overall verdict: BULLISH -- risk-ON environment favours tech longs."
 _OPP_AAPL = "1. SYMBOL: AAPL DIRECTION: LONG CONVICTION: HIGH ENTRY RATIONALE: Breaking out of 3-month consolidation on 2x volume KEY RISK: Broader market selloff SUGGESTED INSTRUMENT: Stock"
 _DEVILS_NO_VETO = "For AAPL: VETO RATING: NO VETO -- thesis is solid."
@@ -222,7 +222,7 @@ class TestVoteCounting:
     def test_bearish_macro_blocks_low_conviction(self):
         """BEARISH macro gives 0; no technical HIGH -> tech+0 macro+0 opp+1 risk+1 = 2 < 3."""
         macro_bear = "Overall verdict: BEARISH -- risk-OFF, recession signals mounting."
-        tech_no_high = "[MEDIUM] AAPL: $190 | Score=25/50 | BUY"  # no HIGH keyword
+        tech_no_high = "[MEDIUM] AAPL: $190 | Score=25 | BUY"  # no HIGH keyword
         with patch.dict(agents.CONFIG, _AGENTS_CFG):
             result = agents.agent_final_decision(
                 **_final_kwargs(macro=macro_bear, technical=tech_no_high, agents_required=3)
