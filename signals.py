@@ -1081,10 +1081,7 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
                     vwap_sd_pct = max(0.1, float(devs.std()))
             # Distance from VWAP as % of price — positive = above VWAP (bullish)
             vwap_dist = ((p - vwap_val) / vwap_val) * 100 if vwap_val > 0 else 0.0
-            # SD of close deviations from rolling VWAP — used for dynamic overextension threshold
-            if vwap_val > 0 and len(close) > 1:
-                devs = (close - vwap_series) / vwap_series * 100
-                vwap_sd_pct = max(0.1, float(devs.std()))
+            # vwap_sd_pct already computed in the native/computed branch above
         else:
             vwap_val = p
             vwap_dist = 0.0
@@ -1847,7 +1844,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # Eliminates correlated IC weight splitting. See score_directional().
     trend_pts = 0
     trend_dir = 0
-    if _enabled("trend"):
+    if _enabled("directional"):
         trend_pts, trend_dir = score_directional(sig_5m, sig_1d, sig_1w)
         trend_pts = int(round(trend_pts * _rmult.get("trend", 1.0)))
         score += trend_pts
@@ -2134,6 +2131,17 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         score += ss_pts
         dim_directions.append((ss_dir, ss_pts))
 
+    # ── 14. OVERNIGHT_DRIFT (0-10) — 90-day close-to-open drift statistics ──
+    # Equity risk premium accrues disproportionately overnight (persistent anomaly).
+    # Computed in compute_indicators() on the 1d timeframe and stored in sig_1d.
+    ov_pts = 0
+    ov_dir = 0
+    if _enabled("overnight_drift"):
+        ov_pts, ov_dir = score_overnight_drift(sig_1d)
+        ov_pts = int(round(min(ov_pts, 10) * _rmult.get("overnight_drift", 1.0)))
+        score += ov_pts
+        dim_directions.append((ov_dir, ov_pts))
+
     # ── BONUS: Candlestick confirmation (+3 max) ────────
     # Direction-agnostic: both bull and bear candles add bonus points.
     # Direction already captured in dim_directions.
@@ -2171,17 +2179,18 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         _N_DIMS = len(_IC_DIMS)
         _ic_breakdown = {
             "trend":         trend_pts,
-            "momentum":      momentum,
-            "squeeze":       squeeze_score,
-            "flow":          flow_score,
-            "breakout":      breakout_score,
-            "mtf":           mtf_score,
-            "news":          ns,
-            "social":        social_pts,
-            "reversion":     rev_score_capped,
-            "iv_skew":       iv_skew_pts,
-            "pead":          pead_pts,
-            "short_squeeze": ss_pts,
+            "momentum":       momentum,
+            "squeeze":        squeeze_score,
+            "flow":           flow_score,
+            "breakout":       breakout_score,
+            "mtf":            mtf_score,
+            "news":           ns,
+            "social":         social_pts,
+            "reversion":      rev_score_capped,
+            "iv_skew":        iv_skew_pts,
+            "pead":           pead_pts,
+            "short_squeeze":  ss_pts,
+            "overnight_drift": ov_pts,
         }
         _ic_sum = sum(
             _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v
@@ -2324,9 +2333,10 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             "news":          ns,
             "social":        social_pts,
             "reversion":     rev_score_capped,
-            "iv_skew":       iv_skew_pts,
-            "pead":          pead_pts,
-            "short_squeeze": ss_pts,
+            "iv_skew":        iv_skew_pts,
+            "pead":           pead_pts,
+            "short_squeeze":  ss_pts,
+            "overnight_drift": ov_pts,
         },
         # Dimensions that were zeroed by a False flag (for diagnostics / dashboard)
         "disabled_dimensions": disabled_dimensions,

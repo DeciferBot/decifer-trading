@@ -633,8 +633,8 @@ def run_weekly_review() -> str:
     closed  = [t for t in recent if t.get("exit_price") is not None]
 
     trade_details = "\n".join([
-        f"- {t['timestamp'][:10]} | {t['symbol']} {t['direction']} | "
-        f"P&L ${t['pnl']:+.2f} | Regime: {t['regime']} | "
+        f"- {t['timestamp'][:10]} | {t['symbol']} {t.get('direction', '?')} | "
+        f"P&L ${(t.get('pnl') or 0.0):+.2f} | Regime: {t.get('regime', 'N/A')} | "
         f"Reasoning: {t.get('reasoning', 'N/A')[:100]}"
         for t in closed[:30]
     ])

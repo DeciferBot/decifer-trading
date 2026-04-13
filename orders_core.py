@@ -51,6 +51,7 @@ from orders_contracts import (
     _is_option_contract,
     _validate_position_price,
     is_equities_extended_hours,
+    _cancel_ibkr_order_by_id,
 )
 
 
@@ -314,7 +315,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
 
         # ── FX minimum lot size ───────────────────────────────────────────
         if instrument == "fx":
-            fx_min_lot = CONFIG.get("fx_min_lot_size", 20000)
+            fx_min_lot = CONFIG.get("fx_min_lot_size", 25000)
             if qty < fx_min_lot:
                 log.info(f"FX {symbol}: qty {qty} below min lot {fx_min_lot} — raising to {fx_min_lot}")
                 qty = fx_min_lot
@@ -414,6 +415,69 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
                         account=account, tif="GTC", outsideRth=True
                     )
                     ib.placeOrder(_smart_contract, _sl_order)
+                    # Record position — TWAP fills are confirmed fills; skip PENDING state.
+                    _fill_price   = float(stats.average_execution_price) if stats.average_execution_price else price
+                    _open_time    = open_time or datetime.now(timezone.utc).isoformat()
+                    _entry_regime = (regime.get("session_character") or regime.get("regime", "UNKNOWN")) if isinstance(regime, dict) else "UNKNOWN"
+                    try:
+                        from ic_calculator import get_current_weights as _get_icw
+                        _icw_at_entry = _get_icw()
+                    except Exception:
+                        _icw_at_entry = None
+                    with _trades_lock:
+                        active_trades[symbol] = {
+                            "symbol":              symbol,
+                            "instrument":          instrument,
+                            "entry":               _fill_price,
+                            "current":             _fill_price,
+                            "qty":                 stats.filled_quantity,
+                            "sl":                  sl,
+                            "tp":                  tp,
+                            "score":               score,
+                            "entry_score":         score,
+                            "reasoning":           reasoning,
+                            "direction":           "LONG",
+                            "pnl":                 0.0,
+                            "status":              "ACTIVE",
+                            "order_id":            None,
+                            "open_time":           _open_time,
+                            "signal_scores":       signal_scores or {},
+                            "ic_weights_at_entry": _icw_at_entry,
+                            "agent_outputs":       agent_outputs or {},
+                            "atr":                 atr,
+                            "advice_id":           advice_id,
+                            "trade_type":          trade_type or "SCALP",
+                            "conviction":          conviction,
+                            "setup_type":          _derive_setup_type(signal_scores or {}),
+                            "entry_regime":        _entry_regime,
+                            "entry_thesis":        _build_entry_thesis(
+                                                       trade_type or "SCALP", symbol, "LONG",
+                                                       conviction, score, _entry_regime,
+                                                       market_read=market_read,
+                                                       rationale=reasoning,
+                                                   ),
+                            "pattern_id":          pattern_id,
+                            "sl_order_id":         None,
+                            "tp_order_id":         None,
+                            "high_water_mark":     _fill_price,
+                            "tranche_mode":        False,
+                            "execution_method":    "twap",
+                        }
+                    _save_positions_file()
+                    try:
+                        from learning import log_trade as _log_trade
+                        _log_trade(
+                            active_trades[symbol],
+                            agent_outputs or {},
+                            regime if isinstance(regime, dict) else {},
+                            "OPEN",
+                        )
+                    except Exception as _lt_err:
+                        log.error(f"execute_buy {symbol}: TWAP trade log failed: {_lt_err}")
+                    log.info(
+                        f"execute_buy {symbol}: TWAP position recorded — "
+                        f"{stats.filled_quantity} shares @ avg ${_fill_price:.2f}"
+                    )
                 return stats.filled_quantity > 0
             except Exception as _se:
                 log.warning(
@@ -526,6 +590,11 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
         order_status = trade.orderStatus.status
         if order_status in ('Cancelled', 'Inactive', 'ApiCancelled', 'ValidationError'):
             log.error(f"Entry order immediately rejected by IBKR for {symbol}: {order_status} — not tracking")
+            # Cancel bracket children — IBKR paper can keep them even when entry is rejected
+            _cancel_ibkr_order_by_id(ib, sl_trade.order.orderId)
+            if tp_trade is not None:
+                _cancel_ibkr_order_by_id(ib, tp_trade.order.orderId)
+            _safe_del_trade(symbol)
             return False
 
         sl_status = sl_trade.orderStatus.status
@@ -632,7 +701,7 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
             with _trades_lock:
                 active_trades[symbol] = {
                     "symbol":              symbol,
-                    "instrument":          "stock",
+                    "instrument":          instrument,
                     "entry":               price,
                     "current":             price,
                     "qty":                 qty,
@@ -892,7 +961,7 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
 
         # ── FX minimum lot size ───────────────────────────────────────────
         if instrument == "fx":
-            fx_min_lot = CONFIG.get("fx_min_lot_size", 20000)
+            fx_min_lot = CONFIG.get("fx_min_lot_size", 25000)
             if qty < fx_min_lot:
                 log.info(f"FX {symbol}: qty {qty} below min lot {fx_min_lot} — raising to {fx_min_lot}")
                 qty = fx_min_lot
@@ -958,6 +1027,10 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
         order_status = trade.orderStatus.status
         if order_status in ('Cancelled', 'Inactive', 'ApiCancelled', 'ValidationError'):
             log.error(f"Short entry immediately rejected by IBKR for {symbol}: {order_status}")
+            # Cancel bracket children — IBKR paper can keep them even when entry is rejected
+            _cancel_ibkr_order_by_id(ib, sl_trade.order.orderId)
+            if tp_trade is not None:
+                _cancel_ibkr_order_by_id(ib, tp_trade.order.orderId)
             _safe_del_trade(symbol)
             return False
 
@@ -1016,7 +1089,7 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
             with _trades_lock:
                 active_trades[symbol] = {
                     "symbol":              symbol,
-                    "instrument":          "stock",
+                    "instrument":          instrument,
                     "entry":               price,
                     "current":             price,
                     "qty":                 qty,
@@ -1092,13 +1165,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
     record_loss = _om.record_loss                                # noqa: F841
 
     # Guard: IBKR cancels MKT orders outside 4 AM–8 PM ET extended hours.
-    # Defer rather than place-and-get-cancelled. The next scan cycle will retry.
-    if not is_equities_extended_hours():
-        import zoneinfo as _zi
-        _now_et = datetime.now(_zi.ZoneInfo("America/New_York")).strftime("%H:%M ET")
-        log.warning(f"execute_sell {symbol}: market closed ({_now_et}) — deferring until extended hours open (4 AM–8 PM ET)")
-        return False
-
+    # FX trades 24/5 — skip hours check. Defer equities/options if outside window.
     with _trades_lock:
         if symbol in active_trades:
             _trade_key = symbol
@@ -1120,6 +1187,14 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
 
     _is_partial = qty_override is not None and qty_override < info["qty"]
     sell_qty = qty_override if _is_partial else info["qty"]
+
+    # Hours guard: equities/options require extended-hours window; FX is 24/5.
+    if info.get("instrument") != "fx" and not is_equities_extended_hours():
+        import zoneinfo as _zi
+        _now_et = datetime.now(_zi.ZoneInfo("America/New_York")).strftime("%H:%M ET")
+        log.warning(f"execute_sell {symbol}: market closed ({_now_et}) — deferring until extended hours open (4 AM–8 PM ET)")
+        _safe_update_trade(_trade_key, {"status": "ACTIVE"})  # revert EXITING status
+        return False
 
     # Stop any active fill watcher so it doesn't race the sell
     from fill_watcher import stop_watcher as _stop_watcher

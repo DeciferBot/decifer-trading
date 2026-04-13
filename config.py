@@ -189,10 +189,10 @@ CONFIG = {
 
     # ── DISAGREEMENT PROTOCOL ─────────────────────────────────
     # How many of 6 agents must agree before a trade is taken
-    # 4 = conservative (default), 3 = standard, 2 = aggressive
-    # NOTE: Raised from 2→3 to filter low-conviction trades (roadmap #08).
+    # 4 = conservative, 3 = standard (paper), 2 = aggressive
+    # Raised from 2→3 (Phase A, 2026-03-28) to filter low-conviction trades.
     # 2/6 was rubber-stamping; 3/6 requires real consensus. (live: 4)
-    "agents_required_to_agree": 2,
+    "agents_required_to_agree": 3,
 
     # ── MOMENTUM SENTINEL ──────────────────────────────────────
     # Background thread monitoring SPY 1m bars via BAR_CACHE (live Alpaca stream).
