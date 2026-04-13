@@ -59,16 +59,19 @@ def _is_closed_trade(t: dict) -> bool:
     """
     Return True if a trade record represents a completed (closed) trade.
 
-    Supports two shapes:
+    Supports three shapes:
     - Legacy shape: ``status`` field in ("closed", "exited", "filled")
-    - Production shape: no ``status`` field; trade is closed when both
-      ``exit_price`` (non-zero) and ``exit_time`` (non-empty) are present.
-      This is the actual shape written by bot.py / IBKR backfill.
+    - IBKR-backfill shape: no ``status``; closed when both ``exit_price``
+      (non-zero) and ``exit_time`` (non-empty) are present.
+    - Production shape (learning.py): action="CLOSE" with exit_price present;
+      uses ``timestamp`` rather than ``exit_time``.
     """
     if t.get("status") in ("closed", "exited", "filled"):
         return True
     if not t.get("status"):
         exit_price = t.get("exit_price")
+        if t.get("action") == "CLOSE" and bool(exit_price):
+            return True
         exit_time = t.get("exit_time")
         return bool(exit_time) and bool(exit_price)
     return False

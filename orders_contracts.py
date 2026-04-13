@@ -207,6 +207,13 @@ def _ibkr_item_to_key(item) -> str:
         right = "C" if right_raw in ("C", "CALL") else "P"
         strike = getattr(c, 'strike', 0)
         return f"{c.symbol}_{right}_{strike}_{expiry_str}"
+    # Forex: IBKR stores secType='CASH' with symbol=base currency (e.g. 'EUR', 'USD').
+    # Reconstruct the 6-char pair (e.g. 'EURUSD', 'USDJPY') so active_trades keys
+    # match the symbol used at order entry time.
+    if getattr(c, 'secType', '') == 'CASH':
+        currency = getattr(c, 'currency', '')
+        if currency:
+            return c.symbol + currency
     return c.symbol
 
 

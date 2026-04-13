@@ -87,7 +87,10 @@ def _check_ibkr_open_order(
                 if ibkr_key == option_key:
                     return True
             else:
-                if trade_symbol == symbol:
+                # For FX pairs (6-char like "EURUSD"), IBKR reports just the base
+                # currency as trade_symbol (e.g. "EUR" or "USD"). Match either form.
+                ibkr_base = symbol[:3] if (len(symbol) == 6 and symbol.isalpha()) else symbol
+                if trade_symbol == symbol or trade_symbol == ibkr_base:
                     return True
         return False
     except Exception as e:
