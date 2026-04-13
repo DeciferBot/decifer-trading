@@ -21,10 +21,11 @@ log = logging.getLogger("decifer.risk")
 EST = pytz.timezone("America/New_York")
 
 # ── Loss-tracking state ────────────────────────────────────────
-_consecutive_losses  = 0
-_pause_until         = None
-_daily_loss_hit      = False
-_session_start_value = None
+_consecutive_losses    = 0
+_pause_until           = None
+_daily_loss_hit        = False
+_session_start_value   = None
+_current_strategy_mode = "NORMAL"
 
 # ── Drawdown-from-peak tracking ────────────────────────────────
 _equity_high_water_mark = None
@@ -816,6 +817,18 @@ def get_consecutive_losses() -> int:
     return _consecutive_losses
 
 
+def get_strategy_mode() -> str:
+    """Return current intraday strategy mode (NORMAL/DEFENSIVE/RECOVERY)."""
+    return _current_strategy_mode
+
+
+def get_pause_until() -> Optional[str]:
+    """Return pause-until time as HH:MM string, or None if not paused."""
+    if _pause_until and datetime.now(EST) < _pause_until:
+        return _pause_until.strftime("%H:%M")
+    return None
+
+
 def set_session_opening_regime(regime_name: str) -> None:
     """
     Record the regime at session open.
@@ -853,7 +866,7 @@ def get_intraday_strategy_mode(portfolio_value: float,
     Compute the current intraday strategy mode from PnL, loss streak, and regime change.
     Modes: NORMAL / DEFENSIVE / RECOVERY.
     """
-    global _strategy_size_multiplier
+    global _strategy_size_multiplier, _current_strategy_mode
 
     _MODE_PARAMS = {
         "NORMAL":    {"score_threshold_adj": 0,  "size_multiplier": 1.0, "max_new_trades": 6},  # Paper: raised from 3
@@ -898,6 +911,7 @@ def get_intraday_strategy_mode(portfolio_value: float,
 
     params = _MODE_PARAMS[mode]
     _strategy_size_multiplier = params["size_multiplier"]
+    _current_strategy_mode = mode
     if mode != "NORMAL":
         log.info(f"Strategy mode: {mode} | PnL={daily_pnl_pct*100:+.2f}% | "
                  f"Streak={_consecutive_losses} | ScoreAdj=+{params['score_threshold_adj']} | "
