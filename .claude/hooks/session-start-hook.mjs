@@ -26,12 +26,14 @@ const CHIEF_STATE = process.env.CHIEF_STATE_PATH
   || resolve(REPO_ROOT, '..', 'chief-decifer', 'state');
 
 const PATHS = {
-  sessions:   join(CHIEF_STATE, 'sessions'),
-  research:   join(CHIEF_STATE, 'research'),
-  specs:      join(CHIEF_STATE, 'specs'),
-  backlog:    join(CHIEF_STATE, 'backlog.json'),
-  checkpoint: join(REPO_ROOT, '.claude', 'memory', 'checkpoint.json'),
-  seenHashes: join(REPO_ROOT, '.claude', 'memory', 'seen-hashes.json'),
+  sessions:      join(CHIEF_STATE, 'sessions'),
+  research:      join(CHIEF_STATE, 'research'),
+  specs:         join(CHIEF_STATE, 'specs'),
+  backlog:       join(CHIEF_STATE, 'backlog.json'),
+  checkpoint:    join(REPO_ROOT, '.claude', 'memory', 'checkpoint.json'),
+  seenHashes:    join(REPO_ROOT, '.claude', 'memory', 'seen-hashes.json'),
+  pendingUpdate: join(REPO_ROOT, '.claude', 'memory', 'pending-doc-update.json'),
+  claudeMd:      join(REPO_ROOT, 'CLAUDE.md'),
 };
 
 const CONTEXT_BUDGET = 5000; // max chars injected into session
@@ -65,6 +67,54 @@ function truncate(str, max) {
 // ─── Load seen hashes (deduplication) ─────────────────────────────────────────
 function loadSeenHashes() {
   return safeRead(PATHS.seenHashes) || { hashes: [] };
+}
+
+// ─── Check for pending doc updates from previous session ──────────────────────
+function buildPendingUpdateSection() {
+  const pending = safeRead(PATHS.pendingUpdate);
+  if (!pending) return '';
+
+  const lines = [
+    '## ⚠ PENDING: Context Docs Need Updating',
+    `The previous session changed code without updating CLAUDE.md or memory files.`,
+    `Changed: ${(pending.codeChanged || []).slice(0, 6).join(', ')}`,
+    '',
+    'Do this FIRST before anything else:',
+    '1. Update CLAUDE.md "Current State" section if phase/features changed.',
+    '2. Add new decisions to CLAUDE.md "Architectural Decisions" + docs/DECISIONS.md.',
+    '3. Update memory/project_decifer.md if phase or gates changed.',
+    '(Then delete .claude/memory/pending-doc-update.json to clear this warning.)',
+  ];
+  return lines.join('\n');
+}
+
+// ─── Check CLAUDE.md freshness vs recent git activity ─────────────────────────
+function buildFreshnessWarning() {
+  try {
+    const { statSync, readdirSync: rd } = await import('fs').catch(() => ({ statSync: null }));
+    if (!statSync) return '';
+
+    // Get CLAUDE.md last modified time
+    const claudeStat = statSync(PATHS.claudeMd);
+    const claudeAge = Date.now() - claudeStat.mtimeMs;
+    const claudeAgeDays = claudeAge / (1000 * 60 * 60 * 24);
+
+    // Get most recent session log time
+    const sessionFiles = existsSync(PATHS.sessions) ? readdirSync(PATHS.sessions).sort().reverse() : [];
+    if (!sessionFiles.length) return '';
+
+    const lastSessionFile = sessionFiles[0];
+    const lastSessionDate = lastSessionFile.slice(0, 10); // YYYY-MM-DD prefix
+    const lastSessionAge = (Date.now() - new Date(lastSessionDate).getTime()) / (1000 * 60 * 60 * 24);
+
+    // Warn if CLAUDE.md is significantly older than the last session
+    if (claudeAgeDays > lastSessionAge + 3) {
+      return `## ⚠ CLAUDE.md May Be Stale\nLast updated ${Math.round(claudeAgeDays)} days ago, but sessions have run since. Verify "Current State" is accurate before starting work.`;
+    }
+    return '';
+  } catch {
+    return '';
+  }
 }
 
 // ─── Context builders ─────────────────────────────────────────────────────────
@@ -175,7 +225,11 @@ function buildBacklogSection(backlogPath) {
 function buildContext() {
   const sections = [];
 
-  // 1. Checkpoint (highest priority — tells us exactly where we left off)
+  // 0. Pending doc update warning (highest priority — must be addressed first)
+  const pendingSection = buildPendingUpdateSection();
+  if (pendingSection) sections.push(pendingSection);
+
+  // 1. Checkpoint (tells us exactly where we left off)
   const checkpoint = safeRead(PATHS.checkpoint);
   const checkpointSection = buildCheckpointSection(checkpoint);
   if (checkpointSection) sections.push(checkpointSection);

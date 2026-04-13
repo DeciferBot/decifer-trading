@@ -64,6 +64,16 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/stop-hook.mjs"
+          }
+        ]
+      }
     ]
   },
   "statusline": {

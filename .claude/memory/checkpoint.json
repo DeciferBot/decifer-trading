@@ -1,21 +1,20 @@
 {
-  "timestamp": "2026-04-09T17:14:21.821Z",
+  "timestamp": "2026-04-12T19:29:15.132Z",
   "branch": "master",
-  "lastCommit": "995c41d fix(options): repair Alpaca chain fetch — wrong field name, missing attributes, silent failures",
+  "lastCommit": "67a359d fix(fred): correct FRED release IDs, regenerate economic calendar",
   "roadmapPhase": null,
   "lastFilesTouched": [
-    "claude/hooks/pre-tool-hook.mjs",
+    "claude/hooks/session-start-hook.mjs",
     ".claude/memory/checkpoint.json",
     ".claude/memory/session-history.jsonl",
     ".claude/settings.json",
-    ".env.example",
-    "CLAUDE.md",
-    "LIVE_TRADING_GATE.md",
-    "agents.py",
-    "alpaca_data.py",
-    "alpha_decay.py"
+    "data/audit_log.jsonl",
+    "data/signals_log.jsonl",
+    ".claude/hooks/stop-hook.mjs",
+    "data/live_ic_report.json",
+    "data/trades.json.backfill_bak"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 155
+  "sessionCount": 200
 }
