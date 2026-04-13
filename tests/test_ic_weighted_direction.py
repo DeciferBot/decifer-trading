@@ -22,12 +22,12 @@ Tests in this file:
   D. ic_module_failure_fallback    — exception in IC block → raw vote used
   E. negative_ic_dim_zeroed_end_to_end — full confluence call with mocked weights
 """
+
 from __future__ import annotations
+
 import os
 import sys
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 # ---------------------------------------------------------------------------
 # Path / import setup (mirrors other test files in this suite)
@@ -38,9 +38,16 @@ if PROJECT_ROOT not in sys.path:
 
 # Stub heavy third-party deps before any Decifer import
 for _mod in [
-    "ib_async", "ib_insync", "anthropic", "yfinance",
-    "praw", "feedparser", "tvDatafeed", "requests_html",
-    "schedule", "colorama",
+    "ib_async",
+    "ib_insync",
+    "anthropic",
+    "yfinance",
+    "praw",
+    "feedparser",
+    "tvDatafeed",
+    "requests_html",
+    "schedule",
+    "colorama",
 ]:
     sys.modules.setdefault(_mod, MagicMock())
 
@@ -61,9 +68,17 @@ _test_cfg: dict = {
     "candle_required": False,
     "regime_routing_enabled": False,
     "dimension_flags": {
-        "trend": True, "momentum": True, "squeeze": True, "flow": True,
-        "breakout": True, "pead": False, "mtf": True,
-        "news": True, "social": False, "reversion": True, "overnight_drift": False,
+        "trend": True,
+        "momentum": True,
+        "squeeze": True,
+        "flow": True,
+        "breakout": True,
+        "pead": False,
+        "mtf": True,
+        "news": True,
+        "social": False,
+        "reversion": True,
+        "overnight_drift": False,
     },
 }
 
@@ -76,7 +91,6 @@ else:
 sys.modules.pop("signals", None)  # ensure fresh import with test config
 import signals
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
@@ -86,8 +100,20 @@ N_DIMS = 12  # canonical dimension count
 
 def _equal_weights() -> dict:
     """Return the equal-weight dict (1/N_DIMS each) for all canonical dimensions."""
-    dims = ["trend", "momentum", "squeeze", "flow", "breakout", "mtf",
-            "news", "social", "reversion", "iv_skew", "pead", "short_squeeze"]
+    dims = [
+        "trend",
+        "momentum",
+        "squeeze",
+        "flow",
+        "breakout",
+        "mtf",
+        "news",
+        "social",
+        "reversion",
+        "iv_skew",
+        "pead",
+        "short_squeeze",
+    ]
     return {d: 1.0 / N_DIMS for d in dims}
 
 
@@ -98,22 +124,35 @@ def _bullish_sig_5m(**overrides) -> dict:
         "bull_aligned": True,
         "bear_aligned": False,
         # Directional / trend
-        "ema9": 105.0, "ema21": 100.0, "ema50": 95.0,
-        "adx": 35.0, "macd_accel": 0.5,
+        "ema9": 105.0,
+        "ema21": 100.0,
+        "ema50": 95.0,
+        "adx": 35.0,
+        "macd_accel": 0.5,
         # Momentum
-        "mfi": 70.0, "rsi_slope": 0.5,
+        "mfi": 70.0,
+        "rsi_slope": 0.5,
         # Squeeze
-        "squeeze_on": True, "squeeze_intensity": 0.9, "bb_position": 0.85,
+        "squeeze_on": True,
+        "squeeze_intensity": 0.9,
+        "bb_position": 0.85,
         # Flow
-        "vwap_dist": 0.4, "obv_slope": 1.0,
+        "vwap_dist": 0.4,
+        "obv_slope": 1.0,
         # Breakout
-        "donch_breakout": 1, "vol_ratio": 2.5,
-        "dc_upper_break": True, "dc_lower_break": False, "volume_ratio": 2.5,
+        "donch_breakout": 1,
+        "vol_ratio": 2.5,
+        "dc_upper_break": True,
+        "dc_lower_break": False,
+        "volume_ratio": 2.5,
         # Reversion (dormant — ADF p > 0.05)
-        "variance_ratio": 1.0, "ou_halflife": 999.0,
-        "adf_pvalue": 0.5, "zscore": 0.0,
+        "variance_ratio": 1.0,
+        "ou_halflife": 999.0,
+        "adf_pvalue": 0.5,
+        "zscore": 0.0,
         # Candles — absent by default
-        "candle_bull": 0, "candle_bear": 0,
+        "candle_bull": 0,
+        "candle_bear": 0,
     }
     base.update(overrides)
     return base
@@ -125,16 +164,29 @@ def _bearish_sig_5m(**overrides) -> dict:
         "signal": "STRONG_SELL",
         "bull_aligned": False,
         "bear_aligned": True,
-        "ema9": 95.0, "ema21": 100.0, "ema50": 105.0,
-        "adx": 35.0, "macd_accel": -0.5,
-        "mfi": 25.0, "rsi_slope": -0.5,
-        "squeeze_on": True, "squeeze_intensity": 0.9, "bb_position": 0.15,
-        "vwap_dist": -0.4, "obv_slope": -1.0,
-        "donch_breakout": -1, "vol_ratio": 2.5,
-        "dc_upper_break": False, "dc_lower_break": True, "volume_ratio": 2.5,
-        "variance_ratio": 1.0, "ou_halflife": 999.0,
-        "adf_pvalue": 0.5, "zscore": 0.0,
-        "candle_bull": 0, "candle_bear": 0,
+        "ema9": 95.0,
+        "ema21": 100.0,
+        "ema50": 105.0,
+        "adx": 35.0,
+        "macd_accel": -0.5,
+        "mfi": 25.0,
+        "rsi_slope": -0.5,
+        "squeeze_on": True,
+        "squeeze_intensity": 0.9,
+        "bb_position": 0.15,
+        "vwap_dist": -0.4,
+        "obv_slope": -1.0,
+        "donch_breakout": -1,
+        "vol_ratio": 2.5,
+        "dc_upper_break": False,
+        "dc_lower_break": True,
+        "volume_ratio": 2.5,
+        "variance_ratio": 1.0,
+        "ou_halflife": 999.0,
+        "adf_pvalue": 0.5,
+        "zscore": 0.0,
+        "candle_bull": 0,
+        "candle_bear": 0,
     }
     base.update(overrides)
     return base
@@ -144,8 +196,8 @@ def _bearish_sig_5m(**overrides) -> dict:
 # A. candle_dir is always defined (no NameError when no candle fires)
 # ---------------------------------------------------------------------------
 
-class TestCandleDirAlwaysDefined:
 
+class TestCandleDirAlwaysDefined:
     def test_no_candle_pattern_no_nameerror(self):
         """compute_confluence must not raise NameError when candle_bull=candle_bear=0."""
         sig = _bullish_sig_5m(candle_bull=0, candle_bear=0)
@@ -166,8 +218,8 @@ class TestCandleDirAlwaysDefined:
 # B. Backward compatibility: IC-weighted sum == raw sum under equal weights
 # ---------------------------------------------------------------------------
 
-class TestEqualWeightsBackwardCompat:
 
+class TestEqualWeightsBackwardCompat:
     def test_bullish_direction_preserved_with_equal_weights(self):
         """Equal IC weights must not change the direction of a strong bullish setup."""
         sig = _bullish_sig_5m()
@@ -191,8 +243,8 @@ class TestEqualWeightsBackwardCompat:
 # C. Zero IC weight excludes dimension from direction vote
 # ---------------------------------------------------------------------------
 
-class TestZeroWeightDimExcluded:
 
+class TestZeroWeightDimExcluded:
     def test_zero_weight_bullish_dim_cannot_override_bearish_consensus(self):
         """
         A strongly bullish 'trend' dimension with IC weight=0 must not pull
@@ -209,11 +261,10 @@ class TestZeroWeightDimExcluded:
         """
         sig = _bullish_sig_5m(
             # Momentum signals strongly bearish despite bullish trend
-            mfi=22.0,       # strong sell pressure (< 35)
-            rsi_slope=-0.8, # RSI falling
+            mfi=22.0,  # strong sell pressure (< 35)
+            rsi_slope=-0.8,  # RSI falling
         )
-        weights = {d: 0.0 for d in ["trend", "squeeze", "flow", "breakout",
-                                     "mtf", "news", "social", "reversion"]}
+        weights = {d: 0.0 for d in ["trend", "squeeze", "flow", "breakout", "mtf", "news", "social", "reversion"]}
         weights["momentum"] = 1.0  # only momentum counts; sum = 1.0
 
         with patch("ic_calculator.get_current_weights", return_value=weights):
@@ -240,8 +291,7 @@ class TestZeroWeightDimExcluded:
         bullish sig and verifies the direction follows momentum (SHORT), not trend.
         """
         sig = _bullish_sig_5m()  # everything bullish
-        weights = {d: 0.0 for d in ["momentum", "squeeze", "flow", "breakout",
-                                     "mtf", "news", "social", "reversion"]}
+        weights = {d: 0.0 for d in ["momentum", "squeeze", "flow", "breakout", "mtf", "news", "social", "reversion"]}
         weights["trend"] = 1.0  # only trend carries weight
 
         with patch("ic_calculator.get_current_weights", return_value=weights):
@@ -274,8 +324,8 @@ class TestZeroWeightDimExcluded:
 # D. IC module failure → raw direction vote fallback
 # ---------------------------------------------------------------------------
 
-class TestICModuleFailureFallback:
 
+class TestICModuleFailureFallback:
     def test_get_weights_exception_does_not_crash_confluence(self):
         """If get_current_weights() raises, compute_confluence must not propagate it."""
         sig = _bullish_sig_5m()
@@ -290,18 +340,14 @@ class TestICModuleFailureFallback:
         with patch("ic_calculator.get_current_weights", side_effect=ImportError("no module")):
             result = signals.compute_confluence(sig, None, None)
         # Bullish signal set should still resolve to LONG via raw vote
-        assert result["direction"] == "LONG", (
-            f"Expected LONG via raw fallback, got {result['direction']}"
-        )
+        assert result["direction"] == "LONG", f"Expected LONG via raw fallback, got {result['direction']}"
 
     def test_bearish_direction_still_correct_on_ic_failure(self):
         """Raw vote fallback: bearish setup still resolves SHORT on IC error."""
         sig = _bearish_sig_5m()
         with patch("ic_calculator.get_current_weights", side_effect=OSError("no file")):
             result = signals.compute_confluence(sig, None, None)
-        assert result["direction"] == "SHORT", (
-            f"Expected SHORT via raw fallback, got {result['direction']}"
-        )
+        assert result["direction"] == "SHORT", f"Expected SHORT via raw fallback, got {result['direction']}"
 
 
 # ---------------------------------------------------------------------------
@@ -309,11 +355,23 @@ class TestICModuleFailureFallback:
 #    (IC computation must not strip the breakdown used by the IC feedback loop)
 # ---------------------------------------------------------------------------
 
-class TestScoreBreakdownPresent:
 
-    EXPECTED_DIMS = {"trend", "momentum", "squeeze", "flow", "breakout",
-                     "mtf", "news", "social", "reversion", "iv_skew",
-                     "pead", "short_squeeze"}
+class TestScoreBreakdownPresent:
+    EXPECTED_DIMS = {
+        "trend",
+        "momentum",
+        "squeeze",
+        "flow",
+        "breakout",
+        "mtf",
+        "news",
+        "social",
+        "reversion",
+        "iv_skew",
+        "pead",
+        "short_squeeze",
+        "overnight_drift",
+    }
 
     def test_score_breakdown_keys_present_bullish(self):
         """score_breakdown must contain all canonical dimension keys."""
@@ -344,6 +402,7 @@ class TestScoreBreakdownPresent:
 # F. ic_weights.json validator — get_current_weights returns valid weights
 # ---------------------------------------------------------------------------
 
+
 class TestGetCurrentWeightsContract:
     """
     Verify that ic_calculator.get_current_weights() always returns a dict that:
@@ -354,21 +413,20 @@ class TestGetCurrentWeightsContract:
     """
 
     def test_returns_all_dims(self):
-        from ic_calculator import get_current_weights, DIMENSIONS
+        from ic_calculator import DIMENSIONS, get_current_weights
+
         w = get_current_weights()
-        assert set(w.keys()) == set(DIMENSIONS), (
-            f"Missing dimensions: {set(DIMENSIONS) - set(w.keys())}"
-        )
+        assert set(w.keys()) == set(DIMENSIONS), f"Missing dimensions: {set(DIMENSIONS) - set(w.keys())}"
 
     def test_weights_sum_to_one(self):
         from ic_calculator import get_current_weights
+
         w = get_current_weights()
-        assert abs(sum(w.values()) - 1.0) < 0.05, (
-            f"Weights sum to {sum(w.values())}, not 1.0"
-        )
+        assert abs(sum(w.values()) - 1.0) < 0.05, f"Weights sum to {sum(w.values())}, not 1.0"
 
     def test_no_negative_weights(self):
         from ic_calculator import get_current_weights
+
         w = get_current_weights()
         for dim, v in w.items():
             assert v >= 0.0, f"Negative weight for {dim!r}: {v}"

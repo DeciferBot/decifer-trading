@@ -2,24 +2,33 @@
 
 All external I/O is mocked; no live IBKR or market-data connections are made.
 """
+
 from __future__ import annotations
-import os, sys, types
+
+import os
+import sys
 from unittest.mock import MagicMock
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Stub heavy deps BEFORE importing any Decifer module
-for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance",
-             "praw", "feedparser", "tvDatafeed", "requests_html"]:
+for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance", "praw", "feedparser", "tvDatafeed", "requests_html"]:
     sys.modules.setdefault(_mod, MagicMock())
 
 # Stub config with required keys
 import config as _config_mod
-_cfg = {"log_file": "/dev/null", "trade_log": "/dev/null",
-        "order_log": "/dev/null", "anthropic_api_key": "test-key",
-        "model": "claude-sonnet-4-20250514", "max_tokens": 1000,
-        "mongo_uri": "", "db_name": "test"}
+
+_cfg = {
+    "log_file": "/dev/null",
+    "trade_log": "/dev/null",
+    "order_log": "/dev/null",
+    "anthropic_api_key": "test-key",
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1000,
+    "mongo_uri": "",
+    "db_name": "test",
+}
 if hasattr(_config_mod, "CONFIG"):
     for _k, _v in _cfg.items():
         _config_mod.CONFIG.setdefault(_k, _v)
@@ -27,11 +36,9 @@ else:
     _config_mod.CONFIG = _cfg
 
 
-import sys
 import os
-import datetime
-from typing import Any, Dict
-from unittest.mock import patch, MagicMock
+import sys
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -43,10 +50,10 @@ if PROJECT_ROOT not in sys.path:
 sys.modules.pop("risk", None)
 import risk
 
-
 # ---------------------------------------------------------------------------
 # can_trade() — allowed path
 # ---------------------------------------------------------------------------
+
 
 class TestCanTradeAllowed:
     """risk.can_trade() should return True for a clean, normal trade."""
@@ -62,7 +69,7 @@ class TestCanTradeAllowed:
         ]
         returns = [0.0, 0, True, 0.0]
         active_patches = []
-        for name, ret in zip(helper_names, returns):
+        for name, ret in zip(helper_names, returns, strict=False):
             if hasattr(risk, name):
                 p = patch.object(risk, name, return_value=ret)
                 active_patches.append(p)
@@ -80,19 +87,21 @@ class TestCanTradeAllowed:
 # can_trade() — blocked paths
 # ---------------------------------------------------------------------------
 
+
 class TestCanTradeBlocked:
     """risk.can_trade() must block trades when safety conditions are violated."""
 
-    def _run_can_trade(self, config, daily_pnl=0.0, position_count=0,
-                       market_open=True, correlation=0.0, portfolio_value=100_000.0):
+    def _run_can_trade(
+        self, config, daily_pnl=0.0, position_count=0, market_open=True, correlation=0.0, portfolio_value=100_000.0
+    ):
         """Helper: run can_trade with controlled helper return values."""
         active_patches = []
         helper_map = {
-            "_get_daily_pnl":             daily_pnl,
-            "_get_portfolio_value":       portfolio_value,
-            "_get_open_position_count":   position_count,
-            "_is_market_open":            market_open,
-            "_get_correlation":           correlation,
+            "_get_daily_pnl": daily_pnl,
+            "_get_portfolio_value": portfolio_value,
+            "_get_open_position_count": position_count,
+            "_is_market_open": market_open,
+            "_get_correlation": correlation,
         }
         for name, ret in helper_map.items():
             if hasattr(risk, name):
@@ -113,9 +122,7 @@ class TestCanTradeBlocked:
             daily_pnl=-(pv * config["max_daily_loss_pct"]),
             portfolio_value=pv,
         )
-        assert result is False, (
-            f"Expected can_trade() to block when daily loss limit is hit, got {result}"
-        )
+        assert result is False, f"Expected can_trade() to block when daily loss limit is hit, got {result}"
 
     def test_blocked_daily_loss_exceeded(self, config):
         """Block when daily loss exceeds max_daily_loss_pct of portfolio."""
@@ -125,79 +132,46 @@ class TestCanTradeBlocked:
             daily_pnl=-(pv * config["max_daily_loss_pct"]) - 500.0,
             portfolio_value=pv,
         )
-        assert result is False, (
-            f"Expected can_trade() to block when daily loss is exceeded, got {result}"
-        )
+        assert result is False, f"Expected can_trade() to block when daily loss is exceeded, got {result}"
 
-    def test_blocked_max_positions_reached(self, config):
-        """Block when number of open positions equals max_positions."""
-        result = self._run_can_trade(
-            config,
-            position_count=config["max_positions"]
-        )
-        assert result is False, (
-            f"Expected can_trade() to block when max positions reached, got {result}"
-        )
-
-    def test_blocked_max_positions_exceeded(self, config):
-        """Block when number of open positions exceeds max_positions."""
-        result = self._run_can_trade(
-            config,
-            position_count=config["max_positions"] + 1
-        )
-        assert result is False, (
-            f"Expected can_trade() to block when positions exceed max, got {result}"
-        )
+    # max_positions gate removed in 854442b — replaced by cash-floor risk controls
 
     def test_blocked_outside_market_hours(self, config):
         """Block when market is closed."""
         result = self._run_can_trade(config, market_open=False)
-        assert result is False, (
-            f"Expected can_trade() to block outside market hours, got {result}"
-        )
+        assert result is False, f"Expected can_trade() to block outside market hours, got {result}"
 
     def test_blocked_high_correlation(self, config):
         """Block when correlation to existing positions exceeds threshold."""
         high_corr = config["correlation_threshold"] + 0.05
-        result = self._run_can_trade(
-            config,
-            position_count=2,
-            correlation=high_corr
-        )
-        assert result is False, (
-            f"Expected can_trade() to block on high correlation, got {result}"
-        )
+        result = self._run_can_trade(config, position_count=2, correlation=high_corr)
+        assert result is False, f"Expected can_trade() to block on high correlation, got {result}"
 
     def test_blocked_correlation_at_threshold(self, config):
         """Block when correlation exactly equals threshold."""
-        result = self._run_can_trade(
-            config,
-            position_count=2,
-            correlation=config["correlation_threshold"]
-        )
-        assert result is False, (
-            f"Expected can_trade() to block at correlation threshold, got {result}"
-        )
+        result = self._run_can_trade(config, position_count=2, correlation=config["correlation_threshold"])
+        assert result is False, f"Expected can_trade() to block at correlation threshold, got {result}"
 
 
 # ---------------------------------------------------------------------------
 # PDT Rule — check_risk_conditions() Layer 5.5
 # ---------------------------------------------------------------------------
 
+
 class TestPDTRule:
     """PDT gate blocks new entries on live accounts under $25K when day trades are exhausted."""
 
     _REGIME = {"regime": "NEUTRAL", "position_size_multiplier": 1.0}
 
-    def _run_check(self, portfolio_value, day_trades_remaining,
-                   is_live=True, pdt_enabled=True):
+    def _run_check(self, portfolio_value, day_trades_remaining, is_live=True, pdt_enabled=True):
         """Run check_risk_conditions with PDT-relevant mocks."""
         import config as config_mod
+
         cfg = config_mod.CONFIG
 
         # Temporarily patch PDT config and account settings
-        original_pdt      = cfg.get("pdt", {}).copy()
-        original_active   = cfg.get("active_account", "")
+        original_pdt = cfg.get("pdt", {}).copy()
+        original_active = cfg.get("active_account", "")
         original_accounts = cfg.get("accounts", {}).copy()
 
         cfg["pdt"] = {"enabled": pdt_enabled, "threshold": 25_000, "max_day_trades": 3}
@@ -213,10 +187,11 @@ class TestPDTRule:
 
         # Freeze time to 10:00 EST (market hours) so the market-hours gate
         # doesn't block calls running overnight in CI or local dev.
-        import pytz
         from datetime import datetime as _real_dt
-        _market_time = _real_dt(2026, 4, 9, 10, 0, 0,
-                                tzinfo=pytz.timezone("America/New_York"))
+
+        import pytz
+
+        _market_time = _real_dt(2026, 4, 9, 10, 0, 0, tzinfo=pytz.timezone("America/New_York"))
 
         class _FakeDatetime(_real_dt):
             @classmethod
@@ -225,9 +200,9 @@ class TestPDTRule:
 
         # Reset module-level risk globals that other tests may have contaminated
         # (e.g. test_system_interactions sets _drawdown_halt=True deliberately)
-        risk._drawdown_halt  = False
+        risk._drawdown_halt = False
         risk._daily_loss_hit = False
-        risk._pause_until    = None
+        risk._pause_until = None
 
         # Build a clean CONFIG dict for risk's module-level reference.
         # risk.CONFIG may point to a stub dict (injected by test_backtester.py or
@@ -235,19 +210,22 @@ class TestPDTRule:
         # ensures check_risk_conditions() always sees the right values regardless
         # of which config stub was loaded at import time.
         _safe_config = dict(risk.CONFIG)
-        _safe_config.update({
-            "daily_loss_limit": 0.06,
-            "min_cash_reserve": 0.10,
-            "pdt": {"enabled": pdt_enabled, "threshold": 25_000, "max_day_trades": 3},
-            "active_account": "DUL123" if is_live else "DUP999",
-            "accounts": {"paper": "DUP999", "live_1": "DUL123"},
-        })
+        _safe_config.update(
+            {
+                "daily_loss_limit": 0.06,
+                "min_cash_reserve": 0.10,
+                "pdt": {"enabled": pdt_enabled, "threshold": 25_000, "max_day_trades": 3},
+                "active_account": "DUL123" if is_live else "DUP999",
+                "accounts": {"paper": "DUP999", "live_1": "DUL123"},
+            }
+        )
 
         try:
-            with patch.object(risk, "_get_day_trades_remaining",
-                              return_value=day_trades_remaining), \
-                 patch.object(risk, "datetime", _FakeDatetime), \
-                 patch.object(risk, "CONFIG", _safe_config):
+            with (
+                patch.object(risk, "_get_day_trades_remaining", return_value=day_trades_remaining),
+                patch.object(risk, "datetime", _FakeDatetime),
+                patch.object(risk, "CONFIG", _safe_config),
+            ):
                 # Pass a safe daily_pnl to avoid triggering other layers
                 return risk.check_risk_conditions(
                     portfolio_value=portfolio_value,
@@ -257,9 +235,9 @@ class TestPDTRule:
                     ib=None,
                 )
         finally:
-            cfg["pdt"]            = original_pdt
+            cfg["pdt"] = original_pdt
             cfg["active_account"] = original_active
-            cfg["accounts"]       = original_accounts
+            cfg["accounts"] = original_accounts
 
     def test_pdt_blocks_when_exhausted_under_threshold(self):
         """Live account under $25K with 0 day trades remaining — block entries."""
@@ -279,22 +257,19 @@ class TestPDTRule:
 
     def test_pdt_skipped_on_paper_account(self):
         """Paper account — PDT gate is exempt even if under threshold."""
-        ok, _reason = self._run_check(
-            portfolio_value=15_000, day_trades_remaining=0, is_live=False
-        )
+        ok, _reason = self._run_check(portfolio_value=15_000, day_trades_remaining=0, is_live=False)
         assert ok is True
 
     def test_pdt_skipped_when_disabled(self):
         """PDT gate disabled in config — never blocks."""
-        ok, _reason = self._run_check(
-            portfolio_value=15_000, day_trades_remaining=0, pdt_enabled=False
-        )
+        ok, _reason = self._run_check(portfolio_value=15_000, day_trades_remaining=0, pdt_enabled=False)
         assert ok is True
 
 
 # ---------------------------------------------------------------------------
 # position_size()
 # ---------------------------------------------------------------------------
+
 
 class TestPositionSize:
     """risk.position_size() must return sensible share counts."""
@@ -308,6 +283,7 @@ class TestPositionSize:
         """
         try:
             import macro_calendar
+
             monkeypatch.setattr(macro_calendar, "get_macro_size_multiplier", lambda: 1.0)
         except Exception:
             pass  # macro_calendar not installed — gate already inactive
@@ -355,9 +331,7 @@ class TestPositionSize:
             stop_price=149.99,  # $0.01 stop -> uncapped would be huge
         )
         max_shares = int((100_000.0 * config["max_position_size"]) / 150.0)
-        assert size <= max_shares, (
-            f"Position size {size} exceeds maximum allowed {max_shares}"
-        )
+        assert size <= max_shares, f"Position size {size} exceeds maximum allowed {max_shares}"
 
     def test_position_size_zero_stop_distance(self, config):
         """Zero stop distance must not raise ZeroDivisionError; return 0."""
@@ -397,9 +371,7 @@ class TestPositionSize:
             entry_price=100.0,
             stop_price=95.0,
         )
-        assert size_large >= size_small, (
-            f"Expected larger account ({size_large}) >= smaller account ({size_small})"
-        )
+        assert size_large >= size_small, f"Expected larger account ({size_large}) >= smaller account ({size_small})"
 
     def test_position_size_tighter_stop_gives_more_shares(self, config):
         """A tighter stop (larger distance) should give fewer shares."""
@@ -418,15 +390,17 @@ class TestPositionSize:
             stop_price=148.0,  # $2 stop
         )
         assert size_tight_stop >= size_wide_stop, (
-            f"Expected tighter stop to yield more/equal shares: "
-            f"tight={size_tight_stop}, wide={size_wide_stop}"
+            f"Expected tighter stop to yield more/equal shares: tight={size_tight_stop}, wide={size_wide_stop}"
         )
 
-    @pytest.mark.parametrize("account,entry,stop,expected_max", [
-        (100_000, 100.0, 99.0,  1000),  # $1 stop, 1% risk = 100 shares; capped at 10% = 100 shares
-        (50_000,  200.0, 195.0, 25),    # $5 stop, 0.5% risk = 50 shares; max = 25 shares at 10%
-        (200_000, 50.0,  45.0,  400),   # $5 stop, 2% risk = 400 shares; max = 400 shares at 10%
-    ])
+    @pytest.mark.parametrize(
+        "account,entry,stop,expected_max",
+        [
+            (100_000, 100.0, 99.0, 1000),  # $1 stop, 1% risk = 100 shares; capped at 10% = 100 shares
+            (50_000, 200.0, 195.0, 25),  # $5 stop, 0.5% risk = 50 shares; max = 25 shares at 10%
+            (200_000, 50.0, 45.0, 400),  # $5 stop, 2% risk = 400 shares; max = 400 shares at 10%
+        ],
+    )
     def test_position_size_parametrized(self, config, account, entry, stop, expected_max):
         """Parametrized size checks: result must always be <= expected_max."""
         size = self._call_position_size(
@@ -443,6 +417,7 @@ class TestPositionSize:
 # _is_market_open() — if exposed
 # ---------------------------------------------------------------------------
 
+
 class TestIsMarketOpen:
     """Test market hours detection if the helper is publicly accessible."""
 
@@ -456,6 +431,4 @@ class TestIsMarketOpen:
         if not hasattr(risk, "_is_market_open"):
             pytest.skip("_is_market_open not publicly accessible")
         result = risk._is_market_open()
-        assert isinstance(result, bool), (
-            f"Expected bool from _is_market_open, got {type(result)}"
-        )
+        assert isinstance(result, bool), f"Expected bool from _is_market_open, got {type(result)}"

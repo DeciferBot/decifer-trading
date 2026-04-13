@@ -22,23 +22,27 @@
 
 from __future__ import annotations
 
+import logging
+import multiprocessing as _mp
 import time as _time
-from datetime import datetime, timezone
 import zoneinfo as _zoneinfo
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import UTC, datetime
+
+import numpy as np
+import pandas as pd
 import requests as _requests
 import yfinance as yf
-import pandas as pd
-import numpy as np
-import logging
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
-import multiprocessing as _mp
+
 try:
     import talib
+
     TALIB_AVAILABLE = True
 except ImportError:
     TALIB_AVAILABLE = False
 try:
     from statsmodels.tsa.stattools import adfuller as _adfuller
+
     STATSMODELS_AVAILABLE = True
 except ImportError:
     STATSMODELS_AVAILABLE = False
@@ -47,6 +51,7 @@ from config import CONFIG
 # yfinance now requires its own curl_cffi session — do not pass requests.Session.
 
 # ── REGIME SIGNAL ROUTER ─────────────────────────────────────────────────────
+
 
 def get_market_regime_vix() -> dict:
     """
@@ -85,31 +90,55 @@ def _regime_multipliers(regime_router: str) -> dict:
     NEWS and SOCIAL are regime-neutral (fundamental/event-driven).
     """
     _all_ones = {
-        "trend":    1.0, "momentum": 1.0, "squeeze":       1.0,
-        "flow":     1.0, "breakout": 1.0, "mtf":           1.0,
-        "news":     1.0, "social":   1.0, "reversion":     1.0,
-        "iv_skew":  1.0, "pead":     1.0, "short_squeeze": 1.0,
+        "trend": 1.0,
+        "momentum": 1.0,
+        "squeeze": 1.0,
+        "flow": 1.0,
+        "breakout": 1.0,
+        "mtf": 1.0,
+        "news": 1.0,
+        "social": 1.0,
+        "reversion": 1.0,
+        "iv_skew": 1.0,
+        "pead": 1.0,
+        "short_squeeze": 1.0,
     }
 
     if not CONFIG.get("regime_routing_enabled", True):
         return _all_ones
 
-    mom_up   = CONFIG.get("regime_router_momentum_mult",  1.3)
+    mom_up = CONFIG.get("regime_router_momentum_mult", 1.3)
     rev_down = CONFIG.get("regime_router_reversion_mult", 0.7)
 
     if regime_router == "momentum":
         return {
-            "trend":    mom_up,  "momentum": mom_up,  "squeeze":       mom_up,
-            "flow":     mom_up,  "breakout": mom_up,  "mtf":           mom_up,
-            "news":     1.0,     "social":   1.0,     "reversion":     rev_down,
-            "iv_skew":  1.0,     "pead":     1.0,     "short_squeeze": 1.0,
+            "trend": mom_up,
+            "momentum": mom_up,
+            "squeeze": mom_up,
+            "flow": mom_up,
+            "breakout": mom_up,
+            "mtf": mom_up,
+            "news": 1.0,
+            "social": 1.0,
+            "reversion": rev_down,
+            "iv_skew": 1.0,
+            "pead": 1.0,
+            "short_squeeze": 1.0,
         }
     if regime_router == "mean_reversion":
         return {
-            "trend":    rev_down, "momentum": rev_down, "squeeze":       rev_down,
-            "flow":     rev_down, "breakout": rev_down, "mtf":           rev_down,
-            "news":     1.0,      "social":   1.0,      "reversion":     mom_up,
-            "iv_skew":  1.0,      "pead":     1.0,      "short_squeeze": 1.0,
+            "trend": rev_down,
+            "momentum": rev_down,
+            "squeeze": rev_down,
+            "flow": rev_down,
+            "breakout": rev_down,
+            "mtf": rev_down,
+            "news": 1.0,
+            "social": 1.0,
+            "reversion": mom_up,
+            "iv_skew": 1.0,
+            "pead": 1.0,
+            "short_squeeze": 1.0,
         }
     return _all_ones
 
@@ -120,7 +149,7 @@ def _regime_multipliers(regime_router: str) -> dict:
 # Ship disabled (hurst_regime.enabled = False); enable after historical validation.
 # See chief-decifer/state/specs/spec-regime-architecture.md Step 2.
 
-_hurst_spy_cache:    dict | None     = None
+_hurst_spy_cache: dict | None = None
 _hurst_spy_cache_ts: datetime | None = None
 
 
@@ -153,9 +182,7 @@ def compute_hurst_dfa(series) -> float:
 
         # Step 2: log-spaced window sizes from 4 to N//4
         n_max = max(4, N // 4)
-        scales = np.unique(
-            np.round(np.logspace(np.log10(4), np.log10(n_max), 12)).astype(int)
-        )
+        scales = np.unique(np.round(np.logspace(np.log10(4), np.log10(n_max), 12)).astype(int))
         scales = scales[(scales >= 4) & (scales <= n_max)]
         if len(scales) < 3:
             return 0.5
@@ -173,10 +200,10 @@ def compute_hurst_dfa(series) -> float:
             x_t = x_cache[n]
             seg_var = []
             for i in range(n_segs):
-                seg = profile[i * n: (i + 1) * n]
+                seg = profile[i * n : (i + 1) * n]
                 coef = np.polyfit(x_t, seg, 1)
                 residuals = seg - np.polyval(coef, x_t)
-                seg_var.append(np.mean(residuals ** 2))
+                seg_var.append(np.mean(residuals**2))
             if seg_var:
                 fluctuations.append(np.sqrt(np.mean(seg_var)))
                 valid_scales.append(int(n))
@@ -219,29 +246,30 @@ def get_hurst_regime_spy() -> dict:
     """
     global _hurst_spy_cache, _hurst_spy_cache_ts
 
-    cfg      = CONFIG.get("hurst_regime", {})
-    ttl      = cfg.get("cache_ttl_seconds", 3600)
+    cfg = CONFIG.get("hurst_regime", {})
+    ttl = cfg.get("cache_ttl_seconds", 3600)
     lookback = cfg.get("lookback_days", 63)
-    hi_thr   = cfg.get("trending_threshold",  0.55)
-    lo_thr   = cfg.get("reverting_threshold", 0.45)
-    now      = datetime.now(timezone.utc)
+    hi_thr = cfg.get("trending_threshold", 0.55)
+    lo_thr = cfg.get("reverting_threshold", 0.45)
+    now = datetime.now(UTC)
 
-    _et_tz        = _zoneinfo.ZoneInfo("America/New_York")
-    _cache_day    = _hurst_spy_cache_ts.astimezone(_et_tz).date() if _hurst_spy_cache_ts else None
-    _today_et     = now.astimezone(_et_tz).date()
-    if (_hurst_spy_cache is not None and _hurst_spy_cache_ts is not None
-            and (now - _hurst_spy_cache_ts).total_seconds() < ttl
-            and _cache_day == _today_et):
+    _et_tz = _zoneinfo.ZoneInfo("America/New_York")
+    _cache_day = _hurst_spy_cache_ts.astimezone(_et_tz).date() if _hurst_spy_cache_ts else None
+    _today_et = now.astimezone(_et_tz).date()
+    if (
+        _hurst_spy_cache is not None
+        and _hurst_spy_cache_ts is not None
+        and (now - _hurst_spy_cache_ts).total_seconds() < ttl
+        and _cache_day == _today_et
+    ):
         return _hurst_spy_cache
 
     try:
-        raw = _safe_download("SPY", period=f"{lookback + 10}d", interval="1d",
-                             progress=False, auto_adjust=True)
+        raw = _safe_download("SPY", period=f"{lookback + 10}d", interval="1d", progress=False, auto_adjust=True)
         raw = _flatten_columns(raw)
         if raw is None or len(raw) < 20:
             log.warning("get_hurst_regime_spy: insufficient SPY data — returning unknown")
-            return {"regime": "unknown", "hurst": None, "source": "fallback",
-                    "lookback_days": lookback}
+            return {"regime": "unknown", "hurst": None, "source": "fallback", "lookback_days": lookback}
 
         prices = raw["Close"].dropna().values[-lookback:]
         h = compute_hurst_dfa(prices)
@@ -253,17 +281,14 @@ def get_hurst_regime_spy() -> dict:
         else:
             regime = "neutral"
 
-        result = {"regime": regime, "hurst": round(h, 3),
-                  "source": "SPY_DFA", "lookback_days": len(prices)}
-        log.info(f"Hurst regime: {regime} (H={h:.3f}, lookback={len(prices)}d, "
-                 f"trending>{hi_thr}, reverting<{lo_thr})")
-        _hurst_spy_cache    = result
+        result = {"regime": regime, "hurst": round(h, 3), "source": "SPY_DFA", "lookback_days": len(prices)}
+        log.info(f"Hurst regime: {regime} (H={h:.3f}, lookback={len(prices)}d, trending>{hi_thr}, reverting<{lo_thr})")
+        _hurst_spy_cache = result
         _hurst_spy_cache_ts = now
         return result
     except Exception as e:
         log.warning(f"get_hurst_regime_spy: error ({e}) — returning unknown")
-        return {"regime": "unknown", "hurst": None, "source": "fallback",
-                "lookback_days": lookback}
+        return {"regime": "unknown", "hurst": None, "source": "fallback", "lookback_days": lookback}
 
 
 # ── 2-STATE GAUSSIAN HMM REGIME SIGNAL ──────────────────────────────────────
@@ -278,7 +303,7 @@ def get_hurst_regime_spy() -> dict:
 # Orthogonal to VIX (implied vol) and Hurst (serial correlation): the HMM
 # directly models the latent return-distribution state.
 
-_hmm_spy_cache:    dict | None     = None
+_hmm_spy_cache: dict | None = None
 _hmm_spy_cache_ts: datetime | None = None
 
 
@@ -307,16 +332,14 @@ def _hmm_fit_2state(obs: np.ndarray, n_iter: int = 60) -> tuple:
     """
     T = len(obs)
     med = np.median(obs)
-    lo  = obs[obs <= med]
-    hi  = obs[obs >  med]
-    mu    = np.array([lo.mean() if len(lo) else obs.mean() - obs.std(),
-                      hi.mean() if len(hi) else obs.mean() + obs.std()])
-    sigma = np.array([max(lo.std(), 1e-6) if len(lo) else obs.std(),
-                      max(hi.std(), 1e-6) if len(hi) else obs.std()])
+    lo = obs[obs <= med]
+    hi = obs[obs > med]
+    mu = np.array([lo.mean() if len(lo) else obs.mean() - obs.std(), hi.mean() if len(hi) else obs.mean() + obs.std()])
+    sigma = np.array([max(lo.std(), 1e-6) if len(lo) else obs.std(), max(hi.std(), 1e-6) if len(hi) else obs.std()])
     if mu[0] > mu[1]:
         mu, sigma = mu[::-1].copy(), sigma[::-1].copy()
 
-    A      = np.array([[0.97, 0.03], [0.03, 0.97]])
+    A = np.array([[0.97, 0.03], [0.03, 0.97]])
     log_pi = np.log(np.array([0.5, 0.5]))
 
     for _ in range(n_iter):
@@ -327,18 +350,18 @@ def _hmm_fit_2state(obs: np.ndarray, n_iter: int = 60) -> tuple:
         la = np.empty((T, 2))
         la[0] = log_pi + log_e[0]
         for t in range(1, T):
-            la[t, 0] = np.logaddexp(la[t-1, 0] + log_A[0, 0],
-                                    la[t-1, 1] + log_A[1, 0]) + log_e[t, 0]
-            la[t, 1] = np.logaddexp(la[t-1, 0] + log_A[0, 1],
-                                    la[t-1, 1] + log_A[1, 1]) + log_e[t, 1]
+            la[t, 0] = np.logaddexp(la[t - 1, 0] + log_A[0, 0], la[t - 1, 1] + log_A[1, 0]) + log_e[t, 0]
+            la[t, 1] = np.logaddexp(la[t - 1, 0] + log_A[0, 1], la[t - 1, 1] + log_A[1, 1]) + log_e[t, 1]
 
         # ── Backward pass (log-space) ─────────────────────────────
         lb = np.zeros((T, 2))
         for t in range(T - 2, -1, -1):
-            lb[t, 0] = np.logaddexp(log_A[0, 0] + log_e[t+1, 0] + lb[t+1, 0],
-                                    log_A[0, 1] + log_e[t+1, 1] + lb[t+1, 1])
-            lb[t, 1] = np.logaddexp(log_A[1, 0] + log_e[t+1, 0] + lb[t+1, 0],
-                                    log_A[1, 1] + log_e[t+1, 1] + lb[t+1, 1])
+            lb[t, 0] = np.logaddexp(
+                log_A[0, 0] + log_e[t + 1, 0] + lb[t + 1, 0], log_A[0, 1] + log_e[t + 1, 1] + lb[t + 1, 1]
+            )
+            lb[t, 1] = np.logaddexp(
+                log_A[1, 0] + log_e[t + 1, 0] + lb[t + 1, 0], log_A[1, 1] + log_e[t + 1, 1] + lb[t + 1, 1]
+            )
 
         # ── Gamma ────────────────────────────────────────────────
         log_gam = la + lb
@@ -347,14 +370,12 @@ def _hmm_fit_2state(obs: np.ndarray, n_iter: int = 60) -> tuple:
         gam = np.exp(log_gam)
 
         # ── Xi (pairwise posteriors) ──────────────────────────────
-        log_ll = np.logaddexp(la[T-1, 0], la[T-1, 1])
+        log_ll = np.logaddexp(la[T - 1, 0], la[T - 1, 1])
         xi = np.zeros((2, 2))
         for t in range(T - 1):
             for i in range(2):
                 for j in range(2):
-                    xi[i, j] += np.exp(
-                        la[t, i] + log_A[i, j] + log_e[t+1, j] + lb[t+1, j] - log_ll
-                    )
+                    xi[i, j] += np.exp(la[t, i] + log_A[i, j] + log_e[t + 1, j] + lb[t + 1, j] - log_ll)
 
         # ── M-step ───────────────────────────────────────────────
         row_sums = xi.sum(axis=1, keepdims=True)
@@ -363,27 +384,25 @@ def _hmm_fit_2state(obs: np.ndarray, n_iter: int = 60) -> tuple:
         A /= A.sum(axis=1, keepdims=True)
 
         gs = np.maximum(gam.sum(axis=0), 1e-300)
-        mu    = (gam * obs[:, np.newaxis]).sum(axis=0) / gs
-        sigma = np.maximum(
-            np.sqrt((gam * (obs[:, np.newaxis] - mu) ** 2).sum(axis=0) / gs), 1e-6
-        )
+        mu = (gam * obs[:, np.newaxis]).sum(axis=0) / gs
+        sigma = np.maximum(np.sqrt((gam * (obs[:, np.newaxis] - mu) ** 2).sum(axis=0) / gs), 1e-6)
         log_pi = np.log(np.maximum(gam[0], 1e-300))
         log_pi -= np.logaddexp(log_pi[0], log_pi[1])
 
     # ── Viterbi decoding ──────────────────────────────────────────
     log_A = np.log(np.maximum(A, 1e-300))
     log_e = np.column_stack([_log_gauss(obs, mu[k], sigma[k]) for k in range(2)])
-    ld    = np.empty((T, 2))
-    psi   = np.zeros((T, 2), dtype=np.int8)
+    ld = np.empty((T, 2))
+    psi = np.zeros((T, 2), dtype=np.int8)
     ld[0] = log_pi + log_e[0]
     for t in range(1, T):
-        c0 = np.array([ld[t-1, 0] + log_A[0, 0], ld[t-1, 1] + log_A[1, 0]])
-        c1 = np.array([ld[t-1, 0] + log_A[0, 1], ld[t-1, 1] + log_A[1, 1]])
+        c0 = np.array([ld[t - 1, 0] + log_A[0, 0], ld[t - 1, 1] + log_A[1, 0]])
+        c1 = np.array([ld[t - 1, 0] + log_A[0, 1], ld[t - 1, 1] + log_A[1, 1]])
         psi[t, 0], psi[t, 1] = int(c0.argmax()), int(c1.argmax())
         ld[t, 0] = c0.max() + log_e[t, 0]
         ld[t, 1] = c1.max() + log_e[t, 1]
 
-    states     = np.empty(T, dtype=np.int8)
+    states = np.empty(T, dtype=np.int8)
     states[-1] = int(ld[-1].argmax())
     for t in range(T - 2, -1, -1):
         states[t] = psi[t + 1, int(states[t + 1])]
@@ -418,27 +437,29 @@ def get_hmm_regime_spy() -> dict:
     if not cfg.get("enabled", False):
         return {"regime": "unknown", "source": "disabled"}
 
-    ttl      = cfg.get("cache_ttl_seconds", 3600)
+    ttl = cfg.get("cache_ttl_seconds", 3600)
     lookback = cfg.get("lookback_days", 252)
-    now      = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
-    _et_tz     = _zoneinfo.ZoneInfo("America/New_York")
+    _et_tz = _zoneinfo.ZoneInfo("America/New_York")
     _cache_day = _hmm_spy_cache_ts.astimezone(_et_tz).date() if _hmm_spy_cache_ts else None
-    _today_et  = now.astimezone(_et_tz).date()
-    if (_hmm_spy_cache is not None and _hmm_spy_cache_ts is not None
-            and (now - _hmm_spy_cache_ts).total_seconds() < ttl
-            and _cache_day == _today_et):
+    _today_et = now.astimezone(_et_tz).date()
+    if (
+        _hmm_spy_cache is not None
+        and _hmm_spy_cache_ts is not None
+        and (now - _hmm_spy_cache_ts).total_seconds() < ttl
+        and _cache_day == _today_et
+    ):
         return _hmm_spy_cache
 
     try:
-        raw = _safe_download("SPY", period=f"{lookback + 30}d", interval="1d",
-                             progress=False, auto_adjust=True)
+        raw = _safe_download("SPY", period=f"{lookback + 30}d", interval="1d", progress=False, auto_adjust=True)
         raw = _flatten_columns(raw)
         if raw is None or len(raw) < 40:
             log.warning("get_hmm_regime_spy: insufficient SPY data — returning unknown")
             return {"regime": "unknown", "source": "insufficient_data"}
 
-        prices      = raw["Close"].dropna().values[-lookback:]
+        prices = raw["Close"].dropna().values[-lookback:]
         if len(prices) < 40:
             return {"regime": "unknown", "source": "insufficient_data"}
         log_returns = np.diff(np.log(prices))
@@ -446,25 +467,25 @@ def get_hmm_regime_spy() -> dict:
         if len(log_returns) < 40:
             return {"regime": "unknown", "source": "insufficient_data"}
 
-        A, mu, sigma, states = _hmm_fit_2state(log_returns)
+        A, mu, _sigma, states = _hmm_fit_2state(log_returns)
 
         current_state = int(states[-1])
-        regime        = "bull" if current_state == 1 else "bear"
-        confidence    = float(A[current_state, current_state])
+        regime = "bull" if current_state == 1 else "bear"
+        confidence = float(A[current_state, current_state])
 
         result = {
-            "regime":       regime,
-            "confidence":   round(confidence, 3),
-            "mu_bull":      round(float(mu[1]), 6),
-            "mu_bear":      round(float(mu[0]), 6),
-            "source":       "HMM_SPY_2state",
+            "regime": regime,
+            "confidence": round(confidence, 3),
+            "mu_bull": round(float(mu[1]), 6),
+            "mu_bear": round(float(mu[0]), 6),
+            "source": "HMM_SPY_2state",
             "lookback_days": len(log_returns),
         }
         log.info(
             f"HMM regime: {regime} (conf={confidence:.3f}, "
             f"μ_bull={mu[1]:.5f}, μ_bear={mu[0]:.5f}, lookback={len(log_returns)}d)"
         )
-        _hmm_spy_cache    = result
+        _hmm_spy_cache = result
         _hmm_spy_cache_ts = now
         return result
 
@@ -473,8 +494,7 @@ def get_hmm_regime_spy() -> dict:
         return {"regime": "unknown", "source": "error"}
 
 
-def _resolve_regime_router(vix_regime: str, hurst_regime: str = "unknown",
-                            hmm_regime: str = "unknown") -> str:
+def _resolve_regime_router(vix_regime: str, hurst_regime: str = "unknown", hmm_regime: str = "unknown") -> str:
     """
     Combine VIX, Hurst DFA, and HMM signals into a single routing regime.
 
@@ -497,7 +517,7 @@ def _resolve_regime_router(vix_regime: str, hurst_regime: str = "unknown",
     VIX-only behaviour with no regression.
     """
     if hurst_regime == "unknown" and hmm_regime == "unknown":
-        return vix_regime   # Original VIX-only path — no regression
+        return vix_regime  # Original VIX-only path — no regression
 
     mom_votes = 0
     rev_votes = 0
@@ -519,9 +539,7 @@ def _resolve_regime_router(vix_regime: str, hurst_regime: str = "unknown",
 
     # Participating = all non-unknown signals (includes VIX always, plus
     # Hurst and HMM if they returned any result — even "neutral")
-    n_participating = (1
-                       + (0 if hurst_regime == "unknown" else 1)
-                       + (0 if hmm_regime   == "unknown" else 1))
+    n_participating = 1 + (0 if hurst_regime == "unknown" else 1) + (0 if hmm_regime == "unknown" else 1)
 
     if mom_votes * 2 > n_participating:
         return "momentum"
@@ -544,11 +562,13 @@ def _fetch_one_thread(args):
     """Worker function for ThreadPoolExecutor. Thread-safe via IBKR client."""
     symbol, news_score, social_score, regime_router, ib = args
     try:
-        return fetch_multi_timeframe(symbol, news_score=news_score, social_score=social_score,
-                                     regime_router=regime_router, ib=ib)
+        return fetch_multi_timeframe(
+            symbol, news_score=news_score, social_score=social_score, regime_router=regime_router, ib=ib
+        )
     except Exception as exc:
         log.debug(f"_fetch_one_thread failed for {symbol}: {exc}")
         return None
+
 
 log = logging.getLogger("decifer.signals")
 
@@ -559,9 +579,10 @@ logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 # These live in the worker process memory (multiprocessing). TTL is enforced by
 # checking time.time() against the cache timestamp.
 import time as _cache_time
-_PEAD_CACHE: dict = {}          # symbol → (earnings_df, timestamp)
-_SHORT_FLOAT_CACHE: dict = {}   # symbol → (short_float_pct, timestamp)
-_PEAD_CACHE_TTL = 6 * 3600      # 6 hours (earnings data changes quarterly)
+
+_PEAD_CACHE: dict = {}  # symbol → (earnings_df, timestamp)
+_SHORT_FLOAT_CACHE: dict = {}  # symbol → (short_float_pct, timestamp)
+_PEAD_CACHE_TTL = 6 * 3600  # 6 hours (earnings data changes quarterly)
 _SHORT_FLOAT_CACHE_TTL = 4 * 3600  # 4 hours (short float updates daily)
 
 
@@ -579,11 +600,12 @@ def _safe_download(symbol: str, **kwargs) -> pd.DataFrame | None:
     yfinance is NOT the primary source. Do not promote it.
     """
     interval = kwargs.get("interval", "1d")
-    period   = kwargs.get("period", "60d")
+    period = kwargs.get("period", "60d")
 
     # ── Layer 1: Alpaca REST (reliable, SIP-accurate) ──────────────────────
     try:
         from alpaca_data import fetch_bars
+
         df = fetch_bars(symbol, period=period, interval=interval)
         if df is not None and len(df) > 0:
             return df
@@ -621,7 +643,7 @@ def normalize_bars(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
     # Flatten multi-level columns (yfinance sometimes returns ('Close','AAPL'))
-    if hasattr(df.columns, 'nlevels') and df.columns.nlevels > 1:
+    if hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
         df = df.copy()
         df.columns = df.columns.get_level_values(0)
         df = df.loc[:, ~df.columns.duplicated()]
@@ -630,11 +652,16 @@ def normalize_bars(df: pd.DataFrame) -> pd.DataFrame:
     rename = {}
     for col in df.columns:
         col_lower = col.lower()
-        if col_lower == 'open'   and col != 'Open':   rename[col] = 'Open'
-        if col_lower == 'high'   and col != 'High':   rename[col] = 'High'
-        if col_lower == 'low'    and col != 'Low':    rename[col] = 'Low'
-        if col_lower == 'close'  and col != 'Close':  rename[col] = 'Close'
-        if col_lower == 'volume' and col != 'Volume': rename[col] = 'Volume'
+        if col_lower == "open" and col != "Open":
+            rename[col] = "Open"
+        if col_lower == "high" and col != "High":
+            rename[col] = "High"
+        if col_lower == "low" and col != "Low":
+            rename[col] = "Low"
+        if col_lower == "close" and col != "Close":
+            rename[col] = "Close"
+        if col_lower == "volume" and col != "Volume":
+            rename[col] = "Volume"
     if rename:
         df = df.rename(columns=rename)
 
@@ -651,11 +678,11 @@ _IBKR_REQUEST_TIMES: list = []
 _IBKR_PACING_LOCK = _mp.Manager().Lock() if False else None  # replaced by threading.Lock below
 
 import threading as _threading
+
 _IBKR_PACING_LOCK = _threading.Lock()
 
 
-def fetch_ibkr_historical(symbol: str, ib, bar_size: str = "5 mins",
-                          duration: str = "5 D") -> pd.DataFrame | None:
+def fetch_ibkr_historical(symbol: str, ib, bar_size: str = "5 mins", duration: str = "5 D") -> pd.DataFrame | None:
     """
     Fetch historical bars from IBKR reqHistoricalData.
 
@@ -669,8 +696,9 @@ def fetch_ibkr_historical(symbol: str, ib, bar_size: str = "5 mins",
         bar_size:  IBKR bar size string e.g. "5 mins", "1 min"
         duration:  IBKR duration string e.g. "5 D", "60 D"
     """
-    from config import CONFIG
     import time as _t
+
+    from config import CONFIG
 
     max_per_10min = CONFIG.get("ibkr_hist_pacing_per_10min", 55)
     window = 600  # 10 minutes in seconds
@@ -689,13 +717,14 @@ def fetch_ibkr_historical(symbol: str, ib, bar_size: str = "5 mins",
 
     try:
         from ib_async import Stock
-        contract = Stock(symbol, 'SMART', 'USD')
+
+        contract = Stock(symbol, "SMART", "USD")
         bars = ib.reqHistoricalData(
             contract,
-            endDateTime='',
+            endDateTime="",
             durationStr=duration,
             barSizeSetting=bar_size,
-            whatToShow='TRADES',
+            whatToShow="TRADES",
             useRTH=True,
             formatDate=1,
         )
@@ -703,15 +732,20 @@ def fetch_ibkr_historical(symbol: str, ib, bar_size: str = "5 mins",
             log.debug(f"fetch_ibkr_historical: no bars returned for {symbol}")
             return None
 
-        df = pd.DataFrame([{
-            'time':   bar.date,
-            'Open':   bar.open,
-            'High':   bar.high,
-            'Low':    bar.low,
-            'Close':  bar.close,
-            'Volume': bar.volume,
-        } for bar in bars])
-        df = df.set_index('time')
+        df = pd.DataFrame(
+            [
+                {
+                    "time": bar.date,
+                    "Open": bar.open,
+                    "High": bar.high,
+                    "Low": bar.low,
+                    "Close": bar.close,
+                    "Volume": bar.volume,
+                }
+                for bar in bars
+            ]
+        )
+        df = df.set_index("time")
         df.index = pd.to_datetime(df.index)
         return df
 
@@ -723,16 +757,16 @@ def fetch_ibkr_historical(symbol: str, ib, bar_size: str = "5 mins",
 def _flatten_columns(df):
     """Flatten multi-level columns from yfinance (e.g. ('Close','AAPL') → 'Close').
     Also deduplicates columns to prevent squeeze() returning DataFrames."""
-    if df is not None and hasattr(df.columns, 'nlevels') and df.columns.nlevels > 1:
+    if df is not None and hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
         df.columns = df.columns.get_level_values(0)
         # Remove duplicate columns (keep first)
         df = df.loc[:, ~df.columns.duplicated()]
     return df
 
 
-def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 0,
-                          regime_router: str = "unknown",
-                          ib=None) -> dict | None:
+def fetch_multi_timeframe(
+    symbol: str, news_score: int = 0, social_score: int = 0, regime_router: str = "unknown", ib=None
+) -> dict | None:
     """
     Fetch data across 3 timeframes for confluence scoring.
     Weekly → Daily → 5-minute
@@ -753,7 +787,8 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
         # Layer 0: IBKR streaming (real-time, lowest latency — market hours only)
         try:
             import bot_state as _bs
-            _mgr = getattr(_bs, 'ibkr_data_manager', None)
+
+            _mgr = getattr(_bs, "ibkr_data_manager", None)
             if _mgr is not None:
                 _ibkr_df = _mgr.get_bars(symbol, "5m")
                 if _ibkr_df is not None and len(_ibkr_df) >= 5:
@@ -765,6 +800,7 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
         # Layer 1: Alpaca bar cache
         try:
             from alpaca_stream import BAR_CACHE
+
             df_5m = BAR_CACHE.get_5m(symbol)
             if df_5m is not None:
                 log.debug(f"fetch_multi_timeframe: {symbol} 5m from Alpaca cache ({len(df_5m)} bars)")
@@ -775,6 +811,7 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
         if df_5m is None or len(df_5m) < 5:
             try:
                 from alpaca_data import fetch_bars
+
                 _alpaca_df = fetch_bars(symbol, period="5d", interval="5m")
                 if _alpaca_df is not None and len(_alpaca_df) >= 5:
                     df_5m = normalize_bars(_alpaca_df)
@@ -784,18 +821,18 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
 
         # Layer 3: yfinance fallback
         if df_5m is None or len(df_5m) < 5:
-            df_5m = normalize_bars(_flatten_columns(
-                _safe_download(symbol, period="5d", interval="5m", progress=False, auto_adjust=True)
-            ))
+            df_5m = normalize_bars(
+                _flatten_columns(_safe_download(symbol, period="5d", interval="5m", progress=False, auto_adjust=True))
+            )
 
         # Daily (trend confirmation) — Alpaca primary via _safe_download
-        df_1d = normalize_bars(_flatten_columns(
-            _safe_download(symbol, period="60d", interval="1d", progress=False, auto_adjust=True)
-        ))
+        df_1d = normalize_bars(
+            _flatten_columns(_safe_download(symbol, period="60d", interval="1d", progress=False, auto_adjust=True))
+        )
         # Weekly (big picture) — Alpaca primary via _safe_download
-        df_1w = normalize_bars(_flatten_columns(
-            _safe_download(symbol, period="1y", interval="1wk", progress=False, auto_adjust=True)
-        ))
+        df_1w = normalize_bars(
+            _flatten_columns(_safe_download(symbol, period="1y", interval="1wk", progress=False, auto_adjust=True))
+        )
 
         if df_5m is None or len(df_5m) < 30:
             return None
@@ -829,50 +866,56 @@ def fetch_multi_timeframe(symbol: str, news_score: int = 0, social_score: int = 
         # flows cleanly into the dimension block. Silently skipped when Alpaca
         # keys are absent, alpaca-py is not installed, or the symbol has no options.
         _iv_skew_score = 0
-        _iv_skew_dir   = 0
+        _iv_skew_dir = 0
         try:
             if CONFIG.get("dimension_flags", {}).get("iv_skew", False):
                 from iv_skew import get_iv_skew as _get_iv_skew
+
                 _skew_data = _get_iv_skew(symbol)
                 if _skew_data:
                     _iv_skew_score = _skew_data.get("iv_skew_score", 0)
-                    _iv_skew_dir   = _skew_data.get("iv_skew_dir",   0)
+                    _iv_skew_dir = _skew_data.get("iv_skew_dir", 0)
         except Exception:
             pass
 
         # Multi-timeframe confluence score (with news + social + iv_skew dimensions)
-        confluence = compute_confluence(sig_5m, sig_1d, sig_1w,
-                                        news_score=news_score, social_score=social_score,
-                                        regime_router=regime_router,
-                                        iv_skew_score=_iv_skew_score,
-                                        iv_skew_dir=_iv_skew_dir,
-                                        symbol=symbol)
+        confluence = compute_confluence(
+            sig_5m,
+            sig_1d,
+            sig_1w,
+            news_score=news_score,
+            social_score=social_score,
+            regime_router=regime_router,
+            iv_skew_score=_iv_skew_score,
+            iv_skew_dir=_iv_skew_dir,
+            symbol=symbol,
+        )
 
         return {
-            "symbol":       symbol,
-            "price":        sig_5m["price"],
-            "signal":       confluence["signal"],
-            "direction":    confluence["direction"],
-            "score":        confluence["score"],
-            "timeframes":   {
-                "5m":  sig_5m,
-                "1d":  sig_1d,
-                "1w":  sig_1w,
+            "symbol": symbol,
+            "price": sig_5m["price"],
+            "signal": confluence["signal"],
+            "direction": confluence["direction"],
+            "score": confluence["score"],
+            "timeframes": {
+                "5m": sig_5m,
+                "1d": sig_1d,
+                "1w": sig_1w,
             },
-            "atr":          sig_5m["atr"],
-            "atr_daily":    sig_1d["atr"] if sig_1d else 0.0,
-            "vol_ratio":    sig_5m["vol_ratio"],
+            "atr": sig_5m["atr"],
+            "atr_daily": sig_1d["atr"] if sig_1d else 0.0,
+            "vol_ratio": sig_5m["vol_ratio"],
             # MTF alignment gate results (for dashboard + logging)
-            "mtf_gate":       confluence.get("mtf_gate", "PASS"),
-            "mtf_conflict":   confluence.get("mtf_conflict", ""),
+            "mtf_gate": confluence.get("mtf_gate", "PASS"),
+            "mtf_conflict": confluence.get("mtf_conflict", ""),
             "mtf_daily_trend": confluence.get("mtf_daily_trend", "N/A"),
             # Per-dimension score breakdown (for IC calculator + feedback loop)
-            "score_breakdown":     confluence.get("score_breakdown", {}),
+            "score_breakdown": confluence.get("score_breakdown", {}),
             "disabled_dimensions": confluence.get("disabled_dimensions", []),
             # Candlestick gate result — must be propagated so signal_pipeline doesn't default to UNKNOWN
-            "candle_gate":         confluence.get("candle_gate", "PASS"),
+            "candle_gate": confluence.get("candle_gate", "PASS"),
             # Regime router state (for logging / dashboard)
-            "regime_router":  regime_router,
+            "regime_router": regime_router,
         }
 
     except Exception as e:
@@ -893,49 +936,50 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
       6. MACD:      Histogram acceleration (timing, not trend)
     """
     try:
+
         def _col(df, name, fallback=None):
             """Extract a column as a 1-D numeric Series, handling multi-index/dupes."""
             if name not in df.columns:
                 return fallback
             col = df[name]
-            if hasattr(col, 'columns'):  # Got DataFrame instead of Series (duplicate cols)
+            if hasattr(col, "columns"):  # Got DataFrame instead of Series (duplicate cols)
                 col = col.iloc[:, 0]
-            if hasattr(col, 'squeeze'):
+            if hasattr(col, "squeeze"):
                 col = col.squeeze()
             # Ensure we have a proper 1-D numeric Series
             if isinstance(col, pd.DataFrame):
                 col = col.iloc[:, 0]
-            return pd.to_numeric(col, errors='coerce')
+            return pd.to_numeric(col, errors="coerce")
 
-        close  = _col(df, "Close")
+        close = _col(df, "Close")
         volume = _col(df, "Volume", fallback=close * 0)
-        high   = _col(df, "High",   fallback=close)
-        low    = _col(df, "Low",    fallback=close)
-        open_  = _col(df, "Open",   fallback=close)
+        high = _col(df, "High", fallback=close)
+        low = _col(df, "Low", fallback=close)
+        open_ = _col(df, "Open", fallback=close)
 
         # Ensure all series are numeric and same length
         min_len = min(len(close), len(volume), len(high), len(low), len(open_))
         if min_len < 30:
             return None
-        close  = close.iloc[-min_len:]
+        close = close.iloc[-min_len:]
         volume = volume.iloc[-min_len:]
-        high   = high.iloc[-min_len:]
-        low    = low.iloc[-min_len:]
-        open_  = open_.iloc[-min_len:]
+        high = high.iloc[-min_len:]
+        low = low.iloc[-min_len:]
+        open_ = open_.iloc[-min_len:]
 
         if len(close) < 30:
             return None
 
         # ── 1. TREND — EMA alignment ────────────────────────
-        ema_fast  = close.ewm(span=CONFIG["ema_fast"],  adjust=False).mean()
-        ema_slow  = close.ewm(span=CONFIG["ema_slow"],  adjust=False).mean()
+        ema_fast = close.ewm(span=CONFIG["ema_fast"], adjust=False).mean()
+        ema_slow = close.ewm(span=CONFIG["ema_slow"], adjust=False).mean()
         ema_trend = close.ewm(span=CONFIG["ema_trend"], adjust=False).mean()
 
         # Full trend alignment
         ef = float(ema_fast.iloc[-1])
         es = float(ema_slow.iloc[-1])
         et = float(ema_trend.iloc[-1])
-        p  = float(close.iloc[-1])
+        p = float(close.iloc[-1])
 
         bull_aligned = ef > es > et
         bear_aligned = ef < es < et
@@ -943,25 +987,23 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
         # ── 2. MOMENTUM — MFI + RSI slope ───────────────────
         # RSI (kept for slope calculation, but MFI is the primary momentum gauge)
         delta = close.diff()
-        gain  = delta.clip(lower=0).rolling(CONFIG["rsi_period"]).mean()
-        loss  = (-delta.clip(upper=0)).rolling(CONFIG["rsi_period"]).mean()
-        rsi   = 100 - (100 / (1 + gain / loss.replace(0, 1e-9)))
-        rsi_val   = float(rsi.iloc[-1])
+        gain = delta.clip(lower=0).rolling(CONFIG["rsi_period"]).mean()
+        loss = (-delta.clip(upper=0)).rolling(CONFIG["rsi_period"]).mean()
+        rsi = 100 - (100 / (1 + gain / loss.replace(0, 1e-9)))
+        rsi_val = float(rsi.iloc[-1])
         rsi_slope = float(rsi.diff(3).iloc[-1])
 
         # ── 3. MACD — timing signal ─────────────────────────
-        macd      = close.ewm(span=CONFIG["macd_fast"], adjust=False).mean() - \
-                    close.ewm(span=CONFIG["macd_slow"], adjust=False).mean()
-        macd_sig  = macd.ewm(span=CONFIG["macd_signal"], adjust=False).mean()
+        macd = (
+            close.ewm(span=CONFIG["macd_fast"], adjust=False).mean()
+            - close.ewm(span=CONFIG["macd_slow"], adjust=False).mean()
+        )
+        macd_sig = macd.ewm(span=CONFIG["macd_signal"], adjust=False).mean()
         macd_hist = macd - macd_sig
         macd_accel = float(macd_hist.diff(2).iloc[-1])
 
         # ── 4. ATR — volatility baseline ────────────────────
-        tr = pd.concat([
-            high - low,
-            (high - close.shift()).abs(),
-            (low  - close.shift()).abs()
-        ], axis=1).max(axis=1)
+        tr = pd.concat([high - low, (high - close.shift()).abs(), (low - close.shift()).abs()], axis=1).max(axis=1)
         atr = float(tr.rolling(CONFIG["atr_period"]).mean().iloc[-1])
 
         # ── 5. VOLUME — ratio to 20-day average ────────────
@@ -969,14 +1011,26 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
         vol_ratio = float(volume.iloc[-1] / avg_vol.iloc[-1]) if avg_vol.iloc[-1] > 0 else 0
 
         # ── DEFAULTS for TA-Lib indicators ──────────────────
-        adx_val = 0.0; trend_strength = "WEAK"
-        mfi_val = 50.0; obv_slope = 0.0
-        bb_upper = p; bb_lower = p; bb_mid = p; bb_width = 0.0; bb_pos = 0.5
-        kc_upper = p; kc_lower = p; squeeze_on = False; squeeze_intensity = 0.0
-        vwap_val = p; vwap_dist = 0.0
-        donch_high = p; donch_low = p; donch_mid = p
+        adx_val = 0.0
+        trend_strength = "WEAK"
+        mfi_val = 50.0
+        obv_slope = 0.0
+        bb_upper = p
+        bb_lower = p
+        bb_mid = p
+        bb_width = 0.0
+        bb_pos = 0.5
+        kc_upper = p
+        kc_lower = p
+        squeeze_on = False
+        squeeze_intensity = 0.0
+        vwap_val = p
+        vwap_dist = 0.0
+        donch_high = p
+        donch_low = p
         donch_breakout = 0  # +1 = high breakout, -1 = low breakout, 0 = inside
-        candle_bull = 0; candle_bear = 0
+        candle_bull = 0
+        candle_bear = 0
 
         # ── TA-LIB INDICATORS (the ones that matter) ───────
         if TALIB_AVAILABLE and len(close) >= 30:
@@ -1008,9 +1062,9 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
                 if not (np.isnan(upper[-1]) or np.isnan(lower[-1])):
                     bb_upper = float(upper[-1])
                     bb_lower = float(lower[-1])
-                    bb_mid   = float(mid[-1])
+                    bb_mid = float(mid[-1])
                     bb_width = (bb_upper - bb_lower) / bb_mid if bb_mid > 0 else 0
-                    bb_pos   = (c[-1] - bb_lower) / (bb_upper - bb_lower) if (bb_upper - bb_lower) > 0 else 0.5
+                    bb_pos = (c[-1] - bb_lower) / (bb_upper - bb_lower) if (bb_upper - bb_lower) > 0 else 0.5
 
                 # Candlestick patterns — only the high-reliability ones
                 patterns_bull = [
@@ -1059,7 +1113,7 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
         vwap_sd_pct = 1.0  # default: 1% if we can't compute
         if tf == "5m" and volume.sum() > 0:
             native_vwap = df.get("vwap") if hasattr(df, "get") else None
-            if native_vwap is not None and hasattr(native_vwap, 'iloc'):
+            if native_vwap is not None and hasattr(native_vwap, "iloc"):
                 last_native = native_vwap.iloc[-1]
                 if pd.notna(last_native) and float(last_native) > 0:
                     vwap_val = float(last_native)
@@ -1090,16 +1144,16 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
         donch_period = CONFIG.get("donchian_period", 20)
         if len(high) >= donch_period:
             donch_high = float(high.rolling(donch_period).max().iloc[-1])
-            donch_low  = float(low.rolling(donch_period).min().iloc[-1])
-            donch_mid  = (donch_high + donch_low) / 2
+            donch_low = float(low.rolling(donch_period).min().iloc[-1])
+            (donch_high + donch_low) / 2
 
             # Breakout detection: price closing above/below channel
             if p >= donch_high:
-                donch_breakout = 1   # Bullish breakout
+                donch_breakout = 1  # Bullish breakout
             elif p <= donch_low:
                 donch_breakout = -1  # Bearish breakout
             else:
-                donch_breakout = 0   # Inside channel
+                donch_breakout = 0  # Inside channel
 
         # ── MEAN-REVERSION METRICS ─────────────────────────
         # Three sub-metrics for the REVERSION dimension:
@@ -1110,9 +1164,9 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
         # These use daily data when available (more stable), falling back to
         # whatever timeframe we're computing on. We need 40+ bars minimum.
 
-        vr_val = 1.0         # Default: random walk (no edge)
-        ou_halflife = 999.0   # Default: no reversion detected
-        zscore_val = 0.0      # Default: at the mean
+        vr_val = 1.0  # Default: random walk (no edge)
+        ou_halflife = 999.0  # Default: no reversion detected
+        zscore_val = 0.0  # Default: at the mean
 
         # Use the close series we already have (could be 5m, 1d, or 1w)
         _rev_series = close.dropna()
@@ -1182,7 +1236,7 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
         adf_pvalue = 1.0  # Default: fail to reject (not mean-reverting)
         if STATSMODELS_AVAILABLE and _rev_len >= 20:
             try:
-                _adf_result = _adfuller(_rev_series.values, maxlag=5, autolag='AIC')
+                _adf_result = _adfuller(_rev_series.values, maxlag=5, autolag="AIC")
                 adf_pvalue = float(_adf_result[1])
             except Exception:
                 adf_pvalue = 1.0
@@ -1214,13 +1268,25 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
         # ── SIGNAL CLASSIFICATION ────────────────────────────
         h_val = float(macd_hist.iloc[-1])
 
-        if bull_aligned and mfi_val > 55 and h_val > 0 and macd_accel > 0 and vol_ratio >= CONFIG["volume_surge_multiplier"]:
+        if (
+            bull_aligned
+            and mfi_val > 55
+            and h_val > 0
+            and macd_accel > 0
+            and vol_ratio >= CONFIG["volume_surge_multiplier"]
+        ):
             signal = "STRONG_BUY"
         elif bull_aligned and mfi_val > 50 and h_val > 0:
             signal = "BUY"
         elif bull_aligned and mfi_val > 45:
             signal = "WEAK_BUY"
-        elif bear_aligned and mfi_val < 45 and h_val < 0 and macd_accel < 0 and vol_ratio >= CONFIG["volume_surge_multiplier"]:
+        elif (
+            bear_aligned
+            and mfi_val < 45
+            and h_val < 0
+            and macd_accel < 0
+            and vol_ratio >= CONFIG["volume_surge_multiplier"]
+        ):
             signal = "STRONG_SELL"
         elif bear_aligned and mfi_val < 50 and h_val < 0:
             signal = "SELL"
@@ -1235,55 +1301,55 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
             signal = "HOLD"
 
         return {
-            "symbol":           symbol,
-            "timeframe":        tf,
-            "price":            round(p, 4),
+            "symbol": symbol,
+            "timeframe": tf,
+            "price": round(p, 4),
             # Trend
-            "ema_fast":         round(ef, 4),
-            "ema_slow":         round(es, 4),
-            "ema_trend":        round(et, 4),
-            "bull_aligned":     bull_aligned,
-            "bear_aligned":     bear_aligned,
-            "adx":              round(adx_val, 1),
-            "trend_strength":   trend_strength,
+            "ema_fast": round(ef, 4),
+            "ema_slow": round(es, 4),
+            "ema_trend": round(et, 4),
+            "bull_aligned": bull_aligned,
+            "bear_aligned": bear_aligned,
+            "adx": round(adx_val, 1),
+            "trend_strength": trend_strength,
             # Momentum
-            "mfi":              round(mfi_val, 1),
-            "rsi":              round(rsi_val, 2),
-            "rsi_slope":        round(rsi_slope, 2),
+            "mfi": round(mfi_val, 1),
+            "rsi": round(rsi_val, 2),
+            "rsi_slope": round(rsi_slope, 2),
             # Timing
-            "macd_hist":        round(h_val, 6),
-            "macd_accel":       round(macd_accel, 6),
+            "macd_hist": round(h_val, 6),
+            "macd_accel": round(macd_accel, 6),
             # Volatility
-            "atr":              round(atr, 4),
-            "vol_ratio":        round(vol_ratio, 2),
+            "atr": round(atr, 4),
+            "vol_ratio": round(vol_ratio, 2),
             # Squeeze
-            "bb_position":      round(bb_pos, 2),
-            "bb_width":         round(bb_width, 4),
-            "squeeze_on":       squeeze_on,
+            "bb_position": round(bb_pos, 2),
+            "bb_width": round(bb_width, 4),
+            "squeeze_on": squeeze_on,
             "squeeze_intensity": round(squeeze_intensity, 2),
             # Flow
-            "vwap":             round(vwap_val, 4),
-            "vwap_dist":        round(vwap_dist, 2),
-            "vwap_sd_pct":      round(vwap_sd_pct, 3),
-            "obv_slope":        round(obv_slope, 0),
+            "vwap": round(vwap_val, 4),
+            "vwap_dist": round(vwap_dist, 2),
+            "vwap_sd_pct": round(vwap_sd_pct, 3),
+            "obv_slope": round(obv_slope, 0),
             # Breakout
-            "donch_high":       round(donch_high, 4),
-            "donch_low":        round(donch_low, 4),
-            "donch_breakout":   donch_breakout,
+            "donch_high": round(donch_high, 4),
+            "donch_low": round(donch_low, 4),
+            "donch_breakout": donch_breakout,
             # Candlestick (high-reliability only)
-            "candle_bull":      candle_bull,
-            "candle_bear":      candle_bear,
+            "candle_bull": candle_bull,
+            "candle_bear": candle_bear,
             # Mean Reversion
-            "variance_ratio":   round(vr_val, 3),
-            "ou_halflife":      round(ou_halflife, 1),
-            "zscore":           round(zscore_val, 2),
-            "adf_pvalue":       round(adf_pvalue, 4),
+            "variance_ratio": round(vr_val, 3),
+            "ou_halflife": round(ou_halflife, 1),
+            "zscore": round(zscore_val, 2),
+            "adf_pvalue": round(adf_pvalue, 4),
             # Overnight drift (populated for 1d timeframe only; 0 for others)
-            "overnight_mean":   round(overnight_mean_return, 6),
+            "overnight_mean": round(overnight_mean_return, 6),
             "overnight_sharpe": round(overnight_sharpe, 3),
             "overnight_n_days": overnight_n_days,
             # Signal
-            "signal":           signal,
+            "signal": signal,
         }
 
     except Exception as e:
@@ -1411,6 +1477,7 @@ def timeframe_alignment_check(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | 
 # Each returns (score: int 0-10, direction: int +1/-1/0)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def score_directional(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None) -> tuple:
     """
     DIRECTIONAL — replaces the old separate TREND + MTF dimensions.
@@ -1440,7 +1507,7 @@ def score_directional(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None) ->
     else:
         base = 0
 
-    a_pts = min(5, int(round(base * adx_mult)))
+    a_pts = min(5, round(base * adx_mult))
 
     # ── Component B: MACD acceleration ────────────────────────────
     macd_accel = sig_5m.get("macd_accel", 0)
@@ -1455,11 +1522,13 @@ def score_directional(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None) ->
 
     # ── Component C: Timeframe agreement vote ─────────────────────
     tfs = [sig_5m]
-    if sig_1d: tfs.append(sig_1d)
-    if sig_1w: tfs.append(sig_1w)
+    if sig_1d:
+        tfs.append(sig_1d)
+    if sig_1w:
+        tfs.append(sig_1w)
     total_tfs = len(tfs)
 
-    buys  = sum(1 for s in tfs if "BUY"  in s.get("signal", ""))
+    buys = sum(1 for s in tfs if "BUY" in s.get("signal", ""))
     sells = sum(1 for s in tfs if "SELL" in s.get("signal", ""))
     agree = max(buys, sells)
     agree_ratio = agree / total_tfs if total_tfs > 0 else 0
@@ -1543,7 +1612,7 @@ def score_pead(symbol: str, sig_1d: dict | None, vol_ratio: float = 0.0) -> tupl
 
         # Recency decay (linear: 1.0 at day 0 → 0.0 at day 60)
         earnings_date = latest.name
-        if hasattr(earnings_date, 'tz_localize') and earnings_date.tzinfo is None:
+        if hasattr(earnings_date, "tz_localize") and earnings_date.tzinfo is None:
             earnings_date = earnings_date.tz_localize("UTC")
         days_since = (today - earnings_date).days
         if days_since > 60 or days_since < 0:
@@ -1551,11 +1620,16 @@ def score_pead(symbol: str, sig_1d: dict | None, vol_ratio: float = 0.0) -> tupl
         decay = max(0.0, 1.0 - (days_since / 60.0))
 
         # Surprise tier (0-6 pts)
-        if surprise_pct >= 20:   surprise_pts = 6
-        elif surprise_pct >= 10: surprise_pts = 5
-        elif surprise_pct >= 7:  surprise_pts = 4
-        elif surprise_pct >= 5:  surprise_pts = 3
-        else:                    surprise_pts = 2  # >= 3%
+        if surprise_pct >= 20:
+            surprise_pts = 6
+        elif surprise_pct >= 10:
+            surprise_pts = 5
+        elif surprise_pct >= 7:
+            surprise_pts = 4
+        elif surprise_pct >= 5:
+            surprise_pts = 3
+        else:
+            surprise_pts = 2  # >= 3%
 
         # Price momentum confirmation (0-2 pts) — is drift actually happening?
         mom_pts = 0
@@ -1570,7 +1644,7 @@ def score_pead(symbol: str, sig_1d: dict | None, vol_ratio: float = 0.0) -> tupl
         vol_pts = 2 if vol_ratio >= 2.0 else (1 if vol_ratio >= 1.5 else 0)
 
         raw = (surprise_pts * decay) + mom_pts + vol_pts
-        score = int(round(min(10, raw)))
+        score = round(min(10, raw))
         direction = +1 if score > 0 else 0
 
         return (score, direction)
@@ -1579,7 +1653,7 @@ def score_pead(symbol: str, sig_1d: dict | None, vol_ratio: float = 0.0) -> tupl
         return (0, 0)
 
 
-def _parse_finviz_short_float(html: str) -> "float | None":
+def _parse_finviz_short_float(html: str) -> float | None:
     """
     Extract short float % from Finviz HTML.
 
@@ -1595,7 +1669,7 @@ def _parse_finviz_short_float(html: str) -> "float | None":
     if idx == -1:
         return None
 
-    window = html[idx:idx + 400]
+    window = html[idx : idx + 400]
 
     # ── Method 1: value is inside <b>…%</b> near the label ────
     m = _re.search(r"<b>(\d{1,3}(?:\.\d{1,2})?)\s*%\s*</b>", window)
@@ -1616,14 +1690,13 @@ def _parse_finviz_short_float(html: str) -> "float | None":
     return None
 
 
-def _fetch_short_float(symbol: str) -> "float | None":
+def _fetch_short_float(symbol: str) -> float | None:
     """
     Fetch short float % for a symbol.
     Source: Finviz quote page (DOM + regex backup for resilience).
     Cached per symbol with 4-hour TTL.
     Returns float (e.g. 15.2 for 15.2%) or None on failure.
     """
-    import requests as _requests
 
     now = _cache_time.time()
     if symbol in _SHORT_FLOAT_CACHE:
@@ -1664,12 +1737,16 @@ def score_short_squeeze(symbol: str, sig_5m: dict) -> tuple:
         return (0, 0)
 
     # Component A: Short float tier (0-4 pts)
-    if short_float >= 30:   sf_pts = 4
-    elif short_float >= 20: sf_pts = 3
-    elif short_float >= 15: sf_pts = 2
-    elif short_float >= 10: sf_pts = 1
+    if short_float >= 30:
+        sf_pts = 4
+    elif short_float >= 20:
+        sf_pts = 3
+    elif short_float >= 15:
+        sf_pts = 2
+    elif short_float >= 10:
+        sf_pts = 1
     else:
-        return (0, 0)   # Below 10% — squeeze unlikely
+        return (0, 0)  # Below 10% — squeeze unlikely
 
     # Component B: Volume surge (0-3 pts)
     vol_ratio = sig_5m.get("vol_ratio", 0)
@@ -1704,9 +1781,9 @@ def score_overnight_drift(sig_1d: dict | None) -> tuple:
     if sig_1d is None:
         return (0, 0)
 
-    mean_ov   = sig_1d.get("overnight_mean", 0.0)
-    sharpe    = sig_1d.get("overnight_sharpe", 0.0)
-    n_days    = sig_1d.get("overnight_n_days", 0)
+    mean_ov = sig_1d.get("overnight_mean", 0.0)
+    sharpe = sig_1d.get("overnight_sharpe", 0.0)
+    n_days = sig_1d.get("overnight_n_days", 0)
 
     if n_days < 20:
         return (0, 0)
@@ -1714,21 +1791,25 @@ def score_overnight_drift(sig_1d: dict | None) -> tuple:
     abs_mean = abs(mean_ov)
 
     # Mean return tier (0-5 pts)
-    if abs_mean >= 0.0015:  mean_pts = 5
-    elif abs_mean >= 0.0010: mean_pts = 4
-    elif abs_mean >= 0.0006: mean_pts = 3
-    elif abs_mean >= 0.0003: mean_pts = 2
-    elif abs_mean >= 0.0001: mean_pts = 1
+    if abs_mean >= 0.0015:
+        mean_pts = 5
+    elif abs_mean >= 0.0010:
+        mean_pts = 4
+    elif abs_mean >= 0.0006:
+        mean_pts = 3
+    elif abs_mean >= 0.0003:
+        mean_pts = 2
+    elif abs_mean >= 0.0001:
+        mean_pts = 1
     else:
-        return (0, 0)   # No discernible edge
+        return (0, 0)  # No discernible edge
 
     # Sharpe consistency multiplier
     abs_sharpe = abs(sharpe)
-    sharpe_mult = 1.0 if abs_sharpe >= 1.5 else (0.8 if abs_sharpe >= 1.0 else
-                  (0.5 if abs_sharpe >= 0.5 else 0.2))
+    sharpe_mult = 1.0 if abs_sharpe >= 1.5 else (0.8 if abs_sharpe >= 1.0 else (0.5 if abs_sharpe >= 0.5 else 0.2))
 
     raw = mean_pts * sharpe_mult * 2
-    score = int(round(min(10, raw)))
+    score = round(min(10, raw))
     direction = +1 if mean_ov > 0 else (-1 if mean_ov < -0.0001 else 0)
     return (score, direction)
 
@@ -1736,11 +1817,17 @@ def score_overnight_drift(sig_1d: dict | None) -> tuple:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
-                       news_score: int = 0, social_score: int = 0,
-                       regime_router: str = "unknown",
-                       iv_skew_score: int = 0, iv_skew_dir: int = 0,
-                       symbol: str | None = None) -> dict:
+def compute_confluence(
+    sig_5m: dict,
+    sig_1d: dict | None,
+    sig_1w: dict | None,
+    news_score: int = 0,
+    social_score: int = 0,
+    regime_router: str = "unknown",
+    iv_skew_score: int = 0,
+    iv_skew_dir: int = 0,
+    symbol: str | None = None,
+) -> dict:
     """
     Decifer 2.0 — 10-dimension scoring engine (alpha-pipeline-v2).
 
@@ -1772,17 +1859,15 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
 
     if gate_mode == "hard" and not mtf_alignment["aligned"] and mtf_alignment["gate_applies"]:
         # Hard gate: block the trade entirely — return zero score + HOLD
-        log.info(
-            f"MTF GATE BLOCKED {sig_5m.get('symbol','?')}: {mtf_alignment['conflict']}"
-        )
+        log.info(f"MTF GATE BLOCKED {sig_5m.get('symbol', '?')}: {mtf_alignment['conflict']}")
         return {
-            "signal":     "HOLD",
-            "direction":  "NEUTRAL",
-            "score":      0,
-            "buy_count":  0,
+            "signal": "HOLD",
+            "direction": "NEUTRAL",
+            "score": 0,
+            "buy_count": 0,
             "sell_count": 0,
-            "tf_count":   1,
-            "mtf_gate":   "BLOCKED",
+            "tf_count": 1,
+            "mtf_gate": "BLOCKED",
             "mtf_conflict": mtf_alignment["conflict"],
             "candle_gate": "SKIPPED",
             "reversion_score": 0,
@@ -1791,22 +1876,31 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             "zscore": 0,
             "adf_pvalue": 1.0,
             "score_breakdown": {
-                "trend": 0, "momentum": 0, "squeeze": 0, "flow": 0,
-                "breakout": 0, "mtf": 0, "news": 0, "social": 0, "reversion": 0,
+                "trend": 0,
+                "momentum": 0,
+                "squeeze": 0,
+                "flow": 0,
+                "breakout": 0,
+                "mtf": 0,
+                "news": 0,
+                "social": 0,
+                "reversion": 0,
                 "iv_skew": 0,
             },
             "disabled_dimensions": [],
         }
 
     signals = [sig_5m["signal"]]
-    if sig_1d: signals.append(sig_1d["signal"])
-    if sig_1w: signals.append(sig_1w["signal"])
+    if sig_1d:
+        signals.append(sig_1d["signal"])
+    if sig_1w:
+        signals.append(sig_1w["signal"])
     total_tf = len(signals)
 
-    buy_signals  = sum(1 for s in signals if "BUY"  in s)
+    buy_signals = sum(1 for s in signals if "BUY" in s)
     sell_signals = sum(1 for s in signals if "SELL" in s)
-    strong_buy   = sum(1 for s in signals if s == "STRONG_BUY")
-    strong_sell  = sum(1 for s in signals if s == "STRONG_SELL")
+    strong_buy = sum(1 for s in signals if s == "STRONG_BUY")
+    strong_sell = sum(1 for s in signals if s == "STRONG_SELL")
 
     score = 0
 
@@ -1827,8 +1921,11 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
 
     # ── Dimension flags — read once, guard each section ───────────
     _flags = CONFIG.get("dimension_flags", {})
+
     def _enabled(name: str) -> bool:
-        on = bool(_flags.get(name, True))  # bool() coerces int 0/1; str "False" is truthy — flags must be Python bool False
+        on = bool(
+            _flags.get(name, True)
+        )  # bool() coerces int 0/1; str "False" is truthy — flags must be Python bool False
         if not on:
             disabled_dimensions.append(name)
         return on
@@ -1846,7 +1943,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     trend_dir = 0
     if _enabled("directional"):
         trend_pts, trend_dir = score_directional(sig_5m, sig_1d, sig_1w)
-        trend_pts = int(round(trend_pts * _rmult.get("trend", 1.0)))
+        trend_pts = round(trend_pts * _rmult.get("trend", 1.0))
         score += trend_pts
         dim_directions.append((trend_dir, trend_pts))
 
@@ -1855,26 +1952,26 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # neutral 50 line measures directional pressure strength.
     # Direction = which side of 50.
     mfi = sig_5m.get("mfi", 50)
-    rs  = sig_5m.get("rsi_slope", 0)
+    rs = sig_5m.get("rsi_slope", 0)
 
     momentum = 0
     mom_dir = 0
     if _enabled("momentum"):
-        mfi_dist = abs(mfi - 50)        # 0-50 range
+        mfi_dist = abs(mfi - 50)  # 0-50 range
         rsi_confirms = (mfi > 50 and rs > 0) or (mfi < 50 and rs < 0)
 
         if mfi_dist > 15 and rsi_confirms:
-            momentum = 10   # Strong directional pressure + RSI confirming
+            momentum = 10  # Strong directional pressure + RSI confirming
         elif mfi_dist > 15:
-            momentum = 8    # Strong pressure, RSI not confirming
+            momentum = 8  # Strong pressure, RSI not confirming
         elif mfi_dist > 5 and rsi_confirms:
-            momentum = 8    # Moderate pressure + RSI confirming
+            momentum = 8  # Moderate pressure + RSI confirming
         elif mfi_dist > 5:
-            momentum = 5    # Moderate pressure
+            momentum = 5  # Moderate pressure
         elif mfi_dist > 0:
-            momentum = 2    # Weak but non-neutral
+            momentum = 2  # Weak but non-neutral
         mom_dir = +1 if mfi > 50 else (-1 if mfi < 50 else 0)
-        momentum = int(round(momentum * _rmult["momentum"]))
+        momentum = round(momentum * _rmult["momentum"])
         score += momentum
         dim_directions.append((mom_dir, momentum))
 
@@ -1903,9 +2000,9 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             # Not in squeeze — BB position measures room to move
             bb_dist = abs(bb_pos - 0.5)
             if 0.1 < bb_dist < 0.3:
-                squeeze_score = 3   # Healthy position, room to run
+                squeeze_score = 3  # Healthy position, room to run
             squeeze_dir = +1 if bb_pos > 0.5 else (-1 if bb_pos < 0.5 else 0)
-        squeeze_score = int(round(min(squeeze_score, 10) * _rmult["squeeze"]))
+        squeeze_score = round(min(squeeze_score, 10) * _rmult["squeeze"])
         score += squeeze_score
         dim_directions.append((squeeze_dir, squeeze_score))
 
@@ -1913,17 +2010,17 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # Score measures the STRENGTH of institutional flow, not its direction.
     # VWAP distance from price = strength; OBV slope = confirmation.
     # Direction = above/below VWAP + OBV slope.
-    vwap_d  = sig_5m.get("vwap_dist", 0)
-    obv_s   = sig_5m.get("obv_slope", 0)
+    vwap_d = sig_5m.get("vwap_dist", 0)
+    obv_s = sig_5m.get("obv_slope", 0)
 
     flow_score = 0
     flow_dir = 0
     if _enabled("flow"):
         abs_vwap = abs(vwap_d)
         if abs_vwap > 0.3:
-            flow_score += 4   # Solidly away from VWAP
+            flow_score += 4  # Solidly away from VWAP
         elif abs_vwap > 0:
-            flow_score += 2   # Slightly away
+            flow_score += 2  # Slightly away
         elif abs_vwap > -0.01:  # essentially at VWAP
             flow_score += 1
 
@@ -1932,9 +2029,9 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             flow_score += 4
         # Divergence penalty: VWAP and OBV disagree
         vwap_dir = +1 if vwap_d > 0 else (-1 if vwap_d < 0 else 0)
-        obv_dir  = +1 if obv_s > 0 else (-1 if obv_s < 0 else 0)
+        obv_dir = +1 if obv_s > 0 else (-1 if obv_s < 0 else 0)
         if vwap_dir != 0 and obv_dir != 0 and vwap_dir != obv_dir:
-            flow_score = max(0, flow_score - 3)   # Penalise divergence
+            flow_score = max(0, flow_score - 3)  # Penalise divergence
 
         # Flow direction: majority of VWAP + OBV
         if vwap_dir == obv_dir:
@@ -1942,8 +2039,8 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         elif abs(vwap_d) > 0.2:
             flow_dir = vwap_dir  # Strong VWAP signal wins
         else:
-            flow_dir = obv_dir   # Near VWAP — OBV wins
-        flow_score = int(round(min(flow_score, 10) * _rmult["flow"]))
+            flow_dir = obv_dir  # Near VWAP — OBV wins
+        flow_score = round(min(flow_score, 10) * _rmult["flow"])
         score += flow_score
         dim_directions.append((flow_dir, flow_score))
 
@@ -1952,7 +2049,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # Volume confirmation applies to both.
     donch = sig_5m.get("donch_breakout")
     if donch is None:
-        donch = (1 if sig_5m.get("dc_upper_break") else (-1 if sig_5m.get("dc_lower_break") else 0))
+        donch = 1 if sig_5m.get("dc_upper_break") else (-1 if sig_5m.get("dc_lower_break") else 0)
     vr = sig_5m.get("vol_ratio")
     if vr is None:
         vr = sig_5m.get("volume_ratio", 0)
@@ -1973,7 +2070,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
                 breakout_score = 4
             elif vr >= 1.5:
                 breakout_score = 2
-        breakout_score = int(round(min(breakout_score, 10) * _rmult["breakout"]))
+        breakout_score = round(min(breakout_score, 10) * _rmult["breakout"])
         score += breakout_score
         dim_directions.append((breakout_dir, breakout_score))
 
@@ -1997,7 +2094,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
                 w_bear = sig_1w.get("bear_aligned", False)
                 if (w_bull and d_bull) or (w_bear and d_bear):
                     mtf_score = 10  # Full weekly+daily confirmation
-        mtf_score = int(round(min(mtf_score, 10) * _rmult.get("mtf", 1.0)))
+        mtf_score = round(min(mtf_score, 10) * _rmult.get("mtf", 1.0))
         score += mtf_score
         dim_directions.append((mtf_dir, mtf_score))
 
@@ -2005,7 +2102,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # news_score is pre-computed by news.py (keyword + Claude two-tier)
     ns = 0
     if _enabled("news"):
-        ns = int(round(min(10, max(0, news_score)) * _rmult["news"]))
+        ns = round(min(10, max(0, news_score)) * _rmult["news"])
         score += ns
         # News direction is embedded in the score sign from news.py
         # (positive = bullish news, negative = bearish) — but here we get
@@ -2016,7 +2113,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     social_pts = 0
     social_dir = 0
     if _enabled("social"):
-        social_pts = int(round(min(10, max(0, social_score)) * _rmult.get("social", 1.0)))
+        social_pts = round(min(10, max(0, social_score)) * _rmult.get("social", 1.0))
         score += social_pts
         social_dir = +1 if social_score > 0 else (-1 if social_score < 0 else 0)
         dim_directions.append((social_dir, social_pts))
@@ -2055,17 +2152,17 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             # VR < 1 = mean-reverting returns. Calibrated on 60-bar Monte Carlo.
             vr_pts = 0
             if _vr < 0.55:
-                vr_pts = 3       # Strong mean-reversion (OU theta ≈ 0.3)
+                vr_pts = 3  # Strong mean-reversion (OU theta ≈ 0.3)
             elif _vr < 0.70:
-                vr_pts = 2       # Moderate mean-reversion (OU theta ≈ 0.2)
+                vr_pts = 2  # Moderate mean-reversion (OU theta ≈ 0.2)
             elif _vr < 0.80:
-                vr_pts = 1       # Weak signal
+                vr_pts = 1  # Weak signal
 
             # Sub-metric 2: OU half-life (0-4 pts)
             # Shorter half-life = faster reversion = more tradeable
             ou_pts = 0
             if _ou_hl < 5:
-                ou_pts = 4       # Reverts in < 5 periods — very tradeable
+                ou_pts = 4  # Reverts in < 5 periods — very tradeable
             elif _ou_hl < 10:
                 ou_pts = 3
             elif _ou_hl < 20:
@@ -2078,14 +2175,14 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
             _abs_z = abs(_zscore)
             zscore_pts = 0
             if _abs_z > 2.5:
-                zscore_pts = 3   # Extreme deviation — high reversion probability
+                zscore_pts = 3  # Extreme deviation — high reversion probability
             elif _abs_z > 2.0:
                 zscore_pts = 2
             elif _abs_z > 1.5:
                 zscore_pts = 1
 
             reversion_score = vr_pts + ou_pts + zscore_pts
-        rev_score_capped = int(round(min(reversion_score, 10) * _rmult["reversion"]))
+        rev_score_capped = round(min(reversion_score, 10) * _rmult["reversion"])
         score += rev_score_capped
         # Reversion direction: z-score tells us which way to trade.
         # Positive z = price above mean → SHORT (fade it)
@@ -2102,7 +2199,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     iv_skew_pts = 0
     _iv_skew_dir = 0
     if _enabled("iv_skew"):
-        iv_skew_pts  = int(round(min(10, max(0, iv_skew_score)) * _rmult.get("iv_skew", 1.0)))
+        iv_skew_pts = round(min(10, max(0, iv_skew_score)) * _rmult.get("iv_skew", 1.0))
         _iv_skew_dir = iv_skew_dir
         score += iv_skew_pts
         dim_directions.append((_iv_skew_dir, iv_skew_pts))
@@ -2116,7 +2213,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     if _enabled("pead") and symbol is not None:
         vol_ratio_for_pead = sig_5m.get("vol_ratio", 0)
         pead_pts, pead_dir = score_pead(symbol, sig_1d, vol_ratio_for_pead)
-        pead_pts = int(round(min(pead_pts, 10) * _rmult.get("pead", 1.0)))
+        pead_pts = round(min(pead_pts, 10) * _rmult.get("pead", 1.0))
         score += pead_pts
         dim_directions.append((pead_dir, pead_pts))
 
@@ -2127,7 +2224,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     ss_dir = 0
     if _enabled("short_squeeze") and symbol is not None:
         ss_pts, ss_dir = score_short_squeeze(symbol, sig_5m)
-        ss_pts = int(round(min(ss_pts, 10) * _rmult.get("short_squeeze", 1.0)))
+        ss_pts = round(min(ss_pts, 10) * _rmult.get("short_squeeze", 1.0))
         score += ss_pts
         dim_directions.append((ss_dir, ss_pts))
 
@@ -2138,7 +2235,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     ov_dir = 0
     if _enabled("overnight_drift"):
         ov_pts, ov_dir = score_overnight_drift(sig_1d)
-        ov_pts = int(round(min(ov_pts, 10) * _rmult.get("overnight_drift", 1.0)))
+        ov_pts = round(min(ov_pts, 10) * _rmult.get("overnight_drift", 1.0))
         score += ov_pts
         dim_directions.append((ov_dir, ov_pts))
 
@@ -2174,55 +2271,51 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # score contribution has been correctly suppressed.
     _ic_dir_sum = None  # None → fall back to raw score-weighted vote below
     try:
-        from ic_calculator import get_current_weights as _get_ic_weights, DIMENSIONS as _IC_DIMS
+        from ic_calculator import DIMENSIONS as _IC_DIMS
+        from ic_calculator import get_current_weights as _get_ic_weights
+
         _icw = _get_ic_weights()
         _N_DIMS = len(_IC_DIMS)
         _ic_breakdown = {
-            "trend":         trend_pts,
-            "momentum":       momentum,
-            "squeeze":        squeeze_score,
-            "flow":           flow_score,
-            "breakout":       breakout_score,
-            "mtf":            mtf_score,
-            "news":           ns,
-            "social":         social_pts,
-            "reversion":      rev_score_capped,
-            "iv_skew":        iv_skew_pts,
-            "pead":           pead_pts,
-            "short_squeeze":  ss_pts,
+            "trend": trend_pts,
+            "momentum": momentum,
+            "squeeze": squeeze_score,
+            "flow": flow_score,
+            "breakout": breakout_score,
+            "mtf": mtf_score,
+            "news": ns,
+            "social": social_pts,
+            "reversion": rev_score_capped,
+            "iv_skew": iv_skew_pts,
+            "pead": pead_pts,
+            "short_squeeze": ss_pts,
             "overnight_drift": ov_pts,
         }
-        _ic_sum = sum(
-            _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v
-            for k, v in _ic_breakdown.items()
-        )
+        _ic_sum = sum(_icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v for k, v in _ic_breakdown.items())
         # candle_bonus is a non-dimension extra (0-3); add it on top of the
         # weighted composite so candlestick confirmation still lifts the score.
-        score = int(round(_ic_sum)) + candle_bonus
+        score = round(_ic_sum) + candle_bonus
 
         # IC-weighted direction vote — dims with weight=0 (negative/noise-floor IC)
         # contribute nothing to the consensus direction, matching their zero score
         # contribution above.  With equal weights this produces the same result as
         # the raw score-weighted sum, so no behaviour change before IC data exists.
         _dim_dirs = {
-            "trend":         trend_dir,
-            "momentum":      mom_dir,
-            "squeeze":       squeeze_dir,
-            "flow":          flow_dir,
-            "breakout":      breakout_dir,
-            "mtf":           mtf_dir,
-            "news":          (+1 if news_score > 0 else (-1 if news_score < 0 else 0)),
-            "social":        social_dir,
-            "reversion":     rev_dir,
-            "iv_skew":       _iv_skew_dir,
-            "pead":          pead_dir,
+            "trend": trend_dir,
+            "momentum": mom_dir,
+            "squeeze": squeeze_dir,
+            "flow": flow_dir,
+            "breakout": breakout_dir,
+            "mtf": mtf_dir,
+            "news": (+1 if news_score > 0 else (-1 if news_score < 0 else 0)),
+            "social": social_dir,
+            "reversion": rev_dir,
+            "iv_skew": _iv_skew_dir,
+            "pead": pead_dir,
             "short_squeeze": ss_dir,
         }
         _ic_dir_sum = (
-            sum(
-                _dim_dirs.get(k, 0) * _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v
-                for k, v in _ic_breakdown.items()
-            )
+            sum(_dim_dirs.get(k, 0) * _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v for k, v in _ic_breakdown.items())
             + candle_dir * candle_bonus  # candlestick bonus preserves its direction influence
         )
     except Exception:
@@ -2238,16 +2331,16 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     if _ic_dir_sum is not None:
         # IC-weighted path
         _dar_num = abs(_ic_dir_sum)
-        _dar_den = sum(
-            abs(_dim_dirs.get(k, 0)) * _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v
-            for k, v in _ic_breakdown.items()
-        ) + abs(candle_dir) * candle_bonus
+        _dar_den = (
+            sum(abs(_dim_dirs.get(k, 0)) * _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v for k, v in _ic_breakdown.items())
+            + abs(candle_dir) * candle_bonus
+        )
     else:
         # Equal-weight path
         _dar_num = abs(sum(d * w for d, w in dim_directions))
         _dar_den = sum(abs(d) * w for d, w in dim_directions)
     dar = _dar_num / _dar_den if _dar_den > 0 else 1.0
-    score = int(round(score * dar))
+    score = round(score * dar)
 
     # ── SOFT GATE: MTF penalty (applied after DAR) ──────
     mtf_gate_status = "PASS"
@@ -2257,10 +2350,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
         score = max(0, score - penalty)
         mtf_gate_status = "PENALISED"
         mtf_conflict_msg = mtf_alignment["conflict"]
-        log.info(
-            f"MTF GATE PENALTY {sig_5m.get('symbol','?')}: -{penalty}pts → {score} | "
-            f"{mtf_alignment['conflict']}"
-        )
+        log.info(f"MTF GATE PENALTY {sig_5m.get('symbol', '?')}: -{penalty}pts → {score} | {mtf_alignment['conflict']}")
 
     # Cap removed — per-dimension 0-10 is the correct winsorisation
     # (MSCI Barra standard).  Composite cap destroyed convergence info.
@@ -2272,10 +2362,7 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # biased toward the signal classification (itself asymmetric).
     # When IC weights are available, the IC-weighted sum is used so that
     # zero-IC-weight dimensions don't swing direction (see IC block above).
-    weighted_sum = (
-        _ic_dir_sum if _ic_dir_sum is not None
-        else sum(d * w for d, w in dim_directions)
-    )
+    weighted_sum = _ic_dir_sum if _ic_dir_sum is not None else sum(d * w for d, w in dim_directions)
 
     # Determine direction from weighted vote
     if weighted_sum > 2:
@@ -2310,61 +2397,57 @@ def compute_confluence(sig_5m: dict, sig_1d: dict | None, sig_1w: dict | None,
     # without a confirming candlestick pattern is downgraded to HOLD.
     # candle_bonus is 0 when neither candle_bull nor candle_bear fired.
     candle_gate_status = "PASS"
-    if CONFIG.get("candle_required", False) and candle_bonus == 0:
-        if "BUY" in final_signal or "SELL" in final_signal:
-            candle_gate_status = "BLOCKED"
-            final_signal = "HOLD"
-            direction = "NEUTRAL"
-            log.info(
-                f"CANDLE GATE BLOCKED {sig_5m.get('symbol', '?')}: "
-                f"no confirming candle (bull={cb}, bear={cd})"
-            )
+    if CONFIG.get("candle_required", False) and candle_bonus == 0 and ("BUY" in final_signal or "SELL" in final_signal):
+        candle_gate_status = "BLOCKED"
+        final_signal = "HOLD"
+        direction = "NEUTRAL"
+        log.info(f"CANDLE GATE BLOCKED {sig_5m.get('symbol', '?')}: no confirming candle (bull={cb}, bear={cd})")
 
     return {
-        "signal":     final_signal,
-        "direction":  direction,
-        "score":      score,
-        "buy_count":  buy_signals,
+        "signal": final_signal,
+        "direction": direction,
+        "score": score,
+        "buy_count": buy_signals,
         "sell_count": sell_signals,
-        "tf_count":   total_tf,
+        "tf_count": total_tf,
         # Direction-agnostic dimension vote (roadmap #01)
         "direction_weighted_sum": round(weighted_sum, 1),
         # Multi-timeframe alignment gate results
-        "mtf_gate":       mtf_gate_status,
-        "mtf_conflict":   mtf_conflict_msg,
+        "mtf_gate": mtf_gate_status,
+        "mtf_conflict": mtf_conflict_msg,
         "mtf_daily_trend": mtf_alignment["daily_trend"],
         "mtf_weekly_trend": mtf_alignment.get("weekly_trend", "N/A"),
         # Direction Agreement Ratio (1.0 = all dims agree, <1 = disagreement penalty)
-        "dar":            round(dar, 3),
+        "dar": round(dar, 3),
         # Candlestick confirmation gate
-        "candle_gate":    candle_gate_status,
+        "candle_gate": candle_gate_status,
         # Reversion metrics (for dashboard + agent consumption)
         "reversion_score": min(reversion_score, 10),
         "variance_ratio": round(_vr, 3),
         "ou_halflife": round(_ou_hl, 1),
-        "zscore":     round(_zscore, 2),
+        "zscore": round(_zscore, 2),
         "adf_pvalue": round(_adf_p, 4),
         # Per-dimension score breakdown (for trade logging / IC feedback loop)
         # Keys must exactly match ic_calculator.DIMENSIONS for IC computation.
         "score_breakdown": {
-            "trend":         trend_pts,
-            "momentum":      momentum,
-            "squeeze":       squeeze_score,
-            "flow":          flow_score,
-            "breakout":      breakout_score,
-            "mtf":           mtf_score,
-            "news":          ns,
-            "social":        social_pts,
-            "reversion":     rev_score_capped,
-            "iv_skew":        iv_skew_pts,
-            "pead":           pead_pts,
-            "short_squeeze":  ss_pts,
+            "trend": trend_pts,
+            "momentum": momentum,
+            "squeeze": squeeze_score,
+            "flow": flow_score,
+            "breakout": breakout_score,
+            "mtf": mtf_score,
+            "news": ns,
+            "social": social_pts,
+            "reversion": rev_score_capped,
+            "iv_skew": iv_skew_pts,
+            "pead": pead_pts,
+            "short_squeeze": ss_pts,
             "overnight_drift": ov_pts,
         },
         # Dimensions that were zeroed by a False flag (for diagnostics / dashboard)
         "disabled_dimensions": disabled_dimensions,
         # Regime routing state that produced these scores
-        "regime_router":       regime_router,
+        "regime_router": regime_router,
     }
 
 
@@ -2382,17 +2465,21 @@ def get_regime_threshold(regime: str) -> int:
 
     Returns an int score threshold (0-99).
     """
-    base  = CONFIG["min_score_to_trade"]
+    base = CONFIG["min_score_to_trade"]
     panic = CONFIG.get("regime_threshold_panic", 99)
     if regime in ("CAPITULATION", "EXTREME_STRESS"):
         return panic
     return base
 
 
-def score_universe(symbols: list, regime: str = "UNKNOWN",
-                   news_data: dict = None, social_data: dict = None,
-                   regime_router: str | None = None,
-                   ib=None) -> tuple:
+def score_universe(
+    symbols: list,
+    regime: str = "UNKNOWN",
+    news_data: dict | None = None,
+    social_data: dict | None = None,
+    regime_router: str | None = None,
+    ib=None,
+) -> tuple:
     """
     Score all symbols in the universe.
 
@@ -2418,17 +2505,19 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
     # ── Determine routing regime (VIX + Hurst + HMM 3-way consensus) ──
     if regime_router is None:
         if CONFIG.get("regime_routing_enabled", True):
-            vix_result  = get_market_regime_vix()
-            _vix_r      = vix_result["regime"]
-            _hurst_r    = "unknown"
-            _hmm_r      = "unknown"
+            vix_result = get_market_regime_vix()
+            _vix_r = vix_result["regime"]
+            _hurst_r = "unknown"
+            _hmm_r = "unknown"
             if CONFIG.get("hurst_regime", {}).get("enabled", False):
                 _hurst_r = get_hurst_regime_spy().get("regime", "unknown")
             if CONFIG.get("hmm_regime", {}).get("enabled", False):
                 _hmm_r = get_hmm_regime_spy().get("regime", "unknown")
             regime_router = _resolve_regime_router(_vix_r, _hurst_r, _hmm_r)
-            log.info(f"score_universe regime router: {regime_router} "
-                     f"(VIX={vix_result.get('vix')}, hurst={_hurst_r}, hmm={_hmm_r})")
+            log.info(
+                f"score_universe regime router: {regime_router} "
+                f"(VIX={vix_result.get('vix')}, hurst={_hurst_r}, hmm={_hmm_r})"
+            )
         else:
             regime_router = "unknown"
 
@@ -2439,11 +2528,13 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
     all_results = []
     failures = 0
     args_list = [
-        (sym,
-         news_data.get(sym, {}).get("news_score", 0),
-         int(social_data.get(sym, {}).get("social_score", 0)),
-         regime_router,
-         ib)
+        (
+            sym,
+            news_data.get(sym, {}).get("news_score", 0),
+            int(social_data.get(sym, {}).get("social_score", 0)),
+            regime_router,
+            ib,
+        )
         for sym in symbols
     ]
 
@@ -2467,8 +2558,7 @@ def score_universe(symbols: list, regime: str = "UNKNOWN",
         logging.warning(f"Thread pool failed ({e}), falling back to sequential scoring")
         for sym, ns, ss, rr, _ib in args_list:
             try:
-                data = fetch_multi_timeframe(sym, news_score=ns, social_score=ss,
-                                             regime_router=rr, ib=_ib)
+                data = fetch_multi_timeframe(sym, news_score=ns, social_score=ss, regime_router=rr, ib=_ib)
                 if data:
                     if sym in news_data:
                         data["news"] = news_data[sym]

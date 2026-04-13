@@ -5,13 +5,15 @@ Covers:
 2. _regime_multipliers()   — correct multipliers per regime; flag disables routing
 3. compute_confluence()    — weights shift per regime; flag disables cleanly
 """
+
 from __future__ import annotations
+
 import os
 import sys
-import types
-import pandas as pd
+from unittest.mock import patch
+
 import numpy as np
-from unittest.mock import patch, MagicMock
+import pandas as pd
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -24,8 +26,15 @@ if "signals" in sys.modules and not hasattr(sys.modules["signals"], "__file__"):
     del sys.modules["signals"]
 
 import signals as _signals_mod  # capture module reference for patch.object (see below)
-from signals import (get_market_regime_vix, _regime_multipliers, compute_confluence,
-                     compute_hurst_dfa, get_hurst_regime_spy, _resolve_regime_router)
+from signals import (
+    _regime_multipliers,
+    _resolve_regime_router,
+    compute_confluence,
+    compute_hurst_dfa,
+    get_hurst_regime_spy,
+    get_market_regime_vix,
+)
+
 # NOTE: other test files (test_signals.py, test_signal_dispatch.py) replace
 # sys.modules["signals"] at collection time with a new module object, so
 # patch("signals._safe_download") would target the wrong module at runtime.
@@ -34,6 +43,7 @@ from signals import (get_market_regime_vix, _regime_multipliers, compute_conflue
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _vix_df(value: float) -> pd.DataFrame:
     """Minimal single-row DataFrame mimicking a yfinance VIX download."""
@@ -47,79 +57,83 @@ def _minimal_sig(direction: str = "bull") -> dict:
     """
     bull = direction == "bull"
     return {
-        "signal":          "BUY" if bull else "SELL",
-        "bull_aligned":    bull,
-        "bear_aligned":    not bull,
-        "macd_accel":      1 if bull else -1,
-        "macd_hist":       0.01,
-        "adx":             30,
-        "mfi":             70 if bull else 30,
-        "rsi_slope":       1 if bull else -1,
-        "squeeze_on":      False,
+        "signal": "BUY" if bull else "SELL",
+        "bull_aligned": bull,
+        "bear_aligned": not bull,
+        "macd_accel": 1 if bull else -1,
+        "macd_hist": 0.01,
+        "adx": 30,
+        "mfi": 70 if bull else 30,
+        "rsi_slope": 1 if bull else -1,
+        "squeeze_on": False,
         "squeeze_intensity": 0,
-        "bb_position":     0.7 if bull else 0.3,
-        "vwap_dist":       0.5 if bull else -0.5,
-        "obv_slope":       1 if bull else -1,
-        "donch_breakout":  1 if bull else -1,
-        "vol_ratio":       2.0,
-        "candle_bull":     0,
-        "candle_bear":     0,
-        "zscore":          -2.0 if bull else 2.0,
-        "variance_ratio":  0.5,
-        "ou_halflife":     4.0,
-        "adf_pvalue":      0.01,
-        "price":           100.0,
-        "atr":             1.5,
-        "ema9":            101.0 if bull else 99.0,
-        "ema21":           100.0,
-        "ema50":           99.0 if bull else 101.0,
+        "bb_position": 0.7 if bull else 0.3,
+        "vwap_dist": 0.5 if bull else -0.5,
+        "obv_slope": 1 if bull else -1,
+        "donch_breakout": 1 if bull else -1,
+        "vol_ratio": 2.0,
+        "candle_bull": 0,
+        "candle_bear": 0,
+        "zscore": -2.0 if bull else 2.0,
+        "variance_ratio": 0.5,
+        "ou_halflife": 4.0,
+        "adf_pvalue": 0.01,
+        "price": 100.0,
+        "atr": 1.5,
+        "ema9": 101.0 if bull else 99.0,
+        "ema21": 100.0,
+        "ema50": 99.0 if bull else 101.0,
     }
 
 
 def _minimal_sig_1d() -> dict:
     """Minimal daily sig for compute_confluence (MTF gate needs it)."""
     return {
-        "signal":       "BUY",
+        "signal": "BUY",
         "bull_aligned": True,
         "bear_aligned": False,
-        "adx":          28,
-        "macd_hist":    0.02,
-        "mfi":          60,
-        "rsi_slope":    1,
-        "squeeze_on":   False,
+        "adx": 28,
+        "macd_hist": 0.02,
+        "mfi": 60,
+        "rsi_slope": 1,
+        "squeeze_on": False,
         "squeeze_intensity": 0,
-        "bb_position":  0.6,
-        "vwap_dist":    0.2,
-        "obv_slope":    1,
+        "bb_position": 0.6,
+        "vwap_dist": 0.2,
+        "obv_slope": 1,
         "donch_breakout": 1,
-        "vol_ratio":    1.5,
-        "candle_bull":  0,
-        "candle_bear":  0,
-        "zscore":       -1.0,
+        "vol_ratio": 1.5,
+        "candle_bull": 0,
+        "candle_bear": 0,
+        "zscore": -1.0,
         "variance_ratio": 0.7,
-        "ou_halflife":  15.0,
-        "adf_pvalue":   0.08,
-        "price":        100.0,
-        "atr":          1.5,
+        "ou_halflife": 15.0,
+        "adf_pvalue": 0.08,
+        "price": 100.0,
+        "atr": 1.5,
     }
 
 
 # ── 1. get_market_regime_vix() ────────────────────────────────────────────────
 
-class TestGetMarketRegimeVix:
 
+class TestGetMarketRegimeVix:
     def test_low_vix_returns_momentum(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_vix_threshold", 20)
-        with patch.object(_signals_mod, "_safe_download", return_value=_vix_df(14.5)), \
-             patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df):
+        with (
+            patch.object(_signals_mod, "_safe_download", return_value=_vix_df(14.5)),
+            patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df),
+        ):
             result = get_market_regime_vix()
         assert result["regime"] == "momentum"
         assert result["vix"] == 14.5
 
     def test_high_vix_returns_mean_reversion(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_vix_threshold", 20)
-        with patch.object(_signals_mod, "_safe_download", return_value=_vix_df(28.0)), \
-             patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df):
+        with (
+            patch.object(_signals_mod, "_safe_download", return_value=_vix_df(28.0)),
+            patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df),
+        ):
             result = get_market_regime_vix()
         assert result["regime"] == "mean_reversion"
         assert result["vix"] == 28.0
@@ -127,15 +141,19 @@ class TestGetMarketRegimeVix:
     def test_vix_exactly_at_threshold_returns_mean_reversion(self, monkeypatch):
         """VIX == threshold is NOT low-vol — boundary belongs to mean_reversion."""
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_vix_threshold", 20)
-        with patch.object(_signals_mod, "_safe_download", return_value=_vix_df(20.0)), \
-             patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df):
+        with (
+            patch.object(_signals_mod, "_safe_download", return_value=_vix_df(20.0)),
+            patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df),
+        ):
             result = get_market_regime_vix()
         assert result["regime"] == "mean_reversion"
 
     def test_threshold_is_configurable(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_vix_threshold", 25)
-        with patch.object(_signals_mod, "_safe_download", return_value=_vix_df(24.9)), \
-             patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df):
+        with (
+            patch.object(_signals_mod, "_safe_download", return_value=_vix_df(24.9)),
+            patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df),
+        ):
             result = get_market_regime_vix()
         assert result["regime"] == "momentum"
 
@@ -148,8 +166,10 @@ class TestGetMarketRegimeVix:
 
     def test_empty_data_defaults_to_momentum(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_vix_threshold", 20)
-        with patch.object(_signals_mod, "_safe_download", return_value=None), \
-             patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df):
+        with (
+            patch.object(_signals_mod, "_safe_download", return_value=None),
+            patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df),
+        ):
             result = get_market_regime_vix()
         assert result["regime"] == "momentum"
         assert result["source"] == "fallback"
@@ -157,10 +177,10 @@ class TestGetMarketRegimeVix:
 
 # ── 2. _regime_multipliers() ─────────────────────────────────────────────────
 
-class TestRegimeMultipliers:
 
+class TestRegimeMultipliers:
     MOMENTUM_DIMS = ("trend", "momentum", "squeeze", "flow", "breakout", "mtf")
-    NEUTRAL_DIMS  = ("news", "social")
+    NEUTRAL_DIMS = ("news", "social")
     REVERSION_DIM = "reversion"
 
     def test_momentum_regime_upweights_momentum_dims(self, monkeypatch):
@@ -204,8 +224,9 @@ class TestRegimeMultipliers:
         monkeypatch.setitem(_config_mod.CONFIG, "regime_routing_enabled", False)
         for regime in ("momentum", "mean_reversion"):
             mults = _regime_multipliers(regime)
-            assert all(v == 1.0 for v in mults.values()), \
+            assert all(v == 1.0 for v in mults.values()), (
                 f"All multipliers should be 1.0 when routing disabled (regime={regime})"
+            )
 
     def test_unknown_regime_returns_all_ones(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "regime_routing_enabled", True)
@@ -226,26 +247,23 @@ class TestRegimeMultipliers:
 
 # ── 3. compute_confluence() with regime routing ───────────────────────────────
 
-class TestRegimeRoutingInConfluence:
 
-    def _score(self, regime_router: str, monkeypatch,
-               enabled: bool = True) -> dict:
+class TestRegimeRoutingInConfluence:
+    def _score(self, regime_router: str, monkeypatch, enabled: bool = True) -> dict:
         """Run compute_confluence with mtf_gate off for clean isolation."""
         monkeypatch.setitem(_config_mod.CONFIG, "regime_routing_enabled", enabled)
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "off")
         monkeypatch.setitem(_config_mod.CONFIG, "candle_required", False)
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_momentum_mult", 1.3)
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_reversion_mult", 0.7)
-        sig5  = _minimal_sig("bull")
+        sig5 = _minimal_sig("bull")
         sig1d = _minimal_sig_1d()
-        return compute_confluence(sig5, sig1d, None,
-                                  news_score=5, social_score=5,
-                                  regime_router=regime_router)
+        return compute_confluence(sig5, sig1d, None, news_score=5, social_score=5, regime_router=regime_router)
 
     def test_momentum_regime_scores_higher_than_neutral_for_trending_setup(self, monkeypatch):
         """A strong momentum setup should score higher with momentum routing active."""
-        result_mom     = self._score("momentum",  monkeypatch)
-        result_neutral = self._score("unknown",   monkeypatch)
+        result_mom = self._score("momentum", monkeypatch)
+        result_neutral = self._score("unknown", monkeypatch)
         # Trending/momentum setup — multiplied dimensions all fire, score should increase
         assert result_mom["score"] >= result_neutral["score"]
 
@@ -260,22 +278,22 @@ class TestRegimeRoutingInConfluence:
         monkeypatch.setitem(_config_mod.CONFIG, "candle_required", False)
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_momentum_mult", 1.3)
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_reversion_mult", 0.7)
-        sig5  = _minimal_sig("bull")
+        sig5 = _minimal_sig("bull")
         sig1d = _minimal_sig_1d()
         # Force strong reversion signal on daily
-        sig1d["adf_pvalue"]     = 0.01
+        sig1d["adf_pvalue"] = 0.01
         sig1d["variance_ratio"] = 0.5
-        sig1d["ou_halflife"]    = 4.0
+        sig1d["ou_halflife"] = 4.0
         sig5["zscore"] = -2.5
 
-        result_mr  = compute_confluence(sig5, sig1d, None, regime_router="mean_reversion")
+        result_mr = compute_confluence(sig5, sig1d, None, regime_router="mean_reversion")
         result_neu = compute_confluence(sig5, sig1d, None, regime_router="unknown")
 
         assert result_mr["score_breakdown"]["reversion"] >= result_neu["score_breakdown"]["reversion"]
 
     def test_routing_disabled_identical_regardless_of_regime_router(self, monkeypatch):
         """With regime_routing_enabled=False, routing label must not change scores."""
-        result_mom = self._score("momentum",      monkeypatch, enabled=False)
+        result_mom = self._score("momentum", monkeypatch, enabled=False)
         result_rev = self._score("mean_reversion", monkeypatch, enabled=False)
         assert result_mom["score"] == result_rev["score"]
         assert result_mom["score_breakdown"] == result_rev["score_breakdown"]
@@ -285,13 +303,14 @@ class TestRegimeRoutingInConfluence:
         result = self._score("mean_reversion", monkeypatch)
         assert result.get("regime_router") == "mean_reversion"
 
-    def test_score_still_capped_at_50(self, monkeypatch):
-        """1.3× multiplier on all momentum dims must not push score above 50."""
+    def test_score_uncapped_after_cap_removal(self, monkeypatch):
+        """Composite score cap was removed (5201f61) — scores may exceed 50."""
         result = self._score("momentum", monkeypatch)
-        assert result["score"] <= 50
+        assert result["score"] > 0
 
 
 # ── 4. PANIC/momentum inconsistency and state distribution ───────────────────
+
 
 class TestPanicMomentumInconsistency:
     """
@@ -305,13 +324,11 @@ class TestPanicMomentumInconsistency:
         never 'mean_reversion'. Documents the asymmetric fallback bias.
         """
         monkeypatch.setitem(_config_mod.CONFIG, "regime_router_vix_threshold", 20)
-        with patch.object(_signals_mod, "_safe_download",
-                          side_effect=Exception("timeout")):
+        with patch.object(_signals_mod, "_safe_download", side_effect=Exception("timeout")):
             result = get_market_regime_vix()
 
         assert result["regime"] == "momentum", (
-            "Fallback bias regression: VIX fetch failure must return 'momentum' "
-            "(documents asymmetric bias)"
+            "Fallback bias regression: VIX fetch failure must return 'momentum' (documents asymmetric bias)"
         )
         assert result["source"] == "fallback"
         assert result["vix"] is None
@@ -328,24 +345,20 @@ class TestPanicMomentumInconsistency:
         high_vix_values = [20.0, 22.0, 25.0, 30.0, 45.0]
 
         for vix in calm_vix_values:
-            with patch.object(_signals_mod, "_safe_download",
-                              return_value=_vix_df(vix)), \
-                 patch.object(_signals_mod, "_flatten_columns",
-                              side_effect=lambda df: df):
+            with (
+                patch.object(_signals_mod, "_safe_download", return_value=_vix_df(vix)),
+                patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df),
+            ):
                 result = get_market_regime_vix()
-            assert result["regime"] == "momentum", (
-                f"VIX={vix} should be 'momentum' with threshold=20"
-            )
+            assert result["regime"] == "momentum", f"VIX={vix} should be 'momentum' with threshold=20"
 
         for vix in high_vix_values:
-            with patch.object(_signals_mod, "_safe_download",
-                              return_value=_vix_df(vix)), \
-                 patch.object(_signals_mod, "_flatten_columns",
-                              side_effect=lambda df: df):
+            with (
+                patch.object(_signals_mod, "_safe_download", return_value=_vix_df(vix)),
+                patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df),
+            ):
                 result = get_market_regime_vix()
-            assert result["regime"] == "mean_reversion", (
-                f"VIX={vix} should be 'mean_reversion' with threshold=20"
-            )
+            assert result["regime"] == "mean_reversion", f"VIX={vix} should be 'mean_reversion' with threshold=20"
 
     def test_regime_multipliers_cover_all_nine_dimensions(self, monkeypatch):
         """
@@ -354,20 +367,28 @@ class TestPanicMomentumInconsistency:
         key would cause a KeyError in compute_confluence.
         """
         monkeypatch.setitem(_config_mod.CONFIG, "regime_routing_enabled", True)
-        _all_dims = {"trend", "momentum", "squeeze", "flow", "breakout",
-                     "mtf", "news", "social", "reversion",
-                     "iv_skew", "pead", "short_squeeze"}
+        _all_dims = {
+            "trend",
+            "momentum",
+            "squeeze",
+            "flow",
+            "breakout",
+            "mtf",
+            "news",
+            "social",
+            "reversion",
+            "iv_skew",
+            "pead",
+            "short_squeeze",
+        }
 
         for regime in ("momentum", "mean_reversion", "unknown"):
             mults = _regime_multipliers(regime)
             assert set(mults.keys()) == _all_dims, (
-                f"Regime '{regime}' missing dimensions: "
-                f"{_all_dims - set(mults.keys())}"
+                f"Regime '{regime}' missing dimensions: {_all_dims - set(mults.keys())}"
             )
             for dim, val in mults.items():
-                assert val > 0, (
-                    f"Multiplier for '{dim}' in '{regime}' must be positive, got {val}"
-                )
+                assert val > 0, f"Multiplier for '{dim}' in '{regime}' must be positive, got {val}"
 
     def test_trend_effective_weight_exceeds_reversion_in_momentum_regime(self, monkeypatch):
         """
@@ -382,19 +403,18 @@ class TestPanicMomentumInconsistency:
         mults = _regime_multipliers("momentum")
         ic_weight = 1.0 / 9  # equal weight for all dims
 
-        effective_trend     = ic_weight * mults["trend"]
+        effective_trend = ic_weight * mults["trend"]
         effective_reversion = ic_weight * mults["reversion"]
 
         assert effective_trend > effective_reversion, (
-            f"trend ({effective_trend:.4f}) should > reversion ({effective_reversion:.4f}) "
-            "in momentum regime"
+            f"trend ({effective_trend:.4f}) should > reversion ({effective_reversion:.4f}) in momentum regime"
         )
 
 
 # ── 5. compute_hurst_dfa() ───────────────────────────────────────────────────
 
-class TestComputeHurstDfa:
 
+class TestComputeHurstDfa:
     def _trending_series(self, n: int = 80) -> np.ndarray:
         """Strongly trending price series (random walk with positive drift)."""
         rng = np.random.default_rng(42)
@@ -435,9 +455,7 @@ class TestComputeHurstDfa:
     def test_trending_series_gives_higher_h_than_reverting(self):
         h_trend = compute_hurst_dfa(self._trending_series())
         h_revert = compute_hurst_dfa(self._reverting_series())
-        assert h_trend > h_revert, (
-            f"Trending series H={h_trend:.3f} should exceed reverting H={h_revert:.3f}"
-        )
+        assert h_trend > h_revert, f"Trending series H={h_trend:.3f} should exceed reverting H={h_revert:.3f}"
 
     def test_random_walk_h_near_half(self):
         """Random walk Hurst should be in [0.3, 0.7] — not perfectly 0.5 on finite data."""
@@ -452,9 +470,9 @@ class TestComputeHurstDfa:
 
 # ── 6. get_hurst_regime_spy() ────────────────────────────────────────────────
 
-class TestGetHurstRegimeSpy:
 
-    def _spy_df(self, h_target: float, n: int = 70) -> "pd.DataFrame":
+class TestGetHurstRegimeSpy:
+    def _spy_df(self, h_target: float, n: int = 70) -> pd.DataFrame:
         """Build a synthetic SPY price DataFrame designed to produce H near h_target."""
         rng = np.random.default_rng(0)
         if h_target > 0.55:
@@ -472,65 +490,88 @@ class TestGetHurstRegimeSpy:
         return pd.DataFrame({"Close": prices})
 
     def test_returns_dict_with_required_keys(self, monkeypatch):
-        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache",    None)
+        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache", None)
         monkeypatch.setattr(_signals_mod, "_hurst_spy_cache_ts", None)
-        monkeypatch.setitem(_config_mod.CONFIG, "hurst_regime", {
-            "enabled": True, "trending_threshold": 0.55,
-            "reverting_threshold": 0.45, "lookback_days": 63,
-            "cache_ttl_seconds": 3600,
-        })
-        with patch.object(_signals_mod, "_safe_download",
-                          return_value=self._spy_df(0.6)), \
-             patch.object(_signals_mod, "_flatten_columns",
-                          side_effect=lambda df: df):
+        monkeypatch.setitem(
+            _config_mod.CONFIG,
+            "hurst_regime",
+            {
+                "enabled": True,
+                "trending_threshold": 0.55,
+                "reverting_threshold": 0.45,
+                "lookback_days": 63,
+                "cache_ttl_seconds": 3600,
+            },
+        )
+        with (
+            patch.object(_signals_mod, "_safe_download", return_value=self._spy_df(0.6)),
+            patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df),
+        ):
             result = get_hurst_regime_spy()
-        assert "regime"  in result
-        assert "hurst"   in result
-        assert "source"  in result
+        assert "regime" in result
+        assert "hurst" in result
+        assert "source" in result
         assert result["regime"] in ("trending", "reverting", "neutral", "unknown")
 
     def test_fetch_failure_returns_unknown(self, monkeypatch):
-        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache",    None)
+        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache", None)
         monkeypatch.setattr(_signals_mod, "_hurst_spy_cache_ts", None)
-        monkeypatch.setitem(_config_mod.CONFIG, "hurst_regime", {
-            "enabled": True, "trending_threshold": 0.55,
-            "reverting_threshold": 0.45, "lookback_days": 63,
-            "cache_ttl_seconds": 3600,
-        })
-        with patch.object(_signals_mod, "_safe_download",
-                          side_effect=Exception("network error")):
+        monkeypatch.setitem(
+            _config_mod.CONFIG,
+            "hurst_regime",
+            {
+                "enabled": True,
+                "trending_threshold": 0.55,
+                "reverting_threshold": 0.45,
+                "lookback_days": 63,
+                "cache_ttl_seconds": 3600,
+            },
+        )
+        with patch.object(_signals_mod, "_safe_download", side_effect=Exception("network error")):
             result = get_hurst_regime_spy()
         assert result["regime"] == "unknown"
         assert result["source"] == "fallback"
 
     def test_insufficient_data_returns_unknown(self, monkeypatch):
-        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache",    None)
+        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache", None)
         monkeypatch.setattr(_signals_mod, "_hurst_spy_cache_ts", None)
-        monkeypatch.setitem(_config_mod.CONFIG, "hurst_regime", {
-            "enabled": True, "trending_threshold": 0.55,
-            "reverting_threshold": 0.45, "lookback_days": 63,
-            "cache_ttl_seconds": 3600,
-        })
+        monkeypatch.setitem(
+            _config_mod.CONFIG,
+            "hurst_regime",
+            {
+                "enabled": True,
+                "trending_threshold": 0.55,
+                "reverting_threshold": 0.45,
+                "lookback_days": 63,
+                "cache_ttl_seconds": 3600,
+            },
+        )
         small_df = pd.DataFrame({"Close": [100.0, 101.0, 102.0]})
-        with patch.object(_signals_mod, "_safe_download",
-                          return_value=small_df), \
-             patch.object(_signals_mod, "_flatten_columns",
-                          side_effect=lambda df: df):
+        with (
+            patch.object(_signals_mod, "_safe_download", return_value=small_df),
+            patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df),
+        ):
             result = get_hurst_regime_spy()
         assert result["regime"] == "unknown"
 
     def test_hurst_value_is_float_in_unit_interval(self, monkeypatch):
-        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache",    None)
+        monkeypatch.setattr(_signals_mod, "_hurst_spy_cache", None)
         monkeypatch.setattr(_signals_mod, "_hurst_spy_cache_ts", None)
-        monkeypatch.setitem(_config_mod.CONFIG, "hurst_regime", {
-            "enabled": True, "trending_threshold": 0.55,
-            "reverting_threshold": 0.45, "lookback_days": 63,
-            "cache_ttl_seconds": 3600,
-        })
-        with patch.object(_signals_mod, "_safe_download",
-                          return_value=self._spy_df(0.5)), \
-             patch.object(_signals_mod, "_flatten_columns",
-                          side_effect=lambda df: df):
+        monkeypatch.setitem(
+            _config_mod.CONFIG,
+            "hurst_regime",
+            {
+                "enabled": True,
+                "trending_threshold": 0.55,
+                "reverting_threshold": 0.45,
+                "lookback_days": 63,
+                "cache_ttl_seconds": 3600,
+            },
+        )
+        with (
+            patch.object(_signals_mod, "_safe_download", return_value=self._spy_df(0.5)),
+            patch.object(_signals_mod, "_flatten_columns", side_effect=lambda df: df),
+        ):
             result = get_hurst_regime_spy()
         if result["hurst"] is not None:
             assert 0.0 <= result["hurst"] <= 1.0
@@ -538,12 +579,12 @@ class TestGetHurstRegimeSpy:
 
 # ── 7. _resolve_regime_router() ──────────────────────────────────────────────
 
-class TestResolveRegimeRouter:
 
+class TestResolveRegimeRouter:
     def test_hurst_unknown_returns_vix_regime_unchanged(self):
         """When Hurst is disabled/failed (unknown), VIX regime passes through unchanged."""
-        assert _resolve_regime_router("momentum",      "unknown") == "momentum"
-        assert _resolve_regime_router("mean_reversion","unknown") == "mean_reversion"
+        assert _resolve_regime_router("momentum", "unknown") == "momentum"
+        assert _resolve_regime_router("mean_reversion", "unknown") == "mean_reversion"
 
     def test_both_agree_momentum(self):
         assert _resolve_regime_router("momentum", "trending") == "momentum"
@@ -561,21 +602,20 @@ class TestResolveRegimeRouter:
 
     def test_hurst_neutral_always_gives_neutral(self):
         """Hurst in the random-walk zone → no consensus possible → neutral."""
-        assert _resolve_regime_router("momentum",      "neutral") == "neutral"
-        assert _resolve_regime_router("mean_reversion","neutral") == "neutral"
+        assert _resolve_regime_router("momentum", "neutral") == "neutral"
+        assert _resolve_regime_router("mean_reversion", "neutral") == "neutral"
 
     def test_neutral_regime_router_string_maps_to_all_ones_multipliers(self, monkeypatch):
         """'neutral' passed to _regime_multipliers must return all 1.0 (fallthrough)."""
         monkeypatch.setitem(_config_mod.CONFIG, "regime_routing_enabled", True)
         mults = _regime_multipliers("neutral")
-        assert all(v == 1.0 for v in mults.values()), (
-            "neutral routing state must produce equal-weight multipliers"
-        )
+        assert all(v == 1.0 for v in mults.values()), "neutral routing state must produce equal-weight multipliers"
 
     def test_disabled_routing_returns_disabled_not_neutral(self):
         """regime_routing_enabled=False in bot_trading produces 'disabled', not 'neutral'.
         _regime_multipliers('disabled') must also return all 1.0."""
         import config as _c
+
         orig = _c.CONFIG.get("regime_routing_enabled", True)
         _c.CONFIG["regime_routing_enabled"] = False
         try:

@@ -14,25 +14,26 @@ import logging
 import math
 import os
 import time
-import urllib.request
 import urllib.parse
+import urllib.request
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 
-from config import CONFIG
 import bot_state
-from bot_state import dash, clog, EQUITY_FILE
+from bot_state import EQUITY_FILE, clog, dash
+from config import CONFIG
 
 log = logging.getLogger("decifer.bot")
 
-_EQUITY_BAK  = EQUITY_FILE + ".bak"
-_EQUITY_TMP  = EQUITY_FILE + ".tmp"
-_BACKFILL_DONE = False   # only run once per process
+_EQUITY_BAK = EQUITY_FILE + ".bak"
+_EQUITY_TMP = EQUITY_FILE + ".tmp"
+_BACKFILL_DONE = False  # only run once per process
 
 
 # ── Equity history persistence ────────────────────────────────────────────────
+
 
 def load_equity_history() -> list:
     """Load equity history; fall back to .bak if the main file is missing or corrupt."""
@@ -69,6 +70,7 @@ def save_equity_history(history: list):
         if _save_counter % 50 == 0:
             try:
                 import shutil
+
                 shutil.copy2(EQUITY_FILE, _EQUITY_BAK)
             except Exception:
                 pass
@@ -78,7 +80,7 @@ def save_equity_history(history: list):
 
 # ── IBKR Flex Web Service ─────────────────────────────────────────────────────
 
-_FLEX_SEND_URL    = "https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.SendRequest"
+_FLEX_SEND_URL = "https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.SendRequest"
 _FLEX_RECEIVE_URL = "https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement"
 
 
@@ -99,7 +101,7 @@ def _fetch_flex_nav(token: str, query_id: str) -> list[dict] | None:
         params = urllib.parse.urlencode({"t": token, "q": query_id, "v": "3"})
         with urllib.request.urlopen(f"{_FLEX_SEND_URL}?{params}", timeout=30) as r:
             root = ET.fromstring(r.read())
-        status   = root.findtext("Status")
+        status = root.findtext("Status")
         ref_code = root.findtext("ReferenceCode")
         if status != "Success" or not ref_code:
             log.warning(f"[Flex] Request rejected: status={status}")
@@ -118,7 +120,7 @@ def _fetch_flex_nav(token: str, query_id: str) -> list[dict] | None:
             try:
                 err = ET.fromstring(raw)
                 if err.findtext("ErrorCode") in ("1019", "1100"):
-                    log.info(f"[Flex] Not ready yet ({attempt+1}/8)...")
+                    log.info(f"[Flex] Not ready yet ({attempt + 1}/8)...")
                     time.sleep(5)
                     continue
             except Exception:
@@ -135,12 +137,11 @@ def _fetch_flex_nav(token: str, query_id: str) -> list[dict] | None:
         # Primary: EquitySummaryByReportDateInBase
         for node in xml_root.iter("EquitySummaryByReportDateInBase"):
             raw_date = node.get("reportDate") or node.get("date") or ""
-            total    = node.get("total") or node.get("nav") or ""
+            total = node.get("total") or node.get("nav") or ""
             if raw_date and total:
                 try:
                     dt = datetime.strptime(raw_date, "%Y-%m-%d")
-                    points.append({"date": dt.strftime("%Y-%m-%d 16:00 ET"),
-                                   "value": round(float(total), 2)})
+                    points.append({"date": dt.strftime("%Y-%m-%d 16:00 ET"), "value": round(float(total), 2)})
                 except (ValueError, TypeError):
                     pass
 
@@ -148,12 +149,11 @@ def _fetch_flex_nav(token: str, query_id: str) -> list[dict] | None:
         if not points:
             for node in xml_root.iter("MTMPerformanceSummaryInBase"):
                 raw_date = node.get("date") or ""
-                total    = node.get("endingValue") or node.get("nav") or ""
+                total = node.get("endingValue") or node.get("nav") or ""
                 if raw_date and total:
                     try:
                         dt = datetime.strptime(raw_date, "%Y-%m-%d")
-                        points.append({"date": dt.strftime("%Y-%m-%d 16:00 ET"),
-                                       "value": round(float(total), 2)})
+                        points.append({"date": dt.strftime("%Y-%m-%d 16:00 ET"), "value": round(float(total), 2)})
                     except (ValueError, TypeError):
                         pass
 
@@ -172,6 +172,7 @@ def _fetch_flex_nav(token: str, query_id: str) -> list[dict] | None:
 
 # ── Trade-based reconstruction ────────────────────────────────────────────────
 
+
 def _reconstruct_from_trades(starting_capital: float, existing: list) -> list[dict]:
     """
     Approximate daily portfolio values from closed trade P&L.
@@ -180,6 +181,7 @@ def _reconstruct_from_trades(starting_capital: float, existing: list) -> list[di
     """
     try:
         from learning import load_trades as _load_trades
+
         trades = _load_trades()
     except Exception:
         try:
@@ -191,7 +193,7 @@ def _reconstruct_from_trades(starting_capital: float, existing: list) -> list[di
 
     daily_pnl: dict[str, float] = defaultdict(float)
     for t in trades:
-        ts = (t.get("exit_time") or t.get("timestamp") or "")
+        ts = t.get("exit_time") or t.get("timestamp") or ""
         ts = str(ts).split("T")[0].split(" ")[0]
         if ts and len(ts) == 10:
             daily_pnl[ts] += float(t.get("pnl") or 0)
@@ -200,12 +202,12 @@ def _reconstruct_from_trades(starting_capital: float, existing: list) -> list[di
         return []
 
     existing_dates = {e["date"].split(" ")[0] for e in existing}
-    anchor_date    = existing[0]["date"].split(" ")[0] if existing else None
-    anchor_value   = existing[0]["value"]              if existing else None
+    anchor_date = existing[0]["date"].split(" ")[0] if existing else None
+    anchor_value = existing[0]["value"] if existing else None
 
     # Build cumulative curve
-    first_dt  = datetime.strptime(min(daily_pnl.keys()), "%Y-%m-%d")
-    day_zero  = (first_dt - timedelta(days=1)).strftime("%Y-%m-%d")
+    first_dt = datetime.strptime(min(daily_pnl.keys()), "%Y-%m-%d")
+    day_zero = (first_dt - timedelta(days=1)).strftime("%Y-%m-%d")
     cumulative = starting_capital
     trade_days: list[tuple[str, float]] = [(day_zero, starting_capital)]
     for d in sorted(daily_pnl.keys()):
@@ -218,14 +220,12 @@ def _reconstruct_from_trades(starting_capital: float, existing: list) -> list[di
         if points_before:
             last_d, last_v = points_before[-1]
             if last_d < anchor_date:
-                gap_days = (datetime.strptime(anchor_date, "%Y-%m-%d") -
-                            datetime.strptime(last_d, "%Y-%m-%d")).days
+                gap_days = (datetime.strptime(anchor_date, "%Y-%m-%d") - datetime.strptime(last_d, "%Y-%m-%d")).days
                 step = (anchor_value - last_v) / max(gap_days, 1)
                 adjusted = []
                 for d, v in trade_days:
                     if last_d < d < anchor_date:
-                        elapsed = (datetime.strptime(d, "%Y-%m-%d") -
-                                   datetime.strptime(last_d, "%Y-%m-%d")).days
+                        elapsed = (datetime.strptime(d, "%Y-%m-%d") - datetime.strptime(last_d, "%Y-%m-%d")).days
                         v = round(last_v + step * elapsed, 2)
                     adjusted.append((d, v))
                 trade_days = adjusted
@@ -242,13 +242,16 @@ def _reconstruct_from_trades(starting_capital: float, existing: list) -> list[di
                 points.append({"date": key, "value": round(v, 2)})
 
     points.sort(key=lambda x: x["date"])
-    log.info(f"[Reconstruct] {len(points)} points generated: "
-             f"{points[0]['date'] if points else 'none'} → "
-             f"{points[-1]['date'] if points else 'none'}")
+    log.info(
+        f"[Reconstruct] {len(points)} points generated: "
+        f"{points[0]['date'] if points else 'none'} → "
+        f"{points[-1]['date'] if points else 'none'}"
+    )
     return points
 
 
 # ── Auto-backfill on startup ──────────────────────────────────────────────────
+
 
 def backfill_equity_history_if_needed() -> bool:
     """
@@ -285,7 +288,7 @@ def backfill_equity_history_if_needed() -> bool:
     new_points: list[dict] | None = None
 
     # ── Method 1: IBKR Flex ───────────────────────────────────────────────────
-    token    = CONFIG.get("ibkr_flex_token", "") or os.environ.get("IBKR_FLEX_TOKEN", "")
+    token = CONFIG.get("ibkr_flex_token", "") or os.environ.get("IBKR_FLEX_TOKEN", "")
     query_id = CONFIG.get("ibkr_flex_query_id", "") or os.environ.get("IBKR_FLEX_QUERY_ID", "")
     if token and query_id:
         clog("INFO", "[Backfill] Fetching historical NAV from IBKR Flex Web Service...")
@@ -293,8 +296,10 @@ def backfill_equity_history_if_needed() -> bool:
         if new_points:
             clog("INFO", f"[Backfill] Flex: {len(new_points)} NAV points retrieved.")
     else:
-        log.info("[Backfill] Flex Query skipped (no IBKR_FLEX_TOKEN/IBKR_FLEX_QUERY_ID). "
-                 "Set them in .env for accurate IBKR historical NAV.")
+        log.info(
+            "[Backfill] Flex Query skipped (no IBKR_FLEX_TOKEN/IBKR_FLEX_QUERY_ID). "
+            "Set them in .env for accurate IBKR historical NAV."
+        )
 
     # ── Method 2: trade reconstruction ───────────────────────────────────────
     if not new_points:
@@ -307,10 +312,7 @@ def backfill_equity_history_if_needed() -> bool:
 
     # Merge: deduplicate, sort, cap at 2000
     existing_dates = {e["date"] for e in history}
-    merged = sorted(
-        [p for p in new_points if p["date"] not in existing_dates] + history,
-        key=lambda x: x["date"]
-    )
+    merged = sorted([p for p in new_points if p["date"] not in existing_dates] + history, key=lambda x: x["date"])
     if len(merged) > 2000:
         merged = merged[-2000:]
 
@@ -321,12 +323,12 @@ def backfill_equity_history_if_needed() -> bool:
 
     dash["equity_history"] = merged
     save_equity_history(merged)
-    clog("INFO", f"[Backfill] +{added} historical points. "
-         f"History now: {merged[0]['date']} → {merged[-1]['date']}")
+    clog("INFO", f"[Backfill] +{added} historical points. History now: {merged[0]['date']} → {merged[-1]['date']}")
     return True
 
 
 # ── Account data ──────────────────────────────────────────────────────────────
+
 
 def get_account_data():
     """Fetch portfolio value and daily P&L from IBKR."""
@@ -356,15 +358,15 @@ def get_account_details():
     try:
         vals = ib.accountValues(CONFIG["active_account"])
         tag_map = {
-            "AvailableFunds":     "available_cash",
-            "BuyingPower":        "buying_power",
+            "AvailableFunds": "available_cash",
+            "BuyingPower": "buying_power",
             "GrossPositionValue": "gross_position_value",
-            "MaintMarginReq":     "margin_used",
-            "ExcessLiquidity":    "excess_liquidity",
-            "TotalCashValue":     "total_cash",
-            "UnrealizedPnL":      "unrealized_pnl",
-            "RealizedPnL":        "realized_pnl",
-            "NetLiquidation":     "net_liquidation",
+            "MaintMarginReq": "margin_used",
+            "ExcessLiquidity": "excess_liquidity",
+            "TotalCashValue": "total_cash",
+            "UnrealizedPnL": "unrealized_pnl",
+            "RealizedPnL": "realized_pnl",
+            "NetLiquidation": "net_liquidation",
         }
         for v in vals:
             if v.tag in tag_map and v.currency == "USD":
@@ -378,6 +380,7 @@ def get_account_details():
 
 
 # ── News & FX helpers ─────────────────────────────────────────────────────────
+
 
 def get_news_headlines() -> list:
     """Return recent news headlines from cached scan data for agents."""
@@ -393,21 +396,18 @@ def get_news_headlines() -> list:
 
 def get_fx_snapshot() -> dict:
     """Get snapshot of key FX pairs."""
-    pairs = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X",
-             "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X"}
+    pairs = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X"}
     result = {}
 
     def fetch_pair(name, ticker):
         try:
             from signals import _safe_download
+
             data = _safe_download(ticker, period="1d", interval="1h", progress=False, auto_adjust=True)
             if data is not None and len(data) > 1:
                 price = float(data["Close"].squeeze().iloc[-1])
-                prev  = float(data["Close"].squeeze().iloc[-2])
-                return name, {
-                    "price":      round(price, 5),
-                    "change_pct": round((price - prev) / prev * 100, 3)
-                }
+                prev = float(data["Close"].squeeze().iloc[-2])
+                return name, {"price": round(price, 5), "change_pct": round((price - prev) / prev * 100, 3)}
         except Exception:
             pass
         return name, None

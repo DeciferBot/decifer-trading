@@ -15,9 +15,9 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import threading
-import logging
 from datetime import date, timedelta
 
 from config import CONFIG
@@ -39,12 +39,13 @@ def _get_client():
     with _client_lock:
         if _client is not None:
             return _client
-        api_key    = CONFIG.get("alpaca_api_key", "")
+        api_key = CONFIG.get("alpaca_api_key", "")
         secret_key = CONFIG.get("alpaca_secret_key", "")
         if not api_key or not secret_key:
             return None
         try:
             from alpaca.data.historical.option import OptionHistoricalDataClient
+
             _client = OptionHistoricalDataClient(api_key, secret_key)
             log.debug("iv_skew: OptionHistoricalDataClient initialised")
         except ImportError:
@@ -75,7 +76,7 @@ def _parse_occ(symbol: str) -> tuple[str, str, float] | None:
         expiry = date(2000 + yy, mm, dd).isoformat()
     except (ValueError, OverflowError):
         return None
-    ctype  = "call" if cp == "C" else "put"
+    ctype = "call" if cp == "C" else "put"
     strike = int(strike_str) / 1000.0
     return expiry, ctype, strike
 
@@ -122,7 +123,7 @@ def get_iv_skew(symbol: str) -> dict | None:
         - No chain data returned for the symbol.
         - Fewer than 2 qualifying contracts found.
     """
-    today     = date.today()
+    today = date.today()
     cache_key = (symbol, today.isoformat())
     if cache_key in _cache:
         return _cache[cache_key]
@@ -131,12 +132,12 @@ def get_iv_skew(symbol: str) -> dict | None:
     if client is None:
         return None
 
-    cfg              = CONFIG.get("iv_skew", {})
-    dte_min          = cfg.get("dte_min",         7)
-    dte_max          = cfg.get("dte_max",         60)
-    target_dte       = cfg.get("target_dte",      30)
-    otm_delta_target = cfg.get("otm_put_delta",  -0.25)   # put delta is negative
-    atm_delta_target = cfg.get("atm_call_delta",  0.50)
+    cfg = CONFIG.get("iv_skew", {})
+    dte_min = cfg.get("dte_min", 7)
+    dte_max = cfg.get("dte_max", 60)
+    target_dte = cfg.get("target_dte", 30)
+    otm_delta_target = cfg.get("otm_put_delta", -0.25)  # put delta is negative
+    atm_delta_target = cfg.get("atm_call_delta", 0.50)
 
     try:
         from alpaca.data.requests import OptionChainRequest
@@ -144,7 +145,7 @@ def get_iv_skew(symbol: str) -> dict | None:
         exp_min = today + timedelta(days=dte_min)
         exp_max = today + timedelta(days=dte_max)
 
-        req   = OptionChainRequest(
+        req = OptionChainRequest(
             underlying_symbol=symbol,
             expiration_date_gte=exp_min,
             expiration_date_lte=exp_max,
@@ -163,16 +164,18 @@ def get_iv_skew(symbol: str) -> dict | None:
             if parsed is None:
                 continue
             exp, ctype, strike = parsed
-            iv    = snap.implied_volatility
+            iv = snap.implied_volatility
             delta = snap.greeks.delta if snap.greeks else None
             if iv is None or iv <= 0 or delta is None:
                 continue
-            expiries.setdefault(exp, []).append({
-                "delta":  float(delta),
-                "iv":     float(iv),
-                "strike": strike,
-                "ctype":  ctype,
-            })
+            expiries.setdefault(exp, []).append(
+                {
+                    "delta": float(delta),
+                    "iv": float(iv),
+                    "strike": strike,
+                    "ctype": ctype,
+                }
+            )
 
         if not expiries:
             return None
@@ -182,11 +185,11 @@ def get_iv_skew(symbol: str) -> dict | None:
             return (date.fromisoformat(exp_str) - today).days
 
         best_expiry = min(expiries.keys(), key=lambda e: abs(_dte(e) - target_dte))
-        entries     = expiries[best_expiry]
+        entries = expiries[best_expiry]
 
         # Separate calls and puts
         calls = [e for e in entries if e["ctype"] == "call"]
-        puts  = [e for e in entries if e["ctype"] == "put"]
+        puts = [e for e in entries if e["ctype"] == "put"]
 
         if not calls or not puts:
             return None
@@ -194,22 +197,22 @@ def get_iv_skew(symbol: str) -> dict | None:
         # ATM call: delta closest to +0.50
         atm_call = min(calls, key=lambda c: abs(c["delta"] - atm_delta_target))
         # OTM put:  delta closest to -0.25
-        otm_put  = min(puts,  key=lambda p: abs(p["delta"] - otm_delta_target))
+        otm_put = min(puts, key=lambda p: abs(p["delta"] - otm_delta_target))
 
         atm_call_iv = atm_call["iv"]
-        otm_put_iv  = otm_put["iv"]
-        skew        = otm_put_iv - atm_call_iv
+        otm_put_iv = otm_put["iv"]
+        skew = otm_put_iv - atm_call_iv
 
         iv_skew_score, iv_skew_dir = _score_skew(skew, cfg)
 
         result = {
-            "skew":          round(skew, 4),
-            "otm_put_iv":    round(otm_put_iv,  4),
-            "atm_call_iv":   round(atm_call_iv, 4),
+            "skew": round(skew, 4),
+            "otm_put_iv": round(otm_put_iv, 4),
+            "atm_call_iv": round(atm_call_iv, 4),
             "iv_skew_score": iv_skew_score,
-            "iv_skew_dir":   iv_skew_dir,
-            "expiry":        best_expiry,
-            "source":        "alpaca",
+            "iv_skew_dir": iv_skew_dir,
+            "expiry": best_expiry,
+            "source": "alpaca",
         }
         _cache[cache_key] = result
         log.debug(
@@ -237,10 +240,10 @@ def _score_skew(skew: float, cfg: dict) -> tuple[int, int]:
 
     Thresholds are configurable in config["iv_skew"].
     """
-    hi    = cfg.get("skew_bearish_hi",  0.15)
-    mid   = cfg.get("skew_bearish_mid", 0.10)
-    lo    = cfg.get("skew_bearish_lo",  0.05)
-    bull  = cfg.get("skew_bullish_lo",  -0.03)
+    hi = cfg.get("skew_bearish_hi", 0.15)
+    mid = cfg.get("skew_bearish_mid", 0.10)
+    lo = cfg.get("skew_bearish_lo", 0.05)
+    bull = cfg.get("skew_bullish_lo", -0.03)
 
     if skew > hi:
         return 10, -1
@@ -249,5 +252,5 @@ def _score_skew(skew: float, cfg: dict) -> tuple[int, int]:
     if skew > lo:
         return 4, -1
     if skew >= bull:
-        return 0, 0   # neutral band
-    return 3, +1      # complacency — slight bullish lean
+        return 0, 0  # neutral band
+    return 3, +1  # complacency — slight bullish lean

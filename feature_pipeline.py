@@ -23,8 +23,8 @@ class FeatureError(Exception):
 
 # ── Individual Indicators ─────────────────────────────────────────
 
-def atr(high: np.ndarray, low: np.ndarray, close: np.ndarray,
-        period: int = 14) -> np.ndarray:
+
+def atr(high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int = 14) -> np.ndarray:
     """
     Average True Range.
 
@@ -69,8 +69,7 @@ def rsi(close: np.ndarray, period: int = 14) -> np.ndarray:
     return result
 
 
-def mfi(high: np.ndarray, low: np.ndarray, close: np.ndarray,
-        volume: np.ndarray, period: int = 14) -> np.ndarray:
+def mfi(high: np.ndarray, low: np.ndarray, close: np.ndarray, volume: np.ndarray, period: int = 14) -> np.ndarray:
     """
     Money Flow Index (volume-weighted RSI).
 
@@ -99,8 +98,7 @@ def mfi(high: np.ndarray, low: np.ndarray, close: np.ndarray,
     return 100 - (100 / (1 + ratio))
 
 
-def vwap(high: np.ndarray, low: np.ndarray, close: np.ndarray,
-         volume: np.ndarray) -> np.ndarray:
+def vwap(high: np.ndarray, low: np.ndarray, close: np.ndarray, volume: np.ndarray) -> np.ndarray:
     """
     VWAP approximated as cumulative(tp × volume) / cumulative(volume).
 
@@ -119,8 +117,7 @@ def vwap(high: np.ndarray, low: np.ndarray, close: np.ndarray,
 
     if (cum_v == 0).all():
         log.warning(
-            "VWAP: all bars have zero cumulative volume — "
-            "VWAP equals close price throughout (data quality issue)"
+            "VWAP: all bars have zero cumulative volume — VWAP equals close price throughout (data quality issue)"
         )
 
     return result
@@ -135,8 +132,7 @@ def regime_label(df: pd.DataFrame) -> pd.Series:
     """
     if "return_1" not in df.columns:
         raise FeatureError(
-            "'return_1' column is required for regime labelling. "
-            "Compute returns before calling regime_label()."
+            "'return_1' column is required for regime labelling. Compute returns before calling regime_label()."
         )
 
     ret_20 = df["close"].pct_change(20)
@@ -153,6 +149,7 @@ def regime_label(df: pd.DataFrame) -> pd.Series:
 
 
 # ── Pipeline Entry Point ──────────────────────────────────────────
+
 
 def run(df: pd.DataFrame) -> pd.DataFrame:
     """

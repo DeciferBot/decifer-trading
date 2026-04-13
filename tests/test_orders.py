@@ -4,9 +4,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
 # Path bootstrap
@@ -28,6 +26,7 @@ for _mod_name in ("ib_async", "anthropic"):
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_orders_module(tmp_path):
     """Import orders with file-IO patched to tmp_path."""
     trades_file = tmp_path / "trades.json"
@@ -35,9 +34,9 @@ def _make_orders_module(tmp_path):
     orders_file = tmp_path / "orders.json"
     orders_file.write_text(json.dumps([]))
 
-    with patch("orders.TRADES_FILE", str(trades_file)), \
-         patch("orders.ORDERS_FILE", str(orders_file)):
+    with patch("orders.TRADES_FILE", str(trades_file)), patch("orders.ORDERS_FILE", str(orders_file)):
         import orders as _orders
+
         return _orders, trades_file, orders_file
 
 
@@ -45,15 +44,19 @@ def _make_orders_module(tmp_path):
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestHasOpenOrderFor:
     """Unit tests for orders.has_open_order_for()."""
 
     def test_returns_false_when_no_open_orders(self, tmp_path):
         """has_open_order_for returns False when open_orders dict is empty."""
-        with patch("orders.open_orders", {}), \
-             patch("orders.TRADES_FILE", str(tmp_path / "trades.json")), \
-             patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")):
+        with (
+            patch("orders.open_orders", {}),
+            patch("orders.TRADES_FILE", str(tmp_path / "trades.json")),
+            patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")),
+        ):
             import orders
+
             result = orders.has_open_order_for("AAPL")
             assert result is False
 
@@ -61,21 +64,26 @@ class TestHasOpenOrderFor:
         """has_open_order_for returns True when symbol is in open_orders."""
         mock_trade = MagicMock()
         mock_trade.orderStatus.status = "Submitted"
-        import orders_guards
-        with patch("orders_guards.open_orders", {"AAPL": mock_trade}), \
-             patch("orders.TRADES_FILE", str(tmp_path / "trades.json")), \
-             patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")):
+        with (
+            patch("orders_guards.open_orders", {"AAPL": mock_trade}),
+            patch("orders.TRADES_FILE", str(tmp_path / "trades.json")),
+            patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")),
+        ):
             import orders
+
             result = orders.has_open_order_for("AAPL")
             assert result is True
 
     def test_returns_false_for_different_symbol(self, tmp_path):
         """has_open_order_for returns False when a different symbol has an open order."""
         mock_trade = MagicMock()
-        with patch("orders.open_orders", {"TSLA": mock_trade}), \
-             patch("orders.TRADES_FILE", str(tmp_path / "trades.json")), \
-             patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")):
+        with (
+            patch("orders.open_orders", {"TSLA": mock_trade}),
+            patch("orders.TRADES_FILE", str(tmp_path / "trades.json")),
+            patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")),
+        ):
             import orders
+
             result = orders.has_open_order_for("AAPL")
             assert result is False
 
@@ -85,9 +93,12 @@ class TestIsOptionsMarketOpen:
 
     def test_returns_bool(self, tmp_path):
         """is_options_market_open always returns a boolean."""
-        with patch("orders.TRADES_FILE", str(tmp_path / "trades.json")), \
-             patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")):
+        with (
+            patch("orders.TRADES_FILE", str(tmp_path / "trades.json")),
+            patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")),
+        ):
             import orders
+
             result = orders.is_options_market_open()
             assert isinstance(result, bool)
 
@@ -98,10 +109,14 @@ class TestSafeTradeHelpers:
     def test_safe_set_and_del_trade(self, tmp_path):
         """_safe_set_trade and _safe_del_trade correctly mutate active_trades."""
         import orders_state
-        with patch("orders.TRADES_FILE", str(tmp_path / "trades.json")), \
-             patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")), \
-             patch("orders_state.active_trades", {}) as mock_trades:
+
+        with (
+            patch("orders.TRADES_FILE", str(tmp_path / "trades.json")),
+            patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")),
+            patch("orders_state.active_trades", {}) as mock_trades,
+        ):
             import orders
+
             orders._safe_set_trade("AAPL", {"qty": 10})
             assert "AAPL" in orders_state.active_trades
             orders._safe_del_trade("AAPL")
@@ -111,10 +126,14 @@ class TestSafeTradeHelpers:
         """_safe_update_trade merges keys into an existing trade entry."""
         initial = {"AAPL": {"qty": 10, "entry": 150.0}}
         import orders_state
-        with patch("orders.TRADES_FILE", str(tmp_path / "trades.json")), \
-             patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")), \
-             patch("orders_state.active_trades", initial):
+
+        with (
+            patch("orders.TRADES_FILE", str(tmp_path / "trades.json")),
+            patch("orders.ORDERS_FILE", str(tmp_path / "orders.json")),
+            patch("orders_state.active_trades", initial),
+        ):
             import orders
+
             orders._safe_update_trade("AAPL", {"stop": 140.0})
             assert orders_state.active_trades["AAPL"]["stop"] == 140.0
             assert orders_state.active_trades["AAPL"]["qty"] == 10

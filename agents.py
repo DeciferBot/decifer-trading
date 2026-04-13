@@ -16,8 +16,10 @@
 
 import logging
 import re
-import anthropic
 from concurrent.futures import ThreadPoolExecutor
+
+import anthropic
+
 from config import CONFIG
 
 log = logging.getLogger("decifer.agents")
@@ -31,7 +33,7 @@ def _call_claude(system_prompt: str, user_message: str) -> str:
             model=CONFIG["claude_model"],
             max_tokens=CONFIG["claude_max_tokens"],
             system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
-            messages=[{"role": "user", "content": user_message}]
+            messages=[{"role": "user", "content": user_message}],
         )
         return resp.content[0].text.strip()
     except Exception as e:
@@ -47,7 +49,7 @@ def _call_claude_alpha(system_prompt: str, user_message: str) -> str:
             model=CONFIG.get("claude_model_alpha", "claude-opus-4-6"),
             max_tokens=CONFIG.get("claude_max_tokens_alpha", 4096),
             system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
-            messages=[{"role": "user", "content": user_message}]
+            messages=[{"role": "user", "content": user_message}],
         )
         return resp.content[0].text.strip()
     except Exception as e:
@@ -56,469 +58,179 @@ def _call_claude_alpha(system_prompt: str, user_message: str) -> str:
 
 
 # ══════════════════════════════════════════════════════════════
-# AGENT 1 — TECHNICAL ANALYST  (deterministic)
+# ORCHESTRATOR
 # ══════════════════════════════════════════════════════════════
 
-def agent_technical(signals: list, regime: dict) -> str:
-    """Deterministic technical analysis report built from pre-computed signal data."""
-    if not signals:
-        return "No symbols above scoring threshold. No technical setups."
 
-    lines = [
-        f"TECHNICAL ANALYSIS — {min(len(signals), 15)} symbols above threshold",
-        (
-            f"Market: VIX={regime['vix']:.1f} | SPY=${regime['spy_price']} "
-            f"({'above' if regime.get('spy_above_200d', regime.get('spy_above_ema')) else 'below'} 200d MA)"
-        ),
-        "",
-    ]
+def load_weekly_review() -> str:
+    """Load most recent weekly review to inject as memory."""
+    import os
 
-    high_syms, medium_syms, low_syms, divergences = [], [], [], []
-
-    for s in signals[:15]:
-        sym = s["symbol"]
-        score = s["score"]
-        sig = s.get("signal", "NEUTRAL")
-        tf5 = s.get("timeframes", {}).get("5m") or {}
-        tf1d = s.get("timeframes", {}).get("1d") or {}
-        tf1w = s.get("timeframes", {}).get("1w") or {}
-
-        mfi = tf5.get("mfi", 50)
-        obv_slope = tf5.get("obv_slope", 0)
-        vol_ratio = s.get("vol_ratio", 1.0)
-        squeeze_on = tf5.get("squeeze_on", False)
-        squeeze_int = tf5.get("squeeze_intensity", 0)
-        donch = tf5.get("donch_breakout", 0)
-        adx = tf5.get("adx", 0)
-        vwap_dist = tf5.get("vwap_dist", 0)
-        bull_al = tf5.get("bull_aligned", False)
-        bear_al = tf5.get("bear_aligned", False)
-
-        aligned_dims = sum(1 for v in s.get("score_breakdown", {}).values() if v > 0)
-
-        if score >= 30:
-            high_syms.append(sym)
-            conviction = "HIGH"
-        elif score >= 20:
-            medium_syms.append(sym)
-            conviction = "MEDIUM"
-        else:
-            low_syms.append(sym)
-            conviction = "LOW"
-
-        ema_str = "BULL" if bull_al else ("BEAR" if bear_al else "MIXED")
-        sq_str = f"Squeeze=ON({squeeze_int:.1f})" if squeeze_on else "Squeeze=off"
-        donch_str = (
-            "Donchian=BREAKOUT_HIGH" if donch == 1
-            else "Donchian=BREAKOUT_LOW" if donch == -1
-            else "Donchian=inside"
-        )
-        tf_agree = "/".join([
-            tf5.get("signal", "?"),
-            tf1d.get("signal", "N/A") if tf1d else "N/A",
-            tf1w.get("signal", "N/A") if tf1w else "N/A",
-        ])
-
-        lines.append(
-            f"[{conviction}] {sym}: ${s['price']} | Score={score}pt | {sig} | "
-            f"ADX={adx:.0f} | MFI={mfi:.0f} | EMA={ema_str} | {sq_str} | "
-            f"Vol={vol_ratio:.1f}x | VWAP_dist={vwap_dist:+.2f}% | {donch_str} | "
-            f"OBV={'UP' if obv_slope > 0 else 'DOWN' if obv_slope < 0 else 'FLAT'} | "
-            f"TF={tf_agree} | Dims={aligned_dims} aligned"
-        )
-
-        news = s.get("news") or {}
-        kw = news.get("keyword_score", 0)
-        sent = news.get("claude_sentiment", "")
-        cat = news.get("claude_catalyst", "")
-        if sent and kw != 0:
-            lines.append(
-                f"  -> News: {sent} (kw={kw:+d})"
-                + (f" | {cat[:80]}" if cat else "")
-            )
-
-        if sig == "BUY" and obv_slope < 0 and mfi < 40:
-            divergences.append(
-                f"  ! {sym}: DISTRIBUTION TRAP -- BUY signal but OBV falling + MFI={mfi:.0f}")
-        elif sig == "BUY" and mfi < 35:
-            divergences.append(
-                f"  ! {sym}: MFI DIVERGENCE -- BUY signal but MFI={mfi:.0f} (weak institutional flow)")
-        elif donch == 1 and vol_ratio < 1.5:
-            divergences.append(
-                f"  ! {sym}: LOW-VOLUME BREAKOUT -- Donchian breach but Vol={vol_ratio:.1f}x (suspect fakeout)")
-        vwap_sd_pct = tf5.get("vwap_sd_pct", 1.0)
-        sd_threshold = 2.0 * vwap_sd_pct
-        regime_name = regime.get("regime", "")
-        if (score >= 45
-                and regime_name in ("RANGE_BOUND", "CHOPPY")
-                and abs(vwap_dist) >= sd_threshold):
-            direction_word = "SHORT" if sig in ("SELL", "STRONG_SELL") else "LONG"
-            contra = "LONG" if direction_word == "SHORT" else "SHORT"
-            divergences.append(
-                f"  ! {sym}: OVEREXTENDED IN RANGE -- score={score}pt + "
-                f"VWAP={vwap_dist:+.1f}% ({abs(vwap_dist)/vwap_sd_pct:.1f}x SD, threshold=2.0x) "
-                f"in {regime_name}. Move already expressed — mean reversion {contra} "
-                f"more probable than {direction_word} continuation."
-            )
-
-    lines.append("")
-    lines.append(
-        f"SUMMARY: HIGH={len(high_syms)} ({', '.join(high_syms) or 'none'}) | "
-        f"MEDIUM={len(medium_syms)} ({', '.join(medium_syms) or 'none'}) | "
-        f"LOW={len(low_syms)} ({', '.join(low_syms) or 'none'})"
-    )
-    if divergences:
-        lines.append("")
-        lines.append("DIVERGENCE WARNINGS:")
-        lines.extend(divergences)
-    else:
-        lines.append("No divergences detected.")
-
-    return "\n".join(lines)
-
-
-# ══════════════════════════════════════════════════════════════
-# AGENT 2 — TRADING ANALYST  (LLM / Opus / uncapped)
-# Single call replacing Macro + Opportunity + Devil's Advocate chain.
-# Sees all inputs simultaneously — no anchoring from prior agent outputs.
-# ══════════════════════════════════════════════════════════════
-
-_TRADING_ANALYST_SYSTEM = """You are the Trading Analyst for Decifer, an autonomous US equity trading system.
-
-Your job is to simultaneously assess the macro environment AND identify the best trading opportunities. \
-You receive all data in one pass — you are not reading summaries from other agents.
-
-OUTPUT FORMAT — produce exactly these sections in this order:
-
-MACRO: [BULLISH | BEARISH | NEUTRAL | UNCERTAIN]
-<2-3 sentences on the macro environment: regime, VIX trajectory, cross-asset signals, risk-on/off verdict>
-
-OPPORTUNITIES:
-For each opportunity (up to 3; fewer if genuine setups are scarce — never force trades):
-
-SYMBOL: <ticker>
-DIRECTION: LONG | SHORT
-CONVICTION: HIGH | MEDIUM | LOW
-RATIONALE: <Lead with the real-world reason — catalyst, sector move, earnings, breakout from base. \
-Do NOT lead with indicator values. A human must understand the trade without knowing what ADX means.>
-INSTRUMENT: stock | call | put
-  (prefer call/put when: options_score > 20 AND IVR < 30% AND stock also signals)
-COUNTER-ARGUMENT: <The single strongest reason this trade fails. Be honest. One sentence.>
-KEY RISK: <Binary events, crowding, macro headwind>
-
-RULES:
-- If fewer than 3 genuine setups exist, say so. Cash is a valid output.
-- Options flow: CALL_BUYER = smart money bullish. PUT_BUYER = smart money bearish. Low IVR = cheap premium.
-- In CAPITULATION regime: output MACRO: BEARISH and no OPPORTUNITIES. Capital preservation.
-- RANGE_BOUND regime: raise your conviction bar — only HIGH conviction setups.
-- TRENDING_DOWN regime: you MUST evaluate SHORT setups. If any SELL or STRONG_SELL signals appear in the scored list, include at least one SHORT opportunity. Do not default to cash or LONGs only — name the short candidates explicitly with DIRECTION: SHORT.
-- RELIEF_RALLY regime: treat as a bear-market bounce — favour shorts on failed breakouts, be sceptical of longs.
-- You determine direction from first principles using all data provided. SELL/STRONG_SELL signals are SHORT candidates; BUY/STRONG_BUY are LONG candidates — but these are starting points, not instructions. If price structure contradicts the signal direction, trust your read and either flip or omit the symbol.
-- Vol=Xx ADV means today's volume vs the 20-day average. Vol>2x = unusual conviction. Vol<0.5x = low participation, treat setups with scepticism. VWAP=+/-X% = how far price is from today's VWAP. A short candidate already sitting far below VWAP in a RANGE_BOUND or CHOPPY regime is a mean-reversion long setup, not a short continuation — recognise this and act accordingly.
-- Keep each section tight. No padding."""
-
-
-def agent_trading_analyst(
-    signals: list,
-    regime: dict,
-    news_headlines: list,
-    fx_data: dict,
-    options_signals: list,
-    strategy_mode: dict,
-    portfolio_value: float = 0.0,
-    daily_pnl: float = 0.0,
-    open_positions: list = None,
-) -> str:
-    """
-    Single Opus LLM call replacing Macro Analyst + Opportunity Finder + Devil's Advocate.
-    Receives all inputs simultaneously — eliminates anchoring bias from the old serial chain.
-    """
-    regime_name = regime.get("regime", "UNKNOWN")
-    vix = regime.get("vix", 0)
-    vix_1h = regime.get("vix_1h_change", 0)
-    spy = regime.get("spy_price", "?")
-    qqq = regime.get("qqq_price", "?")
-    spy_above = regime.get("spy_above_200d", regime.get("spy_above_ema", False))
-    qqq_above = regime.get("qqq_above_200d", regime.get("qqq_above_ema", False))
-    size_mult = regime.get("position_size_multiplier", 1.0)
-
-    sig_lines = []
-    for s in signals[:10]:
-        sym = s["symbol"]
-        score = s["score"]
-        sig = s.get("signal", "?")
-        bd = s.get("score_breakdown", {})
-        bd_str = " ".join(f"{k[:3]}={v:.0f}" for k, v in bd.items() if v > 0)
-        news = s.get("news") or {}
-        kw = news.get("keyword_score", 0)
-        sent = news.get("claude_sentiment", "")
-        news_str = f" | news={sent}(kw={kw:+d})" if sent else (f" | kw={kw:+d}" if kw else "")
-        vol_ratio = s.get("vol_ratio") or s.get("timeframes", {}).get("5m", {}).get("vol_ratio", 1.0)
-        vwap_dist = s.get("timeframes", {}).get("5m", {}).get("vwap_dist", 0)
-        sig_lines.append(f"  {sym}: {score}pt {sig} [{bd_str}]{news_str} | Vol={vol_ratio:.1f}x ADV | VWAP={vwap_dist:+.1f}%")
-
-    opts_lines = []
-    for o in (options_signals or [])[:8]:
-        ivr_str = f"IVR={o['iv_rank']:.0f}%" if o.get("iv_rank") is not None else "IVR=n/a"
-        earn_str = f" earnings_in={o['earnings_days']}d" if o.get("earnings_days") else ""
-        opts_lines.append(
-            f"  [{o['options_score']:>2}/30] {o['signal']:<14} {o['symbol']:<6} "
-            f"${o['price']:.2f} C/P={o['cp_ratio']:.1f}x {ivr_str} {o['dte']}DTE{earn_str}"
-        )
-
-    fx_lines = [
-        f"  {pair}: {d.get('price','?')} ({d.get('change_pct','?')}%)"
-        for pair, d in (fx_data or {}).items()
-    ]
-
-    hl_lines = [f"  - {h}" for h in (news_headlines or [])[:5]]
-    sm_ctx = (strategy_mode or {}).get("context", "")
-
-    overnight_block = ""
-    try:
-        from overnight_research import load_overnight_notes
-        notes = load_overnight_notes()
-        if notes:
-            overnight_block = f"\nOVERNIGHT RESEARCH NOTES:\n{notes}\n"
-    except Exception:
-        pass
-
-    # ── Portfolio context: what's already held ────────────────────────────────
-    held_syms = [p["symbol"] for p in (open_positions or [])]
-    if held_syms:
-        held_block = f"\nALREADY HELD — do NOT recommend new entries for these: {', '.join(held_syms)}\n"
-    else:
-        held_block = ""
-
-    # ── Portfolio P&L context — factual, no directive ────────────────────────
-    pnl_context = ""
-    if portfolio_value > 0 and daily_pnl != 0:
-        pnl_pct = daily_pnl / portfolio_value * 100
-        pnl_context = f"Portfolio P&L today: ${daily_pnl:+,.0f} ({pnl_pct:+.2f}%)\n"
-
-    prompt = f"""REGIME: {regime_name} | VIX={vix:.1f} ({vix_1h:+.1f}%/1h) | size_mult={size_mult:.1f}x
-SPY=${spy} ({'above' if spy_above else 'below'} 200d MA) | QQQ=${qqq} ({'above' if qqq_above else 'below'} 200d MA)
-{pnl_context}{overnight_block}{held_block}
-SCORED SIGNALS — fresh candidates first (NOT already held):
-{chr(10).join(sig_lines) or '  None above threshold'}
-
-OPTIONS FLOW:
-{chr(10).join(opts_lines) or '  No options data'}
-
-FX MARKETS:
-{chr(10).join(fx_lines) or '  No FX data'}
-
-RECENT HEADLINES (top 5):
-{chr(10).join(hl_lines) or '  No headlines'}
-{(chr(10) + 'TRADING CONTEXT: ' + sm_ctx) if sm_ctx else ''}
-
-Produce your analysis now."""
-
-    return _call_claude_alpha(_TRADING_ANALYST_SYSTEM, prompt)
-
-
-# ══════════════════════════════════════════════════════════════
-# PRIVATE HELPERS — deterministic vote parsing
-# ══════════════════════════════════════════════════════════════
-
-def _extract_proposed_symbols(opportunity_text: str, signals: list) -> list:
-    """Return signal dicts for symbols proposed in analyst text, in mention order."""
-    if not opportunity_text or not signals:
-        return []
-    sig_map = {s["symbol"]: s for s in signals}
-    labeled = re.findall(r"SYMBOL[:\s]+([A-Z]{1,5})", opportunity_text.upper())
-    bare = re.findall(r"\b([A-Z]{2,5})\b", opportunity_text)
-    seen, result = set(), []
-    for sym in labeled + bare:
-        if sym in sig_map and sym not in seen:
-            seen.add(sym)
-            result.append(sig_map[sym])
-        if len(result) >= 3:
-            break
-    return result
-
-
-def _extract_macro_vote(analyst_text: str) -> int:
-    """+1 BULLISH | -1 BEARISH | 0 NEUTRAL/UNCERTAIN. Parses Trading Analyst output."""
-    if not analyst_text:
-        return 0
-    m = re.search(r"MACRO:\s*(BULLISH|BEARISH|NEUTRAL|UNCERTAIN)", analyst_text.upper())
-    if m:
-        verdict = m.group(1)
-        if verdict == "BULLISH":
-            return 1
-        if verdict == "BEARISH":
-            return -1
-        return 0  # NEUTRAL or UNCERTAIN
-    upper = analyst_text.upper()
-    if any(kw in upper for kw in ("BULLISH", "RISK-ON", "RISK ON")):
-        return 1
-    if any(kw in upper for kw in ("BEARISH", "RISK-OFF", "RISK OFF")):
-        return -1
-    return 0
-
-
-def _extract_technical_conviction(tech_text: str, symbol: str) -> int:
-    """+1 if technical report rated this symbol HIGH conviction, else 0."""
-    if not tech_text:
-        return 0
-    upper = tech_text.upper()
-    idx = upper.find(symbol)
-    while idx != -1:
-        window = upper[max(0, idx - 20):idx + 120]
-        if "HIGH" in window:
-            return 1
-        idx = upper.find(symbol, idx + 1)
-    return 0
-
-
-def _extract_risk_approval(risk_text: str, symbol: str) -> int:
-    """+1 APPROVE | -1 REJECT/BLOCK | 1 default when symbol not mentioned."""
-    if not risk_text:
-        return 1
-    upper = risk_text.upper()
-    if "ALL TRADES: REJECT" in upper or "RISK GATE: CLOSED" in upper:
-        return -1
-    idx = upper.find(symbol)
-    while idx != -1:
-        window = upper[idx:idx + 300]
-        if "APPROVE" in window:
-            return 1
-        if "REJECT" in window or "BLOCK" in window:
-            return -1
-        idx = upper.find(symbol, idx + len(symbol))
-    return 1
-
-
-def _extract_opportunity_reasoning(opportunity_text: str, symbol: str) -> str:
-    """Pull the entry rationale for a symbol from the analyst report."""
-    if not opportunity_text:
-        return ""
-    idx = opportunity_text.upper().find(symbol)
-    if idx == -1:
-        return ""
-    section = opportunity_text[idx:idx + 600]
-    m = re.search(r"RATIONALE[:\s]+(.+?)(?:\n[0-9A-Z]|\Z)", section,
-                  re.IGNORECASE | re.DOTALL)
-    if m:
-        return m.group(1).strip()[:200]
-    for line in section.split("\n")[1:5]:
-        line = line.strip()
-        if len(line) > 20 and not line.upper().startswith("SYMBOL"):
-            return line[:200]
+    review_file = "weekly_review.txt"
+    if os.path.exists(review_file):
+        try:
+            with open(review_file) as f:
+                return f.read()[-2000:]
+        except Exception:
+            pass
     return ""
 
 
-def _extract_instrument(opportunity_text: str, symbol: str) -> str:
-    """Derive suggested instrument from analyst text."""
-    if not opportunity_text:
-        return "stock"
-    idx = opportunity_text.upper().find(symbol)
-    section = opportunity_text[idx:idx + 500].upper() if idx != -1 else ""
-    if "PUT OPTION" in section or " PUT " in section:
-        return "put"
-    if "CALL OPTION" in section or " CALL " in section:
-        return "call"
-    if "INVERSE ETF" in section:
-        return "inverse_etf"
-    if "FX PAIR" in section or "FOREX" in section:
-        return "fx"
-    return "stock"
-
-
-# ══════════════════════════════════════════════════════════════
-# AGENT 3 — RISK MANAGER  (deterministic)
-# ══════════════════════════════════════════════════════════════
-
-def agent_risk_manager(opportunity_report: str, devils_report: str,
-                       open_positions: list, portfolio_value: float,
-                       daily_pnl: float, regime: dict,
-                       strategy_mode: dict = None,
-                       signals: list = None) -> str:
+def run_all_agents(
+    signals: list,
+    regime: dict,
+    news: list,
+    fx_data: dict,
+    open_positions: list,
+    portfolio_value: float,
+    daily_pnl: float,
+    options_signals: list | None = None,
+    strategy_mode: dict | None = None,
+    positions_to_reconsider: list | None = None,
+) -> dict:
     """
-    Deterministic risk assessment via risk.py functions.
-    `devils_report` retained for API compatibility (unused — Devil's Advocate removed).
-    """
-    from risk import check_risk_conditions, calculate_position_size, calculate_stops
+    Run agent pipeline and return final decision.
 
-    _sm = strategy_mode or {}
-    size_mult = _sm.get("size_multiplier", 1.0)
+    Pipeline:
+      Agent 1 (Technical) + Agent 2 (Trading Analyst/Opus) run in parallel.
+      Agent 3 (Risk Manager) runs deterministically.
+      Agent 4 (Final Decision) runs deterministically.
+
+    Early-exit gates (no LLM calls):
+      - No position slots available
+      - No signals above min_score_to_trade threshold
+    """
+    if strategy_mode is None:
+        strategy_mode = {
+            "mode": "NORMAL",
+            "context": "",
+            "size_multiplier": 1.0,
+            "max_new_trades": 3,
+            "score_threshold_adj": 0,
+            "regime_changed": False,
+        }
+    if positions_to_reconsider is None:
+        positions_to_reconsider = []
+
     max_pos = CONFIG["max_positions"]
-    daily_limit = CONFIG["daily_loss_limit"]
-
+    open_syms = [p["symbol"] for p in open_positions]
     slots_remaining = max_pos - len(open_positions)
-    daily_budget_left = (portfolio_value * daily_limit) + daily_pnl
-
-    lines = [
-        f"Risk Gate check | Portfolio: ${portfolio_value:,.2f} | Daily P&L: ${daily_pnl:+,.2f}",
-        f"Positions: {len(open_positions)}/{max_pos} ({slots_remaining} slots remaining)",
-        f"Daily loss budget remaining: ${daily_budget_left:,.2f}",
-        "",
-    ]
-
-    gate_ok, gate_reason = check_risk_conditions(
-        portfolio_value, daily_pnl, regime, open_positions
-    )
-
-    if not gate_ok:
-        lines.append(f"RISK GATE: CLOSED -- {gate_reason}")
-        lines.append("ALL TRADES: REJECT")
-        return "\n".join(lines)
 
     if slots_remaining <= 0:
-        lines.append(
-            f"RISK GATE: CLOSED -- No position slots remaining ({len(open_positions)}/{max_pos})")
-        lines.append("ALL TRADES: REJECT")
-        return "\n".join(lines)
-
-    lines.append(f"RISK GATE: OPEN -- {gate_reason}")
-    lines.append("")
-
-    candidates = signals[:5] if signals else []
-    for s in candidates:
-        sym = s["symbol"]
-        price = s.get("price", 0)
-        atr = s.get("atr", price * 0.02)
-        score = s.get("score", 20)
-        direction = "LONG" if s.get("signal", "BUY") == "BUY" else "SHORT"
-
-        if price <= 0:
-            lines.append(f"{sym}:\n  DECISION: REJECT\n  REASON: Invalid price data")
-            continue
-
-        qty = calculate_position_size(portfolio_value, price, score, regime, atr=atr)
-        sl, tp = calculate_stops(price, atr, direction)
-
-        lines.append(f"{sym}:")
-        lines.append(f"  DECISION: APPROVE")
-        lines.append(f"  SIZE: {qty} shares")
-        lines.append(f"  STOP LOSS: ${sl:.2f}")
-        lines.append(f"  TAKE PROFIT: ${tp:.2f}")
-        lines.append(
-            f"  REASON: Score={score} | "
-            f"regime_mult={regime.get('position_size_multiplier', 1.0):.1f}x | "
-            f"size_mult={size_mult:.1f}x"
+        log.info(
+            f"Agents: No buy slots ({len(open_positions)}/{max_pos}) — running agents for exit/rotation review only"
         )
 
-    if not candidates:
-        lines.append("No per-symbol signal data provided -- sizing deferred to Final Decision.")
+    threshold = CONFIG.get("min_score_to_trade", 18)
+    qualified = [s for s in signals if s.get("score", 0) >= threshold]
+    if not qualified and not positions_to_reconsider:
+        log.info("Agents: No signals above threshold — skipping LLM calls")
+        return {
+            "buys": [],
+            "sells": [],
+            "hold": open_syms,
+            "cash": False,
+            "agents_agreed": 0,
+            "summary": f"No signals >= {threshold} — agents skipped",
+            "claude_reasoning": "No qualifying signals this cycle. No LLM agents called.",
+            "_agent_outputs": {},
+        }
 
-    return "\n".join(lines)
+    # ── Fresh-first ordering: unheld candidates surface before already-held ──
+    # Agents see top-N signals. If held symbols dominate the top, agents waste
+    # their 3-recommendation budget re-proposing names already in the portfolio.
+    # Placing fresh candidates first ensures new opportunities are seen and acted on.
+    _held_syms_set = set(open_syms)
+    fresh_qualified = [s for s in qualified if s["symbol"] not in _held_syms_set]
+    held_qualified = [s for s in qualified if s["symbol"] in _held_syms_set]
+    ordered_qualified = fresh_qualified + held_qualified  # fresh first, held for context
+    n_fresh = len(fresh_qualified)
+    log.info(
+        f"Agents: {len(qualified)} qualified signals — {n_fresh} fresh, {len(held_qualified)} held "
+        f"(fresh-first ordering applied)"
+    )
+
+    # ── Agents 1+2: Technical (deterministic) + Trading Analyst (Opus) in parallel ──
+    log.info("Agents 1+2: Technical + Trading Analyst/Opus (parallel)...")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        tech_future = pool.submit(agent_technical, ordered_qualified, regime)
+        analyst_future = pool.submit(
+            agent_trading_analyst,
+            ordered_qualified,
+            regime,
+            news,
+            fx_data,
+            options_signals or [],
+            strategy_mode,
+            portfolio_value,
+            daily_pnl,
+            open_positions,
+        )
+        tech = tech_future.result()
+        analyst = analyst_future.result()
+
+    # ── Agent 3: Risk Manager (deterministic) ────────────────────────────────
+    log.info("Agent 3: Risk Manager (deterministic)...")
+    risk = agent_risk_manager(
+        analyst,
+        "",
+        open_positions,
+        portfolio_value,
+        daily_pnl,
+        regime,
+        strategy_mode=strategy_mode,
+        signals=ordered_qualified,
+    )
+
+    # ── Agent 4: Final Decision Maker (deterministic) ────────────────────────
+    log.info("Agent 4: Final Decision Maker (deterministic)...")
+    final = agent_final_decision(
+        tech,
+        analyst,
+        analyst,  # macro=analyst, opportunity=analyst (same source)
+        "",  # devils="" (removed)
+        risk,
+        ordered_qualified,
+        open_positions,
+        regime,
+        CONFIG["agents_required_to_agree"],
+        weekly_memory=load_weekly_review(),
+        strategy_mode=strategy_mode,
+        positions_to_reconsider=positions_to_reconsider,
+        portfolio_value=portfolio_value,
+        daily_pnl=daily_pnl,
+    )
+
+    final["_agent_outputs"] = {
+        "technical": tech,
+        "trading_analyst": analyst,
+        "risk": risk,
+    }
+
+    return final
 
 
 # ══════════════════════════════════════════════════════════════
 # AGENT 4 — FINAL DECISION MAKER  (deterministic)
 # ══════════════════════════════════════════════════════════════
 
-def agent_final_decision(technical: str, macro: str, opportunity: str,
-                         devils: str, risk: str, signals: list,
-                         open_positions: list, regime: dict,
-                         agents_required: int,
-                         weekly_memory: str = "",
-                         strategy_mode: dict = None,
-                         positions_to_reconsider: list = None,
-                         portfolio_value: float = 0.0,
-                         daily_pnl: float = 0.0) -> dict:
+
+def agent_final_decision(
+    technical: str,
+    macro: str,
+    opportunity: str,
+    devils: str,
+    risk: str,
+    signals: list,
+    open_positions: list,
+    regime: dict,
+    agents_required: int,
+    weekly_memory: str = "",
+    strategy_mode: dict | None = None,
+    positions_to_reconsider: list | None = None,
+    portfolio_value: float = 0.0,
+    daily_pnl: float = 0.0,
+) -> dict:
     """
     Deterministic final synthesis — vote counting + JSON assembly.
     `macro` and `opportunity` are both the Trading Analyst output.
@@ -532,7 +244,10 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
 
     if regime.get("regime") == "CAPITULATION":
         return {
-            "buys": [], "sells": [], "hold": [], "cash": True,
+            "buys": [],
+            "sells": [],
+            "hold": [],
+            "cash": True,
             "agents_agreed": 0,
             "summary": f"CAPITULATION -- VIX={regime.get('vix', '?')}, all cash",
             "claude_reasoning": "Regime is CAPITULATION. No new trades. Capital preservation mode.",
@@ -603,39 +318,39 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
         else:
             qty, sl, tp = 1, 0.0, 0.0
 
-        reasoning = (
-            _extract_opportunity_reasoning(opportunity, sym)
-            or f"{sym} selected by Trading Analyst"
-        )
+        reasoning = _extract_opportunity_reasoning(opportunity, sym) or f"{sym} selected by Trading Analyst"
         instrument = _extract_instrument(opportunity, sym)
 
-        buys.append({
-            "symbol": sym,
-            "direction": direction,
-            "qty": qty,
-            "sl": sl,
-            "tp": tp,
-            "instrument": instrument,
-            "reasoning": reasoning,
-        })
+        buys.append(
+            {
+                "symbol": sym,
+                "direction": direction,
+                "qty": qty,
+                "sl": sl,
+                "tp": tp,
+                "instrument": instrument,
+                "reasoning": reasoning,
+            }
+        )
         pass  # no slot counter — cash floor governs deployment
 
-    sells = [
-        p["symbol"] for p in _reconsider
-        if p.get("reason", "").upper() != "HOLD" and p["symbol"] in open_syms
-    ]
+    sells = [p["symbol"] for p in _reconsider if p.get("reason", "").upper() != "HOLD" and p["symbol"] in open_syms]
 
     hold = [sym for sym in open_syms if sym not in sells]
 
     if buys:
         first_sym = buys[0]["symbol"]
         first_dir = buys[0].get("direction", "LONG")
-        agents_agreed = max(0, min(4,
-            _extract_technical_conviction(technical, first_sym)
-            + max(0, macro_vote if first_dir == "LONG" else -macro_vote)
-            + 1
-            + _extract_risk_approval(risk, first_sym)
-        ))
+        agents_agreed = max(
+            0,
+            min(
+                4,
+                _extract_technical_conviction(technical, first_sym)
+                + max(0, macro_vote if first_dir == "LONG" else -macro_vote)
+                + 1
+                + _extract_risk_approval(risk, first_sym),
+            ),
+        )
     else:
         agents_agreed = 0
 
@@ -673,120 +388,449 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
 
 
 # ══════════════════════════════════════════════════════════════
-# ORCHESTRATOR
+# PRIVATE HELPERS — deterministic vote parsing
 # ══════════════════════════════════════════════════════════════
 
-def load_weekly_review() -> str:
-    """Load most recent weekly review to inject as memory."""
-    import os
-    review_file = "weekly_review.txt"
-    if os.path.exists(review_file):
-        try:
-            with open(review_file) as f:
-                return f.read()[-2000:]
-        except Exception:
-            pass
+
+def _extract_proposed_symbols(opportunity_text: str, signals: list) -> list:
+    """Return signal dicts for symbols proposed in analyst text, in mention order."""
+    if not opportunity_text or not signals:
+        return []
+    sig_map = {s["symbol"]: s for s in signals}
+    labeled = re.findall(r"SYMBOL[:\s]+([A-Z]{1,5})", opportunity_text.upper())
+    bare = re.findall(r"\b([A-Z]{2,5})\b", opportunity_text)
+    seen, result = set(), []
+    for sym in labeled + bare:
+        if sym in sig_map and sym not in seen:
+            seen.add(sym)
+            result.append(sig_map[sym])
+        if len(result) >= 3:
+            break
+    return result
+
+
+def _extract_macro_vote(analyst_text: str) -> int:
+    """+1 BULLISH | -1 BEARISH | 0 NEUTRAL/UNCERTAIN. Parses Trading Analyst output."""
+    if not analyst_text:
+        return 0
+    m = re.search(r"MACRO:\s*(BULLISH|BEARISH|NEUTRAL|UNCERTAIN)", analyst_text.upper())
+    if m:
+        verdict = m.group(1)
+        if verdict == "BULLISH":
+            return 1
+        if verdict == "BEARISH":
+            return -1
+        return 0  # NEUTRAL or UNCERTAIN
+    upper = analyst_text.upper()
+    if any(kw in upper for kw in ("BULLISH", "RISK-ON", "RISK ON")):
+        return 1
+    if any(kw in upper for kw in ("BEARISH", "RISK-OFF", "RISK OFF")):
+        return -1
+    return 0
+
+
+def _extract_technical_conviction(tech_text: str, symbol: str) -> int:
+    """+1 if technical report rated this symbol HIGH conviction, else 0."""
+    if not tech_text:
+        return 0
+    upper = tech_text.upper()
+    idx = upper.find(symbol)
+    while idx != -1:
+        window = upper[max(0, idx - 20) : idx + 120]
+        if "HIGH" in window:
+            return 1
+        idx = upper.find(symbol, idx + 1)
+    return 0
+
+
+def _extract_risk_approval(risk_text: str, symbol: str) -> int:
+    """+1 APPROVE | -1 REJECT/BLOCK | 1 default when symbol not mentioned."""
+    if not risk_text:
+        return 1
+    upper = risk_text.upper()
+    if "ALL TRADES: REJECT" in upper or "RISK GATE: CLOSED" in upper:
+        return -1
+    idx = upper.find(symbol)
+    while idx != -1:
+        window = upper[idx : idx + 300]
+        if "APPROVE" in window:
+            return 1
+        if "REJECT" in window or "BLOCK" in window:
+            return -1
+        idx = upper.find(symbol, idx + len(symbol))
+    return 1
+
+
+def _extract_opportunity_reasoning(opportunity_text: str, symbol: str) -> str:
+    """Pull the entry rationale for a symbol from the analyst report."""
+    if not opportunity_text:
+        return ""
+    idx = opportunity_text.upper().find(symbol)
+    if idx == -1:
+        return ""
+    section = opportunity_text[idx : idx + 600]
+    m = re.search(r"RATIONALE[:\s]+(.+?)(?:\n[0-9A-Z]|\Z)", section, re.IGNORECASE | re.DOTALL)
+    if m:
+        return m.group(1).strip()[:200]
+    for line in section.split("\n")[1:5]:
+        line = line.strip()
+        if len(line) > 20 and not line.upper().startswith("SYMBOL"):
+            return line[:200]
     return ""
 
 
-def run_all_agents(signals: list, regime: dict, news: list,
-                   fx_data: dict, open_positions: list,
-                   portfolio_value: float, daily_pnl: float,
-                   options_signals: list = None,
-                   strategy_mode: dict = None,
-                   positions_to_reconsider: list = None) -> dict:
+def _extract_instrument(opportunity_text: str, symbol: str) -> str:
+    """Derive suggested instrument from analyst text."""
+    if not opportunity_text:
+        return "stock"
+    idx = opportunity_text.upper().find(symbol)
+    section = opportunity_text[idx : idx + 500].upper() if idx != -1 else ""
+    if "PUT OPTION" in section or " PUT " in section:
+        return "put"
+    if "CALL OPTION" in section or " CALL " in section:
+        return "call"
+    if "INVERSE ETF" in section:
+        return "inverse_etf"
+    if "FX PAIR" in section or "FOREX" in section:
+        return "fx"
+    return "stock"
+
+
+# ══════════════════════════════════════════════════════════════
+# AGENT 1 — TECHNICAL ANALYST  (deterministic)
+# ══════════════════════════════════════════════════════════════
+
+
+def agent_technical(signals: list, regime: dict) -> str:
+    """Deterministic technical analysis report built from pre-computed signal data."""
+    if not signals:
+        return "No symbols above scoring threshold. No technical setups."
+
+    lines = [
+        f"TECHNICAL ANALYSIS — {min(len(signals), 15)} symbols above threshold",
+        (
+            f"Market: VIX={regime['vix']:.1f} | SPY=${regime['spy_price']} "
+            f"({'above' if regime.get('spy_above_200d', regime.get('spy_above_ema')) else 'below'} 200d MA)"
+        ),
+        "",
+    ]
+
+    high_syms, medium_syms, low_syms, divergences = [], [], [], []
+
+    for s in signals[:15]:
+        sym = s["symbol"]
+        score = s["score"]
+        sig = s.get("signal", "NEUTRAL")
+        tf5 = s.get("timeframes", {}).get("5m") or {}
+        tf1d = s.get("timeframes", {}).get("1d") or {}
+        tf1w = s.get("timeframes", {}).get("1w") or {}
+
+        mfi = tf5.get("mfi", 50)
+        obv_slope = tf5.get("obv_slope", 0)
+        vol_ratio = s.get("vol_ratio", 1.0)
+        squeeze_on = tf5.get("squeeze_on", False)
+        squeeze_int = tf5.get("squeeze_intensity", 0)
+        donch = tf5.get("donch_breakout", 0)
+        adx = tf5.get("adx", 0)
+        vwap_dist = tf5.get("vwap_dist", 0)
+        bull_al = tf5.get("bull_aligned", False)
+        bear_al = tf5.get("bear_aligned", False)
+
+        aligned_dims = sum(1 for v in s.get("score_breakdown", {}).values() if v > 0)
+
+        if score >= 30:
+            high_syms.append(sym)
+            conviction = "HIGH"
+        elif score >= 20:
+            medium_syms.append(sym)
+            conviction = "MEDIUM"
+        else:
+            low_syms.append(sym)
+            conviction = "LOW"
+
+        ema_str = "BULL" if bull_al else ("BEAR" if bear_al else "MIXED")
+        sq_str = f"Squeeze=ON({squeeze_int:.1f})" if squeeze_on else "Squeeze=off"
+        donch_str = (
+            "Donchian=BREAKOUT_HIGH" if donch == 1 else "Donchian=BREAKOUT_LOW" if donch == -1 else "Donchian=inside"
+        )
+        tf_agree = "/".join(
+            [
+                tf5.get("signal", "?"),
+                tf1d.get("signal", "N/A") if tf1d else "N/A",
+                tf1w.get("signal", "N/A") if tf1w else "N/A",
+            ]
+        )
+
+        lines.append(
+            f"[{conviction}] {sym}: ${s['price']} | Score={score}pt | {sig} | "
+            f"ADX={adx:.0f} | MFI={mfi:.0f} | EMA={ema_str} | {sq_str} | "
+            f"Vol={vol_ratio:.1f}x | VWAP_dist={vwap_dist:+.2f}% | {donch_str} | "
+            f"OBV={'UP' if obv_slope > 0 else 'DOWN' if obv_slope < 0 else 'FLAT'} | "
+            f"TF={tf_agree} | Dims={aligned_dims} aligned"
+        )
+
+        news = s.get("news") or {}
+        kw = news.get("keyword_score", 0)
+        sent = news.get("claude_sentiment", "")
+        cat = news.get("claude_catalyst", "")
+        if sent and kw != 0:
+            lines.append(f"  -> News: {sent} (kw={kw:+d})" + (f" | {cat[:80]}" if cat else ""))
+
+        if sig == "BUY" and obv_slope < 0 and mfi < 40:
+            divergences.append(f"  ! {sym}: DISTRIBUTION TRAP -- BUY signal but OBV falling + MFI={mfi:.0f}")
+        elif sig == "BUY" and mfi < 35:
+            divergences.append(f"  ! {sym}: MFI DIVERGENCE -- BUY signal but MFI={mfi:.0f} (weak institutional flow)")
+        elif donch == 1 and vol_ratio < 1.5:
+            divergences.append(
+                f"  ! {sym}: LOW-VOLUME BREAKOUT -- Donchian breach but Vol={vol_ratio:.1f}x (suspect fakeout)"
+            )
+        vwap_sd_pct = tf5.get("vwap_sd_pct", 1.0)
+        sd_threshold = 2.0 * vwap_sd_pct
+        regime_name = regime.get("regime", "")
+        if score >= 45 and regime_name in ("RANGE_BOUND", "CHOPPY") and abs(vwap_dist) >= sd_threshold:
+            direction_word = "SHORT" if sig in ("SELL", "STRONG_SELL") else "LONG"
+            contra = "LONG" if direction_word == "SHORT" else "SHORT"
+            divergences.append(
+                f"  ! {sym}: OVEREXTENDED IN RANGE -- score={score}pt + "
+                f"VWAP={vwap_dist:+.1f}% ({abs(vwap_dist) / vwap_sd_pct:.1f}x SD, threshold=2.0x) "
+                f"in {regime_name}. Move already expressed — mean reversion {contra} "
+                f"more probable than {direction_word} continuation."
+            )
+
+    lines.append("")
+    lines.append(
+        f"SUMMARY: HIGH={len(high_syms)} ({', '.join(high_syms) or 'none'}) | "
+        f"MEDIUM={len(medium_syms)} ({', '.join(medium_syms) or 'none'}) | "
+        f"LOW={len(low_syms)} ({', '.join(low_syms) or 'none'})"
+    )
+    if divergences:
+        lines.append("")
+        lines.append("DIVERGENCE WARNINGS:")
+        lines.extend(divergences)
+    else:
+        lines.append("No divergences detected.")
+
+    return "\n".join(lines)
+
+
+# ══════════════════════════════════════════════════════════════
+# AGENT 2 — TRADING ANALYST  (LLM / Opus / uncapped)
+# Single call replacing Macro + Opportunity + Devil's Advocate chain.
+# Sees all inputs simultaneously — no anchoring from prior agent outputs.
+# ══════════════════════════════════════════════════════════════
+
+_TRADING_ANALYST_SYSTEM = """You are the Trading Analyst for Decifer, an autonomous US equity trading system.
+
+Your job is to simultaneously assess the macro environment AND identify the best trading opportunities. \
+You receive all data in one pass — you are not reading summaries from other agents.
+
+OUTPUT FORMAT — produce exactly these sections in this order:
+
+MACRO: [BULLISH | BEARISH | NEUTRAL | UNCERTAIN]
+<2-3 sentences on the macro environment: regime, VIX trajectory, cross-asset signals, risk-on/off verdict>
+
+OPPORTUNITIES:
+For each opportunity (up to 3; fewer if genuine setups are scarce — never force trades):
+
+SYMBOL: <ticker>
+DIRECTION: LONG | SHORT
+CONVICTION: HIGH | MEDIUM | LOW
+RATIONALE: <Lead with the real-world reason — catalyst, sector move, earnings, breakout from base. \
+Do NOT lead with indicator values. A human must understand the trade without knowing what ADX means.>
+INSTRUMENT: stock | call | put
+  (prefer call/put when: options_score > 20 AND IVR < 30% AND stock also signals)
+COUNTER-ARGUMENT: <The single strongest reason this trade fails. Be honest. One sentence.>
+KEY RISK: <Binary events, crowding, macro headwind>
+
+RULES:
+- If fewer than 3 genuine setups exist, say so. Cash is a valid output.
+- Options flow: CALL_BUYER = smart money bullish. PUT_BUYER = smart money bearish. Low IVR = cheap premium.
+- In CAPITULATION regime: output MACRO: BEARISH and no OPPORTUNITIES. Capital preservation.
+- RANGE_BOUND regime: raise your conviction bar — only HIGH conviction setups.
+- TRENDING_DOWN regime: you MUST evaluate SHORT setups. If any SELL or STRONG_SELL signals appear in the scored list, include at least one SHORT opportunity. Do not default to cash or LONGs only — name the short candidates explicitly with DIRECTION: SHORT.
+- RELIEF_RALLY regime: treat as a bear-market bounce — favour shorts on failed breakouts, be sceptical of longs.
+- You determine direction from first principles using all data provided. SELL/STRONG_SELL signals are SHORT candidates; BUY/STRONG_BUY are LONG candidates — but these are starting points, not instructions. If price structure contradicts the signal direction, trust your read and either flip or omit the symbol.
+- Vol=Xx ADV means today's volume vs the 20-day average. Vol>2x = unusual conviction. Vol<0.5x = low participation, treat setups with scepticism. VWAP=+/-X% = how far price is from today's VWAP. A short candidate already sitting far below VWAP in a RANGE_BOUND or CHOPPY regime is a mean-reversion long setup, not a short continuation — recognise this and act accordingly.
+- Keep each section tight. No padding."""
+
+
+def agent_trading_analyst(
+    signals: list,
+    regime: dict,
+    news_headlines: list,
+    fx_data: dict,
+    options_signals: list,
+    strategy_mode: dict,
+    portfolio_value: float = 0.0,
+    daily_pnl: float = 0.0,
+    open_positions: list | None = None,
+) -> str:
     """
-    Run agent pipeline and return final decision.
-
-    Pipeline:
-      Agent 1 (Technical) + Agent 2 (Trading Analyst/Opus) run in parallel.
-      Agent 3 (Risk Manager) runs deterministically.
-      Agent 4 (Final Decision) runs deterministically.
-
-    Early-exit gates (no LLM calls):
-      - No position slots available
-      - No signals above min_score_to_trade threshold
+    Single Opus LLM call replacing Macro Analyst + Opportunity Finder + Devil's Advocate.
+    Receives all inputs simultaneously — eliminates anchoring bias from the old serial chain.
     """
-    if strategy_mode is None:
-        strategy_mode = {"mode": "NORMAL", "context": "", "size_multiplier": 1.0,
-                         "max_new_trades": 3, "score_threshold_adj": 0, "regime_changed": False}
-    if positions_to_reconsider is None:
-        positions_to_reconsider = []
+    regime_name = regime.get("regime", "UNKNOWN")
+    vix = regime.get("vix", 0)
+    vix_1h = regime.get("vix_1h_change", 0)
+    spy = regime.get("spy_price", "?")
+    qqq = regime.get("qqq_price", "?")
+    spy_above = regime.get("spy_above_200d", regime.get("spy_above_ema", False))
+    qqq_above = regime.get("qqq_above_200d", regime.get("qqq_above_ema", False))
+    size_mult = regime.get("position_size_multiplier", 1.0)
 
+    sig_lines = []
+    for s in signals[:10]:
+        sym = s["symbol"]
+        score = s["score"]
+        sig = s.get("signal", "?")
+        bd = s.get("score_breakdown", {})
+        bd_str = " ".join(f"{k[:3]}={v:.0f}" for k, v in bd.items() if v > 0)
+        news = s.get("news") or {}
+        kw = news.get("keyword_score", 0)
+        sent = news.get("claude_sentiment", "")
+        news_str = f" | news={sent}(kw={kw:+d})" if sent else (f" | kw={kw:+d}" if kw else "")
+        vol_ratio = s.get("vol_ratio") or s.get("timeframes", {}).get("5m", {}).get("vol_ratio", 1.0)
+        vwap_dist = s.get("timeframes", {}).get("5m", {}).get("vwap_dist", 0)
+        sig_lines.append(
+            f"  {sym}: {score}pt {sig} [{bd_str}]{news_str} | Vol={vol_ratio:.1f}x ADV | VWAP={vwap_dist:+.1f}%"
+        )
+
+    opts_lines = []
+    for o in (options_signals or [])[:8]:
+        ivr_str = f"IVR={o['iv_rank']:.0f}%" if o.get("iv_rank") is not None else "IVR=n/a"
+        earn_str = f" earnings_in={o['earnings_days']}d" if o.get("earnings_days") else ""
+        opts_lines.append(
+            f"  [{o['options_score']:>2}/30] {o['signal']:<14} {o['symbol']:<6} "
+            f"${o['price']:.2f} C/P={o['cp_ratio']:.1f}x {ivr_str} {o['dte']}DTE{earn_str}"
+        )
+
+    fx_lines = [f"  {pair}: {d.get('price', '?')} ({d.get('change_pct', '?')}%)" for pair, d in (fx_data or {}).items()]
+
+    hl_lines = [f"  - {h}" for h in (news_headlines or [])[:5]]
+    sm_ctx = (strategy_mode or {}).get("context", "")
+
+    overnight_block = ""
+    try:
+        from overnight_research import load_overnight_notes
+
+        notes = load_overnight_notes()
+        if notes:
+            overnight_block = f"\nOVERNIGHT RESEARCH NOTES:\n{notes}\n"
+    except Exception:
+        pass
+
+    # ── Portfolio context: what's already held ────────────────────────────────
+    held_syms = [p["symbol"] for p in (open_positions or [])]
+    if held_syms:
+        held_block = f"\nALREADY HELD — do NOT recommend new entries for these: {', '.join(held_syms)}\n"
+    else:
+        held_block = ""
+
+    # ── Portfolio P&L context — factual, no directive ────────────────────────
+    pnl_context = ""
+    if portfolio_value > 0 and daily_pnl != 0:
+        pnl_pct = daily_pnl / portfolio_value * 100
+        pnl_context = f"Portfolio P&L today: ${daily_pnl:+,.0f} ({pnl_pct:+.2f}%)\n"
+
+    prompt = f"""REGIME: {regime_name} | VIX={vix:.1f} ({vix_1h:+.1f}%/1h) | size_mult={size_mult:.1f}x
+SPY=${spy} ({"above" if spy_above else "below"} 200d MA) | QQQ=${qqq} ({"above" if qqq_above else "below"} 200d MA)
+{pnl_context}{overnight_block}{held_block}
+SCORED SIGNALS — fresh candidates first (NOT already held):
+{chr(10).join(sig_lines) or "  None above threshold"}
+
+OPTIONS FLOW:
+{chr(10).join(opts_lines) or "  No options data"}
+
+FX MARKETS:
+{chr(10).join(fx_lines) or "  No FX data"}
+
+RECENT HEADLINES (top 5):
+{chr(10).join(hl_lines) or "  No headlines"}
+{(chr(10) + "TRADING CONTEXT: " + sm_ctx) if sm_ctx else ""}
+
+Produce your analysis now."""
+
+    return _call_claude_alpha(_TRADING_ANALYST_SYSTEM, prompt)
+
+
+# ══════════════════════════════════════════════════════════════
+# AGENT 3 — RISK MANAGER  (deterministic)
+# ══════════════════════════════════════════════════════════════
+
+
+def agent_risk_manager(
+    opportunity_report: str,
+    devils_report: str,
+    open_positions: list,
+    portfolio_value: float,
+    daily_pnl: float,
+    regime: dict,
+    strategy_mode: dict | None = None,
+    signals: list | None = None,
+) -> str:
+    """
+    Deterministic risk assessment via risk.py functions.
+    `devils_report` retained for API compatibility (unused — Devil's Advocate removed).
+    """
+    from risk import calculate_position_size, calculate_stops, check_risk_conditions
+
+    _sm = strategy_mode or {}
+    size_mult = _sm.get("size_multiplier", 1.0)
     max_pos = CONFIG["max_positions"]
-    open_syms = [p["symbol"] for p in open_positions]
+    daily_limit = CONFIG["daily_loss_limit"]
+
     slots_remaining = max_pos - len(open_positions)
+    daily_budget_left = (portfolio_value * daily_limit) + daily_pnl
+
+    lines = [
+        f"Risk Gate check | Portfolio: ${portfolio_value:,.2f} | Daily P&L: ${daily_pnl:+,.2f}",
+        f"Positions: {len(open_positions)}/{max_pos} ({slots_remaining} slots remaining)",
+        f"Daily loss budget remaining: ${daily_budget_left:,.2f}",
+        "",
+    ]
+
+    gate_ok, gate_reason = check_risk_conditions(portfolio_value, daily_pnl, regime, open_positions)
+
+    if not gate_ok:
+        lines.append(f"RISK GATE: CLOSED -- {gate_reason}")
+        lines.append("ALL TRADES: REJECT")
+        return "\n".join(lines)
 
     if slots_remaining <= 0:
-        log.info(
-            f"Agents: No buy slots ({len(open_positions)}/{max_pos}) — "
-            f"running agents for exit/rotation review only"
+        lines.append(f"RISK GATE: CLOSED -- No position slots remaining ({len(open_positions)}/{max_pos})")
+        lines.append("ALL TRADES: REJECT")
+        return "\n".join(lines)
+
+    lines.append(f"RISK GATE: OPEN -- {gate_reason}")
+    lines.append("")
+
+    candidates = signals[:5] if signals else []
+    for s in candidates:
+        sym = s["symbol"]
+        price = s.get("price", 0)
+        atr = s.get("atr", price * 0.02)
+        score = s.get("score", 20)
+        direction = "LONG" if s.get("signal", "BUY") == "BUY" else "SHORT"
+
+        if price <= 0:
+            lines.append(f"{sym}:\n  DECISION: REJECT\n  REASON: Invalid price data")
+            continue
+
+        qty = calculate_position_size(portfolio_value, price, score, regime, atr=atr)
+        sl, tp = calculate_stops(price, atr, direction)
+
+        lines.append(f"{sym}:")
+        lines.append("  DECISION: APPROVE")
+        lines.append(f"  SIZE: {qty} shares")
+        lines.append(f"  STOP LOSS: ${sl:.2f}")
+        lines.append(f"  TAKE PROFIT: ${tp:.2f}")
+        lines.append(
+            f"  REASON: Score={score} | "
+            f"regime_mult={regime.get('position_size_multiplier', 1.0):.1f}x | "
+            f"size_mult={size_mult:.1f}x"
         )
 
-    threshold = CONFIG.get("min_score_to_trade", 18)
-    qualified = [s for s in signals if s.get("score", 0) >= threshold]
-    if not qualified and not positions_to_reconsider:
-        log.info("Agents: No signals above threshold — skipping LLM calls")
-        return {
-            "buys": [], "sells": [], "hold": open_syms, "cash": False,
-            "agents_agreed": 0,
-            "summary": f"No signals >= {threshold} — agents skipped",
-            "claude_reasoning": "No qualifying signals this cycle. No LLM agents called.",
-            "_agent_outputs": {},
-        }
+    if not candidates:
+        lines.append("No per-symbol signal data provided -- sizing deferred to Final Decision.")
 
-    # ── Fresh-first ordering: unheld candidates surface before already-held ──
-    # Agents see top-N signals. If held symbols dominate the top, agents waste
-    # their 3-recommendation budget re-proposing names already in the portfolio.
-    # Placing fresh candidates first ensures new opportunities are seen and acted on.
-    _held_syms_set = set(open_syms)
-    fresh_qualified = [s for s in qualified if s["symbol"] not in _held_syms_set]
-    held_qualified  = [s for s in qualified if s["symbol"] in _held_syms_set]
-    ordered_qualified = fresh_qualified + held_qualified  # fresh first, held for context
-    n_fresh = len(fresh_qualified)
-    log.info(f"Agents: {len(qualified)} qualified signals — {n_fresh} fresh, {len(held_qualified)} held "
-             f"(fresh-first ordering applied)")
-
-    # ── Agents 1+2: Technical (deterministic) + Trading Analyst (Opus) in parallel ──
-    log.info("Agents 1+2: Technical + Trading Analyst/Opus (parallel)...")
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        tech_future = pool.submit(agent_technical, ordered_qualified, regime)
-        analyst_future = pool.submit(
-            agent_trading_analyst,
-            ordered_qualified, regime, news, fx_data,
-            options_signals or [], strategy_mode,
-            portfolio_value, daily_pnl, open_positions
-        )
-        tech = tech_future.result()
-        analyst = analyst_future.result()
-
-    # ── Agent 3: Risk Manager (deterministic) ────────────────────────────────
-    log.info("Agent 3: Risk Manager (deterministic)...")
-    risk = agent_risk_manager(
-        analyst, "",
-        open_positions, portfolio_value, daily_pnl, regime,
-        strategy_mode=strategy_mode,
-        signals=ordered_qualified
-    )
-
-    # ── Agent 4: Final Decision Maker (deterministic) ────────────────────────
-    log.info("Agent 4: Final Decision Maker (deterministic)...")
-    final = agent_final_decision(
-        tech, analyst, analyst,  # macro=analyst, opportunity=analyst (same source)
-        "",                      # devils="" (removed)
-        risk, ordered_qualified, open_positions, regime,
-        CONFIG["agents_required_to_agree"],
-        weekly_memory=load_weekly_review(),
-        strategy_mode=strategy_mode,
-        positions_to_reconsider=positions_to_reconsider,
-        portfolio_value=portfolio_value,
-        daily_pnl=daily_pnl,
-    )
-
-    final["_agent_outputs"] = {
-        "technical":       tech,
-        "trading_analyst": analyst,
-        "risk":            risk,
-    }
-
-    return final
+    return "\n".join(lines)

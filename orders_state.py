@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from config import CONFIG
 
@@ -71,6 +71,7 @@ def _get_symbol_lock(symbol: str) -> threading.Lock:
 
 # ── Persist helper ────────────────────────────────────────────────────────────
 
+
 def _persist_positions() -> None:
     """
     Write active_trades snapshot to data/positions.json.
@@ -83,9 +84,10 @@ def _persist_positions() -> None:
     """
     try:
         from trade_store import persist
+
         with _trades_lock:
-            snapshot = dict(active_trades)   # O(n) copy, fast — lock scope ends here
-        persist(snapshot)                    # I/O outside lock
+            snapshot = dict(active_trades)  # O(n) copy, fast — lock scope ends here
+        persist(snapshot)  # I/O outside lock
     except Exception as e:
         log.error(f"trade_store persist failed: {e}")
 
@@ -93,26 +95,29 @@ def _persist_positions() -> None:
 # ── Decision metadata — these fields are written ONCE at trade entry ──────────
 # No function — IBKR reconciliation, re-sync, portfolio updates — may overwrite
 # these after they are set.  _safe_set_trade enforces this at the storage layer.
-DECISION_METADATA_FIELDS: frozenset = frozenset({
-    "trade_type",
-    "conviction",
-    "reasoning",
-    "signal_scores",
-    "agent_outputs",
-    "entry_regime",
-    "entry_thesis",
-    "entry_score",
-    "ic_weights_at_entry",
-    "pattern_id",
-    "setup_type",
-    "advice_id",
-    "open_time",
-    "atr",
-    "high_water_mark",
-})
+DECISION_METADATA_FIELDS: frozenset = frozenset(
+    {
+        "trade_type",
+        "conviction",
+        "reasoning",
+        "signal_scores",
+        "agent_outputs",
+        "entry_regime",
+        "entry_thesis",
+        "entry_score",
+        "ic_weights_at_entry",
+        "pattern_id",
+        "setup_type",
+        "advice_id",
+        "open_time",
+        "atr",
+        "high_water_mark",
+    }
+)
 
 
 # ── Thread-safe active_trades accessors ───────────────────────────────────────
+
 
 def _safe_set_trade(key: str, value: dict) -> None:
     """
@@ -130,23 +135,16 @@ def _safe_set_trade(key: str, value: dict) -> None:
     with _trades_lock:
         existing = active_trades.get(key)
         existing_has_metadata = (
-            existing is not None
-            and existing.get("trade_type")
-            and existing["trade_type"] != "UNKNOWN"
+            existing is not None and existing.get("trade_type") and existing["trade_type"] != "UNKNOWN"
         )
         if existing_has_metadata:
             # Preserve all decision metadata from the existing record.
             # Only allow IBKR-reconcile fields (price, pnl, status, sources) to update.
-            protected = {
-                f: existing[f]
-                for f in DECISION_METADATA_FIELDS
-                if f in existing
-            }
+            protected = {f: existing[f] for f in DECISION_METADATA_FIELDS if f in existing}
             merged = {**value, **protected}
             if merged != value:
                 log.debug(
-                    f"_safe_set_trade({key}): metadata guard preserved "
-                    f"{set(protected) & set(value)} from overwrite"
+                    f"_safe_set_trade({key}): metadata guard preserved {set(protected) & set(value)} from overwrite"
                 )
             active_trades[key] = merged
         else:
@@ -158,6 +156,7 @@ def _safe_set_trade(key: str, value: dict) -> None:
         if _tt and _tt != "UNKNOWN":
             try:
                 from trade_store import ledger_write
+
                 ledger_write(key, active_trades.get(key, value))
             except Exception as _le:
                 log.error(f"metadata ledger write failed for {key}: {_le}")
@@ -170,6 +169,7 @@ def _safe_update_trade(key: str, updates: dict) -> None:
     status, qty). Price/pnl ticks are excluded — too frequent, transient.
     """
     from trade_store import STRUCTURAL_UPDATE_KEYS
+
     with _trades_lock:
         if key in active_trades:
             active_trades[key].update(updates)
@@ -190,12 +190,10 @@ def _save_positions_file() -> None:
     import json
     import os
     import tempfile
+
     try:
         with _trades_lock:
-            snapshot = {
-                k: v for k, v in active_trades.items()
-                if v.get("status") != "RESERVED"
-            }
+            snapshot = {k: v for k, v in active_trades.items() if v.get("status") != "RESERVED"}
         dir_name = os.path.dirname(os.path.abspath(POSITIONS_FILE))
         os.makedirs(dir_name, exist_ok=True)
         with tempfile.NamedTemporaryFile("w", dir=dir_name, delete=False, suffix=".tmp") as f:
@@ -210,6 +208,7 @@ def _load_positions_file() -> dict:
     """Load persisted position metadata. Returns empty dict if file missing or corrupt."""
     import json
     import os
+
     try:
         if not os.path.exists(POSITIONS_FILE):
             return {}
@@ -229,7 +228,7 @@ def _is_recently_closed(symbol: str) -> bool:
         return False
     cooldown = CONFIG.get("reentry_cooldown_minutes", 30)
     closed_at = datetime.fromisoformat(ts_str)
-    return (datetime.now(timezone.utc) - closed_at).total_seconds() < cooldown * 60
+    return (datetime.now(UTC) - closed_at).total_seconds() < cooldown * 60
 
 
 def cleanup_recently_closed() -> int:
@@ -239,10 +238,11 @@ def cleanup_recently_closed() -> int:
     Returns the number of entries removed.
     """
     cooldown_secs = CONFIG.get("reentry_cooldown_minutes", 30) * 60
-    cutoff_secs   = cooldown_secs * 2
-    now           = datetime.now(timezone.utc)
+    cutoff_secs = cooldown_secs * 2
+    now = datetime.now(UTC)
     expired = [
-        sym for sym, ts_str in recently_closed.items()
+        sym
+        for sym, ts_str in recently_closed.items()
         if (now - datetime.fromisoformat(ts_str)).total_seconds() > cutoff_secs
     ]
     for sym in expired:

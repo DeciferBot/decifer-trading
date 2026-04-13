@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 import re
 import threading
-from datetime import date, timedelta, datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 
@@ -34,7 +34,7 @@ from config import CONFIG
 log = logging.getLogger("decifer.alpaca_options")
 
 # ── Lazy client singleton ─────────────────────────────────────────────
-_client_lock    = threading.Lock()
+_client_lock = threading.Lock()
 _options_client = None
 
 
@@ -46,13 +46,14 @@ def _get_client():
     with _client_lock:
         if _options_client is not None:
             return _options_client
-        api_key    = CONFIG.get("alpaca_api_key", "")
+        api_key = CONFIG.get("alpaca_api_key", "")
         secret_key = CONFIG.get("alpaca_secret_key", "")
         if not api_key or not secret_key:
             log.debug("alpaca_options: ALPACA_API_KEY / ALPACA_SECRET_KEY not set")
             return None
         try:
             from alpaca.data.historical.option import OptionHistoricalDataClient
+
             _options_client = OptionHistoricalDataClient(api_key, secret_key)
             log.info("alpaca_options: OptionHistoricalDataClient initialised")
             return _options_client
@@ -67,7 +68,7 @@ def _get_client():
 # ── OCC option symbol helpers ─────────────────────────────────────────
 # OCC format: [underlying][YYMMDD][C/P][8-digit price in 1/1000 dollars]
 # e.g. AAPL240119C00150000 = AAPL, 2024-01-19, Call, $150.000
-_OCC_RE = re.compile(r'^([A-Z ]{1,6})(\d{6})([CP])(\d{8})$')
+_OCC_RE = re.compile(r"^([A-Z ]{1,6})(\d{6})([CP])(\d{8})$")
 
 
 def _parse_option_symbol(sym: str) -> tuple | None:
@@ -79,14 +80,13 @@ def _parse_option_symbol(sym: str) -> tuple | None:
     if not m:
         return None
     underlying = m.group(1).strip()
-    exp_date   = datetime.strptime(m.group(2), '%y%m%d').date()
-    opt_type   = m.group(3)                   # 'C' or 'P'
-    strike     = int(m.group(4)) / 1000.0
+    exp_date = datetime.strptime(m.group(2), "%y%m%d").date()
+    opt_type = m.group(3)  # 'C' or 'P'
+    strike = int(m.group(4)) / 1000.0
     return underlying, exp_date, opt_type, strike
 
 
-def build_option_symbol(symbol: str, expiry_ibkr: str,
-                        right: str, strike: float) -> str:
+def build_option_symbol(symbol: str, expiry_ibkr: str, right: str, strike: float) -> str:
     """
     Build an OCC option symbol.
     expiry_ibkr : 'YYYYMMDD'  (IBKR / Decifer internal format)
@@ -94,12 +94,13 @@ def build_option_symbol(symbol: str, expiry_ibkr: str,
     strike      : dollars (float)
     Returns e.g. 'AAPL240119C00150000'
     """
-    date_str  = datetime.strptime(expiry_ibkr, '%Y%m%d').strftime('%y%m%d')
-    price_str = f"{int(round(strike * 1000)):08d}"
+    date_str = datetime.strptime(expiry_ibkr, "%Y%m%d").strftime("%y%m%d")
+    price_str = f"{round(strike * 1000):08d}"
     return f"{symbol}{date_str}{right}{price_str}"
 
 
 # ── Snapshot → canonical DataFrame ───────────────────────────────────
+
 
 def _snapshots_to_df(snapshots: dict, opt_type: str) -> pd.DataFrame:
     """
@@ -127,7 +128,7 @@ def _snapshots_to_df(snapshots: dict, opt_type: str) -> pd.DataFrame:
         if snap.latest_quote is not None:
             bid = float(snap.latest_quote.bid_price or 0)
             ask = float(snap.latest_quote.ask_price or 0)
-        mid        = (bid + ask) / 2 if bid > 0 and ask > 0 else 0.0
+        mid = (bid + ask) / 2 if bid > 0 and ask > 0 else 0.0
         spread_pct = (ask - bid) / mid if mid > 0 else 1.0
 
         # ── Volume ─────────────────────────────────────────────────
@@ -137,8 +138,7 @@ def _snapshots_to_df(snapshots: dict, opt_type: str) -> pd.DataFrame:
         # indicate active market-maker interest.
         volume = 0
         if snap.latest_quote is not None:
-            volume = int((snap.latest_quote.bid_size or 0) +
-                         (snap.latest_quote.ask_size or 0))
+            volume = int((snap.latest_quote.bid_size or 0) + (snap.latest_quote.ask_size or 0))
 
         # ── OI and IV ──────────────────────────────────────────────
         # Alpaca snapshot also doesn't expose open interest — use the
@@ -153,23 +153,25 @@ def _snapshots_to_df(snapshots: dict, opt_type: str) -> pd.DataFrame:
             delta = snap.greeks.delta
             gamma = snap.greeks.gamma
             theta = snap.greeks.theta
-            vega  = snap.greeks.vega
+            vega = snap.greeks.vega
 
-        rows.append({
-            "strike":            strike,
-            "bid":               bid,
-            "ask":               ask,
-            "mid":               mid,
-            "spread_pct":        spread_pct,
-            "volume":            volume,
-            "openInterest":      oi,
-            "impliedVolatility": iv,
-            "delta":             delta,
-            "gamma":             gamma,
-            "theta":             theta,
-            "vega":              vega,
-            "option_symbol":     sym,
-        })
+        rows.append(
+            {
+                "strike": strike,
+                "bid": bid,
+                "ask": ask,
+                "mid": mid,
+                "spread_pct": spread_pct,
+                "volume": volume,
+                "openInterest": oi,
+                "impliedVolatility": iv,
+                "delta": delta,
+                "gamma": gamma,
+                "theta": theta,
+                "vega": vega,
+                "option_symbol": sym,
+            }
+        )
 
     if not rows:
         return pd.DataFrame()
@@ -180,8 +182,8 @@ def _snapshots_to_df(snapshots: dict, opt_type: str) -> pd.DataFrame:
 
 # ── Public API ────────────────────────────────────────────────────────
 
-def get_all_chains(symbol: str, min_dte: int,
-                   max_dte: int) -> list[dict]:
+
+def get_all_chains(symbol: str, min_dte: int, max_dte: int) -> list[dict]:
     """
     Fetch options chains for all expiries in [min_dte, max_dte] window.
 
@@ -195,21 +197,24 @@ def get_all_chains(symbol: str, min_dte: int,
     if client is None:
         return []
 
-    today    = date.today()
+    today = date.today()
     date_min = today + timedelta(days=min_dte)
     date_max = today + timedelta(days=max_dte)
 
     try:
         from alpaca.data.requests import OptionChainRequest
-        request   = OptionChainRequest(
+
+        request = OptionChainRequest(
             underlying_symbol=symbol,
             expiration_date_gte=date_min,
             expiration_date_lte=date_max,
         )
         snapshots = client.get_option_chain(request)
         if not snapshots:
-            log.warning(f"alpaca_options.get_all_chains {symbol}: Alpaca returned empty chain "
-                        f"(DTE window {min_dte}-{max_dte}, dates {date_min}–{date_max})")
+            log.warning(
+                f"alpaca_options.get_all_chains {symbol}: Alpaca returned empty chain "
+                f"(DTE window {min_dte}-{max_dte}, dates {date_min}–{date_max})"
+            )
             return []
     except Exception as exc:
         log.warning(f"alpaca_options.get_all_chains {symbol}: API call failed — {exc}")
@@ -230,17 +235,19 @@ def get_all_chains(symbol: str, min_dte: int,
     results = []
     for exp_str, exp_snaps in expiry_groups.items():
         exp_date = datetime.strptime(exp_str, "%Y-%m-%d").date()
-        dte      = (exp_date - today).days
-        calls_df = _snapshots_to_df(exp_snaps, 'C')
-        puts_df  = _snapshots_to_df(exp_snaps, 'P')
+        dte = (exp_date - today).days
+        calls_df = _snapshots_to_df(exp_snaps, "C")
+        puts_df = _snapshots_to_df(exp_snaps, "P")
         if calls_df.empty and puts_df.empty:
             continue
-        results.append({
-            "calls":      calls_df,
-            "puts":       puts_df,
-            "expiry_str": exp_str,
-            "dte":        dte,
-        })
+        results.append(
+            {
+                "calls": calls_df,
+                "puts": puts_df,
+                "expiry_str": exp_str,
+                "dte": dte,
+            }
+        )
 
     results.sort(key=lambda x: x["dte"])
     return results
@@ -269,8 +276,9 @@ def get_snapshot_greeks(option_symbol: str) -> dict | None:
 
     try:
         from alpaca.data.requests import OptionSnapshotRequest
+
         request = OptionSnapshotRequest(symbol_or_symbols=option_symbol)
-        result  = client.get_option_snapshot(request)
+        result = client.get_option_snapshot(request)
         if not result or option_symbol not in result:
             return None
         snap = result[option_symbol]
@@ -292,17 +300,17 @@ def get_snapshot_greeks(option_symbol: str) -> dict | None:
             greeks["gamma"] = round(float(snap.greeks.gamma), 5)
         if snap.greeks.theta is not None:
             greeks["theta"] = round(float(snap.greeks.theta), 4)
-        if snap.greeks.vega  is not None:
-            greeks["vega"]  = round(float(snap.greeks.vega),  4)
+        if snap.greeks.vega is not None:
+            greeks["vega"] = round(float(snap.greeks.vega), 4)
 
     iv = float(snap.implied_volatility) if snap.implied_volatility else None
 
     return {
         **greeks,
-        "iv":     iv,
-        "bid":    bid,
-        "ask":    ask,
-        "mid":    mid,
+        "iv": iv,
+        "bid": bid,
+        "ask": ask,
+        "mid": mid,
         "source": "alpaca_live",
     }
 
@@ -317,6 +325,7 @@ def get_underlying_price(symbol: str) -> float | None:
     # Layer 1 — live stream cache (free, no extra call)
     try:
         from alpaca_stream import BAR_CACHE
+
         df = BAR_CACHE.get_5m(symbol)
         if df is not None and not df.empty:
             price = float(df["Close"].iloc[-1])
@@ -331,11 +340,12 @@ def get_underlying_price(symbol: str) -> float | None:
         return None
     try:
         from alpaca.data.historical import StockHistoricalDataClient
-        from alpaca.data.requests   import StockLatestBarRequest
-        api_key    = CONFIG.get("alpaca_api_key", "")
+        from alpaca.data.requests import StockLatestBarRequest
+
+        api_key = CONFIG.get("alpaca_api_key", "")
         secret_key = CONFIG.get("alpaca_secret_key", "")
         stock_client = StockHistoricalDataClient(api_key, secret_key)
-        req    = StockLatestBarRequest(symbol_or_symbols=symbol)
+        req = StockLatestBarRequest(symbol_or_symbols=symbol)
         result = stock_client.get_stock_latest_bar(req)
         if result and symbol in result:
             return float(result[symbol].close)

@@ -10,9 +10,9 @@
 
 from __future__ import annotations
 
-import threading
 import logging
-from datetime import datetime, timedelta, timezone
+import threading
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 
@@ -37,12 +37,13 @@ def _get_client():
     with _client_lock:
         if _client is not None:
             return _client
-        api_key    = CONFIG.get("alpaca_api_key", "")
+        api_key = CONFIG.get("alpaca_api_key", "")
         secret_key = CONFIG.get("alpaca_secret_key", "")
         if not api_key or not secret_key:
             return None
         try:
             from alpaca.data.historical import StockHistoricalDataClient
+
             _client = StockHistoricalDataClient(api_key, secret_key)
             log.debug("alpaca_data: StockHistoricalDataClient initialised")
         except ImportError:
@@ -54,26 +55,27 @@ def _get_client():
 
 # ── Period → start date ───────────────────────────────────────────────────────
 
+
 def _period_to_start(period: str) -> datetime:
     """Convert yfinance-style period string to a UTC start datetime."""
     n_str = "".join(c for c in period if c.isdigit())
-    unit  = "".join(c for c in period if c.isalpha()).lower()
+    unit = "".join(c for c in period if c.isalpha()).lower()
     n = int(n_str) if n_str else 1
 
     if unit in ("y", "yr"):
-        delta = timedelta(days=n * 366)   # covers leap years
+        delta = timedelta(days=n * 366)  # covers leap years
     elif unit in ("mo", "month"):
         delta = timedelta(days=n * 32)
-    else:                                  # "d" or bare number
-        delta = timedelta(days=n + 2)      # +2 buffer for weekends
+    else:  # "d" or bare number
+        delta = timedelta(days=n + 2)  # +2 buffer for weekends
 
-    return datetime.now(timezone.utc) - delta
+    return datetime.now(UTC) - delta
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def fetch_bars(symbol: str, period: str = "60d",
-               interval: str = "1d") -> pd.DataFrame | None:
+
+def fetch_bars(symbol: str, period: str = "60d", interval: str = "1d") -> pd.DataFrame | None:
     """
     Fetch historical OHLCV bars for one symbol from Alpaca REST.
 
@@ -98,11 +100,11 @@ def fetch_bars(symbol: str, period: str = "60d",
         from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 
         tf_map = {
-            "1d":  TimeFrame.Day,
+            "1d": TimeFrame.Day,
             "1wk": TimeFrame.Week,
-            "1h":  TimeFrame.Hour,
-            "5m":  TimeFrame(5,  TimeFrameUnit.Minute),
-            "1m":  TimeFrame.Minute,
+            "1h": TimeFrame.Hour,
+            "5m": TimeFrame(5, TimeFrameUnit.Minute),
+            "1m": TimeFrame.Minute,
         }
         tf = tf_map.get(interval)
         if tf is None:
@@ -117,7 +119,7 @@ def fetch_bars(symbol: str, period: str = "60d",
             adjustment="split",
         )
         bars = client.get_stock_bars(request)
-        df   = bars.df
+        df = bars.df
 
         if df is None or df.empty:
             return None
@@ -128,10 +130,10 @@ def fetch_bars(symbol: str, period: str = "60d",
 
         # Alpaca returns lowercase columns; rename to canonical capitalised form
         rename = {
-            "open":   "Open",
-            "high":   "High",
-            "low":    "Low",
-            "close":  "Close",
+            "open": "Open",
+            "high": "High",
+            "low": "Low",
+            "close": "Close",
             "volume": "Volume",
         }
         df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
@@ -168,6 +170,7 @@ def fetch_snapshots(symbols: list[str]) -> dict[str, dict]:
 
     try:
         from alpaca.data.requests import StockSnapshotRequest
+
         request = StockSnapshotRequest(symbol_or_symbols=symbols, feed="sip")
         raw = client.get_stock_snapshot(request)
         result: dict[str, dict] = {}

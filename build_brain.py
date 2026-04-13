@@ -36,41 +36,41 @@ import webbrowser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import anthropic
 
 # Load .env so ANTHROPIC_API_KEY is available (mirrors config.py pattern)
 try:
     from dotenv import load_dotenv as _load_dotenv
+
     _load_dotenv(os.path.join(os.path.dirname(__file__), ".env"), override=True)
 except ImportError:
     pass
 
 # ─── Config ───────────────────────────────────────────────────────────────────
-ROOT         = Path(__file__).parent
-CACHE_FILE   = ROOT / "brain_cache.json"
-OUTPUT_FILE  = ROOT / "decifer-brain.html"
-NORTH_STAR   = ROOT / "chief-decifer/state/specs/feat-north-star.json"
-BACKLOG      = ROOT / "chief-decifer/state/backlog.json"
+ROOT = Path(__file__).parent
+CACHE_FILE = ROOT / "brain_cache.json"
+OUTPUT_FILE = ROOT / "decifer-brain.html"
+NORTH_STAR = ROOT / "chief-decifer/state/specs/feat-north-star.json"
+BACKLOG = ROOT / "chief-decifer/state/backlog.json"
 
-MODEL_ANNOTATE   = "claude-sonnet-4-6"
+MODEL_ANNOTATE = "claude-sonnet-4-6"
 MODEL_SYNTHESIZE = "claude-opus-4-6"
-MAX_WORKERS      = 5   # parallel Sonnet calls
+MAX_WORKERS = 5  # parallel Sonnet calls
 
-EXCLUDE_DIRS  = {".claude", "__pycache__", "tests", ".git", "logs", "docs", "roadmap"}
-EXCLUDE_FILES = {"build_brain.py"}   # don't annotate the brain generator itself
+EXCLUDE_DIRS = {".claude", "__pycache__", "tests", ".git", "logs", "docs", "roadmap"}
+EXCLUDE_FILES = {"build_brain.py"}  # don't annotate the brain generator itself
 
 GROUPS = {
-    "orchestration": {"label": "Orchestration",     "color": "#6366f1"},
-    "data":          {"label": "Data / Scanning",    "color": "#06b6d4"},
-    "signal":        {"label": "Signal Engine",      "color": "#f59e0b"},
-    "intelligence":  {"label": "Intelligence",       "color": "#8b5cf6"},
-    "execution":     {"label": "Execution",          "color": "#ef4444"},
-    "risk":          {"label": "Risk",               "color": "#f97316"},
-    "learning":      {"label": "Learning",           "color": "#10b981"},
-    "infra":         {"label": "Infrastructure",     "color": "#64748b"},
-    "zombie":        {"label": "Zombie / No Pillar", "color": "#7f1d1d"},
+    "orchestration": {"label": "Orchestration", "color": "#6366f1"},
+    "data": {"label": "Data / Scanning", "color": "#06b6d4"},
+    "signal": {"label": "Signal Engine", "color": "#f59e0b"},
+    "intelligence": {"label": "Intelligence", "color": "#8b5cf6"},
+    "execution": {"label": "Execution", "color": "#ef4444"},
+    "risk": {"label": "Risk", "color": "#f97316"},
+    "learning": {"label": "Learning", "color": "#10b981"},
+    "infra": {"label": "Infrastructure", "color": "#64748b"},
+    "zombie": {"label": "Zombie / No Pillar", "color": "#7f1d1d"},
 }
 
 
@@ -78,14 +78,14 @@ GROUPS = {
 def get_py_files() -> list[Path]:
     files = []
     for entry in sorted(ROOT.rglob("*.py")):
-        rel   = entry.relative_to(ROOT)
+        rel = entry.relative_to(ROOT)
         parts = rel.parts
         if any(p in EXCLUDE_DIRS for p in parts[:-1]):
             continue
         if entry.name in EXCLUDE_FILES:
             continue
         try:
-            if entry.stat().st_size < 50:   # skip empty/stub files
+            if entry.stat().st_size < 50:  # skip empty/stub files
                 continue
         except OSError:
             continue
@@ -99,8 +99,7 @@ def get_blob_hashes() -> dict[str, str]:
     hashes: dict[str, str] = {}
     try:
         out = subprocess.run(
-            ["git", "ls-files", "-s", "--full-name"],
-            capture_output=True, text=True, cwd=ROOT, timeout=10
+            ["git", "ls-files", "-s", "--full-name"], capture_output=True, text=True, cwd=ROOT, timeout=10
         ).stdout
         for line in out.splitlines():
             parts = line.split()
@@ -125,8 +124,7 @@ def ast_analyze(filepath: Path) -> dict:
     try:
         source = filepath.read_text(encoding="utf-8", errors="ignore")
     except Exception:
-        return {"lines": 0, "imports": [], "functions": [], "classes": [],
-                "docstring": "", "source_preview": ""}
+        return {"lines": 0, "imports": [], "functions": [], "classes": [], "docstring": "", "source_preview": ""}
 
     lines = source.count("\n") + 1
     result: dict = {
@@ -144,9 +142,11 @@ def ast_analyze(filepath: Path) -> dict:
         return result
 
     # Module docstring
-    if (tree.body
-            and isinstance(tree.body[0], ast.Expr)
-            and isinstance(getattr(tree.body[0], "value", None), ast.Constant)):
+    if (
+        tree.body
+        and isinstance(tree.body[0], ast.Expr)
+        and isinstance(getattr(tree.body[0], "value", None), ast.Constant)
+    ):
         doc = tree.body[0].value.value
         if isinstance(doc, str):
             result["docstring"] = doc[:600]
@@ -234,7 +234,7 @@ def _sanitize_json_strings(text: str) -> str:
             in_string = not in_string
             result.append(ch)
         elif in_string and ch in ("\n", "\r", "\t"):
-            result.append(" ")   # replace illegal control char with space
+            result.append(" ")  # replace illegal control char with space
         else:
             result.append(ch)
     return "".join(result)
@@ -252,7 +252,7 @@ def _extract_json(text: str) -> dict:
         text = text.strip()
     # Find outermost { ... }
     start = text.find("{")
-    end   = text.rfind("}")
+    end = text.rfind("}")
     if start != -1 and end != -1 and end > start:
         text = text[start : end + 1]
     # Sanitize control chars inside strings
@@ -281,11 +281,16 @@ def annotate_file(client: anthropic.Anthropic, filepath: Path, ast_data: dict) -
         "group": "infra",
         "desc": "(annotation unavailable)",
         "fn": ast_data["functions"][:5],
-        "good": [], "bad": [], "ugly": [],
-        "cfg": [], "files": [],
+        "good": [],
+        "bad": [],
+        "ugly": [],
+        "cfg": [],
+        "files": [],
         "pillars": [],
-        "kill_candidate": False, "kill_reason": None,
-        "bug_risk": "low", "bug_risk_reason": "annotation unavailable",
+        "kill_candidate": False,
+        "kill_reason": None,
+        "bug_risk": "low",
+        "bug_risk_reason": "annotation unavailable",
     }
 
     def _call(prompt: str, max_tokens: int) -> dict:
@@ -328,14 +333,18 @@ def annotate_file(client: anthropic.Anthropic, filepath: Path, ast_data: dict) -
         r = client.messages.create(
             model=MODEL_ANNOTATE,
             max_tokens=300,
-            system='You output only valid RFC 8259 JSON. No markdown. No prose. No code snippets in string values. Use only plain text descriptions.',
-            messages=[{"role": "user", "content":
-                f'Return a JSON object for Python file "{filepath.name}" ({ast_data["lines"]} lines). '
-                f'Functions: {", ".join(ast_data["functions"][:10]) or "none"}. '
-                'Fields: group (pick one: orchestration data signal intelligence execution risk learning infra zombie), '
-                'desc (1 sentence), fn (list), good (list), bad (list), ugly (list), '
-                'cfg (list), files (list), pillars (list of 1-5), kill_candidate (bool), '
-                'kill_reason (str or null), bug_risk (critical/high/medium/low), bug_risk_reason (str).'}],
+            system="You output only valid RFC 8259 JSON. No markdown. No prose. No code snippets in string values. Use only plain text descriptions.",
+            messages=[
+                {
+                    "role": "user",
+                    "content": f'Return a JSON object for Python file "{filepath.name}" ({ast_data["lines"]} lines). '
+                    f"Functions: {', '.join(ast_data['functions'][:10]) or 'none'}. "
+                    "Fields: group (pick one: orchestration data signal intelligence execution risk learning infra zombie), "
+                    "desc (1 sentence), fn (list), good (list), bad (list), ugly (list), "
+                    "cfg (list), files (list), pillars (list of 1-5), kill_candidate (bool), "
+                    "kill_reason (str or null), bug_risk (critical/high/medium/low), bug_risk_reason (str).",
+                }
+            ],
         )
         return _extract_json(r.content[0].text)
     except Exception as exc:
@@ -397,8 +406,7 @@ Rules:
   Include dashboard_v2.py if a v1 still exists, version-suffixed files, unused entrypoints, etc."""
 
 
-def synthesize(client: anthropic.Anthropic, nodes: list[dict],
-               total_lines: int, fast: bool) -> dict | None:
+def synthesize(client: anthropic.Anthropic, nodes: list[dict], total_lines: int, fast: bool) -> dict | None:
     if fast:
         print("  [skip] synthesis (--fast mode)")
         return None
@@ -409,7 +417,7 @@ def synthesize(client: anthropic.Anthropic, nodes: list[dict],
         try:
             bl = json.loads(BACKLOG.read_text())
             phases = bl.get("wip_policy", {}).get("phases", {})
-            items  = bl.get("items", [])
+            items = bl.get("items", [])
             pending = [i for i in items if i.get("status") == "pending"]
             shipped = [i for i in items if i.get("status") == "shipped"]
             backlog_summary = (
@@ -427,7 +435,7 @@ def synthesize(client: anthropic.Anthropic, nodes: list[dict],
         pillars = nd.get("pillars", [])
         summary = (
             f"{nd['label']} ({nd.get('lines', 0)} lines, group={nd['group']}, "
-            f"bug_risk={nd.get('bug_risk','?')}, pillars={pillars}, "
+            f"bug_risk={nd.get('bug_risk', '?')}, pillars={pillars}, "
             f"kill_candidate={nd.get('kill_candidate', False)})\n"
             f"  desc: {nd.get('desc', '')}\n"
             f"  bad:  {'; '.join(nd.get('bad', []))}\n"
@@ -463,8 +471,8 @@ def synthesize(client: anthropic.Anthropic, nodes: list[dict],
 def build_edges(nodes: list[dict], ast_map: dict[str, dict]) -> list[dict]:
     """Build import-dependency edges between project files."""
     # Map stem → node id
-    stem_to_id = {nd["id"]: nd["id"] for nd in nodes}   # id is the stem
-    all_stems  = {nd["id"] for nd in nodes}
+    {nd["id"]: nd["id"] for nd in nodes}  # id is the stem
+    all_stems = {nd["id"] for nd in nodes}
 
     edges = []
     seen: set[tuple[str, str]] = set()
@@ -480,16 +488,15 @@ def build_edges(nodes: list[dict], ast_map: dict[str, dict]) -> list[dict]:
 
 
 # ─── HTML generation ──────────────────────────────────────────────────────────
-def render_html(nodes: list[dict], edges: list[dict],
-                synthesis: dict | None, generated_at: str) -> str:
+def render_html(nodes: list[dict], edges: list[dict], synthesis: dict | None, generated_at: str) -> str:
 
-    nodes_js    = json.dumps(nodes, indent=2, ensure_ascii=False)
-    edges_js    = json.dumps(edges, indent=2, ensure_ascii=False)
-    groups_js   = json.dumps(GROUPS, indent=2)
-    synth_js    = json.dumps(synthesis or {}, indent=2, ensure_ascii=False)
+    nodes_js = json.dumps(nodes, indent=2, ensure_ascii=False)
+    edges_js = json.dumps(edges, indent=2, ensure_ascii=False)
+    groups_js = json.dumps(GROUPS, indent=2)
+    synth_js = json.dumps(synthesis or {}, indent=2, ensure_ascii=False)
     total_files = len(nodes)
     total_lines = sum(n.get("lines", 0) for n in nodes)
-    kill_count  = sum(1 for n in nodes if n.get("kill_candidate"))
+    kill_count = sum(1 for n in nodes if n.get("kill_candidate"))
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -1003,8 +1010,8 @@ function togglePhysics() {{
 # ─── Main ─────────────────────────────────────────────────────────────────────
 def main() -> None:
     args = set(sys.argv[1:])
-    force   = "--force"   in args
-    fast    = "--fast"    in args
+    force = "--force" in args
+    fast = "--fast" in args
     no_open = "--no-open" in args
 
     client = anthropic.Anthropic()
@@ -1026,7 +1033,7 @@ def main() -> None:
 
     # 4. AST analyze all files
     print("AST analysis...")
-    ast_map: dict[str, dict] = {}   # filename -> ast_data
+    ast_map: dict[str, dict] = {}  # filename -> ast_data
     for fp in py_files:
         ast_map[fp.name] = ast_analyze(fp)
 
@@ -1063,8 +1070,8 @@ def main() -> None:
     # 7. Assemble nodes
     nodes: list[dict] = []
     for fp in py_files:
-        key  = file_cache_key(fp, blob_hashes)
-        ann  = cache.get(key, {})
+        key = file_cache_key(fp, blob_hashes)
+        ann = cache.get(key, {})
         stem = fp.stem
 
         # Ensure kill_candidate = True if group is zombie
@@ -1072,22 +1079,22 @@ def main() -> None:
             ann["kill_candidate"] = True
 
         node: dict = {
-            "id":            stem,
-            "label":         fp.name,
-            "group":         ann.get("group", "infra"),
-            "lines":         ast_map[fp.name]["lines"],
-            "desc":          ann.get("desc", ""),
-            "fn":            ann.get("fn", ast_map[fp.name]["functions"][:5]),
-            "good":          ann.get("good", []),
-            "bad":           ann.get("bad", []),
-            "ugly":          ann.get("ugly", []),
-            "cfg":           ann.get("cfg", []),
-            "files":         ann.get("files", []),
-            "pillars":       ann.get("pillars", []),
-            "kill_candidate":ann.get("kill_candidate", False),
-            "kill_reason":   ann.get("kill_reason"),
-            "bug_risk":      ann.get("bug_risk", "low"),
-            "bug_risk_reason":ann.get("bug_risk_reason", ""),
+            "id": stem,
+            "label": fp.name,
+            "group": ann.get("group", "infra"),
+            "lines": ast_map[fp.name]["lines"],
+            "desc": ann.get("desc", ""),
+            "fn": ann.get("fn", ast_map[fp.name]["functions"][:5]),
+            "good": ann.get("good", []),
+            "bad": ann.get("bad", []),
+            "ugly": ann.get("ugly", []),
+            "cfg": ann.get("cfg", []),
+            "files": ann.get("files", []),
+            "pillars": ann.get("pillars", []),
+            "kill_candidate": ann.get("kill_candidate", False),
+            "kill_reason": ann.get("kill_reason"),
+            "bug_risk": ann.get("bug_risk", "low"),
+            "bug_risk_reason": ann.get("bug_risk_reason", ""),
         }
         nodes.append(node)
 

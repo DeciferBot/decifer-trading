@@ -7,23 +7,31 @@ Tests core order execution logic:
 - _validate_position_price: 3-way price consensus logic
 - Thread safety: open_trades + _trades_lock
 """
-import os, sys, types
+
+import os
+import sys
 from unittest.mock import MagicMock
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Stub heavy deps BEFORE importing any Decifer module
-for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance",
-             "praw", "feedparser", "tvDatafeed", "requests_html"]:
+for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance", "praw", "feedparser", "tvDatafeed", "requests_html"]:
     sys.modules.setdefault(_mod, MagicMock())
 
 # Stub config with required keys
 import config as _config_mod
-_cfg = {"log_file": "/dev/null", "trade_log": "/dev/null",
-        "order_log": "/dev/null", "anthropic_api_key": "test-key",
-        "model": "claude-sonnet-4-20250514", "max_tokens": 1000,
-        "mongo_uri": "", "db_name": "test"}
+
+_cfg = {
+    "log_file": "/dev/null",
+    "trade_log": "/dev/null",
+    "order_log": "/dev/null",
+    "anthropic_api_key": "test-key",
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1000,
+    "mongo_uri": "",
+    "db_name": "test",
+}
 if hasattr(_config_mod, "CONFIG"):
     for _k, _v in _cfg.items():
         _config_mod.CONFIG.setdefault(_k, _v)
@@ -31,11 +39,12 @@ else:
     _config_mod.CONFIG = _cfg
 
 
-import pytest
 import threading
 import time
-from unittest.mock import patch, MagicMock, call
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Force-evict any hollow stubs that earlier test files (e.g. test_bot.py) may
 # have planted into sys.modules for orders and its local dependencies.
@@ -54,12 +63,11 @@ for _decifer_mod in ("orders", "risk", "scanner", "signals", "news", "agents"):
 
 # Import the REAL orders module (conftest has already patched all heavy deps)
 import orders
-import orders_options
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIG FIXTURE
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def mock_config():
@@ -70,13 +78,11 @@ def mock_config():
         "ibkr_port": 7496,
         "ibkr_client_id": 10,
         "active_account": "DUP481326",
-
         # Accounts
         "accounts": {
             "paper": "DUP481326",
             "live_1": "U3059777",
         },
-
         # Risk Management
         "risk_pct_per_trade": 0.03,
         "max_positions": 5,  # Small for testing
@@ -88,7 +94,6 @@ def mock_config():
         "consecutive_loss_pause": 8,
         "max_portfolio_allocation": 1.0,
         "starting_capital": 100_000,
-
         # Stops & TP
         "atr_stop_multiplier": 1.5,
         "atr_trail_multiplier": 2.0,
@@ -96,13 +101,11 @@ def mock_config():
         "partial_exit_2_pct": 0.08,
         "min_reward_risk_ratio": 1.5,  # IMPORTANT for R:R validation
         "gap_protection_pct": 0.03,
-
         # Scanning & Scoring
         "agents_required_to_agree": 2,
         "scan_interval_prime": 3,
         "min_score_to_trade": 18,
         "high_conviction_score": 30,
-
         # Market Hours
         "pre_market_start": "04:00",
         "market_open": "09:30",
@@ -112,7 +115,6 @@ def mock_config():
         "close_buffer": "15:55",
         "market_close": "16:00",
         "after_hours_end": "20:00",
-
         # Indicators
         "ema_fast": 9,
         "ema_slow": 21,
@@ -127,28 +129,23 @@ def mock_config():
         "keltner_atr_period": 10,
         "keltner_multiplier": 1.5,
         "donchian_period": 20,
-
         # Dashboard
         "dashboard_port": 8080,
-
         # VIX Thresholds
         "vix_bull_max": 15,
         "vix_choppy_max": 25,
         "vix_panic_min": 35,
         "vix_spike_pct": 0.20,
-
         # Inverse ETFs
         "inverse_etfs": {
             "market_short": "SPXS",
             "tech_short": "SQQQ",
             "vix_long": "UVXY",
         },
-
         # Logging
         "log_file": "logs/decifer.log",
         "trade_log": "data/trades.json",
         "order_log": "data/orders.json",
-
         # Options
         "options_enabled": True,
         "options_min_score": 35,
@@ -168,6 +165,7 @@ def mock_config():
 # IB MOCK FIXTURE
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def mock_ib():
     """Create a mock IB object with necessary methods for order placement."""
@@ -176,15 +174,17 @@ def mock_ib():
     # Mock qualifyContracts — returns the contract unchanged
     def qualify_contracts(contract):
         return [contract]
+
     ib.qualifyContracts.side_effect = qualify_contracts
 
     # Mock placeOrder — returns a mock Trade with order info
     def place_order(contract, order):
         trade = MagicMock()
-        raw_id = getattr(order, 'orderId', None)
+        raw_id = getattr(order, "orderId", None)
         trade.order.orderId = raw_id if isinstance(raw_id, int) else 12345
         trade.orderStatus.status = "Submitted"
         return trade
+
     ib.placeOrder.side_effect = place_order
 
     # Mock sleep — no-op
@@ -199,6 +199,7 @@ def mock_ib():
         ticker.bid = 99.9
         ticker.ask = 100.1
         return [ticker]
+
     ib.reqTickers.side_effect = req_tickers
 
     # Mock portfolio — returns empty list by default
@@ -213,6 +214,7 @@ def mock_ib():
 # ─────────────────────────────────────────────────────────────────────────────
 # TESTS: Module-level globals
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestModuleGlobals:
     """Test that module-level globals exist and have correct types."""
@@ -231,6 +233,7 @@ class TestModuleGlobals:
 # TESTS: execute_buy
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestExecuteBuy:
     """Test execute_buy order placement logic."""
 
@@ -242,20 +245,28 @@ class TestExecuteBuy:
         self.mock_config = mock_config
         self.mock_ib = mock_ib
 
-    @patch('orders.CONFIG')
-    @patch('orders.calculate_position_size')
-    @patch('orders.calculate_stops')
-    @patch('orders.check_correlation')
-    @patch('orders.check_combined_exposure')
-    @patch('orders.check_sector_concentration')
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    @patch('orders.log_order')
+    @patch("orders.CONFIG")
+    @patch("orders.calculate_position_size")
+    @patch("orders.calculate_stops")
+    @patch("orders.check_correlation")
+    @patch("orders.check_combined_exposure")
+    @patch("orders.check_sector_concentration")
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    @patch("orders.log_order")
     def test_execute_buy_happy_path_returns_true(
-        self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_sector, mock_exposure, mock_correlation,
-        mock_stops, mock_position_size, mock_config_obj,
-        mock_config, mock_ib
+        self,
+        mock_log_order,
+        mock_yf_price,
+        mock_tv_cache,
+        mock_sector,
+        mock_exposure,
+        mock_correlation,
+        mock_stops,
+        mock_position_size,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """Happy path: execute_buy places bracket order and returns True."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -279,7 +290,7 @@ class TestExecuteBuy:
             score=30,
             portfolio_value=100_000,
             regime={"regime": "bull"},
-            reasoning="Test trade"
+            reasoning="Test trade",
         )
 
         assert result is True
@@ -287,11 +298,9 @@ class TestExecuteBuy:
         assert orders.open_trades["AAPL"]["symbol"] == "AAPL"
         assert orders.open_trades["AAPL"]["qty"] == 100
 
-    @patch('orders.CONFIG')
-    @patch('orders.check_correlation')
-    def test_execute_buy_duplicate_symbol_returns_false(
-        self, mock_correlation, mock_config_obj, mock_config, mock_ib
-    ):
+    @patch("orders.CONFIG")
+    @patch("orders.check_correlation")
+    def test_execute_buy_duplicate_symbol_returns_false(self, mock_correlation, mock_config_obj, mock_config, mock_ib):
         """execute_buy should reject if symbol already in open_trades."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
 
@@ -310,11 +319,9 @@ class TestExecuteBuy:
 
         assert result is False
 
-    @patch('orders.CONFIG')
-    @patch('orders.check_correlation')
-    def test_execute_buy_max_positions_returns_false(
-        self, mock_correlation, mock_config_obj, mock_config, mock_ib
-    ):
+    @patch("orders.CONFIG")
+    @patch("orders.check_correlation")
+    def test_execute_buy_max_positions_returns_false(self, mock_correlation, mock_config_obj, mock_config, mock_ib):
         """execute_buy should reject if max_positions reached."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
 
@@ -334,11 +341,9 @@ class TestExecuteBuy:
 
         assert result is False
 
-    @patch('orders.CONFIG')
-    @patch('orders.check_correlation')
-    def test_execute_buy_correlation_block_returns_false(
-        self, mock_correlation, mock_config_obj, mock_config, mock_ib
-    ):
+    @patch("orders.CONFIG")
+    @patch("orders.check_correlation")
+    def test_execute_buy_correlation_block_returns_false(self, mock_correlation, mock_config_obj, mock_config, mock_ib):
         """execute_buy should reject if correlation check fails."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_correlation.return_value = (False, "Correlated with existing position")
@@ -357,20 +362,28 @@ class TestExecuteBuy:
 
         assert result is False
 
-    @patch('orders.CONFIG')
-    @patch('orders.calculate_position_size')
-    @patch('orders.calculate_stops')
-    @patch('orders.check_correlation')
-    @patch('orders.check_combined_exposure')
-    @patch('orders.check_sector_concentration')
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    @patch('orders.log_order')
+    @patch("orders.CONFIG")
+    @patch("orders.calculate_position_size")
+    @patch("orders.calculate_stops")
+    @patch("orders.check_correlation")
+    @patch("orders.check_combined_exposure")
+    @patch("orders.check_sector_concentration")
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    @patch("orders.log_order")
     def test_execute_buy_poor_rr_returns_false(
-        self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_sector, mock_exposure, mock_correlation,
-        mock_stops, mock_position_size, mock_config_obj,
-        mock_config, mock_ib
+        self,
+        mock_log_order,
+        mock_yf_price,
+        mock_tv_cache,
+        mock_sector,
+        mock_exposure,
+        mock_correlation,
+        mock_stops,
+        mock_position_size,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """execute_buy should reject if R:R ratio is below threshold (legacy mode only)."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -399,20 +412,28 @@ class TestExecuteBuy:
 
         assert result is False
 
-    @patch('orders.CONFIG')
-    @patch('orders.calculate_position_size')
-    @patch('orders.calculate_stops')
-    @patch('orders.check_correlation')
-    @patch('orders.check_combined_exposure')
-    @patch('orders.check_sector_concentration')
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    @patch('orders.log_order')
+    @patch("orders.CONFIG")
+    @patch("orders.calculate_position_size")
+    @patch("orders.calculate_stops")
+    @patch("orders.check_correlation")
+    @patch("orders.check_combined_exposure")
+    @patch("orders.check_sector_concentration")
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    @patch("orders.log_order")
     def test_execute_buy_price_too_low_returns_false(
-        self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_sector, mock_exposure, mock_correlation,
-        mock_stops, mock_position_size, mock_config_obj,
-        mock_config, mock_ib
+        self,
+        mock_log_order,
+        mock_yf_price,
+        mock_tv_cache,
+        mock_sector,
+        mock_exposure,
+        mock_correlation,
+        mock_stops,
+        mock_position_size,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """execute_buy should reject prices under $1 (contaminated data)."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -436,20 +457,28 @@ class TestExecuteBuy:
 
         assert result is False
 
-    @patch('orders.CONFIG')
-    @patch('orders.calculate_position_size')
-    @patch('orders.calculate_stops')
-    @patch('orders.check_correlation')
-    @patch('orders.check_combined_exposure')
-    @patch('orders.check_sector_concentration')
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    @patch('orders.log_order')
+    @patch("orders.CONFIG")
+    @patch("orders.calculate_position_size")
+    @patch("orders.calculate_stops")
+    @patch("orders.check_correlation")
+    @patch("orders.check_combined_exposure")
+    @patch("orders.check_sector_concentration")
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    @patch("orders.log_order")
     def test_execute_buy_price_too_high_returns_false(
-        self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_sector, mock_exposure, mock_correlation,
-        mock_stops, mock_position_size, mock_config_obj,
-        mock_config, mock_ib
+        self,
+        mock_log_order,
+        mock_yf_price,
+        mock_tv_cache,
+        mock_sector,
+        mock_exposure,
+        mock_correlation,
+        mock_stops,
+        mock_position_size,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """execute_buy should reject prices over $10,000 (contaminated data)."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -473,20 +502,28 @@ class TestExecuteBuy:
 
         assert result is False
 
-    @patch('orders.CONFIG')
-    @patch('orders.calculate_position_size')
-    @patch('orders.calculate_stops')
-    @patch('orders.check_correlation')
-    @patch('orders.check_combined_exposure')
-    @patch('orders.check_sector_concentration')
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    @patch('orders.log_order')
+    @patch("orders.CONFIG")
+    @patch("orders.calculate_position_size")
+    @patch("orders.calculate_stops")
+    @patch("orders.check_correlation")
+    @patch("orders.check_combined_exposure")
+    @patch("orders.check_sector_concentration")
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    @patch("orders.log_order")
     def test_execute_buy_no_price_data_returns_false(
-        self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_sector, mock_exposure, mock_correlation,
-        mock_stops, mock_position_size, mock_config_obj,
-        mock_config, mock_ib
+        self,
+        mock_log_order,
+        mock_yf_price,
+        mock_tv_cache,
+        mock_sector,
+        mock_exposure,
+        mock_correlation,
+        mock_stops,
+        mock_position_size,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """execute_buy should reject if no price data from any source."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -501,8 +538,10 @@ class TestExecuteBuy:
         mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 0
         # Patch at the call site (orders_core imports _get_ibkr_price directly)
-        with patch('orders_core._get_ibkr_price', return_value=0), \
-             patch('orders_core._get_ibkr_bid_ask', return_value=(0, 0)):
+        with (
+            patch("orders_core._get_ibkr_price", return_value=0),
+            patch("orders_core._get_ibkr_bid_ask", return_value=(0, 0)),
+        ):
             result = orders.execute_buy(
                 ib=mock_ib,
                 symbol="NOPRICE",
@@ -515,20 +554,28 @@ class TestExecuteBuy:
 
         assert result is False
 
-    @patch('orders.CONFIG')
-    @patch('orders.calculate_position_size')
-    @patch('orders.calculate_stops')
-    @patch('orders.check_correlation')
-    @patch('orders.check_combined_exposure')
-    @patch('orders.check_sector_concentration')
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    @patch('orders.log_order')
+    @patch("orders.CONFIG")
+    @patch("orders.calculate_position_size")
+    @patch("orders.calculate_stops")
+    @patch("orders.check_correlation")
+    @patch("orders.check_combined_exposure")
+    @patch("orders.check_sector_concentration")
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    @patch("orders.log_order")
     def test_execute_buy_price_contamination_blocks_trade(
-        self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_sector, mock_exposure, mock_correlation,
-        mock_stops, mock_position_size, mock_config_obj,
-        mock_config, mock_ib
+        self,
+        mock_log_order,
+        mock_yf_price,
+        mock_tv_cache,
+        mock_sector,
+        mock_exposure,
+        mock_correlation,
+        mock_stops,
+        mock_position_size,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """execute_buy should reject if sources diverge >50%."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -542,8 +589,10 @@ class TestExecuteBuy:
         # Diverging sources: 100 vs 210 = >50% divergence (triggers contamination guard)
         mock_tv_cache.return_value = {"SYM": {"tv_close": 210.0}}
         mock_yf_price.return_value = 100.0
-        with patch('orders_core._get_ibkr_price', return_value=100.0), \
-             patch('orders_core._get_ibkr_bid_ask', return_value=(99.9, 100.1)):
+        with (
+            patch("orders_core._get_ibkr_price", return_value=100.0),
+            patch("orders_core._get_ibkr_bid_ask", return_value=(99.9, 100.1)),
+        ):
             result = orders.execute_buy(
                 ib=mock_ib,
                 symbol="SYM",
@@ -561,13 +610,14 @@ class TestExecuteBuy:
 # TESTS: execute_sell
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestExecuteSell:
     """Test execute_sell order execution logic."""
 
     @pytest.fixture(autouse=True)
     def mock_market_open(self):
         """Simulate market open so execute_sell is not deferred by market-hours guard."""
-        with patch('orders_core.is_equities_extended_hours', return_value=True):
+        with patch("orders_core.is_equities_extended_hours", return_value=True):
             yield
 
     @pytest.fixture(autouse=True)
@@ -578,14 +628,20 @@ class TestExecuteSell:
         self.mock_config = mock_config
         self.mock_ib = mock_ib
 
-    @patch('orders.CONFIG')
-    @patch('orders._validate_position_price')
-    @patch('orders._get_ibkr_price')
-    @patch('orders.log_order')
-    @patch('orders.record_win')
+    @patch("orders.CONFIG")
+    @patch("orders._validate_position_price")
+    @patch("orders._get_ibkr_price")
+    @patch("orders.log_order")
+    @patch("orders.record_win")
     def test_execute_sell_happy_path_returns_true(
-        self, mock_record_win, mock_log_order, mock_ibkr_price,
-        mock_validate_price, mock_config_obj, mock_config, mock_ib
+        self,
+        mock_record_win,
+        mock_log_order,
+        mock_ibkr_price,
+        mock_validate_price,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """Happy path: execute_sell closes position and returns True."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -603,38 +659,34 @@ class TestExecuteSell:
         mock_validate_price.return_value = (105.0, "IBKR=$105.00")
         mock_record_win.return_value = None
 
-        result = orders.execute_sell(
-            ib=mock_ib,
-            symbol="AAPL",
-            reason="Test close"
-        )
+        result = orders.execute_sell(ib=mock_ib, symbol="AAPL", reason="Test close")
 
         assert result is True
         assert "AAPL" not in orders.open_trades
 
-    @patch('orders.CONFIG')
-    def test_execute_sell_nonexistent_position_returns_false(
-        self, mock_config_obj, mock_config, mock_ib
-    ):
+    @patch("orders.CONFIG")
+    def test_execute_sell_nonexistent_position_returns_false(self, mock_config_obj, mock_config, mock_ib):
         """execute_sell should return False if symbol not in open_trades."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
 
-        result = orders.execute_sell(
-            ib=mock_ib,
-            symbol="NONEXISTENT",
-            reason="Test"
-        )
+        result = orders.execute_sell(ib=mock_ib, symbol="NONEXISTENT", reason="Test")
 
         assert result is False
 
-    @patch('orders.CONFIG')
-    @patch('orders._validate_position_price')
-    @patch('orders._get_ibkr_price')
-    @patch('orders.log_order')
-    @patch('orders.record_loss')
+    @patch("orders.CONFIG")
+    @patch("orders._validate_position_price")
+    @patch("orders._get_ibkr_price")
+    @patch("orders.log_order")
+    @patch("orders.record_loss")
     def test_execute_sell_loss_records_loss(
-        self, mock_record_loss, mock_log_order, mock_ibkr_price,
-        mock_validate_price, mock_config_obj, mock_config, mock_ib
+        self,
+        mock_record_loss,
+        mock_log_order,
+        mock_ibkr_price,
+        mock_validate_price,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """execute_sell should call record_loss if exit price < entry."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -650,23 +702,25 @@ class TestExecuteSell:
         mock_ibkr_price.return_value = 95.0  # Loss
         mock_validate_price.return_value = (95.0, "IBKR=$95.00")
 
-        result = orders.execute_sell(
-            ib=mock_ib,
-            symbol="AAPL",
-            reason="Stop hit"
-        )
+        result = orders.execute_sell(ib=mock_ib, symbol="AAPL", reason="Stop hit")
 
         assert result is True
         mock_record_loss.assert_called_once()
 
-    @patch('orders.CONFIG')
-    @patch('orders._validate_position_price')
-    @patch('orders._get_ibkr_price')
-    @patch('orders.log_order')
-    @patch('orders.record_loss')
+    @patch("orders.CONFIG")
+    @patch("orders._validate_position_price")
+    @patch("orders._get_ibkr_price")
+    @patch("orders.log_order")
+    @patch("orders.record_loss")
     def test_execute_sell_options_composite_key(
-        self, mock_record_loss, mock_log_order, mock_ibkr_price,
-        mock_validate_price, mock_config_obj, mock_config, mock_ib
+        self,
+        mock_record_loss,
+        mock_log_order,
+        mock_ibkr_price,
+        mock_validate_price,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """execute_sell("GSAT") must find options position stored under composite key."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -674,15 +728,15 @@ class TestExecuteSell:
 
         option_key = "GSAT_C_35.0_2026-04-17"
         orders.open_trades[option_key] = {
-            "symbol":      "GSAT",
-            "instrument":  "option",
-            "right":       "C",
-            "strike":      35.0,
+            "symbol": "GSAT",
+            "instrument": "option",
+            "right": "C",
+            "strike": 35.0,
             "expiry_ibkr": "20260417",
-            "qty":         10,
-            "entry":       2.0,
-            "current":     2.0,
-            "direction":   "LONG",
+            "qty": 10,
+            "entry": 2.0,
+            "current": 2.0,
+            "direction": "LONG",
         }
 
         mock_ibkr_price.return_value = 1.5
@@ -699,14 +753,13 @@ class TestExecuteSell:
 # TESTS: _validate_position_price
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestValidatePositionPrice:
     """Test 3-way price consensus validation."""
 
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    def test_validate_position_price_no_sources_returns_zero(
-        self, mock_yf_price, mock_tv_cache
-    ):
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    def test_validate_position_price_no_sources_returns_zero(self, mock_yf_price, mock_tv_cache):
         """If all sources invalid, return (0, reason)."""
         mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 0
@@ -716,11 +769,9 @@ class TestValidatePositionPrice:
         assert price == 0
         assert "No price data" in src
 
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    def test_validate_position_price_single_source_works(
-        self, mock_yf_price, mock_tv_cache
-    ):
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    def test_validate_position_price_single_source_works(self, mock_yf_price, mock_tv_cache):
         """Single valid source should be accepted if within 50% of entry."""
         mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 0
@@ -730,11 +781,9 @@ class TestValidatePositionPrice:
         assert price == 100.0
         assert "IBKR" in src
 
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    def test_validate_position_price_single_source_outlier_rejected(
-        self, mock_yf_price, mock_tv_cache
-    ):
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    def test_validate_position_price_single_source_outlier_rejected(self, mock_yf_price, mock_tv_cache):
         """Single source >50% from entry should be rejected."""
         mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 0
@@ -745,25 +794,21 @@ class TestValidatePositionPrice:
         assert price == 0
         assert "too far from entry" in src
 
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    def test_validate_position_price_two_sources_agreeing(
-        self, mock_yf_price, mock_tv_cache
-    ):
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    def test_validate_position_price_two_sources_agreeing(self, mock_yf_price, mock_tv_cache):
         """Two sources within 50% should use closest to entry."""
         mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 100.5
 
-        price, src = orders._validate_position_price("SYM", ibkr_price=100.0, entry=100.0)
+        price, _src = orders._validate_position_price("SYM", ibkr_price=100.0, entry=100.0)
 
         assert price > 0
         assert price in (100.0, 100.5) or price == round((100.0 + 100.5) / 2, 4)
 
-    @patch('orders_contracts.get_tv_signal_cache')
-    @patch('orders_contracts._get_alpaca_price')
-    def test_validate_position_price_two_sources_diverging(
-        self, mock_yf_price, mock_tv_cache
-    ):
+    @patch("orders_contracts.get_tv_signal_cache")
+    @patch("orders_contracts._get_alpaca_price")
+    def test_validate_position_price_two_sources_diverging(self, mock_yf_price, mock_tv_cache):
         """Two sources diverging >50% should be rejected."""
         mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 210.0  # 52.4% divergence from IBKR (>50%)
@@ -773,11 +818,9 @@ class TestValidatePositionPrice:
         assert price == 0
         assert "divergence" in src.lower()
 
-    @patch('orders_contracts.get_tv_signal_cache')
-    @patch('orders_contracts._get_alpaca_price')
-    def test_validate_position_price_three_sources_consensus(
-        self, mock_yf_price, mock_tv_cache
-    ):
+    @patch("orders_contracts.get_tv_signal_cache")
+    @patch("orders_contracts._get_alpaca_price")
+    def test_validate_position_price_three_sources_consensus(self, mock_yf_price, mock_tv_cache):
         """Three sources within 50% should use median."""
         mock_tv_cache.return_value = {"SYM": {"tv_close": 101.0}}
         mock_yf_price.return_value = 100.5
@@ -787,16 +830,14 @@ class TestValidatePositionPrice:
         assert price > 0
         assert "consensus" in src.lower() or price == 100.5  # median
 
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    def test_validate_position_price_three_sources_one_outlier(
-        self, mock_yf_price, mock_tv_cache
-    ):
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    def test_validate_position_price_three_sources_one_outlier(self, mock_yf_price, mock_tv_cache):
         """Three sources with one outlier should reject outlier and use other two."""
         mock_tv_cache.return_value = {"SYM": {"tv_close": 300.0}}  # Outlier
         mock_yf_price.return_value = 100.5
 
-        price, src = orders._validate_position_price("SYM", ibkr_price=100.0, entry=100.0)
+        price, _src = orders._validate_position_price("SYM", ibkr_price=100.0, entry=100.0)
 
         assert price > 0
         # Should use IBKR + yfinance, not TV
@@ -806,6 +847,7 @@ class TestValidatePositionPrice:
 # ─────────────────────────────────────────────────────────────────────────────
 # TESTS: Thread Safety
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestThreadSafety:
     """Test that open_trades is thread-safe with _trades_lock."""
@@ -896,6 +938,7 @@ class TestThreadSafety:
 # TESTS: Edge Cases & Integration
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
@@ -905,20 +948,28 @@ class TestEdgeCases:
         orders.open_trades.clear()
         orders.recently_closed.clear()
 
-    @patch('orders.CONFIG')
-    @patch('orders.calculate_position_size')
-    @patch('orders.calculate_stops')
-    @patch('orders.check_correlation')
-    @patch('orders.check_combined_exposure')
-    @patch('orders.check_sector_concentration')
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    @patch('orders.log_order')
+    @patch("orders.CONFIG")
+    @patch("orders.calculate_position_size")
+    @patch("orders.calculate_stops")
+    @patch("orders.check_correlation")
+    @patch("orders.check_combined_exposure")
+    @patch("orders.check_sector_concentration")
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    @patch("orders.log_order")
     def test_execute_buy_qty_capped_at_20pct_portfolio(
-        self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_sector, mock_exposure, mock_correlation,
-        mock_stops, mock_position_size, mock_config_obj,
-        mock_config, mock_ib
+        self,
+        mock_log_order,
+        mock_yf_price,
+        mock_tv_cache,
+        mock_sector,
+        mock_exposure,
+        mock_correlation,
+        mock_stops,
+        mock_position_size,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """execute_buy should cap order value at 20% of portfolio (no fixed share cap)."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -946,20 +997,28 @@ class TestEdgeCases:
         assert result is True
         assert orders.open_trades["CHEAP"]["qty"] == 10000
 
-    @patch('orders.CONFIG')
-    @patch('orders.calculate_position_size')
-    @patch('orders.calculate_stops')
-    @patch('orders.check_correlation')
-    @patch('orders.check_combined_exposure')
-    @patch('orders.check_sector_concentration')
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    @patch('orders.log_order')
+    @patch("orders.CONFIG")
+    @patch("orders.calculate_position_size")
+    @patch("orders.calculate_stops")
+    @patch("orders.check_correlation")
+    @patch("orders.check_combined_exposure")
+    @patch("orders.check_sector_concentration")
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    @patch("orders.log_order")
     def test_execute_buy_order_value_capped_at_20pct_portfolio(
-        self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_sector, mock_exposure, mock_correlation,
-        mock_stops, mock_position_size, mock_config_obj,
-        mock_config, mock_ib
+        self,
+        mock_log_order,
+        mock_yf_price,
+        mock_tv_cache,
+        mock_sector,
+        mock_exposure,
+        mock_correlation,
+        mock_stops,
+        mock_position_size,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """execute_buy should cap order value at 20% of portfolio."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -997,20 +1056,28 @@ class TestEdgeCases:
         orders.open_trades.clear()
         assert orders.open_trades == {}
 
-    @patch('orders.CONFIG')
-    @patch('orders.calculate_position_size')
-    @patch('orders.calculate_stops')
-    @patch('orders.check_correlation')
-    @patch('orders.check_combined_exposure')
-    @patch('orders.check_sector_concentration')
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    @patch('orders.log_order')
+    @patch("orders.CONFIG")
+    @patch("orders.calculate_position_size")
+    @patch("orders.calculate_stops")
+    @patch("orders.check_correlation")
+    @patch("orders.check_combined_exposure")
+    @patch("orders.check_sector_concentration")
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    @patch("orders.log_order")
     def test_execute_buy_reason_parameter_stored(
-        self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_sector, mock_exposure, mock_correlation,
-        mock_stops, mock_position_size, mock_config_obj,
-        mock_config, mock_ib
+        self,
+        mock_log_order,
+        mock_yf_price,
+        mock_tv_cache,
+        mock_sector,
+        mock_exposure,
+        mock_correlation,
+        mock_stops,
+        mock_position_size,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """execute_buy should store the reasoning parameter."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -1039,20 +1106,28 @@ class TestEdgeCases:
         assert result is True
         assert orders.open_trades["AAPL"]["reasoning"] == reason
 
-    @patch('orders.CONFIG')
-    @patch('orders.calculate_position_size')
-    @patch('orders.calculate_stops')
-    @patch('orders.check_correlation')
-    @patch('orders.check_combined_exposure')
-    @patch('orders.check_sector_concentration')
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    @patch('orders.log_order')
+    @patch("orders.CONFIG")
+    @patch("orders.calculate_position_size")
+    @patch("orders.calculate_stops")
+    @patch("orders.check_correlation")
+    @patch("orders.check_combined_exposure")
+    @patch("orders.check_sector_concentration")
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    @patch("orders.log_order")
     def test_execute_buy_stores_entry_regime(
-        self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_sector, mock_exposure, mock_correlation,
-        mock_stops, mock_position_size, mock_config_obj,
-        mock_config, mock_ib
+        self,
+        mock_log_order,
+        mock_yf_price,
+        mock_tv_cache,
+        mock_sector,
+        mock_exposure,
+        mock_correlation,
+        mock_stops,
+        mock_position_size,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """execute_buy must store entry_regime so check_external_closes can build thesis reasons."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -1079,20 +1154,28 @@ class TestEdgeCases:
         assert result is True
         assert orders.open_trades["AAPL"]["entry_regime"] == "BULL"
 
-    @patch('orders.CONFIG')
-    @patch('orders.calculate_position_size')
-    @patch('orders.calculate_stops')
-    @patch('orders.check_correlation')
-    @patch('orders.check_combined_exposure')
-    @patch('orders.check_sector_concentration')
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    @patch('orders.log_order')
+    @patch("orders.CONFIG")
+    @patch("orders.calculate_position_size")
+    @patch("orders.calculate_stops")
+    @patch("orders.check_correlation")
+    @patch("orders.check_combined_exposure")
+    @patch("orders.check_sector_concentration")
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    @patch("orders.log_order")
     def test_execute_buy_entry_regime_unknown_when_regime_missing(
-        self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_sector, mock_exposure, mock_correlation,
-        mock_stops, mock_position_size, mock_config_obj,
-        mock_config, mock_ib
+        self,
+        mock_log_order,
+        mock_yf_price,
+        mock_tv_cache,
+        mock_sector,
+        mock_exposure,
+        mock_correlation,
+        mock_stops,
+        mock_position_size,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """entry_regime defaults to UNKNOWN if regime dict has no regime key."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -1119,20 +1202,28 @@ class TestEdgeCases:
         assert result is True
         assert orders.open_trades["AAPL"]["entry_regime"] == "UNKNOWN"
 
-    @patch('orders.CONFIG')
-    @patch('orders.calculate_position_size')
-    @patch('orders.calculate_stops')
-    @patch('orders.check_correlation')
-    @patch('orders.check_combined_exposure')
-    @patch('orders.check_sector_concentration')
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    @patch('orders.log_order')
+    @patch("orders.CONFIG")
+    @patch("orders.calculate_position_size")
+    @patch("orders.calculate_stops")
+    @patch("orders.check_correlation")
+    @patch("orders.check_combined_exposure")
+    @patch("orders.check_sector_concentration")
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    @patch("orders.log_order")
     def test_execute_buy_stores_tp_order_id_for_scalp(
-        self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_sector, mock_exposure, mock_correlation,
-        mock_stops, mock_position_size, mock_config_obj,
-        mock_config, mock_ib
+        self,
+        mock_log_order,
+        mock_yf_price,
+        mock_tv_cache,
+        mock_sector,
+        mock_exposure,
+        mock_correlation,
+        mock_stops,
+        mock_position_size,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """execute_buy must store tp_order_id for SCALP trades so check_external_closes
         can detect TP fills via order ID rather than price tolerance."""
@@ -1162,20 +1253,28 @@ class TestEdgeCases:
         # tp_order_id must be set for SCALP (bracket includes TP leg)
         assert orders.open_trades["AAPL"]["tp_order_id"] is not None
 
-    @patch('orders.CONFIG')
-    @patch('orders.calculate_position_size')
-    @patch('orders.calculate_stops')
-    @patch('orders.check_correlation')
-    @patch('orders.check_combined_exposure')
-    @patch('orders.check_sector_concentration')
-    @patch('orders.get_tv_signal_cache')
-    @patch('orders._get_alpaca_price')
-    @patch('orders.log_order')
+    @patch("orders.CONFIG")
+    @patch("orders.calculate_position_size")
+    @patch("orders.calculate_stops")
+    @patch("orders.check_correlation")
+    @patch("orders.check_combined_exposure")
+    @patch("orders.check_sector_concentration")
+    @patch("orders.get_tv_signal_cache")
+    @patch("orders._get_alpaca_price")
+    @patch("orders.log_order")
     def test_execute_buy_tp_order_id_none_for_swing(
-        self, mock_log_order, mock_yf_price, mock_tv_cache,
-        mock_sector, mock_exposure, mock_correlation,
-        mock_stops, mock_position_size, mock_config_obj,
-        mock_config, mock_ib
+        self,
+        mock_log_order,
+        mock_yf_price,
+        mock_tv_cache,
+        mock_sector,
+        mock_exposure,
+        mock_correlation,
+        mock_stops,
+        mock_position_size,
+        mock_config_obj,
+        mock_config,
+        mock_ib,
     ):
         """SWING/HOLD trades have no TP bracket — tp_order_id must be None."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -1208,6 +1307,7 @@ class TestEdgeCases:
 # RECONCILE — PENDING ORDER HANDLING
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestReconcileWithIbkr:
     """reconcile_with_ibkr must not blindly delete PENDING orders (unfilled buys)."""
 
@@ -1222,8 +1322,7 @@ class TestReconcileWithIbkr:
 
     def test_reconcile_preserves_pending_with_live_ibkr_order(self, mock_config):
         """PENDING entry should survive reconcile when the order is still live in IBKR."""
-        with patch("orders.CONFIG", mock_config), \
-             patch("orders_portfolio._ts_restore", return_value={}):
+        with patch("orders.CONFIG", mock_config), patch("orders_portfolio._ts_restore", return_value={}):
             orders.active_trades.clear()
             orders.active_trades["AAPL"] = {"status": "PENDING", "order_id": 42, "symbol": "AAPL"}
 
@@ -1238,8 +1337,7 @@ class TestReconcileWithIbkr:
 
     def test_reconcile_cancels_pending_when_order_gone_from_ibkr(self, mock_config):
         """PENDING entry with no matching IBKR open order should be cancelled and removed."""
-        with patch("orders.CONFIG", mock_config), \
-             patch("orders_portfolio._ts_restore", return_value={}):
+        with patch("orders.CONFIG", mock_config), patch("orders_portfolio._ts_restore", return_value={}):
             orders.active_trades.clear()
             orders.active_trades["AAPL"] = {"status": "PENDING", "order_id": 42, "symbol": "AAPL"}
 
@@ -1254,8 +1352,7 @@ class TestReconcileWithIbkr:
 
     def test_reconcile_removes_active_position_not_in_portfolio(self, mock_config):
         """ACTIVE positions absent from IBKR portfolio should be removed without checking openTrades."""
-        with patch("orders.CONFIG", mock_config), \
-             patch("orders_portfolio._ts_restore", return_value={}):
+        with patch("orders.CONFIG", mock_config), patch("orders_portfolio._ts_restore", return_value={}):
             orders.active_trades.clear()
             orders.active_trades["MSFT"] = {"status": "ACTIVE", "symbol": "MSFT"}
 
@@ -1271,6 +1368,7 @@ class TestReconcileWithIbkr:
 # TESTS: execute_sell_option — bid pricing + retry discount
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestExecuteSellOptionPricing:
     """Test that execute_sell_option uses bid on attempt 0 and steps down on retries."""
 
@@ -1278,25 +1376,25 @@ class TestExecuteSellOptionPricing:
 
     def _opt_pos(self):
         return {
-            "symbol":          "GSAT",
-            "instrument":      "option",
-            "right":           "C",
-            "strike":          35.0,
-            "expiry_ibkr":     "20260620",
-            "expiry_str":      "2026-06-20",
-            "contracts":       99,
-            "entry":           3.50,
-            "entry_premium":   3.50,
+            "symbol": "GSAT",
+            "instrument": "option",
+            "right": "C",
+            "strike": 35.0,
+            "expiry_ibkr": "20260620",
+            "expiry_str": "2026-06-20",
+            "contracts": 99,
+            "entry": 3.50,
+            "entry_premium": 3.50,
             "current_premium": 2.50,
-            "direction":       "LONG",
+            "direction": "LONG",
         }
 
     def _make_ib(self, bid=2.00, ask=2.20, fill=False):
         """Return a minimal IB mock. fill=True simulates a filled order."""
         ib = MagicMock()
         ticker = MagicMock()
-        ticker.bid  = bid
-        ticker.ask  = ask
+        ticker.bid = bid
+        ticker.ask = ask
         ticker.last = bid
         ib.reqMktData.return_value = ticker
 
@@ -1326,16 +1424,17 @@ class TestExecuteSellOptionPricing:
         if elapsed_past_cooldown:
             _om._option_sell_attempts[self.OPT_KEY] = {
                 "count": _om._MAX_OPTION_SELL_RETRIES,
-                "last_try": datetime.now(timezone.utc) - timedelta(seconds=_om._OPTION_SELL_COOLDOWN + 1),
+                "last_try": datetime.now(UTC) - timedelta(seconds=_om._OPTION_SELL_COOLDOWN + 1),
             }
         elif retry_count > 0:
             # Set last_try past the minimum retry interval so the interval guard doesn't fire.
             # The constant lives in orders_options (not orders), access it directly.
             import orders_options as _oo
+
             _min_interval = _oo._MIN_SELL_RETRY_INTERVAL_S
             _om._option_sell_attempts[self.OPT_KEY] = {
                 "count": retry_count,
-                "last_try": datetime.now(timezone.utc) - timedelta(seconds=_min_interval + 1),
+                "last_try": datetime.now(UTC) - timedelta(seconds=_min_interval + 1),
             }
 
         _om.active_trades[self.OPT_KEY] = self._opt_pos()
@@ -1348,16 +1447,18 @@ class TestExecuteSellOptionPricing:
             obj.lmtPrice = price
             return obj
 
-        with patch("orders_options.is_options_market_open", return_value=True), \
-             patch("orders_options.log_order"), \
-             patch("learning.log_order"), \
-             patch("learning._save_orders"), \
-             patch("learning._save_trades"), \
-             patch("orders_options.record_win"), \
-             patch("orders_options.record_loss"), \
-             patch("orders_options.CONFIG") as mock_cfg, \
-             patch("orders_options.LimitOrder", side_effect=fake_limit_order), \
-             patch("learning.log_trade"):
+        with (
+            patch("orders_options.is_options_market_open", return_value=True),
+            patch("orders_options.log_order"),
+            patch("learning.log_order"),
+            patch("learning._save_orders"),
+            patch("learning._save_trades"),
+            patch("orders_options.record_win"),
+            patch("orders_options.record_loss"),
+            patch("orders_options.CONFIG") as mock_cfg,
+            patch("orders_options.LimitOrder", side_effect=fake_limit_order),
+            patch("learning.log_trade"),
+        ):
             mock_cfg.__getitem__.side_effect = lambda k: mock_config[k]
             mock_cfg.get = lambda k, d=None: mock_config.get(k, d)
             _om.execute_sell_option(ib, self.OPT_KEY, reason="test")

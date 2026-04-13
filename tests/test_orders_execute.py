@@ -19,14 +19,11 @@ KNOWN UNTESTED PATHS (coverage debt — expand these tests):
 
 from __future__ import annotations
 
-import sys
-import os
-import asyncio
-import logging
 import json
-import importlib
+import logging
+import sys
 from pathlib import Path
-from unittest.mock import MagicMock, AsyncMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -155,6 +152,7 @@ log = logging.getLogger("decifer.test_orders_execute")
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_ticker(last: float | None = 150.0, bid: float | None = 149.9, ask: float | None = 150.1):
     """Return a fake ib Ticker-like object with preset price fields."""
     ticker = MagicMock()
@@ -217,6 +215,7 @@ class FakeBroker:
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(autouse=True)
 def isolate_data_files(tmp_path, monkeypatch):
     """Redirect all file I/O in orders / learning / config to tmp_path.
@@ -263,6 +262,7 @@ def rejecting_broker():
 # validate_price tests
 # ---------------------------------------------------------------------------
 
+
 class TestValidatePrice:
     """Tests for _validate_position_price — the 3-way price consensus guard.
 
@@ -273,6 +273,7 @@ class TestValidatePrice:
 
     def _fn(self):
         import orders as o
+
         return o._validate_position_price
 
     def test_both_sources_none_returns_falsy(self):
@@ -280,51 +281,46 @@ class TestValidatePrice:
         the function must return a zero price rather than silently passing
         bad data downstream."""
         fn = self._fn()
-        with patch("orders._get_alpaca_price", return_value=0.0), \
-             patch("orders.get_tv_signal_cache", return_value={}):
+        with patch("orders._get_alpaca_price", return_value=0.0), patch("orders.get_tv_signal_cache", return_value={}):
             price, desc = fn("AAPL", 0.0, 150.0)
-        assert price == 0, (
-            f"Expected zero price when all sources are empty, got {price!r} ({desc})"
-        )
+        assert price == 0, f"Expected zero price when all sources are empty, got {price!r} ({desc})"
 
     def test_zero_ibkr_falls_back_to_yfinance(self):
         """When ibkr_price=0 (excluded), yfinance provides the fallback price."""
         fn = self._fn()
         fallback = 123.45
-        with patch("orders_contracts._get_alpaca_price", return_value=fallback), \
-             patch("orders_contracts.get_tv_signal_cache", return_value={}):
+        with (
+            patch("orders_contracts._get_alpaca_price", return_value=fallback),
+            patch("orders_contracts.get_tv_signal_cache", return_value={}),
+        ):
             price, desc = fn("MSFT", 0.0, 0.0)
-        assert price == pytest.approx(fallback), (
-            f"Expected yfinance fallback {fallback}, got {price!r} ({desc})"
-        )
+        assert price == pytest.approx(fallback), f"Expected yfinance fallback {fallback}, got {price!r} ({desc})"
 
     def test_negative_price_excluded(self):
         """Negative ibkr_price and negative yfinance price are both excluded;
         result must be a zero price, never a negative value."""
         fn = self._fn()
-        with patch("orders._get_alpaca_price", return_value=-1.0), \
-             patch("orders.get_tv_signal_cache", return_value={}):
+        with patch("orders._get_alpaca_price", return_value=-1.0), patch("orders.get_tv_signal_cache", return_value={}):
             price, desc = fn("TSLA", -5.0, 200.0)
-        assert price == 0 or price > 0, (
-            f"Negative prices must never be returned, got {price!r} ({desc})"
-        )
+        assert price == 0 or price > 0, f"Negative prices must never be returned, got {price!r} ({desc})"
         assert price >= 0, f"Price must be non-negative, got {price!r}"
 
     def test_valid_price_passes_through(self):
         """When ibkr and yfinance agree on a healthy price, it passes through."""
         fn = self._fn()
         expected = 250.00
-        with patch("orders._get_alpaca_price", return_value=expected), \
-             patch("orders.get_tv_signal_cache", return_value={}):
+        with (
+            patch("orders._get_alpaca_price", return_value=expected),
+            patch("orders.get_tv_signal_cache", return_value={}),
+        ):
             price, desc = fn("NVDA", expected, expected)
-        assert price == pytest.approx(expected), (
-            f"Expected {expected} to pass consensus check, got {price!r} ({desc})"
-        )
+        assert price == pytest.approx(expected), f"Expected {expected} to pass consensus check, got {price!r} ({desc})"
 
 
 # ---------------------------------------------------------------------------
 # execute_buy tests
 # ---------------------------------------------------------------------------
+
 
 class TestExecuteBuy:
     """Tests for the execute_buy entry path.
@@ -343,6 +339,7 @@ class TestExecuteBuy:
         """Import execute_buy, handling common name variants."""
         try:
             import orders as orders_module
+
             for name in ("execute_buy", "buy", "place_buy", "submit_buy"):
                 fn = getattr(orders_module, name, None)
                 if fn is not None and callable(fn):
@@ -442,13 +439,9 @@ class TestExecuteBuy:
                 except TypeError:
                     pass  # Wrong signature — acceptable, order rejection not testable this way
                 except (RuntimeError, ValueError, KeyError) as exc:
-                    pytest.fail(
-                        f"execute_buy raised unhandled {type(exc).__name__} on order rejection: {exc}"
-                    )
+                    pytest.fail(f"execute_buy raised unhandled {type(exc).__name__} on order rejection: {exc}")
             except (RuntimeError, ValueError, KeyError) as exc:
-                pytest.fail(
-                    f"execute_buy raised unhandled {type(exc).__name__} on order rejection: {exc}"
-                )
+                pytest.fail(f"execute_buy raised unhandled {type(exc).__name__} on order rejection: {exc}")
             # SystemExit / KeyboardInterrupt are intentionally not caught
 
     def test_missing_price_aborts_before_order(self):
@@ -489,6 +482,7 @@ class TestExecuteBuy:
 # Module-level smoke test
 # ---------------------------------------------------------------------------
 
+
 class TestOrdersModuleImport:
     """Verify that orders.py can be imported without side effects."""
 
@@ -510,7 +504,7 @@ class TestOrdersModuleImport:
     def test_orders_has_expected_callables(self):
         """orders.py must expose at least one of the expected buy-side entry
         points so downstream tests can locate the right function."""
-        import orders  # noqa: F811
+        import orders
 
         buy_names = ["execute_buy", "buy", "place_buy", "submit_buy"]
         found = [n for n in buy_names if callable(getattr(orders, n, None))]

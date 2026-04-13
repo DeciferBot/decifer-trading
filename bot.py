@@ -11,13 +11,14 @@
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
-import sys
-import os
 import json
 import logging
+import os
 import resource
+import sys
 import threading
 import types as _types
+
 import schedule
 
 # Raise the fd soft limit to match the hard limit so the bot never hits
@@ -30,21 +31,19 @@ except Exception:
     pass
 
 import zoneinfo
-from datetime import datetime, timezone
-_ET = zoneinfo.ZoneInfo("America/New_York")
-from colorama import Fore, Style, init as colorama_init
+from datetime import datetime
 
-from config import CONFIG
+_ET = zoneinfo.ZoneInfo("America/New_York")
+from colorama import Fore, Style
+from colorama import init as colorama_init
 
 # ── Sub-module imports ────────────────────────────────────────────────────────
 import bot_state
-from bot_state import dash, COLORS, EQUITY_FILE, _subscription_registry, _reconnect_lock, clog
 from bot_ibkr import (
-    _register_subscription, _unregister_subscription,
-    _restore_subscriptions, _send_reconnect_exhausted_alert,
-    _on_disconnected, _reconnect_worker,
-    connect_ibkr, _heartbeat_worker,
+    connect_ibkr,
 )
+from bot_state import clog, dash
+from config import CONFIG
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 colorama_init()
@@ -55,41 +54,53 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(message)s",
-    handlers=[
-        logging.FileHandler(CONFIG["log_file"]),
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=[logging.FileHandler(CONFIG["log_file"]), logging.StreamHandler(sys.stdout)],
 )
 log = logging.getLogger("decifer.bot")
 
 # ── Version ───────────────────────────────────────────────────────────────────
-from version import __version__, __codename__
+from version import __codename__, __version__
+
 log.info(f"Decifer Trading v{__version__} ({__codename__}) — starting up")
 
 # ── Dashboard HTML ────────────────────────────────────────────────────────────
 from dashboard import DASHBOARD_HTML
-DASHBOARD_HTML = DASHBOARD_HTML.replace(
-    'Autonomous AI Trading',
-    f'Autonomous AI Trading &nbsp;·&nbsp; v{__version__}'
-)
+
+DASHBOARD_HTML = DASHBOARD_HTML.replace("Autonomous AI Trading", f"Autonomous AI Trading &nbsp;·&nbsp; v{__version__}")
 
 # ── Persistence ───────────────────────────────────────────────────────────────
 FAVOURITES_FILE = "favourites.json"
-SETTINGS_FILE   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "settings_override.json")
-PROMPTS_FILE    = "prompt_versions.json"
+SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "settings_override.json")
+PROMPTS_FILE = "prompt_versions.json"
 
 # Keys that the dashboard is allowed to persist (prevent writing connection/system keys)
 _DASHBOARD_SETTINGS_KEYS = {
-    "risk_pct_per_trade", "daily_loss_limit", "max_positions",
-    "min_cash_reserve", "max_single_position",
-    "min_score_to_trade", "high_conviction_score", "agents_required_to_agree",
-    "options_min_score", "options_max_risk_pct", "options_max_ivr", "options_target_delta", "options_delta_range",
+    "risk_pct_per_trade",
+    "daily_loss_limit",
+    "max_positions",
+    "min_cash_reserve",
+    "max_single_position",
+    "min_score_to_trade",
+    "high_conviction_score",
+    "agents_required_to_agree",
+    "options_min_score",
+    "options_max_risk_pct",
+    "options_max_ivr",
+    "options_target_delta",
+    "options_delta_range",
     # News Sentinel
-    "sentinel_enabled", "sentinel_poll_seconds", "sentinel_cooldown_minutes",
-    "sentinel_batch_size", "sentinel_max_symbols", "sentinel_keyword_threshold",
-    "sentinel_claude_confidence", "sentinel_min_confidence",
-    "sentinel_use_ibkr", "sentinel_use_finviz",
-    "sentinel_risk_multiplier", "sentinel_max_trades_per_hour",
+    "sentinel_enabled",
+    "sentinel_poll_seconds",
+    "sentinel_cooldown_minutes",
+    "sentinel_batch_size",
+    "sentinel_max_symbols",
+    "sentinel_keyword_threshold",
+    "sentinel_claude_confidence",
+    "sentinel_min_confidence",
+    "sentinel_use_ibkr",
+    "sentinel_use_finviz",
+    "sentinel_risk_multiplier",
+    "sentinel_max_trades_per_hour",
 }
 
 
@@ -104,7 +115,7 @@ def load_favourites() -> list:
 
 
 def save_favourites(favs: list):
-    with open(FAVOURITES_FILE, 'w') as f:
+    with open(FAVOURITES_FILE, "w") as f:
         json.dump(favs, f)
 
 
@@ -144,7 +155,7 @@ def save_settings_overrides(settings: dict):
         for key, val in settings.items():
             if key in _DASHBOARD_SETTINGS_KEYS:
                 existing[key] = val
-        with open(SETTINGS_FILE, 'w') as f:
+        with open(SETTINGS_FILE, "w") as f:
             json.dump(existing, f, indent=2)
     except Exception as e:
         clog("ERROR", f"Failed to save settings: {e}")
@@ -154,9 +165,6 @@ def save_settings_overrides(settings: dict):
 # Re-exported here so that callers using `bot.check_and_reload()`,
 # `bot._file_hash()`, etc. continue to work unchanged.
 # Tests access `bot._file_hashes` as a dict mutation — shared by reference.
-from bot_hot_reload import (
-    WATCHED_MODULES, _file_hashes, _file_hash, _init_hashes, check_and_reload,
-)
 
 
 # ── Module __class__ shim ─────────────────────────────────────────────────────
@@ -174,6 +182,7 @@ from bot_hot_reload import (
 #
 #   bot._reconnecting = False     → sets bot_state._reconnecting = False
 #   bot._reconnecting  (read)     → __getattr__ → bot_state._reconnecting (live)
+
 
 class _BotModule(_types.ModuleType):
     def __setattr__(self, name, value):
@@ -205,29 +214,36 @@ if "bot" not in sys.modules:
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
+
 def main():
     # Lazy imports — keep module-level import chain minimal for tests
+    from bot_account import backfill_equity_history_if_needed, get_account_data, load_equity_history
     from bot_dashboard import start_dashboard
     from bot_ibkr import (
-        connect_ibkr, subscribe_pnl, backfill_trades_from_ibkr,
-        sync_orders_from_ibkr, cancel_orphan_stop_orders, _on_order_status_event,
+        _on_order_status_event,
+        backfill_trades_from_ibkr,
+        cancel_orphan_stop_orders,
+        subscribe_pnl,
+        sync_orders_from_ibkr,
     )
-    from bot_account import get_account_data, load_equity_history, backfill_equity_history_if_needed
-    from bot_trading import run_scan, _check_kill, _process_close_queue
     from bot_sentinel import (
-        _get_sentinel_universe, handle_news_trigger,
-        handle_catalyst_trigger, countdown_tick,
-        start_news_sentinel, start_catalyst_sentinel,
+        countdown_tick,
         start_alpaca_news_stream,
+        start_catalyst_sentinel,
+        start_news_sentinel,
+    )
+    from bot_trading import _check_kill, _process_close_queue, run_scan
+    from learning import (
+        get_performance_summary,
+        load_orders,
+        load_trades,
     )
     from risk import (
-        reset_daily_state, get_scan_interval,
+        get_scan_interval,
         init_equity_high_water_mark_from_history,
+        reset_daily_state,
     )
-    from learning import (
-        load_trades, load_orders, get_performance_summary,
-    )
-    from theme_tracker import load_custom_themes, get_all_themes
+    from theme_tracker import get_all_themes, load_custom_themes
 
     print(f"""
 {Fore.YELLOW}
@@ -239,16 +255,16 @@ def main():
   ╚═════╝ ╚══════╝ ╚═════╝╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 {Style.RESET_ALL}
   {Fore.WHITE}<>  Autonomous AI Trading System  v3.0{Style.RESET_ALL}
-  {Fore.WHITE}Account : {Fore.YELLOW}{CONFIG['active_account']}{Style.RESET_ALL}
-  {Fore.WHITE}Agents  : {Fore.YELLOW}6 Claude agents | {CONFIG['agents_required_to_agree']}/6 required to trade{Style.RESET_ALL}
-  {Fore.WHITE}Risk    : {Fore.YELLOW}{int(CONFIG['risk_pct_per_trade']*100)}% per trade | {int(CONFIG['daily_loss_limit']*100)}% daily limit{Style.RESET_ALL}
-  {Fore.WHITE}Dashboard: {Fore.CYAN}http://localhost:{CONFIG['dashboard_port']}{Style.RESET_ALL}
+  {Fore.WHITE}Account : {Fore.YELLOW}{CONFIG["active_account"]}{Style.RESET_ALL}
+  {Fore.WHITE}Agents  : {Fore.YELLOW}6 Claude agents | {CONFIG["agents_required_to_agree"]}/6 required to trade{Style.RESET_ALL}
+  {Fore.WHITE}Risk    : {Fore.YELLOW}{int(CONFIG["risk_pct_per_trade"] * 100)}% per trade | {int(CONFIG["daily_loss_limit"] * 100)}% daily limit{Style.RESET_ALL}
+  {Fore.WHITE}Dashboard: {Fore.CYAN}http://localhost:{CONFIG["dashboard_port"]}{Style.RESET_ALL}
 """)
 
     # API key check
     if CONFIG["anthropic_api_key"] == "YOUR_API_KEY_HERE":
         print(f"{Fore.RED}ERROR: Set ANTHROPIC_API_KEY environment variable.{Style.RESET_ALL}")
-        print(f"  export ANTHROPIC_API_KEY='sk-ant-...'")
+        print("  export ANTHROPIC_API_KEY='sk-ant-...'")
         sys.exit(1)
 
     # Start dashboard
@@ -257,6 +273,7 @@ def main():
     # ── One-time setup: NLTK VADER lexicon (needed for social sentiment) ──
     try:
         import nltk
+
         nltk.download("vader_lexicon", quiet=True)
     except Exception:
         pass  # Optional — social_sentiment.py has keyword fallback
@@ -265,10 +282,14 @@ def main():
     def _background_data_collection():
         try:
             from data_collector import collect_all
+
             clog("INFO", "Background data collection started (historical training data)")
             result = collect_all(intraday=True, daily=True, add_ml_features=True)
-            clog("INFO", f"Data collection complete: {result['total_rows']:,} rows, "
-                 f"{result['daily_symbols']} daily + {result['intraday_symbols']} intraday symbols")
+            clog(
+                "INFO",
+                f"Data collection complete: {result['total_rows']:,} rows, "
+                f"{result['daily_symbols']} daily + {result['intraday_symbols']} intraday symbols",
+            )
         except ImportError:
             clog("INFO", "data_collector.py not found — skipping historical data collection")
         except Exception as e:
@@ -278,9 +299,11 @@ def main():
 
     # Connect to IBKR — retry loop so dashboard stays live when TWS is offline
     if not connect_ibkr():
-        port = CONFIG['ibkr_port']
-        clog("WARN", f"TWS not reachable on port {port} — dashboard is live at "
-             f"http://localhost:{CONFIG['dashboard_port']}")
+        port = CONFIG["ibkr_port"]
+        clog(
+            "WARN",
+            f"TWS not reachable on port {port} — dashboard is live at http://localhost:{CONFIG['dashboard_port']}",
+        )
         clog("WARN", "Start TWS and click Reconnect in the dashboard, or wait for auto-retry (30s).")
         dash["ibkr_disconnected"] = True
         dash["status"] = "disconnected"
@@ -300,6 +323,7 @@ def main():
     # signals.py reads from this before falling back to Alpaca / yfinance.
     try:
         from ibkr_streaming import IBKRDataManager
+
         bot_state.ibkr_data_manager = IBKRDataManager(bot_state.ib)
         clog("INFO", "IBKR streaming data manager ready")
     except Exception as _e:
@@ -309,7 +333,7 @@ def main():
     # Reset daily risk state — only once per calendar day
     pv, _ = get_account_data()
     today = datetime.now(_ET).date()
-    if not hasattr(main, '_last_reset_date') or main._last_reset_date != today:
+    if not hasattr(main, "_last_reset_date") or main._last_reset_date != today:
         reset_daily_state(pv)
         main._last_reset_date = today
 
@@ -332,14 +356,14 @@ def main():
     # Hot reload hashes intentionally not initialised — check_and_reload() is not called in the main loop
 
     # Load persistent data
-    load_settings_overrides()   # Apply saved dashboard settings on top of config.py defaults
-    dash["favourites"]     = load_favourites()
+    load_settings_overrides()  # Apply saved dashboard settings on top of config.py defaults
+    dash["favourites"] = load_favourites()
     dash["equity_history"] = load_equity_history()
-    backfill_equity_history_if_needed()           # extend history from IBKR Flex or trade reconstruction
+    backfill_equity_history_if_needed()  # extend history from IBKR Flex or trade reconstruction
     if dash["equity_history"]:
         init_equity_high_water_mark_from_history(dash["equity_history"])
-    dash["all_trades"]  = load_trades()
-    dash["all_orders"]  = load_orders()
+    dash["all_trades"] = load_trades()
+    dash["all_orders"] = load_orders()
     dash["performance"] = get_performance_summary(dash["all_trades"])
 
     dash["status"] = "running"
@@ -355,7 +379,7 @@ def main():
         run_scan()
         # Update sentinel dashboard state after each scan
         if bot_state._sentinel:
-            dash["sentinel_stats"]  = bot_state._sentinel.stats
+            dash["sentinel_stats"] = bot_state._sentinel.stats
             dash["sentinel_status"] = bot_state._sentinel.stats.get("status", "unknown")
         # Reschedule with fresh interval
         interval = get_scan_interval()
@@ -384,7 +408,7 @@ def main():
     if CONFIG.get("sentinel_enabled", True):
         bot_state._sentinel = start_news_sentinel(bot_state.ib)
         dash["sentinel_status"] = "running"
-        dash["sentinel_stats"]  = bot_state._sentinel.stats
+        dash["sentinel_stats"] = bot_state._sentinel.stats
         clog("INFO", f"📡 News Sentinel active (IBKR) | polling every {CONFIG.get('sentinel_poll_seconds', 45)}s")
     else:
         clog("INFO", "📡 News Sentinel disabled (sentinel_enabled=False in config)")
@@ -392,18 +416,21 @@ def main():
     # ── Start Catalyst Sentinel (M&A / acquisition monitor) ──────────────────
     if CONFIG.get("catalyst_sentinel_enabled", True):
         bot_state._catalyst_sentinel = start_catalyst_sentinel(bot_state.ib)
-        dash["catalyst_triggers"]       = []
+        dash["catalyst_triggers"] = []
         dash["catalyst_sentinel_stats"] = bot_state._catalyst_sentinel.stats
-        clog("INFO",
-             f"⚡ Catalyst Sentinel active | "
-             f"news every {CONFIG.get('catalyst_news_poll_seconds', 60)}s | "
-             f"EDGAR every {CONFIG.get('catalyst_edgar_poll_seconds', 600)}s")
+        clog(
+            "INFO",
+            f"⚡ Catalyst Sentinel active | "
+            f"news every {CONFIG.get('catalyst_news_poll_seconds', 60)}s | "
+            f"EDGAR every {CONFIG.get('catalyst_edgar_poll_seconds', 600)}s",
+        )
     else:
         clog("INFO", "⚡ Catalyst Sentinel disabled (catalyst_sentinel_enabled=False in config)")
 
     # ── Start Social Sentiment background polling ─────────────────────────────
     try:
         from social_sentiment import start_sentiment_polling
+
         start_sentiment_polling()
         clog("INFO", "Social sentiment polling active (Reddit + ApeWisdom, 60s interval)")
     except ImportError:
@@ -418,6 +445,7 @@ def main():
     try:
         from alpaca_stream import AlpacaBarStream
         from scanner import get_dynamic_universe
+
         _initial_universe = get_dynamic_universe(bot_state.ib, {})
         bot_state._bar_stream = AlpacaBarStream()
         bot_state._bar_stream.start(_initial_universe)
@@ -430,6 +458,7 @@ def main():
     # /api/prices and the next dashboard poll both reflect live market prices.
     try:
         from price_updater import PriceUpdater
+
         bot_state._price_updater = PriceUpdater()
         bot_state._price_updater.start()
         clog("INFO", "💹 Live price updater active (2s, QUOTE_CACHE → positions)")
@@ -442,6 +471,7 @@ def main():
     if CONFIG.get("momentum_sentinel_enabled", True):
         try:
             from momentum_sentinel import start_momentum_sentinel
+
             bot_state._momentum_sentinel = start_momentum_sentinel()
             dash["momentum_sentinel_stats"] = bot_state._momentum_sentinel.stats
             clog(
@@ -455,8 +485,8 @@ def main():
             clog("INFO", f"⚡ Momentum Sentinel skipped: {_ms_err}")
 
     # ── Start Telegram Kill Switch ────────────────────────────────────────────
-    _tg_cfg      = CONFIG.get("telegram", {})
-    _tg_token    = _tg_cfg.get("bot_token", "")
+    _tg_cfg = CONFIG.get("telegram", {})
+    _tg_token = _tg_cfg.get("bot_token", "")
     _tg_chat_ids = _tg_cfg.get("authorized_chat_ids", [])
     if _tg_token and _tg_chat_ids:
         try:
@@ -467,6 +497,7 @@ def main():
                 clog("RISK", "🚨 Telegram KILL — executing FLATTEN ALL...")
                 try:
                     from orders import flatten_all
+
                     flatten_all(bot_state.ib)
                     clog("RISK", "🚨 Telegram FLATTEN ALL complete")
                     return "✅ KILL executed — all positions flattened and bot halted."
@@ -497,7 +528,8 @@ def main():
 
     # ── Start ML Signal Enhancement ───────────────────────────────────────────
     try:
-        from ml_engine import enhance_score
+        from ml_engine import enhance_score as _enhance_score  # noqa: F401 — import tests availability
+
         if CONFIG.get("ml_enabled", False):
             clog("INFO", "ML signal enhancement active (will enhance scores when models trained)")
         else:
@@ -514,6 +546,7 @@ def main():
         if os.path.exists(_ICLOUD_SYNC_SCRIPT):
             try:
                 import subprocess
+
                 subprocess.Popen(
                     ["bash", _ICLOUD_SYNC_SCRIPT],
                     stdout=subprocess.DEVNULL,
@@ -552,7 +585,7 @@ def main():
 
             # ── Sync sentinel state to dashboard ──
             if bot_state._sentinel:
-                dash["sentinel_stats"]  = bot_state._sentinel.stats
+                dash["sentinel_stats"] = bot_state._sentinel.stats
                 dash["sentinel_status"] = bot_state._sentinel.stats.get("status", "unknown")
 
             # ── Sync catalyst sentinel state to dashboard ──
@@ -566,10 +599,12 @@ def main():
             # ── Momentum interrupt: fire immediate scan if sentinel triggered ──
             # The sentinel sets this event when SPY moves fast (background thread).
             # We clear it and call scheduled_scan() on the main thread — safe for IBKR.
-            if (bot_state._momentum_scan_requested.is_set()
-                    and bot_state._scheduled_scan_fn is not None
-                    and not dash.get("paused")
-                    and not dash.get("killed")):
+            if (
+                bot_state._momentum_scan_requested.is_set()
+                and bot_state._scheduled_scan_fn is not None
+                and not dash.get("paused")
+                and not dash.get("killed")
+            ):
                 bot_state._momentum_scan_requested.clear()
                 clog("SIGNAL", "⚡ MOMENTUM INTERRUPT — bypassing scheduler, scanning now")
                 schedule.clear("scan")
@@ -591,6 +626,7 @@ def main():
             bot_state._catalyst_sentinel.stop()
         try:
             from social_sentiment import stop_sentiment_polling
+
             stop_sentiment_polling()
         except Exception:
             pass

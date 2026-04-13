@@ -10,6 +10,7 @@ business-logic functions in the API MAP).  We therefore test:
 We explicitly DO NOT test HTML rendering, chart drawing, or browser
 behaviour — per project rules.
 """
+
 import os
 import sys
 import types
@@ -38,14 +39,19 @@ sys.modules.setdefault("anthropic", anthropic_mod)
 # Stub yfinance
 yf_mod = types.ModuleType("yfinance")
 import pandas as pd
+
 yf_mod.download = MagicMock(return_value=pd.DataFrame())
 yf_mod.Ticker = MagicMock()
 sys.modules.setdefault("yfinance", yf_mod)
 
 # Stub fastapi and related
 for _mod_name in [
-    "fastapi", "fastapi.responses", "fastapi.middleware",
-    "fastapi.middleware.cors", "uvicorn", "starlette",
+    "fastapi",
+    "fastapi.responses",
+    "fastapi.middleware",
+    "fastapi.middleware.cors",
+    "uvicorn",
+    "starlette",
     "starlette.responses",
 ]:
     stub = types.ModuleType(_mod_name)
@@ -67,15 +73,17 @@ tv_mod.Column = MagicMock()
 sys.modules.setdefault("tradingview_screener", tv_mod)
 
 # Stub py_vollib family
-for _m in ["py_vollib", "py_vollib.black_scholes",
-           "py_vollib.black_scholes.greeks",
-           "py_vollib.black_scholes.greeks.analytical",
-           "py_vollib.black_scholes.implied_volatility"]:
+for _m in [
+    "py_vollib",
+    "py_vollib.black_scholes",
+    "py_vollib.black_scholes.greeks",
+    "py_vollib.black_scholes.greeks.analytical",
+    "py_vollib.black_scholes.implied_volatility",
+]:
     sys.modules.setdefault(_m, types.ModuleType(_m))
 
 # Stub sklearn / joblib
-for _m in ["sklearn", "sklearn.ensemble", "sklearn.preprocessing",
-           "sklearn.model_selection", "joblib"]:
+for _m in ["sklearn", "sklearn.ensemble", "sklearn.preprocessing", "sklearn.model_selection", "joblib"]:
     sys.modules.setdefault(_m, types.ModuleType(_m))
 
 # Provide minimal config stub so bot-adjacent imports don't explode
@@ -99,10 +107,10 @@ sys.modules.pop("dashboard", None)
 # Now import dashboard
 import dashboard
 
-
 # ===========================================================================
 # Tests
 # ===========================================================================
+
 
 class TestDashboardHtmlConstant:
     """Structural checks on the DASHBOARD_HTML string."""
@@ -205,21 +213,27 @@ class TestDashboardHtmlConstant:
         html = dashboard.DASHBOARD_HTML
         assert "log" in html.lower()
 
-    @pytest.mark.parametrize("stat_id", [
-        "s-val",    # Portfolio Value
-        "s-pnl",    # Day P&L
-        "s-pos",    # Open Positions
-        "s-scans",  # Scans Run
-    ])
+    @pytest.mark.parametrize(
+        "stat_id",
+        [
+            "s-val",  # Portfolio Value
+            "s-pnl",  # Day P&L
+            "s-pos",  # Open Positions
+            "s-scans",  # Scans Run
+        ],
+    )
     def test_dashboard_has_required_stat_ids(self, stat_id):
         """Critical stat element IDs must be present for JS to update them."""
         assert stat_id in dashboard.DASHBOARD_HTML, f"Missing stat id: {stat_id}"
 
-    @pytest.mark.parametrize("js_fn", [
-        "switchTab",
-        "killSwitch",
-        "togglePause",
-    ])
+    @pytest.mark.parametrize(
+        "js_fn",
+        [
+            "switchTab",
+            "killSwitch",
+            "togglePause",
+        ],
+    )
     def test_dashboard_has_required_js_functions(self, js_fn):
         """Critical JavaScript functions must be defined in the dashboard."""
         assert js_fn in dashboard.DASHBOARD_HTML, f"Missing JS function: {js_fn}"
@@ -233,5 +247,6 @@ class TestDashboardHtmlConstant:
     def test_dashboard_module_importable_without_side_effects(self):
         """Re-importing dashboard should not raise any errors."""
         import importlib
+
         importlib.reload(dashboard)
-        assert hasattr(dashboard, 'DASHBOARD_HTML')
+        assert hasattr(dashboard, "DASHBOARD_HTML")

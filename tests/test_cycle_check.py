@@ -1,28 +1,25 @@
 """Tests for lightweight_cycle_check() and _regime_polarity() — GAP-001."""
 
-import sys
 import os
-from datetime import datetime, timezone, timedelta
-
-import pytest
+import sys
+from datetime import UTC, datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from portfolio_manager import lightweight_cycle_check, _regime_polarity
-
+from portfolio_manager import _regime_polarity, lightweight_cycle_check
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _pos(symbol="AAPL", trade_type="HOLD", entry_regime="BULL_TRENDING",
-         mins_ago=200, entry=100.0, current=100.5):
-    open_time = (datetime.now(timezone.utc) - timedelta(minutes=mins_ago)).isoformat()
+
+def _pos(symbol="AAPL", trade_type="HOLD", entry_regime="BULL_TRENDING", mins_ago=200, entry=100.0, current=100.5):
+    open_time = (datetime.now(UTC) - timedelta(minutes=mins_ago)).isoformat()
     return {
-        "symbol":     symbol,
+        "symbol": symbol,
         "trade_type": trade_type,
-        "regime":     entry_regime,
-        "open_time":  open_time,
-        "entry":      entry,
-        "current":    current,
+        "regime": entry_regime,
+        "open_time": open_time,
+        "entry": entry,
+        "current": current,
     }
 
 
@@ -32,15 +29,18 @@ def _regime(label="TRENDING_UP"):
 
 # ── _regime_polarity ──────────────────────────────────────────────────────────
 
+
 def test_polarity_bull():
     assert _regime_polarity("TRENDING_UP") == "BULL"
     assert _regime_polarity("BULL") == "BULL"
+
 
 def test_polarity_bear():
     assert _regime_polarity("BEAR") == "BEAR"
     assert _regime_polarity("TRENDING_DOWN") == "BEAR"
     assert _regime_polarity("RELIEF_RALLY") == "BEAR"
     assert _regime_polarity("CAPITULATION") == "BEAR"
+
 
 def test_polarity_neutral_and_unknown():
     assert _regime_polarity("NEUTRAL") == ""
@@ -50,6 +50,7 @@ def test_polarity_neutral_and_unknown():
 
 
 # ── HOLD: polar flip triggers REVIEW ─────────────────────────────────────────
+
 
 def test_hold_review_on_bull_to_bear():
     pos = _pos(trade_type="HOLD", entry_regime="TRENDING_UP")
@@ -71,6 +72,7 @@ def test_hold_review_on_bear_to_bull():
 
 
 # ── HOLD: same polarity — no action ──────────────────────────────────────────
+
 
 def test_hold_no_action_same_polarity():
     # TRENDING_UP → BULL is same polarity, not a flip
@@ -100,6 +102,7 @@ def test_hold_no_action_when_current_regime_neutral():
 
 # ── HOLD with empty entry_regime field ───────────────────────────────────────
 
+
 def test_hold_no_action_when_entry_regime_empty():
     pos = _pos(trade_type="HOLD", entry_regime="")
     actions = lightweight_cycle_check([pos], _regime("BEAR"), [])
@@ -108,9 +111,9 @@ def test_hold_no_action_when_entry_regime_empty():
 
 # ── Regression: SCALP and SWING behaviour unchanged ──────────────────────────
 
+
 def test_scalp_still_exits_when_stale():
-    pos = _pos(trade_type="SCALP", entry_regime="BULL", mins_ago=100,
-               entry=100.0, current=100.1)  # pnl < 0.3%
+    pos = _pos(trade_type="SCALP", entry_regime="BULL", mins_ago=100, entry=100.0, current=100.1)  # pnl < 0.3%
     actions = lightweight_cycle_check([pos], _regime("BULL"), [])
     assert len(actions) == 1
     assert actions[0]["action"] == "EXIT"

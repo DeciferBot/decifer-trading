@@ -13,10 +13,9 @@ Covers:
 import json
 import os
 import sys
-import tempfile
 import types
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 # ── Project root on path ──────────────────────────────────────────────────────
@@ -95,9 +94,9 @@ trade_advisor_mod.advise_trade = MagicMock(return_value=_FakeAdvice)
 sys.modules.setdefault("trade_advisor", trade_advisor_mod)
 
 # ── Now import the modules under test ────────────────────────────────────────
-from signal_types import Signal
 import signal_dispatcher
 from market_intelligence import SignalClassification
+from signal_types import Signal
 
 
 def _make_scalp_classify(candidates, regime=None):
@@ -105,23 +104,39 @@ def _make_scalp_classify(candidates, regime=None):
     return (
         "TRENDING_UP",
         "mock market read",
-        [SignalClassification(
-            symbol=c["symbol"], trade_type="SCALP",
-            conviction=0.8, reasoning="test", source="mock",
-        ) for c in candidates],
+        [
+            SignalClassification(
+                symbol=c["symbol"],
+                trade_type="SCALP",
+                conviction=0.8,
+                reasoning="test",
+                source="mock",
+            )
+            for c in candidates
+        ],
     )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _make_signal(symbol: str, direction: str = "LONG") -> Signal:
     return Signal(
         symbol=symbol,
         direction=direction,
         conviction_score=7.0,
-        dimension_scores={"trend": 7, "momentum": 6, "squeeze": 5, "flow": 4,
-                          "breakout": 3, "mtf": 6, "news": 4, "social": 2, "reversion": 1},
-        timestamp=datetime(2026, 3, 29, 10, 0, 0, tzinfo=timezone.utc),
+        dimension_scores={
+            "trend": 7,
+            "momentum": 6,
+            "squeeze": 5,
+            "flow": 4,
+            "breakout": 3,
+            "mtf": 6,
+            "news": 4,
+            "social": 2,
+            "reversion": 1,
+        },
+        timestamp=datetime(2026, 3, 29, 10, 0, 0, tzinfo=UTC),
         regime_context="TRENDING_UP",
         source_agents=[0, 1, 2, 3],
         rationale="Test rationale",
@@ -131,6 +146,7 @@ def _make_signal(symbol: str, direction: str = "LONG") -> Signal:
 
 
 # ── Test cases ────────────────────────────────────────────────────────────────
+
 
 class TestSignalDataclass(unittest.TestCase):
     def test_fields_set_correctly(self):
@@ -144,9 +160,18 @@ class TestSignalDataclass(unittest.TestCase):
 
     def test_to_dict_keys(self):
         d = _make_signal("TSLA").to_dict()
-        for key in ("symbol", "direction", "conviction_score", "dimension_scores",
-                    "timestamp", "regime_context", "source_agents", "rationale",
-                    "price", "atr"):
+        for key in (
+            "symbol",
+            "direction",
+            "conviction_score",
+            "dimension_scores",
+            "timestamp",
+            "regime_context",
+            "source_agents",
+            "rationale",
+            "price",
+            "atr",
+        ):
             self.assertIn(key, d)
 
     def test_to_json_is_valid_json(self):
@@ -166,7 +191,7 @@ class TestSignalDataclass(unittest.TestCase):
             direction="NEUTRAL",
             conviction_score=0.0,
             dimension_scores={},
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             regime_context="UNKNOWN",
         )
         self.assertEqual(s.rationale, "")
@@ -187,6 +212,7 @@ class TestDispatchSignals(unittest.TestCase):
         # Fix the orders MagicMock so dispatch's cooldown/straddle guards don't
         # block signals before they reach execute_buy.
         import orders as _ord_stub
+
         _ord_stub._trades_lock = MagicMock()
         # Clear in-place rather than replacing — replacing breaks the reference
         # that orders_core.py holds, causing test_tranche_exits to see an empty dict.
@@ -199,8 +225,7 @@ class TestDispatchSignals(unittest.TestCase):
 
         # Patch classify_signals so the intelligence gate passes every LONG signal
         # as SCALP (no AVOID), allowing execute_buy to be reached.
-        patcher = patch.object(signal_dispatcher, "classify_signals",
-                               side_effect=_make_scalp_classify)
+        patcher = patch.object(signal_dispatcher, "classify_signals", side_effect=_make_scalp_classify)
         self.mock_classify = patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -210,8 +235,11 @@ class TestDispatchSignals(unittest.TestCase):
 
         with patch.object(signal_dispatcher, "execute_buy", return_value=True):
             results = signal_dispatcher.dispatch_signals(
-                signals, ib=self.ib, portfolio_value=self.pv,
-                regime=self.regime, account_id="DUP00000",
+                signals,
+                ib=self.ib,
+                portfolio_value=self.pv,
+                regime=self.regime,
+                account_id="DUP00000",
             )
 
         self.assertEqual(len(results), 5)
@@ -226,7 +254,10 @@ class TestDispatchSignals(unittest.TestCase):
 
         with patch.object(signal_dispatcher, "execute_buy", return_value=True) as mock_buy:
             results = signal_dispatcher.dispatch_signals(
-                signals, ib=self.ib, portfolio_value=self.pv, regime=self.regime,
+                signals,
+                ib=self.ib,
+                portfolio_value=self.pv,
+                regime=self.regime,
             )
 
         mock_buy.assert_called_once()
@@ -239,14 +270,17 @@ class TestDispatchSignals(unittest.TestCase):
 
         with patch.object(signal_dispatcher, "execute_buy", return_value=True) as mock_buy:
             signal_dispatcher.dispatch_signals(
-                [sig], ib=self.ib, portfolio_value=self.pv, regime=self.regime,
+                [sig],
+                ib=self.ib,
+                portfolio_value=self.pv,
+                regime=self.regime,
             )
 
         call_kwargs = mock_buy.call_args.kwargs
         self.assertEqual(call_kwargs["symbol"], "AMD")
         self.assertAlmostEqual(call_kwargs["price"], 100.0)
         self.assertAlmostEqual(call_kwargs["atr"], 2.5)
-        self.assertEqual(call_kwargs["score"], 35)   # 7.0 * 5 = 35
+        self.assertEqual(call_kwargs["score"], 35)  # 7.0 * 5 = 35
         self.assertEqual(call_kwargs["reasoning"], "Breakout on earnings")
         self.assertEqual(call_kwargs["signal_scores"]["trend"], 7)
 
@@ -255,7 +289,10 @@ class TestDispatchSignals(unittest.TestCase):
 
         with patch.object(signal_dispatcher, "execute_buy", return_value=True) as mock_buy:
             results = signal_dispatcher.dispatch_signals(
-                signals, ib=self.ib, portfolio_value=self.pv, regime=self.regime,
+                signals,
+                ib=self.ib,
+                portfolio_value=self.pv,
+                regime=self.regime,
             )
 
         mock_buy.assert_not_called()
@@ -266,7 +303,10 @@ class TestDispatchSignals(unittest.TestCase):
 
         with patch.object(signal_dispatcher, "execute_buy", return_value=False):
             results = signal_dispatcher.dispatch_signals(
-                signals, ib=self.ib, portfolio_value=self.pv, regime=self.regime,
+                signals,
+                ib=self.ib,
+                portfolio_value=self.pv,
+                regime=self.regime,
             )
 
         self.assertFalse(results[0]["success"])
@@ -276,7 +316,10 @@ class TestDispatchSignals(unittest.TestCase):
 
         with patch.object(signal_dispatcher, "execute_buy", side_effect=RuntimeError("conn lost")):
             results = signal_dispatcher.dispatch_signals(
-                signals, ib=self.ib, portfolio_value=self.pv, regime=self.regime,
+                signals,
+                ib=self.ib,
+                portfolio_value=self.pv,
+                regime=self.regime,
             )
 
         self.assertFalse(results[0]["success"])
@@ -284,7 +327,10 @@ class TestDispatchSignals(unittest.TestCase):
     def test_empty_signal_list_returns_empty_results(self):
         with patch.object(signal_dispatcher, "execute_buy", return_value=True):
             results = signal_dispatcher.dispatch_signals(
-                [], ib=self.ib, portfolio_value=self.pv, regime=self.regime,
+                [],
+                ib=self.ib,
+                portfolio_value=self.pv,
+                regime=self.regime,
             )
         self.assertEqual(results, [])
 
@@ -295,19 +341,24 @@ class TestDispatchSignals(unittest.TestCase):
             _make_signal("SPY", "SHORT"),
         ]
 
-        with patch.object(signal_dispatcher, "execute_buy", return_value=True) as mock_buy, \
-             patch.object(signal_dispatcher, "execute_short", return_value=True) as mock_short:
+        with (
+            patch.object(signal_dispatcher, "execute_buy", return_value=True) as mock_buy,
+            patch.object(signal_dispatcher, "execute_short", return_value=True) as mock_short,
+        ):
             results = signal_dispatcher.dispatch_signals(
-                signals, ib=self.ib, portfolio_value=self.pv, regime=self.regime,
+                signals,
+                ib=self.ib,
+                portfolio_value=self.pv,
+                regime=self.regime,
             )
 
         # execute_buy called once (LONG), execute_short called once (SHORT)
         mock_buy.assert_called_once()
         mock_short.assert_called_once()
         self.assertEqual(len(results), 3)
-        self.assertTrue(results[0]["success"])   # LONG → execute_buy
+        self.assertTrue(results[0]["success"])  # LONG → execute_buy
         self.assertFalse(results[1]["success"])  # NEUTRAL → skipped
-        self.assertTrue(results[2]["success"])   # SHORT → execute_short
+        self.assertTrue(results[2]["success"])  # SHORT → execute_short
 
 
 if __name__ == "__main__":

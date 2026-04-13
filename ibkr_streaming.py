@@ -23,14 +23,13 @@ Integration points:
 import logging
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
-from ib_async import IB, Contract, Ticker, BarData
+from ib_async import IB, BarData, Contract, Ticker
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +37,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class StreamingQuote:
     """Real-time quote data for a single symbol."""
+
     symbol: str
     bid: float = np.nan
     ask: float = np.nan
@@ -56,14 +56,14 @@ class StreamingQuote:
     def to_dict(self) -> dict:
         """Convert to dictionary for easy access."""
         return {
-            'symbol': self.symbol,
-            'bid': self.bid,
-            'ask': self.ask,
-            'last': self.last,
-            'mid': self.mid,
-            'volume': self.volume,
-            'vwap': self.vwap,
-            'timestamp': self.timestamp,
+            "symbol": self.symbol,
+            "bid": self.bid,
+            "ask": self.ask,
+            "last": self.last,
+            "mid": self.mid,
+            "volume": self.volume,
+            "vwap": self.vwap,
+            "timestamp": self.timestamp,
         }
 
 
@@ -94,8 +94,7 @@ class BarAggregator:
             bar_time = bar.time
 
             # Check if we should emit a 1-min bar
-            if self._last_1m_time is None or \
-               (bar_time - self._last_1m_time).total_seconds() >= 60:
+            if self._last_1m_time is None or (bar_time - self._last_1m_time).total_seconds() >= 60:
                 if self._current_1m is not None:
                     self._bars_1m.append(self._current_1m)
 
@@ -109,8 +108,7 @@ class BarAggregator:
                     self._update_aggregated_bar(self._current_1m, bar)
 
             # Check if we should emit a 5-min bar
-            if self._last_5m_time is None or \
-               (bar_time - self._last_5m_time).total_seconds() >= 300:
+            if self._last_5m_time is None or (bar_time - self._last_5m_time).total_seconds() >= 300:
                 if self._current_5m is not None:
                     self._bars_5m.append(self._current_5m)
 
@@ -126,28 +124,28 @@ class BarAggregator:
     def _create_aggregated_bar(self, time: datetime, period_seconds: int) -> dict:
         """Create a new aggregated bar."""
         return {
-            'time': time,
-            'open': np.nan,
-            'high': np.nan,
-            'low': np.nan,
-            'close': np.nan,
-            'volume': 0,
-            'count': 0,
+            "time": time,
+            "open": np.nan,
+            "high": np.nan,
+            "low": np.nan,
+            "close": np.nan,
+            "volume": 0,
+            "count": 0,
         }
 
     def _update_aggregated_bar(self, agg_bar: dict, bar: BarData) -> None:
         """Update an aggregated bar with new tick data."""
-        if agg_bar['count'] == 0:
-            agg_bar['open'] = bar.open
-            agg_bar['high'] = bar.high
-            agg_bar['low'] = bar.low
+        if agg_bar["count"] == 0:
+            agg_bar["open"] = bar.open
+            agg_bar["high"] = bar.high
+            agg_bar["low"] = bar.low
         else:
-            agg_bar['high'] = max(agg_bar['high'], bar.high)
-            agg_bar['low'] = min(agg_bar['low'], bar.low)
+            agg_bar["high"] = max(agg_bar["high"], bar.high)
+            agg_bar["low"] = min(agg_bar["low"], bar.low)
 
-        agg_bar['close'] = bar.close
-        agg_bar['volume'] += bar.volume
-        agg_bar['count'] += 1
+        agg_bar["close"] = bar.close
+        agg_bar["volume"] += bar.volume
+        agg_bar["count"] += 1
 
     def get_bars(self, interval: str = "1m") -> pd.DataFrame:
         """Get aggregated bars as DataFrame.
@@ -164,8 +162,8 @@ class BarAggregator:
                 return pd.DataFrame()
 
             df = pd.DataFrame(list(bars))
-            df.set_index('time', inplace=True)
-            df.drop(columns=['count'], inplace=True, errors='ignore')
+            df.set_index("time", inplace=True)
+            df.drop(columns=["count"], inplace=True, errors="ignore")
             return df
 
 
@@ -188,16 +186,16 @@ class IBKRDataManager:
         self.lock = threading.RLock()
 
         # Current streaming subscriptions
-        self._subscriptions: Dict[str, Ticker] = {}
-        self._quotes: Dict[str, StreamingQuote] = {}
-        self._aggregators: Dict[str, BarAggregator] = {}
+        self._subscriptions: dict[str, Ticker] = {}
+        self._quotes: dict[str, StreamingQuote] = {}
+        self._aggregators: dict[str, BarAggregator] = {}
 
         # Subscription metadata for LRU eviction
-        self._subscription_scores: Dict[str, float] = {}  # Score for each symbol
-        self._subscription_times: Dict[str, datetime] = {}  # Last accessed time
+        self._subscription_scores: dict[str, float] = {}  # Score for each symbol
+        self._subscription_times: dict[str, datetime] = {}  # Last accessed time
 
         # Historical data cache
-        self._hist_cache: Dict[Tuple[str, str, str], pd.DataFrame] = {}
+        self._hist_cache: dict[tuple[str, str, str], pd.DataFrame] = {}
 
         # Rate limiting for historical requests
         self._hist_requests: deque = deque(maxlen=self.MAX_HIST_REQUESTS_PER_10S)
@@ -207,7 +205,7 @@ class IBKRDataManager:
         self._connected = True
         self._reconnect_lock = threading.Lock()
 
-        logger.info(f"IBKRDataManager initialized with IB connection")
+        logger.info("IBKRDataManager initialized with IB connection")
 
     def subscribe(self, symbol: str, score: float = 0.0) -> None:
         """Start streaming quotes and bars for a symbol.
@@ -232,14 +230,14 @@ class IBKRDataManager:
 
             try:
                 # Create contract for the symbol
-                contract = Contract(symbol=symbol, secType='STK', exchange='SMART', currency='USD')
+                contract = Contract(symbol=symbol, secType="STK", exchange="SMART", currency="USD")
 
                 # Request market data (free 15-min delayed with marketDataType=3)
-                ticker = self.ib.reqMktData(contract, '', False, False)
+                ticker = self.ib.reqMktData(contract, "", False, False)
                 self.ib.reqMarketDataType(3)  # Request 15-min delayed data
 
                 # Request real-time bars (5-second)
-                self.ib.reqRealTimeBars(contract, 5, 'MIDPOINT', True)
+                self.ib.reqRealTimeBars(contract, 5, "MIDPOINT", True)
 
                 # Store subscription
                 self._subscriptions[symbol] = ticker
@@ -293,7 +291,7 @@ class IBKRDataManager:
 
         # Calculate priority: recent access + high score = higher priority
         min_symbol = None
-        min_priority = float('inf')
+        min_priority = float("inf")
 
         for symbol in self._subscriptions:
             age_seconds = (datetime.utcnow() - self._subscription_times[symbol]).total_seconds()
@@ -339,7 +337,7 @@ class IBKRDataManager:
                 quote.timestamp = datetime.utcnow()
 
                 # Process real-time bars if available
-                if hasattr(ticker, 'rtVolume') and ticker.rtVolume:
+                if hasattr(ticker, "rtVolume") and ticker.rtVolume:
                     bar_data = self._parse_rt_bar(ticker.rtVolume, symbol)
                     if bar_data:
                         self._aggregators[symbol].add_bar(bar_data)
@@ -347,7 +345,7 @@ class IBKRDataManager:
             except Exception as e:
                 logger.error(f"Error processing tick update for {symbol}: {e}")
 
-    def _parse_rt_bar(self, rt_volume: str, symbol: str) -> Optional[BarData]:
+    def _parse_rt_bar(self, rt_volume: str, symbol: str) -> BarData | None:
         """Parse real-time bar string from ticker.rtVolume.
 
         Format: "price;size;time;bid;ask;bidSize;askSize;volume"
@@ -360,16 +358,16 @@ class IBKRDataManager:
             BarData object or None if parsing fails
         """
         try:
-            parts = rt_volume.split(';')
+            parts = rt_volume.split(";")
             if len(parts) < 8:
                 return None
 
             price = float(parts[0])
             size = int(parts[1])
             rt_time = int(parts[2])
-            bid = float(parts[3])
-            ask = float(parts[4])
-            volume = int(parts[7])
+            float(parts[3])
+            float(parts[4])
+            int(parts[7])
 
             # Convert Unix timestamp to datetime
             bar_time = datetime.fromtimestamp(rt_time)
@@ -392,7 +390,7 @@ class IBKRDataManager:
             logger.debug(f"Failed to parse rtVolume for {symbol}: {e}")
             return None
 
-    def get_quote(self, symbol: str) -> Optional[StreamingQuote]:
+    def get_quote(self, symbol: str) -> StreamingQuote | None:
         """Get latest quote for a symbol.
 
         Args:
@@ -450,15 +448,15 @@ class IBKRDataManager:
                 return pd.DataFrame()
 
             try:
-                contract = Contract(symbol=symbol, secType='STK', exchange='SMART', currency='USD')
+                contract = Contract(symbol=symbol, secType="STK", exchange="SMART", currency="USD")
 
                 # Request historical data
                 bars = self.ib.reqHistoricalData(
                     contract,
-                    endDateTime='',  # Now
+                    endDateTime="",  # Now
                     durationStr=duration,
                     barSizeSetting=bar_size,
-                    whatToShow='MIDPOINT',
+                    whatToShow="MIDPOINT",
                     useRTH=True,  # Regular trading hours only
                     formatDate=2,  # Unix timestamps
                 )
@@ -471,24 +469,26 @@ class IBKRDataManager:
                     return pd.DataFrame()
 
                 # Convert to DataFrame
-                df = pd.DataFrame([
-                    {
-                        'time': bar.date,
-                        'open': bar.open,
-                        'high': bar.high,
-                        'low': bar.low,
-                        'close': bar.close,
-                        'volume': bar.volume,
-                    }
-                    for bar in bars
-                ])
+                df = pd.DataFrame(
+                    [
+                        {
+                            "time": bar.date,
+                            "open": bar.open,
+                            "high": bar.high,
+                            "low": bar.low,
+                            "close": bar.close,
+                            "volume": bar.volume,
+                        }
+                        for bar in bars
+                    ]
+                )
 
-                df['time'] = pd.to_datetime(df['time'])
-                df.set_index('time', inplace=True)
+                df["time"] = pd.to_datetime(df["time"])
+                df.set_index("time", inplace=True)
 
                 # Cache the result
                 self._hist_cache[cache_key] = df.copy()
-                df.attrs['_cached_at'] = datetime.utcnow()
+                df.attrs["_cached_at"] = datetime.utcnow()
 
                 logger.info(f"Backfilled {len(df)} bars for {symbol} ({duration})")
                 return df
@@ -515,10 +515,10 @@ class IBKRDataManager:
 
     def _is_cache_fresh(self, df: pd.DataFrame, max_age_seconds: int = 300) -> bool:
         """Check if cached data is fresh (not older than max_age_seconds)."""
-        if '_cached_at' not in df.attrs:
+        if "_cached_at" not in df.attrs:
             return False
 
-        cached_at = df.attrs['_cached_at']
+        cached_at = df.attrs["_cached_at"]
         age = (datetime.utcnow() - cached_at).total_seconds()
 
         return age < max_age_seconds
@@ -633,37 +633,38 @@ if __name__ == "__main__":
         from ib_async import IB
 
         ib = IB()
-        await ib.connectAsync('127.0.0.1', 7496, clientId=10)
+        await ib.connectAsync("127.0.0.1", 7496, clientId=10)
 
         # Create data manager
         mgr = create_data_manager(ib)
 
         # Subscribe to symbols
-        mgr.subscribe('AAPL', score=10.0)
-        mgr.subscribe('TSLA', score=8.0)
+        mgr.subscribe("AAPL", score=10.0)
+        mgr.subscribe("TSLA", score=8.0)
 
         # Wait for data to arrive
         await ib.sleep(10)
 
         # Get latest quotes
-        aapl_quote = mgr.get_quote('AAPL')
+        aapl_quote = mgr.get_quote("AAPL")
         print(f"AAPL quote: {aapl_quote.to_dict() if aapl_quote else 'N/A'}")
 
         # Get aggregated bars
-        aapl_bars = mgr.get_bars('AAPL', interval='1m')
+        aapl_bars = mgr.get_bars("AAPL", interval="1m")
         print(f"AAPL 1-min bars:\n{aapl_bars.tail()}")
 
         # Backfill historical data
-        hist = mgr.backfill('AAPL', '5 D', '5 mins')
+        hist = mgr.backfill("AAPL", "5 D", "5 mins")
         print(f"AAPL historical ({len(hist)} bars):\n{hist.head()}")
 
         # Use smart router
         router = SmartDataRouter(mgr)
-        data = router.get_data('AAPL', period='30d', interval='5m')
+        data = router.get_data("AAPL", period="30d", interval="5m")
         print(f"Smart routed data for AAPL:\n{data.head()}")
 
         # Cleanup
         ib.disconnect()
 
     import asyncio
+
     asyncio.run(example())

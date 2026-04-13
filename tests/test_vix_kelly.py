@@ -7,25 +7,27 @@ get_vix_rank() is patched to inject VIX rank values.
 """
 
 from __future__ import annotations
-import sys
+
 import os
-import pytest
+import sys
 from unittest.mock import patch
+
+import pytest
 
 # Ensure repo root is on path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import CONFIG
+
 # Evict any hollow stub that test_reconnect.py may have installed for 'risk'
 sys.modules.pop("risk", None)
 import risk
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-_VIX_KELLY      = CONFIG.get("vix_kelly", {"base_kelly": 0.50, "max_reduction": 0.80})
-_BASE_KELLY     = _VIX_KELLY["base_kelly"]               # 0.50
-_MAX_REDUCTION  = _VIX_KELLY["max_reduction"]            # 0.80
+_VIX_KELLY = CONFIG.get("vix_kelly", {"base_kelly": 0.50, "max_reduction": 0.80})
+_BASE_KELLY = _VIX_KELLY["base_kelly"]  # 0.50
+_MAX_REDUCTION = _VIX_KELLY["max_reduction"]  # 0.80
 _REGIME_NEUTRAL = {"position_size_multiplier": 1.0}
 
 
@@ -36,6 +38,7 @@ def _expected_kelly(vix_rank: float) -> float:
 
 
 # ── Test 1: Low VIX rank → larger Kelly fraction ──────────────────────────────
+
 
 class TestLowVixRankLargerFraction:
     def test_low_rank_fraction(self):
@@ -50,6 +53,7 @@ class TestLowVixRankLargerFraction:
 
 # ── Test 2: High VIX rank → smaller Kelly fraction ────────────────────────────
 
+
 class TestHighVixRankSmallerFraction:
     def test_high_rank_smaller_than_low(self):
         """VIX rank 0.9 should produce a meaningfully smaller fraction than rank 0.1."""
@@ -63,7 +67,7 @@ class TestHighVixRankSmallerFraction:
         """At rank 1.0, fraction should equal base_kelly*(1-max_reduction)."""
         with patch.object(risk, "get_vix_rank", return_value=1.0):
             frac, _ = risk.get_kelly_fraction()
-        expected = _expected_kelly(1.0)   # 0.50*(1-0.80) = 0.10
+        expected = _expected_kelly(1.0)  # 0.50*(1-0.80) = 0.10
         assert frac == pytest.approx(expected, rel=1e-6)
         assert frac < 0.15
 
@@ -80,6 +84,7 @@ class TestHighVixRankSmallerFraction:
 # of the primary formula (risk_amount / stop_dollars).  Larger ATR = wider stop
 # = fewer shares for the same risk budget.
 
+
 class TestAtrPrimaryEffect:
     def test_larger_atr_gives_fewer_shares(self):
         """
@@ -87,16 +92,14 @@ class TestAtrPrimaryEffect:
         Primary formula: qty = risk_amount / (atr × atr_stop_multiplier)
         """
         portfolio = 100_000.0
-        price     = 50.0
-        score     = 30
+        price = 50.0
+        score = 30
 
         with patch.object(risk, "get_vix_rank", return_value=0.0):
             qty_tight = risk.calculate_position_size(portfolio, price, score, _REGIME_NEUTRAL, atr=2.0)
-            qty_wide  = risk.calculate_position_size(portfolio, price, score, _REGIME_NEUTRAL, atr=4.0)
+            qty_wide = risk.calculate_position_size(portfolio, price, score, _REGIME_NEUTRAL, atr=4.0)
 
-        assert qty_wide < qty_tight, (
-            f"Wider ATR stop should yield fewer shares: atr=2→{qty_tight}, atr=4→{qty_wide}"
-        )
+        assert qty_wide < qty_tight, f"Wider ATR stop should yield fewer shares: atr=2→{qty_tight}, atr=4→{qty_wide}"
         # Doubling ATR halves qty (within integer-truncation tolerance)
         ratio = qty_wide / qty_tight
         assert abs(ratio - 0.5) < 0.1, f"Doubling ATR should halve qty, got ratio={ratio:.3f}"
@@ -107,8 +110,8 @@ class TestAtrPrimaryEffect:
         positive integer in a reasonable range (not zero, not thousands).
         """
         portfolio = 100_000.0
-        price     = 50.0
-        score     = 30
+        price = 50.0
+        score = 30
 
         with patch.object(risk, "get_vix_rank", return_value=0.0):
             qty = risk.calculate_position_size(portfolio, price, score, _REGIME_NEUTRAL, atr=0.0)
@@ -124,6 +127,7 @@ class TestAtrPrimaryEffect:
 # With ATR-based primary sizing, the secondary ATR vol cap (Layer 9) rarely
 # fires.  It is kept as an emergency guard for corrupted data.
 
+
 class TestAtrVolCapSecondary:
     def test_secondary_cap_does_not_fire_under_normal_conditions(self):
         """
@@ -131,9 +135,9 @@ class TestAtrVolCapSecondary:
         sizing; the secondary vol cap should not further reduce qty.
         """
         portfolio = 100_000.0
-        price     = 50.0
-        score     = 30
-        atr       = 2.0
+        price = 50.0
+        score = 30
+        atr = 2.0
 
         secondary_cap = int((portfolio * CONFIG["atr_vol_target_pct"]) / atr)  # 500 shares
 
@@ -141,6 +145,4 @@ class TestAtrVolCapSecondary:
             qty = risk.calculate_position_size(portfolio, price, score, _REGIME_NEUTRAL, atr=atr)
 
         # Primary path should give fewer shares than the secondary cap
-        assert qty <= secondary_cap, (
-            f"qty={qty} should not exceed secondary vol cap={secondary_cap}"
-        )
+        assert qty <= secondary_cap, f"qty={qty} should not exceed secondary vol cap={secondary_cap}"

@@ -1,9 +1,10 @@
 """Tests for options_scanner.py — max pain, earnings days, nearest expiry, scoring."""
+
 import os
 import sys
 import types
 import unittest.mock as mock
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta
 
 # ── Project root on path ──────────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -25,7 +26,6 @@ anthropic_stub.Anthropic = mock.MagicMock
 sys.modules.setdefault("anthropic", anthropic_stub)
 
 import pandas as pd
-import numpy as np
 
 # yfinance
 yf_stub = types.ModuleType("yfinance")
@@ -34,9 +34,12 @@ yf_stub.download = mock.MagicMock(return_value=pd.DataFrame())
 sys.modules.setdefault("yfinance", yf_stub)
 
 # py_vollib
-for mod in ["py_vollib", "py_vollib.black_scholes",
-            "py_vollib.black_scholes.greeks",
-            "py_vollib.black_scholes.greeks.analytical"]:
+for mod in [
+    "py_vollib",
+    "py_vollib.black_scholes",
+    "py_vollib.black_scholes.greeks",
+    "py_vollib.black_scholes.greeks.analytical",
+]:
     sys.modules.setdefault(mod, types.ModuleType(mod))
 
 # signals
@@ -47,10 +50,9 @@ sys.modules.setdefault("signals", signals_stub)
 # options (used inside options_scanner via `from options import get_iv_rank`)
 options_stub = types.ModuleType("options")
 options_stub.get_iv_rank = mock.MagicMock(return_value=25.0)
-options_stub.calculate_greeks = mock.MagicMock(return_value={
-    "delta": 0.45, "gamma": 0.02, "theta": -0.015,
-    "vega": 0.18, "model_price": 3.50
-})
+options_stub.calculate_greeks = mock.MagicMock(
+    return_value={"delta": 0.45, "gamma": 0.02, "theta": -0.015, "vega": 0.18, "model_price": 3.50}
+)
 sys.modules.setdefault("options", options_stub)
 
 # config
@@ -73,43 +75,48 @@ config_stub.CONFIG = {
 sys.modules.setdefault("config", config_stub)
 
 import pytest
+
 # Evict any hollow stub test_bot.py may have cached for 'options_scanner'
 sys.modules.pop("options_scanner", None)
-import options_scanner  # noqa: E402
-
+import options_scanner
 
 # ═══════════════════════════════════════════════════════════════════════
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════
 
+
 def _make_chain(strikes, call_vol=500, call_oi=2000, put_vol=200, put_oi=1500, iv=0.30):
     """Build matched call/put DataFrames for a list of strikes."""
     rows = []
     for k in strikes:
-        rows.append({
-            "strike": float(k),
-            "bid": 1.0,
-            "ask": 1.15,
-            "mid": 1.075,
-            "volume": float(call_vol),
-            "openInterest": float(call_oi),
-            "impliedVolatility": iv,
-            "spread_pct": 0.14,
-        })
+        rows.append(
+            {
+                "strike": float(k),
+                "bid": 1.0,
+                "ask": 1.15,
+                "mid": 1.075,
+                "volume": float(call_vol),
+                "openInterest": float(call_oi),
+                "impliedVolatility": iv,
+                "spread_pct": 0.14,
+            }
+        )
     calls = pd.DataFrame(rows)
 
     put_rows = []
     for k in strikes:
-        put_rows.append({
-            "strike": float(k),
-            "bid": 0.8,
-            "ask": 0.95,
-            "mid": 0.875,
-            "volume": float(put_vol),
-            "openInterest": float(put_oi),
-            "impliedVolatility": iv,
-            "spread_pct": 0.17,
-        })
+        put_rows.append(
+            {
+                "strike": float(k),
+                "bid": 0.8,
+                "ask": 0.95,
+                "mid": 0.875,
+                "volume": float(put_vol),
+                "openInterest": float(put_oi),
+                "impliedVolatility": iv,
+                "spread_pct": 0.17,
+            }
+        )
     puts = pd.DataFrame(put_rows)
     return calls, puts
 
@@ -121,6 +128,7 @@ def _expiry_in_window(days_from_now=14):
 # ═══════════════════════════════════════════════════════════════════════
 # _compute_max_pain
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestComputeMaxPain:
     """Tests for options_scanner._compute_max_pain(calls, puts)"""
@@ -145,17 +153,17 @@ class TestComputeMaxPain:
         """
         # Manually construct a scenario with concentrated OI at 100
         calls_data = [
-            {"strike": 90.0,  "openInterest": 100.0},
+            {"strike": 90.0, "openInterest": 100.0},
             {"strike": 100.0, "openInterest": 5000.0},
             {"strike": 110.0, "openInterest": 100.0},
         ]
         puts_data = [
-            {"strike": 90.0,  "openInterest": 100.0},
+            {"strike": 90.0, "openInterest": 100.0},
             {"strike": 100.0, "openInterest": 5000.0},
             {"strike": 110.0, "openInterest": 100.0},
         ]
         calls = pd.DataFrame(calls_data)
-        puts  = pd.DataFrame(puts_data)
+        puts = pd.DataFrame(puts_data)
         result = options_scanner._compute_max_pain(calls, puts)
         # 100 should be max pain (balanced OI → lowest total payout)
         assert result == pytest.approx(100.0)
@@ -163,29 +171,33 @@ class TestComputeMaxPain:
     def test_returns_none_on_empty_dataframes(self):
         """Empty calls/puts should return None gracefully."""
         calls = pd.DataFrame(columns=["strike", "openInterest"])
-        puts  = pd.DataFrame(columns=["strike", "openInterest"])
+        puts = pd.DataFrame(columns=["strike", "openInterest"])
         result = options_scanner._compute_max_pain(calls, puts)
         assert result is None
 
     def test_returns_none_on_too_few_strikes(self):
         """Fewer than 3 unique strikes should return None."""
         calls = pd.DataFrame([{"strike": 100.0, "openInterest": 500.0}])
-        puts  = pd.DataFrame([{"strike": 100.0, "openInterest": 500.0}])
+        puts = pd.DataFrame([{"strike": 100.0, "openInterest": 500.0}])
         result = options_scanner._compute_max_pain(calls, puts)
         assert result is None
 
     def test_call_only_pain(self):
         """Only calls provided (no OI on puts) — should still work."""
-        calls = pd.DataFrame([
-            {"strike": 90.0,  "openInterest": 1000.0},
-            {"strike": 100.0, "openInterest": 500.0},
-            {"strike": 110.0, "openInterest": 200.0},
-        ])
-        puts = pd.DataFrame([
-            {"strike": 90.0,  "openInterest": 0.0},
-            {"strike": 100.0, "openInterest": 0.0},
-            {"strike": 110.0, "openInterest": 0.0},
-        ])
+        calls = pd.DataFrame(
+            [
+                {"strike": 90.0, "openInterest": 1000.0},
+                {"strike": 100.0, "openInterest": 500.0},
+                {"strike": 110.0, "openInterest": 200.0},
+            ]
+        )
+        puts = pd.DataFrame(
+            [
+                {"strike": 90.0, "openInterest": 0.0},
+                {"strike": 100.0, "openInterest": 0.0},
+                {"strike": 110.0, "openInterest": 0.0},
+            ]
+        )
         result = options_scanner._compute_max_pain(calls, puts)
         # Should return lowest strike (minimises call intrinsic value)
         assert result == pytest.approx(90.0)
@@ -194,6 +206,7 @@ class TestComputeMaxPain:
 # ═══════════════════════════════════════════════════════════════════════
 # _get_nearest_expiry
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestGetNearestExpiry:
     """Tests for options_scanner._get_nearest_expiry(ticker_obj)"""
@@ -221,7 +234,7 @@ class TestGetNearestExpiry:
         exp = _expiry_in_window(90)
         ticker = mock.MagicMock()
         ticker.options = [exp]
-        exp_str, dte = options_scanner._get_nearest_expiry(ticker)
+        exp_str, _dte = options_scanner._get_nearest_expiry(ticker)
         assert exp_str is None
 
     def test_returns_none_on_no_options(self):
@@ -237,23 +250,24 @@ class TestGetNearestExpiry:
         ticker = mock.MagicMock()
         # Make the attribute access itself raise on property read
         type(ticker).options = mock.PropertyMock(side_effect=Exception("network"))
-        exp_str, dte = options_scanner._get_nearest_expiry(ticker)
+        exp_str, _dte = options_scanner._get_nearest_expiry(ticker)
         assert exp_str is None
 
     def test_picks_first_valid_expiry(self):
         """When multiple expiries exist, the first in-window one is returned."""
-        exp_near  = _expiry_in_window(8)   # in window
-        exp_mid   = _expiry_in_window(21)  # in window
-        exp_far   = _expiry_in_window(90)  # out of window
+        exp_near = _expiry_in_window(8)  # in window
+        exp_mid = _expiry_in_window(21)  # in window
+        exp_far = _expiry_in_window(90)  # out of window
         ticker = mock.MagicMock()
         ticker.options = [exp_near, exp_mid, exp_far]
-        exp_str, dte = options_scanner._get_nearest_expiry(ticker)
+        exp_str, _dte = options_scanner._get_nearest_expiry(ticker)
         assert exp_str == exp_near
 
 
 # ═══════════════════════════════════════════════════════════════════════
 # _get_earnings_days
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestGetEarningsDays:
     """Tests for options_scanner._get_earnings_days(ticker_obj)"""
@@ -318,25 +332,25 @@ class TestGetEarningsDays:
 # _analyse_symbol — integration-style with mocked yfinance
 # ═══════════════════════════════════════════════════════════════════════
 
+
 class TestAnalyseSymbol:
     """Tests for options_scanner._analyse_symbol(symbol, regime)"""
 
-    def _make_full_ticker(self, price=150.0, call_vol=2000, put_vol=400,
-                          call_oi=5000, put_oi=3000, iv=0.25,
-                          earnings_days=None):
+    def _make_full_ticker(
+        self, price=150.0, call_vol=2000, put_vol=400, call_oi=5000, put_oi=3000, iv=0.25, earnings_days=None
+    ):
         """Build a comprehensive mock ticker for _analyse_symbol."""
         exp = _expiry_in_window(14)
         calls, puts = _make_chain(
-            [140, 145, 150, 155, 160],
-            call_vol=call_vol, call_oi=call_oi,
-            put_vol=put_vol, put_oi=put_oi, iv=iv
+            [140, 145, 150, 155, 160], call_vol=call_vol, call_oi=call_oi, put_vol=put_vol, put_oi=put_oi, iv=iv
         )
         chain_mock = mock.MagicMock()
         chain_mock.calls = calls
-        chain_mock.puts  = puts
+        chain_mock.puts = puts
 
-        hist = pd.DataFrame({"Close": [price], "High": [price * 1.01],
-                             "Low": [price * 0.99], "Open": [price], "Volume": [1_000_000]})
+        hist = pd.DataFrame(
+            {"Close": [price], "High": [price * 1.01], "Low": [price * 0.99], "Open": [price], "Volume": [1_000_000]}
+        )
 
         cal = None
         if earnings_days is not None:
@@ -361,8 +375,10 @@ class TestAnalyseSymbol:
     def test_returns_none_when_total_vol_too_low(self):
         """Total volume below _MIN_TOTAL_VOL → None."""
         ticker = self._make_full_ticker(call_vol=10, put_vol=10)
-        with mock.patch("yfinance.Ticker", return_value=ticker), \
-             mock.patch("options_scanner.get_iv_rank", return_value=25.0):
+        with (
+            mock.patch("yfinance.Ticker", return_value=ticker),
+            mock.patch("options_scanner.get_iv_rank", return_value=25.0),
+        ):
             result = options_scanner._analyse_symbol("LOW_VOL")
         assert result is None
 
@@ -371,10 +387,11 @@ class TestAnalyseSymbol:
         call_vol / call_oi >= 0.25 should trigger unusual_calls=True.
         """
         # call_vol=2000, call_oi=4000 → ratio=0.50 > 0.25
-        ticker = self._make_full_ticker(call_vol=2000, call_oi=4000,
-                                        put_vol=100, put_oi=3000)
-        with mock.patch("yfinance.Ticker", return_value=ticker), \
-             mock.patch("options_scanner.get_iv_rank", return_value=20.0):
+        ticker = self._make_full_ticker(call_vol=2000, call_oi=4000, put_vol=100, put_oi=3000)
+        with (
+            mock.patch("yfinance.Ticker", return_value=ticker),
+            mock.patch("options_scanner.get_iv_rank", return_value=20.0),
+        ):
             result = options_scanner._analyse_symbol("AAPL")
         if result is not None:
             assert result["unusual_calls"] is True
@@ -382,18 +399,31 @@ class TestAnalyseSymbol:
     def test_high_score_signal_has_all_keys(self):
         """Result dict (when returned) must contain all required keys."""
         # Setup with high call volume
-        ticker = self._make_full_ticker(call_vol=5000, call_oi=8000,
-                                        put_vol=300, put_oi=3000)
-        with mock.patch("yfinance.Ticker", return_value=ticker), \
-             mock.patch("options_scanner.get_iv_rank", return_value=15.0):
+        ticker = self._make_full_ticker(call_vol=5000, call_oi=8000, put_vol=300, put_oi=3000)
+        with (
+            mock.patch("yfinance.Ticker", return_value=ticker),
+            mock.patch("options_scanner.get_iv_rank", return_value=15.0),
+        ):
             result = options_scanner._analyse_symbol("AAPL")
         if result is not None:
             required_keys = [
-                "symbol", "price", "options_score", "signal",
-                "call_vol", "put_vol", "call_oi", "put_oi",
-                "cp_ratio", "unusual_calls", "unusual_puts",
-                "iv_rank", "dom_strike", "dom_type",
-                "expiry", "dte", "reasoning"
+                "symbol",
+                "price",
+                "options_score",
+                "signal",
+                "call_vol",
+                "put_vol",
+                "call_oi",
+                "put_oi",
+                "cp_ratio",
+                "unusual_calls",
+                "unusual_puts",
+                "iv_rank",
+                "dom_strike",
+                "dom_type",
+                "expiry",
+                "dte",
+                "reasoning",
             ]
             for key in required_keys:
                 assert key in result, f"Missing key: {key}"
@@ -404,23 +434,22 @@ class TestAnalyseSymbol:
         Very low volume with no unusual activity and expensive IV.
         """
         # Normal volume (not unusual), expensive IVR → should not score high enough
-        ticker = self._make_full_ticker(call_vol=500, call_oi=10000,
-                                        put_vol=400, put_oi=9000,
-                                        earnings_days=None)
-        with mock.patch("yfinance.Ticker", return_value=ticker), \
-             mock.patch("options_scanner.get_iv_rank", return_value=70.0):
+        ticker = self._make_full_ticker(call_vol=500, call_oi=10000, put_vol=400, put_oi=9000, earnings_days=None)
+        with (
+            mock.patch("yfinance.Ticker", return_value=ticker),
+            mock.patch("options_scanner.get_iv_rank", return_value=70.0),
+        ):
             result = options_scanner._analyse_symbol("NORMAL")
         # With no unusual volume (0.05 ratio) and high IVR → score < 12
         assert result is None
 
     def test_earnings_play_signal_assigned(self):
         """Earnings within 10 days → signal = 'EARNINGS_PLAY'."""
-        ticker = self._make_full_ticker(
-            call_vol=3000, call_oi=6000, put_vol=2000, put_oi=5000,
-            earnings_days=5
-        )
-        with mock.patch("yfinance.Ticker", return_value=ticker), \
-             mock.patch("options_scanner.get_iv_rank", return_value=20.0):
+        ticker = self._make_full_ticker(call_vol=3000, call_oi=6000, put_vol=2000, put_oi=5000, earnings_days=5)
+        with (
+            mock.patch("yfinance.Ticker", return_value=ticker),
+            mock.patch("options_scanner.get_iv_rank", return_value=20.0),
+        ):
             result = options_scanner._analyse_symbol("EARNER")
         if result is not None:
             assert result["signal"] == "EARNINGS_PLAY"
@@ -429,12 +458,11 @@ class TestAnalyseSymbol:
     def test_call_buyer_signal_on_high_cp_ratio(self):
         """High call/put volume ratio (>= 3) → CALL_BUYER signal."""
         # call_vol=6000, put_vol=500 → cp_ratio=12 > 3
-        ticker = self._make_full_ticker(
-            call_vol=6000, call_oi=10000,
-            put_vol=500,  put_oi=5000
-        )
-        with mock.patch("yfinance.Ticker", return_value=ticker), \
-             mock.patch("options_scanner.get_iv_rank", return_value=20.0):
+        ticker = self._make_full_ticker(call_vol=6000, call_oi=10000, put_vol=500, put_oi=5000)
+        with (
+            mock.patch("yfinance.Ticker", return_value=ticker),
+            mock.patch("options_scanner.get_iv_rank", return_value=20.0),
+        ):
             result = options_scanner._analyse_symbol("BULL")
         if result is not None:
             assert result["signal"] in ["CALL_BUYER", "EARNINGS_PLAY"]
@@ -451,6 +479,7 @@ class TestAnalyseSymbol:
 # ═══════════════════════════════════════════════════════════════════════
 # scan_options_universe
 # ═══════════════════════════════════════════════════════════════════════
+
 
 class TestScanOptionsUniverse:
     """Tests for options_scanner.scan_options_universe(extra_symbols, regime)"""
@@ -498,11 +527,9 @@ class TestScanOptionsUniverse:
                 return r
             return None
 
-        with mock.patch.object(options_scanner, "_analyse_symbol",
-                               side_effect=rotating_result):
+        with mock.patch.object(options_scanner, "_analyse_symbol", side_effect=rotating_result):
             # Force a small universe so our 3 signals dominate
-            with mock.patch.object(options_scanner, "OPTIONABLE_UNIVERSE",
-                                   ["A", "B", "C"]):
+            with mock.patch.object(options_scanner, "OPTIONABLE_UNIVERSE", ["A", "B", "C"]):
                 result = options_scanner.scan_options_universe()
 
         if len(result) >= 2:
@@ -511,11 +538,8 @@ class TestScanOptionsUniverse:
 
     def test_capped_at_max_results(self):
         """Should return at most _MAX_RESULTS entries."""
-        high_score_signal = {
-            "symbol": "X", "options_score": 25, "signal": "CALL_BUYER"
-        }
-        with mock.patch.object(options_scanner, "_analyse_symbol",
-                               return_value=high_score_signal):
+        high_score_signal = {"symbol": "X", "options_score": 25, "signal": "CALL_BUYER"}
+        with mock.patch.object(options_scanner, "_analyse_symbol", return_value=high_score_signal):
             result = options_scanner.scan_options_universe()
         assert len(result) <= options_scanner._MAX_RESULTS
 
@@ -524,13 +548,17 @@ class TestScanOptionsUniverse:
 # Parametrized scoring logic tests
 # ═══════════════════════════════════════════════════════════════════════
 
-@pytest.mark.parametrize("iv_rank,expected_bonus", [
-    (10,  8),   # Very cheap → +8
-    (25,  5),   # Fairly cheap → +5
-    (40,  0),   # Expensive → 0
-    (70,  0),   # Very expensive → 0
-    (None, 0),  # Unknown → 0
-])
+
+@pytest.mark.parametrize(
+    "iv_rank,expected_bonus",
+    [
+        (10, 8),  # Very cheap → +8
+        (25, 5),  # Fairly cheap → +5
+        (40, 0),  # Expensive → 0
+        (70, 0),  # Very expensive → 0
+        (None, 0),  # Unknown → 0
+    ],
+)
 def test_iv_rank_scoring_logic(iv_rank, expected_bonus):
     """
     Verify IV rank scoring awards correct points.
@@ -548,36 +576,38 @@ def test_iv_rank_scoring_logic(iv_rank, expected_bonus):
     assert actual == expected_bonus
 
 
-@pytest.mark.parametrize("cp_ratio,pc_ratio,expected_score_bonus", [
-    (3.5, 0.28, 5),  # Heavy call skew >= 3.0
-    (2.5, 0.40, 3),  # Call-leaning >= 2.0
-    (0.3, 3.5, 5),   # Heavy put skew
-    (0.4, 2.5, 3),   # Put-leaning
-    (1.0, 1.0, 0),   # Balanced → no skew bonus
-])
+@pytest.mark.parametrize(
+    "cp_ratio,pc_ratio,expected_score_bonus",
+    [
+        (3.5, 0.28, 5),  # Heavy call skew >= 3.0
+        (2.5, 0.40, 3),  # Call-leaning >= 2.0
+        (0.3, 3.5, 5),  # Heavy put skew
+        (0.4, 2.5, 3),  # Put-leaning
+        (1.0, 1.0, 0),  # Balanced → no skew bonus
+    ],
+)
 def test_directional_flow_scoring(cp_ratio, pc_ratio, expected_score_bonus):
     """
     Directional flow scoring: test the scoring rules in isolation.
     """
     score = 0
-    if cp_ratio >= 3.0:
+    if cp_ratio >= 3.0 or pc_ratio >= 3.0:
         score += 5
-    elif pc_ratio >= 3.0:
-        score += 5
-    elif cp_ratio >= 2.0:
-        score += 3
-    elif pc_ratio >= 2.0:
+    elif cp_ratio >= 2.0 or pc_ratio >= 2.0:
         score += 3
     assert score == expected_score_bonus
 
 
-@pytest.mark.parametrize("earnings_days,expected_bonus", [
-    (5,  7),   # 3-10 DTE → prime window
-    (15, 4),   # 11-21 DTE
-    (30, 2),   # 22-45 DTE
-    (50, 0),   # > 45 DTE (shouldn't appear — _get_earnings_days returns None)
-    (None, 0), # No earnings
-])
+@pytest.mark.parametrize(
+    "earnings_days,expected_bonus",
+    [
+        (5, 7),  # 3-10 DTE → prime window
+        (15, 4),  # 11-21 DTE
+        (30, 2),  # 22-45 DTE
+        (50, 0),  # > 45 DTE (shouldn't appear — _get_earnings_days returns None)
+        (None, 0),  # No earnings
+    ],
+)
 def test_earnings_scoring_logic(earnings_days, expected_bonus):
     """Earnings scoring rules applied correctly."""
     score = 0

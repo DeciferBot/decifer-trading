@@ -16,8 +16,7 @@ import json
 import logging
 import os
 import time as _time
-from datetime import datetime, date, timedelta, timezone
-from typing import Optional
+from datetime import UTC, date, datetime, timedelta
 
 import requests
 
@@ -26,7 +25,7 @@ from config import CONFIG
 log = logging.getLogger("decifer.fmp")
 
 _BASE = "https://financialmodelingprep.com/api"
-_CACHE_TTL = 4 * 3600   # 4 hours — same cadence as Alpha Vantage
+_CACHE_TTL = 4 * 3600  # 4 hours — same cadence as Alpha Vantage
 
 # ── In-memory cache (key → (data, fetched_at)) ───────────────────────────────
 _cache: dict[str, tuple[object, float]] = {}
@@ -77,6 +76,7 @@ def _get(endpoint: str, params: dict, version: str = "v3") -> list | dict | None
 
 # ── Economic Calendar ─────────────────────────────────────────────────────────
 
+
 def get_economic_calendar(days_ahead: int = 7) -> list[dict]:
     """
     Fetch upcoming economic events for the next `days_ahead` days.
@@ -89,7 +89,7 @@ def get_economic_calendar(days_ahead: int = 7) -> list[dict]:
 
     Filtered to US events only. Sorted by date ascending.
     """
-    today  = date.today()
+    today = date.today()
     end_dt = today + timedelta(days=days_ahead)
     raw = _get(
         "economic_calendar",
@@ -108,16 +108,18 @@ def get_economic_calendar(days_ahead: int = 7) -> list[dict]:
         if impact.lower() not in ("high", "medium", "low"):
             continue  # skip non-event entries
         try:
-            events.append({
-                "date":     (item.get("date") or "")[:10],
-                "event":    item.get("event") or item.get("name") or "",
-                "country":  country,
-                "impact":   impact.capitalize(),
-                "estimate": _safe_float(item.get("estimate")),
-                "previous": _safe_float(item.get("previous")),
-                "actual":   _safe_float(item.get("actual")),
-                "unit":     item.get("unit") or "",
-            })
+            events.append(
+                {
+                    "date": (item.get("date") or "")[:10],
+                    "event": item.get("event") or item.get("name") or "",
+                    "country": country,
+                    "impact": impact.capitalize(),
+                    "estimate": _safe_float(item.get("estimate")),
+                    "previous": _safe_float(item.get("previous")),
+                    "actual": _safe_float(item.get("actual")),
+                    "unit": item.get("unit") or "",
+                }
+            )
         except Exception:
             continue
 
@@ -126,8 +128,8 @@ def get_economic_calendar(days_ahead: int = 7) -> list[dict]:
 
 # ── Earnings Calendar ─────────────────────────────────────────────────────────
 
-def get_earnings_calendar(symbols: list[str] | None = None,
-                          days_ahead: int = 5) -> list[dict]:
+
+def get_earnings_calendar(symbols: list[str] | None = None, days_ahead: int = 5) -> list[dict]:
     """
     Fetch upcoming earnings for the next `days_ahead` days.
 
@@ -139,7 +141,7 @@ def get_earnings_calendar(symbols: list[str] | None = None,
 
     Sorted by date ascending.
     """
-    today  = date.today()
+    today = date.today()
     end_dt = today + timedelta(days=days_ahead)
     raw = _get(
         "earning_calendar",
@@ -160,23 +162,25 @@ def get_earnings_calendar(symbols: list[str] | None = None,
         timing_raw = (item.get("time") or "").lower()
         timing = "BMO" if "bmo" in timing_raw else ("AMC" if "amc" in timing_raw else "")
 
-        results.append({
-            "date":          (item.get("date") or "")[:10],
-            "symbol":        sym,
-            "timing":        timing,
-            "eps_est":       _safe_float(item.get("epsEstimated")),
-            "eps_prior":     _safe_float(item.get("eps")),
-            "revenue_est":   _safe_float(item.get("revenueEstimated")),
-            "revenue_prior": _safe_float(item.get("revenue")),
-        })
+        results.append(
+            {
+                "date": (item.get("date") or "")[:10],
+                "symbol": sym,
+                "timing": timing,
+                "eps_est": _safe_float(item.get("epsEstimated")),
+                "eps_prior": _safe_float(item.get("eps")),
+                "revenue_est": _safe_float(item.get("revenueEstimated")),
+                "revenue_prior": _safe_float(item.get("revenue")),
+            }
+        )
 
     return sorted(results, key=lambda x: x["date"])
 
 
 # ── Analyst Upgrades / Downgrades ─────────────────────────────────────────────
 
-def get_analyst_changes(symbols: list[str] | None = None,
-                        hours_back: int = 24) -> list[dict]:
+
+def get_analyst_changes(symbols: list[str] | None = None, hours_back: int = 24) -> list[dict]:
     """
     Fetch analyst upgrades/downgrades published in the last `hours_back` hours.
 
@@ -192,7 +196,7 @@ def get_analyst_changes(symbols: list[str] | None = None,
     if not raw or not isinstance(raw, list):
         return []
 
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours_back)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours_back)
     sym_set = {s.upper() for s in symbols} if symbols else None
 
     results = []
@@ -205,7 +209,7 @@ def get_analyst_changes(symbols: list[str] | None = None,
         try:
             pub_dt = datetime.fromisoformat(pub_str.replace("Z", "+00:00"))
             if pub_dt.tzinfo is None:
-                pub_dt = pub_dt.replace(tzinfo=timezone.utc)
+                pub_dt = pub_dt.replace(tzinfo=UTC)
         except Exception:
             continue
 
@@ -214,19 +218,22 @@ def get_analyst_changes(symbols: list[str] | None = None,
 
         action = (item.get("action") or "").lower()
 
-        results.append({
-            "symbol":        sym,
-            "action":        action,
-            "from_grade":    item.get("previousGrade") or "",
-            "to_grade":      item.get("newGrade") or "",
-            "firm":          item.get("gradingCompany") or "",
-            "published_date": pub_str,
-        })
+        results.append(
+            {
+                "symbol": sym,
+                "action": action,
+                "from_grade": item.get("previousGrade") or "",
+                "to_grade": item.get("newGrade") or "",
+                "firm": item.get("gradingCompany") or "",
+                "published_date": pub_str,
+            }
+        )
 
     return sorted(results, key=lambda x: x["published_date"], reverse=True)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _safe_float(val) -> float | None:
     if val is None:

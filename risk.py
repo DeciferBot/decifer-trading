@@ -9,11 +9,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-from collections import defaultdict
-from datetime import datetime, time, timedelta, timezone
-from typing import Optional, Tuple
-import pytz
+from datetime import UTC, datetime, time
+
 import pandas_market_calendars as mcal
+import pytz
+
 from config import CONFIG
 
 log = logging.getLogger("decifer.risk")
@@ -21,52 +21,46 @@ log = logging.getLogger("decifer.risk")
 EST = pytz.timezone("America/New_York")
 
 # ── Loss-tracking state ────────────────────────────────────────
-_consecutive_losses    = 0
-_pause_until           = None
-_daily_loss_hit        = False
-_session_start_value   = None
+_consecutive_losses = 0
+_pause_until = None
+_daily_loss_hit = False
+_session_start_value = None
 _current_strategy_mode = "NORMAL"
 
 # ── Drawdown-from-peak tracking ────────────────────────────────
 _equity_high_water_mark = None
-_drawdown_halt          = False
-_last_known_equity      = None
+_drawdown_halt = False
+_last_known_equity = None
 
 # ── HWM state file — survives equity_history truncation ────────
-_BASE          = os.path.dirname(os.path.abspath(__file__))
+_BASE = os.path.dirname(os.path.abspath(__file__))
 HWM_STATE_FILE = os.path.join(_BASE, "data", "hwm_state.json")
 
 # ── Intraday adaptive strategy state ───────────────────────────
-_session_opening_regime: Optional[str] = None  # Regime at session open (set on first scan)
-_session_regime_set:     bool       = False  # Guard: only set once per trading day
-_strategy_size_multiplier: float    = 1.0   # Applied inside calculate_position_size()
+_session_opening_regime: str | None = None  # Regime at session open (set on first scan)
+_session_regime_set: bool = False  # Guard: only set once per trading day
+_strategy_size_multiplier: float = 1.0  # Applied inside calculate_position_size()
 
 # ── Strategy mode params (module-level so dashboard can read them) ──
 MODE_PARAMS = {
-    "NORMAL":    {"score_threshold_adj": 0,  "size_multiplier": 1.0, "max_new_trades": 6},
-    "DEFENSIVE": {"score_threshold_adj": 5,  "size_multiplier": 0.7, "max_new_trades": 4},
-    "RECOVERY":  {"score_threshold_adj": 10, "size_multiplier": 0.5, "max_new_trades": 2},
+    "NORMAL": {"score_threshold_adj": 0, "size_multiplier": 1.0, "max_new_trades": 6},
+    "DEFENSIVE": {"score_threshold_adj": 5, "size_multiplier": 0.7, "max_new_trades": 4},
+    "RECOVERY": {"score_threshold_adj": 10, "size_multiplier": 0.5, "max_new_trades": 2},
 }
 
 # ── VIX-rank Kelly state ────────────────────────────────────────
-_vix_rank_cache:      Optional[float]    = None
-_vix_rank_cache_ts:   Optional[datetime] = None
-_last_vix_rank:       float           = 0.5  # Latest computed rank (for dashboard)
-_last_kelly_fraction: float           = 0.5  # Latest computed fraction (for dashboard)
+_vix_rank_cache: float | None = None
+_vix_rank_cache_ts: datetime | None = None
+_last_vix_rank: float = 0.5  # Latest computed rank (for dashboard)
+_last_kelly_fraction: float = 0.5  # Latest computed fraction (for dashboard)
 
 # ── Sub-module re-exports ──────────────────────────────────────
 # pdt_rule: Pattern Day Trader enforcement (stateless — safe to extract)
 from pdt_rule import (
-    _count_day_trades_remaining_local,
     _get_day_trades_remaining,
 )
 
 # position_sizing: Pure stop/sizing utilities (stateless — safe to extract)
-from position_sizing import (
-    calculate_stops,
-    position_size,
-    get_short_size_multiplier,
-)
 
 
 def reset_daily_state(portfolio_value: float):
@@ -74,18 +68,20 @@ def reset_daily_state(portfolio_value: float):
     global _consecutive_losses, _pause_until, _daily_loss_hit, _session_start_value
     global _equity_high_water_mark
     global _session_opening_regime, _session_regime_set, _strategy_size_multiplier
-    _consecutive_losses  = 0
-    _pause_until         = None
-    _daily_loss_hit      = False
+    _consecutive_losses = 0
+    _pause_until = None
+    _daily_loss_hit = False
     _session_start_value = portfolio_value
     # Initialize HWM if not yet set (don't reset to current — preserve peak across days)
     if _equity_high_water_mark is None:
         _equity_high_water_mark = portfolio_value
     # Reset intraday adaptive strategy state for new day
-    _session_opening_regime   = None
-    _session_regime_set       = False
+    _session_opening_regime = None
+    _session_regime_set = False
     _strategy_size_multiplier = 1.0
-    log.info(f"Daily risk state reset. Session start value: ${portfolio_value:,.2f} | HWM: ${_equity_high_water_mark:,.2f}")
+    log.info(
+        f"Daily risk state reset. Session start value: ${portfolio_value:,.2f} | HWM: ${_equity_high_water_mark:,.2f}"
+    )
 
 
 def record_loss(source: str = "bot"):
@@ -96,16 +92,19 @@ def record_loss(source: str = "bot"):
     """
     global _consecutive_losses, _pause_until
     if source == "external" and _pause_until is not None:
-        log.info(f"External close loss recorded — not extending existing pause")
+        log.info("External close loss recorded — not extending existing pause")
         return
     _consecutive_losses += 1
     if _consecutive_losses >= CONFIG["consecutive_loss_pause"]:
         from datetime import timedelta
+
         if _pause_until is None or datetime.now(EST) >= _pause_until:
             _pause_until = datetime.now(EST) + timedelta(hours=2)
             log.warning(f"⚠️  {_consecutive_losses} consecutive losses — pausing until {_pause_until.strftime('%H:%M')}")
         else:
-            log.info(f"Loss #{_consecutive_losses} — pause already active until {_pause_until.strftime('%H:%M')}, not extending")
+            log.info(
+                f"Loss #{_consecutive_losses} — pause already active until {_pause_until.strftime('%H:%M')}, not extending"
+            )
 
 
 def record_win():
@@ -114,7 +113,7 @@ def record_win():
     _consecutive_losses = 0
 
 
-def _get_ibkr_cash(ib, account: str) -> Optional[float]:
+def _get_ibkr_cash(ib, account: str) -> float | None:
     """
     Get actual cash from IBKR account.
     Uses TotalCashValue — the real USD cash in the account.
@@ -131,7 +130,7 @@ def _get_ibkr_cash(ib, account: str) -> Optional[float]:
     return None
 
 
-def load_hwm_state() -> Optional[float]:
+def load_hwm_state() -> float | None:
     """
     Load the persisted all-time HWM from data/hwm_state.json.
     Returns the stored float, or None if the file is missing or corrupt.
@@ -156,13 +155,14 @@ def save_hwm_state(hwm: float) -> None:
     try:
         os.makedirs(os.path.dirname(HWM_STATE_FILE), exist_ok=True)
         with open(HWM_STATE_FILE, "w") as f:
-            json.dump({"hwm": hwm, "updated": datetime.now(timezone.utc).isoformat()}, f)
+            json.dump({"hwm": hwm, "updated": datetime.now(UTC).isoformat()}, f)
     except Exception as e:
         log.error(f"save_hwm_state: failed to write {HWM_STATE_FILE} — {e}")
 
 
-def check_risk_conditions(portfolio_value: float, daily_pnl: float, regime: dict,
-              open_positions: list = None, ib=None) -> Tuple[bool, str]:
+def check_risk_conditions(
+    portfolio_value: float, daily_pnl: float, regime: dict, open_positions: list | None = None, ib=None
+) -> tuple[bool, str]:
     """
     Master check — can we take new trades right now?
     Returns (bool, reason_if_not).
@@ -185,9 +185,9 @@ def check_risk_conditions(portfolio_value: float, daily_pnl: float, regime: dict
     # ── Layer 5.5: PDT Rule (Pattern Day Trader) ──────────────
     pdt_cfg = CONFIG.get("pdt", {})
     if pdt_cfg.get("enabled", True) and portfolio_value > 0:
-        pdt_threshold  = pdt_cfg.get("threshold", 25_000)
+        pdt_threshold = pdt_cfg.get("threshold", 25_000)
         active_account = CONFIG.get("active_account", "")
-        paper_account  = CONFIG.get("accounts", {}).get("paper", "")
+        paper_account = CONFIG.get("accounts", {}).get("paper", "")
         is_live = active_account != "" and active_account != paper_account
         if is_live and portfolio_value < pdt_threshold:
             remaining = _get_day_trades_remaining(ib, active_account)
@@ -219,15 +219,18 @@ def check_risk_conditions(portfolio_value: float, daily_pnl: float, regime: dict
             deployed = sum(p.get("current", p.get("entry", 0)) * p.get("qty", 0) for p in open_positions)
             cash_pct = (portfolio_value - deployed) / portfolio_value
         if cash_pct < CONFIG["min_cash_reserve"]:
-            return False, f"Cash reserve too low ({cash_pct*100:.1f}% < {CONFIG['min_cash_reserve']*100:.0f}% min). Preserve capital."
+            return (
+                False,
+                f"Cash reserve too low ({cash_pct * 100:.1f}% < {CONFIG['min_cash_reserve'] * 100:.0f}% min). Preserve capital.",
+            )
 
     # ── Layer 3: Market hours ─────────────────────────────────
-    market_open  = time(9, 30)
-    prime_start  = time(9, 32)
+    market_open = time(9, 30)
+    prime_start = time(9, 32)
     close_buffer = time(15, 59)
     market_close = time(16, 0)
-    pre_start    = time(4, 0)
-    after_end    = time(20, 0)
+    pre_start = time(4, 0)
+    after_end = time(20, 0)
 
     if now_time < pre_start or now_time > after_end:
         return False, "Overnight (8pm-4am) — no liquidity, monitoring only"
@@ -240,6 +243,7 @@ def check_risk_conditions(portfolio_value: float, daily_pnl: float, regime: dict
 
 
 # ── Simple can_trade() helpers (mockable in tests) ─────────────────────────
+
 
 def _get_daily_pnl() -> float:
     """Return today's realized + unrealized P&L. Override in production."""
@@ -284,9 +288,9 @@ def can_trade(symbol: str, config: dict) -> bool:
     """
     Simple risk gate: returns True if a new trade on *symbol* is permitted.
     """
-    daily_pnl       = _get_daily_pnl()
+    daily_pnl = _get_daily_pnl()
     portfolio_value = _get_portfolio_value()
-    max_loss_pct    = config.get("max_daily_loss_pct", CONFIG.get("max_daily_loss_pct", 0.05))
+    max_loss_pct = config.get("max_daily_loss_pct", CONFIG.get("max_daily_loss_pct", 0.05))
     if portfolio_value > 0 and daily_pnl <= -(portfolio_value * max_loss_pct):
         log.debug(f"can_trade blocked: daily P&L ${daily_pnl:,.2f} <= -{max_loss_pct:.0%} of ${portfolio_value:,.2f}")
         return False
@@ -309,40 +313,49 @@ def get_session() -> str:
     if not is_trading_day():
         now_et = datetime.now(EST)
         return "WEEKEND" if now_et.weekday() >= 5 else "CLOSED"
-    now_est  = datetime.now(EST).time()
-    pre      = time(4, 0)
-    open_    = time(9, 30)
-    prime    = time(9, 45)
-    lunch    = time(11, 30)
+    now_est = datetime.now(EST).time()
+    pre = time(4, 0)
+    open_ = time(9, 30)
+    prime = time(9, 45)
+    lunch = time(11, 30)
     after_pm = time(14, 0)
-    close_b  = time(15, 55)
-    close    = time(16, 0)
-    after    = time(20, 0)
+    close_b = time(15, 55)
+    close = time(16, 0)
+    after = time(20, 0)
 
-    if now_est < pre:          return "CLOSED"
-    elif now_est < open_:      return "PRE_MARKET"
-    elif now_est < prime:      return "OPEN_BUFFER"
-    elif now_est < lunch:      return "PRIME_AM"
-    elif now_est < after_pm:   return "LUNCH"
-    elif now_est < close_b:    return "PRIME_PM"
-    elif now_est < close:      return "CLOSE_BUFFER"
-    elif now_est < after:      return "AFTER_HOURS"
-    else:                      return "CLOSED"
+    if now_est < pre:
+        return "CLOSED"
+    elif now_est < open_:
+        return "PRE_MARKET"
+    elif now_est < prime:
+        return "OPEN_BUFFER"
+    elif now_est < lunch:
+        return "PRIME_AM"
+    elif now_est < after_pm:
+        return "LUNCH"
+    elif now_est < close_b:
+        return "PRIME_PM"
+    elif now_est < close:
+        return "CLOSE_BUFFER"
+    elif now_est < after:
+        return "AFTER_HOURS"
+    else:
+        return "CLOSED"
 
 
 def get_scan_interval() -> int:
     """Return appropriate scan interval in seconds for current session."""
     session = get_session()
     intervals = {
-        "PRE_MARKET":   CONFIG["scan_interval_pre_market"]   * 60,
-        "OPEN_BUFFER":  CONFIG["scan_interval_extended"]     * 60,
-        "PRIME_AM":     CONFIG["scan_interval_prime"]        * 60,
-        "LUNCH":        CONFIG["scan_interval_standard"]     * 60,
-        "PRIME_PM":     CONFIG["scan_interval_prime"]        * 60,
-        "CLOSE_BUFFER": CONFIG["scan_interval_extended"]     * 60,
-        "AFTER_HOURS":  CONFIG["scan_interval_after_hours"]  * 60,
-        "CLOSED":       CONFIG["scan_interval_overnight"]    * 60,
-        "WEEKEND":      CONFIG["scan_interval_overnight"]    * 60,
+        "PRE_MARKET": CONFIG["scan_interval_pre_market"] * 60,
+        "OPEN_BUFFER": CONFIG["scan_interval_extended"] * 60,
+        "PRIME_AM": CONFIG["scan_interval_prime"] * 60,
+        "LUNCH": CONFIG["scan_interval_standard"] * 60,
+        "PRIME_PM": CONFIG["scan_interval_prime"] * 60,
+        "CLOSE_BUFFER": CONFIG["scan_interval_extended"] * 60,
+        "AFTER_HOURS": CONFIG["scan_interval_after_hours"] * 60,
+        "CLOSED": CONFIG["scan_interval_overnight"] * 60,
+        "WEEKEND": CONFIG["scan_interval_overnight"] * 60,
     }
     return intervals.get(session, CONFIG["scan_interval_standard"] * 60)
 
@@ -351,7 +364,8 @@ def get_scan_interval() -> int:
 # VIX-RANK ADAPTIVE KELLY FRACTION
 # ══════════════════════════════════════════════════════════════════
 
-def get_vix_rank(vix_override: Optional[float] = None) -> float:
+
+def get_vix_rank(vix_override: float | None = None) -> float:
     """
     Returns the percentile (0.0–1.0) of the current ^VIX reading within
     its trailing 252-day range. Caches the result for cache_ttl_seconds.
@@ -359,21 +373,27 @@ def get_vix_rank(vix_override: Optional[float] = None) -> float:
     """
     global _vix_rank_cache, _vix_rank_cache_ts
 
-    ttl      = CONFIG["vix_kelly"]["cache_ttl_seconds"]
+    ttl = CONFIG["vix_kelly"]["cache_ttl_seconds"]
     lookback = CONFIG["vix_kelly"]["vix_lookback_days"]
-    now      = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
-    if (vix_override is None
-            and _vix_rank_cache is not None
-            and _vix_rank_cache_ts is not None
-            and (now - _vix_rank_cache_ts).total_seconds() < ttl):
+    if (
+        vix_override is None
+        and _vix_rank_cache is not None
+        and _vix_rank_cache_ts is not None
+        and (now - _vix_rank_cache_ts).total_seconds() < ttl
+    ):
         return _vix_rank_cache
 
     try:
-        from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FTE
+        from concurrent.futures import ThreadPoolExecutor
+        from concurrent.futures import TimeoutError as _FTE
+
         def _fetch():
             import yfinance as yf
+
             return yf.Ticker("^VIX").history(period=f"{lookback + 15}d")["Close"].dropna()
+
         with ThreadPoolExecutor(max_workers=1) as _pool:
             try:
                 hist = _pool.submit(_fetch).result(timeout=10)
@@ -385,9 +405,9 @@ def get_vix_rank(vix_override: Optional[float] = None) -> float:
             return 0.5
         hist = hist.iloc[-lookback:]
         current = float(vix_override if vix_override is not None else hist.iloc[-1])
-        rank    = float((hist < current).sum()) / len(hist)
+        rank = float((hist < current).sum()) / len(hist)
         if vix_override is None:
-            _vix_rank_cache    = rank
+            _vix_rank_cache = rank
             _vix_rank_cache_ts = now
         log.debug(f"VIX rank: VIX={current:.2f} rank={rank:.3f} window={len(hist)}d")
         return rank
@@ -396,22 +416,22 @@ def get_vix_rank(vix_override: Optional[float] = None) -> float:
         return 0.5
 
 
-def get_kelly_fraction(vix_rank_override: Optional[float] = None) -> Tuple[float, float]:
+def get_kelly_fraction(vix_rank_override: float | None = None) -> tuple[float, float]:
     """
     Returns (kelly_fraction, vix_rank).
     Formula: kelly = base_kelly * (1 - vix_rank * max_reduction)
     """
     global _last_vix_rank, _last_kelly_fraction
-    cfg      = CONFIG["vix_kelly"]
+    cfg = CONFIG["vix_kelly"]
     vix_rank = get_vix_rank(vix_rank_override)
-    kelly    = cfg["base_kelly"] * (1.0 - vix_rank * cfg["max_reduction"])
-    kelly    = max(0.05, min(1.0, kelly))
-    _last_vix_rank       = vix_rank
+    kelly = cfg["base_kelly"] * (1.0 - vix_rank * cfg["max_reduction"])
+    kelly = max(0.05, min(1.0, kelly))
+    _last_vix_rank = vix_rank
     _last_kelly_fraction = kelly
     return kelly, vix_rank
 
 
-def get_drawdown_scalar(equity_override: Optional[float] = None) -> float:
+def get_drawdown_scalar(equity_override: float | None = None) -> float:
     """
     Returns a [min_scalar, 1.0] multiplier that decays linearly as drawdown
     from the equity high-water mark increases.
@@ -429,14 +449,14 @@ def get_drawdown_scalar(equity_override: Optional[float] = None) -> float:
     if equity is None:
         return 1.0
 
-    drawdown   = max(0.0, (hwm - equity) / hwm)
-    max_dd     = CONFIG.get("max_drawdown_alert", 0.25)
+    drawdown = max(0.0, (hwm - equity) / hwm)
+    max_dd = CONFIG.get("max_drawdown_alert", 0.25)
     min_scalar = cfg.get("min_scalar", 0.1)
 
     if max_dd <= 0:
         return 1.0
 
-    t      = min(drawdown / max_dd, 1.0)
+    t = min(drawdown / max_dd, 1.0)
     scalar = 1.0 - t * (1.0 - min_scalar)
     return round(scalar, 6)
 
@@ -444,16 +464,15 @@ def get_drawdown_scalar(equity_override: Optional[float] = None) -> float:
 def get_sizing_state() -> dict:
     """Returns current VIX rank, Kelly fraction, and drawdown scalar for dashboard injection."""
     return {
-        "vix_rank":        round(_last_vix_rank, 3),
-        "kelly_fraction":  round(_last_kelly_fraction, 3),
+        "vix_rank": round(_last_vix_rank, 3),
+        "kelly_fraction": round(_last_kelly_fraction, 3),
         "drawdown_scalar": round(get_drawdown_scalar(), 6),
     }
 
 
-def calculate_position_size(portfolio_value: float, price: float,
-                             score: int, regime: dict,
-                             atr: float = 0.0,
-                             external_mult: float = 1.0) -> int:
+def calculate_position_size(
+    portfolio_value: float, price: float, score: int, regime: dict, atr: float = 0.0, external_mult: float = 1.0
+) -> int:
     """
     VIX-rank adaptive Kelly position sizing with ATR volatility cap.
     Returns number of shares to buy.
@@ -464,11 +483,11 @@ def calculate_position_size(portfolio_value: float, price: float,
 
     base_risk = portfolio_value * CONFIG["risk_pct_per_trade"] * kelly_frac
 
-    _sk_cfg   = CONFIG.get("signal_strength_kelly", {})
+    _sk_cfg = CONFIG.get("signal_strength_kelly", {})
     _sk_floor = _sk_cfg.get("score_floor", 20)
-    _sk_ceil  = _sk_cfg.get("score_ceil",  50)
-    _sk_min   = _sk_cfg.get("min_mult",    0.5)
-    _sk_max   = _sk_cfg.get("max_mult",    1.5)
+    _sk_ceil = _sk_cfg.get("score_ceil", 50)
+    _sk_min = _sk_cfg.get("min_mult", 0.5)
+    _sk_max = _sk_cfg.get("max_mult", 1.5)
     _sk_range = _sk_ceil - _sk_floor
     if _sk_range > 0:
         _sk_t = max(0.0, min(1.0, (score - _sk_floor) / _sk_range))
@@ -484,11 +503,10 @@ def calculate_position_size(portfolio_value: float, price: float,
     else:
         session_mult = 1.0
 
-    risk_amount = (base_risk * conviction_mult * regime_mult * session_mult
-                   * _strategy_size_multiplier * external_mult)
+    risk_amount = base_risk * conviction_mult * regime_mult * session_mult * _strategy_size_multiplier * external_mult
 
     drawdown_scalar = get_drawdown_scalar()
-    risk_amount     = risk_amount * drawdown_scalar
+    risk_amount = risk_amount * drawdown_scalar
 
     if atr > 0:
         stop_dollars = atr * CONFIG["atr_stop_multiplier"]
@@ -500,15 +518,15 @@ def calculate_position_size(portfolio_value: float, price: float,
     max_pos_qty = max(1, int(portfolio_value * CONFIG["max_single_position"] / price))
     qty = min(qty, max_pos_qty)
 
-    atr_capped_qty: Optional[int] = None
+    atr_capped_qty: int | None = None
     if CONFIG.get("atr_vol_cap_enabled") and atr > 0:
-        atr_target     = portfolio_value * CONFIG["atr_vol_target_pct"]
+        atr_target = portfolio_value * CONFIG["atr_vol_target_pct"]
         atr_capped_qty = max(1, int(atr_target / atr))
         if atr_capped_qty < qty:
             qty = atr_capped_qty
 
     order_value = qty * price
-    hard_cap    = portfolio_value * 0.20
+    hard_cap = portfolio_value * 0.20
     if order_value > hard_cap and qty > 1:
         qty = max(1, int(hard_cap / price))
         log.warning(f"Position size hard cap triggered: {order_value:,.0f} > {hard_cap:,.0f}, reduced to {qty} shares")
@@ -526,6 +544,7 @@ def calculate_position_size(portfolio_value: float, price: float,
 # ══════════════════════════════════════════════════════════════════
 # FIX #4: Max drawdown from peak — circuit breaker
 # ══════════════════════════════════════════════════════════════════
+
 
 def update_equity_high_water_mark(current_equity: float) -> bool:
     """
@@ -565,7 +584,7 @@ def update_equity_high_water_mark(current_equity: float) -> bool:
     return False
 
 
-def check_drawdown() -> Tuple[bool, str]:
+def check_drawdown() -> tuple[bool, str]:
     """Returns (ok_to_trade, reason). Called from check_risk_conditions()."""
     if _drawdown_halt:
         drawdown = 0.0
@@ -597,10 +616,9 @@ def init_equity_high_water_mark_from_history(equity_history: list):
     global _equity_high_water_mark
 
     persisted_hwm = load_hwm_state()
-    if persisted_hwm is not None:
-        if _equity_high_water_mark is None or persisted_hwm > _equity_high_water_mark:
-            _equity_high_water_mark = persisted_hwm
-            log.info(f"HWM seeded from hwm_state.json: ${persisted_hwm:,.2f}")
+    if persisted_hwm is not None and (_equity_high_water_mark is None or persisted_hwm > _equity_high_water_mark):
+        _equity_high_water_mark = persisted_hwm
+        log.info(f"HWM seeded from hwm_state.json: ${persisted_hwm:,.2f}")
 
     if not equity_history:
         return
@@ -617,6 +635,7 @@ def init_equity_high_water_mark_from_history(equity_history: list):
 # ══════════════════════════════════════════════════════════════════
 # FIX #1: Cross-instrument exposure check (stock + options same underlying)
 # ══════════════════════════════════════════════════════════════════
+
 
 def get_underlying_exposure(symbol: str, open_positions: list) -> dict:
     """Calculate total exposure to a single underlying across stocks AND options."""
@@ -645,9 +664,9 @@ def get_underlying_exposure(symbol: str, open_positions: list) -> dict:
     }
 
 
-def check_combined_exposure(symbol: str, new_exposure_value: float,
-                            open_positions: list, portfolio_value: float,
-                            instrument: str = "stock") -> Tuple[bool, str]:
+def check_combined_exposure(
+    symbol: str, new_exposure_value: float, open_positions: list, portfolio_value: float, instrument: str = "stock"
+) -> tuple[bool, str]:
     """
     FIX #1 + #3: Check whether adding a new position would create
     excessive combined exposure to the same underlying.
@@ -717,6 +736,7 @@ def _get_sector_monitor():
     if _sector_monitor is None:
         try:
             from portfolio_optimizer import SectorMonitor
+
             _sector_monitor = SectorMonitor()
             log.info("SectorMonitor initialized for sector concentration enforcement")
         except ImportError as e:
@@ -724,9 +744,9 @@ def _get_sector_monitor():
     return _sector_monitor
 
 
-def check_sector_concentration(new_symbol: str, open_positions: list,
-                                portfolio_value: float,
-                                regime: str = "NORMAL") -> Tuple[bool, str]:
+def check_sector_concentration(
+    new_symbol: str, open_positions: list, portfolio_value: float, regime: str = "NORMAL"
+) -> tuple[bool, str]:
     """
     FIX #2: Check if adding new_symbol would breach sector concentration limits.
     Returns (ok_to_trade, reason).
@@ -785,10 +805,10 @@ def check_sector_concentration(new_symbol: str, open_positions: list,
     return True, "OK"
 
 
-def check_correlation(new_symbol: str, open_positions: list) -> Tuple[bool, str]:
+def check_correlation(new_symbol: str, open_positions: list) -> tuple[bool, str]:
     """Basic correlation check — avoid highly correlated positions."""
-    tech    = {"AAPL", "NVDA", "MSFT", "META", "GOOGL", "AMD", "INTC", "ORCL"}
-    semis   = {"NVDA", "AMD", "MU", "INTC", "AMAT", "LRCX", "KLAC", "QCOM"}
+    tech = {"AAPL", "NVDA", "MSFT", "META", "GOOGL", "AMD", "INTC", "ORCL"}
+    semis = {"NVDA", "AMD", "MU", "INTC", "AMAT", "LRCX", "KLAC", "QCOM"}
     indices = {"SPY", "QQQ", "IWM", "DIA"}
 
     open_syms = {p["symbol"] for p in open_positions}
@@ -813,6 +833,7 @@ def check_correlation(new_symbol: str, open_positions: list) -> Tuple[bool, str]
 # INTRADAY ADAPTIVE STRATEGY
 # ══════════════════════════════════════════════════════════════════
 
+
 def get_consecutive_losses() -> int:
     """Return current consecutive loss count (for logging in bot.py)."""
     return _consecutive_losses
@@ -828,7 +849,7 @@ def get_strategy_mode_params() -> dict:
     return MODE_PARAMS[_current_strategy_mode]
 
 
-def get_pause_until() -> Optional[str]:
+def get_pause_until() -> str | None:
     """Return pause-until time as HH:MM string, or None if not paused."""
     if _pause_until and datetime.now(EST) < _pause_until:
         return _pause_until.strftime("%H:%M")
@@ -843,18 +864,18 @@ def set_session_opening_regime(regime_name: str) -> None:
     global _session_opening_regime, _session_regime_set
     if not _session_regime_set and regime_name:
         _session_opening_regime = regime_name
-        _session_regime_set     = True
+        _session_regime_set = True
         log.info(f"Session opening regime recorded: {regime_name}")
 
 
 _SIGNIFICANT_REGIME_CHANGES = {
-    ("TRENDING_UP",   "TRENDING_DOWN"),
-    ("TRENDING_UP",   "RELIEF_RALLY"),
-    ("TRENDING_UP",   "CAPITULATION"),
+    ("TRENDING_UP", "TRENDING_DOWN"),
+    ("TRENDING_UP", "RELIEF_RALLY"),
+    ("TRENDING_UP", "CAPITULATION"),
     ("TRENDING_DOWN", "TRENDING_UP"),
     ("TRENDING_DOWN", "CAPITULATION"),
-    ("RANGE_BOUND",   "CAPITULATION"),
-    ("RELIEF_RALLY",  "CAPITULATION"),
+    ("RANGE_BOUND", "CAPITULATION"),
+    ("RELIEF_RALLY", "CAPITULATION"),
 }
 
 
@@ -865,9 +886,7 @@ def get_regime_changed(current_regime: str) -> bool:
     return (_session_opening_regime, current_regime) in _SIGNIFICANT_REGIME_CHANGES
 
 
-def get_intraday_strategy_mode(portfolio_value: float,
-                                daily_pnl: float,
-                                current_regime: str) -> dict:
+def get_intraday_strategy_mode(portfolio_value: float, daily_pnl: float, current_regime: str) -> dict:
     """
     Compute the current intraday strategy mode from PnL, loss streak, and regime change.
     Modes: NORMAL / DEFENSIVE / RECOVERY.
@@ -915,18 +934,20 @@ def get_intraday_strategy_mode(portfolio_value: float,
     _strategy_size_multiplier = params["size_multiplier"]
     _current_strategy_mode = mode
     if mode != "NORMAL":
-        log.info(f"Strategy mode: {mode} | PnL={daily_pnl_pct*100:+.2f}% | "
-                 f"Streak={_consecutive_losses} | ScoreAdj=+{params['score_threshold_adj']} | "
-                 f"SizeMult={params['size_multiplier']}x | MaxTrades={params['max_new_trades']}")
+        log.info(
+            f"Strategy mode: {mode} | PnL={daily_pnl_pct * 100:+.2f}% | "
+            f"Streak={_consecutive_losses} | ScoreAdj=+{params['score_threshold_adj']} | "
+            f"SizeMult={params['size_multiplier']}x | MaxTrades={params['max_new_trades']}"
+        )
 
     return {
-        "mode":                 mode,
-        "score_threshold_adj":  params["score_threshold_adj"],
-        "size_multiplier":      params["size_multiplier"],
-        "max_new_trades":       params["max_new_trades"],
-        "context":              context,
-        "daily_pnl_pct":        daily_pnl_pct,
-        "regime_changed":       get_regime_changed(current_regime),
+        "mode": mode,
+        "score_threshold_adj": params["score_threshold_adj"],
+        "size_multiplier": params["size_multiplier"],
+        "max_new_trades": params["max_new_trades"],
+        "context": context,
+        "daily_pnl_pct": daily_pnl_pct,
+        "regime_changed": get_regime_changed(current_regime),
     }
 
 

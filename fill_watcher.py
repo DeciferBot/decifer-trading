@@ -24,9 +24,10 @@ _flatten_all_inner() before those functions cancel/close the position.
 import logging
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ib_async import LimitOrder
+
 from config import CONFIG
 from learning import _append_audit_event, log_order
 
@@ -61,6 +62,7 @@ def _interruptible_sleep(seconds: float, stop_event: threading.Event) -> None:
 
 # ── FillWatcher ────────────────────────────────────────────────────────────────
 
+
 class FillWatcher:
     """
     Watches a single PENDING limit order and adjusts its price to chase a fill.
@@ -81,23 +83,32 @@ class FillWatcher:
     instrument  : "stock", "fx", etc. — used for audit logging
     """
 
-    def __init__(self, ib, symbol: str, order_id: int, entry_trade,
-                 original_limit: float, contract, qty: int,
-                 watcher_params: dict = None,
-                 side: str = "BUY", instrument: str = "stock"):
-        self._ib             = ib
-        self._symbol         = symbol
-        self._order_id       = order_id
-        self._entry_trade    = entry_trade
+    def __init__(
+        self,
+        ib,
+        symbol: str,
+        order_id: int,
+        entry_trade,
+        original_limit: float,
+        contract,
+        qty: int,
+        watcher_params: dict | None = None,
+        side: str = "BUY",
+        instrument: str = "stock",
+    ):
+        self._ib = ib
+        self._symbol = symbol
+        self._order_id = order_id
+        self._entry_trade = entry_trade
         self._original_limit = original_limit
-        self._contract       = contract
-        self._qty            = qty
-        self._stop_event     = threading.Event()
+        self._contract = contract
+        self._qty = qty
+        self._stop_event = threading.Event()
         self._watcher_params = watcher_params  # per-trade overrides from execution_agent
-        self._side           = side.upper()
-        self._instrument     = instrument
+        self._side = side.upper()
+        self._instrument = instrument
         # +1 for BUY (chase up), -1 for SELL (chase down)
-        self._chase_sign     = 1 if self._side == "BUY" else -1
+        self._chase_sign = 1 if self._side == "BUY" else -1
 
     # ── Public entry point ─────────────────────────────────────────────────────
 
@@ -110,22 +121,24 @@ class FillWatcher:
         cfg = self._watcher_params if self._watcher_params else _static
 
         initial_wait = float(cfg.get("initial_wait_secs", 30))
-        interval     = float(cfg.get("interval_secs", 20))
+        interval = float(cfg.get("interval_secs", 20))
         max_attempts = int(cfg.get("max_attempts", 3))
-        step_pct     = float(cfg.get("step_pct", 0.002))
-        max_chase    = float(cfg.get("max_chase_pct", 0.01))
+        step_pct = float(cfg.get("step_pct", 0.002))
+        max_chase = float(cfg.get("max_chase_pct", 0.01))
 
         # BUY: ceiling above original (chase up).  SELL: floor below original (chase down).
         price_boundary = round(self._original_limit * (1 + self._chase_sign * max_chase), 2)
-        current_limit  = self._original_limit
-        attempts       = 0
+        current_limit = self._original_limit
+        attempts = 0
 
-        self._log_audit("fill_watcher_started",
-                        original_limit=self._original_limit, price_boundary=price_boundary,
-                        side=self._side)
+        self._log_audit(
+            "fill_watcher_started", original_limit=self._original_limit, price_boundary=price_boundary, side=self._side
+        )
         _boundary_label = "ceiling" if self._side == "BUY" else "floor"
-        log.info(f"FillWatcher started: {self._symbol} {self._side} limit=${self._original_limit:.2f} "
-                 f"{_boundary_label}=${price_boundary:.2f} max_attempts={max_attempts}")
+        log.info(
+            f"FillWatcher started: {self._symbol} {self._side} limit=${self._original_limit:.2f} "
+            f"{_boundary_label}=${price_boundary:.2f} max_attempts={max_attempts}"
+        )
 
         # Phase 1: initial wait — give the order a chance to fill naturally
         _interruptible_sleep(initial_wait, self._stop_event)
@@ -135,15 +148,13 @@ class FillWatcher:
         # Phase 2: watch + adjust loop
         while attempts < max_attempts:
             if not self._ib.isConnected():
-                self._log_audit("fill_watcher_aborted",
-                                reason="IBKR_DISCONNECTED", attempts=attempts)
+                self._log_audit("fill_watcher_aborted", reason="IBKR_DISCONNECTED", attempts=attempts)
                 log.warning(f"FillWatcher: {self._symbol} aborted — IBKR disconnected")
-                self._remove_from_registry()   # BUG FIX: registry was not cleaned on disconnect abort
+                self._remove_from_registry()  # BUG FIX: registry was not cleaned on disconnect abort
                 return
 
             if self._is_filled():
-                self._log_audit("fill_watcher_filled",
-                                attempts=attempts, fill_limit=current_limit)
+                self._log_audit("fill_watcher_filled", attempts=attempts, fill_limit=current_limit)
                 log.info(f"FillWatcher: {self._symbol} filled after {attempts} adjustment(s)")
                 self._remove_from_registry()
                 return
@@ -154,11 +165,17 @@ class FillWatcher:
             # SELL: next < floor means we've chased too low.
             passed_boundary = (next_limit - price_boundary) * self._chase_sign > 0
             if passed_boundary:
-                self._log_audit("fill_watcher_boundary_reached",
-                                current_limit=current_limit, price_boundary=price_boundary,
-                                attempts=attempts, side=self._side)
-                log.warning(f"FillWatcher: {self._symbol} price {_boundary_label} ${price_boundary:.2f} reached "
-                            f"— cancelling unfilled order")
+                self._log_audit(
+                    "fill_watcher_boundary_reached",
+                    current_limit=current_limit,
+                    price_boundary=price_boundary,
+                    attempts=attempts,
+                    side=self._side,
+                )
+                log.warning(
+                    f"FillWatcher: {self._symbol} price {_boundary_label} ${price_boundary:.2f} reached "
+                    f"— cancelling unfilled order"
+                )
                 self._cancel_order("price_ceiling_reached")
                 return
 
@@ -166,11 +183,9 @@ class FillWatcher:
             if success:
                 attempts += 1
                 current_limit = next_limit
-                self._log_audit("fill_watcher_adjusted",
-                                new_limit=next_limit, attempt=attempts)
+                self._log_audit("fill_watcher_adjusted", new_limit=next_limit, attempt=attempts)
             else:
-                self._log_audit("fill_watcher_adjust_failed",
-                                attempted_limit=next_limit, attempt=attempts)
+                self._log_audit("fill_watcher_adjust_failed", attempted_limit=next_limit, attempt=attempts)
                 log.warning(f"FillWatcher: {self._symbol} price adjustment failed — aborting loop")
                 break
 
@@ -180,16 +195,15 @@ class FillWatcher:
 
         # Loop exited — do one final fill check before cancelling
         if self._is_filled():
-            self._log_audit("fill_watcher_filled_late",
-                            attempts=attempts, fill_limit=current_limit)
+            self._log_audit("fill_watcher_filled_late", attempts=attempts, fill_limit=current_limit)
             log.info(f"FillWatcher: {self._symbol} filled (detected post-loop) after {attempts} adjustment(s)")
             self._remove_from_registry()
             return
 
-        self._log_audit("fill_watcher_max_attempts",
-                        attempts=attempts, final_limit=current_limit)
-        log.warning(f"FillWatcher: {self._symbol} max attempts ({attempts}) exhausted "
-                    f"at ${current_limit:.2f} — cancelling")
+        self._log_audit("fill_watcher_max_attempts", attempts=attempts, final_limit=current_limit)
+        log.warning(
+            f"FillWatcher: {self._symbol} max attempts ({attempts}) exhausted at ${current_limit:.2f} — cancelling"
+        )
         self._cancel_order("max_attempts_exhausted")
 
     # ── Internal helpers ───────────────────────────────────────────────────────
@@ -197,7 +211,7 @@ class FillWatcher:
     def _is_filled(self) -> bool:
         """Return True if the order is no longer PENDING (filled, cancelled, or gone)."""
         # Lazy import to avoid circular dependency (orders imports fill_watcher)
-        from orders import active_trades, _trades_lock
+        from orders import _trades_lock, active_trades
 
         try:
             # Layer 1: check in-memory tracker (fastest, no IBKR call)
@@ -212,11 +226,7 @@ class FillWatcher:
                 return True
 
             # Layer 2: direct IBKR open-orders check
-            for t in self._ib.openTrades():
-                if t.order.orderId == self._order_id:
-                    return False   # still live in IBKR — not yet filled
-            # Parent orderId gone from open orders → filled or cancelled
-            return True
+            return all(t.order.orderId != self._order_id for t in self._ib.openTrades())
 
         except Exception as exc:
             log.debug(f"FillWatcher._is_filled: {self._symbol} check error ({exc}) — assuming not filled")
@@ -224,7 +234,6 @@ class FillWatcher:
 
     def _adjust_price(self, new_limit: float) -> bool:
         """Modify the live entry order to *new_limit*. Returns True on success."""
-        from orders import active_trades, _trades_lock
 
         try:
             if not self._ib.isConnected():
@@ -232,19 +241,20 @@ class FillWatcher:
 
             # In ib_async, calling placeOrder with an existing orderId modifies the live order
             modified_order = LimitOrder(
-                self._side, self._qty, new_limit,
+                self._side,
+                self._qty,
+                new_limit,
                 account=CONFIG["active_account"],
                 tif="DAY",
                 outsideRth=True,
             )
-            modified_order.orderId   = self._order_id
-            modified_order.transmit  = True
+            modified_order.orderId = self._order_id
+            modified_order.transmit = True
 
             self._ib.placeOrder(self._contract, modified_order)
             self._ib.sleep(0.3)
 
-            log.info(f"FillWatcher: {self._symbol} limit adjusted "
-                     f"${self._original_limit:.2f} → ${new_limit:.2f}")
+            log.info(f"FillWatcher: {self._symbol} limit adjusted ${self._original_limit:.2f} → ${new_limit:.2f}")
             return True
 
         except Exception as exc:
@@ -253,7 +263,7 @@ class FillWatcher:
 
     def _cancel_order(self, reason: str) -> None:
         """Cancel the entry order and clean up all related state."""
-        from orders import active_trades, _trades_lock, _safe_del_trade
+        from orders import _safe_del_trade
 
         try:
             if self._ib.isConnected():
@@ -282,18 +292,20 @@ class FillWatcher:
 
         # Log cancellation to orders.json
         try:
-            log_order({
-                "order_id":   self._order_id,
-                "symbol":     self._symbol,
-                "side":       self._side,
-                "order_type": "LMT",
-                "qty":        self._qty,
-                "price":      self._original_limit,
-                "status":     "CANCELLED",
-                "instrument": self._instrument,
-                "reason":     reason,
-                "timestamp":  datetime.now(timezone.utc).isoformat(),
-            })
+            log_order(
+                {
+                    "order_id": self._order_id,
+                    "symbol": self._symbol,
+                    "side": self._side,
+                    "order_type": "LMT",
+                    "qty": self._qty,
+                    "price": self._original_limit,
+                    "status": "CANCELLED",
+                    "instrument": self._instrument,
+                    "reason": reason,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                }
+            )
         except Exception as exc:
             log.error(f"FillWatcher._cancel_order: log_order failed for {self._symbol}: {exc}")
 

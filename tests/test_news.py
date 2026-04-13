@@ -9,23 +9,31 @@ Covers:
 
 All tests run fully offline - no network calls.
 """
-import os, sys, types
+
+import os
+import sys
 from unittest.mock import MagicMock
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Stub heavy deps BEFORE importing any Decifer module
-for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance",
-             "praw", "feedparser", "tvDatafeed", "requests_html"]:
+for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance", "praw", "feedparser", "tvDatafeed", "requests_html"]:
     sys.modules.setdefault(_mod, MagicMock())
 
 # Stub config with required keys
 import config as _config_mod
-_cfg = {"log_file": "/dev/null", "trade_log": "/dev/null",
-        "order_log": "/dev/null", "anthropic_api_key": "test-key",
-        "model": "claude-sonnet-4-20250514", "max_tokens": 1000,
-        "mongo_uri": "", "db_name": "test"}
+
+_cfg = {
+    "log_file": "/dev/null",
+    "trade_log": "/dev/null",
+    "order_log": "/dev/null",
+    "anthropic_api_key": "test-key",
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1000,
+    "mongo_uri": "",
+    "db_name": "test",
+}
 if hasattr(_config_mod, "CONFIG"):
     for _k, _v in _cfg.items():
         _config_mod.CONFIG.setdefault(_k, _v)
@@ -33,10 +41,10 @@ else:
     _config_mod.CONFIG = _cfg
 
 
-import sys
 import logging
+import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -54,9 +62,15 @@ log = logging.getLogger("decifer.tests.test_news")
 def _find_scorer(module):
     """Find a keyword scoring function in the news module."""
     candidates = [
-        "score_headline", "score_text", "score_news", "keyword_score",
-        "sentiment_score", "score_sentiment", "analyse_headline",
-        "analyze_headline", "score_article",
+        "score_headline",
+        "score_text",
+        "score_news",
+        "keyword_score",
+        "sentiment_score",
+        "score_sentiment",
+        "analyse_headline",
+        "analyze_headline",
+        "score_article",
     ]
     for name in candidates:
         func = getattr(module, name, None)
@@ -73,11 +87,8 @@ class TestNewsModuleSmoke:
 
     def test_news_has_some_callable(self):
         """news.py should expose at least one callable function."""
-        callables = [name for name in dir(news)
-                     if not name.startswith("_") and callable(getattr(news, name))]
-        assert len(callables) > 0, (
-            f"news.py has no public callables. dir: {dir(news)}"
-        )
+        callables = [name for name in dir(news) if not name.startswith("_") and callable(getattr(news, name))]
+        assert len(callables) > 0, f"news.py has no public callables. dir: {dir(news)}"
 
 
 class TestNewsKeywordScoring:
@@ -85,10 +96,32 @@ class TestNewsKeywordScoring:
 
     def test_pure_keyword_scorer_bullish_words(self):
         """Text containing bullish keywords must produce a positive or neutral score."""
-        bullish_keywords = ["beat", "exceed", "record", "surge", "strong", "upgrade",
-                           "buy", "growth", "profit", "rally", "gain"]
-        bearish_keywords = ["miss", "fail", "loss", "decline", "downgrade", "sell",
-                           "weak", "drop", "crash", "warn", "cut"]
+        bullish_keywords = [
+            "beat",
+            "exceed",
+            "record",
+            "surge",
+            "strong",
+            "upgrade",
+            "buy",
+            "growth",
+            "profit",
+            "rally",
+            "gain",
+        ]
+        bearish_keywords = [
+            "miss",
+            "fail",
+            "loss",
+            "decline",
+            "downgrade",
+            "sell",
+            "weak",
+            "drop",
+            "crash",
+            "warn",
+            "cut",
+        ]
 
         def score_text(text):
             text_lower = text.lower()
@@ -114,6 +147,7 @@ class TestNewsKeywordScoring:
 
     def test_pure_keyword_scorer_case_insensitive(self):
         """Keyword matching must be case-insensitive."""
+
         def score_text(text):
             return 1 if "SURGE" in text.upper() else 0
 
@@ -123,6 +157,7 @@ class TestNewsKeywordScoring:
 
     def test_pure_keyword_scorer_empty_text(self):
         """Empty text should return zero score without raising."""
+
         def score_text(text):
             if not text:
                 return 0
@@ -134,6 +169,7 @@ class TestNewsKeywordScoring:
 
     def test_pure_keyword_scorer_none_text_handled(self):
         """None text must not raise an exception."""
+
         def safe_score(text):
             if text is None:
                 return 0
@@ -142,11 +178,14 @@ class TestNewsKeywordScoring:
         result = safe_score(None)
         assert result == 0
 
-    @pytest.mark.parametrize("text,expected_sign", [
-        ("record profits and revenue beat", 1),
-        ("massive loss and revenue miss warning", -1),
-        ("neutral announcement today", 0),
-    ])
+    @pytest.mark.parametrize(
+        "text,expected_sign",
+        [
+            ("record profits and revenue beat", 1),
+            ("massive loss and revenue miss warning", -1),
+            ("neutral announcement today", 0),
+        ],
+    )
     def test_parametrized_sentiment_direction(self, text, expected_sign):
         """Parametrized directional test for keyword scorer."""
         bullish = ["profit", "beat", "record", "surge", "strong"]
@@ -157,8 +196,10 @@ class TestNewsKeywordScoring:
             bull = sum(1 for w in bullish if w in t)
             bear = sum(1 for w in bearish if w in t)
             raw = bull - bear
-            if raw > 0: return 1
-            if raw < 0: return -1
+            if raw > 0:
+                return 1
+            if raw < 0:
+                return -1
             return 0
 
         assert score(text) == expected_sign

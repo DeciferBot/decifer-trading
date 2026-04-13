@@ -21,31 +21,40 @@ Covers the bugs fixed in commits 62078f6 and 5a4662a:
 
 Each test is a direct regression for a specific code path added in the fix.
 """
-import os, sys, types
-from unittest.mock import MagicMock, patch, call
+
+import os
+import sys
+from unittest.mock import MagicMock, patch
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Stub heavy deps BEFORE importing any Decifer module
-for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance",
-             "praw", "feedparser", "tvDatafeed", "requests_html"]:
+for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance", "praw", "feedparser", "tvDatafeed", "requests_html"]:
     sys.modules.setdefault(_mod, MagicMock())
 
 # Stub config with required keys
 import config as _config_mod
-_cfg = {"log_file": "/dev/null", "trade_log": "/dev/null",
-        "order_log": "/dev/null", "anthropic_api_key": "test-key",
-        "model": "claude-sonnet-4-20250514", "max_tokens": 1000,
-        "mongo_uri": "", "db_name": "test"}
+
+_cfg = {
+    "log_file": "/dev/null",
+    "trade_log": "/dev/null",
+    "order_log": "/dev/null",
+    "anthropic_api_key": "test-key",
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1000,
+    "mongo_uri": "",
+    "db_name": "test",
+}
 if hasattr(_config_mod, "CONFIG"):
     for _k, _v in _cfg.items():
         _config_mod.CONFIG.setdefault(_k, _v)
 else:
     _config_mod.CONFIG = _cfg
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, timezone, timedelta
 
 # Evict any hollow stubs planted by earlier test files (e.g. test_bot.py
 # installs bare types.ModuleType() for "orders" which lacks all attributes)
@@ -53,13 +62,12 @@ for _decifer_mod in ("orders", "risk", "scanner", "signals", "news", "agents"):
     sys.modules.pop(_decifer_mod, None)
 
 # Import the REAL orders module (conftest has already patched all heavy deps)
-import orders
-import orders_options
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SHARED CONFIG FIXTURE  (mirrors test_orders_core.py mock_config)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def mock_config():
@@ -97,15 +105,24 @@ def mock_config():
         "close_buffer": "15:55",
         "market_close": "16:00",
         "after_hours_end": "20:00",
-        "ema_fast": 9, "ema_slow": 21, "ema_trend": 50,
-        "rsi_period": 14, "macd_fast": 12, "macd_slow": 26,
-        "macd_signal": 9, "atr_period": 14,
+        "ema_fast": 9,
+        "ema_slow": 21,
+        "ema_trend": 50,
+        "rsi_period": 14,
+        "macd_fast": 12,
+        "macd_slow": 26,
+        "macd_signal": 9,
+        "atr_period": 14,
         "volume_surge_multiplier": 1.5,
-        "keltner_period": 20, "keltner_atr_period": 10,
-        "keltner_multiplier": 1.5, "donchian_period": 20,
+        "keltner_period": 20,
+        "keltner_atr_period": 10,
+        "keltner_multiplier": 1.5,
+        "donchian_period": 20,
         "dashboard_port": 8080,
-        "vix_bull_max": 15, "vix_choppy_max": 25,
-        "vix_panic_min": 35, "vix_spike_pct": 0.20,
+        "vix_bull_max": 15,
+        "vix_choppy_max": 25,
+        "vix_panic_min": 35,
+        "vix_spike_pct": 0.20,
         "inverse_etfs": {"market_short": "SPXS", "tech_short": "SQQQ", "vix_long": "UVXY"},
         "log_file": "logs/decifer.log",
         "trade_log": "data/trades.json",
@@ -130,6 +147,7 @@ def mock_config():
 # CLASS 1: Orphaned Stop-Loss Reattachment  (commit 62078f6, lines 1801–1831)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestOrphanedStopLoss:
     """
     reconcile_with_ibkr must reattach or re-submit the stop-loss bracket after
@@ -137,8 +155,7 @@ class TestOrphanedStopLoss:
     from IBKR had no SL protection until they were manually closed.
     """
 
-    def _make_stock_portfolio_item(self, symbol="TSLA", position=10,
-                                   avg_cost=100.0, mkt_price=102.0):
+    def _make_stock_portfolio_item(self, symbol="TSLA", position=10, avg_cost=100.0, mkt_price=102.0):
         """Build a minimal MagicMock that looks like an ib_insync portfolio item."""
         item = MagicMock()
         item.position = position
@@ -146,7 +163,7 @@ class TestOrphanedStopLoss:
         item.marketPrice = mkt_price
         item.contract.symbol = symbol
         item.contract.secType = "STK"
-        item.contract.right = ""    # empty → _is_option_contract returns False
+        item.contract.right = ""  # empty → _is_option_contract returns False
         item.contract.strike = 0
         return item
 
@@ -162,8 +179,7 @@ class TestOrphanedStopLoss:
         ib.placeOrder.return_value = new_sl_trade
         return ib
 
-    def _make_sl_open_trade(self, symbol="TSLA", order_id=9999,
-                             order_type="STP", action="SELL"):
+    def _make_sl_open_trade(self, symbol="TSLA", order_id=9999, order_type="STP", action="SELL"):
         """Simulate an existing stop-loss order live in IBKR."""
         t = MagicMock()
         t.contract.symbol = symbol
@@ -188,14 +204,17 @@ class TestOrphanedStopLoss:
         sl_trade = self._make_sl_open_trade(symbol="TSLA", order_id=9999)
         ib = self._make_ib([item], [sl_trade])
 
-        with patch("orders.CONFIG", mock_config), \
-             patch("orders._validate_position_price", return_value=(102.0, "IBKR")), \
-             patch("orders_portfolio._ts_restore", return_value={}):
+        with (
+            patch("orders.CONFIG", mock_config),
+            patch("orders._validate_position_price", return_value=(102.0, "IBKR")),
+            patch("orders_portfolio._ts_restore", return_value={}),
+        ):
             _om.reconcile_with_ibkr(ib)
 
         assert "TSLA" in _om.active_trades, "Position must be added by reconcile"
-        assert _om.active_trades["TSLA"].get("sl_order_id") == 9999, \
+        assert _om.active_trades["TSLA"].get("sl_order_id") == 9999, (
             "sl_order_id must be reattached from existing IBKR stop order"
+        )
         ib.placeOrder.assert_not_called()  # no duplicate SL placed
 
     def test_reconcile_resubmits_sl_when_none_found_in_ibkr(self, mock_config):
@@ -212,20 +231,24 @@ class TestOrphanedStopLoss:
         item = self._make_stock_portfolio_item()
         ib = self._make_ib([item], [], sl_order_id=8888)  # no open SL in IBKR
 
-        with patch("orders.CONFIG", mock_config), \
-             patch("orders._validate_position_price", return_value=(102.0, "IBKR")), \
-             patch("orders_portfolio._ts_restore", return_value={}):
+        with (
+            patch("orders.CONFIG", mock_config),
+            patch("orders._validate_position_price", return_value=(102.0, "IBKR")),
+            patch("orders_portfolio._ts_restore", return_value={}),
+        ):
             _om.reconcile_with_ibkr(ib)
 
         assert "TSLA" in _om.active_trades, "Position must be added by reconcile"
         ib.placeOrder.assert_called_once()  # new SL placed exactly once
-        assert _om.active_trades["TSLA"].get("sl_order_id") == 8888, \
+        assert _om.active_trades["TSLA"].get("sl_order_id") == 8888, (
             "sl_order_id must be set to newly placed stop order"
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CLASS 2: Deferred Option Exits  (commit 62078f6, lines 2244–2252, 2510–2524)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestDeferredOptionExits:
     """
@@ -242,12 +265,19 @@ class TestDeferredOptionExits:
 
     def _opt_pos(self, direction="LONG"):
         return {
-            "symbol": "GSAT", "instrument": "option",
-            "right": "C", "strike": 35.0,
-            "expiry_ibkr": "20260620", "expiry_str": "2026-06-20",
-            "contracts": 2, "qty": 2,
-            "entry": 3.50, "entry_premium": 3.50, "current_premium": 2.50,
-            "direction": direction, "status": "ACTIVE",
+            "symbol": "GSAT",
+            "instrument": "option",
+            "right": "C",
+            "strike": 35.0,
+            "expiry_ibkr": "20260620",
+            "expiry_str": "2026-06-20",
+            "contracts": 2,
+            "qty": 2,
+            "entry": 3.50,
+            "entry_premium": 3.50,
+            "current_premium": 2.50,
+            "direction": direction,
+            "status": "ACTIVE",
         }
 
     def test_execute_sell_option_defers_when_market_closed(self):
@@ -269,8 +299,9 @@ class TestDeferredOptionExits:
             result = _om.execute_sell_option(ib, self.OPT_KEY, reason="signal")
 
         assert result is False
-        assert _om._pending_option_exits.get(self.OPT_KEY) == "signal", \
+        assert _om._pending_option_exits.get(self.OPT_KEY) == "signal", (
             "Deferred exit must be stored in _pending_option_exits"
+        )
         ib.placeOrder.assert_not_called()
 
     def test_flush_pending_option_exits_drains_on_market_open(self):
@@ -290,15 +321,16 @@ class TestDeferredOptionExits:
 
         ib = MagicMock()
 
-        with patch("orders_options.is_options_market_open", return_value=True), \
-             patch("orders_options.execute_sell_option") as mock_sell:
+        with (
+            patch("orders_options.is_options_market_open", return_value=True),
+            patch("orders_options.execute_sell_option") as mock_sell,
+        ):
             _om.flush_pending_option_exits(ib)
 
-        mock_sell.assert_called_once_with(
-            ib, self.OPT_KEY, reason="deferred:signal"
-        )
-        assert self.OPT_KEY not in _om._pending_option_exits, \
+        mock_sell.assert_called_once_with(ib, self.OPT_KEY, reason="deferred:signal")
+        assert self.OPT_KEY not in _om._pending_option_exits, (
             "Processed entry must be removed from _pending_option_exits"
+        )
 
     def test_flush_pending_option_exits_noop_when_market_closed(self):
         """
@@ -311,18 +343,20 @@ class TestDeferredOptionExits:
 
         ib = MagicMock()
 
-        with patch("orders_options.is_options_market_open", return_value=False), \
-             patch("orders_options.execute_sell_option") as mock_sell:
+        with (
+            patch("orders_options.is_options_market_open", return_value=False),
+            patch("orders_options.execute_sell_option") as mock_sell,
+        ):
             _om.flush_pending_option_exits(ib)
 
         mock_sell.assert_not_called()
-        assert self.OPT_KEY in _om._pending_option_exits, \
-            "Deferred exit must still be in queue when market is closed"
+        assert self.OPT_KEY in _om._pending_option_exits, "Deferred exit must still be in queue when market is closed"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CLASS 3: Option Sell State Machine  (commit 62078f6, lines 2294, 2404, 2423)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestOptionSellStateMachine:
     """
@@ -339,12 +373,19 @@ class TestOptionSellStateMachine:
 
     def _opt_pos(self):
         return {
-            "symbol": "NVDA", "instrument": "option",
-            "right": "C", "strike": 900.0,
-            "expiry_ibkr": "20260620", "expiry_str": "2026-06-20",
-            "contracts": 1, "qty": 1,
-            "entry": 10.00, "entry_premium": 10.00, "current_premium": 8.00,
-            "direction": "LONG", "status": "ACTIVE",
+            "symbol": "NVDA",
+            "instrument": "option",
+            "right": "C",
+            "strike": 900.0,
+            "expiry_ibkr": "20260620",
+            "expiry_str": "2026-06-20",
+            "contracts": 1,
+            "qty": 1,
+            "entry": 10.00,
+            "entry_premium": 10.00,
+            "current_premium": 8.00,
+            "direction": "LONG",
+            "status": "ACTIVE",
         }
 
     def _make_ib(self, order_status="Cancelled", filled=0, avg_fill_price=None):
@@ -366,20 +407,23 @@ class TestOptionSellStateMachine:
     def _run(self, mock_config, ib):
         """Run execute_sell_option with standard patches; return the result."""
         import sys as _sys
+
         _om = _sys.modules["orders"]
         _om.active_trades.clear()
         _om._option_sell_attempts.clear()
         _om.active_trades[self.OPT_KEY] = self._opt_pos()
 
-        with patch("orders_options.is_options_market_open", return_value=True), \
-             patch("orders_options.CONFIG") as mock_cfg, \
-             patch("orders_options.log_order"), \
-             patch("orders_options.record_win"), \
-             patch("orders_options.record_loss"), \
-             patch("learning.log_order"), \
-             patch("learning._save_orders"), \
-             patch("learning._save_trades"), \
-             patch("learning.log_trade"):
+        with (
+            patch("orders_options.is_options_market_open", return_value=True),
+            patch("orders_options.CONFIG") as mock_cfg,
+            patch("orders_options.log_order"),
+            patch("orders_options.record_win"),
+            patch("orders_options.record_loss"),
+            patch("learning.log_order"),
+            patch("learning._save_orders"),
+            patch("learning._save_trades"),
+            patch("learning.log_trade"),
+        ):
             mock_cfg.__getitem__.side_effect = lambda k: mock_config[k]
             mock_cfg.get = lambda k, d=None: mock_config.get(k, d)
             return _om.execute_sell_option(ib, self.OPT_KEY, reason="test")
@@ -398,8 +442,9 @@ class TestOptionSellStateMachine:
         result = self._run(mock_config, ib)
 
         assert result is False
-        assert _om.active_trades.get(self.OPT_KEY, {}).get("status") == "ACTIVE", \
+        assert _om.active_trades.get(self.OPT_KEY, {}).get("status") == "ACTIVE", (
             "Status must reset to ACTIVE after unfilled order (not stuck as EXITING)"
+        )
 
     def test_status_resets_to_active_on_false_fill(self, mock_config):
         """
@@ -415,8 +460,9 @@ class TestOptionSellStateMachine:
         result = self._run(mock_config, ib)
 
         assert result is False
-        assert _om.active_trades.get(self.OPT_KEY, {}).get("status") == "ACTIVE", \
+        assert _om.active_trades.get(self.OPT_KEY, {}).get("status") == "ACTIVE", (
             "Status must reset to ACTIVE after paper-account false fill"
+        )
 
     def test_duplicate_exit_blocked_when_already_exiting(self, mock_config):
         """
@@ -435,8 +481,10 @@ class TestOptionSellStateMachine:
 
         ib = MagicMock()
 
-        with patch("orders_options.is_options_market_open", return_value=True), \
-             patch("orders_options.CONFIG") as mock_cfg:
+        with (
+            patch("orders_options.is_options_market_open", return_value=True),
+            patch("orders_options.CONFIG") as mock_cfg,
+        ):
             mock_cfg.__getitem__.side_effect = lambda k: mock_config[k]
             mock_cfg.get = lambda k, d=None: mock_config.get(k, d)
             result = _om.execute_sell_option(ib, self.OPT_KEY, reason="test")
@@ -448,6 +496,7 @@ class TestOptionSellStateMachine:
 # ─────────────────────────────────────────────────────────────────────────────
 # CLASS 4: SHORT Option Exit Pricing  (commit 62078f6, lines 2329–2337)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestShortOptionExit:
     """
@@ -464,11 +513,17 @@ class TestShortOptionExit:
 
     def _short_pos(self):
         return {
-            "symbol": "GSAT", "instrument": "option",
-            "right": "C", "strike": 35.0,
-            "expiry_ibkr": "20260620", "expiry_str": "2026-06-20",
-            "contracts": 2, "qty": 2,
-            "entry": 3.50, "entry_premium": 3.50, "current_premium": 2.50,
+            "symbol": "GSAT",
+            "instrument": "option",
+            "right": "C",
+            "strike": 35.0,
+            "expiry_ibkr": "20260620",
+            "expiry_str": "2026-06-20",
+            "contracts": 2,
+            "qty": 2,
+            "entry": 3.50,
+            "entry_premium": 3.50,
+            "current_premium": 2.50,
             "direction": "SHORT",  # BUY-to-close
             "status": "ACTIVE",
         }
@@ -491,6 +546,7 @@ class TestShortOptionExit:
     def _run(self, mock_config, ib, retry_count=0):
         """Run execute_sell_option and return (captured_action, captured_price)."""
         import sys as _sys
+
         _om = _sys.modules["orders"]
         _om.active_trades.clear()
         _om._option_sell_attempts.clear()
@@ -499,7 +555,7 @@ class TestShortOptionExit:
             _om._option_sell_attempts[self.OPT_KEY] = {
                 "count": retry_count,
                 # Use a past timestamp so the min-retry-interval guard (90s) is already elapsed.
-                "last_try": datetime.now(timezone.utc) - timedelta(seconds=200),
+                "last_try": datetime.now(UTC) - timedelta(seconds=200),
             }
 
         _om.active_trades[self.OPT_KEY] = self._short_pos()
@@ -513,16 +569,18 @@ class TestShortOptionExit:
             obj.lmtPrice = price
             return obj
 
-        with patch("orders_options.is_options_market_open", return_value=True), \
-             patch("orders_options.CONFIG") as mock_cfg, \
-             patch("orders_options.LimitOrder", side_effect=fake_limit_order), \
-             patch("orders_options.log_order"), \
-             patch("orders_options.record_win"), \
-             patch("orders_options.record_loss"), \
-             patch("learning.log_order"), \
-             patch("learning._save_orders"), \
-             patch("learning._save_trades"), \
-             patch("learning.log_trade"):
+        with (
+            patch("orders_options.is_options_market_open", return_value=True),
+            patch("orders_options.CONFIG") as mock_cfg,
+            patch("orders_options.LimitOrder", side_effect=fake_limit_order),
+            patch("orders_options.log_order"),
+            patch("orders_options.record_win"),
+            patch("orders_options.record_loss"),
+            patch("learning.log_order"),
+            patch("learning._save_orders"),
+            patch("learning._save_trades"),
+            patch("learning.log_trade"),
+        ):
             mock_cfg.__getitem__.side_effect = lambda k: mock_config[k]
             mock_cfg.get = lambda k, d=None: mock_config.get(k, d)
             _om.execute_sell_option(ib, self.OPT_KEY, reason="test")
@@ -563,6 +621,7 @@ class TestShortOptionExit:
 # CLASS 5: execute_sell Composite Key Lookup  (commit 5a4662a, lines 1269–1282)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestExecuteSellCompositeKey:
     """
     Options are stored in active_trades under composite keys such as
@@ -577,7 +636,7 @@ class TestExecuteSellCompositeKey:
 
     def _opt_pos(self):
         return {
-            "symbol": "GSAT",           # plain symbol — the search key
+            "symbol": "GSAT",  # plain symbol — the search key
             "instrument": "option",
             "right": "C",
             "strike": 35.0,
@@ -607,21 +666,22 @@ class TestExecuteSellCompositeKey:
 
         ib = MagicMock()
 
-        with patch("orders.CONFIG", mock_config), \
-             patch("orders_core.is_equities_extended_hours", return_value=True), \
-             patch("orders._validate_position_price", return_value=(3.50, "IBKR")), \
-             patch("orders._get_ibkr_price", return_value=3.50), \
-             patch("orders.record_win"), \
-             patch("orders.record_loss"), \
-             patch("orders.log_order"), \
-             patch("learning.log_order"), \
-             patch("learning._save_orders"), \
-             patch("learning._save_trades"), \
-             patch("learning.log_trade"), \
-             patch("fill_watcher.stop_watcher"):
+        with (
+            patch("orders.CONFIG", mock_config),
+            patch("orders_core.is_equities_extended_hours", return_value=True),
+            patch("orders._validate_position_price", return_value=(3.50, "IBKR")),
+            patch("orders._get_ibkr_price", return_value=3.50),
+            patch("orders.record_win"),
+            patch("orders.record_loss"),
+            patch("orders.log_order"),
+            patch("learning.log_order"),
+            patch("learning._save_orders"),
+            patch("learning._save_trades"),
+            patch("learning.log_trade"),
+            patch("fill_watcher.stop_watcher"),
+        ):
             result = _om.execute_sell(ib, "GSAT", reason="signal")
 
         # A True return proves the option was found via the composite key search.
         # False with "No open position" would mean the bug regressed.
-        assert result is True, \
-            "execute_sell('GSAT') must find and close the option stored under composite key"
+        assert result is True, "execute_sell('GSAT') must find and close the option stored under composite key"

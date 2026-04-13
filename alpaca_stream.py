@@ -16,8 +16,9 @@
 
 from __future__ import annotations
 
-import threading
 import logging
+import threading
+
 import pandas as pd
 
 log = logging.getLogger("decifer.alpaca_stream")
@@ -34,6 +35,7 @@ STREAM_ANCHORS: frozenset[str] = frozenset(["SPY", "QQQ"])
 # ═══════════════════════════════════════════════════════════════
 # BAR CACHE — 1-minute OHLCV, aggregated to 5m on demand
 # ═══════════════════════════════════════════════════════════════
+
 
 class _BarCache:
     """
@@ -53,14 +55,19 @@ class _BarCache:
     def update(self, symbol: str, bar: dict) -> None:
         """Append one 1-minute bar to the cache. Trims to _MAX_1M_BARS."""
         with self._lock:
-            row = pd.DataFrame([{
-                'Open':   bar['open'],
-                'High':   bar['high'],
-                'Low':    bar['low'],
-                'Close':  bar['close'],
-                'Volume': bar['volume'],
-                'vwap':   bar.get('vwap'),
-            }], index=pd.to_datetime([bar['timestamp']]))
+            row = pd.DataFrame(
+                [
+                    {
+                        "Open": bar["open"],
+                        "High": bar["high"],
+                        "Low": bar["low"],
+                        "Close": bar["close"],
+                        "Volume": bar["volume"],
+                        "vwap": bar.get("vwap"),
+                    }
+                ],
+                index=pd.to_datetime([bar["timestamp"]]),
+            )
 
             if symbol not in self._data:
                 self._data[symbol] = row
@@ -86,17 +93,17 @@ class _BarCache:
 
         # Resample 1m → 5m
         agg = {
-            'Open':   'first',
-            'High':   'max',
-            'Low':    'min',
-            'Close':  'last',
-            'Volume': 'sum',
+            "Open": "first",
+            "High": "max",
+            "Low": "min",
+            "Close": "last",
+            "Volume": "sum",
         }
-        if 'vwap' in df.columns and df['vwap'].notna().any():
+        if "vwap" in df.columns and df["vwap"].notna().any():
             # Volume-weighted average of per-minute VWAPs
-            agg['vwap'] = 'mean'
+            agg["vwap"] = "mean"
 
-        df_5m = df.resample('5min').agg(agg).dropna(subset=['Close'])
+        df_5m = df.resample("5min").agg(agg).dropna(subset=["Close"])
         return df_5m if len(df_5m) >= 5 else None
 
     def symbols(self) -> set:
@@ -116,6 +123,7 @@ BAR_CACHE = _BarCache()
 # ═══════════════════════════════════════════════════════════════
 # QUOTE CACHE — real-time bid/ask + spread
 # ═══════════════════════════════════════════════════════════════
+
 
 class _QuoteCache:
     """
@@ -139,8 +147,8 @@ class _QuoteCache:
         spread_pct = (ask - bid) / mid if mid > 0 else None
         with self._lock:
             self._quotes[symbol] = {
-                "bid":        bid,
-                "ask":        ask,
+                "bid": bid,
+                "ask": ask,
                 "spread_pct": spread_pct,
             }
 
@@ -164,6 +172,7 @@ QUOTE_CACHE = _QuoteCache()
 # DAILY BAR CACHE — intraday running daily OHLCV bar
 # ═══════════════════════════════════════════════════════════════
 
+
 class _DailyBarCache:
     """
     Thread-safe cache of today's running OHLCV bar per symbol.
@@ -180,11 +189,11 @@ class _DailyBarCache:
         """Replace today's bar for symbol. Alpaca sends full updated bar."""
         with self._lock:
             self._bars[symbol] = {
-                "open":      bar.get("open"),
-                "high":      bar.get("high"),
-                "low":       bar.get("low"),
-                "close":     bar.get("close"),
-                "volume":    bar.get("volume"),
+                "open": bar.get("open"),
+                "high": bar.get("high"),
+                "low": bar.get("low"),
+                "close": bar.get("close"),
+                "volume": bar.get("volume"),
                 "timestamp": bar.get("timestamp"),
             }
 
@@ -202,6 +211,7 @@ DAILY_BAR_CACHE = _DailyBarCache()
 # ═══════════════════════════════════════════════════════════════
 # HALT CACHE — real-time trading halt / resume status
 # ═══════════════════════════════════════════════════════════════
+
 
 class _HaltCache:
     """
@@ -245,6 +255,7 @@ HALT_CACHE = _HaltCache()
 # ALPACA BAR STREAM — WebSocket subscriber + cache writer
 # ═══════════════════════════════════════════════════════════════
 
+
 class AlpacaBarStream:
     """
     Subscribes to Alpaca WebSocket SIP stream for a list of symbols.
@@ -285,8 +296,7 @@ class AlpacaBarStream:
             name="alpaca-bar-stream",
         )
         self._thread.start()
-        log.info(f"AlpacaBarStream: started for {len(full_symbols)} symbols "
-                 f"(anchors: {sorted(STREAM_ANCHORS)})")
+        log.info(f"AlpacaBarStream: started for {len(full_symbols)} symbols (anchors: {sorted(STREAM_ANCHORS)})")
 
     def stop(self) -> None:
         """Stop the stream gracefully."""
@@ -319,7 +329,8 @@ class AlpacaBarStream:
     def _run(self, symbols: list[str]) -> None:
         """Background thread: connect to Alpaca WebSocket and stream all channels."""
         from config import CONFIG
-        api_key    = CONFIG.get("alpaca_api_key", "")
+
+        api_key = CONFIG.get("alpaca_api_key", "")
         secret_key = CONFIG.get("alpaca_secret_key", "")
 
         if not api_key or not secret_key:
@@ -328,44 +339,50 @@ class AlpacaBarStream:
             return
 
         try:
-            from alpaca.data.live import StockDataStream
             from alpaca.data.enums import DataFeed
+            from alpaca.data.live import StockDataStream
 
             self._stream = StockDataStream(api_key, secret_key, feed=DataFeed.SIP)
 
             # ── Handler: 1-minute bars → BAR_CACHE ───────────────
             async def on_bar(bar) -> None:
-                BAR_CACHE.update(bar.symbol, {
-                    'timestamp': bar.timestamp,
-                    'open':      bar.open,
-                    'high':      bar.high,
-                    'low':       bar.low,
-                    'close':     bar.close,
-                    'volume':    bar.volume,
-                    'vwap':      getattr(bar, 'vwap', None),
-                })
+                BAR_CACHE.update(
+                    bar.symbol,
+                    {
+                        "timestamp": bar.timestamp,
+                        "open": bar.open,
+                        "high": bar.high,
+                        "low": bar.low,
+                        "close": bar.close,
+                        "volume": bar.volume,
+                        "vwap": getattr(bar, "vwap", None),
+                    },
+                )
                 log.debug(f"AlpacaBarStream: {bar.symbol} 1m close={bar.close:.2f}")
 
             # ── Handler: intraday daily bars → DAILY_BAR_CACHE ───
             async def on_daily_bar(bar) -> None:
-                DAILY_BAR_CACHE.update(bar.symbol, {
-                    'open':      bar.open,
-                    'high':      bar.high,
-                    'low':       bar.low,
-                    'close':     bar.close,
-                    'volume':    bar.volume,
-                    'timestamp': bar.timestamp,
-                })
+                DAILY_BAR_CACHE.update(
+                    bar.symbol,
+                    {
+                        "open": bar.open,
+                        "high": bar.high,
+                        "low": bar.low,
+                        "close": bar.close,
+                        "volume": bar.volume,
+                        "timestamp": bar.timestamp,
+                    },
+                )
 
             # ── Handler: quotes → QUOTE_CACHE ────────────────────
             async def on_quote(quote) -> None:
-                bid = getattr(quote, 'bid_price', 0) or 0
-                ask = getattr(quote, 'ask_price', 0) or 0
+                bid = getattr(quote, "bid_price", 0) or 0
+                ask = getattr(quote, "ask_price", 0) or 0
                 QUOTE_CACHE.update(quote.symbol, bid, ask)
 
             # ── Handler: trading statuses → HALT_CACHE ────────────
             async def on_status(status) -> None:
-                code = getattr(status, 'status_code', 'T') or 'T'
+                code = getattr(status, "status_code", "T") or "T"
                 HALT_CACHE.update(status.symbol, code)
 
             # Subscribe all four channels on the single SIP connection

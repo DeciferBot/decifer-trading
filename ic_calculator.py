@@ -21,8 +21,7 @@
 import json
 import logging
 import os
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 
@@ -31,41 +30,59 @@ log = logging.getLogger("decifer.ic_calculator")
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 DIMENSIONS = [
-    "trend", "momentum", "squeeze", "flow", "breakout",
-    "mtf", "news", "social", "reversion", "iv_skew",
-    "pead", "short_squeeze",
+    "trend",
+    "momentum",
+    "squeeze",
+    "flow",
+    "breakout",
+    "mtf",
+    "news",
+    "social",
+    "reversion",
+    "iv_skew",
+    "pead",
+    "short_squeeze",
 ]
 # Core 9 dimensions that have always been logged — the minimum required to
 # admit a record into IC calculation.  Newer dimensions (iv_skew, pead,
 # short_squeeze) are backfilled with 0 for records that predate their addition.
 _CORE_DIMENSIONS = [
-    "trend", "momentum", "squeeze", "flow", "breakout",
-    "mtf", "news", "social", "reversion",
+    "trend",
+    "momentum",
+    "squeeze",
+    "flow",
+    "breakout",
+    "mtf",
+    "news",
+    "social",
+    "reversion",
 ]
 _N = len(DIMENSIONS)
 EQUAL_WEIGHTS: dict = {d: 1.0 / _N for d in DIMENSIONS}
 
 _BASE = os.path.dirname(os.path.abspath(__file__))
-IC_WEIGHTS_FILE      = os.path.join(_BASE, "data", "ic_weights.json")
-IC_HISTORY_FILE      = os.path.join(_BASE, "data", "ic_weights_history.jsonl")
-SIGNALS_LOG_FILE     = os.path.join(_BASE, "data", "signals_log.jsonl")
-IC_LIVE_FILE         = os.path.join(_BASE, "data", "ic_weights_live.json")
+IC_WEIGHTS_FILE = os.path.join(_BASE, "data", "ic_weights.json")
+IC_HISTORY_FILE = os.path.join(_BASE, "data", "ic_weights_history.jsonl")
+SIGNALS_LOG_FILE = os.path.join(_BASE, "data", "signals_log.jsonl")
+IC_LIVE_FILE = os.path.join(_BASE, "data", "ic_weights_live.json")
 IC_LIVE_HISTORY_FILE = os.path.join(_BASE, "data", "ic_weights_live_history.jsonl")
 
-ROLLING_WINDOW = 60   # records to use for IC calculation
-MIN_VALID      = 20   # minimum records with forward returns before IC is trusted
+ROLLING_WINDOW = 60  # records to use for IC calculation
+MIN_VALID = 20  # minimum records with forward returns before IC is trusted
 
 
 def _ic_cfg(key: str, default):
     """Read a value from CONFIG['ic_calculator'], falling back to *default*."""
     try:
         from config import CONFIG
+
         return CONFIG.get("ic_calculator", {}).get(key, default)
     except Exception:
         return default
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
 
 def _spearman(x: np.ndarray, y: np.ndarray) -> float:
     """
@@ -76,6 +93,7 @@ def _spearman(x: np.ndarray, y: np.ndarray) -> float:
     """
     try:
         from scipy.stats import spearmanr
+
         corr, _ = spearmanr(x, y)
         return float(corr) if np.isfinite(corr) else 0.0
     except ImportError:
@@ -86,7 +104,7 @@ def _spearman(x: np.ndarray, y: np.ndarray) -> float:
         return 0.0
     rx = np.argsort(np.argsort(x)).astype(float)
     ry = np.argsort(np.argsort(y)).astype(float)
-    d  = rx - ry
+    d = rx - ry
     denom = n * (n * n - 1)
     return float(1.0 - 6.0 * np.sum(d * d) / denom) if denom > 0 else 0.0
 
@@ -101,8 +119,9 @@ def _zscore_array(arr: np.ndarray) -> np.ndarray:
 
 # ── Signal log loading ─────────────────────────────────────────────────────────
 
+
 def _load_signal_records(
-    signals_log_path: str = None,
+    signals_log_path: str | None = None,
     window: int = ROLLING_WINDOW,
     min_age_days: int = 0,
 ) -> list:
@@ -118,7 +137,7 @@ def _load_signal_records(
     if not os.path.exists(path):
         return []
     records = []
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     try:
         with open(path) as f:
             for line in f:
@@ -139,9 +158,7 @@ def _load_signal_records(
                         ts_str = rec.get("ts", "")
                         if not ts_str:
                             continue
-                        scan_date = datetime.fromisoformat(
-                            ts_str.replace("Z", "+00:00")
-                        ).date()
+                        scan_date = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).date()
                         if (today - scan_date).days < min_age_days:
                             continue
                     records.append(rec)
@@ -154,6 +171,7 @@ def _load_signal_records(
 
 
 # ── Forward-return computation ─────────────────────────────────────────────────
+
 
 def _fetch_forward_returns_batch(records: list) -> dict:
     """
@@ -171,7 +189,7 @@ def _fetch_forward_returns_batch(records: list) -> dict:
         if sym:
             by_symbol.setdefault(sym, []).append(idx)
 
-    result: dict[int, Optional[float]] = {}
+    result: dict[int, float | None] = {}
 
     fwd_horizon: int = int(_ic_cfg("forward_horizon_days", 1))
     min_age_cal: int = fwd_horizon + 1
@@ -204,15 +222,14 @@ def _fetch_forward_returns_batch(records: list) -> dict:
                 result[i] = None
             continue
 
-        earliest  = min(ts_list) - timedelta(days=1)
+        earliest = min(ts_list) - timedelta(days=1)
         # +15 calendar days covers 5+ trading days from the latest scan
-        latest    = max(ts_list) + timedelta(days=15)
+        latest = max(ts_list) + timedelta(days=15)
         start_str = earliest.strftime("%Y-%m-%d")
-        end_str   = latest.strftime("%Y-%m-%d")
+        end_str = latest.strftime("%Y-%m-%d")
 
         try:
-            df = yf.download(sym, start=start_str, end=end_str,
-                             interval="1d", progress=False, auto_adjust=True)
+            df = yf.download(sym, start=start_str, end=end_str, interval="1d", progress=False, auto_adjust=True)
             if df is None or len(df) < 2:
                 for i in idxs:
                     result[i] = None
@@ -246,7 +263,7 @@ def _fetch_forward_returns_batch(records: list) -> dict:
             try:
                 scan_dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
                 scan_date = scan_dt.date()
-                if (datetime.now(timezone.utc).date() - scan_date).days < min_age_cal:
+                if (datetime.now(UTC).date() - scan_date).days < min_age_cal:
                     result[i] = None
                     continue
                 # Find the first trading close on or after fwd_offset_cal calendar days
@@ -276,11 +293,12 @@ def _fetch_forward_returns_batch(records: list) -> dict:
 
 # ── IC calculation ─────────────────────────────────────────────────────────────
 
+
 def compute_rolling_ic(
-    signals_log_path: str = None,
+    signals_log_path: str | None = None,
     window: int = ROLLING_WINDOW,
     min_valid: int = MIN_VALID,
-    historical_log_path: str = None,
+    historical_log_path: str | None = None,
 ) -> dict:
     """
     Compute Spearman IC per dimension using the most recent `window` records.
@@ -315,7 +333,9 @@ def compute_rolling_ic(
         records = live_records + hist_records
         log.info(
             "compute_rolling_ic: merged %d live + %d historical = %d records",
-            len(live_records), len(hist_records), len(records),
+            len(live_records),
+            len(hist_records),
+            len(records),
         )
     else:
         records = _load_signal_records(signals_log_path, window, min_age_days=min_age_days)
@@ -323,15 +343,16 @@ def compute_rolling_ic(
     if len(records) < min_valid:
         log.info(
             "compute_rolling_ic: %d valid records (need %d) — returning None IC",
-            len(records), min_valid,
+            len(records),
+            min_valid,
         )
         return {d: None for d in DIMENSIONS}
 
     fwd_map = _fetch_forward_returns_batch(records)
 
     # Build paired arrays of (dim_scores, forward_return) for each dimension
-    dim_raw:     dict[str, list] = {d: [] for d in DIMENSIONS}
-    fwd_returns: list            = []
+    dim_raw: dict[str, list] = {d: [] for d in DIMENSIONS}
+    fwd_returns: list = []
 
     for idx, rec in enumerate(records):
         fwd = fwd_map.get(idx)
@@ -345,9 +366,9 @@ def compute_rolling_ic(
     n = len(fwd_returns)
     if n < min_valid:
         log.info(
-            "compute_rolling_ic: only %d records have forward returns (need %d) — "
-            "returning None IC",
-            n, min_valid,
+            "compute_rolling_ic: only %d records have forward returns (need %d) — returning None IC",
+            n,
+            min_valid,
         )
         return {d: None for d in DIMENSIONS}
 
@@ -378,6 +399,7 @@ def compute_rolling_ic(
 
 
 # ── Weight normalisation ───────────────────────────────────────────────────────
+
 
 def normalize_ic_weights(raw_ic: dict) -> tuple:
     """
@@ -411,7 +433,7 @@ def normalize_ic_weights(raw_ic: dict) -> tuple:
             "hhi_capped": False,
         }
 
-    ic_min  = _ic_cfg("ic_min_threshold", 0.0)
+    ic_min = _ic_cfg("ic_min_threshold", 0.0)
     hhi_cap = _ic_cfg("max_single_weight", 0.40)
 
     floored: dict = {}
@@ -446,14 +468,15 @@ def normalize_ic_weights(raw_ic: dict) -> tuple:
     hhi_capped = False
     if any(w > hhi_cap for w in normalized.values()):
         hhi_capped = True
-        over  = [d for d, w in normalized.items() if w > hhi_cap]
+        over = [d for d, w in normalized.items() if w > hhi_cap]
         under = {d: w for d, w in normalized.items() if w <= hhi_cap}
         log.warning(
             "normalize_ic_weights: HHI cap triggered — %s exceeded %.0f%% weight; clipping",
-            over, hhi_cap * 100,
+            over,
+            hhi_cap * 100,
         )
-        remaining    = 1.0 - len(over) * hhi_cap
-        under_total  = sum(under.values())
+        remaining = 1.0 - len(over) * hhi_cap
+        under_total = sum(under.values())
         capped: dict = {}
         for d in DIMENSIONS:
             if d in over:
@@ -473,6 +496,7 @@ def normalize_ic_weights(raw_ic: dict) -> tuple:
 
 
 # ── Cache I/O ──────────────────────────────────────────────────────────────────
+
 
 def get_current_weights() -> dict:
     """
@@ -501,8 +525,8 @@ def get_current_weights() -> dict:
 
 
 def update_ic_weights(
-    signals_log_path: str = None,
-    historical_log_path: str = None,
+    signals_log_path: str | None = None,
+    historical_log_path: str | None = None,
 ) -> dict:
     """
     Recompute IC weights, write to cache, append to history log.
@@ -515,36 +539,35 @@ def update_ic_weights(
         backtest_signals.py.  When provided, historical records are merged
         with live records for a statistically richer IC estimate.
     """
-    raw_ic          = compute_rolling_ic(signals_log_path, historical_log_path=historical_log_path)
+    raw_ic = compute_rolling_ic(signals_log_path, historical_log_path=historical_log_path)
     weights, ic_meta = normalize_ic_weights(raw_ic)
 
-    all_none   = all(v is None for v in raw_ic.values())
+    all_none = all(v is None for v in raw_ic.values())
     _eq_weight = 1.0 / _N
     # Tolerance-based comparison — exact float equality fails because 1/N
     # (0.08333…3) and round(1/N, 10) (0.08333333330) differ beyond ==.
-    all_equal  = (
-        _ic_cfg("force_equal_weights", False)
-        or all(abs(weights.get(d, 0.0) - _eq_weight) < 1e-9 for d in DIMENSIONS)
+    all_equal = _ic_cfg("force_equal_weights", False) or all(
+        abs(weights.get(d, 0.0) - _eq_weight) < 1e-9 for d in DIMENSIONS
     )
 
     n_records = len(_load_signal_records(signals_log_path))
 
     record = {
-        "updated":              datetime.now(timezone.utc).isoformat(),
-        "raw_ic":               {d: (raw_ic.get(d) if raw_ic.get(d) is not None
-                                     else None) for d in DIMENSIONS},
-        "weights":              weights,
-        "n_records":            n_records,
-        "using_equal_weights":  all_none or all_equal,
-        "noise_floor_applied":  ic_meta["noise_floor_applied"],
+        "updated": datetime.now(UTC).isoformat(),
+        "raw_ic": {d: (raw_ic.get(d) if raw_ic.get(d) is not None else None) for d in DIMENSIONS},
+        "weights": weights,
+        "n_records": n_records,
+        "using_equal_weights": all_none or all_equal,
+        "noise_floor_applied": ic_meta["noise_floor_applied"],
         "dimensions_suppressed": ic_meta["dimensions_suppressed"],
-        "hhi_capped":           ic_meta["hhi_capped"],
+        "hhi_capped": ic_meta["hhi_capped"],
     }
 
     os.makedirs(os.path.dirname(IC_WEIGHTS_FILE), exist_ok=True)
 
     # Atomic write for the current weights file
     import tempfile
+
     dir_ = os.path.dirname(IC_WEIGHTS_FILE)
     fd, tmp = tempfile.mkstemp(dir=dir_, suffix=".tmp")
     try:
@@ -603,10 +626,7 @@ def get_system_ic_health() -> float:
         raw_ic = data.get("raw_ic", {})
         if not raw_ic:
             return 0.0
-        positive_ics = [
-            float(v) for v in raw_ic.values()
-            if v is not None and np.isfinite(float(v)) and float(v) > 0.0
-        ]
+        positive_ics = [float(v) for v in raw_ic.values() if v is not None and np.isfinite(float(v)) and float(v) > 0.0]
         if not positive_ics:
             return 0.0
         return float(np.mean(positive_ics))
@@ -636,7 +656,8 @@ def get_short_quality_score() -> float:
         if len(short_records) < MIN_VALID:
             log.debug(
                 "get_short_quality_score: %d short records (need %d) — returning 0.0",
-                len(short_records), MIN_VALID,
+                len(short_records),
+                MIN_VALID,
             )
             return 0.0
 
@@ -685,7 +706,7 @@ def get_short_quality_score() -> float:
         return 0.0
 
 
-def update_live_ic(signals_log_path: str = None) -> dict:
+def update_live_ic(signals_log_path: str | None = None) -> dict:
     """
     Compute IC from live trades only and write to ic_weights_live.json.
 
@@ -700,20 +721,20 @@ def update_live_ic(signals_log_path: str = None) -> dict:
 
     Call this on the same weekly cycle as update_ic_weights().
     """
-    raw_ic = compute_rolling_ic(signals_log_path)   # live-only (no historical_log_path)
+    raw_ic = compute_rolling_ic(signals_log_path)  # live-only (no historical_log_path)
     n_records = len(_load_signal_records(signals_log_path))
 
     record = {
-        "updated":    datetime.now(timezone.utc).isoformat(),
-        "raw_ic":     {d: (raw_ic.get(d) if raw_ic.get(d) is not None else None)
-                       for d in DIMENSIONS},
-        "n_records":  n_records,
-        "source":     "live_trades_only",
+        "updated": datetime.now(UTC).isoformat(),
+        "raw_ic": {d: (raw_ic.get(d) if raw_ic.get(d) is not None else None) for d in DIMENSIONS},
+        "n_records": n_records,
+        "source": "live_trades_only",
     }
 
     os.makedirs(os.path.dirname(IC_LIVE_FILE), exist_ok=True)
 
     import tempfile
+
     dir_ = os.path.dirname(IC_LIVE_FILE)
     fd, tmp = tempfile.mkstemp(dir=dir_, suffix=".tmp")
     try:
@@ -733,10 +754,7 @@ def update_live_ic(signals_log_path: str = None) -> dict:
     log.info(
         "Live IC updated (n=%d): %s",
         n_records,
-        ", ".join(
-            f"{d}={raw_ic[d]:.3f}" if raw_ic.get(d) is not None else f"{d}=None"
-            for d in DIMENSIONS
-        ),
+        ", ".join(f"{d}={raw_ic[d]:.3f}" if raw_ic.get(d) is not None else f"{d}=None" for d in DIMENSIONS),
     )
     return record
 
@@ -773,12 +791,13 @@ def check_ic_divergence(divergence_threshold: float = 0.03) -> list:
 
     live_ic = live_data.get("raw_ic", {})
     hist_ic = hist_data.get("raw_ic", {})
-    live_n  = live_data.get("n_records", 0)
+    live_n = live_data.get("n_records", 0)
 
     if live_n < MIN_VALID:
         log.debug(
             "check_ic_divergence: only %d live records (need %d) — skipping",
-            live_n, MIN_VALID,
+            live_n,
+            MIN_VALID,
         )
         return []
 
@@ -795,9 +814,7 @@ def check_ic_divergence(divergence_threshold: float = 0.03) -> list:
         if abs(delta) < divergence_threshold:
             continue
 
-        if l > 0 and h < 0:
-            direction = "sign_flip"
-        elif l < 0 and h > 0:
+        if (l > 0 and h < 0) or (l < 0 and h > 0):
             direction = "sign_flip"
         elif delta > 0:
             direction = "live_better"
@@ -805,24 +822,30 @@ def check_ic_divergence(divergence_threshold: float = 0.03) -> list:
             direction = "live_worse"
 
         entry = {
-            "dimension":    d,
-            "live_ic":      round(l, 4),
+            "dimension": d,
+            "live_ic": round(l, 4),
             "historical_ic": round(h, 4),
-            "delta":        round(delta, 4),
-            "direction":    direction,
-            "live_n":       live_n,
+            "delta": round(delta, 4),
+            "direction": direction,
+            "live_n": live_n,
         }
         warnings.append(entry)
 
         log.warning(
             "IC_DIVERGENCE [%s] live=%.4f hist=%.4f delta=%+.4f (%s) n_live=%d",
-            d, l, h, delta, direction, live_n,
+            d,
+            l,
+            h,
+            delta,
+            direction,
+            live_n,
         )
 
     if not warnings:
         log.info(
             "check_ic_divergence: no significant divergence (threshold=%.3f, n_live=%d)",
-            divergence_threshold, live_n,
+            divergence_threshold,
+            live_n,
         )
 
     return warnings
@@ -865,11 +888,12 @@ def _check_ic_auto_disable(raw_ic: dict) -> None:
     """
     try:
         from config import CONFIG
+
         ic_cfg = CONFIG.get("ic_calculator", {})
-        disable_thresh  = ic_cfg.get("auto_disable_threshold", -0.02)
-        disable_weeks   = ic_cfg.get("auto_disable_weeks",     3)
-        enable_thresh   = ic_cfg.get("auto_enable_threshold",  0.01)
-        enable_weeks    = ic_cfg.get("auto_enable_weeks",      2)
+        disable_thresh = ic_cfg.get("auto_disable_threshold", -0.02)
+        disable_weeks = ic_cfg.get("auto_disable_weeks", 3)
+        enable_thresh = ic_cfg.get("auto_enable_threshold", 0.01)
+        enable_weeks = ic_cfg.get("auto_enable_weeks", 2)
 
         # Load IC history (need enough snapshots to check consecutive weeks)
         needed = max(disable_weeks, enable_weeks) + 1
@@ -890,7 +914,7 @@ def _check_ic_auto_disable(raw_ic: dict) -> None:
 
         # Audit log path
         audit_path = os.path.join(_BASE, "data", "audit_log.jsonl")
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
 
         changed = False
         for dim in DIMENSIONS:
@@ -911,15 +935,24 @@ def _check_ic_auto_disable(raw_ic: dict) -> None:
                     changed = True
                     log.warning(
                         "IC_AUTO_DISABLE: %s (IC %s for %d consecutive weeks)",
-                        dim, [round(v, 4) for v in last_n_ics], disable_weeks,
+                        dim,
+                        [round(v, 4) for v in last_n_ics],
+                        disable_weeks,
                     )
                     try:
                         with open(audit_path, "a") as f:
-                            f.write(json.dumps({
-                                "ts": now_iso, "event": "IC_AUTO_DISABLE",
-                                "dimension": dim, "ic_history": last_n_ics,
-                                "reason": f"{disable_weeks} consecutive weeks IC < {disable_thresh}",
-                            }) + "\n")
+                            f.write(
+                                json.dumps(
+                                    {
+                                        "ts": now_iso,
+                                        "event": "IC_AUTO_DISABLE",
+                                        "dimension": dim,
+                                        "ic_history": last_n_ics,
+                                        "reason": f"{disable_weeks} consecutive weeks IC < {disable_thresh}",
+                                    }
+                                )
+                                + "\n"
+                            )
                     except Exception:
                         pass
 
@@ -931,20 +964,30 @@ def _check_ic_auto_disable(raw_ic: dict) -> None:
                     changed = True
                     log.info(
                         "IC_AUTO_ENABLE: %s (IC %s for %d consecutive weeks)",
-                        dim, [round(v, 4) for v in last_m_ics], enable_weeks,
+                        dim,
+                        [round(v, 4) for v in last_m_ics],
+                        enable_weeks,
                     )
                     try:
                         with open(audit_path, "a") as f:
-                            f.write(json.dumps({
-                                "ts": now_iso, "event": "IC_AUTO_ENABLE",
-                                "dimension": dim, "ic_history": last_m_ics,
-                                "reason": f"{enable_weeks} consecutive weeks IC > {enable_thresh}",
-                            }) + "\n")
+                            f.write(
+                                json.dumps(
+                                    {
+                                        "ts": now_iso,
+                                        "event": "IC_AUTO_ENABLE",
+                                        "dimension": dim,
+                                        "ic_history": last_m_ics,
+                                        "reason": f"{enable_weeks} consecutive weeks IC > {enable_thresh}",
+                                    }
+                                )
+                                + "\n"
+                            )
                     except Exception:
                         pass
 
         if changed:
             import tempfile
+
             dir_ = os.path.dirname(override_path)
             os.makedirs(dir_, exist_ok=True)
             fd, tmp = tempfile.mkstemp(dir=dir_, suffix=".tmp")
@@ -964,12 +1007,12 @@ def _check_ic_auto_disable(raw_ic: dict) -> None:
 
 # ── Live-trade IC vs historical comparison ────────────────────────────────────
 
-LIVE_IC_MILESTONE = 50          # trades needed before comparison runs
+LIVE_IC_MILESTONE = 50  # trades needed before comparison runs
 _TRADES_FILE = os.path.join(_BASE, "data", "trades.json")
 _LIVE_IC_REPORT_FILE = os.path.join(_BASE, "data", "live_ic_report.json")
 
 
-def compute_live_trade_ic(trades_path: str = None) -> dict:
+def compute_live_trade_ic(trades_path: str | None = None) -> dict:
     """
     Compute IC from our own closed trades using actual PnL as the return proxy.
 
@@ -1009,10 +1052,10 @@ def compute_live_trade_ic(trades_path: str = None) -> dict:
         except (TypeError, ValueError):
             continue
         entry = t.get("entry_price") or t.get("price") or 0.0
-        qty   = t.get("qty") or 1
+        qty = t.get("qty") or 1
         try:
             notional = float(entry) * float(qty)
-            pnl_pct  = pnl / notional if notional > 0 else None
+            pnl_pct = pnl / notional if notional > 0 else None
         except (TypeError, ValueError):
             pnl_pct = None
         if pnl_pct is None or not np.isfinite(pnl_pct):
@@ -1022,11 +1065,10 @@ def compute_live_trade_ic(trades_path: str = None) -> dict:
     n = len(eligible)
     if n < 10:
         log.info("compute_live_trade_ic: only %d eligible trades (need ≥10)", n)
-        return {"n_trades": n, "raw_ic": {d: None for d in DIMENSIONS},
-                "timestamp": datetime.now(timezone.utc).isoformat()}
+        return {"n_trades": n, "raw_ic": {d: None for d in DIMENSIONS}, "timestamp": datetime.now(UTC).isoformat()}
 
     dim_scores: dict = {d: [] for d in DIMENSIONS}
-    pnl_arr: list    = []
+    pnl_arr: list = []
     for scores, pnl_pct in eligible:
         pnl_arr.append(pnl_pct)
         for d in DIMENSIONS:
@@ -1045,9 +1087,9 @@ def compute_live_trade_ic(trades_path: str = None) -> dict:
             raw_ic[d] = None
 
     result = {
-        "n_trades":  n,
-        "raw_ic":    raw_ic,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "n_trades": n,
+        "raw_ic": raw_ic,
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     log.info(
         "compute_live_trade_ic: n=%d  IC=[%s]",
@@ -1058,8 +1100,8 @@ def compute_live_trade_ic(trades_path: str = None) -> dict:
 
 
 def compare_live_vs_historical_ic(
-    trades_path: str = None,
-    historical_log_path: str = None,
+    trades_path: str | None = None,
+    historical_log_path: str | None = None,
     milestone: int = LIVE_IC_MILESTONE,
 ) -> dict:
     """
@@ -1084,19 +1126,19 @@ def compare_live_vs_historical_ic(
 
     # Always compute current historical IC for the comparison baseline
     hist_log = historical_log_path or os.path.join(_BASE, "data", "signals_log_historical.jsonl")
-    hist_ic  = compute_rolling_ic(historical_log_path=hist_log)
+    hist_ic = compute_rolling_ic(historical_log_path=hist_log)
 
     report: dict = {
-        "n_live_trades":     n,
-        "ready":             n >= milestone,
-        "progress_pct":      round(min(n / milestone * 100, 100), 1),
-        "agreement_r":       None,
-        "agreement_label":   "PENDING",
-        "dim_comparison":    {},
+        "n_live_trades": n,
+        "ready": n >= milestone,
+        "progress_pct": round(min(n / milestone * 100, 100), 1),
+        "agreement_r": None,
+        "agreement_label": "PENDING",
+        "dim_comparison": {},
         "recommend_disable": False,
-        "live_ic":           live_ic,
-        "hist_ic":           hist_ic,
-        "timestamp":         datetime.now(timezone.utc).isoformat(),
+        "live_ic": live_ic,
+        "hist_ic": hist_ic,
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
     # Always build per-dim comparison table (useful even before milestone)
@@ -1104,9 +1146,11 @@ def compare_live_vs_historical_ic(
         lv = live_ic.get(d)
         hv = hist_ic.get(d)
         agree = (
-            lv is not None and hv is not None
-            and np.isfinite(lv) and np.isfinite(hv)
-            and ((lv >= 0) == (hv >= 0))   # same sign
+            lv is not None
+            and hv is not None
+            and np.isfinite(lv)
+            and np.isfinite(hv)
+            and ((lv >= 0) == (hv >= 0))  # same sign
         )
         report["dim_comparison"][d] = {
             "live": round(lv, 4) if lv is not None else None,
@@ -1117,7 +1161,9 @@ def compare_live_vs_historical_ic(
     if n < milestone:
         log.info(
             "compare_live_vs_historical_ic: %d/%d trades — %.0f%% to milestone",
-            n, milestone, report["progress_pct"],
+            n,
+            milestone,
+            report["progress_pct"],
         )
         _write_live_ic_report(report)
         return report
@@ -1126,19 +1172,29 @@ def compare_live_vs_historical_ic(
     pairs = [
         (live_ic[d], hist_ic[d])
         for d in _CORE_DIMENSIONS
-        if live_ic.get(d) is not None and hist_ic.get(d) is not None
-        and np.isfinite(live_ic[d]) and np.isfinite(hist_ic[d])
+        if live_ic.get(d) is not None
+        and hist_ic.get(d) is not None
+        and np.isfinite(live_ic[d])
+        and np.isfinite(hist_ic[d])
     ]
     if len(pairs) >= 3:
         live_vec = np.array([p[0] for p in pairs])
         hist_vec = np.array([p[1] for p in pairs])
-        r = float(_spearman(_zscore_array(live_vec), _zscore_array(hist_vec))) if live_vec.std() > 1e-9 and hist_vec.std() > 1e-9 else 0.0
+        r = (
+            float(_spearman(_zscore_array(live_vec), _zscore_array(hist_vec)))
+            if live_vec.std() > 1e-9 and hist_vec.std() > 1e-9
+            else 0.0
+        )
         report["agreement_r"] = round(r, 4)
-        if   r >= 0.70: label = "STRONG"
-        elif r >= 0.50: label = "MODERATE"
-        elif r >= 0.25: label = "WEAK"
-        else:           label = "DIVERGENT"
-        report["agreement_label"]   = label
+        if r >= 0.70:
+            label = "STRONG"
+        elif r >= 0.50:
+            label = "MODERATE"
+        elif r >= 0.25:
+            label = "WEAK"
+        else:
+            label = "DIVERGENT"
+        report["agreement_label"] = label
         report["recommend_disable"] = r >= 0.50
 
     log.info(
@@ -1155,6 +1211,7 @@ def compare_live_vs_historical_ic(
 def _write_live_ic_report(report: dict) -> None:
     """Atomically write the live IC report to disk."""
     import tempfile
+
     dir_ = os.path.dirname(_LIVE_IC_REPORT_FILE)
     os.makedirs(dir_, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=dir_, suffix=".tmp")
@@ -1179,9 +1236,19 @@ def get_live_ic_progress() -> dict:
         with open(_LIVE_IC_REPORT_FILE) as f:
             return json.load(f)
     except FileNotFoundError:
-        return {"n_live_trades": 0, "progress_pct": 0.0, "ready": False,
-                "agreement_label": "PENDING", "recommend_disable": False}
+        return {
+            "n_live_trades": 0,
+            "progress_pct": 0.0,
+            "ready": False,
+            "agreement_label": "PENDING",
+            "recommend_disable": False,
+        }
     except Exception as e:
         log.warning("get_live_ic_progress: %s", e)
-        return {"n_live_trades": 0, "progress_pct": 0.0, "ready": False,
-                "agreement_label": "PENDING", "recommend_disable": False}
+        return {
+            "n_live_trades": 0,
+            "progress_pct": 0.0,
+            "ready": False,
+            "agreement_label": "PENDING",
+            "recommend_disable": False,
+        }

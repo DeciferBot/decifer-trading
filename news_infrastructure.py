@@ -9,15 +9,16 @@ Provides:
 Both NewsSentinel and CatalystSentinel use these classes with independent instances.
 This eliminates the exact code duplication that previously existed between them.
 """
+
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def headline_hash(text: str) -> str:
     """Normalise and hash a headline for dedup. First 120 chars after stripping punctuation."""
-    clean = re.sub(r'[^a-z0-9 ]', '', text.lower().strip())
+    clean = re.sub(r"[^a-z0-9 ]", "", text.lower().strip())
     return clean[:120]
 
 
@@ -40,7 +41,7 @@ class HeadlineDeduplicator:
             return
         self._seen.add(h)
         if len(self._seen) > self._max_size:
-            to_remove = list(self._seen)[:self._max_size // 2]
+            to_remove = list(self._seen)[: self._max_size // 2]
             for k in to_remove:
                 self._seen.discard(k)
 
@@ -69,8 +70,8 @@ class SymbolCooldown:
         last = self._cooldowns.get(symbol)
         if not last:
             return False
-        elapsed = (datetime.now(timezone.utc) - last).total_seconds()
+        elapsed = (datetime.now(UTC) - last).total_seconds()
         return elapsed < self.cooldown_minutes * 60
 
     def set_cooldown(self, symbol: str) -> None:
-        self._cooldowns[symbol] = datetime.now(timezone.utc)
+        self._cooldowns[symbol] = datetime.now(UTC)

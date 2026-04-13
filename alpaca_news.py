@@ -11,8 +11,8 @@
 
 from __future__ import annotations
 
-import threading
 import logging
+import threading
 
 from config import CONFIG
 from news_infrastructure import HeadlineDeduplicator, SymbolCooldown
@@ -20,7 +20,7 @@ from news_infrastructure import HeadlineDeduplicator, SymbolCooldown
 log = logging.getLogger("decifer.alpaca_news")
 
 # Match materiality thresholds used by news_sentinel
-_KEYWORD_THRESHOLD     = CONFIG.get("sentinel_keyword_threshold", 3)
+_KEYWORD_THRESHOLD = CONFIG.get("sentinel_keyword_threshold", 3)
 _CLAUDE_CONF_THRESHOLD = CONFIG.get("sentinel_claude_confidence", 7)
 
 
@@ -44,14 +44,12 @@ class AlpacaNewsStream:
 
     def __init__(self, get_universe_fn, on_trigger_fn) -> None:
         self.get_universe = get_universe_fn
-        self.on_trigger   = on_trigger_fn
-        self._stream      = None
+        self.on_trigger = on_trigger_fn
+        self._stream = None
         self._thread: threading.Thread | None = None
-        self._running     = False
-        self._dedup       = HeadlineDeduplicator(max_size=5000)
-        self._cooldown    = SymbolCooldown(
-            cooldown_minutes=CONFIG.get("sentinel_cooldown_minutes", 10)
-        )
+        self._running = False
+        self._dedup = HeadlineDeduplicator(max_size=5000)
+        self._cooldown = SymbolCooldown(cooldown_minutes=CONFIG.get("sentinel_cooldown_minutes", 10))
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -61,9 +59,7 @@ class AlpacaNewsStream:
             log.debug("AlpacaNewsStream: already running")
             return
         self._running = True
-        self._thread = threading.Thread(
-            target=self._run, daemon=True, name="alpaca-news-stream"
-        )
+        self._thread = threading.Thread(target=self._run, daemon=True, name="alpaca-news-stream")
         self._thread.start()
         log.info("📰 Alpaca news stream started (Benzinga real-time feed)")
 
@@ -81,13 +77,11 @@ class AlpacaNewsStream:
 
     def _run(self) -> None:
         """Connect to Alpaca news WebSocket and block until stop() is called."""
-        api_key    = CONFIG.get("alpaca_api_key", "")
+        api_key = CONFIG.get("alpaca_api_key", "")
         secret_key = CONFIG.get("alpaca_secret_key", "")
 
         if not api_key or not secret_key:
-            log.warning(
-                "AlpacaNewsStream: ALPACA_API_KEY / ALPACA_SECRET_KEY not set — disabled"
-            )
+            log.warning("AlpacaNewsStream: ALPACA_API_KEY / ALPACA_SECRET_KEY not set — disabled")
             self._running = False
             return
 
@@ -103,7 +97,7 @@ class AlpacaNewsStream:
                     log.error(f"AlpacaNewsStream: processing error — {exc}")
 
             self._stream.subscribe_news(on_news, "*")
-            self._stream.run()   # blocks until stop() is called
+            self._stream.run()  # blocks until stop() is called
 
         except ImportError:
             log.error("AlpacaNewsStream: alpaca-py not installed — pip install alpaca-py")
@@ -124,7 +118,7 @@ class AlpacaNewsStream:
           5. Fire   — on_trigger_fn callback if confirmed material
         """
         headline = getattr(article, "headline", "") or ""
-        symbols  = getattr(article, "symbols",  []) or []
+        symbols = getattr(article, "symbols", []) or []
 
         if not headline or not symbols:
             return
@@ -141,7 +135,7 @@ class AlpacaNewsStream:
 
         # ── 3. Keyword materiality score ──────────────────────
         try:
-            from news import keyword_score, BULLISH_STRONG, BEARISH_STRONG
+            from news import BEARISH_STRONG, BULLISH_STRONG, keyword_score
         except ImportError:
             log.debug("AlpacaNewsStream: news module unavailable — skipping article")
             return
@@ -149,15 +143,14 @@ class AlpacaNewsStream:
         kw = keyword_score([headline])
 
         is_material = False
-        urgency     = "MODERATE"
+        urgency = "MODERATE"
 
         if abs(kw["score"]) >= _KEYWORD_THRESHOLD:
             is_material = True
             urgency = "CRITICAL" if abs(kw["score"]) >= 6 else "HIGH"
 
         headline_lower = headline.lower()
-        if any(k in headline_lower for k in BULLISH_STRONG) or \
-           any(k in headline_lower for k in BEARISH_STRONG):
+        if any(k in headline_lower for k in BULLISH_STRONG) or any(k in headline_lower for k in BEARISH_STRONG):
             is_material = True
             if urgency == "MODERATE":
                 urgency = "HIGH"
@@ -165,11 +158,7 @@ class AlpacaNewsStream:
         if not is_material:
             return
 
-        direction = (
-            "BULLISH" if kw["score"] > 0 else
-            "BEARISH" if kw["score"] < 0 else
-            "NEUTRAL"
-        )
+        direction = "BULLISH" if kw["score"] > 0 else "BEARISH" if kw["score"] < 0 else "NEUTRAL"
 
         created = getattr(article, "created_at", None)
         ts = created.isoformat() if hasattr(created, "isoformat") else str(created or "")
@@ -181,38 +170,32 @@ class AlpacaNewsStream:
                 continue
 
             trigger = {
-                "symbol":         sym,
-                "headlines":      [headline],
+                "symbol": sym,
+                "headlines": [headline],
                 "headline_count": 1,
-                "keyword_score":  kw["score"],
-                "keyword_hits":   kw.get("keywords", [])[:8],
-                "direction":      direction,
-                "urgency":        urgency,
-                "sources":        ["alpaca_benzinga"],
-                "age_hours":      0.0,
-                "triggered_at":   ts,
+                "keyword_score": kw["score"],
+                "keyword_hits": kw.get("keywords", [])[:8],
+                "direction": direction,
+                "urgency": urgency,
+                "sources": ["alpaca_benzinga"],
+                "age_hours": 0.0,
+                "triggered_at": ts,
             }
 
             # Claude deep-read — confirms materiality, extracts catalyst
             try:
                 from news_sentinel import deep_read_trigger
+
                 trigger = deep_read_trigger(trigger)
             except Exception as exc:
                 log.debug(f"AlpacaNewsStream: Claude call failed for {sym} — {exc}")
 
-            if (trigger.get("claude_confidence", 0) < 4 and
-                    trigger["urgency"] != "CRITICAL"):
-                log.info(
-                    f"📰 {sym}: confidence {trigger.get('claude_confidence', 0)}/10 "
-                    f"below threshold — skipped"
-                )
+            if trigger.get("claude_confidence", 0) < 4 and trigger["urgency"] != "CRITICAL":
+                log.info(f"📰 {sym}: confidence {trigger.get('claude_confidence', 0)}/10 below threshold — skipped")
                 continue
 
             self._cooldown.set_cooldown(sym)
-            log.info(
-                f"📰 ALPACA NEWS TRIGGER: {sym} | {direction} | "
-                f"urgency={urgency} | {headline[:80]}"
-            )
+            log.info(f"📰 ALPACA NEWS TRIGGER: {sym} | {direction} | urgency={urgency} | {headline[:80]}")
 
             try:
                 self.on_trigger(trigger)

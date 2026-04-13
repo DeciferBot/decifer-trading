@@ -7,13 +7,13 @@
 # ╚══════════════════════════════════════════════════════════════╝
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from signal_types import Signal
-from orders import execute_buy, execute_short
-from trade_advisor import advise_trade
 from market_intelligence import classify_signals
+from orders_core import execute_buy, execute_short
 from pattern_library import record_entry
+from signal_types import Signal
+from trade_advisor import advise_trade
 
 log = logging.getLogger("decifer.dispatcher")
 
@@ -28,19 +28,21 @@ def _get_account_config(account_id: str) -> dict:
 
 # ── Signal → candidate dict ───────────────────────────────────────────────────
 
+
 def _signal_to_candidate(signal: Signal) -> dict:
     """Convert a Signal to the flat dict the intelligence layer expects."""
     return {
-        "symbol":          signal.symbol,
-        "direction":       signal.direction,
-        "score":           int(round(signal.conviction_score * 5)),
+        "symbol": signal.symbol,
+        "direction": signal.direction,
+        "score": round(signal.conviction_score * 5),
         "score_breakdown": signal.dimension_scores or {},
-        "rationale":       signal.rationale or "",
-        "regime_context":  signal.regime_context or "",
+        "rationale": signal.rationale or "",
+        "regime_context": signal.regime_context or "",
     }
 
 
 # ── Main dispatch ─────────────────────────────────────────────────────────────
+
 
 def dispatch_signals(
     signals: list,
@@ -48,7 +50,7 @@ def dispatch_signals(
     portfolio_value: float,
     regime: dict,
     account_id: str = "",
-    agent_outputs: dict = None,
+    agent_outputs: dict | None = None,
 ) -> list:
     """
     Classify then route each Signal to the order layer.
@@ -81,13 +83,13 @@ def dispatch_signals(
     if agent_outputs is None:
         agent_outputs = {}
 
-    account_cfg  = _get_account_config(account_id)
+    account_cfg = _get_account_config(account_id)
     allowed_dirs = account_cfg.get("allowed_directions", ["LONG", "SHORT"])
 
     # ── Intelligence classification (gate) ────────────────────
     # Convert signals to candidate dicts, classify the full batch in one call.
     # classify_signals always returns a classification for every candidate.
-    candidates    = [_signal_to_candidate(s) for s in signals]
+    candidates = [_signal_to_candidate(s) for s in signals]
     session_character, market_read, classifications = classify_signals(candidates, regime=regime)
     # Propagate session_character into the regime dict so orders_core and
     # check_external_closes can read it without a separate import.
@@ -102,16 +104,17 @@ def dispatch_signals(
 
     for signal in signals:
         result = {
-            "signal":     signal,
-            "success":    False,
-            "side":       signal.direction,
-            "price":      signal.price,
+            "signal": signal,
+            "success": False,
+            "side": signal.direction,
+            "price": signal.price,
             "trade_type": "",
             "conviction": 0.0,
         }
 
         # ── Cooldown / exit guard ──────────────────────────────
         import orders as _ord
+
         with _ord._trades_lock:
             _existing = _ord.active_trades.get(signal.symbol, {})
         if _existing.get("status") == "EXITING" or _ord._is_recently_closed(signal.symbol):
@@ -126,10 +129,7 @@ def dispatch_signals(
         # by execute_buy/execute_short.
         _existing_dir = _existing.get("direction") if _existing else None
         if _existing_dir and _existing_dir != signal.direction:
-            log.warning(
-                f"dispatch: {signal.symbol} straddle blocked — "
-                f"open={_existing_dir} new={signal.direction}"
-            )
+            log.warning(f"dispatch: {signal.symbol} straddle blocked — open={_existing_dir} new={signal.direction}")
             result["side"] = "BLOCKED_STRADDLE"
             results.append(result)
             continue
@@ -145,10 +145,7 @@ def dispatch_signals(
             continue
 
         if cls.trade_type == "AVOID":
-            log.info(
-                f"dispatch: {signal.symbol} AVOIDED by intelligence | "
-                f"{cls.reasoning[:80]}"
-            )
+            log.info(f"dispatch: {signal.symbol} AVOIDED by intelligence | {cls.reasoning[:80]}")
             result["side"] = "AVOIDED"
             results.append(result)
             continue
@@ -160,8 +157,10 @@ def dispatch_signals(
         # Returns pattern_id stored on the position for learning loop.
         try:
             from market_observer import get_market_observation
+
             obs = get_market_observation()
             from orders_core import _derive_setup_type
+
             pattern_id = record_entry(
                 observation=obs,
                 symbol=signal.symbol,
@@ -195,13 +194,13 @@ def dispatch_signals(
                     symbol=signal.symbol,
                     price=signal.price,
                     atr=signal.atr,
-                    score=int(round(signal.conviction_score * 5)),
+                    score=round(signal.conviction_score * 5),
                     portfolio_value=portfolio_value,
                     regime=regime,
                     reasoning=signal.rationale,
                     signal_scores=signal.dimension_scores,
                     agent_outputs=agent_outputs,
-                    open_time=datetime.now(timezone.utc).isoformat(),
+                    open_time=datetime.now(UTC).isoformat(),
                     candle_gate=signal.candle_gate,
                     instrument=signal.instrument,
                     advice_pt=advice.profit_target,
@@ -219,7 +218,7 @@ def dispatch_signals(
                 success = False
 
             result["success"] = success
-            result["side"]    = "BUY"
+            result["side"] = "BUY"
 
         elif signal.direction == "SHORT" and "SHORT" in allowed_dirs:
             try:
@@ -239,13 +238,13 @@ def dispatch_signals(
                     symbol=signal.symbol,
                     price=signal.price,
                     atr=signal.atr,
-                    score=int(round(signal.conviction_score * 5)),
+                    score=round(signal.conviction_score * 5),
                     portfolio_value=portfolio_value,
                     regime=regime,
                     reasoning=signal.rationale,
                     signal_scores=signal.dimension_scores,
                     agent_outputs=agent_outputs,
-                    open_time=datetime.now(timezone.utc).isoformat(),
+                    open_time=datetime.now(UTC).isoformat(),
                     candle_gate=signal.candle_gate,
                     instrument=signal.instrument,
                     advice_pt=advice.profit_target,
@@ -263,12 +262,11 @@ def dispatch_signals(
                 success = False
 
             result["success"] = success
-            result["side"]    = "SHORT"
+            result["side"] = "SHORT"
 
         else:
             log.debug(
-                f"dispatch: skipping {signal.symbol} direction={signal.direction} "
-                f"(not a dispatchable LONG or SHORT)"
+                f"dispatch: skipping {signal.symbol} direction={signal.direction} (not a dispatchable LONG or SHORT)"
             )
 
         results.append(result)

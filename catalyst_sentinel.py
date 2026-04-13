@@ -24,14 +24,15 @@ import logging
 import re
 import threading
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 import xml.etree.ElementTree as ET
 from collections import deque
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
+
 from config import CONFIG
 from news_infrastructure import HeadlineDeduplicator, SymbolCooldown
 from risk import is_trading_day
@@ -46,45 +47,76 @@ log = logging.getLogger("decifer.catalyst")
 # flag a headline as a potential acquisition event.
 MA_ANNOUNCEMENT_KEYWORDS = {
     # Definitive deal language
-    "to be acquired", "acquisition agreement", "merger agreement",
-    "definitive agreement", "definitive merger", "agreed to be acquired",
-    "agreed to acquire", "deal to acquire", "agree to buy",
+    "to be acquired",
+    "acquisition agreement",
+    "merger agreement",
+    "definitive agreement",
+    "definitive merger",
+    "agreed to be acquired",
+    "agreed to acquire",
+    "deal to acquire",
+    "agree to buy",
     # Offer language
-    "tender offer", "per share in cash", "per share in an all-cash",
-    "takeover bid", "unsolicited bid", "hostile takeover",
-    "going private", "take-private", "management buyout", "mbo",
+    "tender offer",
+    "per share in cash",
+    "per share in an all-cash",
+    "takeover bid",
+    "unsolicited bid",
+    "hostile takeover",
+    "going private",
+    "take-private",
+    "management buyout",
+    "mbo",
     # Strategic language (softer — requires multi-keyword confirmation)
-    "strategic alternatives", "exploring a sale", "sale process",
-    "received a buyout", "received an offer to acquire",
+    "strategic alternatives",
+    "exploring a sale",
+    "sale process",
+    "received a buyout",
+    "received an offer to acquire",
 }
 
 # Soft signals — need 2+ matches OR combination with a ticker symbol
 MA_SOFT_KEYWORDS = {
-    "buyout", "takeover", "acquired by", "buys", "purchase price",
-    "premium", "acquirer", "strategic review", "due diligence",
-    "merger talks", "acquisition talks", "in talks to acquire",
+    "buyout",
+    "takeover",
+    "acquired by",
+    "buys",
+    "purchase price",
+    "premium",
+    "acquirer",
+    "strategic review",
+    "due diligence",
+    "merger talks",
+    "acquisition talks",
+    "in talks to acquire",
 }
 
 # Keywords that would cause a FALSE POSITIVE — filter these out
 MA_NEGATIVE_KEYWORDS = {
-    "acquires technology", "acquires talent", "acquires domain",
-    "acquires content", "acquires license", "acquires rights",
+    "acquires technology",
+    "acquires talent",
+    "acquires domain",
+    "acquires content",
+    "acquires license",
+    "acquires rights",
     # "acquires" alone for a small asset deal is not a takeout
 }
 
 # ═══════════════════════════════════════════════════════════════
 # DEDUP TRACKING
 # ═══════════════════════════════════════════════════════════════
-_headline_dedup  = HeadlineDeduplicator(max_size=5000)
-_seen_edgar_events: set[str] = set()     # (form_type, cik, date) keys
+_headline_dedup = HeadlineDeduplicator(max_size=5000)
+_seen_edgar_events: set[str] = set()  # (form_type, cik, date) keys
 _recent_triggers: deque = deque(maxlen=100)
 
 # Cooldowns: per-symbol, prevents re-firing on the same event
 _cooldown = SymbolCooldown(cooldown_minutes=CONFIG.get("catalyst_cooldown_minutes", 60))
 
+
 # Thin compatibility aliases — used internally below
 def _is_on_cooldown(symbol: str) -> bool:
     return _cooldown.is_on_cooldown(symbol)
+
 
 def _set_cooldown(symbol: str) -> None:
     _cooldown.set_cooldown(symbol)
@@ -93,6 +125,7 @@ def _set_cooldown(symbol: str) -> None:
 # ═══════════════════════════════════════════════════════════════
 # NEWS — M&A KEYWORD DETECTION
 # ═══════════════════════════════════════════════════════════════
+
 
 def _check_ma_keywords(headline: str) -> tuple[bool, str, bool]:
     """
@@ -114,10 +147,18 @@ def _check_ma_keywords(headline: str) -> tuple[bool, str, bool]:
     for kw in MA_ANNOUNCEMENT_KEYWORDS:
         if kw in text:
             # Definitive if the keyword is deal-closing language
-            is_def = any(x in kw for x in [
-                "definitive", "agreement", "per share", "tender offer",
-                "going private", "agreed to", "merger agreement",
-            ])
+            is_def = any(
+                x in kw
+                for x in [
+                    "definitive",
+                    "agreement",
+                    "per share",
+                    "tender offer",
+                    "going private",
+                    "agreed to",
+                    "merger agreement",
+                ]
+            )
             return True, kw, is_def
 
     # Check soft keywords — require 2+ matches
@@ -133,7 +174,7 @@ def _extract_ticker_from_headline(headline: str, universe: list[str]) -> str | N
     Try to identify which ticker the headline is about from the universe.
     Scans for the ticker as a word in the headline text.
     """
-    words = re.findall(r'\b[A-Z]{1,5}\b', headline)
+    words = re.findall(r"\b[A-Z]{1,5}\b", headline)
     for word in words:
         if word in universe:
             return word
@@ -155,7 +196,7 @@ def _fetch_ma_news(symbols: list[str]) -> list[dict]:
                 return []
 
             root = ET.fromstring(resp.content)
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             hits = []
 
             for item in root.findall(".//item")[:6]:
@@ -171,25 +212,28 @@ def _fetch_ma_news(symbols: list[str]) -> list[dict]:
                 if pub_date:
                     try:
                         from email.utils import parsedate_to_datetime
+
                         age_hours = (now - parsedate_to_datetime(pub_date)).total_seconds() / 3600
                     except Exception:
                         pass
 
-                if age_hours > 4:      # Only consider news < 4 hours old
+                if age_hours > 4:  # Only consider news < 4 hours old
                     continue
 
                 is_match, keyword, is_definitive = _check_ma_keywords(title)
                 if not is_match:
                     continue
 
-                hits.append({
-                    "symbol":        sym,
-                    "headline":      title,
-                    "keyword":       keyword,
-                    "is_definitive": is_definitive,
-                    "age_hours":     round(age_hours, 2),
-                    "source":        "yahoo_rss",
-                })
+                hits.append(
+                    {
+                        "symbol": sym,
+                        "headline": title,
+                        "keyword": keyword,
+                        "is_definitive": is_definitive,
+                        "age_hours": round(age_hours, 2),
+                        "source": "yahoo_rss",
+                    }
+                )
 
             return hits
         except Exception as e:
@@ -197,6 +241,7 @@ def _fetch_ma_news(symbols: list[str]) -> list[dict]:
             return []
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
+
     with ThreadPoolExecutor(max_workers=8) as pool:
         futures = {pool.submit(_check_symbol, sym): sym for sym in symbols}
         for future in as_completed(futures):
@@ -212,26 +257,24 @@ def _fetch_ma_news(symbols: list[str]) -> list[dict]:
 # EDGAR — SEC RSS POLLING
 # ═══════════════════════════════════════════════════════════════
 
-_SEC_TICKERS_CACHE: dict[str, str] = {}   # cik → ticker
+_SEC_TICKERS_CACHE: dict[str, str] = {}  # cik → ticker
 _SEC_TICKERS_FETCHED_AT: datetime | None = None
 _ATOM_NS = "http://www.w3.org/2005/Atom"
 
 _EDGAR_FEEDS = {
     "SC 13D": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=SC+13D&dateb=&owner=include&count=40&search_text=&output=atom",
     "SC 13G": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=SC+13G&dateb=&owner=include&count=40&search_text=&output=atom",
-    "4":      "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=4&dateb=&owner=include&count=40&search_text=&output=atom",
+    "4": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=4&dateb=&owner=include&count=40&search_text=&output=atom",
 }
 
 
 def _load_sec_tickers() -> dict[str, str]:
     """Returns {cik → ticker}. Cached for 24 hours."""
     global _SEC_TICKERS_CACHE, _SEC_TICKERS_FETCHED_AT
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Use in-memory cache
-    if (_SEC_TICKERS_FETCHED_AT and
-            (now - _SEC_TICKERS_FETCHED_AT).total_seconds() < 86400 and
-            _SEC_TICKERS_CACHE):
+    if _SEC_TICKERS_FETCHED_AT and (now - _SEC_TICKERS_FETCHED_AT).total_seconds() < 86400 and _SEC_TICKERS_CACHE:
         return _SEC_TICKERS_CACHE
 
     # Try disk cache
@@ -289,13 +332,13 @@ def _parse_edgar_feed(form_type: str, url: str) -> list[dict]:
     events = []
 
     for entry in root.findall("atom:entry", ns):
-        title_el   = entry.find("atom:title", ns)
+        title_el = entry.find("atom:title", ns)
         updated_el = entry.find("atom:updated", ns)
-        link_el    = entry.find("atom:link", ns)
+        link_el = entry.find("atom:link", ns)
 
-        title   = (title_el.text or "").strip()   if title_el   is not None else ""
-        updated = (updated_el.text or "").strip()  if updated_el is not None else ""
-        link    = link_el.attrib.get("href", "")  if link_el    is not None else ""
+        title = (title_el.text or "").strip() if title_el is not None else ""
+        updated = (updated_el.text or "").strip() if updated_el is not None else ""
+        link = link_el.attrib.get("href", "") if link_el is not None else ""
 
         company = title.split("(")[0].strip() if "(" in title else title
 
@@ -305,15 +348,17 @@ def _parse_edgar_feed(form_type: str, url: str) -> list[dict]:
         if m:
             cik = m.group(1).zfill(10)
 
-        events.append({
-            "form_type":    form_type,
-            "company_name": company,
-            "cik":          cik,
-            "ticker":       None,
-            "title":        title,
-            "updated":      updated,
-            "link":         link,
-        })
+        events.append(
+            {
+                "form_type": form_type,
+                "company_name": company,
+                "cik": cik,
+                "ticker": None,
+                "title": title,
+                "updated": updated,
+                "link": link,
+            }
+        )
 
     return events
 
@@ -366,23 +411,24 @@ def _poll_edgar(watchlist: set[str]) -> list[dict]:
 # CATALYST TRIGGER BUILDER
 # ═══════════════════════════════════════════════════════════════
 
+
 def _build_news_trigger(news_hit: dict) -> dict:
     """Build a standardised catalyst trigger dict from a news hit."""
     return {
-        "symbol":        news_hit["symbol"],
-        "trigger_type":  "ma_announcement",
-        "headlines":     [news_hit["headline"]],
-        "keyword":       news_hit["keyword"],
+        "symbol": news_hit["symbol"],
+        "trigger_type": "ma_announcement",
+        "headlines": [news_hit["headline"]],
+        "keyword": news_hit["keyword"],
         "is_definitive": news_hit["is_definitive"],
-        "direction":     "BULLISH",
-        "urgency":       "CRITICAL" if news_hit["is_definitive"] else "HIGH",
-        "age_hours":     news_hit["age_hours"],
-        "source":        news_hit["source"],
+        "direction": "BULLISH",
+        "urgency": "CRITICAL" if news_hit["is_definitive"] else "HIGH",
+        "age_hours": news_hit["age_hours"],
+        "source": news_hit["source"],
         # Enriched by deep_read_trigger before firing
-        "claude_sentiment":   "BULLISH",
-        "claude_confidence":  8 if news_hit["is_definitive"] else 5,
-        "claude_catalyst":    f"M&A signal: {news_hit['keyword']}",
-        "triggered_at":       datetime.now(timezone.utc).isoformat(),
+        "claude_sentiment": "BULLISH",
+        "claude_confidence": 8 if news_hit["is_definitive"] else 5,
+        "claude_catalyst": f"M&A signal: {news_hit['keyword']}",
+        "triggered_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -406,26 +452,27 @@ def _build_edgar_trigger(edgar_event: dict) -> dict:
         confidence = 3
 
     return {
-        "symbol":        ticker,
-        "trigger_type":  f"edgar_{form.lower().replace(' ', '')}",
-        "headlines":     [edgar_event["title"]],
-        "keyword":       form,
+        "symbol": ticker,
+        "trigger_type": f"edgar_{form.lower().replace(' ', '')}",
+        "headlines": [edgar_event["title"]],
+        "keyword": form,
         "is_definitive": False,  # Pre-announcement signal, not an announcement
-        "direction":     "BULLISH",
-        "urgency":       urgency,
-        "age_hours":     0,
-        "source":        "sec_edgar",
-        "edgar_link":    edgar_event.get("link", ""),
-        "claude_sentiment":   "BULLISH",
-        "claude_confidence":  confidence,
-        "claude_catalyst":    catalyst,
-        "triggered_at":       datetime.now(timezone.utc).isoformat(),
+        "direction": "BULLISH",
+        "urgency": urgency,
+        "age_hours": 0,
+        "source": "sec_edgar",
+        "edgar_link": edgar_event.get("link", ""),
+        "claude_sentiment": "BULLISH",
+        "claude_confidence": confidence,
+        "claude_catalyst": catalyst,
+        "triggered_at": datetime.now(UTC).isoformat(),
     }
 
 
 # ═══════════════════════════════════════════════════════════════
 # CATALYST SENTINEL CLASS
 # ═══════════════════════════════════════════════════════════════
+
 
 class CatalystSentinel:
     """
@@ -447,28 +494,28 @@ class CatalystSentinel:
         ib              : IB instance (optional, not currently used)
         """
         self.get_universe = get_universe_fn
-        self.on_trigger   = on_trigger_fn
-        self.ib           = ib
+        self.on_trigger = on_trigger_fn
+        self.ib = ib
 
         self._running = False
-        self._news_thread  = None
+        self._news_thread = None
         self._edgar_thread = None
         self._paused = False
 
-        self.news_poll_seconds  = CONFIG.get("catalyst_news_poll_seconds", 60)
+        self.news_poll_seconds = CONFIG.get("catalyst_news_poll_seconds", 60)
         self.edgar_poll_seconds = CONFIG.get("catalyst_edgar_poll_seconds", 600)
 
         # Stats for dashboard
         self.stats = {
-            "status":           "stopped",
-            "news_polls":       0,
-            "edgar_polls":      0,
-            "triggers_fired":   0,
-            "last_news_poll":   None,
-            "last_edgar_poll":  None,
-            "last_trigger":     None,
+            "status": "stopped",
+            "news_polls": 0,
+            "edgar_polls": 0,
+            "triggers_fired": 0,
+            "last_news_poll": None,
+            "last_edgar_poll": None,
+            "last_trigger": None,
             "symbols_monitored": 0,
-            "recent_triggers":  [],
+            "recent_triggers": [],
         }
 
     def start(self):
@@ -477,12 +524,8 @@ class CatalystSentinel:
             return
         self._running = True
 
-        self._news_thread = threading.Thread(
-            target=self._news_loop, daemon=True, name="CatalystSentinel-News"
-        )
-        self._edgar_thread = threading.Thread(
-            target=self._edgar_loop, daemon=True, name="CatalystSentinel-EDGAR"
-        )
+        self._news_thread = threading.Thread(target=self._news_loop, daemon=True, name="CatalystSentinel-News")
+        self._edgar_thread = threading.Thread(target=self._edgar_loop, daemon=True, name="CatalystSentinel-EDGAR")
         self._news_thread.start()
         self._edgar_thread.start()
 
@@ -555,7 +598,7 @@ class CatalystSentinel:
                 for ev in edgar_events:
                     sym = ev.get("ticker", "")
                     if not sym:
-                        continue   # Can't execute without a ticker
+                        continue  # Can't execute without a ticker
                     if _is_on_cooldown(sym):
                         continue
 
@@ -578,11 +621,11 @@ class CatalystSentinel:
         self.stats["triggers_fired"] += 1
 
         summary = {
-            "symbol":      sym,
+            "symbol": sym,
             "trigger_type": trigger.get("trigger_type", "unknown"),
-            "urgency":     trigger.get("urgency", "?"),
-            "catalyst":    trigger.get("claude_catalyst", "")[:80],
-            "time":        datetime.now().strftime("%H:%M:%S"),
+            "urgency": trigger.get("urgency", "?"),
+            "catalyst": trigger.get("claude_catalyst", "")[:80],
+            "time": datetime.now().strftime("%H:%M:%S"),
         }
         self.stats["last_trigger"] = summary
         self.stats["recent_triggers"].insert(0, summary)
@@ -610,6 +653,7 @@ class CatalystSentinel:
 # ═══════════════════════════════════════════════════════════════
 # UTILITY
 # ═══════════════════════════════════════════════════════════════
+
 
 def get_catalyst_history() -> list[dict]:
     """Return recent catalyst trigger history for dashboard display."""

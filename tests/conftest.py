@@ -5,16 +5,14 @@ replaced with lightweight fakes before any Decifer module is imported, so
 the suite runs fully offline and never touches a live system.
 """
 
-import sys
 import os
+import sys
 import types
-import asyncio
-from unittest.mock import MagicMock, AsyncMock, patch
-from typing import Dict, Any
+from unittest.mock import MagicMock
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 
 # ---------------------------------------------------------------------------
 # Project root on sys.path (flat project — no package structure)
@@ -125,10 +123,11 @@ _anthropic = _fake_module("anthropic", Anthropic=MagicMock, AsyncAnthropic=Magic
 # yfinance stub
 # ---------------------------------------------------------------------------
 
+
 def _make_ohlcv(rows=60):
     """Return a realistic-looking OHLCV DataFrame."""
     np.random.seed(42)
-    idx = pd.date_range(end=pd.Timestamp.today(), periods=rows, freq='B')
+    idx = pd.date_range(end=pd.Timestamp.today(), periods=rows, freq="B")
     close = 100.0 + np.cumsum(np.random.randn(rows) * 0.5)
     high = close + np.abs(np.random.randn(rows) * 0.3)
     low = close - np.abs(np.random.randn(rows) * 0.3)
@@ -168,17 +167,19 @@ class _FakeTicker:
     def option_chain(self, date):
         chain = MagicMock()
         strikes = [140, 145, 150, 155, 160]
-        chain.calls = pd.DataFrame({
-            "strike": strikes,
-            "lastPrice": [10.0, 6.0, 3.0, 1.0, 0.5],
-            "impliedVolatility": [0.22, 0.25, 0.28, 0.32, 0.36],
-            "openInterest": [500, 300, 200, 150, 100],
-            "volume": [200, 150, 100, 75, 50],
-            "delta": [0.75, 0.60, 0.50, 0.40, 0.25],
-            "gamma": [0.03, 0.05, 0.06, 0.05, 0.03],
-            "theta": [-0.03, -0.05, -0.06, -0.05, -0.03],
-            "vega": [0.08, 0.10, 0.12, 0.10, 0.08],
-        })
+        chain.calls = pd.DataFrame(
+            {
+                "strike": strikes,
+                "lastPrice": [10.0, 6.0, 3.0, 1.0, 0.5],
+                "impliedVolatility": [0.22, 0.25, 0.28, 0.32, 0.36],
+                "openInterest": [500, 300, 200, 150, 100],
+                "volume": [200, 150, 100, 75, 50],
+                "delta": [0.75, 0.60, 0.50, 0.40, 0.25],
+                "gamma": [0.03, 0.05, 0.06, 0.05, 0.03],
+                "theta": [-0.03, -0.05, -0.06, -0.05, -0.03],
+                "vega": [0.08, 0.10, 0.12, 0.10, 0.08],
+            }
+        )
         chain.puts = chain.calls.copy()
         return chain
 
@@ -203,6 +204,7 @@ _yfinance = _fake_module(
     Ticker=_FakeTicker,
     download=_fake_yf_download,
 )
+
 
 # ---------------------------------------------------------------------------
 # requests stub
@@ -241,9 +243,7 @@ _requests = _fake_module(
 # pandas_ta stub
 # ---------------------------------------------------------------------------
 _pandas_ta = _fake_module("pandas_ta")
-_pandas_ta.rsi = lambda s, length=14: pd.Series(
-    np.full(len(s), 50.0), index=s.index
-)
+_pandas_ta.rsi = lambda s, length=14: pd.Series(np.full(len(s), 50.0), index=s.index)
 _pandas_ta.macd = lambda s, **kw: pd.DataFrame(
     {
         "MACD_12_26_9": np.full(len(s), 0.1),
@@ -262,9 +262,7 @@ _pandas_ta.bbands = lambda s, **kw: pd.DataFrame(
     },
     index=s.index,
 )
-_pandas_ta.atr = lambda high, low, close, length=14: pd.Series(
-    np.full(len(close), 1.5), index=close.index
-)
+_pandas_ta.atr = lambda high, low, close, length=14: pd.Series(np.full(len(close), 1.5), index=close.index)
 _pandas_ta.stoch = lambda high, low, close, **kw: pd.DataFrame(
     {
         "STOCHk_14_3_3": np.full(len(close), 50.0),
@@ -273,10 +271,10 @@ _pandas_ta.stoch = lambda high, low, close, **kw: pd.DataFrame(
     index=close.index,
 )
 _pandas_ta.ema = lambda s, length=20: pd.Series(
-    np.full(len(s), s.mean() if hasattr(s, 'mean') else 100.0), index=s.index
+    np.full(len(s), s.mean() if hasattr(s, "mean") else 100.0), index=s.index
 )
 _pandas_ta.sma = lambda s, length=20: pd.Series(
-    np.full(len(s), s.mean() if hasattr(s, 'mean') else 100.0), index=s.index
+    np.full(len(s), s.mean() if hasattr(s, "mean") else 100.0), index=s.index
 )
 _pandas_ta.adx = lambda high, low, close, **kw: pd.DataFrame(
     {
@@ -300,12 +298,8 @@ _sklearn_preprocessing = _fake_module("sklearn.preprocessing")
 _sklearn_preprocessing.StandardScaler = MagicMock
 _sklearn_preprocessing.LabelEncoder = MagicMock
 _sklearn_model_selection = _fake_module("sklearn.model_selection")
-_sklearn_model_selection.train_test_split = MagicMock(
-    return_value=([], [], [], [])
-)
-_sklearn_model_selection.cross_val_score = MagicMock(
-    return_value=np.array([0.8, 0.82, 0.79])
-)
+_sklearn_model_selection.train_test_split = MagicMock(return_value=([], [], [], []))
+_sklearn_model_selection.cross_val_score = MagicMock(return_value=np.array([0.8, 0.82, 0.79]))
 _sklearn_model_selection.TimeSeriesSplit = MagicMock
 _sklearn_metrics = _fake_module("sklearn.metrics")
 _sklearn_metrics.accuracy_score = MagicMock(return_value=0.8)
@@ -329,24 +323,24 @@ _scipy_stats.pearsonr = MagicMock(return_value=(0.5, 0.05))
 _scipy_stats.spearmanr = MagicMock(return_value=(0.5, 0.05))
 _scipy_stats.norm = MagicMock()
 _scipy_optimize = _fake_module("scipy.optimize")
-_scipy_optimize.minimize = MagicMock(
-    return_value=MagicMock(x=np.array([0.5, 0.5]), success=True, fun=0.1)
-)
+_scipy_optimize.minimize = MagicMock(return_value=MagicMock(x=np.array([0.5, 0.5]), success=True, fun=0.1))
 
 # ---------------------------------------------------------------------------
 # feedparser stub
 # ---------------------------------------------------------------------------
 _feedparser = _fake_module("feedparser")
-_feedparser.parse = MagicMock(return_value=MagicMock(
-    entries=[
-        MagicMock(
-            title="Test headline",
-            summary="Test summary text",
-            link="https://example.com/article",
-            published="Mon, 01 Jan 2025 12:00:00 GMT",
-        )
-    ]
-))
+_feedparser.parse = MagicMock(
+    return_value=MagicMock(
+        entries=[
+            MagicMock(
+                title="Test headline",
+                summary="Test summary text",
+                link="https://example.com/article",
+                published="Mon, 01 Jan 2025 12:00:00 GMT",
+            )
+        ]
+    )
+)
 
 # ---------------------------------------------------------------------------
 # praw (Reddit) stub
@@ -395,6 +389,7 @@ _plotly_express = _fake_module("plotly.express")
 # pytest fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def fake_ib():
     """Return a fresh _FakeIB instance."""
@@ -435,6 +430,7 @@ def _redirect_hwm_state_file(tmp_path, monkeypatch):
     """
     try:
         import risk
+
         monkeypatch.setattr(risk, "HWM_STATE_FILE", str(tmp_path / "hwm_state.json"))
     except Exception:
         pass  # risk not yet imported in this test — no-op
@@ -445,6 +441,7 @@ def _redirect_hwm_state_file(tmp_path, monkeypatch):
 def config():
     """Return the Decifer CONFIG dict for signal tests."""
     import config as config_mod
+
     return getattr(config_mod, "CONFIG", {})
 
 

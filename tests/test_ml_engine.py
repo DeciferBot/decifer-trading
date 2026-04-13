@@ -1,12 +1,12 @@
 # tests/test_ml_engine.py
 # Tests for ml_engine.py — TradeLabeler, DeciferML, SignalEnhancer, RegimeClassifier
 
+import json
 import os
 import sys
-import json
 import tempfile
 import types
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -39,21 +39,20 @@ sys.modules.setdefault("config", configmod)
 
 import ml_engine
 from ml_engine import (
-    TradeLabeler,
-    DeciferML,
-    SignalEnhancer,
-    RegimeClassifier,
-    WeeklyReportGenerator,
-    ensure_models_dir,
-    enhance_score,
-    BREAKEVEN_THRESHOLD,
     SKLEARN_AVAILABLE,
+    DeciferML,
+    RegimeClassifier,
+    SignalEnhancer,
+    TradeLabeler,
+    WeeklyReportGenerator,
+    enhance_score,
+    ensure_models_dir,
 )
-
 
 # ────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ────────────────────────────────────────────────────────────────────────────
+
 
 def _make_trade_record(
     symbol="AAPL",
@@ -113,6 +112,7 @@ def _make_sufficient_trades(n=60):
 # ensure_models_dir
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class TestEnsureModelsDir:
     def test_creates_directory(self, tmp_path):
         """ensure_models_dir creates the models directory."""
@@ -135,11 +135,12 @@ class TestEnsureModelsDir:
 # TradeLabeler tests
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class TestTradeLabeler:
     """Tests for TradeLabeler — label_trade, extract_features, create_dataset."""
 
     def setup_method(self):
-        self.tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+        self.tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)  # noqa: SIM115
         self.tmp.close()
         os.remove(self.tmp.name)
 
@@ -220,10 +221,7 @@ class TestTradeLabeler:
     def test_extract_features_holding_time_positive(self):
         """holding_minutes is positive for a same-day trade."""
         lb = self._labeler([])
-        trade = _make_trade_record(
-            entry_time="2024-01-15T10:00:00",
-            exit_time="2024-01-15T12:30:00"
-        )
+        trade = _make_trade_record(entry_time="2024-01-15T10:00:00", exit_time="2024-01-15T12:30:00")
         features = lb.extract_features(trade)
         assert features["holding_minutes"] == 150.0
 
@@ -237,9 +235,7 @@ class TestTradeLabeler:
 
     def test_create_dataset_returns_dataframe(self):
         """create_dataset returns a DataFrame with outcome column."""
-        import pandas as pd
-        trades = [_make_trade_record(pnl=100 if i % 2 == 0 else -50)
-                  for i in range(10)]
+        trades = [_make_trade_record(pnl=100 if i % 2 == 0 else -50) for i in range(10)]
         lb = self._labeler(trades)
         df = lb.create_dataset()
         assert df is not None
@@ -248,8 +244,7 @@ class TestTradeLabeler:
 
     def test_create_dataset_outcomes_are_valid(self):
         """All outcomes in dataset are WIN, LOSS, or BREAKEVEN."""
-        trades = [_make_trade_record(pnl=pnl)
-                  for pnl in [200, -100, 0.01, -300, 500]]
+        trades = [_make_trade_record(pnl=pnl) for pnl in [200, -100, 0.01, -300, 500]]
         lb = self._labeler(trades)
         df = lb.create_dataset()
         assert set(df["outcome"].unique()).issubset({"WIN", "LOSS", "BREAKEVEN"})
@@ -261,12 +256,13 @@ class TestTradeLabeler:
 
 import pytest
 
+
 @pytest.mark.skipif(not SKLEARN_AVAILABLE, reason="scikit-learn not installed")
 class TestDeciferML:
     """Tests for DeciferML — prepare_data, train, predict."""
 
     def setup_method(self):
-        self.tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+        self.tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)  # noqa: SIM115
         self.tmp.close()
         trades = _make_sufficient_trades(60)
         with open(self.tmp.name, "w") as f:
@@ -282,8 +278,8 @@ class TestDeciferML:
 
     def _fresh_ml(self):
         ml = DeciferML.__new__(DeciferML)
-        from sklearn.ensemble import RandomForestClassifier, GradientBoostingRegressor
         from sklearn.preprocessing import StandardScaler
+
         ml.labeler = TradeLabeler(trade_log_file=self.tmp.name)
         ml.df = None
         ml.X = None
@@ -389,6 +385,7 @@ class TestDeciferML:
 # SignalEnhancer tests
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class TestSignalEnhancer:
     """Tests for SignalEnhancer.enhance_score and module-level enhance_score."""
 
@@ -412,8 +409,7 @@ class TestSignalEnhancer:
     def test_enhance_score_adjusted_is_numeric(self):
         """adjusted_score is a number."""
         enhancer = self._enhancer()
-        symbol_data = {"symbol": "TSLA", "base_score": 6.0, "score": 6.0,
-                       "regime": "RANGE_BOUND", "vix": 20.0}
+        symbol_data = {"symbol": "TSLA", "base_score": 6.0, "score": 6.0, "regime": "RANGE_BOUND", "vix": 20.0}
         result = enhancer.enhance_score(symbol_data)
         assert isinstance(result["adjusted_score"], (int, float))
 
@@ -422,18 +418,17 @@ class TestSignalEnhancer:
         enhancer = self._enhancer()
         # Ensure no model is loaded
         enhancer.model = None
-        symbol_data = {"symbol": "NVDA", "base_score": 8.5, "score": 8.5,
-                       "regime": "TRENDING_UP", "vix": 12.0}
+        symbol_data = {"symbol": "NVDA", "base_score": 8.5, "score": 8.5, "regime": "TRENDING_UP", "vix": 12.0}
         result = enhancer.enhance_score(symbol_data)
         # adjusted_score should be a reasonable number (not NaN/None)
         assert result["adjusted_score"] is not None
-        assert not (isinstance(result["adjusted_score"], float) and
-                    result["adjusted_score"] != result["adjusted_score"])  # not NaN
+        assert not (
+            isinstance(result["adjusted_score"], float) and result["adjusted_score"] != result["adjusted_score"]
+        )  # not NaN
 
     def test_module_level_enhance_score_works(self):
         """Module-level enhance_score function is callable and returns dict."""
-        symbol_data = {"symbol": "AMD", "base_score": 5.0, "score": 5.0,
-                       "regime": "TRENDING_DOWN", "vix": 25.0}
+        symbol_data = {"symbol": "AMD", "base_score": 5.0, "score": 5.0, "regime": "TRENDING_DOWN", "vix": 25.0}
         result = enhance_score(symbol_data)
         assert isinstance(result, dict)
 
@@ -441,6 +436,7 @@ class TestSignalEnhancer:
 # ────────────────────────────────────────────────────────────────────────────
 # RegimeClassifier tests
 # ────────────────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.skipif(not SKLEARN_AVAILABLE, reason="scikit-learn not installed")
 class TestRegimeClassifier:
@@ -462,11 +458,12 @@ class TestRegimeClassifier:
 # WeeklyReportGenerator tests
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class TestWeeklyReportGenerator:
     """Tests for WeeklyReportGenerator.generate_report."""
 
     def setup_method(self):
-        self.tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+        self.tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)  # noqa: SIM115
         self.tmp.close()
         self._orig = ml_engine.TRADE_LOG_FILE
         ml_engine.TRADE_LOG_FILE = self.tmp.name

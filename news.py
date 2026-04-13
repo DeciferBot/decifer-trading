@@ -9,19 +9,21 @@
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
-import re
 import json
 import logging
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta, timezone
-from email.utils import parsedate_to_datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import requests
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
+
 import anthropic
+import requests
+
 from config import CONFIG
 
 # ── MODULE-LEVEL CLAUDE CLIENT (created once, reused) ──────
 _claude_client = None
+
 
 def _get_claude_client():
     global _claude_client
@@ -29,67 +31,184 @@ def _get_claude_client():
         _claude_client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
     return _claude_client
 
+
 log = logging.getLogger("decifer.news")
 
 # ── NEWS CACHE (avoid refetching within scan window) ───────
-_news_cache = {}       # {symbol: {"data": {...}, "fetched_at": datetime}}
-_CACHE_TTL_MIN = 15    # Cache results for 15 minutes (sentinel handles real-time news)
+_news_cache = {}  # {symbol: {"data": {...}, "fetched_at": datetime}}
+_CACHE_TTL_MIN = 15  # Cache results for 15 minutes (sentinel handles real-time news)
 
 # ── SENTIMENT KEYWORD DICTIONARIES ───────────────────────────
 # Curated for financial news. Weighted: strong words = 2, normal = 1.
 BULLISH_STRONG = {
-    "surges", "soars", "skyrockets", "beats", "smashes", "crushes",
-    "blowout", "record high", "all-time high", "breakout", "moonshot",
-    "massive growth", "blows past", "exceeds expectations", "upgrades",
-    "strong buy", "outperform", "bullish", "raises guidance", "raised guidance",
-    "accelerating", "blockbuster", "doubles", "triples", "rockets",
+    "surges",
+    "soars",
+    "skyrockets",
+    "beats",
+    "smashes",
+    "crushes",
+    "blowout",
+    "record high",
+    "all-time high",
+    "breakout",
+    "moonshot",
+    "massive growth",
+    "blows past",
+    "exceeds expectations",
+    "upgrades",
+    "strong buy",
+    "outperform",
+    "bullish",
+    "raises guidance",
+    "raised guidance",
+    "accelerating",
+    "blockbuster",
+    "doubles",
+    "triples",
+    "rockets",
     # ── M&A / acquisition announcement keywords ──────────────────────────────
     # Added to ensure the News Sentinel flags acquisition headlines as CRITICAL
     # without waiting for Claude confidence scoring.
-    "to be acquired", "acquisition agreement", "merger agreement",
-    "definitive agreement", "agreed to be acquired", "agreed to acquire",
-    "tender offer", "per share in cash", "takeover bid", "going private",
-    "take-private", "management buyout",
+    "to be acquired",
+    "acquisition agreement",
+    "merger agreement",
+    "definitive agreement",
+    "agreed to be acquired",
+    "agreed to acquire",
+    "tender offer",
+    "per share in cash",
+    "takeover bid",
+    "going private",
+    "take-private",
+    "management buyout",
 }
 
 BULLISH_NORMAL = {
-    "rises", "gains", "climbs", "rallies", "advances", "jumps",
-    "up", "higher", "positive", "growth", "profit", "revenue beat",
-    "earnings beat", "buy", "upgrade", "upbeat", "optimistic", "boost",
-    "expansion", "recovery", "rebounds", "lifts", "improves", "tops",
-    "raised", "dividend", "buyback", "repurchase", "acquisition",
-    "partnership", "deal", "contract", "approval", "fda approval",
-    "launched", "innovation", "breakthrough", "momentum", "demand",
-    "overweight", "price target raised", "initiated", "accumulate",
+    "rises",
+    "gains",
+    "climbs",
+    "rallies",
+    "advances",
+    "jumps",
+    "up",
+    "higher",
+    "positive",
+    "growth",
+    "profit",
+    "revenue beat",
+    "earnings beat",
+    "buy",
+    "upgrade",
+    "upbeat",
+    "optimistic",
+    "boost",
+    "expansion",
+    "recovery",
+    "rebounds",
+    "lifts",
+    "improves",
+    "tops",
+    "raised",
+    "dividend",
+    "buyback",
+    "repurchase",
+    "acquisition",
+    "partnership",
+    "deal",
+    "contract",
+    "approval",
+    "fda approval",
+    "launched",
+    "innovation",
+    "breakthrough",
+    "momentum",
+    "demand",
+    "overweight",
+    "price target raised",
+    "initiated",
+    "accumulate",
 }
 
 BEARISH_STRONG = {
-    "crashes", "plunges", "tanks", "collapses", "plummets", "cratering",
-    "bankruptcy", "default", "fraud", "sec investigation", "delisted",
-    "massive loss", "warns", "guidance cut", "slashes", "downgrades",
-    "strong sell", "underperform", "bearish", "recall", "lawsuit",
-    "indictment", "scandal", "misses badly", "catastrophic", "freefall",
+    "crashes",
+    "plunges",
+    "tanks",
+    "collapses",
+    "plummets",
+    "cratering",
+    "bankruptcy",
+    "default",
+    "fraud",
+    "sec investigation",
+    "delisted",
+    "massive loss",
+    "warns",
+    "guidance cut",
+    "slashes",
+    "downgrades",
+    "strong sell",
+    "underperform",
+    "bearish",
+    "recall",
+    "lawsuit",
+    "indictment",
+    "scandal",
+    "misses badly",
+    "catastrophic",
+    "freefall",
 }
 
 BEARISH_NORMAL = {
-    "falls", "drops", "declines", "slips", "slides", "dips", "tumbles",
-    "down", "lower", "negative", "loss", "deficit", "revenue miss",
-    "earnings miss", "sell", "downgrade", "cuts", "layoffs", "restructuring",
-    "debt", "dilution", "offering", "secondary", "concern", "risk",
-    "headwinds", "weak", "disappointing", "below expectations", "misses",
-    "underweight", "price target cut", "overvalued", "expensive",
-    "slowdown", "contraction", "recession", "tariff", "sanctions",
+    "falls",
+    "drops",
+    "declines",
+    "slips",
+    "slides",
+    "dips",
+    "tumbles",
+    "down",
+    "lower",
+    "negative",
+    "loss",
+    "deficit",
+    "revenue miss",
+    "earnings miss",
+    "sell",
+    "downgrade",
+    "cuts",
+    "layoffs",
+    "restructuring",
+    "debt",
+    "dilution",
+    "offering",
+    "secondary",
+    "concern",
+    "risk",
+    "headwinds",
+    "weak",
+    "disappointing",
+    "below expectations",
+    "misses",
+    "underweight",
+    "price target cut",
+    "overvalued",
+    "expensive",
+    "slowdown",
+    "contraction",
+    "recession",
+    "tariff",
+    "sanctions",
 }
 
 # Pre-compute: separate single-word and multi-word keywords for fast matching
-_BULL_STRONG_SINGLE = {kw for kw in BULLISH_STRONG if ' ' not in kw}
-_BULL_STRONG_MULTI  = {kw for kw in BULLISH_STRONG if ' ' in kw}
-_BULL_NORMAL_SINGLE = {kw for kw in BULLISH_NORMAL if ' ' not in kw}
-_BULL_NORMAL_MULTI  = {kw for kw in BULLISH_NORMAL if ' ' in kw}
-_BEAR_STRONG_SINGLE = {kw for kw in BEARISH_STRONG if ' ' not in kw}
-_BEAR_STRONG_MULTI  = {kw for kw in BEARISH_STRONG if ' ' in kw}
-_BEAR_NORMAL_SINGLE = {kw for kw in BEARISH_NORMAL if ' ' not in kw}
-_BEAR_NORMAL_MULTI  = {kw for kw in BEARISH_NORMAL if ' ' in kw}
+_BULL_STRONG_SINGLE = {kw for kw in BULLISH_STRONG if " " not in kw}
+_BULL_STRONG_MULTI = {kw for kw in BULLISH_STRONG if " " in kw}
+_BULL_NORMAL_SINGLE = {kw for kw in BULLISH_NORMAL if " " not in kw}
+_BULL_NORMAL_MULTI = {kw for kw in BULLISH_NORMAL if " " in kw}
+_BEAR_STRONG_SINGLE = {kw for kw in BEARISH_STRONG if " " not in kw}
+_BEAR_STRONG_MULTI = {kw for kw in BEARISH_STRONG if " " in kw}
+_BEAR_NORMAL_SINGLE = {kw for kw in BEARISH_NORMAL if " " not in kw}
+_BEAR_NORMAL_MULTI = {kw for kw in BEARISH_NORMAL if " " in kw}
 
 
 def fetch_yahoo_rss(symbol: str, max_articles: int = 10) -> list[dict]:
@@ -99,15 +218,13 @@ def fetch_yahoo_rss(symbol: str, max_articles: int = 10) -> list[dict]:
     """
     url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}&region=US&lang=en-US"
     try:
-        resp = requests.get(url, timeout=3, headers={
-            "User-Agent": "Decifer/2.0 (Trading Bot)"
-        })
+        resp = requests.get(url, timeout=3, headers={"User-Agent": "Decifer/2.0 (Trading Bot)"})
         if resp.status_code != 200:
             return []
 
         root = ET.fromstring(resp.content)
         articles = []
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         for item in root.findall(".//item")[:max_articles]:
             title = item.findtext("title", "").strip()
@@ -125,12 +242,14 @@ def fetch_yahoo_rss(symbol: str, max_articles: int = 10) -> list[dict]:
                     pass
 
             if title:
-                articles.append({
-                    "title": title,
-                    "published": pub_date,
-                    "link": link,
-                    "age_hours": round(age_hours, 1),
-                })
+                articles.append(
+                    {
+                        "title": title,
+                        "published": pub_date,
+                        "link": link,
+                        "age_hours": round(age_hours, 1),
+                    }
+                )
 
         return articles
 
@@ -221,14 +340,19 @@ def claude_sentiment(symbol: str, headlines: list[str], direction: str = "") -> 
                 "Analyse headlines and output ONLY valid JSON. "
                 "No explanation, no markdown, just JSON."
             ),
-            messages=[{"role": "user", "content": f"""Symbol: {symbol}
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""Symbol: {symbol}
 Current signal direction: {direction}
 
 Recent headlines:
 {headline_text}
 
 Output JSON:
-{{"sentiment": "BULLISH" or "BEARISH" or "NEUTRAL", "confidence": 0-10, "catalyst": "one sentence max"}}"""}]
+{{"sentiment": "BULLISH" or "BEARISH" or "NEUTRAL", "confidence": 0-10, "catalyst": "one sentence max"}}""",
+                }
+            ],
         )
         raw = resp.content[0].text.strip()
         raw = raw.replace("```json", "").replace("```", "").strip()
@@ -245,8 +369,7 @@ Output JSON:
         return {"sentiment": "NEUTRAL", "confidence": 0, "summary": ""}
 
 
-def get_news_sentiment(symbol: str, direction: str = "",
-                       keyword_threshold: int = 2) -> dict:
+def get_news_sentiment(symbol: str, direction: str = "", keyword_threshold: int = 2) -> dict:
     """
     Two-tier news sentiment for a single symbol.
 
@@ -283,28 +406,32 @@ def get_news_sentiment(symbol: str, direction: str = "",
     # news feed.  Uses the same keyword_score() pipeline on combined headlines.
     # Only fires when Finnhub key is present AND Yahoo RSS is empty or weak.
     finnhub_contrib = 0
-    if CONFIG.get("use_finnhub") and CONFIG.get("finnhub_api_key"):
-        if not headlines or abs(kw["score"]) < keyword_threshold:
-            try:
-                import finnhub_client as _fh
-                fh_articles = _fh.get_company_news(symbol, lookback_days=2)
-                if fh_articles:
-                    # Use headline + first 120 chars of summary for richer context
-                    fh_headlines = [
-                        f"{a.get('headline', '')} {a.get('summary', '')[:120]}".strip()
-                        for a in fh_articles
-                    ]
-                    fh_kw = keyword_score(fh_headlines)
-                    if abs(fh_kw["score"]) >= keyword_threshold:
-                        # Finnhub has a clear signal where Yahoo RSS was ambiguous
-                        raw_contrib = fh_kw["score"]
-                        finnhub_contrib = max(-2, min(+2, raw_contrib // 2))
-                        log.debug(
-                            "Finnhub news %s: %d articles, kw_score=%+d → contrib=%+d",
-                            symbol, len(fh_articles), fh_kw["score"], finnhub_contrib,
-                        )
-            except Exception as _e:
-                log.debug("Finnhub company news error for %s: %s", symbol, _e)
+    if (
+        CONFIG.get("use_finnhub")
+        and CONFIG.get("finnhub_api_key")
+        and (not headlines or abs(kw["score"]) < keyword_threshold)
+    ):
+        try:
+            import finnhub_client as _fh
+
+            fh_articles = _fh.get_company_news(symbol, lookback_days=2)
+            if fh_articles:
+                # Use headline + first 120 chars of summary for richer context
+                fh_headlines = [f"{a.get('headline', '')} {a.get('summary', '')[:120]}".strip() for a in fh_articles]
+                fh_kw = keyword_score(fh_headlines)
+                if abs(fh_kw["score"]) >= keyword_threshold:
+                    # Finnhub has a clear signal where Yahoo RSS was ambiguous
+                    raw_contrib = fh_kw["score"]
+                    finnhub_contrib = max(-2, min(+2, raw_contrib // 2))
+                    log.debug(
+                        "Finnhub news %s: %d articles, kw_score=%+d → contrib=%+d",
+                        symbol,
+                        len(fh_articles),
+                        fh_kw["score"],
+                        finnhub_contrib,
+                    )
+        except Exception as _e:
+            log.debug("Finnhub company news error for %s: %s", symbol, _e)
 
     # ── Compute final news_score (0-10) ──────────────────────
     news_score = 0
@@ -328,9 +455,9 @@ def get_news_sentiment(symbol: str, direction: str = "",
     # Claude contribution (0-5)
     if claude["sentiment"] != "NEUTRAL":
         sentiment_aligned = (
-            (direction == "LONG" and claude["sentiment"] == "BULLISH") or
-            (direction == "SHORT" and claude["sentiment"] == "BEARISH") or
-            direction == ""
+            (direction == "LONG" and claude["sentiment"] == "BULLISH")
+            or (direction == "SHORT" and claude["sentiment"] == "BEARISH")
+            or direction == ""
         )
         if sentiment_aligned:
             news_score += min(5, claude["confidence"] // 2)
@@ -380,8 +507,7 @@ def _empty_sentiment(symbol: str) -> dict:
     }
 
 
-def batch_news_sentiment(symbols: list[str],
-                         directions: dict[str, str] = None) -> dict[str, dict]:
+def batch_news_sentiment(symbols: list[str], directions: dict[str, str] | None = None) -> dict[str, dict]:
     """
     Fetch news sentiment for a batch of symbols — PARALLEL with caching.
     Returns {symbol: news_sentiment_dict}.
@@ -393,7 +519,7 @@ def batch_news_sentiment(symbols: list[str],
     if directions is None:
         directions = {}
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     results = {}
     to_fetch = []
 
@@ -430,12 +556,12 @@ def batch_news_sentiment(symbols: list[str],
     with ThreadPoolExecutor(max_workers=10) as pool:
         futures = {pool.submit(fetch_one, sym): sym for sym in to_fetch}
         for future in as_completed(futures):
-            sym, articles, headlines, recency, kw = future.result()
+            sym, _articles, headlines, recency, kw = future.result()
             rss_results[sym] = (headlines, recency, kw)
 
     # ── Phase 2: Claude tier-2 for top scorers (max 5) ─────────
     claude_candidates = []
-    for sym, (headlines, recency, kw) in rss_results.items():
+    for sym, (headlines, _recency, kw) in rss_results.items():
         if abs(kw["score"]) >= 2 and headlines:
             claude_candidates.append((sym, headlines, kw["score"]))
 
@@ -445,6 +571,7 @@ def batch_news_sentiment(symbols: list[str],
 
     claude_results = {}
     if claude_candidates:
+
         def claude_one(sym, headlines, direction):
             try:
                 return sym, claude_sentiment(sym, headlines, direction)
@@ -454,8 +581,7 @@ def batch_news_sentiment(symbols: list[str],
 
         with ThreadPoolExecutor(max_workers=3) as pool:
             futures = {
-                pool.submit(claude_one, sym, hls, directions.get(sym, "")): sym
-                for sym, hls, _ in claude_candidates
+                pool.submit(claude_one, sym, hls, directions.get(sym, "")): sym for sym, hls, _ in claude_candidates
             }
             for future in as_completed(futures):
                 sym, claude_res = future.result()
@@ -467,6 +593,7 @@ def batch_news_sentiment(symbols: list[str],
     av_results: dict[str, dict] = {}
     try:
         from alpha_vantage_client import get_news_sentiment as _av_news
+
         av_results = _av_news(to_fetch)
         hits = sum(1 for v in av_results.values() if abs(v.get("sentiment_score", 0)) > 0.15)
         if av_results:
@@ -483,7 +610,7 @@ def batch_news_sentiment(symbols: list[str],
         headlines, recency, kw = rss_results[sym]
         direction = directions.get(sym, "")
         claude = claude_results.get(sym, {"sentiment": "NEUTRAL", "confidence": 0, "summary": ""})
-        av     = av_results.get(sym.upper(), {})
+        av = av_results.get(sym.upper(), {})
 
         # Compute news_score (same logic as get_news_sentiment)
         news_score = 0
@@ -497,9 +624,9 @@ def batch_news_sentiment(symbols: list[str],
 
         if claude["sentiment"] != "NEUTRAL":
             sentiment_aligned = (
-                (direction == "LONG" and claude["sentiment"] == "BULLISH") or
-                (direction == "SHORT" and claude["sentiment"] == "BEARISH") or
-                direction == ""
+                (direction == "LONG" and claude["sentiment"] == "BULLISH")
+                or (direction == "SHORT" and claude["sentiment"] == "BEARISH")
+                or direction == ""
             )
             if sentiment_aligned:
                 news_score += min(5, claude["confidence"] // 2)
@@ -510,14 +637,14 @@ def batch_news_sentiment(symbols: list[str],
         # Only fires when AV has meaningful relevance (>= 0.15) for this ticker.
         # sentiment_score is -1 to +1; scaled by relevance; max contribution ±3.
         av_sentiment_score = av.get("sentiment_score", 0.0)
-        av_relevance       = av.get("relevance", 0.0)
+        av_relevance = av.get("relevance", 0.0)
         av_contrib = 0.0
         if av_relevance >= 0.15 and abs(av_sentiment_score) > 0.05:
-            raw = av_sentiment_score * av_relevance * 3.0   # max ±3
+            raw = av_sentiment_score * av_relevance * 3.0  # max ±3
             if direction in ("LONG", ""):
                 av_contrib = raw
             elif direction == "SHORT":
-                av_contrib = -raw   # bearish AV signal = positive for shorts
+                av_contrib = -raw  # bearish AV signal = positive for shorts
         news_score = max(0, min(10, news_score + av_contrib))
 
         if recency < 2:
@@ -541,8 +668,8 @@ def batch_news_sentiment(symbols: list[str],
             "claude_catalyst": claude.get("summary", ""),
             "av_sentiment_score": round(av_sentiment_score, 4),
             "av_sentiment_label": av.get("sentiment_label", ""),
-            "av_relevance":       round(av_relevance, 4),
-            "av_topics":          av.get("topics", []),
+            "av_relevance": round(av_relevance, 4),
+            "av_topics": av.get("topics", []),
             "news_score": min(10, max(0, news_score)),
         }
 

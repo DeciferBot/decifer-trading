@@ -1,10 +1,12 @@
 """Tests for sentinel_agents.py — 3-agent news-triggered trade pipeline."""
+
+import json
 import os
 import sys
 import types
-import json
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # ── path setup ──────────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -37,10 +39,10 @@ sys.modules.pop("sentinel_agents", None)
 # ── now import ───────────────────────────────────────────────────────────────
 import sentinel_agents as sa
 
-
 # ════════════════════════════════════════════════════════════════════════════
 # FIXTURES & HELPERS
 # ════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.fixture
 def bullish_trigger():
@@ -56,6 +58,7 @@ def bullish_trigger():
         "sources": ["Yahoo Finance", "FinViz"],
     }
 
+
 @pytest.fixture
 def bearish_trigger():
     return {
@@ -70,6 +73,7 @@ def bearish_trigger():
         "sources": ["Reuters"],
     }
 
+
 @pytest.fixture
 def open_positions():
     return [
@@ -77,9 +81,11 @@ def open_positions():
         {"symbol": "GOOGL", "qty": 5, "entry": 140.0, "current": 142.0, "pnl": 10.0},
     ]
 
+
 @pytest.fixture
 def regime_trending():
     return {"regime": "TRENDING", "vix": 15.0, "spy_trend": "UP"}
+
 
 def _mock_claude_response(text):
     """Create a mock Claude API response returning the given text."""
@@ -92,8 +98,8 @@ def _mock_claude_response(text):
 # _call_claude
 # ════════════════════════════════════════════════════════════════════════════
 
-class TestCallClaude:
 
+class TestCallClaude:
     def test_returns_text_on_success(self):
         """_call_claude should return stripped text from the API response."""
         expected = "BULLISH catalyst confirmed"
@@ -125,8 +131,8 @@ class TestCallClaude:
 # agent_catalyst
 # ════════════════════════════════════════════════════════════════════════════
 
-class TestAgentCatalyst:
 
+class TestAgentCatalyst:
     def test_returns_string(self, bullish_trigger):
         """agent_catalyst should always return a string."""
         with patch.object(sa, "_call_claude", return_value="Material catalyst. BULLISH."):
@@ -137,9 +143,11 @@ class TestAgentCatalyst:
     def test_includes_symbol_in_prompt(self, bullish_trigger):
         """The prompt passed to Claude must mention the symbol."""
         captured = {}
+
         def fake_call(sys_p, user_p, max_tokens=500):
             captured["user"] = user_p
             return "analysis"
+
         with patch.object(sa, "_call_claude", side_effect=fake_call):
             sa.agent_catalyst(bullish_trigger)
         assert "NVDA" in captured["user"]
@@ -147,9 +155,11 @@ class TestAgentCatalyst:
     def test_includes_headlines_in_prompt(self, bullish_trigger):
         """All headlines must appear in the prompt sent to Claude."""
         captured = {}
+
         def fake_call(sys_p, user_p, max_tokens=500):
             captured["user"] = user_p
             return "ok"
+
         with patch.object(sa, "_call_claude", side_effect=fake_call):
             sa.agent_catalyst(bullish_trigger)
         for headline in bullish_trigger["headlines"]:
@@ -157,12 +167,13 @@ class TestAgentCatalyst:
 
     def test_with_current_position(self, bullish_trigger):
         """agent_catalyst with an open position should not crash and include position info."""
-        pos = {"qty": 10, "entry": 450.0, "current": 470.0, "pnl": 200.0,
-               "direction": "LONG", "sl": 440.0, "tp": 500.0}
+        pos = {"qty": 10, "entry": 450.0, "current": 470.0, "pnl": 200.0, "direction": "LONG", "sl": 440.0, "tp": 500.0}
         captured = {}
+
         def fake_call(sys_p, user_p, max_tokens=500):
             captured["user"] = user_p
             return "hold position"
+
         with patch.object(sa, "_call_claude", side_effect=fake_call):
             result = sa.agent_catalyst(bullish_trigger, pos)
         assert "HOLDING" in captured["user"]
@@ -171,19 +182,28 @@ class TestAgentCatalyst:
     def test_no_position_shows_no_current_position(self, bearish_trigger):
         """Without position, prompt should say NO CURRENT POSITION."""
         captured = {}
+
         def fake_call(sys_p, user_p, max_tokens=500):
             captured["user"] = user_p
             return "bearish"
+
         with patch.object(sa, "_call_claude", side_effect=fake_call):
             sa.agent_catalyst(bearish_trigger, None)
         assert "NO CURRENT POSITION" in captured["user"]
 
     def test_empty_headlines_no_crash(self):
         """Trigger with no headlines should not raise."""
-        trigger = {"symbol": "TSLA", "headlines": [], "keyword_score": 0,
-                   "direction": "NEUTRAL", "urgency": "LOW",
-                   "claude_sentiment": "NEUTRAL", "claude_confidence": 0,
-                   "claude_catalyst": "", "sources": []}
+        trigger = {
+            "symbol": "TSLA",
+            "headlines": [],
+            "keyword_score": 0,
+            "direction": "NEUTRAL",
+            "urgency": "LOW",
+            "claude_sentiment": "NEUTRAL",
+            "claude_confidence": 0,
+            "claude_catalyst": "",
+            "sources": [],
+        }
         with patch.object(sa, "_call_claude", return_value=""):
             result = sa.agent_catalyst(trigger)
         assert isinstance(result, str)
@@ -193,14 +213,13 @@ class TestAgentCatalyst:
 # agent_risk_gate
 # ════════════════════════════════════════════════════════════════════════════
 
-class TestAgentRiskGate:
 
+class TestAgentRiskGate:
     def test_returns_string(self, bearish_trigger, open_positions, regime_trending):
         """agent_risk_gate should always return a string."""
         with patch.object(sa, "_call_claude", return_value="DECISION: BLOCK\nREASON: overexposed"):
             result = sa.agent_risk_gate(
-                "catalyst analysis", bearish_trigger, open_positions,
-                100000.0, -500.0, regime_trending
+                "catalyst analysis", bearish_trigger, open_positions, 100000.0, -500.0, regime_trending
             )
         assert isinstance(result, str)
 
@@ -211,8 +230,7 @@ class TestAgentRiskGate:
 
     def test_output_shows_position_count(self, bullish_trigger, open_positions, regime_trending):
         """Number of open positions should be reflected in the output."""
-        result = sa.agent_risk_gate("cat", bullish_trigger, open_positions,
-                                    100000.0, 0.0, regime_trending)
+        result = sa.agent_risk_gate("cat", bullish_trigger, open_positions, 100000.0, 0.0, regime_trending)
         # max_positions is 5, 2 are open -> 3 remaining
         assert "2" in result or "remaining" in result
 
@@ -231,23 +249,25 @@ class TestAgentRiskGate:
 # agent_instant_decision
 # ════════════════════════════════════════════════════════════════════════════
 
-class TestAgentInstantDecision:
 
+class TestAgentInstantDecision:
     def _make_valid_json(self, symbol="NVDA", action="BUY", confidence=8):
-        return json.dumps({
-            "action": action,
-            "symbol": symbol,
-            "qty": 10,
-            "sl": 440.0,
-            "tp": 510.0,
-            "instrument": "stock",
-            "inverse_symbol": None,
-            "urgency": "HIGH",
-            "confidence": confidence,
-            "reasoning": "Strong earnings beat catalyst.",
-            "catalyst": "Blowout earnings",
-            "trigger_type": "news_sentinel",
-        })
+        return json.dumps(
+            {
+                "action": action,
+                "symbol": symbol,
+                "qty": 10,
+                "sl": 440.0,
+                "tp": 510.0,
+                "instrument": "stock",
+                "inverse_symbol": None,
+                "urgency": "HIGH",
+                "confidence": confidence,
+                "reasoning": "Strong earnings beat catalyst.",
+                "catalyst": "Blowout earnings",
+                "trigger_type": "news_sentinel",
+            }
+        )
 
     def test_returns_dict_on_valid_json(self, bullish_trigger):
         """Valid JSON from Claude should be parsed into a dict."""
@@ -270,8 +290,7 @@ class TestAgentInstantDecision:
         """SKIP fallback must include all required fields for downstream safety."""
         with patch.object(sa, "_call_claude_opus", return_value="{invalid"):
             result = sa.agent_instant_decision("cat", "risk", bullish_trigger)
-        for field in ["action", "symbol", "qty", "sl", "tp", "instrument",
-                      "confidence", "reasoning", "trigger_type"]:
+        for field in ["action", "symbol", "qty", "sl", "tp", "instrument", "confidence", "reasoning", "trigger_type"]:
             assert field in result, f"Missing field: {field}"
 
     def test_handles_markdown_wrapped_json(self, bullish_trigger):
@@ -311,36 +330,42 @@ class TestAgentInstantDecision:
 # run_sentinel_pipeline
 # ════════════════════════════════════════════════════════════════════════════
 
-class TestRunSentinelPipeline:
 
+class TestRunSentinelPipeline:
     def _make_decision(self, symbol, action="BUY"):
         return {
-            "action": action, "symbol": symbol, "qty": 10,
-            "sl": 440.0, "tp": 510.0, "instrument": "stock",
-            "confidence": 8, "reasoning": "Test", "trigger_type": "news_sentinel",
+            "action": action,
+            "symbol": symbol,
+            "qty": 10,
+            "sl": 440.0,
+            "tp": 510.0,
+            "instrument": "stock",
+            "confidence": 8,
+            "reasoning": "Test",
+            "trigger_type": "news_sentinel",
         }
 
     def test_pipeline_returns_decision_dict(self, bullish_trigger, open_positions, regime_trending):
         """Pipeline should return a complete decision dict."""
         decision = self._make_decision("NVDA")
-        with patch.object(sa, "agent_catalyst", return_value="catalyst report"), \
-             patch.object(sa, "agent_risk_gate", return_value="risk report"), \
-             patch.object(sa, "agent_instant_decision", return_value=decision):
-            result = sa.run_sentinel_pipeline(
-                bullish_trigger, open_positions, 100000.0, -500.0, regime_trending
-            )
+        with (
+            patch.object(sa, "agent_catalyst", return_value="catalyst report"),
+            patch.object(sa, "agent_risk_gate", return_value="risk report"),
+            patch.object(sa, "agent_instant_decision", return_value=decision),
+        ):
+            result = sa.run_sentinel_pipeline(bullish_trigger, open_positions, 100000.0, -500.0, regime_trending)
         assert result["action"] == "BUY"
         assert result["symbol"] == "NVDA"
 
     def test_pipeline_attaches_sentinel_outputs(self, bullish_trigger, open_positions, regime_trending):
         """Result must include _sentinel_outputs with catalyst and risk_gate text."""
         decision = self._make_decision("NVDA")
-        with patch.object(sa, "agent_catalyst", return_value="cat_text"), \
-             patch.object(sa, "agent_risk_gate", return_value="risk_text"), \
-             patch.object(sa, "agent_instant_decision", return_value=decision):
-            result = sa.run_sentinel_pipeline(
-                bullish_trigger, open_positions, 100000.0, 0.0, regime_trending
-            )
+        with (
+            patch.object(sa, "agent_catalyst", return_value="cat_text"),
+            patch.object(sa, "agent_risk_gate", return_value="risk_text"),
+            patch.object(sa, "agent_instant_decision", return_value=decision),
+        ):
+            result = sa.run_sentinel_pipeline(bullish_trigger, open_positions, 100000.0, 0.0, regime_trending)
         assert "_sentinel_outputs" in result
         assert result["_sentinel_outputs"]["catalyst"] == "cat_text"
         assert result["_sentinel_outputs"]["risk_gate"] == "risk_text"
@@ -348,12 +373,12 @@ class TestRunSentinelPipeline:
     def test_pipeline_attaches_trigger(self, bullish_trigger, open_positions, regime_trending):
         """Result must include the original _trigger for logging."""
         decision = self._make_decision("NVDA")
-        with patch.object(sa, "agent_catalyst", return_value="c"), \
-             patch.object(sa, "agent_risk_gate", return_value="r"), \
-             patch.object(sa, "agent_instant_decision", return_value=decision):
-            result = sa.run_sentinel_pipeline(
-                bullish_trigger, open_positions, 100000.0, 0.0, regime_trending
-            )
+        with (
+            patch.object(sa, "agent_catalyst", return_value="c"),
+            patch.object(sa, "agent_risk_gate", return_value="r"),
+            patch.object(sa, "agent_instant_decision", return_value=decision),
+        ):
+            result = sa.run_sentinel_pipeline(bullish_trigger, open_positions, 100000.0, 0.0, regime_trending)
         assert "_trigger" in result
         assert result["_trigger"]["symbol"] == "NVDA"
 
@@ -365,15 +390,17 @@ class TestRunSentinelPipeline:
         ]
         decision = self._make_decision("NVDA")
         captured = {}
+
         def fake_catalyst(trigger, current_pos=None):
             captured["pos"] = current_pos
             return "cat"
-        with patch.object(sa, "agent_catalyst", side_effect=fake_catalyst), \
-             patch.object(sa, "agent_risk_gate", return_value="risk"), \
-             patch.object(sa, "agent_instant_decision", return_value=decision):
-            sa.run_sentinel_pipeline(
-                bullish_trigger, positions, 100000.0, 0.0, regime_trending
-            )
+
+        with (
+            patch.object(sa, "agent_catalyst", side_effect=fake_catalyst),
+            patch.object(sa, "agent_risk_gate", return_value="risk"),
+            patch.object(sa, "agent_instant_decision", return_value=decision),
+        ):
+            sa.run_sentinel_pipeline(bullish_trigger, positions, 100000.0, 0.0, regime_trending)
         assert captured["pos"] is not None
         assert captured["pos"]["symbol"] == "NVDA"
 
@@ -382,26 +409,28 @@ class TestRunSentinelPipeline:
         positions = [{"symbol": "MSFT", "qty": 10, "entry": 300.0}]
         decision = self._make_decision("AAPL", "SKIP")
         captured = {}
+
         def fake_catalyst(trigger, current_pos=None):
             captured["pos"] = current_pos
             return "cat"
-        with patch.object(sa, "agent_catalyst", side_effect=fake_catalyst), \
-             patch.object(sa, "agent_risk_gate", return_value="r"), \
-             patch.object(sa, "agent_instant_decision", return_value=decision):
-            sa.run_sentinel_pipeline(
-                bearish_trigger, positions, 100000.0, 0.0, regime_trending
-            )
+
+        with (
+            patch.object(sa, "agent_catalyst", side_effect=fake_catalyst),
+            patch.object(sa, "agent_risk_gate", return_value="r"),
+            patch.object(sa, "agent_instant_decision", return_value=decision),
+        ):
+            sa.run_sentinel_pipeline(bearish_trigger, positions, 100000.0, 0.0, regime_trending)
         assert captured["pos"] is None
 
     def test_pipeline_calls_all_three_agents(self, bullish_trigger, open_positions, regime_trending):
         """All three agents must be called exactly once."""
         decision = self._make_decision("NVDA")
-        with patch.object(sa, "agent_catalyst", return_value="c") as m1, \
-             patch.object(sa, "agent_risk_gate", return_value="r") as m2, \
-             patch.object(sa, "agent_instant_decision", return_value=decision) as m3:
-            sa.run_sentinel_pipeline(
-                bullish_trigger, open_positions, 100000.0, 0.0, regime_trending
-            )
+        with (
+            patch.object(sa, "agent_catalyst", return_value="c") as m1,
+            patch.object(sa, "agent_risk_gate", return_value="r") as m2,
+            patch.object(sa, "agent_instant_decision", return_value=decision) as m3,
+        ):
+            sa.run_sentinel_pipeline(bullish_trigger, open_positions, 100000.0, 0.0, regime_trending)
         m1.assert_called_once()
         m2.assert_called_once()
         m3.assert_called_once()
@@ -409,11 +438,11 @@ class TestRunSentinelPipeline:
     def test_pipeline_empty_positions(self, bullish_trigger, regime_trending):
         """Pipeline with no open positions should not crash."""
         decision = self._make_decision("NVDA")
-        with patch.object(sa, "agent_catalyst", return_value="c"), \
-             patch.object(sa, "agent_risk_gate", return_value="r"), \
-             patch.object(sa, "agent_instant_decision", return_value=decision):
-            result = sa.run_sentinel_pipeline(
-                bullish_trigger, [], 50000.0, 0.0, regime_trending
-            )
+        with (
+            patch.object(sa, "agent_catalyst", return_value="c"),
+            patch.object(sa, "agent_risk_gate", return_value="r"),
+            patch.object(sa, "agent_instant_decision", return_value=decision),
+        ):
+            result = sa.run_sentinel_pipeline(bullish_trigger, [], 50000.0, 0.0, regime_trending)
         assert result is not None
         assert result["action"] == "BUY"

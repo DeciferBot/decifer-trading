@@ -13,10 +13,9 @@ Covers:
 
 NOTE: Relies on conftest.py for all dependency stubbing and path setup.
 """
+
 import os
 import sys
-
-import pytest
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -29,25 +28,46 @@ if "signals" in sys.modules and not hasattr(sys.modules["signals"], "__file__"):
 
 from signals import compute_confluence
 
-
 # ---------------------------------------------------------------------------
 # Signal fixture helpers (reuse same pattern as test_mtf_gate.py)
 # ---------------------------------------------------------------------------
 
-def _make_sig(signal="BUY", bull_aligned=True, bear_aligned=False,
-              adx=30.0, macd_hist=0.001, mfi=60.0, rsi=55.0, rsi_slope=1.0,
-              macd_accel=0.0001, atr=1.5, vol_ratio=1.2, bb_position=0.6,
-              bb_width=0.04, squeeze_on=False, squeeze_intensity=0.0,
-              vwap_dist=0.3, obv_slope=1000, donch_breakout=0,
-              candle_bull=0, candle_bear=0, variance_ratio=1.0,
-              ou_halflife=999.0, zscore=0.0, adf_pvalue=1.0,
-              symbol="TEST", timeframe="5m", price=150.0):
+
+def _make_sig(
+    signal="BUY",
+    bull_aligned=True,
+    bear_aligned=False,
+    adx=30.0,
+    macd_hist=0.001,
+    mfi=60.0,
+    rsi=55.0,
+    rsi_slope=1.0,
+    macd_accel=0.0001,
+    atr=1.5,
+    vol_ratio=1.2,
+    bb_position=0.6,
+    bb_width=0.04,
+    squeeze_on=False,
+    squeeze_intensity=0.0,
+    vwap_dist=0.3,
+    obv_slope=1000,
+    donch_breakout=0,
+    candle_bull=0,
+    candle_bear=0,
+    variance_ratio=1.0,
+    ou_halflife=999.0,
+    zscore=0.0,
+    adf_pvalue=1.0,
+    symbol="TEST",
+    timeframe="5m",
+    price=150.0,
+):
     return {
         "symbol": symbol,
         "timeframe": timeframe,
         "price": price,
         "ema_fast": price + 1 if bull_aligned else price - 1,
-        "ema_slow": price if bull_aligned else price,
+        "ema_slow": price,
         "ema_trend": price - 1 if bull_aligned else price + 1,
         "bull_aligned": bull_aligned,
         "bear_aligned": bear_aligned,
@@ -84,8 +104,8 @@ def _make_sig(signal="BUY", bull_aligned=True, bear_aligned=False,
 # candle_required=True — gate fires without candle
 # ---------------------------------------------------------------------------
 
-class TestCandleGateBlocking:
 
+class TestCandleGateBlocking:
     def test_buy_blocked_without_candle(self, monkeypatch):
         """BUY signal + candle_required=True + no candle → HOLD."""
         monkeypatch.setitem(_config_mod.CONFIG, "candle_required", True)
@@ -98,10 +118,19 @@ class TestCandleGateBlocking:
         """SELL signal + candle_required=True + no candle → HOLD."""
         monkeypatch.setitem(_config_mod.CONFIG, "candle_required", True)
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "off")
-        sig = _make_sig(signal="SELL", bull_aligned=False, bear_aligned=True,
-                        mfi=35.0, rsi=40.0, rsi_slope=-1.0, macd_hist=-0.001,
-                        vwap_dist=-0.3, obv_slope=-1000,
-                        candle_bull=0, candle_bear=0)
+        sig = _make_sig(
+            signal="SELL",
+            bull_aligned=False,
+            bear_aligned=True,
+            mfi=35.0,
+            rsi=40.0,
+            rsi_slope=-1.0,
+            macd_hist=-0.001,
+            vwap_dist=-0.3,
+            obv_slope=-1000,
+            candle_bull=0,
+            candle_bear=0,
+        )
         result = compute_confluence(sig, None, None)
         assert result["signal"] == "HOLD"
         assert result["candle_gate"] == "BLOCKED"
@@ -125,14 +154,13 @@ class TestCandleGateBlocking:
 # candle_required=True — gate passes with confirming candle
 # ---------------------------------------------------------------------------
 
-class TestCandleGateAllowing:
 
+class TestCandleGateAllowing:
     def test_buy_passes_with_bull_candle(self, monkeypatch):
         """BUY + candle_bull > 0 → signal passes through."""
         monkeypatch.setitem(_config_mod.CONFIG, "candle_required", True)
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "off")
-        result = compute_confluence(
-            _make_sig(signal="BUY", candle_bull=2), None, None)
+        result = compute_confluence(_make_sig(signal="BUY", candle_bull=2), None, None)
         assert result["signal"] != "HOLD"
         assert result["candle_gate"] == "PASS"
 
@@ -140,10 +168,19 @@ class TestCandleGateAllowing:
         """SELL + candle_bear > 0 → signal passes through."""
         monkeypatch.setitem(_config_mod.CONFIG, "candle_required", True)
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "off")
-        sig = _make_sig(signal="SELL", bull_aligned=False, bear_aligned=True,
-                        mfi=35.0, rsi=40.0, rsi_slope=-1.0, macd_hist=-0.001,
-                        vwap_dist=-0.3, obv_slope=-1000,
-                        candle_bull=0, candle_bear=2)
+        sig = _make_sig(
+            signal="SELL",
+            bull_aligned=False,
+            bear_aligned=True,
+            mfi=35.0,
+            rsi=40.0,
+            rsi_slope=-1.0,
+            macd_hist=-0.001,
+            vwap_dist=-0.3,
+            obv_slope=-1000,
+            candle_bull=0,
+            candle_bear=2,
+        )
         result = compute_confluence(sig, None, None)
         assert result["signal"] != "HOLD"
         assert result["candle_gate"] == "PASS"
@@ -155,12 +192,11 @@ class TestCandleGateAllowing:
         # Pin equal IC weights so live data/ic_weights.json cannot push the base
         # score to the 50-cap before the candle bonus is applied.
         import ic_calculator as _ic
+
         monkeypatch.setattr(_ic, "get_current_weights", lambda: _ic.EQUAL_WEIGHTS)
 
-        no_candle = compute_confluence(
-            _make_sig(signal="BUY", candle_bull=0), None, None)
-        with_candle = compute_confluence(
-            _make_sig(signal="BUY", candle_bull=2), None, None)
+        no_candle = compute_confluence(_make_sig(signal="BUY", candle_bull=0), None, None)
+        with_candle = compute_confluence(_make_sig(signal="BUY", candle_bull=2), None, None)
 
         assert with_candle["score"] > no_candle["score"]
 
@@ -169,8 +205,8 @@ class TestCandleGateAllowing:
 # candle_required=False (default) — gate never fires
 # ---------------------------------------------------------------------------
 
-class TestCandleGateOff:
 
+class TestCandleGateOff:
     def test_off_by_default_allows_buy_without_candle(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "candle_required", False)
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "off")
@@ -180,10 +216,19 @@ class TestCandleGateOff:
     def test_off_allows_sell_without_candle(self, monkeypatch):
         monkeypatch.setitem(_config_mod.CONFIG, "candle_required", False)
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "off")
-        sig = _make_sig(signal="SELL", bull_aligned=False, bear_aligned=True,
-                        mfi=35.0, rsi=40.0, rsi_slope=-1.0, macd_hist=-0.001,
-                        vwap_dist=-0.3, obv_slope=-1000,
-                        candle_bull=0, candle_bear=0)
+        sig = _make_sig(
+            signal="SELL",
+            bull_aligned=False,
+            bear_aligned=True,
+            mfi=35.0,
+            rsi=40.0,
+            rsi_slope=-1.0,
+            macd_hist=-0.001,
+            vwap_dist=-0.3,
+            obv_slope=-1000,
+            candle_bull=0,
+            candle_bear=0,
+        )
         result = compute_confluence(sig, None, None)
         assert result.get("candle_gate") == "PASS"
 
@@ -192,8 +237,8 @@ class TestCandleGateOff:
 # Edge cases
 # ---------------------------------------------------------------------------
 
-class TestCandleGateEdgeCases:
 
+class TestCandleGateEdgeCases:
     def test_hold_signal_unaffected(self, monkeypatch):
         """When the scorer resolves to HOLD (all indicators neutral), candle gate is PASS.
 
@@ -205,13 +250,22 @@ class TestCandleGateEdgeCases:
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "off")
         neutral_sig = _make_sig(
             signal="HOLD",
-            bull_aligned=False, bear_aligned=False,
-            adx=10.0, macd_hist=0.0, macd_accel=0.0,
-            mfi=50.0, rsi=50.0, rsi_slope=0.0,
-            vwap_dist=0.0, obv_slope=0,
-            donch_breakout=0, vol_ratio=0.5,
-            bb_position=0.5, squeeze_on=False,
-            candle_bull=0, candle_bear=0,
+            bull_aligned=False,
+            bear_aligned=False,
+            adx=10.0,
+            macd_hist=0.0,
+            macd_accel=0.0,
+            mfi=50.0,
+            rsi=50.0,
+            rsi_slope=0.0,
+            vwap_dist=0.0,
+            obv_slope=0,
+            donch_breakout=0,
+            vol_ratio=0.5,
+            bb_position=0.5,
+            squeeze_on=False,
+            candle_bull=0,
+            candle_bear=0,
         )
         result = compute_confluence(neutral_sig, None, None)
         assert result["signal"] == "HOLD"
@@ -228,8 +282,9 @@ class TestCandleGateEdgeCases:
     def test_mtf_hard_gate_early_return_has_candle_gate(self, monkeypatch):
         """The MTF hard gate early-return path also includes candle_gate."""
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "hard")
-        bearish_daily = _make_sig(signal="SELL", bull_aligned=False, bear_aligned=True,
-                                  adx=30.0, macd_hist=-0.01, timeframe="1d")
+        bearish_daily = _make_sig(
+            signal="SELL", bull_aligned=False, bear_aligned=True, adx=30.0, macd_hist=-0.01, timeframe="1d"
+        )
         result = compute_confluence(_make_sig(signal="BUY"), bearish_daily, None)
         assert result["signal"] == "HOLD"
         assert result["mtf_gate"] == "BLOCKED"
@@ -241,8 +296,8 @@ class TestCandleGateEdgeCases:
 # tf_count regression — guards against total_tf NameError (Bug #1)
 # ---------------------------------------------------------------------------
 
-class TestTfCountRegression:
 
+class TestTfCountRegression:
     def test_tf_count_always_in_return_dict(self, monkeypatch):
         """tf_count must be present in return dict — absence means total_tf NameError."""
         monkeypatch.setitem(_config_mod.CONFIG, "candle_required", False)

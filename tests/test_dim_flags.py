@@ -7,22 +7,21 @@ Covers:
 - disabled_dimensions key is present and accurate in the return dict
 - Flags don't affect the MTF gate or the candle gate
 """
+
 import os
 import sys
-import types
 from unittest.mock import MagicMock
 
 # ── Project root ────────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Stub heavy deps before any Decifer import
-for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance",
-             "praw", "feedparser", "tvDatafeed", "requests_html"]:
+for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance", "praw", "feedparser", "tvDatafeed", "requests_html"]:
     sys.modules.setdefault(_mod, MagicMock())
 
-import config as _config_mod  # noqa: E402 — must come after stubs
-_cfg = {"log_file": "/dev/null", "trade_log": "/dev/null",
-        "order_log": "/dev/null", "anthropic_api_key": "test"}
+import config as _config_mod
+
+_cfg = {"log_file": "/dev/null", "trade_log": "/dev/null", "order_log": "/dev/null", "anthropic_api_key": "test"}
 if hasattr(_config_mod, "CONFIG"):
     for _k, _v in _cfg.items():
         _config_mod.CONFIG.setdefault(_k, _v)
@@ -30,16 +29,44 @@ else:
     _config_mod.CONFIG = _cfg
 
 sys.modules.pop("signals", None)
-import signals  # noqa: E402
-
 import pytest
+
+import signals
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
-ALL_DIMS = ["directional", "momentum", "squeeze", "flow", "breakout", "mtf", "news", "social", "reversion", "iv_skew", "pead", "short_squeeze", "overnight_drift"]
+ALL_DIMS = [
+    "directional",
+    "momentum",
+    "squeeze",
+    "flow",
+    "breakout",
+    "mtf",
+    "news",
+    "social",
+    "reversion",
+    "iv_skew",
+    "pead",
+    "short_squeeze",
+    "overnight_drift",
+]
 
 # score_breakdown uses "trend" as the key for the directional dimension
-BREAKDOWN_KEYS = ["trend", "momentum", "squeeze", "flow", "breakout", "mtf", "news", "social", "reversion", "iv_skew", "pead", "short_squeeze", "overnight_drift"]
+BREAKDOWN_KEYS = [
+    "trend",
+    "momentum",
+    "squeeze",
+    "flow",
+    "breakout",
+    "mtf",
+    "news",
+    "social",
+    "reversion",
+    "iv_skew",
+    "pead",
+    "short_squeeze",
+    "overnight_drift",
+]
 
 
 def _base_sig(signal="BUY") -> dict:
@@ -76,23 +103,23 @@ def _base_sig(signal="BUY") -> dict:
 def _run(sig_5m, flags=None, news_score=5, social_score=5):
     """Call compute_confluence with patched dimension_flags."""
     import config
+
     original_flags = config.CONFIG.get("dimension_flags", {})
     original_mtf = config.CONFIG.get("mtf_gate_mode", "off")
     try:
-        config.CONFIG["mtf_gate_mode"] = "off"   # disable MTF gate so it doesn't interfere
+        config.CONFIG["mtf_gate_mode"] = "off"  # disable MTF gate so it doesn't interfere
         if flags is not None:
             config.CONFIG["dimension_flags"] = flags
         else:
             config.CONFIG["dimension_flags"] = {d: True for d in ALL_DIMS}
-        return signals.compute_confluence(sig_5m, None, None,
-                                          news_score=news_score,
-                                          social_score=social_score)
+        return signals.compute_confluence(sig_5m, None, None, news_score=news_score, social_score=social_score)
     finally:
         config.CONFIG["dimension_flags"] = original_flags
         config.CONFIG["mtf_gate_mode"] = original_mtf
 
 
 # ── 1. Baseline: all flags True scores > 0 ───────────────────────────────────
+
 
 def test_all_flags_true_scores_nonzero():
     result = _run(_base_sig(), flags={d: True for d in ALL_DIMS})
@@ -101,6 +128,7 @@ def test_all_flags_true_scores_nonzero():
 
 
 # ── 2. All flags False → score is 0 (or just candle bonus) ───────────────────
+
 
 def test_all_flags_false_score_is_zero():
     # Candle bonus is not a dimension flag — suppress it for a clean zero.
@@ -122,6 +150,7 @@ def test_all_flags_false_no_exception():
 
 
 # ── 3. disabled_dimensions reflects what was turned off ──────────────────────
+
 
 def test_disabled_dimensions_list_empty_when_all_on():
     result = _run(_base_sig(), flags={d: True for d in ALL_DIMS})
@@ -145,6 +174,7 @@ def test_disabled_dimensions_all_nine():
 
 # ── 4. Individually disabling each dimension lowers or keeps the score ────────
 
+
 @pytest.mark.parametrize("dim", ALL_DIMS)
 def test_disabling_dim_lowers_score(dim):
     """Score with one dim disabled must be <= score with all dims enabled."""
@@ -160,13 +190,13 @@ def test_disabling_dim_lowers_score(dim):
     result_dim_off = _run(sig, flags=one_off)
 
     assert result_dim_off["score"] <= result_full["score"], (
-        f"Disabling '{dim}' raised score from {result_full['score']} "
-        f"to {result_dim_off['score']}"
+        f"Disabling '{dim}' raised score from {result_full['score']} to {result_dim_off['score']}"
     )
     assert dim in result_dim_off["disabled_dimensions"]
 
 
 # ── 5. Disabling news/social zeroes their specific contribution ───────────────
+
 
 def test_news_flag_off_zeroes_news_score():
     flags = {d: True for d in ALL_DIMS}
@@ -185,6 +215,7 @@ def test_social_flag_off_zeroes_social_score():
 
 # ── 6. Disabling reversion zeroes its sub-metrics ────────────────────────────
 
+
 def test_reversion_flag_off_zeroes_reversion():
     flags = {d: True for d in ALL_DIMS}
     flags["reversion"] = False
@@ -200,15 +231,16 @@ def test_reversion_flag_off_zeroes_reversion():
 
 # ── 7. Missing dimension_flags in config → defaults to all-enabled (backward compat) ──
 
+
 def test_missing_flags_config_all_enabled():
     """If dimension_flags is absent from config, all dims score normally."""
     import config
+
     original = config.CONFIG.pop("dimension_flags", None)
     original_mtf = config.CONFIG.get("mtf_gate_mode", "off")
     try:
         config.CONFIG["mtf_gate_mode"] = "off"
-        result = signals.compute_confluence(_base_sig(), None, None,
-                                            news_score=5, social_score=5)
+        result = signals.compute_confluence(_base_sig(), None, None, news_score=5, social_score=5)
         assert result["score"] > 0
         assert result["disabled_dimensions"] == []
     finally:
@@ -218,6 +250,7 @@ def test_missing_flags_config_all_enabled():
 
 
 # ── 8. Score breakdown keys are always present, even when disabled ────────────
+
 
 def test_score_breakdown_always_has_all_keys():
     result = _run(_base_sig(), flags={d: False for d in ALL_DIMS})

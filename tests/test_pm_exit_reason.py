@@ -6,24 +6,33 @@ Tests for:
   - _build_pm_exit_reason() structured output
   - PM TRIM/EXIT reason format
 """
+
 import os
 import sys
-import types
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
-from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ── Stub all heavy deps before any Decifer module loads ───────────────────────
 for _mod_name in [
-    "ib_async", "ib_insync", "anthropic", "yfinance", "praw",
-    "feedparser", "tvDatafeed", "requests_html", "httpx", "colorama",
+    "ib_async",
+    "ib_insync",
+    "anthropic",
+    "yfinance",
+    "praw",
+    "feedparser",
+    "tvDatafeed",
+    "requests_html",
+    "httpx",
+    "colorama",
     "portfolio_manager",
 ]:
     sys.modules.setdefault(_mod_name, MagicMock())
 
 # colorama needs Fore / Style / init attributes
 import colorama as _colorama_stub
+
 _colorama_stub.Fore = MagicMock()
 _colorama_stub.Style = MagicMock()
 _colorama_stub.init = MagicMock()
@@ -34,17 +43,29 @@ _colorama_stub.init = MagicMock()
 # (test_signal_dispatch.py, test_signal_pipeline.py). Let them be imported
 # for real so those later tests receive the real implementations.
 for _decifer in [
-    "bot_state", "bot_account", "bot_ibkr", "scanner", "signals", "agents",
-    "orders", "options", "options_scanner", "risk", "risk_gates", "learning",
+    "bot_state",
+    "bot_account",
+    "bot_ibkr",
+    "scanner",
+    "signals",
+    "agents",
+    "orders",
+    "options",
+    "options_scanner",
+    "risk",
+    "risk_gates",
+    "learning",
 ]:
     sys.modules.setdefault(_decifer, MagicMock())
 
 # Ensure bot_state.dash and bot_state.clog exist
 import bot_state as _bs
+
 _bs.dash = {}
 _bs.clog = MagicMock()
 
 import config as _config_mod
+
 _cfg = {
     "log_file": "/dev/null",
     "trade_log": "/dev/null",
@@ -63,13 +84,12 @@ if hasattr(_config_mod, "CONFIG"):
 else:
     _config_mod.CONFIG = _cfg
 
-import pytest
 
 # Now import bot_trading — module-level code runs with stubs in place
 import bot_trading
 
-
 # ─── helpers ────────────────────────────────────────────────────────────────
+
 
 def _make_pos(
     trade_type="SCALP",
@@ -81,7 +101,7 @@ def _make_pos(
     open_time=None,
 ):
     if open_time is None:
-        open_time = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+        open_time = (datetime.now(UTC) - timedelta(minutes=30)).isoformat()
     return {
         "symbol": "TEST",
         "direction": direction,
@@ -107,6 +127,7 @@ def _make_pos(
 
 # ─── _polarity ───────────────────────────────────────────────────────────────
 
+
 class TestPolarity:
     def test_bull_regimes(self):
         assert bot_trading._polarity("MOMENTUM_BULL") == "BULL"
@@ -126,6 +147,7 @@ class TestPolarity:
 
 
 # ─── _build_pm_exit_reason ──────────────────────────────────────────────────
+
 
 class TestBuildPmExitReason:
     def test_format_contains_required_fields(self):
@@ -155,9 +177,7 @@ class TestBuildPmExitReason:
 
     def test_pm_trim_tag(self):
         pos = _make_pos()
-        result = bot_trading._build_pm_exit_reason(
-            pos, {}, "cycle_regime_shift", "trimming", exit_tag="pm_trim"
-        )
+        result = bot_trading._build_pm_exit_reason(pos, {}, "cycle_regime_shift", "trimming", exit_tag="pm_trim")
         assert result.startswith("pm_trim |")
 
     def test_reason_pm_truncated_to_120_chars(self):
@@ -181,6 +201,7 @@ class TestBuildPmExitReason:
 
 # ─── tp_order_id exit-type classification ───────────────────────────────────
 
+
 class TestTpOrderIdClassification:
     """Validate the classification logic added to check_external_closes().
 
@@ -202,8 +223,7 @@ class TestTpOrderIdClassification:
             return "tp_hit"
         elif pnl > 0 and trade_dict.get("tp"):
             tp = trade_dict.get("tp")
-            hit_tp = (not is_short and exit_price >= tp * 0.99) or \
-                     (is_short and exit_price <= tp * 1.01)
+            hit_tp = (not is_short and exit_price >= tp * 0.99) or (is_short and exit_price <= tp * 1.01)
             return "tp_hit" if hit_tp else "manual"
         else:
             return "manual"

@@ -13,37 +13,38 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from ib_async import IB, Option
-from ib_async import LimitOrder, StopOrder
+from ib_async import IB, LimitOrder, Option, StopOrder
 
 from config import CONFIG
 from learning import log_order
-from risk import (check_combined_exposure, check_sector_concentration,
-                  record_win, record_loss)
-from orders_state import (
-    log,
-    active_trades, recently_closed,
-    _trades_lock,
-    _safe_del_trade, _safe_update_trade,
-)
 from orders_contracts import (
-    is_options_market_open, _ET,
-    get_contract,
+    _ET,
     _cancel_ibkr_order_by_id,
     _is_option_contract,
+    get_contract,
+    is_options_market_open,
 )
+from orders_state import (
+    _safe_del_trade,
+    _safe_update_trade,
+    _trades_lock,
+    active_trades,
+    log,
+    recently_closed,
+)
+from risk import check_combined_exposure, check_sector_concentration, record_loss, record_win
 
 # ── Module-level options tracking state ─────────────────────────────────────
-_option_sell_attempts: dict = {}   # opt_key → {"count": int, "last_try": datetime, "had_partial": bool}
-_MAX_OPTION_SELL_RETRIES = 3       # after this many failures, pause retries for cooldown
-_OPTION_SELL_COOLDOWN = 600        # seconds (10 min) before retrying after max failures
-_MIN_SELL_RETRY_INTERVAL_S = 90    # min seconds between any two sell attempts (prevents PM+check_options double-fire)
+_option_sell_attempts: dict = {}  # opt_key → {"count": int, "last_try": datetime, "had_partial": bool}
+_MAX_OPTION_SELL_RETRIES = 3  # after this many failures, pause retries for cooldown
+_OPTION_SELL_COOLDOWN = 600  # seconds (10 min) before retrying after max failures
+_MIN_SELL_RETRY_INTERVAL_S = 90  # min seconds between any two sell attempts (prevents PM+check_options double-fire)
 
 # Exits requested while the options market was closed — flushed on next open cycle
 _PENDING_EXITS_FILE = os.path.join(os.path.dirname(__file__), "data", "pending_option_exits.json")
-_pending_option_exits: dict = {}   # opt_key → original reason string
+_pending_option_exits: dict = {}  # opt_key → original reason string
 
 
 def _load_pending_exits() -> None:
@@ -54,6 +55,7 @@ def _load_pending_exits() -> None:
                 _pending_option_exits = json.load(f)
             if _pending_option_exits:
                 import logging as _logging
+
                 _logging.getLogger(__name__).info(
                     f"orders_options: loaded {len(_pending_option_exits)} persisted pending exit(s): "
                     + ", ".join(_pending_option_exits.keys())
@@ -71,23 +73,24 @@ def _save_pending_exits() -> None:
         os.replace(tmp, _PENDING_EXITS_FILE)
     except Exception as _e:
         import logging as _logging
+
         _logging.getLogger(__name__).warning(f"orders_options: failed to persist pending exits: {_e}")
 
 
 _load_pending_exits()
 
 
-def execute_buy_option(ib: IB, contract_info: dict,
-                       portfolio_value: float, reasoning: str = "",
-                       score: int = 0) -> bool:
+def execute_buy_option(
+    ib: IB, contract_info: dict, portfolio_value: float, reasoning: str = "", score: int = 0
+) -> bool:
     """
     Buy an options contract (call or put).
     contract_info is the dict returned by options.find_best_contract().
     Entry is a limit order at the mid price.
     Returns True if order placed successfully.
     """
-    symbol    = contract_info["symbol"]
-    opt_key   = f"{symbol}_{contract_info['right']}_{contract_info['strike']}_{contract_info['expiry_str']}"
+    symbol = contract_info["symbol"]
+    opt_key = f"{symbol}_{contract_info['right']}_{contract_info['strike']}_{contract_info['expiry_str']}"
 
     # Options only trade during regular market hours (9:30–16:00 ET)
     if not is_options_market_open():
@@ -106,12 +109,11 @@ def execute_buy_option(ib: IB, contract_info: dict,
 
         # ── FIX #1+3: Cross-instrument + combined exposure check ──────
         n_contracts = contract_info["contracts"]
-        mid_price   = contract_info["mid"]
+        mid_price = contract_info["mid"]
         est_option_value = n_contracts * mid_price * 100  # total premium outlay
 
         exp_ok, exp_reason = check_combined_exposure(
-            symbol, est_option_value, list(active_trades.values()),
-            portfolio_value, instrument="option"
+            symbol, est_option_value, list(active_trades.values()), portfolio_value, instrument="option"
         )
         if not exp_ok:
             log.warning(f"Combined exposure block for {symbol} options: {exp_reason}")
@@ -119,8 +121,9 @@ def execute_buy_option(ib: IB, contract_info: dict,
 
         # ── FIX #2: Sector concentration check ────────────────────────
         sec_ok, sec_reason = check_sector_concentration(
-            symbol, list(active_trades.values()),
-            portfolio_value  # regime not passed to execute_buy_option, default NORMAL
+            symbol,
+            list(active_trades.values()),
+            portfolio_value,  # regime not passed to execute_buy_option, default NORMAL
         )
         if not sec_ok:
             log.warning(f"Sector block for {symbol} options: {sec_reason}")
@@ -134,7 +137,7 @@ def execute_buy_option(ib: IB, contract_info: dict,
     # The alpha is in getting the position on, not saving $0.05-0.10 on entry.
     ask_price = contract_info.get("ask", 0.0)
     if ask_price > mid_price > 0:
-        limit_price = round(ask_price, 2)        # at-ask: fills reliably
+        limit_price = round(ask_price, 2)  # at-ask: fills reliably
     else:
         limit_price = round(mid_price * 1.05, 2)  # fallback: 5% above mid
 
@@ -151,71 +154,73 @@ def execute_buy_option(ib: IB, contract_info: dict,
         account = CONFIG["active_account"]
 
         # Options only trade during regular hours — outsideRth must be False
-        entry_order = LimitOrder("BUY", n_contracts, limit_price,
-                                 account=account, tif="DAY", outsideRth=False)
+        entry_order = LimitOrder("BUY", n_contracts, limit_price, account=account, tif="DAY", outsideRth=False)
         trade = ib.placeOrder(option_contract, entry_order)
         ib.sleep(1)
 
         # Check if IBKR immediately rejected the order
         order_status = trade.orderStatus.status
-        if order_status in ('Cancelled', 'Inactive', 'ApiCancelled', 'ValidationError'):
+        if order_status in ("Cancelled", "Inactive", "ApiCancelled", "ValidationError"):
             log.error(f"Option order immediately rejected by IBKR for {opt_key}: {order_status}")
             _safe_del_trade(opt_key)  # release reservation
             return False
 
         # Log the option order
-        log_order({
-            "order_id":   trade.order.orderId,
-            "symbol":     symbol,
-            "side":       "BUY",
-            "order_type": "LMT",
-            "qty":        n_contracts,
-            "price":      limit_price,
-            "status":     "SUBMITTED",
-            "instrument": "option",
-            "right":      contract_info["right"],
-            "strike":     contract_info["strike"],
-            "expiry":     contract_info["expiry_str"],
-            "mid":        mid_price,
-            "ask":        ask_price,
-            "spread_pct": contract_info.get("spread_pct"),
-            "reasoning":  reasoning,
-            "timestamp":  datetime.now(timezone.utc).isoformat(),
-        })
+        log_order(
+            {
+                "order_id": trade.order.orderId,
+                "symbol": symbol,
+                "side": "BUY",
+                "order_type": "LMT",
+                "qty": n_contracts,
+                "price": limit_price,
+                "status": "SUBMITTED",
+                "instrument": "option",
+                "right": contract_info["right"],
+                "strike": contract_info["strike"],
+                "expiry": contract_info["expiry_str"],
+                "mid": mid_price,
+                "ask": ask_price,
+                "spread_pct": contract_info.get("spread_pct"),
+                "reasoning": reasoning,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
 
         try:
             from ic_calculator import get_current_weights as _get_icw_opt
+
             _icw_at_entry_opt = _get_icw_opt()
         except Exception:
             _icw_at_entry_opt = None
         active_trades[opt_key] = {
-            "symbol":              symbol,
-            "instrument":          "option",
-            "right":               contract_info["right"],
-            "strike":              contract_info["strike"],
-            "expiry_str":          contract_info["expiry_str"],
-            "expiry_ibkr":         contract_info["expiry_ibkr"],
-            "dte":                 contract_info["dte"],
-            "contracts":           n_contracts,
-            "entry_premium":       mid_price,
-            "current_premium":     mid_price,
-            "entry":               mid_price,          # unified field for dashboard
-            "current":             mid_price,
-            "qty":                 n_contracts,
-            "sl":                  round(mid_price * (1 - CONFIG.get("options_stop_loss", 0.50)), 4),
-            "tp":                  round(mid_price * (1 + CONFIG.get("options_profit_target", 0.75)), 4),
-            "delta":               contract_info.get("delta"),
-            "theta":               contract_info.get("theta"),
-            "iv":                  contract_info.get("iv"),
-            "iv_rank":             contract_info.get("iv_rank"),
-            "underlying_price":    contract_info.get("underlying_price"),
-            "pnl":                 0.0,
-            "score":               score,
-            "entry_score":         score,   # immutable snapshot for portfolio manager
-            "direction":           "LONG",
-            "reasoning":           reasoning,
-            "status":              "PENDING",
-            "order_id":            trade.order.orderId,
+            "symbol": symbol,
+            "instrument": "option",
+            "right": contract_info["right"],
+            "strike": contract_info["strike"],
+            "expiry_str": contract_info["expiry_str"],
+            "expiry_ibkr": contract_info["expiry_ibkr"],
+            "dte": contract_info["dte"],
+            "contracts": n_contracts,
+            "entry_premium": mid_price,
+            "current_premium": mid_price,
+            "entry": mid_price,  # unified field for dashboard
+            "current": mid_price,
+            "qty": n_contracts,
+            "sl": round(mid_price * (1 - CONFIG.get("options_stop_loss", 0.50)), 4),
+            "tp": round(mid_price * (1 + CONFIG.get("options_profit_target", 0.75)), 4),
+            "delta": contract_info.get("delta"),
+            "theta": contract_info.get("theta"),
+            "iv": contract_info.get("iv"),
+            "iv_rank": contract_info.get("iv_rank"),
+            "underlying_price": contract_info.get("underlying_price"),
+            "pnl": 0.0,
+            "score": score,
+            "entry_score": score,  # immutable snapshot for portfolio manager
+            "direction": "LONG",
+            "reasoning": reasoning,
+            "status": "PENDING",
+            "order_id": trade.order.orderId,
             "ic_weights_at_entry": _icw_at_entry_opt,
         }
 
@@ -234,7 +239,7 @@ def execute_buy_option(ib: IB, contract_info: dict,
         return False
 
 
-def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_override: int = None) -> bool:
+def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_override: int | None = None) -> bool:
     """
     Close an open options position using a limit order at the current bid.
     IBKR rejects MKT and midpoint LMT orders on illiquid/falling options, so we
@@ -247,8 +252,7 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
     if not is_options_market_open():
         now_et = datetime.now(_ET)
         log.warning(
-            f"Options market closed ({now_et.strftime('%H:%M ET')}) — "
-            f"deferring exit for {opt_key} until next open"
+            f"Options market closed ({now_et.strftime('%H:%M ET')}) — deferring exit for {opt_key} until next open"
         )
         _pending_option_exits[opt_key] = reason
         _save_pending_exits()
@@ -273,11 +277,14 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
     # ── Retry gating: don't spam IBKR with the same failing order ──
     attempts = _option_sell_attempts.get(opt_key, {"count": 0, "last_try": datetime.min, "had_partial": False})
     if attempts["count"] >= _MAX_OPTION_SELL_RETRIES:
-        elapsed = (datetime.now(timezone.utc) - attempts["last_try"]).total_seconds()
+        elapsed = (datetime.now(UTC) - attempts["last_try"]).total_seconds()
         if elapsed < _OPTION_SELL_COOLDOWN:
-            log.warning(f"Option sell for {opt_key} failed {attempts['count']}x — "
-                        f"cooling down ({int(_OPTION_SELL_COOLDOWN - elapsed)}s remaining)")
+            log.warning(
+                f"Option sell for {opt_key} failed {attempts['count']}x — "
+                f"cooling down ({int(_OPTION_SELL_COOLDOWN - elapsed)}s remaining)"
+            )
             from learning import _append_audit_event
+
             _append_audit_event(
                 "option_sell_stuck",
                 opt_key=opt_key,
@@ -295,10 +302,12 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
 
     # ── Min interval guard: prevent PM + check_options double-firing in the same cycle ──
     if attempts["count"] > 0 and attempts["last_try"] != datetime.min:
-        elapsed_since_last = (datetime.now(timezone.utc) - attempts["last_try"]).total_seconds()
+        elapsed_since_last = (datetime.now(UTC) - attempts["last_try"]).total_seconds()
         if elapsed_since_last < _MIN_SELL_RETRY_INTERVAL_S:
-            log.debug(f"Option sell {opt_key}: retry interval not elapsed "
-                      f"({int(elapsed_since_last)}s / {_MIN_SELL_RETRY_INTERVAL_S}s) — skipping")
+            log.debug(
+                f"Option sell {opt_key}: retry interval not elapsed "
+                f"({int(elapsed_since_last)}s / {_MIN_SELL_RETRY_INTERVAL_S}s) — skipping"
+            )
             return False
 
     _safe_update_trade(opt_key, {"status": "EXITING"})
@@ -315,18 +324,19 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
         ib.qualifyContracts(option_contract)
 
         # ── Get current bid for limit price ──
-        ticker = ib.reqMktData(option_contract, '', False, False)
+        ticker = ib.reqMktData(option_contract, "", False, False)
         ib.sleep(2)  # allow quote data to arrive
 
-        bid = getattr(ticker, 'bid', None)
-        ask = getattr(ticker, 'ask', None)
-        last = getattr(ticker, 'last', None)
+        bid = getattr(ticker, "bid", None)
+        ask = getattr(ticker, "ask", None)
+        last = getattr(ticker, "last", None)
 
         # Determine order direction: SHORT positions close with BUY, LONG with SELL
         _is_short = pos.get("direction", "LONG").upper() == "SHORT"
         _close_action = "BUY" if _is_short else "SELL"
 
         import math as _m
+
         _bid_ok = bid is not None and not _m.isnan(bid) and bid > 0
         _ask_ok = ask is not None and not _m.isnan(ask) and ask > 0
         _retry_count = attempts["count"]
@@ -361,14 +371,14 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
 
         ib.cancelMktData(option_contract)
 
-        sell_order = LimitOrder(_close_action, sell_contracts, limit_price,
-                                account=CONFIG["active_account"],
-                                tif="DAY")
+        sell_order = LimitOrder(_close_action, sell_contracts, limit_price, account=CONFIG["active_account"], tif="DAY")
         sell_order.outsideRth = False
         opt_sell_trade = ib.placeOrder(option_contract, sell_order)
 
-        log.info(f"Option LMT {_close_action} placed: {opt_key} x{sell_contracts} @ ${limit_price:.2f} "
-                 f"(bid={bid}, ask={ask}, direction={pos.get('direction', 'LONG')})")
+        log.info(
+            f"Option LMT {_close_action} placed: {opt_key} x{sell_contracts} @ ${limit_price:.2f} "
+            f"(bid={bid}, ask={ask}, direction={pos.get('direction', 'LONG')})"
+        )
 
         # Wait for fill confirmation
         max_wait = 15 if attempts["count"] == 0 else 25
@@ -394,17 +404,19 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
                 # Partial fill: market IS trading at this level — don't step price down,
                 # just record the timestamp so the min-interval guard prevents immediate re-fire.
                 attempts["had_partial"] = True
-                attempts["last_try"] = datetime.now(timezone.utc)
+                attempts["last_try"] = datetime.now(UTC)
                 _option_sell_attempts[opt_key] = attempts
             else:
                 # Zero fill: market rejected this price — step down next attempt.
                 attempts["count"] += 1
                 attempts["had_partial"] = False
-                attempts["last_try"] = datetime.now(timezone.utc)
+                attempts["last_try"] = datetime.now(UTC)
                 _option_sell_attempts[opt_key] = attempts
-            log.error(f"Option sell for {opt_key} not filled — status={order_status}, "
-                      f"limit=${limit_price:.2f}. Attempt {attempts['count']}/{_MAX_OPTION_SELL_RETRIES}. "
-                      f"Keeping position in tracker (IBKR still holds it).")
+            log.error(
+                f"Option sell for {opt_key} not filled — status={order_status}, "
+                f"limit=${limit_price:.2f}. Attempt {attempts['count']}/{_MAX_OPTION_SELL_RETRIES}. "
+                f"Keeping position in tracker (IBKR still holds it)."
+            )
             try:
                 ib.cancelOrder(opt_sell_trade.order)
             except Exception:
@@ -420,7 +432,7 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
                 f"treating as failed (paper account false positive)."
             )
             attempts["count"] += 1
-            attempts["last_try"] = datetime.now(timezone.utc)
+            attempts["last_try"] = datetime.now(UTC)
             _option_sell_attempts[opt_key] = attempts
             try:
                 ib.cancelOrder(opt_sell_trade.order)
@@ -433,25 +445,27 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
         _option_sell_attempts.pop(opt_key, None)
 
         # Log the option close order
-        log_order({
-            "order_id":   opt_sell_trade.order.orderId,
-            "symbol":     pos["symbol"],
-            "side":       _close_action,
-            "order_type": "LMT",
-            "qty":        sell_contracts,
-            "price":      limit_price,
-            "status":     "FILLED",
-            "instrument": "option",
-            "right":      pos["right"],
-            "strike":     pos["strike"],
-            "expiry":     pos["expiry_str"],
-            "fill_price": fill_price,
-            "role":       "close",
-            "reason":     reason,
-            "timestamp":  datetime.now(timezone.utc).isoformat(),
-        })
+        log_order(
+            {
+                "order_id": opt_sell_trade.order.orderId,
+                "symbol": pos["symbol"],
+                "side": _close_action,
+                "order_type": "LMT",
+                "qty": sell_contracts,
+                "price": limit_price,
+                "status": "FILLED",
+                "instrument": "option",
+                "right": pos["right"],
+                "strike": pos["strike"],
+                "expiry": pos["expiry_str"],
+                "fill_price": fill_price,
+                "role": "close",
+                "reason": reason,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
 
-        entry   = pos["entry_premium"]
+        entry = pos["entry_premium"]
         current = fill_price
         if _is_short:
             pnl = (entry - current) * sell_contracts * 100
@@ -461,10 +475,12 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
         # Check commission report for IBKR realizedPNL
         try:
             import math as _math
+
             _fills = ib.fills()
             _close_sides = ("SLD", "SELL") if _close_action == "SELL" else ("BOT", "BUY")
             opt_sell_fills = [
-                f for f in _fills
+                f
+                for f in _fills
                 if f.contract.symbol == pos["symbol"]
                 and f.execution.side.upper() in _close_sides
                 and _is_option_contract(f.contract)
@@ -472,7 +488,7 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
             for f in opt_sell_fills:
                 cr = f.commissionReport
                 if cr is not None:
-                    raw = getattr(cr, 'realizedPNL', None)
+                    raw = getattr(cr, "realizedPNL", None)
                     if raw is not None:
                         raw_f = float(raw)
                         if not _math.isnan(raw_f) and raw_f != 0.0:
@@ -487,6 +503,7 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
             record_loss()
 
         from learning import log_trade
+
         log_trade(
             trade=pos,
             agent_outputs={},
@@ -494,9 +511,9 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
             action="CLOSE",
             outcome={
                 "exit_price": round(current, 4),
-                "pnl":        round(pnl, 2),
-                "reason":     reason,
-            }
+                "pnl": round(pnl, 2),
+                "reason": reason,
+            },
         )
 
         log.info(
@@ -508,15 +525,15 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
             _safe_update_trade(opt_key, {"contracts": remaining_c, "qty": remaining_c, "status": "ACTIVE"})
             log.info(f"[TRIM] {opt_key}: sold {sell_contracts} contracts, {remaining_c} remaining")
         else:
-            recently_closed[pos["symbol"]] = datetime.now(timezone.utc).isoformat()
+            recently_closed[pos["symbol"]] = datetime.now(UTC).isoformat()
             del active_trades[opt_key]
         return True
 
     except Exception as e:
         log.error(f"Option sell failed {opt_key}: {e}")
-        _exc_att = _option_sell_attempts.get(opt_key, {"count": 0, "last_try": datetime.now(timezone.utc)})
+        _exc_att = _option_sell_attempts.get(opt_key, {"count": 0, "last_try": datetime.now(UTC)})
         _exc_att["count"] += 1
-        _exc_att["last_try"] = datetime.now(timezone.utc)
+        _exc_att["last_try"] = datetime.now(UTC)
         _option_sell_attempts[opt_key] = _exc_att
         _safe_update_trade(opt_key, {"status": "ACTIVE"})
         return False
@@ -582,17 +599,17 @@ def update_tranche_status(ib: IB) -> None:
             # ── T1 HAS FILLED ──────────────────────────────────────────────────
             log.info(f"[TRANCHE] T1 filled for {symbol} (order #{t1_order_id})")
 
-            entry    = trade["entry"]
-            t1_qty   = trade["t1_qty"]
-            t2_qty   = trade["t2_qty"]
-            tp_t1    = trade["tp"]
+            entry = trade["entry"]
+            t1_qty = trade["t1_qty"]
+            t2_qty = trade["t2_qty"]
+            tp_t1 = trade["tp"]
             sl_price = trade["sl"]
 
             t1_pnl = round((tp_t1 - entry) * t1_qty, 2)
             from learning import log_trade
+
             log_trade(
-                trade={**trade, "qty": t1_qty,
-                       "tranche_id": 1, "parent_trade_id": trade.get("order_id")},
+                trade={**trade, "qty": t1_qty, "tranche_id": 1, "parent_trade_id": trade.get("order_id")},
                 agent_outputs=trade.get("agent_outputs", {}),
                 regime={"regime": "UNKNOWN", "vix": 0.0},
                 action="CLOSE",
@@ -608,9 +625,12 @@ def update_tranche_status(ib: IB) -> None:
             # Place standalone T2 stop
             contract = get_contract(symbol)
             t2_stop = StopOrder(
-                "SELL", t2_qty, sl_price,
+                "SELL",
+                t2_qty,
+                sl_price,
                 account=CONFIG["active_account"],
-                tif="GTC", outsideRth=True,
+                tif="GTC",
+                outsideRth=True,
             )
             t2_stop.transmit = True
             t2_stop_trade = ib.placeOrder(contract, t2_stop)
@@ -619,10 +639,10 @@ def update_tranche_status(ib: IB) -> None:
 
             with _trades_lock:
                 if symbol in active_trades:
-                    active_trades[symbol]["t1_status"]      = "FILLED"
+                    active_trades[symbol]["t1_status"] = "FILLED"
                     active_trades[symbol]["t2_sl_order_id"] = new_id
-                    active_trades[symbol]["sl_order_id"]    = new_id
-                    active_trades[symbol]["qty"]            = t2_qty
+                    active_trades[symbol]["sl_order_id"] = new_id
+                    active_trades[symbol]["qty"] = t2_qty
 
             log.info(
                 f"[TRANCHE] {symbol} T1 ✅ P&L ${t1_pnl:+.2f} — "
@@ -670,19 +690,19 @@ def update_trailing_stops(ib: IB) -> None:
                 continue
 
             direction = trade.get("direction", "LONG")
-            current   = trade.get("current", trade["entry"])
-            hwm       = trade.get("high_water_mark", trade["entry"])
-            old_sl    = trade["sl"]
-            qty       = trade["qty"]
+            current = trade.get("current", trade["entry"])
+            hwm = trade.get("high_water_mark", trade["entry"])
+            old_sl = trade["sl"]
+            qty = trade["qty"]
 
             if direction == "LONG":
                 new_hwm = max(hwm, current)
-                new_sl  = round(new_hwm - trail_mult * atr, 2)
+                new_sl = round(new_hwm - trail_mult * atr, 2)
                 if new_sl <= old_sl:
                     continue
             else:  # SHORT
                 new_hwm = min(hwm, current)
-                new_sl  = round(new_hwm + trail_mult * atr, 2)
+                new_sl = round(new_hwm + trail_mult * atr, 2)
                 if new_sl >= old_sl:
                     continue
 
@@ -692,7 +712,9 @@ def update_trailing_stops(ib: IB) -> None:
 
             contract = get_contract(symbol)
             modified_stop = StopOrder(
-                "SELL", qty, new_sl,
+                "SELL",
+                qty,
+                new_sl,
                 account=CONFIG["active_account"],
                 tif="GTC",
                 outsideRth=True,
@@ -704,7 +726,7 @@ def update_trailing_stops(ib: IB) -> None:
 
             with _trades_lock:
                 if symbol in active_trades:
-                    active_trades[symbol]["sl"]              = new_sl
+                    active_trades[symbol]["sl"] = new_sl
                     active_trades[symbol]["high_water_mark"] = new_hwm
 
             log.info(
@@ -757,7 +779,8 @@ def _save_options_ledger(ledger: dict) -> None:
 def _options_attempted_today(symbol: str, direction: str) -> bool:
     """Return True if we already attempted options on this symbol+direction today."""
     from datetime import datetime as _dt
-    key   = f"{symbol}_{direction}"
+
+    key = f"{symbol}_{direction}"
     today = _dt.now().strftime("%Y-%m-%d")
     return _options_ledger.get(key) == today
 
@@ -765,7 +788,8 @@ def _options_attempted_today(symbol: str, direction: str) -> bool:
 def _record_options_attempt(symbol: str, direction: str) -> None:
     """Mark this symbol+direction as attempted today and persist."""
     from datetime import datetime as _dt
-    key   = f"{symbol}_{direction}"
+
+    key = f"{symbol}_{direction}"
     today = _dt.now().strftime("%Y-%m-%d")
     _options_ledger[key] = today
     # Prune stale entries (any date != today) to keep the file tidy

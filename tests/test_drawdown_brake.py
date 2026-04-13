@@ -10,23 +10,31 @@ Covers:
 - Empty equity history is a no-op
 - Existing higher HWM is not downgraded
 """
+
 import os
 import sys
 from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-for mod in ["ib_async", "ib_insync", "anthropic", "yfinance",
-            "praw", "feedparser", "tvDatafeed", "requests_html"]:
+for mod in ["ib_async", "ib_insync", "anthropic", "yfinance", "praw", "feedparser", "tvDatafeed", "requests_html"]:
     sys.modules.setdefault(mod, MagicMock())
 
 import config as _config_mod
+
 _cfg = {
-    "log_file": "/dev/null", "trade_log": "/dev/null", "order_log": "/dev/null",
-    "anthropic_api_key": "test-key", "model": "claude-sonnet-4-20250514",
-    "max_tokens": 1000, "mongo_uri": "", "db_name": "test",
-    "max_drawdown_alert": 0.25, "daily_loss_limit": 0.10,
-    "min_cash_reserve": 0.05, "consecutive_loss_pause": 5,
+    "log_file": "/dev/null",
+    "trade_log": "/dev/null",
+    "order_log": "/dev/null",
+    "anthropic_api_key": "test-key",
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1000,
+    "mongo_uri": "",
+    "db_name": "test",
+    "max_drawdown_alert": 0.25,
+    "daily_loss_limit": 0.10,
+    "min_cash_reserve": 0.05,
+    "consecutive_loss_pause": 5,
     "pdt": {"enabled": False},
 }
 if hasattr(_config_mod, "CONFIG"):
@@ -37,9 +45,9 @@ else:
     _config_mod.CONFIG = _cfg
 
 sys.modules.pop("risk", None)
-import risk
-
 import pytest
+
+import risk
 
 
 def _reset():
@@ -52,8 +60,10 @@ def _reset():
 # Test 1: first breach returns True
 # ---------------------------------------------------------------------------
 
+
 class TestNewlyHaltedReturnsTrue:
-    def setup_method(self): _reset()
+    def setup_method(self):
+        _reset()
 
     def test_returns_true_on_first_breach(self):
         """Exactly at the 25% drawdown limit must return True."""
@@ -72,12 +82,14 @@ class TestNewlyHaltedReturnsTrue:
 # Test 2: subsequent calls when already halted return False (idempotent)
 # ---------------------------------------------------------------------------
 
+
 class TestAlreadyHaltedReturnsFalse:
-    def setup_method(self): _reset()
+    def setup_method(self):
+        _reset()
 
     def test_second_call_at_same_equity_returns_false(self):
         risk.update_equity_high_water_mark(100_000.0)
-        risk.update_equity_high_water_mark(74_000.0)   # first breach → True
+        risk.update_equity_high_water_mark(74_000.0)  # first breach → True
         result = risk.update_equity_high_water_mark(74_000.0)  # already halted
         assert result is False
 
@@ -92,8 +104,10 @@ class TestAlreadyHaltedReturnsFalse:
 # Test 3: normal equity updates return False
 # ---------------------------------------------------------------------------
 
+
 class TestNoBreachReturnsFalse:
-    def setup_method(self): _reset()
+    def setup_method(self):
+        _reset()
 
     def test_small_drawdown_returns_false(self):
         """10% drawdown — well below 25% limit — must return False."""
@@ -120,8 +134,10 @@ class TestNoBreachReturnsFalse:
 # Test 4: equity exceeding HWM clears _drawdown_halt
 # ---------------------------------------------------------------------------
 
+
 class TestHaltClearsOnRecovery:
-    def setup_method(self): _reset()
+    def setup_method(self):
+        _reset()
 
     def test_halt_clears_on_new_high(self):
         risk.update_equity_high_water_mark(100_000.0)
@@ -138,8 +154,10 @@ class TestHaltClearsOnRecovery:
 # Test 5: check_risk_conditions() blocks new trades when drawdown halted
 # ---------------------------------------------------------------------------
 
+
 class TestCheckRiskConditionsBlockedWhenDrawdownHalted:
-    def setup_method(self): _reset()
+    def setup_method(self):
+        _reset()
 
     def test_blocks_new_trades(self):
         risk._drawdown_halt = True
@@ -161,8 +179,10 @@ class TestCheckRiskConditionsBlockedWhenDrawdownHalted:
 # Test 6–9: init_equity_high_water_mark_from_history()
 # ---------------------------------------------------------------------------
 
+
 class TestInitHWMFromHistory:
-    def setup_method(self): _reset()
+    def setup_method(self):
+        _reset()
 
     def test_sets_max_value(self):
         history = [
@@ -201,6 +221,7 @@ class TestInitHWMFromHistory:
 # (NEW) HWM state file persistence tests
 # ---------------------------------------------------------------------------
 
+
 class TestHWMStatePersistence:
     """
     Validates load_hwm_state() / save_hwm_state() and the updated
@@ -214,6 +235,7 @@ class TestHWMStatePersistence:
     def test_save_hwm_state_creates_valid_json(self, tmp_path, monkeypatch):
         """save_hwm_state() must create a readable JSON file with 'hwm' and 'updated' keys."""
         import json as _json
+
         monkeypatch.setattr(risk, "HWM_STATE_FILE", str(tmp_path / "hwm_state.json"))
         risk.save_hwm_state(123_456.78)
 
@@ -233,8 +255,7 @@ class TestHWMStatePersistence:
 
     def test_load_hwm_state_missing_file_returns_none(self, tmp_path, monkeypatch):
         """load_hwm_state() with no file must return None (no crash)."""
-        monkeypatch.setattr(risk, "HWM_STATE_FILE",
-                            str(tmp_path / "nonexistent.json"))
+        monkeypatch.setattr(risk, "HWM_STATE_FILE", str(tmp_path / "nonexistent.json"))
         assert risk.load_hwm_state() is None
 
     def test_load_hwm_state_corrupt_file_returns_none(self, tmp_path, monkeypatch):
@@ -249,13 +270,9 @@ class TestHWMStatePersistence:
         Documents the original bug: 2000 truncated entries that don't include
         the all-time peak produce a lower HWM when no state file is present.
         """
-        monkeypatch.setattr(risk, "HWM_STATE_FILE",
-                            str(tmp_path / "nonexistent.json"))
+        monkeypatch.setattr(risk, "HWM_STATE_FILE", str(tmp_path / "nonexistent.json"))
         all_time_peak = 200_000.0
-        truncated_history = [
-            {"date": f"2026-01-{i:04d}", "value": 100_000.0 + i}
-            for i in range(2000)
-        ]
+        truncated_history = [{"date": f"2026-01-{i:04d}", "value": 100_000.0 + i} for i in range(2000)]
         risk.init_equity_high_water_mark_from_history(truncated_history)
         assert risk._equity_high_water_mark < all_time_peak, (
             "Without state file, truncated history should produce a lower HWM"
@@ -269,10 +286,7 @@ class TestHWMStatePersistence:
         monkeypatch.setattr(risk, "HWM_STATE_FILE", str(tmp_path / "hwm_state.json"))
         risk.save_hwm_state(200_000.0)
 
-        truncated_history = [
-            {"date": f"2026-01-{i:04d}", "value": 100_000.0 + i}
-            for i in range(2000)
-        ]
+        truncated_history = [{"date": f"2026-01-{i:04d}", "value": 100_000.0 + i} for i in range(2000)]
         risk.init_equity_high_water_mark_from_history(truncated_history)
         assert risk._equity_high_water_mark == pytest.approx(200_000.0), (
             f"State file must restore all-time peak, got {risk._equity_high_water_mark:,.2f}"
@@ -292,10 +306,8 @@ class TestHWMStatePersistence:
         a new all-time high is set so the state file stays current.
         """
         monkeypatch.setattr(risk, "HWM_STATE_FILE", str(tmp_path / "hwm_state.json"))
-        risk.update_equity_high_water_mark(100_000.0)   # init
-        risk.update_equity_high_water_mark(110_000.0)   # new high
+        risk.update_equity_high_water_mark(100_000.0)  # init
+        risk.update_equity_high_water_mark(110_000.0)  # new high
 
         loaded = risk.load_hwm_state()
-        assert loaded == pytest.approx(110_000.0), (
-            "State file must reflect the new all-time high after update"
-        )
+        assert loaded == pytest.approx(110_000.0), "State file must reflect the new all-time high after update"

@@ -20,13 +20,14 @@ Usage:
 """
 
 from __future__ import annotations
+
 import json
 import os
 import shutil
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 
-ROOT   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TRADES = os.path.join(ROOT, "data", "trades.json")
 BACKUP = os.path.join(ROOT, "data", "trades.json.pre_migration_bak")
 
@@ -36,39 +37,39 @@ LEGACY_SOURCES = {"ibkr_activity_statement", "ibkr_backfill"}
 # Canonical field set from learning.py:log_trade()
 # Value is the default used when field is absent.
 CANONICAL = {
-    "timestamp":           None,
-    "action":              None,
-    "symbol":              None,
-    "direction":           "LONG",
-    "qty":                 None,
-    "entry_price":         None,
-    "exit_price":          None,
-    "sl":                  None,
-    "tp":                  None,
-    "score":               None,    # never fabricate — null means unknown
-    "entry_score":         None,
-    "setup_type":          None,
-    "reasoning":           None,
-    "regime":              None,
-    "vix":                 None,
-    "pnl":                 None,
-    "pnl_pct":             None,
-    "exit_reason":         None,
-    "hold_minutes":        None,
-    "agents":              {},
-    "signal_scores":       {},
-    "score_breakdown":     {},
+    "timestamp": None,
+    "action": None,
+    "symbol": None,
+    "direction": "LONG",
+    "qty": None,
+    "entry_price": None,
+    "exit_price": None,
+    "sl": None,
+    "tp": None,
+    "score": None,  # never fabricate — null means unknown
+    "entry_score": None,
+    "setup_type": None,
+    "reasoning": None,
+    "regime": None,
+    "vix": None,
+    "pnl": None,
+    "pnl_pct": None,
+    "exit_reason": None,
+    "hold_minutes": None,
+    "agents": {},
+    "signal_scores": {},
+    "score_breakdown": {},
     "ic_weights_at_entry": None,
-    "ic_weighted_score":   None,
-    "candle_gate":         "UNKNOWN",
-    "tranche_id":          None,
-    "parent_trade_id":     None,
-    "pattern_id":          None,
-    "advice_id":           "",
-    "trade_type":          None,
-    "conviction":          None,
-    "entry_thesis":        None,
-    "legacy":              False,   # will be overridden for legacy sources
+    "ic_weighted_score": None,
+    "candle_gate": "UNKNOWN",
+    "tranche_id": None,
+    "parent_trade_id": None,
+    "pattern_id": None,
+    "advice_id": "",
+    "trade_type": None,
+    "conviction": None,
+    "entry_thesis": None,
+    "legacy": False,  # will be overridden for legacy sources
 }
 
 
@@ -94,15 +95,12 @@ def _derive_hold_minutes(trade: dict) -> int | None:
     """Compute hold_minutes from whatever time fields exist."""
     # New schema: open_time (set on active trade) vs close timestamp
     # Old schema: entry_time + exit_time both present
-    entry_str = (trade.get("entry_time")
-                 or trade.get("open_time")
-                 or trade.get("time"))
-    exit_str  = (trade.get("exit_time")
-                 or trade.get("close_time"))
+    entry_str = trade.get("entry_time") or trade.get("open_time") or trade.get("time")
+    exit_str = trade.get("exit_time") or trade.get("close_time")
     if not entry_str or not exit_str:
         return None
     entry_dt = _parse_dt(entry_str)
-    exit_dt  = _parse_dt(exit_str)
+    exit_dt = _parse_dt(exit_str)
     if entry_dt is None or exit_dt is None:
         return None
     # Make both tz-aware or both naive before subtracting
@@ -117,9 +115,9 @@ def _derive_hold_minutes(trade: dict) -> int | None:
 
 def _derive_pnl_pct(trade: dict) -> float | None:
     """Compute pnl_pct from pnl / (entry_price * qty) if both present."""
-    pnl         = trade.get("pnl")
+    pnl = trade.get("pnl")
     entry_price = trade.get("entry_price")
-    qty         = trade.get("qty")
+    qty = trade.get("qty")
     if pnl is None or not entry_price or not qty:
         return None
     invested = abs(float(entry_price)) * abs(float(qty))
@@ -170,17 +168,17 @@ def main(apply: bool = False) -> None:
         trades = json.load(f)
 
     original_count = len(trades)
-    migrated       = [migrate_trade(t) for t in trades]
+    migrated = [migrate_trade(t) for t in trades]
 
     # Stats
-    legacy_count   = sum(1 for t in migrated if t.get("legacy"))
-    hold_derived   = sum(
-        1 for o, m in zip(trades, migrated)
+    legacy_count = sum(1 for t in migrated if t.get("legacy"))
+    hold_derived = sum(
+        1
+        for o, m in zip(trades, migrated, strict=False)
         if o.get("hold_minutes") is None and m.get("hold_minutes") is not None
     )
-    pct_derived    = sum(
-        1 for o, m in zip(trades, migrated)
-        if o.get("pnl_pct") is None and m.get("pnl_pct") is not None
+    pct_derived = sum(
+        1 for o, m in zip(trades, migrated, strict=False) if o.get("pnl_pct") is None and m.get("pnl_pct") is not None
     )
 
     # Verify all trades now have the full canonical set

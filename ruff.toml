@@ -1,0 +1,55 @@
+# Decifer Trading — Ruff config
+# Docs: https://docs.astral.sh/ruff/configuration/
+
+target-version = "py311"
+line-length = 120
+
+# Files to skip
+exclude = [
+    "venv",
+    ".claude",
+    "__pycache__",
+    "*.egg-info",
+]
+
+[lint]
+# Rules enabled:
+#   F   — Pyflakes (unused imports, undefined names, redefined variables)
+#   E   — pycodestyle errors (syntax-level style issues)
+#   W   — pycodestyle warnings
+#   I   — isort (import sorting)
+#   UP  — pyupgrade (modernize syntax for target Python version)
+#   B   — flake8-bugbear (common bug patterns)
+#   SIM — flake8-simplify (simplifiable constructs)
+#   RUF — Ruff-specific rules
+select = ["F", "E", "W", "I", "UP", "B", "SIM", "RUF"]
+
+ignore = [
+    "E501",   # line too long — handled by formatter
+    "E402",   # import not at top — intentional (sys.path, conditional imports, try/except fallbacks)
+    "E741",   # ambiguous variable names (l, O, I) — common in math/finance code
+    "B008",   # function call in default arg — used intentionally in some patterns
+    "SIM105", # suppressible-exception — try/except/pass is more readable than contextlib.suppress
+    "SIM108", # ternary instead of if/else — readability preference
+    "SIM117", # multiple-with-statements — nested with is clearer in many cases
+    "RUF001", # ambiguous unicode in string — decorative box chars are intentional
+    "RUF002", # ambiguous unicode in docstring — decorative box chars are intentional
+    "RUF003", # ambiguous unicode in comment — decorative box chars are intentional
+    "RUF012", # mutable class variable annotation — too noisy for this codebase
+]
+
+# Allow unused variables when underscore-prefixed
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[lint.per-file-ignores]
+"tests/*" = ["F841", "B018"]  # unused vars and useless expressions OK in tests
+
+[lint.isort]
+known-first-party = [
+    "agents", "signals", "scanner", "bot", "config", "risk",
+    "orders", "options", "news", "learning", "dashboard",
+]
+
+[format]
+quote-style = "double"
+indent-style = "space"

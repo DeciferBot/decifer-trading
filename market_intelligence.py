@@ -33,16 +33,15 @@ from __future__ import annotations
 import json
 import logging
 import threading
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 import anthropic
 
 from config import CONFIG
-from market_observer import get_market_observation, invalidate_cache, MarketObservation
-from pattern_library import get_relevant_patterns, get_thesis_performance, get_setup_performance
-from macro_calendar import get_next_event, _ALL_EVENTS  # type: ignore[attr-defined]
+from macro_calendar import _ALL_EVENTS, get_next_event  # type: ignore[attr-defined]
+from market_observer import MarketObservation, get_market_observation, invalidate_cache
+from pattern_library import get_relevant_patterns, get_setup_performance, get_thesis_performance
 
 log = logging.getLogger("decifer.intelligence")
 
@@ -50,80 +49,115 @@ log = logging.getLogger("decifer.intelligence")
 # Opus picks one of these to describe the market session.  Stored as entry_regime
 # on every new position — replaces the mechanical BULL_TRENDING/CHOPPY labels.
 SESSION_CHARACTER_VOCAB = {
-    "MOMENTUM_BULL",   # strong uptrend, VIX low, broad participation
-    "RELIEF_RALLY",    # bouncing from recent selloff, VIX declining but still elevated
-    "FEAR_ELEVATED",   # VIX rising, cautious but not extreme
-    "DISTRIBUTION",    # selling pressure, SPY declining or losing breadth
-    "TRENDING_BEAR",   # sustained downtrend, shorts working
+    "MOMENTUM_BULL",  # strong uptrend, VIX low, broad participation
+    "RELIEF_RALLY",  # bouncing from recent selloff, VIX declining but still elevated
+    "FEAR_ELEVATED",  # VIX rising, cautious but not extreme
+    "DISTRIBUTION",  # selling pressure, SPY declining or losing breadth
+    "TRENDING_BEAR",  # sustained downtrend, shorts working
     "EXTREME_STRESS",  # VIX spiked hard — circuit breaker territory
 }
-_DEFAULT_SESSION_CHARACTER = "FEAR_ELEVATED"   # conservative fallback if Opus omits
+_DEFAULT_SESSION_CHARACTER = "FEAR_ELEVATED"  # conservative fallback if Opus omits
 
 # ── Significance keywords — trigger full news refresh if seen in headlines ──
 _SIGNIFICANCE_KEYWORDS = {
-    "fed", "fomc", "rate", "hike", "cut", "cpi", "nfp", "payroll",
-    "earnings", "guidance", "miss", "beat", "downgrade", "upgrade",
-    "halt", "bankruptcy", "merger", "acquisition", "tariff", "sanction",
-    "default", "recession", "gdp", "inflation", "surprise",
+    "fed",
+    "fomc",
+    "rate",
+    "hike",
+    "cut",
+    "cpi",
+    "nfp",
+    "payroll",
+    "earnings",
+    "guidance",
+    "miss",
+    "beat",
+    "downgrade",
+    "upgrade",
+    "halt",
+    "bankruptcy",
+    "merger",
+    "acquisition",
+    "tariff",
+    "sanction",
+    "default",
+    "recession",
+    "gdp",
+    "inflation",
+    "surprise",
     # Geopolitical — unscheduled overnight events that move markets
-    "ceasefire", "peace deal", "peace agreement", "war", "invasion",
-    "military", "conflict", "nuclear", "sanctions lifted", "trade deal",
-    "trade agreement", "embargo", "coup", "assassination",
+    "ceasefire",
+    "peace deal",
+    "peace agreement",
+    "war",
+    "invasion",
+    "military",
+    "conflict",
+    "nuclear",
+    "sanctions lifted",
+    "trade deal",
+    "trade agreement",
+    "embargo",
+    "coup",
+    "assassination",
 }
 
 # ── Dataclasses ───────────────────────────────────────────────────────────────
 
+
 @dataclass
 class SignalClassification:
-    symbol:      str
-    trade_type:  str    # SCALP | SWING | HOLD | AVOID
-    conviction:  float  # 0.0–1.0, evidence-based — not LLM self-reported confidence
-    reasoning:   str    # Opus rationale (logged only, never acted upon mechanically)
-    source:      str    # "opus" | "fallback"
+    symbol: str
+    trade_type: str  # SCALP | SWING | HOLD | AVOID
+    conviction: float  # 0.0–1.0, evidence-based — not LLM self-reported confidence
+    reasoning: str  # Opus rationale (logged only, never acted upon mechanically)
+    source: str  # "opus" | "fallback"
 
 
 @dataclass
 class SessionContext:
     """Cached per intelligence_cache_minutes. Rebuilt on expiry."""
-    timestamp:         str
-    market_read:       str           # Opus free-form market interpretation
-    observation:       MarketObservation
-    news_mode:         str           # "full" | "headlines"
-    news_text:         str           # formatted for prompt inclusion
-    pattern_text:      str           # formatted recent patterns for prompt inclusion
-    macro_text:        str           # upcoming macro events
-    thesis_perf_text:  str = ""      # formatted thesis performance for prompt inclusion
-    setup_perf_text:   str = ""      # formatted setup-type edge data for prompt inclusion
-    overnight_text:    str = ""      # overnight research notes (pre-market tone, calendar, yesterday)
+
+    timestamp: str
+    market_read: str  # Opus free-form market interpretation
+    observation: MarketObservation
+    news_mode: str  # "full" | "headlines"
+    news_text: str  # formatted for prompt inclusion
+    pattern_text: str  # formatted recent patterns for prompt inclusion
+    macro_text: str  # upcoming macro events
+    thesis_perf_text: str = ""  # formatted thesis performance for prompt inclusion
+    setup_perf_text: str = ""  # formatted setup-type edge data for prompt inclusion
+    overnight_text: str = ""  # overnight research notes (pre-market tone, calendar, yesterday)
 
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
 
-_ctx_lock    = threading.Lock()
-_session_ctx: Optional[SessionContext] = None
-_ctx_time:    Optional[datetime]       = None
-_session_open_done: bool               = False   # tracks whether first-call full news ran
-_last_session_character: str           = _DEFAULT_SESSION_CHARACTER
+_ctx_lock = threading.Lock()
+_session_ctx: SessionContext | None = None
+_ctx_time: datetime | None = None
+_session_open_done: bool = False  # tracks whether first-call full news ran
+_last_session_character: str = _DEFAULT_SESSION_CHARACTER
 
 
 def _context_valid() -> bool:
     if _session_ctx is None or _ctx_time is None:
         return False
     ttl = timedelta(minutes=CONFIG.get("intelligence_cache_minutes", 30))
-    return (datetime.now(timezone.utc) - _ctx_time) < ttl
+    return (datetime.now(UTC) - _ctx_time) < ttl
 
 
 def invalidate_session_context() -> None:
     """Force context rebuild on next classify call."""
     global _session_ctx, _ctx_time, _session_open_done
     with _ctx_lock:
-        _session_ctx       = None
-        _ctx_time          = None
+        _session_ctx = None
+        _ctx_time = None
         _session_open_done = False
     invalidate_cache()
 
 
 # ── News gathering ────────────────────────────────────────────────────────────
+
 
 def _fetch_market_news(full: bool) -> tuple[str, bool]:
     """
@@ -132,6 +166,7 @@ def _fetch_market_news(full: bool) -> tuple[str, bool]:
     """
     try:
         from news import fetch_yahoo_rss
+
         # Use SPY as the market proxy news source
         articles = fetch_yahoo_rss("SPY", max_articles=15 if full else 8)
         if not articles:
@@ -161,13 +196,11 @@ def _format_macro_calendar() -> str:
     """Format upcoming macro events — 5-day window — for prompt context."""
     try:
         from datetime import date as _date
-        today  = _date.today()
+
+        today = _date.today()
         cutoff = today + timedelta(days=5)
 
-        upcoming = [
-            e for e in _ALL_EVENTS
-            if today <= e["date"] <= cutoff
-        ]
+        upcoming = [e for e in _ALL_EVENTS if today <= e["date"] <= cutoff]
 
         if not upcoming:
             # Fall back to just the next event if none in 5-day window
@@ -178,7 +211,7 @@ def _format_macro_calendar() -> str:
 
         lines = []
         for ev in upcoming:
-            label      = ev["date"].strftime("%a %b %-d")
+            label = ev["date"].strftime("%a %b %-d")
             delta_days = (ev["date"] - today).days
             if delta_days == 0:
                 tag = "  *** TODAY ***"
@@ -200,16 +233,13 @@ def _format_patterns(patterns: list[dict]) -> str:
 
     lines = ["Recent patterns from similar market conditions (learn from these):"]
     for p in patterns[:15]:
-        outcome  = "WIN" if (p.get("pnl") or 0) > 0 else "LOSS"
-        pnl_pct  = p.get("pnl_pct", 0) or 0
-        tt       = p.get("trade_type", "?")
-        sym      = p.get("symbol", "?")
-        read     = (p.get("market_read") or "")[:120]
-        reason   = p.get("exit_reason", "?")
-        lines.append(
-            f"  {sym} {tt} → {outcome} {pnl_pct:+.1f}% ({reason})\n"
-            f"    context: {read}"
-        )
+        outcome = "WIN" if (p.get("pnl") or 0) > 0 else "LOSS"
+        pnl_pct = p.get("pnl_pct", 0) or 0
+        tt = p.get("trade_type", "?")
+        sym = p.get("symbol", "?")
+        read = (p.get("market_read") or "")[:120]
+        reason = p.get("exit_reason", "?")
+        lines.append(f"  {sym} {tt} → {outcome} {pnl_pct:+.1f}% ({reason})\n    context: {read}")
     return "\n".join(lines)
 
 
@@ -238,8 +268,13 @@ def _format_setup_performance(perfs: list[dict]) -> str:
         return "Setup-type edge data\nInsufficient data yet (need ≥3 completed trades per setup type)."
     lines = ["Entry setup edge (by dominant signal dimension, ≥3 trades):"]
     for p in perfs:
-        edge_label = "EDGE" if p["win_rate"] >= 0.55 and p["avg_pnl_pct"] > 0 else \
-                     "AVOID" if p["win_rate"] < 0.40 or p["avg_pnl_pct"] < -0.1 else "NEUTRAL"
+        edge_label = (
+            "EDGE"
+            if p["win_rate"] >= 0.55 and p["avg_pnl_pct"] > 0
+            else "AVOID"
+            if p["win_rate"] < 0.40 or p["avg_pnl_pct"] < -0.1
+            else "NEUTRAL"
+        )
         lines.append(
             f"  {p['trade_type']} / {p['setup_type']}: "
             f"{p['win_rate'] * 100:.0f}% WR, avg {p['avg_pnl_pct']:+.2f}% "
@@ -250,28 +285,30 @@ def _format_setup_performance(perfs: list[dict]) -> str:
 
 # ── Session context builder ───────────────────────────────────────────────────
 
+
 def _build_session_context(full_news: bool) -> SessionContext:
     """Fetch all context data and build SessionContext. Called when cache expires."""
-    obs            = get_market_observation(force_refresh=True)
-    patterns       = get_relevant_patterns(obs, n=CONFIG.get("intelligence_pattern_lookback", 20))
-    news_text, _   = _fetch_market_news(full=full_news)
-    macro_text     = _format_macro_calendar()
-    pattern_text   = _format_patterns(patterns)
-    thesis_perfs   = get_thesis_performance(min_samples=3)
-    thesis_text    = _format_thesis_performance(thesis_perfs)
-    setup_perfs    = get_setup_performance(min_samples=3)
-    setup_text     = _format_setup_performance(setup_perfs)
+    obs = get_market_observation(force_refresh=True)
+    patterns = get_relevant_patterns(obs, n=CONFIG.get("intelligence_pattern_lookback", 20))
+    news_text, _ = _fetch_market_news(full=full_news)
+    macro_text = _format_macro_calendar()
+    pattern_text = _format_patterns(patterns)
+    thesis_perfs = get_thesis_performance(min_samples=3)
+    thesis_text = _format_thesis_performance(thesis_perfs)
+    setup_perfs = get_setup_performance(min_samples=3)
+    setup_text = _format_setup_performance(setup_perfs)
 
     overnight_text = ""
     try:
         from overnight_research import load_overnight_notes
+
         overnight_text = load_overnight_notes()
     except Exception as exc:
         log.debug("intelligence: overnight notes unavailable — %s", exc)
 
     return SessionContext(
-        timestamp=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
-        market_read="",          # filled after Opus call in classify_signals
+        timestamp=datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
+        market_read="",  # filled after Opus call in classify_signals
         observation=obs,
         news_mode="full" if full_news else "headlines",
         news_text=news_text,
@@ -285,22 +322,23 @@ def _build_session_context(full_news: bool) -> SessionContext:
 
 # ── Prompt builders ───────────────────────────────────────────────────────────
 
+
 def _build_regime_context_block(regime: dict) -> str:
     """Format the raw regime dict as a readable context block for the prompt."""
-    vix          = regime.get("vix", 0)
-    vix_1h       = regime.get("vix_1h_change", 0)
-    spy_price    = regime.get("spy_price", 0)
-    spy_above    = regime.get("spy_above_200d", False)
-    qqq_price    = regime.get("qqq_price", 0)
-    qqq_above    = regime.get("qqq_above_200d", False)
-    breadth      = regime.get("breadth_pct")
-    credit_stress= regime.get("credit_stress", False)
-    credit_spread= regime.get("credit_spread")
-    label        = regime.get("regime", "UNKNOWN")
-    router       = regime.get("regime_router", "unknown")
+    vix = regime.get("vix", 0)
+    vix_1h = regime.get("vix_1h_change", 0)
+    spy_price = regime.get("spy_price", 0)
+    spy_above = regime.get("spy_above_200d", False)
+    qqq_price = regime.get("qqq_price", 0)
+    qqq_above = regime.get("qqq_above_200d", False)
+    breadth = regime.get("breadth_pct")
+    credit_stress = regime.get("credit_stress", False)
+    credit_spread = regime.get("credit_spread")
+    label = regime.get("regime", "UNKNOWN")
+    router = regime.get("regime_router", "unknown")
 
-    breadth_str  = f"{breadth:.0f}%" if breadth is not None else "unavailable"
-    credit_str   = f"{credit_spread:.0f} bps" if credit_spread is not None else "unavailable"
+    breadth_str = f"{breadth:.0f}%" if breadth is not None else "unavailable"
+    credit_str = f"{credit_spread:.0f} bps" if credit_spread is not None else "unavailable"
 
     return (
         f"  System regime label: {label}  (informational — reason freely from the data below)\n"
@@ -322,27 +360,21 @@ def _build_classification_prompt(
 
     candidate_lines = []
     for c in candidates:
-        sym   = c.get("symbol", "?")
-        dir_  = c.get("direction", "?")
+        sym = c.get("symbol", "?")
+        dir_ = c.get("direction", "?")
         score = c.get("score", 0)
-        dims  = c.get("score_breakdown", {})
+        dims = c.get("score_breakdown", {})
         dim_str = ", ".join(f"{k}={v:.0f}" for k, v in dims.items() if v)
-        candidate_lines.append(
-            f"  {sym} {dir_}  score={score}  dims=[{dim_str}]"
-        )
+        candidate_lines.append(f"  {sym} {dir_}  score={score}  dims=[{dim_str}]")
     candidates_block = "\n".join(candidate_lines) if candidate_lines else "  (no candidates)"
 
     regime_block = (
-        f"\n## Market context at classification time\n{_build_regime_context_block(regime)}\n"
-        if regime else ""
+        f"\n## Market context at classification time\n{_build_regime_context_block(regime)}\n" if regime else ""
     )
 
     vocab_str = " | ".join(sorted(SESSION_CHARACTER_VOCAB))
 
-    overnight_block = (
-        f"\n## Overnight research notes\n{ctx.overnight_text}\n"
-        if ctx.overnight_text else ""
-    )
+    overnight_block = f"\n## Overnight research notes\n{ctx.overnight_text}\n" if ctx.overnight_text else ""
 
     return f"""You are the intelligence layer for Decifer, an autonomous trading system. \
 Before any trade is placed, you reason about the market and classify each signal.
@@ -402,6 +434,7 @@ Respond with ONLY valid JSON, no markdown:
 
 # ── Evidence-based fallback ───────────────────────────────────────────────────
 
+
 def _fallback_classify(
     candidate: dict,
     obs: MarketObservation,
@@ -410,21 +443,25 @@ def _fallback_classify(
     Tier 2: mechanical classification from signal score and observation.
     Used when Opus is unavailable. Always produces a valid result.
     """
-    sym    = candidate.get("symbol", "?")
-    score  = candidate.get("score", 0)
-    dir_   = candidate.get("direction", "LONG")
+    sym = candidate.get("symbol", "?")
+    score = candidate.get("score", 0)
+    dir_ = candidate.get("direction", "LONG")
 
     # AVOID if acute market stress contradicts direction
     spy = obs.assets.get("SPY") if obs else None
     if spy and dir_ == "LONG" and spy.change_1d < -2.0 and obs.vix > 28:
         return SignalClassification(
-            symbol=sym, trade_type="AVOID", conviction=0.0,
+            symbol=sym,
+            trade_type="AVOID",
+            conviction=0.0,
             reasoning="Fallback: acute market stress contradicts LONG",
             source="fallback",
         )
     if spy and dir_ == "SHORT" and spy.change_1d > 2.0 and obs.vix < 15:
         return SignalClassification(
-            symbol=sym, trade_type="AVOID", conviction=0.0,
+            symbol=sym,
+            trade_type="AVOID",
+            conviction=0.0,
             reasoning="Fallback: strong risk-on contradicts SHORT",
             source="fallback",
         )
@@ -433,22 +470,23 @@ def _fallback_classify(
     conviction = round(min(score / 50.0, 1.0), 2)
     if score >= 40:
         trade_type = "SWING"
-    elif score >= 28:
-        trade_type = "SCALP"
-    elif score >= CONFIG.get("min_score_to_trade", 14):
+    elif score >= 28 or score >= CONFIG.get("min_score_to_trade", 14):
         trade_type = "SCALP"
     else:
         trade_type = "AVOID"
         conviction = 0.0
 
     return SignalClassification(
-        symbol=sym, trade_type=trade_type, conviction=conviction,
+        symbol=sym,
+        trade_type=trade_type,
+        conviction=conviction,
         reasoning=f"Fallback: score={score}",
         source="fallback",
     )
 
 
 # ── Response parser ───────────────────────────────────────────────────────────
+
 
 def _parse_response(
     text: str,
@@ -476,7 +514,7 @@ def _parse_response(
     session_character = raw_char if raw_char in SESSION_CHARACTER_VOCAB else _DEFAULT_SESSION_CHARACTER
 
     market_read = str(raw.get("market_read", ""))[:600]
-    raw_list    = raw.get("classifications", [])
+    raw_list = raw.get("classifications", [])
 
     # Index by symbol for lookup
     raw_by_sym = {r.get("symbol", "").upper(): r for r in raw_list}
@@ -484,7 +522,7 @@ def _parse_response(
     results = []
     for c in candidates:
         sym = c.get("symbol", "").upper()
-        r   = raw_by_sym.get(sym)
+        r = raw_by_sym.get(sym)
 
         if not r:
             log.debug(f"intelligence: {sym} missing from Opus output — fallback")
@@ -500,18 +538,21 @@ def _parse_response(
         except (TypeError, ValueError):
             conviction = 0.5
 
-        results.append(SignalClassification(
-            symbol=sym,
-            trade_type=tt,
-            conviction=round(conviction, 3),
-            reasoning=str(r.get("reasoning", ""))[:300],
-            source="opus",
-        ))
+        results.append(
+            SignalClassification(
+                symbol=sym,
+                trade_type=tt,
+                conviction=round(conviction, 3),
+                reasoning=str(r.get("reasoning", ""))[:300],
+                source="opus",
+            )
+        )
 
     return session_character, market_read, results
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
 
 def classify_signals(
     candidates: list[dict],
@@ -547,33 +588,36 @@ def classify_signals(
 
     # ── Circuit breaker — extreme VIX: skip Opus, mark EXTREME_STRESS ─────────
     if regime:
-        vix       = regime.get("vix", 0)
+        vix = regime.get("vix", 0)
         vix_spike = regime.get("vix_1h_change", 0)
         if vix > CONFIG.get("vix_panic_min", 35) or vix_spike > CONFIG.get("vix_spike_pct", 0.20):
             log.warning(f"[intelligence] EXTREME_STRESS circuit breaker — VIX={vix:.1f} spike={vix_spike:.1%}")
             obs = get_market_observation()
             _last_session_character = "EXTREME_STRESS"
-            return "EXTREME_STRESS", "EXTREME_STRESS — VIX circuit breaker active. No new entries.", \
-                   [_fallback_classify(c, obs) for c in candidates]
+            return (
+                "EXTREME_STRESS",
+                "EXTREME_STRESS — VIX circuit breaker active. No new entries.",
+                [_fallback_classify(c, obs) for c in candidates],
+            )
 
     # ── Rebuild session context if needed ─────────────────────
     with _ctx_lock:
         needs_rebuild = force_context_refresh or not _context_valid()
-        first_call    = not _session_open_done
+        first_call = not _session_open_done
 
     if needs_rebuild:
         ctx = _build_session_context(full_news=first_call)
 
         # Check if any new headline warrants a full news refresh
         if not first_call:
-            headlines, significant = _fetch_market_news(full=False)
+            _headlines, significant = _fetch_market_news(full=False)
             if significant:
                 log.info("intelligence: significance keyword detected — forcing full news refresh")
                 ctx = _build_session_context(full_news=True)
 
         with _ctx_lock:
-            _session_ctx       = ctx
-            _ctx_time          = datetime.now(timezone.utc)
+            _session_ctx = ctx
+            _ctx_time = datetime.now(UTC)
             _session_open_done = True
     else:
         with _ctx_lock:
@@ -585,7 +629,7 @@ def classify_signals(
     try:
         prompt = _build_classification_prompt(ctx, candidates, regime=regime)
         client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
-        resp   = client.messages.create(
+        resp = client.messages.create(
             model=CONFIG.get("intelligence_model", "claude-opus-4-6"),
             max_tokens=CONFIG.get("intelligence_max_tokens", 1024),
             messages=[{"role": "user", "content": prompt}],

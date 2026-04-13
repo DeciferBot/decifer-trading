@@ -17,11 +17,10 @@ The test uses AST parsing (no deps required) to verify that either:
 
 In practice we enforce (a) for all core modules.
 """
+
 from __future__ import annotations
 
 import ast
-import os
-import sys
 from pathlib import Path
 
 import pytest
@@ -63,11 +62,10 @@ def _has_future_annotations(source: str) -> bool:
     except SyntaxError:
         return False
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom):
-            if node.module == "__future__":
-                for alias in node.names:
-                    if alias.name == "annotations":
-                        return True
+        if isinstance(node, ast.ImportFrom) and node.module == "__future__":
+            for alias in node.names:
+                if alias.name == "annotations":
+                    return True
     return False
 
 

@@ -30,10 +30,9 @@ import json
 import logging
 import os
 import tempfile
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 log = logging.getLogger("decifer.ic_validator")
 
@@ -42,21 +41,30 @@ log = logging.getLogger("decifer.ic_validator")
 _BASE = os.path.dirname(os.path.abspath(__file__))
 
 _DEFAULT_IC_WEIGHTS_PATH = os.path.join(_BASE, "data", "ic_weights.json")
-_DEFAULT_RESULTS_DIR     = os.path.join(_BASE, "backtest_results")
-_DEFAULT_VALIDATION_OUT  = os.path.join(_BASE, "data", "ic_validation_result.json")
+_DEFAULT_RESULTS_DIR = os.path.join(_BASE, "backtest_results")
+_DEFAULT_VALIDATION_OUT = os.path.join(_BASE, "data", "ic_validation_result.json")
 
 DIMENSIONS = [
-    "trend", "momentum", "squeeze", "flow", "breakout",
-    "mtf", "news", "social", "reversion",
+    "trend",
+    "momentum",
+    "squeeze",
+    "flow",
+    "breakout",
+    "mtf",
+    "news",
+    "social",
+    "reversion",
 ]
 
 
 # ── Config helper ──────────────────────────────────────────────────────────────
 
+
 def _val_cfg(key: str, default):
     """Read from CONFIG['phase_gate']['ic_validation_gate'], falling back to default."""
     try:
         from config import CONFIG
+
         return CONFIG.get("phase_gate", {}).get("ic_validation_gate", {}).get(key, default)
     except Exception:
         return default
@@ -64,37 +72,40 @@ def _val_cfg(key: str, default):
 
 # ── Data structures ────────────────────────────────────────────────────────────
 
+
 @dataclass
 class ICHealthReport:
     """Snapshot of IC quality read from the weekly ic_weights.json cache."""
-    n_records:           int           # total records loaded when IC was computed
-    n_valid_records:     int           # proxy: same as n_records (cache doesn't separate)
-    n_positive_dims:     int           # dimensions with raw IC > 0
-    raw_ic:              dict          # dimension → float | None from cache
-    mean_positive_ic:    float         # mean of positive-IC values; 0.0 if none
-    using_equal_weights: bool          # True when cache flagged equal-weights fallback
-    quality:             str           # "STRONG" | "MODERATE" | "WEAK" | "NO_SIGNAL"
+
+    n_records: int  # total records loaded when IC was computed
+    n_valid_records: int  # proxy: same as n_records (cache doesn't separate)
+    n_positive_dims: int  # dimensions with raw IC > 0
+    raw_ic: dict  # dimension → float | None from cache
+    mean_positive_ic: float  # mean of positive-IC values; 0.0 if none
+    using_equal_weights: bool  # True when cache flagged equal-weights fallback
+    quality: str  # "STRONG" | "MODERATE" | "WEAK" | "NO_SIGNAL"
 
 
 @dataclass
 class LiveReadinessReport:
     """Outcome of all three IC validation gates."""
+
     # Gate outcomes
-    sample_gate_passed:  bool
-    ic_gate_passed:      bool
-    sharpe_gate_passed:  bool
+    sample_gate_passed: bool
+    ic_gate_passed: bool
+    sharpe_gate_passed: bool
 
     # Diagnostic data
-    n_valid_records:     int
-    mean_positive_ic:    float
-    n_positive_dims:     int
-    walkforward_sharpe:  Optional[float]
-    ic_quality:          str
+    n_valid_records: int
+    mean_positive_ic: float
+    n_positive_dims: int
+    walkforward_sharpe: float | None
+    ic_quality: str
 
     # Aggregate
-    failures:            list = field(default_factory=list)
-    ready_for_live:      bool = False
-    checked_at:          str  = ""     # ISO 8601 UTC timestamp
+    failures: list = field(default_factory=list)
+    ready_for_live: bool = False
+    checked_at: str = ""  # ISO 8601 UTC timestamp
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -102,7 +113,8 @@ class LiveReadinessReport:
 
 # ── IC health ──────────────────────────────────────────────────────────────────
 
-def get_ic_health(ic_weights_path: Optional[str] = None) -> ICHealthReport:
+
+def get_ic_health(ic_weights_path: str | None = None) -> ICHealthReport:
     """
     Read data/ic_weights.json and classify IC quality.
 
@@ -171,7 +183,8 @@ def get_ic_health(ic_weights_path: Optional[str] = None) -> ICHealthReport:
 
 # ── Walk-forward Sharpe ────────────────────────────────────────────────────────
 
-def load_walkforward_sharpe(results_dir: Optional[str] = None) -> Optional[float]:
+
+def load_walkforward_sharpe(results_dir: str | None = None) -> float | None:
     """
     Scan backtest_results/ for the most recently modified JSON that contains
     report.sharpe_ratio and return that value.
@@ -214,7 +227,8 @@ def load_walkforward_sharpe(results_dir: Optional[str] = None) -> Optional[float
 
 # ── Gate evaluation ────────────────────────────────────────────────────────────
 
-def check_live_readiness(config: Optional[dict] = None) -> LiveReadinessReport:
+
+def check_live_readiness(config: dict | None = None) -> LiveReadinessReport:
     """
     Evaluate all three IC validation gates without writing to disk.
 
@@ -223,10 +237,10 @@ def check_live_readiness(config: Optional[dict] = None) -> LiveReadinessReport:
 
     Returns LiveReadinessReport with ready_for_live=True only when all pass.
     """
-    min_records  = _val_cfg("min_valid_records",      50)
-    min_mean_ic  = _val_cfg("min_mean_positive_ic",  0.05)
-    min_pos_dims = _val_cfg("min_positive_dims",       5)
-    min_sharpe   = _val_cfg("min_walkforward_sharpe", 0.8)
+    min_records = _val_cfg("min_valid_records", 50)
+    min_mean_ic = _val_cfg("min_mean_positive_ic", 0.05)
+    min_pos_dims = _val_cfg("min_positive_dims", 5)
+    min_sharpe = _val_cfg("min_walkforward_sharpe", 0.8)
 
     health = get_ic_health()
     sharpe = load_walkforward_sharpe()
@@ -241,10 +255,7 @@ def check_live_readiness(config: Optional[dict] = None) -> LiveReadinessReport:
         )
 
     # Gate 2 — IC quality (breadth check takes priority in the message)
-    ic_ok = (
-        health.mean_positive_ic >= min_mean_ic
-        and health.n_positive_dims >= min_pos_dims
-    )
+    ic_ok = health.mean_positive_ic >= min_mean_ic and health.n_positive_dims >= min_pos_dims
     if not ic_ok:
         if health.n_positive_dims < min_pos_dims:
             failures.append(
@@ -262,8 +273,8 @@ def check_live_readiness(config: Optional[dict] = None) -> LiveReadinessReport:
     if not sharpe_ok:
         if sharpe is None:
             failures.append(
-                f"SHARPE GATE: no walk-forward backtest results found in backtest_results/. "
-                f"Run: python backtester.py --symbols <SYMBOLS> --start <DATE> --end <DATE>"
+                "SHARPE GATE: no walk-forward backtest results found in backtest_results/. "
+                "Run: python backtester.py --symbols <SYMBOLS> --start <DATE> --end <DATE>"
             )
         else:
             failures.append(
@@ -282,13 +293,14 @@ def check_live_readiness(config: Optional[dict] = None) -> LiveReadinessReport:
         ic_quality=health.quality,
         failures=failures,
         ready_for_live=len(failures) == 0,
-        checked_at=datetime.now(timezone.utc).isoformat(),
+        checked_at=datetime.now(UTC).isoformat(),
     )
 
 
 # ── Persist ────────────────────────────────────────────────────────────────────
 
-def validate_and_persist(out_path: Optional[str] = None) -> LiveReadinessReport:
+
+def validate_and_persist(out_path: str | None = None) -> LiveReadinessReport:
     """
     Run check_live_readiness() and atomically write the result to
     data/ic_validation_result.json (or out_path).
@@ -325,6 +337,7 @@ def validate_and_persist(out_path: Optional[str] = None) -> LiveReadinessReport:
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
+
 def _print_report(result: LiveReadinessReport) -> None:
     print("\n" + "=" * 60)
     print("IC VALIDATION GATE".center(60))
@@ -339,9 +352,9 @@ def _print_report(result: LiveReadinessReport) -> None:
 
     print("\n--- GATE STATUS ---")
     gates = [
-        ("Sample gate",  result.sample_gate_passed),
-        ("IC gate",      result.ic_gate_passed),
-        ("Sharpe gate",  result.sharpe_gate_passed),
+        ("Sample gate", result.sample_gate_passed),
+        ("IC gate", result.ic_gate_passed),
+        ("Sharpe gate", result.sharpe_gate_passed),
     ]
     for name, passed in gates:
         mark = "PASS" if passed else "FAIL"
@@ -363,8 +376,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.WARNING)
     parser = argparse.ArgumentParser(description="Decifer IC Validation Gate")
-    parser.add_argument("--save", action="store_true",
-                        help="Persist result to data/ic_validation_result.json")
+    parser.add_argument("--save", action="store_true", help="Persist result to data/ic_validation_result.json")
     args = parser.parse_args()
 
     if args.save:

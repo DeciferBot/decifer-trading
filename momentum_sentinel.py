@@ -29,12 +29,13 @@ Two independent signals — either fires the interrupt:
 A cooldown (default 15 min) prevents retriggering on the same move.
 Direction is logged and passed to the scan so the regime router can confirm.
 """
+
 from __future__ import annotations
 
 import logging
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 
 from config import CONFIG
 from risk import is_trading_day
@@ -49,16 +50,16 @@ class MomentumSentinel:
     """
 
     def __init__(self) -> None:
-        self._running    = False
+        self._running = False
         self._thread: threading.Thread | None = None
-        self._last_fire  = None   # datetime of last trigger (for cooldown)
+        self._last_fire = None  # datetime of last trigger (for cooldown)
         self.stats: dict = {
-            "status":         "stopped",
-            "last_trigger":   None,
-            "trigger_count":  0,
+            "status": "stopped",
+            "last_trigger": None,
+            "trigger_count": 0,
             "last_direction": None,
             "last_magnitude": None,
-            "last_type":      None,
+            "last_type": None,
         }
 
     # ── Public API ─────────────────────────────────────────────────────────────
@@ -67,7 +68,7 @@ class MomentumSentinel:
         if self._running:
             return
         self._running = True
-        self._thread  = threading.Thread(
+        self._thread = threading.Thread(
             target=self._run,
             daemon=True,
             name="momentum-sentinel",
@@ -77,17 +78,17 @@ class MomentumSentinel:
         log.info("MomentumSentinel: started")
 
     def stop(self) -> None:
-        self._running        = False
+        self._running = False
         self.stats["status"] = "stopped"
         log.info("MomentumSentinel: stopped")
 
     # ── Background loop ────────────────────────────────────────────────────────
 
     def _run(self) -> None:
-        poll_s      = CONFIG.get("momentum_sentinel_poll_s",     10)
-        fast_pct    = CONFIG.get("momentum_sentinel_fast_pct",    0.3)
-        slow_pct    = CONFIG.get("momentum_sentinel_slow_pct",    0.6)
-        cooldown_m  = CONFIG.get("momentum_sentinel_cooldown_m",  15)
+        poll_s = CONFIG.get("momentum_sentinel_poll_s", 10)
+        fast_pct = CONFIG.get("momentum_sentinel_fast_pct", 0.3)
+        slow_pct = CONFIG.get("momentum_sentinel_slow_pct", 0.6)
+        cooldown_m = CONFIG.get("momentum_sentinel_cooldown_m", 15)
 
         while self._running:
             try:
@@ -110,7 +111,8 @@ class MomentumSentinel:
         # ── Read live SPY 1m bars from BAR_CACHE ──────────────────────────────
         # SPY is a STREAM_ANCHOR — always subscribed, so BAR_CACHE has its bars.
         from alpaca_stream import BAR_CACHE
-        df = BAR_CACHE._data.get("SPY")   # raw 1m bars (thread-safe read under lock)
+
+        df = BAR_CACHE._data.get("SPY")  # raw 1m bars (thread-safe read under lock)
         if df is None or len(df) < 3:
             return
 
@@ -123,23 +125,23 @@ class MomentumSentinel:
         # Signal 1: fast burst — last 3 x 1m bars (~3 min)
         n_fast = min(3, len(closes))
         spy_3m_ago = float(closes.iloc[-n_fast])
-        fast_move  = (spy_now - spy_3m_ago) / spy_3m_ago * 100
+        fast_move = (spy_now - spy_3m_ago) / spy_3m_ago * 100
 
         # Signal 2: sustained — last 10 x 1m bars (~10 min)
         n_slow = min(10, len(closes))
         spy_10m_ago = float(closes.iloc[-n_slow])
-        slow_move   = (spy_now - spy_10m_ago) / spy_10m_ago * 100
+        slow_move = (spy_now - spy_10m_ago) / spy_10m_ago * 100
 
         # ── Evaluate thresholds ────────────────────────────────────────────────
         trigger_type = None
-        magnitude    = 0.0
+        magnitude = 0.0
 
         if abs(fast_move) >= fast_pct:
             trigger_type = "fast_burst"
-            magnitude    = fast_move
+            magnitude = fast_move
         elif abs(slow_move) >= slow_pct:
             trigger_type = "sustained"
-            magnitude    = slow_move
+            magnitude = slow_move
 
         if trigger_type is None:
             return
@@ -152,17 +154,16 @@ class MomentumSentinel:
         from bot_state import clog
 
         self._last_fire = datetime.now()
-        self.stats["trigger_count"]  += 1
-        self.stats["last_trigger"]    = self._last_fire.strftime("%H:%M:%S")
-        self.stats["last_direction"]  = direction
-        self.stats["last_magnitude"]  = round(magnitude, 3)
-        self.stats["last_type"]       = trigger_type
+        self.stats["trigger_count"] += 1
+        self.stats["last_trigger"] = self._last_fire.strftime("%H:%M:%S")
+        self.stats["last_direction"] = direction
+        self.stats["last_magnitude"] = round(magnitude, 3)
+        self.stats["last_type"] = trigger_type
 
         arrow = "▲" if direction == "UP" else "▼"
         clog(
             "SIGNAL",
-            f"⚡ MOMENTUM SENTINEL [{trigger_type}]: SPY {arrow} {magnitude:+.2f}% "
-            f"→ immediate scan requested",
+            f"⚡ MOMENTUM SENTINEL [{trigger_type}]: SPY {arrow} {magnitude:+.2f}% → immediate scan requested",
         )
 
         # Signal the main loop to run a scan immediately.
@@ -171,6 +172,7 @@ class MomentumSentinel:
 
 
 # ── Factory ────────────────────────────────────────────────────────────────────
+
 
 def start_momentum_sentinel() -> MomentumSentinel:
     sentinel = MomentumSentinel()

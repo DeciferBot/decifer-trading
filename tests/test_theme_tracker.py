@@ -1,15 +1,14 @@
 """Tests for theme_tracker.py"""
+
 import os
 import sys
-import json
-import tempfile
-import pytest
 
 # Add project root to sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Mock config before importing theme_tracker
 import types
+
 config_mod = types.ModuleType("config")
 config_mod.CONFIG = {
     "sentinel_max_symbols": 80,
@@ -25,37 +24,47 @@ scanner_mod.CORE_SYMBOLS = ["SPY", "QQQ", "IWM"]
 scanner_mod.MOMENTUM_FALLBACK = ["NVDA", "AAPL", "TSLA", "AMZN", "MSFT", "META", "AMD", "GOOGL", "V", "MA"]
 sys.modules.setdefault("scanner", scanner_mod)
 
-import theme_tracker
+import os
+
 # Ensure project root is on path before importing theme_tracker
-import sys, os
+import sys
+
+import theme_tracker
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Force reload in case a stale cached version was picked up
 import importlib
-if 'theme_tracker' in sys.modules:
-    importlib.reload(sys.modules['theme_tracker'])
-import sys, os
+
+if "theme_tracker" in sys.modules:
+    importlib.reload(sys.modules["theme_tracker"])
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import sys, os, importlib
+import importlib
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if 'theme_tracker' in sys.modules:
-    importlib.reload(sys.modules['theme_tracker'])
+if "theme_tracker" in sys.modules:
+    importlib.reload(sys.modules["theme_tracker"])
 from theme_tracker import (
+    THEMES,
+    add_custom_theme,
+    build_sentinel_universe,
     detect_themes_from_holdings,
     detect_trending_themes,
-    build_sentinel_universe,
-    add_custom_theme,
-    remove_theme,
-    toggle_theme,
     get_all_themes,
-    score_headline_theme_relevance,
     get_holdings_symbols,
-    THEMES,
+    remove_theme,
+    score_headline_theme_relevance,
+    toggle_theme,
 )
-
 
 # ---------------------------------------------------------------------------
 # get_holdings_symbols
 # ---------------------------------------------------------------------------
+
 
 class TestGetHoldingsSymbols:
     def test_extracts_symbols_from_positions(self):
@@ -96,6 +105,7 @@ class TestGetHoldingsSymbols:
 # ---------------------------------------------------------------------------
 # detect_themes_from_holdings
 # ---------------------------------------------------------------------------
+
 
 class TestDetectThemesFromHoldings:
     def test_detects_ai_theme_from_nvda(self):
@@ -142,6 +152,7 @@ class TestDetectThemesFromHoldings:
 # ---------------------------------------------------------------------------
 # detect_trending_themes
 # ---------------------------------------------------------------------------
+
 
 class TestDetectTrendingThemes:
     def test_detects_ai_from_headlines(self):
@@ -206,6 +217,7 @@ class TestDetectTrendingThemes:
 # build_sentinel_universe
 # ---------------------------------------------------------------------------
 
+
 class TestBuildSentinelUniverse:
     def test_returns_list(self):
         result = build_sentinel_universe()
@@ -258,6 +270,7 @@ class TestBuildSentinelUniverse:
 # Theme Management
 # ---------------------------------------------------------------------------
 
+
 class TestThemeManagement:
     def test_get_all_themes_returns_dict(self):
         all_themes = get_all_themes()
@@ -266,7 +279,7 @@ class TestThemeManagement:
 
     def test_get_all_themes_has_required_keys(self):
         all_themes = get_all_themes()
-        for key, val in all_themes.items():
+        for _key, val in all_themes.items():
             assert "name" in val
             assert "symbols_count" in val
             assert "active" in val
@@ -334,19 +347,16 @@ class TestThemeManagement:
 # score_headline_theme_relevance
 # ---------------------------------------------------------------------------
 
+
 class TestScoreHeadlineThemeRelevance:
     def test_ai_headline_scores_ai_theme(self):
-        result = score_headline_theme_relevance(
-            "NVIDIA reports record GPU sales for AI training", "NVDA"
-        )
+        result = score_headline_theme_relevance("NVIDIA reports record GPU sales for AI training", "NVDA")
         assert isinstance(result, dict)
         # At least one theme should score > 0
         assert any(v > 0 for v in result.values())
 
     def test_unrelated_headline_scores_zero_or_low(self):
-        result = score_headline_theme_relevance(
-            "Weather forecast for the weekend", "XYZ"
-        )
+        result = score_headline_theme_relevance("Weather forecast for the weekend", "XYZ")
         assert isinstance(result, dict)
         # All scores should be 0
         assert all(v == 0 for v in result.values())
@@ -356,14 +366,10 @@ class TestScoreHeadlineThemeRelevance:
         assert isinstance(result, dict)
 
     def test_biotech_headline_scores_biotech(self):
-        result = score_headline_theme_relevance(
-            "FDA approves new clinical trial for cancer therapy", "MRNA"
-        )
+        result = score_headline_theme_relevance("FDA approves new clinical trial for cancer therapy", "MRNA")
         assert isinstance(result, dict)
         assert result.get("biotech", 0) > 0
 
     def test_ev_headline_scores_ev(self):
-        result = score_headline_theme_relevance(
-            "Tesla electric vehicle sales surge globally", "TSLA"
-        )
+        result = score_headline_theme_relevance("Tesla electric vehicle sales surge globally", "TSLA")
         assert result.get("ev_battery", 0) > 0

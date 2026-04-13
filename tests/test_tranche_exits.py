@@ -12,8 +12,9 @@ Covers:
 """
 
 from __future__ import annotations
-import sys
+
 import os
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -28,27 +29,26 @@ for _mod in ("orders", "risk", "scanner", "signals", "news", "agents"):
     sys.modules.pop(_mod, None)
 
 import orders
-import orders_state
 import orders_options
-
+import orders_state
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 _BASE_CONFIG = {
-    "active_account":        "DU_TEST",
-    "atr_stop_multiplier":   1.5,
-    "atr_trail_multiplier":  2.0,
+    "active_account": "DU_TEST",
+    "atr_stop_multiplier": 1.5,
+    "atr_trail_multiplier": 2.0,
     "min_reward_risk_ratio": 1.5,
-    "risk_pct_per_trade":    0.01,
-    "risk_per_trade":        0.01,
-    "max_positions":         10,
-    "max_single_position":   0.10,
-    "max_position_size":     0.30,
+    "risk_pct_per_trade": 0.01,
+    "risk_per_trade": 0.01,
+    "max_positions": 10,
+    "max_single_position": 0.10,
+    "max_position_size": 0.30,
     "correlation_threshold": 0.75,
-    "max_sector_exposure":   0.50,
+    "max_sector_exposure": 0.50,
     "consecutive_loss_pause": 8,
     "high_conviction_score": 30,
-    "fill_watcher":          {"enabled": False},
+    "fill_watcher": {"enabled": False},
     "max_portfolio_allocation": 1.0,
 }
 
@@ -88,28 +88,36 @@ def _make_ib(entry_price=100.0):
 
 def _run_execute_buy(ib, qty, tranche_mode=True, atr=1.0, price=100.0):
     """Invoke execute_buy with standard mocks. Returns success bool."""
-    with patch("orders.CONFIG", _BASE_CONFIG), \
-         patch("orders.calculate_position_size", return_value=qty), \
-         patch("orders.calculate_stops", return_value=(price - atr * 1.5, price + atr * 3.375)), \
-         patch("orders.get_contract", return_value=MagicMock()), \
-         patch("orders._get_ibkr_price", return_value=price), \
-         patch("orders.get_tv_signal_cache", return_value={}), \
-         patch("orders.check_correlation", return_value=(True, "")), \
-         patch("orders.check_combined_exposure", return_value=(True, "")), \
-         patch("orders.check_sector_concentration", return_value=(True, "")), \
-         patch("orders._is_duplicate_check_enabled", return_value=False), \
-         patch("orders.log_order"), \
-         patch("learning.log_trade"):
+    with (
+        patch("orders.CONFIG", _BASE_CONFIG),
+        patch("orders.calculate_position_size", return_value=qty),
+        patch("orders.calculate_stops", return_value=(price - atr * 1.5, price + atr * 3.375)),
+        patch("orders.get_contract", return_value=MagicMock()),
+        patch("orders._get_ibkr_price", return_value=price),
+        patch("orders.get_tv_signal_cache", return_value={}),
+        patch("orders.check_correlation", return_value=(True, "")),
+        patch("orders.check_combined_exposure", return_value=(True, "")),
+        patch("orders.check_sector_concentration", return_value=(True, "")),
+        patch("orders._is_duplicate_check_enabled", return_value=False),
+        patch("orders.log_order"),
+        patch("learning.log_trade"),
+    ):
         return orders.execute_buy(
-            ib, "AAPL", price, atr, 25, 100_000, _REGIME,
+            ib,
+            "AAPL",
+            price,
+            atr,
+            25,
+            100_000,
+            _REGIME,
             tranche_mode=tranche_mode,
         )
 
 
 # ── Test 1 & 2: Tranche size arithmetic ────────────────────────────────────────
 
-class TestTrancheSizeCalc:
 
+class TestTrancheSizeCalc:
     def test_odd_qty_split(self):
         """qty=101: t1=50, t2=51, sum=101."""
         t1 = 101 // 2
@@ -146,8 +154,8 @@ class TestTrancheSizeCalc:
 
 # ── Test 3: T1 limit placed at entry + 1.5×ATR ────────────────────────────────
 
-class TestT1LimitPlacement:
 
+class TestT1LimitPlacement:
     def setup_method(self):
         orders_state.active_trades.clear()
 
@@ -158,13 +166,19 @@ class TestT1LimitPlacement:
         """T1 TP LimitOrder is constructed with the calculate_stops TP price and qty = t1_qty."""
         ib = _make_ib()
         price, atr = 100.0, 1.0
-        mock_limit = MagicMock(side_effect=lambda *a, **kw: MagicMock(
-            totalQuantity=a[1], lmtPrice=a[2],
-            parentId=None, transmit=False,
-        ))
+        mock_limit = MagicMock(
+            side_effect=lambda *a, **kw: MagicMock(
+                totalQuantity=a[1],
+                lmtPrice=a[2],
+                parentId=None,
+                transmit=False,
+            )
+        )
 
-        with patch.object(orders, "LimitOrder", mock_limit), \
-             patch.object(orders, "StopOrder", MagicMock(return_value=MagicMock(parentId=None, transmit=False))):
+        with (
+            patch.object(orders, "LimitOrder", mock_limit),
+            patch.object(orders, "StopOrder", MagicMock(return_value=MagicMock(parentId=None, transmit=False))),
+        ):
             result = _run_execute_buy(ib, qty=100, tranche_mode=True, atr=atr, price=price)
 
         assert result is True
@@ -174,20 +188,26 @@ class TestT1LimitPlacement:
         # _run_execute_buy mocks calculate_stops to return (price - atr*1.5, price + atr*3.375).
         expected_tp_price = round(price + atr * 3.375, 2)  # 103.375
         assert mock_limit.call_count >= 2
-        tp_args = mock_limit.call_args_list[1][0]   # positional args of 2nd call
-        assert tp_args[1] == 50          # qty = t1_qty = 100 // 2
+        tp_args = mock_limit.call_args_list[1][0]  # positional args of 2nd call
+        assert tp_args[1] == 50  # qty = t1_qty = 100 // 2
         assert tp_args[2] == pytest.approx(expected_tp_price, abs=0.01)
 
     def test_t1_qty_is_half_of_total(self):
         """T1 TP LimitOrder qty = qty // 2 = 50 for total qty=100."""
         ib = _make_ib()
-        mock_limit = MagicMock(side_effect=lambda *a, **kw: MagicMock(
-            totalQuantity=a[1], lmtPrice=a[2],
-            parentId=None, transmit=False,
-        ))
+        mock_limit = MagicMock(
+            side_effect=lambda *a, **kw: MagicMock(
+                totalQuantity=a[1],
+                lmtPrice=a[2],
+                parentId=None,
+                transmit=False,
+            )
+        )
 
-        with patch.object(orders, "LimitOrder", mock_limit), \
-             patch.object(orders, "StopOrder", MagicMock(return_value=MagicMock(parentId=None, transmit=False))):
+        with (
+            patch.object(orders, "LimitOrder", mock_limit),
+            patch.object(orders, "StopOrder", MagicMock(return_value=MagicMock(parentId=None, transmit=False))),
+        ):
             result = _run_execute_buy(ib, qty=100, tranche_mode=True)
 
         assert result is True
@@ -210,32 +230,32 @@ class TestT1LimitPlacement:
 
 # ── Test 4: T2 stop placed when T1 order disappears ───────────────────────────
 
-class TestUpdateTrancheStatus:
 
+class TestUpdateTrancheStatus:
     def _make_trade(self, t1_order_id=200, t1_status="OPEN"):
         return {
-            "symbol":          "AAPL",
-            "instrument":      "stock",
-            "status":          "ACTIVE",
-            "direction":       "LONG",
-            "entry":           100.0,
-            "current":         101.5,
-            "qty":             100,
-            "t1_qty":          50,
-            "t2_qty":          50,
-            "sl":              98.5,
-            "tp":              101.5,
-            "atr":             1.0,
-            "sl_order_id":     100,
-            "t1_order_id":     t1_order_id,
-            "t2_sl_order_id":  None,
-            "t1_status":       t1_status,
-            "tranche_mode":    True,
-            "order_id":        99,
-            "agent_outputs":   {},
-            "score":           25,
-            "reasoning":       "test",
-            "open_time":       "2026-04-01T09:30:00+00:00",
+            "symbol": "AAPL",
+            "instrument": "stock",
+            "status": "ACTIVE",
+            "direction": "LONG",
+            "entry": 100.0,
+            "current": 101.5,
+            "qty": 100,
+            "t1_qty": 50,
+            "t2_qty": 50,
+            "sl": 98.5,
+            "tp": 101.5,
+            "atr": 1.0,
+            "sl_order_id": 100,
+            "t1_order_id": t1_order_id,
+            "t2_sl_order_id": None,
+            "t1_status": t1_status,
+            "tranche_mode": True,
+            "order_id": 99,
+            "agent_outputs": {},
+            "score": 25,
+            "reasoning": "test",
+            "open_time": "2026-04-01T09:30:00+00:00",
             "high_water_mark": 101.5,
         }
 
@@ -249,32 +269,34 @@ class TestUpdateTrancheStatus:
 
         ib = MagicMock()
         ib.isConnected.return_value = True
-        ib.openTrades.return_value = []     # T1 order gone (filled)
+        ib.openTrades.return_value = []  # T1 order gone (filled)
         ib.placeOrder.return_value = new_stop_trade
         ib.sleep = MagicMock()
 
         captured_stop_args = []
         mock_stop = MagicMock(side_effect=lambda *a, **kw: captured_stop_args.append(a) or MagicMock(transmit=False))
 
-        with patch("orders_options.get_contract", return_value=MagicMock()), \
-             patch("orders_options._cancel_ibkr_order_by_id"), \
-             patch("orders_options.CONFIG", {"active_account": "DU_TEST"}), \
-             patch.object(orders_options, "StopOrder", mock_stop), \
-             patch("learning.log_trade"):
+        with (
+            patch("orders_options.get_contract", return_value=MagicMock()),
+            patch("orders_options._cancel_ibkr_order_by_id"),
+            patch("orders_options.CONFIG", {"active_account": "DU_TEST"}),
+            patch.object(orders_options, "StopOrder", mock_stop),
+            patch("learning.log_trade"),
+        ):
             orders.update_tranche_status(ib)
 
         assert ib.placeOrder.called
         assert len(captured_stop_args) == 1, "StopOrder should be called once for T2"
         _action, _qty, _price = captured_stop_args[0][:3]
         assert _action == "SELL"
-        assert _qty == 50                           # t2_qty
-        assert _price == pytest.approx(98.5)        # sl_price
+        assert _qty == 50  # t2_qty
+        assert _price == pytest.approx(98.5)  # sl_price
 
         trade = orders_state.active_trades["AAPL"]
         assert trade["t1_status"] == "FILLED"
         assert trade["t2_sl_order_id"] == 999
-        assert trade["sl_order_id"] == 999          # updated for trailing stop
-        assert trade["qty"] == 50                   # updated for execute_sell
+        assert trade["sl_order_id"] == 999  # updated for trailing stop
+        assert trade["qty"] == 50  # updated for execute_sell
 
     def test_no_action_when_t1_still_live(self):
         """T1 order still in IBKR open trades → no changes made."""
@@ -288,9 +310,11 @@ class TestUpdateTrancheStatus:
         ib.isConnected.return_value = True
         ib.openTrades.return_value = [live_order]
 
-        with patch("orders_options.get_contract", return_value=MagicMock()), \
-             patch("learning.log_trade"), \
-             patch("orders_options.CONFIG", {"active_account": "DU_TEST"}):
+        with (
+            patch("orders_options.get_contract", return_value=MagicMock()),
+            patch("learning.log_trade"),
+            patch("orders_options.CONFIG", {"active_account": "DU_TEST"}),
+        ):
             orders.update_tranche_status(ib)
 
         assert not ib.placeOrder.called
@@ -305,8 +329,7 @@ class TestUpdateTrancheStatus:
         ib.isConnected.return_value = True
         ib.openTrades.return_value = []
 
-        with patch("orders_options.CONFIG", {"active_account": "DU_TEST"}), \
-             patch("learning.log_trade"):
+        with patch("orders_options.CONFIG", {"active_account": "DU_TEST"}), patch("learning.log_trade"):
             orders.update_tranche_status(ib)
 
         assert not ib.placeOrder.called
@@ -317,8 +340,8 @@ class TestUpdateTrancheStatus:
 
 # ── Test 5: Two log_trade OPEN calls with distinct tranche_ids ─────────────────
 
-class TestJournalAtOpen:
 
+class TestJournalAtOpen:
     def setup_method(self):
         orders_state.active_trades.clear()
 
@@ -330,20 +353,28 @@ class TestJournalAtOpen:
         ib = _make_ib()
         logged = []
 
-        with patch("orders.CONFIG", _BASE_CONFIG), \
-             patch("orders.calculate_position_size", return_value=100), \
-             patch("orders.calculate_stops", return_value=(98.5, 103.375)), \
-             patch("orders.get_contract", return_value=MagicMock()), \
-             patch("orders._get_ibkr_price", return_value=100.0), \
-             patch("orders.get_tv_signal_cache", return_value={}), \
-             patch("orders.check_correlation", return_value=(True, "")), \
-             patch("orders.check_combined_exposure", return_value=(True, "")), \
-             patch("orders.check_sector_concentration", return_value=(True, "")), \
-             patch("orders._is_duplicate_check_enabled", return_value=False), \
-             patch("orders.log_order"), \
-             patch("learning.log_trade", side_effect=lambda **kw: logged.append(kw)):
+        with (
+            patch("orders.CONFIG", _BASE_CONFIG),
+            patch("orders.calculate_position_size", return_value=100),
+            patch("orders.calculate_stops", return_value=(98.5, 103.375)),
+            patch("orders.get_contract", return_value=MagicMock()),
+            patch("orders._get_ibkr_price", return_value=100.0),
+            patch("orders.get_tv_signal_cache", return_value={}),
+            patch("orders.check_correlation", return_value=(True, "")),
+            patch("orders.check_combined_exposure", return_value=(True, "")),
+            patch("orders.check_sector_concentration", return_value=(True, "")),
+            patch("orders._is_duplicate_check_enabled", return_value=False),
+            patch("orders.log_order"),
+            patch("learning.log_trade", side_effect=lambda **kw: logged.append(kw)),
+        ):
             orders.execute_buy(
-                ib, "AAPL", 100.0, 1.0, 25, 100_000, _REGIME,
+                ib,
+                "AAPL",
+                100.0,
+                1.0,
+                25,
+                100_000,
+                _REGIME,
                 tranche_mode=True,
             )
 
@@ -357,20 +388,28 @@ class TestJournalAtOpen:
         ib = _make_ib()
         logged = []
 
-        with patch("orders.CONFIG", _BASE_CONFIG), \
-             patch("orders.calculate_position_size", return_value=99), \
-             patch("orders.calculate_stops", return_value=(98.5, 103.375)), \
-             patch("orders.get_contract", return_value=MagicMock()), \
-             patch("orders._get_ibkr_price", return_value=100.0), \
-             patch("orders.get_tv_signal_cache", return_value={}), \
-             patch("orders.check_correlation", return_value=(True, "")), \
-             patch("orders.check_combined_exposure", return_value=(True, "")), \
-             patch("orders.check_sector_concentration", return_value=(True, "")), \
-             patch("orders._is_duplicate_check_enabled", return_value=False), \
-             patch("orders.log_order"), \
-             patch("learning.log_trade", side_effect=lambda **kw: logged.append(kw)):
+        with (
+            patch("orders.CONFIG", _BASE_CONFIG),
+            patch("orders.calculate_position_size", return_value=99),
+            patch("orders.calculate_stops", return_value=(98.5, 103.375)),
+            patch("orders.get_contract", return_value=MagicMock()),
+            patch("orders._get_ibkr_price", return_value=100.0),
+            patch("orders.get_tv_signal_cache", return_value={}),
+            patch("orders.check_correlation", return_value=(True, "")),
+            patch("orders.check_combined_exposure", return_value=(True, "")),
+            patch("orders.check_sector_concentration", return_value=(True, "")),
+            patch("orders._is_duplicate_check_enabled", return_value=False),
+            patch("orders.log_order"),
+            patch("learning.log_trade", side_effect=lambda **kw: logged.append(kw)),
+        ):
             orders.execute_buy(
-                ib, "AAPL", 100.0, 1.0, 25, 100_000, _REGIME,
+                ib,
+                "AAPL",
+                100.0,
+                1.0,
+                25,
+                100_000,
+                _REGIME,
                 tranche_mode=False,
             )
 
@@ -381,8 +420,8 @@ class TestJournalAtOpen:
 
 # ── Test 6: log_trade CLOSE called for T1 ─────────────────────────────────────
 
-class TestJournalAtT1Close:
 
+class TestJournalAtT1Close:
     def teardown_method(self):
         orders_state.active_trades.clear()
 
@@ -390,14 +429,27 @@ class TestJournalAtT1Close:
         """update_tranche_status logs CLOSE with tranche_id=1 and reason='tranche_1_tp'."""
         orders_state.active_trades.clear()
         orders_state.active_trades["AAPL"] = {
-            "symbol": "AAPL", "instrument": "stock", "status": "ACTIVE",
-            "direction": "LONG", "entry": 100.0, "current": 101.5,
-            "qty": 100, "t1_qty": 50, "t2_qty": 50,
-            "sl": 98.5, "tp": 101.5, "atr": 1.0,
-            "sl_order_id": 100, "t1_order_id": 200,
-            "t2_sl_order_id": None, "t1_status": "OPEN",
-            "tranche_mode": True, "order_id": 99,
-            "agent_outputs": {}, "score": 25, "reasoning": "test",
+            "symbol": "AAPL",
+            "instrument": "stock",
+            "status": "ACTIVE",
+            "direction": "LONG",
+            "entry": 100.0,
+            "current": 101.5,
+            "qty": 100,
+            "t1_qty": 50,
+            "t2_qty": 50,
+            "sl": 98.5,
+            "tp": 101.5,
+            "atr": 1.0,
+            "sl_order_id": 100,
+            "t1_order_id": 200,
+            "t2_sl_order_id": None,
+            "t1_status": "OPEN",
+            "tranche_mode": True,
+            "order_id": 99,
+            "agent_outputs": {},
+            "score": 25,
+            "reasoning": "test",
             "open_time": "2026-04-01T09:30:00+00:00",
             "high_water_mark": 101.5,
         }
@@ -407,16 +459,18 @@ class TestJournalAtT1Close:
 
         ib = MagicMock()
         ib.isConnected.return_value = True
-        ib.openTrades.return_value = []   # T1 filled
+        ib.openTrades.return_value = []  # T1 filled
         ib.placeOrder.return_value = new_stop
         ib.sleep = MagicMock()
 
         close_calls = []
 
-        with patch("orders_options.get_contract", return_value=MagicMock()), \
-             patch("orders_options._cancel_ibkr_order_by_id"), \
-             patch("orders_options.CONFIG", {"active_account": "DU_TEST"}), \
-             patch("learning.log_trade", side_effect=lambda **kw: close_calls.append(kw)):
+        with (
+            patch("orders_options.get_contract", return_value=MagicMock()),
+            patch("orders_options._cancel_ibkr_order_by_id"),
+            patch("orders_options.CONFIG", {"active_account": "DU_TEST"}),
+            patch("learning.log_trade", side_effect=lambda **kw: close_calls.append(kw)),
+        ):
             orders.update_tranche_status(ib)
 
         assert len(close_calls) == 1
@@ -430,8 +484,8 @@ class TestJournalAtT1Close:
 
 # ── Test 7: Legacy mode (tranche_mode=False) ───────────────────────────────────
 
-class TestLegacyMode:
 
+class TestLegacyMode:
     def setup_method(self):
         orders_state.active_trades.clear()
 
@@ -441,34 +495,46 @@ class TestLegacyMode:
     def test_legacy_tp_qty_is_qty_over_3(self):
         """tranche_mode=False: TP qty = qty//3, t1_status='N/A'."""
         ib = _make_ib()
-        mock_limit = MagicMock(side_effect=lambda *a, **kw: MagicMock(
-            totalQuantity=a[1], lmtPrice=a[2],
-            parentId=None, transmit=False,
-        ))
+        mock_limit = MagicMock(
+            side_effect=lambda *a, **kw: MagicMock(
+                totalQuantity=a[1],
+                lmtPrice=a[2],
+                parentId=None,
+                transmit=False,
+            )
+        )
 
-        with patch("orders.CONFIG", _BASE_CONFIG), \
-             patch("orders.calculate_position_size", return_value=99), \
-             patch("orders.calculate_stops", return_value=(98.5, 103.375)), \
-             patch("orders.get_contract", return_value=MagicMock()), \
-             patch("orders._get_ibkr_price", return_value=100.0), \
-             patch("orders.get_tv_signal_cache", return_value={}), \
-             patch("orders.check_correlation", return_value=(True, "")), \
-             patch("orders.check_combined_exposure", return_value=(True, "")), \
-             patch("orders.check_sector_concentration", return_value=(True, "")), \
-             patch("orders._is_duplicate_check_enabled", return_value=False), \
-             patch("orders.log_order"), \
-             patch("learning.log_trade"), \
-             patch.object(orders, "LimitOrder", mock_limit), \
-             patch.object(orders, "StopOrder", MagicMock(return_value=MagicMock(parentId=None, transmit=False))):
+        with (
+            patch("orders.CONFIG", _BASE_CONFIG),
+            patch("orders.calculate_position_size", return_value=99),
+            patch("orders.calculate_stops", return_value=(98.5, 103.375)),
+            patch("orders.get_contract", return_value=MagicMock()),
+            patch("orders._get_ibkr_price", return_value=100.0),
+            patch("orders.get_tv_signal_cache", return_value={}),
+            patch("orders.check_correlation", return_value=(True, "")),
+            patch("orders.check_combined_exposure", return_value=(True, "")),
+            patch("orders.check_sector_concentration", return_value=(True, "")),
+            patch("orders._is_duplicate_check_enabled", return_value=False),
+            patch("orders.log_order"),
+            patch("learning.log_trade"),
+            patch.object(orders, "LimitOrder", mock_limit),
+            patch.object(orders, "StopOrder", MagicMock(return_value=MagicMock(parentId=None, transmit=False))),
+        ):
             result = orders.execute_buy(
-                ib, "AAPL", 100.0, 1.0, 25, 100_000, _REGIME,
+                ib,
+                "AAPL",
+                100.0,
+                1.0,
+                25,
+                100_000,
+                _REGIME,
                 tranche_mode=False,
             )
 
         assert result is True
         # LimitOrder calls: [0] = entry BUY, [1] = TP SELL with qty//3
         tp_args = mock_limit.call_args_list[1][0]
-        assert tp_args[1] == 33   # 99 // 3 = 33
+        assert tp_args[1] == 33  # 99 // 3 = 33
 
         trade = orders_state.active_trades.get("AAPL", {})
         assert trade.get("tranche_mode") is False

@@ -16,10 +16,10 @@ Covers:
   - Exactly one definition of each previously-duplicated symbol exists
 """
 
+import inspect
 import os
 import sys
 import types
-import inspect
 from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
@@ -33,8 +33,14 @@ if project_root not in sys.path:
 # 2. Stub ALL heavy deps BEFORE importing any Decifer module
 # ---------------------------------------------------------------------------
 for _mod in [
-    "ib_async", "ib_insync", "anthropic", "yfinance",
-    "praw", "feedparser", "tvDatafeed", "requests_html",
+    "ib_async",
+    "ib_insync",
+    "anthropic",
+    "yfinance",
+    "praw",
+    "feedparser",
+    "tvDatafeed",
+    "requests_html",
 ]:
     sys.modules.setdefault(_mod, MagicMock())
 
@@ -88,7 +94,7 @@ sys.modules.setdefault("joblib", types.ModuleType("joblib"))
 # ---------------------------------------------------------------------------
 # 3. Stub config with all required keys BEFORE importing orders
 # ---------------------------------------------------------------------------
-import config as _config_mod  # noqa: E402
+import config as _config_mod
 
 _cfg = {
     "ib_host": "127.0.0.1",
@@ -136,23 +142,30 @@ sys.modules.setdefault("scanner", _scanner_stub)
 # ---------------------------------------------------------------------------
 # 5. NOW import orders  (pop any hollow stub test_bot.py may have cached)
 # ---------------------------------------------------------------------------
-for _decifer_mod in ("orders", "risk", "learning", "scanner", "signals",
-                     "news", "agents", "options", "options_scanner"):
+for _decifer_mod in (
+    "orders",
+    "risk",
+    "learning",
+    "scanner",
+    "signals",
+    "news",
+    "agents",
+    "options",
+    "options_scanner",
+):
     sys.modules.pop(_decifer_mod, None)
-import orders  # noqa: E402
+import pytest
 
-import pytest  # noqa: E402
-
+import orders
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_ibkr_trade(symbol: str, side: str = "BUY",
-                     sec_type: str = "STK",
-                     strike: float = 0.0,
-                     right: str = "",
-                     expiry: str = ""):
+
+def _make_ibkr_trade(
+    symbol: str, side: str = "BUY", sec_type: str = "STK", strike: float = 0.0, right: str = "", expiry: str = ""
+):
     """Build a minimal fake IBKR Trade object."""
     contract = MagicMock()
     contract.symbol = symbol
@@ -180,6 +193,7 @@ def _make_ib(open_trade_list):
 # ===========================================================================
 # TEST CLASS 1 — _is_duplicate_check_enabled
 # ===========================================================================
+
 
 class TestIsDuplicateCheckEnabled:
     """Unit tests for the private helper _is_duplicate_check_enabled()."""
@@ -268,6 +282,7 @@ class TestIsDuplicateCheckEnabled:
 # ===========================================================================
 # TEST CLASS 2 — has_open_order_for: stock orders
 # ===========================================================================
+
 
 class TestHasOpenOrderForStocks:
     """Tests for has_open_order_for() with equity symbols."""
@@ -366,6 +381,7 @@ class TestHasOpenOrderForStocks:
 # TEST CLASS 3 — has_open_order_for: options
 # ===========================================================================
 
+
 class TestHasOpenOrderForOptions:
     """Tests for has_open_order_for() with options (option_key matching)."""
 
@@ -387,9 +403,7 @@ class TestHasOpenOrderForOptions:
         """
         trade = self._make_option_trade("AAPL", "C", 150.0, "20260116")
         ib = _make_ib([trade])
-        result = orders.has_open_order_for(
-            ib, "AAPL", side="BUY", option_key="AAPL_C_150.0_2026-01-16"
-        )
+        result = orders.has_open_order_for(ib, "AAPL", side="BUY", option_key="AAPL_C_150.0_2026-01-16")
         assert result is True
 
     def test_different_strike_not_blocked(self):
@@ -398,9 +412,7 @@ class TestHasOpenOrderForOptions:
         """
         trade = self._make_option_trade("AAPL", "C", 150.0, "20260116")
         ib = _make_ib([trade])
-        result = orders.has_open_order_for(
-            ib, "AAPL", side="BUY", option_key="AAPL_C_160.0_2026-01-16"
-        )
+        result = orders.has_open_order_for(ib, "AAPL", side="BUY", option_key="AAPL_C_160.0_2026-01-16")
         assert result is False
 
     def test_different_expiry_not_blocked(self):
@@ -410,9 +422,7 @@ class TestHasOpenOrderForOptions:
         """
         trade = self._make_option_trade("AAPL", "C", 150.0, "20260116")
         ib = _make_ib([trade])
-        result = orders.has_open_order_for(
-            ib, "AAPL", side="BUY", option_key="AAPL_C_150.0_2026-02-20"
-        )
+        result = orders.has_open_order_for(ib, "AAPL", side="BUY", option_key="AAPL_C_150.0_2026-02-20")
         assert result is False
 
     def test_different_right_not_blocked(self):
@@ -421,9 +431,7 @@ class TestHasOpenOrderForOptions:
         """
         trade = self._make_option_trade("AAPL", "C", 150.0, "20260116")
         ib = _make_ib([trade])
-        result = orders.has_open_order_for(
-            ib, "AAPL", side="BUY", option_key="AAPL_P_150.0_2026-01-16"
-        )
+        result = orders.has_open_order_for(ib, "AAPL", side="BUY", option_key="AAPL_P_150.0_2026-01-16")
         assert result is False
 
     def test_different_underlying_not_blocked(self):
@@ -433,9 +441,7 @@ class TestHasOpenOrderForOptions:
         """
         trade = self._make_option_trade("AAPL", "C", 150.0, "20260116")
         ib = _make_ib([trade])
-        result = orders.has_open_order_for(
-            ib, "MSFT", side="BUY", option_key="MSFT_C_150.0_2026-01-16"
-        )
+        result = orders.has_open_order_for(ib, "MSFT", side="BUY", option_key="MSFT_C_150.0_2026-01-16")
         assert result is False
 
     def test_option_key_with_call_string_right(self):
@@ -444,9 +450,7 @@ class TestHasOpenOrderForOptions:
         """
         trade = self._make_option_trade("AAPL", "CALL", 150.0, "20260116")
         ib = _make_ib([trade])
-        result = orders.has_open_order_for(
-            ib, "AAPL", side="BUY", option_key="AAPL_C_150.0_2026-01-16"
-        )
+        result = orders.has_open_order_for(ib, "AAPL", side="BUY", option_key="AAPL_C_150.0_2026-01-16")
         assert result is True
 
     def test_option_key_with_put_string_right(self):
@@ -455,9 +459,7 @@ class TestHasOpenOrderForOptions:
         """
         trade = self._make_option_trade("AAPL", "PUT", 150.0, "20260116")
         ib = _make_ib([trade])
-        result = orders.has_open_order_for(
-            ib, "AAPL", side="BUY", option_key="AAPL_P_150.0_2026-01-16"
-        )
+        result = orders.has_open_order_for(ib, "AAPL", side="BUY", option_key="AAPL_P_150.0_2026-01-16")
         assert result is True
 
     def test_stock_open_order_does_not_block_option(self):
@@ -467,24 +469,21 @@ class TestHasOpenOrderForOptions:
         """
         trade = _make_ibkr_trade("AAPL", "BUY")  # stock, no expiry/strike
         ib = _make_ib([trade])
-        result = orders.has_open_order_for(
-            ib, "AAPL", side="BUY", option_key="AAPL_C_150.0_2026-01-16"
-        )
+        result = orders.has_open_order_for(ib, "AAPL", side="BUY", option_key="AAPL_C_150.0_2026-01-16")
         # The stock trade will not match the option key because strike/expiry differ
         assert result is False
 
     def test_no_open_orders_option_returns_false(self):
         """Empty book with option_key query returns False."""
         ib = _make_ib([])
-        result = orders.has_open_order_for(
-            ib, "AAPL", side="BUY", option_key="AAPL_C_150.0_2026-01-16"
-        )
+        result = orders.has_open_order_for(ib, "AAPL", side="BUY", option_key="AAPL_C_150.0_2026-01-16")
         assert result is False
 
 
 # ===========================================================================
 # TEST CLASS 4 — Re-entry after position close
 # ===========================================================================
+
 
 class TestReentryAfterClose:
     """Regression tests: re-entry after close must not be incorrectly blocked."""
@@ -532,6 +531,7 @@ class TestReentryAfterClose:
 # TEST CLASS 5 — No duplicate definitions (regression)
 # ===========================================================================
 
+
 class TestNoDuplicateDefinitions:
     """Regression tests that confirm the shadowing bug is fully fixed."""
 
@@ -544,8 +544,7 @@ class TestNoDuplicateDefinitions:
         names = [n for n, _ in members]
         count = names.count("has_open_order_for")
         assert count == 1, (
-            f"Expected 1 'has_open_order_for', found {count}. "
-            "Duplicate-definition bug may still be present."
+            f"Expected 1 'has_open_order_for', found {count}. Duplicate-definition bug may still be present."
         )
 
     def test_is_duplicate_check_enabled_defined_exactly_once(self):
@@ -556,8 +555,7 @@ class TestNoDuplicateDefinitions:
         names = [n for n, _ in members]
         count = names.count("_is_duplicate_check_enabled")
         assert count == 1, (
-            f"Expected 1 '_is_duplicate_check_enabled', found {count}. "
-            "Shadowing bug may still be present."
+            f"Expected 1 '_is_duplicate_check_enabled', found {count}. Shadowing bug may still be present."
         )
 
     def test_get_symbol_lock_defined_exactly_once(self):
@@ -568,8 +566,7 @@ class TestNoDuplicateDefinitions:
         names = [n for n, _ in members]
         count = names.count("_get_symbol_lock")
         assert count == 1, (
-            f"Expected 1 '_get_symbol_lock', found {count}. "
-            "Duplicate definition bug may still be present."
+            f"Expected 1 '_get_symbol_lock', found {count}. Duplicate definition bug may still be present."
         )
 
     def test_order_duplicate_check_constant_is_true(self):
@@ -607,6 +604,7 @@ class TestNoDuplicateDefinitions:
 # TEST CLASS 6 — ORDER_DUPLICATE_CHECK_ENABLED_DEFAULT constant
 # ===========================================================================
 
+
 class TestDuplicateCheckConstant:
     """Tests for the module-level constant."""
 
@@ -627,14 +625,18 @@ class TestDuplicateCheckConstant:
 # TEST CLASS 7 — Parametrized edge-case matrix
 # ===========================================================================
 
-@pytest.mark.parametrize("existing_symbol, query_symbol, expected", [
-    ("AAPL", "AAPL", True),   # exact match → blocked
-    ("AAPL", "MSFT", False),  # different symbol → allowed
-    ("TSLA", "TSLA", True),   # another exact match
-    ("NVDA", "AMD",  False),  # different symbol → allowed
-    ("SPY",  "QQQ",  False),  # ETF pair → allowed
-    ("SPY",  "SPY",  True),   # same ETF → blocked
-])
+
+@pytest.mark.parametrize(
+    "existing_symbol, query_symbol, expected",
+    [
+        ("AAPL", "AAPL", True),  # exact match → blocked
+        ("AAPL", "MSFT", False),  # different symbol → allowed
+        ("TSLA", "TSLA", True),  # another exact match
+        ("NVDA", "AMD", False),  # different symbol → allowed
+        ("SPY", "QQQ", False),  # ETF pair → allowed
+        ("SPY", "SPY", True),  # same ETF → blocked
+    ],
+)
 def test_has_open_order_symbol_matrix(existing_symbol, query_symbol, expected):
     """
     Parametrized matrix: for each (existing, query) pair verify the
@@ -644,19 +646,21 @@ def test_has_open_order_symbol_matrix(existing_symbol, query_symbol, expected):
     ib = _make_ib([existing])
     result = orders.has_open_order_for(ib, query_symbol, side="BUY")
     assert result is expected, (
-        f"has_open_order_for(ib, '{query_symbol}') with existing '{existing_symbol}' "
-        f"expected {expected}, got {result}"
+        f"has_open_order_for(ib, '{query_symbol}') with existing '{existing_symbol}' expected {expected}, got {result}"
     )
 
 
-@pytest.mark.parametrize("config_value, expected", [
-    (True, True),
-    (False, False),
-    (1, True),
-    (0, False),
-    ("enabled", True),
-    ("", False),
-])
+@pytest.mark.parametrize(
+    "config_value, expected",
+    [
+        (True, True),
+        (False, False),
+        (1, True),
+        (0, False),
+        ("enabled", True),
+        ("", False),
+    ],
+)
 def test_is_duplicate_check_enabled_config_matrix(config_value, expected):
     """
     Parametrized matrix for _is_duplicate_check_enabled across various
@@ -665,6 +669,5 @@ def test_is_duplicate_check_enabled_config_matrix(config_value, expected):
     with patch.dict(orders.CONFIG, {"ORDER_DUPLICATE_CHECK_ENABLED": config_value}):
         result = orders._is_duplicate_check_enabled()
         assert result is expected, (
-            f"_is_duplicate_check_enabled() with config={config_value!r} "
-            f"expected {expected}, got {result}"
+            f"_is_duplicate_check_enabled() with config={config_value!r} expected {expected}, got {result}"
         )

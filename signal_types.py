@@ -8,7 +8,6 @@
 # ╚══════════════════════════════════════════════════════════════╝
 
 import json
-import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -43,33 +42,33 @@ class Signal:
 
     symbol: str
     direction: Literal["LONG", "SHORT", "NEUTRAL"]
-    conviction_score: float          # 0–10
-    dimension_scores: dict           # {"trend": 7, "momentum": 5, ...}
+    conviction_score: float  # 0–10
+    dimension_scores: dict  # {"trend": 7, "momentum": 5, ...}
     timestamp: datetime
     regime_context: str
     source_agents: list = field(default_factory=list)
     rationale: str = ""
     # Routing metadata — populated from raw scored dict, needed by execute_buy
     price: float = 0.0
-    atr: float = 0.0         # 5-minute ATR (bar noise — used for stop sizing)
-    atr_daily: float = 0.0   # Daily ATR (session range — used by trade advisor for PT sizing)
+    atr: float = 0.0  # 5-minute ATR (bar noise — used for stop sizing)
+    atr_daily: float = 0.0  # Daily ATR (session range — used by trade advisor for PT sizing)
     candle_gate: str = "UNKNOWN"
-    instrument: str = "stock"   # "stock", "fx", "option" — routes get_contract()
+    instrument: str = "stock"  # "stock", "fx", "option" — routes get_contract()
 
     def to_dict(self) -> dict:
         """Serialise to a JSON-safe dict (timestamp as ISO string)."""
         return {
-            "symbol":           self.symbol,
-            "direction":        self.direction,
+            "symbol": self.symbol,
+            "direction": self.direction,
             "conviction_score": round(self.conviction_score, 3),
             "dimension_scores": self.dimension_scores,
-            "timestamp":        self.timestamp.isoformat(),
-            "regime_context":   self.regime_context,
-            "source_agents":    self.source_agents,
-            "rationale":        self.rationale,
-            "price":            self.price,
-            "atr":              self.atr,
-            "atr_daily":        self.atr_daily,
+            "timestamp": self.timestamp.isoformat(),
+            "regime_context": self.regime_context,
+            "source_agents": self.source_agents,
+            "rationale": self.rationale,
+            "price": self.price,
+            "atr": self.atr,
+            "atr_daily": self.atr_daily,
         }
 
     def to_json(self) -> str:

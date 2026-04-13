@@ -18,18 +18,20 @@ from __future__ import annotations
 
 import logging
 import warnings
-from datetime import date, datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date, datetime
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
 
-from config import CONFIG
 try:
     from options import get_iv_rank  # module-level so tests can patch options_scanner.get_iv_rank
 except (ImportError, Exception):
+
     def get_iv_rank(symbol, iv=None):  # type: ignore
         return None
+
 
 log = logging.getLogger("decifer.options_scanner")
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
@@ -39,30 +41,62 @@ logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 # Scanned every cycle in addition to top TV screener hits.
 OPTIONABLE_UNIVERSE = [
     # Mega-cap tech (tightest spreads, highest options liquidity)
-    "AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOGL", "AMD",
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "TSLA",
+    "AMZN",
+    "META",
+    "GOOGL",
+    "AMD",
     # High-beta / momentum (high IV, active options flow)
-    "PLTR", "MSTR", "CRWD", "DDOG", "SNOW", "SHOP", "COIN", "HOOD",
-    "SMCI", "NFLX", "UBER", "CRM", "ORCL",
+    "PLTR",
+    "MSTR",
+    "CRWD",
+    "DDOG",
+    "SNOW",
+    "SHOP",
+    "COIN",
+    "HOOD",
+    "SMCI",
+    "NFLX",
+    "UBER",
+    "CRM",
+    "ORCL",
     # Semiconductors
-    "MU", "INTC", "QCOM", "AMAT",
+    "MU",
+    "INTC",
+    "QCOM",
+    "AMAT",
     # ETFs (deepest options liquidity of all)
-    "SPY", "QQQ", "IWM", "XLK", "XLF", "GLD",
+    "SPY",
+    "QQQ",
+    "IWM",
+    "XLK",
+    "XLF",
+    "GLD",
     # Active momentum names from the Decifer watchlist
-    "HIMS", "OSCR", "ASTS", "ALAB", "NBIS", "IBIT",
+    "HIMS",
+    "OSCR",
+    "ASTS",
+    "ALAB",
+    "NBIS",
+    "IBIT",
 ]
 
 # ── Scanner thresholds ─────────────────────────────────────────────────
-_SCAN_MIN_DTE      = 5     # Wider than trading window — catches early catalyst setups
-_SCAN_MAX_DTE      = 45
+_SCAN_MIN_DTE = 5  # Wider than trading window — catches early catalyst setups
+_SCAN_MAX_DTE = 45
 _UNUSUAL_VOL_RATIO = 0.25  # volume / OI > 25% = unusual (significant same-day activity)
-_MIN_TOTAL_VOL     = 200   # Skip symbols with < 200 total options contracts traded
-_MIN_OPTIONS_SCORE = 12    # Must score at least 12 / 30 to be returned to agents
-_MAX_RESULTS       = 15    # Top N signals returned per cycle
+_MIN_TOTAL_VOL = 200  # Skip symbols with < 200 total options contracts traded
+_MIN_OPTIONS_SCORE = 12  # Must score at least 12 / 30 to be returned to agents
+_MAX_RESULTS = 15  # Top N signals returned per cycle
 
 
 # ═══════════════════════════════════════════════════════════════════════
 # INTERNAL HELPERS
 # ═══════════════════════════════════════════════════════════════════════
+
 
 def _get_nearest_expiry(ticker_obj) -> tuple[str | None, int | None]:
     """
@@ -136,9 +170,7 @@ def _compute_max_pain(calls: pd.DataFrame, puts: pd.DataFrame) -> float | None:
     Vectorized implementation for performance.
     """
     try:
-        strikes = sorted(set(
-            calls["strike"].dropna().tolist() + puts["strike"].dropna().tolist()
-        ))
+        strikes = sorted(set(calls["strike"].dropna().tolist() + puts["strike"].dropna().tolist()))
         if len(strikes) < 3:
             return None
 
@@ -153,7 +185,7 @@ def _compute_max_pain(calls: pd.DataFrame, puts: pd.DataFrame) -> float | None:
         total_pain = np.zeros(len(test_prices))
         for i, tp in enumerate(test_prices):
             call_val = np.sum(call_oi * np.maximum(0.0, tp - call_strikes))
-            put_val  = np.sum(put_oi * np.maximum(0.0, put_strikes - tp))
+            put_val = np.sum(put_oi * np.maximum(0.0, put_strikes - tp))
             total_pain[i] = call_val + put_val
 
         return float(test_prices[np.argmin(total_pain)])
@@ -166,7 +198,8 @@ def _compute_max_pain(calls: pd.DataFrame, puts: pd.DataFrame) -> float | None:
 # SINGLE-SYMBOL ANALYSIS
 # ═══════════════════════════════════════════════════════════════════════
 
-def _analyse_symbol(symbol: str, regime: dict = None) -> dict | None:
+
+def _analyse_symbol(symbol: str, regime: dict | None = None) -> dict | None:
     """
     Run full options analysis for one symbol.
     Returns an options signal dict or None if nothing notable.
@@ -177,17 +210,20 @@ def _analyse_symbol(symbol: str, regime: dict = None) -> dict | None:
 
         try:
             from alpaca_options import (
-                get_underlying_price as _alpaca_price,
-                get_chain            as _alpaca_chain,
+                get_chain as _alpaca_chain,
             )
-            _s     = _alpaca_price(symbol)
+            from alpaca_options import (
+                get_underlying_price as _alpaca_price,
+            )
+
+            _s = _alpaca_price(symbol)
             _chain = _alpaca_chain(symbol, _SCAN_MIN_DTE, _SCAN_MAX_DTE)
             if _s and _s > 0 and _chain:
-                S       = _s
-                calls   = _chain["calls"]
-                puts    = _chain["puts"]
+                S = _s
+                calls = _chain["calls"]
+                puts = _chain["puts"]
                 exp_str = _chain["expiry_str"]
-                dte     = _chain["dte"]
+                dte = _chain["dte"]
         except Exception:
             pass
 
@@ -209,7 +245,7 @@ def _analyse_symbol(symbol: str, regime: dict = None) -> dict | None:
                 warnings.simplefilter("ignore")
                 _chain_yf = ticker.option_chain(exp_str)
             calls = _chain_yf.calls.copy()
-            puts  = _chain_yf.puts.copy()
+            puts = _chain_yf.puts.copy()
 
         # ── Earnings calendar (yfinance — lightweight, no chain needed) ──
         earnings_days = None
@@ -226,13 +262,13 @@ def _analyse_symbol(symbol: str, regime: dict = None) -> dict | None:
 
         # ── Volume & OI totals ────────────────────────────────────────
         call_vol = float(calls["volume"].fillna(0).sum())
-        put_vol  = float(puts["volume"].fillna(0).sum())
-        call_oi  = float(calls["openInterest"].fillna(0).sum())
-        put_oi   = float(puts["openInterest"].fillna(0).sum())
+        put_vol = float(puts["volume"].fillna(0).sum())
+        call_oi = float(calls["openInterest"].fillna(0).sum())
+        put_oi = float(puts["openInterest"].fillna(0).sum())
         total_vol = call_vol + put_vol
 
         if total_vol < _MIN_TOTAL_VOL:
-            return None   # Not enough activity to be meaningful
+            return None  # Not enough activity to be meaningful
 
         # ── Call/Put ratio (by volume) ────────────────────────────────
         cp_ratio = round(call_vol / put_vol, 2) if put_vol > 10 else 10.0
@@ -241,21 +277,18 @@ def _analyse_symbol(symbol: str, regime: dict = None) -> dict | None:
         # ── Unusual volume detection ──────────────────────────────────
         # "Unusual" = today's volume is > 25% of total open interest
         unusual_calls = (call_oi > 0) and (call_vol / call_oi >= _UNUSUAL_VOL_RATIO)
-        unusual_puts  = (put_oi  > 0) and (put_vol  / put_oi  >= _UNUSUAL_VOL_RATIO)
+        unusual_puts = (put_oi > 0) and (put_vol / put_oi >= _UNUSUAL_VOL_RATIO)
 
         # ── Dominant strike (most active contract today) ──────────────
-        all_c = pd.concat([
-            calls.assign(opt_type="call"),
-            puts.assign(opt_type="put")
-        ], ignore_index=True)
+        all_c = pd.concat([calls.assign(opt_type="call"), puts.assign(opt_type="put")], ignore_index=True)
         all_c["volume"] = all_c["volume"].fillna(0)
-        dom_row    = all_c.loc[all_c["volume"].idxmax()]
+        dom_row = all_c.loc[all_c["volume"].idxmax()]
         dom_strike = float(dom_row["strike"])
-        dom_type   = str(dom_row["opt_type"])
+        dom_type = str(dom_row["opt_type"])
         # Safe scalar extraction — impliedVolatility can be a Series after concat
         try:
             _raw_iv = dom_row["impliedVolatility"]
-            dom_iv  = float(_raw_iv.iloc[0] if hasattr(_raw_iv, "iloc") else _raw_iv)
+            dom_iv = float(_raw_iv.iloc[0] if hasattr(_raw_iv, "iloc") else _raw_iv)
         except Exception:
             dom_iv = 0.30
         if not (0 < dom_iv < 5):
@@ -272,42 +305,35 @@ def _analyse_symbol(symbol: str, regime: dict = None) -> dict | None:
         # ══════════════════════════════════════════════════════════════
         # SCORING  (0 – 30)
         # ══════════════════════════════════════════════════════════════
-        score   = 0
+        score = 0
         reasons = []
 
         # 1. Unusual volume  (0–10)
         # Both sides unusual: award based on which side dominates by magnitude
         if unusual_calls and unusual_puts:
-            if cp_ratio >= 1.5:          # Call-dominated both-unusual
+            if cp_ratio >= 1.5:  # Call-dominated both-unusual
                 score += 9
                 reasons.append(
                     f"unusual vol both sides, CALL-led — C/P={cp_ratio:.1f}x "
-                    f"(call {call_vol/call_oi*100:.0f}%, put {put_vol/put_oi*100:.0f}% of OI)"
+                    f"(call {call_vol / call_oi * 100:.0f}%, put {put_vol / put_oi * 100:.0f}% of OI)"
                 )
-            elif pc_ratio >= 1.5:        # Put-dominated both-unusual
+            elif pc_ratio >= 1.5:  # Put-dominated both-unusual
                 score += 9
                 reasons.append(
                     f"unusual vol both sides, PUT-led — C/P={cp_ratio:.1f}x "
-                    f"(put {put_vol/put_oi*100:.0f}%, call {call_vol/call_oi*100:.0f}% of OI)"
+                    f"(put {put_vol / put_oi * 100:.0f}%, call {call_vol / call_oi * 100:.0f}% of OI)"
                 )
-            else:                        # Balanced — event/uncertainty hedging
+            else:  # Balanced — event/uncertainty hedging
                 score += 7
-                reasons.append(
-                    f"unusual vol both sides balanced — C/P={cp_ratio:.1f}x "
-                    f"(likely event/catalyst hedging)"
-                )
+                reasons.append(f"unusual vol both sides balanced — C/P={cp_ratio:.1f}x (likely event/catalyst hedging)")
         elif unusual_calls:
             score += 10
             reasons.append(
-                f"unusual CALL volume — {call_vol/call_oi*100:.0f}% of call OI "
-                f"({int(call_vol):,} contracts)"
+                f"unusual CALL volume — {call_vol / call_oi * 100:.0f}% of call OI ({int(call_vol):,} contracts)"
             )
         elif unusual_puts:
             score += 9
-            reasons.append(
-                f"unusual PUT volume — {put_vol/put_oi*100:.0f}% of put OI "
-                f"({int(put_vol):,} contracts)"
-            )
+            reasons.append(f"unusual PUT volume — {put_vol / put_oi * 100:.0f}% of put OI ({int(put_vol):,} contracts)")
 
         # 2. IV rank  (0–8)
         if iv_rank is not None:
@@ -370,31 +396,30 @@ def _analyse_symbol(symbol: str, regime: dict = None) -> dict | None:
         reasoning = (
             f"{symbol} @ ${S:.2f} | {' | '.join(reasons)} | "
             f"dominant: ${dom_strike:.0f} {dom_type.upper()} | "
-            f"{dte} DTE ({exp_str})"
-            + (f" | max_pain=${max_pain:.0f}" if max_pain else "")
+            f"{dte} DTE ({exp_str})" + (f" | max_pain=${max_pain:.0f}" if max_pain else "")
         )
 
         return {
-            "symbol":          symbol,
-            "price":           round(S, 2),
-            "options_score":   score,
-            "signal":          signal,
-            "call_vol":        int(call_vol),
-            "put_vol":         int(put_vol),
-            "call_oi":         int(call_oi),
-            "put_oi":          int(put_oi),
-            "cp_ratio":        cp_ratio,
-            "unusual_calls":   unusual_calls,
-            "unusual_puts":    unusual_puts,
-            "iv_rank":         iv_rank,
-            "dom_strike":      dom_strike,
-            "dom_type":        dom_type,
-            "dom_iv":          round(dom_iv, 3),
-            "earnings_days":   earnings_days,
-            "max_pain":        max_pain,
-            "expiry":          exp_str,
-            "dte":             dte,
-            "reasoning":       reasoning,
+            "symbol": symbol,
+            "price": round(S, 2),
+            "options_score": score,
+            "signal": signal,
+            "call_vol": int(call_vol),
+            "put_vol": int(put_vol),
+            "call_oi": int(call_oi),
+            "put_oi": int(put_oi),
+            "cp_ratio": cp_ratio,
+            "unusual_calls": unusual_calls,
+            "unusual_puts": unusual_puts,
+            "iv_rank": iv_rank,
+            "dom_strike": dom_strike,
+            "dom_type": dom_type,
+            "dom_iv": round(dom_iv, 3),
+            "earnings_days": earnings_days,
+            "max_pain": max_pain,
+            "expiry": exp_str,
+            "dte": dte,
+            "reasoning": reasoning,
         }
 
     except Exception as e:
@@ -406,8 +431,8 @@ def _analyse_symbol(symbol: str, regime: dict = None) -> dict | None:
 # MAIN ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════
 
-def scan_options_universe(extra_symbols: list = None,
-                          regime: dict = None) -> list[dict]:
+
+def scan_options_universe(extra_symbols: list | None = None, regime: dict | None = None) -> list[dict]:
     """
     Scan the optionable universe for notable options setups.
 
@@ -418,7 +443,7 @@ def scan_options_universe(extra_symbols: list = None,
 
     Returns up to _MAX_RESULTS dicts, sorted by options_score descending.
     """
-    symbols     = list(set(OPTIONABLE_UNIVERSE + (extra_symbols or [])))
+    symbols = list(set(OPTIONABLE_UNIVERSE + (extra_symbols or [])))
     regime_name = (regime or {}).get("regime", "UNKNOWN")
 
     results = []
@@ -434,9 +459,8 @@ def scan_options_universe(extra_symbols: list = None,
 
             # Regime-aware filtering
             # In a BULL regime, suppress weak put signals (noise > signal)
-            if regime_name == "TRENDING_UP" and result["signal"] == "PUT_BUYER":
-                if result["options_score"] < 20:
-                    continue
+            if regime_name == "TRENDING_UP" and result["signal"] == "PUT_BUYER" and result["options_score"] < 20:
+                continue
             # In PANIC, ignore call-buyer signals — only hedging/put flow matters
             if regime_name == "CAPITULATION" and result["signal"] == "CALL_BUYER":
                 continue
@@ -446,10 +470,7 @@ def scan_options_universe(extra_symbols: list = None,
     results.sort(key=lambda x: x["options_score"], reverse=True)
     top = results[:_MAX_RESULTS]
 
-    log.info(
-        f"Options scan: {len(top)} notable setups from {len(symbols)} symbols "
-        f"(regime={regime_name})"
-    )
+    log.info(f"Options scan: {len(top)} notable setups from {len(symbols)} symbols (regime={regime_name})")
     for r in top[:5]:
         log.info(f"  [{r['options_score']:>2}/30] {r['signal']:<14} {r.get('reasoning', '')[:90]}")
 

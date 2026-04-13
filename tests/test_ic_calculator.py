@@ -9,6 +9,7 @@ Covers:
   (f) get_current_weights falls back to equal weights when cache is absent/corrupt
   (g) update_ic_weights writes a valid JSON cache and appends history
 """
+
 import json
 import os
 import sys
@@ -25,17 +26,31 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 # Stub heavy deps BEFORE importing any Decifer module
-for _mod in ["ib_async", "ib_insync", "anthropic", "praw",
-             "feedparser", "tvDatafeed", "requests_html", "schedule", "colorama"]:
+for _mod in [
+    "ib_async",
+    "ib_insync",
+    "anthropic",
+    "praw",
+    "feedparser",
+    "tvDatafeed",
+    "requests_html",
+    "schedule",
+    "colorama",
+]:
     sys.modules.setdefault(_mod, MagicMock())
 
 # Minimal config stub
 import config as _cfg_mod
+
 _cfg = {
-    "log_file": "/dev/null", "trade_log": "/dev/null",
-    "order_log": "/dev/null", "anthropic_api_key": "test-key",
-    "model": "claude-sonnet-4-6", "max_tokens": 1000,
-    "signals_log": "/dev/null", "audit_log": "/dev/null",
+    "log_file": "/dev/null",
+    "trade_log": "/dev/null",
+    "order_log": "/dev/null",
+    "anthropic_api_key": "test-key",
+    "model": "claude-sonnet-4-6",
+    "max_tokens": 1000,
+    "signals_log": "/dev/null",
+    "audit_log": "/dev/null",
 }
 if hasattr(_cfg_mod, "CONFIG"):
     for k, v in _cfg.items():
@@ -45,24 +60,23 @@ else:
 
 import ic_calculator as ic
 
-
 DIMS = ic.DIMENSIONS
-N    = len(DIMS)
+N = len(DIMS)
 
 
 # ---------------------------------------------------------------------------
 # Helper to build a signals-log record
 # ---------------------------------------------------------------------------
 
-def _make_record(symbol="AAPL", price=100.0, ts="2025-01-01T10:00:00+00:00",
-                 breakdown=None):
+
+def _make_record(symbol="AAPL", price=100.0, ts="2025-01-01T10:00:00+00:00", breakdown=None):
     if breakdown is None:
         breakdown = {d: 5.0 for d in DIMS}
     return {
-        "symbol":         symbol,
-        "price":          price,
-        "ts":             ts,
-        "score":          30,
+        "symbol": symbol,
+        "price": price,
+        "ts": ts,
+        "score": 30,
         "score_breakdown": breakdown,
     }
 
@@ -70,6 +84,7 @@ def _make_record(symbol="AAPL", price=100.0, ts="2025-01-01T10:00:00+00:00",
 # ---------------------------------------------------------------------------
 # (a) IC calculation correct on synthetic data
 # ---------------------------------------------------------------------------
+
 
 def _real_spearman(x, y):
     """Numpy-only Spearman correlation — bypasses the scipy mock in conftest."""
@@ -79,13 +94,12 @@ def _real_spearman(x, y):
         return 0.0
     rx = np.argsort(np.argsort(x)).astype(float)
     ry = np.argsort(np.argsort(y)).astype(float)
-    d  = rx - ry
+    d = rx - ry
     denom = n * (n * n - 1)
     return float(1.0 - 6.0 * np.sum(d * d) / denom) if denom > 0 else 0.0
 
 
 class TestComputeRollingIC:
-
     def test_positive_correlation_detected(self, tmp_path):
         """
         Dimension 'trend' score perfectly predicts forward return.
@@ -96,7 +110,7 @@ class TestComputeRollingIC:
         records = []
         for i in range(30):
             bd = {d: 5.0 for d in DIMS}
-            bd["trend"] = float(i)       # monotone → perfect rank correlation
+            bd["trend"] = float(i)  # monotone → perfect rank correlation
             records.append(_make_record(symbol=f"SYM{i:02d}", breakdown=bd))
 
         log_file = tmp_path / "signals_log.jsonl"
@@ -106,9 +120,10 @@ class TestComputeRollingIC:
 
         forward_returns = {i: float(i) / 100.0 for i in range(30)}
 
-        with patch.object(ic, "_fetch_forward_returns_batch",
-                          return_value=forward_returns), \
-             patch.object(ic, "_spearman", side_effect=_real_spearman):
+        with (
+            patch.object(ic, "_fetch_forward_returns_batch", return_value=forward_returns),
+            patch.object(ic, "_spearman", side_effect=_real_spearman),
+        ):
             raw = ic.compute_rolling_ic(
                 signals_log_path=str(log_file),
                 window=30,
@@ -138,9 +153,10 @@ class TestComputeRollingIC:
 
         forward_returns = {i: -float(i) / 100.0 for i in range(30)}
 
-        with patch.object(ic, "_fetch_forward_returns_batch",
-                          return_value=forward_returns), \
-             patch.object(ic, "_spearman", side_effect=_real_spearman):
+        with (
+            patch.object(ic, "_fetch_forward_returns_batch", return_value=forward_returns),
+            patch.object(ic, "_spearman", side_effect=_real_spearman),
+        ):
             raw = ic.compute_rolling_ic(
                 signals_log_path=str(log_file),
                 window=30,
@@ -148,9 +164,7 @@ class TestComputeRollingIC:
             )
 
         assert raw["momentum"] is not None
-        assert raw["momentum"] < -0.8, (
-            f"Expected large negative IC, got {raw['momentum']:.4f}"
-        )
+        assert raw["momentum"] < -0.8, f"Expected large negative IC, got {raw['momentum']:.4f}"
 
     def test_insufficient_records_returns_none_ic(self, tmp_path):
         """Fewer than min_valid records → every dimension returns None."""
@@ -161,16 +175,13 @@ class TestComputeRollingIC:
                 f.write(json.dumps(rec) + "\n")
 
         forward_returns = {i: 0.01 for i in range(10)}
-        with patch.object(ic, "_fetch_forward_returns_batch",
-                          return_value=forward_returns):
+        with patch.object(ic, "_fetch_forward_returns_batch", return_value=forward_returns):
             raw = ic.compute_rolling_ic(
                 signals_log_path=str(log_file),
                 min_valid=20,
             )
 
-        assert all(v is None for v in raw.values()), (
-            f"Expected all None, got {raw}"
-        )
+        assert all(v is None for v in raw.values()), f"Expected all None, got {raw}"
 
     def test_empty_log_returns_none_ic(self, tmp_path):
         """Empty signals_log → every dimension returns None."""
@@ -183,10 +194,14 @@ class TestComputeRollingIC:
     def test_missing_score_breakdown_records_skipped(self, tmp_path):
         """Records without score_breakdown are silently skipped."""
         records = []
-        for i in range(25):
-            rec = {"symbol": "AAPL", "price": 100.0,
-                   "ts": "2025-01-01T10:00:00+00:00", "score": 30,
-                   "score_breakdown": {}}  # empty → invalid
+        for _i in range(25):
+            rec = {
+                "symbol": "AAPL",
+                "price": 100.0,
+                "ts": "2025-01-01T10:00:00+00:00",
+                "score": 30,
+                "score_breakdown": {},
+            }  # empty → invalid
             records.append(rec)
 
         log_file = tmp_path / "signals_log.jsonl"
@@ -202,6 +217,7 @@ class TestComputeRollingIC:
 # (b) Negative IC dimensions receive zero weight
 # ---------------------------------------------------------------------------
 
+
 class TestNegativeICZeroWeight:
     """
     These tests verify normalize_ic_weights() logic directly.
@@ -212,13 +228,13 @@ class TestNegativeICZeroWeight:
     def test_negative_ic_gives_zero_weight(self):
         """Negative IC must produce zero weight, not inverted."""
         raw = {d: 0.1 for d in DIMS}
-        raw["trend"]    = -0.5  # strongly negative → must be zeroed
+        raw["trend"] = -0.5  # strongly negative → must be zeroed
         raw["momentum"] = -0.2  # negative → zero
 
         with patch.object(ic, "_ic_cfg", side_effect=lambda k, d: False if k == "force_equal_weights" else d):
             weights, _ = ic.normalize_ic_weights(raw)
 
-        assert weights["trend"]    == 0.0, "Negative IC must produce zero weight"
+        assert weights["trend"] == 0.0, "Negative IC must produce zero weight"
         assert weights["momentum"] == 0.0, "Negative IC must produce zero weight"
 
     def test_zero_ic_gives_zero_weight(self):
@@ -241,24 +257,26 @@ class TestNegativeICZeroWeight:
     def test_mixed_ic_only_positive_dims_get_weight(self):
         """Only the positive-IC dimensions should have non-zero weights."""
         raw = {d: 0.0 for d in DIMS}
-        raw.update({
-            "trend":     0.3,
-            "momentum":  0.2,
-            "squeeze":  -0.1,
-            "flow":      0.0,
-            "breakout":  0.15,
-            "mtf":      -0.4,
-            "news":      0.1,
-            "social":   -0.05,
-            "reversion": 0.05,
-        })
+        raw.update(
+            {
+                "trend": 0.3,
+                "momentum": 0.2,
+                "squeeze": -0.1,
+                "flow": 0.0,
+                "breakout": 0.15,
+                "mtf": -0.4,
+                "news": 0.1,
+                "social": -0.05,
+                "reversion": 0.05,
+            }
+        )
         with patch.object(ic, "_ic_cfg", side_effect=lambda k, d: False if k == "force_equal_weights" else d):
             weights, _ = ic.normalize_ic_weights(raw)
 
-        assert weights["squeeze"]  == 0.0
-        assert weights["flow"]     == 0.0
-        assert weights["mtf"]      == 0.0
-        assert weights["social"]   == 0.0
+        assert weights["squeeze"] == 0.0
+        assert weights["flow"] == 0.0
+        assert weights["mtf"] == 0.0
+        assert weights["social"] == 0.0
 
         for d in ["trend", "momentum", "breakout", "news", "reversion"]:
             assert weights[d] > 0, f"{d} should have positive weight"
@@ -268,8 +286,8 @@ class TestNegativeICZeroWeight:
 # (c) All-zero / all-negative IC falls back to equal weights
 # ---------------------------------------------------------------------------
 
-class TestEqualWeightFallback:
 
+class TestEqualWeightFallback:
     def test_all_none_ic_returns_equal_weights(self):
         """All None IC → equal weights."""
         raw = {d: None for d in DIMS}
@@ -299,22 +317,22 @@ class TestEqualWeightFallback:
 # (d) Weights always sum to 1.0
 # ---------------------------------------------------------------------------
 
-class TestWeightsSumToOne:
 
-    @pytest.mark.parametrize("ic_scenario", [
-        {d: 0.1 for d in DIMS},                  # all positive
-        {d: -0.1 for d in DIMS},                 # all negative → equal fallback
-        {d: None for d in DIMS},                 # all None → equal fallback
-        {"trend": 0.5, **{d: 0.0 for d in DIMS if d != "trend"}},  # single winner
-        {d: (0.3 if i % 2 == 0 else -0.2)
-         for i, d in enumerate(DIMS)},           # mixed
-    ])
+class TestWeightsSumToOne:
+    @pytest.mark.parametrize(
+        "ic_scenario",
+        [
+            {d: 0.1 for d in DIMS},  # all positive
+            {d: -0.1 for d in DIMS},  # all negative → equal fallback
+            {d: None for d in DIMS},  # all None → equal fallback
+            {"trend": 0.5, **{d: 0.0 for d in DIMS if d != "trend"}},  # single winner
+            {d: (0.3 if i % 2 == 0 else -0.2) for i, d in enumerate(DIMS)},  # mixed
+        ],
+    )
     def test_weights_sum_to_one(self, ic_scenario):
         weights, _ = ic.normalize_ic_weights(ic_scenario)
         total = sum(weights.values())
-        assert abs(total - 1.0) < 1e-9, (
-            f"Weights sum to {total}, not 1.0 (scenario={ic_scenario})"
-        )
+        assert abs(total - 1.0) < 1e-9, f"Weights sum to {total}, not 1.0 (scenario={ic_scenario})"
 
     def test_weights_always_all_dimensions_present(self):
         """Output must contain exactly the 9 canonical dimensions."""
@@ -334,26 +352,24 @@ class TestWeightsSumToOne:
 # Noise floor (ic_min_threshold) and HHI cap (max_single_weight)
 # ---------------------------------------------------------------------------
 
-class TestNoiseFlorAndHHICap:
 
+class TestNoiseFlorAndHHICap:
     def test_noise_floor_suppresses_below_threshold(self, monkeypatch):
         """Dimensions with IC below the noise floor should receive zero weight."""
-        monkeypatch.setattr(ic, "_ic_cfg",
-                            lambda key, default: 0.05 if key == "ic_min_threshold" else default)
+        monkeypatch.setattr(ic, "_ic_cfg", lambda key, default: 0.05 if key == "ic_min_threshold" else default)
         raw = {d: 0.1 for d in DIMS}
-        raw["news"]   = 0.02  # below 0.05 floor
+        raw["news"] = 0.02  # below 0.05 floor
         raw["social"] = 0.03  # below 0.05 floor
         weights, meta = ic.normalize_ic_weights(raw)
-        assert weights["news"]   == 0.0, "news IC below floor must be zeroed"
+        assert weights["news"] == 0.0, "news IC below floor must be zeroed"
         assert weights["social"] == 0.0, "social IC below floor must be zeroed"
         assert meta["noise_floor_applied"] is True
-        assert "news"   in meta["dimensions_suppressed"]
+        assert "news" in meta["dimensions_suppressed"]
         assert "social" in meta["dimensions_suppressed"]
 
     def test_noise_floor_zero_means_positive_ic_passes(self, monkeypatch):
         """With ic_min_threshold=0.0 (Phase 1 default), any positive IC should pass."""
-        monkeypatch.setattr(ic, "_ic_cfg",
-                            lambda key, default: 0.0 if key == "ic_min_threshold" else default)
+        monkeypatch.setattr(ic, "_ic_cfg", lambda key, default: 0.0 if key == "ic_min_threshold" else default)
         raw = {d: 0.01 for d in DIMS}  # all very small but positive
         weights, meta = ic.normalize_ic_weights(raw)
         for d, w in weights.items():
@@ -363,35 +379,35 @@ class TestNoiseFlorAndHHICap:
 
     def test_noise_floor_all_below_threshold_returns_equal_weights(self, monkeypatch):
         """If all dimensions are below the noise floor, fall back to equal weights."""
-        monkeypatch.setattr(ic, "_ic_cfg",
-                            lambda key, default: 0.10 if key == "ic_min_threshold" else default)
+        monkeypatch.setattr(ic, "_ic_cfg", lambda key, default: 0.10 if key == "ic_min_threshold" else default)
         raw = {d: 0.05 for d in DIMS}  # all below 0.10 floor
-        weights, meta = ic.normalize_ic_weights(raw)
+        weights, _meta = ic.normalize_ic_weights(raw)
         _assert_equal_weights(weights)
 
     def test_hhi_cap_clips_dominant_dimension(self, monkeypatch):
         """If one dimension would exceed max_single_weight, it must be clipped."""
-        monkeypatch.setattr(ic, "_ic_cfg", lambda key, default: (
-            0.0  if key == "ic_min_threshold" else
-            0.40 if key == "max_single_weight" else default
-        ))
+        monkeypatch.setattr(
+            ic,
+            "_ic_cfg",
+            lambda key, default: 0.0 if key == "ic_min_threshold" else 0.40 if key == "max_single_weight" else default,
+        )
         # Give trend a huge IC so it would otherwise dominate
         raw = {d: 0.01 for d in DIMS}
         raw["trend"] = 1.0
         weights, meta = ic.normalize_ic_weights(raw)
-        assert weights["trend"] <= 0.40 + 1e-9, \
-            f"trend weight {weights['trend']:.3f} exceeds HHI cap 0.40"
+        assert weights["trend"] <= 0.40 + 1e-9, f"trend weight {weights['trend']:.3f} exceeds HHI cap 0.40"
         assert meta["hhi_capped"] is True
         assert abs(sum(weights.values()) - 1.0) < 1e-9, "weights must still sum to 1.0 after HHI cap"
 
     def test_hhi_cap_not_triggered_when_within_limit(self, monkeypatch):
         """No clipping if all weights are within the cap."""
-        monkeypatch.setattr(ic, "_ic_cfg", lambda key, default: (
-            0.0  if key == "ic_min_threshold" else
-            0.40 if key == "max_single_weight" else default
-        ))
+        monkeypatch.setattr(
+            ic,
+            "_ic_cfg",
+            lambda key, default: 0.0 if key == "ic_min_threshold" else 0.40 if key == "max_single_weight" else default,
+        )
         raw = {d: 0.1 for d in DIMS}  # uniform — equal 1/9 ≈ 0.111, well below 0.40
-        weights, meta = ic.normalize_ic_weights(raw)
+        _weights, meta = ic.normalize_ic_weights(raw)
         assert meta["hhi_capped"] is False
 
 
@@ -399,12 +415,11 @@ class TestNoiseFlorAndHHICap:
 # Cache I/O: get_current_weights / update_ic_weights
 # ---------------------------------------------------------------------------
 
-class TestCacheIO:
 
+class TestCacheIO:
     def test_get_current_weights_no_file_returns_equal(self, tmp_path, monkeypatch):
         """Missing cache → equal weights."""
-        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE",
-                            str(tmp_path / "nonexistent.json"))
+        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE", str(tmp_path / "nonexistent.json"))
         weights = ic.get_current_weights()
         _assert_equal_weights(weights)
 
@@ -438,8 +453,8 @@ class TestCacheIO:
 
     def test_update_ic_weights_writes_file(self, tmp_path, monkeypatch):
         """update_ic_weights() must write a valid ic_weights.json."""
-        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE",  str(tmp_path / "ic_weights.json"))
-        monkeypatch.setattr(ic, "IC_HISTORY_FILE",  str(tmp_path / "history.jsonl"))
+        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE", str(tmp_path / "ic_weights.json"))
+        monkeypatch.setattr(ic, "IC_HISTORY_FILE", str(tmp_path / "history.jsonl"))
         monkeypatch.setattr(ic, "SIGNALS_LOG_FILE", str(tmp_path / "signals.jsonl"))
         (tmp_path / "signals.jsonl").write_text("")  # empty → falls back to equal
 
@@ -456,8 +471,8 @@ class TestCacheIO:
     def test_update_ic_weights_appends_history(self, tmp_path, monkeypatch):
         """update_ic_weights() appends one line to history per call."""
         hf = tmp_path / "history.jsonl"
-        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE",  str(tmp_path / "ic_weights.json"))
-        monkeypatch.setattr(ic, "IC_HISTORY_FILE",  str(hf))
+        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE", str(tmp_path / "ic_weights.json"))
+        monkeypatch.setattr(ic, "IC_HISTORY_FILE", str(hf))
         monkeypatch.setattr(ic, "SIGNALS_LOG_FILE", str(tmp_path / "signals.jsonl"))
         (tmp_path / "signals.jsonl").write_text("")
 
@@ -472,19 +487,19 @@ class TestCacheIO:
 # Helper
 # ---------------------------------------------------------------------------
 
+
 def _assert_equal_weights(weights: dict):
     assert set(weights.keys()) == set(DIMS), "Missing dimensions in weights"
     for d in DIMS:
         expected = pytest.approx(1.0 / N, abs=1e-6)
-        assert weights[d] == expected, (
-            f"Expected equal weight {1/N:.6f} for {d}, got {weights[d]}"
-        )
+        assert weights[d] == expected, f"Expected equal weight {1 / N:.6f} for {d}, got {weights[d]}"
     assert abs(sum(weights.values()) - 1.0) < 1e-9
 
 
 # ---------------------------------------------------------------------------
 # (NEW) IC Weight Initialization Edge Cases
 # ---------------------------------------------------------------------------
+
 
 class TestICInitializationEdgeCases:
     """
@@ -496,34 +511,29 @@ class TestICInitializationEdgeCases:
     def test_equal_weights_sum_to_exactly_one(self):
         """EQUAL_WEIGHTS constant must sum to exactly 1.0 (no floating-point drift)."""
         total = sum(ic.EQUAL_WEIGHTS.values())
-        assert abs(total - 1.0) < 1e-9, (
-            f"EQUAL_WEIGHTS sums to {total}, not 1.0"
-        )
+        assert abs(total - 1.0) < 1e-9, f"EQUAL_WEIGHTS sums to {total}, not 1.0"
 
     def test_equal_weights_contains_all_dimensions(self):
         """EQUAL_WEIGHTS must contain exactly the canonical dimension keys (one per DIMENSIONS entry)."""
         from ic_calculator import DIMENSIONS
+
         expected = set(DIMENSIONS)
-        assert set(ic.EQUAL_WEIGHTS.keys()) == expected, (
-            f"EQUAL_WEIGHTS has wrong keys: {set(ic.EQUAL_WEIGHTS.keys())}"
-        )
+        assert set(ic.EQUAL_WEIGHTS.keys()) == expected, f"EQUAL_WEIGHTS has wrong keys: {set(ic.EQUAL_WEIGHTS.keys())}"
 
     def test_equal_weights_each_dimension_is_equal_share(self):
         """Each dimension's weight must equal 1/N where N = len(DIMENSIONS)."""
         from ic_calculator import DIMENSIONS
+
         n = len(DIMENSIONS)
         for dim, w in ic.EQUAL_WEIGHTS.items():
-            assert abs(w - 1.0 / n) < 1e-9, (
-                f"EQUAL_WEIGHTS[{dim!r}] = {w}, expected {1.0/n}"
-            )
+            assert abs(w - 1.0 / n) < 1e-9, f"EQUAL_WEIGHTS[{dim!r}] = {w}, expected {1.0 / n}"
 
     def test_get_current_weights_consistent_across_two_calls(self, tmp_path, monkeypatch):
         """
         Calling get_current_weights() twice with no file must return identical
         equal-weights dicts — no caching anomaly between calls.
         """
-        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE",
-                            str(tmp_path / "nonexistent.json"))
+        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE", str(tmp_path / "nonexistent.json"))
         w1 = ic.get_current_weights()
         w2 = ic.get_current_weights()
         assert w1 == w2, "Two successive calls with no file must return identical dicts"
@@ -577,13 +587,11 @@ class TestICInitializationEdgeCases:
         get_current_weights() must return a copy of EQUAL_WEIGHTS, not the dict
         itself. Mutating the returned value must not affect the next call.
         """
-        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE",
-                            str(tmp_path / "nonexistent.json"))
+        monkeypatch.setattr(ic, "IC_WEIGHTS_FILE", str(tmp_path / "nonexistent.json"))
         w1 = ic.get_current_weights()
-        w1["trend"] = 999.0   # mutate the returned copy
+        w1["trend"] = 999.0  # mutate the returned copy
 
         w2 = ic.get_current_weights()
         assert w2["trend"] == pytest.approx(1.0 / N, abs=1e-6), (
-            "Mutating the returned dict polluted the next call — "
-            "fallback must return a fresh copy"
+            "Mutating the returned dict polluted the next call — fallback must return a fresh copy"
         )

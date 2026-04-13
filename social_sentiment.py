@@ -6,22 +6,21 @@
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
-import json
 import logging
+import re
 import threading
 import time
 from collections import defaultdict, deque
-from datetime import datetime, timezone, timedelta
-from typing import Optional
-import re
+from datetime import UTC, datetime, timedelta
 
 try:
     import requests
 except ImportError:
-    raise ImportError("requests library required. pip install requests")
+    raise ImportError("requests library required. pip install requests") from None
 
 try:
     from nltk.sentiment import SentimentIntensityAnalyzer
+
     VADER_AVAILABLE = True
 except ImportError:
     VADER_AVAILABLE = False
@@ -76,7 +75,6 @@ FINANCE_LEXICON = {
     "beat estimates": 1.5,
     "beat earnings": 1.5,
     "earnings beat": 1.5,
-
     # Bearish signals (negative in trading context)
     "bear": -2.0,
     "bearish": -2.0,
@@ -90,8 +88,7 @@ FINANCE_LEXICON = {
     "crashing": -2.5,
     "collapse": -3.0,
     "bankruptcy": -3.0,
-    "bankrupt": -3.0,
-    "short squeeze": 3.0,  # Context dependent but often bullish for longs
+    "bankrupt": -3.0,  # Context dependent but often bullish for longs
     "short": -1.5,
     "shorting": -2.0,
     "short ladder": -2.5,
@@ -110,8 +107,7 @@ FINANCE_LEXICON = {
     "sell-off": -2.0,
     "selloff": -2.0,
     "sell": -0.5,
-    "selling": -0.5,
-    "resistance": 1.0,  # Can be bearish or neutral depending on context
+    "selling": -0.5,  # Can be bearish or neutral depending on context
     "death cross": -2.0,
     "overbought": -1.5,
     "oversupply": -1.5,
@@ -130,6 +126,7 @@ FINANCE_LEXICON = {
     "sec investigation": -2.5,
 }
 
+
 # ═══════════════════════════════════════════════════════════════
 # MENTION VELOCITY TRACKER
 # Tracks mention counts over time windows to detect acceleration
@@ -139,6 +136,7 @@ class MentionVelocityTracker:
     Tracks mention history per ticker to compute velocity (acceleration).
     A stock going 5→50 mentions/hr is a signal; 50 steady is not.
     """
+
     def __init__(self, max_history: int = 24):
         self.history = defaultdict(lambda: deque(maxlen=max_history))  # (timestamp, count)
         self.lock = threading.Lock()
@@ -146,7 +144,7 @@ class MentionVelocityTracker:
     def record_mention(self, ticker: str, count: int):
         """Record mention count at current timestamp."""
         with self.lock:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             self.history[ticker].append((now, count))
 
     def get_velocity(self, ticker: str, window_hours: float = 1.0) -> float:
@@ -163,14 +161,11 @@ class MentionVelocityTracker:
             if ticker not in self.history or len(self.history[ticker]) < 2:
                 return 0.0
 
-            now = datetime.now(timezone.utc)
-            cutoff = now - timedelta(hours=window_hours)
+            now = datetime.now(UTC)
+            now - timedelta(hours=window_hours)
 
             # Filter to time window
-            window = [
-                (t, c) for t, c in self.history[ticker]
-                if (now - t).total_seconds() <= window_hours * 3600
-            ]
+            window = [(t, c) for t, c in self.history[ticker] if (now - t).total_seconds() <= window_hours * 3600]
 
             if len(window) < 2:
                 return 0.0
@@ -210,15 +205,14 @@ class FinanceVADER:
     Wrapper around NLTK VADER with finance-specific lexicon.
     Falls back to keyword-based sentiment if VADER unavailable.
     """
+
     def __init__(self):
         self.vader_available = VADER_AVAILABLE
         if self.vader_available:
             try:
                 self.analyzer = SentimentIntensityAnalyzer()
                 # Update with finance lexicon
-                self.analyzer.lexicon.update({
-                    word: score for word, score in FINANCE_LEXICON.items()
-                })
+                self.analyzer.lexicon.update({word: score for word, score in FINANCE_LEXICON.items()})
             except Exception as e:
                 log.warning(f"VADER init failed: {e}, falling back to keyword sentiment")
                 self.vader_available = False
@@ -281,6 +275,7 @@ class RedditFetcher:
     Fetch Reddit posts from public subreddits via JSON endpoint.
     Rate limit: 100 req/min per Reddit TOS.
     """
+
     BASE_URL = "https://www.reddit.com"
     SUBREDDITS = ["wallstreetbets", "stocks", "options", "investing", "pennystocks"]
 
@@ -312,9 +307,7 @@ class RedditFetcher:
         self._check_rate_limit()
 
         url = f"{self.BASE_URL}/r/{subreddit}/new.json"
-        headers = {
-            "User-Agent": "Decifer/2.0 SocialSentiment (trading bot)"
-        }
+        headers = {"User-Agent": "Decifer/2.0 SocialSentiment (trading bot)"}
 
         try:
             resp = requests.get(url, headers=headers, timeout=5, params={"limit": limit})
@@ -330,15 +323,17 @@ class RedditFetcher:
                     continue
 
                 post = item["data"]
-                posts.append({
-                    "title": post.get("title", ""),
-                    "author": post.get("author", ""),
-                    "score": post.get("score", 0),
-                    "url": post.get("url", ""),
-                    "timestamp": post.get("created_utc", 0),
-                    "text": post.get("selftext", ""),
-                    "subreddit": post.get("subreddit", subreddit),
-                })
+                posts.append(
+                    {
+                        "title": post.get("title", ""),
+                        "author": post.get("author", ""),
+                        "score": post.get("score", 0),
+                        "url": post.get("url", ""),
+                        "timestamp": post.get("created_utc", 0),
+                        "text": post.get("selftext", ""),
+                        "subreddit": post.get("subreddit", subreddit),
+                    }
+                )
 
             return posts
 
@@ -365,6 +360,7 @@ class ApeWisdomFetcher:
     Pre-computed aggregation of Reddit mentions across many subreddits.
     No API key required.
     """
+
     BASE_URL = "https://apewisdom.io/api/v1.0"
 
     def fetch_trending(self, limit: int = 50) -> dict[str, dict]:
@@ -373,9 +369,7 @@ class ApeWisdomFetcher:
         Returns {ticker: {mentions: int, rank: int, ...}}
         """
         url = f"{self.BASE_URL}/filter/all-stocks"
-        headers = {
-            "User-Agent": "Decifer/2.0 SocialSentiment"
-        }
+        headers = {"User-Agent": "Decifer/2.0 SocialSentiment"}
 
         try:
             resp = requests.get(url, headers=headers, timeout=5)
@@ -484,7 +478,7 @@ class SocialSentimentTracker:
             try:
                 self._update_mention_cache()
                 self.stats["polls_completed"] += 1
-                self.stats["last_poll"] = datetime.now(timezone.utc).isoformat()
+                self.stats["last_poll"] = datetime.now(UTC).isoformat()
             except Exception as e:
                 log.error(f"Polling loop error: {e}")
                 self.stats["errors"] += 1
@@ -510,7 +504,10 @@ class SocialSentimentTracker:
 
                 # Extract ticker symbols (simple regex: $SYMBOL or SYMBOL surrounded by word boundaries)
                 # More sophisticated: look for 1-5 uppercase letters
-                tickers = re.findall(r'\$([A-Z]{1,5})\b|\b([A-Z]{1,5})\b(?=.*(?:stock|ticker|shares|shares|calls|puts|puts|options|buy|sell))', combined)
+                tickers = re.findall(
+                    r"\$([A-Z]{1,5})\b|\b([A-Z]{1,5})\b(?=.*(?:stock|ticker|shares|shares|calls|puts|puts|options|buy|sell))",
+                    combined,
+                )
 
                 for match in tickers:
                     ticker = match[0] if match[0] else match[1]
@@ -520,13 +517,15 @@ class SocialSentimentTracker:
                         continue
 
                     new_mentions[ticker]["count"] += 1
-                    new_mentions[ticker]["posts"].append({
-                        "title": post["title"],
-                        "author": post["author"],
-                        "score": post["score"],
-                        "subreddit": post["subreddit"],
-                        "url": post["url"],
-                    })
+                    new_mentions[ticker]["posts"].append(
+                        {
+                            "title": post["title"],
+                            "author": post["author"],
+                            "score": post["score"],
+                            "subreddit": post["subreddit"],
+                            "url": post["url"],
+                        }
+                    )
 
             # Also fetch from ApeWisdom for additional signals
             ape_trending = self.apewisdom.fetch_trending(limit=50)
@@ -584,7 +583,7 @@ class SocialSentimentTracker:
 
                 # Mention velocity
                 velocity_1h = self.velocity_tracker.get_hourly_velocity(symbol)
-                velocity_24h = self.velocity_tracker.get_24h_velocity(symbol)
+                self.velocity_tracker.get_24h_velocity(symbol)
 
                 # Composite social_score: blend of mention count, velocity, and sentiment
                 # Formula: (mention_count_norm * 0.3) + (velocity * 0.4) + (sentiment_norm * 0.3)
@@ -594,11 +593,7 @@ class SocialSentimentTracker:
                 sentiment_score = (sentiment + 1.0) / 2.0 * 10.0
 
                 # Combine
-                social_score = (
-                    mention_score * 0.3 +
-                    velocity_1h * 0.4 +
-                    sentiment_score * 0.3
-                )
+                social_score = mention_score * 0.3 + velocity_1h * 0.4 + sentiment_score * 0.3
 
                 # Top posts (sorted by score)
                 top_posts = sorted(posts, key=lambda p: p.get("score", 0), reverse=True)[:5]
@@ -610,7 +605,7 @@ class SocialSentimentTracker:
                     "mentions_1h": mention_count,  # Simplified: using total count
                     "mentions_24h": mention_count * 2,  # Estimate (in real scenario, track separately)
                     "top_posts": top_posts,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 }
 
         return result
@@ -628,16 +623,9 @@ class SocialSentimentTracker:
         sentiment = self.get_social_sentiment(tickers)
 
         # Sort by social_score
-        sorted_tickers = sorted(
-            sentiment.items(),
-            key=lambda x: x[1]["social_score"],
-            reverse=True
-        )
+        sorted_tickers = sorted(sentiment.items(), key=lambda x: x[1]["social_score"], reverse=True)
 
-        return {
-            ticker: data
-            for ticker, data in sorted_tickers[:limit]
-        }
+        return {ticker: data for ticker, data in sorted_tickers[:limit]}
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -645,6 +633,7 @@ class SocialSentimentTracker:
 # ═══════════════════════════════════════════════════════════════
 _tracker_instance = None
 _tracker_lock = threading.Lock()
+
 
 def get_sentiment_tracker() -> SocialSentimentTracker:
     """Get or create global sentiment tracker instance."""
@@ -697,15 +686,12 @@ def get_trending_sentiment(limit: int = 10) -> dict:
 if __name__ == "__main__":
     import sys
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("  DECIFER 2.0 — Social Sentiment Module")
     print("  Reddit + ApeWisdom + VADER Sentiment Analysis")
-    print("="*70)
+    print("=" * 70)
 
     # Parse arguments
     if len(sys.argv) > 1:
@@ -720,7 +706,7 @@ if __name__ == "__main__":
             print(f"  Mention Velocity:   {data['mention_velocity']:.2f}")
             print(f"  Mentions (1h):      {data['mentions_1h']}")
             print(f"  Sentiment Basis:    {len(data['top_posts'])} posts")
-            if data['top_posts']:
+            if data["top_posts"]:
                 print(f"  Top Post:           {data['top_posts'][0]['title'][:60]}...")
     else:
         # Default: fetch trending tickers
@@ -734,11 +720,13 @@ if __name__ == "__main__":
         print(f"\nTop {len(trending)} trending tickers:\n")
 
         for idx, (symbol, data) in enumerate(trending.items(), 1):
-            print(f"{idx:2d}. {symbol:6s} | Score: {data['social_score']:5.1f}/10.0 | "
-                  f"Sentiment: {data['sentiment']:+.2f} | Velocity: {data['mention_velocity']:5.1f} | "
-                  f"Posts: {len(data['top_posts'])}")
+            print(
+                f"{idx:2d}. {symbol:6s} | Score: {data['social_score']:5.1f}/10.0 | "
+                f"Sentiment: {data['sentiment']:+.2f} | Velocity: {data['mention_velocity']:5.1f} | "
+                f"Posts: {len(data['top_posts'])}"
+            )
 
-        print(f"\nTimestamp: {datetime.now(timezone.utc).isoformat()}")
+        print(f"\nTimestamp: {datetime.now(UTC).isoformat()}")
         print(f"Cache TTL: {tracker.cache_ttl}s")
         print(f"Stats: {tracker.stats}")
 

@@ -7,16 +7,15 @@ All calculations use yfinance for real-time data with 60-day historical lookback
 Correlation matrix cached and recomputed every 30 minutes for performance.
 """
 
+import logging
+import time
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from datetime import datetime, timedelta
-from typing import Dict, List, Tuple, Optional
-from collections import defaultdict
-import logging
-from dataclasses import dataclass, field
-from functools import lru_cache
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +23,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CorrelationWarning:
     """Warning for high correlation between positions."""
+
     symbol: str
     correlated_symbol: str
     correlation: float
@@ -33,12 +33,13 @@ class CorrelationWarning:
 @dataclass
 class RiskReport:
     """Comprehensive portfolio risk report."""
+
     portfolio_var_95: float
     conditional_var_95: float
     max_drawdown_potential: float
-    sector_concentration: Dict[str, float]
-    sector_alerts: List[str] = field(default_factory=list)
-    correlation_warnings: List[CorrelationWarning] = field(default_factory=list)
+    sector_concentration: dict[str, float]
+    sector_alerts: list[str] = field(default_factory=list)
+    correlation_warnings: list[CorrelationWarning] = field(default_factory=list)
     position_count_optimal: int = 0
     total_risk_score: float = 0.0
 
@@ -46,6 +47,7 @@ class RiskReport:
 @dataclass
 class RebalanceSignal:
     """Rebalancing recommendation."""
+
     symbol: str
     action: str  # 'TRIM', 'ADD', 'CLOSE'
     current_weight: float
@@ -67,26 +69,20 @@ class CorrelationTracker:
         self.cache_interval_seconds = 1800  # 30 minutes
         self.symbols_cached = None
 
-    def _fetch_returns(self, symbols: List[str]) -> pd.DataFrame:
+    def _fetch_returns(self, symbols: list[str]) -> pd.DataFrame:
         """Fetch daily returns for symbols using yfinance."""
         try:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=self.lookback_days)
 
             # Fetch adjusted close prices
-            data = yf.download(
-                ' '.join(symbols),
-                start=start_date,
-                end=end_date,
-                progress=False,
-                threads=False
-            )
+            data = yf.download(" ".join(symbols), start=start_date, end=end_date, progress=False, threads=False)
 
             # Handle single symbol case
             if len(symbols) == 1:
-                prices = data['Adj Close'].to_frame(name=symbols[0])
+                prices = data["Adj Close"].to_frame(name=symbols[0])
             else:
-                prices = data['Adj Close']
+                prices = data["Adj Close"]
 
             # Calculate daily returns
             returns = prices.pct_change().dropna()
@@ -95,7 +91,7 @@ class CorrelationTracker:
             logger.error(f"Error fetching returns for {symbols}: {e}")
             return pd.DataFrame()
 
-    def update(self, symbols: List[str]) -> np.ndarray:
+    def update(self, symbols: list[str]) -> np.ndarray:
         """
         Update correlation matrix. Returns cached result if <30 min old.
 
@@ -106,10 +102,7 @@ class CorrelationTracker:
             Correlation matrix (NxN numpy array)
         """
         # Check cache validity
-        if (self.correlation_matrix is not None and
-            self.symbols_cached == symbols and
-            self.last_update is not None):
-
+        if self.correlation_matrix is not None and self.symbols_cached == symbols and self.last_update is not None:
             elapsed = time.time() - self.last_update
             if elapsed < self.cache_interval_seconds:
                 return self.correlation_matrix
@@ -118,7 +111,7 @@ class CorrelationTracker:
         returns = self._fetch_returns(symbols)
 
         if returns.empty or len(returns) < 10:
-            logger.warning(f"Insufficient data for correlation matrix")
+            logger.warning("Insufficient data for correlation matrix")
             # Return identity matrix if data unavailable
             return np.eye(len(symbols))
 
@@ -129,7 +122,7 @@ class CorrelationTracker:
 
         return self.correlation_matrix
 
-    def get_correlation(self, symbol1: str, symbol2: str, symbols: List[str]) -> float:
+    def get_correlation(self, symbol1: str, symbol2: str, symbols: list[str]) -> float:
         """Get correlation between two specific symbols."""
         corr_matrix = self.update(symbols)
         try:
@@ -139,15 +132,13 @@ class CorrelationTracker:
         except (ValueError, IndexError):
             return 0.0
 
-    def find_correlated_cluster(self, symbol: str, symbols: List[str],
-                               threshold: float = 0.7) -> List[str]:
+    def find_correlated_cluster(self, symbol: str, symbols: list[str], threshold: float = 0.7) -> list[str]:
         """Find all symbols correlated >threshold with given symbol."""
         corr_matrix = self.update(symbols)
         try:
             idx = symbols.index(symbol)
             correlations = corr_matrix[idx]
-            cluster = [symbols[i] for i, corr in enumerate(correlations)
-                      if corr > threshold and symbols[i] != symbol]
+            cluster = [symbols[i] for i, corr in enumerate(correlations) if corr > threshold and symbols[i] != symbol]
             return cluster
         except ValueError:
             return []
@@ -165,28 +156,26 @@ class RiskParitySizer:
         self.volatility_cache = {}
         self.cache_time = {}
 
-    def _calculate_volatility(self, symbol: str, lookback_days: int = None) -> float:
+    def _calculate_volatility(self, symbol: str, lookback_days: int | None = None) -> float:
         """Calculate annualized volatility for a symbol."""
         if lookback_days is None:
             lookback_days = self.lookback_days
 
         # Check cache (valid for 1 hour)
-        if symbol in self.volatility_cache:
-            if time.time() - self.cache_time[symbol] < 3600:
-                return self.volatility_cache[symbol]
+        if symbol in self.volatility_cache and time.time() - self.cache_time[symbol] < 3600:
+            return self.volatility_cache[symbol]
 
         try:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=lookback_days)
 
-            data = yf.download(symbol, start=start_date, end=end_date,
-                             progress=False)
+            data = yf.download(symbol, start=start_date, end=end_date, progress=False)
 
             if data.empty:
                 logger.warning(f"No data for {symbol}, returning default vol")
                 return 0.20  # Default 20% volatility
 
-            returns = data['Adj Close'].pct_change().dropna()
+            returns = data["Adj Close"].pct_change().dropna()
             daily_vol = returns.std()
             annual_vol = daily_vol * np.sqrt(252)
 
@@ -198,8 +187,7 @@ class RiskParitySizer:
             logger.error(f"Error calculating volatility for {symbol}: {e}")
             return 0.20
 
-    def calculate_weights(self, symbols: List[str],
-                         volatilities: Optional[Dict[str, float]] = None) -> Dict[str, float]:
+    def calculate_weights(self, symbols: list[str], volatilities: dict[str, float] | None = None) -> dict[str, float]:
         """
         Calculate risk-parity weights for given symbols.
 
@@ -230,9 +218,9 @@ class RiskParitySizer:
 
         return weights
 
-    def adjust_for_correlation(self, weights: Dict[str, float],
-                              correlation_matrix: np.ndarray,
-                              symbols: List[str]) -> Dict[str, float]:
+    def adjust_for_correlation(
+        self, weights: dict[str, float], correlation_matrix: np.ndarray, symbols: list[str]
+    ) -> dict[str, float]:
         """
         Adjust weights for portfolio correlation.
         High correlation between positions should reduce position count.
@@ -268,21 +256,19 @@ class PortfolioVaR:
         self.lookback_days = lookback_days
         self.percentile = (1.0 - confidence_level) * 100
 
-    def _get_portfolio_returns(self, portfolio: Dict[str, Tuple[int, float]],
-                              symbols: List[str]) -> pd.Series:
+    def _get_portfolio_returns(self, portfolio: dict[str, tuple[int, float]], symbols: list[str]) -> pd.Series:
         """Calculate portfolio returns from position weights."""
         try:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=self.lookback_days)
 
             # Fetch price data
-            data = yf.download(' '.join(symbols), start=start_date,
-                             end=end_date, progress=False)
+            data = yf.download(" ".join(symbols), start=start_date, end=end_date, progress=False)
 
             if len(symbols) == 1:
-                prices = data['Adj Close'].to_frame(name=symbols[0])
+                prices = data["Adj Close"].to_frame(name=symbols[0])
             else:
-                prices = data['Adj Close']
+                prices = data["Adj Close"]
 
             returns = prices.pct_change().dropna()
 
@@ -303,8 +289,7 @@ class PortfolioVaR:
             logger.error(f"Error calculating portfolio returns: {e}")
             return pd.Series()
 
-    def historical_var(self, portfolio: Dict[str, Tuple[int, float]],
-                      symbols: List[str]) -> float:
+    def historical_var(self, portfolio: dict[str, tuple[int, float]], symbols: list[str]) -> float:
         """
         Calculate historical VaR as percentile of historical returns.
         Returns the daily loss at confidence level.
@@ -319,8 +304,7 @@ class PortfolioVaR:
         var = -np.percentile(returns, self.percentile)
         return var
 
-    def conditional_var(self, portfolio: Dict[str, Tuple[int, float]],
-                       symbols: List[str]) -> float:
+    def conditional_var(self, portfolio: dict[str, tuple[int, float]], symbols: list[str]) -> float:
         """
         Calculate Conditional VaR (Expected Shortfall).
         Average loss beyond the VaR level.
@@ -340,10 +324,13 @@ class PortfolioVaR:
         cvar = -tail_losses.mean()
         return cvar
 
-    def parametric_var(self, portfolio: Dict[str, Tuple[int, float]],
-                      correlation_matrix: np.ndarray,
-                      symbols: List[str],
-                      volatilities: Dict[str, float]) -> float:
+    def parametric_var(
+        self,
+        portfolio: dict[str, tuple[int, float]],
+        correlation_matrix: np.ndarray,
+        symbols: list[str],
+        volatilities: dict[str, float],
+    ) -> float:
         """
         Calculate parametric VaR using correlation matrix and volatilities.
         Assumes normal distribution of returns.
@@ -358,13 +345,11 @@ class PortfolioVaR:
         if total_value == 0:
             return 0.0
 
-        weights = np.array([
-            (portfolio.get(sym, (0, 1))[0] * portfolio.get(sym, (0, 1))[1]) / total_value
-            for sym in symbols
-        ])
+        weights = np.array(
+            [(portfolio.get(sym, (0, 1))[0] * portfolio.get(sym, (0, 1))[1]) / total_value for sym in symbols]
+        )
 
-        vols = np.array([volatilities.get(sym, 0.20) / np.sqrt(252)
-                        for sym in symbols])
+        vols = np.array([volatilities.get(sym, 0.20) / np.sqrt(252) for sym in symbols])
 
         # Portfolio variance: w^T * Cov * w
         cov_matrix = correlation_matrix * np.outer(vols, vols)
@@ -394,29 +379,43 @@ class SectorMonitor:
 
     # Default sector mapping (fallback)
     DEFAULT_SECTOR_MAP = {
-        'NVDA': 'Technology', 'AMD': 'Technology', 'AVGO': 'Technology',
-        'INTC': 'Technology', 'MSFT': 'Technology', 'AAPL': 'Technology',
-        'GOOGL': 'Technology', 'META': 'Technology', 'JPM': 'Financials',
-        'BAC': 'Financials', 'GS': 'Financials', 'XOM': 'Energy',
-        'CVX': 'Energy', 'COP': 'Energy', 'JNJ': 'Healthcare',
-        'UNH': 'Healthcare', 'PFE': 'Healthcare', 'MCD': 'Consumer',
-        'AMZN': 'Consumer', 'WMT': 'Consumer', 'BA': 'Industrials'
+        "NVDA": "Technology",
+        "AMD": "Technology",
+        "AVGO": "Technology",
+        "INTC": "Technology",
+        "MSFT": "Technology",
+        "AAPL": "Technology",
+        "GOOGL": "Technology",
+        "META": "Technology",
+        "JPM": "Financials",
+        "BAC": "Financials",
+        "GS": "Financials",
+        "XOM": "Energy",
+        "CVX": "Energy",
+        "COP": "Energy",
+        "JNJ": "Healthcare",
+        "UNH": "Healthcare",
+        "PFE": "Healthcare",
+        "MCD": "Consumer",
+        "AMZN": "Consumer",
+        "WMT": "Consumer",
+        "BA": "Industrials",
     }
 
     def __init__(self):
         self.sector_cache = {}
         self.cache_time = {}
         self.sector_limits = {
-            'NORMAL': 0.30,      # 30% max per sector in normal regime
-            'CHOPPY': 0.20,      # 20% max in choppy regime
-            'PANIC': 0.15        # 15% max in panic regime
+            "NORMAL": 0.30,  # 30% max per sector in normal regime
+            "CHOPPY": 0.20,  # 20% max in choppy regime
+            "PANIC": 0.15,  # 15% max in panic regime
         }
 
     def _get_sector_from_yfinance(self, symbol: str) -> str:
         """Fetch sector from yfinance ticker info."""
         try:
             ticker = yf.Ticker(symbol)
-            sector = ticker.info.get('sector', None)
+            sector = ticker.info.get("sector", None)
 
             if sector:
                 self.sector_cache[symbol] = sector
@@ -424,10 +423,10 @@ class SectorMonitor:
                 return sector
 
             # Fallback to manual mapping
-            return self.DEFAULT_SECTOR_MAP.get(symbol, 'Other')
+            return self.DEFAULT_SECTOR_MAP.get(symbol, "Other")
         except Exception as e:
             logger.warning(f"Could not fetch sector for {symbol}: {e}")
-            return self.DEFAULT_SECTOR_MAP.get(symbol, 'Other')
+            return self.DEFAULT_SECTOR_MAP.get(symbol, "Other")
 
     @staticmethod
     def _extract_qty_price(val):
@@ -442,15 +441,17 @@ class SectorMonitor:
         if symbol in self.DEFAULT_SECTOR_MAP:
             return self.DEFAULT_SECTOR_MAP[symbol]
 
-        if symbol in self.sector_cache:
-            if time.time() - self.cache_time.get(symbol, 0) < 86400:  # 24h cache
-                return self.sector_cache[symbol]
+        if symbol in self.sector_cache and time.time() - self.cache_time.get(symbol, 0) < 86400:  # 24h cache
+            return self.sector_cache[symbol]
 
         return self._get_sector_from_yfinance(symbol)
 
-    def calculate_sector_weights(self, portfolio: Dict[str, Tuple[int, float]]) -> Dict[str, float]:
+    def calculate_sector_weights(self, portfolio: dict[str, tuple[int, float]]) -> dict[str, float]:
         """Calculate current sector exposure as % of portfolio."""
-        def _qp(v): return self._extract_qty_price(v)
+
+        def _qp(v):
+            return self._extract_qty_price(v)
+
         total_value = sum(_qp(v)[0] * _qp(v)[1] for v in portfolio.values())
 
         if total_value == 0:
@@ -462,15 +463,13 @@ class SectorMonitor:
             sector = self.get_sector(symbol)
             sector_values[sector] += qty * price
 
-        sector_weights = {
-            sector: value / total_value
-            for sector, value in sector_values.items()
-        }
+        sector_weights = {sector: value / total_value for sector, value in sector_values.items()}
 
         return sector_weights
 
-    def check_concentration(self, portfolio: Dict[str, Tuple[int, float]],
-                           regime: str = 'NORMAL') -> Tuple[Dict[str, float], List[str]]:
+    def check_concentration(
+        self, portfolio: dict[str, tuple[int, float]], regime: str = "NORMAL"
+    ) -> tuple[dict[str, float], list[str]]:
         """
         Check sector concentration and generate alerts.
 
@@ -488,15 +487,9 @@ class SectorMonitor:
 
         for sector, weight in sector_weights.items():
             if weight > limit:
-                alerts.append(
-                    f"SECTOR ALERT: {sector} at {weight:.1%} "
-                    f"(limit: {limit:.1%} in {regime} regime)"
-                )
+                alerts.append(f"SECTOR ALERT: {sector} at {weight:.1%} (limit: {limit:.1%} in {regime} regime)")
             elif weight > limit * 0.8:
-                alerts.append(
-                    f"SECTOR WARNING: {sector} at {weight:.1%} "
-                    f"approaching {limit:.1%} limit"
-                )
+                alerts.append(f"SECTOR WARNING: {sector} at {weight:.1%} approaching {limit:.1%} limit")
 
         return sector_weights, alerts
 
@@ -514,10 +507,13 @@ class PortfolioOptimizer:
         self.portfolio_var = PortfolioVaR(lookback_days=lookback_days)
         self.sector_monitor = SectorMonitor()
 
-    def check_new_position(self, new_symbol: str,
-                          existing_symbols: List[str],
-                          correlation_threshold: float = 0.7,
-                          threshold: float = None) -> List[CorrelationWarning]:
+    def check_new_position(
+        self,
+        new_symbol: str,
+        existing_symbols: list[str],
+        correlation_threshold: float = 0.7,
+        threshold: float | None = None,
+    ) -> list[CorrelationWarning]:
         """
         Check if new position is too correlated with existing positions.
 
@@ -538,32 +534,27 @@ class PortfolioOptimizer:
         if not existing_symbols:
             return warnings
 
-        symbols = existing_symbols + [new_symbol]
+        symbols = [*existing_symbols, new_symbol]
 
         # Find correlated symbols
-        cluster = self.correlation_tracker.find_correlated_cluster(
-            new_symbol, symbols, correlation_threshold
-        )
+        cluster = self.correlation_tracker.find_correlated_cluster(new_symbol, symbols, correlation_threshold)
 
         for corr_symbol in cluster:
-            corr_value = self.correlation_tracker.get_correlation(
-                new_symbol, corr_symbol, symbols
-            )
+            corr_value = self.correlation_tracker.get_correlation(new_symbol, corr_symbol, symbols)
 
             warning = CorrelationWarning(
                 symbol=new_symbol,
                 correlated_symbol=corr_symbol,
                 correlation=corr_value,
-                message=f"{new_symbol} has correlation of {corr_value:.2f} "
-                       f"with existing position {corr_symbol}"
+                message=f"{new_symbol} has correlation of {corr_value:.2f} with existing position {corr_symbol}",
             )
             warnings.append(warning)
 
         return warnings
 
-    def get_optimal_position_size(self, symbol: str, base_size: int,
-                                 portfolio: Dict[str, Tuple[int, float]],
-                                 capital: float) -> Tuple[int, str]:
+    def get_optimal_position_size(
+        self, symbol: str, base_size: int, portfolio: dict[str, tuple[int, float]], capital: float
+    ) -> tuple[int, str]:
         """
         Adjust position size for correlation and risk parity.
 
@@ -580,14 +571,12 @@ class PortfolioOptimizer:
             return base_size, "No existing positions for adjustment"
 
         existing_symbols = list(portfolio.keys())
-        symbols = existing_symbols + [symbol]
+        symbols = [*existing_symbols, symbol]
 
         # Get correlations
         correlations = []
         for existing_sym in existing_symbols:
-            corr = self.correlation_tracker.get_correlation(
-                symbol, existing_sym, symbols
-            )
+            corr = self.correlation_tracker.get_correlation(symbol, existing_sym, symbols)
             correlations.append(corr)
 
         avg_correlation = np.mean(correlations) if correlations else 0.0
@@ -596,14 +585,11 @@ class PortfolioOptimizer:
         correlation_factor = 1.0 / (1.0 + max(0, avg_correlation - 0.5))
         adjusted_size = int(base_size * correlation_factor)
 
-        reasoning = f"Correlation factor: {correlation_factor:.2f} " \
-                   f"(avg correlation: {avg_correlation:.2f})"
-
         return max(1, adjusted_size)
 
-    def check_portfolio_risk(self, portfolio: Dict[str, Tuple[int, float]],
-                            trading_regime: str = 'NORMAL',
-                            var_threshold: float = 0.05) -> RiskReport:
+    def check_portfolio_risk(
+        self, portfolio: dict[str, tuple[int, float]], trading_regime: str = "NORMAL", var_threshold: float = 0.05
+    ) -> RiskReport:
         """
         Generate comprehensive portfolio risk report.
 
@@ -615,6 +601,7 @@ class PortfolioOptimizer:
         Returns:
             RiskReport with all risk metrics
         """
+
         # Normalize portfolio format: accept both (qty, price) tuples and
         # {"qty": N, "current": P} dicts (as used by bot.py and tests).
         def _norm(v):
@@ -628,20 +615,14 @@ class PortfolioOptimizer:
 
         if not symbols:
             return RiskReport(
-                portfolio_var_95=0.0,
-                conditional_var_95=0.0,
-                max_drawdown_potential=0.0,
-                sector_concentration={}
+                portfolio_var_95=0.0, conditional_var_95=0.0, max_drawdown_potential=0.0, sector_concentration={}
             )
 
         # Calculate correlations
         correlation_matrix = self.correlation_tracker.update(symbols)
 
         # Calculate volatilities
-        volatilities = {
-            sym: self.risk_parity._calculate_volatility(sym)
-            for sym in symbols
-        }
+        {sym: self.risk_parity._calculate_volatility(sym) for sym in symbols}
 
         # Calculate VaR metrics
         var_95 = self.portfolio_var.historical_var(portfolio, symbols)
@@ -651,9 +632,7 @@ class PortfolioOptimizer:
         var_pct = var_95 / total_value if total_value > 0 else 0.0
 
         # Sector concentration — guard against mock/stub returning [] or similar
-        _concentration_result = self.sector_monitor.check_concentration(
-            portfolio, trading_regime
-        )
+        _concentration_result = self.sector_monitor.check_concentration(portfolio, trading_regime)
         if isinstance(_concentration_result, tuple) and len(_concentration_result) == 2:
             sector_weights, sector_alerts = _concentration_result
         else:
@@ -671,8 +650,7 @@ class PortfolioOptimizer:
                             symbol=sym1,
                             correlated_symbol=sym2,
                             correlation=corr,
-                            message=f"High correlation {corr:.2f} between {sym1} "
-                                   f"and {sym2}"
+                            message=f"High correlation {corr:.2f} between {sym1} and {sym2}",
                         )
                     )
 
@@ -687,7 +665,7 @@ class PortfolioOptimizer:
             avg_correlation = float(np.nanmean(_upper)) if len(_upper) > 0 else 0.0
         except Exception:
             avg_correlation = 0.0
-        if not avg_correlation == avg_correlation:  # isnan check
+        if avg_correlation != avg_correlation:  # isnan check
             avg_correlation = 0.0
         correlation_adjustment = 1.0 / (1.0 + avg_correlation) if kelly_f > 0 else 1.0
 
@@ -697,8 +675,10 @@ class PortfolioOptimizer:
             optimal_count = 5
 
         # Risk score (0-100)
-        risk_score = min(100, var_pct * 100 + len(correlation_warnings) * 5 +
-                        max(sector_weights.values()) * 50 if sector_weights else 0)
+        risk_score = min(
+            100,
+            var_pct * 100 + len(correlation_warnings) * 5 + max(sector_weights.values()) * 50 if sector_weights else 0,
+        )
 
         return RiskReport(
             portfolio_var_95=var_95,
@@ -708,10 +688,10 @@ class PortfolioOptimizer:
             sector_alerts=sector_alerts,
             correlation_warnings=correlation_warnings,
             position_count_optimal=optimal_count,
-            total_risk_score=risk_score
+            total_risk_score=risk_score,
         )
 
-    def suggest_rebalance(self, portfolio: Dict[str, Tuple[int, float]]) -> List[RebalanceSignal]:
+    def suggest_rebalance(self, portfolio: dict[str, tuple[int, float]]) -> list[RebalanceSignal]:
         """
         Generate rebalancing suggestions based on position drift.
 
@@ -728,18 +708,13 @@ class PortfolioOptimizer:
             return signals
 
         # Calculate target weights using risk parity
-        volatilities = {
-            sym: self.risk_parity._calculate_volatility(sym)
-            for sym in symbols
-        }
+        volatilities = {sym: self.risk_parity._calculate_volatility(sym) for sym in symbols}
 
         target_weights = self.risk_parity.calculate_weights(symbols, volatilities)
 
         # Adjust for correlation
         correlation_matrix = self.correlation_tracker.update(symbols)
-        target_weights = self.risk_parity.adjust_for_correlation(
-            target_weights, correlation_matrix, symbols
-        )
+        target_weights = self.risk_parity.adjust_for_correlation(target_weights, correlation_matrix, symbols)
 
         # Calculate current weights
         total_value = sum(qty * price for qty, price in portfolio.values())
@@ -756,11 +731,11 @@ class PortfolioOptimizer:
             if current > target * 2:
                 signal = RebalanceSignal(
                     symbol=symbol,
-                    action='TRIM',
+                    action="TRIM",
                     current_weight=current,
                     target_weight=target,
                     suggested_adjustment=current - target,
-                    reason=f"Position grown to {current:.1%}, target is {target:.1%}"
+                    reason=f"Position grown to {current:.1%}, target is {target:.1%}",
                 )
                 signals.append(signal)
 
@@ -768,11 +743,11 @@ class PortfolioOptimizer:
             elif current < target * 0.5 and target > 0:
                 signal = RebalanceSignal(
                     symbol=symbol,
-                    action='ADD',
+                    action="ADD",
                     current_weight=current,
                     target_weight=target,
                     suggested_adjustment=target - current,
-                    reason=f"Position shrunk to {current:.1%}, target is {target:.1%}"
+                    reason=f"Position shrunk to {current:.1%}, target is {target:.1%}",
                 )
                 signals.append(signal)
 
@@ -780,11 +755,11 @@ class PortfolioOptimizer:
             elif current < 0.01 and current < target * 0.3:
                 signal = RebalanceSignal(
                     symbol=symbol,
-                    action='CLOSE',
+                    action="CLOSE",
                     current_weight=current,
                     target_weight=target,
                     suggested_adjustment=-current,
-                    reason=f"Position at {current:.1%}, minimal contribution"
+                    reason=f"Position at {current:.1%}, minimal contribution",
                 )
                 signals.append(signal)
 
@@ -793,8 +768,10 @@ class PortfolioOptimizer:
 
 # Convenience functions for integration with bot.py and risk.py
 
-def get_optimal_size(symbol: str, base_size: int, portfolio: Dict[str, Tuple[int, float]],
-                     capital: float = 100000) -> Tuple[int, str]:
+
+def get_optimal_size(
+    symbol: str, base_size: int, portfolio: dict[str, tuple[int, float]], capital: float = 100000
+) -> tuple[int, str]:
     """
     Get optimal position size adjusted for correlation and risk.
 
@@ -815,8 +792,7 @@ def get_optimal_size(symbol: str, base_size: int, portfolio: Dict[str, Tuple[int
     return result[0] if isinstance(result, tuple) else result
 
 
-def check_portfolio_risk(portfolio: Dict[str, Tuple[int, float]],
-                        trading_regime: str = 'NORMAL') -> Dict:
+def check_portfolio_risk(portfolio: dict[str, tuple[int, float]], trading_regime: str = "NORMAL") -> dict:
     """
     Generate comprehensive risk report.
 
@@ -833,26 +809,26 @@ def check_portfolio_risk(portfolio: Dict[str, Tuple[int, float]],
     report = optimizer.check_portfolio_risk(portfolio, trading_regime)
 
     return {
-        'var_95': report.portfolio_var_95,
-        'cvar_95': report.conditional_var_95,
-        'max_drawdown_potential': report.max_drawdown_potential,
-        'sector_concentration': report.sector_concentration,
-        'sector_alerts': report.sector_alerts,
-        'correlation_warnings': [
+        "var_95": report.portfolio_var_95,
+        "cvar_95": report.conditional_var_95,
+        "max_drawdown_potential": report.max_drawdown_potential,
+        "sector_concentration": report.sector_concentration,
+        "sector_alerts": report.sector_alerts,
+        "correlation_warnings": [
             {
-                'symbol': w.symbol,
-                'correlated_with': w.correlated_symbol,
-                'correlation': w.correlation,
-                'message': w.message
+                "symbol": w.symbol,
+                "correlated_with": w.correlated_symbol,
+                "correlation": w.correlation,
+                "message": w.message,
             }
             for w in report.correlation_warnings
         ],
-        'optimal_position_count': report.position_count_optimal,
-        'total_risk_score': report.total_risk_score
+        "optimal_position_count": report.position_count_optimal,
+        "total_risk_score": report.total_risk_score,
     }
 
 
-def suggest_rebalance(portfolio: Dict[str, Tuple[int, float]]) -> List[Dict]:
+def suggest_rebalance(portfolio: dict[str, tuple[int, float]]) -> list[dict]:
     """
     Get rebalancing suggestions.
 
@@ -869,34 +845,30 @@ def suggest_rebalance(portfolio: Dict[str, Tuple[int, float]]) -> List[Dict]:
 
     return [
         {
-            'symbol': s.symbol,
-            'action': s.action,
-            'current_weight': s.current_weight,
-            'target_weight': s.target_weight,
-            'suggested_adjustment': s.suggested_adjustment,
-            'reason': s.reason
+            "symbol": s.symbol,
+            "action": s.action,
+            "current_weight": s.current_weight,
+            "target_weight": s.target_weight,
+            "suggested_adjustment": s.suggested_adjustment,
+            "reason": s.reason,
         }
         for s in signals
     ]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Example usage
     logging.basicConfig(level=logging.INFO)
 
     # Sample portfolio
-    sample_portfolio = {
-        'NVDA': (100, 875.50),
-        'AMD': (150, 185.25),
-        'INTC': (200, 45.75)
-    }
+    sample_portfolio = {"NVDA": (100, 875.50), "AMD": (150, 185.25), "INTC": (200, 45.75)}
 
     # Create optimizer and run analysis
     optimizer = PortfolioOptimizer()
 
     # Check risk
-    risk_report = optimizer.check_portfolio_risk(sample_portfolio, 'NORMAL')
-    print(f"\nPortfolio Risk Report:")
+    risk_report = optimizer.check_portfolio_risk(sample_portfolio, "NORMAL")
+    print("\nPortfolio Risk Report:")
     print(f"  VaR (95%): ${risk_report.portfolio_var_95:,.2f}")
     print(f"  CVaR (95%): ${risk_report.conditional_var_95:,.2f}")
     print(f"  Max Drawdown: {risk_report.max_drawdown_potential:.2%}")
@@ -906,14 +878,13 @@ if __name__ == '__main__':
     # Get rebalance suggestions
     signals = optimizer.suggest_rebalance(sample_portfolio)
     if signals:
-        print(f"\nRebalancing Suggestions:")
+        print("\nRebalancing Suggestions:")
         for signal in signals:
-            print(f"  {signal.symbol}: {signal.action} "
-                  f"({signal.current_weight:.1%} -> {signal.target_weight:.1%})")
+            print(f"  {signal.symbol}: {signal.action} ({signal.current_weight:.1%} -> {signal.target_weight:.1%})")
 
     # Check new position
-    warnings = optimizer.check_new_position('AVGO', list(sample_portfolio.keys()))
+    warnings = optimizer.check_new_position("AVGO", list(sample_portfolio.keys()))
     if warnings:
-        print(f"\nCorrelation Warnings for AVGO:")
+        print("\nCorrelation Warnings for AVGO:")
         for warning in warnings:
             print(f"  {warning.message}")

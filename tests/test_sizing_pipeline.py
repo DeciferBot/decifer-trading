@@ -25,17 +25,14 @@ visible.  A standard ATR=2.0 is provided so the primary ATR-based path fires.
 Safety-cap tests use live config (uncapped=False).
 """
 
-import sys
-import os
 import inspect
-from unittest.mock import patch, MagicMock
-
-import pytest
+import os
+import sys
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance",
-             "praw", "feedparser", "tvDatafeed", "requests_html"]:
+for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance", "praw", "feedparser", "tvDatafeed", "requests_html"]:
     sys.modules.setdefault(_mod, MagicMock())
 
 import risk
@@ -43,31 +40,39 @@ from config import CONFIG
 
 # ── Shared constants ──────────────────────────────────────────────────────────
 
-PORTFOLIO  = 100_000.0
-PRICE      = 50.0
-ATR        = 2.0          # typical ATR for a $50 stock; stop_dollars = 2.0 × 1.5 = $3.00
-SCORE_LOW  = 20           # → conviction_mult = 0.75
-SCORE_MID  = 32           # → conviction_mult = 1.0
+PORTFOLIO = 100_000.0
+PRICE = 50.0
+ATR = 2.0  # typical ATR for a $50 stock; stop_dollars = 2.0 × 1.5 = $3.00
+SCORE_LOW = 20  # → conviction_mult = 0.75
+SCORE_MID = 32  # → conviction_mult = 1.0
 SCORE_HIGH = CONFIG.get("high_conviction_score", 40)  # → conviction_mult = 1.5
 
 REGIME_NEUTRAL = {"position_size_multiplier": 1.0}
-REGIME_PANIC   = {"position_size_multiplier": 0.0}
-REGIME_HALF    = {"position_size_multiplier": 0.5}
+REGIME_PANIC = {"position_size_multiplier": 0.0}
+REGIME_HALF = {"position_size_multiplier": 0.5}
 
-VIX_CALM  = 0.0
+VIX_CALM = 0.0
 VIX_PANIC = 1.0
 
 # Patch values for ratio tests: remove caps, lower risk_pct so Kelly path is visible
 _UNCAPPED_CONFIG = {
-    "risk_pct_per_trade": 0.001,   # keeps position value well under 20% hard cap
+    "risk_pct_per_trade": 0.001,  # keeps position value well under 20% hard cap
     "max_single_position": 100.0,  # effectively removes 10% single-position cap
 }
 
 
-def _call(portfolio=PORTFOLIO, price=PRICE, score=SCORE_MID,
-          regime=None, atr=ATR, external_mult=1.0,
-          vix_rank=VIX_CALM, strategy_mult=1.0, session="REGULAR",
-          uncapped=True):
+def _call(
+    portfolio=PORTFOLIO,
+    price=PRICE,
+    score=SCORE_MID,
+    regime=None,
+    atr=ATR,
+    external_mult=1.0,
+    vix_rank=VIX_CALM,
+    strategy_mult=1.0,
+    session="REGULAR",
+    uncapped=True,
+):
     """
     Helper: call calculate_position_size with controlled environment.
 
@@ -78,11 +83,13 @@ def _call(portfolio=PORTFOLIO, price=PRICE, score=SCORE_MID,
     if regime is None:
         regime = REGIME_NEUTRAL
     cfg_patch = _UNCAPPED_CONFIG if uncapped else {}
-    with patch.object(risk, "get_vix_rank", return_value=vix_rank), \
-         patch.object(risk, "get_session", return_value=session), \
-         patch.object(risk, "_equity_high_water_mark", None), \
-         patch.object(risk, "_last_known_equity", None), \
-         patch.dict(CONFIG, cfg_patch):
+    with (
+        patch.object(risk, "get_vix_rank", return_value=vix_rank),
+        patch.object(risk, "get_session", return_value=session),
+        patch.object(risk, "_equity_high_water_mark", None),
+        patch.object(risk, "_last_known_equity", None),
+        patch.dict(CONFIG, cfg_patch),
+    ):
         risk._strategy_size_multiplier = strategy_mult
         return risk.calculate_position_size(
             portfolio_value=portfolio,
@@ -96,6 +103,7 @@ def _call(portfolio=PORTFOLIO, price=PRICE, score=SCORE_MID,
 
 # ── Layer 2: Conviction multiplier ────────────────────────────────────────────
 
+
 class TestConvictionLayer:
     def test_high_conviction_larger_than_low(self):
         assert _call(score=SCORE_HIGH) > _call(score=SCORE_LOW)
@@ -103,7 +111,7 @@ class TestConvictionLayer:
     def test_high_conviction_is_2x_low(self):
         """1.5 / 0.75 = 2.0× ratio; integer math keeps it within 15%."""
         qty_high = _call(score=SCORE_HIGH)
-        qty_low  = _call(score=SCORE_LOW)
+        qty_low = _call(score=SCORE_LOW)
         ratio = qty_high / qty_low
         assert abs(ratio - 2.0) < 0.15, f"Expected ~2.0×, got {ratio:.3f}"
 
@@ -112,6 +120,7 @@ class TestConvictionLayer:
 
 
 # ── Layer 3: Regime multiplier ────────────────────────────────────────────────
+
 
 class TestRegimeLayer:
     def test_panic_regime_produces_minimum_position(self):
@@ -124,6 +133,7 @@ class TestRegimeLayer:
 
 # ── Layer 4: Session multiplier ───────────────────────────────────────────────
 
+
 class TestSessionLayer:
     def test_extended_hours_reduces_position(self):
         assert _call(session="PRE_MARKET") < _call(session="REGULAR")
@@ -134,6 +144,7 @@ class TestSessionLayer:
 
 
 # ── Layer 5: Strategy mode multiplier ─────────────────────────────────────────
+
 
 class TestStrategyModeLayer:
     def test_defensive_reduces_vs_normal(self):
@@ -149,19 +160,20 @@ class TestStrategyModeLayer:
 
 # ── Layer 6: External multiplier (sentinel / catalyst) ────────────────────────
 
+
 class TestExternalMultLayer:
     def test_no_external_mult_equals_default(self):
         assert _call(external_mult=1.0) == _call()
 
     def test_sentinel_mult_reduces_position(self):
-        qty_normal   = _call(external_mult=1.0)
+        qty_normal = _call(external_mult=1.0)
         qty_sentinel = _call(external_mult=0.75)
         assert qty_sentinel < qty_normal
         ratio = qty_sentinel / qty_normal
         assert abs(ratio - 0.75) < 0.05, f"Expected 0.75×, got {ratio:.3f}"
 
     def test_catalyst_mult_reduces_position(self):
-        qty_normal   = _call(external_mult=1.0)
+        qty_normal = _call(external_mult=1.0)
         qty_catalyst = _call(external_mult=0.375)
         assert qty_catalyst < qty_normal
         ratio = qty_catalyst / qty_normal
@@ -176,16 +188,16 @@ class TestExternalMultLayer:
 
 # ── Primary conversion: ATR-based stop vs fallback ────────────────────────────
 
+
 class TestAtrPrimaryPath:
     """The core sizing formula uses actual stop distance, not a 2% proxy."""
 
     def test_larger_atr_gives_fewer_shares(self):
         """Wide stop (large ATR) = fewer shares for same risk amount."""
         qty_tight = _call(atr=1.0)
-        qty_wide  = _call(atr=4.0)
+        qty_wide = _call(atr=4.0)
         assert qty_wide < qty_tight, (
-            f"Larger ATR (wider stop) should yield fewer shares: "
-            f"atr=1→{qty_tight}, atr=4→{qty_wide}"
+            f"Larger ATR (wider stop) should yield fewer shares: atr=1→{qty_tight}, atr=4→{qty_wide}"
         )
 
     def test_atr_doubles_qty_halves(self):
@@ -202,7 +214,7 @@ class TestAtrPrimaryPath:
 
     def test_atr_path_and_fallback_are_in_same_order_of_magnitude(self):
         """The two paths should not produce wildly different results for typical inputs."""
-        qty_atr      = _call(atr=ATR)
+        qty_atr = _call(atr=ATR)
         qty_fallback = _call(atr=0.0)
         # Allow up to 5× difference — they use different stop assumptions
         assert 0.2 <= (qty_fallback / qty_atr) <= 5.0, (
@@ -212,10 +224,11 @@ class TestAtrPrimaryPath:
 
 # ── Compounding / worst-case scenarios ───────────────────────────────────────
 
+
 class TestCompoundingScenarios:
     def test_recovery_plus_catalyst_compounding(self):
         """RECOVERY (0.5×) + catalyst (0.375×) = 0.1875× — must be ≥ 1 share."""
-        qty_normal   = _call(strategy_mult=1.0, external_mult=1.0)
+        qty_normal = _call(strategy_mult=1.0, external_mult=1.0)
         qty_compound = _call(strategy_mult=0.5, external_mult=0.375)
         assert qty_compound >= 1
         if qty_normal > 10:
@@ -223,10 +236,12 @@ class TestCompoundingScenarios:
             assert ratio < 0.30, f"RECOVERY+catalyst should be < 30% of normal, got {ratio:.3f}"
 
     def test_all_multipliers_reduce_together(self):
-        qty_normal = _call(strategy_mult=1.0, external_mult=1.0,
-                           session="REGULAR", regime=REGIME_NEUTRAL, score=SCORE_MID)
-        qty_worst  = _call(strategy_mult=0.5, external_mult=0.375,
-                           session="PRE_MARKET", regime=REGIME_HALF, score=SCORE_LOW)
+        qty_normal = _call(
+            strategy_mult=1.0, external_mult=1.0, session="REGULAR", regime=REGIME_NEUTRAL, score=SCORE_MID
+        )
+        qty_worst = _call(
+            strategy_mult=0.5, external_mult=0.375, session="PRE_MARKET", regime=REGIME_HALF, score=SCORE_LOW
+        )
         assert qty_worst <= qty_normal
 
     def test_pipeline_is_commutative_for_equal_product(self):
@@ -238,6 +253,7 @@ class TestCompoundingScenarios:
 
 # ── Safety caps ───────────────────────────────────────────────────────────────
 
+
 class TestSafetyCapsLayer:
     def test_hard_cap_fires_on_extreme_low_price(self):
         """$0.01 price causes position value to explode — 20% hard cap must fire."""
@@ -247,7 +263,7 @@ class TestSafetyCapsLayer:
 
     def test_external_mult_does_not_bypass_hard_cap(self):
         """Sentinel and normal trades are both bounded by the hard cap."""
-        qty_normal   = _call(external_mult=1.0, uncapped=False)
+        qty_normal = _call(external_mult=1.0, uncapped=False)
         qty_sentinel = _call(external_mult=0.75, uncapped=False)
         assert qty_sentinel <= qty_normal
 
@@ -256,16 +272,13 @@ class TestSafetyCapsLayer:
         With live config and high conviction + calm VIX + standard ATR,
         the max_single_position cap should hold position below 10% of portfolio.
         """
-        qty = _call(score=SCORE_HIGH, vix_rank=VIX_CALM,
-                    strategy_mult=1.0, external_mult=1.0,
-                    atr=ATR, uncapped=False)
+        qty = _call(score=SCORE_HIGH, vix_rank=VIX_CALM, strategy_mult=1.0, external_mult=1.0, atr=ATR, uncapped=False)
         max_allowed = int(PORTFOLIO * CONFIG["max_single_position"] / PRICE)
-        assert qty <= max_allowed, (
-            f"qty={qty} exceeded max_single_position cap of {max_allowed}"
-        )
+        assert qty <= max_allowed, f"qty={qty} exceeded max_single_position cap of {max_allowed}"
 
 
 # ── Signature contract ────────────────────────────────────────────────────────
+
 
 class TestSignatureContract:
     def test_function_accepts_external_mult_kwarg(self):
@@ -284,18 +297,18 @@ class TestSignatureContract:
 
 # ── No double strategy-mode application ──────────────────────────────────────
 
+
 class TestNoDoubleStrategyMode:
     def test_strategy_mode_applied_exactly_once(self):
         """
         RECOVERY mode (0.5×) must produce ~0.5× of NORMAL — not 0.25×.
         0.25× would indicate double-application of the strategy multiplier.
         """
-        qty_normal   = _call(strategy_mult=1.0, external_mult=1.0)
+        qty_normal = _call(strategy_mult=1.0, external_mult=1.0)
         qty_recovery = _call(strategy_mult=0.5, external_mult=1.0)
         ratio = qty_recovery / qty_normal
         assert abs(ratio - 0.5) < 0.05, (
-            f"Expected 0.5× (single application), got {ratio:.3f} "
-            f"(0.25 would indicate double-application)"
+            f"Expected 0.5× (single application), got {ratio:.3f} (0.25 would indicate double-application)"
         )
 
     def test_double_application_canary(self):
@@ -304,14 +317,13 @@ class TestNoDoubleStrategyMode:
         _strategy_size_multiplier. Single-application result must be ~2× the double.
         """
         qty_single = _call(strategy_mult=0.5, external_mult=1.0)
-        qty_double = _call(strategy_mult=0.5, external_mult=0.5)   # simulates the old bug
+        qty_double = _call(strategy_mult=0.5, external_mult=0.5)  # simulates the old bug
         if qty_single > 4:
-            assert qty_single > qty_double, (
-                f"Single-application ({qty_single}) should exceed double ({qty_double})"
-            )
+            assert qty_single > qty_double, f"Single-application ({qty_single}) should exceed double ({qty_double})"
 
 
 # ── Signal-strength-proportional Kelly multiplier ────────────────────────────
+
 
 class TestSignalStrengthKelly:
     """
@@ -338,20 +350,18 @@ class TestSignalStrengthKelly:
         score=35 → t=0.5 → conviction_mult=1.0.
         Ratio of score=35 to score=20 should be ~2× (1.0/0.5).
         """
-        qty_mid   = _call(score=35)
+        qty_mid = _call(score=35)
         qty_floor = _call(score=20)
         ratio = qty_mid / qty_floor
-        assert abs(ratio - 2.0) < 0.15, (
-            f"score=35/score=20 should be ~2.0×, got {ratio:.3f}"
-        )
+        assert abs(ratio - 2.0) < 0.15, f"score=35/score=20 should be ~2.0×, got {ratio:.3f}"
 
     def test_scaling_is_monotonically_increasing(self):
         """Position size must increase (non-strictly) with score."""
         scores = [20, 25, 30, 35, 40, 45, 50]
-        qtys   = [_call(score=s) for s in scores]
+        qtys = [_call(score=s) for s in scores]
         for i in range(len(qtys) - 1):
             assert qtys[i] <= qtys[i + 1], (
-                f"Not monotone: score={scores[i]}→{qtys[i]}, score={scores[i+1]}→{qtys[i+1]}"
+                f"Not monotone: score={scores[i]}→{qtys[i]}, score={scores[i + 1]}→{qtys[i + 1]}"
             )
 
     def test_below_floor_clamped_to_min_mult(self):
@@ -369,10 +379,8 @@ class TestSignalStrengthKelly:
         """
         qty_max = _call(score=50)
         qty_min = _call(score=20)
-        ratio   = qty_max / qty_min
-        assert abs(ratio - 3.0) < 0.45, (
-            f"score=50/score=20 should be ~3.0×, got {ratio:.3f}"
-        )
+        ratio = qty_max / qty_min
+        assert abs(ratio - 3.0) < 0.45, f"score=50/score=20 should be ~3.0×, got {ratio:.3f}"
 
     def test_backward_compat_old_low_tier(self):
         """
@@ -383,15 +391,12 @@ class TestSignalStrengthKelly:
         qty_27 = _call(score=27)
         qty_28 = _call(score=28)
         qty_35 = _call(score=35)
-        assert qty_20 <= qty_27 <= qty_35, (
-            f"score=27 not between score=20 and score=35: {qty_20}, {qty_27}, {qty_35}"
-        )
-        assert qty_20 <= qty_28 <= qty_35, (
-            f"score=28 not between score=20 and score=35: {qty_20}, {qty_28}, {qty_35}"
-        )
+        assert qty_20 <= qty_27 <= qty_35, f"score=27 not between score=20 and score=35: {qty_20}, {qty_27}, {qty_35}"
+        assert qty_20 <= qty_28 <= qty_35, f"score=28 not between score=20 and score=35: {qty_20}, {qty_28}, {qty_35}"
 
 
 # ── Drawdown-proportional position scaler ────────────────────────────────────
+
 
 class TestDrawdownScaler:
     """
@@ -403,80 +408,97 @@ class TestDrawdownScaler:
     # ── Unit tests for get_drawdown_scalar() ──────────────────────
 
     def test_returns_1_when_hwm_not_initialized(self):
-        with patch.object(risk, "_equity_high_water_mark", None), \
-             patch.object(risk, "_last_known_equity", None):
+        with patch.object(risk, "_equity_high_water_mark", None), patch.object(risk, "_last_known_equity", None):
             assert risk.get_drawdown_scalar() == 1.0
 
     def test_returns_1_at_zero_drawdown(self):
         hwm = 100_000.0
-        with patch.object(risk, "_equity_high_water_mark", hwm), \
-             patch.object(risk, "_last_known_equity", hwm):
+        with patch.object(risk, "_equity_high_water_mark", hwm), patch.object(risk, "_last_known_equity", hwm):
             assert risk.get_drawdown_scalar() == 1.0
 
     def test_returns_min_scalar_at_max_drawdown(self):
-        hwm    = 100_000.0
+        hwm = 100_000.0
         max_dd = CONFIG.get("max_drawdown_alert", 0.25)
         equity = hwm * (1.0 - max_dd)
-        with patch.object(risk, "_equity_high_water_mark", hwm), \
-             patch.object(risk, "_last_known_equity", equity), \
-             patch.dict(CONFIG, {"drawdown_scaler": {"enabled": True, "min_scalar": 0.1}}):
+        with (
+            patch.object(risk, "_equity_high_water_mark", hwm),
+            patch.object(risk, "_last_known_equity", equity),
+            patch.dict(CONFIG, {"drawdown_scaler": {"enabled": True, "min_scalar": 0.1}}),
+        ):
             scalar = risk.get_drawdown_scalar()
             assert abs(scalar - 0.1) < 0.001, f"Expected 0.1 at max drawdown, got {scalar}"
 
     def test_returns_midpoint_scalar_at_half_drawdown(self):
         """t=0.5 → scalar = 1.0 - 0.5*(1.0-0.1) = 0.55."""
-        hwm    = 100_000.0
+        hwm = 100_000.0
         max_dd = CONFIG.get("max_drawdown_alert", 0.25)
         equity = hwm * (1.0 - max_dd * 0.5)
-        with patch.object(risk, "_equity_high_water_mark", hwm), \
-             patch.object(risk, "_last_known_equity", equity), \
-             patch.dict(CONFIG, {"drawdown_scaler": {"enabled": True, "min_scalar": 0.1}}):
+        with (
+            patch.object(risk, "_equity_high_water_mark", hwm),
+            patch.object(risk, "_last_known_equity", equity),
+            patch.dict(CONFIG, {"drawdown_scaler": {"enabled": True, "min_scalar": 0.1}}),
+        ):
             scalar = risk.get_drawdown_scalar()
             assert abs(scalar - 0.55) < 0.01, f"Expected 0.55 at half max_dd, got {scalar}"
 
     def test_clamped_at_min_scalar_beyond_threshold(self):
         """Drawdown beyond max_dd stays at min_scalar."""
-        hwm    = 100_000.0
-        equity = hwm * 0.50   # 50% drawdown >> 25% threshold
-        with patch.object(risk, "_equity_high_water_mark", hwm), \
-             patch.object(risk, "_last_known_equity", equity), \
-             patch.dict(CONFIG, {"drawdown_scaler": {"enabled": True, "min_scalar": 0.1}}):
+        hwm = 100_000.0
+        equity = hwm * 0.50  # 50% drawdown >> 25% threshold
+        with (
+            patch.object(risk, "_equity_high_water_mark", hwm),
+            patch.object(risk, "_last_known_equity", equity),
+            patch.dict(CONFIG, {"drawdown_scaler": {"enabled": True, "min_scalar": 0.1}}),
+        ):
             scalar = risk.get_drawdown_scalar()
             assert abs(scalar - 0.1) < 0.001, f"Expected 0.1 (clamped), got {scalar}"
 
     def test_disabled_returns_1(self):
-        hwm    = 100_000.0
-        equity = hwm * 0.80   # 20% drawdown — would reduce if enabled
-        with patch.object(risk, "_equity_high_water_mark", hwm), \
-             patch.object(risk, "_last_known_equity", equity), \
-             patch.dict(CONFIG, {"drawdown_scaler": {"enabled": False, "min_scalar": 0.1}}):
+        hwm = 100_000.0
+        equity = hwm * 0.80  # 20% drawdown — would reduce if enabled
+        with (
+            patch.object(risk, "_equity_high_water_mark", hwm),
+            patch.object(risk, "_last_known_equity", equity),
+            patch.dict(CONFIG, {"drawdown_scaler": {"enabled": False, "min_scalar": 0.1}}),
+        ):
             assert risk.get_drawdown_scalar() == 1.0
 
     def test_equity_override_respected(self):
         """equity_override bypasses _last_known_equity global."""
         hwm = 100_000.0
-        with patch.object(risk, "_equity_high_water_mark", hwm), \
-             patch.object(risk, "_last_known_equity", hwm * 0.5):   # 50% DD via global
+        with (
+            patch.object(risk, "_equity_high_water_mark", hwm),
+            patch.object(risk, "_last_known_equity", hwm * 0.5),
+        ):  # 50% DD via global
             # Override with full equity → should return 1.0
             assert risk.get_drawdown_scalar(equity_override=hwm) == 1.0
 
     # ── Integration tests: scalar flows through calculate_position_size() ──────
 
-    def _call_dd(self, equity: float, hwm: float,
-                portfolio=PORTFOLIO, price=PRICE, score=SCORE_MID,
-                regime=None, atr=ATR, external_mult=1.0):
+    def _call_dd(
+        self,
+        equity: float,
+        hwm: float,
+        portfolio=PORTFOLIO,
+        price=PRICE,
+        score=SCORE_MID,
+        regime=None,
+        atr=ATR,
+        external_mult=1.0,
+    ):
         """
         Calls calculate_position_size() directly with controlled drawdown state.
         Does NOT go through _call() to avoid _call()'s own HWM=None patch overriding ours.
         """
         if regime is None:
             regime = REGIME_NEUTRAL
-        with patch.object(risk, "get_vix_rank", return_value=VIX_CALM), \
-             patch.object(risk, "get_session", return_value="REGULAR"), \
-             patch.object(risk, "_equity_high_water_mark", hwm), \
-             patch.object(risk, "_last_known_equity", equity), \
-             patch.dict(CONFIG, {**_UNCAPPED_CONFIG,
-                                 "drawdown_scaler": {"enabled": True, "min_scalar": 0.1}}):
+        with (
+            patch.object(risk, "get_vix_rank", return_value=VIX_CALM),
+            patch.object(risk, "get_session", return_value="REGULAR"),
+            patch.object(risk, "_equity_high_water_mark", hwm),
+            patch.object(risk, "_last_known_equity", equity),
+            patch.dict(CONFIG, {**_UNCAPPED_CONFIG, "drawdown_scaler": {"enabled": True, "min_scalar": 0.1}}),
+        ):
             risk._strategy_size_multiplier = 1.0
             return risk.calculate_position_size(
                 portfolio_value=portfolio,
@@ -490,7 +512,7 @@ class TestDrawdownScaler:
     def test_no_drawdown_does_not_reduce_position(self):
         """0% drawdown → scalar=1.0 → same qty as baseline with HWM=None."""
         hwm = 100_000.0
-        qty_baseline  = _call()                           # HWM=None, scalar=1.0
+        qty_baseline = _call()  # HWM=None, scalar=1.0
         qty_nodrawdown = self._call_dd(equity=hwm, hwm=hwm)
         assert qty_baseline == qty_nodrawdown, (
             f"0% drawdown should not change position: {qty_baseline} vs {qty_nodrawdown}"
@@ -498,10 +520,10 @@ class TestDrawdownScaler:
 
     def test_max_drawdown_reduces_position(self):
         """equity at max_drawdown_alert → position substantially reduced."""
-        hwm    = 100_000.0
+        hwm = 100_000.0
         max_dd = CONFIG.get("max_drawdown_alert", 0.25)
         equity = hwm * (1.0 - max_dd)
-        qty_nodrawdown  = self._call_dd(equity=hwm,    hwm=hwm)
+        qty_nodrawdown = self._call_dd(equity=hwm, hwm=hwm)
         qty_maxdrawdown = self._call_dd(equity=equity, hwm=hwm)
         assert qty_maxdrawdown < qty_nodrawdown, (
             f"Max drawdown should reduce position: {qty_maxdrawdown} vs {qty_nodrawdown}"
@@ -512,23 +534,18 @@ class TestDrawdownScaler:
         Worst case: score=20 (min_mult=0.5) + max drawdown (scalar=0.1)
         = 0.05 of best-case position. Must still return at least 1 share.
         """
-        hwm    = 100_000.0
+        hwm = 100_000.0
         max_dd = CONFIG.get("max_drawdown_alert", 0.25)
         equity = hwm * (1.0 - max_dd)
-        qty_best  = self._call_dd(equity=hwm,    hwm=hwm,    score=50)
-        qty_worst = self._call_dd(equity=equity, hwm=hwm,    score=20)
+        qty_best = self._call_dd(equity=hwm, hwm=hwm, score=50)
+        qty_worst = self._call_dd(equity=equity, hwm=hwm, score=20)
         assert qty_worst <= max(1, qty_best // 4), (
-            f"Low signal + max drawdown should be much smaller than best case: "
-            f"worst={qty_worst}, best={qty_best}"
+            f"Low signal + max drawdown should be much smaller than best case: worst={qty_worst}, best={qty_best}"
         )
         assert qty_worst >= 1, "Must always return at least 1 share"
 
     def test_drawdown_scalar_in_sizing_state(self):
         """get_sizing_state() must expose drawdown_scalar."""
         state = risk.get_sizing_state()
-        assert "drawdown_scalar" in state, (
-            f"get_sizing_state() missing 'drawdown_scalar': {list(state.keys())}"
-        )
-        assert 0.0 < state["drawdown_scalar"] <= 1.0, (
-            f"drawdown_scalar out of range: {state['drawdown_scalar']}"
-        )
+        assert "drawdown_scalar" in state, f"get_sizing_state() missing 'drawdown_scalar': {list(state.keys())}"
+        assert 0.0 < state["drawdown_scalar"] <= 1.0, f"drawdown_scalar out of range: {state['drawdown_scalar']}"

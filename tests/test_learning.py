@@ -1,13 +1,12 @@
 # tests/test_learning.py
 # Tests for learning.py — trade logging, performance tracking, capital management
 
+import json
 import os
 import sys
-import json
-import math
 import tempfile
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -17,15 +16,20 @@ import types
 
 # Stub anthropic
 anthropicmod = types.ModuleType("anthropic")
+
+
 class _FakeAnthropic:
     def __init__(self, api_key=None):
         pass
+
     class messages:
         @staticmethod
         def create(**kwargs):
             m = MagicMock()
             m.content = [MagicMock(text="Weekly review text.")]
             return m
+
+
 anthropicmod.Anthropic = _FakeAnthropic
 sys.modules.setdefault("anthropic", anthropicmod)
 
@@ -51,10 +55,10 @@ sys.modules.pop("learning", None)
 
 import learning
 
-
 # ────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ────────────────────────────────────────────────────────────────────────────
+
 
 def _clear_files():
     for f in ["/tmp/test_trades.json", "/tmp/test_orders.json"]:
@@ -62,8 +66,7 @@ def _clear_files():
             os.remove(f)
 
 
-def _make_trade(symbol="AAPL", action="OPEN", pnl=None, exit_price=None,
-                open_time=None, qty=10, entry=150.0):
+def _make_trade(symbol="AAPL", action="OPEN", pnl=None, exit_price=None, open_time=None, qty=10, entry=150.0):
     t = {
         "symbol": symbol,
         "action": action,
@@ -88,12 +91,13 @@ def _make_trade(symbol="AAPL", action="OPEN", pnl=None, exit_price=None,
 # Capital base tests
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class TestCapitalBase:
     """Tests for capital tracking functions."""
 
     def setup_method(self):
         """Point CAPITAL_FILE to a temp file and fix starting_capital to test value."""
-        self.tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+        self.tmp = tempfile.NamedTemporaryFile(suffix=".json", delete=False)  # noqa: SIM115
         self.tmp.close()
         os.remove(self.tmp.name)  # start without file
         self._orig = learning.CAPITAL_FILE
@@ -158,6 +162,7 @@ class TestCapitalBase:
 # Order logging tests
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class TestOrderLogging:
     """Tests for log_order, load_orders, update_order_status."""
 
@@ -170,13 +175,19 @@ class TestOrderLogging:
         learning.ORDER_LOG_FILE = self._orig
         _clear_files()
 
-    def _order(self, symbol="AAPL", side="BUY", qty=10, price=150.0,
-                order_id=1, status="SUBMITTED", instrument="stock"):
+    def _order(
+        self, symbol="AAPL", side="BUY", qty=10, price=150.0, order_id=1, status="SUBMITTED", instrument="stock"
+    ):
         return {
-            "symbol": symbol, "side": side, "qty": qty, "price": price,
-            "order_id": order_id, "status": status,
-            "order_type": "LMT", "instrument": instrument,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "symbol": symbol,
+            "side": side,
+            "qty": qty,
+            "price": price,
+            "order_id": order_id,
+            "status": status,
+            "order_type": "LMT",
+            "instrument": instrument,
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     def test_log_order_creates_record(self):
@@ -255,6 +266,7 @@ class TestOrderLogging:
 # Trade logging tests
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class TestTradeLogging:
     """Tests for log_trade and load_trades."""
 
@@ -271,8 +283,7 @@ class TestTradeLogging:
         return {"regime": "TRENDING_UP", "vix": 15.0}
 
     def _agents(self):
-        return {"technical": "bullish", "macro": "neutral",
-                "opportunity": "buy", "devils": "risks", "risk": "approved"}
+        return {"technical": "bullish", "macro": "neutral", "opportunity": "buy", "devils": "risks", "risk": "approved"}
 
     def test_log_trade_open_creates_record(self):
         """log_trade OPEN creates a persisted record."""
@@ -317,8 +328,7 @@ class TestTradeLogging:
 
     def test_log_trade_agents_truncated_at_500_chars(self):
         """Agent output is stored and truncated to 500 chars."""
-        agents = {"technical": "X" * 600, "macro": "",
-                  "opportunity": "", "devils": "", "risk": ""}
+        agents = {"technical": "X" * 600, "macro": "", "opportunity": "", "devils": "", "risk": ""}
         trade = _make_trade("AMD", action="OPEN")
         learning.log_trade(trade, agents, self._regime(), "OPEN")
         trades = learning.load_trades()
@@ -343,6 +353,7 @@ class TestTradeLogging:
 # ────────────────────────────────────────────────────────────────────────────
 # Signal scan logging tests
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class TestSignalScanLogging:
     """Tests for log_signal_scan."""
@@ -369,8 +380,15 @@ class TestSignalScanLogging:
             "score": score,
             "price": price,
             "score_breakdown": {
-                "trend": 5, "momentum": 4, "squeeze": 3, "flow": 4,
-                "breakout": 3, "mtf": 4, "news": 5, "social": 3, "reversion": 4,
+                "trend": 5,
+                "momentum": 4,
+                "squeeze": 3,
+                "flow": 4,
+                "breakout": 3,
+                "mtf": 4,
+                "news": 5,
+                "social": 3,
+                "reversion": 4,
             },
             "disabled_dimensions": [],
         }
@@ -439,6 +457,7 @@ class TestSignalScanLogging:
 # ────────────────────────────────────────────────────────────────────────────
 # Performance summary tests
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class TestPerformanceSummary:
     """Tests for get_performance_summary."""
@@ -516,7 +535,7 @@ class TestPerformanceSummary:
         trades = [
             self._closed_trade(100),
             {"pnl": None, "exit_price": None, "entry_price": 100},  # open
-            {"pnl": 50},                                              # no exit_price
+            {"pnl": 50},  # no exit_price
         ]
         result = learning.get_performance_summary(trades)
         assert result["total_trades"] == 1
@@ -547,6 +566,7 @@ class TestPerformanceSummary:
 # ────────────────────────────────────────────────────────────────────────────
 # Weekly review test
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class TestWeeklyReview:
     """Tests for run_weekly_review."""
@@ -591,9 +611,8 @@ class TestWeeklyReview:
 
     def test_weekly_review_calls_claude_and_saves_file(self):
         """run_weekly_review calls Claude and writes weekly_review.txt."""
-        from datetime import timedelta
 
-        recent_ts = datetime.now(timezone.utc).isoformat()
+        recent_ts = datetime.now(UTC).isoformat()
         trade = {
             "timestamp": recent_ts,
             "symbol": "TSLA",

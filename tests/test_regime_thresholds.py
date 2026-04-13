@@ -7,11 +7,11 @@ New behaviour (post north-star regime-as-reasoning-input):
 - PANIC and EXTREME_STRESS return the configured panic value (blocks all trades).
 - Unknown regime names fall back to base.
 """
+
 from __future__ import annotations
+
 import os
 import sys
-
-import pytest
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -55,11 +55,20 @@ class TestRegimeThresholdFlat:
         """Core invariant: every non-circuit-breaker regime returns the same threshold."""
         monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 18)
         base = 18
-        for regime in ("TRENDING_UP", "TRENDING_DOWN", "RANGE_BOUND", "RELIEF_RALLY", "UNKNOWN",
-                       "MOMENTUM_BULL", "FEAR_ELEVATED",
-                       "DISTRIBUTION", "TRENDING_BEAR"):
-            assert get_regime_threshold(regime) == base, \
+        for regime in (
+            "TRENDING_UP",
+            "TRENDING_DOWN",
+            "RANGE_BOUND",
+            "RELIEF_RALLY",
+            "UNKNOWN",
+            "MOMENTUM_BULL",
+            "FEAR_ELEVATED",
+            "DISTRIBUTION",
+            "TRENDING_BEAR",
+        ):
+            assert get_regime_threshold(regime) == base, (
                 f"Expected {base} for {regime}, got {get_regime_threshold(regime)}"
+            )
 
 
 class TestCircuitBreakerThreshold:

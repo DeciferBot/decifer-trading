@@ -15,34 +15,29 @@
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
-import os
-import sys
-import json
 import argparse
+import json
 import logging
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timedelta, time
-from pathlib import Path
-from typing import Optional, Dict, List, Tuple
+import os
 from collections import defaultdict
+from dataclasses import asdict, dataclass
+from datetime import datetime, time
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytz
 
 from config import CONFIG
-from signals import compute_indicators, compute_confluence
+from signals import compute_confluence, compute_indicators
 
 log = logging.getLogger("decifer.backtester")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 
 EST = pytz.timezone("America/New_York")
 BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = BASE_DIR / "data" / "historical"        # legacy — kept for utility functions
-FEATURES_DIR = BASE_DIR / "data" / "features"     # tiered store — primary read source
+DATA_DIR = BASE_DIR / "data" / "historical"  # legacy — kept for utility functions
+FEATURES_DIR = BASE_DIR / "data" / "features"  # tiered store — primary read source
 RESULTS_DIR = BASE_DIR / "backtest_results"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -51,15 +46,17 @@ RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 # DATA STRUCTURES
 # ═════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class Trade:
     """Record of a single executed trade."""
+
     symbol: str
     entry_date: datetime
     entry_price: float
     qty: int
-    exit_date: Optional[datetime] = None
-    exit_price: Optional[float] = None
+    exit_date: datetime | None = None
+    exit_price: float | None = None
     pnl: float = 0.0
     pnl_pct: float = 0.0
     exit_reason: str = "OPEN"  # STOP_LOSS, TAKE_PROFIT, PARTIAL, BREAKEVEN
@@ -86,6 +83,7 @@ class Trade:
 @dataclass
 class Position:
     """Active position tracking."""
+
     symbol: str
     qty: int
     entry_price: float
@@ -98,8 +96,8 @@ class Position:
     entry_low: float = 0.0
     max_high_price: float = 0.0
     max_low_price: float = 0.0
-    exit_target_1: Optional[float] = None  # First partial exit
-    exit_target_2: Optional[float] = None  # Second partial exit
+    exit_target_1: float | None = None  # First partial exit
+    exit_target_2: float | None = None  # Second partial exit
     partial_exit_1_done: bool = False
     partial_exit_2_done: bool = False
 
@@ -126,6 +124,7 @@ class Position:
 @dataclass
 class PortfolioState:
     """Snapshot of portfolio at a point in time."""
+
     timestamp: datetime
     cash: float
     gross_value: float
@@ -140,21 +139,23 @@ class PortfolioState:
 # PORTFOLIO MANAGER
 # ═════════════════════════════════════════════════════════════════
 
+
 class Portfolio:
     """Manages positions, cash, and P&L tracking."""
 
     def __init__(self, starting_capital: float):
         self.starting_capital = starting_capital
         self.cash = starting_capital
-        self.positions: Dict[int, Position] = {}  # trade_id -> Position
-        self.closed_trades: List[Trade] = []
+        self.positions: dict[int, Position] = {}  # trade_id -> Position
+        self.closed_trades: list[Trade] = []
         self.daily_start_value = starting_capital
         self.daily_pnl = 0.0
         self.trade_counter = 0
-        self.history: List[PortfolioState] = []
+        self.history: list[PortfolioState] = []
 
-    def open_position(self, symbol: str, qty: int, price: float, date: datetime,
-                      atr: float, regime: str, score: int) -> Trade:
+    def open_position(
+        self, symbol: str, qty: int, price: float, date: datetime, atr: float, regime: str, score: int
+    ) -> Trade:
         """Open a new position and return the Trade record."""
         if qty <= 0:
             return None
@@ -198,12 +199,10 @@ class Portfolio:
         position.exit_target_2 = price * (1 + CONFIG["partial_exit_2_pct"])
 
         self.positions[trade_id] = position
-        log.info(f"ENTRY {symbol}: {qty} @ ${price:.2f} | Score: {score} | "
-                 f"Regime: {regime} | Cash: ${self.cash:,.2f}")
+        log.info(f"ENTRY {symbol}: {qty} @ ${price:.2f} | Score: {score} | Regime: {regime} | Cash: ${self.cash:,.2f}")
         return trade
 
-    def close_position(self, trade_id: int, price: float, date: datetime,
-                       reason: str = "MANUAL") -> Optional[Trade]:
+    def close_position(self, trade_id: int, price: float, date: datetime, reason: str = "MANUAL") -> Trade | None:
         """Close a position and return the completed Trade."""
         if trade_id not in self.positions:
             return None
@@ -238,12 +237,15 @@ class Portfolio:
         self.closed_trades.append(trade)
         del self.positions[trade_id]
 
-        log.info(f"EXIT {pos.symbol}: {qty} @ ${price:.2f} ({reason}) | "
-                 f"P&L: ${pnl_dollars:+.2f} ({pnl_pct:+.1%}) | Hold: {trade.hold_minutes}m")
+        log.info(
+            f"EXIT {pos.symbol}: {qty} @ ${price:.2f} ({reason}) | "
+            f"P&L: ${pnl_dollars:+.2f} ({pnl_pct:+.1%}) | Hold: {trade.hold_minutes}m"
+        )
         return trade
 
-    def partial_close(self, trade_id: int, qty_close: int, price: float,
-                      date: datetime, reason: str = "PARTIAL_EXIT") -> Optional[Trade]:
+    def partial_close(
+        self, trade_id: int, qty_close: int, price: float, date: datetime, reason: str = "PARTIAL_EXIT"
+    ) -> Trade | None:
         """Close part of a position."""
         if trade_id not in self.positions:
             return None
@@ -277,18 +279,19 @@ class Portfolio:
 
         # Update position with remaining qty
         pos.qty = qty_remain
-        log.info(f"PARTIAL_EXIT {pos.symbol}: -{qty_close} (keep {qty_remain}) @ ${price:.2f} | "
-                 f"P&L: ${pnl_dollars:+.2f}")
+        log.info(
+            f"PARTIAL_EXIT {pos.symbol}: -{qty_close} (keep {qty_remain}) @ ${price:.2f} | P&L: ${pnl_dollars:+.2f}"
+        )
         return trade
 
-    def update_prices(self, prices: Dict[str, float]):
+    def update_prices(self, prices: dict[str, float]):
         """Update current prices for all positions."""
-        for trade_id, pos in self.positions.items():
+        for _trade_id, pos in self.positions.items():
             if pos.symbol in prices:
                 price = prices[pos.symbol]
                 pos.update_max_prices(price, price)
 
-    def gross_value(self, prices: Dict[str, float]) -> float:
+    def gross_value(self, prices: dict[str, float]) -> float:
         """Sum of all position values + cash."""
         value = self.cash
         for pos in self.positions.values():
@@ -296,7 +299,7 @@ class Portfolio:
                 value += pos.current_value(prices[pos.symbol])
         return value
 
-    def unrealized_pnl(self, prices: Dict[str, float]) -> float:
+    def unrealized_pnl(self, prices: dict[str, float]) -> float:
         """Total unrealized P&L across all positions."""
         pnl = 0.0
         for pos in self.positions.values():
@@ -304,14 +307,15 @@ class Portfolio:
                 pnl += pos.unrealized_pnl(prices[pos.symbol])
         return pnl
 
-    def daily_pnl_current(self, prices: Dict[str, float]) -> float:
+    def daily_pnl_current(self, prices: dict[str, float]) -> float:
         """Realized daily P&L from closed trades + unrealized from open."""
-        realized = sum(t.pnl for t in self.closed_trades if t.exit_date and
-                      t.exit_date.date() == datetime.now(EST).date())
+        realized = sum(
+            t.pnl for t in self.closed_trades if t.exit_date and t.exit_date.date() == datetime.now(EST).date()
+        )
         unrealized = self.unrealized_pnl(prices)
         return realized + unrealized
 
-    def record_state(self, timestamp: datetime, prices: Dict[str, float]):
+    def record_state(self, timestamp: datetime, prices: dict[str, float]):
         """Snapshot current portfolio state."""
         gross = self.gross_value(prices)
         net = gross
@@ -336,12 +340,19 @@ class Portfolio:
 # BACKTESTER ENGINE
 # ═════════════════════════════════════════════════════════════════
 
+
 class Backtester:
     """Main backtesting engine."""
 
-    def __init__(self, symbols: List[str], start_date: datetime, end_date: datetime,
-                 min_score: int = None, atr_stop_mult: float = None,
-                 atr_trail_mult: float = None):
+    def __init__(
+        self,
+        symbols: list[str],
+        start_date: datetime,
+        end_date: datetime,
+        min_score: int | None = None,
+        atr_stop_mult: float | None = None,
+        atr_trail_mult: float | None = None,
+    ):
         self.symbols = symbols
         self.start_date = start_date
         self.end_date = end_date
@@ -353,14 +364,14 @@ class Backtester:
         self.atr_trail_mult = atr_trail_mult or CONFIG["atr_trail_multiplier"]
 
         # Data storage
-        self.data: Dict[str, pd.DataFrame] = {}
+        self.data: dict[str, pd.DataFrame] = {}
         self.current_bar = {}  # Symbol -> current index in its dataframe
-        self.regimes: Dict[datetime, str] = {}  # Date -> market regime
+        self.regimes: dict[datetime, str] = {}  # Date -> market regime
 
-        log.info(f"Backtester initialized: {len(symbols)} symbols, "
-                 f"{start_date.date()} → {end_date.date()}")
-        log.info(f"Min score: {self.min_score}, ATR stop mult: {self.atr_stop_mult}, "
-                 f"ATR trail mult: {self.atr_trail_mult}")
+        log.info(f"Backtester initialized: {len(symbols)} symbols, {start_date.date()} → {end_date.date()}")
+        log.info(
+            f"Min score: {self.min_score}, ATR stop mult: {self.atr_stop_mult}, ATR trail mult: {self.atr_trail_mult}"
+        )
 
     def load_data(self):
         """Load feature-enriched Parquet files for all symbols.
@@ -379,9 +390,9 @@ class Backtester:
         legacy_intraday = DATA_DIR / "intraday"
 
         candidates = [
-            (feat_daily,    "{symbol}_1d.parquet",  "daily (features)"),
-            (feat_intraday, "{symbol}_5m.parquet",  "5m (features)"),
-            (legacy_daily,  "{symbol}_1d.parquet",  "daily (legacy)"),
+            (feat_daily, "{symbol}_1d.parquet", "daily (features)"),
+            (feat_intraday, "{symbol}_5m.parquet", "5m (features)"),
+            (legacy_daily, "{symbol}_1d.parquet", "daily (legacy)"),
             (legacy_intraday, "{symbol}_5m.parquet", "5m (legacy)"),
         ]
 
@@ -414,7 +425,7 @@ class Backtester:
             raise ValueError("No data loaded for any symbol")
 
         # Initialize bar indices
-        for symbol in self.data.keys():
+        for symbol in self.data:
             self.current_bar[symbol] = 0
 
     def get_regime(self, date: datetime) -> str:
@@ -427,7 +438,7 @@ class Backtester:
             return self.regimes[date]
         return "BULL_TRENDING"
 
-    def compute_signal(self, symbol: str, idx: int) -> Optional[Dict]:
+    def compute_signal(self, symbol: str, idx: int) -> dict | None:
         """
         Compute signal score for a bar using local indicators.
         Returns dict with 'score', 'direction', 'signal', 'atr'.
@@ -440,7 +451,7 @@ class Backtester:
             return None
 
         # Extract lookback window (last 50 bars for stability)
-        window = df.iloc[max(0, idx-49):idx+1].copy()
+        window = df.iloc[max(0, idx - 49) : idx + 1].copy()
         if len(window) < 30:
             return None
 
@@ -463,7 +474,7 @@ class Backtester:
             "vol_ratio": indicators.get("vol_ratio", 1.0),
         }
 
-    def check_stops_and_exits(self, date: datetime, prices: Dict[str, float]):
+    def check_stops_and_exits(self, date: datetime, prices: dict[str, float]):
         """Walk through all positions and check for stop/profit targets."""
         to_close = []
 
@@ -472,8 +483,8 @@ class Backtester:
                 continue
 
             price = prices[pos.symbol]
-            pnl = pos.unrealized_pnl(price)
-            pnl_pct = pos.unrealized_pnl_pct(price)
+            pos.unrealized_pnl(price)
+            pos.unrealized_pnl_pct(price)
 
             # ATR-based stop loss
             stop_price = pos.entry_price - (self.atr_stop_mult * pos.atr_at_entry)
@@ -489,13 +500,12 @@ class Backtester:
                 continue
 
             # Partial exits
-            if (not pos.partial_exit_1_done and price >= pos.exit_target_1):
+            if not pos.partial_exit_1_done and price >= pos.exit_target_1:
                 qty_close = max(1, int(pos.qty / 3))  # Sell 1/3
                 self.portfolio.partial_close(trade_id, qty_close, price, date, "PARTIAL_1")
                 pos.partial_exit_1_done = True
 
-            if (not pos.partial_exit_2_done and pos.partial_exit_1_done and
-                price >= pos.exit_target_2):
+            if not pos.partial_exit_2_done and pos.partial_exit_1_done and price >= pos.exit_target_2:
                 qty_close = max(1, int(pos.qty / 3))  # Sell another 1/3
                 self.portfolio.partial_close(trade_id, qty_close, price, date, "PARTIAL_2")
                 pos.partial_exit_2_done = True
@@ -504,7 +514,7 @@ class Backtester:
         for trade_id, price, reason in to_close:
             self.portfolio.close_position(trade_id, price, date, reason)
 
-    def run(self) -> List[Trade]:
+    def run(self) -> list[Trade]:
         """Execute full backtest walk-forward."""
         log.info("Starting backtest walk-forward...")
 
@@ -545,8 +555,7 @@ class Backtester:
                     current_signals[symbol] = signal
 
             # Check existing positions for stops/exits
-            self.check_stops_and_exits(datetime.combine(current_date, time(16, 0), EST),
-                                       current_prices)
+            self.check_stops_and_exits(datetime.combine(current_date, time(16, 0), EST), current_prices)
 
             # Attempt new entries
             if len(self.portfolio.positions) < CONFIG["max_positions"]:
@@ -573,16 +582,10 @@ class Backtester:
 
                     if qty > 0 and qty * price <= self.portfolio.cash:
                         trade_date = datetime.combine(current_date, time(10, 0), EST)
-                        self.portfolio.open_position(
-                            symbol, qty, price, trade_date,
-                            atr, regime, signal["score"]
-                        )
+                        self.portfolio.open_position(symbol, qty, price, trade_date, atr, regime, signal["score"])
 
             # Record portfolio state
-            self.portfolio.record_state(
-                datetime.combine(current_date, time(16, 0), EST),
-                current_prices
-            )
+            self.portfolio.record_state(datetime.combine(current_date, time(16, 0), EST), current_prices)
 
         # Close all remaining positions at market close
         final_date = all_dates[-1]
@@ -595,9 +598,10 @@ class Backtester:
             pos = self.portfolio.positions[trade_id]
             if pos.symbol in final_prices:
                 self.portfolio.close_position(
-                    trade_id, final_prices[pos.symbol],
+                    trade_id,
+                    final_prices[pos.symbol],
                     datetime.combine(final_date, time(16, 0), EST),
-                    "END_OF_BACKTEST"
+                    "END_OF_BACKTEST",
                 )
 
         log.info(f"Backtest complete: {len(self.portfolio.closed_trades)} trades closed")
@@ -608,8 +612,8 @@ class Backtester:
 # REPORTING
 # ═════════════════════════════════════════════════════════════════
 
-def generate_report(trades: List[Trade], start_date: datetime, end_date: datetime,
-                    portfolio: Portfolio = None) -> Dict:
+
+def generate_report(trades: list[Trade], start_date: datetime, end_date: datetime, portfolio: Portfolio = None) -> dict:
     """Generate comprehensive performance report."""
     if not trades:
         return {"error": "No trades to report"}
@@ -640,7 +644,7 @@ def generate_report(trades: List[Trade], start_date: datetime, end_date: datetim
     # Drawdown
     cum_pnl = np.cumsum(pnls)
     running_max = np.maximum.accumulate(cum_pnl)
-    drawdown = (cum_pnl - running_max)
+    drawdown = cum_pnl - running_max
     max_drawdown = np.min(drawdown) if len(drawdown) > 0 else 0
 
     # Regime breakdown
@@ -678,11 +682,11 @@ def generate_report(trades: List[Trade], start_date: datetime, end_date: datetim
     return report
 
 
-def print_report(report: Dict):
+def print_report(report: dict):
     """Pretty-print performance report."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("BACKTEST RESULTS".center(70))
-    print("="*70)
+    print("=" * 70)
 
     print(f"\nPeriod: {report.get('period', 'N/A')}")
     print(f"Starting Capital: ${CONFIG['starting_capital']:,.0f}")
@@ -715,11 +719,12 @@ def print_report(report: Dict):
         pct = (pnl / CONFIG["starting_capital"]) * 100
         print(f"{month}: ${pnl:+10,.2f} ({pct:+.2f}%)")
 
-    print("\n" + "="*70 + "\n")
+    print("\n" + "=" * 70 + "\n")
 
 
-def parameter_sweep(symbols: List[str], start_date: datetime, end_date: datetime,
-                    param_name: str, param_values: List[float]) -> List[Dict]:
+def parameter_sweep(
+    symbols: list[str], start_date: datetime, end_date: datetime, param_name: str, param_values: list[float]
+) -> list[dict]:
     """Grid search over a parameter."""
     log.info(f"Parameter sweep: {param_name} = {param_values}")
     results = []
@@ -752,15 +757,17 @@ def parameter_sweep(symbols: List[str], start_date: datetime, end_date: datetime
         print_report(report)
 
     # Summary table
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("PARAMETER SWEEP SUMMARY".center(70))
-    print("="*70)
+    print("=" * 70)
     print(f"\n{param_name:20s} | Trades | Win% | Profit | Sharpe | Max DD")
-    print("-"*70)
+    print("-" * 70)
     for r in results:
-        print(f"{r['param_value']:20} | {r['total_trades']:6d} | "
-              f"{r['win_rate']:4.0%} | ${r['total_pnl']:8,.0f} | "
-              f"{r['sharpe_ratio']:6.2f} | ${r['max_drawdown']:7,.0f}")
+        print(
+            f"{r['param_value']:20} | {r['total_trades']:6d} | "
+            f"{r['win_rate']:4.0%} | ${r['total_pnl']:8,.0f} | "
+            f"{r['sharpe_ratio']:6.2f} | ${r['max_drawdown']:7,.0f}"
+        )
 
     return results
 
@@ -769,13 +776,14 @@ def parameter_sweep(symbols: List[str], start_date: datetime, end_date: datetime
 # DATA DOWNLOADER
 # ═════════════════════════════════════════════════════════════════
 
+
 def download_historical_data(
-    symbols: List[str],
+    symbols: list[str],
     start: str,
     end: str,
     interval: str = "1d",
     out_dir=None,
-) -> Dict[str, bool]:
+) -> dict[str, bool]:
     """
     Download OHLCV history via yfinance and cache as Parquet files.
 
@@ -813,7 +821,7 @@ def download_historical_data(
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    results: Dict[str, bool] = {}
+    results: dict[str, bool] = {}
     suffix = "" if interval == "1d" else f"_{interval}"
 
     for symbol in symbols:
@@ -844,7 +852,8 @@ def download_historical_data(
             if missing:
                 log.warning(
                     "download_historical_data: %s missing required columns %s",
-                    symbol, missing,
+                    symbol,
+                    missing,
                 )
                 results[symbol] = False
                 continue
@@ -852,7 +861,9 @@ def download_historical_data(
             df.to_parquet(out_file)
             log.info(
                 "download_historical_data: saved %s (%d bars) → %s",
-                symbol, len(df), out_file,
+                symbol,
+                len(df),
+                out_file,
             )
             results[symbol] = True
 
@@ -867,27 +878,22 @@ def download_historical_data(
 # CLI & MAIN
 # ═════════════════════════════════════════════════════════════════
 
+
 def main():
     parser = argparse.ArgumentParser(description="Decifer Backtester")
-    parser.add_argument("--symbols", nargs="+", default=["AAPL", "TSLA"],
-                        help="Symbols to backtest")
-    parser.add_argument("--start", type=str, default="2024-01-01",
-                        help="Start date (YYYY-MM-DD)")
-    parser.add_argument("--end", type=str, default="2024-12-31",
-                        help="End date (YYYY-MM-DD)")
-    parser.add_argument("--min-score", type=int, default=None,
-                        help="Override min_score_to_trade")
-    parser.add_argument("--atr-stop-mult", type=float, default=None,
-                        help="Override atr_stop_multiplier")
-    parser.add_argument("--atr-trail-mult", type=float, default=None,
-                        help="Override atr_trail_multiplier")
-    parser.add_argument("--param-sweep", nargs="+",
-                        metavar=("PARAM", "VALUES"),
-                        help="Grid search: --param-sweep min_score 10 15 20 25")
-    parser.add_argument("--save-trades", action="store_true",
-                        help="Save individual trades to JSON")
-    parser.add_argument("--download-data", action="store_true",
-                        help="Download historical data via yfinance before running backtest")
+    parser.add_argument("--symbols", nargs="+", default=["AAPL", "TSLA"], help="Symbols to backtest")
+    parser.add_argument("--start", type=str, default="2024-01-01", help="Start date (YYYY-MM-DD)")
+    parser.add_argument("--end", type=str, default="2024-12-31", help="End date (YYYY-MM-DD)")
+    parser.add_argument("--min-score", type=int, default=None, help="Override min_score_to_trade")
+    parser.add_argument("--atr-stop-mult", type=float, default=None, help="Override atr_stop_multiplier")
+    parser.add_argument("--atr-trail-mult", type=float, default=None, help="Override atr_trail_multiplier")
+    parser.add_argument(
+        "--param-sweep", nargs="+", metavar=("PARAM", "VALUES"), help="Grid search: --param-sweep min_score 10 15 20 25"
+    )
+    parser.add_argument("--save-trades", action="store_true", help="Save individual trades to JSON")
+    parser.add_argument(
+        "--download-data", action="store_true", help="Download historical data via yfinance before running backtest"
+    )
 
     args = parser.parse_args()
 
@@ -908,8 +914,7 @@ def main():
     if args.param_sweep and len(args.param_sweep) >= 2:
         param_name = args.param_sweep[0]
         param_values = [float(v) for v in args.param_sweep[1:]]
-        results = parameter_sweep(args.symbols, start_date, end_date,
-                                  param_name, param_values)
+        results = parameter_sweep(args.symbols, start_date, end_date, param_name, param_values)
 
         # Save sweep results
         output_file = RESULTS_DIR / f"sweep_{param_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
@@ -921,7 +926,9 @@ def main():
     # Single backtest mode
     log.info(f"Starting backtest: {', '.join(args.symbols)}")
     backtester = Backtester(
-        args.symbols, start_date, end_date,
+        args.symbols,
+        start_date,
+        end_date,
         min_score=args.min_score,
         atr_stop_mult=args.atr_stop_mult,
         atr_trail_mult=args.atr_trail_mult,

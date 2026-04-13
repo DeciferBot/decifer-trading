@@ -18,19 +18,16 @@
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
-import os
-import sys
-import json
-import time
-import logging
 import argparse
-from datetime import datetime, timedelta
+import json
+import logging
+import os
+import time
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
-import yfinance as yf
 import pandas as pd
-import numpy as np
+import yfinance as yf
 
 import raw_store
 
@@ -41,9 +38,11 @@ def _strip_tz(df: pd.DataFrame) -> pd.DataFrame:
         df = df.copy()
         df.index = df.index.tz_convert("UTC").tz_localize(None)
     return df
+
+
 import feature_pipeline
-from raw_store import DataQualityError  # re-export for callers
 from feature_pipeline import FeatureError  # re-export for callers
+from raw_store import DataQualityError  # re-export for callers
 
 log = logging.getLogger("decifer.data_collector")
 
@@ -65,25 +64,76 @@ FEATURES_DAILY_DIR = FEATURES_DIR / "daily"
 # Broad coverage across sectors + high-volume names for robust training data
 DEFAULT_UNIVERSE = [
     # Mega-cap tech
-    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AMD", "INTC", "CRM",
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "AMZN",
+    "NVDA",
+    "META",
+    "TSLA",
+    "AMD",
+    "INTC",
+    "CRM",
     # Semis
-    "AVGO", "QCOM", "MU", "MRVL", "AMAT",
+    "AVGO",
+    "QCOM",
+    "MU",
+    "MRVL",
+    "AMAT",
     # Finance
-    "JPM", "BAC", "GS", "MS", "V", "MA",
+    "JPM",
+    "BAC",
+    "GS",
+    "MS",
+    "V",
+    "MA",
     # Healthcare
-    "UNH", "JNJ", "PFE", "ABBV", "LLY", "MRK",
+    "UNH",
+    "JNJ",
+    "PFE",
+    "ABBV",
+    "LLY",
+    "MRK",
     # Energy
-    "XOM", "CVX", "COP", "SLB", "OXY",
+    "XOM",
+    "CVX",
+    "COP",
+    "SLB",
+    "OXY",
     # Consumer
-    "WMT", "COST", "HD", "NKE", "SBUX", "MCD",
+    "WMT",
+    "COST",
+    "HD",
+    "NKE",
+    "SBUX",
+    "MCD",
     # Industrials
-    "CAT", "BA", "GE", "HON", "UPS",
+    "CAT",
+    "BA",
+    "GE",
+    "HON",
+    "UPS",
     # ETFs (regime/sector data)
-    "SPY", "QQQ", "IWM", "DIA", "XLF", "XLE", "XLK", "XLV", "GLD", "TLT",
+    "SPY",
+    "QQQ",
+    "IWM",
+    "DIA",
+    "XLF",
+    "XLE",
+    "XLK",
+    "XLV",
+    "GLD",
+    "TLT",
     # Volatility
     "VIX",
     # High-vol meme/momentum (useful for training on extreme regimes)
-    "GME", "AMC", "PLTR", "SOFI", "RIVN", "LCID", "NIO",
+    "GME",
+    "AMC",
+    "PLTR",
+    "SOFI",
+    "RIVN",
+    "LCID",
+    "NIO",
 ]
 
 
@@ -97,11 +147,8 @@ def _fetch_with_retry(fn, *args, retries: int = 3, backoff: float = 1.5, label: 
         except Exception as exc:
             last_exc = exc
             if attempt < retries - 1:
-                wait = backoff * (2 ** attempt)
-                log.warning(
-                    f"{label} attempt {attempt + 1}/{retries} failed: {exc} "
-                    f"— retrying in {wait:.1f}s"
-                )
+                wait = backoff * (2**attempt)
+                log.warning(f"{label} attempt {attempt + 1}/{retries} failed: {exc} — retrying in {wait:.1f}s")
                 time.sleep(wait)
     raise last_exc
 
@@ -138,7 +185,8 @@ def save_meta(meta: dict):
 # 1. YFINANCE — Intraday (5m bars, last 60 days)
 # ═════════════════════════════════════════════════════════════════
 
-def download_intraday_yf(symbol: str, interval: str = "5m") -> Optional[pd.DataFrame]:
+
+def download_intraday_yf(symbol: str, interval: str = "5m") -> pd.DataFrame | None:
     """
     Download intraday bars. Priority: Alpaca → yfinance (fallback only).
     5m bars: 60 days lookback. 1m bars: 7 days lookback.
@@ -149,18 +197,17 @@ def download_intraday_yf(symbol: str, interval: str = "5m") -> Optional[pd.DataF
     # Layer 1: Alpaca — primary source
     try:
         from alpaca_data import fetch_bars
+
         df = fetch_bars(symbol, period=period, interval=interval)
         if df is not None and not df.empty:
             df = df.copy()
             df.index.name = "datetime"
-            df = df.rename(columns={"Open": "open", "High": "high", "Low": "low",
-                                    "Close": "close", "Volume": "volume"})
+            df = df.rename(columns={"Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
             df = df[[c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]]
             df["symbol"] = symbol
             df["source"] = "alpaca"
             df["interval"] = interval
-            log.info(f"[alpaca-intraday] {symbol} {interval}: {len(df)} bars "
-                     f"({df.index.min()} → {df.index.max()})")
+            log.info(f"[alpaca-intraday] {symbol} {interval}: {len(df)} bars ({df.index.min()} → {df.index.max()})")
             return df
     except Exception as e:
         log.debug(f"[alpaca-intraday] {symbol} failed: {e}")
@@ -170,7 +217,9 @@ def download_intraday_yf(symbol: str, interval: str = "5m") -> Optional[pd.DataF
         ticker = yf.Ticker(symbol)
         df = _fetch_with_retry(
             ticker.history,
-            period=period, interval=interval, prepost=True,
+            period=period,
+            interval=interval,
+            prepost=True,
             label=f"[yf-intraday] {symbol}",
         )
 
@@ -179,14 +228,12 @@ def download_intraday_yf(symbol: str, interval: str = "5m") -> Optional[pd.DataF
             return None
 
         df.index.name = "datetime"
-        df = df.rename(columns={"Open": "open", "High": "high", "Low": "low",
-                                "Close": "close", "Volume": "volume"})
+        df = df.rename(columns={"Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
         df = df[[c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]]
         df["symbol"] = symbol
         df["source"] = "yfinance"
         df["interval"] = interval
-        log.info(f"[yf-intraday] {symbol} {interval}: {len(df)} bars "
-                 f"({df.index.min()} → {df.index.max()})")
+        log.info(f"[yf-intraday] {symbol} {interval}: {len(df)} bars ({df.index.min()} → {df.index.max()})")
         return df
 
     except Exception as e:
@@ -198,7 +245,8 @@ def download_intraday_yf(symbol: str, interval: str = "5m") -> Optional[pd.DataF
 # 2. Daily bars — Alpaca primary, yfinance fallback
 # ═════════════════════════════════════════════════════════════════
 
-def download_daily_yf(symbol: str) -> Optional[pd.DataFrame]:
+
+def download_daily_yf(symbol: str) -> pd.DataFrame | None:
     """
     Download daily bars. Priority: Alpaca (Algo Trader Plus, ~5yr) → yfinance (max history).
     yfinance is fallback only — used for long ML training history beyond Alpaca's range.
@@ -206,17 +254,16 @@ def download_daily_yf(symbol: str) -> Optional[pd.DataFrame]:
     # Layer 1: Alpaca — primary source
     try:
         from alpaca_data import fetch_bars
+
         df = fetch_bars(symbol, period="5y", interval="1d")
         if df is not None and not df.empty:
             df = df.copy()
             df.index.name = "date"
-            df = df.rename(columns={"Open": "open", "High": "high", "Low": "low",
-                                    "Close": "close", "Volume": "volume"})
+            df = df.rename(columns={"Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
             df = df[[c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]]
             df["symbol"] = symbol
             df["source"] = "alpaca"
-            log.info(f"[alpaca-daily] {symbol}: {len(df)} bars "
-                     f"({df.index.min().date()} → {df.index.max().date()})")
+            log.info(f"[alpaca-daily] {symbol}: {len(df)} bars ({df.index.min().date()} → {df.index.max().date()})")
             return df
     except Exception as e:
         log.debug(f"[alpaca-daily] {symbol} failed: {e}")
@@ -226,7 +273,8 @@ def download_daily_yf(symbol: str) -> Optional[pd.DataFrame]:
         ticker = yf.Ticker(symbol)
         df = _fetch_with_retry(
             ticker.history,
-            period="max", interval="1d",
+            period="max",
+            interval="1d",
             label=f"[yf-daily] {symbol}",
         )
 
@@ -235,8 +283,7 @@ def download_daily_yf(symbol: str) -> Optional[pd.DataFrame]:
             return None
 
         df.index.name = "date"
-        df = df.rename(columns={"Open": "open", "High": "high", "Low": "low",
-                                "Close": "close", "Volume": "volume"})
+        df = df.rename(columns={"Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
         keep_cols = ["open", "high", "low", "close", "volume"]
         if "Dividends" in df.columns:
             df = df.rename(columns={"Dividends": "dividends"})
@@ -247,8 +294,7 @@ def download_daily_yf(symbol: str) -> Optional[pd.DataFrame]:
         df = df[[c for c in keep_cols if c in df.columns]]
         df["symbol"] = symbol
         df["source"] = "yfinance"
-        log.info(f"[yf-daily] {symbol}: {len(df)} bars "
-                 f"({df.index.min().date()} → {df.index.max().date()})")
+        log.info(f"[yf-daily] {symbol}: {len(df)} bars ({df.index.min().date()} → {df.index.max().date()})")
         return df
 
     except Exception as e:
@@ -260,7 +306,8 @@ def download_daily_yf(symbol: str) -> Optional[pd.DataFrame]:
 # 3. STOOQ — Daily OHLCV (unlimited, no API key)
 # ═════════════════════════════════════════════════════════════════
 
-def download_daily_stooq(symbol: str) -> Optional[pd.DataFrame]:
+
+def download_daily_stooq(symbol: str) -> pd.DataFrame | None:
     """
     Download daily data from Stooq (Polish financial data provider).
     Free, unlimited, no API key. Good backup/cross-validation source.
@@ -282,8 +329,7 @@ def download_daily_stooq(symbol: str) -> Optional[pd.DataFrame]:
         df["symbol"] = symbol
         df["source"] = "stooq"
 
-        log.info(f"[stooq] {symbol}: {len(df)} bars "
-                 f"({df.index.min().date()} → {df.index.max().date()})")
+        log.info(f"[stooq] {symbol}: {len(df)} bars ({df.index.min().date()} → {df.index.max().date()})")
         return df
 
     except Exception as e:
@@ -295,7 +341,8 @@ def download_daily_stooq(symbol: str) -> Optional[pd.DataFrame]:
 # 4. ALPHA VANTAGE — Daily (25 calls/day free, 20yr history)
 # ═════════════════════════════════════════════════════════════════
 
-def download_daily_alphavantage(symbol: str, api_key: str = None) -> Optional[pd.DataFrame]:
+
+def download_daily_alphavantage(symbol: str, api_key: str | None = None) -> pd.DataFrame | None:
     """
     Download full daily history from Alpha Vantage.
     Free tier: 25 calls/day. Set ALPHA_VANTAGE_KEY env var or pass api_key.
@@ -306,8 +353,10 @@ def download_daily_alphavantage(symbol: str, api_key: str = None) -> Optional[pd
         return None
 
     try:
-        url = (f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY"
-               f"&symbol={symbol}&outputsize=full&apikey={key}&datatype=csv")
+        url = (
+            f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY"
+            f"&symbol={symbol}&outputsize=full&apikey={key}&datatype=csv"
+        )
         df = _fetch_with_retry(pd.read_csv, url, label=f"[alphavantage] {symbol}")
 
         if df is None or df.empty or "timestamp" not in df.columns:
@@ -321,8 +370,7 @@ def download_daily_alphavantage(symbol: str, api_key: str = None) -> Optional[pd
         df["symbol"] = symbol
         df["source"] = "alphavantage"
 
-        log.info(f"[alphavantage] {symbol}: {len(df)} bars "
-                 f"({df.index.min().date()} → {df.index.max().date()})")
+        log.info(f"[alphavantage] {symbol}: {len(df)} bars ({df.index.min().date()} → {df.index.max().date()})")
         return df
 
     except Exception as e:
@@ -334,7 +382,8 @@ def download_daily_alphavantage(symbol: str, api_key: str = None) -> Optional[pd
 # 5. ALPHA VANTAGE — Earnings Calendar (PEAD dimension)
 # ═════════════════════════════════════════════════════════════════
 
-def fetch_earnings_calendar(symbol: str, api_key: str = None) -> "dict | None":
+
+def fetch_earnings_calendar(symbol: str, api_key: str | None = None) -> "dict | None":
     """
     Fetch the next earnings date for a symbol from Alpha Vantage.
 
@@ -345,18 +394,16 @@ def fetch_earnings_calendar(symbol: str, api_key: str = None) -> "dict | None":
     Callers: signals.py PEAD dimension caches this via _PEAD_CACHE.
     """
     from config import CONFIG
+
     key = api_key or CONFIG.get("alpha_vantage_key") or os.environ.get("ALPHA_VANTAGE_KEY")
     if not key:
         return None
 
     try:
-        url = (f"https://www.alphavantage.co/query"
-               f"?function=EARNINGS_CALENDAR&symbol={symbol}&horizon=3month&apikey={key}")
-        resp = _fetch_with_retry(
-            lambda u: __import__('requests').get(u, timeout=10),
-            url,
-            label=f"[earnings] {symbol}"
+        url = (
+            f"https://www.alphavantage.co/query?function=EARNINGS_CALENDAR&symbol={symbol}&horizon=3month&apikey={key}"
         )
+        resp = _fetch_with_retry(lambda u: __import__("requests").get(u, timeout=10), url, label=f"[earnings] {symbol}")
         if resp is None or resp.status_code != 200:
             return None
 
@@ -366,16 +413,17 @@ def fetch_earnings_calendar(symbol: str, api_key: str = None) -> "dict | None":
             return None
 
         import csv
+
         reader = csv.DictReader(lines)
         for row in reader:
             if row.get("symbol", "").upper() == symbol.upper():
                 return {
-                    "symbol":      symbol,
+                    "symbol": symbol,
                     "report_date": row.get("reportDate", ""),
-                    "fiscal_end":  row.get("fiscalDateEnding", ""),
-                    "estimate":    row.get("estimate", ""),
-                    "currency":    row.get("currency", "USD"),
-                    "source":      "alphavantage",
+                    "fiscal_end": row.get("fiscalDateEnding", ""),
+                    "estimate": row.get("estimate", ""),
+                    "currency": row.get("currency", "USD"),
+                    "source": "alphavantage",
                 }
         return None
 
@@ -388,6 +436,7 @@ def fetch_earnings_calendar(symbol: str, api_key: str = None) -> "dict | None":
 # ENRICHMENT — Add technical features for ML training
 # ═════════════════════════════════════════════════════════════════
 
+
 def add_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Add ML training features to OHLCV data.
@@ -398,6 +447,7 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ── Internal indicator shims — kept for test backward compatibility ──
+
 
 def _atr(high, low, close, period=14):
     """Shim: delegates to feature_pipeline.atr()."""
@@ -423,6 +473,7 @@ def _label_regime(df: pd.DataFrame) -> pd.Series:
 # ORCHESTRATOR — Run full collection pipeline
 # ═════════════════════════════════════════════════════════════════
 
+
 def _write_features(df: pd.DataFrame, symbol: str, timeframe: str) -> int:
     """
     Compute features and write to the features store.
@@ -439,7 +490,7 @@ def _write_features(df: pd.DataFrame, symbol: str, timeframe: str) -> int:
         existing = pd.read_parquet(feat_path)
         # Normalize both to tz-naive UTC before concat to avoid tz comparison errors
         existing = _strip_tz(existing)
-        enriched  = _strip_tz(enriched)
+        enriched = _strip_tz(enriched)
         enriched = pd.concat([existing, enriched])
         enriched = enriched[~enriched.index.duplicated(keep="last")]
         enriched = enriched.sort_index()
@@ -448,8 +499,9 @@ def _write_features(df: pd.DataFrame, symbol: str, timeframe: str) -> int:
     return len(enriched)
 
 
-def collect_all(symbols: list = None, intraday: bool = True, daily: bool = True,
-                add_ml_features: bool = True) -> dict:
+def collect_all(
+    symbols: list | None = None, intraday: bool = True, daily: bool = True, add_ml_features: bool = True
+) -> dict:
     """
     Main entry point: download historical data for all symbols.
 
@@ -476,7 +528,7 @@ def collect_all(symbols: list = None, intraday: bool = True, daily: bool = True,
     results = {"intraday": {}, "daily": {}, "errors": []}
 
     for i, sym in enumerate(symbols):
-        log.info(f"[{i+1}/{len(symbols)}] Collecting {sym}...")
+        log.info(f"[{i + 1}/{len(symbols)}] Collecting {sym}...")
 
         # ── Intraday (5m) ──
         if intraday:
@@ -547,7 +599,7 @@ def collect_all(symbols: list = None, intraday: bool = True, daily: bool = True,
     return summary
 
 
-def get_training_dataset(symbols: list = None, interval: str = "1d") -> pd.DataFrame:
+def get_training_dataset(symbols: list | None = None, interval: str = "1d") -> pd.DataFrame:
     """
     Load feature-enriched data as a single DataFrame ready for ML training.
     Reads from data/features/ (tiered store). Falls back to data/historical/
@@ -589,10 +641,7 @@ def get_training_dataset(symbols: list = None, interval: str = "1d") -> pd.DataF
                 log.warning(f"Failed to load legacy {legacy_path.name}: {e}")
 
     if not frames:
-        log.warning(
-            "No training data found in features/ or historical/. "
-            "Run collect_all() first."
-        )
+        log.warning("No training data found in features/ or historical/. Run collect_all() first.")
         return pd.DataFrame()
 
     combined = pd.concat(frames)
@@ -631,8 +680,8 @@ if __name__ == "__main__":
         add_ml_features=not args.no_features,
     )
 
-    print(f"\n{'='*60}")
-    print(f"  COLLECTION COMPLETE")
+    print(f"\n{'=' * 60}")
+    print("  COLLECTION COMPLETE")
     print(f"  Symbols: {result['symbols_processed']}")
     print(f"  Intraday: {result['intraday_symbols']} symbols with 5m data")
     print(f"  Daily: {result['daily_symbols']} symbols with daily data")
@@ -640,4 +689,4 @@ if __name__ == "__main__":
     print(f"  Data dir: {result['data_dir']}")
     if result["errors"]:
         print(f"  Errors: {', '.join(result['errors'])}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")

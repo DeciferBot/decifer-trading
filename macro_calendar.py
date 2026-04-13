@@ -13,8 +13,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta
-from typing import Optional
+from datetime import date, datetime
 
 import pytz
 
@@ -149,9 +148,7 @@ def hours_to_next_event(from_dt: datetime | None = None) -> float | None:
 
     # CPI and NFP release pre-market at 08:30 ET; FOMC decision at 14:00 ET
     hour = 8 if event["type"] in ("CPI", "NFP") else 14
-    event_dt = _EST.localize(
-        datetime(event["date"].year, event["date"].month, event["date"].day, hour, 30)
-    )
+    event_dt = _EST.localize(datetime(event["date"].year, event["date"].month, event["date"].day, hour, 30))
     if from_dt.tzinfo is None:
         from_dt = _EST.localize(from_dt)
 
@@ -177,6 +174,7 @@ def get_macro_size_multiplier() -> float:
     trend-following strategies alike.
     """
     from config import CONFIG
+
     mult = CONFIG.get("macro_event_size_mult", 0.5)
     window = CONFIG.get("macro_event_hours_window", 24.0)
 
@@ -185,7 +183,9 @@ def get_macro_size_multiplier() -> float:
         h = hours_to_next_event()
         log.info(
             "MACRO GATE: %s in %.1fh — position size → %.0f%% of normal",
-            event["type"] if event else "event", h or 0, mult * 100,
+            event["type"] if event else "event",
+            h or 0,
+            mult * 100,
         )
         return mult
     return 1.0

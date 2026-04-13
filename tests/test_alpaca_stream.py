@@ -17,7 +17,7 @@ No network connections are made.
 import os
 import sys
 import types
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 import pytest
@@ -31,31 +31,31 @@ for _stub in ("alpaca", "alpaca.data", "alpaca.data.live", "alpaca.data.enums"):
     sys.modules.setdefault(_stub, types.ModuleType(_stub))
 
 from alpaca_stream import (
+    _MAX_1M_BARS,
     BAR_CACHE,
-    QUOTE_CACHE,
     DAILY_BAR_CACHE,
     HALT_CACHE,
+    QUOTE_CACHE,
     _BarCache,
-    _QuoteCache,
     _DailyBarCache,
     _HaltCache,
-    _MAX_1M_BARS,
+    _QuoteCache,
 )
 
-
 # ── Shared helpers ─────────────────────────────────────────────────────────────
+
 
 def _bar(ts_offset_minutes: int = 0, close: float = 100.0) -> dict:
     """Build a minimal 1-minute bar dict as AlpacaBarStream produces."""
     ts = pd.Timestamp("2026-04-07 10:00:00", tz="UTC") + pd.Timedelta(minutes=ts_offset_minutes)
     return {
         "timestamp": ts,
-        "open":   close - 0.1,
-        "high":   close + 0.5,
-        "low":    close - 0.5,
-        "close":  close,
+        "open": close - 0.1,
+        "high": close + 0.5,
+        "low": close - 0.5,
+        "close": close,
         "volume": 10_000,
-        "vwap":   close,
+        "vwap": close,
     }
 
 
@@ -81,8 +81,8 @@ def _fresh_daily_cache() -> _DailyBarCache:
 # BAR_CACHE
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class TestBarCacheUpdate:
 
+class TestBarCacheUpdate:
     def test_update_adds_symbol(self):
         c = _fresh_bar_cache()
         c.update("AAPL", _bar(0))
@@ -106,7 +106,7 @@ class TestBarCacheUpdate:
         it replaces rather than appends — so row count stays the same."""
         c = _fresh_bar_cache()
         c.update("AAPL", _bar(0, close=100.0))
-        c.update("AAPL", _bar(0, close=101.0))   # same timestamp
+        c.update("AAPL", _bar(0, close=101.0))  # same timestamp
         df = c._data["AAPL"]
         assert len(df) == 1
         assert float(df["Close"].iloc[-1]) == 101.0
@@ -126,7 +126,6 @@ class TestBarCacheUpdate:
 
 
 class TestBarCacheGet5m:
-
     def test_returns_none_with_zero_bars(self):
         c = _fresh_bar_cache()
         assert c.get_5m("AAPL") is None
@@ -139,7 +138,7 @@ class TestBarCacheGet5m:
 
     def test_returns_dataframe_with_enough_bars(self):
         c = _fresh_bar_cache()
-        for i in range(25):   # 5 complete 5-minute periods
+        for i in range(25):  # 5 complete 5-minute periods
             c.update("AAPL", _bar(i))
         result = c.get_5m("AAPL")
         assert result is not None
@@ -206,7 +205,6 @@ class TestBarCacheGet5m:
 
 
 class TestBarCacheClear:
-
     def test_clear_empties_all_symbols(self):
         c = _fresh_bar_cache()
         for sym in ("AAPL", "TSLA", "SPY"):
@@ -227,8 +225,8 @@ class TestBarCacheClear:
 # QUOTE_CACHE
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class TestQuoteCacheUpdate:
 
+class TestQuoteCacheUpdate:
     def test_stores_valid_quote(self):
         c = _fresh_quote_cache()
         c.update("AAPL", bid=149.9, ask=150.1)
@@ -275,7 +273,6 @@ class TestQuoteCacheUpdate:
 
 
 class TestQuoteCacheGetSpreadPct:
-
     def test_returns_none_for_unknown_symbol(self):
         c = _fresh_quote_cache()
         assert c.get_spread_pct("UNKNOWN") is None
@@ -305,21 +302,21 @@ class TestQuoteCacheGetSpreadPct:
 # HALT_CACHE
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class TestHaltCache:
 
+class TestHaltCache:
     def test_symbol_not_halted_by_default(self):
         c = _fresh_halt_cache()
         assert c.is_halted("AAPL") is False
 
     def test_non_T_status_marks_halted(self):
         c = _fresh_halt_cache()
-        c.update("AAPL", "H")   # H = halted
+        c.update("AAPL", "H")  # H = halted
         assert c.is_halted("AAPL") is True
 
     def test_T_status_clears_halt(self):
         c = _fresh_halt_cache()
         c.update("AAPL", "H")
-        c.update("AAPL", "T")   # T = trading (normal)
+        c.update("AAPL", "T")  # T = trading (normal)
         assert c.is_halted("AAPL") is False
 
     def test_halt_only_affects_named_symbol(self):
@@ -338,7 +335,7 @@ class TestHaltCache:
         c = _fresh_halt_cache()
         c.update("AAPL", "H")
         c.update("TSLA", "H")
-        c.update("SPY",  "T")
+        c.update("SPY", "T")
         assert c.halted_symbols() == {"AAPL", "TSLA"}
 
     def test_halted_symbols_returns_copy(self):
@@ -366,13 +363,16 @@ class TestHaltCache:
 # DAILY_BAR_CACHE
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class TestDailyBarCache:
 
+class TestDailyBarCache:
     def _daily(self, open=100.0, high=105.0, low=99.0, close=103.0, volume=1_000_000):
         return {
-            "open": open, "high": high, "low": low,
-            "close": close, "volume": volume,
-            "timestamp": datetime.now(timezone.utc),
+            "open": open,
+            "high": high,
+            "low": low,
+            "close": close,
+            "volume": volume,
+            "timestamp": datetime.now(UTC),
         }
 
     def test_returns_none_before_first_update(self):
@@ -403,8 +403,7 @@ class TestDailyBarCache:
 
     def test_all_ohlcv_fields_stored(self):
         c = _fresh_daily_cache()
-        c.update("AAPL", self._daily(open=100.0, high=105.0, low=99.0,
-                                      close=103.0, volume=1_000_000))
+        c.update("AAPL", self._daily(open=100.0, high=105.0, low=99.0, close=103.0, volume=1_000_000))
         bar = c.get("AAPL")
         for key in ("open", "high", "low", "close", "volume"):
             assert key in bar
@@ -422,8 +421,8 @@ class TestDailyBarCache:
 # Smoke-test that the module exports the right types.
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class TestModuleSingletons:
 
+class TestModuleSingletons:
     def test_bar_cache_is_bar_cache_type(self):
         assert isinstance(BAR_CACHE, _BarCache)
 

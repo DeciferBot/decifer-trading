@@ -15,11 +15,12 @@ already imports from). risk_gates.py sits above both:
 
 No circularity. bot_trading.py calls these in response to risk signals.
 """
+
 from __future__ import annotations
 
-from config import CONFIG
 from bot_state import clog
-from orders import close_position, get_open_positions, reconcile_with_ibkr
+from config import CONFIG
+from orders_portfolio import close_position, get_open_positions, reconcile_with_ibkr
 from risk import _get_ibkr_cash
 
 
@@ -32,7 +33,7 @@ def auto_rebalance_cash(ib, portfolio_value: float, regime: dict) -> None:
     Options are skipped — they cannot be closed outside regular hours.
     """
     min_reserve = CONFIG.get("min_cash_reserve", 0.10)
-    positions   = get_open_positions()
+    positions = get_open_positions()
 
     if not positions:
         clog("RISK", "Auto-rebalance: No positions to close")
@@ -43,30 +44,32 @@ def auto_rebalance_cash(ib, portfolio_value: float, regime: dict) -> None:
         if cash is not None:
             return cash / portfolio_value if portfolio_value > 0 else 1.0
         open_pos = get_open_positions()
-        deployed = sum(
-            p.get("current", p.get("entry", 0)) * p.get("qty", 0)
-            for p in open_pos
-        )
+        deployed = sum(p.get("current", p.get("entry", 0)) * p.get("qty", 0) for p in open_pos)
         return (portfolio_value - deployed) / portfolio_value if portfolio_value > 0 else 1.0
 
-    cash_pct     = _current_cash_pct()
+    cash_pct = _current_cash_pct()
     cash_deficit = (min_reserve - cash_pct) * portfolio_value
-    clog("RISK", f"Auto-rebalance: cash={cash_pct*100:.1f}% (need {min_reserve*100:.0f}%) "
-         f"— need to free ~${cash_deficit:,.0f}")
+    clog(
+        "RISK",
+        f"Auto-rebalance: cash={cash_pct * 100:.1f}% (need {min_reserve * 100:.0f}%) "
+        f"— need to free ~${cash_deficit:,.0f}",
+    )
 
     ranked = []
     for p in positions:
         if p.get("instrument") == "option":
             continue  # Options can't close outside regular hours — stocks only
-        entry   = p.get("entry", 0)
+        entry = p.get("entry", 0)
         current = p.get("current", entry)
-        qty     = p.get("qty", 0)
+        qty = p.get("qty", 0)
         if entry > 0 and qty != 0:
-            ranked.append({
-                "symbol":         p.get("_trade_key", p.get("symbol")),
-                "pnl_pct":        (current - entry) / entry,
-                "position_value": abs(current * qty),
-            })
+            ranked.append(
+                {
+                    "symbol": p.get("_trade_key", p.get("symbol")),
+                    "pnl_pct": (current - entry) / entry,
+                    "position_value": abs(current * qty),
+                }
+            )
 
     if not ranked:
         clog("RISK", "Auto-rebalance: Could not evaluate positions")
@@ -78,19 +81,23 @@ def auto_rebalance_cash(ib, portfolio_value: float, regime: dict) -> None:
         if cash_pct >= min_reserve:
             break
         sym = candidate["symbol"]
-        clog("RISK", f"Auto-rebalance: Closing {sym} (P&L: {candidate['pnl_pct']:+.1%}, "
-             f"value: ${candidate['position_value']:,.0f}) to free cash")
+        clog(
+            "RISK",
+            f"Auto-rebalance: Closing {sym} (P&L: {candidate['pnl_pct']:+.1%}, "
+            f"value: ${candidate['position_value']:,.0f}) to free cash",
+        )
         try:
             result = close_position(ib, sym)
             if result:
                 clog("RISK", f"Auto-rebalance: {result}")
                 ib.sleep(2)
                 cash_pct = _current_cash_pct()
-                clog("RISK", f"Auto-rebalance: cash now at {cash_pct*100:.1f}%")
+                clog("RISK", f"Auto-rebalance: cash now at {cash_pct * 100:.1f}%")
             else:
-                clog("ERROR",
-                     f"Auto-rebalance: Could not close {sym} "
-                     f"(not in IBKR — phantom entry?), purging and trying next")
+                clog(
+                    "ERROR",
+                    f"Auto-rebalance: Could not close {sym} (not in IBKR — phantom entry?), purging and trying next",
+                )
                 reconcile_with_ibkr(ib)
                 continue
         except Exception as e:
@@ -98,6 +105,4 @@ def auto_rebalance_cash(ib, portfolio_value: float, regime: dict) -> None:
             continue
 
     if cash_pct < min_reserve:
-        clog("RISK",
-             f"Auto-rebalance: cash still at {cash_pct*100:.1f}% "
-             f"after closing all eligible positions")
+        clog("RISK", f"Auto-rebalance: cash still at {cash_pct * 100:.1f}% after closing all eligible positions")

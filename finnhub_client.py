@@ -12,17 +12,19 @@
 
 from __future__ import annotations
 
-import time
 import logging
+import time
 from datetime import date, timedelta
+
 import requests
+
 from config import CONFIG
 
 log = logging.getLogger("decifer.finnhub")
 
 _BASE = "https://finnhub.io/api/v1"
-_CALL_TIMES: list[float] = []   # rolling window of call timestamps
-_RATE_LIMIT = 55                 # stay below the 60/min free tier cap
+_CALL_TIMES: list[float] = []  # rolling window of call timestamps
+_RATE_LIMIT = 55  # stay below the 60/min free tier cap
 
 
 def _get(endpoint: str, params: dict | None = None) -> dict | list | None:
@@ -69,6 +71,7 @@ def _get(endpoint: str, params: dict | None = None) -> dict | list | None:
 
 
 # ── Public helpers ────────────────────────────────────────────────────────────
+
 
 def get_quote(symbol: str) -> dict | None:
     """

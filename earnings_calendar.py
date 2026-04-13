@@ -17,11 +17,11 @@ Data source priority:
 Both callers previously had independent yfinance calendar implementations.
 This module owns that logic in one place.
 """
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 log = logging.getLogger("decifer.earnings_calendar")
 
@@ -38,13 +38,14 @@ def get_earnings_within_hours(symbols: list[str], hours: int = 48) -> set[str]:
     if not symbols:
         return flagged
 
-    now_utc = datetime.now(timezone.utc)
-    cutoff  = now_utc + timedelta(hours=hours)
+    now_utc = datetime.now(UTC)
+    cutoff = now_utc + timedelta(hours=hours)
     covered: set[str] = set()
 
     # ── Source 1: Alpha Vantage EARNINGS_CALENDAR (cached, zero-cost after first fetch) ──
     try:
         from alpha_vantage_client import get_earnings_calendar
+
         av_calendar = get_earnings_calendar()
         if av_calendar:
             for sym in symbols:
@@ -52,9 +53,7 @@ def get_earnings_within_hours(symbols: list[str], hours: int = 48) -> set[str]:
                 if report_str:
                     covered.add(sym)
                     try:
-                        report_dt = datetime.strptime(report_str, "%Y-%m-%d").replace(
-                            tzinfo=timezone.utc
-                        )
+                        report_dt = datetime.strptime(report_str, "%Y-%m-%d").replace(tzinfo=UTC)
                         if now_utc <= report_dt <= cutoff:
                             flagged.add(sym)
                     except ValueError:
@@ -69,6 +68,7 @@ def get_earnings_within_hours(symbols: list[str], hours: int = 48) -> set[str]:
 
     try:
         import yfinance as yf
+
         for sym in remaining:
             try:
                 cal = yf.Ticker(sym).calendar
@@ -81,7 +81,7 @@ def get_earnings_within_hours(symbols: list[str], hours: int = 48) -> set[str]:
                                 val = val.to_pydatetime()
                             if isinstance(val, datetime):
                                 if val.tzinfo is None:
-                                    val = val.replace(tzinfo=timezone.utc)
+                                    val = val.replace(tzinfo=UTC)
                                 if now_utc <= val <= cutoff:
                                     flagged.add(sym)
             except Exception:
@@ -92,7 +92,7 @@ def get_earnings_within_hours(symbols: list[str], hours: int = 48) -> set[str]:
     return flagged
 
 
-def get_earnings_days(symbol: str) -> Optional[int]:
+def get_earnings_days(symbol: str) -> int | None:
     """
     Return days until next earnings for a single symbol, or None.
     Returns None on any failure or if earnings are > 60 days out.
@@ -104,6 +104,7 @@ def get_earnings_days(symbol: str) -> Optional[int]:
     # ── Source 1: Alpha Vantage EARNINGS_CALENDAR (cached) ────────────────────
     try:
         from alpha_vantage_client import get_earnings_calendar
+
         av_calendar = get_earnings_calendar()
         if av_calendar:
             report_str = av_calendar.get(symbol.upper())
@@ -118,8 +119,8 @@ def get_earnings_days(symbol: str) -> Optional[int]:
 
     # ── Source 2: yfinance fallback ────────────────────────────────────────────
     try:
-        import yfinance as yf
         import pandas as pd
+        import yfinance as yf
 
         cal = yf.Ticker(symbol).calendar
         if cal is None:

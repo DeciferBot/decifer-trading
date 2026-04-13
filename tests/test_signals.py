@@ -8,24 +8,33 @@ Covers:
 - Empty / None / single-row data -> no exception
 - End-to-end: compute_indicators() -> compute_confluence() with synthetic OHLCV
 """
+
 from __future__ import annotations
-import os, sys, types
+
+import os
+import sys
 from unittest.mock import MagicMock
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Stub heavy deps BEFORE importing any Decifer module
-for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance",
-             "praw", "feedparser", "tvDatafeed", "requests_html"]:
+for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance", "praw", "feedparser", "tvDatafeed", "requests_html"]:
     sys.modules.setdefault(_mod, MagicMock())
 
 # Stub config with required keys
 import config as _config_mod
-_cfg = {"log_file": "/dev/null", "trade_log": "/dev/null",
-        "order_log": "/dev/null", "anthropic_api_key": "test-key",
-        "model": "claude-sonnet-4-20250514", "max_tokens": 1000,
-        "mongo_uri": "", "db_name": "test"}
+
+_cfg = {
+    "log_file": "/dev/null",
+    "trade_log": "/dev/null",
+    "order_log": "/dev/null",
+    "anthropic_api_key": "test-key",
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1000,
+    "mongo_uri": "",
+    "db_name": "test",
+}
 if hasattr(_config_mod, "CONFIG"):
     for _k, _v in _cfg.items():
         _config_mod.CONFIG.setdefault(_k, _v)
@@ -33,13 +42,12 @@ else:
     _config_mod.CONFIG = _cfg
 
 
-import sys
 import os
-from typing import Any, Dict
+import sys
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -49,47 +57,86 @@ if PROJECT_ROOT not in sys.path:
 sys.modules.pop("signals", None)
 import signals
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def bullish_indicators():
     return {
-        "signal": "STRONG_BUY", "bull_aligned": True, "bear_aligned": False,
-        "macd_accel": 0.5, "adx": 30.0, "mfi": 70.0, "rsi_slope": 0.5,
-        "squeeze_on": True, "squeeze_intensity": 0.8, "bb_position": 0.8,
-        "vwap_dist": 0.5, "obv_slope": 1.0,
-        "dc_upper_break": True, "dc_lower_break": False, "volume_ratio": 2.0,
-        "reversion_score": 0, "variance_ratio": 0.5, "ou_halflife": 0,
-        "zscore": 0.0, "adf_pvalue": 1.0,
+        "signal": "STRONG_BUY",
+        "bull_aligned": True,
+        "bear_aligned": False,
+        "macd_accel": 0.5,
+        "adx": 30.0,
+        "mfi": 70.0,
+        "rsi_slope": 0.5,
+        "squeeze_on": True,
+        "squeeze_intensity": 0.8,
+        "bb_position": 0.8,
+        "vwap_dist": 0.5,
+        "obv_slope": 1.0,
+        "dc_upper_break": True,
+        "dc_lower_break": False,
+        "volume_ratio": 2.0,
+        "reversion_score": 0,
+        "variance_ratio": 0.5,
+        "ou_halflife": 0,
+        "zscore": 0.0,
+        "adf_pvalue": 1.0,
     }
 
 
 @pytest.fixture()
 def bearish_indicators():
     return {
-        "signal": "STRONG_SELL", "bull_aligned": False, "bear_aligned": True,
-        "macd_accel": -0.5, "adx": 30.0, "mfi": 25.0, "rsi_slope": -0.5,
-        "squeeze_on": True, "squeeze_intensity": 0.8, "bb_position": 0.2,
-        "vwap_dist": -0.5, "obv_slope": -1.0,
-        "dc_upper_break": False, "dc_lower_break": True, "volume_ratio": 2.0,
-        "reversion_score": 0, "variance_ratio": 0.5, "ou_halflife": 0,
-        "zscore": 0.0, "adf_pvalue": 1.0,
+        "signal": "STRONG_SELL",
+        "bull_aligned": False,
+        "bear_aligned": True,
+        "macd_accel": -0.5,
+        "adx": 30.0,
+        "mfi": 25.0,
+        "rsi_slope": -0.5,
+        "squeeze_on": True,
+        "squeeze_intensity": 0.8,
+        "bb_position": 0.2,
+        "vwap_dist": -0.5,
+        "obv_slope": -1.0,
+        "dc_upper_break": False,
+        "dc_lower_break": True,
+        "volume_ratio": 2.0,
+        "reversion_score": 0,
+        "variance_ratio": 0.5,
+        "ou_halflife": 0,
+        "zscore": 0.0,
+        "adf_pvalue": 1.0,
     }
 
 
 @pytest.fixture()
 def mixed_indicators():
     return {
-        "signal": "HOLD", "bull_aligned": False, "bear_aligned": False,
-        "macd_accel": 0.0, "adx": 15.0, "mfi": 50.0, "rsi_slope": 0.0,
-        "squeeze_on": False, "squeeze_intensity": 0.0, "bb_position": 0.5,
-        "vwap_dist": 0.0, "obv_slope": 0.0,
-        "dc_upper_break": False, "dc_lower_break": False, "volume_ratio": 1.0,
-        "reversion_score": 0, "variance_ratio": 0.5, "ou_halflife": 0,
-        "zscore": 0.0, "adf_pvalue": 1.0,
+        "signal": "HOLD",
+        "bull_aligned": False,
+        "bear_aligned": False,
+        "macd_accel": 0.0,
+        "adx": 15.0,
+        "mfi": 50.0,
+        "rsi_slope": 0.0,
+        "squeeze_on": False,
+        "squeeze_intensity": 0.0,
+        "bb_position": 0.5,
+        "vwap_dist": 0.0,
+        "obv_slope": 0.0,
+        "dc_upper_break": False,
+        "dc_lower_break": False,
+        "volume_ratio": 1.0,
+        "reversion_score": 0,
+        "variance_ratio": 0.5,
+        "ou_halflife": 0,
+        "zscore": 0.0,
+        "adf_pvalue": 1.0,
     }
 
 
@@ -134,6 +181,7 @@ def bearish_ohlcv():
 # Helper: call compute_confluence handling optional config param
 # ---------------------------------------------------------------------------
 
+
 def _call_confluence(indicators, config=None):
     """Call compute_confluence() normalising to [0.0, 1.0] for assertions.
     BUY/LONG  -> score/NORM     (high = bullish)
@@ -174,36 +222,28 @@ def _call_indicators(df):
 # compute_confluence() — score correctness
 # ---------------------------------------------------------------------------
 
-class TestComputeConfluence:
 
+class TestComputeConfluence:
     def test_all_bullish_gives_high_score(self, bullish_indicators, config):
         """All-bullish indicators should produce a score >= 0.55."""
         score = _call_confluence(bullish_indicators, config)
-        assert score >= 0.55, (
-            f"Expected high score for all-bullish indicators, got {score:.4f}"
-        )
+        assert score >= 0.55, f"Expected high score for all-bullish indicators, got {score:.4f}"
 
     def test_all_bearish_gives_low_score(self, bearish_indicators, config):
         """All-bearish indicators should produce a score < 0.45."""
         score = _call_confluence(bearish_indicators, config)
-        assert score < 0.45, (
-            f"Expected low score for all-bearish indicators, got {score:.4f}"
-        )
+        assert score < 0.45, f"Expected low score for all-bearish indicators, got {score:.4f}"
 
     def test_bullish_beats_bearish(self, bullish_indicators, bearish_indicators, config):
         """Bullish score must be strictly greater than bearish score."""
         bull_score = _call_confluence(bullish_indicators, config)
         bear_score = _call_confluence(bearish_indicators, config)
-        assert bull_score > bear_score, (
-            f"Expected bullish ({bull_score:.4f}) > bearish ({bear_score:.4f})"
-        )
+        assert bull_score > bear_score, f"Expected bullish ({bull_score:.4f}) > bearish ({bear_score:.4f})"
 
     def test_mixed_indicators_give_moderate_score(self, mixed_indicators, config):
         """Mixed indicators should produce a score between 0.25 and 0.75."""
         score = _call_confluence(mixed_indicators, config)
-        assert 0.25 <= score <= 0.75, (
-            f"Expected moderate score for mixed indicators, got {score:.4f}"
-        )
+        assert 0.25 <= score <= 0.75, f"Expected moderate score for mixed indicators, got {score:.4f}"
 
     def test_score_range_bullish_within_zero_one(self, bullish_indicators, config):
         """Bullish score must be within [0.0, 1.0]."""
@@ -223,25 +263,21 @@ class TestComputeConfluence:
     def test_returns_numeric_type(self, bullish_indicators, config):
         """Return type must be int or float."""
         score = _call_confluence(bullish_indicators, config)
-        assert isinstance(score, (int, float)), (
-            f"Expected numeric return type, got {type(score)}"
-        )
+        assert isinstance(score, (int, float)), f"Expected numeric return type, got {type(score)}"
 
     def test_deterministic_same_input_same_output(self, bullish_indicators, config):
         """Same input must always produce same output (no randomness)."""
         score_1 = _call_confluence(bullish_indicators, config)
         score_2 = _call_confluence(bullish_indicators, config)
-        assert score_1 == score_2, (
-            f"Non-deterministic: first={score_1}, second={score_2}"
-        )
+        assert score_1 == score_2, f"Non-deterministic: first={score_1}, second={score_2}"
 
 
 # ---------------------------------------------------------------------------
 # compute_confluence() — edge cases
 # ---------------------------------------------------------------------------
 
-class TestComputeConfluenceEdgeCases:
 
+class TestComputeConfluenceEdgeCases:
     def test_empty_indicators_no_exception(self, config):
         """Empty indicator dict must not raise an exception."""
         try:
@@ -264,9 +300,7 @@ class TestComputeConfluenceEdgeCases:
             score = _call_confluence(indicators, config)
             assert isinstance(score, (int, float))
         except Exception as exc:
-            pytest.fail(
-                f"compute_confluence raised unexpectedly with None values: {exc}"
-            )
+            pytest.fail(f"compute_confluence raised unexpectedly with None values: {exc}")
 
     def test_nan_values_no_exception(self, config):
         """NaN indicator values must not crash the function."""
@@ -282,9 +316,7 @@ class TestComputeConfluenceEdgeCases:
             score = _call_confluence(indicators, config)
             assert isinstance(score, (int, float))
         except Exception as exc:
-            pytest.fail(
-                f"compute_confluence raised unexpectedly with NaN values: {exc}"
-            )
+            pytest.fail(f"compute_confluence raised unexpectedly with NaN values: {exc}")
 
     def test_extreme_values_no_exception(self, config):
         """Extreme indicator values must be handled gracefully."""
@@ -300,29 +332,23 @@ class TestComputeConfluenceEdgeCases:
             score = _call_confluence(indicators, config)
             assert isinstance(score, (int, float))
         except Exception as exc:
-            pytest.fail(
-                f"compute_confluence raised with extreme values: {exc}"
-            )
+            pytest.fail(f"compute_confluence raised with extreme values: {exc}")
 
 
 # ---------------------------------------------------------------------------
 # compute_indicators() edge cases
 # ---------------------------------------------------------------------------
 
-class TestComputeIndicatorsEdgeCases:
 
+class TestComputeIndicatorsEdgeCases:
     def test_empty_dataframe_no_exception(self, config):
         """Empty DataFrame must not crash compute_indicators()."""
-        empty_df = pd.DataFrame(
-            columns=["Open", "High", "Low", "Close", "Volume"]
-        )
+        empty_df = pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
         try:
             indicators = _call_indicators(empty_df)
             assert isinstance(indicators, dict)
         except Exception as exc:
-            pytest.fail(
-                f"compute_indicators raised with empty DataFrame: {exc}"
-            )
+            pytest.fail(f"compute_indicators raised with empty DataFrame: {exc}")
 
     def test_single_row_no_exception(self, config):
         """Single-row DataFrame must not crash."""
@@ -390,63 +416,48 @@ class TestComputeIndicatorsEdgeCases:
 # End-to-end integration: compute_indicators() -> compute_confluence()
 # ---------------------------------------------------------------------------
 
-class TestIndicatorConfluenceIntegration:
 
-    def test_bullish_trend_gives_above_floor_score(
-        self, bullish_ohlcv, config
-    ):
+class TestIndicatorConfluenceIntegration:
+    def test_bullish_trend_gives_above_floor_score(self, bullish_ohlcv, config):
         """Steadily rising prices should yield a score > 0.4."""
         indicators = _call_indicators(bullish_ohlcv)
         score = _call_confluence(indicators, config)
-        assert score > 0.4, (
-            f"Bullish OHLCV end-to-end score {score:.4f} is unexpectedly low"
-        )
+        assert score > 0.4, f"Bullish OHLCV end-to-end score {score:.4f} is unexpectedly low"
         assert 0.0 <= score <= 1.0
 
-    def test_bearish_trend_gives_below_ceiling_score(
-        self, bearish_ohlcv, config
-    ):
+    def test_bearish_trend_gives_below_ceiling_score(self, bearish_ohlcv, config):
         """Steadily falling prices should yield a score < 0.6."""
         indicators = _call_indicators(bearish_ohlcv)
         score = _call_confluence(indicators, config)
-        assert score < 0.6, (
-            f"Bearish OHLCV end-to-end score {score:.4f} is unexpectedly high"
-        )
+        assert score < 0.6, f"Bearish OHLCV end-to-end score {score:.4f} is unexpectedly high"
         assert 0.0 <= score <= 1.0
 
-    def test_end_to_end_score_type_and_range(
-        self, sample_ohlcv, config
-    ):
+    def test_end_to_end_score_type_and_range(self, sample_ohlcv, config):
         """With the shared fixture OHLCV, score is a float in [0, 1]."""
         indicators = _call_indicators(sample_ohlcv)
         score = _call_confluence(indicators, config)
         assert isinstance(score, (int, float))
         assert 0.0 <= score <= 1.0
 
-    def test_bullish_beats_bearish_end_to_end(
-        self, bullish_ohlcv, bearish_ohlcv, config
-    ):
+    def test_bullish_beats_bearish_end_to_end(self, bullish_ohlcv, bearish_ohlcv, config):
         """Bullish OHLCV should yield a higher score than bearish OHLCV."""
         bull_indicators = _call_indicators(bullish_ohlcv)
         bear_indicators = _call_indicators(bearish_ohlcv)
         bull_score = _call_confluence(bull_indicators, config)
         bear_score = _call_confluence(bear_indicators, config)
         # Allow a small tolerance — signal might be weak at short horizon
-        assert bull_score >= bear_score - 0.1, (
-            f"Expected bull ({bull_score:.4f}) >= bear ({bear_score:.4f}) - 0.1"
-        )
+        assert bull_score >= bear_score - 0.1, f"Expected bull ({bull_score:.4f}) >= bear ({bear_score:.4f}) - 0.1"
 
     def test_compute_indicators_returns_dict(self, sample_ohlcv):
         """compute_indicators() must always return a dict."""
         result = _call_indicators(sample_ohlcv)
-        assert isinstance(result, dict), (
-            f"Expected dict from compute_indicators, got {type(result)}"
-        )
+        assert isinstance(result, dict), f"Expected dict from compute_indicators, got {type(result)}"
 
 
 # ---------------------------------------------------------------------------
 # Parametrized signal weight boundary tests
 # ---------------------------------------------------------------------------
+
 
 class TestSignalWeightBoundaries:
     """Verify that extreme single-indicator values don't push score out of [0,1]."""
@@ -464,9 +475,7 @@ class TestSignalWeightBoundaries:
             "sentiment": 0.0,
         }
         score = _call_confluence(indicators, config)
-        assert 0.0 <= score <= 1.0, (
-            f"Score {score} out of range for RSI={rsi_value}"
-        )
+        assert 0.0 <= score <= 1.0, f"Score {score} out of range for RSI={rsi_value}"
 
     @pytest.mark.parametrize("sentiment", [-1.0, -0.5, 0.0, 0.5, 1.0])
     def test_sentiment_boundary_score_in_range(self, sentiment, config):
@@ -481,6 +490,4 @@ class TestSignalWeightBoundaries:
             "sentiment": sentiment,
         }
         score = _call_confluence(indicators, config)
-        assert 0.0 <= score <= 1.0, (
-            f"Score {score} out of range for sentiment={sentiment}"
-        )
+        assert 0.0 <= score <= 1.0, f"Score {score} out of range for sentiment={sentiment}"

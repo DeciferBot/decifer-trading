@@ -11,7 +11,7 @@ Covers:
 import json
 import os
 import sys
-import time
+
 import pytest
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -20,35 +20,41 @@ if PROJECT_ROOT not in sys.path:
 
 # Stub heavy deps before importing any Decifer module
 from unittest.mock import MagicMock
-for _mod in ["ib_async", "ib_insync", "anthropic", "praw",
-             "feedparser", "tvDatafeed", "requests_html", "schedule", "colorama"]:
+
+for _mod in [
+    "ib_async",
+    "ib_insync",
+    "anthropic",
+    "praw",
+    "feedparser",
+    "tvDatafeed",
+    "requests_html",
+    "schedule",
+    "colorama",
+]:
     sys.modules.setdefault(_mod, MagicMock())
 
 import ic_validator as icv
 from ic_validator import (
     DIMENSIONS,
-    ICHealthReport,
-    LiveReadinessReport,
+    check_live_readiness,
     get_ic_health,
     load_walkforward_sharpe,
-    check_live_readiness,
     validate_and_persist,
 )
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def _write_ic_cache(tmp_path, raw_ic: dict, n_records: int = 60,
-                    using_equal: bool = False) -> str:
+def _write_ic_cache(tmp_path, raw_ic: dict, n_records: int = 60, using_equal: bool = False) -> str:
     """Write a minimal ic_weights.json to tmp_path and return the path string."""
     equal_w = {d: round(1.0 / len(DIMENSIONS), 6) for d in DIMENSIONS}
     payload = {
-        "weights":             equal_w,
-        "raw_ic":              raw_ic,
-        "n_records":           n_records,
+        "weights": equal_w,
+        "raw_ic": raw_ic,
+        "n_records": n_records,
         "using_equal_weights": using_equal,
-        "updated":             "2026-01-01T00:00:00+00:00",
+        "updated": "2026-01-01T00:00:00+00:00",
     }
     f = tmp_path / "ic_weights.json"
     f.write_text(json.dumps(payload))
@@ -69,7 +75,7 @@ def _write_backtest_result(results_dir, sharpe: float, filename: str = "backtest
 def _strong_raw_ic() -> dict:
     """Raw IC where 7 of 9 dimensions are strongly positive."""
     ic = {d: 0.08 for d in DIMENSIONS}
-    ic["social"]    = -0.02
+    ic["social"] = -0.02
     ic["reversion"] = -0.01
     return ic
 
@@ -77,7 +83,7 @@ def _strong_raw_ic() -> dict:
 def _weak_raw_ic() -> dict:
     """Raw IC where only 2 dimensions are barely positive."""
     ic = {d: -0.05 for d in DIMENSIONS}
-    ic["trend"]    = 0.01
+    ic["trend"] = 0.01
     ic["momentum"] = 0.015
     return ic
 
@@ -86,10 +92,8 @@ def _weak_raw_ic() -> dict:
 
 
 class TestGetICHealth:
-
     def test_missing_cache_returns_no_signal(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(icv, "_DEFAULT_IC_WEIGHTS_PATH",
-                            str(tmp_path / "nonexistent.json"))
+        monkeypatch.setattr(icv, "_DEFAULT_IC_WEIGHTS_PATH", str(tmp_path / "nonexistent.json"))
         result = get_ic_health()
         assert result.quality == "NO_SIGNAL"
         assert result.n_records == 0
@@ -122,7 +126,7 @@ class TestGetICHealth:
         """3-4 positive dims with mean IC in [0.02, 0.05) → MODERATE."""
         raw = {d: -0.05 for d in DIMENSIONS}
         for d in ["trend", "momentum", "squeeze", "flow"]:
-            raw[d] = 0.03   # 4 positive, mean = 0.03
+            raw[d] = 0.03  # 4 positive, mean = 0.03
         path = _write_ic_cache(tmp_path, raw, using_equal=False)
         result = get_ic_health(ic_weights_path=path)
         assert result.quality == "MODERATE"
@@ -158,7 +162,7 @@ class TestGetICHealth:
 
     def test_using_equal_weights_true_forces_no_signal(self, tmp_path):
         """Even if raw_ic values look positive, using_equal_weights=True → NO_SIGNAL."""
-        raw = {d: 0.1 for d in DIMENSIONS}   # all positive
+        raw = {d: 0.1 for d in DIMENSIONS}  # all positive
         path = _write_ic_cache(tmp_path, raw, using_equal=True)  # but flagged as equal
         result = get_ic_health(ic_weights_path=path)
         assert result.quality == "NO_SIGNAL"
@@ -168,7 +172,6 @@ class TestGetICHealth:
 
 
 class TestLoadWalkforwardSharpe:
-
     def test_nonexistent_dir_returns_none(self, tmp_path):
         sharpe = load_walkforward_sharpe(str(tmp_path / "nonexistent"))
         assert sharpe is None
@@ -230,11 +233,11 @@ class TestLoadWalkforwardSharpe:
 
 
 class TestCheckLiveReadiness:
-
     def _setup_passing(self, tmp_path, monkeypatch, n_records=60, sharpe=1.2):
         """Wire up all passing conditions."""
         monkeypatch.setattr(
-            icv, "_DEFAULT_IC_WEIGHTS_PATH",
+            icv,
+            "_DEFAULT_IC_WEIGHTS_PATH",
             _write_ic_cache(tmp_path, _strong_raw_ic(), n_records=n_records, using_equal=False),
         )
         d = tmp_path / "results"
@@ -263,7 +266,8 @@ class TestCheckLiveReadiness:
     def test_ic_gate_failure_too_few_positive_dims(self, tmp_path, monkeypatch):
         """Only 2 positive dims (need 5) → IC gate fails with breadth message."""
         monkeypatch.setattr(
-            icv, "_DEFAULT_IC_WEIGHTS_PATH",
+            icv,
+            "_DEFAULT_IC_WEIGHTS_PATH",
             _write_ic_cache(tmp_path, _weak_raw_ic(), n_records=60, using_equal=False),
         )
         d = tmp_path / "results"
@@ -277,9 +281,10 @@ class TestCheckLiveReadiness:
 
     def test_ic_gate_failure_ic_too_low(self, tmp_path, monkeypatch):
         """5+ positive dims but mean IC < 0.05 → IC gate fails with magnitude message."""
-        raw = {d: 0.02 for d in DIMENSIONS}   # 9 positive dims, mean = 0.02 < 0.05
+        raw = {d: 0.02 for d in DIMENSIONS}  # 9 positive dims, mean = 0.02 < 0.05
         monkeypatch.setattr(
-            icv, "_DEFAULT_IC_WEIGHTS_PATH",
+            icv,
+            "_DEFAULT_IC_WEIGHTS_PATH",
             _write_ic_cache(tmp_path, raw, n_records=60, using_equal=False),
         )
         d = tmp_path / "results"
@@ -293,7 +298,8 @@ class TestCheckLiveReadiness:
     def test_sharpe_gate_failure_no_results(self, tmp_path, monkeypatch):
         """No backtest results → sharpe gate fails."""
         monkeypatch.setattr(
-            icv, "_DEFAULT_IC_WEIGHTS_PATH",
+            icv,
+            "_DEFAULT_IC_WEIGHTS_PATH",
             _write_ic_cache(tmp_path, _strong_raw_ic(), n_records=60, using_equal=False),
         )
         empty_dir = tmp_path / "empty_results"
@@ -314,8 +320,7 @@ class TestCheckLiveReadiness:
 
     def test_multiple_failures_all_reported(self, tmp_path, monkeypatch):
         """When all three gates fail, failures list has three entries."""
-        monkeypatch.setattr(icv, "_DEFAULT_IC_WEIGHTS_PATH",
-                            str(tmp_path / "nonexistent.json"))
+        monkeypatch.setattr(icv, "_DEFAULT_IC_WEIGHTS_PATH", str(tmp_path / "nonexistent.json"))
         empty_dir = tmp_path / "empty_results"
         empty_dir.mkdir()
         monkeypatch.setattr(icv, "_DEFAULT_RESULTS_DIR", str(empty_dir))
@@ -324,12 +329,12 @@ class TestCheckLiveReadiness:
         assert len(result.failures) == 3
 
     def test_checked_at_is_valid_iso8601(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(icv, "_DEFAULT_IC_WEIGHTS_PATH",
-                            str(tmp_path / "nonexistent.json"))
+        monkeypatch.setattr(icv, "_DEFAULT_IC_WEIGHTS_PATH", str(tmp_path / "nonexistent.json"))
         result = check_live_readiness()
         assert result.checked_at
         from datetime import datetime
-        datetime.fromisoformat(result.checked_at)   # must not raise
+
+        datetime.fromisoformat(result.checked_at)  # must not raise
 
     def test_ic_quality_propagated(self, tmp_path, monkeypatch):
         self._setup_passing(tmp_path, monkeypatch)
@@ -339,17 +344,15 @@ class TestCheckLiveReadiness:
     def test_n_positive_dims_propagated(self, tmp_path, monkeypatch):
         self._setup_passing(tmp_path, monkeypatch)
         result = check_live_readiness()
-        assert result.n_positive_dims == 7   # _strong_raw_ic has 7 positive
+        assert result.n_positive_dims == 7  # _strong_raw_ic has 7 positive
 
 
 # ── (d) TestValidateAndPersist ────────────────────────────────────────────────
 
 
 class TestValidateAndPersist:
-
     def test_writes_valid_json_to_disk(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(icv, "_DEFAULT_IC_WEIGHTS_PATH",
-                            str(tmp_path / "nonexistent.json"))
+        monkeypatch.setattr(icv, "_DEFAULT_IC_WEIGHTS_PATH", str(tmp_path / "nonexistent.json"))
         out = tmp_path / "validation_result.json"
         validate_and_persist(out_path=str(out))
         assert out.exists()
@@ -358,8 +361,7 @@ class TestValidateAndPersist:
         assert isinstance(data["ready_for_live"], bool)
 
     def test_persisted_json_matches_returned_report(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(icv, "_DEFAULT_IC_WEIGHTS_PATH",
-                            str(tmp_path / "nonexistent.json"))
+        monkeypatch.setattr(icv, "_DEFAULT_IC_WEIGHTS_PATH", str(tmp_path / "nonexistent.json"))
         out = tmp_path / "result.json"
         result = validate_and_persist(out_path=str(out))
         data = json.loads(out.read_text())
@@ -368,23 +370,28 @@ class TestValidateAndPersist:
         assert data["failures"] == result.failures
 
     def test_persisted_json_has_all_required_keys(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(icv, "_DEFAULT_IC_WEIGHTS_PATH",
-                            str(tmp_path / "nonexistent.json"))
+        monkeypatch.setattr(icv, "_DEFAULT_IC_WEIGHTS_PATH", str(tmp_path / "nonexistent.json"))
         out = tmp_path / "result.json"
         validate_and_persist(out_path=str(out))
         data = json.loads(out.read_text())
         required = {
-            "ready_for_live", "ic_gate_passed", "sharpe_gate_passed",
-            "sample_gate_passed", "n_valid_records", "mean_positive_ic",
-            "n_positive_dims", "walkforward_sharpe", "ic_quality",
-            "failures", "checked_at",
+            "ready_for_live",
+            "ic_gate_passed",
+            "sharpe_gate_passed",
+            "sample_gate_passed",
+            "n_valid_records",
+            "mean_positive_ic",
+            "n_positive_dims",
+            "walkforward_sharpe",
+            "ic_quality",
+            "failures",
+            "checked_at",
         }
         assert required.issubset(data.keys())
 
     def test_second_call_overwrites_first(self, tmp_path, monkeypatch):
         """Calling validate_and_persist twice must overwrite, not append."""
-        monkeypatch.setattr(icv, "_DEFAULT_IC_WEIGHTS_PATH",
-                            str(tmp_path / "nonexistent.json"))
+        monkeypatch.setattr(icv, "_DEFAULT_IC_WEIGHTS_PATH", str(tmp_path / "nonexistent.json"))
         out = tmp_path / "result.json"
         validate_and_persist(out_path=str(out))
         validate_and_persist(out_path=str(out))

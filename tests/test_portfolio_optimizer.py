@@ -1,12 +1,14 @@
 """Tests for portfolio_optimizer.py — correlation, risk parity, VaR, sector monitoring."""
+
 import os
 import sys
 import types
+from datetime import datetime
+from unittest.mock import MagicMock, patch
+
 import numpy as np
 import pandas as pd
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
-from datetime import datetime, timedelta
 
 # ── path setup ──────────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -36,10 +38,10 @@ sys.modules.pop("portfolio_optimizer", None)
 # ── now import the module ────────────────────────────────────────────────────
 import portfolio_optimizer as po
 
-
 # ════════════════════════════════════════════════════════════════════════════
 # HELPERS
 # ════════════════════════════════════════════════════════════════════════════
+
 
 def _make_returns(symbols, n_days=40, seed=42):
     """Build a deterministic returns DataFrame."""
@@ -61,8 +63,8 @@ def _fake_yf_download(returns_df):
 # CorrelationTracker
 # ════════════════════════════════════════════════════════════════════════════
 
-class TestCorrelationTracker:
 
+class TestCorrelationTracker:
     def test_update_returns_identity_on_empty_data(self):
         """When yfinance returns empty, update() should return an identity matrix."""
         tracker = po.CorrelationTracker(lookback_days=60)
@@ -92,6 +94,7 @@ class TestCorrelationTracker:
     def test_update_uses_cache_within_interval(self):
         """A second call within 30 min should NOT re-fetch from yfinance."""
         import time
+
         symbols = ["AAPL", "MSFT"]
         tracker = po.CorrelationTracker()
         # Pre-populate cache
@@ -110,11 +113,10 @@ class TestCorrelationTracker:
         symbols = ["A", "B", "C"]
         tracker = po.CorrelationTracker()
         # Inject known correlation matrix
-        tracker.correlation_matrix = np.array([[1.0, 0.8, 0.3],
-                                               [0.8, 1.0, 0.2],
-                                               [0.3, 0.2, 1.0]])
+        tracker.correlation_matrix = np.array([[1.0, 0.8, 0.3], [0.8, 1.0, 0.2], [0.3, 0.2, 1.0]])
         tracker.symbols_cached = symbols[:]
         import time
+
         tracker.last_update = time.time()
 
         corr = tracker.get_correlation("A", "B", symbols)
@@ -124,6 +126,7 @@ class TestCorrelationTracker:
         """Symbol not in list should return 0.0 safely."""
         tracker = po.CorrelationTracker()
         import time
+
         tracker.correlation_matrix = np.eye(2)
         tracker.symbols_cached = ["A", "B"]
         tracker.last_update = time.time()
@@ -135,14 +138,17 @@ class TestCorrelationTracker:
         """Should return symbols above threshold, excluding self."""
         symbols = ["A", "B", "C", "D"]
         tracker = po.CorrelationTracker()
-        tracker.correlation_matrix = np.array([
-            [1.0, 0.9, 0.3, 0.1],
-            [0.9, 1.0, 0.2, 0.1],
-            [0.3, 0.2, 1.0, 0.6],
-            [0.1, 0.1, 0.6, 1.0],
-        ])
+        tracker.correlation_matrix = np.array(
+            [
+                [1.0, 0.9, 0.3, 0.1],
+                [0.9, 1.0, 0.2, 0.1],
+                [0.3, 0.2, 1.0, 0.6],
+                [0.1, 0.1, 0.6, 1.0],
+            ]
+        )
         tracker.symbols_cached = symbols[:]
         import time
+
         tracker.last_update = time.time()
 
         cluster = tracker.find_correlated_cluster("A", symbols, threshold=0.7)
@@ -155,8 +161,8 @@ class TestCorrelationTracker:
 # RiskParitySizer
 # ════════════════════════════════════════════════════════════════════════════
 
-class TestRiskParitySizer:
 
+class TestRiskParitySizer:
     def test_calculate_weights_sums_to_one(self):
         """Risk parity weights must always sum to 1.0."""
         sizer = po.RiskParitySizer()
@@ -199,10 +205,13 @@ class TestRiskParitySizer:
         result = sizer.adjust_for_correlation(weights, np.array([[1.0]]), ["AAPL"])
         assert abs(result["AAPL"] - 1.0) < 1e-6
 
-    @pytest.mark.parametrize("vols,expected_order", [
-        ({"A": 0.10, "B": 0.20, "C": 0.40}, ["A", "B", "C"]),  # low→high vol = high→low weight
-        ({"X": 0.50, "Y": 0.15}, ["Y", "X"]),
-    ])
+    @pytest.mark.parametrize(
+        "vols,expected_order",
+        [
+            ({"A": 0.10, "B": 0.20, "C": 0.40}, ["A", "B", "C"]),  # low→high vol = high→low weight
+            ({"X": 0.50, "Y": 0.15}, ["Y", "X"]),
+        ],
+    )
     def test_weight_order_by_volatility(self, vols, expected_order):
         """Parametrize: lowest vol always gets highest weight."""
         sizer = po.RiskParitySizer()
@@ -216,8 +225,8 @@ class TestRiskParitySizer:
 # PortfolioVaR
 # ════════════════════════════════════════════════════════════════════════════
 
-class TestPortfolioVaR:
 
+class TestPortfolioVaR:
     def _make_var_instance(self):
         return po.PortfolioVaR(confidence_level=0.95, lookback_days=60)
 
@@ -285,8 +294,8 @@ class TestPortfolioVaR:
 # SectorMonitor
 # ════════════════════════════════════════════════════════════════════════════
 
-class TestSectorMonitor:
 
+class TestSectorMonitor:
     def test_get_sector_uses_default_map(self):
         """Known symbols should be returned from DEFAULT_SECTOR_MAP without yfinance."""
         monitor = po.SectorMonitor()
@@ -333,8 +342,8 @@ class TestSectorMonitor:
 # PortfolioOptimizer (public API)
 # ════════════════════════════════════════════════════════════════════════════
 
-class TestPortfolioOptimizer:
 
+class TestPortfolioOptimizer:
     def _make_optimizer(self):
         return po.PortfolioOptimizer()
 
@@ -361,8 +370,10 @@ class TestPortfolioOptimizer:
         opt = self._make_optimizer()
         # Two positions, patch correlation to be high
         portfolio = {"NVDA": {"qty": 10, "current": 500.0}}
-        with patch.object(opt.correlation_tracker, "get_correlation", return_value=0.95), \
-             patch.object(opt.risk_parity, "_calculate_volatility", return_value=0.30):
+        with (
+            patch.object(opt.correlation_tracker, "get_correlation", return_value=0.95),
+            patch.object(opt.risk_parity, "_calculate_volatility", return_value=0.30),
+        ):
             size = opt.get_optimal_position_size("AMD", 100, portfolio, 50000)
         # Just ensure it returns a number and doesn't crash
         assert isinstance(size, (int, float))
@@ -384,10 +395,12 @@ class TestPortfolioOptimizer:
         }
 
         # Patch all internal yfinance calls to avoid network
-        with patch("portfolio_optimizer.yf.download", return_value=pd.DataFrame()), \
-             patch.object(opt.sector_monitor, "check_concentration", return_value=[]), \
-             patch.object(opt.correlation_tracker, "update", return_value=np.eye(2)), \
-             patch.object(opt.risk_parity, "_calculate_volatility", return_value=0.20):
+        with (
+            patch("portfolio_optimizer.yf.download", return_value=pd.DataFrame()),
+            patch.object(opt.sector_monitor, "check_concentration", return_value=[]),
+            patch.object(opt.correlation_tracker, "update", return_value=np.eye(2)),
+            patch.object(opt.risk_parity, "_calculate_volatility", return_value=0.20),
+        ):
             report = opt.check_portfolio_risk(portfolio, "TRENDING")
 
         assert report is not None
@@ -397,8 +410,8 @@ class TestPortfolioOptimizer:
 # Module-level public functions
 # ════════════════════════════════════════════════════════════════════════════
 
-class TestModuleLevelFunctions:
 
+class TestModuleLevelFunctions:
     def test_get_optimal_size_returns_numeric(self):
         """Module-level get_optimal_size should return a number."""
         portfolio = {"AAPL": {"qty": 5, "current": 170.0}}

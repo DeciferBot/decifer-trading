@@ -9,12 +9,7 @@
 import json
 import logging
 import os
-import pickle
-import sys
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
-import warnings
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -23,13 +18,11 @@ log = logging.getLogger("decifer.ml_engine")
 
 # Optional ML libraries with graceful fallback
 try:
-    from sklearn.ensemble import RandomForestClassifier, GradientBoostingRegressor
+    from sklearn.ensemble import GradientBoostingRegressor, RandomForestClassifier
+    from sklearn.metrics import confusion_matrix, mean_squared_error, r2_score, roc_auc_score
+    from sklearn.model_selection import TimeSeriesSplit, cross_val_score
     from sklearn.preprocessing import StandardScaler
-    from sklearn.model_selection import cross_val_score, TimeSeriesSplit
-    from sklearn.metrics import (
-        classification_report, confusion_matrix, roc_auc_score,
-        mean_squared_error, r2_score
-    )
+
     SKLEARN_AVAILABLE = True
     log.info("scikit-learn loaded successfully")
 except Exception as e:
@@ -38,6 +31,7 @@ except Exception as e:
 
 try:
     import joblib
+
     JOBLIB_AVAILABLE = True
     log.info("joblib loaded successfully")
 except Exception as e:
@@ -67,6 +61,7 @@ def ensure_models_dir():
 # TradeLabeler: Read trades.json and extract features + labels
 # ──────────────────────────────────────────────────────────────────
 
+
 class TradeLabeler:
     """
     Reads trades.json, labels outcomes (WIN/LOSS/BREAKEVEN),
@@ -87,7 +82,7 @@ class TradeLabeler:
             return
 
         try:
-            with open(self.trade_log_file, "r") as f:
+            with open(self.trade_log_file) as f:
                 self.trades = json.load(f)
             log.info(f"Loaded {len(self.trades)} trades from {self.trade_log_file}")
         except Exception as e:
@@ -121,9 +116,7 @@ class TradeLabeler:
         Includes: score, regime, VIX, volume, momentum, sector, time info.
         """
         try:
-            entry_time = datetime.fromisoformat(
-                trade.get("entry_time", "").replace(" ", "T")
-            )
+            entry_time = datetime.fromisoformat(trade.get("entry_time", "").replace(" ", "T"))
         except Exception:
             return None
 
@@ -151,12 +144,8 @@ class TradeLabeler:
     def _calculate_holding_time(self, trade: dict) -> float:
         """Calculate holding time in minutes."""
         try:
-            entry = datetime.fromisoformat(
-                trade.get("entry_time", "").replace(" ", "T")
-            )
-            exit_t = datetime.fromisoformat(
-                trade.get("exit_time", "").replace(" ", "T")
-            )
+            entry = datetime.fromisoformat(trade.get("entry_time", "").replace(" ", "T"))
+            exit_t = datetime.fromisoformat(trade.get("exit_time", "").replace(" ", "T"))
             delta = exit_t - entry
             return delta.total_seconds() / 60.0
         except Exception:
@@ -167,12 +156,13 @@ class TradeLabeler:
         reasoning = trade.get("reasoning", "")
         # Look for "Agents agreed N/6" pattern
         import re
+
         match = re.search(r"Agents agreed (\d+)/\d+", reasoning)
         if match:
             return int(match.group(1))
         return 0
 
-    def create_dataset(self) -> Optional[pd.DataFrame]:
+    def create_dataset(self) -> pd.DataFrame | None:
         """Create labeled training dataset from all trades."""
         if not self.trades:
             log.warning("No trades to label")
@@ -195,16 +185,14 @@ class TradeLabeler:
 
         df = pd.DataFrame(data_list)
         self.labeled_data = df
-        log.info(
-            f"Created dataset: {len(df)} trades. "
-            f"Outcomes: {df['outcome'].value_counts().to_dict()}"
-        )
+        log.info(f"Created dataset: {len(df)} trades. Outcomes: {df['outcome'].value_counts().to_dict()}")
         return df
 
 
 # ──────────────────────────────────────────────────────────────────
 # DeciferML: Train models, predict, evaluate
 # ──────────────────────────────────────────────────────────────────
+
 
 class DeciferML:
     """
@@ -231,24 +219,23 @@ class DeciferML:
         """Prepare features and labels for training."""
         self.df = self.labeler.create_dataset()
         if self.df is None or len(self.df) < MIN_TRADES_FOR_ML:
-            log.warning(
-                f"Insufficient trades ({len(self.df) if self.df is not None else 0} < {MIN_TRADES_FOR_ML})"
-            )
+            log.warning(f"Insufficient trades ({len(self.df) if self.df is not None else 0} < {MIN_TRADES_FOR_ML})")
             return False
 
         # Select features for ML
         feature_cols = [
-            "score", "vix", "holding_minutes", "time_of_day", "day_of_week",
-            "is_after_hours", "agents_agreed"
+            "score",
+            "vix",
+            "holding_minutes",
+            "time_of_day",
+            "day_of_week",
+            "is_after_hours",
+            "agents_agreed",
         ]
 
         # Add regime one-hot encoding
         regime_dummies = pd.get_dummies(self.df["regime"], prefix="regime")
-        regime_dummies = regime_dummies.reindex(
-            [f"regime_{r}" for r in REGIME_OPTIONS],
-            fill_value=0,
-            axis=1
-        )
+        regime_dummies = regime_dummies.reindex([f"regime_{r}" for r in REGIME_OPTIONS], fill_value=0, axis=1)
 
         # Combine features
         X = self.df[feature_cols].copy()
@@ -274,29 +261,18 @@ class DeciferML:
 
         try:
             self.model_clf = RandomForestClassifier(
-                n_estimators=100,
-                max_depth=10,
-                min_samples_split=5,
-                min_samples_leaf=2,
-                random_state=42,
-                n_jobs=-1
+                n_estimators=100, max_depth=10, min_samples_split=5, min_samples_leaf=2, random_state=42, n_jobs=-1
             )
             self.model_clf.fit(self.X, self.y)
 
             # Cross-validation with walk-forward splits (no lookahead bias)
             tscv = TimeSeriesSplit(n_splits=5)
-            scores = cross_val_score(
-                self.model_clf, self.X, self.y,
-                cv=tscv, scoring="roc_auc"
-            )
-            log.info(
-                f"Win/Loss classifier trained. "
-                f"CV ROC-AUC: {scores.mean():.3f} (+/- {scores.std():.3f})"
-            )
+            scores = cross_val_score(self.model_clf, self.X, self.y, cv=tscv, scoring="roc_auc")
+            log.info(f"Win/Loss classifier trained. CV ROC-AUC: {scores.mean():.3f} (+/- {scores.std():.3f})")
 
             # Feature importance
             importance = self.model_clf.feature_importances_
-            self.feature_importance = dict(zip(self.feature_names, importance))
+            self.feature_importance = dict(zip(self.feature_names, importance, strict=False))
 
             return True
         except Exception as e:
@@ -310,29 +286,17 @@ class DeciferML:
 
         try:
             # Target: PnL as percentage of entry
-            y_returns = (
-                self.df["pnl"] / (self.df["entry_price"] * self.df["shares"])
-            ).fillna(0)
+            y_returns = (self.df["pnl"] / (self.df["entry_price"] * self.df["shares"])).fillna(0)
 
             self.model_reg = GradientBoostingRegressor(
-                n_estimators=100,
-                max_depth=5,
-                learning_rate=0.1,
-                random_state=42,
-                subsample=0.8
+                n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42, subsample=0.8
             )
             self.model_reg.fit(self.X, y_returns)
 
             # Cross-validation
             tscv = TimeSeriesSplit(n_splits=5)
-            scores = cross_val_score(
-                self.model_reg, self.X, y_returns,
-                cv=tscv, scoring="r2"
-            )
-            log.info(
-                f"Return regressor trained. "
-                f"CV R²: {scores.mean():.3f} (+/- {scores.std():.3f})"
-            )
+            scores = cross_val_score(self.model_reg, self.X, y_returns, cv=tscv, scoring="r2")
+            log.info(f"Return regressor trained. CV R²: {scores.mean():.3f} (+/- {scores.std():.3f})")
 
             return True
         except Exception as e:
@@ -374,13 +338,13 @@ class DeciferML:
             return {
                 "win_prob": float(win_prob),
                 "expected_return": float(expected_return),
-                "confidence": float(confidence)
+                "confidence": float(confidence),
             }
         except Exception as e:
             log.error(f"Prediction failed: {e}")
             return {"win_prob": 0.5, "expected_return": 0.0, "confidence": 0.0}
 
-    def _features_to_array(self, features_list: List[dict]) -> np.ndarray:
+    def _features_to_array(self, features_list: list[dict]) -> np.ndarray:
         """Convert list of feature dicts to properly shaped array."""
         rows = []
         for features in features_list:
@@ -431,7 +395,7 @@ class DeciferML:
             self.scaler = joblib.load(os.path.join(MODELS_DIR, "scaler.pkl"))
             self.feature_names = joblib.load(os.path.join(MODELS_DIR, "features.pkl"))
 
-            with open(os.path.join(MODELS_DIR, "metadata.json"), "r") as f:
+            with open(os.path.join(MODELS_DIR, "metadata.json")) as f:
                 metadata = json.load(f)
                 self.train_date = datetime.fromisoformat(metadata.get("train_date"))
                 self.feature_importance = metadata.get("feature_importance", {})
@@ -460,9 +424,7 @@ class DeciferML:
             }
 
             if self.model_reg is not None:
-                y_returns = (
-                    self.df["pnl"] / (self.df["entry_price"] * self.df["shares"])
-                ).fillna(0)
+                y_returns = (self.df["pnl"] / (self.df["entry_price"] * self.df["shares"])).fillna(0)
                 y_returns_pred = self.model_reg.predict(self.X)
 
                 results["regressor"] = {
@@ -479,6 +441,7 @@ class DeciferML:
 # ──────────────────────────────────────────────────────────────────
 # SignalEnhancer: Adjust 0-50 score with ML confidence
 # ──────────────────────────────────────────────────────────────────
+
 
 class SignalEnhancer:
     """
@@ -581,6 +544,7 @@ class SignalEnhancer:
 # RegimeClassifier: ML-based regime detection
 # ──────────────────────────────────────────────────────────────────
 
+
 class RegimeClassifier:
     """
     ML-based regime detection. Trained on labeled historical data.
@@ -621,9 +585,7 @@ class RegimeClassifier:
             y = df["regime"]
 
             self.feature_names = feature_cols
-            self.model = RandomForestClassifier(
-                n_estimators=50, max_depth=7, random_state=42
-            )
+            self.model = RandomForestClassifier(n_estimators=50, max_depth=7, random_state=42)
             self.model.fit(X, y)
 
             score = self.model.score(X, y)
@@ -651,11 +613,15 @@ class RegimeClassifier:
             return "UNKNOWN"
 
         try:
-            X = np.array([[
-                market_data.get("returns", 0),
-                market_data.get("volatility", 1.0),
-                market_data.get("volume_ma_ratio", 1.0)
-            ]])
+            X = np.array(
+                [
+                    [
+                        market_data.get("returns", 0),
+                        market_data.get("volatility", 1.0),
+                        market_data.get("volume_ma_ratio", 1.0),
+                    ]
+                ]
+            )
 
             regime = self.model.predict(X)[0]
             return str(regime)
@@ -667,6 +633,7 @@ class RegimeClassifier:
 # ──────────────────────────────────────────────────────────────────
 # Weekly Report Generator
 # ──────────────────────────────────────────────────────────────────
+
 
 class WeeklyReportGenerator:
     """Generate performance analytics and pattern insights."""
@@ -714,7 +681,7 @@ class WeeklyReportGenerator:
 
         return "\n".join(report)
 
-    def _overall_stats(self) -> List[str]:
+    def _overall_stats(self) -> list[str]:
         """Overall win rate, average return, etc."""
         lines = ["OVERALL PERFORMANCE"]
         lines.append("-" * 70)
@@ -737,11 +704,13 @@ class WeeklyReportGenerator:
         lines.append(f"Avg Win / Avg Loss:  ${avg_win:,.2f} / ${avg_loss:,.2f}")
 
         if losses > 0:
-            lines.append(f"Profit Factor:       {abs(wins * avg_win) / (losses * avg_loss):.2f}" if avg_loss > 0 else "Inf")
+            lines.append(
+                f"Profit Factor:       {abs(wins * avg_win) / (losses * avg_loss):.2f}" if avg_loss > 0 else "Inf"
+            )
 
         return lines
 
-    def _regime_performance(self) -> List[str]:
+    def _regime_performance(self) -> list[str]:
         """Breakdown by market regime."""
         lines = ["REGIME-SPECIFIC PERFORMANCE"]
         lines.append("-" * 70)
@@ -754,13 +723,11 @@ class WeeklyReportGenerator:
 
             avg_pnl = subset["pnl"].mean()
 
-            lines.append(
-                f"{regime:15} │ {total:3} trades │ Win: {win_pct:6.1%} │ Avg P&L: ${avg_pnl:>9,.2f}"
-            )
+            lines.append(f"{regime:15} │ {total:3} trades │ Win: {win_pct:6.1%} │ Avg P&L: ${avg_pnl:>9,.2f}")
 
         return lines
 
-    def _time_of_day_performance(self) -> List[str]:
+    def _time_of_day_performance(self) -> list[str]:
         """Breakdown by hour of day."""
         lines = ["TIME-OF-DAY PERFORMANCE"]
         lines.append("-" * 70)
@@ -776,14 +743,12 @@ class WeeklyReportGenerator:
             win_pct = wins / total
             avg_pnl = subset["pnl"].mean()
 
-            time_range = f"{int(hour):02d}:00-{int(hour)+1:02d}:00"
-            lines.append(
-                f"{time_range} │ {total:3} trades │ Win: {win_pct:6.1%} │ Avg P&L: ${avg_pnl:>9,.2f}"
-            )
+            time_range = f"{int(hour):02d}:00-{int(hour) + 1:02d}:00"
+            lines.append(f"{time_range} │ {total:3} trades │ Win: {win_pct:6.1%} │ Avg P&L: ${avg_pnl:>9,.2f}")
 
         return lines
 
-    def _setup_analysis(self) -> List[str]:
+    def _setup_analysis(self) -> list[str]:
         """Best and worst setups."""
         lines = ["SETUP ANALYSIS"]
         lines.append("-" * 70)
@@ -808,7 +773,7 @@ class WeeklyReportGenerator:
 
         return lines
 
-    def _feature_importance(self) -> List[str]:
+    def _feature_importance(self) -> list[str]:
         """Show which dimensions matter most."""
         lines = ["FEATURE IMPORTANCE (from last trained model)"]
         lines.append("-" * 70)
@@ -820,7 +785,7 @@ class WeeklyReportGenerator:
             return ["No model metadata available."]
 
         try:
-            with open(metadata_path, "r") as f:
+            with open(metadata_path) as f:
                 metadata = json.load(f)
 
             importance = metadata.get("feature_importance", {})
@@ -842,6 +807,7 @@ class WeeklyReportGenerator:
 # ──────────────────────────────────────────────────────────────────
 # Public API Functions
 # ──────────────────────────────────────────────────────────────────
+
 
 def train_models() -> bool:
     """
@@ -898,40 +864,23 @@ def generate_weekly_report() -> str:
 # CLI Interface
 # ──────────────────────────────────────────────────────────────────
 
+
 def main():
     """CLI mode: python3 ml_engine.py --train or --report"""
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Decifer ML Engine — Train models or generate reports"
-    )
-    parser.add_argument(
-        "--train",
-        action="store_true",
-        help="Train all ML models from scratch"
-    )
-    parser.add_argument(
-        "--report",
-        action="store_true",
-        help="Generate weekly performance report"
-    )
-    parser.add_argument(
-        "--eval",
-        action="store_true",
-        help="Evaluate trained models"
-    )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Verbose logging"
-    )
+    parser = argparse.ArgumentParser(description="Decifer ML Engine — Train models or generate reports")
+    parser.add_argument("--train", action="store_true", help="Train all ML models from scratch")
+    parser.add_argument("--report", action="store_true", help="Generate weekly performance report")
+    parser.add_argument("--eval", action="store_true", help="Evaluate trained models")
+    parser.add_argument("--verbose", action="store_true", help="Verbose logging")
 
     args = parser.parse_args()
 
     # Setup logging
     logging.basicConfig(
         level=logging.INFO if args.verbose else logging.WARNING,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s"
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     )
 
     if not args.train and not args.report and not args.eval:

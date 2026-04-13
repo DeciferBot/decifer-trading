@@ -24,8 +24,8 @@ import os
 import sys
 from datetime import datetime
 
-TRADE_LOG   = os.path.join(os.path.dirname(__file__), "data", "trades.json")
-AUDIT_OUT   = os.path.join(os.path.dirname(__file__), "data", "candle_gate_audit.json")
+TRADE_LOG = os.path.join(os.path.dirname(__file__), "data", "trades.json")
+AUDIT_OUT = os.path.join(os.path.dirname(__file__), "data", "candle_gate_audit.json")
 
 
 def _load_trades(path: str) -> list:
@@ -57,8 +57,8 @@ def run_audit(trade_log_path: str = TRADE_LOG, output_path: str = AUDIT_OUT) -> 
     trades = _load_trades(trade_log_path)
     open_trades = [t for t in trades if t.get("action") == "OPEN"]
 
-    valid           = []
-    skipped         = []
+    valid = []
+    skipped = []
     flagged_unknown = []
     flagged_anomaly = []
 
@@ -77,13 +77,13 @@ def run_audit(trade_log_path: str = TRADE_LOG, output_path: str = AUDIT_OUT) -> 
     flagged = flagged_unknown + flagged_anomaly
 
     summary = {
-        "audit_timestamp":  datetime.utcnow().isoformat() + "Z",
-        "total_open":       len(open_trades),
-        "valid":            len(valid),
-        "skipped":          len(skipped),
-        "flagged_unknown":  len(flagged_unknown),
-        "flagged_anomaly":  len(flagged_anomaly),
-        "flagged_trades":   flagged,
+        "audit_timestamp": datetime.utcnow().isoformat() + "Z",
+        "total_open": len(open_trades),
+        "valid": len(valid),
+        "skipped": len(skipped),
+        "flagged_unknown": len(flagged_unknown),
+        "flagged_anomaly": len(flagged_anomaly),
+        "flagged_trades": flagged,
     }
 
     # Write output
@@ -107,12 +107,16 @@ def _print_summary(s: dict) -> None:
         print("\n  ⚠️  ANOMALY TRADES (candle_gate=BLOCKED on OPEN record):")
         for t in s["flagged_trades"]:
             if t.get("_audit_flag") == "ANOMALY":
-                print(f"     {t.get('timestamp', '?')}  {t.get('symbol', '?')}  "
-                      f"score={t.get('score', '?')}  regime={t.get('regime', '?')}")
+                print(
+                    f"     {t.get('timestamp', '?')}  {t.get('symbol', '?')}  "
+                    f"score={t.get('score', '?')}  regime={t.get('regime', '?')}"
+                )
 
     if s["flagged_unknown"] > 0:
-        print(f"\n  ℹ️  {s['flagged_unknown']} trade(s) predate gate logging — "
-              "exclude from performance calculations until gate is verified.")
+        print(
+            f"\n  ℹ️  {s['flagged_unknown']} trade(s) predate gate logging — "
+            "exclude from performance calculations until gate is verified."
+        )
     print("──────────────────────────────────────────────────────\n")
 
 

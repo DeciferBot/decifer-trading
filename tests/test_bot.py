@@ -5,14 +5,11 @@ Focuses on testable pure-Python helpers: settings persistence,
 hot-reload hash detection, favourites I/O, colour map, dash state
 initialisation, and the reconnect/alert helpers.
 """
+
+import json
 import os
 import sys
-import json
-import tempfile
-import hashlib
-import threading
 import types
-import importlib
 
 # ── project root on path ─────────────────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -23,13 +20,28 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ib_async
 ib_async_mod = types.ModuleType("ib_async")
+
+
 class _FakeIB:
-    def __init__(self): self.connected = False
-    def connect(self, *a, **kw): self.connected = True
-    def disconnect(self): self.connected = False
-    def reqPnL(self, *a, **kw): pass
-    def reqMktData(self, *a, **kw): return object()
-    def run(self): pass
+    def __init__(self):
+        self.connected = False
+
+    def connect(self, *a, **kw):
+        self.connected = True
+
+    def disconnect(self):
+        self.connected = False
+
+    def reqPnL(self, *a, **kw):
+        pass
+
+    def reqMktData(self, *a, **kw):
+        return object()
+
+    def run(self):
+        pass
+
+
 ib_async_mod.IB = _FakeIB
 ib_async_mod.Stock = lambda *a, **kw: object()
 ib_async_mod.Contract = lambda *a, **kw: object()
@@ -53,9 +65,7 @@ sys.modules.setdefault("httpx", httpx_mod)
 
 # colorama
 colorama_mod = types.ModuleType("colorama")
-colorama_mod.Fore = types.SimpleNamespace(
-    YELLOW="", GREEN="", CYAN="", RED="", WHITE="", MAGENTA="", RESET=""
-)
+colorama_mod.Fore = types.SimpleNamespace(YELLOW="", GREEN="", CYAN="", RED="", WHITE="", MAGENTA="", RESET="")
 colorama_mod.Style = types.SimpleNamespace(RESET_ALL="", BRIGHT="")
 colorama_mod.init = lambda **kw: None
 sys.modules.setdefault("colorama", colorama_mod)
@@ -81,7 +91,9 @@ sys.modules.setdefault("pandas_ta", pta_mod)
 
 # py_vollib stubs
 for _stub in [
-    "py_vollib", "py_vollib.black_scholes", "py_vollib.black_scholes.greeks",
+    "py_vollib",
+    "py_vollib.black_scholes",
+    "py_vollib.black_scholes.greeks",
     "py_vollib.black_scholes.greeks.analytical",
     "py_vollib.black_scholes.implied_volatility",
 ]:
@@ -89,8 +101,11 @@ for _stub in [
 
 # sklearn stubs (ml_engine)
 for _stub in [
-    "sklearn", "sklearn.ensemble", "sklearn.preprocessing",
-    "sklearn.model_selection", "sklearn.metrics",
+    "sklearn",
+    "sklearn.ensemble",
+    "sklearn.preprocessing",
+    "sklearn.model_selection",
+    "sklearn.metrics",
 ]:
     sys.modules.setdefault(_stub, types.ModuleType(_stub))
 
@@ -113,62 +128,59 @@ sys.modules.setdefault("feedparser", feedparser_mod)
 sys.modules.setdefault("nltk", types.ModuleType("nltk"))
 nltk_sa = types.ModuleType("nltk.sentiment")
 nltk_sa_v = types.ModuleType("nltk.sentiment.vader")
-nltk_sa_v.SentimentIntensityAnalyzer = type(
-    "SIA", (), {"polarity_scores": lambda self, t: {"compound": 0.0}}
-)
+nltk_sa_v.SentimentIntensityAnalyzer = type("SIA", (), {"polarity_scores": lambda self, t: {"compound": 0.0}})
 sys.modules.setdefault("nltk.sentiment", nltk_sa)
 sys.modules.setdefault("nltk.sentiment.vader", nltk_sa_v)
 
 # vaderSentiment
 vader_pkg = types.ModuleType("vaderSentiment")
 vader_sa = types.ModuleType("vaderSentiment.vaderSentiment")
-vader_sa.SentimentIntensityAnalyzer = type(
-    "SIA", (), {"polarity_scores": lambda self, t: {"compound": 0.0}}
-)
+vader_sa.SentimentIntensityAnalyzer = type("SIA", (), {"polarity_scores": lambda self, t: {"compound": 0.0}})
 sys.modules.setdefault("vaderSentiment", vader_pkg)
 sys.modules.setdefault("vaderSentiment.vaderSentiment", vader_sa)
 
 # ── Minimal config so bot.py can complete module-level code ──────────────────
 import tempfile as _tmpmod
+
 _test_tmp = _tmpmod.mkdtemp(prefix="decifer_test_")
 config_mod = types.ModuleType("config")
 config_mod.CONFIG = {
-    "log_file":                     os.path.join(_test_tmp, "decifer_test.log"),
-    "trade_log":                    os.path.join(_test_tmp, "decifer_trades_test.json"),
-    "order_log":                    os.path.join(_test_tmp, "decifer_orders_test.json"),
-    "active_account":               "DU123456",
-    "agents_required_to_agree":     3,
-    "ibkr_host":                    "127.0.0.1",
-    "ibkr_port":                    7497,
-    "ibkr_client_id":               1,
-    "risk_pct_per_trade":           0.01,
-    "daily_loss_limit":             0.02,
-    "max_positions":                10,
-    "min_cash_reserve":             5000.0,
-    "max_single_position":          0.15,
-    "min_score_to_trade":           60,
-    "high_conviction_score":        80,
-    "options_min_score":            75,
-    "options_max_risk_pct":         0.02,
-    "options_max_ivr":              60,
-    "options_target_delta":         0.35,
-    "options_delta_range":          0.10,
-    "sentinel_enabled":             True,
-    "sentinel_poll_seconds":        30,
-    "sentinel_cooldown_minutes":    60,
-    "sentinel_batch_size":          10,
-    "sentinel_max_symbols":         50,
-    "sentinel_keyword_threshold":   3,
-    "sentinel_claude_confidence":   0.7,
-    "sentinel_min_confidence":      0.6,
-    "sentinel_use_ibkr":            False,
-    "sentinel_use_finviz":          True,
-    "sentinel_risk_multiplier":     0.5,
+    "log_file": os.path.join(_test_tmp, "decifer_test.log"),
+    "trade_log": os.path.join(_test_tmp, "decifer_trades_test.json"),
+    "order_log": os.path.join(_test_tmp, "decifer_orders_test.json"),
+    "active_account": "DU123456",
+    "agents_required_to_agree": 3,
+    "ibkr_host": "127.0.0.1",
+    "ibkr_port": 7497,
+    "ibkr_client_id": 1,
+    "risk_pct_per_trade": 0.01,
+    "daily_loss_limit": 0.02,
+    "max_positions": 10,
+    "min_cash_reserve": 5000.0,
+    "max_single_position": 0.15,
+    "min_score_to_trade": 60,
+    "high_conviction_score": 80,
+    "options_min_score": 75,
+    "options_max_risk_pct": 0.02,
+    "options_max_ivr": 60,
+    "options_target_delta": 0.35,
+    "options_delta_range": 0.10,
+    "sentinel_enabled": True,
+    "sentinel_poll_seconds": 30,
+    "sentinel_cooldown_minutes": 60,
+    "sentinel_batch_size": 10,
+    "sentinel_max_symbols": 50,
+    "sentinel_keyword_threshold": 3,
+    "sentinel_claude_confidence": 0.7,
+    "sentinel_min_confidence": 0.6,
+    "sentinel_use_ibkr": False,
+    "sentinel_use_finviz": True,
+    "sentinel_risk_multiplier": 0.5,
     "sentinel_max_trades_per_hour": 2,
-    "reconnect_max_attempts":       5,
-    "reconnect_max_wait_secs":      60,
-    "reconnect_base_wait_secs":     1,
-    "reconnect_alert_webhook":      "",
+    "reconnect_max_attempts": 5,
+    "reconnect_max_wait_secs": 60,
+    "reconnect_base_wait_secs": 1,
+    "reconnect_alert_webhook": "",
 }
 sys.modules.setdefault("config", config_mod)
 
@@ -177,11 +189,23 @@ sys.modules.setdefault("config", config_mod)
 # and blanket-stubbing them here would prevent later test files from importing
 # the real modules.
 for _mod_name in [
-    "scanner", "signals", "news", "agents", "orders", "options",
-    "options_scanner", "risk", "learning", "dashboard",
-    "news_sentinel", "theme_tracker", "sentinel_agents",
-    "social_sentiment", "portfolio_optimizer",
-    "smart_execution", "backtester",
+    "scanner",
+    "signals",
+    "news",
+    "agents",
+    "orders",
+    "options",
+    "options_scanner",
+    "risk",
+    "learning",
+    "dashboard",
+    "news_sentinel",
+    "theme_tracker",
+    "sentinel_agents",
+    "social_sentiment",
+    "portfolio_optimizer",
+    "smart_execution",
+    "backtester",
 ]:
     if _mod_name not in sys.modules:
         _m = types.ModuleType(_mod_name)
@@ -190,14 +214,14 @@ for _mod_name in [
 # scanner
 scanner_stub = sys.modules["scanner"]
 scanner_stub.get_dynamic_universe = lambda *a, **kw: []
-scanner_stub.get_market_regime    = lambda *a, **kw: {"regime": "NEUTRAL", "vix": 15, "spy_price": 450}
-scanner_stub.get_tv_signal_cache  = lambda: {}
+scanner_stub.get_market_regime = lambda *a, **kw: {"regime": "NEUTRAL", "vix": 15, "spy_price": 450}
+scanner_stub.get_tv_signal_cache = lambda: {}
 
 # signals
 signals_stub = sys.modules["signals"]
-signals_stub.score_universe        = lambda *a, **kw: ([], [])
+signals_stub.score_universe = lambda *a, **kw: ([], [])
 signals_stub.fetch_multi_timeframe = lambda *a, **kw: {}
-signals_stub.get_regime_threshold  = lambda *a, **kw: 18
+signals_stub.get_regime_threshold = lambda *a, **kw: 18
 
 # news
 news_stub = sys.modules["news"]
@@ -209,21 +233,21 @@ agents_stub.run_all_agents = lambda *a, **kw: {"action": "HOLD"}
 
 # orders
 orders_stub = sys.modules["orders"]
-orders_stub.execute_buy               = lambda *a, **kw: None
-orders_stub.execute_sell              = lambda *a, **kw: None
-orders_stub.flatten_all               = lambda *a, **kw: None
-orders_stub.reconcile_with_ibkr       = lambda *a, **kw: None
-orders_stub.get_open_positions        = lambda: []
-orders_stub.update_position_prices    = lambda *a, **kw: None
-orders_stub.update_positions_from_ibkr= lambda *a, **kw: None
-orders_stub.execute_buy_option        = lambda *a, **kw: None
-orders_stub.execute_sell_option       = lambda *a, **kw: None
-orders_stub.update_trailing_stops     = lambda *a, **kw: None
-orders_stub.update_tranche_status     = lambda *a, **kw: None
+orders_stub.execute_buy = lambda *a, **kw: None
+orders_stub.execute_sell = lambda *a, **kw: None
+orders_stub.flatten_all = lambda *a, **kw: None
+orders_stub.reconcile_with_ibkr = lambda *a, **kw: None
+orders_stub.get_open_positions = lambda: []
+orders_stub.update_position_prices = lambda *a, **kw: None
+orders_stub.update_positions_from_ibkr = lambda *a, **kw: None
+orders_stub.execute_buy_option = lambda *a, **kw: None
+orders_stub.execute_sell_option = lambda *a, **kw: None
+orders_stub.update_trailing_stops = lambda *a, **kw: None
+orders_stub.update_tranche_status = lambda *a, **kw: None
 
 # options
 options_stub = sys.modules["options"]
-options_stub.find_best_contract  = lambda *a, **kw: None
+options_stub.find_best_contract = lambda *a, **kw: None
 options_stub.check_options_exits = lambda *a, **kw: []
 
 # options_scanner
@@ -232,36 +256,40 @@ optscan_stub.scan_options_universe = lambda *a, **kw: []
 
 # risk
 risk_stub = sys.modules["risk"]
-risk_stub.can_trade                     = lambda *a, **kw: True
-risk_stub.check_risk_conditions         = lambda *a, **kw: (True, "ok")
-risk_stub.get_session                   = lambda: "REGULAR"
-risk_stub.get_scan_interval             = lambda: 300
-risk_stub.reset_daily_state             = lambda *a, **kw: None
-risk_stub.calculate_position_size       = lambda *a, **kw: 10
-risk_stub.calculate_stops               = lambda *a, **kw: (0.95, 1.10)
-risk_stub.update_equity_high_water_mark             = lambda *a, **kw: False
-risk_stub.init_equity_high_water_mark_from_history  = lambda *a, **kw: None
+risk_stub.can_trade = lambda *a, **kw: True
+risk_stub.check_risk_conditions = lambda *a, **kw: (True, "ok")
+risk_stub.get_session = lambda: "REGULAR"
+risk_stub.get_scan_interval = lambda: 300
+risk_stub.reset_daily_state = lambda *a, **kw: None
+risk_stub.calculate_position_size = lambda *a, **kw: 10
+risk_stub.calculate_stops = lambda *a, **kw: (0.95, 1.10)
+risk_stub.update_equity_high_water_mark = lambda *a, **kw: False
+risk_stub.init_equity_high_water_mark_from_history = lambda *a, **kw: None
 # ── intraday adaptive strategy (feat/intraday-adaptive) ─────────────────────
-risk_stub.get_intraday_strategy_mode    = lambda *a, **kw: {
-    "mode": "NORMAL", "score_threshold_adj": 0, "size_multiplier": 1.0,
-    "max_new_trades": 5, "context": "test", "regime_changed": False,
+risk_stub.get_intraday_strategy_mode = lambda *a, **kw: {
+    "mode": "NORMAL",
+    "score_threshold_adj": 0,
+    "size_multiplier": 1.0,
+    "max_new_trades": 5,
+    "context": "test",
+    "regime_changed": False,
     "daily_pnl_pct": 0.0,
 }
-risk_stub.set_session_opening_regime    = lambda *a, **kw: None
-risk_stub.check_thesis_validity         = lambda *a, **kw: []
-risk_stub.get_consecutive_losses        = lambda: 0
+risk_stub.set_session_opening_regime = lambda *a, **kw: None
+risk_stub.check_thesis_validity = lambda *a, **kw: []
+risk_stub.get_consecutive_losses = lambda: 0
 
 # learning
 learning_stub = sys.modules["learning"]
-learning_stub.log_trade                = lambda *a, **kw: None
-learning_stub.log_signal_scan          = lambda *a, **kw: None
-learning_stub.load_trades              = lambda: []
-learning_stub.load_orders              = lambda: []
-learning_stub.get_performance_summary  = lambda *a, **kw: {}
-learning_stub.run_weekly_review        = lambda: "review"
-learning_stub.TRADE_LOG_FILE           = "/tmp/trades.json"
-learning_stub.get_effective_capital    = lambda: 100000.0
-learning_stub.record_capital_adjustment= lambda *a, **kw: None
+learning_stub.log_trade = lambda *a, **kw: None
+learning_stub.log_signal_scan = lambda *a, **kw: None
+learning_stub.load_trades = lambda: []
+learning_stub.load_orders = lambda: []
+learning_stub.get_performance_summary = lambda *a, **kw: {}
+learning_stub.run_weekly_review = lambda: "review"
+learning_stub.TRADE_LOG_FILE = "/tmp/trades.json"
+learning_stub.get_effective_capital = lambda: 100000.0
+learning_stub.record_capital_adjustment = lambda *a, **kw: None
 
 # dashboard
 dash_stub = sys.modules["dashboard"]
@@ -269,34 +297,47 @@ dash_stub.DASHBOARD_HTML = "<html>DASH</html>"
 
 # news_sentinel
 news_sent_stub = sys.modules["news_sentinel"]
+
+
 class _FakeSentinel:
-    def __init__(self, *a, **kw): pass
-    def start(self): pass
-    def stop(self): pass
-    def pause(self): pass
-    def resume(self): pass
-news_sent_stub.NewsSentinel        = _FakeSentinel
-news_sent_stub.get_sentinel_history= lambda: []
+    def __init__(self, *a, **kw):
+        pass
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
+    def pause(self):
+        pass
+
+    def resume(self):
+        pass
+
+
+news_sent_stub.NewsSentinel = _FakeSentinel
+news_sent_stub.get_sentinel_history = lambda: []
 
 # theme_tracker
 theme_stub = sys.modules["theme_tracker"]
 theme_stub.build_sentinel_universe = lambda *a, **kw: []
-theme_stub.load_custom_themes      = lambda: {}
-theme_stub.get_all_themes          = lambda: {}
+theme_stub.load_custom_themes = lambda: {}
+theme_stub.get_all_themes = lambda: {}
 
 # sentinel_agents
 sentinel_agents_stub = sys.modules["sentinel_agents"]
 sentinel_agents_stub.run_sentinel_pipeline = lambda *a, **kw: {}
 
 # ── Now import bot ────────────────────────────────────────────────────────────
-import bot  # noqa: E402
-
 import pytest
 
+import bot
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helper
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _tmp_settings_file(tmp_path, content: dict) -> str:
     p = tmp_path / "settings_override.json"
@@ -307,6 +348,7 @@ def _tmp_settings_file(tmp_path, content: dict) -> str:
 # ═════════════════════════════════════════════════════════════════════════════
 # 1. Dashboard initial state
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestDashInitialState:
     """Verify the dash dict is populated with sensible defaults on import."""
@@ -342,6 +384,7 @@ class TestDashInitialState:
 # 2. Color map
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestColorMap:
     """COLORS dict should contain all expected keys."""
 
@@ -357,6 +400,7 @@ class TestColorMap:
 # ═════════════════════════════════════════════════════════════════════════════
 # 3. Favourites I/O
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestFavourites:
     """load_favourites / save_favourites round-trip."""
@@ -401,6 +445,7 @@ class TestFavourites:
 # 4. Settings persistence
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestSettingsPersistence:
     """save_settings_overrides / load_settings_overrides round-trip."""
 
@@ -435,7 +480,7 @@ class TestSettingsPersistence:
 
     def test_load_when_file_missing_does_not_raise(self, monkeypatch, tmp_path):
         monkeypatch.setattr(bot, "SETTINGS_FILE", str(tmp_path / "no_file.json"))
-        bot.load_settings_overrides()   # should not raise
+        bot.load_settings_overrides()  # should not raise
 
     def test_allowed_keys_whitelist(self):
         for key in bot._DASHBOARD_SETTINGS_KEYS:
@@ -456,6 +501,7 @@ class TestSettingsPersistence:
 # 5. _sync_dash_from_config
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestSyncDashFromConfig:
     """_sync_dash_from_config keeps dash aligned with CONFIG."""
 
@@ -473,6 +519,7 @@ class TestSyncDashFromConfig:
 # ═════════════════════════════════════════════════════════════════════════════
 # 6. File-hash helpers
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestFileHash:
     """_file_hash returns a stable MD5 string."""
@@ -503,6 +550,7 @@ class TestFileHash:
 # ═════════════════════════════════════════════════════════════════════════════
 # 7. Subscription registry
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestSubscriptionRegistry:
     """_register_subscription / _unregister_subscription."""
@@ -539,11 +587,12 @@ class TestSubscriptionRegistry:
 # 8. _init_hashes — populates _file_hashes for known modules
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestInitHashes:
     """_init_hashes should run without error and populate some keys."""
 
     def test_does_not_raise(self):
-        bot._init_hashes()   # must not raise
+        bot._init_hashes()  # must not raise
 
     def test_populates_dict(self):
         bot._file_hashes.clear()
@@ -556,11 +605,12 @@ class TestInitHashes:
 # 9. check_and_reload — no-op when nothing changed
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestCheckAndReload:
     """check_and_reload should return empty list when files are unchanged."""
 
     def test_returns_empty_list_when_no_change(self):
-        bot._init_hashes()   # seed hashes as current
+        bot._init_hashes()  # seed hashes as current
         changed = bot.check_and_reload()
         assert isinstance(changed, list)
         # Files didn't change, so nothing should be reloaded
@@ -586,6 +636,7 @@ class TestCheckAndReload:
 # 10. _send_reconnect_exhausted_alert — no webhook set → only updates dash
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestReconnectAlert:
     """Alert helper should update dash status and not crash."""
 
@@ -608,12 +659,13 @@ class TestReconnectAlert:
 # 11. _restore_subscriptions — empty registry is a no-op
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestRestoreSubscriptions:
     """_restore_subscriptions should handle empty registry gracefully."""
 
     def test_empty_registry_does_not_raise(self):
         bot._subscription_registry.clear()
-        bot._restore_subscriptions()   # must not raise
+        bot._restore_subscriptions()  # must not raise
 
     def test_pnl_subscription_type(self):
         bot._subscription_registry.clear()
@@ -633,13 +685,20 @@ class TestRestoreSubscriptions:
 # 12. CONFIG structure sanity
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestConfigStructure:
     """Verify the CONFIG that bot.py uses has essential keys."""
 
     REQUIRED_KEYS = [
-        "log_file", "active_account", "agents_required_to_agree",
-        "risk_pct_per_trade", "daily_loss_limit", "max_positions",
-        "min_score_to_trade", "ibkr_host", "ibkr_port",
+        "log_file",
+        "active_account",
+        "agents_required_to_agree",
+        "risk_pct_per_trade",
+        "daily_loss_limit",
+        "max_positions",
+        "min_score_to_trade",
+        "ibkr_host",
+        "ibkr_port",
     ]
 
     @pytest.mark.parametrize("key", REQUIRED_KEYS)

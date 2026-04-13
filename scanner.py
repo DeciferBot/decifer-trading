@@ -12,12 +12,14 @@ from __future__ import annotations
 
 import concurrent.futures as _cf
 import logging
+
 from ib_async import IB
+
 from config import CONFIG
-from signals import _safe_download
 
 try:
     from tradingview_screener import Query, col
+
     _TV_AVAILABLE = True
 except ImportError:
     _TV_AVAILABLE = False
@@ -29,8 +31,7 @@ except ImportError:
 log = logging.getLogger("decifer.scanner")
 
 
-def _regime_download(symbol: str, period: str = "5d", interval: str = "1h",
-                     auto_adjust: bool = True, **_ignored):
+def _regime_download(symbol: str, period: str = "5d", interval: str = "1h", auto_adjust: bool = True, **_ignored):
     """Download bars for regime detection.
 
     Priority: Alpaca (paid, reliable) → yfinance (fallback only).
@@ -39,6 +40,7 @@ def _regime_download(symbol: str, period: str = "5d", interval: str = "1h",
     # Layer 1: Alpaca — primary source
     try:
         from alpaca_data import fetch_bars
+
         df = fetch_bars(symbol, period=period, interval=interval)
         if df is not None and len(df) > 0:
             return df
@@ -46,44 +48,76 @@ def _regime_download(symbol: str, period: str = "5d", interval: str = "1h",
         log.debug(f"_regime_download Alpaca {symbol} failed: {_e}")
 
     # Layer 2: yfinance — fallback only
-    import yfinance as _yf, time as _t
+    import time as _t
+
+    import yfinance as _yf
+
     for attempt in range(3):
         try:
-            df = _yf.Ticker(symbol).history(period=period, interval=interval,
-                                            auto_adjust=auto_adjust)
+            df = _yf.Ticker(symbol).history(period=period, interval=interval, auto_adjust=auto_adjust)
             if df is not None and len(df) > 0:
                 return df
         except Exception as _e:
-            log.debug(f"_regime_download yf {symbol} attempt {attempt+1} failed: {_e}")
+            log.debug(f"_regime_download yf {symbol} attempt {attempt + 1} failed: {_e}")
         if attempt < 2:
             _t.sleep(2)
     return None
 
+
 # ── Symbols always included regardless of scanner results ──────
 CORE_SYMBOLS = [
     # Macro ETFs (regime detection)
-    "SPY", "QQQ", "IWM", "VXX",
+    "SPY",
+    "QQQ",
+    "IWM",
+    "VXX",
     # Volatility
-    "UVXY", "SVXY",
+    "UVXY",
+    "SVXY",
     # Inverse ETFs (short exposure)
-    "SPXS", "SQQQ",
+    "SPXS",
+    "SQQQ",
     # Crypto proxies
-    "IBIT", "BITO", "MSTR",
+    "IBIT",
+    "BITO",
+    "MSTR",
     # Commodities
-    "GLD", "SLV", "USO", "COPX",
+    "GLD",
+    "SLV",
+    "USO",
+    "COPX",
 ]
 
 # ── Momentum watchlist — always scored as a floor ─────────────
 MOMENTUM_FALLBACK = [
-    "AAPL", "NVDA", "TSLA", "AMZN", "MSFT", "META", "GOOGL",
-    "AMD",  "ORCL", "NFLX", "CRM",  "SHOP", "SNOW", "PLTR",
-    "WDC",  "MU",   "NBIS", "OSCR", "ASTS", "HIMS", "ALAB",
+    "AAPL",
+    "NVDA",
+    "TSLA",
+    "AMZN",
+    "MSFT",
+    "META",
+    "GOOGL",
+    "AMD",
+    "ORCL",
+    "NFLX",
+    "CRM",
+    "SHOP",
+    "SNOW",
+    "PLTR",
+    "WDC",
+    "MU",
+    "NBIS",
+    "OSCR",
+    "ASTS",
+    "HIMS",
+    "ALAB",
 ]
 
 # ── TV signal cache — populated each scan cycle ───────────────
 # signals.py reads this to skip re-fetching fields already computed here.
 # Keys are plain tickers (e.g. "NVDA"). Values are indicator dicts.
 _tv_cache: dict[str, dict] = {}
+
 
 def get_tv_signal_cache() -> dict[str, dict]:
     """
@@ -93,28 +127,29 @@ def get_tv_signal_cache() -> dict[str, dict]:
     """
     return _tv_cache
 
+
 # ── Field set fetched on every query ──────────────────────────
 _COLS = [
     "name",
     "close",
     "volume",
-    "change",                       # daily % change
-    "gap",                          # gap from prior close %
-    "relative_volume_10d_calc",     # rel. volume vs 10d avg
-    "RSI|60",                       # 1h RSI
-    "MACD.macd|60",                 # 1h MACD line
-    "MACD.signal|60",               # 1h MACD signal
-    "EMA9|60",                      # 1h EMA9
-    "EMA21|60",                     # 1h EMA21
-    "ATR|60",                       # 1h ATR (position sizing)
-    "VWAP",                         # intraday VWAP
-    "premarket_change",             # pre-market % change
-    "premarket_volume",             # pre-market volume
-    "Recommend.All",                # TV composite signal (-1 → +1)
+    "change",  # daily % change
+    "gap",  # gap from prior close %
+    "relative_volume_10d_calc",  # rel. volume vs 10d avg
+    "RSI|60",  # 1h RSI
+    "MACD.macd|60",  # 1h MACD line
+    "MACD.signal|60",  # 1h MACD signal
+    "EMA9|60",  # 1h EMA9
+    "EMA21|60",  # 1h EMA21
+    "ATR|60",  # 1h ATR (position sizing)
+    "VWAP",  # intraday VWAP
+    "premarket_change",  # pre-market % change
+    "premarket_volume",  # pre-market volume
+    "Recommend.All",  # TV composite signal (-1 → +1)
     "market_cap_basic",
-    "change_from_open",             # Intraday % change from open (short scanner)
-    "EMA20",                        # 20-period EMA (breakdown scanner)
-    "EMA50",                        # 50-period EMA (breakdown scanner)
+    "change_from_open",  # Intraday % change from open (short scanner)
+    "EMA20",  # 20-period EMA (breakdown scanner)
+    "EMA50",  # 50-period EMA (breakdown scanner)
 ]
 
 # ── Base filter applied to every query ────────────────────────
@@ -123,8 +158,8 @@ if _TV_AVAILABLE:
         col("exchange").isin(["NYSE", "NASDAQ", "AMEX"]),
         col("type") == "stock",
         col("market_cap_basic") > 100_000_000,  # $100M+ market cap
-        col("volume") > 500_000,                # minimum liquidity
-        col("close").between(2.0, 500.0),       # no pennies, no extreme prices
+        col("volume") > 500_000,  # minimum liquidity
+        col("close").between(2.0, 500.0),  # no pennies, no extreme prices
     ]
 else:
     _BASE = []
@@ -149,7 +184,7 @@ def _extract(df, source_name: str, symbols: set) -> int:
     """
     global _tv_cache
     added = 0
-    for row in df.to_dict('records'):
+    for row in df.to_dict("records"):
         raw = row.get("ticker", "")
         sym = raw.split(":")[-1] if ":" in raw else str(row.get("name", ""))
         if not sym or len(sym) > 6 or not sym.replace(".", "").isalpha():
@@ -158,26 +193,26 @@ def _extract(df, source_name: str, symbols: set) -> int:
         added += 1
         # Cache every indicator field TV returned for this symbol
         _tv_cache[sym] = {
-            "tv_close":         row.get("close"),
-            "tv_volume":        row.get("volume"),
-            "tv_change":        row.get("change"),
-            "tv_gap":           row.get("gap"),
-            "tv_rel_vol":       row.get("relative_volume_10d_calc"),
-            "tv_rsi_1h":        row.get("RSI|60"),
-            "tv_macd_1h":       row.get("MACD.macd|60"),
-            "tv_macd_sig_1h":   row.get("MACD.signal|60"),
-            "tv_ema9_1h":       row.get("EMA9|60"),
-            "tv_ema21_1h":      row.get("EMA21|60"),
-            "tv_atr_1h":        row.get("ATR|60"),
-            "tv_vwap":          row.get("VWAP"),
-            "tv_pm_change":     row.get("premarket_change"),
-            "tv_pm_volume":     row.get("premarket_volume"),
-            "tv_recommend":     row.get("Recommend.All"),
-            "tv_market_cap":    row.get("market_cap_basic"),
-            "tv_change_open":   row.get("change_from_open"),
-            "tv_ema20":         row.get("EMA20"),
-            "tv_ema50":         row.get("EMA50"),
-            "tv_source":        source_name,
+            "tv_close": row.get("close"),
+            "tv_volume": row.get("volume"),
+            "tv_change": row.get("change"),
+            "tv_gap": row.get("gap"),
+            "tv_rel_vol": row.get("relative_volume_10d_calc"),
+            "tv_rsi_1h": row.get("RSI|60"),
+            "tv_macd_1h": row.get("MACD.macd|60"),
+            "tv_macd_sig_1h": row.get("MACD.signal|60"),
+            "tv_ema9_1h": row.get("EMA9|60"),
+            "tv_ema21_1h": row.get("EMA21|60"),
+            "tv_atr_1h": row.get("ATR|60"),
+            "tv_vwap": row.get("VWAP"),
+            "tv_pm_change": row.get("premarket_change"),
+            "tv_pm_volume": row.get("premarket_volume"),
+            "tv_recommend": row.get("Recommend.All"),
+            "tv_market_cap": row.get("market_cap_basic"),
+            "tv_change_open": row.get("change_from_open"),
+            "tv_ema20": row.get("EMA20"),
+            "tv_ema50": row.get("EMA50"),
+            "tv_source": source_name,
         }
     return added
 
@@ -216,6 +251,7 @@ def get_sector_rotation_bias() -> dict:
     Returns {"available": False} on any error (non-blocking).
     """
     import time as _time
+
     global _sector_bias_cache, _sector_bias_ts
 
     now = _time.monotonic()
@@ -226,17 +262,18 @@ def get_sector_rotation_bias() -> dict:
         return {"available": False}
 
     try:
-        tickers = ["SPY"] + list(_SECTOR_ETFS.keys())
+        tickers = ["SPY", *list(_SECTOR_ETFS.keys())]
         data = _regime_download(",".join(tickers), period="1mo", interval="1d")
         if data is None or data.empty:
             return {"available": False}
 
         # Compute 5-day return per ticker
         import pandas as _pd
+
         if isinstance(data.columns, _pd.MultiIndex):
-            closes = data["Close"] if "Close" in data.columns.get_level_values(0) else data.iloc[:, 0]
+            data["Close"] if "Close" in data.columns.get_level_values(0) else data.iloc[:, 0]
         else:
-            closes = data[["Close"]] if "Close" in data.columns else data
+            data[["Close"]] if "Close" in data.columns else data
 
         # yfinance with multiple tickers returns MultiIndex columns — handle both
         returns: dict[str, float] = {}
@@ -252,17 +289,13 @@ def get_sector_rotation_bias() -> dict:
                 continue
 
         spy_ret = returns.get("SPY", 0.0)
-        sector_rs = {
-            etf: returns[etf] - spy_ret
-            for etf in _SECTOR_ETFS
-            if etf in returns
-        }
+        sector_rs = {etf: returns[etf] - spy_ret for etf in _SECTOR_ETFS if etf in returns}
 
         if len(sector_rs) < 6:
             return {"available": False}
 
         ranked = sorted(sector_rs.items(), key=lambda x: x[1], reverse=True)
-        leaders  = [etf for etf, _ in ranked[:3]]
+        leaders = [etf for etf, _ in ranked[:3]]
         laggards = [etf for etf, _ in ranked[-3:]]
 
         bias = {}
@@ -276,10 +309,10 @@ def get_sector_rotation_bias() -> dict:
 
         result = {
             "available": True,
-            "bias":      bias,
-            "leaders":   leaders,
-            "laggards":  laggards,
-            "ranked":    ranked,
+            "bias": bias,
+            "leaders": leaders,
+            "laggards": laggards,
+            "ranked": ranked,
             "spy_5d_ret": round(spy_ret, 2),
         }
 
@@ -288,7 +321,9 @@ def get_sector_rotation_bias() -> dict:
 
         log.info(
             "Sector rotation: leaders=%s laggards=%s (SPY 5d=%.1f%%)",
-            leaders, laggards, spy_ret,
+            leaders,
+            laggards,
+            spy_ret,
         )
         return result
 
@@ -297,7 +332,7 @@ def get_sector_rotation_bias() -> dict:
         return {"available": False}
 
 
-def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
+def get_dynamic_universe(ib: IB, regime: dict | None = None) -> list[str]:
     """
     Build a dynamic universe using TradingView Screener.
 
@@ -329,7 +364,7 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
     The `ib` parameter is retained for API compatibility.
     """
     global _tv_cache
-    _tv_cache = {}   # Fresh cache each scan cycle
+    _tv_cache = {}  # Fresh cache each scan cycle
 
     symbols: set[str] = set(CORE_SYMBOLS)
 
@@ -341,20 +376,20 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
             log.debug("Sector rotation: adding leader %s to universe", etf)
 
     # ── Circuit breaker — extreme VIX only ────────────────────
-    _vix      = (regime or {}).get("vix", 0)
-    _vix_1h   = (regime or {}).get("vix_1h_change", 0)
-    _is_extreme = (
-        _vix > CONFIG.get("vix_panic_min", 35) or
-        _vix_1h > CONFIG.get("vix_spike_pct", 0.20)
-    )
+    _vix = (regime or {}).get("vix", 0)
+    _vix_1h = (regime or {}).get("vix_1h_change", 0)
+    _is_extreme = _vix > CONFIG.get("vix_panic_min", 35) or _vix_1h > CONFIG.get("vix_spike_pct", 0.20)
     if _is_extreme:
-        log.warning(f"Universe: EXTREME_STRESS circuit breaker — VIX={_vix:.1f} spike={_vix_1h:.1%}. "
-                    "Directional scans skipped.")
+        log.warning(
+            f"Universe: EXTREME_STRESS circuit breaker — VIX={_vix:.1f} spike={_vix_1h:.1%}. Directional scans skipped."
+        )
 
     total_from_tv = 0
 
     if not _TV_AVAILABLE:
-        log.warning("tradingview-screener not available — skipping TV scans. Install with: pip install tradingview-screener")
+        log.warning(
+            "tradingview-screener not available — skipping TV scans. Install with: pip install tradingview-screener"
+        )
         symbols.update(MOMENTUM_FALLBACK)
         log.info(f"Universe (fallback): {len(symbols)} symbols")
         return list(symbols)
@@ -365,95 +400,172 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
     _scan_tasks: list[tuple[str, dict]] = []
 
     # 1. Volume leaders (always)
-    _scan_tasks.append(("volume_leaders", dict(
-        extra_filters=[col("volume") > 1_000_000],
-        sort_by="volume", ascending=False, limit=30,
-    )))
+    _scan_tasks.append(
+        (
+            "volume_leaders",
+            dict(
+                extra_filters=[col("volume") > 1_000_000],
+                sort_by="volume",
+                ascending=False,
+                limit=30,
+            ),
+        )
+    )
 
     # 2. Relative volume surge (always)
-    _scan_tasks.append(("rel_vol_surge", dict(
-        extra_filters=[col("relative_volume_10d_calc") > 1.5, col("volume") > 300_000],
-        sort_by="relative_volume_10d_calc", ascending=False, limit=25,
-    )))
+    _scan_tasks.append(
+        (
+            "rel_vol_surge",
+            dict(
+                extra_filters=[col("relative_volume_10d_calc") > 1.5, col("volume") > 300_000],
+                sort_by="relative_volume_10d_calc",
+                ascending=False,
+                limit=25,
+            ),
+        )
+    )
 
     if not _is_extreme:
         # 3. Momentum longs
-        _scan_tasks.append(("momentum_long", dict(
-            extra_filters=[
-                col("RSI|60").between(45, 68),
-                col("MACD.macd|60") > col("MACD.signal|60"),
-                col("relative_volume_10d_calc") > 1.2,
-            ],
-            sort_by="relative_volume_10d_calc", ascending=False, limit=20,
-        )))
+        _scan_tasks.append(
+            (
+                "momentum_long",
+                dict(
+                    extra_filters=[
+                        col("RSI|60").between(45, 68),
+                        col("MACD.macd|60") > col("MACD.signal|60"),
+                        col("relative_volume_10d_calc") > 1.2,
+                    ],
+                    sort_by="relative_volume_10d_calc",
+                    ascending=False,
+                    limit=20,
+                ),
+            )
+        )
 
         # 4. Momentum shorts
-        _scan_tasks.append(("momentum_short", dict(
-            extra_filters=[
-                col("RSI|60").between(32, 55),
-                col("MACD.macd|60") < col("MACD.signal|60"),
-                col("relative_volume_10d_calc") > 1.2,
-            ],
-            sort_by="relative_volume_10d_calc", ascending=False, limit=20,
-        )))
+        _scan_tasks.append(
+            (
+                "momentum_short",
+                dict(
+                    extra_filters=[
+                        col("RSI|60").between(32, 55),
+                        col("MACD.macd|60") < col("MACD.signal|60"),
+                        col("relative_volume_10d_calc") > 1.2,
+                    ],
+                    sort_by="relative_volume_10d_calc",
+                    ascending=False,
+                    limit=20,
+                ),
+            )
+        )
 
         # 5. Breakdown — below EMA20/50
-        _scan_tasks.append(("breakdown", dict(
-            extra_filters=[
-                col("close") < col("EMA20"),
-                col("close") < col("EMA50"),
-                col("change") < -1.0,
-                col("relative_volume_10d_calc") > 1.2,
-            ],
-            sort_by="change", ascending=True, limit=15,
-        )))
+        _scan_tasks.append(
+            (
+                "breakdown",
+                dict(
+                    extra_filters=[
+                        col("close") < col("EMA20"),
+                        col("close") < col("EMA50"),
+                        col("change") < -1.0,
+                        col("relative_volume_10d_calc") > 1.2,
+                    ],
+                    sort_by="change",
+                    ascending=True,
+                    limit=15,
+                ),
+            )
+        )
 
         # 6. Volume distribution — heavy selling
-        _scan_tasks.append(("volume_distribution", dict(
-            extra_filters=[
-                col("relative_volume_10d_calc") > 2.0,
-                col("change") < -2.0,
-            ],
-            sort_by="relative_volume_10d_calc", ascending=False, limit=12,
-        )))
+        _scan_tasks.append(
+            (
+                "volume_distribution",
+                dict(
+                    extra_filters=[
+                        col("relative_volume_10d_calc") > 2.0,
+                        col("change") < -2.0,
+                    ],
+                    sort_by="relative_volume_10d_calc",
+                    ascending=False,
+                    limit=12,
+                ),
+            )
+        )
 
         # 7. Bearish momentum
-        _scan_tasks.append(("bearish_momentum", dict(
-            extra_filters=[
-                col("RSI|60") < 40,
-                col("MACD.macd|60") < col("MACD.signal|60"),
-                col("change") < -0.5,
-                col("relative_volume_10d_calc") > 1.0,
-            ],
-            sort_by="RSI|60", ascending=True, limit=12,
-        )))
+        _scan_tasks.append(
+            (
+                "bearish_momentum",
+                dict(
+                    extra_filters=[
+                        col("RSI|60") < 40,
+                        col("MACD.macd|60") < col("MACD.signal|60"),
+                        col("change") < -0.5,
+                        col("relative_volume_10d_calc") > 1.0,
+                    ],
+                    sort_by="RSI|60",
+                    ascending=True,
+                    limit=12,
+                ),
+            )
+        )
 
         # 8. Intraday breakdown
-        _scan_tasks.append(("intraday_breakdown", dict(
-            extra_filters=[col("change_from_open") < -3.0, col("volume") > 500_000],
-            sort_by="change_from_open", ascending=True, limit=15,
-        )))
+        _scan_tasks.append(
+            (
+                "intraday_breakdown",
+                dict(
+                    extra_filters=[col("change_from_open") < -3.0, col("volume") > 500_000],
+                    sort_by="change_from_open",
+                    ascending=True,
+                    limit=15,
+                ),
+            )
+        )
 
         # 9a. Gap up — catalyst longs
-        _scan_tasks.append(("gap_go", dict(
-            extra_filters=[col("gap").between(3.0, 50.0), col("volume") > 1_000_000],
-            sort_by="gap", ascending=False, limit=15,
-        )))
+        _scan_tasks.append(
+            (
+                "gap_go",
+                dict(
+                    extra_filters=[col("gap").between(3.0, 50.0), col("volume") > 1_000_000],
+                    sort_by="gap",
+                    ascending=False,
+                    limit=15,
+                ),
+            )
+        )
 
         # 9b. Gap down — short candidates
-        _scan_tasks.append(("gap_down", dict(
-            extra_filters=[col("gap").between(-50.0, -3.0), col("volume") > 1_000_000],
-            sort_by="gap", ascending=True, limit=15,
-        )))
+        _scan_tasks.append(
+            (
+                "gap_down",
+                dict(
+                    extra_filters=[col("gap").between(-50.0, -3.0), col("volume") > 1_000_000],
+                    sort_by="gap",
+                    ascending=True,
+                    limit=15,
+                ),
+            )
+        )
 
         # 10. Pre-market movers
-        _scan_tasks.append(("premarket_movers", dict(
-            extra_filters=[
-                col("premarket_change").between(3.0, 200.0),
-                col("premarket_volume") > 50_000,
-            ],
-            sort_by="premarket_change", ascending=False, limit=15,
-        )))
+        _scan_tasks.append(
+            (
+                "premarket_movers",
+                dict(
+                    extra_filters=[
+                        col("premarket_change").between(3.0, 200.0),
+                        col("premarket_volume") > 50_000,
+                    ],
+                    sort_by="premarket_change",
+                    ascending=False,
+                    limit=15,
+                ),
+            )
+        )
 
     # ── Execute all queries in parallel, extract serially ────────────────────
     def _run_scan_task(task):
@@ -478,15 +590,11 @@ def get_dynamic_universe(ib: IB, regime: dict = None) -> list[str]:
     # ── Momentum fallback (floor — always included) ───────────
     symbols.update(MOMENTUM_FALLBACK)
 
-    log.info(
-        f"Universe: {len(symbols)} symbols | "
-        f"{total_from_tv} TV hits | "
-        f"vix={_vix:.1f} extreme={_is_extreme}"
-    )
+    log.info(f"Universe: {len(symbols)} symbols | {total_from_tv} TV hits | vix={_vix:.1f} extreme={_is_extreme}")
     return list(symbols)
 
 
-_last_good_regime: dict | None = None   # Cache last valid regime for bad-data fallback
+_last_good_regime: dict | None = None  # Cache last valid regime for bad-data fallback
 
 
 def get_market_regime(ib: IB) -> dict:
@@ -499,17 +607,18 @@ def get_market_regime(ib: IB) -> dict:
 
     def _flat(df):
         """Flatten multi-level columns from newer yfinance."""
-        if df is not None and hasattr(df.columns, 'nlevels') and df.columns.nlevels > 1:
+        if df is not None and hasattr(df.columns, "nlevels") and df.columns.nlevels > 1:
             df.columns = df.columns.get_level_values(0)
         return df
 
     # Use module-level _regime_download so tests can patch scanner._regime_download.
     import sys as _sys
+
     _dl = _sys.modules[__name__]._regime_download
 
     try:
-        spy = _dl("SPY",  period="5d", interval="1h", auto_adjust=True)
-        qqq = _dl("QQQ",  period="5d", interval="1h", auto_adjust=True)
+        spy = _dl("SPY", period="5d", interval="1h", auto_adjust=True)
+        qqq = _dl("QQQ", period="5d", interval="1h", auto_adjust=True)
 
         vix = None
         for vix_ticker in ["^VIX", "VIX", "VIXY"]:
@@ -549,14 +658,17 @@ def get_market_regime(ib: IB) -> dict:
         # SPY trades ~$400-800, QQQ ~$300-600, VIX ~8-80 in normal/stressed markets.
         # Anything wildly outside these bands is bad data, not a real move.
         spy_sane = 100 < spy_price_now < 2000
-        qqq_sane = 50  < qqq_price_now < 1500
-        vix_sane = 5   < vix_now < 100
+        qqq_sane = 50 < qqq_price_now < 1500
+        vix_sane = 5 < vix_now < 100
 
         if not spy_sane or not qqq_sane or not vix_sane:
             bad_parts = []
-            if not spy_sane: bad_parts.append(f"SPY=${spy_price_now:.2f}")
-            if not qqq_sane: bad_parts.append(f"QQQ=${qqq_price_now:.2f}")
-            if not vix_sane: bad_parts.append(f"VIX={vix_now:.2f}")
+            if not spy_sane:
+                bad_parts.append(f"SPY=${spy_price_now:.2f}")
+            if not qqq_sane:
+                bad_parts.append(f"QQQ=${qqq_price_now:.2f}")
+            if not vix_sane:
+                bad_parts.append(f"VIX={vix_now:.2f}")
             log.error(
                 f"REGIME DATA SANITY FAIL: {', '.join(bad_parts)} — "
                 f"values outside plausible range, rejecting corrupt data"
@@ -567,14 +679,18 @@ def get_market_regime(ib: IB) -> dict:
             else:
                 log.warning("No previous good regime cached — returning UNKNOWN")
                 return {
-                    "regime": "UNKNOWN", "vix": 0, "vix_1h_change": 0,
-                    "spy_price": 0, "spy_above_200d": False,
-                    "qqq_price": 0, "qqq_above_200d": False,
+                    "regime": "UNKNOWN",
+                    "vix": 0,
+                    "vix_1h_change": 0,
+                    "spy_price": 0,
+                    "spy_above_200d": False,
+                    "qqq_price": 0,
+                    "qqq_above_200d": False,
                     "position_size_multiplier": 0.5,
                     "regime_router": "unknown",
                 }
 
-        vix_prev      = float(vix_close.iloc[-2]) if vix_close is not None and len(vix_close) > 1 else vix_now
+        vix_prev = float(vix_close.iloc[-2]) if vix_close is not None and len(vix_close) > 1 else vix_now
         vix_1h_change = (vix_now - vix_prev) / vix_prev if vix_prev > 0 else 0
 
         # ── 200-DAY DAILY MA — more reliable trend signal than 20h EMA ──
@@ -584,14 +700,14 @@ def get_market_regime(ib: IB) -> dict:
         # Fallback: use short-term EMA if daily fetch fails.
         spy_above_200d = False
         qqq_above_200d = False
-        spy_200d_ma    = None
-        qqq_200d_ma    = None
+        spy_200d_ma = None
+        qqq_200d_ma = None
         try:
             spy_daily = _dl("SPY", period="1y", interval="1d", auto_adjust=True)
             qqq_daily = _dl("QQQ", period="1y", interval="1d", auto_adjust=True)
             if spy_daily is not None and len(spy_daily) >= 50:
-                spy_d_close   = spy_daily["Close"].squeeze().dropna()
-                spy_200d_ma   = float(spy_d_close.rolling(min(200, len(spy_d_close))).mean().iloc[-1])
+                spy_d_close = spy_daily["Close"].squeeze().dropna()
+                spy_200d_ma = float(spy_d_close.rolling(min(200, len(spy_d_close))).mean().iloc[-1])
                 spy_above_200d = spy_price_now > spy_200d_ma
             else:
                 # Daily data unavailable — fail safe: assume not above 200d MA
@@ -599,8 +715,8 @@ def get_market_regime(ib: IB) -> dict:
                 spy_above_200d = False
                 log.warning("SPY daily data unavailable for 200d MA — defaulting spy_above_200d=False")
             if qqq_daily is not None and len(qqq_daily) >= 50:
-                qqq_d_close   = qqq_daily["Close"].squeeze().dropna()
-                qqq_200d_ma   = float(qqq_d_close.rolling(min(200, len(qqq_d_close))).mean().iloc[-1])
+                qqq_d_close = qqq_daily["Close"].squeeze().dropna()
+                qqq_200d_ma = float(qqq_d_close.rolling(min(200, len(qqq_d_close))).mean().iloc[-1])
                 qqq_above_200d = qqq_price_now > qqq_200d_ma
             else:
                 qqq_above_200d = False
@@ -614,8 +730,8 @@ def get_market_regime(ib: IB) -> dict:
         # Breadth confirms whether a trend has broad participation or is
         # driven by a handful of mega-caps. A SPY above its 200d MA with
         # MMTH < 40% is a narrow-leader rally, not a genuine bull regime.
-        breadth_pct  = None
-        breadth_cfg  = CONFIG.get("breadth_regime", {})
+        breadth_pct = None
+        breadth_cfg = CONFIG.get("breadth_regime", {})
         if breadth_cfg.get("enabled", True):
             try:
                 _bt = breadth_cfg.get("ticker", "^MMTH")
@@ -632,18 +748,18 @@ def get_market_regime(ib: IB) -> dict:
         #   Factor 3: Market breadth (participation confirmation)
         _bull_min = breadth_cfg.get("bull_min", 55.0)
         _bear_max = breadth_cfg.get("bear_max", 40.0)
-        _breadth_confirms_bull = (breadth_pct is None or breadth_pct > _bull_min)
-        _breadth_confirms_bear = (breadth_pct is None or breadth_pct < _bear_max)
+        _breadth_confirms_bull = breadth_pct is None or breadth_pct > _bull_min
+        _breadth_confirms_bear = breadth_pct is None or breadth_pct < _bear_max
 
         if vix_now > CONFIG["vix_panic_min"] or vix_1h_change > CONFIG["vix_spike_pct"]:
             regime = "CAPITULATION"
-        elif (vix_now < CONFIG["vix_bull_max"] and spy_above_200d and qqq_above_200d
-              and _breadth_confirms_bull):
+        elif vix_now < CONFIG["vix_bull_max"] and spy_above_200d and qqq_above_200d and _breadth_confirms_bull:
             regime = "TRENDING_UP"
-        elif (not spy_above_200d and not qqq_above_200d and vix_now > CONFIG["vix_choppy_max"]
-              and _breadth_confirms_bear):
+        elif (
+            not spy_above_200d and not qqq_above_200d and vix_now > CONFIG["vix_choppy_max"] and _breadth_confirms_bear
+        ):
             regime = "TRENDING_DOWN"
-        elif (not spy_above_200d and not qqq_above_200d and vix_1h_change < -0.05):
+        elif not spy_above_200d and not qqq_above_200d and vix_1h_change < -0.05:
             # Both below 200d MA (structural bear) but VIX falling — intraday bounce within downtrend
             regime = "RELIEF_RALLY"
         else:
@@ -660,7 +776,7 @@ def get_market_regime(ib: IB) -> dict:
         # DXY rising = dollar strengthening = risk-off (money flees to safety).
         # Credit spread (HYG yield vs LQD yield) widening = corporate stress.
         # These signals can detect risk-off transitions 1-2 days before VIX spikes.
-        dxy_trend    = "unknown"
+        dxy_trend = "unknown"
         credit_stress = False
         credit_spread = None
         if CONFIG.get("cross_asset_regime_enabled", True):
@@ -712,14 +828,15 @@ def get_market_regime(ib: IB) -> dict:
         #   1. Open-to-now > rally_override_pct%  (sustained intraday trend)
         #   2. 30m ROC > roc_override_pct%        (fast acceleration, e.g. +0.5% in 30 min)
         _rally_threshold = CONFIG.get("regime_router_rally_override_pct", 1.5)
-        _roc_threshold   = CONFIG.get("regime_router_roc_override_pct",   0.4)
+        _roc_threshold = CONFIG.get("regime_router_roc_override_pct", 0.4)
         _spy_intraday_pct = 0.0
-        _spy_roc_30m      = 0.0
+        _spy_roc_30m = 0.0
         try:
             # Layer 1: live stream cache (SPY always subscribed as STREAM_ANCHOR)
             _spy5 = None
             try:
                 from alpaca_stream import BAR_CACHE
+
                 _spy5 = BAR_CACHE.get_5m("SPY")
             except Exception:
                 pass
@@ -727,49 +844,52 @@ def get_market_regime(ib: IB) -> dict:
             # Layer 2: Alpaca REST (stream cold — bot just started)
             if _spy5 is None or len(_spy5) < 2:
                 from alpaca_data import fetch_bars as _fetch_bars
+
                 _spy5 = _fetch_bars("SPY", period="1d", interval="5m")
 
             if _spy5 is not None and len(_spy5) >= 2:
-                _spy5_close   = _spy5["Close"].squeeze().dropna()
-                _spy5_now     = float(_spy5_close.iloc[-1])
-                _spy5_open    = float(_spy5_close.iloc[0])   # today's first bar
+                _spy5_close = _spy5["Close"].squeeze().dropna()
+                _spy5_now = float(_spy5_close.iloc[-1])
+                _spy5_open = float(_spy5_close.iloc[0])  # today's first bar
                 _spy5_30m_ago = float(_spy5_close.iloc[max(-7, -len(_spy5_close))])  # ~30 min back
-                _spy_intraday_pct = (_spy5_now - _spy5_open)    / _spy5_open    * 100
-                _spy_roc_30m      = (_spy5_now - _spy5_30m_ago) / _spy5_30m_ago * 100
+                _spy_intraday_pct = (_spy5_now - _spy5_open) / _spy5_open * 100
+                _spy_roc_30m = (_spy5_now - _spy5_30m_ago) / _spy5_30m_ago * 100
         except Exception as _re:
             log.debug("Rally override SPY fetch failed (%s) — skipping override", _re)
 
         _override_to = None
         if abs(_spy_intraday_pct) > _rally_threshold:
             _override_to = "momentum" if _spy_intraday_pct > 0 else "mean_reversion"
-            _trigger     = f"open-to-now {_spy_intraday_pct:+.1f}%"
+            _trigger = f"open-to-now {_spy_intraday_pct:+.1f}%"
         elif abs(_spy_roc_30m) > _roc_threshold:
             _override_to = "momentum" if _spy_roc_30m > 0 else "mean_reversion"
-            _trigger     = f"30m ROC {_spy_roc_30m:+.2f}%"
+            _trigger = f"30m ROC {_spy_roc_30m:+.2f}%"
 
         if _override_to and _regime_router != _override_to:
             log.info(
                 "RALLY OVERRIDE (%s): router overridden %s → %s",
-                _trigger, _regime_router, _override_to,
+                _trigger,
+                _regime_router,
+                _override_to,
             )
             _regime_router = _override_to
 
         result = {
-            "regime":                   regime,
-            "vix":                      round(vix_now, 2),
-            "vix_1h_change":            round(vix_1h_change * 100, 2),
-            "spy_price":                round(spy_price_now, 2),
-            "spy_above_200d":           spy_above_200d,
-            "spy_200d_ma":              round(spy_200d_ma, 2) if spy_200d_ma else None,
-            "qqq_price":                round(qqq_price_now, 2),
-            "qqq_above_200d":           qqq_above_200d,
-            "qqq_200d_ma":              round(qqq_200d_ma, 2) if qqq_200d_ma else None,
-            "breadth_pct":              round(breadth_pct, 1) if breadth_pct is not None else None,
+            "regime": regime,
+            "vix": round(vix_now, 2),
+            "vix_1h_change": round(vix_1h_change * 100, 2),
+            "spy_price": round(spy_price_now, 2),
+            "spy_above_200d": spy_above_200d,
+            "spy_200d_ma": round(spy_200d_ma, 2) if spy_200d_ma else None,
+            "qqq_price": round(qqq_price_now, 2),
+            "qqq_above_200d": qqq_above_200d,
+            "qqq_200d_ma": round(qqq_200d_ma, 2) if qqq_200d_ma else None,
+            "breadth_pct": round(breadth_pct, 1) if breadth_pct is not None else None,
             "position_size_multiplier": _regime_size_mult(regime),
-            "regime_router":            _regime_router,
-            "dxy_trend":                dxy_trend,
-            "credit_stress":            credit_stress,
-            "credit_spread":            credit_spread,
+            "regime_router": _regime_router,
+            "dxy_trend": dxy_trend,
+            "credit_stress": credit_stress,
+            "credit_spread": credit_spread,
         }
 
         # Cache this as last known good regime
@@ -802,12 +922,12 @@ def get_market_regime(ib: IB) -> dict:
 
 def _regime_size_mult(regime: str) -> float:
     return {
-        "TRENDING_UP":   1.0,
+        "TRENDING_UP": 1.0,
         "TRENDING_DOWN": 1.0,
-        "RELIEF_RALLY":  1.0,
-        "RANGE_BOUND":   1.0,
-        "CAPITULATION":  0.0,
-        "UNKNOWN":       0.75,
+        "RELIEF_RALLY": 1.0,
+        "RANGE_BOUND": 1.0,
+        "CAPITULATION": 0.0,
+        "UNKNOWN": 0.75,
     }.get(regime, 0.75)
 
 

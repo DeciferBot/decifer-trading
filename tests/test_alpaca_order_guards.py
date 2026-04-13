@@ -21,36 +21,44 @@ import logging
 import os
 import sys
 import types
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 # ── Project root ──────────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ── Stub every heavy dep that orders_core imports at module level ─────────────
-for _m in ("ib_async", "ib_insync", "anthropic", "praw", "feedparser",
-           "tradingview_screener", "cvxpy",
-           "alpaca", "alpaca.data", "alpaca.data.historical",
-           "alpaca.data.live", "alpaca.data.enums", "alpaca.data.timeframe",
-           "alpaca.data.requests"):
+for _m in (
+    "ib_async",
+    "ib_insync",
+    "anthropic",
+    "praw",
+    "feedparser",
+    "tradingview_screener",
+    "cvxpy",
+    "alpaca",
+    "alpaca.data",
+    "alpaca.data.historical",
+    "alpaca.data.live",
+    "alpaca.data.enums",
+    "alpaca.data.timeframe",
+    "alpaca.data.requests",
+):
     sys.modules.setdefault(_m, types.ModuleType(_m))
 
 _col = types.ModuleType("colorama")
-_col.Fore  = types.SimpleNamespace(YELLOW="", GREEN="", CYAN="", RED="", WHITE="",
-                                    MAGENTA="", RESET="")
+_col.Fore = types.SimpleNamespace(YELLOW="", GREEN="", CYAN="", RED="", WHITE="", MAGENTA="", RESET="")
 _col.Style = types.SimpleNamespace(RESET_ALL="", BRIGHT="")
-_col.init  = lambda **kw: None
+_col.init = lambda **kw: None
 sys.modules.setdefault("colorama", _col)
 
 # ── Import alpaca_stream singletons (real module) ────────────────────────────
 # We import the real alpaca_stream so we can manipulate the caches directly.
 if "alpaca_stream" in sys.modules and not hasattr(sys.modules["alpaca_stream"], "__file__"):
     del sys.modules["alpaca_stream"]
-from alpaca_stream import HALT_CACHE, QUOTE_CACHE, _HaltCache, _QuoteCache
-
+from alpaca_stream import _HaltCache, _QuoteCache
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
 
 def _make_fresh_halt_cache() -> _HaltCache:
     c = _HaltCache()
@@ -69,6 +77,7 @@ def _make_fresh_quote_cache() -> _QuoteCache:
 # call the guard logic directly (extracted as a pure function test).  We test
 # the guard's contract — not execute_buy's full lifecycle.
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class TestHaltCacheGuardContract:
     """
@@ -112,13 +121,14 @@ class TestHaltCacheGuardContract:
 
     def test_guard_logic_passes_when_not_halted(self):
         c = _make_fresh_halt_cache()
-        result = c.is_halted("SPY")   # never marked halted
+        result = c.is_halted("SPY")  # never marked halted
         assert result is False, "Guard must not block a non-halted symbol"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Tests: QUOTE_CACHE spread gate contract
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class TestSpreadGateContract:
     """
@@ -130,7 +140,7 @@ class TestSpreadGateContract:
             return False
     """
 
-    _MAX_SPREAD = 0.003   # matches CONFIG default
+    _MAX_SPREAD = 0.003  # matches CONFIG default
 
     def _gate(self, spread_pct, max_spread=None):
         """Return True if the gate would block (i.e. order aborted)."""
@@ -174,8 +184,8 @@ class TestSpreadGateContract:
 # (critical for paper trading without Alpaca stream running)
 # ══════════════════════════════════════════════════════════════════════════════
 
-class TestQuoteCacheEmptyState:
 
+class TestQuoteCacheEmptyState:
     def test_empty_cache_returns_none_spread(self):
         """Without a running stream, cache is empty → spread_pct is None."""
         c = _make_fresh_quote_cache()
@@ -192,8 +202,7 @@ class TestQuoteCacheEmptyState:
         # Inline the guard check
         max_spread = 0.003
         gate_blocks = spread is not None and spread > max_spread
-        assert gate_blocks is False, \
-            "Empty QUOTE_CACHE must not block orders — paper trading depends on this"
+        assert gate_blocks is False, "Empty QUOTE_CACHE must not block orders — paper trading depends on this"
 
     def test_populated_cache_returns_spread(self):
         c = _make_fresh_quote_cache()
@@ -213,7 +222,7 @@ class TestQuoteCacheEmptyState:
     def test_wide_spread_blocks(self):
         """2% spread must trigger the gate."""
         c = _make_fresh_quote_cache()
-        c.update("JUNK", bid=49.0, ask=51.0)   # ~4% spread
+        c.update("JUNK", bid=49.0, ask=51.0)  # ~4% spread
         sp = c.get_spread_pct("JUNK")
         gate_blocks = sp is not None and sp > 0.003
         assert gate_blocks is True
@@ -226,6 +235,7 @@ class TestQuoteCacheEmptyState:
 # target symbol.  The function must return False immediately (guard short-circuit)
 # without ever reaching the IBKR layer.
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 class TestExecuteBuyHaltGate:
     """
@@ -242,74 +252,89 @@ class TestExecuteBuyHaltGate:
         empty_quotes = _make_fresh_quote_cache()
 
         import alpaca_stream as _ast
-        original_halt  = _ast.HALT_CACHE
+
+        original_halt = _ast.HALT_CACHE
         original_quote = _ast.QUOTE_CACHE
-        _ast.HALT_CACHE  = halted
+        _ast.HALT_CACHE = halted
         _ast.QUOTE_CACHE = empty_quotes
         try:
             from orders_core import execute_buy
+
             result = execute_buy(
-                ib=MagicMock(), symbol="HALT_ME",
-                price=100.0, atr=1.5, score=25,
-                portfolio_value=100_000, regime={"regime": "TRENDING_UP"},
+                ib=MagicMock(),
+                symbol="HALT_ME",
+                price=100.0,
+                atr=1.5,
+                score=25,
+                portfolio_value=100_000,
+                regime={"regime": "TRENDING_UP"},
             )
             assert result is False, "Halted symbol must be blocked by halt gate"
         finally:
-            _ast.HALT_CACHE  = original_halt
+            _ast.HALT_CACHE = original_halt
             _ast.QUOTE_CACHE = original_quote
 
     def test_non_halted_symbol_not_blocked_by_halt_gate(self, caplog):
         """A non-halted symbol must not be blocked by the halt gate."""
-        empty_halt  = _make_fresh_halt_cache()
+        empty_halt = _make_fresh_halt_cache()
         empty_quote = _make_fresh_quote_cache()
 
         import alpaca_stream as _ast
-        original_halt  = _ast.HALT_CACHE
+
+        original_halt = _ast.HALT_CACHE
         original_quote = _ast.QUOTE_CACHE
-        _ast.HALT_CACHE  = empty_halt
+        _ast.HALT_CACHE = empty_halt
         _ast.QUOTE_CACHE = empty_quote
         try:
             from orders_core import execute_buy
+
             with caplog.at_level(logging.WARNING, logger="decifer.orders"):
                 # Attempt a buy; it will fail downstream (no IBKR), but
                 # the halt gate warning must NOT appear.
                 execute_buy(
-                    ib=MagicMock(), symbol="AAPL",
-                    price=100.0, atr=1.5, score=25,
-                    portfolio_value=100_000, regime={"regime": "TRENDING_UP"},
+                    ib=MagicMock(),
+                    symbol="AAPL",
+                    price=100.0,
+                    atr=1.5,
+                    score=25,
+                    portfolio_value=100_000,
+                    regime={"regime": "TRENDING_UP"},
                 )
-            halt_msgs = [r.message for r in caplog.records
-                         if "trading halted" in r.message.lower()]
-            assert not halt_msgs, \
-                f"Halt gate fired on non-halted symbol: {halt_msgs}"
+            halt_msgs = [r.message for r in caplog.records if "trading halted" in r.message.lower()]
+            assert not halt_msgs, f"Halt gate fired on non-halted symbol: {halt_msgs}"
         finally:
-            _ast.HALT_CACHE  = original_halt
+            _ast.HALT_CACHE = original_halt
             _ast.QUOTE_CACHE = original_quote
 
 
 class TestExecuteBuySpreadGate:
-
     def test_wide_spread_returns_false(self):
         """execute_buy must return False immediately when spread exceeds the gate."""
-        empty_halt  = _make_fresh_halt_cache()
+        empty_halt = _make_fresh_halt_cache()
         wide_quotes = _make_fresh_quote_cache()
-        wide_quotes.update("WIDE", bid=48.0, ask=52.0)   # 8% spread — clearly blocked
+        wide_quotes.update("WIDE", bid=48.0, ask=52.0)  # 8% spread — clearly blocked
 
         import alpaca_stream as _ast
-        original_halt  = _ast.HALT_CACHE
+
+        original_halt = _ast.HALT_CACHE
         original_quote = _ast.QUOTE_CACHE
-        _ast.HALT_CACHE  = empty_halt
+        _ast.HALT_CACHE = empty_halt
         _ast.QUOTE_CACHE = wide_quotes
         try:
             from orders_core import execute_buy
+
             result = execute_buy(
-                ib=MagicMock(), symbol="WIDE",
-                price=50.0, atr=1.0, score=25,
-                portfolio_value=100_000, regime={"regime": "TRENDING_UP"},
+                ib=MagicMock(),
+                symbol="WIDE",
+                price=50.0,
+                atr=1.0,
+                score=25,
+                portfolio_value=100_000,
+                regime={"regime": "TRENDING_UP"},
             )
             assert result is False, "Wide spread must be blocked by spread gate"
         finally:
-            _ast.HALT_CACHE  = original_halt
+            _ast.HALT_CACHE = original_halt
             _ast.QUOTE_CACHE = original_quote
 
     def test_empty_quote_cache_does_not_block(self, caplog):
@@ -320,29 +345,35 @@ class TestExecuteBuySpreadGate:
         This is the primary paper-trading safety: the bot must trade normally
         even when the Alpaca stream hasn't connected yet.
         """
-        empty_halt  = _make_fresh_halt_cache()
-        empty_quote = _make_fresh_quote_cache()   # no quotes stored
+        empty_halt = _make_fresh_halt_cache()
+        empty_quote = _make_fresh_quote_cache()  # no quotes stored
 
         import alpaca_stream as _ast
-        original_halt  = _ast.HALT_CACHE
+
+        original_halt = _ast.HALT_CACHE
         original_quote = _ast.QUOTE_CACHE
-        _ast.HALT_CACHE  = empty_halt
+        _ast.HALT_CACHE = empty_halt
         _ast.QUOTE_CACHE = empty_quote
         try:
             from orders_core import execute_buy
+
             with caplog.at_level(logging.WARNING, logger="decifer.orders"):
                 execute_buy(
-                    ib=MagicMock(), symbol="AAPL",
-                    price=100.0, atr=1.5, score=25,
-                    portfolio_value=100_000, regime={"regime": "TRENDING_UP"},
+                    ib=MagicMock(),
+                    symbol="AAPL",
+                    price=100.0,
+                    atr=1.5,
+                    score=25,
+                    portfolio_value=100_000,
+                    regime={"regime": "TRENDING_UP"},
                 )
-            spread_blocked_msgs = [r.message for r in caplog.records
-                                   if "spread" in r.message.lower()
-                                   and "aborting" in r.message.lower()]
+            spread_blocked_msgs = [
+                r.message for r in caplog.records if "spread" in r.message.lower() and "aborting" in r.message.lower()
+            ]
             assert not spread_blocked_msgs, (
                 "Spread gate fired on EMPTY cache — this blocks ALL orders when "
                 f"Alpaca stream is not running: {spread_blocked_msgs}"
             )
         finally:
-            _ast.HALT_CACHE  = original_halt
+            _ast.HALT_CACHE = original_halt
             _ast.QUOTE_CACHE = original_quote

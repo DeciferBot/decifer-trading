@@ -21,8 +21,8 @@ import sys
 import tempfile
 import types
 import unittest
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, patch, call
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 
 # ── Project root on path ──────────────────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -88,31 +88,31 @@ sys.modules.setdefault("social_sentiment", _social)
 # ── Now import the module under test ─────────────────────────────────────────
 import signal_pipeline
 from signal_pipeline import (
-    _apply_tv_prefilter,
-    _scored_to_signals,
+    SignalPipelineResult,
     _append_signals_log,
     _apply_strategy_threshold,
+    _apply_tv_prefilter,
+    _scored_to_signals,
     run_signal_pipeline,
-    SignalPipelineResult,
 )
-from signal_types import Signal, SIGNALS_LOG
-
+from signal_types import SIGNALS_LOG, Signal
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
+
 
 def _tv_entry(**overrides) -> dict:
     """Build a TV cache entry that passes ALL hard kills by default."""
     base = {
-        "tv_close":       150.0,
-        "tv_recommend":   0.5,
-        "tv_rel_vol":     2.0,
-        "tv_rsi_1h":      55.0,
-        "tv_change":      1.5,
-        "tv_ema9_1h":     149.0,
-        "tv_ema21_1h":    148.0,   # spread ≈ 0.67% > 0.1% → ema_aligned
-        "tv_macd_1h":     0.5,
-        "tv_macd_sig_1h": 0.3,     # diff = 0.2 > 0.01 → macd_thrust
-        "tv_vwap":        148.0,
+        "tv_close": 150.0,
+        "tv_recommend": 0.5,
+        "tv_rel_vol": 2.0,
+        "tv_rsi_1h": 55.0,
+        "tv_change": 1.5,
+        "tv_ema9_1h": 149.0,
+        "tv_ema21_1h": 148.0,  # spread ≈ 0.67% > 0.1% → ema_aligned
+        "tv_macd_1h": 0.5,
+        "tv_macd_sig_1h": 0.3,  # diff = 0.2 > 0.01 → macd_thrust
+        "tv_vwap": 148.0,
     }
     base.update(overrides)
     return base
@@ -130,26 +130,38 @@ def _scored_dict(symbol="AAPL", score=35, direction="LONG") -> dict:
         "direction": direction,
         "price": 180.0,
         "atr": 3.5,
-        "score_breakdown": {"trend": 7, "momentum": 6, "squeeze": 5,
-                             "flow": 4, "breakout": 3, "mtf": 6,
-                             "news": 4, "social": 2, "reversion": 1},
+        "score_breakdown": {
+            "trend": 7,
+            "momentum": 6,
+            "squeeze": 5,
+            "flow": 4,
+            "breakout": 3,
+            "mtf": 6,
+            "news": 4,
+            "social": 2,
+            "reversion": 1,
+        },
     }
 
 
 def _default_regime() -> dict:
-    return {"regime": "TRENDING_UP", "vix": 15.0, "spy_price": 500.0,
-            "regime_router": "momentum"}
+    return {"regime": "TRENDING_UP", "vix": 15.0, "spy_price": 500.0, "regime_router": "momentum"}
 
 
 def _default_strategy_mode() -> dict:
-    return {"mode": "NORMAL", "score_threshold_adj": 0,
-            "daily_pnl_pct": 0.0, "size_multiplier": 1.0, "max_new_trades": 5}
+    return {
+        "mode": "NORMAL",
+        "score_threshold_adj": 0,
+        "daily_pnl_pct": 0.0,
+        "size_multiplier": 1.0,
+        "max_new_trades": 5,
+    }
 
 
 # ── TestApplyTvPrefilter ───────────────────────────────────────────────────────
 
-class TestApplyTvPrefilter(unittest.TestCase):
 
+class TestApplyTvPrefilter(unittest.TestCase):
     # ── Empty / no-cache cases ──────────────────────────────────────────────
 
     def test_empty_cache_returns_universe_unchanged(self):
@@ -219,22 +231,33 @@ class TestApplyTvPrefilter(unittest.TestCase):
 
     def test_neither_ema_nor_macd_kills_symbol(self):
         """ema spread < 0.001 AND macd diff < 0.01 → excluded."""
-        cache = {"X": _tv_entry(tv_ema9_1h=100.0, tv_ema21_1h=100.0,
-                                tv_macd_1h=0.5, tv_macd_sig_1h=0.5)}
+        cache = {"X": _tv_entry(tv_ema9_1h=100.0, tv_ema21_1h=100.0, tv_macd_1h=0.5, tv_macd_sig_1h=0.5)}
         result = _apply_tv_prefilter(["X"], cache, [])
         self.assertNotIn("X", result)
 
     def test_ema_aligned_alone_passes(self):
         """ema_aligned=True, macd_thrust=False → passes."""
-        cache = {"X": _tv_entry(tv_ema9_1h=102.0, tv_ema21_1h=100.0,  # 2% spread
-                                tv_macd_1h=0.5, tv_macd_sig_1h=0.5)}   # no thrust
+        cache = {
+            "X": _tv_entry(
+                tv_ema9_1h=102.0,
+                tv_ema21_1h=100.0,  # 2% spread
+                tv_macd_1h=0.5,
+                tv_macd_sig_1h=0.5,
+            )
+        }  # no thrust
         result = _apply_tv_prefilter(["X"], cache, [])
         self.assertIn("X", result)
 
     def test_macd_thrust_alone_passes(self):
         """macd_thrust=True, ema_aligned=False → passes."""
-        cache = {"X": _tv_entry(tv_ema9_1h=100.0, tv_ema21_1h=100.0,   # no alignment
-                                tv_macd_1h=0.5, tv_macd_sig_1h=0.3)}    # thrust = 0.2
+        cache = {
+            "X": _tv_entry(
+                tv_ema9_1h=100.0,
+                tv_ema21_1h=100.0,  # no alignment
+                tv_macd_1h=0.5,
+                tv_macd_sig_1h=0.3,
+            )
+        }  # thrust = 0.2
         result = _apply_tv_prefilter(["X"], cache, [])
         self.assertIn("X", result)
 
@@ -250,8 +273,8 @@ class TestApplyTvPrefilter(unittest.TestCase):
         """Symbol with stronger rec × rel_vol appears in top-25; weaker one may be cut."""
         symbols = ["STRONG", "WEAK"]
         cache = {
-            "STRONG": _tv_entry(tv_recommend=0.9, tv_rel_vol=5.0),   # rank = 4.5
-            "WEAK":   _tv_entry(tv_recommend=0.1, tv_rel_vol=0.6),   # rank = 0.06
+            "STRONG": _tv_entry(tv_recommend=0.9, tv_rel_vol=5.0),  # rank = 4.5
+            "WEAK": _tv_entry(tv_recommend=0.1, tv_rel_vol=0.6),  # rank = 0.06
         }
         result = _apply_tv_prefilter(symbols, cache, [])
         self.assertIn("STRONG", result)
@@ -266,10 +289,12 @@ class TestApplyTvPrefilter(unittest.TestCase):
         """Symbol with VWAP alignment should rank higher than identical one without."""
         # Both have same rec × rel_vol = 1.0; VWAP-aligned gets 1.3x → wins
         cache = {
-            "ALIGNED": _tv_entry(tv_recommend=0.5, tv_rel_vol=2.0,
-                                  tv_close=151.0, tv_vwap=148.0),  # close > vwap, rec > 0
-            "FLAT":    _tv_entry(tv_recommend=0.5, tv_rel_vol=2.0,
-                                  tv_close=145.0, tv_vwap=148.0),  # close < vwap, rec > 0 → no bonus
+            "ALIGNED": _tv_entry(
+                tv_recommend=0.5, tv_rel_vol=2.0, tv_close=151.0, tv_vwap=148.0
+            ),  # close > vwap, rec > 0
+            "FLAT": _tv_entry(
+                tv_recommend=0.5, tv_rel_vol=2.0, tv_close=145.0, tv_vwap=148.0
+            ),  # close < vwap, rec > 0 → no bonus
         }
         result = _apply_tv_prefilter(["ALIGNED", "FLAT"], cache, [])
         # Both should be present (only 2 symbols); but ALIGNED should rank first
@@ -280,8 +305,8 @@ class TestApplyTvPrefilter(unittest.TestCase):
     def test_favourites_preserved_when_filtered_out(self):
         """FAV would be killed by rec=0.0 but is in favourites → still in result."""
         cache = {
-            "FAV": _tv_entry(tv_recommend=0.0),   # rec=0 → killed by hard kill
-            "OK":  _tv_entry(),
+            "FAV": _tv_entry(tv_recommend=0.0),  # rec=0 → killed by hard kill
+            "OK": _tv_entry(),
         }
         result = _apply_tv_prefilter(["FAV", "OK"], cache, favourites=["FAV"])
         self.assertIn("FAV", result)
@@ -318,11 +343,10 @@ class TestApplyTvPrefilter(unittest.TestCase):
 
 # ── TestScoredToSignals ───────────────────────────────────────────────────────
 
-class TestScoredToSignals(unittest.TestCase):
 
+class TestScoredToSignals(unittest.TestCase):
     def test_basic_conversion(self):
-        scored = [_scored_dict("AAPL", score=35, direction="LONG"),
-                  _scored_dict("NVDA", score=40, direction="SHORT")]
+        scored = [_scored_dict("AAPL", score=35, direction="LONG"), _scored_dict("NVDA", score=40, direction="SHORT")]
         signals = _scored_to_signals(scored, "TRENDING_UP")
         self.assertEqual(len(signals), 2)
         self.assertEqual(signals[0].symbol, "AAPL")
@@ -359,13 +383,18 @@ class TestScoredToSignals(unittest.TestCase):
 
 # ── TestAppendSignalsLog ──────────────────────────────────────────────────────
 
-class TestAppendSignalsLog(unittest.TestCase):
 
+class TestAppendSignalsLog(unittest.TestCase):
     def _make_signal(self, symbol="AAPL") -> Signal:
         return Signal(
-            symbol=symbol, direction="LONG", conviction_score=7.0,
-            dimension_scores={"trend": 7}, timestamp=datetime.now(timezone.utc),
-            regime_context="TRENDING_UP", price=100.0, atr=2.5,
+            symbol=symbol,
+            direction="LONG",
+            conviction_score=7.0,
+            dimension_scores={"trend": 7},
+            timestamp=datetime.now(UTC),
+            regime_context="TRENDING_UP",
+            price=100.0,
+            atr=2.5,
         )
 
     def test_writes_valid_jsonl_lines(self):
@@ -374,7 +403,8 @@ class TestAppendSignalsLog(unittest.TestCase):
             path = f.name
         try:
             _append_signals_log(signals, path)
-            lines = open(path).readlines()
+            with open(path) as f:
+                lines = f.readlines()
             self.assertEqual(len(lines), 2)
             for line in lines:
                 parsed = json.loads(line.strip())
@@ -397,7 +427,8 @@ class TestAppendSignalsLog(unittest.TestCase):
         try:
             _append_signals_log([sig], path)
             _append_signals_log([sig], path)
-            lines = open(path).readlines()
+            with open(path) as f:
+                lines = f.readlines()
             self.assertEqual(len(lines), 2)
         finally:
             os.unlink(path)
@@ -410,8 +441,8 @@ class TestAppendSignalsLog(unittest.TestCase):
 
 # ── TestApplyStrategyThreshold ───────────────────────────────────────────────
 
-class TestApplyStrategyThreshold(unittest.TestCase):
 
+class TestApplyStrategyThreshold(unittest.TestCase):
     def _scored_list(self, scores):
         return [{"symbol": f"S{i}", "score": s} for i, s in enumerate(scores)]
 
@@ -426,8 +457,10 @@ class TestApplyStrategyThreshold(unittest.TestCase):
         """adj=5, base=20 → effective=25; scores below 25 removed."""
         scored = self._scored_list([10, 20, 25, 30])
         mode = {"mode": "DEFENSIVE", "score_threshold_adj": 5}
-        with patch.object(signal_pipeline, "get_regime_threshold", return_value=20), \
-             patch.object(signal_pipeline, "_get_edge_gate_adj", return_value=(0, "no_data")):
+        with (
+            patch.object(signal_pipeline, "get_regime_threshold", return_value=20),
+            patch.object(signal_pipeline, "_get_edge_gate_adj", return_value=(0, "no_data")),
+        ):
             result = _apply_strategy_threshold(scored, mode, "TRENDING_UP")
         scores_in = [s["score"] for s in result]
         self.assertTrue(all(s >= 25 for s in scores_in))
@@ -442,8 +475,8 @@ class TestApplyStrategyThreshold(unittest.TestCase):
 
 # ── TestRunSignalPipeline ─────────────────────────────────────────────────────
 
-class TestRunSignalPipeline(unittest.TestCase):
 
+class TestRunSignalPipeline(unittest.TestCase):
     def _base_kwargs(self, tmp_path=None):
         return dict(
             universe=["AAPL", "MSFT"],
@@ -461,9 +494,11 @@ class TestRunSignalPipeline(unittest.TestCase):
         all_scored = all_scored or scored
         kw = self._base_kwargs(tmp_path)
         kw.update(kwargs)
-        with patch.object(signal_pipeline, "score_universe", return_value=(scored, all_scored)), \
-             patch.object(signal_pipeline, "batch_news_sentiment", return_value={}), \
-             patch.object(signal_pipeline, "log_signal_scan"):
+        with (
+            patch.object(signal_pipeline, "score_universe", return_value=(scored, all_scored)),
+            patch.object(signal_pipeline, "batch_news_sentiment", return_value={}),
+            patch.object(signal_pipeline, "log_signal_scan"),
+        ):
             return run_signal_pipeline(**kw)
 
     def test_happy_path_returns_signal_pipeline_result(self):
@@ -480,9 +515,11 @@ class TestRunSignalPipeline(unittest.TestCase):
         self.assertEqual(result.regime_name, "TRENDING_UP")
 
     def test_score_universe_called_with_correct_regime(self):
-        with patch.object(signal_pipeline, "score_universe", return_value=([], [])) as mock_su, \
-             patch.object(signal_pipeline, "batch_news_sentiment", return_value={}), \
-             patch.object(signal_pipeline, "log_signal_scan"):
+        with (
+            patch.object(signal_pipeline, "score_universe", return_value=([], [])) as mock_su,
+            patch.object(signal_pipeline, "batch_news_sentiment", return_value={}),
+            patch.object(signal_pipeline, "log_signal_scan"),
+        ):
             run_signal_pipeline(**self._base_kwargs())
         call_args = mock_su.call_args
         self.assertEqual(call_args.args[1], "TRENDING_UP")
@@ -490,15 +527,21 @@ class TestRunSignalPipeline(unittest.TestCase):
     def test_social_skipped_in_pre_market(self):
         kw = self._base_kwargs()
         kw["session"] = "PRE_MARKET"
-        with patch.object(signal_pipeline, "score_universe", return_value=([], [])), \
-             patch.object(signal_pipeline, "batch_news_sentiment", return_value={}), \
-             patch.object(signal_pipeline, "log_signal_scan"), \
-             patch.dict(sys.modules, {"social_sentiment": MagicMock()}) as mocked:
+        with (
+            patch.object(signal_pipeline, "score_universe", return_value=([], [])),
+            patch.object(signal_pipeline, "batch_news_sentiment", return_value={}),
+            patch.object(signal_pipeline, "log_signal_scan"),
+            patch.dict(sys.modules, {"social_sentiment": MagicMock()}) as mocked,
+        ):
             run_signal_pipeline(**kw)
             # social_sentiment.get_social_sentiment should NOT have been called
             # (session gate fires before import)
             # We verify by checking score_universe got empty social_data
-            su_call = signal_pipeline.score_universe.call_args if hasattr(signal_pipeline.score_universe, "call_args") else None
+            su_call = (
+                signal_pipeline.score_universe.call_args
+                if hasattr(signal_pipeline.score_universe, "call_args")
+                else None
+            )
 
     def test_signals_log_written_to_specified_path(self):
         scored = [_scored_dict("AAPL", score=35)]
@@ -506,7 +549,8 @@ class TestRunSignalPipeline(unittest.TestCase):
             path = f.name
         try:
             self._patched_pipeline(scored=scored, tmp_path=path)
-            lines = open(path).readlines()
+            with open(path) as f:
+                lines = f.readlines()
             self.assertGreaterEqual(len(lines), 1)
             parsed = json.loads(lines[0])
             self.assertEqual(parsed["symbol"], "AAPL")
@@ -516,9 +560,11 @@ class TestRunSignalPipeline(unittest.TestCase):
     def test_empty_universe_returns_empty_signals(self):
         kw = self._base_kwargs()
         kw["universe"] = []
-        with patch.object(signal_pipeline, "score_universe", return_value=([], [])), \
-             patch.object(signal_pipeline, "batch_news_sentiment", return_value={}), \
-             patch.object(signal_pipeline, "log_signal_scan"):
+        with (
+            patch.object(signal_pipeline, "score_universe", return_value=([], [])),
+            patch.object(signal_pipeline, "batch_news_sentiment", return_value={}),
+            patch.object(signal_pipeline, "log_signal_scan"),
+        ):
             result = run_signal_pipeline(**kw)
         self.assertEqual(result.signals, [])
         self.assertEqual(result.scored, [])
@@ -526,6 +572,7 @@ class TestRunSignalPipeline(unittest.TestCase):
     def test_signals_log_constant_is_default_path(self):
         """SIGNALS_LOG constant is the default value of signals_log_path."""
         import inspect
+
         sig = inspect.signature(run_signal_pipeline)
         default = sig.parameters["signals_log_path"].default
         self.assertEqual(default, SIGNALS_LOG)

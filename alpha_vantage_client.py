@@ -22,7 +22,7 @@ import logging
 import os
 import time
 from collections import Counter
-from datetime import date
+from datetime import UTC, date
 
 import requests
 
@@ -35,15 +35,16 @@ _RATE_LIMIT_PATH = os.path.join(os.path.dirname(__file__), "data", "av_rate_limi
 
 # Aggressive caching — 25 calls/day free tier cannot support per-scan fetches.
 # Yahoo RSS handles freshness; AV enriches quality every 4 hours.
-_NEWS_TTL       = 4 * 3600   # seconds — successful result TTL
-_NEWS_ERROR_TTL = 30 * 60    # seconds — error result TTL (retry after 30 min)
-_EARNINGS_TTL   = 4 * 3600   # seconds
+_NEWS_TTL = 4 * 3600  # seconds — successful result TTL
+_NEWS_ERROR_TTL = 30 * 60  # seconds — error result TTL (retry after 30 min)
+_EARNINGS_TTL = 4 * 3600  # seconds
 
 _news_cache: dict[str, tuple[dict, float]] = {}  # cache_key → (result, monotonic_time)
 _earnings_cache: tuple[dict | None, float] = (None, 0.0)
 
 
 # ── API keys (multi-key rotation) ─────────────────────────────────────────────
+
 
 def _api_keys() -> list[str]:
     """
@@ -69,6 +70,7 @@ def _api_key() -> str:
 
 
 # ── Rate limiter ───────────────────────────────────────────────────────────────
+
 
 def _consume_call() -> str:
     """
@@ -127,6 +129,7 @@ def get_calls_today() -> int:
 
 # ── News sentiment ─────────────────────────────────────────────────────────────
 
+
 def get_news_sentiment(tickers: list[str]) -> dict[str, dict]:
     """
     Fetch structured news sentiment for a batch of tickers (1 API call).
@@ -160,8 +163,7 @@ def get_news_sentiment(tickers: list[str]) -> dict[str, dict]:
         return {}
 
     ticker_str = ",".join(t.upper() for t in batch)
-    url = (f"{_BASE_URL}?function=NEWS_SENTIMENT"
-           f"&tickers={ticker_str}&apikey={key}&sort=LATEST&limit=200")
+    url = f"{_BASE_URL}?function=NEWS_SENTIMENT&tickers={ticker_str}&apikey={key}&sort=LATEST&limit=200"
 
     try:
         resp = requests.get(url, timeout=10, headers={"User-Agent": "Decifer/2.0"})
@@ -193,37 +195,42 @@ def get_news_sentiment(tickers: list[str]) -> dict[str, dict]:
                 sym = (ts.get("ticker") or "").upper()
                 if sym not in ticker_upper:
                     continue
-                relevance  = float(ts.get("relevance_score")  or 0)
+                relevance = float(ts.get("relevance_score") or 0)
                 sent_score = float(ts.get("ticker_sentiment_score") or 0)
                 sent_label = ts.get("ticker_sentiment_label", "Neutral")
 
                 if sym not in agg:
                     agg[sym] = {
-                        "weighted_sum": 0.0, "weight_total": 0.0,
-                        "count": 0, "topics": set(), "labels": [],
+                        "weighted_sum": 0.0,
+                        "weight_total": 0.0,
+                        "count": 0,
+                        "topics": set(),
+                        "labels": [],
                     }
                 agg[sym]["weighted_sum"] += sent_score * relevance
                 agg[sym]["weight_total"] += relevance
-                agg[sym]["count"]        += 1
+                agg[sym]["count"] += 1
                 agg[sym]["topics"].update(topics)
                 agg[sym]["labels"].append(sent_label)
 
         result: dict[str, dict] = {}
         for sym, a in agg.items():
-            avg_sent      = a["weighted_sum"] / a["weight_total"] if a["weight_total"] > 0 else 0.0
-            avg_relevance = a["weight_total"] / a["count"]        if a["count"] > 0        else 0.0
+            avg_sent = a["weighted_sum"] / a["weight_total"] if a["weight_total"] > 0 else 0.0
+            avg_relevance = a["weight_total"] / a["count"] if a["count"] > 0 else 0.0
             dominant_label = Counter(a["labels"]).most_common(1)[0][0] if a["labels"] else "Neutral"
             result[sym] = {
                 "sentiment_score": round(avg_sent, 4),
                 "sentiment_label": dominant_label,
-                "relevance":       round(avg_relevance, 4),
-                "article_count":   a["count"],
-                "topics":          sorted(a["topics"]),
+                "relevance": round(avg_relevance, 4),
+                "article_count": a["count"],
+                "topics": sorted(a["topics"]),
             }
 
         log.info(
             "AV news sentiment: %d/%d tickers with coverage (%d articles in feed)",
-            len(result), len(batch), len(feed),
+            len(result),
+            len(batch),
+            len(feed),
         )
         _news_cache[cache_key] = (result, now)
         return result
@@ -272,8 +279,7 @@ def get_news_articles(tickers: list[str], limit: int = 50) -> list[dict]:
 
     batch = tickers[:15]  # AV NEWS_SENTIMENT rejects > ~20 tickers; cap at 15
     ticker_str = ",".join(t.upper() for t in batch)
-    url = (f"{_BASE_URL}?function=NEWS_SENTIMENT"
-           f"&tickers={ticker_str}&apikey={key}&sort=LATEST&limit={limit}")
+    url = f"{_BASE_URL}?function=NEWS_SENTIMENT&tickers={ticker_str}&apikey={key}&sort=LATEST&limit={limit}"
 
     try:
         resp = requests.get(url, timeout=10, headers={"User-Agent": "Decifer/2.0"})
@@ -293,8 +299,9 @@ def get_news_articles(tickers: list[str], limit: int = 50) -> list[dict]:
             _articles_cache = ([], time.monotonic())
             return cached_articles or []
 
-        from datetime import datetime, timezone as _tz
-        now_utc = datetime.now(_tz.utc)
+        from datetime import datetime
+
+        now_utc = datetime.now(UTC)
 
         articles = []
         for art in data.get("feed", []):
@@ -309,8 +316,8 @@ def get_news_articles(tickers: list[str], limit: int = 50) -> list[dict]:
             age_hours = 0.0
             created_ts = 0
             try:
-                dt = datetime.strptime(time_str, "%Y%m%dT%H%M%S").replace(tzinfo=_tz.utc)
-                age_hours  = (now_utc - dt).total_seconds() / 3600
+                dt = datetime.strptime(time_str, "%Y%m%dT%H%M%S").replace(tzinfo=UTC)
+                age_hours = (now_utc - dt).total_seconds() / 3600
                 created_ts = int(dt.timestamp() * 1000)
             except Exception:
                 pass
@@ -331,22 +338,27 @@ def get_news_articles(tickers: list[str], limit: int = 50) -> list[dict]:
                 if (ts.get("ticker") or "").strip()
             ]
 
-            articles.append({
-                "headline":   headline,
-                "summary":    (art.get("summary") or "").strip(),
-                "url":        (art.get("url") or "").strip(),
-                "source":     (art.get("source") or "").strip(),
-                "image_url":  image_url,
-                "symbols":    symbols,
-                "sentiment":  sentiment,
-                "age_hours":  round(age_hours, 2),
-                "created_ts": created_ts,
-                "news_score": 0,
-                "catalyst":   "",
-            })
+            articles.append(
+                {
+                    "headline": headline,
+                    "summary": (art.get("summary") or "").strip(),
+                    "url": (art.get("url") or "").strip(),
+                    "source": (art.get("source") or "").strip(),
+                    "image_url": image_url,
+                    "symbols": symbols,
+                    "sentiment": sentiment,
+                    "age_hours": round(age_hours, 2),
+                    "created_ts": created_ts,
+                    "news_score": 0,
+                    "catalyst": "",
+                }
+            )
 
-        log.info("AV news articles: %d articles fetched (%d with images)",
-                 len(articles), sum(1 for a in articles if a["image_url"]))
+        log.info(
+            "AV news articles: %d articles fetched (%d with images)",
+            len(articles),
+            sum(1 for a in articles if a["image_url"]),
+        )
         _articles_cache = (articles, now_mono)
         return articles
 
@@ -356,6 +368,7 @@ def get_news_articles(tickers: list[str], limit: int = 50) -> list[dict]:
 
 
 # ── Earnings calendar ──────────────────────────────────────────────────────────
+
 
 def get_sector_performance() -> dict[str, dict]:
     """
@@ -368,6 +381,7 @@ def get_sector_performance() -> dict[str, dict]:
     Returns {} when: no API key configured, rate limit exhausted, or AV returns an error.
     """
     import os as _os
+
     _cache_path = _os.path.join(_os.path.dirname(__file__), "data", "sector_performance.json")
     today = date.today().isoformat()
 
@@ -403,8 +417,8 @@ def get_sector_performance() -> dict[str, dict]:
 
         # AV SECTOR returns keys like "Rank A: Real-Time Performance", "Rank B: 1 Day Performance", etc.
         timeframe_map = {
-            "Rank B: 1 Day Performance":   "1D",
-            "Rank C: 5 Day Performance":   "5D",
+            "Rank B: 1 Day Performance": "1D",
+            "Rank C: 5 Day Performance": "5D",
             "Rank D: 1 Month Performance": "1M",
             "Rank E: 3 Month Performance": "3M",
             "Rank F: Year-to-Date (YTD) Performance": "YTD",
@@ -465,12 +479,11 @@ def get_earnings_calendar(horizon_months: int = 3) -> dict[str, str]:
         reader = csv.DictReader(io.StringIO(text))
         result: dict[str, str] = {}
         for row in reader:
-            sym         = (row.get("symbol")     or "").strip().upper()
+            sym = (row.get("symbol") or "").strip().upper()
             report_date = (row.get("reportDate") or "").strip()
-            if sym and report_date:
-                # Symbols with multiple upcoming dates: keep the earliest
-                if sym not in result or report_date < result[sym]:
-                    result[sym] = report_date
+            # Symbols with multiple upcoming dates: keep the earliest
+            if sym and report_date and (sym not in result or report_date < result[sym]):
+                result[sym] = report_date
 
         log.info("AV earnings calendar: %d upcoming earnings (horizon=%s)", len(result), horizon_str)
         _earnings_cache = (result, now)

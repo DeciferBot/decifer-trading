@@ -14,9 +14,9 @@ Usage:
     python tools/signal_correlation.py --threshold 0.5
 """
 
+import argparse
 import json
 import sys
-import argparse
 from pathlib import Path
 
 import numpy as np
@@ -53,9 +53,9 @@ def print_matrix(df: pd.DataFrame, label: str, threshold: float) -> list:
     corr = df[DIMS].corr(method="pearson")
     high_pairs = []
 
-    print(f"\n{'='*72}")
+    print(f"\n{'=' * 72}")
     print(f"  {label}  (n={len(df):,})")
-    print(f"{'='*72}")
+    print(f"{'=' * 72}")
 
     # Header
     col_w = 7
@@ -68,12 +68,12 @@ def print_matrix(df: pd.DataFrame, label: str, threshold: float) -> list:
         for col_dim in DIMS:
             val = corr.loc[row_dim, col_dim]
             marker = "*" if row_dim != col_dim and abs(val) >= threshold else " "
-            row_str += f"{val:>{col_w-1}.2f}{marker}"
+            row_str += f"{val:>{col_w - 1}.2f}{marker}"
         print(row_str)
 
     # Collect high pairs (upper triangle only)
     for i, d1 in enumerate(DIMS):
-        for d2 in DIMS[i+1:]:
+        for d2 in DIMS[i + 1 :]:
             val = corr.loc[d1, d2]
             if abs(val) >= threshold:
                 high_pairs.append((d1, d2, val))
@@ -95,8 +95,9 @@ def pca_dims(df: pd.DataFrame, variance_target: float = 0.90) -> int:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--threshold", type=float, default=0.6,
-                        help="Flag pairs with |r| above this value (default 0.6)")
+    parser.add_argument(
+        "--threshold", type=float, default=0.6, help="Flag pairs with |r| above this value (default 0.6)"
+    )
     args = parser.parse_args()
 
     if not SIGNALS_LOG.exists():
@@ -122,9 +123,9 @@ def main():
             print_matrix(sub, regime, args.threshold)
 
     # --- High correlation summary ---
-    print(f"\n{'='*72}")
+    print(f"\n{'=' * 72}")
     print(f"  HIGH-CORRELATION PAIRS (|r| >= {args.threshold})")
-    print(f"{'='*72}")
+    print(f"{'=' * 72}")
     if not high_pairs:
         print(f"  None found above threshold {args.threshold}")
     else:
@@ -134,19 +135,19 @@ def main():
 
     # --- PCA effective dimensionality ---
     n_eff, evr = pca_dims(df)
-    print(f"\n{'='*72}")
-    print(f"  PCA EFFECTIVE DIMENSIONALITY")
-    print(f"{'='*72}")
+    print(f"\n{'=' * 72}")
+    print("  PCA EFFECTIVE DIMENSIONALITY")
+    print(f"{'=' * 72}")
     print(f"  Components needed for 90% variance: {n_eff} of {len(DIMS)}")
-    print(f"  Per-component explained variance:")
+    print("  Per-component explained variance:")
     for i, v in enumerate(evr, 1):
         bar = "#" * int(v * 40)
         print(f"    PC{i:>2}: {v:.3f}  {bar}")
 
     # --- Verdict ---
-    print(f"\n{'='*72}")
-    print(f"  VERDICT")
-    print(f"{'='*72}")
+    print(f"\n{'=' * 72}")
+    print("  VERDICT")
+    print(f"{'=' * 72}")
     if n_eff <= 4:
         print(f"  Effective dims = {n_eff}. Signal compression is HIGH.")
         print("  The 9 scored dimensions behave like ~4 independent factors.")
@@ -158,9 +159,12 @@ def main():
         print(f"  Effective dims = {n_eff}. Dimensions are largely independent.")
 
     if high_pairs:
-        tech_pairs = [(d1, d2, r) for d1, d2, r in high_pairs
-                      if d1 in ["trend","momentum","squeeze","flow","breakout"]
-                      and d2 in ["trend","momentum","squeeze","flow","breakout"]]
+        tech_pairs = [
+            (d1, d2, r)
+            for d1, d2, r in high_pairs
+            if d1 in ["trend", "momentum", "squeeze", "flow", "breakout"]
+            and d2 in ["trend", "momentum", "squeeze", "flow", "breakout"]
+        ]
         if tech_pairs:
             print(f"\n  {len(tech_pairs)} high-correlation pair(s) within the technical cluster:")
             for d1, d2, val in tech_pairs:

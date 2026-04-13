@@ -3,23 +3,31 @@
 All market data is mocked with deterministic DataFrames.
 No network connections are made.
 """
-import os, sys, types
+
+import os
+import sys
 from unittest.mock import MagicMock
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Stub heavy deps BEFORE importing any Decifer module
-for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance",
-             "praw", "feedparser", "tvDatafeed", "requests_html"]:
+for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance", "praw", "feedparser", "tvDatafeed", "requests_html"]:
     sys.modules.setdefault(_mod, MagicMock())
 
 # Stub config with required keys
 import config as _config_mod
-_cfg = {"log_file": "/dev/null", "trade_log": "/dev/null",
-        "order_log": "/dev/null", "anthropic_api_key": "test-key",
-        "model": "claude-sonnet-4-20250514", "max_tokens": 1000,
-        "mongo_uri": "", "db_name": "test"}
+
+_cfg = {
+    "log_file": "/dev/null",
+    "trade_log": "/dev/null",
+    "order_log": "/dev/null",
+    "anthropic_api_key": "test-key",
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1000,
+    "mongo_uri": "",
+    "db_name": "test",
+}
 if hasattr(_config_mod, "CONFIG"):
     for _k, _v in _cfg.items():
         _config_mod.CONFIG.setdefault(_k, _v)
@@ -27,14 +35,13 @@ else:
     _config_mod.CONFIG = _cfg
 
 
-import sys
 import os
-from unittest.mock import patch, MagicMock
-from typing import List, Dict
+import sys
+from unittest.mock import MagicMock, patch
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -45,20 +52,20 @@ if PROJECT_ROOT not in sys.path:
 sys.modules.pop("scanner", None)
 try:
     import scanner
+
     # Confirm it's the real module (a MagicMock stub would have no __file__)
     HAS_SCANNER = hasattr(scanner, "__file__") and scanner.__file__ is not None
 except (ImportError, Exception):
     HAS_SCANNER = False
 
 
-pytestmark = pytest.mark.skipif(
-    not HAS_SCANNER, reason="scanner module not importable"
-)
+pytestmark = pytest.mark.skipif(not HAS_SCANNER, reason="scanner module not importable")
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def sample_symbols():
@@ -106,11 +113,27 @@ def low_volume_data():
 # ---------------------------------------------------------------------------
 
 _TV_ROW_COLS = [
-    "ticker", "name", "close", "volume", "change", "gap",
-    "relative_volume_10d_calc", "RSI|60", "MACD.macd|60", "MACD.signal|60",
-    "EMA9|60", "EMA21|60", "ATR|60", "VWAP", "premarket_change",
-    "premarket_volume", "Recommend.All", "market_cap_basic",
-    "change_from_open", "EMA20", "EMA50",
+    "ticker",
+    "name",
+    "close",
+    "volume",
+    "change",
+    "gap",
+    "relative_volume_10d_calc",
+    "RSI|60",
+    "MACD.macd|60",
+    "MACD.signal|60",
+    "EMA9|60",
+    "EMA21|60",
+    "ATR|60",
+    "VWAP",
+    "premarket_change",
+    "premarket_volume",
+    "Recommend.All",
+    "market_cap_basic",
+    "change_from_open",
+    "EMA20",
+    "EMA50",
 ]
 
 
@@ -145,17 +168,32 @@ def _tv_df(tickers=("AAPL", "MSFT")):
 
 class _FakeColResult:
     """Stub for a tradingview_screener Column expression — supports all comparison ops."""
-    def __gt__(self, o): return self
-    def __lt__(self, o): return self
-    def __ge__(self, o): return self
-    def __le__(self, o): return self
-    def __eq__(self, o): return self
-    def between(self, a, b): return self
-    def isin(self, lst): return self
+
+    def __gt__(self, o):
+        return self
+
+    def __lt__(self, o):
+        return self
+
+    def __ge__(self, o):
+        return self
+
+    def __le__(self, o):
+        return self
+
+    def __eq__(self, o):
+        return self
+
+    def between(self, a, b):
+        return self
+
+    def isin(self, lst):
+        return self
 
 
 class _FakeCol:
-    def __call__(self, name): return _FakeColResult()
+    def __call__(self, name):
+        return _FakeColResult()
 
 
 _FAKE_COL = _FakeCol()
@@ -171,10 +209,9 @@ class TestScannerFilters:
         # Trigger circuit breaker via raw VIX value, not the regime label
         extreme_regime = {"regime": "PANIC", "vix": 40.0, "vix_1h_change": 0.05}
         # col may not be importable when tradingview-screener is absent — inject a stub
-        with patch.object(scanner, "col", _FAKE_COL, create=True):
-            with patch.object(scanner, "_TV_AVAILABLE", True):
-                with patch.object(scanner, "_query", return_value=(2, mock_df)) as mock_q:
-                    result = scanner.get_dynamic_universe(ib, regime=extreme_regime)
+        with patch.object(scanner, "col", _FAKE_COL, create=True), patch.object(scanner, "_TV_AVAILABLE", True):
+            with patch.object(scanner, "_query", return_value=(2, mock_df)) as mock_q:
+                result = scanner.get_dynamic_universe(ib, regime=extreme_regime)
         # Only volume_leaders + rel_vol_surge run when circuit breaker fires
         assert mock_q.call_count == 2, f"Expected 2 always-on scans, got {mock_q.call_count}"
         for sym in scanner.CORE_SYMBOLS:
@@ -192,10 +229,9 @@ class TestScannerFilters:
     def test_empty_symbol_list_returns_empty(self, config):
         """When every TV query raises an exception, falls back to CORE + MOMENTUM_FALLBACK."""
         ib = MagicMock()
-        with patch.object(scanner, "col", _FAKE_COL, create=True):
-            with patch.object(scanner, "_TV_AVAILABLE", True):
-                with patch.object(scanner, "_query", side_effect=Exception("TV offline")):
-                    result = scanner.get_dynamic_universe(ib, regime={"regime": "TRENDING_DOWN"})
+        with patch.object(scanner, "col", _FAKE_COL, create=True), patch.object(scanner, "_TV_AVAILABLE", True):
+            with patch.object(scanner, "_query", side_effect=Exception("TV offline")):
+                result = scanner.get_dynamic_universe(ib, regime={"regime": "TRENDING_DOWN"})
         expected = set(scanner.CORE_SYMBOLS) | set(scanner.MOMENTUM_FALLBACK)
         assert set(result) == expected
 
@@ -239,15 +275,17 @@ class TestScannerRanking:
 
         def mock_dl(ticker, **kw):
             if kw.get("interval") == "1d":
-                if ticker in ("SPY", "QQQ"): return daily_df
+                if ticker in ("SPY", "QQQ"):
+                    return daily_df
                 return pd.DataFrame()
-            if ticker == "SPY": return spy_df
-            if ticker == "QQQ": return qqq_df
+            if ticker == "SPY":
+                return spy_df
+            if ticker == "QQQ":
+                return qqq_df
             return vix_df
 
-        with patch("scanner._regime_download", side_effect=mock_dl):
-            with patch.dict(scanner.CONFIG, _VIX_CFG):
-                result = scanner.get_market_regime(ib)
+        with patch("scanner._regime_download", side_effect=mock_dl), patch.dict(scanner.CONFIG, _VIX_CFG):
+            result = scanner.get_market_regime(ib)
         assert result["regime"] == "TRENDING_UP"
 
     def test_rank_empty_returns_empty(self):
@@ -258,13 +296,14 @@ class TestScannerRanking:
         vix_df = _price_df(40.0)
 
         def mock_dl(ticker, **kw):
-            if ticker == "SPY": return spy_df
-            if ticker == "QQQ": return qqq_df
+            if ticker == "SPY":
+                return spy_df
+            if ticker == "QQQ":
+                return qqq_df
             return vix_df
 
-        with patch("scanner._regime_download", side_effect=mock_dl):
-            with patch.dict(scanner.CONFIG, _VIX_CFG):
-                result = scanner.get_market_regime(ib)
+        with patch("scanner._regime_download", side_effect=mock_dl), patch.dict(scanner.CONFIG, _VIX_CFG):
+            result = scanner.get_market_regime(ib)
         assert result["regime"] == "CAPITULATION"
 
     def test_rank_single_candidate_returns_one(self):
@@ -279,15 +318,24 @@ class TestScannerRanking:
 
         def mock_dl(ticker, **kw):
             if kw.get("interval") == "1d":
-                if ticker in ("SPY", "QQQ"): return daily_df
+                if ticker in ("SPY", "QQQ"):
+                    return daily_df
                 return pd.DataFrame()
-            if ticker == "SPY": return spy_df
-            if ticker == "QQQ": return qqq_df
+            if ticker == "SPY":
+                return spy_df
+            if ticker == "QQQ":
+                return qqq_df
             return vix_df
 
-        with patch("scanner._regime_download", side_effect=mock_dl):
-            with patch.dict(scanner.CONFIG, _VIX_CFG):
-                result = scanner.get_market_regime(ib)
-        for key in ("regime", "vix", "spy_price", "spy_above_200d",
-                    "qqq_price", "qqq_above_200d", "position_size_multiplier"):
+        with patch("scanner._regime_download", side_effect=mock_dl), patch.dict(scanner.CONFIG, _VIX_CFG):
+            result = scanner.get_market_regime(ib)
+        for key in (
+            "regime",
+            "vix",
+            "spy_price",
+            "spy_above_200d",
+            "qqq_price",
+            "qqq_above_200d",
+            "position_size_multiplier",
+        ):
             assert key in result, f"Missing key: {key}"

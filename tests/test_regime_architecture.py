@@ -6,9 +6,9 @@ running in parallel. VIX-proxy is the sole committed approach until the IC
 Phase 2 gate (closed_trades >= 200) is met.
 """
 
+import importlib.util
 import os
 import sys
-import importlib.util
 
 import pytest
 
@@ -17,22 +17,23 @@ import pytest
 # Load the real config.py directly from disk to avoid that stub.
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+
 def _load_real_config() -> dict:
-    spec = importlib.util.spec_from_file_location(
-        "_real_config_arch", os.path.join(_PROJECT_ROOT, "config.py")
-    )
+    spec = importlib.util.spec_from_file_location("_real_config_arch", os.path.join(_PROJECT_ROOT, "config.py"))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)  # type: ignore[union-attr]
     return mod.CONFIG  # type: ignore[attr-defined]
+
 
 REAL_CONFIG = _load_real_config()
 
 # RegimeClassifier import — must come after sys.modules is stable
 sys.path.insert(0, _PROJECT_ROOT)
-from ml_engine import RegimeClassifier  # noqa: E402
+from ml_engine import RegimeClassifier
 
 try:
-    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.ensemble import RandomForestClassifier  # noqa: F401 — import IS the test
+
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
@@ -52,9 +53,7 @@ def test_canonical_regime_states_declared_in_config():
     states = REAL_CONFIG["regime_states"]
     assert isinstance(states, (tuple, list, frozenset))
     required = {"TRENDING_UP", "TRENDING_DOWN", "RELIEF_RALLY", "RANGE_BOUND", "CAPITULATION", "UNKNOWN"}
-    assert required.issubset(set(states)), (
-        f"Missing canonical regime states: {required - set(states)}"
-    )
+    assert required.issubset(set(states)), f"Missing canonical regime states: {required - set(states)}"
 
 
 @pytest.mark.skipif(not SKLEARN_AVAILABLE, reason="scikit-learn not installed")
@@ -79,6 +78,7 @@ def test_regime_threshold_covers_all_canonical_states(monkeypatch):
     """get_regime_threshold() must return a valid threshold for every canonical regime state."""
     import config as _config_mod
     from signals import get_regime_threshold
+
     # Ensure all keys get_regime_threshold reads are present (guards against stub pollution)
     _required = {
         "min_score_to_trade": 18,
@@ -95,6 +95,4 @@ def test_regime_threshold_covers_all_canonical_states(monkeypatch):
         assert isinstance(threshold, (int, float)), (
             f"get_regime_threshold('{state}') returned non-numeric: {threshold!r}"
         )
-        assert threshold >= 0, (
-            f"get_regime_threshold('{state}') returned negative threshold: {threshold}"
-        )
+        assert threshold >= 0, f"get_regime_threshold('{state}') returned negative threshold: {threshold}"

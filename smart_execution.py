@@ -14,30 +14,31 @@ Features:
 """
 
 import logging
+import statistics
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Any
-import statistics
+from typing import Any
 
 from ib_async import Contract, Order
-
 
 logger = logging.getLogger(__name__)
 
 
 class SliceStatus(Enum):
     """Status of an individual order slice."""
-    Pending   = "pending"
+
+    Pending = "pending"
     Submitted = "submitted"
-    Filled    = "filled"
-    Failed    = "failed"
+    Filled = "filled"
+    Failed = "failed"
     Cancelled = "cancelled"
 
 
 class ExecutionStrategy(Enum):
     """Execution strategy options."""
+
     TWAP = "twap"
     VWAP = "vwap"
     ICEBERG = "iceberg"
@@ -47,6 +48,7 @@ class ExecutionStrategy(Enum):
 @dataclass
 class ExecutionConfig:
     """Configuration for smart execution."""
+
     # TWAP settings
     twap_slices: int = 5
     twap_duration_minutes: int = 5
@@ -77,6 +79,7 @@ class ExecutionConfig:
 @dataclass
 class OrderSlice:
     """Represents a single slice of a larger order."""
+
     order_id: int
     symbol: str
     action: str  # BUY or SELL
@@ -88,9 +91,9 @@ class OrderSlice:
     filled_quantity: int = 0
     status: SliceStatus = SliceStatus.Pending
     price_adjustments: int = 0
-    filled_prices: List[float] = field(default_factory=list)
+    filled_prices: list[float] = field(default_factory=list)
 
-    def average_fill_price(self) -> Optional[float]:
+    def average_fill_price(self) -> float | None:
         """Calculate average fill price for this slice."""
         if not self.filled_prices or self.filled_quantity == 0:
             return None
@@ -109,6 +112,7 @@ class OrderSlice:
 @dataclass
 class ExecutionStats:
     """Tracks execution quality metrics."""
+
     symbol: str
     action: str
     target_quantity: int
@@ -119,12 +123,12 @@ class ExecutionStats:
     average_execution_price: float = 0.0
     vwap_benchmark: float = 0.0
     start_time: datetime = field(default_factory=datetime.now)
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
     slippage_bps: float = 0.0  # basis points
     implementation_shortfall_bps: float = 0.0
-    min_price: float = float('inf')
+    min_price: float = float("inf")
     max_price: float = 0.0
-    fill_prices: List[float] = field(default_factory=list)
+    fill_prices: list[float] = field(default_factory=list)
 
     def completion_rate(self) -> float:
         """Percentage of order filled."""
@@ -188,16 +192,12 @@ class TWAPExecutor:
         """
         self.ib = ib_client
         self.config = config
-        self.slices: Dict[int, OrderSlice] = {}
-        self.stats: Optional[ExecutionStats] = None
+        self.slices: dict[int, OrderSlice] = {}
+        self.stats: ExecutionStats | None = None
 
     def execute(
-        self,
-        contract: Contract,
-        action: str,
-        quantity: int,
-        current_price: float
-    ) -> Tuple[Dict[str, Any], ExecutionStats]:
+        self, contract: Contract, action: str, quantity: int, current_price: float
+    ) -> tuple[dict[str, Any], ExecutionStats]:
         """Execute TWAP order.
 
         Args:
@@ -209,24 +209,16 @@ class TWAPExecutor:
         Returns:
             Tuple of (execution_results, ExecutionStats)
         """
-        logger.info(
-            f"Starting TWAP execution: {action} {quantity} {contract.symbol} "
-            f"at ${current_price:.2f}"
-        )
+        logger.info(f"Starting TWAP execution: {action} {quantity} {contract.symbol} at ${current_price:.2f}")
 
         # Initialize stats
         self.stats = ExecutionStats(
-            symbol=contract.symbol,
-            action=action,
-            target_quantity=quantity,
-            arrival_price=current_price
+            symbol=contract.symbol, action=action, target_quantity=quantity, arrival_price=current_price
         )
 
         slice_size = quantity // self.config.twap_slices
         remainder = quantity % self.config.twap_slices
-        slice_duration = (
-            self.config.twap_duration_minutes * 60 / self.config.twap_slices
-        )
+        slice_duration = self.config.twap_duration_minutes * 60 / self.config.twap_slices
 
         # Create slices
         now = datetime.now()
@@ -242,7 +234,7 @@ class TWAPExecutor:
                 limit_price=current_price,
                 slice_index=i,
                 scheduled_time=scheduled_time,
-                created_time=now
+                created_time=now,
             )
             self.slices[i] = slice_obj
 
@@ -272,8 +264,7 @@ class TWAPExecutor:
             "implementation_shortfall_bps": self.stats.implementation_shortfall_bps,
             "slices_filled": self.stats.slices_filled,
             "execution_time_seconds": (
-                (self.stats.end_time - self.stats.start_time).total_seconds()
-                if self.stats.end_time else 0
+                (self.stats.end_time - self.stats.start_time).total_seconds() if self.stats.end_time else 0
             ),
         }
 
@@ -284,12 +275,7 @@ class TWAPExecutor:
 
         return execution_result, self.stats
 
-    def _execute_slice(
-        self,
-        contract: Contract,
-        slice_obj: OrderSlice,
-        slice_index: int
-    ) -> None:
+    def _execute_slice(self, contract: Contract, slice_obj: OrderSlice, slice_index: int) -> None:
         """Execute a single slice with timeout and price adjustment.
 
         Args:
@@ -299,9 +285,7 @@ class TWAPExecutor:
         """
         try:
             # Wait until scheduled time
-            wait_time = (
-                slice_obj.scheduled_time - datetime.now()
-            ).total_seconds()
+            wait_time = (slice_obj.scheduled_time - datetime.now()).total_seconds()
             if wait_time > 0:
                 time.sleep(wait_time)
 
@@ -325,10 +309,7 @@ class TWAPExecutor:
                     trade = self.ib.placeOrder(contract, order)
                     slice_obj.order_id = trade.order.orderId
 
-                    logger.info(
-                        f"Slice {slice_index}: Submitted {order.totalQuantity} "
-                        f"shares at ${limit_price:.2f}"
-                    )
+                    logger.info(f"Slice {slice_index}: Submitted {order.totalQuantity} shares at ${limit_price:.2f}")
 
                     # Wait for fill or timeout
                     start_time = datetime.now()
@@ -336,10 +317,7 @@ class TWAPExecutor:
                         elapsed = (datetime.now() - start_time).total_seconds()
 
                         if elapsed > self.config.twap_slice_timeout_seconds:
-                            logger.warning(
-                                f"Slice {slice_index} timeout after "
-                                f"{elapsed:.1f}s, adjusting price"
-                            )
+                            logger.warning(f"Slice {slice_index} timeout after {elapsed:.1f}s, adjusting price")
                             # Cancel and retry with adjusted price
                             self.ib.cancelOrder(trade.order)
                             self.ib.sleep(0.5)
@@ -362,17 +340,11 @@ class TWAPExecutor:
                             if filled > 0:
                                 slice_obj.filled_quantity = filled
                                 # Record fill prices (simplified: use limit price)
-                                slice_obj.filled_prices.extend(
-                                    [limit_price] * filled
-                                )
+                                slice_obj.filled_prices.extend([limit_price] * filled)
                                 self.stats.filled_quantity += filled
                                 self.stats.slices_filled += 1
-                                self.stats.fill_prices.extend(
-                                    [limit_price] * filled
-                                )
-                                logger.info(
-                                    f"Slice {slice_index}: Filled {filled} shares"
-                                )
+                                self.stats.fill_prices.extend([limit_price] * filled)
+                                logger.info(f"Slice {slice_index}: Filled {filled} shares")
                             break
 
                     attempt += 1
@@ -411,10 +383,10 @@ class VWAPExecutor:
         """
         self.ib = ib_client
         self.config = config
-        self.stats: Optional[ExecutionStats] = None
+        self.stats: ExecutionStats | None = None
         self.twap_executor = TWAPExecutor(ib_client, config)
 
-    def get_volume_profile(self, symbol: str) -> Dict[str, float]:
+    def get_volume_profile(self, symbol: str) -> dict[str, float]:
         """Get historical volume profile by time of day.
 
         Returns weights for each hour (0-23).
@@ -432,29 +404,37 @@ class VWAPExecutor:
         # positive weights; overnight hours (0-8, 17-23) get minimal weight.
         # All weights are normalized so they sum to exactly 1.0.
         raw = {
-            0: 0.2, 1: 0.1, 2: 0.1, 3: 0.1, 4: 0.2,   # Overnight
-            5: 0.3, 6: 0.4, 7: 0.5, 8: 0.7,             # Pre-market build-up
-            9: 18.0,   # 9:30 AM - Open (highest)
+            0: 0.2,
+            1: 0.1,
+            2: 0.1,
+            3: 0.1,
+            4: 0.2,  # Overnight
+            5: 0.3,
+            6: 0.4,
+            7: 0.5,
+            8: 0.7,  # Pre-market build-up
+            9: 18.0,  # 9:30 AM - Open (highest)
             10: 15.0,  # 10 AM
-            11: 9.0,   # 11 AM
-            12: 6.0,   # Noon - Lunch lull
-            13: 7.0,   # 1 PM
+            11: 9.0,  # 11 AM
+            12: 6.0,  # Noon - Lunch lull
+            13: 7.0,  # 1 PM
             14: 10.0,  # 2 PM
             15: 13.0,  # 3 PM - Power hour
             16: 15.0,  # 4 PM - Close
-            17: 0.7, 18: 0.5, 19: 0.4, 20: 0.3,         # After-hours
-            21: 0.2, 22: 0.2, 23: 0.1,                   # Late evening
+            17: 0.7,
+            18: 0.5,
+            19: 0.4,
+            20: 0.3,  # After-hours
+            21: 0.2,
+            22: 0.2,
+            23: 0.1,  # Late evening
         }
         total = sum(raw.values())
         return {hour: weight / total for hour, weight in raw.items()}
 
     def execute(
-        self,
-        contract: Contract,
-        action: str,
-        quantity: int,
-        current_price: float
-    ) -> Tuple[Dict[str, Any], ExecutionStats]:
+        self, contract: Contract, action: str, quantity: int, current_price: float
+    ) -> tuple[dict[str, Any], ExecutionStats]:
         """Execute VWAP order with volume weighting.
 
         Args:
@@ -466,31 +446,24 @@ class VWAPExecutor:
         Returns:
             Tuple of (execution_results, ExecutionStats)
         """
-        logger.info(
-            f"Starting VWAP execution: {action} {quantity} {contract.symbol} "
-            f"at ${current_price:.2f}"
-        )
+        logger.info(f"Starting VWAP execution: {action} {quantity} {contract.symbol} at ${current_price:.2f}")
 
         # Get volume profile
         profile = self.get_volume_profile(contract.symbol)
 
         # Normalize profile to sum = 1
         total_weight = sum(profile.values())
-        normalized_profile = {
-            hour: weight / total_weight for hour, weight in profile.items()
-        }
+        normalized_profile = {hour: weight / total_weight for hour, weight in profile.items()}
 
         # Adjust TWAP config to use volume-weighted slices
-        config = ExecutionConfig(
+        ExecutionConfig(
             twap_slices=self.config.twap_slices,
             twap_duration_minutes=self.config.twap_duration_minutes,
-            **vars(self.config.__dict__)
+            **vars(self.config.__dict__),
         )
 
         # Execute using TWAP with volume adjustments
-        result, stats = self.twap_executor.execute(
-            contract, action, quantity, current_price
-        )
+        result, stats = self.twap_executor.execute(contract, action, quantity, current_price)
 
         # Override strategy name
         result["strategy"] = "VWAP"
@@ -542,12 +515,8 @@ class IcebergOrder:
         return visible
 
     def execute(
-        self,
-        contract: Contract,
-        action: str,
-        quantity: int,
-        current_price: float
-    ) -> Tuple[Dict[str, Any], ExecutionStats]:
+        self, contract: Contract, action: str, quantity: int, current_price: float
+    ) -> tuple[dict[str, Any], ExecutionStats]:
         """Execute iceberg order.
 
         Args:
@@ -559,9 +528,7 @@ class IcebergOrder:
         Returns:
             Tuple of (execution_results, ExecutionStats)
         """
-        logger.info(
-            f"Starting iceberg execution: {action} {quantity} {contract.symbol}"
-        )
+        logger.info(f"Starting iceberg execution: {action} {quantity} {contract.symbol}")
 
         self.total_quantity = quantity
         self.visible_quantity = self.calculate_visible_quantity(quantity)
@@ -569,10 +536,7 @@ class IcebergOrder:
 
         # Create stats
         stats = ExecutionStats(
-            symbol=contract.symbol,
-            action=action,
-            target_quantity=quantity,
-            arrival_price=current_price
+            symbol=contract.symbol, action=action, target_quantity=quantity, arrival_price=current_price
         )
 
         try:
@@ -587,10 +551,7 @@ class IcebergOrder:
             trade = self.ib.placeOrder(contract, order)
             self.order_id = trade.order.orderId
 
-            logger.info(
-                f"Iceberg: Initial visible order {self.visible_quantity} "
-                f"of {quantity} at ${current_price:.2f}"
-            )
+            logger.info(f"Iceberg: Initial visible order {self.visible_quantity} of {quantity} at ${current_price:.2f}")
 
             # Monitor and refill as shares are filled
             while self.remaining_quantity > 0:
@@ -601,9 +562,7 @@ class IcebergOrder:
 
                     if self.remaining_quantity > 0:
                         # Refill with next batch
-                        next_visible = self.calculate_visible_quantity(
-                            self.remaining_quantity
-                        )
+                        next_visible = self.calculate_visible_quantity(self.remaining_quantity)
                         next_visible = min(next_visible, self.remaining_quantity)
 
                         order = Order()
@@ -617,8 +576,7 @@ class IcebergOrder:
                         self.order_id = trade.order.orderId
 
                         logger.info(
-                            f"Iceberg: Refilled with {next_visible} shares, "
-                            f"{self.remaining_quantity} remaining"
+                            f"Iceberg: Refilled with {next_visible} shares, {self.remaining_quantity} remaining"
                         )
                     else:
                         logger.info(f"Iceberg: Order complete, {filled} filled")
@@ -638,8 +596,7 @@ class IcebergOrder:
                 "completion_rate": stats.completion_rate(),
                 "visible_quantity": self.visible_quantity,
                 "execution_time_seconds": (
-                    (stats.end_time - stats.start_time).total_seconds()
-                    if stats.end_time else 0
+                    (stats.end_time - stats.start_time).total_seconds() if stats.end_time else 0
                 ),
             }
 
@@ -655,7 +612,7 @@ class ExecutionAnalytics:
 
     def __init__(self):
         """Initialize analytics tracker."""
-        self.execution_history: List[ExecutionStats] = []
+        self.execution_history: list[ExecutionStats] = []
 
     def record_execution(self, stats: ExecutionStats) -> None:
         """Record execution statistics.
@@ -670,7 +627,7 @@ class ExecutionAnalytics:
             f"slippage: {stats.slippage_bps:.2f} bps"
         )
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get summary statistics across all executions.
 
         Returns:
@@ -693,7 +650,7 @@ class ExecutionAnalytics:
             "max_slippage_bps": max(slippages),
         }
 
-    def get_symbol_summary(self, symbol: str) -> Dict[str, Any]:
+    def get_symbol_summary(self, symbol: str) -> dict[str, Any]:
         """Get summary for a specific symbol.
 
         Args:
@@ -702,9 +659,7 @@ class ExecutionAnalytics:
         Returns:
             Symbol-specific metrics
         """
-        symbol_executions = [
-            s for s in self.execution_history if s.symbol == symbol
-        ]
+        symbol_executions = [s for s in self.execution_history if s.symbol == symbol]
 
         if not symbol_executions:
             return {}
@@ -725,8 +680,8 @@ def smart_execute(
     quantity: int,
     current_price: float,
     strategy: str = "twap",
-    config: Optional[ExecutionConfig] = None,
-) -> Tuple[Dict[str, Any], ExecutionStats]:
+    config: ExecutionConfig | None = None,
+) -> tuple[dict[str, Any], ExecutionStats]:
     """Main entry point for smart order execution.
 
     Automatically selects execution strategy based on order size and config.
@@ -750,17 +705,12 @@ def smart_execute(
     if config is None:
         config = ExecutionConfig()
 
-    logger.info(
-        f"Smart execute: {action} {quantity} {contract.symbol} "
-        f"using {strategy.upper()}"
-    )
+    logger.info(f"Smart execute: {action} {quantity} {contract.symbol} using {strategy.upper()}")
 
     # Validate strategy
     valid_strategies = {s.value for s in ExecutionStrategy}
     if strategy.lower() not in valid_strategies:
-        raise ValueError(
-            f"Invalid strategy '{strategy}'. Must be one of {valid_strategies}"
-        )
+        raise ValueError(f"Invalid strategy '{strategy}'. Must be one of {valid_strategies}")
 
     try:
         if strategy.lower() == ExecutionStrategy.TWAP.value:
@@ -791,7 +741,7 @@ def smart_execute(
                 action=action,
                 target_quantity=quantity,
                 arrival_price=current_price,
-                filled_quantity=0
+                filled_quantity=0,
             )
 
             result = {
@@ -809,11 +759,7 @@ def smart_execute(
         raise
 
 
-def should_use_smart_execution(
-    quantity: int,
-    price: float,
-    config: Optional[ExecutionConfig] = None
-) -> bool:
+def should_use_smart_execution(quantity: int, price: float, config: ExecutionConfig | None = None) -> bool:
     """Determine if order should use smart execution.
 
     Args:
@@ -830,9 +776,6 @@ def should_use_smart_execution(
     # Check both quantity and notional thresholds
     notional = quantity * price
 
-    use_smart = (
-        quantity >= config.smart_execution_min_shares
-        or notional >= config.smart_execution_min_notional
-    )
+    use_smart = quantity >= config.smart_execution_min_shares or notional >= config.smart_execution_min_notional
 
     return use_smart

@@ -8,16 +8,15 @@
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
-import json
 import logging
 import threading
 import time
-from datetime import datetime, timezone, timedelta
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import UTC, datetime, timedelta
 
 from config import CONFIG
-from news import keyword_score, claude_sentiment, BULLISH_STRONG, BEARISH_STRONG
+from news import BEARISH_STRONG, BULLISH_STRONG, claude_sentiment, keyword_score
 from news_infrastructure import HeadlineDeduplicator, SymbolCooldown, headline_hash
 
 log = logging.getLogger("decifer.sentinel")
@@ -25,7 +24,7 @@ log = logging.getLogger("decifer.sentinel")
 # ═══════════════════════════════════════════════════════════════
 # SHARED INFRASTRUCTURE INSTANCES
 # ═══════════════════════════════════════════════════════════════
-_dedup    = HeadlineDeduplicator(max_size=5000)
+_dedup = HeadlineDeduplicator(max_size=5000)
 _cooldown = SymbolCooldown(cooldown_minutes=CONFIG.get("sentinel_cooldown_minutes", 10))
 _headline_history: deque = deque(maxlen=200)  # recent triggers for dashboard
 
@@ -43,8 +42,10 @@ CLAUDE_CONFIDENCE_THRESHOLD = CONFIG.get("sentinel_claude_confidence", 7)
 def _headline_hash(headline: str) -> str:
     return headline_hash(headline)
 
+
 def _is_on_cooldown(symbol: str) -> bool:
     return _cooldown.is_on_cooldown(symbol)
+
 
 def _set_cooldown(symbol: str) -> None:
     _cooldown.set_cooldown(symbol)
@@ -64,10 +65,11 @@ def fetch_ibkr_news(ib, symbol: str) -> list[dict]:
 
     try:
         from ib_async import Stock
+
         contract = Stock(symbol, "SMART", "USD")
         ib.qualifyContracts(contract)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         start = (now - timedelta(hours=4)).strftime("%Y%m%d-%H:%M:%S")
         end = now.strftime("%Y%m%d-%H:%M:%S")
 
@@ -77,34 +79,36 @@ def fetch_ibkr_news(ib, symbol: str) -> list[dict]:
             providerCodes="BZ+FLY+DJ+MT+BRF",  # Benzinga, FlyOnTheWall, DowJones, MT, Briefing
             startDateTime=start,
             endDateTime=end,
-            totalResults=10
+            totalResults=10,
         )
 
         articles = []
-        for item in (headlines or []):
-            title = getattr(item, 'headline', '') or ''
-            pub_time = getattr(item, 'time', None)
+        for item in headlines or []:
+            title = getattr(item, "headline", "") or ""
+            pub_time = getattr(item, "time", None)
 
             age_hours = 0.5
             if pub_time:
                 try:
                     if isinstance(pub_time, datetime):
-                        age_hours = (now - pub_time.replace(tzinfo=timezone.utc)).total_seconds() / 3600
+                        age_hours = (now - pub_time.replace(tzinfo=UTC)).total_seconds() / 3600
                     else:
-                        pub_dt = datetime.strptime(str(pub_time)[:19], "%Y%m%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                        pub_dt = datetime.strptime(str(pub_time)[:19], "%Y%m%d %H:%M:%S").replace(tzinfo=UTC)
                         age_hours = (now - pub_dt).total_seconds() / 3600
                 except Exception:
                     pass
 
             if title:
-                articles.append({
-                    "title": title,
-                    "published": str(pub_time) if pub_time else "",
-                    "link": "",
-                    "age_hours": round(age_hours, 1),
-                    "symbol": symbol,
-                    "source": "ibkr",
-                })
+                articles.append(
+                    {
+                        "title": title,
+                        "published": str(pub_time) if pub_time else "",
+                        "link": "",
+                        "age_hours": round(age_hours, 1),
+                        "symbol": symbol,
+                        "source": "ibkr",
+                    }
+                )
 
         return articles
     except Exception as e:
@@ -211,18 +215,20 @@ def assess_materiality(articles: list[dict]) -> list[dict]:
 
         sources = list(set(a["source"] for a in recent))
 
-        triggers.append({
-            "symbol": sym,
-            "headlines": headlines[:5],
-            "headline_count": len(headlines),
-            "keyword_score": kw["score"],
-            "keyword_hits": kw["keywords"][:8],
-            "direction": direction,
-            "urgency": urgency,
-            "sources": sources,
-            "age_hours": min(a["age_hours"] for a in recent),
-            "triggered_at": datetime.now(timezone.utc).isoformat(),
-        })
+        triggers.append(
+            {
+                "symbol": sym,
+                "headlines": headlines[:5],
+                "headline_count": len(headlines),
+                "keyword_score": kw["score"],
+                "keyword_hits": kw["keywords"][:8],
+                "direction": direction,
+                "urgency": urgency,
+                "sources": sources,
+                "age_hours": min(a["age_hours"] for a in recent),
+                "triggered_at": datetime.now(UTC).isoformat(),
+            }
+        )
 
     # Sort by urgency then keyword score strength
     urgency_rank = {"CRITICAL": 0, "HIGH": 1, "MODERATE": 2}
@@ -252,9 +258,8 @@ def deep_read_trigger(trigger: dict) -> dict:
     if claude_result.get("confidence", 0) >= CLAUDE_CONFIDENCE_THRESHOLD:
         if trigger["urgency"] == "MODERATE":
             trigger["urgency"] = "HIGH"
-    elif claude_result.get("confidence", 0) <= 3:
-        if trigger["urgency"] != "CRITICAL":
-            trigger["urgency"] = "LOW"
+    elif claude_result.get("confidence", 0) <= 3 and trigger["urgency"] != "CRITICAL":
+        trigger["urgency"] = "LOW"
 
     return trigger
 
@@ -277,8 +282,7 @@ class NewsSentinel:
         sentinel.start()
     """
 
-    def __init__(self, get_universe_fn, on_trigger_fn, ib=None,
-                 poll_interval: int = None):
+    def __init__(self, get_universe_fn, on_trigger_fn, ib=None, poll_interval: int | None = None):
         """
         get_universe_fn: callable returning list of symbols to monitor
         on_trigger_fn:   callable(trigger_dict) — called when material news fires
@@ -354,11 +358,11 @@ class NewsSentinel:
                 batch_size = CONFIG.get("sentinel_batch_size", 10)
                 poll_num = self.stats["polls"]
                 start_idx = (poll_num * batch_size) % max(1, len(universe))
-                batch = universe[start_idx:start_idx + batch_size]
+                batch = universe[start_idx : start_idx + batch_size]
 
                 # If batch wraps around, grab from beginning too
                 if len(batch) < batch_size:
-                    batch += universe[:batch_size - len(batch)]
+                    batch += universe[: batch_size - len(batch)]
 
                 # Deduplicate
                 batch = list(dict.fromkeys(batch))
@@ -392,10 +396,11 @@ class NewsSentinel:
                     trigger = deep_read_trigger(trigger)
 
                     # Final gate: Claude must confirm materiality
-                    if (trigger.get("claude_confidence", 0) < 4 and
-                            trigger["urgency"] != "CRITICAL"):
-                        log.info(f"Sentinel: {trigger['symbol']} — Claude confidence too low "
-                                 f"({trigger.get('claude_confidence', 0)}), skipping")
+                    if trigger.get("claude_confidence", 0) < 4 and trigger["urgency"] != "CRITICAL":
+                        log.info(
+                            f"Sentinel: {trigger['symbol']} — Claude confidence too low "
+                            f"({trigger.get('claude_confidence', 0)}), skipping"
+                        )
                         continue
 
                     # ── FIRE TRIGGER ──────────────────────────────
@@ -415,19 +420,21 @@ class NewsSentinel:
                     self.stats["recent_triggers"] = self.stats["recent_triggers"][:20]
 
                     # Record in headline history
-                    _headline_history.appendleft({
-                        "symbol": trigger["symbol"],
-                        "headline": trigger["headlines"][0] if trigger["headlines"] else "",
-                        "direction": trigger["direction"],
-                        "urgency": trigger["urgency"],
-                        "time": datetime.now().strftime("%H:%M:%S"),
-                    })
+                    _headline_history.appendleft(
+                        {
+                            "symbol": trigger["symbol"],
+                            "headline": trigger["headlines"][0] if trigger["headlines"] else "",
+                            "direction": trigger["direction"],
+                            "urgency": trigger["urgency"],
+                            "time": datetime.now().strftime("%H:%M:%S"),
+                        }
+                    )
 
                     log.info(
                         f"🚨 SENTINEL TRIGGER: {trigger['symbol']} | "
                         f"{trigger['direction']} | urgency={trigger['urgency']} | "
                         f"kw_score={trigger['keyword_score']} | "
-                        f"claude={trigger.get('claude_sentiment','?')}({trigger.get('claude_confidence',0)}) | "
+                        f"claude={trigger.get('claude_sentiment', '?')}({trigger.get('claude_confidence', 0)}) | "
                         f"catalyst: {trigger.get('claude_catalyst', trigger['headlines'][0][:60])}"
                     )
 

@@ -21,18 +21,18 @@ import json
 import logging
 import os
 import time
-from datetime import datetime, date, timedelta, timezone
-from typing import Optional
+from datetime import UTC, date, datetime, timedelta
 
 log = logging.getLogger("decifer.alpha_decay")
 
 HORIZONS = [1, 3, 5, 10]  # trading days after entry
 _TRADE_LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "trades.json")
-_CACHE_FILE     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "alpha_decay_cache.json")
-_CACHE_TTL      = 3600  # seconds — re-use yfinance data for up to 1 hour
+_CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "alpha_decay_cache.json")
+_CACHE_TTL = 3600  # seconds — re-use yfinance data for up to 1 hour
 
 
 # ── Disk cache ───────────────────────────────────────────────────────────────
+
 
 def _cache_key(trades: list) -> str:
     """
@@ -42,7 +42,7 @@ def _cache_key(trades: list) -> str:
       - same trades, repeated call within TTL → cache hit
     """
     closed = [t for t in trades if t.get("exit_price") is not None or t.get("pnl") is not None]
-    count  = len(closed)
+    count = len(closed)
     if not closed:
         return f"{count}|"
     dates = []
@@ -54,7 +54,7 @@ def _cache_key(trades: list) -> str:
     return f"{count}|{latest}"
 
 
-def _load_cache(key: str) -> Optional[dict]:
+def _load_cache(key: str) -> dict | None:
     """Return cached stats dict if key matches and TTL has not expired, else None."""
     try:
         with open(_CACHE_FILE) as f:
@@ -77,7 +77,8 @@ def _save_cache(key: str, data: dict) -> None:
 
 # ── Entry-date parser ──────────────────────────────────────────────────────
 
-def _parse_entry_date(trade: dict) -> Optional[date]:
+
+def _parse_entry_date(trade: dict) -> date | None:
     """
     Extract the entry date from a trade record.
     Handles multiple timestamp field names and formats used across trade sources.
@@ -100,7 +101,8 @@ def _parse_entry_date(trade: dict) -> Optional[date]:
 
 # ── Forward return fetcher ────────────────────────────────────────────────
 
-def fetch_forward_returns(symbol: str, entry_dt: date, horizons: list) -> Optional[dict]:
+
+def fetch_forward_returns(symbol: str, entry_dt: date, horizons: list) -> dict | None:
     """
     Download daily OHLCV via yfinance and return the % price change at each
     forward horizon relative to the entry-bar closing price.
@@ -123,7 +125,7 @@ def fetch_forward_returns(symbol: str, entry_dt: date, horizons: list) -> Option
         # Download window: entry date – 2 days buffer (for weekends/holidays at start)
         #                  + max_horizon * 2 + 10 days buffer at end
         start = entry_dt - timedelta(days=2)
-        end   = entry_dt + timedelta(days=max(horizons) * 2 + 14)
+        end = entry_dt + timedelta(days=max(horizons) * 2 + 14)
         today = date.today()
         if end > today:
             end = today
@@ -188,7 +190,8 @@ def fetch_forward_returns(symbol: str, entry_dt: date, horizons: list) -> Option
 
 # ── Per-trade decay computation ───────────────────────────────────────────
 
-def compute_alpha_decay(trades: list = None, horizons: list = None) -> list:
+
+def compute_alpha_decay(trades: list | None = None, horizons: list | None = None) -> list:
     """
     For each closed trade compute forward returns at every horizon.
 
@@ -219,10 +222,7 @@ def compute_alpha_decay(trades: list = None, horizons: list = None) -> list:
             return []
 
     # Only process closed trades (exit recorded)
-    closed = [
-        t for t in trades
-        if t.get("exit_price") is not None or t.get("pnl") is not None
-    ]
+    closed = [t for t in trades if t.get("exit_price") is not None or t.get("pnl") is not None]
 
     results = []
     for trade in closed:
@@ -242,35 +242,38 @@ def compute_alpha_decay(trades: list = None, horizons: list = None) -> list:
         if not direction:
             action = (trade.get("action") or "").upper()
             direction = "SHORT" if action == "SELL" else "LONG"
-        dir_sign  = -1 if direction == "SHORT" else 1
-        dir_adj   = {h: round(v * dir_sign, 6) for h, v in fwd.items()}
+        dir_sign = -1 if direction == "SHORT" else 1
+        dir_adj = {h: round(v * dir_sign, 6) for h, v in fwd.items()}
 
-        results.append({
-            "symbol":                symbol,
-            "direction":             direction,
-            "score":                 trade.get("score") or 0,
-            "regime":                trade.get("regime") or "UNKNOWN",
-            "entry_date":            entry_dt.isoformat(),
-            "pnl":                   trade.get("pnl"),
-            "forward_returns":       fwd,
-            "direction_adj_returns": dir_adj,
-            "signal_scores":         trade.get("signal_scores") or {},
-        })
+        results.append(
+            {
+                "symbol": symbol,
+                "direction": direction,
+                "score": trade.get("score") or 0,
+                "regime": trade.get("regime") or "UNKNOWN",
+                "entry_date": entry_dt.isoformat(),
+                "pnl": trade.get("pnl"),
+                "forward_returns": fwd,
+                "direction_adj_returns": dir_adj,
+                "signal_scores": trade.get("signal_scores") or {},
+            }
+        )
 
     return results
 
 
 # ── Aggregation helpers ───────────────────────────────────────────────────
 
-def _percentile(values: list, p: float) -> Optional[float]:
+
+def _percentile(values: list, p: float) -> float | None:
     """Compute percentile p (0–100) without numpy."""
     vals = [v for v in values if v is not None]
     if not vals:
         return None
-    s   = sorted(vals)
+    s = sorted(vals)
     idx = (len(s) - 1) * p / 100.0
-    lo  = int(idx)
-    hi  = min(lo + 1, len(s) - 1)
+    lo = int(idx)
+    hi = min(lo + 1, len(s) - 1)
     return round(s[lo] + (idx - lo) * (s[hi] - s[lo]), 6)
 
 
@@ -289,38 +292,45 @@ def _aggregate(records: list, horizons: list) -> dict:
     than 5 complete records are available.
     """
     if not records:
-        return {"median": [None] * len(horizons),
-                "p25":    [None] * len(horizons),
-                "p75":    [None] * len(horizons),
-                "n":      0,
-                "n_total": 0}
+        return {
+            "median": [None] * len(horizons),
+            "p25": [None] * len(horizons),
+            "p75": [None] * len(horizons),
+            "n": 0,
+            "n_total": 0,
+        }
 
     complete = _complete(records, horizons)
-    cohort   = complete if len(complete) >= 5 else records
+    cohort = complete if len(complete) >= 5 else records
 
     medians, p25s, p75s = [], [], []
     for h in horizons:
-        vals = [r["direction_adj_returns"][h]
-                for r in cohort
-                if h in r.get("direction_adj_returns", {})]
+        vals = [r["direction_adj_returns"][h] for r in cohort if h in r.get("direction_adj_returns", {})]
         medians.append(_percentile(vals, 50))
         p25s.append(_percentile(vals, 25))
         p75s.append(_percentile(vals, 75))
 
     return {
-        "median":  medians,
-        "p25":     p25s,
-        "p75":     p75s,
-        "n":       len(cohort),    # records used for analysis (complete-horizon cohort)
-        "n_total": len(records),   # total records in segment (including partial)
+        "median": medians,
+        "p25": p25s,
+        "p75": p75s,
+        "n": len(cohort),  # records used for analysis (complete-horizon cohort)
+        "n_total": len(records),  # total records in segment (including partial)
     }
 
 
 # ── Dimension segmentation ────────────────────────────────────────────────
 
 _DIMENSIONS = (
-    "trend", "momentum", "squeeze", "flow", "breakout",
-    "mtf", "news", "social", "reversion",
+    "trend",
+    "momentum",
+    "squeeze",
+    "flow",
+    "breakout",
+    "mtf",
+    "news",
+    "social",
+    "reversion",
 )
 
 
@@ -332,10 +342,7 @@ def _dominant_dimension(signal_scores: dict):
     """
     if not signal_scores:
         return None
-    valid = {
-        k: v for k, v in signal_scores.items()
-        if k in _DIMENSIONS and isinstance(v, (int, float))
-    }
+    valid = {k: v for k, v in signal_scores.items() if k in _DIMENSIONS and isinstance(v, (int, float))}
     if not valid:
         return None
     return max(valid, key=lambda k: valid[k])
@@ -343,7 +350,8 @@ def _dominant_dimension(signal_scores: dict):
 
 # ── Public summary API ────────────────────────────────────────────────────
 
-def get_alpha_decay_stats(trades: list = None, horizons: list = None) -> dict:
+
+def get_alpha_decay_stats(trades: list | None = None, horizons: list | None = None) -> dict:
     """
     Compute and aggregate forward return distributions by segment.
 
@@ -390,7 +398,7 @@ def get_alpha_decay_stats(trades: list = None, horizons: list = None) -> dict:
     cache_key = None
     if _from_file:
         cache_key = _cache_key(trades)
-        cached    = _load_cache(cache_key)
+        cached = _load_cache(cache_key)
         if cached is not None:
             log.debug("alpha_decay: cache hit (%s)", cache_key)
             return cached
@@ -398,41 +406,48 @@ def get_alpha_decay_stats(trades: list = None, horizons: list = None) -> dict:
     records = compute_alpha_decay(trades=trades, horizons=horizons)
 
     groups = {
-        "all":        records,
+        "all": records,
         "high_score": [r for r in records if (r.get("score") or 0) >= 38],
-        "low_score":  [r for r in records if (r.get("score") or 0) < 38],
-        "bull":       [r for r in records if str(r.get("regime") or "") in ("TRENDING_UP", "BULL_TRENDING") or str(r.get("regime") or "").startswith("BULL")],
-        "bear":       [r for r in records if str(r.get("regime") or "") in ("TRENDING_DOWN", "RELIEF_RALLY", "CAPITULATION", "BEAR_TRENDING") or str(r.get("regime") or "").startswith("BEAR")],
-        "long_only":  [r for r in records if r.get("direction") == "LONG"],
+        "low_score": [r for r in records if (r.get("score") or 0) < 38],
+        "bull": [
+            r
+            for r in records
+            if str(r.get("regime") or "") in ("TRENDING_UP", "BULL_TRENDING")
+            or str(r.get("regime") or "").startswith("BULL")
+        ],
+        "bear": [
+            r
+            for r in records
+            if str(r.get("regime") or "") in ("TRENDING_DOWN", "RELIEF_RALLY", "CAPITULATION", "BEAR_TRENDING")
+            or str(r.get("regime") or "").startswith("BEAR")
+        ],
+        "long_only": [r for r in records if r.get("direction") == "LONG"],
         "short_only": [r for r in records if r.get("direction") == "SHORT"],
     }
 
     # Per-dimension segments: trades where that dimension had the highest score.
     # Sparse until live trades with signal_scores accumulate.
     for _dim in _DIMENSIONS:
-        groups[f"dim_{_dim}"] = [
-            r for r in records
-            if _dominant_dimension(r.get("signal_scores", {})) == _dim
-        ]
+        groups[f"dim_{_dim}"] = [r for r in records if _dominant_dimension(r.get("signal_scores", {})) == _dim]
 
     agg = {name: _aggregate(recs, horizons) for name, recs in groups.items()}
 
     # Optimal horizon: horizon index with the highest median across all trades
     all_medians = agg["all"]["median"]
     optimal = None
-    valid   = [(i, v) for i, v in enumerate(all_medians) if v is not None]
+    valid = [(i, v) for i, v in enumerate(all_medians) if v is not None]
     if valid:
-        best_i  = max(valid, key=lambda x: x[1])[0]
+        best_i = max(valid, key=lambda x: x[1])[0]
         optimal = horizons[best_i]
 
     complete_count = len(_complete(records, horizons))
     result = {
-        "horizons":        horizons,
-        "groups":          agg,
+        "horizons": horizons,
+        "groups": agg,
         "optimal_horizon": optimal,
-        "trade_count":     len(records),   # total records with any price data
-        "complete_count":  complete_count, # records with data at ALL horizons (cohort used for chart)
-        "computed_at":     datetime.now(timezone.utc).isoformat(),
+        "trade_count": len(records),  # total records with any price data
+        "complete_count": complete_count,  # records with data at ALL horizons (cohort used for chart)
+        "computed_at": datetime.now(UTC).isoformat(),
     }
 
     if cache_key is not None:

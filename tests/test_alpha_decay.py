@@ -3,13 +3,14 @@
 # Coverage: entry-date parsing, forward-return aggregation, stats output shape,
 # direction-sign inversion for SHORT trades, graceful empty/missing-data handling.
 
+import json
 import os
 import sys
-import json
-import pytest
 import tempfile
-from datetime import date, datetime, timezone
-from unittest.mock import patch, MagicMock
+from datetime import date
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # ── Path setup ────────────────────────────────────────────────────────────
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,63 +20,62 @@ import types
 
 _yf_stub = types.ModuleType("yfinance")
 _yf_stub.Ticker = MagicMock()
-_yf_stub.cache  = MagicMock()
+_yf_stub.cache = MagicMock()
 sys.modules.setdefault("yfinance", _yf_stub)
 
 import alpha_decay
 from alpha_decay import (
+    _DIMENSIONS,
+    HORIZONS,
+    _aggregate,
+    _cache_key,
+    _dominant_dimension,
+    _load_cache,
     _parse_entry_date,
     _percentile,
-    _aggregate,
-    _dominant_dimension,
-    _cache_key,
-    _load_cache,
     _save_cache,
-    _DIMENSIONS,
-    get_alpha_decay_stats,
     compute_alpha_decay,
-    HORIZONS,
+    get_alpha_decay_stats,
 )
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────
 
+
 def _make_trade(**kwargs):
     base = {
-        "symbol":      "AAPL",
-        "direction":   "LONG",
-        "score":       35,
-        "regime":      "TRENDING_UP",
-        "entry_time":  "2026-03-20 10:00:00",
-        "exit_price":  155.0,
-        "pnl":         500.0,
+        "symbol": "AAPL",
+        "direction": "LONG",
+        "score": 35,
+        "regime": "TRENDING_UP",
+        "entry_time": "2026-03-20 10:00:00",
+        "exit_price": 155.0,
+        "pnl": 500.0,
     }
     base.update(kwargs)
     return base
 
 
-def _make_record(direction="LONG", score=35, regime="TRENDING_UP",
-                 returns=None):
+def _make_record(direction="LONG", score=35, regime="TRENDING_UP", returns=None):
     """Build a pre-computed decay record (as returned by compute_alpha_decay)."""
     fwd = returns or {1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005}
     dir_sign = -1 if direction == "SHORT" else 1
-    dir_adj  = {h: round(v * dir_sign, 6) for h, v in fwd.items()}
+    dir_adj = {h: round(v * dir_sign, 6) for h, v in fwd.items()}
     return {
-        "symbol":                "AAPL",
-        "direction":             direction,
-        "score":                 score,
-        "regime":                regime,
-        "entry_date":            "2026-03-20",
-        "pnl":                   500.0,
-        "forward_returns":       fwd,
+        "symbol": "AAPL",
+        "direction": direction,
+        "score": score,
+        "regime": regime,
+        "entry_date": "2026-03-20",
+        "pnl": 500.0,
+        "forward_returns": fwd,
         "direction_adj_returns": dir_adj,
     }
 
 
 # ── _parse_entry_date ─────────────────────────────────────────────────────
 
-class TestParseEntryDate:
 
+class TestParseEntryDate:
     def test_entry_time_space_separator(self):
         t = _make_trade(entry_time="2026-03-20 10:00:00")
         assert _parse_entry_date(t) == date(2026, 3, 20)
@@ -93,8 +93,7 @@ class TestParseEntryDate:
         assert _parse_entry_date(t) == date(2026, 3, 22)
 
     def test_prefers_entry_time_over_timestamp(self):
-        t = _make_trade(entry_time="2026-03-20 10:00:00",
-                        timestamp="2026-03-25T12:00:00")
+        t = _make_trade(entry_time="2026-03-20 10:00:00", timestamp="2026-03-25T12:00:00")
         assert _parse_entry_date(t) == date(2026, 3, 20)
 
     def test_returns_none_for_missing_fields(self):
@@ -106,8 +105,8 @@ class TestParseEntryDate:
 
 # ── _percentile ───────────────────────────────────────────────────────────
 
-class TestPercentile:
 
+class TestPercentile:
     def test_median_of_odd_list(self):
         assert _percentile([1, 2, 3, 4, 5], 50) == 3.0
 
@@ -128,8 +127,8 @@ class TestPercentile:
 
 # ── _aggregate ────────────────────────────────────────────────────────────
 
-class TestAggregate:
 
+class TestAggregate:
     def test_empty_records_returns_none_arrays(self):
         result = _aggregate([], HORIZONS)
         assert result["n"] == 0
@@ -144,8 +143,7 @@ class TestAggregate:
 
     def test_short_sign_inversion_in_records(self):
         # A SHORT trade with price rising should have negative dir_adj_return
-        record = _make_record(direction="SHORT",
-                              returns={1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005})
+        record = _make_record(direction="SHORT", returns={1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005})
         assert record["direction_adj_returns"][1] == pytest.approx(-0.01, abs=1e-6)
         result = _aggregate([record], HORIZONS)
         assert result["median"][0] == pytest.approx(-0.01, abs=1e-6)
@@ -172,26 +170,31 @@ class TestAggregate:
 
 # ── get_alpha_decay_stats (with mocked compute_alpha_decay) ───────────────
 
-class TestGetAlphaDecayStats:
 
+class TestGetAlphaDecayStats:
     def _mock_records(self):
         return [
-            _make_record(direction="LONG", score=40, regime="TRENDING_UP",
-                         returns={1: 0.02, 3: 0.03, 5: 0.025, 10: 0.01}),
-            _make_record(direction="LONG", score=30, regime="TRENDING_UP",
-                         returns={1: 0.01, 3: 0.015, 5: 0.01, 10: -0.005}),
-            _make_record(direction="SHORT", score=42, regime="TRENDING_DOWN",
-                         returns={1: -0.02, 3: -0.03, 5: -0.025, 10: -0.01}),
-            _make_record(direction="LONG", score=25, regime="RANGE_BOUND",
-                         returns={1: -0.005, 3: -0.01, 5: -0.015, 10: -0.02}),
+            _make_record(
+                direction="LONG", score=40, regime="TRENDING_UP", returns={1: 0.02, 3: 0.03, 5: 0.025, 10: 0.01}
+            ),
+            _make_record(
+                direction="LONG", score=30, regime="TRENDING_UP", returns={1: 0.01, 3: 0.015, 5: 0.01, 10: -0.005}
+            ),
+            _make_record(
+                direction="SHORT", score=42, regime="TRENDING_DOWN", returns={1: -0.02, 3: -0.03, 5: -0.025, 10: -0.01}
+            ),
+            _make_record(
+                direction="LONG", score=25, regime="RANGE_BOUND", returns={1: -0.005, 3: -0.01, 5: -0.015, 10: -0.02}
+            ),
         ]
 
     def _patched_stats(self):
         """Get alpha decay stats with cache bypassed and compute_alpha_decay mocked."""
-        with patch.object(alpha_decay, "compute_alpha_decay",
-                          return_value=self._mock_records()), \
-             patch.object(alpha_decay, "_load_cache", return_value=None), \
-             patch.object(alpha_decay, "_save_cache"):
+        with (
+            patch.object(alpha_decay, "compute_alpha_decay", return_value=self._mock_records()),
+            patch.object(alpha_decay, "_load_cache", return_value=None),
+            patch.object(alpha_decay, "_save_cache"),
+        ):
             return get_alpha_decay_stats()
 
     def test_output_shape(self):
@@ -208,20 +211,19 @@ class TestGetAlphaDecayStats:
         stats = self._patched_stats()
 
         groups = stats["groups"]
-        for g in ("all", "high_score", "low_score", "bull", "bear",
-                  "long_only", "short_only"):
+        for g in ("all", "high_score", "low_score", "bull", "bear", "long_only", "short_only"):
             assert g in groups, f"Missing group: {g}"
 
     def test_group_counts(self):
         stats = self._patched_stats()
 
         g = stats["groups"]
-        assert g["all"]["n"]        == 4
+        assert g["all"]["n"] == 4
         assert g["high_score"]["n"] == 2  # score 40, 42
-        assert g["low_score"]["n"]  == 2  # score 30, 25
-        assert g["bull"]["n"]       == 2  # TRENDING_UP × 2
-        assert g["bear"]["n"]       == 1  # TRENDING_DOWN × 1
-        assert g["long_only"]["n"]  == 3
+        assert g["low_score"]["n"] == 2  # score 30, 25
+        assert g["bull"]["n"] == 2  # TRENDING_UP × 2
+        assert g["bear"]["n"] == 1  # TRENDING_DOWN × 1
+        assert g["long_only"]["n"] == 3
         assert g["short_only"]["n"] == 1
 
     def test_optimal_horizon_is_set(self):
@@ -231,23 +233,27 @@ class TestGetAlphaDecayStats:
         assert stats["optimal_horizon"] in HORIZONS
 
     def test_empty_trade_set(self):
-        with patch.object(alpha_decay, "compute_alpha_decay", return_value=[]), \
-             patch.object(alpha_decay, "_load_cache", return_value=None), \
-             patch.object(alpha_decay, "_save_cache"), \
-             patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"):
+        with (
+            patch.object(alpha_decay, "compute_alpha_decay", return_value=[]),
+            patch.object(alpha_decay, "_load_cache", return_value=None),
+            patch.object(alpha_decay, "_save_cache"),
+            patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"),
+        ):
             stats = get_alpha_decay_stats()
 
-        assert stats["trade_count"]     == 0
+        assert stats["trade_count"] == 0
         assert stats["optimal_horizon"] is None
         for g in stats["groups"].values():
             assert g["n"] == 0
 
     def test_custom_horizons(self):
         custom = [2, 7]
-        with patch.object(alpha_decay, "compute_alpha_decay", return_value=[]), \
-             patch.object(alpha_decay, "_load_cache", return_value=None), \
-             patch.object(alpha_decay, "_save_cache"), \
-             patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"):
+        with (
+            patch.object(alpha_decay, "compute_alpha_decay", return_value=[]),
+            patch.object(alpha_decay, "_load_cache", return_value=None),
+            patch.object(alpha_decay, "_save_cache"),
+            patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"),
+        ):
             stats = get_alpha_decay_stats(horizons=custom)
 
         assert stats["horizons"] == custom
@@ -255,11 +261,12 @@ class TestGetAlphaDecayStats:
 
 # ── compute_alpha_decay (trades → records, with mocked yfinance) ──────────
 
-class TestComputeAlphaDecay:
 
+class TestComputeAlphaDecay:
     def _mock_df(self, closes):
         """Build a minimal DataFrame mock that behaves like yfinance history output."""
         import pandas as pd
+
         idx = pd.date_range("2026-03-20", periods=len(closes), freq="B")
         return pd.DataFrame({"Close": closes}, index=idx)
 
@@ -299,14 +306,14 @@ class TestComputeAlphaDecay:
     def test_loads_from_file_when_trades_is_none(self):
         sample = [_make_trade()]
         fwd = {1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005}
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json",
-                                         delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(sample, f)
             tmp = f.name
         try:
-            with patch.object(alpha_decay, "_TRADE_LOG_FILE", tmp), \
-                 patch.object(alpha_decay, "fetch_forward_returns",
-                              return_value=fwd):
+            with (
+                patch.object(alpha_decay, "_TRADE_LOG_FILE", tmp),
+                patch.object(alpha_decay, "fetch_forward_returns", return_value=fwd),
+            ):
                 result = compute_alpha_decay()
             assert len(result) == 1
             assert result[0]["symbol"] == "AAPL"
@@ -361,8 +368,8 @@ class TestComputeAlphaDecay:
 
 # ── _dominant_dimension ───────────────────────────────────────────────────
 
-class TestDominantDimension:
 
+class TestDominantDimension:
     def test_returns_highest_scoring_dimension(self):
         scores = {"trend": 7, "momentum": 9, "squeeze": 4}
         assert _dominant_dimension(scores) == "momentum"
@@ -393,8 +400,8 @@ class TestDominantDimension:
 
 # ── Dimension segments in get_alpha_decay_stats ───────────────────────────
 
-class TestDimensionSegments:
 
+class TestDimensionSegments:
     def _records_with_scores(self):
         r1 = _make_record(returns={1: 0.02, 3: 0.03, 5: 0.025, 10: 0.01})
         r1["signal_scores"] = {"trend": 9, "momentum": 4}
@@ -405,39 +412,39 @@ class TestDimensionSegments:
         return [r1, r2, r3]
 
     def test_all_dimension_keys_present(self):
-        with patch.object(alpha_decay, "compute_alpha_decay",
-                          return_value=self._records_with_scores()):
+        with patch.object(alpha_decay, "compute_alpha_decay", return_value=self._records_with_scores()):
             stats = get_alpha_decay_stats()
         for dim in _DIMENSIONS:
             assert f"dim_{dim}" in stats["groups"], f"Missing: dim_{dim}"
 
     def test_dimension_counts_correct(self):
-        with patch.object(alpha_decay, "compute_alpha_decay",
-                          return_value=self._records_with_scores()), \
-             patch.object(alpha_decay, "_load_cache", return_value=None), \
-             patch.object(alpha_decay, "_save_cache"), \
-             patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"):
+        with (
+            patch.object(alpha_decay, "compute_alpha_decay", return_value=self._records_with_scores()),
+            patch.object(alpha_decay, "_load_cache", return_value=None),
+            patch.object(alpha_decay, "_save_cache"),
+            patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"),
+        ):
             stats = get_alpha_decay_stats()
         g = stats["groups"]
-        assert g["dim_trend"]["n"]    == 1  # r1 dominant = trend
+        assert g["dim_trend"]["n"] == 1  # r1 dominant = trend
         assert g["dim_momentum"]["n"] == 1  # r2 dominant = momentum
-        assert g["dim_squeeze"]["n"]  == 0  # no trade dominated by squeeze
+        assert g["dim_squeeze"]["n"] == 0  # no trade dominated by squeeze
 
     def test_empty_signal_scores_not_counted_in_any_dimension(self):
-        with patch.object(alpha_decay, "compute_alpha_decay",
-                          return_value=self._records_with_scores()), \
-             patch.object(alpha_decay, "_load_cache", return_value=None), \
-             patch.object(alpha_decay, "_save_cache"), \
-             patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"):
+        with (
+            patch.object(alpha_decay, "compute_alpha_decay", return_value=self._records_with_scores()),
+            patch.object(alpha_decay, "_load_cache", return_value=None),
+            patch.object(alpha_decay, "_save_cache"),
+            patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"),
+        ):
             stats = get_alpha_decay_stats()
         # r3 has empty signal_scores → must not appear in any dim segment
-        total_dim_n = sum(
-            stats["groups"][f"dim_{d}"]["n"] for d in _DIMENSIONS
-        )
+        total_dim_n = sum(stats["groups"][f"dim_{d}"]["n"] for d in _DIMENSIONS)
         assert total_dim_n == 2  # only r1 and r2
 
 
 # ── Caching ───────────────────────────────────────────────────────────────────
+
 
 class TestCaching:
     """Tests for _cache_key, _load_cache, _save_cache, and cache integration
@@ -459,13 +466,13 @@ class TestCaching:
 
     def test_cache_key_only_counts_closed_trades(self):
         closed = _make_trade(entry_time="2026-03-20 10:00:00")  # has pnl
-        open_  = _make_trade(entry_time="2026-03-21 10:00:00", exit_price=None, pnl=None)
+        open_ = _make_trade(entry_time="2026-03-21 10:00:00", exit_price=None, pnl=None)
         key = _cache_key([closed, open_])
         assert key.startswith("1|")  # only 1 closed
 
     def test_cache_key_changes_when_new_trade_added(self):
         t1 = [_make_trade(entry_time="2026-03-20 10:00:00")]
-        t2 = t1 + [_make_trade(entry_time="2026-03-22 10:00:00")]
+        t2 = [*t1, _make_trade(entry_time="2026-03-22 10:00:00")]
         assert _cache_key(t1) != _cache_key(t2)
 
     def test_cache_key_stable_for_same_data(self):
@@ -495,10 +502,10 @@ class TestCaching:
 
     def test_load_returns_none_when_ttl_expired(self, tmp_path):
         import time as _time
+
         cache_file = str(tmp_path / "cache.json")
         data = {"x": 1}
-        with patch.object(alpha_decay, "_CACHE_FILE", cache_file), \
-             patch.object(alpha_decay, "_CACHE_TTL", 60):
+        with patch.object(alpha_decay, "_CACHE_FILE", cache_file), patch.object(alpha_decay, "_CACHE_TTL", 60):
             _save_cache("k", data)
             # Simulate clock advancing beyond TTL
             with patch("alpha_decay.time") as mock_time:
@@ -510,19 +517,25 @@ class TestCaching:
     def test_stats_cached_on_first_call(self, tmp_path):
         """Second call with same trades returns cached result without re-computing."""
         cache_file = str(tmp_path / "cache.json")
-        sample     = [_make_trade()]
-        fwd        = {1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005}
+        sample = [_make_trade()]
+        fwd = {1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005}
 
-        with patch.object(alpha_decay, "_CACHE_FILE", cache_file), \
-             patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"), \
-             patch.object(alpha_decay, "fetch_forward_returns", return_value=fwd):
+        with (
+            patch.object(alpha_decay, "_CACHE_FILE", cache_file),
+            patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"),
+            patch.object(alpha_decay, "fetch_forward_returns", return_value=fwd),
+        ):
             # First call: compute and cache
             stats1 = get_alpha_decay_stats(trades=None)
 
         # Overwrite trade file content — second call still uses cache
-        with patch.object(alpha_decay, "_CACHE_FILE", cache_file), \
-             patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"), \
-             patch.object(alpha_decay, "compute_alpha_decay", side_effect=AssertionError("should not recompute")) as mock_compute:
+        with (
+            patch.object(alpha_decay, "_CACHE_FILE", cache_file),
+            patch.object(alpha_decay, "_TRADE_LOG_FILE", "/nonexistent"),
+            patch.object(
+                alpha_decay, "compute_alpha_decay", side_effect=AssertionError("should not recompute")
+            ) as mock_compute,
+        ):
             # Cache key will match (0 closed trades → "0|")
             stats2 = get_alpha_decay_stats(trades=None)
 
@@ -531,12 +544,15 @@ class TestCaching:
     def test_explicit_trades_arg_bypasses_cache(self, tmp_path):
         """When trades are passed explicitly, the cache is not read or written."""
         cache_file = str(tmp_path / "cache.json")
-        sample     = [_make_trade()]
-        fwd        = {1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005}
+        sample = [_make_trade()]
+        fwd = {1: 0.01, 3: 0.02, 5: 0.015, 10: 0.005}
 
-        with patch.object(alpha_decay, "_CACHE_FILE", cache_file), \
-             patch.object(alpha_decay, "fetch_forward_returns", return_value=fwd):
+        with (
+            patch.object(alpha_decay, "_CACHE_FILE", cache_file),
+            patch.object(alpha_decay, "fetch_forward_returns", return_value=fwd),
+        ):
             get_alpha_decay_stats(trades=sample)
 
         import os
+
         assert not os.path.exists(cache_file), "cache must not be written for explicit trades"

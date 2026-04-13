@@ -3,24 +3,21 @@
 Tests for data_collector.py — feature engineering, metadata, and helpers.
 All network calls are mocked; no real yfinance or HTTP requests.
 """
+
+import json
 import os
 import sys
-import json
-import tempfile
 import types
-from datetime import datetime
-from pathlib import Path
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, patch
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
 
 # ── Add project root to path ──────────────────────────────────────
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ── Stub heavy imports BEFORE importing Decifer modules ──────────
-import importlib
 
 # ib_async
 ib_async_stub = types.ModuleType("ib_async")
@@ -46,13 +43,16 @@ sys.modules.setdefault("tradingview_screener", tv_stub)
 sys.modules.setdefault("tradingview_screener.scanner", tv_stub)
 
 # py_vollib
-for mod in ["py_vollib", "py_vollib.black_scholes", "py_vollib.black_scholes.greeks",
-            "py_vollib.black_scholes.greeks.analytical"]:
+for mod in [
+    "py_vollib",
+    "py_vollib.black_scholes",
+    "py_vollib.black_scholes.greeks",
+    "py_vollib.black_scholes.greeks.analytical",
+]:
     sys.modules.setdefault(mod, types.ModuleType(mod))
 
 # sklearn
-for mod in ["sklearn", "sklearn.ensemble", "sklearn.preprocessing",
-            "sklearn.model_selection", "sklearn.metrics"]:
+for mod in ["sklearn", "sklearn.ensemble", "sklearn.preprocessing", "sklearn.model_selection", "sklearn.metrics"]:
     sys.modules.setdefault(mod, types.ModuleType(mod))
 
 sys.modules.setdefault("joblib", types.ModuleType("joblib"))
@@ -91,25 +91,19 @@ sys.modules.setdefault("signals", signals_stub)
 
 # Now import the module under test
 from data_collector import (
-    add_features,
-    ensure_dirs,
-    load_meta,
-    save_meta,
-    download_intraday_yf,
-    download_daily_yf,
-    download_daily_stooq,
-    download_daily_alphavantage,
     _atr,
     _rsi,
-    META_FILE,
-    INTRADAY_DIR,
-    DAILY_DIR,
+    add_features,
+    download_daily_alphavantage,
+    download_daily_stooq,
+    download_daily_yf,
+    download_intraday_yf,
 )
-
 
 # ─────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────
+
 
 def make_ohlcv(n=100, start_price=100.0) -> pd.DataFrame:
     """Create a synthetic OHLCV DataFrame with n bars."""
@@ -139,13 +133,17 @@ def make_yf_history_df(n=100):
 # ensure_dirs
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestEnsureDirs:
     def test_creates_dirs_if_missing(self, tmp_path):
         """ensure_dirs should create INTRADAY_DIR and DAILY_DIR."""
-        with patch("data_collector.INTRADAY_DIR", tmp_path / "intraday"), \
-             patch("data_collector.DAILY_DIR", tmp_path / "daily"):
+        with (
+            patch("data_collector.INTRADAY_DIR", tmp_path / "intraday"),
+            patch("data_collector.DAILY_DIR", tmp_path / "daily"),
+        ):
             # Patch the module-level paths used inside ensure_dirs
             import data_collector as dc
+
             orig_intra = dc.INTRADAY_DIR
             orig_daily = dc.DAILY_DIR
             dc.INTRADAY_DIR = tmp_path / "intraday"
@@ -161,6 +159,7 @@ class TestEnsureDirs:
     def test_idempotent_when_dirs_exist(self, tmp_path):
         """Calling ensure_dirs twice should not raise."""
         import data_collector as dc
+
         orig_intra = dc.INTRADAY_DIR
         orig_daily = dc.DAILY_DIR
         dc.INTRADAY_DIR = tmp_path / "intraday"
@@ -177,9 +176,11 @@ class TestEnsureDirs:
 # load_meta / save_meta
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestMetadata:
     def test_load_meta_returns_defaults_when_file_missing(self, tmp_path):
         import data_collector as dc
+
         orig = dc.META_FILE
         dc.META_FILE = tmp_path / "nonexistent.json"
         try:
@@ -192,6 +193,7 @@ class TestMetadata:
 
     def test_load_meta_reads_existing_file(self, tmp_path):
         import data_collector as dc
+
         orig = dc.META_FILE
         meta_path = tmp_path / "meta.json"
         data = {"last_run": "2024-01-01", "symbols": {"AAPL": 100}, "total_rows": 500}
@@ -207,6 +209,7 @@ class TestMetadata:
 
     def test_save_meta_writes_last_run(self, tmp_path):
         import data_collector as dc
+
         orig = dc.META_FILE
         meta_path = tmp_path / "meta.json"
         dc.META_FILE = meta_path
@@ -220,6 +223,7 @@ class TestMetadata:
 
     def test_load_meta_handles_corrupt_file(self, tmp_path):
         import data_collector as dc
+
         orig = dc.META_FILE
         meta_path = tmp_path / "corrupt.json"
         meta_path.write_text("NOT VALID JSON{{{")
@@ -234,6 +238,7 @@ class TestMetadata:
 # ─────────────────────────────────────────────────────────────────
 # _atr helper
 # ─────────────────────────────────────────────────────────────────
+
 
 class TestATRHelper:
     def test_atr_returns_array_same_length(self):
@@ -268,6 +273,7 @@ class TestATRHelper:
 # _rsi helper
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestRSIHelper:
     def test_rsi_returns_array_same_length(self):
         close = make_ohlcv(60)["close"].values
@@ -299,6 +305,7 @@ class TestRSIHelper:
 # add_features
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestAddFeatures:
     def test_add_features_returns_dataframe(self):
         df = make_ohlcv(100)
@@ -309,12 +316,22 @@ class TestAddFeatures:
         df = make_ohlcv(100)
         result = add_features(df.copy())
         expected_cols = [
-            "return_1", "return_5", "return_10",
-            "atr_14", "volatility_20",
-            "ema_9", "ema_21", "ema_50",
-            "rsi_14", "vol_sma_20", "vol_ratio",
-            "bb_upper", "bb_lower", "bb_position",
-            "vwap", "vwap_dist",
+            "return_1",
+            "return_5",
+            "return_10",
+            "atr_14",
+            "volatility_20",
+            "ema_9",
+            "ema_21",
+            "ema_50",
+            "rsi_14",
+            "vol_sma_20",
+            "vol_ratio",
+            "bb_upper",
+            "bb_lower",
+            "bb_position",
+            "vwap",
+            "vwap_dist",
             "regime",
         ]
         for col in expected_cols:
@@ -360,8 +377,7 @@ class TestAddFeatures:
         """ema_trend should be 1 when EMA9 > EMA21."""
         close = np.linspace(50, 200, 200)
         df = pd.DataFrame(
-            {"open": close, "high": close + 1, "low": close - 1,
-             "close": close, "volume": np.ones(200) * 1e6},
+            {"open": close, "high": close + 1, "low": close - 1, "close": close, "volume": np.ones(200) * 1e6},
             index=pd.date_range("2020-01-01", periods=200, freq="D"),
         )
         result = add_features(df)
@@ -397,6 +413,7 @@ class TestAddFeatures:
 # ─────────────────────────────────────────────────────────────────
 # download_intraday_yf (mocked)
 # ─────────────────────────────────────────────────────────────────
+
 
 class TestDownloadIntradayYF:
     def _make_mock_ticker(self, df):
@@ -451,6 +468,7 @@ class TestDownloadIntradayYF:
 # download_daily_yf (mocked)
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestDownloadDailyYF:
     def _make_mock_ticker(self, df):
         mock = MagicMock()
@@ -504,6 +522,7 @@ class TestDownloadDailyYF:
 # download_daily_alphavantage (no key → None)
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestDownloadAlphaVantage:
     def test_returns_none_without_api_key(self):
         with patch.dict(os.environ, {}, clear=True):
@@ -523,18 +542,21 @@ class TestDownloadAlphaVantage:
 # download_daily_stooq (mocked)
 # ─────────────────────────────────────────────────────────────────
 
+
 class TestDownloadDailyStooq:
     def _make_stooq_df(self, n=100):
         dates = pd.date_range("2020-01-01", periods=n, freq="D")
         close = 100.0 + np.arange(n)
-        df = pd.DataFrame({
-            "Date": dates.astype(str),
-            "Open": close,
-            "High": close + 1,
-            "Low": close - 1,
-            "Close": close,
-            "Volume": np.ones(n) * 1e6,
-        })
+        df = pd.DataFrame(
+            {
+                "Date": dates.astype(str),
+                "Open": close,
+                "High": close + 1,
+                "Low": close - 1,
+                "Close": close,
+                "Volume": np.ones(n) * 1e6,
+            }
+        )
         return df
 
     def test_returns_none_on_exception(self):
@@ -564,14 +586,18 @@ class TestDownloadDailyStooq:
 # Parametrized edge-case matrix for add_features
 # ─────────────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("n_rows,should_have_features", [
-    (0, False),   # empty
-    (10, False),  # below minimum (50)
-    (49, False),  # just below threshold
-    (50, True),   # exactly at threshold
-    (100, True),  # normal
-    (200, True),  # large
-])
+
+@pytest.mark.parametrize(
+    "n_rows,should_have_features",
+    [
+        (0, False),  # empty
+        (10, False),  # below minimum (50)
+        (49, False),  # just below threshold
+        (50, True),  # exactly at threshold
+        (100, True),  # normal
+        (200, True),  # large
+    ],
+)
 def test_add_features_row_threshold(n_rows, should_have_features):
     if n_rows == 0:
         df = pd.DataFrame()

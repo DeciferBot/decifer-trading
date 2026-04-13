@@ -25,17 +25,18 @@ import logging
 import os
 import zoneinfo
 from collections import defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 log = logging.getLogger("decifer.overnight")
 
-_ET          = zoneinfo.ZoneInfo("America/New_York")
-NOTES_PATH   = "data/overnight_notes.md"
-TRADES_FILE  = "data/trades.json"
-_TONE_SYMS   = ["SPY", "QQQ", "IWM"]   # market breadth proxies
+_ET = zoneinfo.ZoneInfo("America/New_York")
+NOTES_PATH = "data/overnight_notes.md"
+TRADES_FILE = "data/trades.json"
+_TONE_SYMS = ["SPY", "QQQ", "IWM"]  # market breadth proxies
 
 
 # ── Pre-market / after-hours tone ─────────────────────────────────────────────
+
 
 def _get_price_tone() -> str:
     """
@@ -44,6 +45,7 @@ def _get_price_tone() -> str:
     """
     try:
         from alpaca_data import fetch_snapshots
+
         snaps = fetch_snapshots(_TONE_SYMS)
         if not snaps:
             return "Pre-market tone: unavailable (Alpaca not connected)"
@@ -53,23 +55,23 @@ def _get_price_tone() -> str:
             s = snaps.get(sym)
             if not s:
                 continue
-            price  = s.get("price") or 0
-            chg    = s.get("change_1d")
+            price = s.get("price") or 0
+            chg = s.get("change_1d")
             if chg is None:
                 lines.append(f"  {sym:<4} ${price:.2f}  (gap vs close: n/a)")
             else:
-                pct    = chg * 100
-                tag    = "gap-up" if pct > 0.15 else ("gap-down" if pct < -0.15 else "flat")
+                pct = chg * 100
+                tag = "gap-up" if pct > 0.15 else ("gap-down" if pct < -0.15 else "flat")
                 lines.append(f"  {sym:<4} ${price:.2f}  {pct:+.2f}% vs close  ({tag})")
 
-        return "PRE-MARKET / AFTER-HOURS TONE:\n" + "\n".join(lines) if lines \
-               else "Pre-market tone: no data returned"
+        return "PRE-MARKET / AFTER-HOURS TONE:\n" + "\n".join(lines) if lines else "Pre-market tone: no data returned"
     except Exception as exc:
         log.debug("overnight: price tone failed — %s", exc)
         return "Pre-market tone: unavailable"
 
 
 # ── Yesterday's performance summary ──────────────────────────────────────────
+
 
 def _get_performance_summary() -> str:
     """
@@ -98,14 +100,14 @@ def _get_performance_summary() -> str:
         if not day_trades:
             return f"Yesterday's performance: no closed trades on {yesterday}"
 
-        pnls     = [t["pnl"] for t in day_trades]
-        wins     = [t for t in day_trades if t["pnl"] > 0]
-        losses   = [t for t in day_trades if t["pnl"] <= 0]
+        pnls = [t["pnl"] for t in day_trades]
+        wins = [t for t in day_trades if t["pnl"] > 0]
+        losses = [t for t in day_trades if t["pnl"] <= 0]
         total_pnl = sum(pnls)
-        win_rate  = len(wins) / len(day_trades) * 100 if day_trades else 0
+        win_rate = len(wins) / len(day_trades) * 100 if day_trades else 0
 
         # Best and worst trade
-        best  = max(day_trades, key=lambda x: x["pnl"])
+        best = max(day_trades, key=lambda x: x["pnl"])
         worst = min(day_trades, key=lambda x: x["pnl"])
 
         # Regime breakdown
@@ -113,7 +115,7 @@ def _get_performance_summary() -> str:
         for t in day_trades:
             r = t.get("regime", "UNKNOWN")
             by_regime[r]["count"] += 1
-            by_regime[r]["pnl"]   += t["pnl"]
+            by_regime[r]["pnl"] += t["pnl"]
             if t["pnl"] > 0:
                 by_regime[r]["wins"] += 1
 
@@ -126,14 +128,14 @@ def _get_performance_summary() -> str:
         if wins:
             bw = best
             lines.append(
-                f"  Best:  {bw.get('symbol','?')} {bw.get('direction','?')} "
-                f"+${bw['pnl']:,.2f}  ({bw.get('exit_reason','?')} / {bw.get('regime','?')})"
+                f"  Best:  {bw.get('symbol', '?')} {bw.get('direction', '?')} "
+                f"+${bw['pnl']:,.2f}  ({bw.get('exit_reason', '?')} / {bw.get('regime', '?')})"
             )
         if losses:
             bw = worst
             lines.append(
-                f"  Worst: {bw.get('symbol','?')} {bw.get('direction','?')} "
-                f"${bw['pnl']:,.2f}  ({bw.get('exit_reason','?')} / {bw.get('regime','?')})"
+                f"  Worst: {bw.get('symbol', '?')} {bw.get('direction', '?')} "
+                f"${bw['pnl']:,.2f}  ({bw.get('exit_reason', '?')} / {bw.get('regime', '?')})"
             )
 
         # Regime performance (only regimes with >= 2 trades)
@@ -141,10 +143,7 @@ def _get_performance_summary() -> str:
         for regime_name, data in sorted(by_regime.items(), key=lambda x: x[1]["pnl"]):
             if data["count"] >= 2:
                 wr = data["wins"] / data["count"] * 100
-                regime_notes.append(
-                    f"    {regime_name}: {data['count']} trades  "
-                    f"{wr:.0f}% WR  ${data['pnl']:+,.2f}"
-                )
+                regime_notes.append(f"    {regime_name}: {data['count']} trades  {wr:.0f}% WR  ${data['pnl']:+,.2f}")
         if regime_notes:
             lines.append("  By regime:")
             lines.extend(regime_notes)
@@ -164,13 +163,16 @@ def _get_performance_summary() -> str:
 
 # ── Macro snapshot (FRED recent values) ──────────────────────────────────────
 
+
 def _get_macro_snapshot() -> str:
     """
     Fetch recent values of key macro indicators from FRED.
     Returns a formatted string block. Never raises.
     """
     try:
-        from fred_client import get_macro_snapshot, is_available as fred_ok
+        from fred_client import get_macro_snapshot
+        from fred_client import is_available as fred_ok
+
         if not fred_ok():
             return ""
         items = get_macro_snapshot()
@@ -178,7 +180,7 @@ def _get_macro_snapshot() -> str:
             return ""
         lines = ["MACRO INDICATORS (latest FRED):"]
         for item in items:
-            val_str   = f"{item['value']:.2f}{item['unit']}"
+            val_str = f"{item['value']:.2f}{item['unit']}"
             prior_str = f"  prior: {item['prior']:.2f}" if item.get("prior") is not None else ""
             lines.append(f"  {item['name']}: {val_str}  (as of {item['date']}){prior_str}")
         return "\n".join(lines)
@@ -189,6 +191,7 @@ def _get_macro_snapshot() -> str:
 
 # ── Economic calendar (macro_calendar + FRED primary + FMP fallback) ──────────
 
+
 def _get_economic_calendar() -> str:
     """
     Build a 5-day economic calendar.
@@ -197,17 +200,15 @@ def _get_economic_calendar() -> str:
     Layer 3: FMP economic calendar (fallback — only used when FRED is unavailable).
     Returns a formatted string block. Never raises.
     """
-    today    = date.today()
-    days     = [(today + timedelta(days=i)) for i in range(6)]
+    today = date.today()
+    days = [(today + timedelta(days=i)) for i in range(6)]
     day_strs = {str(d): [] for d in days}
 
     def _add_event(d_str: str, ev_name: str, impact: str) -> None:
         if d_str not in day_strs:
             return
         already = any(
-            ev_name.upper() in e["event"].upper()
-            or e["event"].upper() in ev_name.upper()
-            for e in day_strs[d_str]
+            ev_name.upper() in e["event"].upper() or e["event"].upper() in ev_name.upper() for e in day_strs[d_str]
         )
         if not already:
             day_strs[d_str].append({"event": ev_name, "impact": impact, "detail": ""})
@@ -215,6 +216,7 @@ def _get_economic_calendar() -> str:
     # ── Layer 1: hardcoded macro calendar ────────────────────────
     try:
         from macro_calendar import _ALL_EVENTS  # type: ignore[attr-defined]
+
         for event in _ALL_EVENTS:
             _add_event(str(event["date"]), event["type"], "High")
     except Exception as exc:
@@ -223,7 +225,9 @@ def _get_economic_calendar() -> str:
     # ── Layer 2: FRED (primary) ───────────────────────────────────
     fred_populated = False
     try:
-        from fred_client import get_upcoming_releases, is_available as fred_ok
+        from fred_client import get_upcoming_releases
+        from fred_client import is_available as fred_ok
+
         if fred_ok():
             fred_events = get_upcoming_releases(days_ahead=5)
             for ev in fred_events:
@@ -235,22 +239,23 @@ def _get_economic_calendar() -> str:
     # ── Layer 3: FMP (fallback — only when FRED unavailable/empty) ────────────
     if not fred_populated:
         try:
-            from fmp_client import get_economic_calendar, is_available as fmp_ok
+            from fmp_client import get_economic_calendar
+            from fmp_client import is_available as fmp_ok
+
             if fmp_ok():
                 fmp_events = get_economic_calendar(days_ahead=5)
                 for ev in fmp_events:
                     _add_event(ev["date"], ev["event"], ev["impact"])
                 if fmp_events:
-                    log.debug("overnight: economic calendar using FMP fallback (%d events)",
-                              len(fmp_events))
+                    log.debug("overnight: economic calendar using FMP fallback (%d events)", len(fmp_events))
         except Exception as exc:
             log.debug("overnight: FMP calendar fallback failed — %s", exc)
 
     lines = ["ECONOMIC CALENDAR — Next 5 Days:"]
     for d in days:
-        d_str   = str(d)
-        label   = d.strftime("%a %b %-d")
-        events  = day_strs.get(d_str, [])
+        d_str = str(d)
+        label = d.strftime("%a %b %-d")
+        events = day_strs.get(d_str, [])
         if not events:
             lines.append(f"  {label}: No high-impact events")
         else:
@@ -263,6 +268,7 @@ def _get_economic_calendar() -> str:
 
 # ── Earnings calendar ─────────────────────────────────────────────────────────
 
+
 def _get_earnings_calendar(universe: list[str] | None) -> str:
     """
     Fetch earnings for the next 5 days.
@@ -271,7 +277,9 @@ def _get_earnings_calendar(universe: list[str] | None) -> str:
     """
     # ── Source 1: FMP (has EPS estimates) ────────────────────────
     try:
-        from fmp_client import get_earnings_calendar, is_available as fmp_ok
+        from fmp_client import get_earnings_calendar
+        from fmp_client import is_available as fmp_ok
+
         if fmp_ok():
             items = get_earnings_calendar(symbols=universe, days_ahead=5)
             if items:
@@ -282,12 +290,13 @@ def _get_earnings_calendar(universe: list[str] | None) -> str:
     # ── Source 2: Alpha Vantage fallback (dates, no estimates) ───
     try:
         from alpha_vantage_client import get_earnings_calendar as av_calendar
-        av_raw = av_calendar()   # {symbol: "YYYY-MM-DD"}
+
+        av_raw = av_calendar()  # {symbol: "YYYY-MM-DD"}
         if av_raw:
-            today   = date.today()
-            cutoff  = today + timedelta(days=5)
+            today = date.today()
+            cutoff = today + timedelta(days=5)
             sym_set = {s.upper() for s in universe} if universe else None
-            items   = []
+            items = []
             for sym, d_str in av_raw.items():
                 sym_up = sym.upper()
                 # Filter to exchange-listed equities only:
@@ -306,13 +315,15 @@ def _get_earnings_calendar(universe: list[str] | None) -> str:
                 except ValueError:
                     continue
                 if today <= d <= cutoff:
-                    items.append({
-                        "date":        d_str,
-                        "symbol":      sym_up,
-                        "timing":      "",
-                        "eps_est":     None,
-                        "eps_prior":   None,
-                    })
+                    items.append(
+                        {
+                            "date": d_str,
+                            "symbol": sym_up,
+                            "timing": "",
+                            "eps_est": None,
+                            "eps_prior": None,
+                        }
+                    )
             items.sort(key=lambda x: x["date"])
             if items:
                 return _format_earnings(items, source="Alpha Vantage — dates only")
@@ -325,18 +336,19 @@ def _get_earnings_calendar(universe: list[str] | None) -> str:
 def _format_earnings(items: list[dict], source: str = "") -> str:
     lines = [f"EARNINGS — Next 5 Days:{f'  ({source})' if source else ''}"]
     for item in items:
-        d_str    = item["date"]
-        label    = datetime.strptime(d_str, "%Y-%m-%d").strftime("%a %b %-d")
+        d_str = item["date"]
+        label = datetime.strptime(d_str, "%Y-%m-%d").strftime("%a %b %-d")
         timing_s = f" {item['timing']}" if item.get("timing") else ""
-        sym      = item["symbol"]
-        eps_e    = f"EPS est ${item['eps_est']:.2f}" if item.get("eps_est") is not None else ""
-        eps_p    = f"prior ${item['eps_prior']:.2f}" if item.get("eps_prior") is not None else ""
-        details  = "  ".join(filter(None, [eps_e, eps_p]))
+        sym = item["symbol"]
+        eps_e = f"EPS est ${item['eps_est']:.2f}" if item.get("eps_est") is not None else ""
+        eps_p = f"prior ${item['eps_prior']:.2f}" if item.get("eps_prior") is not None else ""
+        details = "  ".join(filter(None, [eps_e, eps_p]))
         lines.append(f"  {label}{timing_s}: {sym}  {details}")
     return "\n".join(lines)
 
 
 # ── Market news + AI interpretation ──────────────────────────────────────────
+
 
 def _get_market_news() -> str:
     """
@@ -348,17 +360,18 @@ def _get_market_news() -> str:
     try:
         from alpaca.data.historical import NewsClient
         from alpaca.data.requests import NewsRequest
+
         from config import CONFIG
 
-        api_key    = CONFIG.get("alpaca_api_key", "")
+        api_key = CONFIG.get("alpaca_api_key", "")
         secret_key = CONFIG.get("alpaca_secret_key", "")
         if not api_key or not secret_key:
             return "Market news: Alpaca credentials not set"
 
-        client   = NewsClient(api_key, secret_key)
-        start_dt = datetime.now(timezone.utc) - timedelta(hours=16)
-        req      = NewsRequest(start=start_dt, limit=30, include_content=False)
-        news     = client.get_news(req)
+        client = NewsClient(api_key, secret_key)
+        start_dt = datetime.now(UTC) - timedelta(hours=16)
+        req = NewsRequest(start=start_dt, limit=30, include_content=False)
+        news = client.get_news(req)
         articles = (news.data or {}).get("news", [])
         for a in articles:
             h = getattr(a, "headline", "") or ""
@@ -374,19 +387,18 @@ def _get_market_news() -> str:
     # ── Claude Haiku interpretation ───────────────────────────────
     try:
         import anthropic
+
         from config import CONFIG
 
         # Config may hold the placeholder if .env was loaded after module import;
         # always prefer the live env var for overnight standalone runs.
         _cfg_key = CONFIG.get("anthropic_api_key", "")
-        api_key  = (
-            _cfg_key
-            if (_cfg_key and _cfg_key != "YOUR_API_KEY_HERE")
-            else os.environ.get("ANTHROPIC_API_KEY", "")
+        api_key = (
+            _cfg_key if (_cfg_key and _cfg_key != "YOUR_API_KEY_HERE") else os.environ.get("ANTHROPIC_API_KEY", "")
         )
         if not api_key:
             raise ValueError("Anthropic API key not configured")
-        ai     = anthropic.Anthropic(api_key=api_key)
+        ai = anthropic.Anthropic(api_key=api_key)
         prompt = (
             "You are a market analyst reviewing overnight news for an AI trading system.\n\n"
             f"Below are {len(headlines)} headlines from the last 16 hours. Your job:\n"
@@ -401,8 +413,7 @@ def _get_market_news() -> str:
             "    Impact: <sector/direction in one line>\n"
             "  ...\n"
             "Net bias: <bullish/bearish/neutral> — <brief reason>\n\n"
-            "HEADLINES:\n" +
-            "\n".join(f"- {h}" for h in headlines[:30])
+            "HEADLINES:\n" + "\n".join(f"- {h}" for h in headlines[:30])
         )
         resp = ai.messages.create(
             model=CONFIG.get("claude_model_haiku", "claude-haiku-4-5-20251001"),
@@ -422,28 +433,30 @@ def _get_market_news() -> str:
 
 # ── Analyst changes ───────────────────────────────────────────────────────────
 
+
 def _get_analyst_changes(universe: list[str] | None) -> str:
     """
     Fetch analyst upgrades/downgrades in the last 24 hours.
     Filtered to universe if provided. Returns formatted string. Never raises.
     """
     try:
-        from fmp_client import get_analyst_changes, is_available as fmp_ok
+        from fmp_client import get_analyst_changes
+        from fmp_client import is_available as fmp_ok
+
         if not fmp_ok():
             return "Analyst changes: FMP_API_KEY not set"
 
         items = get_analyst_changes(symbols=universe, hours_back=24)
         if not items:
-            return "Analyst changes: none in last 24h" + \
-                   (" for tracked universe" if universe else "")
+            return "Analyst changes: none in last 24h" + (" for tracked universe" if universe else "")
 
         lines = ["ANALYST CHANGES (Last 24h):"]
-        for item in items[:15]:   # cap at 15 lines
-            action    = item["action"].upper()
-            from_g    = item["from_grade"]
-            to_g      = item["to_grade"]
-            firm      = item["firm"]
-            sym       = item["symbol"]
+        for item in items[:15]:  # cap at 15 lines
+            action = item["action"].upper()
+            from_g = item["from_grade"]
+            to_g = item["to_grade"]
+            firm = item["firm"]
+            sym = item["symbol"]
             grade_str = f"{from_g} → {to_g}" if from_g and to_g else (to_g or from_g or "")
             lines.append(f"  {sym}  {action}  {grade_str}  ({firm})")
 
@@ -456,6 +469,7 @@ def _get_analyst_changes(universe: list[str] | None) -> str:
 
 # ── Main generator ────────────────────────────────────────────────────────────
 
+
 def generate_overnight_notes(universe: list[str] | None = None) -> str:
     """
     Generate overnight research notes and write to data/overnight_notes.md.
@@ -467,9 +481,9 @@ def generate_overnight_notes(universe: list[str] | None = None) -> str:
     Returns:
         The full notes text (also written to disk).
     """
-    now_et    = datetime.now(_ET)
-    date_str  = now_et.strftime("%Y-%m-%d")
-    gen_time  = now_et.strftime("%Y-%m-%d %H:%M ET")
+    now_et = datetime.now(_ET)
+    date_str = now_et.strftime("%Y-%m-%d")
+    gen_time = now_et.strftime("%Y-%m-%d %H:%M ET")
 
     macro_snapshot = _get_macro_snapshot()
     sections = [
@@ -514,9 +528,10 @@ def load_overnight_notes() -> str:
     try:
         mtime = os.path.getmtime(NOTES_PATH)
         import time as _t
+
         # Weekend: Monday (0) or Sunday (6) — notes may be up to 80h old (Fri 4pm → Mon 8am)
-        weekday  = datetime.now(_ET).weekday()
-        max_age  = 80 * 3600 if weekday in (0, 6) else 20 * 3600
+        weekday = datetime.now(_ET).weekday()
+        max_age = 80 * 3600 if weekday in (0, 6) else 20 * 3600
         if _t.time() - mtime > max_age:
             log.debug("overnight: notes file is stale (> %dh), skipping", max_age // 3600)
             return ""
@@ -534,14 +549,16 @@ if __name__ == "__main__":
     # Load .env for standalone runs (bot sets env vars at startup)
     try:
         from dotenv import load_dotenv
+
         load_dotenv(override=True)
     except ImportError:
         _env_path = os.path.join(os.path.dirname(__file__), ".env")
         if os.path.exists(_env_path):
-            for _line in open(_env_path):
-                _line = _line.strip()
-                if _line and not _line.startswith("#") and "=" in _line:
-                    _k, _, _v = _line.partition("=")
-                    # Force-set: shell may export empty stubs; .env values are authoritative
-                    os.environ[_k.strip()] = _v.strip()
+            with open(_env_path) as _env_f:
+                for _line in _env_f:
+                    _line = _line.strip()
+                    if _line and not _line.startswith("#") and "=" in _line:
+                        _k, _, _v = _line.partition("=")
+                        # Force-set: shell may export empty stubs; .env values are authoritative
+                        os.environ[_k.strip()] = _v.strip()
     print(generate_overnight_notes())

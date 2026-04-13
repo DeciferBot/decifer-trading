@@ -1,20 +1,16 @@
 """Tests for get_thesis_performance() — GAP-004: exit_reason → entry reasoning feedback."""
 
-import sys
-import os
 import json
-import tempfile
-from pathlib import Path
+import os
+import sys
 from unittest.mock import patch
-
-import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pattern_library
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _make_library(records: list[dict]) -> dict:
     """Build a pattern_library dict from a list of records."""
@@ -25,21 +21,22 @@ def _record(
     pattern_id: str,
     trade_type: str = "SCALP",
     pnl: float = 100.0,
-    pnl_pct: float = None,
+    pnl_pct: float | None = None,
     exit_reason: str = "sl_hit | SCALP | regime:BULL→BULL | held:30min | thesis:noise_stop",
 ) -> dict:
     if pnl_pct is None:
         pnl_pct = 0.01 if pnl >= 0 else -0.01
     return {
-        "pattern_id":  pattern_id,
-        "trade_type":  trade_type,
-        "pnl":         pnl,
-        "pnl_pct":     pnl_pct,
+        "pattern_id": pattern_id,
+        "trade_type": trade_type,
+        "pnl": pnl,
+        "pnl_pct": pnl_pct,
         "exit_reason": exit_reason,
     }
 
 
 # ── Basic aggregation ─────────────────────────────────────────────────────────
+
 
 def test_returns_empty_when_no_completed_patterns(tmp_path):
     lib = {}
@@ -144,10 +141,9 @@ def test_win_rate_100_percent(tmp_path):
 
 
 def test_sorted_by_count_descending(tmp_path):
-    records = (
-        [_record(f"g{i}", "SCALP", exit_reason="... | thesis:noise_stop") for i in range(5)]
-        + [_record(f"h{i}", "SWING", exit_reason="... | thesis:confirmed") for i in range(2)]
-    )
+    records = [_record(f"g{i}", "SCALP", exit_reason="... | thesis:noise_stop") for i in range(5)] + [
+        _record(f"h{i}", "SWING", exit_reason="... | thesis:confirmed") for i in range(2)
+    ]
     lib = _make_library(records)
     with patch.object(pattern_library, "LIBRARY_PATH", tmp_path / "pl.json"):
         (tmp_path / "pl.json").write_text(json.dumps(lib))

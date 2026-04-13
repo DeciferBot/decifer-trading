@@ -12,27 +12,40 @@
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from signal_types import Signal, SIGNALS_LOG
-from signals import score_universe, get_regime_threshold
-from news import batch_news_sentiment
 from learning import log_signal_scan
+from news import batch_news_sentiment
+from signal_types import SIGNALS_LOG, Signal
+from signals import get_regime_threshold, score_universe
 
 log = logging.getLogger("decifer.pipeline")
 
 # Symbols always preserved through the TV pre-filter regardless of TV data.
 # Keep in sync with scanner.CORE_SYMBOLS.
-_PREFILTER_CORE = frozenset([
-    "SPY", "QQQ", "IWM", "VXX",   # Macro ETFs
-    "UVXY", "SVXY",                # Volatility
-    "SPXS", "SQQQ",               # Inverse ETFs
-    "IBIT", "BITO", "MSTR",       # Crypto proxies
-    "GLD", "SLV", "USO", "COPX",  # Commodities
-])
+_PREFILTER_CORE = frozenset(
+    [
+        "SPY",
+        "QQQ",
+        "IWM",
+        "VXX",  # Macro ETFs
+        "UVXY",
+        "SVXY",  # Volatility
+        "SPXS",
+        "SQQQ",  # Inverse ETFs
+        "IBIT",
+        "BITO",
+        "MSTR",  # Crypto proxies
+        "GLD",
+        "SLV",
+        "USO",
+        "COPX",  # Commodities
+    ]
+)
 
 
 # ── Result type ────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class SignalPipelineResult:
@@ -57,6 +70,7 @@ class SignalPipelineResult:
                     Consumed by the options scanner.
     regime_name   : str  — regime label at scoring time (e.g. "BULL_TRENDING").
     """
+
     signals: list
     scored: list
     all_scored: list
@@ -66,6 +80,7 @@ class SignalPipelineResult:
 
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
+
 
 def _apply_tv_prefilter(universe: list, tv_cache: dict, favourites: list) -> list:
     """
@@ -90,16 +105,16 @@ def _apply_tv_prefilter(universe: list, tv_cache: dict, favourites: list) -> lis
             rejected["no_tv_data"] += 1
             continue  # No TV data → skip (CORE_SYMBOLS without TV hits)
 
-        close   = tv.get("tv_close")
-        rec     = tv.get("tv_recommend")
+        close = tv.get("tv_close")
+        rec = tv.get("tv_recommend")
         rel_vol = tv.get("tv_rel_vol")
-        rsi     = tv.get("tv_rsi_1h")
-        ema9    = tv.get("tv_ema9_1h")
-        ema21   = tv.get("tv_ema21_1h")
-        macd    = tv.get("tv_macd_1h")
-        macd_s  = tv.get("tv_macd_sig_1h")
-        change  = tv.get("tv_change")
-        vwap    = tv.get("tv_vwap")
+        rsi = tv.get("tv_rsi_1h")
+        ema9 = tv.get("tv_ema9_1h")
+        ema21 = tv.get("tv_ema21_1h")
+        macd = tv.get("tv_macd_1h")
+        macd_s = tv.get("tv_macd_sig_1h")
+        change = tv.get("tv_change")
+        vwap = tv.get("tv_vwap")
 
         # ── Hard kills — no edge, don't waste yfinance calls ──────────────
         if close is None or close <= 0:
@@ -120,16 +135,15 @@ def _apply_tv_prefilter(universe: list, tv_cache: dict, favourites: list) -> lis
 
         # ── EMA alignment — need some trend structure ──────────────────────
         ema_aligned = (
-            ema9 is not None and ema21 is not None
-            and ema9 != 0 and ema21 != 0
+            ema9 is not None
+            and ema21 is not None
+            and ema9 != 0
+            and ema21 != 0
             and abs(ema9 - ema21) / max(ema9, ema21) > 0.001
         )
 
         # ── MACD thrust — need some acceleration ───────────────────────────
-        macd_thrust = (
-            macd is not None and macd_s is not None
-            and abs(macd - macd_s) > 0.01
-        )
+        macd_thrust = macd is not None and macd_s is not None and abs(macd - macd_s) > 0.01
 
         if not ema_aligned and not macd_thrust:
             rejected["no_structure"] += 1
@@ -139,9 +153,8 @@ def _apply_tv_prefilter(universe: list, tv_cache: dict, favourites: list) -> lis
         # Treat missing rel_vol as neutral (1.0) so the symbol isn't penalised
         # for a TV data gap while still participating in ranking.
         rank_score = abs(rec) * (rel_vol if rel_vol is not None else 1.0)
-        if vwap and close and vwap > 0:
-            if (rec > 0 and close > vwap) or (rec < 0 and close < vwap):
-                rank_score *= 1.3  # 30% VWAP alignment bonus
+        if vwap and close and vwap > 0 and ((rec > 0 and close > vwap) or (rec < 0 and close < vwap)):
+            rank_score *= 1.3  # 30% VWAP alignment bonus
 
         ranked.append((sym, rank_score))
 
@@ -179,7 +192,9 @@ def _fetch_news(universe: list, timeout_sec: int = 8) -> dict:
     A stalled news fetch used to block the entire scan pipeline; the timeout
     ensures at worst we skip news for one cycle rather than hanging indefinitely.
     """
-    from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FuturesTimeout
+    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import TimeoutError as _FuturesTimeout
+
     try:
         with ThreadPoolExecutor(max_workers=1, thread_name_prefix="news_fetch") as pool:
             future = pool.submit(batch_news_sentiment, universe[:50])
@@ -205,12 +220,14 @@ def _fetch_social(universe: list, session: str) -> dict:
         return {}
     try:
         from config import CONFIG
+
         if not CONFIG.get("dimension_flags", {}).get("social", True):
             return {}
     except Exception:
         pass
     try:
         from social_sentiment import get_social_sentiment
+
         sentiment = get_social_sentiment(universe[:50])
         hits = sum(1 for v in sentiment.values() if v.get("social_score", 0) > 0)
         log.info(f"Social: {len(sentiment)} symbols scanned, {hits} with sentiment signal")
@@ -232,17 +249,19 @@ def _get_edge_gate_adj() -> tuple:
     """
     try:
         from config import CONFIG
+
         ic_cfg = CONFIG.get("ic_calculator", {})
         if not ic_cfg.get("edge_gate_enabled", True):
             return 0, "disabled"
         from ic_calculator import get_system_ic_health
+
         health = get_system_ic_health()
         if health == 0.0:
             return 0, "no_data"
-        off_thresh  = ic_cfg.get("edge_gate_off_threshold", 0.005)
+        off_thresh = ic_cfg.get("edge_gate_off_threshold", 0.005)
         warn_thresh = ic_cfg.get("edge_gate_warn_threshold", 0.02)
-        off_adj     = ic_cfg.get("edge_gate_off_adj", 12)
-        warn_adj    = ic_cfg.get("edge_gate_warn_adj", 5)
+        off_adj = ic_cfg.get("edge_gate_off_adj", 12)
+        warn_adj = ic_cfg.get("edge_gate_warn_adj", 5)
         if health < off_thresh:
             return off_adj, "broken"
         if health < warn_thresh:
@@ -253,9 +272,7 @@ def _get_edge_gate_adj() -> tuple:
         return 0, "no_data"
 
 
-def _apply_strategy_threshold(
-    scored: list, strategy_mode: dict, regime_name: str
-) -> list:
+def _apply_strategy_threshold(scored: list, strategy_mode: dict, regime_name: str) -> list:
     """
     Filter the scored list by the effective score threshold.
 
@@ -275,7 +292,7 @@ def _apply_strategy_threshold(
 
     parts = []
     if mode_adj:
-        parts.append(f"mode={strategy_mode.get('mode','?')}+{mode_adj}")
+        parts.append(f"mode={strategy_mode.get('mode', '?')}+{mode_adj}")
     if edge_adj:
         parts.append(f"edge_gate={edge_state}+{edge_adj}")
 
@@ -284,8 +301,7 @@ def _apply_strategy_threshold(
         filtered = [s for s in scored if s["score"] >= effective]
         reason = " | ".join(parts)
         log.info(
-            f"Scored: {pre} → {len(filtered)} after threshold filter "
-            f"(raised {used_threshold}→{effective} [{reason}])"
+            f"Scored: {pre} → {len(filtered)} after threshold filter (raised {used_threshold}→{effective} [{reason}])"
         )
         if edge_adj:
             log.warning(
@@ -297,10 +313,7 @@ def _apply_strategy_threshold(
     if edge_state not in ("healthy", "disabled", "no_data"):
         log.warning(f"EDGE GATE [{edge_state.upper()}]: system IC health low (adj={edge_adj})")
 
-    log.info(
-        f"Scored: {len(scored)} above threshold ({used_threshold}) "
-        f"[{regime_name}] edge={edge_state}"
-    )
+    log.info(f"Scored: {len(scored)} above threshold ({used_threshold}) [{regime_name}] edge={edge_state}")
     return scored
 
 
@@ -320,6 +333,7 @@ def _apply_short_quality_gate(scored: list, regime_name: str) -> list:
     """
     try:
         from ic_calculator import get_short_quality_score
+
         short_quality = get_short_quality_score()
     except Exception as e:
         log.debug(f"Short quality gate: could not fetch IC — skipping gate: {e}")
@@ -330,6 +344,7 @@ def _apply_short_quality_gate(scored: list, regime_name: str) -> list:
         return scored
 
     from config import CONFIG as _cfg
+
     short_min = _cfg.get("min_score_to_trade", 14)  # Match the long floor — no asymmetry
 
     pre = len(scored)
@@ -355,25 +370,27 @@ def _apply_short_quality_gate(scored: list, regime_name: str) -> list:
 
 def _scored_to_signals(scored: list, regime_name: str) -> list:
     """Convert score_universe() raw dicts → typed Signal objects."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     signals = []
     for s in scored:
         direction = s.get("direction", "NEUTRAL")
         if direction not in ("LONG", "SHORT", "NEUTRAL"):
             direction = "NEUTRAL"
-        signals.append(Signal(
-            symbol=s["symbol"],
-            direction=direction,
-            conviction_score=round(s.get("score", 0) / 5.0, 3),
-            dimension_scores=s.get("score_breakdown", {}),
-            timestamp=now,
-            regime_context=regime_name,
-            price=s.get("price", 0.0),
-            atr=s.get("atr", 0.0),
-            atr_daily=s.get("atr_daily", 0.0),
-            candle_gate=s.get("candle_gate", "UNKNOWN"),
-            instrument=s.get("instrument", "stock"),
-        ))
+        signals.append(
+            Signal(
+                symbol=s["symbol"],
+                direction=direction,
+                conviction_score=round(s.get("score", 0) / 5.0, 3),
+                dimension_scores=s.get("score_breakdown", {}),
+                timestamp=now,
+                regime_context=regime_name,
+                price=s.get("price", 0.0),
+                atr=s.get("atr", 0.0),
+                atr_daily=s.get("atr_daily", 0.0),
+                candle_gate=s.get("candle_gate", "UNKNOWN"),
+                instrument=s.get("instrument", "stock"),
+            )
+        )
     return signals
 
 
@@ -390,6 +407,7 @@ def _append_signals_log(signals: list, log_path: str) -> None:
 
 
 # ── Public entry point ─────────────────────────────────────────────────────────
+
 
 def run_signal_pipeline(
     universe: list,
@@ -444,6 +462,7 @@ def run_signal_pipeline(
     # 1b. Sympathy scanner — add sector peers when a leader has earnings within 48h
     try:
         from sympathy_scanner import get_sympathy_candidates
+
         sympathy_peers = get_sympathy_candidates(filtered)
         if sympathy_peers:
             filtered = filtered + sympathy_peers
@@ -474,8 +493,10 @@ def run_signal_pipeline(
     # 4b. Small cap supplemental track ($50M–$2B market cap)
     try:
         from config import CONFIG as _cfg
+
         if _cfg.get("small_cap_enabled", False):
             from scanner import get_small_cap_universe
+
             sc_symbols = get_small_cap_universe()
             if sc_symbols:
                 sc_threshold = _cfg.get("small_cap_min_score", 22)
@@ -494,8 +515,7 @@ def run_signal_pipeline(
                     s["universe_track"] = "small_cap"
                 # Filter by small cap threshold and merge (dedup by symbol)
                 existing_syms = {s["symbol"] for s in scored}
-                sc_above = [s for s in sc_scored
-                            if s["score"] >= sc_threshold and s["symbol"] not in existing_syms]
+                sc_above = [s for s in sc_scored if s["score"] >= sc_threshold and s["symbol"] not in existing_syms]
                 scored.extend(sc_above)
                 sc_all_new = [s for s in sc_all if s["symbol"] not in {x["symbol"] for x in all_scored}]
                 all_scored.extend(sc_all_new)
@@ -506,8 +526,10 @@ def run_signal_pipeline(
     # 4c. FX track — score major currency pairs (disabled by default)
     try:
         from config import CONFIG as _cfg
+
         if _cfg.get("fx_enabled", False):
             from fx_signals import score_fx_universe
+
             fx_scored = score_fx_universe(regime)
             if fx_scored:
                 existing_syms = {s["symbol"] for s in scored}

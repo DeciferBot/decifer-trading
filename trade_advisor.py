@@ -24,8 +24,8 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 import anthropic
@@ -35,23 +35,25 @@ from position_sizing import calculate_stops
 
 log = logging.getLogger("decifer.advisor")
 
-ADVISOR_LOG_PATH      = Path("data/advisor_log.json")
-_MAX_ADVISOR_ENTRIES  = 500   # Trim to this many entries on every save to prevent unbounded growth
+ADVISOR_LOG_PATH = Path("data/advisor_log.json")
+_MAX_ADVISOR_ENTRIES = 500  # Trim to this many entries on every save to prevent unbounded growth
 
 # ── Dataclass ─────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class TradeAdvice:
     advice_id: str
-    instrument: str          # "COMMON" | "CALL" | "PUT"
-    size_multiplier: float   # 0.25–2.0 applied to formula base size
-    profit_target: float     # absolute price level
-    stop_loss: float         # absolute price level
-    reasoning: str           # Opus rationale (logged only, never acted upon)
-    source: str = "opus"     # "opus" | "formula" — which path produced this advice
+    instrument: str  # "COMMON" | "CALL" | "PUT"
+    size_multiplier: float  # 0.25–2.0 applied to formula base size
+    profit_target: float  # absolute price level
+    stop_loss: float  # absolute price level
+    reasoning: str  # Opus rationale (logged only, never acted upon)
+    source: str = "opus"  # "opus" | "formula" — which path produced this advice
 
 
 # ── Log helpers ───────────────────────────────────────────────────────────────
+
 
 def _load_log() -> dict:
     if ADVISOR_LOG_PATH.exists():
@@ -68,7 +70,7 @@ def _save_log(data: dict) -> None:
     # Entries without outcomes are still kept — they may get outcomes soon.
     if len(data) > _MAX_ADVISOR_ENTRIES:
         items = sorted(data.items(), key=lambda kv: kv[1].get("timestamp", ""), reverse=True)
-        data  = dict(items[:_MAX_ADVISOR_ENTRIES])
+        data = dict(items[:_MAX_ADVISOR_ENTRIES])
     ADVISOR_LOG_PATH.write_text(json.dumps(data, indent=2))
 
 
@@ -80,6 +82,7 @@ def _recent_history(data: dict, n: int) -> list:
 
 
 # ── Prompt builder ────────────────────────────────────────────────────────────
+
 
 def _build_prompt(
     symbol: str,
@@ -104,8 +107,8 @@ def _build_prompt(
             rows.append(
                 f"  {r['symbol']} {r['direction']} entry=${r['entry_price']:.2f} "
                 f"PT=${r['profit_target']:.2f} SL=${r['stop_loss']:.2f} "
-                f"size_mult={r['size_multiplier']} → {outcome} PnL=${r.get('pnl',0):.2f} "
-                f"({r.get('exit_reason','?')})"
+                f"size_mult={r['size_multiplier']} → {outcome} PnL=${r.get('pnl', 0):.2f} "
+                f"({r.get('exit_reason', '?')})"
             )
         history_block = "Your recent decisions (learn from these):\n" + "\n".join(rows)
     else:
@@ -158,6 +161,7 @@ Respond with ONLY a JSON object — no markdown, no explanation outside the JSON
 
 
 # ── Validation ────────────────────────────────────────────────────────────────
+
 
 def _validate(
     raw: dict,
@@ -223,27 +227,26 @@ def _validate(
     # ── R:R floor ─────────────────────────────────────────────
     if direction == "LONG":
         reward = pt - entry_price
-        risk   = entry_price - sl
+        risk = entry_price - sl
     else:
         reward = entry_price - pt
-        risk   = sl - entry_price
+        risk = sl - entry_price
 
     if risk <= 0 or (reward / risk) < min_rr:
-        log.warning(
-            f"advisor: R:R {reward:.2f}/{risk:.2f} below floor {min_rr} — using formula PT"
-        )
+        log.warning(f"advisor: R:R {reward:.2f}/{risk:.2f} below floor {min_rr} — using formula PT")
         pt = fallback_tp
 
     return {
-        "instrument":      instrument,
+        "instrument": instrument,
         "size_multiplier": size_mult,
-        "profit_target":   round(pt, 2),
-        "stop_loss":       round(sl, 2),
-        "reasoning":       str(raw.get("reasoning", ""))[:300],
+        "profit_target": round(pt, 2),
+        "stop_loss": round(sl, 2),
+        "reasoning": str(raw.get("reasoning", ""))[:300],
     }
 
 
 # ── Formula fallback ──────────────────────────────────────────────────────────
+
 
 def _formula_advice(
     symbol: str,
@@ -266,6 +269,7 @@ def _formula_advice(
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
 
 def advise_trade(
     symbol: str,
@@ -295,15 +299,22 @@ def advise_trade(
         return _formula_advice(symbol, direction, entry_price, atr_5m, advice_id)
 
     try:
-        log_data  = _load_log()
-        history   = _recent_history(log_data, CONFIG.get("llm_advisor_history", 15))
-        prompt    = _build_prompt(
-            symbol, direction, entry_price, atr_5m, atr_daily,
-            conviction_score, dimension_scores, rationale, regime_context,
+        log_data = _load_log()
+        history = _recent_history(log_data, CONFIG.get("llm_advisor_history", 15))
+        prompt = _build_prompt(
+            symbol,
+            direction,
+            entry_price,
+            atr_5m,
+            atr_daily,
+            conviction_score,
+            dimension_scores,
+            rationale,
+            regime_context,
             history,
         )
 
-        client  = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
+        client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
         message = client.messages.create(
             model=CONFIG.get("llm_advisor_model", "claude-opus-4-6"),
             max_tokens=CONFIG.get("llm_advisor_max_tokens", 512),
@@ -333,25 +344,25 @@ def advise_trade(
 
         # Log for learning loop
         log_data[advice_id] = {
-            "advice_id":       advice_id,
-            "timestamp":       datetime.now(timezone.utc).isoformat(),
-            "symbol":          symbol,
-            "direction":       direction,
-            "entry_price":     entry_price,
-            "atr_5m":          atr_5m,
-            "atr_daily":       atr_daily,
+            "advice_id": advice_id,
+            "timestamp": datetime.now(UTC).isoformat(),
+            "symbol": symbol,
+            "direction": direction,
+            "entry_price": entry_price,
+            "atr_5m": atr_5m,
+            "atr_daily": atr_daily,
             "conviction_score": conviction_score,
-            "instrument":      advice.instrument,
+            "instrument": advice.instrument,
             "size_multiplier": advice.size_multiplier,
-            "profit_target":   advice.profit_target,
-            "stop_loss":       advice.stop_loss,
-            "reasoning":       advice.reasoning,
-            "source":          advice.source,
+            "profit_target": advice.profit_target,
+            "stop_loss": advice.stop_loss,
+            "reasoning": advice.reasoning,
+            "source": advice.source,
             # Outcome fields — filled by record_outcome() when trade closes
-            "exit_price":      None,
-            "pnl":             None,
-            "exit_reason":     None,
-            "outcome_at":      None,
+            "exit_price": None,
+            "pnl": None,
+            "exit_reason": None,
+            "outcome_at": None,
         }
         _save_log(log_data)
 
@@ -383,12 +394,14 @@ def record_outcome(
         log_data = _load_log()
         if advice_id not in log_data:
             return
-        log_data[advice_id].update({
-            "exit_price":  exit_price,
-            "pnl":         pnl,
-            "exit_reason": exit_reason,
-            "outcome_at":  datetime.now(timezone.utc).isoformat(),
-        })
+        log_data[advice_id].update(
+            {
+                "exit_price": exit_price,
+                "pnl": pnl,
+                "exit_reason": exit_reason,
+                "outcome_at": datetime.now(UTC).isoformat(),
+            }
+        )
         _save_log(log_data)
     except Exception as exc:
         log.warning(f"[advisor] record_outcome failed for {advice_id}: {exc}")

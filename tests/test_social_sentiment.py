@@ -3,7 +3,9 @@
 All Reddit/Twitter API calls are mocked with canned JSON responses.
 No network connections are made.
 """
-import os, sys, types
+
+import os
+import sys
 from unittest.mock import MagicMock
 
 # Add project root to path
@@ -11,16 +13,22 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Stub heavy deps BEFORE importing any Dec# Read the actual file first to find the broken if block at line 38
 # The fix below targets the empty if-body at line 38 True:  # placeholder — see below for actual fix at line 38er module
-for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance",
-             "praw", "feedparser", "tvDatafeed", "requests_html"]:
+for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance", "praw", "feedparser", "tvDatafeed", "requests_html"]:
     sys.modules.setdefault(_mod, MagicMock())
 
 # Stub config with required keys
 import config as _config_mod
-_cfg = {"log_file": "/dev/null", "trade_log": "/dev/null",
-        "order_log": "/dev/null", "anthropic_api_key": "test-key",
-        "model": "claude-sonnet-4-20250514", "max_tokens": 1000,
-        "mongo_uri": "", "db_name": "test"}
+
+_cfg = {
+    "log_file": "/dev/null",
+    "trade_log": "/dev/null",
+    "order_log": "/dev/null",
+    "anthropic_api_key": "test-key",
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1000,
+    "mongo_uri": "",
+    "db_name": "test",
+}
 if hasattr(_config_mod, "CONFIG"):
     for _k, _v in _cfg.items():
         _config_mod.CONFIG.setdefault(_k, _v)
@@ -28,10 +36,9 @@ else:
     _config_mod.CONFIG = _cfg
 
 
-import sys
 import os
-from unittest.mock import patch, MagicMock
-from typing import List, Dict
+import sys
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -44,14 +51,14 @@ if PROJECT_ROOT not in sys.path:
 sys.modules.pop("social_sentiment", None)
 try:
     import social_sentiment
+
     HAS_SOCIAL = hasattr(social_sentiment, "FinanceVADER")
 except (ImportError, Exception):
     HAS_SOCIAL = False
 
 
 pytestmark = pytest.mark.skipif(
-    not HAS_SOCIAL,
-    reason="social_sentiment module not importable or FinanceVADER not found"
+    not HAS_SOCIAL, reason="social_sentiment module not importable or FinanceVADER not found"
 )
 
 
@@ -80,6 +87,7 @@ NEUTRAL_POSTS = [
 # ---------------------------------------------------------------------------
 # Text scoring
 # ---------------------------------------------------------------------------
+
 
 class TestSocialTextScoring:
     """Tests for FinanceVADER.get_sentiment — finance-context text scorer.
@@ -113,6 +121,7 @@ class TestSocialTextScoring:
 # Aggregate sentiment
 # ---------------------------------------------------------------------------
 
+
 class TestSocialAggregateSentiment:
     """Tests for FinanceVADER.get_sentiment_batch — average sentiment across texts.
 
@@ -133,9 +142,7 @@ class TestSocialAggregateSentiment:
         vader = self._vader()
         bull_score = vader.get_sentiment_batch([p["text"] for p in BULLISH_POSTS])
         bear_score = vader.get_sentiment_batch([p["text"] for p in BEARISH_POSTS])
-        assert bull_score > bear_score, (
-            f"Bullish ({bull_score:.3f}) must exceed bearish ({bear_score:.3f})"
-        )
+        assert bull_score > bear_score, f"Bullish ({bull_score:.3f}) must exceed bearish ({bear_score:.3f})"
 
     def test_empty_posts_no_exception(self):
         """Empty list returns 0.0 without raising."""

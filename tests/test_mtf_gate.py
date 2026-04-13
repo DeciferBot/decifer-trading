@@ -11,6 +11,7 @@ Covers:
 
 NOTE: Relies on conftest.py for all dependency stubbing and path setup.
 """
+
 import os
 import sys
 
@@ -29,28 +30,49 @@ import config as _config_mod
 if "signals" in sys.modules and not hasattr(sys.modules["signals"], "__file__"):
     del sys.modules["signals"]
 
-from signals import timeframe_alignment_check, compute_confluence
-
+from signals import compute_confluence, timeframe_alignment_check
 
 # ---------------------------------------------------------------------------
 # Fixtures: synthetic signal dicts mimicking compute_indicators() output
 # ---------------------------------------------------------------------------
 
-def _make_sig(signal="BUY", bull_aligned=True, bear_aligned=False,
-              adx=30.0, macd_hist=0.001, mfi=60.0, rsi=55.0, rsi_slope=1.0,
-              macd_accel=0.0001, atr=1.5, vol_ratio=1.2, bb_position=0.6,
-              bb_width=0.04, squeeze_on=False, squeeze_intensity=0.0,
-              vwap_dist=0.3, obv_slope=1000, donch_breakout=0,
-              candle_bull=0, candle_bear=0, variance_ratio=1.0,
-              ou_halflife=999.0, zscore=0.0, adf_pvalue=1.0,
-              symbol="TEST", timeframe="5m", price=150.0):
+
+def _make_sig(
+    signal="BUY",
+    bull_aligned=True,
+    bear_aligned=False,
+    adx=30.0,
+    macd_hist=0.001,
+    mfi=60.0,
+    rsi=55.0,
+    rsi_slope=1.0,
+    macd_accel=0.0001,
+    atr=1.5,
+    vol_ratio=1.2,
+    bb_position=0.6,
+    bb_width=0.04,
+    squeeze_on=False,
+    squeeze_intensity=0.0,
+    vwap_dist=0.3,
+    obv_slope=1000,
+    donch_breakout=0,
+    candle_bull=0,
+    candle_bear=0,
+    variance_ratio=1.0,
+    ou_halflife=999.0,
+    zscore=0.0,
+    adf_pvalue=1.0,
+    symbol="TEST",
+    timeframe="5m",
+    price=150.0,
+):
     """Build a synthetic signal dict matching compute_indicators() output."""
     return {
         "symbol": symbol,
         "timeframe": timeframe,
         "price": price,
         "ema_fast": price + 1 if bull_aligned else price - 1,
-        "ema_slow": price if bull_aligned else price,
+        "ema_slow": price,
         "ema_trend": price - 1 if bull_aligned else price + 1,
         "bull_aligned": bull_aligned,
         "bear_aligned": bear_aligned,
@@ -92,57 +114,60 @@ def bullish_5m():
 @pytest.fixture
 def bearish_5m():
     """5m signal saying SELL with strong alignment."""
-    return _make_sig(signal="SELL", bull_aligned=False, bear_aligned=True,
-                     mfi=35.0, rsi=40.0, rsi_slope=-1.0, macd_hist=-0.001,
-                     vwap_dist=-0.3, obv_slope=-1000, timeframe="5m")
+    return _make_sig(
+        signal="SELL",
+        bull_aligned=False,
+        bear_aligned=True,
+        mfi=35.0,
+        rsi=40.0,
+        rsi_slope=-1.0,
+        macd_hist=-0.001,
+        vwap_dist=-0.3,
+        obv_slope=-1000,
+        timeframe="5m",
+    )
 
 
 @pytest.fixture
 def bullish_daily():
     """Daily signal: clearly bullish trend (EMA aligned, strong ADX)."""
-    return _make_sig(signal="BUY", bull_aligned=True, bear_aligned=False,
-                     adx=30.0, macd_hist=0.01, timeframe="1d")
+    return _make_sig(signal="BUY", bull_aligned=True, bear_aligned=False, adx=30.0, macd_hist=0.01, timeframe="1d")
 
 
 @pytest.fixture
 def bearish_daily():
     """Daily signal: clearly bearish trend (EMA aligned, strong ADX)."""
-    return _make_sig(signal="SELL", bull_aligned=False, bear_aligned=True,
-                     adx=30.0, macd_hist=-0.01, timeframe="1d")
+    return _make_sig(signal="SELL", bull_aligned=False, bear_aligned=True, adx=30.0, macd_hist=-0.01, timeframe="1d")
 
 
 @pytest.fixture
 def neutral_daily():
     """Daily signal: no clear trend (low ADX, no EMA alignment)."""
-    return _make_sig(signal="HOLD", bull_aligned=False, bear_aligned=False,
-                     adx=15.0, macd_hist=0.0, timeframe="1d")
+    return _make_sig(signal="HOLD", bull_aligned=False, bear_aligned=False, adx=15.0, macd_hist=0.0, timeframe="1d")
 
 
 @pytest.fixture
 def weak_bearish_daily():
     """Daily signal: bearish EMA alignment but weak ADX (below gate threshold)."""
-    return _make_sig(signal="SELL", bull_aligned=False, bear_aligned=True,
-                     adx=15.0, macd_hist=-0.001, timeframe="1d")
+    return _make_sig(signal="SELL", bull_aligned=False, bear_aligned=True, adx=15.0, macd_hist=-0.001, timeframe="1d")
 
 
 @pytest.fixture
 def bullish_weekly():
-    return _make_sig(signal="BUY", bull_aligned=True, bear_aligned=False,
-                     adx=25.0, timeframe="1w")
+    return _make_sig(signal="BUY", bull_aligned=True, bear_aligned=False, adx=25.0, timeframe="1w")
 
 
 @pytest.fixture
 def bearish_weekly():
-    return _make_sig(signal="SELL", bull_aligned=False, bear_aligned=True,
-                     adx=25.0, timeframe="1w")
+    return _make_sig(signal="SELL", bull_aligned=False, bear_aligned=True, adx=25.0, timeframe="1w")
 
 
 # ---------------------------------------------------------------------------
 # timeframe_alignment_check() — unit tests
 # ---------------------------------------------------------------------------
 
-class TestTimeframeAlignmentCheck:
 
+class TestTimeframeAlignmentCheck:
     def test_aligned_bull_5m_bull_daily(self, bullish_5m, bullish_daily):
         """5m BUY + daily bullish = aligned."""
         result = timeframe_alignment_check(bullish_5m, bullish_daily, None)
@@ -189,16 +214,14 @@ class TestTimeframeAlignmentCheck:
         result = timeframe_alignment_check(hold_5m, bearish_daily, None)
         assert result["aligned"] is True
 
-    def test_weekly_gate_when_enabled(self, bullish_5m, bullish_daily,
-                                      bearish_weekly, monkeypatch):
+    def test_weekly_gate_when_enabled(self, bullish_5m, bullish_daily, bearish_weekly, monkeypatch):
         """Weekly bearish + mtf_require_weekly=True → conflict."""
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_require_weekly", True)
         result = timeframe_alignment_check(bullish_5m, bullish_daily, bearish_weekly)
         assert result["weekly_confirms"] is False
         assert result["aligned"] is False
 
-    def test_weekly_gate_ignored_when_disabled(self, bullish_5m, bullish_daily,
-                                               bearish_weekly, monkeypatch):
+    def test_weekly_gate_ignored_when_disabled(self, bullish_5m, bullish_daily, bearish_weekly, monkeypatch):
         """Weekly bearish + mtf_require_weekly=False → no conflict."""
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_require_weekly", False)
         result = timeframe_alignment_check(bullish_5m, bullish_daily, bearish_weekly)
@@ -210,8 +233,8 @@ class TestTimeframeAlignmentCheck:
 # compute_confluence() — hard gate mode
 # ---------------------------------------------------------------------------
 
-class TestComputeConfluenceHardGate:
 
+class TestComputeConfluenceHardGate:
     def test_hard_gate_blocks_misaligned(self, bullish_5m, bearish_daily, monkeypatch):
         """Hard gate: 5m BUY + daily BEAR → score=0, signal=HOLD."""
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "hard")
@@ -229,8 +252,7 @@ class TestComputeConfluenceHardGate:
         assert result["score"] > 0
         assert result["mtf_gate"] == "PASS"
 
-    def test_hard_gate_blocks_bear_5m_vs_bull_daily(self, bearish_5m, bullish_daily,
-                                                     monkeypatch):
+    def test_hard_gate_blocks_bear_5m_vs_bull_daily(self, bearish_5m, bullish_daily, monkeypatch):
         """Hard gate: 5m SELL + daily BULL → blocked."""
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "hard")
         result = compute_confluence(bearish_5m, bullish_daily, None)
@@ -242,8 +264,8 @@ class TestComputeConfluenceHardGate:
 # compute_confluence() — soft gate mode
 # ---------------------------------------------------------------------------
 
-class TestComputeConfluenceSoftGate:
 
+class TestComputeConfluenceSoftGate:
     def test_soft_gate_penalises_misaligned(self, bullish_5m, bearish_daily, monkeypatch):
         """Soft gate: misaligned → score reduced by penalty, but not blocked."""
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "soft")
@@ -251,6 +273,7 @@ class TestComputeConfluenceSoftGate:
         # Pin equal IC weights so live data/ic_weights.json cannot inflate the
         # pre-cap score above 50, which would mask the penalty after capping.
         import ic_calculator as _ic
+
         monkeypatch.setattr(_ic, "get_current_weights", lambda: _ic.EQUAL_WEIGHTS)
 
         # Get aligned score for comparison
@@ -264,8 +287,7 @@ class TestComputeConfluenceSoftGate:
         assert result["mtf_gate"] == "PENALISED"
         assert result["score"] <= max(0, baseline_score - 8)
 
-    def test_soft_gate_no_penalty_when_aligned(self, bullish_5m, bullish_daily,
-                                                monkeypatch):
+    def test_soft_gate_no_penalty_when_aligned(self, bullish_5m, bullish_daily, monkeypatch):
         """Soft gate: aligned → no penalty applied."""
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "soft")
         result = compute_confluence(bullish_5m, bullish_daily, None)
@@ -283,8 +305,8 @@ class TestComputeConfluenceSoftGate:
 # compute_confluence() — gate off mode (legacy behaviour)
 # ---------------------------------------------------------------------------
 
-class TestComputeConfluenceGateOff:
 
+class TestComputeConfluenceGateOff:
     def test_off_mode_no_blocking(self, bullish_5m, bearish_daily, monkeypatch):
         """Gate off: misaligned → no blocking, no penalty."""
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "off")
@@ -297,13 +319,12 @@ class TestComputeConfluenceGateOff:
 # Edge cases
 # ---------------------------------------------------------------------------
 
-class TestMTFGateEdgeCases:
 
+class TestMTFGateEdgeCases:
     def test_strong_buy_signal_gated(self, bearish_daily, monkeypatch):
         """Even STRONG_BUY should be blocked by hard gate when daily is bearish."""
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_gate_mode", "hard")
-        strong_5m = _make_sig(signal="STRONG_BUY", bull_aligned=True,
-                              vol_ratio=2.5, mfi=70.0)
+        strong_5m = _make_sig(signal="STRONG_BUY", bull_aligned=True, vol_ratio=2.5, mfi=70.0)
         result = compute_confluence(strong_5m, bearish_daily, None)
         assert result["signal"] == "HOLD"
         assert result["score"] == 0
@@ -318,8 +339,7 @@ class TestMTFGateEdgeCases:
     def test_adx_threshold_configurable(self, bullish_5m, monkeypatch):
         """Changing mtf_adx_min_for_gate changes when gate fires."""
         # Daily bearish with ADX=22
-        daily = _make_sig(signal="SELL", bull_aligned=False, bear_aligned=True,
-                          adx=22.0, timeframe="1d")
+        daily = _make_sig(signal="SELL", bull_aligned=False, bear_aligned=True, adx=22.0, timeframe="1d")
 
         # Default threshold (20) → gate should fire
         monkeypatch.setitem(_config_mod.CONFIG, "mtf_adx_min_for_gate", 20)

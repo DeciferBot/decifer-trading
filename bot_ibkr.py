@@ -21,24 +21,25 @@ import threading
 import time
 import urllib.request
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime
 
-from config import CONFIG
 import bot_state
-from bot_state import dash, _subscription_registry, _reconnect_lock, clog
+from bot_state import _reconnect_lock, _subscription_registry, clog, dash
+from config import CONFIG
 
 log = logging.getLogger("decifer.bot")
 
 # Ensure reconnect/heartbeat keys exist — they may be absent in minimal test configs
 # that are registered before config.py fully loads (e.g. test_bot.py's fake config).
-CONFIG.setdefault("heartbeat_interval_secs",  1200)
-CONFIG.setdefault("reconnect_max_attempts",      10)
-CONFIG.setdefault("reconnect_max_wait_secs",     60)
-CONFIG.setdefault("reconnect_base_wait_secs",     1)
-CONFIG.setdefault("reconnect_alert_webhook",      "")
+CONFIG.setdefault("heartbeat_interval_secs", 1200)
+CONFIG.setdefault("reconnect_max_attempts", 10)
+CONFIG.setdefault("reconnect_max_wait_secs", 60)
+CONFIG.setdefault("reconnect_base_wait_secs", 1)
+CONFIG.setdefault("reconnect_alert_webhook", "")
 
 
 # ── Subscription registry helpers ────────────────────────────────────────────
+
 
 def _register_subscription(key: str, params: dict) -> None:
     """Record a market-data or PnL subscription so it can be restored after reconnect."""
@@ -77,6 +78,7 @@ def _restore_subscriptions() -> None:
                 log.info("  ✔ Re-requested positions")
             elif sub_type == "ticker":
                 from ib_async import Stock
+
                 contract = Stock(key, "SMART", "USD")
                 ib.reqMktData(contract, "", False, False)
                 log.info(f"  ✔ Re-subscribed market data for {key}")
@@ -87,6 +89,7 @@ def _restore_subscriptions() -> None:
 
 
 # ── ExecId correction helper ─────────────────────────────────────────────────
+
 
 def _exec_id_prefix(eid: str) -> str:
     """
@@ -103,10 +106,23 @@ def _exec_id_prefix(eid: str) -> str:
 # ── IBKR error / message handler ─────────────────────────────────────────────
 
 # Codes that IBKR sends as informational system messages — not real errors.
-_INFORMATIONAL_CODES = frozenset({
-    2100, 2101, 2102, 2103, 2104, 2105, 2106, 2107, 2108,
-    2119, 2158, 10167,
-})
+_INFORMATIONAL_CODES = frozenset(
+    {
+        2100,
+        2101,
+        2102,
+        2103,
+        2104,
+        2105,
+        2106,
+        2107,
+        2108,
+        2119,
+        2158,
+        10167,
+    }
+)
+
 
 def _on_ibkr_error(req_id: int, error_code: int, error_string: str, contract) -> None:
     """
@@ -139,7 +155,7 @@ def _on_ibkr_error(req_id: int, error_code: int, error_string: str, contract) ->
 
     if error_code == 1101:
         # Reconnected but market data subscriptions were lost — must re-subscribe.
-        log.warning(f"IBKR error 1101: reconnected, data LOST — re-subscribing")
+        log.warning("IBKR error 1101: reconnected, data LOST — re-subscribing")
         clog("INFO", "IBKR: reconnected (data lost) — restoring subscriptions")
         dash["ibkr_disconnected"] = False
         try:
@@ -150,21 +166,25 @@ def _on_ibkr_error(req_id: int, error_code: int, error_string: str, contract) ->
 
     if error_code == 1102:
         # Reconnected and market data maintained — nothing to restore.
-        log.info(f"IBKR error 1102: reconnected, data maintained — no re-subscribe needed")
+        log.info("IBKR error 1102: reconnected, data maintained — no re-subscribe needed")
         clog("INFO", "IBKR: reconnected (data maintained)")
         dash["ibkr_disconnected"] = False
         return
 
     if error_code == 507:
-        log.error(f"IBKR error 507: socket EOF — triggering reconnect")
+        log.error("IBKR error 507: socket EOF — triggering reconnect")
         clog("ERROR", "IBKR: socket EOF — reconnecting")
         _on_disconnected()
         return
 
     if error_code == 326:
-        log.critical(f"IBKR error 326: duplicate clientId — another session is connected. Aborting bot.")
-        clog("ERROR", "IBKR FATAL: duplicate clientId 326 — another session already connected. Bot must be restarted with a unique clientId.")
+        log.critical("IBKR error 326: duplicate clientId — another session is connected. Aborting bot.")
+        clog(
+            "ERROR",
+            "IBKR FATAL: duplicate clientId 326 — another session already connected. Bot must be restarted with a unique clientId.",
+        )
         import os
+
         os._exit(1)
 
     if error_code == 200:
@@ -198,6 +218,7 @@ def _on_ibkr_error(req_id: int, error_code: int, error_string: str, contract) ->
 
 
 # ── Alert & reconnect workers ─────────────────────────────────────────────────
+
 
 def _send_reconnect_exhausted_alert(attempts: int) -> None:
     """
@@ -239,18 +260,15 @@ def _reconnect_worker() -> None:
     On success, re-subscribes to all registered feeds.
     """
     max_attempts = CONFIG.get("reconnect_max_attempts", 10)
-    max_wait     = CONFIG.get("reconnect_max_wait_secs", 60)
-    base_wait    = CONFIG.get("reconnect_base_wait_secs", 1)
-    host         = CONFIG.get("ibkr_host", "127.0.0.1")
-    port         = CONFIG.get("ibkr_port", 7497)
-    client_id    = CONFIG.get("ibkr_client_id", 1)
+    max_wait = CONFIG.get("reconnect_max_wait_secs", 60)
+    base_wait = CONFIG.get("reconnect_base_wait_secs", 1)
+    host = CONFIG.get("ibkr_host", "127.0.0.1")
+    port = CONFIG.get("ibkr_port", 7497)
+    client_id = CONFIG.get("ibkr_client_id", 1)
 
     wait = base_wait
     for attempt in range(1, max_attempts + 1):
-        log.warning(
-            f"IBKR reconnect attempt {attempt}/{max_attempts} "
-            f"(waiting {wait}s before connect)…"
-        )
+        log.warning(f"IBKR reconnect attempt {attempt}/{max_attempts} (waiting {wait}s before connect)…")
         dash["status"] = f"reconnecting ({attempt}/{max_attempts})"
         time.sleep(wait)
 
@@ -262,7 +280,9 @@ def _reconnect_worker() -> None:
             dash["ibkr_disconnected"] = False
             # Look up via bot module so patch.object(bot, "_restore_subscriptions") works
             _bot = sys.modules.get("bot")
-            restore_fn = getattr(_bot, "_restore_subscriptions", _restore_subscriptions) if _bot else _restore_subscriptions
+            restore_fn = (
+                getattr(_bot, "_restore_subscriptions", _restore_subscriptions) if _bot else _restore_subscriptions
+            )
             restore_fn()
             # Re-fetch today's completed orders that arrived while we were disconnected.
             try:
@@ -276,7 +296,11 @@ def _reconnect_worker() -> None:
     else:
         # All attempts exhausted — look up via bot module for patch.object compatibility
         _bot = sys.modules.get("bot")
-        alert_fn = getattr(_bot, "_send_reconnect_exhausted_alert", _send_reconnect_exhausted_alert) if _bot else _send_reconnect_exhausted_alert
+        alert_fn = (
+            getattr(_bot, "_send_reconnect_exhausted_alert", _send_reconnect_exhausted_alert)
+            if _bot
+            else _send_reconnect_exhausted_alert
+        )
         alert_fn(max_attempts)
 
     with _reconnect_lock:
@@ -307,14 +331,15 @@ def _heartbeat_worker() -> None:
     CONFIG['heartbeat_interval_secs'] seconds to prevent idle-timeout disconnects.
     """
     import asyncio
+
     # ib_async's synchronous wrappers require an event loop on the calling thread.
     # Create one for this daemon thread so reqCurrentTime() doesn't raise
     # "There is no current event loop in thread 'ibkr-heartbeat'".
     asyncio.set_event_loop(asyncio.new_event_loop())
 
     interval = CONFIG.get("heartbeat_interval_secs", 1200)
-    tick     = 60
-    elapsed  = 0
+    tick = 60
+    elapsed = 0
 
     while True:
         time.sleep(tick)
@@ -335,7 +360,8 @@ def _heartbeat_worker() -> None:
 
 # ── SL fill event handler ─────────────────────────────────────────────────────
 
-def _on_ibkr_fill(trade, fill) -> None:  # noqa: ARG001
+
+def _on_ibkr_fill(trade, fill) -> None:
     """
     Called by ib.execDetailsEvent for every order fill.
     If the fill matches a known bot stop-loss order, flag the symbol so
@@ -344,7 +370,8 @@ def _on_ibkr_fill(trade, fill) -> None:  # noqa: ARG001
     No ib calls here — event callbacks must not block the ib event loop.
     """
     try:
-        from orders import open_trades, _trades_lock
+        from orders import _trades_lock, open_trades
+
         oid = getattr(fill.execution, "orderId", None)
         if oid is None:
             return
@@ -353,7 +380,9 @@ def _on_ibkr_fill(trade, fill) -> None:  # noqa: ARG001
                 sl_oid = t.get("sl_order_id")
                 if sl_oid and int(sl_oid) == int(oid):
                     bot_state._sl_fill_events.add(sym)
-                    log.info(f"[SL-FILL] Stop-loss fill detected for {sym} (orderId={oid}) — flagged for immediate processing")
+                    log.info(
+                        f"[SL-FILL] Stop-loss fill detected for {sym} (orderId={oid}) — flagged for immediate processing"
+                    )
                     break
     except Exception as exc:
         log.warning(f"_on_ibkr_fill error: {exc}")
@@ -363,15 +392,24 @@ def _on_ibkr_fill(trade, fill) -> None:  # noqa: ARG001
 
 # IBKR account-value tags we care about — anything not in this set is silently ignored
 # to keep bot_state.account_values lean.
-_ACCOUNT_KEYS_OF_INTEREST = frozenset({
-    "NetLiquidation", "BuyingPower", "AvailableFunds",
-    "ExcessLiquidity", "Cushion", "HighestSeverity",
-    "DayTradesRemaining",
-    "DayTradesRemainingT+1", "DayTradesRemainingT+2",
-    "DayTradesRemainingT+3", "DayTradesRemainingT+4",
-    "MaintMarginReq", "InitMarginReq",
-    "GrossPositionValue",
-})
+_ACCOUNT_KEYS_OF_INTEREST = frozenset(
+    {
+        "NetLiquidation",
+        "BuyingPower",
+        "AvailableFunds",
+        "ExcessLiquidity",
+        "Cushion",
+        "HighestSeverity",
+        "DayTradesRemaining",
+        "DayTradesRemainingT+1",
+        "DayTradesRemainingT+2",
+        "DayTradesRemainingT+3",
+        "DayTradesRemainingT+4",
+        "MaintMarginReq",
+        "InitMarginReq",
+        "GrossPositionValue",
+    }
+)
 
 
 def _on_account_value(account_value) -> None:
@@ -385,7 +423,7 @@ def _on_account_value(account_value) -> None:
         val = account_value.value
 
         if tag == "accountReady":
-            bot_state._account_ready = (val.lower() == "true")
+            bot_state._account_ready = val.lower() == "true"
             if not bot_state._account_ready:
                 log.warning("IBKR accountReady=false — account data suppressed during server reset")
             return
@@ -424,6 +462,7 @@ def _on_position(position) -> None:
 
 # ── Commission report + order-bound callbacks ─────────────────────────────────
 
+
 def _on_commission_report(trade, fill, report) -> None:
     """
     Fires after a fill is confirmed with its commission details.
@@ -431,15 +470,18 @@ def _on_commission_report(trade, fill, report) -> None:
     No ib calls here — must not block the event loop.
     """
     try:
-        from learning import load_orders as _load_orders, _save_orders
+        from learning import _save_orders
+        from learning import load_orders as _load_orders
+
         order_id = getattr(fill.execution, "orderId", None)
         if order_id is None:
             return
 
-        commission   = getattr(report, "commission",   None)
-        realized_pnl = getattr(report, "realizedPNL",  None)
+        commission = getattr(report, "commission", None)
+        realized_pnl = getattr(report, "realizedPNL", None)
 
         import math
+
         def _safe_float(v):
             if v is None:
                 return None
@@ -449,18 +491,18 @@ def _on_commission_report(trade, fill, report) -> None:
             except (TypeError, ValueError):
                 return None
 
-        commission   = _safe_float(commission)
+        commission = _safe_float(commission)
         realized_pnl = _safe_float(realized_pnl)
 
         if commission is None and realized_pnl is None:
             return
 
-        orders  = _load_orders()
+        orders = _load_orders()
         changed = False
         for o in orders:
             if o.get("order_id") == order_id:
                 if commission is not None:
-                    o["commission"]   = commission
+                    o["commission"] = commission
                 if realized_pnl is not None:
                     o["realized_pnl"] = realized_pnl
                 changed = True
@@ -475,14 +517,15 @@ def _on_commission_report(trade, fill, report) -> None:
 
 # ── Connect / subscribe ───────────────────────────────────────────────────────
 
+
 def connect_ibkr() -> bool:
     from orders import reconcile_with_ibkr
+
     ib = bot_state.ib
     try:
         if ib.isConnected():
             return True
-        ib.connect(CONFIG["ibkr_host"], CONFIG["ibkr_port"],
-                   clientId=CONFIG["ibkr_client_id"], readonly=False)
+        ib.connect(CONFIG["ibkr_host"], CONFIG["ibkr_port"], clientId=CONFIG["ibkr_client_id"], readonly=False)
         ib.reqMarketDataType(3)
         if _on_disconnected not in ib.disconnectedEvent:
             ib.disconnectedEvent += _on_disconnected
@@ -512,7 +555,10 @@ def connect_ibkr() -> bool:
         # Note: reqAutoOpenOrders(True) intentionally omitted — requires clientId=0
         # and triggers ib_async.orderBoundEvent which does not exist in ib_async 0.9.x,
         # crashing the asyncio thread.
-        clog("INFO", f"IBKR connected — port {CONFIG['ibkr_port']} | Account: {CONFIG.get('active_account', '')} | Market data: DELAYED (free)")
+        clog(
+            "INFO",
+            f"IBKR connected — port {CONFIG['ibkr_port']} | Account: {CONFIG.get('active_account', '')} | Market data: DELAYED (free)",
+        )
         reconcile_with_ibkr(ib)
         dash["status"] = "running"
         return True
@@ -533,13 +579,14 @@ def subscribe_pnl():
 
 # ── Trade backfill ────────────────────────────────────────────────────────────
 
+
 def backfill_trades_from_ibkr():
     """
     On startup, read IBKR execution history and match buy/sell pairs.
     Write any completed trades not already in trades.json.
     Partial fills for the same order are consolidated using weighted-average price.
     """
-    from learning import load_trades, TRADE_LOG_FILE
+    from learning import TRADE_LOG_FILE, load_trades
     from orders import _is_option_contract
 
     ib = bot_state.ib
@@ -550,12 +597,12 @@ def backfill_trades_from_ibkr():
         for t in existing:
             eid = t.get("exec_id") or f"{t.get('symbol')}-{t.get('exit_time')}"
             existing_ids.add(eid)
-            existing_ids.add(f"{t.get('symbol')}-{t.get('timestamp','')}")
+            existing_ids.add(f"{t.get('symbol')}-{t.get('timestamp', '')}")
             if t.get("order_id"):
                 existing_ids.add(f"order-{t['order_id']}")
-            eq  = t.get("qty") or t.get("shares") or t.get("total_shares") or 0
+            eq = t.get("qty") or t.get("shares") or t.get("total_shares") or 0
             ets = t.get("exit_time") or t.get("timestamp") or ""
-            ep  = float(t.get("exit_price") or t.get("avg_price") or 0)
+            ep = float(t.get("exit_price") or t.get("avg_price") or 0)
             if ets:
                 existing_fuzzy.append((t.get("symbol", ""), eq, ets, ep))
 
@@ -563,36 +610,53 @@ def backfill_trades_from_ibkr():
         if not fills:
             return
 
-        order_groups = defaultdict(lambda: {
-            "sym": "", "side": "", "order_id": None,
-            "exec_ids": [], "total_shares": 0.0,
-            "value": 0.0, "total_pnl": 0.0,
-            "latest_time": "", "earliest_time": ""
-        })
+        order_groups = defaultdict(
+            lambda: {
+                "sym": "",
+                "side": "",
+                "order_id": None,
+                "exec_ids": [],
+                "total_shares": 0.0,
+                "value": 0.0,
+                "total_pnl": 0.0,
+                "latest_time": "",
+                "earliest_time": "",
+            }
+        )
 
-        opt_order_groups = defaultdict(lambda: {
-            "sym": "", "underlying": "", "side": "", "order_id": None,
-            "exec_ids": [], "total_contracts": 0.0,
-            "value": 0.0, "total_pnl": 0.0,
-            "latest_time": "", "earliest_time": "",
-            "right": "", "strike": 0.0, "expiry": "",
-        })
+        opt_order_groups = defaultdict(
+            lambda: {
+                "sym": "",
+                "underlying": "",
+                "side": "",
+                "order_id": None,
+                "exec_ids": [],
+                "total_contracts": 0.0,
+                "value": 0.0,
+                "total_pnl": 0.0,
+                "latest_time": "",
+                "earliest_time": "",
+                "right": "",
+                "strike": 0.0,
+                "expiry": "",
+            }
+        )
 
         for fill in fills:
             try:
-                is_opt    = _is_option_contract(fill.contract)
+                is_opt = _is_option_contract(fill.contract)
                 underlying = fill.contract.symbol
-                side       = fill.execution.side.upper()
-                price      = float(fill.execution.price)
-                shares     = float(fill.execution.shares)
-                etime      = fill.execution.time.strftime("%Y-%m-%d %H:%M:%S") if fill.execution.time else ""
-                eid        = _exec_id_prefix(fill.execution.execId)
-                order_id   = fill.execution.orderId
+                side = fill.execution.side.upper()
+                price = float(fill.execution.price)
+                shares = float(fill.execution.shares)
+                etime = fill.execution.time.strftime("%Y-%m-%d %H:%M:%S") if fill.execution.time else ""
+                eid = _exec_id_prefix(fill.execution.execId)
+                order_id = fill.execution.orderId
 
                 pnl = 0.0
-                cr  = fill.commissionReport
+                cr = fill.commissionReport
                 if cr is not None:
-                    raw = getattr(cr, 'realizedPNL', None)
+                    raw = getattr(cr, "realizedPNL", None)
                     if raw is not None:
                         try:
                             raw_f = float(raw)
@@ -602,9 +666,9 @@ def backfill_trades_from_ibkr():
                             pass
 
                 if is_opt:
-                    right     = getattr(fill.contract, 'right', '') or ''
-                    strike    = getattr(fill.contract, 'strike', 0) or 0
-                    raw_exp   = str(getattr(fill.contract, 'lastTradeDateOrContractMonth', ''))
+                    right = getattr(fill.contract, "right", "") or ""
+                    strike = getattr(fill.contract, "strike", 0) or 0
+                    raw_exp = str(getattr(fill.contract, "lastTradeDateOrContractMonth", ""))
                     if len(raw_exp) == 8 and raw_exp.isdigit():
                         expiry_str = f"{raw_exp[:4]}-{raw_exp[4:6]}-{raw_exp[6:]}"
                     else:
@@ -613,17 +677,17 @@ def backfill_trades_from_ibkr():
 
                     key = (opt_sym, order_id, side)
                     g = opt_order_groups[key]
-                    g["sym"]             = opt_sym
-                    g["underlying"]      = underlying
-                    g["side"]            = side
-                    g["order_id"]        = order_id
+                    g["sym"] = opt_sym
+                    g["underlying"] = underlying
+                    g["side"] = side
+                    g["order_id"] = order_id
                     g["exec_ids"].append(eid)
                     g["total_contracts"] += shares
-                    g["value"]           += price * shares
-                    g["total_pnl"]       += pnl
-                    g["right"]           = right
-                    g["strike"]          = strike
-                    g["expiry"]          = expiry_str
+                    g["value"] += price * shares
+                    g["total_pnl"] += pnl
+                    g["right"] = right
+                    g["strike"] = strike
+                    g["expiry"] = expiry_str
                     if not g["latest_time"] or etime > g["latest_time"]:
                         g["latest_time"] = etime
                     if not g["earliest_time"] or etime < g["earliest_time"]:
@@ -632,22 +696,24 @@ def backfill_trades_from_ibkr():
                     sym = underlying
                     key = (sym, order_id, side)
                     g = order_groups[key]
-                    g["sym"]          = sym
-                    g["side"]         = side
-                    g["order_id"]     = order_id
+                    g["sym"] = sym
+                    g["side"] = side
+                    g["order_id"] = order_id
                     g["exec_ids"].append(eid)
                     g["total_shares"] += shares
-                    g["value"]        += price * shares
-                    g["total_pnl"]    += pnl
+                    g["value"] += price * shares
+                    g["total_pnl"] += pnl
                     if not g["latest_time"] or etime > g["latest_time"]:
                         g["latest_time"] = etime
                     if not g["earliest_time"] or etime < g["earliest_time"]:
                         g["earliest_time"] = etime
             except Exception as fill_exc:
-                log.warning(f"backfill: skipping fill (execId={getattr(getattr(fill, 'execution', None), 'execId', '?')}): {fill_exc}")
+                log.warning(
+                    f"backfill: skipping fill (execId={getattr(getattr(fill, 'execution', None), 'execId', '?')}): {fill_exc}"
+                )
                 continue
 
-        buy_orders  = defaultdict(list)
+        buy_orders = defaultdict(list)
         sell_orders = defaultdict(list)
 
         for (sym, order_id, side), g in order_groups.items():
@@ -656,12 +722,12 @@ def backfill_trades_from_ibkr():
                 continue
             avg_price = g["value"] / total_shares
             order_rec = {
-                "order_id":      order_id,
-                "exec_ids":      g["exec_ids"],
-                "avg_price":     round(avg_price, 4),
-                "total_shares":  total_shares,
-                "total_pnl":     g["total_pnl"],
-                "time":          g["latest_time"],
+                "order_id": order_id,
+                "exec_ids": g["exec_ids"],
+                "avg_price": round(avg_price, 4),
+                "total_shares": total_shares,
+                "total_pnl": g["total_pnl"],
+                "time": g["latest_time"],
                 "earliest_time": g["earliest_time"],
             }
             if side in ("BOT", "BUY"):
@@ -681,13 +747,14 @@ def backfill_trades_from_ibkr():
                 if already:
                     continue
 
-                sell_qty   = int(sell["total_shares"])
-                sell_ts    = sell["time"]
+                sell_qty = int(sell["total_shares"])
+                sell_ts = sell["time"]
                 sell_price = float(sell.get("avg_price") or 0)
-                for (ex_sym, ex_qty, ex_ts, ex_price) in existing_fuzzy:
+                for ex_sym, ex_qty, ex_ts, ex_price in existing_fuzzy:
                     if ex_sym == sym and ex_qty == sell_qty:
                         price_match = (
-                            ex_price == 0 or sell_price == 0
+                            ex_price == 0
+                            or sell_price == 0
                             or abs(ex_price - sell_price) / max(ex_price, sell_price) < 0.01
                         )
                         if not price_match:
@@ -713,7 +780,7 @@ def backfill_trades_from_ibkr():
                     continue
 
                 entry_price = matching_buy["avg_price"]
-                entry_time  = matching_buy["time"]
+                entry_time = matching_buy["time"]
 
                 pnl = sell["total_pnl"]
                 if pnl == 0.0:
@@ -722,33 +789,33 @@ def backfill_trades_from_ibkr():
                     continue
 
                 try:
-                    entry_dt  = datetime.strptime(entry_time, "%Y-%m-%d %H:%M:%S")
-                    exit_dt   = datetime.strptime(sell["time"], "%Y-%m-%d %H:%M:%S")
+                    entry_dt = datetime.strptime(entry_time, "%Y-%m-%d %H:%M:%S")
+                    exit_dt = datetime.strptime(sell["time"], "%Y-%m-%d %H:%M:%S")
                     hold_mins = int((exit_dt - entry_dt).total_seconds() / 60)
                 except Exception:
                     hold_mins = 0
 
                 trade = {
-                    "symbol":       sym,
-                    "action":       "BUY",
-                    "direction":    "LONG",
-                    "entry_price":  entry_price,
-                    "exit_price":   sell["avg_price"],
-                    "qty":          int(sell["total_shares"]),
-                    "shares":       int(sell["total_shares"]),
-                    "pnl":          round(pnl, 2),
-                    "entry_time":   entry_time,
-                    "exit_time":    sell["time"],
+                    "symbol": sym,
+                    "action": "BUY",
+                    "direction": "LONG",
+                    "entry_price": entry_price,
+                    "exit_price": sell["avg_price"],
+                    "qty": int(sell["total_shares"]),
+                    "shares": int(sell["total_shares"]),
+                    "pnl": round(pnl, 2),
+                    "entry_time": entry_time,
+                    "exit_time": sell["time"],
                     "hold_minutes": hold_mins,
-                    "exit_reason":  "stop_loss" if pnl < 0 else "take_profit",
-                    "regime":       "UNKNOWN",
-                    "vix":          0.0,
-                    "score":        0,
-                    "order_id":     sell["order_id"],
-                    "exec_id":      sell["exec_ids"][0],
-                    "timestamp":    sell["time"].replace(" ", "T"),
-                    "reasoning":    "Backfilled from IBKR execution history on startup.",
-                    "source":       "ibkr_backfill"
+                    "exit_reason": "stop_loss" if pnl < 0 else "take_profit",
+                    "regime": "UNKNOWN",
+                    "vix": 0.0,
+                    "score": 0,
+                    "order_id": sell["order_id"],
+                    "exec_id": sell["exec_ids"][0],
+                    "timestamp": sell["time"].replace(" ", "T"),
+                    "reasoning": "Backfilled from IBKR execution history on startup.",
+                    "source": "ibkr_backfill",
                 }
                 new_trades.append(trade)
                 existing_ids.add(order_key)
@@ -759,20 +826,18 @@ def backfill_trades_from_ibkr():
         for sym, b_orders in buy_orders.items():
             for buy_cover in sorted(b_orders, key=lambda b: b["time"]):
                 order_key = f"order-{buy_cover['order_id']}"
-                already = (
-                    order_key in existing_ids
-                    or any(eid in existing_ids for eid in buy_cover["exec_ids"])
-                )
+                already = order_key in existing_ids or any(eid in existing_ids for eid in buy_cover["exec_ids"])
                 if already:
                     continue
 
-                cover_qty   = int(buy_cover["total_shares"])
-                cover_ts    = buy_cover["time"]
+                cover_qty = int(buy_cover["total_shares"])
+                cover_ts = buy_cover["time"]
                 cover_price = float(buy_cover.get("avg_price") or 0)
-                for (ex_sym, ex_qty, ex_ts, ex_price) in existing_fuzzy:
+                for ex_sym, ex_qty, ex_ts, ex_price in existing_fuzzy:
                     if ex_sym == sym and ex_qty == cover_qty:
                         price_match = (
-                            ex_price == 0 or cover_price == 0
+                            ex_price == 0
+                            or cover_price == 0
                             or abs(ex_price - cover_price) / max(ex_price, cover_price) < 0.01
                         )
                         if not price_match:
@@ -789,8 +854,7 @@ def backfill_trades_from_ibkr():
                     continue
 
                 matching_short_entry = None
-                for sell_entry in sorted(sell_orders.get(sym, []),
-                                         key=lambda s: s["time"], reverse=True):
+                for sell_entry in sorted(sell_orders.get(sym, []), key=lambda s: s["time"], reverse=True):
                     sek = f"order-{sell_entry['order_id']}"
                     if sell_entry["time"] <= buy_cover["time"] and sek not in existing_ids:
                         matching_short_entry = sell_entry
@@ -800,7 +864,7 @@ def backfill_trades_from_ibkr():
                     continue
 
                 entry_price = matching_short_entry["avg_price"]
-                entry_time  = matching_short_entry["time"]
+                entry_time = matching_short_entry["time"]
 
                 pnl = buy_cover["total_pnl"]
                 if pnl == 0.0:
@@ -809,33 +873,33 @@ def backfill_trades_from_ibkr():
                     continue
 
                 try:
-                    entry_dt  = datetime.strptime(entry_time, "%Y-%m-%d %H:%M:%S")
-                    exit_dt   = datetime.strptime(buy_cover["time"], "%Y-%m-%d %H:%M:%S")
+                    entry_dt = datetime.strptime(entry_time, "%Y-%m-%d %H:%M:%S")
+                    exit_dt = datetime.strptime(buy_cover["time"], "%Y-%m-%d %H:%M:%S")
                     hold_mins = int((exit_dt - entry_dt).total_seconds() / 60)
                 except Exception:
                     hold_mins = 0
 
                 trade = {
-                    "symbol":       sym,
-                    "action":       "SELL",
-                    "direction":    "SHORT",
-                    "entry_price":  entry_price,
-                    "exit_price":   buy_cover["avg_price"],
-                    "qty":          int(buy_cover["total_shares"]),
-                    "shares":       int(buy_cover["total_shares"]),
-                    "pnl":          round(pnl, 2),
-                    "entry_time":   entry_time,
-                    "exit_time":    buy_cover["time"],
+                    "symbol": sym,
+                    "action": "SELL",
+                    "direction": "SHORT",
+                    "entry_price": entry_price,
+                    "exit_price": buy_cover["avg_price"],
+                    "qty": int(buy_cover["total_shares"]),
+                    "shares": int(buy_cover["total_shares"]),
+                    "pnl": round(pnl, 2),
+                    "entry_time": entry_time,
+                    "exit_time": buy_cover["time"],
                     "hold_minutes": hold_mins,
-                    "exit_reason":  "stop_loss" if pnl < 0 else "take_profit",
-                    "regime":       "UNKNOWN",
-                    "vix":          0.0,
-                    "score":        0,
-                    "order_id":     buy_cover["order_id"],
-                    "exec_id":      buy_cover["exec_ids"][0],
-                    "timestamp":    buy_cover["time"].replace(" ", "T"),
-                    "reasoning":    "Backfilled from IBKR execution history on startup.",
-                    "source":       "ibkr_backfill"
+                    "exit_reason": "stop_loss" if pnl < 0 else "take_profit",
+                    "regime": "UNKNOWN",
+                    "vix": 0.0,
+                    "score": 0,
+                    "order_id": buy_cover["order_id"],
+                    "exec_id": buy_cover["exec_ids"][0],
+                    "timestamp": buy_cover["time"].replace(" ", "T"),
+                    "reasoning": "Backfilled from IBKR execution history on startup.",
+                    "source": "ibkr_backfill",
                 }
                 new_trades.append(trade)
                 existing_ids.add(order_key)
@@ -844,7 +908,7 @@ def backfill_trades_from_ibkr():
                 existing_ids.add(f"order-{matching_short_entry['order_id']}")
 
         # ── Process OPTIONS trades ────────────────────────────────────────────
-        opt_buy_orders  = defaultdict(list)
+        opt_buy_orders = defaultdict(list)
         opt_sell_orders = defaultdict(list)
         for (opt_sym, order_id, side), g in opt_order_groups.items():
             total = g["total_contracts"]
@@ -852,17 +916,17 @@ def backfill_trades_from_ibkr():
                 continue
             avg_premium = g["value"] / total
             order_rec = {
-                "order_id":        order_id,
-                "exec_ids":        g["exec_ids"],
-                "avg_price":       round(avg_premium, 4),
+                "order_id": order_id,
+                "exec_ids": g["exec_ids"],
+                "avg_price": round(avg_premium, 4),
                 "total_contracts": total,
-                "total_pnl":       g["total_pnl"],
-                "time":            g["latest_time"],
-                "earliest_time":   g["earliest_time"],
-                "right":           g["right"],
-                "strike":          g["strike"],
-                "expiry":          g["expiry"],
-                "underlying":      g["underlying"],
+                "total_pnl": g["total_pnl"],
+                "time": g["latest_time"],
+                "earliest_time": g["earliest_time"],
+                "right": g["right"],
+                "strike": g["strike"],
+                "expiry": g["expiry"],
+                "underlying": g["underlying"],
             }
             if side in ("BOT", "BUY"):
                 opt_buy_orders[opt_sym].append(order_rec)
@@ -880,13 +944,14 @@ def backfill_trades_from_ibkr():
                 if already:
                     continue
 
-                sell_qty   = int(sell["total_contracts"])
-                sell_ts    = sell["time"]
+                sell_qty = int(sell["total_contracts"])
+                sell_ts = sell["time"]
                 sell_price = float(sell.get("avg_price") or 0)
-                for (ex_sym, ex_qty, ex_ts, ex_price) in existing_fuzzy:
+                for ex_sym, ex_qty, ex_ts, ex_price in existing_fuzzy:
                     if (ex_sym == opt_sym or ex_sym == sell["underlying"]) and ex_qty == sell_qty:
                         price_match = (
-                            ex_price == 0 or sell_price == 0
+                            ex_price == 0
+                            or sell_price == 0
                             or abs(ex_price - sell_price) / max(ex_price, sell_price) < 0.01
                         )
                         if not price_match:
@@ -912,7 +977,7 @@ def backfill_trades_from_ibkr():
                     continue
 
                 entry_premium = matching_buy["avg_price"]
-                entry_time    = matching_buy["time"]
+                entry_time = matching_buy["time"]
 
                 pnl = sell["total_pnl"]
                 if pnl == 0.0:
@@ -921,37 +986,37 @@ def backfill_trades_from_ibkr():
                     continue
 
                 try:
-                    entry_dt  = datetime.strptime(entry_time, "%Y-%m-%d %H:%M:%S")
-                    exit_dt   = datetime.strptime(sell["time"], "%Y-%m-%d %H:%M:%S")
+                    entry_dt = datetime.strptime(entry_time, "%Y-%m-%d %H:%M:%S")
+                    exit_dt = datetime.strptime(sell["time"], "%Y-%m-%d %H:%M:%S")
                     hold_mins = int((exit_dt - entry_dt).total_seconds() / 60)
                 except Exception:
                     hold_mins = 0
 
                 trade = {
-                    "symbol":       sell["underlying"],
-                    "action":       "BUY",
-                    "direction":    "LONG",
-                    "instrument":   "option",
-                    "right":        sell["right"],
-                    "strike":       sell["strike"],
-                    "expiry":       sell["expiry"],
-                    "entry_price":  entry_premium,
-                    "exit_price":   sell["avg_price"],
-                    "qty":          int(sell["total_contracts"]),
-                    "shares":       int(sell["total_contracts"]),
-                    "pnl":          round(pnl, 2),
-                    "entry_time":   entry_time,
-                    "exit_time":    sell["time"],
+                    "symbol": sell["underlying"],
+                    "action": "BUY",
+                    "direction": "LONG",
+                    "instrument": "option",
+                    "right": sell["right"],
+                    "strike": sell["strike"],
+                    "expiry": sell["expiry"],
+                    "entry_price": entry_premium,
+                    "exit_price": sell["avg_price"],
+                    "qty": int(sell["total_contracts"]),
+                    "shares": int(sell["total_contracts"]),
+                    "pnl": round(pnl, 2),
+                    "entry_time": entry_time,
+                    "exit_time": sell["time"],
                     "hold_minutes": hold_mins,
-                    "exit_reason":  "stop_loss" if pnl < 0 else "take_profit",
-                    "regime":       "UNKNOWN",
-                    "vix":          0.0,
-                    "score":        0,
-                    "order_id":     sell["order_id"],
-                    "exec_id":      sell["exec_ids"][0],
-                    "timestamp":    sell["time"].replace(" ", "T"),
-                    "reasoning":    "Backfilled from IBKR execution history on startup.",
-                    "source":       "ibkr_backfill"
+                    "exit_reason": "stop_loss" if pnl < 0 else "take_profit",
+                    "regime": "UNKNOWN",
+                    "vix": 0.0,
+                    "score": 0,
+                    "order_id": sell["order_id"],
+                    "exec_id": sell["exec_ids"][0],
+                    "timestamp": sell["time"].replace(" ", "T"),
+                    "reasoning": "Backfilled from IBKR execution history on startup.",
+                    "source": "ibkr_backfill",
                 }
                 new_trades.append(trade)
                 existing_ids.add(order_key)
@@ -973,14 +1038,14 @@ def backfill_trades_from_ibkr():
         for t in all_trades:
             sym = t.get("symbol", "")
             qty = t.get("qty") or t.get("shares") or t.get("total_shares") or 0
-            ts  = t.get("timestamp") or t.get("exit_time") or ""
-            ep  = t.get("entry_price") or 0
+            ts = t.get("timestamp") or t.get("exit_time") or ""
+            ep = t.get("entry_price") or 0
 
             is_dupe = False
-            for i, (s_sym, s_qty, s_ts, s_ep, s_idx) in enumerate(seen):
+            for _i, (s_sym, s_qty, s_ts, s_ep, s_idx) in enumerate(seen):
                 if s_sym != sym or not ts or not s_ts:
                     continue
-                qty_match   = (s_qty == qty) if qty and s_qty else True
+                qty_match = (s_qty == qty) if qty and s_qty else True
                 price_match = (abs(ep - s_ep) / max(s_ep, 0.01) < 0.02) if ep and s_ep else False
                 if not qty_match and not price_match:
                     continue
@@ -990,12 +1055,11 @@ def backfill_trades_from_ibkr():
                     if abs((t2 - t1).total_seconds()) < 300:
                         existing_rec = deduped[s_idx]
                         existing_pnl = abs(existing_rec.get("pnl") or 0)
-                        new_pnl      = abs(t.get("pnl") or 0)
+                        new_pnl = abs(t.get("pnl") or 0)
                         existing_oid = existing_rec.get("order_id")
-                        new_oid      = t.get("order_id")
-                        should_replace = (
-                            (new_oid and not existing_oid)
-                            or (new_pnl > existing_pnl and not (existing_oid and not new_oid))
+                        new_oid = t.get("order_id")
+                        should_replace = (new_oid and not existing_oid) or (
+                            new_pnl > existing_pnl and not (existing_oid and not new_oid)
                         )
                         if should_replace:
                             deduped[s_idx] = t
@@ -1026,28 +1090,29 @@ def backfill_trades_from_ibkr():
 
 # ── Order sync ────────────────────────────────────────────────────────────────
 
+
 def sync_orders_from_ibkr():
     """
     Sync order statuses from IBKR into orders.json.
     Three-pass approach: update statuses, log new fills, mark stale as cancelled.
     """
-    from learning import log_order as _log_order, load_orders as _load_orders
+    from learning import load_orders as _load_orders
+    from learning import log_order as _log_order
+
     ib = bot_state.ib
     try:
         orders = _load_orders()
 
         for t in ib.trades():
-            contract    = t.contract
-            order       = t.order
+            contract = t.contract
+            order = t.order
             ibkr_status = (t.orderStatus.status or "").upper()
-            sec_type    = getattr(contract, 'secType', 'STK')
-            instrument  = "option" if sec_type == "OPT" else "stock"
+            sec_type = getattr(contract, "secType", "STK")
+            instrument = "option" if sec_type == "OPT" else "stock"
 
             if ibkr_status in ("FILLED",):
                 mapped_status = "FILLED"
-            elif ibkr_status in ("CANCELLED", "APICANCELED", "APICANCELLED"):
-                mapped_status = "CANCELLED"
-            elif ibkr_status in ("INACTIVE",):
+            elif ibkr_status in ("CANCELLED", "APICANCELED", "APICANCELLED") or ibkr_status in ("INACTIVE",):
                 mapped_status = "CANCELLED"
             elif ibkr_status in ("PENDINGCANCEL",):
                 # Order can still fill in this state — do NOT mark as CANCELLED.
@@ -1057,36 +1122,44 @@ def sync_orders_from_ibkr():
             else:
                 mapped_status = ibkr_status
 
-            _fp        = t.orderStatus.avgFillPrice
+            _fp = t.orderStatus.avgFillPrice
             fill_price = float(_fp) if (_fp is not None and _fp > 0) else 0
             filled_qty = int(t.orderStatus.filled) if t.orderStatus.filled else 0
 
             if not order.orderId:  # IBKR hasn't assigned an ID yet — skip to avoid order_id=0 accumulation
                 continue
 
-            _log_order({
-                "order_id":   order.orderId,
-                "perm_id":    getattr(order, "permId", None) or None,
-                "symbol":     contract.symbol,
-                "side":       order.action,
-                "order_type": order.orderType,
-                "qty":        int(order.totalQuantity),
-                "price":      float(order.lmtPrice) if order.lmtPrice and abs(float(order.lmtPrice)) < 1e10 else (float(order.auxPrice) if order.auxPrice and abs(float(order.auxPrice)) < 1e10 else 0),
-                "status":     mapped_status,
-                "instrument": instrument,
-                "filled_qty": filled_qty,
-                "fill_price": fill_price if fill_price > 0 else None,
-                "source":     "ibkr_sync",
-            })
+            _log_order(
+                {
+                    "order_id": order.orderId,
+                    "perm_id": getattr(order, "permId", None) or None,
+                    "symbol": contract.symbol,
+                    "side": order.action,
+                    "order_type": order.orderType,
+                    "qty": int(order.totalQuantity),
+                    "price": float(order.lmtPrice)
+                    if order.lmtPrice and abs(float(order.lmtPrice)) < 1e10
+                    else (float(order.auxPrice) if order.auxPrice and abs(float(order.auxPrice)) < 1e10 else 0),
+                    "status": mapped_status,
+                    "instrument": instrument,
+                    "filled_qty": filled_qty,
+                    "fill_price": fill_price if fill_price > 0 else None,
+                    "source": "ibkr_sync",
+                }
+            )
 
             if mapped_status == "FILLED" and fill_price > 0 and order.action == "BUY" and instrument == "stock":
                 from orders import _safe_update_trade
-                sym       = contract.symbol
+
+                sym = contract.symbol
                 total_qty = int(order.totalQuantity)
-                updates   = {"entry": fill_price, "status": "FILLED"}
+                updates = {"entry": fill_price, "status": "FILLED"}
                 if 0 < filled_qty < total_qty:
                     updates["qty"] = filled_qty
-                    clog("WARNING", f"Partial fill: {sym} ordered {total_qty} filled {filled_qty} @ ${fill_price:.2f} — tracker qty adjusted")
+                    clog(
+                        "WARNING",
+                        f"Partial fill: {sym} ordered {total_qty} filled {filled_qty} @ ${fill_price:.2f} — tracker qty adjusted",
+                    )
                 _safe_update_trade(sym, updates)
 
         ibkr_known_ids = set()
@@ -1099,10 +1172,10 @@ def sync_orders_from_ibkr():
             ibkr_open_ids.add(t.order.orderId)
             ibkr_known_ids.add(t.order.orderId)
 
-        orders  = _load_orders()
+        orders = _load_orders()
         changed = False
         for o in orders:
-            oid    = o.get("order_id")
+            oid = o.get("order_id")
             status = (o.get("status") or "").upper()
             # PENDING_CANCEL: IBKR cancel request acknowledged but fill still possible.
             # Do not mark as CANCELLED until IBKR confirms with "Cancelled" status.
@@ -1117,6 +1190,7 @@ def sync_orders_from_ibkr():
 
         if changed:
             from learning import _save_orders
+
             _save_orders(orders)
 
         clog("INFO", f"Order sync complete — {len(orders)} orders tracked")
@@ -1131,20 +1205,21 @@ def cancel_orphan_stop_orders():
     Protects against stale exit orders left over from a crashed session.
     """
     from orders import get_open_positions
+
     ib = bot_state.ib
     try:
         active_symbols = {p["symbol"] for p in get_open_positions()}
         cancelled = 0
         for t in ib.openTrades():
-            order    = t.order
+            order = t.order
             contract = t.contract
-            sym      = contract.symbol
+            sym = contract.symbol
             # FX: IBKR reports base currency ("EUR") but active_trades
             # uses the 6-char pair ("EURUSD"). Reconstruct the pair.
-            if getattr(contract, 'secType', '') == 'CASH':
-                sym = contract.symbol + getattr(contract, 'currency', '')
-            otype    = (order.orderType or "").upper()
-            action   = (order.action or "").upper()
+            if getattr(contract, "secType", "") == "CASH":
+                sym = contract.symbol + getattr(contract, "currency", "")
+            otype = (order.orderType or "").upper()
+            action = (order.action or "").upper()
             # Only target sell-side stop orders (STP, STP LMT, TRAIL) — these are exits
             if otype not in ("STP", "STP LMT", "TRAIL", "TRAILLMT"):
                 continue
@@ -1171,12 +1246,13 @@ def _on_order_status_event(trade):
     Updates orders.json immediately so the dashboard reflects fills/cancels live.
     """
     from learning import log_order as _log_order
+
     try:
-        contract    = trade.contract
-        order       = trade.order
+        contract = trade.contract
+        order = trade.order
         ibkr_status = (trade.orderStatus.status or "").upper()
-        sec_type    = getattr(contract, 'secType', 'STK')
-        instrument  = "option" if sec_type == "OPT" else "stock"
+        sec_type = getattr(contract, "secType", "STK")
+        instrument = "option" if sec_type == "OPT" else "stock"
 
         if ibkr_status in ("FILLED",):
             mapped_status = "FILLED"
@@ -1190,33 +1266,41 @@ def _on_order_status_event(trade):
         else:
             mapped_status = ibkr_status
 
-        _fp        = trade.orderStatus.avgFillPrice
+        _fp = trade.orderStatus.avgFillPrice
         fill_price = float(_fp) if (_fp is not None and _fp > 0) else 0
         filled_qty = int(trade.orderStatus.filled) if trade.orderStatus.filled else 0
 
-        _log_order({
-            "order_id":   order.orderId,
-            "perm_id":    getattr(order, "permId", None) or None,
-            "symbol":     contract.symbol,
-            "side":       order.action,
-            "order_type": order.orderType,
-            "qty":        int(order.totalQuantity),
-            "price":      float(order.lmtPrice) if order.lmtPrice and abs(float(order.lmtPrice)) < 1e10 else (float(order.auxPrice) if order.auxPrice and abs(float(order.auxPrice)) < 1e10 else 0),
-            "status":     mapped_status,
-            "instrument": instrument,
-            "filled_qty": filled_qty,
-            "fill_price": fill_price if fill_price > 0 else None,
-            "source":     "ibkr_event",
-        })
+        _log_order(
+            {
+                "order_id": order.orderId,
+                "perm_id": getattr(order, "permId", None) or None,
+                "symbol": contract.symbol,
+                "side": order.action,
+                "order_type": order.orderType,
+                "qty": int(order.totalQuantity),
+                "price": float(order.lmtPrice)
+                if order.lmtPrice and abs(float(order.lmtPrice)) < 1e10
+                else (float(order.auxPrice) if order.auxPrice and abs(float(order.auxPrice)) < 1e10 else 0),
+                "status": mapped_status,
+                "instrument": instrument,
+                "filled_qty": filled_qty,
+                "fill_price": fill_price if fill_price > 0 else None,
+                "source": "ibkr_event",
+            }
+        )
 
         if mapped_status == "FILLED" and fill_price > 0 and order.action == "BUY" and instrument == "stock":
             from orders import _safe_update_trade
-            sym       = contract.symbol
+
+            sym = contract.symbol
             total_qty = int(order.totalQuantity)
-            updates   = {"entry": fill_price, "status": "FILLED"}
+            updates = {"entry": fill_price, "status": "FILLED"}
             if 0 < filled_qty < total_qty:
                 updates["qty"] = filled_qty
-                clog("WARNING", f"Partial fill event: {sym} ordered {total_qty} filled {filled_qty} @ ${fill_price:.2f} — tracker qty adjusted")
+                clog(
+                    "WARNING",
+                    f"Partial fill event: {sym} ordered {total_qty} filled {filled_qty} @ ${fill_price:.2f} — tracker qty adjusted",
+                )
             _safe_update_trade(sym, updates)
 
     except Exception as e:

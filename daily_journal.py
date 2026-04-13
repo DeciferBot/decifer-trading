@@ -9,8 +9,8 @@ import json
 import os
 import sys
 import zoneinfo
-from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+from datetime import datetime
 
 _ET = zoneinfo.ZoneInfo("America/New_York")
 
@@ -21,6 +21,7 @@ JOURNAL_DIR = "journals"
 LOG_FILE = "logs/decifer.log"
 
 # ── Helpers ──────────────────────────────────────────────────────
+
 
 def load_json(path):
     if not os.path.exists(path):
@@ -33,9 +34,13 @@ def parse_ts(raw):
     """Best-effort parse of various timestamp formats in our data."""
     if not raw:
         return None
-    for fmt in ["%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z",
-                "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S",
-                "%Y-%m-%d %H:%M:%S"]:
+    for fmt in [
+        "%Y-%m-%dT%H:%M:%S.%f%z",
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+    ]:
         try:
             return datetime.strptime(raw, fmt)
         except ValueError:
@@ -62,6 +67,7 @@ def get_day_orders(orders, target_date):
 
 
 # ── Core Analysis ────────────────────────────────────────────────
+
 
 def analyse_trades(trades):
     """Full analysis of a set of trades. Returns dict of metrics."""
@@ -147,81 +153,96 @@ def identify_patterns(today, cumulative):
         long_pct = long_data["count"] / total * 100 if total else 0
         bear_trades = today.get("by_regime", {}).get("TRENDING_DOWN", {}).get("count", 0)
         if long_pct > 75 and bear_trades > 0:
-            patterns.append({
-                "type": "CRITICAL",
-                "name": "Long Bias in Bear Market",
-                "detail": f"{long_pct:.0f}% of trades were LONG but {bear_trades} trades occurred in TRENDING_DOWN regime. "
-                          f"Longs lost ${long_data['pnl']:+,.2f} today.",
-                "action": "Prioritize building direction-agnostic signals (roadmap #01) and short-candidate scanner (#02)."
-            })
+            patterns.append(
+                {
+                    "type": "CRITICAL",
+                    "name": "Long Bias in Bear Market",
+                    "detail": f"{long_pct:.0f}% of trades were LONG but {bear_trades} trades occurred in TRENDING_DOWN regime. "
+                    f"Longs lost ${long_data['pnl']:+,.2f} today.",
+                    "action": "Prioritize building direction-agnostic signals (roadmap #01) and short-candidate scanner (#02).",
+                }
+            )
 
     # Pattern: Stop-loss domination
     sl_data = today.get("by_reason", {}).get("stop_loss", {})
     if sl_data.get("count", 0) > today["total"] * 0.5 and today["total"] >= 3:
-        patterns.append({
-            "type": "WARNING",
-            "name": "Stop-Loss Dominated",
-            "detail": f"{sl_data['count']}/{today['total']} trades hit stop loss (${sl_data['pnl']:+,.2f}). "
-                      f"Either entries are poor or stops are too tight.",
-            "action": "Review entry timing relative to intraday volatility. Consider wider stops with smaller position sizes."
-        })
+        patterns.append(
+            {
+                "type": "WARNING",
+                "name": "Stop-Loss Dominated",
+                "detail": f"{sl_data['count']}/{today['total']} trades hit stop loss (${sl_data['pnl']:+,.2f}). "
+                f"Either entries are poor or stops are too tight.",
+                "action": "Review entry timing relative to intraday volatility. Consider wider stops with smaller position sizes.",
+            }
+        )
 
     # Pattern: Accelerating losses (each day worse than prior)
     if cumulative and today["total_pnl"] < cumulative.get("avg_daily_pnl", 0) * 1.5:
-        patterns.append({
-            "type": "WARNING",
-            "name": "Accelerating Losses",
-            "detail": f"Today's P&L (${today['total_pnl']:+,.2f}) is worse than the cumulative daily average "
-                      f"(${cumulative.get('avg_daily_pnl', 0):+,.2f}). Losses are getting bigger, not smaller.",
-            "action": "Consider reducing position sizing or pausing until roadmap fixes are live."
-        })
+        patterns.append(
+            {
+                "type": "WARNING",
+                "name": "Accelerating Losses",
+                "detail": f"Today's P&L (${today['total_pnl']:+,.2f}) is worse than the cumulative daily average "
+                f"(${cumulative.get('avg_daily_pnl', 0):+,.2f}). Losses are getting bigger, not smaller.",
+                "action": "Consider reducing position sizing or pausing until roadmap fixes are live.",
+            }
+        )
 
     # Pattern: Overtrading
     if today["total"] > 15:
-        patterns.append({
-            "type": "WARNING",
-            "name": "Overtrading",
-            "detail": f"{today['total']} trades in a single day. More trades ≠ more alpha. "
-                      f"Commission drag and poor entry selectivity compound losses.",
-            "action": "Raise consensus threshold to 3/6 (roadmap #08 — 5-minute config change)."
-        })
+        patterns.append(
+            {
+                "type": "WARNING",
+                "name": "Overtrading",
+                "detail": f"{today['total']} trades in a single day. More trades ≠ more alpha. "
+                f"Commission drag and poor entry selectivity compound losses.",
+                "action": "Raise consensus threshold to 3/6 (roadmap #08 — 5-minute config change).",
+            }
+        )
 
     # Pattern: Quick exits (held < 5 min)
     if today.get("quick_exits", 0) >= 3:
-        patterns.append({
-            "type": "INFO",
-            "name": "Rapid-Fire Exits",
-            "detail": f"{today['quick_exits']} trades held < 5 minutes. These are likely noise trades that "
-                      f"enter and immediately get stopped out.",
-            "action": "Check if stop-loss placement is too tight relative to bid-ask spread and short-term volatility."
-        })
+        patterns.append(
+            {
+                "type": "INFO",
+                "name": "Rapid-Fire Exits",
+                "detail": f"{today['quick_exits']} trades held < 5 minutes. These are likely noise trades that "
+                f"enter and immediately get stopped out.",
+                "action": "Check if stop-loss placement is too tight relative to bid-ask spread and short-term volatility.",
+            }
+        )
 
     # Pattern: UNKNOWN regime trading
     unk = today.get("by_regime", {}).get("UNKNOWN", {})
     if unk.get("count", 0) > today["total"] * 0.4 and today["total"] >= 3:
-        patterns.append({
-            "type": "WARNING",
-            "name": "Blind Regime Trading",
-            "detail": f"{unk['count']}/{today['total']} trades entered with regime=UNKNOWN. "
-                      f"The system doesn't know what market it's trading in.",
-            "action": "Fix regime detection so it resolves before order placement. Never enter with UNKNOWN regime."
-        })
+        patterns.append(
+            {
+                "type": "WARNING",
+                "name": "Blind Regime Trading",
+                "detail": f"{unk['count']}/{today['total']} trades entered with regime=UNKNOWN. "
+                f"The system doesn't know what market it's trading in.",
+                "action": "Fix regime detection so it resolves before order placement. Never enter with UNKNOWN regime.",
+            }
+        )
 
     # Pattern: Repeated symbol losses
     for sym, data in today.get("by_symbol", {}).items():
         if data["count"] >= 2 and data["pnl"] < -500:
-            patterns.append({
-                "type": "INFO",
-                "name": f"Repeat Loser: {sym}",
-                "detail": f"{sym} traded {data['count']} times today for ${data['pnl']:+,.2f}. "
-                          f"Re-entering a losing name in the same session compounds losses.",
-                "action": f"Consider a cooldown period after closing a losing {sym} position."
-            })
+            patterns.append(
+                {
+                    "type": "INFO",
+                    "name": f"Repeat Loser: {sym}",
+                    "detail": f"{sym} traded {data['count']} times today for ${data['pnl']:+,.2f}. "
+                    f"Re-entering a losing name in the same session compounds losses.",
+                    "action": f"Consider a cooldown period after closing a losing {sym} position.",
+                }
+            )
 
     return patterns
 
 
 # ── Journal Rendering ────────────────────────────────────────────
+
 
 def render_journal(target_date, today_analysis, cumulative_analysis, patterns, day_orders, day_number):
     """Render a markdown journal entry."""
@@ -237,8 +258,8 @@ def render_journal(target_date, today_analysis, cumulative_analysis, patterns, d
     emoji = "🟢" if a["total_pnl"] >= 0 else "🔴"
     lines.append(f"## {emoji} Day Summary")
     lines.append("")
-    lines.append(f"| Metric | Value |")
-    lines.append(f"|--------|-------|")
+    lines.append("| Metric | Value |")
+    lines.append("|--------|-------|")
     lines.append(f"| Trades | {a['total']} ({a['wins']}W / {a['losses']}L) |")
     lines.append(f"| Win Rate | {a['win_rate']}% |")
     lines.append(f"| Day P&L | ${a['total_pnl']:+,.2f} |")
@@ -269,7 +290,9 @@ def render_journal(target_date, today_analysis, cumulative_analysis, patterns, d
         hold = t.get("hold_minutes")
         hold_str = f"{hold}m" if hold and hold > 0 else "—"
         pnl_fmt = f"${pnl:+,.2f}"
-        lines.append(f"| {i} | {sym} | {direction} | {qty} | ${entry:.2f} | ${exit_p:.2f} | {pnl_fmt} | {reason} | {regime} | {hold_str} |")
+        lines.append(
+            f"| {i} | {sym} | {direction} | {qty} | ${entry:.2f} | ${exit_p:.2f} | {pnl_fmt} | {reason} | {regime} | {hold_str} |"
+        )
     lines.append("")
 
     # ── What Worked
@@ -286,7 +309,9 @@ def render_journal(target_date, today_analysis, cumulative_analysis, patterns, d
             lines.append(f"**{sym} {direction} (+${pnl:,.2f})** — Exited via {reason}. {reasoning}")
             lines.append("")
     else:
-        lines.append("Nothing. Zero winning trades today. That's the signal — something is fundamentally wrong with entry selection.")
+        lines.append(
+            "Nothing. Zero winning trades today. That's the signal — something is fundamentally wrong with entry selection."
+        )
         lines.append("")
 
     # ── What Didn't Work
@@ -348,8 +373,8 @@ def render_journal(target_date, today_analysis, cumulative_analysis, patterns, d
         c = cumulative_analysis
         lines.append("## Cumulative Performance (All Days)")
         lines.append("")
-        lines.append(f"| Metric | Value |")
-        lines.append(f"|--------|-------|")
+        lines.append("| Metric | Value |")
+        lines.append("|--------|-------|")
         lines.append(f"| Total Trades | {c['total']} |")
         lines.append(f"| Win Rate | {c['win_rate']}% |")
         lines.append(f"| Total P&L | ${c['total_pnl']:+,.2f} |")
@@ -362,11 +387,17 @@ def render_journal(target_date, today_analysis, cumulative_analysis, patterns, d
     lines.append("")
     focus_items = []
     if any(p["type"] == "CRITICAL" for p in patterns):
-        focus_items.append("**Fix the root cause** — the bias roadmap features (especially #01 direction-agnostic signals and #02 short scanner) are not nice-to-haves. Every day without them is more money lost to the same structural bug.")
+        focus_items.append(
+            "**Fix the root cause** — the bias roadmap features (especially #01 direction-agnostic signals and #02 short scanner) are not nice-to-haves. Every day without them is more money lost to the same structural bug."
+        )
     if a["total"] > 12:
-        focus_items.append("**Trade less** — raise consensus threshold to 3/6 immediately (roadmap #08, 5-minute change). Quality over quantity.")
+        focus_items.append(
+            "**Trade less** — raise consensus threshold to 3/6 immediately (roadmap #08, 5-minute change). Quality over quantity."
+        )
     if a.get("by_regime", {}).get("UNKNOWN", {}).get("count", 0) > 3:
-        focus_items.append("**Never enter blind** — fix regime detection so UNKNOWN regime blocks new entries instead of letting them through.")
+        focus_items.append(
+            "**Never enter blind** — fix regime detection so UNKNOWN regime blocks new entries instead of letting them through."
+        )
     if not focus_items:
         focus_items.append("Continue monitoring. System performing within parameters.")
     for item in focus_items:
@@ -380,6 +411,7 @@ def render_journal(target_date, today_analysis, cumulative_analysis, patterns, d
 
 
 # ── Main ─────────────────────────────────────────────────────────
+
 
 def generate_journal(target_date=None, day_number=None):
     """Generate journal for a specific date. Defaults to today."""
@@ -401,9 +433,11 @@ def generate_journal(target_date=None, day_number=None):
     today_analysis = analyse_trades(day_trades)
 
     # Analyse cumulative (all trades up to and including today)
-    all_up_to = [t for t in trades
-                 if (t.get("entry_time") or t.get("timestamp", ""))[:10] <= target_date
-                 and t.get("pnl") is not None]
+    all_up_to = [
+        t
+        for t in trades
+        if (t.get("entry_time") or t.get("timestamp", ""))[:10] <= target_date and t.get("pnl") is not None
+    ]
     cumulative = analyse_trades(all_up_to)
 
     # Calculate avg daily P&L for cumulative
@@ -420,8 +454,7 @@ def generate_journal(target_date=None, day_number=None):
     patterns = identify_patterns(today_analysis, cumulative)
 
     # Render
-    md = render_journal(target_date, today_analysis, cumulative, patterns, day_orders,
-                        day_number or "?")
+    md = render_journal(target_date, today_analysis, cumulative, patterns, day_orders, day_number or "?")
 
     # Save
     os.makedirs(JOURNAL_DIR, exist_ok=True)

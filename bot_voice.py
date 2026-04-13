@@ -13,34 +13,35 @@ import threading
 
 log = logging.getLogger("decifer.voice")
 
-_VOICE_RATE   = 180
-_VOICE_NAME   = "Daniel"
+_VOICE_RATE = 180
+_VOICE_NAME = "Daniel"
 
 # Human-readable labels for internal codes
 _REGIME_LABELS = {
-    "BULL_TREND":     "a bull trend",
-    "BEAR_TREND":     "a bear trend",
-    "HIGH_VOL":       "high volatility",
-    "LOW_VOL":        "low volatility",
-    "RISK_OFF":       "risk off",
-    "RISK_ON":        "risk on",
-    "CHOPPY":         "choppy conditions",
-    "NEUTRAL":        "neutral conditions",
-    "UNKNOWN":        "an unknown regime",
+    "BULL_TREND": "a bull trend",
+    "BEAR_TREND": "a bear trend",
+    "HIGH_VOL": "high volatility",
+    "LOW_VOL": "low volatility",
+    "RISK_OFF": "risk off",
+    "RISK_ON": "risk on",
+    "CHOPPY": "choppy conditions",
+    "NEUTRAL": "neutral conditions",
+    "UNKNOWN": "an unknown regime",
 }
 
 _EXIT_LABELS = {
-    "stop_loss_hit":            "stop loss hit",
-    "take_profit_hit":          "take profit hit",
+    "stop_loss_hit": "stop loss hit",
+    "take_profit_hit": "take profit hit",
     "externally_closed_by_user": "manually closed",
-    "externally_closed":        "externally closed",
-    "trailing_stop_hit":        "trailing stop hit",
+    "externally_closed": "externally closed",
+    "trailing_stop_hit": "trailing stop hit",
 }
 
 
 def _clean(text: str) -> str:
     """Normalize internal codes and symbols so they sound natural when spoken."""
     import re
+
     # Replace underscores with spaces
     text = text.replace("_", " ")
     # Strip markdown-style formatting
@@ -118,9 +119,10 @@ def _generate_natural(event: str, fallback: str, **ctx) -> str:
         }
 
         template = _prompts.get(event, "Describe this trading event naturally in one sentence: {event}")
-        prompt   = template.format(event=event, **{k: (str(v) if v is not None else "unknown") for k, v in ctx.items()})
+        prompt = template.format(event=event, **{k: (str(v) if v is not None else "unknown") for k, v in ctx.items()})
 
         from config import CONFIG as _CONFIG
+
         resp = client.messages.create(
             model=_CONFIG.get("claude_model_haiku", "claude-haiku-4-5-20251001"),
             max_tokens=120,
@@ -143,6 +145,7 @@ def speak_natural(event: str, fallback: str = "", **ctx) -> None:
     Generate a friendly spoken alert via Claude Haiku, then speak it.
     Fully non-blocking — runs in a background thread.
     """
+
     def _run():
         text = _generate_natural(event, fallback, **ctx) or fallback
         if text:
@@ -159,26 +162,24 @@ def answer_voice_query(question: str, dash: dict) -> str:
     Speaks the answer aloud and returns the text.
     """
     try:
-        from agents import _call_claude
-
-        regime    = dash.get("regime") or {}
+        regime = dash.get("regime") or {}
         positions = dash.get("positions") or []
-        pv        = dash.get("portfolio_value") or 0
+        pv = dash.get("portfolio_value") or 0
         daily_pnl = dash.get("daily_pnl") or 0
-        scanning  = dash.get("scanning", False)
-        paused    = dash.get("paused", False)
-        killed    = dash.get("killed", False)
+        scanning = dash.get("scanning", False)
+        paused = dash.get("paused", False)
+        killed = dash.get("killed", False)
 
         # Positions
         pos_lines = []
         for p in positions:
-            sym     = p.get("symbol", "")
-            dirn    = p.get("direction", "LONG")
-            qty     = p.get("qty", 0)
-            entry   = p.get("entry") or 0
-            now     = p.get("current") or 0
-            pnl     = p.get("pnl") or 0
-            conv    = p.get("conviction") or 0
+            sym = p.get("symbol", "")
+            dirn = p.get("direction", "LONG")
+            qty = p.get("qty", 0)
+            entry = p.get("entry") or 0
+            now = p.get("current") or 0
+            pnl = p.get("pnl") or 0
+            conv = p.get("conviction") or 0
             regime_ = p.get("entry_regime", "")
             pos_lines.append(
                 f"{sym} {dirn} x{qty} entry ${entry:.2f} now ${now:.2f} P&L ${pnl:+.2f}"
@@ -190,8 +191,8 @@ def answer_voice_query(question: str, dash: dict) -> str:
         trades = dash.get("trades") or []
         trade_lines = []
         for t in trades[:5]:
-            side  = t.get("side", "")
-            sym   = t.get("symbol", "")
+            side = t.get("side", "")
+            sym = t.get("symbol", "")
             price = t.get("price", "")
             pnl_t = t.get("pnl", "")
             pnl_s = f" P&L ${pnl_t:+.2f}" if isinstance(pnl_t, (int, float)) else ""
@@ -208,7 +209,7 @@ def answer_voice_query(question: str, dash: dict) -> str:
 
         # Sector bias
         sector_bias = dash.get("sector_bias") or {}
-        sector_leaders  = [e for e, _ in (sector_bias.get("ranked") or [])[:3]]
+        sector_leaders = [e for e, _ in (sector_bias.get("ranked") or [])[:3]]
         sector_laggards = [e for e, _ in (sector_bias.get("ranked") or [])[-3:]]
 
         # Claude analysis from last scan
@@ -240,12 +241,14 @@ def answer_voice_query(question: str, dash: dict) -> str:
             "Keep answers to 2-3 sentences max. No markdown, no bullet points, no preamble."
         )
 
+        from agents import client
         from config import CONFIG as _CONFIG
+
         _resp = client.messages.create(
             model=_CONFIG.get("claude_model_haiku", "claude-haiku-4-5-20251001"),
             max_tokens=200,
             system=system,
-            messages=[{"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}]
+            messages=[{"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}],
         )
         answer = _resp.content[0].text.strip()
         answer = answer or "I couldn't retrieve that right now."

@@ -12,24 +12,33 @@ Approach:
 
 All tests run fully offline using AsyncMock / MagicMock.
 """
+
 from __future__ import annotations
-import os, sys, types
+
+import os
+import sys
 from unittest.mock import MagicMock
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # Stub heavy deps BEFORE importing any Decifer module
-for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance",
-             "praw", "feedparser", "tvDatafeed", "requests_html"]:
+for _mod in ["ib_async", "ib_insync", "anthropic", "yfinance", "praw", "feedparser", "tvDatafeed", "requests_html"]:
     sys.modules.setdefault(_mod, MagicMock())
 
 # Stub config with required keys
 import config as _config_mod
-_cfg = {"log_file": "/dev/null", "trade_log": "/dev/null",
-        "order_log": "/dev/null", "anthropic_api_key": "test-key",
-        "model": "claude-sonnet-4-20250514", "max_tokens": 1000,
-        "mongo_uri": "", "db_name": "test"}
+
+_cfg = {
+    "log_file": "/dev/null",
+    "trade_log": "/dev/null",
+    "order_log": "/dev/null",
+    "anthropic_api_key": "test-key",
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1000,
+    "mongo_uri": "",
+    "db_name": "test",
+}
 if hasattr(_config_mod, "CONFIG"):
     for _k, _v in _cfg.items():
         _config_mod.CONFIG.setdefault(_k, _v)
@@ -37,12 +46,10 @@ else:
     _config_mod.CONFIG = _cfg
 
 
-import sys
 import asyncio
 import logging
-import threading
+import sys
 from pathlib import Path
-from typing import List
 
 import pytest
 
@@ -57,8 +64,7 @@ if str(PROJECT_ROOT) not in sys.path:
 # have installed — keep it so that @patch('orders.CONFIG') in test_orders_core.py
 # applies to the same module object that execute_buy() runs in.
 if "orders" not in sys.modules or not hasattr(sys.modules["orders"], "_symbol_locks"):
-    for _decifer_mod in ("orders", "risk", "learning", "scanner", "signals",
-                         "news", "agents"):
+    for _decifer_mod in ("orders", "risk", "learning", "scanner", "signals", "news", "agents"):
         sys.modules.pop(_decifer_mod, None)
 import orders
 
@@ -70,14 +76,23 @@ log = logging.getLogger("decifer.tests.test_orders_guard")
 # ---------------------------------------------------------------------------
 
 GUARD_CANDIDATES = [
-    "_trades_lock", "_active_orders", "active_orders",
-    "_in_flight", "in_flight",
-    "_pending_orders", "pending_orders",
-    "_order_lock", "order_lock",
-    "_symbol_locks", "symbol_locks",
-    "_open_orders", "open_orders",
-    "_submitted_orders", "submitted_orders",
-    "_orders_in_progress", "orders_in_progress",
+    "_trades_lock",
+    "_active_orders",
+    "active_orders",
+    "_in_flight",
+    "in_flight",
+    "_pending_orders",
+    "pending_orders",
+    "_order_lock",
+    "order_lock",
+    "_symbol_locks",
+    "symbol_locks",
+    "_open_orders",
+    "open_orders",
+    "_submitted_orders",
+    "submitted_orders",
+    "_orders_in_progress",
+    "orders_in_progress",
 ]
 
 
@@ -94,6 +109,7 @@ def _find_guard(module):
 # ---------------------------------------------------------------------------
 # Test 1 - Guard data structure exists
 # ---------------------------------------------------------------------------
+
 
 class TestDuplicateOrderGuardExists:
     """Verify orders.py contains a per-symbol duplicate-order guard."""
@@ -133,14 +149,13 @@ class TestDuplicateOrderGuardExists:
         if guard is None:
             pytest.skip("No guard found")
         if isinstance(guard, (set, dict)):
-            assert len(guard) == 0, (
-                f"orders.{name} is not empty at import time: {guard}"
-            )
+            assert len(guard) == 0, f"orders.{name} is not empty at import time: {guard}"
 
 
 # ---------------------------------------------------------------------------
 # Test 2 - Set-based guard semantics
 # ---------------------------------------------------------------------------
+
 
 class TestSetGuardSemantics:
     """Unit-level verification that set-based deduplication works correctly."""
@@ -148,7 +163,7 @@ class TestSetGuardSemantics:
     def test_set_guard_blocks_duplicate_symbol(self):
         """Adding the same symbol twice to a set must block the second attempt."""
         guard: set = set()
-        results: List[bool] = []
+        results: list[bool] = []
 
         def try_place(symbol: str) -> None:
             if symbol in guard:
@@ -160,14 +175,12 @@ class TestSetGuardSemantics:
         try_place("AAPL")
         try_place("AAPL")  # should be blocked
 
-        assert results == [True, False], (
-            f"Expected [True, False] got {results}"
-        )
+        assert results == [True, False], f"Expected [True, False] got {results}"
 
     def test_different_symbols_both_allowed(self):
         """Two different symbols must both be permitted."""
         guard: set = set()
-        results: List[bool] = []
+        results: list[bool] = []
 
         for symbol in ("AAPL", "TSLA"):
             if symbol not in guard:
@@ -210,7 +223,7 @@ class TestSetGuardSemantics:
     def test_duplicate_across_multiple_symbols(self):
         """Duplicate for one symbol must not affect others."""
         guard: set = set()
-        log_: List[str] = []
+        log_: list[str] = []
 
         def try_place(symbol: str) -> None:
             if symbol in guard:
@@ -231,12 +244,13 @@ class TestSetGuardSemantics:
 # Test 3 - Async lock serialisation semantics
 # ---------------------------------------------------------------------------
 
+
 class TestAsyncLockSemantics:
     """Verify asyncio.Lock correctly serialises concurrent same-symbol orders."""
 
     def test_async_lock_serialises_same_symbol(self):
         """Two coroutines for same symbol via single Lock must not interleave."""
-        execution_log: List[str] = []
+        execution_log: list[str] = []
 
         async def run():
             lock = asyncio.Lock()  # create inside event loop (py3.9 compat)
@@ -264,7 +278,7 @@ class TestAsyncLockSemantics:
 
     def test_per_symbol_locks_allow_parallel_different_symbols(self):
         """Per-symbol locks must allow AAPL and TSLA to proceed concurrently."""
-        execution_log: List[str] = []
+        execution_log: list[str] = []
         locks: dict = {}
 
         async def place_order(symbol: str) -> None:
@@ -289,7 +303,7 @@ class TestAsyncLockSemantics:
 
     def test_async_lock_prevents_second_entry_while_held(self):
         """While lock is held, second coroutine must wait (lock.locked() is True)."""
-        status: List[str] = []
+        status: list[str] = []
 
         async def run():
             lock = asyncio.Lock()  # create inside event loop (py3.9 compat)
@@ -319,7 +333,7 @@ class TestAsyncLockSemantics:
 
     def test_three_concurrent_same_symbol_fully_serialised(self):
         """Three concurrent orders for the same symbol must fully serialise."""
-        execution_log: List[str] = []
+        execution_log: list[str] = []
         order_count = [0]
 
         async def run():
@@ -352,6 +366,7 @@ class TestAsyncLockSemantics:
 # Test 4 - Orders module public API smoke tests
 # ---------------------------------------------------------------------------
 
+
 class TestOrdersModuleSmoke:
     """Smoke tests: orders.py must import cleanly and expose expected callables."""
 
@@ -361,10 +376,20 @@ class TestOrdersModuleSmoke:
     def test_expected_callables_present(self):
         """orders.py should expose at least one recognised order-placement function."""
         candidates = [
-            "execute_buy", "execute_sell", "execute_buy_option",
-            "place_order", "submit_order", "execute_order", "send_order",
-            "place_buy", "place_sell", "create_order", "buy", "sell",
-            "place_trade", "submit_trade",
+            "execute_buy",
+            "execute_sell",
+            "execute_buy_option",
+            "place_order",
+            "submit_order",
+            "execute_order",
+            "send_order",
+            "place_buy",
+            "place_sell",
+            "create_order",
+            "buy",
+            "sell",
+            "place_trade",
+            "submit_trade",
         ]
         found = [name for name in candidates if hasattr(orders, name)]
         assert len(found) > 0, (
@@ -375,6 +400,7 @@ class TestOrdersModuleSmoke:
     def test_no_syntax_errors_at_import(self):
         """If orders imported without exception, it has no syntax errors."""
         import importlib
+
         # Use sys.modules['orders'] rather than the local `orders` reference —
         # other test files may have popped+reimported orders, replacing the object
         # in sys.modules, which would make importlib.reload(orders) fail with

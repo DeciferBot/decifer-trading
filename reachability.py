@@ -27,24 +27,118 @@ ALL_ENTRY_POINTS = ["bot.py", "dashboard.py", "telegram_bot.py"]
 
 # Third-party / stdlib modules — never project files
 STDLIB_PREFIXES = {
-    "ast", "os", "sys", "json", "re", "math", "time", "datetime", "pathlib",
-    "threading", "subprocess", "logging", "collections", "functools", "itertools",
-    "typing", "dataclasses", "enum", "abc", "io", "copy", "random", "hashlib",
-    "hmac", "base64", "urllib", "http", "socket", "ssl", "struct", "traceback",
-    "contextlib", "weakref", "gc", "signal", "resource", "platform", "shutil",
-    "tempfile", "glob", "fnmatch", "stat", "errno", "inspect", "importlib",
-    "types", "warnings", "textwrap", "string", "unicodedata", "zoneinfo",
-    "asyncio", "concurrent", "queue", "multiprocessing", "pickle", "shelve",
-    "csv", "configparser", "argparse", "getpass", "getopt", "unittest",
-    "decimal", "fractions", "statistics", "operator", "heapq", "bisect",
+    "ast",
+    "os",
+    "sys",
+    "json",
+    "re",
+    "math",
+    "time",
+    "datetime",
+    "pathlib",
+    "threading",
+    "subprocess",
+    "logging",
+    "collections",
+    "functools",
+    "itertools",
+    "typing",
+    "dataclasses",
+    "enum",
+    "abc",
+    "io",
+    "copy",
+    "random",
+    "hashlib",
+    "hmac",
+    "base64",
+    "urllib",
+    "http",
+    "socket",
+    "ssl",
+    "struct",
+    "traceback",
+    "contextlib",
+    "weakref",
+    "gc",
+    "signal",
+    "resource",
+    "platform",
+    "shutil",
+    "tempfile",
+    "glob",
+    "fnmatch",
+    "stat",
+    "errno",
+    "inspect",
+    "importlib",
+    "types",
+    "warnings",
+    "textwrap",
+    "string",
+    "unicodedata",
+    "zoneinfo",
+    "asyncio",
+    "concurrent",
+    "queue",
+    "multiprocessing",
+    "pickle",
+    "shelve",
+    "csv",
+    "configparser",
+    "argparse",
+    "getpass",
+    "getopt",
+    "unittest",
+    "decimal",
+    "fractions",
+    "statistics",
+    "operator",
+    "heapq",
+    "bisect",
     # third-party
-    "anthropic", "alpaca_trade_api", "alpaca", "ibapi", "requests", "aiohttp",
-    "pandas", "numpy", "scipy", "sklearn", "lightgbm", "torch", "tensorflow",
-    "yfinance", "finnhub", "ta", "tulipy", "colorama", "schedule", "flask",
-    "fastapi", "uvicorn", "pydantic", "dotenv", "pytest", "coverage",
-    "websocket", "websockets", "httpx", "certifi", "charset_normalizer",
-    "idna", "urllib3", "tzdata", "pytz", "dateutil", "arrow",
-    "telegram", "alpaca_streams", "msgspec", "orjson", "ujson",
+    "anthropic",
+    "alpaca_trade_api",
+    "alpaca",
+    "ibapi",
+    "requests",
+    "aiohttp",
+    "pandas",
+    "numpy",
+    "scipy",
+    "sklearn",
+    "lightgbm",
+    "torch",
+    "tensorflow",
+    "yfinance",
+    "finnhub",
+    "ta",
+    "tulipy",
+    "colorama",
+    "schedule",
+    "flask",
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "dotenv",
+    "pytest",
+    "coverage",
+    "websocket",
+    "websockets",
+    "httpx",
+    "certifi",
+    "charset_normalizer",
+    "idna",
+    "urllib3",
+    "tzdata",
+    "pytz",
+    "dateutil",
+    "arrow",
+    "telegram",
+    "alpaca_streams",
+    "msgspec",
+    "orjson",
+    "ujson",
 }
 
 
@@ -80,9 +174,8 @@ def extract_imports(filepath: Path) -> list[str]:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 modules.append(alias.name.split(".")[0])
-        elif isinstance(node, ast.ImportFrom):
-            if node.module:
-                modules.append(node.module.split(".")[0])
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            modules.append(node.module.split(".")[0])
             # Handle `from . import X` — relative, skip
     return modules
 
@@ -109,7 +202,7 @@ def walk_reachable(
             queue.append((stem, 0, "<entry>"))
 
     while queue:
-        stem, depth, importer = queue.popleft()
+        stem, depth, _importer = queue.popleft()
         fp = project_files.get(stem)
         if fp is None:
             continue
@@ -170,35 +263,37 @@ def run(entry_names: list[str], json_output: bool = False) -> None:
     total_dead_lines = sum(d["lines"] for d in dead)
 
     if json_output:
-        print(json.dumps({
-            "entry_points": entry_names,
-            "reachable_count": len(reachable),
-            "dead_count": len(dead),
-            "dead_lines": total_dead_lines,
-            "reachable": {
-                s: {"depth": info["depth"], "file": info["path"].name}
-                for s, info in reachable.items()
-            },
-            "dead": dead,
-        }, indent=2))
+        print(
+            json.dumps(
+                {
+                    "entry_points": entry_names,
+                    "reachable_count": len(reachable),
+                    "dead_count": len(dead),
+                    "dead_lines": total_dead_lines,
+                    "reachable": {
+                        s: {"depth": info["depth"], "file": info["path"].name} for s, info in reachable.items()
+                    },
+                    "dead": dead,
+                },
+                indent=2,
+            )
+        )
         return
 
     # ── Terminal output ───────────────────────────────────────────────────────
-    W  = "\033[0m"
-    B  = "\033[1m"
-    R  = "\033[91m"
-    G  = "\033[92m"
-    Y  = "\033[93m"
+    W = "\033[0m"
+    B = "\033[1m"
+    R = "\033[91m"
+    G = "\033[92m"
+    Y = "\033[93m"
     BL = "\033[94m"
-    M  = "\033[95m"
-    C  = "\033[96m"
     DIM = "\033[2m"
 
     print()
-    print(f"{B}{'─'*62}{W}")
+    print(f"{B}{'─' * 62}{W}")
     print(f"{B}  Decifer Reachability Analysis{W}")
     print(f"{DIM}  Entry: {', '.join(entry_names)}{W}")
-    print(f"{B}{'─'*62}{W}")
+    print(f"{B}{'─' * 62}{W}")
     print()
 
     # Reachable tree
@@ -213,7 +308,7 @@ def run(entry_names: list[str], json_output: bool = False) -> None:
     print(f"{B}{R}  CONFIRMED DEAD  {len(dead)} files  ·  {total_dead_lines:,} lines{W}")
     print()
     for d in dead:
-        rel = d["path"]
+        d["path"]
         lines = d["lines"]
         bar = "▓" * min(30, max(1, lines // 100))
         print(f"  {R}{d['file']:40s}{W}  {Y}{lines:4d} lines{W}  {DIM}{bar}{W}")
@@ -222,11 +317,11 @@ def run(entry_names: list[str], json_output: bool = False) -> None:
     # Summary
     total_files = len(reachable) + len(dead)
     pct_dead = (len(dead) / total_files * 100) if total_files else 0
-    print(f"{'─'*62}")
+    print(f"{'─' * 62}")
     print(f"  Total project files : {total_files}")
     print(f"  Reachable           : {G}{len(reachable)}{W}")
     print(f"  {R}Confirmed dead      : {len(dead)}  ({pct_dead:.0f}%)  ·  {total_dead_lines:,} lines{W}")
-    print(f"{'─'*62}")
+    print(f"{'─' * 62}")
     print()
 
     # Warn about entry points that weren't found

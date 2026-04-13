@@ -36,27 +36,31 @@ _persist_lock = threading.Lock()
 
 # Fields that IBKR is allowed to update at reconciliation time.
 # Everything NOT in this set is owned by the bot and never overwritten.
-IBKR_RECONCILE_FIELDS = frozenset({
-    "current",
-    "current_premium",
-    "pnl",
-    "_price_sources",
-    "status",           # IBKR can confirm ACTIVE from PENDING after fill
-})
+IBKR_RECONCILE_FIELDS = frozenset(
+    {
+        "current",
+        "current_premium",
+        "pnl",
+        "_price_sources",
+        "status",  # IBKR can confirm ACTIVE from PENDING after fill
+    }
+)
 
 # Fields that, if changed via _safe_update_trade, warrant a disk persist.
 # Price/pnl ticks are excluded — those are transient and IBKR re-provides them.
-STRUCTURAL_UPDATE_KEYS = frozenset({
-    "sl",
-    "tp",
-    "sl_order_id",
-    "tp_order_id",
-    "t1_order_id",
-    "t2_sl_order_id",
-    "t1_status",
-    "status",
-    "qty",
-})
+STRUCTURAL_UPDATE_KEYS = frozenset(
+    {
+        "sl",
+        "tp",
+        "sl_order_id",
+        "tp_order_id",
+        "t1_order_id",
+        "t2_sl_order_id",
+        "t1_status",
+        "status",
+        "qty",
+    }
+)
 
 
 def persist(snapshot: dict) -> None:
@@ -68,8 +72,7 @@ def persist(snapshot: dict) -> None:
     """
     _POSITIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
     clean = {
-        k: v for k, v in snapshot.items()
-        if isinstance(v, dict) and v.get("status") != "RESERVED" and "instrument" in v
+        k: v for k, v in snapshot.items() if isinstance(v, dict) and v.get("status") != "RESERVED" and "instrument" in v
     }
     with _persist_lock:
         tmp = _POSITIONS_FILE.with_suffix(".tmp")
@@ -92,17 +95,38 @@ _LEDGER_FILE = Path(CONFIG.get("metadata_ledger_file", "data/metadata_ledger.jso
 _ledger_lock = threading.Lock()
 
 # Fields captured in the ledger (superset of DECISION_METADATA_FIELDS in orders_state)
-_LEDGER_FIELDS = frozenset({
-    "symbol", "instrument", "direction", "entry", "qty",
-    "trade_type", "conviction", "reasoning",
-    "signal_scores", "agent_outputs",
-    "entry_regime", "entry_thesis", "entry_score",
-    "ic_weights_at_entry", "pattern_id", "setup_type",
-    "advice_id", "open_time", "atr", "high_water_mark",
-    "right", "strike", "expiry_str",
-    "tranche_mode", "t1_qty", "t2_qty",
-    "sl", "tp",
-})
+_LEDGER_FIELDS = frozenset(
+    {
+        "symbol",
+        "instrument",
+        "direction",
+        "entry",
+        "qty",
+        "trade_type",
+        "conviction",
+        "reasoning",
+        "signal_scores",
+        "agent_outputs",
+        "entry_regime",
+        "entry_thesis",
+        "entry_score",
+        "ic_weights_at_entry",
+        "pattern_id",
+        "setup_type",
+        "advice_id",
+        "open_time",
+        "atr",
+        "high_water_mark",
+        "right",
+        "strike",
+        "expiry_str",
+        "tranche_mode",
+        "t1_qty",
+        "t2_qty",
+        "sl",
+        "tp",
+    }
+)
 
 
 def ledger_write(key: str, position: dict) -> None:
@@ -154,10 +178,12 @@ def ledger_lookup(key: str, symbol: str = "", instrument: str = "") -> dict:
             return ledger[key]
         if symbol and instrument:
             for v in ledger.values():
-                if (v.get("symbol") == symbol
-                        and v.get("instrument") == instrument
-                        and v.get("trade_type")
-                        and v["trade_type"] != "UNKNOWN"):
+                if (
+                    v.get("symbol") == symbol
+                    and v.get("instrument") == instrument
+                    and v.get("trade_type")
+                    and v["trade_type"] != "UNKNOWN"
+                ):
                     return v
         return {}
     except Exception as e:
@@ -176,10 +202,7 @@ def restore() -> dict:
             if raw:
                 data = json.loads(raw)
                 if isinstance(data, dict):
-                    log.info(
-                        f"trade_store: restored {len(data)} open position(s) "
-                        f"from {_POSITIONS_FILE}"
-                    )
+                    log.info(f"trade_store: restored {len(data)} open position(s) from {_POSITIONS_FILE}")
                     return data
     except Exception as e:
         log.error(f"trade_store: failed to restore positions: {e}")

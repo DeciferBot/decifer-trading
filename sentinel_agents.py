@@ -14,7 +14,9 @@
 
 import json
 import logging
+
 import anthropic
+
 from config import CONFIG
 
 log = logging.getLogger("decifer.sentinel_agents")
@@ -28,7 +30,7 @@ def _call_claude(system_prompt: str, user_message: str, max_tokens: int = 500) -
             model=CONFIG["claude_model"],
             max_tokens=max_tokens,
             system=system_prompt,
-            messages=[{"role": "user", "content": user_message}]
+            messages=[{"role": "user", "content": user_message}],
         )
         return resp.content[0].text.strip()
     except Exception as e:
@@ -43,7 +45,7 @@ def _call_claude_opus(system_prompt: str, user_message: str, max_tokens: int = 5
             model=CONFIG.get("claude_model_alpha", "claude-opus-4-6"),
             max_tokens=max_tokens,
             system=system_prompt,
-            messages=[{"role": "user", "content": user_message}]
+            messages=[{"role": "user", "content": user_message}],
         )
         return resp.content[0].text.strip()
     except Exception as e:
@@ -64,7 +66,7 @@ You are fast and decisive. No fluff. This is time-sensitive.
 Output structured analysis only."""
 
 
-def agent_catalyst(trigger: dict, current_position: dict = None) -> str:
+def agent_catalyst(trigger: dict, current_position: dict | None = None) -> str:
     """
     Assess the news catalyst and its potential market impact.
 
@@ -133,15 +135,16 @@ Assess this catalyst:
 # questions with no reasoning required.
 # ══════════════════════════════════════════════════════════════
 
-def agent_risk_gate(catalyst_report: str, trigger: dict,
-                    open_positions: list, portfolio_value: float,
-                    daily_pnl: float, regime: dict) -> str:
+
+def agent_risk_gate(
+    catalyst_report: str, trigger: dict, open_positions: list, portfolio_value: float, daily_pnl: float, regime: dict
+) -> str:
     """
     Deterministic risk gate for news-triggered trades.
     Uses risk.py functions to answer the same 5 questions the LLM was asked.
     Returns human-readable text compatible with agent_instant_decision input.
     """
-    from risk import check_risk_conditions, calculate_position_size, calculate_stops
+    from risk import calculate_position_size, calculate_stops, check_risk_conditions
 
     sym = trigger["symbol"]
     direction = trigger.get("direction", "UNKNOWN")
@@ -152,16 +155,22 @@ def agent_risk_gate(catalyst_report: str, trigger: dict,
     # News-triggered trades use a tighter risk multiplier (0.75x normal)
     sentinel_mult = CONFIG.get("sentinel_risk_multiplier", 0.75)
 
-    open_syms = [p.get("symbol") for p in open_positions]
+    [p.get("symbol") for p in open_positions]
     existing_pos = next((p for p in open_positions if p.get("symbol") == sym), None)
     slots_remaining = max_pos - len(open_positions)
     daily_budget_left = (portfolio_value * daily_limit) + daily_pnl
 
-    positions_text = "\n".join([
-        f"  {p.get('symbol', '?')}: {p.get('qty', 0)} shares | "
-        f"Entry ${p.get('entry', 0):.2f} | P&L ${p.get('pnl', 0):.2f}"
-        for p in open_positions[:10]
-    ]) if open_positions else "  No open positions"
+    (
+        "\n".join(
+            [
+                f"  {p.get('symbol', '?')}: {p.get('qty', 0)} shares | "
+                f"Entry ${p.get('entry', 0):.2f} | P&L ${p.get('pnl', 0):.2f}"
+                for p in open_positions[:10]
+            ]
+        )
+        if open_positions
+        else "  No open positions"
+    )
 
     lines = [
         f"SENTINEL RISK GATE -- {sym}",
@@ -183,9 +192,7 @@ def agent_risk_gate(catalyst_report: str, trigger: dict,
     reg = regime.get("regime", "UNKNOWN")
     dir_upper = direction.upper()
     q3 = True
-    if reg == "CAPITULATION":
-        q3 = False
-    elif reg in ("TRENDING_DOWN", "RELIEF_RALLY") and dir_upper == "BULLISH":
+    if reg == "CAPITULATION" or (reg in ("TRENDING_DOWN", "RELIEF_RALLY") and dir_upper == "BULLISH"):
         q3 = False
     lines.append(f"  3. Regime aligned with trade direction: {'YES' if q3 else 'NO'} ({reg} / {direction})")
 
@@ -212,9 +219,8 @@ def agent_risk_gate(catalyst_report: str, trigger: dict,
             failed.append(f"regime {reg} conflicts with {direction}")
         if not q5:
             failed.append(gate_reason)
-        decision = "BLOCK"
         reason = "; ".join(failed)
-        lines.append(f"DECISION: BLOCK")
+        lines.append("DECISION: BLOCK")
         lines.append(f"REASON: {reason}")
         return "\n".join(lines)
 
@@ -225,9 +231,9 @@ def agent_risk_gate(catalyst_report: str, trigger: dict,
     trade_direction = "LONG" if dir_upper in ("BULLISH", "LONG", "BUY") else "SHORT"
 
     if price > 0 and portfolio_value > 0:
-        qty = calculate_position_size(portfolio_value, price,
-                                       trigger.get("score", 20), regime,
-                                       atr=atr, external_mult=sentinel_mult)
+        qty = calculate_position_size(
+            portfolio_value, price, trigger.get("score", 20), regime, atr=atr, external_mult=sentinel_mult
+        )
         sl, tp = calculate_stops(price, atr, trade_direction)
         # Tighten stop loss by 25% for news-driven trades
         if trade_direction == "LONG":
@@ -258,8 +264,9 @@ Output ONLY valid JSON. No markdown, no explanation outside the JSON.
 This trade will execute IMMEDIATELY with real money. Be precise."""
 
 
-def agent_instant_decision(catalyst_report: str, risk_report: str,
-                            trigger: dict, current_position: dict = None) -> dict:
+def agent_instant_decision(
+    catalyst_report: str, risk_report: str, trigger: dict, current_position: dict | None = None
+) -> dict:
     """
     Final synthesis -- outputs actionable JSON for immediate execution.
     """
@@ -273,9 +280,9 @@ RISK GATE:
 {risk_report}
 
 SYMBOL: {sym}
-CURRENTLY HOLDING: {'YES' if is_holding else 'NO'}
-NEWS DIRECTION: {trigger.get('direction', 'UNKNOWN')}
-URGENCY: {trigger.get('urgency', 'MODERATE')}
+CURRENTLY HOLDING: {"YES" if is_holding else "NO"}
+NEWS DIRECTION: {trigger.get("direction", "UNKNOWN")}
+URGENCY: {trigger.get("urgency", "MODERATE")}
 
 Synthesise both reports into a single executable instruction.
 
@@ -291,7 +298,7 @@ Output ONLY valid JSON:
   "urgency": "CRITICAL" or "HIGH" or "MODERATE",
   "confidence": 0-10,
   "reasoning": "One sentence explaining the decision",
-  "catalyst": "{trigger.get('claude_catalyst', trigger.get('headlines', [''])[0][:60])}",
+  "catalyst": "{trigger.get("claude_catalyst", trigger.get("headlines", [""])[0][:60])}",
   "trigger_type": "news_sentinel"
 }}
 
@@ -336,11 +343,9 @@ Rules:
 # ══════════════════════════════════════════════════════════════
 # ORCHESTRATOR — Run the 3-agent sentinel pipeline
 # ══════════════════════════════════════════════════════════════
-def run_sentinel_pipeline(trigger: dict,
-                           open_positions: list,
-                           portfolio_value: float,
-                           daily_pnl: float,
-                           regime: dict) -> dict:
+def run_sentinel_pipeline(
+    trigger: dict, open_positions: list, portfolio_value: float, daily_pnl: float, regime: dict
+) -> dict:
     """
     Run the lightweight 3-agent sentinel pipeline.
     Agent 1 (Catalyst) and Agent 3 (Instant Decision) remain LLM.
@@ -360,8 +365,7 @@ def run_sentinel_pipeline(trigger: dict,
 
     # Agent 2: Risk Gate (deterministic)
     log.info(f"  Agent 2: Risk Gate ({sym}) [deterministic]...")
-    risk = agent_risk_gate(catalyst, trigger, open_positions,
-                           portfolio_value, daily_pnl, regime)
+    risk = agent_risk_gate(catalyst, trigger, open_positions, portfolio_value, daily_pnl, regime)
 
     # Agent 3: Instant Decision (LLM)
     log.info(f"  Agent 3: Instant Decision ({sym})...")
@@ -377,9 +381,6 @@ def run_sentinel_pipeline(trigger: dict,
     confidence = decision.get("confidence", 0)
     reasoning = decision.get("reasoning", "")
 
-    log.info(
-        f"Sentinel decision for {sym}: {action} | "
-        f"confidence={confidence}/10 | {reasoning[:80]}"
-    )
+    log.info(f"Sentinel decision for {sym}: {action} | confidence={confidence}/10 | {reasoning[:80]}")
 
     return decision

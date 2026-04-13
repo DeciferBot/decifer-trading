@@ -22,8 +22,7 @@ thesis drift: "does the original story still make sense?"
 """
 
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from datetime import UTC, datetime
 
 import anthropic
 
@@ -32,7 +31,7 @@ from earnings_calendar import get_earnings_within_hours
 
 log = logging.getLogger("decifer.portfolio_manager")
 
-_client: Optional[anthropic.Anthropic] = None
+_client: anthropic.Anthropic | None = None
 
 
 def _get_client() -> anthropic.Anthropic:
@@ -110,6 +109,7 @@ RULES:
 # MAIN REVIEW FUNCTION
 # ══════════════════════════════════════════════════════════════
 
+
 def run_portfolio_review(
     open_positions: list,
     all_scored: list,
@@ -147,13 +147,12 @@ def run_portfolio_review(
     score_map = {s["symbol"]: s.get("score", 0) for s in (all_scored or [])}
 
     # Check earnings (stocks only — options and FX have no earnings events)
-    stock_syms = [p["symbol"] for p in open_positions
-                  if p.get("instrument") not in ("option", "fx")]
+    stock_syms = [p["symbol"] for p in open_positions if p.get("instrument") not in ("option", "fx")]
     earnings_lookahead = pm_cfg.get("earnings_lookahead_hours", 48)
     earnings_flagged = get_earnings_within_hours(stock_syms, earnings_lookahead)
 
     # Build position summaries for the prompt
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     pos_lines = []
     for p in open_positions:
         sym = p.get("symbol", "?")
@@ -167,12 +166,12 @@ def run_portfolio_review(
         entry_score = p.get("entry_score", p.get("score", 0))
         current_score = score_map.get(sym)
 
-        pnl = p.get("pnl", 0)
+        p.get("pnl", 0)
         pnl_pct = ((current_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
 
         # Days held
         try:
-            open_dt = datetime.fromisoformat(p.get("open_time", "")).replace(tzinfo=timezone.utc)
+            open_dt = datetime.fromisoformat(p.get("open_time", "")).replace(tzinfo=UTC)
             days_held = (now_utc - open_dt).days
         except Exception:
             days_held = 0
@@ -228,11 +227,13 @@ Review each position and output SYMBOL / ACTION / REASON for every one."""
         resp = client.messages.create(
             model=CONFIG.get("claude_model_alpha", "claude-opus-4-6"),
             max_tokens=CONFIG.get("claude_max_tokens_alpha", 4096),
-            system=[{
-                "type": "text",
-                "text": _PM_SYSTEM,
-                "cache_control": {"type": "ephemeral"},
-            }],
+            system=[
+                {
+                    "type": "text",
+                    "text": _PM_SYSTEM,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
             messages=[{"role": "user", "content": prompt}],
         )
         raw = resp.content[0].text.strip()
@@ -248,6 +249,7 @@ Review each position and output SYMBOL / ACTION / REASON for every one."""
 # RESPONSE PARSER
 # ══════════════════════════════════════════════════════════════
 
+
 def _regime_polarity(regime_str: str) -> str:
     """Return 'BULL', 'BEAR', or '' from a regime label string.
     Handles both legacy mechanical labels (BULL_TRENDING, BEAR_TRENDING) and
@@ -258,8 +260,7 @@ def _regime_polarity(regime_str: str) -> str:
     if r in ("TRENDING_UP", "MOMENTUM_BULL", "BULL", "BULL_TRENDING"):
         return "BULL"
     # Explicit BEAR mappings — bearish/risk-off regimes including relief rallies
-    if r in ("TRENDING_DOWN", "RELIEF_RALLY", "CAPITULATION", "DISTRIBUTION",
-             "TRENDING_BEAR", "BEAR", "BEAR_TRENDING"):
+    if r in ("TRENDING_DOWN", "RELIEF_RALLY", "CAPITULATION", "DISTRIBUTION", "TRENDING_BEAR", "BEAR", "BEAR_TRENDING"):
         return "BEAR"
     # Legacy substring match for any other labels
     if "BULL" in r:
@@ -295,14 +296,14 @@ def lightweight_cycle_check(
 
     # Prefer session_character (Opus-generated) over mechanical label so that
     # the cycle check compares the same vocabulary as entry_regime.
-    current_regime        = regime.get("session_character") or regime.get("regime", "UNKNOWN")
-    scalp_max_mins        = pm_cfg.get("scalp_max_hold_minutes", 90)
-    scalp_min_pnl         = pm_cfg.get("scalp_min_pnl_pct", 0.003)   # 0.3%
-    score_collapse_delta  = pm_cfg.get("cycle_score_collapse_threshold", 10)
+    current_regime = regime.get("session_character") or regime.get("regime", "UNKNOWN")
+    scalp_max_mins = pm_cfg.get("scalp_max_hold_minutes", 90)
+    scalp_min_pnl = pm_cfg.get("scalp_min_pnl_pct", 0.003)  # 0.3%
+    score_collapse_delta = pm_cfg.get("cycle_score_collapse_threshold", 10)
 
     # Build current-score lookup from latest scan results (symbol → score)
     scored_map: dict = {}
-    for s in (all_scored or []):
+    for s in all_scored or []:
         sym_key = s.get("symbol") or s.get("ticker")
         score_val = s.get("score") or s.get("conviction_score", 0)
         if sym_key:
@@ -311,19 +312,19 @@ def lightweight_cycle_check(
             except (TypeError, ValueError):
                 pass
 
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     actions = []
     actioned_syms: set = set()
 
     for pos in open_positions:
-        sym           = pos.get("symbol", "")
-        trade_type    = pos.get("trade_type", "SCALP")
-        entry_price   = pos.get("entry", 0)
+        sym = pos.get("symbol", "")
+        trade_type = pos.get("trade_type", "SCALP")
+        entry_price = pos.get("entry", 0)
         current_price = pos.get("current", entry_price)
-        entry_regime  = pos.get("regime", "") or pos.get("entry_regime", "")
+        entry_regime = pos.get("regime", "") or pos.get("entry_regime", "")
 
         try:
-            open_dt   = datetime.fromisoformat(pos.get("open_time", "")).replace(tzinfo=timezone.utc)
+            open_dt = datetime.fromisoformat(pos.get("open_time", "")).replace(tzinfo=UTC)
             mins_held = (now_utc - open_dt).total_seconds() / 60
         except Exception:
             mins_held = 0
@@ -332,63 +333,71 @@ def lightweight_cycle_check(
 
         if trade_type == "SCALP":
             if mins_held > scalp_max_mins and pnl_pct < scalp_min_pnl:
-                actions.append({
-                    "symbol":    sym,
-                    "action":    "EXIT",
-                    "reasoning": (
-                        f"SCALP thesis stale: {mins_held:.0f}m elapsed, "
-                        f"pnl={pnl_pct * 100:+.2f}% (target >{scalp_min_pnl * 100:.1f}%) — "
-                        "momentum did not materialise; exit to free capital"
-                    ),
-                })
+                actions.append(
+                    {
+                        "symbol": sym,
+                        "action": "EXIT",
+                        "reasoning": (
+                            f"SCALP thesis stale: {mins_held:.0f}m elapsed, "
+                            f"pnl={pnl_pct * 100:+.2f}% (target >{scalp_min_pnl * 100:.1f}%) — "
+                            "momentum did not materialise; exit to free capital"
+                        ),
+                    }
+                )
                 actioned_syms.add(sym)
 
         elif trade_type == "SWING":
             if entry_regime and current_regime and entry_regime != current_regime:
-                actions.append({
-                    "symbol":    sym,
-                    "action":    "REVIEW",
-                    "reasoning": (
-                        f"SWING regime shifted: entry={entry_regime} → now={current_regime}; "
-                        "thesis context changed — full Opus review required"
-                    ),
-                })
+                actions.append(
+                    {
+                        "symbol": sym,
+                        "action": "REVIEW",
+                        "reasoning": (
+                            f"SWING regime shifted: entry={entry_regime} → now={current_regime}; "
+                            "thesis context changed — full Opus review required"
+                        ),
+                    }
+                )
                 actioned_syms.add(sym)
 
         elif trade_type == "HOLD":
-            entry_polarity   = _regime_polarity(entry_regime)
+            entry_polarity = _regime_polarity(entry_regime)
             current_polarity = _regime_polarity(current_regime)
             if entry_polarity and current_polarity and entry_polarity != current_polarity:
-                actions.append({
-                    "symbol":    sym,
-                    "action":    "REVIEW",
-                    "reasoning": (
-                        f"HOLD macro backdrop flipped: entry={entry_regime} → now={current_regime}; "
-                        "polar regime shift — thesis integrity check required"
-                    ),
-                })
+                actions.append(
+                    {
+                        "symbol": sym,
+                        "action": "REVIEW",
+                        "reasoning": (
+                            f"HOLD macro backdrop flipped: entry={entry_regime} → now={current_regime}; "
+                            "polar regime shift — thesis integrity check required"
+                        ),
+                    }
+                )
                 actioned_syms.add(sym)
 
         # Score collapse check — applies to all trade types not already actioned.
         # If signal quality has materially deteriorated since entry, queue a review
         # before the bracket fires so the exit can be thesis-driven, not price-driven.
         if sym not in actioned_syms and sym in scored_map:
-            entry_sc   = pos.get("entry_score") or pos.get("score") or 0
+            entry_sc = pos.get("entry_score") or pos.get("score") or 0
             current_sc = scored_map[sym]
             try:
                 drop = float(entry_sc) - float(current_sc)
             except (TypeError, ValueError):
                 drop = 0
             if drop >= score_collapse_delta:
-                actions.append({
-                    "symbol":    sym,
-                    "action":    "REVIEW",
-                    "reasoning": (
-                        f"Signal quality collapsed: entry_score={entry_sc:.0f} → "
-                        f"current={current_sc:.0f} (drop={drop:.0f}pts ≥ threshold={score_collapse_delta}); "
-                        "original setup may no longer be valid — review thesis before bracket fires"
-                    ),
-                })
+                actions.append(
+                    {
+                        "symbol": sym,
+                        "action": "REVIEW",
+                        "reasoning": (
+                            f"Signal quality collapsed: entry_score={entry_sc:.0f} → "
+                            f"current={current_sc:.0f} (drop={drop:.0f}pts ≥ threshold={score_collapse_delta}); "
+                            "original setup may no longer be valid — review thesis before bracket fires"
+                        ),
+                    }
+                )
 
     return actions
 
@@ -399,6 +408,7 @@ def _parse_actions(text: str, open_positions: list) -> list:
     Falls back to HOLD for any position not found in output.
     """
     import re
+
     results = {}
     blocks = re.split(r"\n(?=SYMBOL:)", text.strip())
     for block in blocks:
@@ -415,10 +425,7 @@ def _parse_actions(text: str, open_positions: list) -> list:
         elif sym_m:
             raw_act = re.search(r"ACTION:\s*(\S+)", block)
             raw_val = raw_act.group(1) if raw_act else "<missing>"
-            log.warning(
-                f"portfolio_manager: {sym_m.group(1)} had unparseable "
-                f"ACTION '{raw_val}' — defaulting HOLD"
-            )
+            log.warning(f"portfolio_manager: {sym_m.group(1)} had unparseable ACTION '{raw_val}' — defaulting HOLD")
 
     # Ensure every open position has an entry
     output = []
