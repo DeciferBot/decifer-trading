@@ -1701,12 +1701,11 @@ function renderPositions(positions) {
     const trancheBadge = (!isPending && p.tranche_mode)
       ? ` <span style="font-size:8px;color:var(--cyan);background:rgba(0,229,255,.12);border:1px solid var(--cyan);padding:1px 5px;border-radius:8px;font-weight:600;letter-spacing:0.5px">${p.t1_status === 'FILLED' ? 'T1 FILLED' : 'T1 OPEN'}</span>`
       : '';
-    // Trade-type pill: SCALP / SWING / HOLD
-    const _ttc = {SCALP:'var(--cyan)',SWING:'var(--orange)',HOLD:'var(--green)'};
-    const _ttbg = {SCALP:'rgba(0,229,255,.12)',SWING:'rgba(255,152,0,.12)',HOLD:'rgba(0,230,118,.12)'};
-    const typePill = (p.trade_type && p.trade_type !== 'UNKNOWN')
-      ? ` <span style="font-size:8px;color:${_ttc[p.trade_type]||'var(--muted2)'};background:${_ttbg[p.trade_type]||'rgba(255,255,255,.06)'};border:1px solid ${_ttc[p.trade_type]||'var(--muted2)'};padding:1px 5px;border-radius:8px;font-weight:600;letter-spacing:0.5px">${p.trade_type}</span>`
-      : '';
+    // Trade-type pill: SCALP / SWING / HOLD / UNKNOWN
+    const _ttLabel = p.trade_type || 'UNKNOWN';
+    const _ttc = {SCALP:'var(--cyan)',SWING:'var(--orange)',HOLD:'var(--green)',UNKNOWN:'var(--muted2)'};
+    const _ttbg = {SCALP:'rgba(0,229,255,.12)',SWING:'rgba(255,152,0,.12)',HOLD:'rgba(0,230,118,.12)',UNKNOWN:'rgba(255,255,255,.06)'};
+    const typePill = ` <span style="font-size:8px;color:${_ttc[_ttLabel]||'var(--muted2)'};background:${_ttbg[_ttLabel]||'rgba(255,255,255,.06)'};border:1px solid ${_ttc[_ttLabel]||'var(--muted2)'};padding:1px 5px;border-radius:8px;font-weight:600;letter-spacing:0.5px">${_ttLabel}</span>`;
     // Action button: Cancel for pending, Close for active
     const actionBtn = isPending && p.order_id
       ? `<button onclick="event.stopPropagation();cancelOrder(${p.order_id},${p._idx})" style="background:rgba(255,214,0,.12);border:1px solid var(--yellow);color:var(--yellow);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Cancel pending order">CANCEL</button>`
