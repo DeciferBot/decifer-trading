@@ -274,24 +274,46 @@ def _percentile(values: list, p: float) -> Optional[float]:
     return round(s[lo] + (idx - lo) * (s[hi] - s[lo]), 6)
 
 
+def _complete(records: list, horizons: list) -> list:
+    """Return only records that have direction_adj_returns at every horizon."""
+    return [r for r in records if all(h in r.get("direction_adj_returns", {}) for h in horizons)]
+
+
 def _aggregate(records: list, horizons: list) -> dict:
-    """Return median / p25 / p75 per horizon across a set of decay records."""
+    """
+    Return median / p25 / p75 per horizon.
+
+    Uses only records that have data at EVERY horizon (cohort analysis) so that
+    the comparison across horizons reflects the same set of trades rather than
+    shrinking samples as horizons grow.  Falls back to all records when fewer
+    than 5 complete records are available.
+    """
     if not records:
         return {"median": [None] * len(horizons),
                 "p25":    [None] * len(horizons),
                 "p75":    [None] * len(horizons),
-                "n":      0}
+                "n":      0,
+                "n_total": 0}
+
+    complete = _complete(records, horizons)
+    cohort   = complete if len(complete) >= 5 else records
 
     medians, p25s, p75s = [], [], []
     for h in horizons:
         vals = [r["direction_adj_returns"][h]
-                for r in records
+                for r in cohort
                 if h in r.get("direction_adj_returns", {})]
         medians.append(_percentile(vals, 50))
         p25s.append(_percentile(vals, 25))
         p75s.append(_percentile(vals, 75))
 
-    return {"median": medians, "p25": p25s, "p75": p75s, "n": len(records)}
+    return {
+        "median":  medians,
+        "p25":     p25s,
+        "p75":     p75s,
+        "n":       len(cohort),    # records used for analysis (complete-horizon cohort)
+        "n_total": len(records),   # total records in segment (including partial)
+    }
 
 
 # ── Dimension segmentation ────────────────────────────────────────────────
@@ -403,11 +425,13 @@ def get_alpha_decay_stats(trades: list = None, horizons: list = None) -> dict:
         best_i  = max(valid, key=lambda x: x[1])[0]
         optimal = horizons[best_i]
 
+    complete_count = len(_complete(records, horizons))
     result = {
         "horizons":        horizons,
         "groups":          agg,
         "optimal_horizon": optimal,
-        "trade_count":     len(records),
+        "trade_count":     len(records),   # total records with any price data
+        "complete_count":  complete_count, # records with data at ALL horizons (cohort used for chart)
         "computed_at":     datetime.now(timezone.utc).isoformat(),
     }
 
