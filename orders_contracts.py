@@ -102,9 +102,7 @@ def is_equities_extended_hours() -> bool:
 def get_contract(symbol: str, instrument: str = "stock"):
     """Build the correct IBKR contract for any instrument type."""
     if instrument == "fx" or len(symbol) == 6 and symbol.isalpha():
-        base = symbol[:3]
-        quote = symbol[3:]
-        return Forex(symbol, currency=quote, localSymbol=f"{base}.{quote}")
+        return Forex(symbol)
     else:
         return Stock(symbol, "SMART", "USD")
 

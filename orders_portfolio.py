@@ -324,6 +324,22 @@ def reconcile_with_ibkr(ib: IB):
     saved_positions = _load_positions_file()
     if saved_positions:
         log.info(f"Loaded {len(saved_positions)} saved position(s) from disk for metadata restore")
+
+    def _find_saved(key: str, sym: str, instrument: str) -> dict:
+        """
+        Exact-key match first; fall back to symbol+instrument scan.
+        The fallback catches key-format mismatches (e.g. stock key "NBIS" vs
+        option key "NBIS_C_157.5_2026-04-24") that cause metadata loss on every
+        re-sync when positions were saved under a different key format.
+        """
+        if key in saved_positions:
+            return saved_positions[key]
+        for v in saved_positions.values():
+            if (v.get("symbol") == sym
+                    and v.get("instrument") == instrument
+                    and v.get("trade_type")):   # must have real decision metadata
+                return v
+        return {}
     try:
         # ── Step 1: restore our own position ledger ───────────────────────────
         stored = _ts_restore()
@@ -499,8 +515,10 @@ def reconcile_with_ibkr(ib: IB):
                         "direction":      direction,
                         "score":          0,
                         "reasoning":      "External position — not opened by this bot session",
-                        "trade_type":     "SCALP",
+                        "trade_type":     "UNKNOWN",
                         "conviction":     0.0,
+                        "entry_regime":   "UNKNOWN",
+                        "metadata_status": "MISSING",
                         "pnl":            pnl,
                         "status":         "ACTIVE",
                         "_price_sources": src_desc,
@@ -520,7 +538,7 @@ def reconcile_with_ibkr(ib: IB):
                             pnl = round((ibkr_entry - validated_price) * qty * 100, 2)
                         else:
                             pnl = round((validated_price - ibkr_entry) * qty * 100, 2)
-                        _saved = saved_positions.get(key, {})
+                        _saved = _find_saved(key, sym, "option")
                         new_entry = {
                             "symbol":          sym,
                             "instrument":      "option",
@@ -539,7 +557,11 @@ def reconcile_with_ibkr(ib: IB):
                             "tp":              round(ibkr_entry * (1 + CONFIG.get("options_profit_target", 1.00)), 4),
                             "direction":       direction,
                             "score":           0,
-                            "reasoning":       "Reconciled from IBKR on startup",
+                            "trade_type":      "UNKNOWN",
+                            "conviction":      0.0,
+                            "entry_regime":    "UNKNOWN",
+                            "metadata_status": "MISSING",
+                            "reasoning":       "Reconciled from IBKR on startup — metadata not found",
                             "pnl":             pnl,
                             "status":          "ACTIVE",
                             "_price_sources":  src_desc,
@@ -577,7 +599,7 @@ def reconcile_with_ibkr(ib: IB):
                             pnl = round((ibkr_entry - validated_price) * qty, 2)
                         else:
                             pnl = round((validated_price - ibkr_entry) * qty, 2)
-                        _saved = saved_positions.get(key, {})
+                        _saved = _find_saved(key, sym, "stock")
                         new_entry = {
                             "symbol":         sym,
                             "instrument":     "stock",
@@ -587,7 +609,11 @@ def reconcile_with_ibkr(ib: IB):
                             "sl":             sl,
                             "tp":             tp,
                             "score":          0,
-                            "reasoning":      "Reconciled from IBKR on startup",
+                            "trade_type":     "UNKNOWN",
+                            "conviction":     0.0,
+                            "entry_regime":   "UNKNOWN",
+                            "metadata_status": "MISSING",
+                            "reasoning":      "Reconciled from IBKR on startup — metadata not found",
                             "direction":      direction,
                             "pnl":            pnl,
                             "status":         "ACTIVE",
@@ -748,9 +774,35 @@ def update_positions_from_ibkr(ib: IB):
                 _cancel_ibkr_order_by_id(ib, _oid)
             _safe_del_trade(_key)
 
-        # Re-add positions that IBKR has but tracker is missing
-        # (lightweight reconciliation — catches positions lost by failed sells,
-        #  partial startup reconciliation, or any other tracker/IBKR desync)
+        # Re-add positions that IBKR has but tracker is missing.
+        # Metadata rescue: before writing a bare-minimum stub, try to salvage the
+        # original decision record from positions.json.  Key-format mismatches
+        # (e.g. a stock key "NBIS" vs option key "NBIS_C_157.5_2026-04-24") are the
+        # most common cause — the position IS on disk, just under the wrong key.
+        # IBKR_RECONCILE_FIELDS are the only fields we overwrite; everything else
+        # (trade_type, conviction, reasoning, signal_scores, entry_regime, …) is
+        # preserved verbatim from the saved record.  Without this the whole training-
+        # data corpus is corrupted every time the bot drops and re-adds a position.
+        from trade_store import restore as _restore_positions, IBKR_RECONCILE_FIELDS
+
+        def _find_saved_metadata(sym: str, instrument: str) -> dict:
+            """
+            Scan positions.json for the best metadata match for this symbol+instrument.
+            Returns the saved dict (possibly stale keys) or {} if nothing useful found.
+            """
+            try:
+                saved = _restore_positions()
+                # Exact key match first (already covered by `ibkr_key not in active_trades`
+                # but positions.json may have the entry under the old key).
+                for saved_key, saved_val in saved.items():
+                    if (saved_val.get("symbol") == sym
+                            and saved_val.get("instrument") == instrument
+                            and saved_val.get("trade_type")):   # has real metadata
+                        return saved_val
+            except Exception:
+                pass
+            return {}
+
         for ibkr_key, item in price_map.items():
             if ibkr_key not in active_trades:
                 try:
@@ -759,6 +811,11 @@ def update_positions_from_ibkr(ib: IB):
                     direction = "SHORT" if item.position < 0 else "LONG"
                     qty = abs(int(item.position))
                     ibkr_mkt = float(item.marketPrice)
+                    instrument = "option" if is_opt else "stock"
+
+                    # Attempt to recover the original trade metadata from disk.
+                    saved_meta = _find_saved_metadata(sym, instrument)
+                    metadata_restored = bool(saved_meta)
 
                     if is_opt:
                         entry = round(float(item.averageCost) / 100, 4)
@@ -775,7 +832,9 @@ def update_positions_from_ibkr(ib: IB):
                             pnl = round((entry - validated) * qty * mult, 2)
                         else:
                             pnl = round((validated - entry) * qty * mult, 2)
-                        _safe_set_trade(ibkr_key, {
+
+                        # Build the authoritative IBKR structural fields.
+                        ibkr_fields = {
                             "symbol": sym, "instrument": "option",
                             "right": right, "strike": c.strike,
                             "expiry_str": expiry_str, "expiry_ibkr": raw_exp,
@@ -785,11 +844,34 @@ def update_positions_from_ibkr(ib: IB):
                             "qty": qty,
                             "sl": round(entry * (1 - CONFIG.get("options_stop_loss", 0.50)), 4),
                             "tp": round(entry * (1 + CONFIG.get("options_profit_target", 1.00)), 4),
-                            "direction": direction, "score": 0,
-                            "reasoning": "Re-synced from IBKR (was missing from tracker)",
+                            "direction": direction,
                             "pnl": pnl, "status": "ACTIVE",
-                        })
-                        log.warning(f"Re-added missing option {ibkr_key} from IBKR ({direction} {qty}x, premium ${entry:.4f})")
+                        }
+
+                        if metadata_restored:
+                            # Merge: start from saved record, overlay IBKR structural fields.
+                            new_entry = {**saved_meta, **ibkr_fields}
+                            log.warning(
+                                f"Re-added missing option {ibkr_key} from IBKR — "
+                                f"metadata RESTORED from disk (trade_type={saved_meta.get('trade_type','?')})"
+                            )
+                        else:
+                            # Genuine orphan: no saved record at all.
+                            new_entry = {
+                                **ibkr_fields,
+                                "score": 0,
+                                "trade_type": "UNKNOWN",
+                                "conviction": 0.0,
+                                "entry_regime": "UNKNOWN",
+                                "metadata_status": "MISSING",
+                                "reasoning": "Re-synced from IBKR — original metadata not found",
+                            }
+                            log.warning(
+                                f"Re-added missing option {ibkr_key} from IBKR — "
+                                f"NO metadata found; trade_type/conviction unknown"
+                            )
+                        _safe_set_trade(ibkr_key, new_entry)
+
                     else:
                         entry = round(float(item.averageCost), 4)
                         validated = ibkr_mkt if ibkr_mkt > 0 else entry
@@ -799,14 +881,36 @@ def update_positions_from_ibkr(ib: IB):
                         else:
                             sl = round(entry * 0.98, 2); tp = round(entry * 1.06, 2)
                             pnl = round((validated - entry) * qty, 2)
-                        _safe_set_trade(ibkr_key, {
+
+                        ibkr_fields = {
                             "symbol": sym, "instrument": "stock",
                             "entry": entry, "current": round(validated, 4),
-                            "qty": qty, "sl": sl, "tp": tp, "score": 0,
-                            "reasoning": "Re-synced from IBKR (was missing from tracker)",
+                            "qty": qty, "sl": sl, "tp": tp,
                             "direction": direction, "pnl": pnl, "status": "ACTIVE",
-                        })
-                        log.warning(f"Re-added missing stock {ibkr_key} from IBKR ({direction} {qty} @ ${entry:.2f})")
+                        }
+
+                        if metadata_restored:
+                            new_entry = {**saved_meta, **ibkr_fields}
+                            log.warning(
+                                f"Re-added missing stock {ibkr_key} from IBKR — "
+                                f"metadata RESTORED from disk (trade_type={saved_meta.get('trade_type','?')})"
+                            )
+                        else:
+                            new_entry = {
+                                **ibkr_fields,
+                                "score": 0,
+                                "trade_type": "UNKNOWN",
+                                "conviction": 0.0,
+                                "entry_regime": "UNKNOWN",
+                                "metadata_status": "MISSING",
+                                "reasoning": "Re-synced from IBKR — original metadata not found",
+                            }
+                            log.warning(
+                                f"Re-added missing stock {ibkr_key} from IBKR — "
+                                f"NO metadata found; trade_type/conviction unknown"
+                            )
+                        _safe_set_trade(ibkr_key, new_entry)
+
                 except Exception as readd_err:
                     log.error(f"Failed to re-add {ibkr_key}: {readd_err}")
 

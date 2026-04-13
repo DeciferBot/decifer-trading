@@ -208,3 +208,31 @@ These decisions are inferred from the current codebase. Future entries will be l
 **Decision**: After a sentinel trigger fires for a symbol, block re-triggering for 10 minutes.
 
 **Reasoning**: Breaking news generates cascading headlines — the same story gets reported by multiple outlets over several minutes. Without a cooldown, the sentinel would fire repeatedly on the same event, wasting Claude API calls and potentially entering the same trade multiple times. 10 minutes is long enough to let the news cycle pass but short enough to catch genuinely new developments.
+
+---
+
+## 2026-04-13
+
+### Trade Metadata Immutability — IBKR Re-sync Must Never Overwrite Decision Metadata
+**Decision**: Decision metadata (trade_type, conviction, reasoning, signal_scores, agent_outputs, entry_regime, entry_thesis, entry_score, ic_weights_at_entry, pattern_id, setup_type, advice_id, open_time, atr, high_water_mark) is immutable once written. No reconciliation function may overwrite it.
+
+**Context**: IBKR position re-sync was overwriting local trade metadata with stub values ("Re-synced from IBKR — metadata not found"), erasing the entire decision context for the trade. This is fatal to the learning system — a closed trade without its decision metadata cannot contribute to IC calculation or pattern library training.
+
+**Implementation**: `_safe_set_trade()` in `orders_state.py` enforces this at the storage layer. If an existing position already has a non-UNKNOWN `trade_type`, the 15 protected fields from `DECISION_METADATA_FIELDS` are preserved regardless of what the caller passes. IBKR is allowed to update only: `current`, `current_premium`, `pnl`, `_price_sources`, `status` (defined in `trade_store.IBKR_RECONCILE_FIELDS`). Positions without metadata (reconciled from IBKR cold, no local record) are flagged `metadata_status: "MISSING"` and shown with a red banner in the dashboard.
+
+**Why the storage layer**: Enforcing at `_safe_set_trade` means no caller — no matter how it reaches the function — can bypass the guard. Enforcing at the call sites would require auditing every future code path.
+
+### log_trade Deduplication Uses pattern_id, Not Symbol Alone
+**Decision**: CLOSE record deduplication in `learning.py` checks pattern_id before applying the 24h same-symbol window. Two CLOSE records with different pattern_ids are always different trade cycles, never duplicates.
+
+**Reasoning**: The original 24h same-symbol dedup was correct for partial fills of a single sell order, but silently dropped legitimate second closes when a symbol was traded, fully closed, reopened, and closed again within 24 hours. Since each trade entry gets a unique pattern_id from the pattern library, differing pattern_ids are definitive proof of distinct trades. The guard falls back gracefully: if either record lacks a pattern_id (pre-pattern-tracking data), the old 24h logic applies.
+
+### pnl_pct Stored in trades.json per Trade Record
+**Decision**: Every CLOSE record in trades.json now includes `pnl_pct` alongside `pnl`.
+
+**Reasoning**: pnl_pct (return on capital including the ×100 options contract multiplier) is the normalised metric for comparing performance across different position sizes and instruments. Storing it at close time means IC analysis, pattern library retrospectives, and any future Alphalens integration can use it directly without recomputing.
+
+### IC using_equal_weights Detection via Tolerance, Not Exact Float Equality
+**Decision**: `using_equal_weights` in `ic_calculator.py` uses `abs(w - 1/N) < 1e-9` tolerance check plus an explicit `CONFIG.get("force_equal_weights")` flag, not `weights == {d: round(1/N, 10)}`.
+
+**Reasoning**: `1/12 = 0.08333…3` (16 sig figs) and `round(1/12, 10) = 0.0833333333` (10 sig figs) are not equal under Python `==`, so the old check always returned False. The dashboard incorrectly showed IC weights as "active" even when `force_equal_weights=True`. This is a cosmetic bug but misleading for learning system diagnostics.

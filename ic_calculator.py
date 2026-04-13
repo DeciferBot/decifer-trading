@@ -518,8 +518,14 @@ def update_ic_weights(
     raw_ic          = compute_rolling_ic(signals_log_path, historical_log_path=historical_log_path)
     weights, ic_meta = normalize_ic_weights(raw_ic)
 
-    all_none  = all(v is None for v in raw_ic.values())
-    all_equal = weights == {d: round(1.0 / _N, 10) for d in DIMENSIONS}
+    all_none   = all(v is None for v in raw_ic.values())
+    _eq_weight = 1.0 / _N
+    # Tolerance-based comparison — exact float equality fails because 1/N
+    # (0.08333…3) and round(1/N, 10) (0.08333333330) differ beyond ==.
+    all_equal  = (
+        CONFIG.get("force_equal_weights", False)
+        or all(abs(weights.get(d, 0.0) - _eq_weight) < 1e-9 for d in DIMENSIONS)
+    )
 
     n_records = len(_load_signal_records(signals_log_path))
 

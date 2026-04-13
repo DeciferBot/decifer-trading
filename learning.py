@@ -319,6 +319,7 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
         "regime":         regime.get("session_character") or regime.get("regime"),
         "vix":            regime.get("vix"),
         "pnl":            outcome.get("pnl") if outcome else None,
+        "pnl_pct":        outcome.get("pnl_pct") if outcome else None,
         "exit_reason":    outcome.get("reason") if outcome else None,
         "hold_minutes":   hold_minutes,
         "agents": {
@@ -378,6 +379,13 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict,
             try:
                 ts_ex = datetime.fromisoformat(existing["timestamp"])
                 if abs((ts_new - ts_ex).total_seconds()) < 86400:  # within 24 hours
+                    # Pattern_id guard: different pattern_ids = different trade cycles, never dupes.
+                    # A symbol can be traded, closed, and reopened within 24 hours — each has a
+                    # distinct pattern_id. Only bypass this guard when one record lacks a pattern_id
+                    # (older data that predates pattern tracking).
+                    if (record.get("pattern_id") and existing.get("pattern_id")
+                            and record["pattern_id"] != existing["pattern_id"]):
+                        continue
                     # Tranche guard: T1 close and T2 close are distinct — never treat as dupes
                     if (record.get("tranche_id") is not None
                             and existing.get("tranche_id") is not None

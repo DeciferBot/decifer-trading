@@ -90,12 +90,67 @@ def _persist_positions() -> None:
         log.error(f"trade_store persist failed: {e}")
 
 
+# ── Decision metadata — these fields are written ONCE at trade entry ──────────
+# No function — IBKR reconciliation, re-sync, portfolio updates — may overwrite
+# these after they are set.  _safe_set_trade enforces this at the storage layer.
+DECISION_METADATA_FIELDS: frozenset = frozenset({
+    "trade_type",
+    "conviction",
+    "reasoning",
+    "signal_scores",
+    "agent_outputs",
+    "entry_regime",
+    "entry_thesis",
+    "entry_score",
+    "ic_weights_at_entry",
+    "pattern_id",
+    "setup_type",
+    "advice_id",
+    "open_time",
+    "atr",
+    "high_water_mark",
+})
+
+
 # ── Thread-safe active_trades accessors ───────────────────────────────────────
 
 def _safe_set_trade(key: str, value: dict) -> None:
-    """Thread-safe write to active_trades dict. Persists if not a RESERVED placeholder."""
+    """
+    Thread-safe write to active_trades dict.  Persists if not a RESERVED placeholder.
+
+    METADATA IMMUTABILITY GUARD
+    If an existing entry for `key` already has real decision metadata
+    (trade_type is set and not "UNKNOWN"), this function will NEVER overwrite
+    those fields — even if the caller passes a new dict without them.
+    IBKR reconciliation, re-sync, and all other callers are bound by this rule.
+
+    The only way to write decision metadata is on first entry (when the position
+    does not yet exist, or when it currently has trade_type="UNKNOWN").
+    """
     with _trades_lock:
-        active_trades[key] = value
+        existing = active_trades.get(key)
+        existing_has_metadata = (
+            existing is not None
+            and existing.get("trade_type")
+            and existing["trade_type"] != "UNKNOWN"
+        )
+        if existing_has_metadata:
+            # Preserve all decision metadata from the existing record.
+            # Only allow IBKR-reconcile fields (price, pnl, status, sources) to update.
+            protected = {
+                f: existing[f]
+                for f in DECISION_METADATA_FIELDS
+                if f in existing
+            }
+            merged = {**value, **protected}
+            if merged != value:
+                log.debug(
+                    f"_safe_set_trade({key}): metadata guard preserved "
+                    f"{set(protected) & set(value)} from overwrite"
+                )
+            active_trades[key] = merged
+        else:
+            active_trades[key] = value
     if value.get("status") != "RESERVED":
         _persist_positions()
 

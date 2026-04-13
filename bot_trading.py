@@ -488,7 +488,7 @@ def check_external_closes(regime: dict):
                     outcome={
                         "exit_price": round(exit_price, 2),
                         "pnl":        round(pnl, 2),
-                        "pnl_pct":    round(pnl / ((trade.get("entry") or 1) * (trade.get("qty") or 1)), 4),
+                        "pnl_pct":    round(pnl / ((trade.get("entry") or 1) * (trade.get("qty") or 1) * (100 if trade.get("instrument") == "option" else 1)), 4),
                         "reason":     exit_reason,
                     }
                 )
@@ -1176,7 +1176,7 @@ def run_scan():
                             outcome={
                                 "exit_price": round(_ep_ce, 4),
                                 "pnl":        round(_pnl_ce, 2),
-                                "pnl_pct":    round(_pnl_ce / ((_pos_ce.get("entry") or 1) * (_pos_ce.get("qty") or 1)), 4),
+                                "pnl_pct":    round(_pnl_ce / ((_pos_ce.get("entry") or 1) * (_pos_ce.get("qty") or 1) * (100 if _pos_ce.get("instrument") == "option" else 1)), 4),
                                 "reason":     f"cycle_check:{_rsn_ca[:120]}",
                             },
                         )
@@ -1274,7 +1274,7 @@ def run_scan():
                             outcome={
                                 "exit_price": round(ep_pm, 4),
                                 "pnl":        round(pnl_pm, 2),
-                                "pnl_pct":    round(pnl_pm / ((pos_pm.get("entry") or 1) * (pos_pm.get("qty") or 1)), 4),
+                                "pnl_pct":    round(pnl_pm / ((pos_pm.get("entry") or 1) * (pos_pm.get("qty") or 1) * (100 if pos_pm.get("instrument") == "option" else 1)), 4),
                                 "reason":     _build_pm_exit_reason(pos_pm, regime, pm_trigger, reason_pm, exit_tag="pm_exit"),
                             },
                         )
@@ -1332,7 +1332,7 @@ def run_scan():
                                     outcome={
                                         "exit_price": round(_ep_trim, 4),
                                         "pnl":        round(_trim_pnl, 2),
-                                        "pnl_pct":    round(_trim_pnl / (((_entry or 1) * _trim_q)), 4),
+                                        "pnl_pct":    round(_trim_pnl / (((_entry or 1) * _trim_q) * (100 if _trim_pos.get("instrument") == "option" else 1)), 4),
                                         "reason":     _trim_reason,
                                     },
                                 )
@@ -1494,7 +1494,7 @@ def run_scan():
                 outcome={
                     "exit_price": round(exit_price, 4),
                     "pnl":        round(pnl_val, 2),
-                    "pnl_pct":    round(pnl_val / ((pos.get("entry") or 1) * (pos.get("qty") or 1)), 4),
+                    "pnl_pct":    round(pnl_val / ((pos.get("entry") or 1) * (pos.get("qty") or 1) * (100 if pos.get("instrument") == "option" else 1)), 4),
                     "reason":     "agent_sell",
                 }
             )
