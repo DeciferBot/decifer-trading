@@ -1434,7 +1434,8 @@ def run_scan():
     for _b in _buys:
         _sym    = _b.get("symbol", "?") if isinstance(_b, dict) else _b
         _reason = _b.get("reasoning", "No reason given") if isinstance(_b, dict) else "No reason given"
-        _action_lines.append(f"BUY {_sym} — {_reason}")
+        _dir_label = "SHORT" if isinstance(_b, dict) and _b.get("direction") == "SHORT" else "BUY"
+        _action_lines.append(f"{_dir_label} {_sym} — {_reason}")
     for _s in _sells:
         _sym = _s if isinstance(_s, str) else _s.get("symbol", str(_s))
         _action_lines.append(f"SELL {_sym}")
