@@ -225,6 +225,9 @@ def agent_trading_analyst(
     fx_data: dict,
     options_signals: list,
     strategy_mode: dict,
+    portfolio_value: float = 0.0,
+    daily_pnl: float = 0.0,
+    open_positions: list = None,
 ) -> str:
     """
     Single Opus LLM call replacing Macro Analyst + Opportunity Finder + Devil's Advocate.
@@ -280,10 +283,23 @@ def agent_trading_analyst(
     except Exception:
         pass
 
+    # ── Portfolio context: what's already held ────────────────────────────────
+    held_syms = [p["symbol"] for p in (open_positions or [])]
+    if held_syms:
+        held_block = f"\nALREADY HELD — do NOT recommend new entries for these: {', '.join(held_syms)}\n"
+    else:
+        held_block = ""
+
+    # ── Portfolio P&L context — factual, no directive ────────────────────────
+    pnl_context = ""
+    if portfolio_value > 0 and daily_pnl != 0:
+        pnl_pct = daily_pnl / portfolio_value * 100
+        pnl_context = f"Portfolio P&L today: ${daily_pnl:+,.0f} ({pnl_pct:+.2f}%)\n"
+
     prompt = f"""REGIME: {regime_name} | VIX={vix:.1f} ({vix_1h:+.1f}%/1h) | size_mult={size_mult:.1f}x
 SPY=${spy} ({'above' if spy_above else 'below'} 200d MA) | QQQ=${qqq} ({'above' if qqq_above else 'below'} 200d MA)
-{overnight_block}
-SCORED SIGNALS (top 10):
+{pnl_context}{overnight_block}{held_block}
+SCORED SIGNALS — fresh candidates first (NOT already held):
 {chr(10).join(sig_lines) or '  None above threshold'}
 
 OPTIONS FLOW:
@@ -511,10 +527,8 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
     from risk import calculate_position_size, calculate_stops
 
     _sm = strategy_mode or {}
-    _sm_max_trades = _sm.get("max_new_trades", 3)
     size_mult = _sm.get("size_multiplier", 1.0)
     _reconsider = positions_to_reconsider or []
-    max_pos = CONFIG["max_positions"]
 
     if regime.get("regime") == "CAPITULATION":
         return {
@@ -528,12 +542,18 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
     macro_vote = _extract_macro_vote(macro)
 
     open_syms = [p["symbol"] for p in open_positions]
-    slots_available = max_pos - len(open_positions)
+    open_syms_set = set(open_syms)
     buys = []
 
     for s in proposed:
         sym = s["symbol"]
         direction = "LONG" if s.get("direction", "LONG") == "LONG" else "SHORT"
+
+        # Hard gate: already held — a new entry doubles the position, doesn't add alpha.
+        # The PM pipeline handles exits and trims on existing positions.
+        if sym in open_syms_set:
+            log.debug(f"Final: {sym} skipped — already held (PM handles existing positions)")
+            continue
 
         # Hard gate: reject if agent direction contradicts scanner direction.
         # A mismatch means the LLM latched onto bullish/bearish indicators and
@@ -566,8 +586,11 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
             log.debug(f"Final: {sym} skipped -- {votes} votes < {agents_required} required")
             continue
 
-        if slots_available <= 0 or len(buys) >= _sm_max_trades:
-            break
+        # No slot cap. The cash floor (min_cash_reserve), per-trade risk sizing
+        # (risk_pct_per_trade), correlation gate, and sector cap are the actual
+        # risk controls — a count of positions is a redundant blunt proxy for these.
+        # In RECOVERY mode, size_multiplier (0.5x) already reduces exposure; no
+        # trade count throttle needed on top.
 
         price = s.get("price", 0)
         atr = s.get("atr", price * 0.02 if price > 0 else 1.0)
@@ -595,7 +618,7 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
             "instrument": instrument,
             "reasoning": reasoning,
         })
-        slots_available -= 1
+        pass  # no slot counter — cash floor governs deployment
 
     sells = [
         p["symbol"] for p in _reconsider
@@ -626,7 +649,7 @@ def agent_final_decision(technical: str, macro: str, opportunity: str,
         claude_reasoning = (
             f"Entering {buys[0]['symbol']}: {first_r}. "
             f"{agents_agreed} agents aligned. "
-            f"Risk gate open, {len(open_positions)}/{max_pos} positions used."
+            f"Risk gate open, {len(open_positions)} positions held."
         )
     elif sells:
         summary = f"{regime_label} -- exiting {', '.join(sells)}"
@@ -694,15 +717,11 @@ def run_all_agents(signals: list, regime: dict, news: list,
     open_syms = [p["symbol"] for p in open_positions]
     slots_remaining = max_pos - len(open_positions)
 
-    if slots_remaining <= 0 and not positions_to_reconsider:
-        log.info("Agents: No position slots available — skipping LLM calls")
-        return {
-            "buys": [], "sells": [], "hold": open_syms, "cash": False,
-            "agents_agreed": 0,
-            "summary": f"No slots ({len(open_positions)}/{max_pos}) — agents skipped",
-            "claude_reasoning": "All position slots filled. No LLM agents called.",
-            "_agent_outputs": {},
-        }
+    if slots_remaining <= 0:
+        log.info(
+            f"Agents: No buy slots ({len(open_positions)}/{max_pos}) — "
+            f"running agents for exit/rotation review only"
+        )
 
     threshold = CONFIG.get("min_score_to_trade", 18)
     qualified = [s for s in signals if s.get("score", 0) >= threshold]
@@ -716,14 +735,27 @@ def run_all_agents(signals: list, regime: dict, news: list,
             "_agent_outputs": {},
         }
 
+    # ── Fresh-first ordering: unheld candidates surface before already-held ──
+    # Agents see top-N signals. If held symbols dominate the top, agents waste
+    # their 3-recommendation budget re-proposing names already in the portfolio.
+    # Placing fresh candidates first ensures new opportunities are seen and acted on.
+    _held_syms_set = set(open_syms)
+    fresh_qualified = [s for s in qualified if s["symbol"] not in _held_syms_set]
+    held_qualified  = [s for s in qualified if s["symbol"] in _held_syms_set]
+    ordered_qualified = fresh_qualified + held_qualified  # fresh first, held for context
+    n_fresh = len(fresh_qualified)
+    log.info(f"Agents: {len(qualified)} qualified signals — {n_fresh} fresh, {len(held_qualified)} held "
+             f"(fresh-first ordering applied)")
+
     # ── Agents 1+2: Technical (deterministic) + Trading Analyst (Opus) in parallel ──
     log.info("Agents 1+2: Technical + Trading Analyst/Opus (parallel)...")
     with ThreadPoolExecutor(max_workers=2) as pool:
-        tech_future = pool.submit(agent_technical, qualified, regime)
+        tech_future = pool.submit(agent_technical, ordered_qualified, regime)
         analyst_future = pool.submit(
             agent_trading_analyst,
-            qualified, regime, news, fx_data,
-            options_signals or [], strategy_mode
+            ordered_qualified, regime, news, fx_data,
+            options_signals or [], strategy_mode,
+            portfolio_value, daily_pnl, open_positions
         )
         tech = tech_future.result()
         analyst = analyst_future.result()
@@ -734,7 +766,7 @@ def run_all_agents(signals: list, regime: dict, news: list,
         analyst, "",
         open_positions, portfolio_value, daily_pnl, regime,
         strategy_mode=strategy_mode,
-        signals=qualified
+        signals=ordered_qualified
     )
 
     # ── Agent 4: Final Decision Maker (deterministic) ────────────────────────
@@ -742,7 +774,7 @@ def run_all_agents(signals: list, regime: dict, news: list,
     final = agent_final_decision(
         tech, analyst, analyst,  # macro=analyst, opportunity=analyst (same source)
         "",                      # devils="" (removed)
-        risk, qualified, open_positions, regime,
+        risk, ordered_qualified, open_positions, regime,
         CONFIG["agents_required_to_agree"],
         weekly_memory=load_weekly_review(),
         strategy_mode=strategy_mode,

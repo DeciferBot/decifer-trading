@@ -202,8 +202,10 @@ def close_position(ib_unused, trade_key: str) -> Optional[str]:
     trade_key = trade_key.upper().strip()
 
     # Guard: IBKR cancels MKT orders outside 4 AM–8 PM ET extended hours.
-    # Options skip this check — they have their own 9:30–4 PM gate elsewhere.
-    if not is_equities_extended_hours():
+    # FX trades 24/5 — skip the hours check. Options have their own 9:30–4 PM gate.
+    _stored_instrument = active_trades.get(trade_key, {}).get("instrument", "stock")
+    _is_fx_trade = _stored_instrument == "fx"
+    if not _is_fx_trade and not is_equities_extended_hours():
         import zoneinfo as _zi
         _now_et = datetime.now(_zi.ZoneInfo("America/New_York")).strftime("%H:%M ET")
         log.warning(f"close_position {trade_key}: market closed ({_now_et}) — deferring until extended hours open (4 AM–8 PM ET)")
@@ -427,7 +429,9 @@ def reconcile_with_ibkr(ib: IB):
             # Per-item try/except: one bad position must NOT kill the entire loop
             try:
                 key = _ibkr_item_to_key(item)
-                sym = item.contract.symbol
+                is_fx = getattr(item.contract, 'secType', '') == 'CASH'
+                # FX: use reconstructed pair (e.g. "EURUSD"), not base currency ("EUR")
+                sym = key if is_fx else item.contract.symbol
                 is_option = _is_option_contract(item.contract)
                 ibkr_mkt = float(item.marketPrice)
 
@@ -506,7 +510,7 @@ def reconcile_with_ibkr(ib: IB):
 
                     base_entry: dict = {
                         "symbol":         sym,
-                        "instrument":     "option" if is_option else "stock",
+                        "instrument":     "option" if is_option else ("fx" if is_fx else "stock"),
                         "entry":          ibkr_entry,
                         "current":        round(validated_price, 4),
                         "qty":            qty,
@@ -743,6 +747,14 @@ def update_positions_from_ibkr(ib: IB):
                 # Default 480 min (8 h) covers a full extended-hours session.
                 _effective_timeout = CONFIG.get("fill_watcher", {}).get(
                     "option_orphan_timeout_mins", 480)
+            elif _key in price_map:
+                # Order has already filled and IBKR shows an active position — not orphaned.
+                # This covers FX and any other orders whose FillWatcher removed itself on fill.
+                with _trades_lock:
+                    if _key in active_trades:
+                        active_trades[_key]["status"] = "ACTIVE"
+                log.info(f"PENDING {_key} found in IBKR portfolio — marking ACTIVE (fill confirmed)")
+                continue
             else:
                 with _fw_lock:
                     _has_watcher = _key in _active_watchers
@@ -807,11 +819,13 @@ def update_positions_from_ibkr(ib: IB):
             if ibkr_key not in active_trades:
                 try:
                     is_opt = _is_option_contract(item.contract)
-                    sym = item.contract.symbol
+                    is_fx = getattr(item.contract, 'secType', '') == 'CASH'
+                    # FX: use reconstructed pair symbol (e.g. "EURUSD"), not base ("EUR")
+                    sym = ibkr_key if is_fx else item.contract.symbol
                     direction = "SHORT" if item.position < 0 else "LONG"
                     qty = abs(int(item.position))
                     ibkr_mkt = float(item.marketPrice)
-                    instrument = "option" if is_opt else "stock"
+                    instrument = "option" if is_opt else ("fx" if is_fx else "stock")
 
                     # Attempt to recover the original trade metadata from disk.
                     saved_meta = _find_saved_metadata(sym, instrument)
@@ -883,16 +897,17 @@ def update_positions_from_ibkr(ib: IB):
                             pnl = round((validated - entry) * qty, 2)
 
                         ibkr_fields = {
-                            "symbol": sym, "instrument": "stock",
+                            "symbol": sym, "instrument": instrument,
                             "entry": entry, "current": round(validated, 4),
                             "qty": qty, "sl": sl, "tp": tp,
                             "direction": direction, "pnl": pnl, "status": "ACTIVE",
                         }
 
+                        _re_add_label = "fx" if is_fx else "stock"
                         if metadata_restored:
                             new_entry = {**saved_meta, **ibkr_fields}
                             log.warning(
-                                f"Re-added missing stock {ibkr_key} from IBKR — "
+                                f"Re-added missing {_re_add_label} {ibkr_key} from IBKR — "
                                 f"metadata RESTORED from disk (trade_type={saved_meta.get('trade_type','?')})"
                             )
                         else:
@@ -906,7 +921,7 @@ def update_positions_from_ibkr(ib: IB):
                                 "reasoning": "Re-synced from IBKR — original metadata not found",
                             }
                             log.warning(
-                                f"Re-added missing stock {ibkr_key} from IBKR — "
+                                f"Re-added missing {_re_add_label} {ibkr_key} from IBKR — "
                                 f"NO metadata found; trade_type/conviction unknown"
                             )
                         _safe_set_trade(ibkr_key, new_entry)

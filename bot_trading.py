@@ -1511,11 +1511,6 @@ def run_scan():
         return
 
     _all_buys = decision.get("buys", [])
-    _max_buys = strategy_mode.get("max_new_trades", 3)
-    if len(_all_buys) > _max_buys:
-        clog("RISK", f"Strategy mode cap: {len(_all_buys)} agent buys → {_max_buys} "
-                     f"(mode: {strategy_mode['mode']})")
-        _all_buys = _all_buys[:_max_buys]
 
     for buy in _all_buys:
         sym      = buy.get("symbol") if isinstance(buy, dict) else buy

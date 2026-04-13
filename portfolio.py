@@ -21,6 +21,12 @@ def _portfolio_item_to_dict(item) -> dict:
     contract = item.contract
     symbol   = getattr(contract, "symbol",   "UNKNOWN")
     sec_type = getattr(contract, "secType",  "STK")
+    # FX: IBKR stores symbol=base currency (e.g. "EUR") + currency="USD"
+    # Reconstruct the full pair (e.g. "EURUSD") so positions show correctly.
+    if sec_type == "CASH":
+        _quote = getattr(contract, "currency", "")
+        if _quote:
+            symbol = symbol + _quote
     return {
         "symbol":       symbol,
         "sec_type":     sec_type,

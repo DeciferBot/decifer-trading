@@ -146,8 +146,9 @@ def run_portfolio_review(
     # Build score lookup from all_scored
     score_map = {s["symbol"]: s.get("score", 0) for s in (all_scored or [])}
 
-    # Check earnings
-    stock_syms = [p["symbol"] for p in open_positions if p.get("instrument") != "option"]
+    # Check earnings (stocks only — options and FX have no earnings events)
+    stock_syms = [p["symbol"] for p in open_positions
+                  if p.get("instrument") not in ("option", "fx")]
     earnings_lookahead = pm_cfg.get("earnings_lookahead_hours", 48)
     earnings_flagged = get_earnings_within_hours(stock_syms, earnings_lookahead)
 

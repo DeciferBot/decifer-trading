@@ -264,21 +264,40 @@ def find_best_contract(symbol: str,
     max_ivr    = CONFIG.get("options_max_ivr",      50)
     t_delta    = CONFIG.get("options_target_delta", 0.40)
     d_range    = CONFIG.get("options_delta_range",  0.15)
-    base_risk  = CONFIG.get("options_max_risk_pct", 0.01) * portfolio_value
+    hard_cap   = CONFIG.get("options_max_risk_pct", 0.01) * portfolio_value
 
-    # ── Conviction scaling — mirror stock logic ──────────────────
-    # Higher scores → larger options allocation, lower scores → smaller.
-    high_conv = CONFIG.get("high_conviction_score", 30)  # match config.py default (was 38 — diverged)
+    # ── Conviction scaling — within the hard cap, never above it ─────────────
+    # options_max_risk_pct is an ABSOLUTE ceiling on premium at risk per trade.
+    # Options already embed leverage (0.50 delta = 50% of stock move per dollar).
+    # Conviction adjusts the FRACTION of the cap used — high conviction gets
+    # the full budget; low conviction gets a fraction. No multiplier ever exceeds 1.0.
+    # (Old logic applied 1.5x above the cap → WOLF was sized at 3.75% not 2.5%.)
+    high_conv = CONFIG.get("high_conviction_score", 30)
     if score >= high_conv:
-        conviction_mult = 1.5     # High conviction → 1.5x base risk
+        conviction_mult = 1.00    # Full cap — deploy the full budget
     elif score >= 32:
-        conviction_mult = 1.0     # Moderate conviction → base risk
+        conviction_mult = 0.75    # Moderate — 75% of cap
     else:
-        conviction_mult = 0.75    # Low conviction → 0.75x base risk
+        conviction_mult = 0.50    # Low — half the cap; options are expensive to be wrong
 
-    max_risk = base_risk * conviction_mult
-    log.info(f"Options sizing {symbol}: score={score} → conviction={conviction_mult}x → "
-             f"max_risk=${max_risk:,.0f} (base=${base_risk:,.0f})")
+    max_risk = round(hard_cap * conviction_mult, 2)
+
+    # ── Double-exposure guard ──────────────────────────────────────────────────
+    # If a stock position is already open, equity + options exposure stacks on
+    # the same name. Halve the options budget so combined delta stays within limits.
+    try:
+        from orders import open_trades as _open_trades_check
+        if symbol in _open_trades_check:
+            max_risk = round(max_risk * 0.5, 2)
+            log.info(
+                f"Options {symbol}: equity already held → halved budget to "
+                f"${max_risk:,.0f} (combined exposure guard)"
+            )
+    except Exception:
+        pass
+
+    log.info(f"Options sizing {symbol}: score={score} → conviction={conviction_mult:.2f}x → "
+             f"max_risk=${max_risk:,.0f} (hard_cap=${hard_cap:,.0f})")
 
     try:
         today = date.today()

@@ -291,12 +291,6 @@ def can_trade(symbol: str, config: dict) -> bool:
         log.debug(f"can_trade blocked: daily P&L ${daily_pnl:,.2f} <= -{max_loss_pct:.0%} of ${portfolio_value:,.2f}")
         return False
 
-    position_count = _get_open_position_count()
-    max_pos = config.get("max_positions", CONFIG.get("max_positions", 10))
-    if position_count >= max_pos:
-        log.debug(f"can_trade blocked: {position_count} positions >= max {max_pos}")
-        return False
-
     if not _is_market_open():
         log.debug("can_trade blocked: market closed")
         return False

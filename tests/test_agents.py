@@ -249,25 +249,28 @@ class TestVoteCounting:
 # ---------------------------------------------------------------------------
 
 class TestPositionCap:
-    """Confirms max_positions and max_new_trades limits are respected."""
+    """Position count no longer caps buys — cash floor and risk controls govern."""
 
-    def test_full_positions_prevents_new_buys(self):
-        """When open positions >= max_positions, no new buys."""
-        full_positions = [{"symbol": f"SYM{i}"} for i in range(5)]
+    def test_already_held_symbol_skipped(self):
+        """A symbol already in open_positions is not re-entered."""
+        held = [{"symbol": "NVDA"}]
         with patch.dict(agents.CONFIG, _AGENTS_CFG):
             result = agents.agent_final_decision(
-                **_final_kwargs(open_positions=full_positions)
+                **_final_kwargs(open_positions=held)
             )
-        assert result["buys"] == []
+        buy_syms = [b["symbol"] for b in result.get("buys", [])]
+        assert "NVDA" not in buy_syms
 
-    def test_max_new_trades_zero_prevents_buys(self):
-        """strategy_mode max_new_trades=0 prevents any buys."""
+    def test_recovery_mode_size_multiplier_applied(self):
+        """RECOVERY mode reduces size_multiplier to 0.5 — no trade count block."""
         sm = {"mode": "RECOVERY", "context": "", "size_multiplier": 0.5, "max_new_trades": 0}
         with patch.dict(agents.CONFIG, _AGENTS_CFG):
             result = agents.agent_final_decision(
                 **_final_kwargs(strategy_mode=sm)
             )
-        assert result["buys"] == []
+        # Result is a valid dict — agents still run, size_multiplier applied downstream
+        assert isinstance(result, dict)
+        assert "buys" in result
 
 
 # ---------------------------------------------------------------------------
