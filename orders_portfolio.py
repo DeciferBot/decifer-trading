@@ -35,7 +35,7 @@ from orders_contracts import (
     _cancel_ibkr_order_by_id,
     is_equities_extended_hours,
 )
-from trade_store import restore as _ts_restore
+from trade_store import restore as _ts_restore, ledger_lookup as _ledger_lookup
 
 # ── flatten_all order-book wait constants ─────────────────────────────────────
 # After reqGlobalCancel, IBKR processes cancellations asynchronously.  We poll
@@ -342,18 +342,24 @@ def reconcile_with_ibkr(ib: IB):
 
     def _find_saved(key: str, sym: str, instrument: str) -> dict:
         """
-        Exact-key match first; fall back to symbol+instrument scan.
-        The fallback catches key-format mismatches (e.g. stock key "NBIS" vs
-        option key "NBIS_C_157.5_2026-04-24") that cause metadata loss on every
-        re-sync when positions were saved under a different key format.
+        Three-tier metadata recovery:
+          1. positions.json (exact key, then symbol+instrument scan)
+          2. metadata_ledger.json (durable, crash-safe, never bulk-rewritten)
         """
+        # Tier 1: positions.json exact key
         if key in saved_positions:
             return saved_positions[key]
+        # Tier 1b: positions.json symbol+instrument scan
         for v in saved_positions.values():
             if (v.get("symbol") == sym
                     and v.get("instrument") == instrument
                     and v.get("trade_type")):   # must have real decision metadata
                 return v
+        # Tier 2: metadata ledger (survives crashes / positions.json corruption)
+        ledger_hit = _ledger_lookup(key, sym, instrument)
+        if ledger_hit:
+            log.info(f"Reconcile {key}: metadata recovered from ledger (trade_type={ledger_hit.get('trade_type','?')})")
+            return ledger_hit
         return {}
     try:
         # ── Step 1: restore our own position ledger ───────────────────────────
@@ -372,6 +378,17 @@ def reconcile_with_ibkr(ib: IB):
         for item in portfolio_items:
             if item.position != 0:
                 ibkr_keys.add(_ibkr_item_to_key(item))
+
+        # FX (CASH) positions may not appear in ib.portfolio() if
+        # reqAccountUpdates hasn't delivered updatePortfolio callbacks yet.
+        # Augment ibkr_keys with ib.positions() so FX entries are not
+        # incorrectly purged as "closed while bot was down".
+        try:
+            for pos in ib.positions():
+                if pos.position != 0:
+                    ibkr_keys.add(_ibkr_item_to_key(pos))
+        except Exception:
+            pass
 
         # ── Step 3: detect positions closed while bot was down ────────────────
         # In our store but not in IBKR → SL/TP was triggered or manually closed.
@@ -603,6 +620,64 @@ def reconcile_with_ibkr(ib: IB):
                                 new_entry["score"] = _saved["score"]
                             new_entry["_metadata_restored"] = True
                         _safe_set_trade(key, new_entry)
+                    elif is_fx:
+                        # FX position — tighter SL/TP (0.5%/1.5%) and 4-decimal precision
+                        if direction == "SHORT":
+                            sl = round(ibkr_entry * 1.005, 4)
+                            tp = round(ibkr_entry * 0.985, 4)
+                        else:
+                            sl = round(ibkr_entry * 0.995, 4)
+                            tp = round(ibkr_entry * 1.015, 4)
+                        log.info(f"FX position {key} in IBKR but not tracked — adding ({direction} {qty} units @ {ibkr_entry:.4f}, validated {validated_price:.4f} via {src_desc})")
+                        if direction == "SHORT":
+                            pnl = round((ibkr_entry - validated_price) * qty, 2)
+                        else:
+                            pnl = round((validated_price - ibkr_entry) * qty, 2)
+                        _saved = _find_saved(key, sym, "fx")
+                        new_entry = {
+                            "symbol":         sym,
+                            "instrument":     "fx",
+                            "entry":          ibkr_entry,
+                            "current":        round(validated_price, 4),
+                            "qty":            qty,
+                            "sl":             sl,
+                            "tp":             tp,
+                            "score":          0,
+                            "trade_type":     "UNKNOWN",
+                            "conviction":     0.0,
+                            "entry_regime":   "UNKNOWN",
+                            "metadata_status": "MISSING",
+                            "reasoning":      "Reconciled from IBKR on startup — metadata not found",
+                            "direction":      direction,
+                            "pnl":            pnl,
+                            "status":         "ACTIVE",
+                            "_price_sources": src_desc,
+                        }
+                        if _saved:
+                            log.info(f"Reconcile {key}: restoring FX metadata (trade_type={_saved.get('trade_type','?')})")
+                            new_entry["trade_type"]          = _saved.get("trade_type", "SCALP")
+                            new_entry["reasoning"]           = _saved.get("reasoning", new_entry["reasoning"])
+                            new_entry["signal_scores"]       = _saved.get("signal_scores", {})
+                            new_entry["agent_outputs"]       = _saved.get("agent_outputs", {})
+                            new_entry["entry_score"]         = _saved.get("entry_score", 0)
+                            new_entry["open_time"]           = _saved.get("open_time")
+                            new_entry["atr"]                 = _saved.get("atr", 0)
+                            new_entry["conviction"]          = _saved.get("conviction", 0.0)
+                            new_entry["entry_regime"]        = _saved.get("entry_regime", "UNKNOWN")
+                            new_entry["entry_thesis"]        = _saved.get("entry_thesis", "")
+                            new_entry["pattern_id"]          = _saved.get("pattern_id", "")
+                            new_entry["tranche_mode"]        = _saved.get("tranche_mode", False)
+                            new_entry["t1_qty"]              = _saved.get("t1_qty")
+                            new_entry["t2_qty"]              = _saved.get("t2_qty")
+                            new_entry["t1_status"]           = _saved.get("t1_status")
+                            new_entry["t1_order_id"]         = _saved.get("t1_order_id")
+                            new_entry["high_water_mark"]     = _saved.get("high_water_mark", ibkr_entry)
+                            new_entry["ic_weights_at_entry"] = _saved.get("ic_weights_at_entry")
+                            new_entry["advice_id"]           = _saved.get("advice_id", "")
+                            if _saved.get("score", 0) > 0:
+                                new_entry["score"] = _saved["score"]
+                            new_entry["_metadata_restored"] = True
+                        _safe_set_trade(key, new_entry)
                     else:
                         # Stock position
                         if direction == "SHORT":
@@ -662,7 +737,7 @@ def reconcile_with_ibkr(ib: IB):
                             new_entry["_metadata_restored"] = True
                         _safe_set_trade(key, new_entry)
 
-                    if not is_option:
+                    if not is_option and not is_fx:
                         close_action = "BUY" if direction == "SHORT" else "SELL"
                         _reattach_sl_order(ib, key, sym, qty, sl, close_action)
 
@@ -672,6 +747,81 @@ def reconcile_with_ibkr(ib: IB):
                 failed_count += 1
                 item_sym = getattr(getattr(item, 'contract', None), 'symbol', '???')
                 log.error(f"Reconciliation failed for {item_sym}: {item_err} — skipping, continuing with remaining positions")
+
+        # ── Step 5: reconcile FX positions only visible via ib.positions() ──
+        # ib.portfolio() sometimes omits CASH positions when reqAccountUpdates
+        # callbacks haven't arrived yet.  ib.positions() is populated from a
+        # separate subscription and is more reliable for FX.  Any FX key that
+        # appeared in ib.positions() but NOT in portfolio_items (and is not
+        # already tracked) needs to be added to active_trades here.
+        _portfolio_keys = {_ibkr_item_to_key(it) for it in portfolio_items if it.position != 0}
+        try:
+            for pos in ib.positions():
+                if pos.position == 0:
+                    continue
+                _pk = _ibkr_item_to_key(pos)
+                if _pk in _portfolio_keys or _pk in active_trades:
+                    continue  # already handled above
+                if getattr(pos.contract, 'secType', '') != 'CASH':
+                    continue  # only FX needs this fallback
+                try:
+                    sym = _pk  # reconstructed pair e.g. "EURUSD"
+                    direction = "SHORT" if pos.position < 0 else "LONG"
+                    qty = abs(int(pos.position))
+                    ibkr_entry = round(float(pos.avgCost), 4)
+                    # Position objects lack marketPrice — use price validation
+                    validated_price, src_desc = _validate_position_price(sym, 0, ibkr_entry)
+                    if validated_price <= 0:
+                        validated_price = ibkr_entry
+                        src_desc = "no market price — using entry"
+                    if direction == "SHORT":
+                        sl = round(ibkr_entry * 1.005, 4)
+                        tp = round(ibkr_entry * 0.985, 4)
+                        pnl = round((ibkr_entry - validated_price) * qty, 2)
+                    else:
+                        sl = round(ibkr_entry * 0.995, 4)
+                        tp = round(ibkr_entry * 1.015, 4)
+                        pnl = round((validated_price - ibkr_entry) * qty, 2)
+                    log.warning(f"FX position {_pk} found in ib.positions() but not ib.portfolio() — adding ({direction} {qty} units @ {ibkr_entry:.4f})")
+                    _saved = _find_saved(_pk, sym, "fx")
+                    new_entry = {
+                        "symbol":         sym,
+                        "instrument":     "fx",
+                        "entry":          ibkr_entry,
+                        "current":        round(validated_price, 4),
+                        "qty":            qty,
+                        "sl":             sl,
+                        "tp":             tp,
+                        "score":          0,
+                        "trade_type":     "UNKNOWN",
+                        "conviction":     0.0,
+                        "entry_regime":   "UNKNOWN",
+                        "metadata_status": "MISSING",
+                        "reasoning":      "Reconciled from IBKR ib.positions() — FX not in portfolio()",
+                        "direction":      direction,
+                        "pnl":            pnl,
+                        "status":         "ACTIVE",
+                        "_price_sources": src_desc,
+                    }
+                    if _saved:
+                        log.info(f"Reconcile {_pk}: restoring FX metadata (trade_type={_saved.get('trade_type','?')})")
+                        for _fld in ("trade_type", "reasoning", "signal_scores", "agent_outputs",
+                                     "entry_score", "open_time", "atr", "conviction", "entry_regime",
+                                     "entry_thesis", "pattern_id", "tranche_mode", "t1_qty", "t2_qty",
+                                     "t1_status", "t1_order_id", "high_water_mark", "ic_weights_at_entry",
+                                     "advice_id"):
+                            if _saved.get(_fld) is not None:
+                                new_entry[_fld] = _saved[_fld]
+                        if _saved.get("score", 0) > 0:
+                            new_entry["score"] = _saved["score"]
+                        new_entry["_metadata_restored"] = True
+                    _safe_set_trade(_pk, new_entry)
+                    reconciled_count += 1
+                except Exception as fx_err:
+                    failed_count += 1
+                    log.error(f"FX positions() reconcile failed for {_pk}: {fx_err}")
+        except Exception:
+            pass  # ib.positions() unavailable — non-fatal
 
         log.info(f"Reconciliation complete. Tracking {len(active_trades)} positions. (processed={reconciled_count}, failed={failed_count})")
         _save_positions_file()
@@ -732,10 +882,22 @@ def update_positions_from_ibkr(ib: IB):
             if item.position != 0:
                 price_map[_ibkr_item_to_key(item)] = item
 
+        # FX (CASH) positions may not appear in ib.portfolio() if
+        # reqAccountUpdates hasn't delivered updatePortfolio callbacks yet.
+        # Build a fallback set from ib.positions() so FX entries are not
+        # incorrectly treated as stale or orphaned.
+        _positions_keys: set = set()
+        try:
+            for pos in ib.positions():
+                if pos.position != 0:
+                    _positions_keys.add(_ibkr_item_to_key(pos))
+        except Exception:
+            pass
+
         # Remove positions no longer in IBKR (closed externally via SL/TP/manual)
         stale_keys = []
         with _trades_lock:
-            stale_keys = [k for k in active_trades if k not in price_map and active_trades[k].get("status") != "PENDING"]
+            stale_keys = [k for k in active_trades if k not in price_map and k not in _positions_keys and active_trades[k].get("status") != "PENDING"]
             for k in stale_keys:
                 log.warning(f"Position {k} no longer in IBKR portfolio — removing from tracker")
                 del active_trades[k]
@@ -760,13 +922,15 @@ def update_positions_from_ibkr(ib: IB):
                 # Default 480 min (8 h) covers a full extended-hours session.
                 _effective_timeout = CONFIG.get("fill_watcher", {}).get(
                     "option_orphan_timeout_mins", 480)
-            elif _key in price_map:
+            elif _key in price_map or _key in _positions_keys:
                 # Order has already filled and IBKR shows an active position — not orphaned.
-                # This covers FX and any other orders whose FillWatcher removed itself on fill.
+                # Checks both ib.portfolio() and ib.positions() because FX (CASH)
+                # positions may only appear in the latter.
                 with _trades_lock:
                     if _key in active_trades:
                         active_trades[_key]["status"] = "ACTIVE"
-                log.info(f"PENDING {_key} found in IBKR portfolio — marking ACTIVE (fill confirmed)")
+                _src = "portfolio" if _key in price_map else "positions"
+                log.info(f"PENDING {_key} found in IBKR {_src} — marking ACTIVE (fill confirmed)")
                 continue
             else:
                 with _fw_lock:

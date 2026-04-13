@@ -153,6 +153,14 @@ def _safe_set_trade(key: str, value: dict) -> None:
             active_trades[key] = value
     if value.get("status") != "RESERVED":
         _persist_positions()
+        # Write decision metadata to the durable ledger (first write wins).
+        _tt = value.get("trade_type")
+        if _tt and _tt != "UNKNOWN":
+            try:
+                from trade_store import ledger_write
+                ledger_write(key, active_trades.get(key, value))
+            except Exception as _le:
+                log.error(f"metadata ledger write failed for {key}: {_le}")
 
 
 def _safe_update_trade(key: str, updates: dict) -> None:
