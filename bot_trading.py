@@ -367,7 +367,8 @@ def check_external_closes(regime: dict):
     If a position exists in our tracker but not in IBKR, it was closed
     externally.  Log it properly so Trade History tab shows it.
     """
-    from orders import _ibkr_item_to_key, _is_option_contract, open_trades
+    from orders_contracts import _ibkr_item_to_key, _is_option_contract
+    from orders_state import open_trades
 
     ib = bot_state.ib
 
@@ -599,7 +600,8 @@ def check_external_closes(regime: dict):
 
 def check_options_positions():
     """Monitor open options positions for profit target, stop loss, and DTE exits."""
-    from orders import is_options_market_open, open_trades
+    from orders_contracts import is_options_market_open
+    from orders_state import open_trades
 
     ib = bot_state.ib
     if not CONFIG.get("options_enabled"):
@@ -617,7 +619,7 @@ def check_options_positions():
             if sold:
                 dash["positions"] = get_open_positions()
             else:
-                from orders import (
+                from orders_options import (
                     _MAX_OPTION_SELL_RETRIES,
                     _OPTION_SELL_COOLDOWN,
                     _option_sell_attempts,
@@ -663,7 +665,7 @@ def _process_close_queue():
     close_queue = dash.pop("_close_queue", [])
     for sym in close_queue:
         try:
-            from orders import close_position
+            from orders_portfolio import close_position
 
             result = close_position(ib, sym)
             if result:
@@ -685,7 +687,7 @@ def _eod_options_review(regime: dict):
     judgment based on each position's greeks, P&L, and the current regime.
     """
     from agents import _call_claude
-    from orders import close_position, get_open_positions
+    from orders_portfolio import close_position, get_open_positions
 
     ib = bot_state.ib
     positions = get_open_positions()
@@ -830,7 +832,7 @@ def _maybe_generate_overnight_research():
 
         def _run():
             try:
-                from orders import get_open_positions
+                from orders_portfolio import get_open_positions
                 from overnight_research import generate_overnight_notes
 
                 universe = [p["symbol"] for p in get_open_positions()]
@@ -1268,8 +1270,8 @@ def run_scan():
             _act_ca = _ca.get("action", "")
             _rsn_ca = _ca.get("reasoning", "")
             if _act_ca == "EXIT" and _sym_ca:
-                from orders import _trades_lock as _ce_lock
-                from orders import open_trades as _ce_trades
+                from orders_state import _trades_lock as _ce_lock
+                from orders_state import open_trades as _ce_trades
 
                 with _ce_lock:
                     _already_ce = _ce_trades.get(_sym_ca, {}).get("status") == "EXITING"
@@ -1370,8 +1372,8 @@ def run_scan():
                 act_pm = action.get("action", "HOLD")
                 reason_pm = action.get("reasoning", "portfolio manager")
                 if act_pm == "EXIT" and sym_pm:
-                    from orders import _trades_lock as _pm_lock
-                    from orders import open_trades as _pm_trades
+                    from orders_state import _trades_lock as _pm_lock
+                    from orders_state import open_trades as _pm_trades
 
                     # Dedup: skip if exit already in flight for this symbol
                     with _pm_lock:
@@ -1442,9 +1444,10 @@ def run_scan():
                             },
                         )
                 elif act_pm == "TRIM" and sym_pm:
-                    from orders import _trades_lock as _pm_lock
-                    from orders import open_trades as _pm_trades
+                    from orders_state import _trades_lock as _pm_lock
+                    from orders_state import open_trades as _pm_trades
 
+                    pos_pm = next((p for p in open_pos if p["symbol"] == sym_pm), None)
                     # TRIM fires at most once per symbol per session.  A second TRIM on
                     # the same position (same trigger condition, just time has passed)
                     # is a loop artefact, not a new thesis event.  EXIT can still fire
@@ -1791,7 +1794,7 @@ def run_scan():
             )
             _write_last_decision(sym, buy, sig, decision, pv)
 
-        from orders import is_options_market_open
+        from orders_contracts import is_options_market_open
 
         if (
             CONFIG.get("options_enabled")
