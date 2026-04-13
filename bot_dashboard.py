@@ -460,43 +460,46 @@ class DashHandler(BaseHTTPRequestHandler):
             except Exception:
                 state["decision_history"] = []
             state["settings"] = {
-                "risk_pct_per_trade":       CONFIG.get("risk_pct_per_trade", 0.04),
-                "daily_loss_limit":         CONFIG.get("daily_loss_limit", 0.06),
-                "max_positions":            CONFIG.get("max_positions", 12),
-                "min_cash_reserve":         CONFIG.get("min_cash_reserve", 0.10),
-                "max_single_position":      CONFIG.get("max_single_position", 0.15),
-                "min_score_to_trade":       CONFIG.get("min_score_to_trade", 28),
-                "high_conviction_score":    CONFIG.get("high_conviction_score", 38),
-                "agents_required_to_agree": CONFIG.get("agents_required_to_agree", 3),
-                "options_min_score":        CONFIG.get("options_min_score", 35),
-                "options_max_risk_pct":     CONFIG.get("options_max_risk_pct", 0.025),
-                "options_max_ivr":          CONFIG.get("options_max_ivr", 65),
-                "options_target_delta":     CONFIG.get("options_target_delta", 0.50),
-                "options_delta_range":      CONFIG.get("options_delta_range", 0.35),
-                "options_dte_min":          CONFIG.get("iv_skew", {}).get("dte_min", 7),
-                "options_dte_max":          CONFIG.get("iv_skew", {}).get("dte_max", 60),
+                "risk_pct_per_trade":       CONFIG["risk_pct_per_trade"],
+                "daily_loss_limit":         CONFIG["daily_loss_limit"],
+                "max_positions":            CONFIG["max_positions"],
+                "min_cash_reserve":         CONFIG["min_cash_reserve"],
+                "max_single_position":      CONFIG["max_single_position"],
+                "min_score_to_trade":       CONFIG["min_score_to_trade"],
+                "high_conviction_score":    CONFIG["high_conviction_score"],
+                "agents_required_to_agree": CONFIG["agents_required_to_agree"],
+                "options_min_score":        CONFIG["options_min_score"],
+                "options_max_risk_pct":     CONFIG["options_max_risk_pct"],
+                "options_max_ivr":          CONFIG["options_max_ivr"],
+                "options_target_delta":     CONFIG["options_target_delta"],
+                "options_delta_range":      CONFIG["options_delta_range"],
+                "options_dte_min":          CONFIG["iv_skew"]["dte_min"],
+                "options_dte_max":          CONFIG["iv_skew"]["dte_max"],
                 # Sentinel settings
-                "sentinel_enabled":             CONFIG.get("sentinel_enabled", True),
-                "sentinel_poll_seconds":        CONFIG.get("sentinel_poll_seconds", 45),
-                "sentinel_cooldown_minutes":    CONFIG.get("sentinel_cooldown_minutes", 10),
-                "sentinel_max_trades_per_hour": CONFIG.get("sentinel_max_trades_per_hour", 3),
-                "sentinel_risk_multiplier":     CONFIG.get("sentinel_risk_multiplier", 0.75),
-                "sentinel_keyword_threshold":   CONFIG.get("sentinel_keyword_threshold", 3),
-                "sentinel_min_confidence":      CONFIG.get("sentinel_min_confidence", 5),
-                "sentinel_use_ibkr":            CONFIG.get("sentinel_use_ibkr", True),
-                "sentinel_use_finviz":          CONFIG.get("sentinel_use_finviz", True),
+                "sentinel_enabled":             CONFIG["sentinel_enabled"],
+                "sentinel_poll_seconds":        CONFIG["sentinel_poll_seconds"],
+                "sentinel_cooldown_minutes":    CONFIG["sentinel_cooldown_minutes"],
+                "sentinel_max_trades_per_hour": CONFIG["sentinel_max_trades_per_hour"],
+                "sentinel_risk_multiplier":     CONFIG["sentinel_risk_multiplier"],
+                "sentinel_keyword_threshold":   CONFIG["sentinel_keyword_threshold"],
+                "sentinel_min_confidence":      CONFIG["sentinel_min_confidence"],
+                "sentinel_use_ibkr":            CONFIG["sentinel_use_ibkr"],
+                "sentinel_use_finviz":          CONFIG["sentinel_use_finviz"],
             }
             try:
-                from risk import get_consecutive_losses, get_strategy_mode, get_pause_until
+                from risk import get_consecutive_losses, get_strategy_mode, get_strategy_mode_params, get_pause_until
                 state["consecutive_losses"]      = get_consecutive_losses()
-                state["consecutive_loss_pause"]  = CONFIG.get("consecutive_loss_pause", 5)
+                state["consecutive_loss_pause"]  = CONFIG["consecutive_loss_pause"]
                 state["strategy_mode"]           = get_strategy_mode()
+                state["strategy_mode_params"]    = get_strategy_mode_params()
                 state["pause_until"]             = get_pause_until()
             except Exception:
                 state["consecutive_losses"]      = 0
-                state["consecutive_loss_pause"]  = 5
-                state["strategy_mode"]           = "NORMAL"
+                state["consecutive_loss_pause"]  = None
+                state["strategy_mode"]           = None
+                state["strategy_mode_params"]    = None
                 state["pause_until"]             = None
+            state["active_dimensions"] = [k for k, v in CONFIG["dimension_flags"].items() if v]
             self.wfile.write(json.dumps(state).encode())
         elif self.path == "/api/favourites":
             self.send_response(200)

@@ -41,6 +41,13 @@ _session_opening_regime: Optional[str] = None  # Regime at session open (set on 
 _session_regime_set:     bool       = False  # Guard: only set once per trading day
 _strategy_size_multiplier: float    = 1.0   # Applied inside calculate_position_size()
 
+# ── Strategy mode params (module-level so dashboard can read them) ──
+MODE_PARAMS = {
+    "NORMAL":    {"score_threshold_adj": 0,  "size_multiplier": 1.0, "max_new_trades": 6},
+    "DEFENSIVE": {"score_threshold_adj": 5,  "size_multiplier": 0.7, "max_new_trades": 4},
+    "RECOVERY":  {"score_threshold_adj": 10, "size_multiplier": 0.5, "max_new_trades": 2},
+}
+
 # ── VIX-rank Kelly state ────────────────────────────────────────
 _vix_rank_cache:      Optional[float]    = None
 _vix_rank_cache_ts:   Optional[datetime] = None
@@ -822,6 +829,11 @@ def get_strategy_mode() -> str:
     return _current_strategy_mode
 
 
+def get_strategy_mode_params() -> dict:
+    """Return the score/size/trade-limit params for the current strategy mode."""
+    return MODE_PARAMS[_current_strategy_mode]
+
+
 def get_pause_until() -> Optional[str]:
     """Return pause-until time as HH:MM string, or None if not paused."""
     if _pause_until and datetime.now(EST) < _pause_until:
@@ -868,11 +880,7 @@ def get_intraday_strategy_mode(portfolio_value: float,
     """
     global _strategy_size_multiplier, _current_strategy_mode
 
-    _MODE_PARAMS = {
-        "NORMAL":    {"score_threshold_adj": 0,  "size_multiplier": 1.0, "max_new_trades": 6},  # Paper: raised from 3
-        "DEFENSIVE": {"score_threshold_adj": 5,  "size_multiplier": 0.7, "max_new_trades": 4},  # Paper: raised from 2
-        "RECOVERY":  {"score_threshold_adj": 10, "size_multiplier": 0.5, "max_new_trades": 2},  # Paper: raised from 1
-    }
+    _MODE_PARAMS = MODE_PARAMS  # Paper: NORMAL=6, DEFENSIVE=4, RECOVERY=2 max_new_trades
 
     daily_pnl_pct = (daily_pnl / portfolio_value) if portfolio_value > 0 else 0.0
 

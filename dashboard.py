@@ -50,10 +50,19 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--orange);border-bottom-color:var(--orange)}
 
+/* DECISION BAR */
+.decision-bar{display:flex;align-items:center;gap:12px;padding:0 16px;height:32px;border-bottom:1px solid var(--border);background:var(--bg2);overflow:hidden;flex-shrink:0}
+.decision-bar-label{font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;white-space:nowrap;flex-shrink:0}
+.decision-bar-actions{display:flex;flex-wrap:nowrap;gap:6px;align-items:center;overflow:hidden;flex:1;min-width:0}
+.decision-bar-time{font-size:9px;color:var(--muted2);white-space:nowrap;flex-shrink:0}
+.decision-pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:3px;border:1px solid;white-space:nowrap;flex-shrink:0}
+.decision-pill-action{font-size:9px;font-weight:700;letter-spacing:1px}
+.decision-pill-ticker{font-size:11px;font-weight:700;color:var(--text)}
+
 /* VIEWS */
-.view{display:none;height:calc(100vh - 46px - 66px - 58px - 34px);overflow:hidden}
+.view{display:none;height:calc(100vh - 46px - 66px - 58px - 32px - 34px);overflow:hidden}
 .view.active{display:flex}
-#view-portfolio{height:calc(100vh - 46px - 66px - 58px - 34px);overflow-y:auto !important;overflow-x:hidden}
+#view-portfolio{height:calc(100vh - 46px - 66px - 58px - 32px - 34px);overflow-y:auto !important;overflow-x:hidden}
 #view-portfolio > *{flex-shrink:0}
 
 /* ── VIEW 1: LIVE ── */
@@ -144,7 +153,7 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .pp{color:var(--green)}.pn{color:var(--red)}
 
 /* ── VIEW 3: GROWTH ── */
-.growth-view{flex-direction:column;overflow-y:auto;padding:14px;gap:12px;height:calc(100vh - 46px - 66px - 34px)}
+.growth-view{flex-direction:column;overflow-y:auto;padding:14px;gap:12px;height:calc(100vh - 46px - 66px - 32px - 34px)}
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px}
 .card-title{font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:10px}
 .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:4px}
@@ -164,7 +173,7 @@ canvas{display:block;width:100% !important}
 .agent-last{font-size:11px;color:var(--muted2);line-height:1.6;max-height:80px;overflow-y:auto;white-space:pre-wrap}
 
 /* ── VIEW 5: RISK ── */
-.risk-view{flex-direction:column;overflow-y:auto;overflow-x:hidden;padding:14px;gap:12px;height:calc(100vh - 46px - 66px - 58px - 34px)}
+.risk-view{flex-direction:column;overflow-y:auto;overflow-x:hidden;padding:14px;gap:12px;height:calc(100vh - 46px - 66px - 58px - 32px - 34px)}
 .risk-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .risk-meter{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px}
 .rm-label{font-size:9px;letter-spacing:1px;color:var(--muted2);text-transform:uppercase;margin-bottom:8px}
@@ -178,7 +187,7 @@ canvas{display:block;width:100% !important}
 .r-pos-total{display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:6px 0 0;border-top:1px solid var(--border);font-size:11px;font-weight:600}
 
 /* ── VIEW 7: NEWS ── */
-.news-view{flex-direction:column;height:calc(100vh - 46px - 66px - 34px);overflow:hidden}
+.news-view{flex-direction:column;height:calc(100vh - 46px - 66px - 32px - 34px);overflow:hidden}
 .news-hdr{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2)}
 .news-body{flex:1;overflow-y:auto;padding:12px 14px;min-height:0}
 .news-badge{flex-shrink:0;padding:3px 8px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:.5px;text-align:center}
@@ -377,6 +386,15 @@ canvas{display:block;width:100% !important}
   <div class="stat"><div class="sl">Realized P&amp;L</div><div class="sv" id="s-rpnl">—</div><div class="ss">closed today</div></div>
   <div class="stat"><div class="sl">Margin Used</div><div class="sv cw" id="s-margin">—</div><div class="ss" id="s-margin-pct">—</div></div>
   <div class="stat"><div class="sl">Excess Liquidity</div><div class="sv cw" id="s-excess">—</div><div class="ss">safety buffer</div></div>
+</div>
+
+<!-- DECISION BAR -->
+<div class="decision-bar">
+  <div class="decision-bar-label">Last Decision</div>
+  <div class="decision-bar-actions" id="decision-bar-actions">
+    <span style="color:var(--muted2);font-size:11px">Awaiting first scan…</span>
+  </div>
+  <div class="decision-bar-time" id="decision-bar-time">—</div>
 </div>
 
 <!-- TABS -->
@@ -774,8 +792,8 @@ canvas{display:block;width:100% !important}
 <div class="view settings-view" id="view-settings">
   <div class="setting-card">
     <div class="setting-title">&lt;&gt; Bot Control</div>
-    <div class="setting-row"><span class="setting-label">Active Account</span><span class="setting-val" id="cfg-account">DUP481326</span></div>
-    <div class="setting-row"><span class="setting-label">Bot Status</span><span class="setting-val" id="cfg-status">Running</span></div>
+    <div class="setting-row"><span class="setting-label">Active Account</span><span class="setting-val" id="cfg-account">—</span></div>
+    <div class="setting-row"><span class="setting-label">Bot Status</span><span class="setting-val" id="cfg-status">—</span></div>
     <div style="display:flex;gap:8px;padding-top:10px">
       <button class="apply-btn" onclick="applySettings()" style="flex:1">✅ Apply Settings</button>
       <button class="apply-btn" onclick="restartBot()" style="flex:1;border-color:var(--red);color:var(--red);background:rgba(255,23,68,.08)">🔄 Restart Bot</button>
@@ -783,21 +801,21 @@ canvas{display:block;width:100% !important}
   </div>
   <div class="setting-card">
     <div class="setting-title">Risk Parameters</div>
-    <div class="setting-row"><span class="setting-label">Risk per trade (%)</span><input class="setting-input" id="cfg-risk-pct" type="number" step="0.5" min="0.5" max="10" value="4"></div>
-    <div class="setting-row"><span class="setting-label">Daily loss limit (%)</span><input class="setting-input" id="cfg-daily-limit" type="number" step="0.5" min="1" max="15" value="6"></div>
-    <div class="setting-row"><span class="setting-label">Max positions</span><input class="setting-input" id="cfg-max-pos" type="number" step="1" min="1" max="30" value="12"></div>
-    <div class="setting-row"><span class="setting-label">Min cash reserve (%)</span><input class="setting-input" id="cfg-cash-reserve" type="number" step="5" min="0" max="80" value="10"></div>
-    <div class="setting-row"><span class="setting-label">Max single position (%)</span><input class="setting-input" id="cfg-max-single" type="number" step="1" min="1" max="30" value="15"></div>
+    <div class="setting-row"><span class="setting-label">Risk per trade (%)</span><input class="setting-input" id="cfg-risk-pct" type="number" step="0.5" min="0.5" max="10"></div>
+    <div class="setting-row"><span class="setting-label">Daily loss limit (%)</span><input class="setting-input" id="cfg-daily-limit" type="number" step="0.5" min="1" max="15"></div>
+    <div class="setting-row"><span class="setting-label">Max positions</span><input class="setting-input" id="cfg-max-pos" type="number" step="1" min="1" max="30"></div>
+    <div class="setting-row"><span class="setting-label">Min cash reserve (%)</span><input class="setting-input" id="cfg-cash-reserve" type="number" step="5" min="0" max="80"></div>
+    <div class="setting-row"><span class="setting-label">Max single position (%)</span><input class="setting-input" id="cfg-max-single" type="number" step="1" min="1" max="30"></div>
   </div>
   <div class="setting-card">
     <div class="setting-title">Scoring &amp; Agents</div>
-    <div class="setting-row"><span class="setting-label">Min score to trade (/50)</span><input class="setting-input" id="cfg-min-score" type="number" step="1" min="10" max="45" value="28"></div>
-    <div class="setting-row"><span class="setting-label">High conviction score</span><input class="setting-input" id="cfg-high-score" type="number" step="1" min="20" max="50" value="38"></div>
+    <div class="setting-row"><span class="setting-label">Min score to trade (/50)</span><input class="setting-input" id="cfg-min-score" type="number" step="1" min="10" max="45"></div>
+    <div class="setting-row"><span class="setting-label">High conviction score</span><input class="setting-input" id="cfg-high-score" type="number" step="1" min="20" max="50"></div>
     <div class="setting-row">
       <span class="setting-label">Agents required to agree</span>
       <select id="agree-select" class="setting-input" style="width:60px">
         <option value="2">2/6</option>
-        <option value="3" selected>3/6</option>
+        <option value="3">3/6</option>
         <option value="4">4/6</option>
         <option value="5">5/6</option>
         <option value="6">6/6</option>
@@ -806,12 +824,12 @@ canvas{display:block;width:100% !important}
   </div>
   <div class="setting-card">
     <div class="setting-title">Options</div>
-    <div class="setting-row"><span class="setting-label">Min score for options</span><input class="setting-input" id="cfg-opt-min-score" type="number" step="1" min="20" max="50" value="35"></div>
-    <div class="setting-row"><span class="setting-label">Options risk per trade (%)</span><input class="setting-input" id="cfg-opt-risk" type="number" step="0.5" min="0.5" max="5" value="2.5"></div>
-    <div class="setting-row"><span class="setting-label">Max IV Rank</span><input class="setting-input" id="cfg-opt-ivr" type="number" step="5" min="20" max="100" value="65"></div>
-    <div class="setting-row"><span class="setting-label">Target delta</span><input class="setting-input" id="cfg-opt-delta" type="number" step="0.05" min="0.2" max="0.7" value="0.50"></div>
-    <div class="setting-row"><span class="setting-label">Delta range (±)</span><input class="setting-input" id="cfg-opt-delta-range" type="number" step="0.05" min="0.10" max="0.45" value="0.35"></div>
-    <div class="setting-row"><span class="setting-label">DTE range</span><span class="setting-val">5 — 45 days</span></div>
+    <div class="setting-row"><span class="setting-label">Min score for options</span><input class="setting-input" id="cfg-opt-min-score" type="number" step="1" min="20" max="50"></div>
+    <div class="setting-row"><span class="setting-label">Options risk per trade (%)</span><input class="setting-input" id="cfg-opt-risk" type="number" step="0.5" min="0.5" max="5"></div>
+    <div class="setting-row"><span class="setting-label">Max IV Rank</span><input class="setting-input" id="cfg-opt-ivr" type="number" step="5" min="20" max="100"></div>
+    <div class="setting-row"><span class="setting-label">Target delta</span><input class="setting-input" id="cfg-opt-delta" type="number" step="0.05" min="0.2" max="0.7"></div>
+    <div class="setting-row"><span class="setting-label">Delta range (±)</span><input class="setting-input" id="cfg-opt-delta-range" type="number" step="0.05" min="0.10" max="0.45"></div>
+    <div class="setting-row"><span class="setting-label">DTE range</span><span class="setting-val" id="cfg-dte-range">—</span></div>
   </div>
 
   <div class="setting-card">
@@ -819,12 +837,12 @@ canvas{display:block;width:100% !important}
     <div class="setting-row"><span class="setting-label">Sentinel enabled</span>
       <select id="cfg-sentinel-enabled" class="setting-input" style="width:70px"><option value="true">On</option><option value="false">Off</option></select>
     </div>
-    <div class="setting-row"><span class="setting-label">Poll interval (sec)</span><input class="setting-input" id="cfg-sentinel-poll" type="number" step="5" min="15" max="120" value="45"></div>
-    <div class="setting-row"><span class="setting-label">Cooldown per symbol (min)</span><input class="setting-input" id="cfg-sentinel-cooldown" type="number" step="1" min="1" max="60" value="10"></div>
-    <div class="setting-row"><span class="setting-label">Max trades / hour</span><input class="setting-input" id="cfg-sentinel-max-trades" type="number" step="1" min="1" max="10" value="3"></div>
-    <div class="setting-row"><span class="setting-label">Position size multiplier</span><input class="setting-input" id="cfg-sentinel-risk-mult" type="number" step="0.05" min="0.25" max="1.5" value="0.75"></div>
-    <div class="setting-row"><span class="setting-label">Keyword threshold</span><input class="setting-input" id="cfg-sentinel-kw-thresh" type="number" step="1" min="1" max="10" value="3"></div>
-    <div class="setting-row"><span class="setting-label">Min confidence to trade</span><input class="setting-input" id="cfg-sentinel-min-conf" type="number" step="1" min="1" max="10" value="5"></div>
+    <div class="setting-row"><span class="setting-label">Poll interval (sec)</span><input class="setting-input" id="cfg-sentinel-poll" type="number" step="5" min="15" max="120"></div>
+    <div class="setting-row"><span class="setting-label">Cooldown per symbol (min)</span><input class="setting-input" id="cfg-sentinel-cooldown" type="number" step="1" min="1" max="60"></div>
+    <div class="setting-row"><span class="setting-label">Max trades / hour</span><input class="setting-input" id="cfg-sentinel-max-trades" type="number" step="1" min="1" max="10"></div>
+    <div class="setting-row"><span class="setting-label">Position size multiplier</span><input class="setting-input" id="cfg-sentinel-risk-mult" type="number" step="0.05" min="0.25" max="1.5"></div>
+    <div class="setting-row"><span class="setting-label">Keyword threshold</span><input class="setting-input" id="cfg-sentinel-kw-thresh" type="number" step="1" min="1" max="10"></div>
+    <div class="setting-row"><span class="setting-label">Min confidence to trade</span><input class="setting-input" id="cfg-sentinel-min-conf" type="number" step="1" min="1" max="10"></div>
     <div class="setting-row"><span class="setting-label">Use IBKR news</span>
       <select id="cfg-sentinel-ibkr" class="setting-input" style="width:70px"><option value="true">On</option><option value="false">Off</option></select>
     </div>
@@ -1104,10 +1122,14 @@ async function loadOvernightNotes() {
 }
 
 // ── IC Weights ─────────────────────────────────────────────
-const _IC_DIMS = ['trend','momentum','squeeze','flow','breakout','mtf','news','social','reversion'];
+// Populated from d.active_dimensions on first state poll — never hardcoded
+let _IC_DIMS = [];
 const _IC_LABELS = {
-  trend:'TREND', momentum:'MOM', squeeze:'SQZ', flow:'FLOW', breakout:'BRK',
-  mtf:'MTF', news:'NEWS', social:'SOC', reversion:'REV'
+  directional:'DIR', momentum:'MOM', squeeze:'SQZ', flow:'FLOW', breakout:'BRK',
+  pead:'PEAD', news:'NEWS', short_squeeze:'SS', reversion:'REV',
+  overnight_drift:'OVNT', social:'SOC', iv_skew:'IVS',
+  // legacy names (pre-merge) — kept so old trade records still render
+  trend:'TREND', mtf:'MTF',
 };
 
 async function loadICWeights() {
@@ -1146,8 +1168,14 @@ function renderICWeights(d) {
       'Updated ' + updDt.toLocaleDateString() + ' ' + updDt.toTimeString().slice(0,5);
   }
 
-  // Build per-dimension bars
-  const maxW  = Math.max(...Object.values(weights), 1/9);
+  // Build per-dimension bars — derive dims from live weights, fall back to active_dimensions
+  const dimKeys = Object.keys(weights).length
+    ? Object.keys(weights)
+    : (window._activeDimensions || []);
+  if (dimKeys.length) _IC_DIMS = dimKeys;
+  const nDims  = _IC_DIMS.length || 1;
+  const equalW = 1 / nDims;
+  const maxW   = Math.max(...Object.values(weights), equalW);
   const barsEl = document.getElementById('ic-bars');
 
   // Header row already in HTML; clear and re-render data rows
@@ -1162,7 +1190,7 @@ function renderICWeights(d) {
     const ic   = rawIC[dim];
     const pct  = (w * 100).toFixed(1) + '%';
     const barW = Math.round((w / maxW) * 100);
-    const barCol = isEqual ? 'var(--muted)' : (w > 1/9 * 1.1 ? 'var(--green)' : w < 1/9 * 0.9 ? 'var(--red)' : 'var(--orange)');
+    const barCol = isEqual ? 'var(--muted)' : (w > equalW * 1.1 ? 'var(--green)' : w < equalW * 0.9 ? 'var(--red)' : 'var(--orange)');
 
     // 4-week trend: compare most recent vs 4-weeks-ago weight for this dim
     let trendTxt = '—';
@@ -1303,8 +1331,11 @@ function renderAlphaDecay(d) {
     }
 
     const visibleGroups = ['all', 'high_score', 'low_score', 'bull', 'bear'];
+    const _hc = _liveSettings.high_conviction_score;
     const groupLabels   = {
-      all: 'All', high_score: 'Hi-Conv (≥38)', low_score: 'Lo-Conv (<38)',
+      all: 'All',
+      high_score: _hc != null ? `Hi-Conv (≥${_hc})` : 'Hi-Conv',
+      low_score:  _hc != null ? `Lo-Conv (<${_hc})`  : 'Lo-Conv',
       bull: 'Bull Regime', bear: 'Bear Regime'
     };
     for (const key of visibleGroups) {
@@ -1434,14 +1465,15 @@ function renderAlphaDecay(d) {
   });
 
   // Segment table
+  const _hcSeg = _liveSettings.high_conviction_score;
   const segRows = [
-    ['All Trades',       'all'],
-    ['Hi-Conv (≥38)',    'high_score'],
-    ['Lo-Conv (<38)',    'low_score'],
-    ['Bull Regime',      'bull'],
-    ['Bear Regime',      'bear'],
-    ['Long Only',        'long_only'],
-    ['Short Only',       'short_only'],
+    ['All Trades',                                          'all'],
+    [_hcSeg != null ? `Hi-Conv (≥${_hcSeg})` : 'Hi-Conv', 'high_score'],
+    [_hcSeg != null ? `Lo-Conv (<${_hcSeg})`  : 'Lo-Conv', 'low_score'],
+    ['Bull Regime',                                         'bull'],
+    ['Bear Regime',                                         'bear'],
+    ['Long Only',                                           'long_only'],
+    ['Short Only',                                          'short_only'],
   ];
   const hi1  = d.horizons.indexOf(1);
   const hi3  = d.horizons.indexOf(3);
@@ -1849,10 +1881,12 @@ function renderOrders() {
                       role === 'take_profit' ? 'var(--green)' :
                       role === 'emergency_flatten' ? 'var(--red)' : !role ? 'var(--text)' : 'var(--muted2)';
 
-    // Score: color-coded by signal strength (≥40 strong, ≥28 threshold, below = weak)
+    // Score: color-coded by signal strength (hi-conv = green, above min = orange, below = weak)
     const sc = o.score != null ? o.score : null;
+    const _scHi  = _liveSettings.high_conviction_score ?? null;
+    const _scMin = _liveSettings.min_score_to_trade    ?? null;
     const scoreHtml = sc != null
-      ? `<span style="color:${sc >= 40 ? 'var(--green)' : sc >= 28 ? 'var(--orange)' : 'var(--muted2)'};font-weight:600">${sc}</span>`
+      ? `<span style="color:${_scHi != null && sc >= _scHi ? 'var(--green)' : _scMin != null && sc >= _scMin ? 'var(--orange)' : 'var(--muted2)'};font-weight:600">${sc}</span>`
       : '—';
 
     const cancelBtn = ['SUBMITTED','PRESUBMITTED'].includes(status) && o.order_id
@@ -1999,9 +2033,11 @@ function buildTradeExplanation(t) {
 
   // ── CONVICTION ──
   if (t.score && t.score > 0) {
-    const hiConv  = _liveSettings.high_conviction_score || 38;
-    const minConv = _liveSettings.min_score_to_trade   || 28;
-    const convLabel = t.score >= hiConv ? 'very high' : t.score >= minConv ? 'moderate' : 'borderline';
+    const hiConv  = _liveSettings.high_conviction_score ?? null;
+    const minConv = _liveSettings.min_score_to_trade   ?? null;
+    const convLabel = (hiConv != null && minConv != null)
+      ? (t.score >= hiConv ? 'very high' : t.score >= minConv ? 'moderate' : 'borderline')
+      : '—';
     story += `Conviction: <strong>${convLabel}</strong> — scored ${t.score}/50. `;
   }
 
@@ -2049,35 +2085,74 @@ function buildTradeExplanation(t) {
   return story || '<div style="color:var(--muted2)">No reasoning recorded for this trade.</div>';
 }
 
-// ── Render agents view — dynamic from agent_conversation ───
-// agent_conversation is [{agent, role, time, output}] built by bot_trading.py.
-// No hardcoded agent names, count, or keys — all read from state.
-function renderAgents(convo) {
-  if (!convo || !convo.length) return;
+// ── Render Trade Actions — actual executed orders this session ───
+// Shows dash["trades"] (orders submitted to broker), not agent recommendations.
+// Agent recommendations are already visible in the Agent Live Conversation above.
+function renderAgents(convo) { /* no-op: agent output shown in renderAgentConvoFull */ }
+
+function renderTradeActions(trades) {
   const el = document.getElementById('agents-grid');
   if (!el) return;
-  const finalEntry = convo.find(m => m.agent === 'Final Decision Maker') || convo[convo.length - 1];
-  if (!finalEntry) return;
-  const lines = (finalEntry.output || '').split('\n').map(l => l.trim()).filter(Boolean);
-  if (!lines.length || lines[0] === 'No trades this cycle.') {
-    el.innerHTML = '<div style="color:var(--muted2);font-size:11px;padding:6px 0">No trades this cycle.</div>';
+  if (!trades || !trades.length) {
+    el.innerHTML = '<div style="color:var(--muted2);font-size:11px;padding:6px 0">No orders submitted this session.</div>';
     return;
   }
-  const ACTION_COLOR = { BUY: 'var(--green)', SELL: 'var(--red)', HOLD: 'var(--orange)' };
-  const ACTION_BG    = { BUY: 'rgba(0,200,83,.12)', SELL: 'rgba(255,82,82,.12)', HOLD: 'rgba(255,107,0,.12)' };
+  const ACTION_COLOR = { BUY: 'var(--green)', SHORT: 'var(--red)', SELL: 'var(--orange)' };
+  const ACTION_BG    = { BUY: 'rgba(0,200,83,.12)', SHORT: 'rgba(255,82,82,.12)', SELL: 'rgba(255,107,0,.12)' };
+  // Deduplicate by side+symbol (most-recent first — trades is already newest-first)
+  const seen = new Set();
+  const unique = trades.filter(t => {
+    const key = (t.side || '').split(' ')[0] + '|' + (t.symbol || '');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 0">' +
-    lines.map(line => {
-      const parts  = line.split(/\s+/);
-      const action = (parts[0] || '').toUpperCase();
-      const ticker = parts.slice(1).join(' ');
+    unique.map(t => {
+      const action = (t.side || '').toUpperCase().split(' ')[0];
       const color  = ACTION_COLOR[action] || 'var(--muted2)';
       const bg     = ACTION_BG[action]    || 'rgba(80,80,80,.1)';
-      return `<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:4px;border:1px solid ${color};background:${bg}">
+      const price  = t.price ? ` @ $${parseFloat(t.price).toFixed(2)}` : '';
+      return `<div style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:4px;border:1px solid ${color};background:${bg}" title="${esc(t.time || '')}${price}">
         <span style="font-size:10px;font-weight:700;color:${color};letter-spacing:1px">${esc(action)}</span>
-        <span style="font-size:13px;font-weight:700;color:var(--text)">${esc(ticker)}</span>
+        <span style="font-size:13px;font-weight:700;color:var(--text)">${esc(t.symbol || '')}</span>
+        ${price ? `<span style="font-size:9px;color:var(--muted2)">${esc(price)}</span>` : ''}
       </div>`;
     }).join('') +
   '</div>';
+}
+
+// ── Decision Bar (always-visible top strip) ─────────────────
+function renderDecisionBar(convo, lastScan) {
+  const actionsEl = document.getElementById('decision-bar-actions');
+  const timeEl    = document.getElementById('decision-bar-time');
+  if (!actionsEl) return;
+
+  const finalEntry = convo.find(m => m.agent === 'Final Decision Maker') || convo[convo.length - 1];
+  if (!finalEntry) return;
+
+  const lines = (finalEntry.output || '').split('\n').map(l => l.trim()).filter(Boolean);
+  if (timeEl) timeEl.textContent = finalEntry.time || lastScan || '—';
+
+  if (!lines.length || lines[0] === 'No trades this cycle.') {
+    actionsEl.innerHTML = '<span style="color:var(--muted2);font-size:11px">No trades this cycle.</span>';
+    return;
+  }
+
+  const ACTION_COLOR = { BUY: 'var(--green)', SELL: 'var(--red)', HOLD: 'var(--orange)' };
+  const ACTION_BG    = { BUY: 'rgba(0,200,83,.15)', SELL: 'rgba(255,82,82,.15)', HOLD: 'rgba(255,107,0,.15)' };
+
+  actionsEl.innerHTML = lines.map(line => {
+    const parts  = line.split(/\s+/);
+    const action = (parts[0] || '').toUpperCase();
+    const ticker = parts.slice(1).join(' ');
+    const color  = ACTION_COLOR[action] || 'var(--muted2)';
+    const bg     = ACTION_BG[action]    || 'rgba(80,80,80,.1)';
+    return `<div class="decision-pill" style="border-color:${color};background:${bg}">
+      <span class="decision-pill-action" style="color:${color}">${esc(action)}</span>
+      <span class="decision-pill-ticker">${esc(ticker)}</span>
+    </div>`;
+  }).join('');
 }
 
 // ── Chart instances ────────────────────────────────────────
@@ -2452,16 +2527,16 @@ async function poll() {
     document.getElementById('session-name').textContent = d.session || '—';
 
     // Agents required — store globals for Last Decision card and color-code the vote
-    const _req = d.agents_required || 4;
+    const _req = d.agents_required ?? null;
     const _agreed = d.last_agents_agreed;
     window._agentsRequired   = _req;
     window._lastAgentsAgreed = _agreed;
     window._lastScanTime     = d.last_scan || '';
     const _total = window._totalAgents || (d.agent_conversation || []).length || '';
-    document.getElementById('agents-req').textContent = _req + (_total ? '/' + _total : '');
+    document.getElementById('agents-req').textContent = _req != null ? _req + (_total ? '/' + _total : '') : '—';
     const agreeEl = document.getElementById('last-agree');
     agreeEl.textContent = _agreed != null ? _agreed + (_total ? '/' + _total : '') : '—';
-    if (_agreed != null) agreeEl.style.color = _agreed >= _req ? 'var(--green)' : 'var(--red)';
+    if (_agreed != null && _req != null) agreeEl.style.color = _agreed >= _req ? 'var(--green)' : 'var(--red)';
     else agreeEl.style.color = '';
 
     // Risk budget — limit from settings, not hardcoded
@@ -2526,11 +2601,13 @@ async function poll() {
     // Growth view
     if (d.performance) renderGrowth(d.performance, d.equity_history);
 
-    // Agents view — rendered from conversation (dynamic, no hardcoded names)
+    // Agents view — conversation + executed trade actions
     if (d.agent_conversation && d.agent_conversation.length) {
       window._totalAgents = d.agent_conversation.length;
-      renderAgents(d.agent_conversation);
+      renderDecisionBar(d.agent_conversation, d.last_scan);
     }
+    // Trade Actions: show only orders actually submitted this session (not recommendations)
+    renderTradeActions(d.trades);
 
     // Trade card — last decision with history navigation
     const incoming = d.decision_history && d.decision_history.length
@@ -2554,22 +2631,23 @@ async function poll() {
     // Risk view — daily limit from settings
     if (d.portfolio_value) {
       const pv    = d.portfolio_value;
-      const limit = pv * (d.settings?.daily_loss_limit || 0);
+      const limit = pv * (d.settings?.daily_loss_limit ?? 0);
       const used  = Math.abs(Math.min(pnl, 0));
       const positions = d.positions || [];
 
       // ── Strategy mode banner ───────────────────────────────────
-      const mode       = d.strategy_mode || 'NORMAL';
+      const mode       = d.strategy_mode ?? null;
       const modeBanner = document.getElementById('r-mode-banner');
-      if (mode === 'NORMAL') {
+      if (!mode || mode === 'NORMAL') {
         modeBanner.style.display = 'none';
       } else {
         modeBanner.style.display = 'flex';
         modeBanner.className     = 'risk-mode-banner ' + mode.toLowerCase();
         document.getElementById('r-mode-label').textContent  = mode + ' MODE';
-        const modeDetail = mode === 'DEFENSIVE'
-          ? 'Score threshold +5 · Size ×0.7 · Max 4 new trades'
-          : 'Score threshold +10 · Size ×0.5 · Max 2 new trades — capital preservation';
+        const mp = d.strategy_mode_params;
+        const modeDetail = mp
+          ? `Score threshold +${mp.score_threshold_adj} · Size ×${mp.size_multiplier} · Max ${mp.max_new_trades} new trades${mode === 'RECOVERY' ? ' — capital preservation' : ''}`
+          : mode + ' MODE';
         document.getElementById('r-mode-detail').textContent = modeDetail;
       }
 
@@ -2602,12 +2680,12 @@ async function poll() {
 
       // ── Consecutive losses + pause-until ─────────────────────
       const lossN     = d.consecutive_losses || 0;
-      const lossPause = d.consecutive_loss_pause || 5;
-      const lossPct   = Math.min(lossN / lossPause * 100, 100);
+      const lossPause = d.consecutive_loss_pause ?? null;
+      const lossPct   = lossPause != null ? Math.min(lossN / lossPause * 100, 100) : 0;
       document.getElementById('r-loss-bar').style.width     = lossPct + '%';
-      document.getElementById('r-loss-n').textContent       = lossN + ' of ' + lossPause;
-      const lossStatus = lossN >= lossPause ? 'PAUSED' : lossN >= lossPause - 1 ? 'WARNING' : 'OK';
-      const lossColor  = lossN >= lossPause ? 'var(--red)' : lossN >= lossPause - 1 ? 'var(--yellow)' : 'var(--green)';
+      document.getElementById('r-loss-n').textContent       = lossPause != null ? lossN + ' of ' + lossPause : lossN + ' of —';
+      const lossStatus = lossPause != null ? (lossN >= lossPause ? 'PAUSED' : lossN >= lossPause - 1 ? 'WARNING' : 'OK') : '—';
+      const lossColor  = lossPause != null ? (lossN >= lossPause ? 'var(--red)' : lossN >= lossPause - 1 ? 'var(--yellow)' : 'var(--green)') : 'var(--muted2)';
       document.getElementById('r-loss-status').textContent  = lossStatus;
       document.getElementById('r-loss-status').style.color  = lossColor;
       const resumeEl = document.getElementById('r-loss-resume');
@@ -2619,12 +2697,12 @@ async function poll() {
       }
 
       // ── Cash reserve ──────────────────────────────────────────
-      const minCashPct = Math.round((d.settings?.min_cash_reserve || 0.10) * 100);
+      const minCashPct = d.settings?.min_cash_reserve != null ? Math.round(d.settings.min_cash_reserve * 100) : null;
       const cashPct    = Math.max(100 - deployed, 0);
       document.getElementById('r-cash-bar').style.width      = Math.min(cashPct, 100) + '%';
-      document.getElementById('r-cash-bar').style.background = cashPct < minCashPct ? 'var(--red)' : 'var(--green)';
+      document.getElementById('r-cash-bar').style.background = minCashPct != null ? (cashPct < minCashPct ? 'var(--red)' : 'var(--green)') : 'var(--muted2)';
       document.getElementById('r-cash-pct').textContent      = cashPct.toFixed(1) + '% cash';
-      document.getElementById('r-cash-min').textContent      = 'Min: ' + minCashPct + '%';
+      document.getElementById('r-cash-min').textContent      = minCashPct != null ? 'Min: ' + minCashPct + '%' : 'Min: —';
 
       // ── Open position risk table ──────────────────────────────
       const posDetail = document.getElementById('r-pos-detail');
@@ -2667,6 +2745,10 @@ async function poll() {
 
     // Cache latest settings so functions without `d` scope can read them
     if (d.settings) _liveSettings = d.settings;
+    if (d.active_dimensions && d.active_dimensions.length) {
+      window._activeDimensions = d.active_dimensions;
+      if (!_IC_DIMS.length) _IC_DIMS = d.active_dimensions;
+    }
 
     // Settings — populate form inputs from live CONFIG values
     document.getElementById('cfg-account').textContent = d.account || '—';
@@ -2687,6 +2769,9 @@ async function poll() {
       document.getElementById('cfg-opt-ivr').value     = s.options_max_ivr;
       document.getElementById('cfg-opt-delta').value   = s.options_target_delta;
       document.getElementById('cfg-opt-delta-range').value = s.options_delta_range;
+      if (s.options_dte_min != null && s.options_dte_max != null) {
+        document.getElementById('cfg-dte-range').textContent = s.options_dte_min + ' — ' + s.options_dte_max + ' days';
+      }
       // Sentinel settings
       if (s.sentinel_enabled != null) {
         document.getElementById('cfg-sentinel-enabled').value  = String(s.sentinel_enabled);
@@ -3506,15 +3591,24 @@ function showPositionDetail(idx) {
   const badge = isOpt ? ' <span style="color:var(--cyan);font-size:12px">OPT</span>' : '';
   const dirBadge = `<span style="font-size:11px;color:${dir==='LONG'?'var(--green)':'var(--red)'};font-weight:600;background:${dir==='LONG'?'rgba(0,200,83,.1)':'rgba(255,23,68,.1)'};padding:2px 8px;border-radius:10px">${dir}</span>`;
 
-  const RECONCILED_MARKER = 'Reconciled from IBKR on startup';
+  const metaMissing = p.metadata_status === 'MISSING' || !p.trade_type || p.trade_type === 'UNKNOWN';
+  const isResynced = (p.reasoning || '').toLowerCase().includes('re-synced from ibkr')
+                  || (p.reasoning || '').toLowerCase().includes('reconciled from ibkr')
+                  || (p.reasoning || '').toLowerCase().includes('external position');
   let reasoningText;
-  if (!p.reasoning) {
-    reasoningText = 'No reasoning recorded for this position.';
-  } else if (p.reasoning === RECONCILED_MARKER) {
-    reasoningText = 'Position loaded from broker at startup \u2014 entry reasoning not available.';
+  if (!p.reasoning || isResynced) {
+    reasoningText = metaMissing
+      ? '\u26a0 Metadata lost \u2014 position re-synced from IBKR without the original trade rationale. trade_type / conviction / signal scores are unknown. This is a training-data gap.'
+      : 'Position loaded from broker at startup \u2014 entry reasoning not available.';
   } else {
     reasoningText = p.reasoning;
   }
+
+  const tradeTypeColor = {SCALP:'var(--cyan)',SWING:'var(--orange)',HOLD:'var(--green)',UNKNOWN:'var(--red)'}[p.trade_type] || 'var(--muted2)';
+  const tradeTypeRow = `<div class="pos-modal-row"><span class="pos-modal-label">Trade Type</span><span class="pos-modal-val" style="color:${tradeTypeColor};font-weight:600">${p.trade_type || '\u2014'}</span></div>`;
+  const convictionRow = (p.conviction != null && p.conviction > 0) ? `<div class="pos-modal-row"><span class="pos-modal-label">Conviction</span><span class="pos-modal-val">${(p.conviction*100).toFixed(0)}%</span></div>` : '';
+  const regimeRow = (p.entry_regime && p.entry_regime !== 'UNKNOWN') ? `<div class="pos-modal-row"><span class="pos-modal-label">Entry Regime</span><span class="pos-modal-val" style="font-size:11px">${p.entry_regime}</span></div>` : '';
+  const metaBanner = metaMissing ? `<div style="background:rgba(255,23,68,.1);border:1px solid var(--red);border-radius:4px;padding:7px 11px;margin-bottom:10px;font-size:10px;color:var(--red);font-weight:600">METADATA MISSING \u2014 trade_type / conviction / regime unknown. Training-data gap.</div>` : '';
 
   let agentSection = '';
   if (p.agent_outputs && p.agent_outputs.opportunity) {
@@ -3533,6 +3627,7 @@ function showPositionDetail(idx) {
       <button class="pos-modal-close" onclick="closePositionModal()">&times;</button>
     </div>
     <div class="pos-modal-body">
+      ${metaBanner}
       <div class="pos-modal-row"><span class="pos-modal-label">Position Value</span><span class="pos-modal-val" style="color:var(--orange)">${fmt$(posValue)}</span></div>
       <div class="pos-modal-row"><span class="pos-modal-label">P&L</span><span class="pos-modal-val" style="color:${pnlCol}">${pnl >= 0 ? '+' : ''}${fmt$(pnl)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)</span></div>
       <div class="pos-modal-row"><span class="pos-modal-label">Entry Price</span><span class="pos-modal-val">${fmt$(p.entry)}</span></div>
@@ -3540,6 +3635,9 @@ function showPositionDetail(idx) {
       <div class="pos-modal-row"><span class="pos-modal-label">Stop Loss</span><span class="pos-modal-val" style="color:var(--red)">${fmt$(p.sl)}</span></div>
       <div class="pos-modal-row"><span class="pos-modal-label">Take Profit</span><span class="pos-modal-val" style="color:var(--green)">${fmt$(p.tp)}</span></div>
       ${optRows}
+      ${tradeTypeRow}
+      ${convictionRow}
+      ${regimeRow}
       <div class="pos-modal-row"><span class="pos-modal-label">Score</span><span class="pos-modal-val">${p.score || '—'}</span></div>
       <div class="pos-modal-row"><span class="pos-modal-label">Status</span><span class="pos-modal-val">${p.status || '—'}</span></div>
       ${p._price_sources ? `<div class="pos-modal-row"><span class="pos-modal-label">Price Source</span><span class="pos-modal-val" style="font-size:10px">${p._price_sources}</span></div>` : ''}
