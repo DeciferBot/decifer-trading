@@ -98,32 +98,37 @@ def _check_ibkr_open_order(
                 if trade_symbol == symbol or trade_symbol == ibkr_base:
                     return True
 
-        # ── FX position check (belt-and-suspenders) ───────────────────────────
-        # execute_short does not start a FillWatcher, so the orphan cleaner can
-        # purge active_trades["USDJPY"] 5 min after entry even when the SELL filled
-        # and a real position exists. Guard against re-entry by checking portfolio.
-        is_fx_pair = len(symbol) == 6 and symbol.isalpha() and option_key is None
-        if is_fx_pair:
+        # ── Portfolio position check (belt-and-suspenders) ────────────────────
+        # If active_trades lost track of a position (orphan cleaner purge, bot
+        # restart before reconciliation), the system could re-enter. Guard against
+        # re-entry by checking ib.portfolio() for ALL non-option instruments.
+        if option_key is None:
             try:
                 from config import CONFIG as _CFG
                 portfolio_items = ib.portfolio(_CFG.get("active_account", ""))
-                ibkr_base = symbol[:3]
+                is_fx = len(symbol) == 6 and symbol.isalpha()
+                ibkr_base = symbol[:3] if is_fx else symbol
                 # SELL side → we already hold a SHORT (position < 0); block re-entry.
                 # BUY  side → we already hold a LONG  (position > 0); block re-entry.
                 position_sign = -1 if side.upper() == "SELL" else 1
                 for item in portfolio_items:
                     c = item.contract
-                    item_sym  = getattr(c, "symbol",   "")
-                    item_ccy  = getattr(c, "currency", "")
-                    item_pair = item_sym + item_ccy
-                    if (item_pair == symbol or item_sym == ibkr_base) and (item.position * position_sign) > 0:
+                    item_sym = getattr(c, "symbol", "")
+                    item_sec = getattr(c, "secType", "")
+                    if is_fx:
+                        item_ccy = getattr(c, "currency", "")
+                        item_pair = item_sym + item_ccy
+                        match = (item_pair == symbol or item_sym == ibkr_base) and item_sec == "CASH"
+                    else:
+                        match = item_sym == symbol and item_sec == "STK"
+                    if match and (item.position * position_sign) > 0:
                         log.warning(
-                            f"_check_ibkr_open_order: FX {symbol} position already open "
+                            f"_check_ibkr_open_order: {symbol} position already open "
                             f"(qty={item.position}) — blocking duplicate {side}"
                         )
                         return True
-            except Exception as _fx_e:
-                log.debug(f"_check_ibkr_open_order: FX portfolio check failed for {symbol}: {_fx_e}")
+            except Exception as _pos_e:
+                log.debug(f"_check_ibkr_open_order: portfolio check failed for {symbol}: {_pos_e}")
 
         return False
     except Exception as e:

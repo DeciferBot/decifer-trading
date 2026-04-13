@@ -289,11 +289,13 @@ def execute_buy(ib: IB, symbol: str, price: float, atr: float,
 
         # ── PRICE SANITY CHECK — catch data pipeline contamination ──
         # Reject obviously broken prices that would produce absurd position sizes.
-        # Stocks under $1 are penny stocks; stocks over $10,000 are likely errors.
-        if price < 1.0:
-            log.error(f"Price too low for {symbol}: ${price:.2f} — likely data contamination, aborting")
+        # FX pairs trade at legitimate sub-$1 levels (AUDUSD ~0.67, NZDUSD ~0.60)
+        # and high levels (USDJPY ~155), so use wider bounds for FX.
+        _price_floor, _price_ceil = (0.0001, 99999) if instrument == "fx" else (1.0, 10000)
+        if price < _price_floor:
+            log.error(f"Price too low for {symbol}: ${price:.4f} — likely data contamination, aborting")
             return False
-        if price > 10000:
+        if price > _price_ceil:
             log.error(f"Price too high for {symbol}: ${price:.2f} — likely data contamination, aborting")
             return False
 
@@ -945,8 +947,9 @@ def execute_short(ib: IB, symbol: str, price: float, atr: float,
         best_price = min(price_vals)
         price = best_price
 
-        if price < 1.0 or price > 10000:
-            log.error(f"Price out of range for short {symbol}: ${price:.2f} — aborting")
+        _price_floor, _price_ceil = (0.0001, 99999) if instrument == "fx" else (1.0, 10000)
+        if price < _price_floor or price > _price_ceil:
+            log.error(f"Price out of range for short {symbol}: ${price:.4f} — aborting")
             _safe_del_trade(symbol)
             return False
 

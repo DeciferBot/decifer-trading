@@ -230,11 +230,20 @@ def close_position(ib_unused, trade_key: str) -> Optional[str]:
             break
 
     # Fallback: try matching just the symbol (backward compat for stock-only calls)
+    # Also handles FX by reconstructing the pair from base + currency.
     if not target:
         for item in portfolio_items:
-            if item.position != 0 and item.contract.symbol.upper() == trade_key and item.contract.secType == "STK":
+            if item.position == 0:
+                continue
+            c = item.contract
+            if c.secType == "STK" and c.symbol.upper() == trade_key:
                 target = item
                 break
+            if c.secType == "CASH":
+                _pair = (getattr(c, "symbol", "") + getattr(c, "currency", "")).upper()
+                if _pair == trade_key:
+                    target = item
+                    break
 
     if not target:
         log.warning(f"Close {trade_key}: Position not found in IBKR portfolio")
@@ -246,7 +255,8 @@ def close_position(ib_unused, trade_key: str) -> Optional[str]:
     action = "SELL" if pos > 0 else "BUY"
     qty = abs(int(pos))
     is_option = target.contract.secType == "OPT"
-    instrument = "option" if is_option else "stock"
+    is_fx = target.contract.secType == "CASH"
+    instrument = "option" if is_option else ("fx" if is_fx else "stock")
 
     # 2) Cancel related open orders for this symbol
     try:
@@ -263,7 +273,10 @@ def close_position(ib_unused, trade_key: str) -> Optional[str]:
 
     # 3) Place market order for immediate fill
     contract = target.contract
-    contract.exchange = "SMART"
+    # FX (secType CASH) uses IDEALPRO — don't override with SMART.
+    # The contract from ib.portfolio() already has the correct exchange.
+    if contract.secType != "CASH":
+        contract.exchange = "SMART"
     try:
         eib.qualifyContracts(contract)
     except Exception:
