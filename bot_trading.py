@@ -1837,7 +1837,7 @@ def run_scan():
         if (
             CONFIG.get("options_enabled")
             and get_session() not in ("PRE_MARKET", "AFTER_HOURS")
-            and sig["score"] >= CONFIG.get("options_min_score", 42)
+            and sig["score"] >= CONFIG.get("options_min_score", 35)
         ):
             if not is_options_market_open():
                 clog(

@@ -1,6 +1,198 @@
 [
   {
     "form_type": "4",
+    "company_name": "485BPOS - PRUCO LIFE VARIABLE UNIVERSAL ACCOUNT",
+    "cik": null,
+    "ticker": null,
+    "title": "485BPOS - PRUCO LIFE VARIABLE UNIVERSAL ACCOUNT (0000851693) (Filer)",
+    "updated": "2026-04-14T14:34:10-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/851693/000085169326000035/0000851693-26-000035-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0000851693-26-000035 <b>Size:</b> 1 MB\n",
+    "fetched_at": "2026-04-14T18:34:56.828455+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485BPOS - SEPARATE ACCOUNT A OF PACIFIC LIFE INSURANCE CO",
+    "cik": null,
+    "ticker": null,
+    "title": "485BPOS - SEPARATE ACCOUNT A OF PACIFIC LIFE INSURANCE CO (0000935823) (Filer)",
+    "updated": "2026-04-14T14:32:47-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/935823/000110465926043113/0001104659-26-043113-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001104659-26-043113 <b>Size:</b> 3 MB\n",
+    "fetched_at": "2026-04-14T18:34:56.828532+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "4 - Otter Tail Corp",
+    "cik": null,
+    "ticker": null,
+    "title": "4 - Otter Tail Corp (0001466593) (Issuer)",
+    "updated": "2026-04-14T14:32:40-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/1466593/000195946626000002/0001959466-26-000002-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001959466-26-000002 <b>Size:</b> 5 KB\n",
+    "fetched_at": "2026-04-14T18:34:56.828602+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485BPOS - PRUCO LIFE VARIABLE UNIVERSAL ACCOUNT",
+    "cik": null,
+    "ticker": null,
+    "title": "485BPOS - PRUCO LIFE VARIABLE UNIVERSAL ACCOUNT (0000851693) (Filer)",
+    "updated": "2026-04-14T14:32:19-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/851693/000085169326000032/0000851693-26-000032-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0000851693-26-000032 <b>Size:</b> 7 MB\n",
+    "fetched_at": "2026-04-14T18:34:56.828671+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485BPOS - PRUCO LIFE VARIABLE UNIVERSAL ACCOUNT",
+    "cik": null,
+    "ticker": null,
+    "title": "485BPOS - PRUCO LIFE VARIABLE UNIVERSAL ACCOUNT (0000851693) (Filer)",
+    "updated": "2026-04-14T14:31:27-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/851693/000085169326000031/0000851693-26-000031-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0000851693-26-000031 <b>Size:</b> 8 MB\n",
+    "fetched_at": "2026-04-14T18:34:56.828745+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - BANK OF MONTREAL /CAN/",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - BANK OF MONTREAL /CAN/ (0000927971) (Filer)",
+    "updated": "2026-04-14T14:30:31-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/927971/000121465926004632/0001214659-26-004632-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001214659-26-004632 <b>Size:</b> 79 KB\n",
+    "fetched_at": "2026-04-14T18:34:56.828783+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485BPOS - SEPARATE ACCOUNT A OF PACIFIC LIFE INSURANCE CO",
+    "cik": null,
+    "ticker": null,
+    "title": "485BPOS - SEPARATE ACCOUNT A OF PACIFIC LIFE INSURANCE CO (0000935823) (Filer)",
+    "updated": "2026-04-14T14:30:05-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/935823/000110465926043111/0001104659-26-043111-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001104659-26-043111 <b>Size:</b> 5 MB\n",
+    "fetched_at": "2026-04-14T18:34:56.828858+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485APOS - Tidal Trust II",
+    "cik": null,
+    "ticker": null,
+    "title": "485APOS - Tidal Trust II (0001924868) (Filer)",
+    "updated": "2026-04-14T14:29:44-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/1924868/000199937126008256/0001999371-26-008256-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001999371-26-008256 <b>Size:</b> 2 MB\n",
+    "fetched_at": "2026-04-14T18:34:56.828940+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - BARCLAYS BANK PLC",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - BARCLAYS BANK PLC (0000312070) (Filer)",
+    "updated": "2026-04-14T14:29:41-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/312070/000191870426009896/0001918704-26-009896-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001918704-26-009896 <b>Size:</b> 591 KB\n",
+    "fetched_at": "2026-04-14T18:34:56.829061+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485BPOS - PRUCO LIFE VARIABLE UNIVERSAL ACCOUNT",
+    "cik": null,
+    "ticker": null,
+    "title": "485BPOS - PRUCO LIFE VARIABLE UNIVERSAL ACCOUNT (0000851693) (Filer)",
+    "updated": "2026-04-14T14:29:11-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/851693/000085169326000029/0000851693-26-000029-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0000851693-26-000029 <b>Size:</b> 3 MB\n",
+    "fetched_at": "2026-04-14T18:34:56.829150+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485BXT - Exchange Listed Funds Trust",
+    "cik": null,
+    "ticker": null,
+    "title": "485BXT - Exchange Listed Funds Trust (0001547950) (Filer)",
+    "updated": "2026-04-14T14:28:41-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/1547950/000121390026043419/0001213900-26-043419-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043419 <b>Size:</b> 26 KB\n",
+    "fetched_at": "2026-04-14T18:34:56.829230+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "497K - Gallery Trust",
+    "cik": null,
+    "ticker": null,
+    "title": "497K - Gallery Trust (0001651872) (Filer)",
+    "updated": "2026-04-14T14:28:37-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/1651872/000139834426006530/0001398344-26-006530-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001398344-26-006530 <b>Size:</b> 17 KB\n",
+    "fetched_at": "2026-04-14T18:34:56.829268+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485BPOS - PRUCO LIFE VARIABLE UNIVERSAL ACCOUNT",
+    "cik": null,
+    "ticker": null,
+    "title": "485BPOS - PRUCO LIFE VARIABLE UNIVERSAL ACCOUNT (0000851693) (Filer)",
+    "updated": "2026-04-14T14:28:19-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/851693/000085169326000028/0000851693-26-000028-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0000851693-26-000028 <b>Size:</b> 9 MB\n",
+    "fetched_at": "2026-04-14T18:34:56.829342+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485BPOS - SEPARATE ACCOUNT A OF PACIFIC LIFE INSURANCE CO",
+    "cik": null,
+    "ticker": null,
+    "title": "485BPOS - SEPARATE ACCOUNT A OF PACIFIC LIFE INSURANCE CO (0000935823) (Filer)",
+    "updated": "2026-04-14T14:27:34-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/935823/000110465926043109/0001104659-26-043109-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001104659-26-043109 <b>Size:</b> 7 MB\n",
+    "fetched_at": "2026-04-14T18:34:56.829427+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - BARCLAYS BANK PLC",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - BARCLAYS BANK PLC (0000312070) (Filer)",
+    "updated": "2026-04-14T14:26:40-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/312070/000191870426009895/0001918704-26-009895-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001918704-26-009895 <b>Size:</b> 679 KB\n",
+    "fetched_at": "2026-04-14T18:34:56.829465+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "4 - Gemini Space Station, Inc.",
+    "cik": null,
+    "ticker": null,
+    "title": "4 - Gemini Space Station, Inc. (0002055592) (Issuer)",
+    "updated": "2026-04-14T14:25:54-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/2055592/000211288326000006/0002112883-26-000006-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0002112883-26-000006 <b>Size:</b> 5 KB\n",
+    "fetched_at": "2026-04-14T18:34:56.829542+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
     "company_name": "485BPOS - SEPARATE ACCOUNT A OF PACIFIC LIFE INSURANCE CO",
     "cik": null,
     "ticker": null,
@@ -8,7 +200,7 @@
     "updated": "2026-04-14T14:24:15-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/935823/000110465926043107/0001104659-26-043107-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001104659-26-043107 <b>Size:</b> 6 MB\n",
-    "fetched_at": "2026-04-14T18:24:50.581176+00:00",
+    "fetched_at": "2026-04-14T18:34:56.829616+00:00",
     "on_watchlist": false
   },
   {
@@ -20,7 +212,7 @@
     "updated": "2026-04-14T14:23:05-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/1651872/000139834426006527/0001398344-26-006527-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001398344-26-006527 <b>Size:</b> 17 KB\n",
-    "fetched_at": "2026-04-14T18:24:50.581203+00:00",
+    "fetched_at": "2026-04-14T18:34:56.829659+00:00",
     "on_watchlist": false
   },
   {
@@ -32,7 +224,7 @@
     "updated": "2026-04-14T14:22:16-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/19617/000121390026043417/0001213900-26-043417-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043417 <b>Size:</b> 289 KB\n",
-    "fetched_at": "2026-04-14T18:24:50.581255+00:00",
+    "fetched_at": "2026-04-14T18:34:56.829735+00:00",
     "on_watchlist": false
   },
   {
@@ -44,7 +236,7 @@
     "updated": "2026-04-14T14:22:14-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/851693/000085169326000022/0000851693-26-000022-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0000851693-26-000022 <b>Size:</b> 1 MB\n",
-    "fetched_at": "2026-04-14T18:24:50.581308+00:00",
+    "fetched_at": "2026-04-14T18:34:56.829813+00:00",
     "on_watchlist": false
   },
   {
@@ -56,7 +248,7 @@
     "updated": "2026-04-14T14:21:54-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/19617/000121390026043416/0001213900-26-043416-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043416 <b>Size:</b> 632 KB\n",
-    "fetched_at": "2026-04-14T18:24:50.581360+00:00",
+    "fetched_at": "2026-04-14T18:34:56.829904+00:00",
     "on_watchlist": false
   },
   {
@@ -68,19 +260,19 @@
     "updated": "2026-04-14T14:21:25-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/19617/000183988226020104/0001839882-26-020104-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001839882-26-020104 <b>Size:</b> 297 KB\n",
-    "fetched_at": "2026-04-14T18:24:50.581410+00:00",
+    "fetched_at": "2026-04-14T18:34:56.829981+00:00",
     "on_watchlist": false
   },
   {
     "form_type": "4",
-    "company_name": "424B2 - JPMORGAN CHASE & CO",
+    "company_name": "424B2 - JPMorgan Chase Financial Co. LLC",
     "cik": null,
     "ticker": null,
-    "title": "424B2 - JPMORGAN CHASE & CO (0000019617) (Filer)",
+    "title": "424B2 - JPMorgan Chase Financial Co. LLC (0001665650) (Filer)",
     "updated": "2026-04-14T14:20:33-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/19617/000183988226020101/0001839882-26-020101-index.htm",
+    "link": "https://www.sec.gov/Archives/edgar/data/1665650/000183988226020101/0001839882-26-020101-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001839882-26-020101 <b>Size:</b> 451 KB\n",
-    "fetched_at": "2026-04-14T18:24:50.581463+00:00",
+    "fetched_at": "2026-04-14T18:34:56.830036+00:00",
     "on_watchlist": false
   },
   {

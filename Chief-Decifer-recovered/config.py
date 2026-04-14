@@ -5,9 +5,12 @@ All paths and settings are read from .env — never hardcoded.
 
 import os
 from pathlib import Path
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv()
+# find_dotenv(usecwd=True) walks up from CWD until it finds a .env file,
+# so this works correctly regardless of which directory scripts are run from
+# and requires no symlinks or DECIFER_REPO_PATH on a fresh install.
+load_dotenv(find_dotenv(usecwd=True))
 
 # Path to the decifer-trading repo (for git history, test results, code health).
 # Required — no fallback. Chief's state is ALWAYS at $DECIFER_REPO_PATH/chief-decifer/state/.

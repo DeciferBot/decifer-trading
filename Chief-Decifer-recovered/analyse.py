@@ -24,9 +24,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv()
+load_dotenv(find_dotenv(usecwd=True))
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 # Import STATE_DIR from config so analyse.py writes to the same sacred state
