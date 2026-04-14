@@ -256,3 +256,79 @@ def test_score_breakdown_always_has_all_keys():
     result = _run(_base_sig(), flags={d: False for d in ALL_DIMS})
     for dim in BREAKDOWN_KEYS:
         assert dim in result["score_breakdown"], f"Missing key '{dim}' in score_breakdown"
+
+
+# ── 9. Sentiment Consensus Gate ──────────────────────────────────────────────
+
+
+def _run_with_consensus_cfg(sig_5m, news_score, social_score, gate_cfg=None):
+    """Run compute_confluence with a specific sentiment_consensus_gate config."""
+    import config
+
+    original_flags = config.CONFIG.get("dimension_flags", {})
+    original_mtf = config.CONFIG.get("mtf_gate_mode", "off")
+    original_gate = config.CONFIG.get("sentiment_consensus_gate", {})
+    try:
+        config.CONFIG["mtf_gate_mode"] = "off"
+        config.CONFIG["dimension_flags"] = {d: True for d in ALL_DIMS}
+        if gate_cfg is not None:
+            config.CONFIG["sentiment_consensus_gate"] = gate_cfg
+        return signals.compute_confluence(sig_5m, None, None, news_score=news_score, social_score=social_score)
+    finally:
+        config.CONFIG["dimension_flags"] = original_flags
+        config.CONFIG["mtf_gate_mode"] = original_mtf
+        config.CONFIG["sentiment_consensus_gate"] = original_gate
+
+
+def test_consensus_gate_agreement_boosts_score():
+    """Both news and social positive, both >= threshold → consensus=True, score higher."""
+    gate_cfg = {"enabled": True, "min_score_threshold": 3, "agreement_boost_pct": 0.15, "conflict_penalty_pct": 0.20}
+    result_agree = _run_with_consensus_cfg(_base_sig(), news_score=5, social_score=5, gate_cfg=gate_cfg)
+    result_neutral = _run_with_consensus_cfg(_base_sig(), news_score=0, social_score=0, gate_cfg=gate_cfg)
+    assert result_agree["sentiment_consensus"] is True
+    assert result_agree["score"] >= result_neutral["score"]
+
+
+def test_consensus_gate_conflict_penalises_score():
+    """News positive, social negative, both >= threshold → conflict penalty fires."""
+    gate_on = {"enabled": True, "min_score_threshold": 3, "agreement_boost_pct": 0.15, "conflict_penalty_pct": 0.20}
+    gate_off = {"enabled": False, "min_score_threshold": 3, "agreement_boost_pct": 0.15, "conflict_penalty_pct": 0.20}
+    # Same inputs, gate on vs off — penalty should reduce the score
+    result_gate_on = _run_with_consensus_cfg(_base_sig(), news_score=5, social_score=-5, gate_cfg=gate_on)
+    result_gate_off = _run_with_consensus_cfg(_base_sig(), news_score=5, social_score=-5, gate_cfg=gate_off)
+    assert result_gate_on["sentiment_consensus"] is False
+    assert result_gate_on["score"] <= result_gate_off["score"]
+
+
+def test_consensus_gate_neutral_source_no_effect():
+    """One source neutral (score=0) → gate does not fire, sentiment_consensus stays False."""
+    gate_cfg = {"enabled": True, "min_score_threshold": 3, "agreement_boost_pct": 0.15, "conflict_penalty_pct": 0.20}
+    result = _run_with_consensus_cfg(_base_sig(), news_score=0, social_score=5, gate_cfg=gate_cfg)
+    assert result["sentiment_consensus"] is False
+
+
+def test_consensus_gate_below_threshold_no_effect():
+    """Both sources below min_score_threshold → gate does not fire, score unchanged vs gate_off."""
+    gate_on = {"enabled": True, "min_score_threshold": 3, "agreement_boost_pct": 0.15, "conflict_penalty_pct": 0.20}
+    gate_off = {"enabled": False, "min_score_threshold": 3, "agreement_boost_pct": 0.15, "conflict_penalty_pct": 0.20}
+    # scores of 2 are below the threshold of 3 — gate should not fire regardless of enabled flag
+    result_gate_on = _run_with_consensus_cfg(_base_sig(), news_score=2, social_score=2, gate_cfg=gate_on)
+    result_gate_off = _run_with_consensus_cfg(_base_sig(), news_score=2, social_score=2, gate_cfg=gate_off)
+    assert result_gate_on["sentiment_consensus"] is False
+    assert result_gate_on["score"] == result_gate_off["score"]
+
+
+def test_consensus_gate_disabled_no_effect():
+    """Gate disabled via config → no score change, sentiment_consensus=False."""
+    gate_off = {"enabled": False, "min_score_threshold": 3, "agreement_boost_pct": 0.15, "conflict_penalty_pct": 0.20}
+    gate_on = {"enabled": True, "min_score_threshold": 3, "agreement_boost_pct": 0.15, "conflict_penalty_pct": 0.20}
+    result_off = _run_with_consensus_cfg(_base_sig(), news_score=8, social_score=8, gate_cfg=gate_off)
+    result_on = _run_with_consensus_cfg(_base_sig(), news_score=8, social_score=8, gate_cfg=gate_on)
+    assert result_off["sentiment_consensus"] is False
+    assert result_off["score"] < result_on["score"]
+
+
+def test_consensus_flag_present_in_result():
+    """sentiment_consensus key must always be present in compute_confluence output."""
+    result = _run(_base_sig())
+    assert "sentiment_consensus" in result

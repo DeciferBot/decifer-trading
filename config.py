@@ -426,6 +426,22 @@ CONFIG = {
         "min_mult": 0.5,
         "max_mult": 1.5,
     },
+    # ── SENTIMENT CONSENSUS GATE ─────────────────────────────────
+    # Applies a score bonus when NEWS and SOCIAL dimensions agree directionally,
+    # and a penalty when they conflict. Both sources must carry meaningful signal
+    # (>= min_score_threshold pts) for the gate to fire — a neutral/missing source
+    # does not trigger a conflict penalty.
+    # Research: Context Analytics (2025) — Twitter vs. News cross-correlation ≈ 0,
+    # so directional agreement is a genuine independent vote. Live portfolio data:
+    # "all sources agree" subset +33% YTD vs SPY +17%.
+    # Live equivalent: raise agreement_boost_pct/conflict_penalty_pct to 0.20/0.25.
+    "sentiment_consensus_gate": {
+        "enabled": True,
+        "min_score_threshold": 3,      # both dims must score >= 3pts for gate to apply
+        "agreement_boost_pct": 0.15,   # +15% of combined news+social when sources agree
+        "conflict_penalty_pct": 0.20,  # -20% of combined news+social when sources conflict
+        # Live: raise to 0.20 / 0.25 for tighter gate
+    },
     # ── DRAWDOWN-PROPORTIONAL POSITION SCALER ────────────────────
     # Smoothly reduces position size as equity draws down from HWM.
     # Linear: 1.0 at 0% drawdown → min_scalar at max_drawdown_alert.

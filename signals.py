@@ -2118,6 +2118,33 @@ def compute_confluence(
         social_dir = +1 if social_score > 0 else (-1 if social_score < 0 else 0)
         dim_directions.append((social_dir, social_pts))
 
+    # ── SENTIMENT CONSENSUS GATE — phase 1: compute flag and pending adjustment ─
+    # News and social have near-zero cross-correlation (Context Analytics 2025),
+    # so directional agreement is a genuine independent vote, not a correlated echo.
+    # Both dimensions must carry meaningful signal (>= min_score_threshold) for
+    # the gate to fire. A neutral/missing source does not trigger a conflict penalty.
+    # Score adjustment is applied AFTER IC+DAR so it is not overwritten by the
+    # IC recomputation (mirrors the MTF soft gate pattern).
+    sentiment_consensus = False
+    _consensus_adj = 0  # pending score delta: positive = boost, negative = penalty
+    _sc_cfg = CONFIG.get("sentiment_consensus_gate", {})
+    if _sc_cfg.get("enabled", True) and _enabled("news") and _enabled("social"):
+        _news_dir = +1 if news_score > 0 else (-1 if news_score < 0 else 0)
+        _soc_dir = +1 if social_score > 0 else (-1 if social_score < 0 else 0)
+        _min_sig = _sc_cfg.get("min_score_threshold", 3)
+        # Use abs of raw scores for threshold — scores are clamped to 0-10 positive in
+        # ns/social_pts, so a bearish score (-5) would produce 0 pts. Checking abs(raw)
+        # correctly detects meaningful signal in either direction.
+        _news_abs = min(10, abs(news_score))
+        _soc_abs = min(10, abs(social_score))
+        if _news_dir != 0 and _soc_dir != 0 and _news_abs >= _min_sig and _soc_abs >= _min_sig:
+            _combined_ref = _news_abs + _soc_abs
+            if _news_dir == _soc_dir:
+                _consensus_adj = round(_combined_ref * _sc_cfg.get("agreement_boost_pct", 0.15))
+                sentiment_consensus = True
+            else:
+                _consensus_adj = -round(_combined_ref * _sc_cfg.get("conflict_penalty_pct", 0.20))
+
     # ── 9. REVERSION (0-10) — mean-reversion tendency ──────
     # Composite of Variance Ratio (VR) + OU half-life + z-score,
     # gated by ADF test (p < 0.05). Fires in ranging/choppy markets
@@ -2352,6 +2379,15 @@ def compute_confluence(
         mtf_conflict_msg = mtf_alignment["conflict"]
         log.info(f"MTF GATE PENALTY {sig_5m.get('symbol', '?')}: -{penalty}pts → {score} | {mtf_alignment['conflict']}")
 
+    # ── SENTIMENT CONSENSUS GATE — phase 2: apply score adjustment ──────────
+    # Applied here (after IC+DAR) so it survives the IC recomputation.
+    if _consensus_adj != 0:
+        score = max(0, score + _consensus_adj)
+        if _consensus_adj > 0:
+            log.debug(f"SENTIMENT CONSENSUS [{sig_5m.get('symbol', '?')}]: agree +{_consensus_adj}pts")
+        else:
+            log.debug(f"SENTIMENT CONSENSUS [{sig_5m.get('symbol', '?')}]: conflict {_consensus_adj}pts")
+
     # Cap removed — per-dimension 0-10 is the correct winsorisation
     # (MSCI Barra standard).  Composite cap destroyed convergence info.
 
@@ -2421,6 +2457,8 @@ def compute_confluence(
         "dar": round(dar, 3),
         # Candlestick confirmation gate
         "candle_gate": candle_gate_status,
+        # Sentiment consensus gate (True when news+social agree directionally)
+        "sentiment_consensus": sentiment_consensus,
         # Reversion metrics (for dashboard + agent consumption)
         "reversion_score": min(reversion_score, 10),
         "variance_ratio": round(_vr, 3),
