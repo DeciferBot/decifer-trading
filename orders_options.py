@@ -800,3 +800,181 @@ def _record_options_attempt(symbol: str, direction: str) -> None:
 
 
 _options_ledger: dict = _load_options_ledger()
+
+
+# ── Add-to-position helpers ──────────────────────────────────────────────────
+
+def _get_open_option_position(symbol: str) -> tuple[str, dict] | None:
+    """Return (opt_key, position_dict) for an open options position on symbol, or None."""
+    with _trades_lock:
+        for key, pos in active_trades.items():
+            if (
+                pos.get("symbol") == symbol
+                and pos.get("instrument") == "option"
+                and pos.get("status") not in ("EXITING", "RESERVED")
+            ):
+                return key, dict(pos)
+    return None
+
+
+def ask_opus_add_to_option(
+    symbol: str,
+    position: dict,
+    signal_score: int,
+    signal_breakdown: dict,
+    direction: str,
+    regime: str,
+) -> dict:
+    """
+    Ask Opus whether to add contracts to an existing options position.
+
+    Returns {"action": "ADD", "contracts": N, "reasoning": "..."}
+         or {"action": "HOLD", "reasoning": "..."}.
+    Falls back to HOLD on any error — never blocks execution on a bad API call.
+    """
+    import json as _json2
+
+    import anthropic
+
+    entry = position.get("entry_premium", 0)
+    current = position.get("current_premium", entry)
+    pnl_pct = ((current - entry) / entry * 100) if entry > 0 else 0.0
+    contracts_held = position.get("contracts", 1)
+    max_add = max(1, round(contracts_held * 0.5))
+
+    breakdown_lines = "\n".join(
+        f"  {dim}: {val}" for dim, val in sorted(signal_breakdown.items(), key=lambda x: -x[1]) if val > 0
+    )
+
+    prompt = f"""You are managing an existing options position and must decide whether to add contracts.
+
+EXISTING POSITION:
+  Symbol   : {symbol}
+  Contract : {position.get('right','?')} ${position.get('strike','?')} exp {position.get('expiry_str','?')} ({position.get('dte','?')} DTE)
+  Held     : {contracts_held} contracts
+  Entry    : ${entry:.2f}  |  Current: ${current:.2f}  |  P&L: {pnl_pct:+.1f}%
+  Delta    : {position.get('delta','?')}
+
+CURRENT SIGNAL (score={signal_score}/60, direction={direction}):
+{breakdown_lines or '  (no breakdown available)'}
+
+REGIME: {regime}
+
+RULES (non-negotiable):
+- Never add to a losing position (current premium < entry premium)
+- Max add is {max_add} contracts (50% of current holding, rounded up)
+- Only ADD if signal has materially strengthened — score increase, new dimension firing, or clear momentum continuation
+- HOLD if signal is flat, weakened, or there is any ambiguity
+
+Respond with valid JSON only, no markdown:
+{{"action": "ADD", "contracts": N, "reasoning": "..."}}
+or
+{{"action": "HOLD", "reasoning": "..."}}"""
+
+    try:
+        client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
+        message = client.messages.create(
+            model=CONFIG.get("llm_advisor_model", "claude-opus-4-6"),
+            max_tokens=256,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = message.content[0].text.strip()
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+            text = text.strip()
+        result = _json2.loads(text)
+        action = result.get("action", "HOLD").upper()
+        if action == "ADD":
+            contracts = max(1, min(int(result.get("contracts", 1)), max_add))
+            log.info(
+                f"Opus add-to-option {symbol}: ADD {contracts} contracts — {result.get('reasoning','')[:120]}"
+            )
+            return {"action": "ADD", "contracts": contracts, "reasoning": result.get("reasoning", "")}
+        else:
+            log.info(f"Opus add-to-option {symbol}: HOLD — {result.get('reasoning','')[:120]}")
+            return {"action": "HOLD", "reasoning": result.get("reasoning", "")}
+    except Exception as exc:
+        log.warning(f"ask_opus_add_to_option {symbol} failed ({exc}) — defaulting to HOLD")
+        return {"action": "HOLD", "reasoning": str(exc), "_opus_failed": True}
+
+
+def execute_add_to_option(
+    ib: IB,
+    opt_key: str,
+    contract_info: dict,
+    add_contracts: int,
+    reasoning: str = "",
+    score: int = 0,
+) -> bool:
+    """
+    Add contracts to an existing options position.
+    Places a new DAY limit order at the ask for add_contracts.
+    Updates active_trades qty/contracts in place — does not reset SL/TP.
+    Returns True if order placed successfully.
+    """
+    if opt_key not in active_trades:
+        log.warning(f"execute_add_to_option: {opt_key} not in active_trades — aborting")
+        return False
+
+    symbol = contract_info["symbol"]
+    ask_price = contract_info.get("ask", 0.0)
+    mid_price = contract_info.get("mid", 0.0)
+    limit_price = round(ask_price if ask_price > mid_price > 0 else mid_price * 1.05, 2)
+
+    try:
+        option_contract = Option(
+            symbol,
+            contract_info["expiry_ibkr"],
+            contract_info["strike"],
+            contract_info["right"],
+            exchange="SMART",
+            currency="USD",
+        )
+        ib.qualifyContracts(option_contract)
+        account = CONFIG["active_account"]
+
+        entry_order = LimitOrder("BUY", add_contracts, limit_price, account=account, tif="DAY", outsideRth=False)
+        trade = ib.placeOrder(option_contract, entry_order)
+        ib.sleep(1)
+
+        order_status = trade.orderStatus.status
+        if order_status in ("Cancelled", "Inactive", "ApiCancelled", "ValidationError"):
+            log.error(f"Add-to-option order rejected by IBKR for {opt_key}: {order_status}")
+            return False
+
+        log_order(
+            {
+                "order_id": trade.order.orderId,
+                "symbol": symbol,
+                "side": "ADD",
+                "order_type": "LMT",
+                "qty": add_contracts,
+                "price": limit_price,
+                "status": "SUBMITTED",
+                "instrument": "option",
+                "right": contract_info["right"],
+                "strike": contract_info["strike"],
+                "expiry": contract_info["expiry_str"],
+                "mid": mid_price,
+                "ask": ask_price,
+                "reasoning": reasoning,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
+
+        with _trades_lock:
+            if opt_key in active_trades:
+                active_trades[opt_key]["contracts"] = active_trades[opt_key].get("contracts", 0) + add_contracts
+                active_trades[opt_key]["qty"] = active_trades[opt_key]["contracts"]
+
+        log.info(
+            f"✅ ADD {add_contracts} contracts {opt_key} @ ${limit_price:.2f} "
+            f"(total now {active_trades.get(opt_key, {}).get('contracts', '?')})"
+        )
+        return True
+
+    except Exception as exc:
+        log.error(f"execute_add_to_option {symbol}: {exc}")
+        return False
