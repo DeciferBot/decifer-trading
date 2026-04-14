@@ -202,7 +202,8 @@ def _enrich_macro_events(articles: list) -> None:
                 if raw.startswith("json"):
                     raw = raw[4:]
             classifications = json.loads(raw)
-            _macro_cache[cache_key] = classifications
+            if classifications:  # only cache non-empty — empty result allows retry on next cycle
+                _macro_cache[cache_key] = classifications
             log.info("Macro classifier: %d macro events found in %d articles", len(classifications), len(articles))
         except Exception as exc:
             log.warning("Macro event classification error: %s", exc)
@@ -358,7 +359,11 @@ def _stock_logo(symbol: str) -> str:
 
 
 def _fetch_og_image(url: str) -> str:
-    """Fetch og:image from an article URL. Returns '' on any failure."""
+    """
+    Fetch the primary story image from an article URL.
+    Tries og:image, twitter:image, and twitter:image:src meta tags.
+    Returns '' on any failure.
+    """
     if not url or not url.startswith("http"):
         return ""
     try:
@@ -366,18 +371,25 @@ def _fetch_og_image(url: str) -> str:
 
         resp = _req.get(
             url,
-            timeout=3,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; Decifer/2.0)"},
+            timeout=6,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml",
+            },
             allow_redirects=True,
         )
         if resp.status_code != 200:
             return ""
-        # Match both attribute orderings of <meta property="og:image" content="...">
-        for pat in (
+        html = resp.text[:80_000]
+        # Try og:image, twitter:image, twitter:image:src — all are reliable story photos
+        patterns = [
             r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
             r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
-        ):
-            m = re.search(pat, resp.text[:50_000], re.I)
+            r'<meta[^>]+name=["\']twitter:image(?::src)?["\'][^>]+content=["\']([^"\']+)["\']',
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']twitter:image(?::src)?["\']',
+        ]
+        for pat in patterns:
+            m = re.search(pat, html, re.I)
             if m:
                 img = m.group(1).strip()
                 if img.startswith("http"):
@@ -398,13 +410,13 @@ def _enrich_images(articles: list) -> None:
         for a in articles
         if not a.get("image_url")
         and a.get("url", "").startswith("http")
-        and "yahoo.com/quote" not in a.get("url", "")  # generic pages — skip
+        and "yahoo.com/quote/" not in a.get("url", "")  # generic listing pages — skip
     ]
     if needs:
         try:
-            with ThreadPoolExecutor(max_workers=8) as pool:
+            with ThreadPoolExecutor(max_workers=12) as pool:
                 futures = {pool.submit(_fetch_og_image, a["url"]): a for a in needs}
-                for fut in as_completed(futures, timeout=4):
+                for fut in as_completed(futures, timeout=15):
                     art = futures[fut]
                     try:
                         img = fut.result(timeout=0)
@@ -415,8 +427,12 @@ def _enrich_images(articles: list) -> None:
         except Exception:
             pass  # timeout or pool error — proceed with whatever completed
 
-    # No logo fallback — articles without images show the gradient ticker placeholder
-    # in the frontend, which looks cleaner than a corporate logo thumbnail.
+    # Logo fallback for articles still without an image after og:image scraping
+    for a in articles:
+        if not a.get("image_url"):
+            syms = a.get("symbols", [])
+            if syms:
+                a["image_url"] = _stock_logo(syms[0])
 
 
 class DashHandler(BaseHTTPRequestHandler):

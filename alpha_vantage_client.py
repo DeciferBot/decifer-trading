@@ -338,6 +338,11 @@ def get_news_articles(tickers: list[str], limit: int = 50) -> list[dict]:
                 if (ts.get("ticker") or "").strip()
             ]
 
+            # Derive a 0–10 news_score from the AV sentiment magnitude.
+            # AV overall_sentiment_score typically ranges ±0.15–0.5; scale so
+            # 0.15 → ~3, 0.35 → ~7, 0.5+ → 10.
+            news_score = min(10, round(abs(score) * 20))
+
             articles.append(
                 {
                     "headline": headline,
@@ -349,7 +354,7 @@ def get_news_articles(tickers: list[str], limit: int = 50) -> list[dict]:
                     "sentiment": sentiment,
                     "age_hours": round(age_hours, 2),
                     "created_ts": created_ts,
-                    "news_score": 0,
+                    "news_score": news_score,
                     "catalyst": "",
                 }
             )
