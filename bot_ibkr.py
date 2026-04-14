@@ -1186,6 +1186,7 @@ def sync_orders_from_ibkr():
             if oid in ibkr_known_ids:
                 continue
             o["status"] = "CANCELLED"
+            o["reason"] = "ibkr_sync:not_found_in_ibkr"
             changed = True
 
         if changed:
@@ -1270,6 +1271,22 @@ def _on_order_status_event(trade):
         fill_price = float(_fp) if (_fp is not None and _fp > 0) else 0
         filled_qty = int(trade.orderStatus.filled) if trade.orderStatus.filled else 0
 
+        # Capture IBKR cancel/reject reason from the trade log (most recent non-empty entry)
+        _cancel_reason = None
+        if mapped_status == "CANCELLED":
+            _why = getattr(trade.orderStatus, "whyHeld", "") or ""
+            if _why:
+                _cancel_reason = f"ibkr_event:whyHeld={_why}"
+            else:
+                for _entry in reversed(getattr(trade, "log", []) or []):
+                    _msg = getattr(_entry, "message", "") or ""
+                    if _msg:
+                        _code = getattr(_entry, "errorCode", 0)
+                        _cancel_reason = f"ibkr_event:{_code}:{_msg}"[:200]
+                        break
+                if not _cancel_reason:
+                    _cancel_reason = f"ibkr_event:{ibkr_status}"
+
         _log_order(
             {
                 "order_id": order.orderId,
@@ -1286,6 +1303,7 @@ def _on_order_status_event(trade):
                 "filled_qty": filled_qty,
                 "fill_price": fill_price if fill_price > 0 else None,
                 "source": "ibkr_event",
+                **({"reason": _cancel_reason} if _cancel_reason else {}),
             }
         )
 

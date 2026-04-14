@@ -40,9 +40,13 @@ from colorama import init as colorama_init
 # ── Sub-module imports ────────────────────────────────────────────────────────
 import bot_state
 from bot_ibkr import (
+    _register_subscription,
+    _restore_subscriptions,
+    _send_reconnect_exhausted_alert,
+    _unregister_subscription,
     connect_ibkr,
 )
-from bot_state import clog, dash
+from bot_state import _subscription_registry, clog, dash
 from config import CONFIG
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -178,11 +182,23 @@ def save_settings_overrides(settings: dict):
 # sys.modules.get("bot").check_and_reload(); tests do bot.check_and_reload().
 # Ruff respects the noqa comments below.
 from bot_hot_reload import (  # noqa: F401
+    WATCHED_MODULES,
     _file_hash,
     _file_hashes,
     _init_hashes,
     check_and_reload,
 )
+
+# ── Color map — used by dashboard and tests ───────────────────────────────────
+COLORS: dict = {
+    "TRADE": "cyan",
+    "SIGNAL": "green",
+    "ANALYSIS": "blue",
+    "ERROR": "red",
+    "INFO": "white",
+    "RISK": "yellow",
+    "SCAN": "magenta",
+}
 
 
 # ── Module __class__ shim ─────────────────────────────────────────────────────

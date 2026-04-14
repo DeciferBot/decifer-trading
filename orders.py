@@ -19,6 +19,8 @@ has no attribute 'CONFIG'``. See commit message for ``409964c`` area.
 
 from __future__ import annotations
 
+import threading
+
 from ib_async import IB, Forex, Future, LimitOrder, MarketOrder, Option, Stock, StopOrder
 
 from config import CONFIG
@@ -53,6 +55,8 @@ from orders_options import (
     update_trailing_stops,
 )
 from orders_portfolio import (
+    _GLOBAL_CANCEL_POLL_INTERVAL,
+    _GLOBAL_CANCEL_WAIT_SECS,
     _wait_for_order_book_clear,
     close_position,
     flatten_all,
@@ -70,7 +74,9 @@ from orders_state import (
     _get_symbol_lock,
     _is_recently_closed,
     _safe_del_trade,
+    _safe_set_trade,
     _safe_update_trade,
+    _symbol_locks,
     _trades_lock,
     active_trades,
     log,
@@ -121,6 +127,8 @@ __all__ = [
     "ORDER_DUPLICATE_CHECK_ENABLED_DEFAULT",
     "ORDERS_FILE",
     "TRADES_FILE",
+    "_GLOBAL_CANCEL_POLL_INTERVAL",
+    "_GLOBAL_CANCEL_WAIT_SECS",
     "_MAX_OPTION_SELL_RETRIES",
     "_OPTION_SELL_COOLDOWN",
     "_cancel_ibkr_order_by_id",
@@ -138,11 +146,14 @@ __all__ = [
     "_option_sell_attempts",
     "_pending_option_exits",
     "_safe_del_trade",
+    "_safe_set_trade",
     "_safe_update_trade",
+    "_symbol_locks",
     "_trades_lock",
     "_validate_position_price",
     "_wait_for_order_book_clear",
     "active_trades",
+    "threading",
     "calculate_position_size",
     "calculate_stops",
     "cancel_order_by_id",

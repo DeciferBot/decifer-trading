@@ -52,9 +52,14 @@ trimmed, exited early, or added to. You do NOT enter new trades — that is the 
 
 ACTIONS (use exactly one per position):
   HOLD  — thesis intact, mechanical stops are sufficient, no action needed
-  TRIM  — reduce position by ~50% now; signal weakening but not broken; lock in partial gains
+  TRIM  — reduce position; signal weakening but not broken; lock in partial gains.
+          You decide the percentage. Add: TRIM_PCT: 25 (barely weakening, keep most),
+          50 (standard half-out), or 75 (mostly out, small tracker kept).
   EXIT  — exit the full position immediately; thesis is broken; do not wait for stop
-  ADD   — add to position; signal strengthening, price pulling back to a good level
+  ADD   — add to position; signal strengthening, conviction rising, or price pulling back
+          to a strong entry level. You decide the dollar amount. Add: ADD_NOTIONAL: <dollars>.
+          Size relative to signal conviction and available cash — a high-conviction add
+          can equal or exceed the original position size.
 
 TRADE TYPES — each position has a type that determines the right review lens:
   SCALP — pure technical, short hold. Score drift > 5 points or any regime/news deterioration → EXIT fast.
@@ -96,7 +101,11 @@ OUTPUT FORMAT — produce exactly this for every position provided, no exception
 
 SYMBOL: <ticker>
 ACTION: HOLD | TRIM | EXIT | ADD
+TRIM_PCT: <integer>            (required when ACTION is TRIM — percentage of position to sell: 25, 50, or 75)
+ADD_NOTIONAL: <dollars>        (required when ACTION is ADD — dollar amount to buy, e.g. 5000)
 REASON: <one clear sentence — lead with the dominant factor>
+
+Omit TRIM_PCT and ADD_NOTIONAL lines for HOLD and EXIT actions.
 
 RULES:
 - Every position in the input must get an output entry.
@@ -117,6 +126,7 @@ def run_portfolio_review(
     news_sentiment: dict,
     portfolio_value: float,
     trigger: str,
+    available_cash: float = 0.0,
 ) -> list:
     """
     Review open positions for thesis drift.
@@ -202,10 +212,13 @@ def run_portfolio_review(
         trade_type = p.get("trade_type", "SCALP")
         conviction = p.get("conviction", 0.0)
 
+        notional = current_price * qty
+        pos_pct = (notional / portfolio_value * 100) if portfolio_value > 0 else 0
+
         pos_lines.append(
             f"POSITION: {sym} ({instrument}) {direction}  trade_type={trade_type}  conviction={conviction:.2f}\n"
             f"  entry=${entry_price:.2f} current=${current_price:.2f} "
-            f"qty={qty} pnl={pnl_pct:+.1f}%\n"
+            f"qty={qty} notional=${notional:,.0f} position_pct={pos_pct:.1f}% pnl={pnl_pct:+.1f}%\n"
             f"  {score_line}\n"
             f"  entry_regime={entry_regime} current_regime={regime_name}\n"
             f"  days_held={days_held}"
@@ -215,12 +228,12 @@ def run_portfolio_review(
 
     prompt = f"""REVIEW TRIGGER: {trigger}
 REGIME: {regime_name} | VIX={vix:.1f}
-PORTFOLIO VALUE: ${portfolio_value:,.2f}
+PORTFOLIO VALUE: ${portfolio_value:,.2f} | AVAILABLE CASH: ${available_cash:,.0f}
 
 OPEN POSITIONS ({len(open_positions)}):
 {chr(10).join(pos_lines)}
 
-Review each position and output SYMBOL / ACTION / REASON for every one."""
+Review each position and output SYMBOL / ACTION / TRIM_PCT (if TRIM) / ADD_NOTIONAL (if ADD) / REASON for every one."""
 
     try:
         client = _get_client()
@@ -417,11 +430,33 @@ def _parse_actions(text: str, open_positions: list) -> list:
         rea_m = re.search(r"REASON:\s*(.+?)(?:\n|$)", block, re.IGNORECASE)
         if sym_m and act_m:
             sym = sym_m.group(1)
-            results[sym] = {
+            action = act_m.group(1)
+            entry: dict = {
                 "symbol": sym,
-                "action": act_m.group(1),
+                "action": action,
                 "reasoning": rea_m.group(1).strip() if rea_m else "",
             }
+
+            # TRIM_PCT — how much of the position to sell (25/50/75)
+            if action == "TRIM":
+                trim_m = re.search(r"TRIM_PCT:\s*(\d+)", block)
+                if trim_m:
+                    raw_pct = int(trim_m.group(1))
+                    entry["trim_pct"] = max(1, min(raw_pct, 99))
+                else:
+                    entry["trim_pct"] = 50  # safe default
+                    log.warning(f"portfolio_manager: {sym} TRIM missing TRIM_PCT — defaulting 50%")
+
+            # ADD_NOTIONAL — dollar amount to add
+            if action == "ADD":
+                add_m = re.search(r"ADD_NOTIONAL:\s*\$?([\d,]+(?:\.\d+)?)", block)
+                if add_m:
+                    entry["add_notional"] = float(add_m.group(1).replace(",", ""))
+                else:
+                    entry["add_notional"] = 0.0
+                    log.warning(f"portfolio_manager: {sym} ADD missing ADD_NOTIONAL — will skip execution")
+
+            results[sym] = entry
         elif sym_m:
             raw_act = re.search(r"ACTION:\s*(\S+)", block)
             raw_val = raw_act.group(1) if raw_act else "<missing>"

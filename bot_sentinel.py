@@ -212,6 +212,7 @@ def _execute_trigger_buy(
                 signal_scores=sig.get("score_breakdown", {}),
                 agent_outputs={},
                 open_time=datetime.now(UTC).isoformat(),
+                advice_size_mult=size_mult,
             )
             if success:
                 dash["trades"].insert(

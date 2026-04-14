@@ -155,11 +155,12 @@ CONFIG = {
     "max_position_size": 0.30,  # Max fraction of account per position (30%)
     "max_daily_loss_pct": 0.05,  # 5% max daily loss before halting
     "correlation_threshold": 0.75,  # Block new trade if correlation > this
-    "max_positions": 15,  # 15 × 6% = 90% deployed; 10% cash floor stops at ~14
+    "max_positions": 15,
     "daily_loss_limit": 0.10,  # 10% daily loss limit
     "max_drawdown_alert": 0.25,  # 25% drawdown alert
     "min_cash_reserve": 0.10,  # 10% cash floor — hard stop on new entries
-    "max_single_position": 0.06,  # 6% per position — keeps 14 positions before hitting floor
+    "max_single_position": 0.06,  # Cross-instrument exposure guard only (stock+option stacking on same name).
+    # Not enforced as a sizing cap — Opus decides position size from account context.
     "max_sector_exposure": 0.40,  # 40% sector cap
     "consecutive_loss_pause": 999,  # Paper learning mode: effectively disabled (live: 5)
     "reentry_cooldown_minutes": 30,  # Block re-entry after close (lifecycle gate)
@@ -712,7 +713,8 @@ CONFIG = {
     "fill_watcher": {
         "enabled": True,  # Master switch — set False to disable without removing code
         "initial_wait_secs": 30,  # Seconds to wait before the first price adjustment
-        "max_attempts": 3,  # Max number of adjustments before cancelling
+        "max_attempts": 3,  # Max number of adjustments before cancelling/converting
+        "market_fallback_on_max_attempts": True,  # paper: True — convert to MKT after max chase; live: False
         "interval_secs": 20,  # Seconds between each adjustment attempt
         "step_pct": 0.002,  # Price chase step: 0.2% per attempt (e.g. $0.20 on a $100 stock)
         "max_chase_pct": 0.01,  # Hard ceiling: never pay more than 1% above the original limit

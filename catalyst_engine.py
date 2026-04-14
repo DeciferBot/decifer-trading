@@ -31,6 +31,10 @@ from config import (
 )
 
 log = logging.getLogger("decifer.catalyst_engine")
+
+# File written by _edgar_runner (via signals/edgar_monitor.py) — rolling 7-day window.
+# _edgar_monitor reads from here instead of polling SEC directly.
+_EDGAR_FILE = CATALYST_DIR / "edgar_events.json"
 _UTC = timezone.utc
 
 

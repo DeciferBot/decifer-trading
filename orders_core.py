@@ -525,10 +525,10 @@ def execute_buy(
             entry_order = MarketOrder("BUY", qty, account=account, tif="DAY", outsideRth=True)
         elif exec_plan.order_type == "MIDPOINT":
             _midprice = round((ibkr_bid + ibkr_ask) / 2, 2) if ibkr_bid > 0 and ibkr_ask > 0 else limit_price
-            entry_order = LimitOrder("BUY", qty, _midprice, account=account, tif="DAY", outsideRth=True)
+            entry_order = LimitOrder("BUY", qty, _midprice, account=account, tif="GTC", outsideRth=True)
         else:  # "LIMIT" (default)
             _effective_limit = exec_plan.limit_price if exec_plan.limit_price > 0 else limit_price
-            entry_order = LimitOrder("BUY", qty, _effective_limit, account=account, tif="DAY", outsideRth=True)
+            entry_order = LimitOrder("BUY", qty, _effective_limit, account=account, tif="GTC", outsideRth=True)
         # Stamp signal source on the order — survives in IBKR execution history.
         entry_order.orderRef = f"DEC:{score}"[:20]
         entry_order.transmit = False
@@ -1051,7 +1051,7 @@ def execute_short(
         limit_price = round(price * 0.998, 2)
 
         # Entry: sell short
-        entry_order = LimitOrder("SELL", qty, limit_price, account=account, tif="DAY", outsideRth=True)
+        entry_order = LimitOrder("SELL", qty, limit_price, account=account, tif="GTC", outsideRth=True)
         entry_order.orderRef = f"DEC:{score}"[:20]
         entry_order.transmit = False
         trade = ib.placeOrder(contract, entry_order)
@@ -1411,4 +1411,93 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             )
         except Exception:
             pass
+        return False
+
+
+def execute_add_to_position(
+    ib: IB,
+    symbol: str,
+    add_qty: int,
+    current_price: float,
+    regime: dict,
+    reason: str = "portfolio_manager_add",
+) -> bool:
+    """
+    Add shares to an existing LONG position (DCA / conviction-add).
+
+    Places a limit buy at current price + 0.2% for fill assurance,
+    then updates the position's qty and averaged entry price in the tracker.
+    Only supports stock (not options/FX) — PM ADD on options is rare and
+    handled separately.
+
+    Returns True if order placed successfully.
+    """
+    from ib_async import LimitOrder as _LimitOrder
+    from learning import log_order as _log_order
+
+    if add_qty < 1:
+        log.warning(f"execute_add_to_position {symbol}: invalid add_qty={add_qty} — skipping")
+        return False
+
+    with _trades_lock:
+        if symbol not in active_trades:
+            log.warning(f"execute_add_to_position {symbol}: no active position — cannot add")
+            return False
+        info = dict(active_trades[symbol])
+
+    if info.get("direction", "LONG") != "LONG":
+        log.warning(f"execute_add_to_position {symbol}: ADD on SHORT not supported — skipping")
+        return False
+
+    if not is_equities_extended_hours():
+        import zoneinfo as _zi
+
+        _now_et = datetime.now(_zi.ZoneInfo("America/New_York")).strftime("%H:%M ET")
+        log.warning(f"execute_add_to_position {symbol}: market closed ({_now_et}) — deferring ADD")
+        return False
+
+    existing_qty = info.get("qty", 0)
+    existing_entry = info.get("entry", current_price)
+    limit_price = round(current_price * 1.002, 2)  # small premium for fill assurance
+
+    try:
+        contract = get_contract(symbol, "stock")
+        ib.qualifyContracts(contract)
+
+        add_order = _LimitOrder("BUY", add_qty, limit_price, account=CONFIG["active_account"])
+        add_order.outsideRth = True
+        trade = ib.placeOrder(contract, add_order)
+        ib.sleep(0.4)
+
+        # Update position: blended avg entry and new total qty
+        new_qty = existing_qty + add_qty
+        new_avg_entry = round(
+            ((existing_entry * existing_qty) + (current_price * add_qty)) / new_qty, 4
+        )
+        _safe_update_trade(symbol, {"qty": new_qty, "entry": new_avg_entry})
+
+        log.info(
+            f"[ADD] {symbol}: +{add_qty} @ limit ${limit_price:.2f} | "
+            f"avg_entry ${existing_entry:.2f} → ${new_avg_entry:.2f} | "
+            f"qty {existing_qty} → {new_qty} | {reason}"
+        )
+
+        _log_order(
+            {
+                "symbol": symbol,
+                "side": "BUY",
+                "order_type": "LMT",
+                "qty": add_qty,
+                "price": limit_price,
+                "order_id": getattr(getattr(trade, "order", None), "orderId", 0),
+                "status": "SUBMITTED",
+                "reason": reason,
+                "regime": regime.get("regime", ""),
+                "note": "portfolio_manager_add",
+            }
+        )
+        return True
+
+    except Exception as e:
+        log.error(f"execute_add_to_position {symbol}: failed — {e}")
         return False

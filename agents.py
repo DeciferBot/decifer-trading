@@ -87,6 +87,7 @@ def run_all_agents(
     options_signals: list | None = None,
     strategy_mode: dict | None = None,
     positions_to_reconsider: list | None = None,
+    available_cash: float = 0.0,
 ) -> dict:
     """
     Run agent pipeline and return final decision.
@@ -165,6 +166,7 @@ def run_all_agents(
             portfolio_value,
             daily_pnl,
             open_positions,
+            available_cash,
         )
         tech = tech_future.result()
         analyst = analyst_future.result()
@@ -665,6 +667,7 @@ def agent_trading_analyst(
     portfolio_value: float = 0.0,
     daily_pnl: float = 0.0,
     open_positions: list | None = None,
+    available_cash: float = 0.0,
 ) -> str:
     """
     Single Opus LLM call replacing Macro Analyst + Opportunity Finder + Devil's Advocate.
@@ -686,14 +689,18 @@ def agent_trading_analyst(
         sig = s.get("signal", "?")
         bd = s.get("score_breakdown", {})
         bd_str = " ".join(f"{k[:3]}={v:.0f}" for k, v in bd.items() if v > 0)
-        news = s.get("news") or {}
-        kw = news.get("keyword_score", 0)
-        sent = news.get("claude_sentiment", "")
+        sig_news = s.get("news") or {}
+        kw = sig_news.get("keyword_score", 0)
+        sent = sig_news.get("claude_sentiment", "")
         news_str = f" | news={sent}(kw={kw:+d})" if sent else (f" | kw={kw:+d}" if kw else "")
         vol_ratio = s.get("vol_ratio") or s.get("timeframes", {}).get("5m", {}).get("vol_ratio", 1.0)
         vwap_dist = s.get("timeframes", {}).get("5m", {}).get("vwap_dist", 0)
+        price = s.get("price", 0)
+        atr = s.get("atr", 0)
+        price_str = f" | ${price:.2f}" if price > 0 else ""
+        atr_str = f" atr=${atr:.2f} ({atr/price*100:.1f}%)" if price > 0 and atr > 0 else ""
         sig_lines.append(
-            f"  {sym}: {score}pt {sig} [{bd_str}]{news_str} | Vol={vol_ratio:.1f}x ADV | VWAP={vwap_dist:+.1f}%"
+            f"  {sym}: {score}pt {sig} [{bd_str}]{news_str} | Vol={vol_ratio:.1f}x ADV | VWAP={vwap_dist:+.1f}%{price_str}{atr_str}"
         )
 
     opts_lines = []
@@ -720,22 +727,48 @@ def agent_trading_analyst(
     except Exception:
         pass
 
-    # ── Portfolio context: what's already held ────────────────────────────────
-    held_syms = [p["symbol"] for p in (open_positions or [])]
-    if held_syms:
-        held_block = f"\nALREADY HELD — do NOT recommend new entries for these: {', '.join(held_syms)}\n"
-    else:
-        held_block = ""
+    # ── Account state block ───────────────────────────────────────────────────
+    max_pos = CONFIG["max_positions"]
+    slots_used = len(open_positions or [])
+    slots_remaining = max_pos - slots_used
+    daily_budget_left = (portfolio_value * CONFIG.get("daily_loss_limit", 0.10)) + min(0, daily_pnl)
+    pnl_pct = (daily_pnl / portfolio_value * 100) if portfolio_value > 0 else 0
+    account_block = ""
+    if portfolio_value > 0:
+        account_block = (
+            f"ACCOUNT: portfolio=${portfolio_value:,.0f} | cash=${available_cash:,.0f} "
+            f"| day_pnl=${daily_pnl:+,.0f} ({pnl_pct:+.2f}%) | budget_left=${daily_budget_left:,.0f} "
+            f"| positions={slots_used}/{max_pos} ({slots_remaining} slots open)\n"
+        )
 
-    # ── Portfolio P&L context — factual, no directive ────────────────────────
-    pnl_context = ""
-    if portfolio_value > 0 and daily_pnl != 0:
-        pnl_pct = daily_pnl / portfolio_value * 100
-        pnl_context = f"Portfolio P&L today: ${daily_pnl:+,.0f} ({pnl_pct:+.2f}%)\n"
+    # ── Open position detail ──────────────────────────────────────────────────
+    held_block = ""
+    if open_positions:
+        pos_lines = []
+        for p in open_positions:
+            sym = p.get("symbol", "?")
+            direction = p.get("direction", "LONG")
+            entry = p.get("entry", 0)
+            current = p.get("current", entry)
+            qty = p.get("qty", 0)
+            notional = current * qty
+            pnl_p = ((current - entry) / entry * 100) if entry > 0 else 0
+            if direction == "SHORT":
+                pnl_p = -pnl_p
+            trade_type = p.get("trade_type", "SCALP")
+            pos_lines.append(
+                f"  {sym}: {direction} {trade_type} | entry=${entry:.2f} now=${current:.2f} "
+                f"qty={qty} notional=${notional:,.0f} pnl={pnl_p:+.1f}%"
+            )
+        held_block = (
+            "\nOPEN POSITIONS (do NOT recommend new entries for these symbols):\n"
+            + "\n".join(pos_lines)
+            + "\n"
+        )
 
     prompt = f"""REGIME: {regime_name} | VIX={vix:.1f} ({vix_1h:+.1f}%/1h) | size_mult={size_mult:.1f}x
 SPY=${spy} ({"above" if spy_above else "below"} 200d MA) | QQQ=${qqq} ({"above" if qqq_above else "below"} 200d MA)
-{pnl_context}{overnight_block}{held_block}
+{account_block}{overnight_block}{held_block}
 SCORED SIGNALS — fresh candidates first (NOT already held):
 {chr(10).join(sig_lines) or "  None above threshold"}
 

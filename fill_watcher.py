@@ -26,7 +26,7 @@ import threading
 import time
 from datetime import UTC, datetime
 
-from ib_async import LimitOrder
+from ib_async import LimitOrder, MarketOrder
 
 from config import CONFIG
 from learning import _append_audit_event, log_order
@@ -202,9 +202,16 @@ class FillWatcher:
 
         self._log_audit("fill_watcher_max_attempts", attempts=attempts, final_limit=current_limit)
         log.warning(
-            f"FillWatcher: {self._symbol} max attempts ({attempts}) exhausted at ${current_limit:.2f} — cancelling"
+            f"FillWatcher: {self._symbol} max attempts ({attempts}) exhausted at ${current_limit:.2f}"
         )
-        self._cancel_order("max_attempts_exhausted")
+        _use_fallback = (
+            CONFIG.get("fill_watcher", {}).get("market_fallback_on_max_attempts", False)
+            and self._instrument == "stock"
+        )
+        if _use_fallback:
+            self._fallback_to_market(current_limit)
+        else:
+            self._cancel_order("max_attempts_exhausted")
 
     # ── Internal helpers ───────────────────────────────────────────────────────
 
@@ -245,7 +252,7 @@ class FillWatcher:
                 self._qty,
                 new_limit,
                 account=CONFIG["active_account"],
-                tif="DAY",
+                tif="GTC",
                 outsideRth=True,
             )
             modified_order.orderId = self._order_id
@@ -312,6 +319,73 @@ class FillWatcher:
         self._log_audit("fill_watcher_cancelled", reason=reason)
         self._remove_from_registry()
         log.warning(f"FillWatcher: {self._symbol} order #{self._order_id} CANCELLED ({reason})")
+
+    def _fallback_to_market(self, final_limit: float) -> None:
+        """
+        Convert an unexecuted limit entry to a market order after max chase attempts.
+        Used in paper trading to guarantee a fill rather than losing the data point.
+        Cancels the stale limit order (and any bracket children), then places a
+        standalone market order. The portfolio manager handles exit from there.
+        live: disable via market_fallback_on_max_attempts=False in config.
+        """
+        try:
+            if self._ib.isConnected():
+                # Cancel the stale limit order
+                try:
+                    self._ib.cancelOrder(self._entry_trade.order)
+                    self._ib.sleep(0.5)
+                except Exception as exc:
+                    log.warning(f"FillWatcher._fallback_to_market: cancelOrder for {self._symbol} raised: {exc}")
+
+                # Cancel any bracket children (SL/TP) attached to this parent
+                try:
+                    for t in self._ib.openTrades():
+                        if getattr(t.order, "parentId", None) == self._order_id:
+                            self._ib.cancelOrder(t.order)
+                except Exception:
+                    pass
+
+                # Place standalone market order
+                mkt_order = MarketOrder(self._side, self._qty, account=CONFIG["active_account"])
+                mkt_order.outsideRth = True
+                mkt_trade = self._ib.placeOrder(self._contract, mkt_order)
+                self._ib.sleep(1.0)
+
+                new_oid = mkt_trade.order.orderId
+                if not new_oid:
+                    # IBKR hasn't assigned an ID yet — not a rejection, just slow.
+                    # Log with 0 so audit trail is complete; position stays tracked by symbol.
+                    log.warning(f"FillWatcher._fallback_to_market: {self._symbol} MKT order has no orderId yet (will reconcile via sync)")
+                log_order(
+                    {
+                        "order_id": new_oid,
+                        "symbol": self._symbol,
+                        "side": self._side,
+                        "order_type": "MKT",
+                        "qty": self._qty,
+                        "price": final_limit,
+                        "status": "SUBMITTED",
+                        "instrument": self._instrument,
+                        "reason": "market_fallback_after_max_attempts",
+                        "timestamp": datetime.now(UTC).isoformat(),
+                    }
+                )
+                self._log_audit("fill_watcher_market_fallback", final_limit=final_limit, new_order_id=new_oid)
+                log.info(
+                    f"FillWatcher: {self._symbol} converted to MKT order #{new_oid} after max chase attempts"
+                )
+            else:
+                # IBKR disconnected — fall back to cancel path
+                log.warning(f"FillWatcher._fallback_to_market: {self._symbol} — IBKR disconnected, cancelling instead")
+                self._cancel_order("max_attempts_exhausted_disconnected")
+                return
+        except Exception as exc:
+            log.error(f"FillWatcher._fallback_to_market: {self._symbol} failed: {exc} — falling back to cancel")
+            self._cancel_order("max_attempts_exhausted")
+            return
+
+        # Clean up state (position tracker stays — market order is still pending a fill)
+        self._remove_from_registry()
 
     def _remove_from_registry(self) -> None:
         """Remove self from _active_watchers (idempotent)."""

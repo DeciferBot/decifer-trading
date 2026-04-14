@@ -515,8 +515,8 @@ def calculate_position_size(
         assumed_stop = price * CONFIG["assumed_stop_pct"]
         qty = max(1, int(risk_amount / assumed_stop))
 
-    max_pos_qty = max(1, int(portfolio_value * CONFIG["max_single_position"] / price))
-    qty = min(qty, max_pos_qty)
+    # max_single_position cap removed — Opus (Portfolio Manager) decides sizing.
+    # The only remaining hard cap is the 20% order value guard in orders_core.py.
 
     atr_capped_qty: int | None = None
     if CONFIG.get("atr_vol_cap_enabled") and atr > 0:
@@ -1020,3 +1020,6 @@ def check_thesis_validity(open_positions: list, current_regime: str) -> list:
             flagged.append({"symbol": pos.get("symbol", "?"), "reason": reason})
 
     return flagged
+
+# Backwards-compat alias — tests reference risk.position_size
+position_size = calculate_position_size

@@ -1373,6 +1373,13 @@ def run_scan():
     if should_review and open_pos:
         clog("ANALYSIS", f"Portfolio review triggered: {pm_trigger}")
         try:
+            # Approximate available cash from portfolio value minus open position notionals.
+            # Avoids an extra IBKR call; accurate enough for Opus sizing decisions.
+            _pos_notional = sum(
+                p.get("current", p.get("entry", 0)) * p.get("qty", 0) for p in open_pos
+            )
+            _available_cash = max(0.0, pv - _pos_notional)
+
             pm_actions = run_portfolio_review(
                 open_positions=open_pos,
                 all_scored=pipeline.all_scored,
@@ -1380,6 +1387,7 @@ def run_scan():
                 news_sentiment=news_sentiment,
                 portfolio_value=pv,
                 trigger=pm_trigger,
+                available_cash=_available_cash,
             )
             for action in pm_actions:
                 sym_pm = action.get("symbol", "")
@@ -1487,7 +1495,8 @@ def run_scan():
                             for _ok in _opt_keys_pm:
                                 with _pm_lock:
                                     _c = _pm_trades.get(_ok, {}).get("contracts", 0)
-                                _trim_c = max(1, _c // 2)
+                                _trim_pct = action.get("trim_pct", 50)
+                                _trim_c = max(1, round(_c * _trim_pct / 100))
                                 execute_sell_option(
                                     ib,
                                     _ok,
@@ -1497,7 +1506,8 @@ def run_scan():
                         if sym_pm in _pm_trades:
                             with _pm_lock:
                                 _q = _pm_trades.get(sym_pm, {}).get("qty", 0)
-                            _trim_q = max(1, _q // 2)
+                            _trim_pct = action.get("trim_pct", 50)
+                            _trim_q = max(1, round(_q * _trim_pct / 100))
                             _trim_reason = _build_pm_exit_reason(
                                 pos_pm or {}, regime, pm_trigger, reason_pm, exit_tag="pm_trim"
                             )
@@ -1535,8 +1545,40 @@ def run_scan():
                                         "reason": _trim_reason,
                                     },
                                 )
-                elif act_pm == "ADD":
-                    clog("INFO", f"Portfolio manager ADD: {sym_pm} — {reason_pm} (manual review)")
+                elif act_pm == "ADD" and sym_pm:
+                    from orders_core import execute_add_to_position as _execute_add
+
+                    pos_pm = next((p for p in open_pos if p["symbol"] == sym_pm), None)
+                    if not pos_pm:
+                        clog("WARN", f"PM ADD: no active position found for {sym_pm} — skipping")
+                    else:
+                        _add_notional = action.get("add_notional", 0.0)
+                        if _add_notional <= 0:
+                            clog("WARN", f"PM ADD: {sym_pm} — Opus did not specify ADD_NOTIONAL, skipping")
+                        else:
+                            _add_price = pos_pm.get("current", 0)
+                            if _add_price <= 0:
+                                clog("WARN", f"PM ADD: {sym_pm} — invalid current price, skipping")
+                            else:
+                                _add_qty = max(1, int(_add_notional / _add_price))
+                                clog(
+                                    "TRADE",
+                                    f"Portfolio manager ADD: {sym_pm} +{_add_qty} shares "
+                                    f"(~${_add_notional:,.0f} @ ${_add_price:.2f}) — {reason_pm}",
+                                )
+                                _added = _execute_add(
+                                    ib=ib,
+                                    symbol=sym_pm,
+                                    add_qty=_add_qty,
+                                    current_price=_add_price,
+                                    regime=regime,
+                                    reason=f"portfolio_manager_add:{pm_trigger}",
+                                )
+                                # A successful ADD represents a fresh conviction re-entry.
+                                # Clear the trim-once guard so Opus can TRIM again if the
+                                # signal later collapses after the add.
+                                if _added:
+                                    _trimmed_today.discard(sym_pm)
                 else:
                     clog("INFO", f"Portfolio manager HOLD: {sym_pm} — {reason_pm}")
             # Log all actions to audit log
@@ -1599,6 +1641,11 @@ def run_scan():
         for _p in positions_to_reconsider:
             clog("RISK", f"  Reconsider: {_p['symbol']} — {_p['reason']}")
 
+    _agent_pos_notional = sum(
+        p.get("current", p.get("entry", 0)) * p.get("qty", 0) for p in open_pos
+    )
+    _agent_cash = max(0.0, pv - _agent_pos_notional)
+
     decision = run_all_agents(
         signals=scored,
         regime=regime,
@@ -1610,6 +1657,7 @@ def run_scan():
         options_signals=options_signals,
         strategy_mode=strategy_mode,
         positions_to_reconsider=positions_to_reconsider,
+        available_cash=_agent_cash,
     )
 
     dash["claude_analysis"] = decision.get("summary", decision.get("claude_reasoning", ""))
@@ -1834,8 +1882,13 @@ def run_scan():
 
         from orders_contracts import is_options_market_open
 
+        _intel_avoided = any(r.get("side") == "AVOIDED" for r in dispatch_results)
+        if _intel_avoided:
+            clog("INFO", f"Options skipped for {sym} — intelligence gate returned AVOID (applies to all instruments)")
+
         if (
-            CONFIG.get("options_enabled")
+            not _intel_avoided
+            and CONFIG.get("options_enabled")
             and get_session() not in ("PRE_MARKET", "AFTER_HOURS")
             and sig["score"] >= CONFIG.get("options_min_score", 35)
         ):
@@ -1856,16 +1909,18 @@ def run_scan():
                     if _options_attempted_today(sym, direction):
                         clog(
                             "INFO",
-                            f"Options attempt already recorded for {sym} {direction} today — skipping (DAY order terminal)",
+                            f"Options attempt already recorded for {sym} {direction} today — skipping (duplicate order guard)",
                         )
                     else:
                         clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
+                        # Record before evaluation so any failure reason (no data, no chain,
+                        # IVR too high) blocks retries for the rest of the day. Conditions
+                        # that cause find_best_contract to return None are stable intraday
+                        # and retrying every cycle wastes API calls and agent time.
+                        _record_options_attempt(sym, direction)
                         try:
                             contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
                             if contract_info:
-                                _record_options_attempt(
-                                    sym, direction
-                                )  # mark after contract found, before IBKR submit (survives crash)
                                 opt_success = execute_buy_option(
                                     ib, contract_info, pv, reasoning=reason, score=sig["score"]
                                 )
