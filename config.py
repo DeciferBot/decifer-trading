@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 try:
     from dotenv import load_dotenv as _load_dotenv
@@ -15,6 +16,32 @@ try:
     _load_dotenv(os.path.join(os.path.dirname(__file__), ".env"), override=False)
 except ImportError:
     pass  # python-dotenv not installed — fall back to shell environment
+
+# ── Catalyst Intelligence Layer ───────────────────────────────────────────────
+# Module-level constants so signal modules can `from config import CATALYST_DIR`
+# regardless of whether they're running inside Decifer or Chief Decifer.
+_REPO_ROOT = Path(__file__).parent
+CATALYST_DIR = _REPO_ROOT / "chief-decifer" / "state" / "internal" / "catalyst"
+
+CATALYST_THRESHOLDS = {
+    "ev_revenue_max":     3.0,
+    "revenue_growth_min": 0.10,
+    "market_cap_min":     1e9,
+    "market_cap_max":     50e9,
+    "target_sectors": [
+        "Healthcare",
+        "Technology",
+        "Industrials",
+        "Communication Services",
+        "Consumer Discretionary",
+    ],
+}
+
+# Runner intervals — override via environment variable if needed
+CATALYST_SCREEN_INTERVAL  = int(os.getenv("CATALYST_SCREEN_INTERVAL",  str(4 * 3600)))  # 4h
+EDGAR_POLL_INTERVAL       = int(os.getenv("EDGAR_POLL_INTERVAL",       "600"))           # 10m
+OPTIONS_ANOMALY_INTERVAL  = int(os.getenv("OPTIONS_ANOMALY_INTERVAL",  str(30 * 60)))   # 30m
+SENTIMENT_SCORER_INTERVAL = int(os.getenv("SENTIMENT_SCORER_INTERVAL", str(15 * 60)))   # 15m
 
 CONFIG = {
     # ── IBKR CONNECTION ────────────────────────────────────────

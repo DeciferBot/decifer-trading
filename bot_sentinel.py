@@ -442,6 +442,24 @@ def start_catalyst_sentinel(ib):
     return sentinel
 
 
+def start_catalyst_engine():
+    """
+    Initialise and start the CatalystEngine intelligence layer.
+    Returns the running engine instance; caller stores in bot_state._catalyst_engine.
+
+    Session 1: WatchlistStore + 4 scoring runners only.
+    Session 2: real-time monitors added, CatalystSentinel retired.
+    """
+    from catalyst_engine import CatalystEngine
+
+    engine = CatalystEngine(
+        get_universe_fn=_get_sentinel_universe,
+        on_trigger_fn=None,  # wired in Session 2
+    )
+    engine.start()
+    return engine
+
+
 # ── Scan countdown ────────────────────────────────────────────────────────────
 
 

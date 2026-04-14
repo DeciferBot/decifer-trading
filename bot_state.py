@@ -85,6 +85,8 @@ dash = {
     # ── Catalyst Sentinel state ────────────────────────────────────────────
     "catalyst_triggers": [],
     "catalyst_sentinel_stats": {},
+    # ── Catalyst Engine state ──────────────────────────────────────────────
+    "catalyst_engine_stats": {},
     # ── Directional skew (BACK-007) ─────────────────────────────────────────
     "skew": {},
     # ── Sector rotation bias (updated each scan cycle) ───────────────────────
@@ -124,6 +126,9 @@ _sentinel_hour_start = None
 _catalyst_sentinel = None
 _catalyst_trades_today = 0
 _catalyst_trade_date = ""
+
+# ── Catalyst Engine state ─────────────────────────────────────────────────────
+_catalyst_engine = None   # CatalystEngine instance
 
 # ── Alpaca streams ───────────────────────────────────────────────────────────
 _bar_stream = None  # AlpacaBarStream instance — started in bot.py main()

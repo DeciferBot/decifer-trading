@@ -247,6 +247,7 @@ def main():
     from bot_sentinel import (
         countdown_tick,
         start_alpaca_news_stream,
+        start_catalyst_engine,
         start_catalyst_sentinel,
         start_news_sentinel,
     )
@@ -445,6 +446,16 @@ def main():
     else:
         clog("INFO", "⚡ Catalyst Sentinel disabled (catalyst_sentinel_enabled=False in config)")
 
+    # ── Start Catalyst Engine (M&A intelligence layer) ───────────────────────
+    # Session 1: WatchlistStore + 4 scoring runners (fundamental/EDGAR/options/sentiment).
+    # Session 2: real-time news/EDGAR monitors added, CatalystSentinel retired.
+    try:
+        bot_state._catalyst_engine = start_catalyst_engine()
+        dash["catalyst_engine_stats"] = bot_state._catalyst_engine.get_stats()
+        clog("INFO", f"⚡ Catalyst Engine active | {bot_state._catalyst_engine.store.count()} candidates pre-loaded")
+    except Exception as _ce_err:
+        clog("WARN", f"⚡ Catalyst Engine failed to start: {_ce_err}")
+
     # ── Start Social Sentiment background polling ─────────────────────────────
     try:
         from social_sentiment import start_sentiment_polling
@@ -610,6 +621,10 @@ def main():
             if bot_state._catalyst_sentinel:
                 dash["catalyst_sentinel_stats"] = bot_state._catalyst_sentinel.stats
 
+            # ── Sync catalyst engine stats to dashboard ──
+            if bot_state._catalyst_engine:
+                dash["catalyst_engine_stats"] = bot_state._catalyst_engine.get_stats()
+
             # ── Sync momentum sentinel state to dashboard ──
             if bot_state._momentum_sentinel:
                 dash["momentum_sentinel_stats"] = bot_state._momentum_sentinel.stats
@@ -642,6 +657,8 @@ def main():
             bot_state._sentinel.stop()
         if bot_state._catalyst_sentinel:
             bot_state._catalyst_sentinel.stop()
+        if bot_state._catalyst_engine:
+            bot_state._catalyst_engine.stop()
         try:
             from social_sentiment import stop_sentiment_polling
 
