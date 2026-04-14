@@ -409,12 +409,16 @@ def update_timestamp(_n, _clicks):
 # ── Entry point ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    from signals.auto_runner import start as start_auto_runner
-    start_auto_runner(
-        screen_interval=CATALYST_SCREEN_INTERVAL,
-        edgar_interval=EDGAR_POLL_INTERVAL,
-        options_interval=OPTIONS_ANOMALY_INTERVAL,
-        sentiment_interval=SENTIMENT_SCORER_INTERVAL,
-    )
+    # auto_runner disabled — CatalystEngine in the Decifer bot now owns all
+    # scoring runners (fundamental screen, EDGAR monitor, options anomaly,
+    # sentiment scorer). Chief Decifer reads the same candidates files at
+    # chief-decifer/state/internal/catalyst/ — dashboard panels unchanged.
+    # from signals.auto_runner import start as start_auto_runner
+    # start_auto_runner(
+    #     screen_interval=CATALYST_SCREEN_INTERVAL,
+    #     edgar_interval=EDGAR_POLL_INTERVAL,
+    #     options_interval=OPTIONS_ANOMALY_INTERVAL,
+    #     sentiment_interval=SENTIMENT_SCORER_INTERVAL,
+    # )
     print(f"\n\u26A1 Chief Decifer starting on http://localhost:{PORT}\n")
     app.run(debug=False, host="0.0.0.0", port=PORT)

@@ -1,14 +1,17 @@
 {
-  "timestamp": "2026-04-14T18:30:46.062Z",
+  "timestamp": "2026-04-14T19:02:10.207Z",
   "branch": "master",
-  "lastCommit": "75a426b chore: update runtime state, catalyst data, and Chief-Decifer config",
+  "lastCommit": "f28d69f fix(catalyst): wire signal scripts to config.CATALYST_DIR + fix .env loading",
   "roadmapPhase": null,
   "lastFilesTouched": [
     "claude/memory/checkpoint.json",
     ".claude/memory/session-history.jsonl",
+    "Chief-Decifer-recovered/app.py",
+    "Chief-Decifer-recovered/state/catalyst/edgar_events.json",
+    "data/audit_log.jsonl",
     "data/signals_log.jsonl"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 264
+  "sessionCount": 269
 }
