@@ -152,7 +152,7 @@ CONFIG = {
     "assumed_stop_pct": 0.04,  # 4% fallback stop when ATR is unavailable.
     # Primary path uses atr × atr_stop_multiplier instead.
     "risk_per_trade": 0.01,  # 1% per trade — used by legacy position_size()
-    "max_position_size": 0.30,  # Max fraction of account per position (30%)
+    "max_position_size": 0.30,  # Informational only — not enforced in sizing (see risk.py comment). Hard cap is 20% in orders_core.py. (live: re-evaluate enforcement)
     "max_daily_loss_pct": 0.05,  # 5% max daily loss before halting
     "correlation_threshold": 0.75,  # Block new trade if correlation > this
     "max_positions": 15,
@@ -221,7 +221,7 @@ CONFIG = {
     # ── SCORING THRESHOLD ─────────────────────────────────────
     # NOTE: Lowered for paper trading to capture more setups for ML training (live values in comments)
     "min_score_to_trade": 14,  # Out of 50 — lower = more trades for training (live: 28)
-    "high_conviction_score": 36,  # Above this = 1.5x position size — narrower band, fewer bloated positions
+    "high_conviction_score": 36,  # Options only: score >= this → full options_max_risk_pct budget; below → 0.75x. Equity sizing uses signal_strength_kelly linear map instead.
     # ── DIMENSION FLAGS ───────────────────────────────────────────
     # Enable / disable individual signal dimensions without code changes.
     # Set any flag to False to zero that dimension's score and remove its

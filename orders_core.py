@@ -306,13 +306,19 @@ def execute_buy(
             log.info(f"[advisor] {symbol} size_mult={advice_size_mult} → qty={qty}")
 
         # ── HARD CAPS — last line of defense against contaminated data ──
-        # Max order value = 20% of portfolio (stricter than max_single_position for safety)
-        max_order_value = portfolio_value * 0.20
+        # Max order value = 20% of portfolio (stricter than max_single_position for safety).
+        # 3x leveraged inverse ETFs use a 6.67% notional cap so that effective market
+        # exposure stays ≤ 20% of portfolio (6.67% × 3x leverage = 20%).
+        # UVXY excluded: its leverage is non-standard and price-regime-dependent.
+        _LEVERAGED_3X_ETFS = frozenset({"SPXS", "SQQQ"})
+        _leverage = 3 if symbol in _LEVERAGED_3X_ETFS else 1
+        max_order_value = portfolio_value * 0.20 / _leverage
         if qty * price > max_order_value:
             old_qty = qty
             qty = max(1, int(max_order_value / price))
+            _cap_label = f"{20 / _leverage:.1f}% notional (= 20% market exposure, 3x ETF)" if _leverage > 1 else "20%"
             log.warning(
-                f"Order value ${old_qty * price:,.0f} exceeds 20% cap ${max_order_value:,.0f} for {symbol} — reduced qty {old_qty}→{qty}"
+                f"Order value ${old_qty * price:,.0f} exceeds {_cap_label} cap ${max_order_value:,.0f} for {symbol} — reduced qty {old_qty}→{qty}"
             )
 
         # ── FX minimum lot size ───────────────────────────────────────────

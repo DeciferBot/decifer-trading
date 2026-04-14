@@ -979,14 +979,14 @@ def get_intraday_strategy_mode(portfolio_value: float, daily_pnl: float, current
         context = ""
 
     params = _MODE_PARAMS[mode]
-    _strategy_size_multiplier = params["size_multiplier"]
-    _current_strategy_mode = mode
-    if mode != "NORMAL":
+    if mode != _current_strategy_mode:
         log.info(
-            f"Strategy mode: {mode} | PnL={daily_pnl_pct * 100:+.2f}% | "
+            f"Strategy mode: {_current_strategy_mode}→{mode} | PnL={daily_pnl_pct * 100:+.2f}% | "
             f"Streak={_consecutive_losses} | ScoreAdj=+{params['score_threshold_adj']} | "
             f"SizeMult={params['size_multiplier']}x | MaxTrades={params['max_new_trades']}"
         )
+    _strategy_size_multiplier = params["size_multiplier"]
+    _current_strategy_mode = mode
 
     return {
         "mode": mode,
