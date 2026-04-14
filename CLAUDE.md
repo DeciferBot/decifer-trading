@@ -111,6 +111,11 @@ TWAP/VWAP/Iceberg only for orders above $10K notional or 500 shares. Smaller ord
 
 ## Session Protocol (mandatory)
 
+0. **CHECK ENVIRONMENT** — before anything else, verify the machine is set up:
+   - Run `python3 -c "import anthropic, pandas, dash"` — if this fails, run `bash scripts/setup.sh` immediately and stop until it completes.
+   - Check that `.env` exists at the repo root — if missing, run `bash scripts/setup.sh` (it will pull all secrets from iCloud Keychain automatically).
+   - Do not proceed with any task until the environment check passes.
+
 1. **LOAD CONTEXT** — read checkpoint, last 2 session logs, active specs. If a `pending-doc-update.json` warning was injected, handle it first.
 2. **REVIEW PENDING** — confirm branch, what feature is in flight
 3. **COMMIT TO MASTER** — push directly to master unless Tier 3 multi-session rewrite
