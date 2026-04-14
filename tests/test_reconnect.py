@@ -91,13 +91,14 @@ colorama_stub.Style = MagicMock()
 colorama_stub.init = MagicMock()
 sys.modules.setdefault("colorama", colorama_stub)
 
-# Stub every local module that bot.py imports at module level
+# Stub every local module that bot.py (or its lazy imports) pulls in
 for _mod_name in [
     "scanner",
     "signals",
     "news",
     "agents",
     "orders",
+    "orders_portfolio",  # bot_ibkr.connect_ibkr() does a lazy import of this
     "options",
     "options_scanner",
     "risk",

@@ -278,12 +278,7 @@ def _reconnect_worker() -> None:
             log.info(f"✔ IBKR reconnected on attempt {attempt}.")
             dash["status"] = "connected"
             dash["ibkr_disconnected"] = False
-            # Look up via bot module so patch.object(bot, "_restore_subscriptions") works
-            _bot = sys.modules.get("bot")
-            restore_fn = (
-                getattr(_bot, "_restore_subscriptions", _restore_subscriptions) if _bot else _restore_subscriptions
-            )
-            restore_fn()
+            _restore_subscriptions()
             # Re-fetch today's completed orders that arrived while we were disconnected.
             try:
                 ib.reqCompletedOrders(False)
@@ -294,14 +289,8 @@ def _reconnect_worker() -> None:
             log.error(f"Reconnect attempt {attempt} failed: {exc}")
             wait = min(wait * 2, max_wait)
     else:
-        # All attempts exhausted — look up via bot module for patch.object compatibility
-        _bot = sys.modules.get("bot")
-        alert_fn = (
-            getattr(_bot, "_send_reconnect_exhausted_alert", _send_reconnect_exhausted_alert)
-            if _bot
-            else _send_reconnect_exhausted_alert
-        )
-        alert_fn(max_attempts)
+        # All attempts exhausted
+        _send_reconnect_exhausted_alert(max_attempts)
 
     with _reconnect_lock:
         bot_state._reconnecting = False
