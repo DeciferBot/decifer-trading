@@ -70,6 +70,16 @@ def _load_signal_records(
     return records[-window:]
 
 
+def _dir_sign(rec: dict) -> int:
+    """Return -1 for SHORT records, +1 for everything else (LONG, NEUTRAL, missing).
+
+    Converts raw price returns into direction-adjusted returns so that a SHORT
+    candidate whose price fell (negative raw return) contributes positively to IC,
+    matching the convention that a correct directional call is a positive outcome.
+    """
+    return -1 if rec.get("direction") == "SHORT" else 1
+
+
 def _fetch_forward_returns_batch(records: list) -> dict:
     """
     Fetch 5-trading-day forward returns for every (symbol, scan_date) pair.
@@ -99,7 +109,8 @@ def _fetch_forward_returns_batch(records: list) -> dict:
         if all(records[i].get("fwd_return") is not None for i in idxs):
             for i in idxs:
                 try:
-                    result[i] = float(records[i]["fwd_return"])
+                    raw = float(records[i]["fwd_return"])
+                    result[i] = _dir_sign(records[i]) * raw
                 except (TypeError, ValueError):
                     result[i] = None
             continue
@@ -151,7 +162,8 @@ def _fetch_forward_returns_batch(records: list) -> dict:
             # skip the yfinance round-trip for these.
             if rec.get("fwd_return") is not None:
                 try:
-                    result[i] = float(rec["fwd_return"])
+                    raw = float(rec["fwd_return"])
+                    result[i] = _dir_sign(rec) * raw
                 except (TypeError, ValueError):
                     result[i] = None
                 continue
@@ -176,7 +188,7 @@ def _fetch_forward_returns_batch(records: list) -> dict:
                 if sp <= 0 or future_price <= 0:
                     result[i] = None
                     continue
-                result[i] = (future_price - sp) / sp
+                result[i] = _dir_sign(rec) * (future_price - sp) / sp
             except Exception as e:
                 log.debug("forward return idx=%d %s: %s", i, sym, e)
                 result[i] = None
