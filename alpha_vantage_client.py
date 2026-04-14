@@ -81,7 +81,9 @@ def _consume_call() -> str:
     """
     keys = _api_keys()
     if not keys:
-        return ""
+        # Fall back to _api_key() (single-key backwards-compat path, also allows
+        # tests to patch av._api_key without needing to patch _api_keys).
+        return _api_key()
 
     today = date.today().isoformat()
     try:

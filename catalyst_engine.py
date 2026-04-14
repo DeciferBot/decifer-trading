@@ -527,13 +527,29 @@ class CatalystEngine:
                     pass
         return results
 
+    def _load_edgar_events_file(self) -> list[dict]:
+        """
+        Read the rolling EDGAR events file written by _edgar_runner.
+        Returns empty list if the file doesn't exist yet or is unreadable.
+        """
+        try:
+            return json.loads(_EDGAR_FILE.read_text())
+        except Exception:
+            return []
+
     def _news_monitor(self, interval: int) -> None:
         """
         Polls Yahoo RSS every `interval` seconds for M&A announcement keywords.
         Fires enriched triggers immediately on match.
+        Skips polling outside trading days to avoid unnecessary HTTP calls.
         """
+        from risk import is_trading_day
+
         while self._running:
             try:
+                if not is_trading_day():
+                    time.sleep(3600)  # check once per hour on weekends / holidays
+                    continue
                 universe = self.get_universe()
                 if universe:
                     from catalyst_sentinel import _build_news_trigger
@@ -552,55 +568,64 @@ class CatalystEngine:
 
     def _edgar_monitor(self, interval: int) -> None:
         """
-        Polls SEC EDGAR RSS (SC 13D / SC 13G / Form 4) every `interval` seconds.
-        Fires enriched triggers for watchlist hits and all 13D activist filings.
-        Staggered 45s after startup.
+        Fires enriched triggers for watchlist hits and SC 13D activist filings.
+
+        Reads from edgar_events.json written by _edgar_runner — avoids duplicate
+        SEC RSS polling. Only events from the last 24 hours are processed so that
+        a fresh bot restart doesn't re-fire week-old triggers. Instance-level
+        _seen_edgar_events dedup prevents duplicate fires within a session.
+
+        Staggered 45s after startup so _edgar_runner has had a chance to write
+        at least one event file before we try to read it.
+        Skips polling outside trading days.
         """
-        from catalyst_sentinel import (
-            _parse_edgar_feed,
-            _load_sec_tickers,
-            _build_edgar_trigger,
-            _EDGAR_FEEDS,
-        )
+        from datetime import timedelta
+        from risk import is_trading_day
+        from catalyst_sentinel import _build_edgar_trigger
 
         time.sleep(45)
         while self._running:
             try:
-                cik_map   = _load_sec_tickers()
+                if not is_trading_day():
+                    time.sleep(3600)
+                    continue
+
                 watchlist = set(self.store.all_tickers())
+                cutoff = (datetime.now(_UTC) - timedelta(hours=24)).isoformat()
+                all_events = self._load_edgar_events_file()
 
-                for form_type, url in _EDGAR_FEEDS.items():
-                    events = _parse_edgar_feed(form_type, url)
-                    time.sleep(0.5)
+                for ev in all_events:
+                    # Skip events older than 24 hours — prevents stale trigger replay on restart
+                    if (ev.get("updated") or "") < cutoff:
+                        continue
 
-                    for ev in events:
-                        # Resolve CIK → ticker
-                        ticker = cik_map.get(ev.get("cik") or "") or None
-                        ev["ticker"] = ticker
+                    form_type = ev.get("form_type", "")
+                    ticker = (ev.get("ticker") or "").upper()
 
-                        # Dedup — same event key as catalyst_sentinel for consistency
-                        dedup_key = f"{form_type}|{ev.get('cik')}|{(ev.get('updated') or '')[:10]}"
-                        if dedup_key in self._seen_edgar_events:
-                            continue
-                        self._seen_edgar_events.add(dedup_key)
-                        if len(self._seen_edgar_events) > 2000:
-                            stale = list(self._seen_edgar_events)[:500]
-                            for k in stale:
-                                self._seen_edgar_events.discard(k)
+                    # Dedup — consistent key with _edgar_runner's own dedup
+                    dedup_key = f"{form_type}|{ev.get('cik')}|{(ev.get('updated') or '')[:10]}"
+                    if dedup_key in self._seen_edgar_events:
+                        continue
+                    self._seen_edgar_events.add(dedup_key)
+                    if len(self._seen_edgar_events) > 2000:
+                        stale = list(self._seen_edgar_events)[:500]
+                        for k in stale:
+                            self._seen_edgar_events.discard(k)
 
-                        if not ticker:
-                            continue
+                    if not ticker:
+                        continue
 
-                        on_watchlist = ticker.upper() in watchlist
-                        if form_type != "SC 13D" and not on_watchlist:
-                            continue  # 13G and Form 4 only interesting for pre-identified targets
+                    on_watchlist = ticker in watchlist
+                    if form_type != "SC 13D" and not on_watchlist:
+                        continue  # 13G and Form 4 only interesting for pre-identified targets
 
-                        if self._cooldown.is_on_cooldown(ticker):
-                            continue
+                    if self._cooldown.is_on_cooldown(ticker):
+                        continue
 
-                        ev["on_watchlist"] = on_watchlist
-                        trigger = _build_edgar_trigger(ev)
-                        self._fire(trigger)
+                    ev["on_watchlist"] = on_watchlist
+                    ev["ticker"] = ticker  # ensure uppercase for downstream consumers
+                    trigger = _build_edgar_trigger(ev)
+                    self._fire(trigger)
 
                 self.stats["edgar_monitor_polls"] += 1
                 self.stats["last_edgar_monitor"] = datetime.now(_UTC).strftime("%H:%M UTC")

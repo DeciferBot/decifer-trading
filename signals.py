@@ -125,6 +125,7 @@ def _regime_multipliers(regime_router: str) -> dict:
             "iv_skew": 1.0,
             "pead": 1.0,
             "short_squeeze": 1.0,
+            "overnight_drift": 1.0,
         }
     if regime_router == "mean_reversion":
         return {
@@ -140,6 +141,7 @@ def _regime_multipliers(regime_router: str) -> dict:
             "iv_skew": 1.0,
             "pead": 1.0,
             "short_squeeze": 1.0,
+            "overnight_drift": 1.0,
         }
     return _all_ones
 
