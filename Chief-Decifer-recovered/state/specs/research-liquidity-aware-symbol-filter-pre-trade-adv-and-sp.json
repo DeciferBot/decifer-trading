@@ -1,0 +1,17 @@
+{
+  "id": "research-liquidity-aware-symbol-filter-pre-trade-adv-and-sp",
+  "title": "Liquidity-Aware Symbol Filter \u2014 Pre-Trade ADV and Spread Screen",
+  "status": "future",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Add a pre-trade liquidity screen that checks estimated bid-ask spread (proxied from yfinance tick or 1-minute OHLCV data) and ADV (average daily volume) before allowing order submission. Research from market microstructure literature consistently shows that low-liquidity instruments produce the worst retail execution outcomes, and that retail traders face elevated adverse selection costs on thinly-traded names. This is especially relevant for Decifer's short-candidate scanner which may surface small/mid-cap names with wide spreads.",
+  "source": "research",
+  "research_topic": "Order Execution & Market Microstructure",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "Prevents routing orders into illiquid names where spread alone costs 10\u201350 bps; eliminating bottom-quintile liquidity trades from the universe can reduce average slippage by 15\u201330% across the portfolio",
+  "difficulty": "Easy",
+  "dev_days": 3,
+  "created_at": "2026-04-01T03:03:57.766572Z",
+  "deferral_reason": "not in paper_trading_single_account Active pipeline \u2014 deferred for future stage review"
+}

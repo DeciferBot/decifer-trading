@@ -1,0 +1,17 @@
+{
+  "id": "feat-short-scanner",
+  "title": "Short-Candidate Scanner",
+  "status": "complete",
+  "priority": "P0",
+  "phase": "A",
+  "designed_date": "2026-03-26",
+  "started_date": "2026-03-27",
+  "completed_date": "2026-03-28",
+  "summary": "Three short-candidate scan types added to scanner.py — breakdown (price below EMA20/50, bearish alignment), bearish momentum (RSI < 40, MACD bearish crossover), and intraday breakdown (down >3% from open). All scans are regime-weighted: limits expand in BEAR_TRENDING, run at reduced capacity in BULL_TRENDING. Shipped in Phase A commit (620e75d).",
+  "approach": "Extended get_dynamic_universe() in scanner.py with scans 5a (breakdown), 7a (bearish_momentum), 8a (intraday_breakdown). EMA20/EMA50 added to FIELDS list. Regime-weighted limits: breakdown_limit = 25 if bear else 15 if choppy else 10. Short candidates flow into same universe as longs, scored by direction-agnostic signal engine.",
+  "files_affected": ["scanner.py"],
+  "dependencies": [],
+  "roadmap_ref": "roadmap/02-short-candidate-scanner.md",
+  "branch": "feat/phase-a-roadmap",
+  "approved_by": "amit"
+}

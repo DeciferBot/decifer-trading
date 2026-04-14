@@ -1,0 +1,24 @@
+{
+  "id": "feat-ma3-dashboard-setup-screen",
+  "title": "One-Time User Setup Screen",
+  "status": "future",
+  "priority": "P1",
+  "phase": "MA3",
+  "designed_date": "2026-03-29",
+  "started_date": null,
+  "completed_date": null,
+  "summary": "First-time users land on a guided setup screen after login. They enter their IBKR credentials, Claude API key, and initial strategy preferences. Credentials are encrypted client-side before ever leaving the browser \u2014 the server only ever stores the encrypted blob.",
+  "approach": "Build a multi-step setup wizard (3 steps): (1) IBKR credentials \u2014 account ID, gateway host, port, password. (2) Claude API key. (3) Strategy preferences \u2014 score thresholds, risk %, options on/off, kill switch, favourite symbols. Client-side JS encrypts credentials with a key derived from the user's password (WebCrypto API, PBKDF2 + AES-GCM) before POST. Server stores encrypted blob in user's container volume. On setup complete: set setup_complete flag, redirect to main dashboard. Add a re-run setup option in settings if user wants to update credentials.",
+  "files_affected": [
+    "dashboard_web/setup.py",
+    "dashboard_web/templates/setup.html",
+    "dashboard_web/static/setup.js"
+  ],
+  "dependencies": [
+    "feat-ma3-dashboard-auth"
+  ],
+  "roadmap_ref": "vision/Decifer_MultiAccount_Architecture.docx \u00a7 2 (Layer 3) and \u00a7 5",
+  "branch": null,
+  "approved_by": null,
+  "deferral_reason": "multi-account infrastructure \u2014 future stage (paper_trading_single_account prioritisation)"
+}

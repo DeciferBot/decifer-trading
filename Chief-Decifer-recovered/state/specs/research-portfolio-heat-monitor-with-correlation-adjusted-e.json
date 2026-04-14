@@ -1,0 +1,12 @@
+{
+  "id": "research-portfolio-heat-monitor-with-correlation-adjusted-e",
+  "title": "Portfolio Heat Monitor with Correlation-Adjusted Exposure Cap",
+  "status": "future",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Before any new order is submitted, compute the portfolio's total correlation-adjusted heat: sum each open position's dollar-risk, then scale by \u221a(N \u00d7 avg_pairwise_correlation) to get effective heat as a % of NAV. Block new orders that would push effective heat above a configurable threshold (default 5% for conservative, 8% for aggressive profiles). This is the single most-cited failure mode in retail and early-stage algo trading \u2014 positions that look diversified by ticker are often highly correlated and create cluster risk during sector events.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "created_at": "2026-03-29T10:57:08.134405Z",
+  "deferral_reason": "not in paper_trading_single_account Active pipeline \u2014 deferred for future stage review"
+}

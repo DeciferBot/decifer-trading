@@ -1,0 +1,25 @@
+{
+  "id": "feat-fill-watcher",
+  "title": "Order Fill Watcher — Execution Management Layer",
+  "status": "complete",
+  "priority": "P1",
+  "phase": "B",
+  "designed_date": "2026-03-31",
+  "started_date": "2026-03-31",
+  "completed_date": "2026-03-31",
+  "summary": "Background daemon thread that monitors a PENDING limit buy order after placement and chases price upward in configurable steps to secure a fill. Cancels if the price ceiling or max attempts are exhausted — prevents stale signals from sitting open indefinitely. Rule-based (no AI calls) for execution speed.",
+  "approach": "New fill_watcher.py module with FillWatcher class (per-symbol daemon thread) and stop_watcher() registry. Integrated into execute_buy() (start), execute_sell() (stop), and _flatten_all_inner() (stop-all). Config block added to config.py with 6 tunable params. All state transitions logged to audit_log.jsonl as fill_watcher_* events.",
+  "files_affected": ["fill_watcher.py", "orders.py", "config.py", "tests/test_fill_watcher.py"],
+  "dependencies": [],
+  "config_params": {
+    "enabled": true,
+    "initial_wait_secs": 30,
+    "max_attempts": 3,
+    "interval_secs": 20,
+    "step_pct": 0.002,
+    "max_chase_pct": 0.01
+  },
+  "notes": "Rule-based by design. Full AI-powered execution agent planned for Phase 3 (before live trading). See feat-execution-agent spec.",
+  "branch": null,
+  "approved_by": "amit"
+}

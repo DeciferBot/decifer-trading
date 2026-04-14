@@ -1,0 +1,17 @@
+{
+  "id": "feat-directional-skew-dashboard",
+  "title": "Directional Skew Dashboard",
+  "status": "complete",
+  "priority": "P1",
+  "phase": "A",
+  "designed_date": "2026-03-27",
+  "started_date": "2026-03-27",
+  "completed_date": "2026-03-28",
+  "summary": "get_directional_skew() added to learning.py — calculates long/short ratio over rolling 48h and 7d windows, with regime-aware alerts (e.g. heavy long in BEAR_TRENDING triggers warning). Dashboard displays skew bar, ratio, and alert panel in real time. Shipped in Phase A commit (620e75d).",
+  "approach": "New get_directional_skew(window_hours, regime) and get_directional_skew_multi() in learning.py. Dashboard reads skew data and renders: skew-bar (visual slider), skew-val (numeric), skew-detail (L/S counts), skew-alert (regime mismatch warning). Diagnostic only — not fed back into agent prompts.",
+  "files_affected": ["learning.py", "dashboard.py"],
+  "dependencies": [],
+  "roadmap_ref": "roadmap/07-directional-skew-tracking.md",
+  "branch": "feat/phase-a-roadmap",
+  "approved_by": "amit"
+}

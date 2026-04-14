@@ -1,0 +1,16 @@
+{
+  "id": "research-hurst-exponent-regime-filter-trend-vs-mean-reversi",
+  "title": "Hurst Exponent Regime Filter \u2014 Trend vs Mean-Reversion Classifier",
+  "status": "archived",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "The Hurst exponent quantifies long-range dependence in a return series: H>0.5 indicates persistent/trending behaviour, H\u22480.5 is random walk, and H<0.5 indicates anti-persistent/mean-reverting behaviour. A QuantConnect practitioner study identified this as a 'fractal regime filter' that acts as an upstream analytical gate separating exploitable directional regimes from noise. For Decifer's 9-dimension signal scorer, this matters because trend signals (trend, momentum, breakout) have positive expected IC in trending markets but negative IC in choppy markets \u2014 Hurst can route the scoring to the right sub-signals per ticker.",
+  "source": "research",
+  "research_topic": "Market Regime Detection & Adaptation",
+  "impact_score": 3,
+  "impact_label": "Low Impact",
+  "expected_impact": "Separates trending markets (H>0.5) from mean-reverting markets (H<0.5) at the individual stock level; allows Decifer to route signals to the correct dimension (trend/momentum vs mean-reversion) based on each ticker's current behaviour rather than applying all 9 dimensions equally",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-03-30T04:17:09.376323Z"
+}

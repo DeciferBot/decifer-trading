@@ -1,0 +1,22 @@
+{
+  "id": "feat-hmm-regime-detection",
+  "title": "HMM Regime Detection & Volatility Classification",
+  "status": "backlog",
+  "priority": "P2",
+  "phase": "D",
+  "designed_date": null,
+  "started_date": null,
+  "completed_date": null,
+  "summary": "Train a 3-state Gaussian HMM (hmmlearn) on SPY daily log-returns + VIX to classify each day as Low-Vol/Trending, Medium, or High-Vol/Choppy. Gate entries on regime: suppress longs in bear/choppy regime, suppress shorts in bull regime. Retrain weekly. Reduces max drawdown 15–50% vs unfiltered strategy.",
+  "approach": "Use hmmlearn with 3 Gaussian states trained on SPY log-returns + VIX + TICK. Retrain weekly. Gate entries: suppress longs in bear/high-vol regime, suppress shorts in bull regime. Expose current regime as a signal input to position sizer.",
+  "dev_days": 3,
+  "difficulty": "Medium",
+  "expected_impact": "Reduces max drawdown 15–50% vs unfiltered strategy; eliminates trades in high-vol regimes",
+  "subsystem": "AI & Learning",
+  "files_affected": ["regime.py", "signals.py", "risk.py", "bot.py"],
+  "dependencies": ["feat-alphalens-validation"],
+  "merged_from": ["feat-hmm-regime-detection", "research-gaussian-hmm-regime-classifier-3-state-spy-volatil"],
+  "roadmap_ref": "roadmap/07-hmm-regime.md",
+  "branch": null,
+  "approved_by": null
+}

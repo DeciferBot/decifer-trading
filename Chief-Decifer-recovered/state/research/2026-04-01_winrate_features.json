@@ -1,0 +1,102 @@
+{
+  "date": "2026-04-01",
+  "topic": "Win Rate Improvement — ML Feature Engineering & Predictive Signal Construction",
+  "status": "complete",
+  "source": "Web research",
+  "findings": [
+    {
+      "feature": "Triple Barrier Meta-Labeling",
+      "tier": 1,
+      "expected_impact": "+5–8% win rate",
+      "dev_days": 3,
+      "difficulty": "Medium",
+      "summary": "Meta-labeling, introduced by Marcos López de Prado in 'Advances in Financial Machine Learning', is a two-stage approach that separates the question of trade direction from the question of whether to take a trade at all. A primary model generates directional signals (long/short), and a secondary ML classifier is trained only to predict if each signal will be a winner — effectively filtering out false positives. The training labels are assigned via the Triple Barrier Method: a profit target, a stop-loss, and a maximum holding period define three barriers; whichever is hit first determines the label (1=win, -1=loss, 0=timeout). Empirical results from Hudson & Thames and a 2025 MDPI crypto study show consistent improvement in Sharpe ratio and win rate because the meta-model learns the market conditions under which the primary signal is reliable. This is distinct from Decifer's existing 9-dimension score, which combines signals linearly — meta-labeling adds a trained non-linear confidence gate on top of the aggregated score.",
+      "module": "ml_engine.py",
+      "upgrades": "ML Engine — Meta-Label Confidence Filter",
+      "subsystem": "AI & Learning",
+      "what_changes": "Add a TripleBarrierLabeler class that retrospectively labels historical trades using configurable profit_target_pct, stop_loss_pct, and max_holding_bars. Train a secondary LightGBM or LogisticRegression meta-classifier on these labels using the 9 signal dimension scores and current regime as features. In live trading, a signal only passes to order sizing if the meta-classifier confidence exceeds a threshold (e.g. 0.55). Retrain weekly using the last 252 bars.",
+      "why_it_matters": "Decifer's current scoring system passes ALL signals that exceed the composite threshold, regardless of market conditions that historically suppress win rates for that signal type. Meta-labeling creates an adaptive veto layer trained on actual outcomes, not arbitrary rules. It directly addresses the structural bullish bias by learning which regimes cause long-biased signals to lose."
+    },
+    {
+      "feature": "Cross-Sectional Momentum Rank Signal",
+      "tier": 1,
+      "expected_impact": "+3–5% win rate",
+      "dev_days": 2,
+      "difficulty": "Easy",
+      "summary": "Cross-sectional momentum ranks each stock's recent return against the universe of tracked symbols, rather than measuring its return in isolation. Research from Oxford (Poh et al., SSRN 3751012) shows that learning-to-rank algorithms applied to cross-sectional momentum can approximately triple Sharpe ratios compared to treating each asset's signal independently. The core insight is that a stock up +8% may look bullish in absolute terms, but if 90% of the watchlist gained more, it is a relative laggard — a bearish cross-sectional signal. Using yfinance to download a universe of 50–100 S&P 500 stocks daily, the system can compute 21-day returns, rank them via pandas.qcut, and add the percentile rank as a new signal dimension. This is fully free-data compatible and computationally cheap.",
+      "module": "signals.py",
+      "upgrades": "Signal Generation — Cross-Sectional Relative Strength Rank",
+      "subsystem": "Signal Generation",
+      "what_changes": "Add a CrossSectionalMomentumSignal class that downloads 21-day returns for the full watchlist each morning via yfinance.download(). Compute pandas.rank(pct=True) across the universe. Stocks in the top quartile (rank > 0.75) receive +1 in a new 'csrank' dimension; bottom quartile receive -1; middle receive 0. Integrate csrank as the 10th scoring dimension in the aggregator. Optionally cache the daily ranks to avoid redundant downloads.",
+      "why_it_matters": "Decifer's current signal dimensions are all absolute (price vs moving average, RSI level, etc.). Absolute signals have no awareness of relative market strength and will fire bullishly on a stock that is merely falling less than the market. Cross-sectional ranking grounds each signal in its peer context, which is the basis of virtually every institutional equity factor model and addresses the known bullish bias by requiring relative outperformance."
+    },
+    {
+      "feature": "GJR-GARCH Volatility Forecast for Dynamic Signal Gating",
+      "tier": 1,
+      "expected_impact": "+3–4% win rate via false signal suppression in vol spikes",
+      "dev_days": 3,
+      "difficulty": "Medium",
+      "summary": "The GJR-GARCH (Glosten-Jagannathan-Runkle GARCH) model extends standard GARCH by adding an asymmetry parameter that gives extra weight to negative return shocks — capturing the well-known 'leverage effect' where bad news causes larger volatility spikes than equivalent good news. Using the Python `arch` library (pure Python, no C dependencies unlike TA-Lib) with yfinance price history, Decifer can generate a 1-day-ahead conditional volatility forecast for SPY and each position. This forecast can gate signal scoring: if forecast_vol > 1.5x the 30-day average, reduce signal dimension weights or widen the entry threshold. QuantInsti benchmarks from 2025 confirm GJR-GARCH out-of-sample accuracy on SPY is measurably better than plain GARCH. The `arch` library is pip-installable with no system C libraries required.",
+      "module": "risk.py",
+      "upgrades": "Risk & Portfolio — Forward Volatility Forecast Gate",
+      "subsystem": "Risk & Portfolio",
+      "what_changes": "Add a GJRGarchForecaster class using `from arch import arch_model`. Fit GJR-GARCH(1,1) on 252 bars of daily SPY log returns each morning. Extract the 1-step-ahead conditional volatility forecast. Persist forecast to state. In risk.py's position_size() method, multiply the Kelly fraction by a vol_adjustment_factor = min(1.0, avg_vol_30d / forecast_vol). This shrinks sizing before volatility materialises rather than reacting to it. Optionally suppress new entries entirely when forecast_vol > 2x long-run average.",
+      "why_it_matters": "Decifer's current risk module sizes positions based on realised ATR, which is backward-looking. By the time ATR rises, the adverse move has often already occurred. GJR-GARCH forecasts tomorrow's volatility from today's market structure, allowing pre-emptive position reduction before high-vol sessions that tend to generate whipsaws and stop-outs — directly improving win rate by avoiding low-probability-of-success entries."
+    },
+    {
+      "feature": "Intermarket Macro Correlation Confirmation Gate",
+      "tier": 1,
+      "expected_impact": "+3–5% win rate on equity longs",
+      "dev_days": 2,
+      "difficulty": "Easy",
+      "summary": "Intermarket analysis studies the correlation between equities, bonds (TLT), gold (GLD), and the dollar (UUP) to infer macro risk appetite. In a risk-on regime, equities rise, bonds fall, gold weakens, and the dollar is neutral-to-strong. When these four assets confirm the trade direction simultaneously, win rates on equity longs are materially higher than when they diverge. All four ETFs (SPY, TLT, GLD, UUP) are freely available via yfinance. The gate computes a simple 5-day correlation score: if TLT is falling (rising yields = risk-on) AND GLD is flat/falling AND UUP is stable, add +1 to a new 'macro_confirm' signal dimension. If TLT is surging (flight to safety) AND GLD is rising (fear), set macro_confirm = -2 as a strong veto. This is consistent with John Murphy's intermarket framework and is actively used by institutional algo desks.",
+      "module": "signals.py",
+      "upgrades": "Signal Generation — Intermarket Macro Confirmation Overlay",
+      "subsystem": "Signal Generation",
+      "what_changes": "Add an IntemarketGate class that downloads daily close for TLT, GLD, UUP via yfinance. Compute 5-day return for each. Apply a scoring rule: TLT_ret < -0.5% → +1 (risk-on); GLD_ret < -0.3% → +0.5 (risk-on); UUP_ret > 0 → +0.5 (dollar strength = risk-on). Sum to macro_confirm in range [-2, +2]. Integrate as an additional composite modifier (not one of the 9 dimensions but a global multiplier on the final composite score: composite *= (1 + 0.1 * macro_confirm)).",
+      "why_it_matters": "The system has no awareness of cross-asset risk sentiment. A bullish equity signal fired during a TLT surge and GLD spike (classic flight-to-safety) will have a materially lower win rate than the same signal in a confirmed risk-on environment. This gate adds macro context that is invisible to price-only signals and directly addresses the lack of regime awareness noted in the known issues."
+    },
+    {
+      "feature": "Rolling Expanding Window Z-Score Feature Normalization",
+      "tier": 2,
+      "expected_impact": "+2–3% win rate via reduced scale bias in ML model",
+      "dev_days": 1,
+      "difficulty": "Easy",
+      "summary": "ML models (especially gradient boosting and neural networks) are sensitive to feature scale. If raw values like RSI (0–100) and price change percent (e.g. 0.02) are fed as-is, the model may over-weight the numerically larger feature. Rolling z-score normalization standardises each feature relative to its own recent history using an expanding window (or rolling 252-bar window), computing z = (x - rolling_mean) / rolling_std. This is data-leakage safe because at each point in time it only uses data available up to that point — unlike StandardScaler which normalises on the full training set. A 2025 Medium study on z-score trading strategies showed that normalised signals produce more statistically consistent entry thresholds across different volatility regimes. The hybrid trading paper (ArXiv 2601.19504) explicitly used StandardScaler on all features before XGBoost and achieved 63% out-of-sample accuracy vs baseline.",
+      "module": "ml_engine.py",
+      "upgrades": "ML Engine — Leak-Safe Rolling Feature Normaliser",
+      "subsystem": "AI & Learning",
+      "what_changes": "Add a RollingZScoreTransformer class with fit_transform(df, window=252) that computes expanding mean and std for each feature column using df.expanding().mean() and df.expanding().std(), clipping z-scores to [-3, 3] to limit outlier impact. Replace the existing StandardScaler call in ml_engine.py's train() method with RollingZScoreTransformer to prevent look-ahead bias during backtesting. Apply the same transformer (using only pre-trade-date statistics) during live inference.",
+      "why_it_matters": "Decifer's existing ml_engine.py uses a static StandardScaler fitted on the training set, which leaks distributional information from future dates into the feature normalisation. This inflates backtest accuracy relative to live performance and skews feature weights. Rolling z-score normalisation removes this bias, producing a more honest estimate of live win rate and improving model generalisation."
+    },
+    {
+      "feature": "Additive Hybrid Score: ML Prediction + Rule-Based Gate Threshold",
+      "tier": 2,
+      "expected_impact": "+4–6% win rate via reduced false positives",
+      "dev_days": 2,
+      "difficulty": "Medium",
+      "summary": "The ArXiv 2025 paper on hybrid AI trading (2601.19504) achieved a 61.5% win rate (vs 53.4% baseline) by combining an XGBoost classifier prediction with additive rule-based confirmation gates, requiring a composite score ≥ 2 before entry. Each confirmation layer adds +1 to a running tally: ML prediction = buy (+1), price > EMA50 AND MACD crossover (+1), RSI < 30 (+1). Trade only executes if total ≥ 2. This prevents the ML model from firing alone on low-confidence predictions and prevents rule-based signals from firing in isolation when the ML model disagrees. Decifer already has a 9-dimension composite score; integrating a binary ML prediction (+1 if P(win) > 0.55, else 0) as an additional gate creates this multi-modal confirmation structure without requiring full architectural changes.",
+      "module": "ml_engine.py",
+      "upgrades": "ML Engine — Multi-Modal Score Confirmation Gate",
+      "subsystem": "AI & Learning",
+      "what_changes": "Expose a predict_confidence(symbol, features) method on the MLEngine class that returns P(win) from the trained meta-classifier. In the signal aggregator (signals.py), add the ML confidence as a modifier: if ml_confidence > 0.55, add +2 to composite score; if ml_confidence < 0.45, subtract 2 (veto). Adjust the existing entry threshold from composite >= 5 to composite >= 6 to account for the two additional ML points, preserving overall selectivity while enforcing multi-modal confirmation.",
+      "why_it_matters": "Currently the ML engine and the rule-based scoring system operate independently with results compared but not combined. The rule-based system can fire entries the ML model would veto and vice versa. A unified additive gate ensures both the systematic rules and the learned model must agree before capital is deployed, which the ArXiv evidence confirms raises win rate by ~8 percentage points in an analogous architecture."
+    }
+  ],
+  "total_dev_days": 13,
+  "top_3_quick_wins": [
+    "Rolling Expanding Z-Score Feature Normalization (1 day, +2–3% win rate — closes ML data leakage gap)",
+    "Intermarket Macro Correlation Confirmation Gate (2 days, +3–5% on equity longs — free ETF data via yfinance)",
+    "Cross-Sectional Momentum Rank Signal (2 days, +3–5% win rate — directly addresses bullish absolute-signal bias)"
+  ],
+  "urls": [
+    "https://arxiv.org/html/2601.19504v1",
+    "https://hudsonthames.org/does-meta-labeling-add-to-signal-efficacy-triple-barrier-method/",
+    "https://link.springer.com/article/10.1186/s40854-025-00866-w",
+    "https://blog.quantinsti.com/garch-gjr-garch-volatility-forecasting-python/",
+    "https://papers.ssrn.com/sol3/Delivery.cfm/SSRN_ID3751012_code4522156.pdf?abstractid=3751012",
+    "https://acy.com/en/market-news/education/market-correlations-intermarket-analysis-j-o-20251003-091510/",
+    "https://medium.com/@redsword_23261/z-score-normalized-linear-signal-quantitative-trading-strategy-a3a3b073c0cc",
+    "https://theaiquant.medium.com/garch-models-for-volatility-forecasting-a-python-based-guide-d48deb5c7d7b"
+  ]
+}

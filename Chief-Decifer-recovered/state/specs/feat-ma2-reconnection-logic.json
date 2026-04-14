@@ -1,0 +1,24 @@
+{
+  "id": "feat-ma2-reconnection-logic",
+  "title": "Reconnection Logic \u2014 Backoff, Sequence, State Sync",
+  "status": "future",
+  "priority": "P1",
+  "phase": "MA2",
+  "designed_date": "2026-03-29",
+  "started_date": null,
+  "completed_date": null,
+  "summary": "Connections drop on network interruptions, server restarts, and idle timeouts. Missed connections mean missed signals and missed trades. This feature makes container-to-brain connections resilient: exponential backoff, sequence number gap detection, and a signal snapshot on reconnect.",
+  "approach": "Container side: implement exponential backoff reconnect (1s, 2s, 4s, 8s, cap at 60s). On reconnect, send last_seen_sequence to brain. Brain side: on container reconnect with last_seen_sequence, replay any signals since that sequence number (keep a rolling 5-minute signal buffer). Containers detect gaps by checking if received sequence != last + 1 and request replay. Add a 30-second ping/pong heartbeat between brain and each container. Write tests: simulate disconnect mid-sequence, verify container catches up on reconnect.",
+  "files_affected": [
+    "broadcaster.py",
+    "container_client.py"
+  ],
+  "dependencies": [
+    "feat-ma2-websocket-broadcaster",
+    "feat-ma2-signal-registry"
+  ],
+  "roadmap_ref": "vision/Decifer_MultiAccount_Architecture.docx \u00a7 6 (Known Problems)",
+  "branch": null,
+  "approved_by": null,
+  "deferral_reason": "multi-account infrastructure \u2014 future stage (paper_trading_single_account prioritisation)"
+}

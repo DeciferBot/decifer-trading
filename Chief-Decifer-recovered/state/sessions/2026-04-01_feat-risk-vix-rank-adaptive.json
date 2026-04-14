@@ -1,0 +1,23 @@
+{
+  "date": "2026-04-01",
+  "timestamp": "2026-04-01T15:18:58.758Z",
+  "branch": "master",
+  "phase": "unknown",
+  "last_commit": "8b50f7a feat(risk): VIX-rank adaptive Kelly fraction + ATR volatility cap",
+  "files_changed": [
+    "ata/orders.json",
+    "equity_history.json",
+    "ic_calculator.py",
+    "learning.py",
+    "signal_dispatcher.py",
+    "signal_pipeline.py",
+    "signal_types.py",
+    "signals.py",
+    "tests/test_candle_gate.py",
+    "CLAUDE.md.bak"
+  ],
+  "test_status": "unknown",
+  "summary": "8b50f7a feat(risk): VIX-rank adaptive Kelly fraction + ATR volatility cap",
+  "open_todos": [],
+  "session_count": 63
+}

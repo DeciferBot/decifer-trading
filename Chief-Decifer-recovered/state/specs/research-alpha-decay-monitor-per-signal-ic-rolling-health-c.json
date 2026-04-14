@@ -1,0 +1,19 @@
+{
+  "id": "research-alpha-decay-monitor-per-signal-ic-rolling-health-c",
+  "title": "Signal Freshness & Alpha Decay Monitor (All Dimensions incl. Sentiment)",
+  "status": "future",
+  "phase": "C",
+  "priority": "P2",
+  "summary": "Per-signal rolling IC health dashboard. Tracks Information Coefficient decay for all 9+ signal dimensions including news and social sentiment. Flags dimensions where IC has dropped below threshold \u2014 indicating the signal edge has eroded. Auto-reduces weight for decayed signals. 3-day dev, Easy-Medium.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "created_at": "2026-03-29T10:57:08.131178Z",
+  "deferral_reason": "Covered by research-alpha-decay-chart (in_progress) \u2014 deferred during paper_trading_single_account prioritisation",
+  "dev_days": 3,
+  "difficulty": "Medium",
+  "subsystem": "Analytics & UI",
+  "merged_from": [
+    "research-alpha-decay-monitor-per-signal-ic-rolling-health-c",
+    "research-sentiment-decay-tracker-with-ic-rolling-health-che"
+  ]
+}

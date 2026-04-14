@@ -1,0 +1,12 @@
+{
+  "id": "research-signal-correlation-de-duplication-guard",
+  "title": "Signal Correlation De-Duplication Guard",
+  "status": "future",
+  "phase": "C",
+  "priority": "P2",
+  "summary": "A 2025 paper on reinforcement-learning signal combination (Tandfonline) identified that reconciling correlated signals \u2014 particularly multiple moving averages \u2014 is a core challenge in technical analysis systems, and applied PCA to reduce dimensionality and information redundancy before feeding signals to a policy network. Decifer's 9 dimensions include several that are likely highly correlated (e.g. trend + momentum + breakout all capture directional price movement). Without decorrelation, the composite score double-counts the same information, inflating conviction on crowded signals. This feature computes a pairwise correlation matrix for the 9 dimensions and downweights correlated clusters.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "created_at": "2026-03-29T10:57:08.132355Z",
+  "deferral_reason": "Future; partially addressed by intra-portfolio-rolling-corr \u2014 deferred during paper_trading_single_account prioritisation"
+}

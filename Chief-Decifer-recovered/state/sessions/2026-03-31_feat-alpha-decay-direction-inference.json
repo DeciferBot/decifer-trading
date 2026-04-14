@@ -1,0 +1,22 @@
+{
+  "date": "2026-03-31",
+  "timestamp": "2026-03-31T21:53:20.923Z",
+  "branch": "master",
+  "phase": "unknown",
+  "last_commit": "b778561 feat(alpha-decay): direction inference fix, dimension segments, dashboard table",
+  "files_changed": [
+    "CLAUDE.md.bak",
+    "data/audit_log.jsonl",
+    "data/hwm_state.json",
+    "data/sec_tickers.json",
+    "data/signals_log.jsonl",
+    "ic_validator.py",
+    "signals_log.jsonl",
+    "tests/test_ic_validator.py",
+    "tests/test_tranche_exits.py"
+  ],
+  "test_status": "unknown",
+  "summary": "b778561 feat(alpha-decay): direction inference fix, dimension segments, dashboard table",
+  "open_todos": [],
+  "session_count": 54
+}

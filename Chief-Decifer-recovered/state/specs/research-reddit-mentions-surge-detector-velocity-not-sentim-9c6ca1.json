@@ -1,0 +1,16 @@
+{
+  "id": "research-reddit-mentions-surge-detector-velocity-not-sentim-9c6ca1",
+  "title": "Reddit Mentions Surge Detector (Velocity, Not Sentiment)",
+  "status": "archived",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Published research is honest and mixed on Reddit/WSB as an alpha source: a PMC-indexed study found that following WSB buy/sell submissions produced no risk-adjusted alpha in long-short portfolios, and AlphaArchitect confirmed the BUZZ ETF (social sentiment) underperformed the S&P 500 by 15 percentage points over April 2021\u2013March 2024. However, the research mechanism that does show signal is not sentiment but mention velocity \u2014 the rate of change in ticker mentions, which precedes retail buying pressure and short-term price momentum. This feature tracks mentions-per-hour acceleration on Reddit finance subreddits using the free Reddit API, not sentiment classification.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "impact_score": 5,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "Positive leading indicator for 1\u20133 day price spikes; standalone WSB alpha is near zero but velocity as a confirmation signal shows potential",
+  "difficulty": "Easy",
+  "dev_days": 2,
+  "created_at": "2026-04-01T16:13:23.666321Z"
+}

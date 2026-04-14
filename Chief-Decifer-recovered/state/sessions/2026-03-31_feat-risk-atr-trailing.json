@@ -1,0 +1,23 @@
+{
+  "date": "2026-03-31",
+  "timestamp": "2026-03-31T17:39:28.056Z",
+  "branch": "master",
+  "phase": "unknown",
+  "last_commit": "57b11fb feat(risk): ATR trailing stop — slide stop up as HWM advances",
+  "files_changed": [
+    "onfig.py",
+    "data/orders.json",
+    "equity_history.json",
+    "ic_calculator.py",
+    "orders.py",
+    "risk.py",
+    "tests/test_ic_calculator.py",
+    "tests/test_risk.py",
+    "CLAUDE.md.bak",
+    "data/audit_log.jsonl"
+  ],
+  "test_status": "unknown",
+  "summary": "57b11fb feat(risk): ATR trailing stop — slide stop up as HWM advances",
+  "open_todos": [],
+  "session_count": 39
+}

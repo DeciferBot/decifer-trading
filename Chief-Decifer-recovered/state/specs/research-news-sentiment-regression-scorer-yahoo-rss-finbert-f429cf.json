@@ -1,0 +1,16 @@
+{
+  "id": "research-news-sentiment-regression-scorer-yahoo-rss-finbert-f429cf",
+  "title": "News Sentiment Regression Scorer (Yahoo RSS \u2192 FinBERT)",
+  "status": "archived",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "A July 2025 arXiv backtesting study (arXiv:2507.03350) applied sentiment regression models to news articles on Dow Jones 30 stocks and found all models produced positive returns, with the regression approach achieving 50.63% over 28 months versus buy-and-hold. The key insight is that regression-scored sentiment (a continuous score) outperforms binary positive/negative classification \u2014 suggesting Decifer's existing Yahoo RSS news dimension should score articles on a continuous sentiment scale rather than a binary flag. FinBERT (a finance-domain BERT model) can be run locally for free and produces continuous sentiment scores ideal for this approach.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "impact_score": 7,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "+50% return over 28 months in backtested Dow Jones 30 study vs Buy & Hold; practical Decifer estimate: +2\u20133% win rate on news-catalyst setups",
+  "difficulty": "Medium",
+  "dev_days": 4,
+  "created_at": "2026-04-01T16:13:23.659401Z"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "research-intermarket-macro-correlation-confirmation-gate",
+  "title": "Intermarket Macro Correlation Confirmation Gate",
+  "status": "future",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Intermarket analysis studies the correlation between equities, bonds (TLT), gold (GLD), and the dollar (UUP) to infer macro risk appetite. In a risk-on regime, equities rise, bonds fall, gold weakens, and the dollar is neutral-to-strong. When these four assets confirm the trade direction simultaneously, win rates on equity longs are materially higher than when they diverge. All four ETFs (SPY, TLT, GLD, UUP) are freely available via yfinance. The gate computes a simple 5-day correlation score: if TLT is falling (rising yields = risk-on) AND GLD is flat/falling AND UUP is stable, add +1 to a new 'macro_confirm' signal dimension. If TLT is surging (flight to safety) AND GLD is rising (fear), set macro_confirm = -2 as a strong veto. This is consistent with John Murphy's intermarket framework and is actively used by institutional algo desks.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 ML Feature Engineering & Predictive Signal Construction",
+  "impact_score": 10,
+  "impact_label": "High Impact",
+  "expected_impact": "+3\u20135% win rate on equity longs",
+  "difficulty": "Easy",
+  "dev_days": 2,
+  "created_at": "2026-04-01T04:14:25.115284Z",
+  "deferral_reason": "not in paper_trading_single_account Active pipeline \u2014 deferred for future stage review"
+}

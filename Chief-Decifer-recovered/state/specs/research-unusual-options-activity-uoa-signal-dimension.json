@@ -1,0 +1,11 @@
+{
+  "id": "research-unusual-options-activity-uoa-signal-dimension",
+  "title": "Unusual Options Activity (UOA) Signal Dimension",
+  "status": "archived",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Peer-reviewed research by Dr. Cuyler Strong (Journal of Portfolio Management) confirmed that specific types of unusual options activity \u2014 large, near-expiry, out-of-the-money contracts \u2014 are associated with statistically significant positive abnormal returns on the underlying stock. Practitioners (Barchart, OptionStrat, LuxAlgo) note that options markets often move before stock prices because of the inherent leverage and the footprint of informed institutional positioning. Decifer can access the put/call ratio and basic options volume via yfinance's options chain, making this a genuinely free-data implementation. The UOA signal would become a 10th dimension in the score, or optionally replace the existing 'flow' dimension with a more rigorous formulation.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "created_at": "2026-03-29T10:57:08.131427Z"
+}

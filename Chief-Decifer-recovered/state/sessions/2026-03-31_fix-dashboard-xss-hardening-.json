@@ -1,0 +1,23 @@
+{
+  "date": "2026-03-31",
+  "timestamp": "2026-03-31T19:53:39.515Z",
+  "branch": "master",
+  "phase": "unknown",
+  "last_commit": "ef5923f fix(dashboard): XSS hardening, log escaping, symbol injection fixes + learning.py silent exception",
+  "files_changed": [
+    "ot.py",
+    "data/orders.json",
+    "equity_history.json",
+    "ic_calculator.py",
+    "signal_dispatcher.py",
+    "signal_types.py",
+    "signals.py",
+    "tests/test_ic_calculator.py",
+    "tests/test_signal_dispatch.py",
+    "CLAUDE.md.bak"
+  ],
+  "test_status": "unknown",
+  "summary": "ef5923f fix(dashboard): XSS hardening, log escaping, symbol injection fixes + learning.py silent exception",
+  "open_todos": [],
+  "session_count": 46
+}

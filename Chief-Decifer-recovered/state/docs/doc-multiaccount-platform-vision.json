@@ -1,0 +1,38 @@
+{
+  "doc_id": "doc-multiaccount-platform-vision",
+  "title": "Multi-Account Platform Vision",
+  "type": "vision",
+  "status": "draft",
+  "author": "amit",
+  "created_date": "2026-03-28",
+  "updated_date": "2026-03-28",
+  "summary": "Evolve Decifer from a single-account trading bot into a multi-account platform that can run independent strategies across separate IBKR accounts with unified monitoring and risk management.",
+  "sections": [
+    {
+      "heading": "Why Multi-Account",
+      "content": "Running multiple strategies on a single account creates position conflicts, makes P&L attribution difficult, and limits risk isolation. Separate accounts per strategy (or strategy group) solve all three problems while enabling cleaner performance measurement."
+    },
+    {
+      "heading": "Architecture Changes",
+      "content": "The core change is making account_id a first-class parameter throughout the stack — orders, positions, risk, and dashboard all become account-aware. The IBKR API already supports multiple accounts via Financial Advisor (FA) or separate logins."
+    },
+    {
+      "heading": "Phased Rollout",
+      "content": "Phase E in the roadmap covers six features (feat-019 through feat-024) that build multi-account support incrementally: aggregation first, then per-account risk, order routing, correlation guards, unified journaling, and finally comparative analytics."
+    },
+    {
+      "heading": "Risk Model",
+      "content": "Each account gets its own risk envelope (max drawdown, position limits, sector caps). A cross-account correlation guard prevents the combined portfolio from taking on unintended concentrated exposure. Global kill-switch remains — one button stops all accounts."
+    },
+    {
+      "heading": "Success Criteria",
+      "content": "The platform is ready when: (1) two strategies can run on separate accounts simultaneously without interference, (2) the dashboard shows per-account and combined metrics, (3) risk limits are enforced independently per account, and (4) the trade journal correctly attributes every trade."
+    }
+  ],
+  "related_features": ["feat-019", "feat-020", "feat-021", "feat-022", "feat-023", "feat-024"],
+  "open_questions": [
+    "FA account vs separate logins — which is simpler for paper?",
+    "Should strategies be allowed to share an account if desired?",
+    "How to handle margin calculation across accounts?"
+  ]
+}

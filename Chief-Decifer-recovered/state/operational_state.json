@@ -1,0 +1,42 @@
+{
+  "_doc": "Operational state for Chief Decifer. Hand-curated. Keep short. Update when features are enabled/disabled, when a deliberate decision ships, or when a known tradeoff changes.",
+  "disabled_features": [
+    {
+      "feature": "FX scanning and trading",
+      "config_key": "fx_enabled",
+      "value": false,
+      "why": "No IBKR FX market data subscription",
+      "source": "config.py:292",
+      "implication_for_chief": "Do not raise risks about FX execution, FX orphan stops, or FX lifecycle bugs. FX fixes in recent commits are cleanup of legacy state, not active exposure."
+    }
+  ],
+  "recent_decisions": [
+    {
+      "decision": "Direction Agreement Ratio (DAR) shipped; composite score cap removed",
+      "context": "Deliberate — discussed with Amit. Uncapped score is the intended new behavior.",
+      "implication_for_chief": "Do not classify the cap removal as a risk. If worth flagging at all, put it in observations framed as 'monitor score distribution post-change.'"
+    },
+    {
+      "decision": "Paper thresholds deliberately loose (min_score 18, agents_required 3, max_positions 20)",
+      "context": "Phase A design choice — cost of bad paper trade = 0, value = training data.",
+      "implication_for_chief": "Do not frame loose paper config as a risk. Live values preserved as inline comments in config.py."
+    },
+    {
+      "decision": "HMM regime detection deferred; VIX-proxy + SPY EMA is production",
+      "context": "Locked until >=200 closed trades + IC Phase 2 review.",
+      "implication_for_chief": "Do not recommend turning on HMM. Do not flag 'only VIX-proxy is running' as a risk."
+    }
+  ],
+  "accepted_tradeoffs": [
+    {
+      "tradeoff": "Test suite ~60% pass rate",
+      "reason": "Tests and code diverged during rapid development. Runtime unaffected. Policy: don't spend sessions fixing unless directly related to the work being done.",
+      "implication_for_chief": "Low pass rate alone is not a risk. Only flag specific failing tests in code paths that are active and untested elsewhere."
+    },
+    {
+      "tradeoff": "High WIP feature count",
+      "reason": "Multiple orthogonal improvement tracks (sizing, regime, signals) proceed in parallel because they touch different modules.",
+      "implication_for_chief": "Do not flag WIP count alone as a risk. Only flag if two specific features are observed modifying the same function/section."
+    }
+  ]
+}

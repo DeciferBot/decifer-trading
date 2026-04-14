@@ -1,0 +1,17 @@
+{
+  "id": "research-claude-earnings-call-q-a-sentiment-scorer",
+  "title": "Claude Earnings Call Q&A Sentiment Scorer",
+  "status": "future",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Build an earnings call transcript parser that uses Claude to score the tone and evasiveness of the Q&A section (not just prepared remarks) within 2 hours of a call ending. Chiang et al. (2025) used LLM vector embeddings from 192K earnings call transcripts to quantify semantic alignment between analyst questions and executive answers as a proxy for transparency. LSEG MarketPsych's practitioner data shows companies expressing high 'disapproval' in earnings calls underperform meaningfully the following month. The signal is highest-impact in the 1-5 day post-call window \u2014 perfectly suited to Decifer's short-term trading horizon.",
+  "source": "research",
+  "research_topic": "Sentiment Analysis & NLP for Trading",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "Chiang et al. 2025 (192K transcripts) show earnings call Q&A tone predicts next-period returns; LSEG MarketPsych found top-5% 'disapproval' calls underperform significantly the following month \u2014 adds event-driven catalyst layer",
+  "difficulty": "Medium",
+  "dev_days": 4,
+  "created_at": "2026-03-31T04:35:09.281782Z",
+  "deferral_reason": "Future enhancement \u2014 deferred during paper_trading_single_account prioritisation"
+}

@@ -1,0 +1,202 @@
+{
+  "generated_at": "2026-03-29T19:43:43.941755+00:00",
+  "vision_statement": "Decifer is a cloud-hosted, profitable trading bot that friends and family connect to via a web interface, linking their own broker accounts and managing their own risk profiles. The path runs through paper trading profitability, live single-account trading, cloud hosting, and finally a multi-user production platform.",
+  "current_stage_assessment": "Decifer is in paper_trading_single_account stage. The infrastructure is maturing rapidly \u2014 typed Signal pipeline was just shipped, a phase gate requiring 50 trades and positive expectancy before live trading was added, and test coverage is at 99% (1141/1142). The immediate priority is generating enough paper trade volume and signal quality to pass the phase gate and validate profitability, not building multi-account or cloud features.",
+  "executive_summary": "Decifer has strong engineering momentum: a typed Signal pipeline just shipped, a live-trading phase gate with positive expectancy requirements is in place, and the test suite is at 99% pass rate. The project is well-structured for its current stage. However, the phase gate requires 50 paper trades and positive expectancy \u2014 there is no evidence these thresholds have been reached yet, making signal quality and trade volume the critical bottleneck. The research base strongly supports IC-weighted dynamic signal scoring as the highest-leverage improvement to signal quality, yet this remains unbuilt. There are also 49 active pipeline features \u2014 far too many given the 3-item WIP limit just enforced \u2014 suggesting the backlog needs a ruthless triage before engineering attention fragments. The single failing test (agent JSON parse error handling) is benign but should be closed. The most important near-term question is: are paper trades actually being logged with enough volume and quality to pass the phase gate?",
+  "recommended_actions": [
+    {
+      "action": "Validate phase gate progress: audit signals_log.jsonl trade volume and expectancy against the 50-trade / positive-expectancy threshold",
+      "type": "validate",
+      "why_now": "The phase gate added two commits ago is the explicit blocker before live trading. If paper trade volume is too low or expectancy is negative, every other signal quality feature is building on unvalidated ground. This takes 30 minutes and tells us whether we are close to stage exit or far away \u2014 which determines everything else on this list.",
+      "source": "Recent commits: 'feat(phase_gate): alpha validation gate \u2014 50 trades + positive expectancy' and 'feat(signals,perf): signals_log.jsonl + baseline performance audit'",
+      "cowork_prompt": "Context: Decifer just shipped a phase gate that blocks progression to live trading until 50 paper trades are logged with positive expectancy. The signals_log.jsonl file was also just created to capture per-trade data.\n\nGoal: Audit the current state of paper trading progress against the phase gate criteria.\n\nTasks:\n1. Open signals_log.jsonl and count the number of completed trades (entries with both entry and exit records).\n2. Calculate the current win rate and expectancy (average P&L per trade).\n3. Check how the phase gate logic reads this file \u2014 confirm it is correctly identifying completed trades vs. open positions.\n4. If trade count is below 50, identify what is throttling trade frequency: is the consensus threshold (3/6 agents) too restrictive, is the scanner universe too narrow, or is the candle gate filtering too aggressively?\n5. Produce a short written summary: current trade count, current expectancy, estimated time to hit 50 trades at current rate, and the top 1-2 identified bottlenecks.\n6. Do NOT change any thresholds without explicit approval \u2014 this is a read-only audit session."
+    },
+    {
+      "action": "Build Z-Score Normalised Signal Composite \u2014 cross-sectional standardisation of all 9 signal dimensions before compositing",
+      "type": "build",
+      "why_now": "This is a P1 active feature that directly improves the quality of every trade signal Decifer generates. The research findings confirm IC-weighted dynamic scoring substantially outperforms static equal-weight models, and Z-score normalisation is the prerequisite step \u2014 without it, raw dimension scores on different scales (0-10) create implicit weighting that makes IC measurement and subsequent IC-weighting unreliable. This is foundational to the signal quality work chain and is the lowest-complexity, highest-leverage signal improvement available right now.",
+      "source": "Active pipeline: '[B P1] Z-Score Normalised Signal Composite (Cross-Sectional Standardisation)'; Research: 'Signal Quality & Alpha Generation \u2014 IC-weighted dynamic weighting substantially outperforms static equal-weight signal models'",
+      "cowork_prompt": "Context: Decifer has a 9-dimension signal model in signals.py (1191 lines). All dimensions score 0-10. These raw scores are currently composited with equal weight. The typed Signal pipeline was just shipped (see recent commit: 'feat(signals): typed Signal pipeline \u2014 dispatcher + signal_types').\n\nGoal: Implement cross-sectional Z-score normalisation of all 9 signal dimension scores before they are composited into a final score.\n\nTasks:\n1. Open signals.py and locate the signal compositing logic.\n2. For each of the 9 dimensions, maintain a rolling window (suggest 60 observations minimum) of that dimension's raw scores.\n3. At composite time, convert each raw dimension score to a Z-score: z = (raw_score - rolling_mean) / rolling_std. Handle edge cases: fewer than 10 observations (fall back to raw score), std dev near zero (use raw score unchanged).\n4. Cap Z-scores at \u00b13 to prevent outlier domination.\n5. The final composite should sum the Z-scores (or average them) rather than the raw 0-10 values.\n6. Add a rolling stats store (dict keyed by dimension name) that persists across the scan loop \u2014 do NOT reinitialise on every scan.\n7. Write unit tests: (a) verify Z-score output is ~N(0,1) after sufficient observations, (b) verify fallback behaviour with <10 observations, (c) verify \u00b13 cap.\n8. Log the per-dimension Z-scores alongside raw scores in signals_log.jsonl for future IC analysis.\n9. Do NOT change the 0-10 raw scoring logic in individual dimension functions \u2014 only change the compositing layer."
+    },
+    {
+      "action": "Build Signal Decay Monitor & Freshness Dashboard \u2014 weekly rolling IC computation per dimension",
+      "type": "build",
+      "why_now": "This is a P1 active feature and is the direct enabler of IC-weighted dynamic scoring (the highest-leverage signal quality improvement identified in research). You cannot weight dimensions by IC without first measuring IC. The typed Signal pipeline and signals_log.jsonl just shipped, giving us the data substrate needed. Building this now means IC data starts accumulating immediately, and IC-weighted scoring can be built as soon as enough observations exist. Without this, the project is flying blind on which signal dimensions are actually predictive.",
+      "source": "Active pipeline: '[B P1] Signal Decay Monitor & Freshness Dashboard'; Research: 'Signal Quality & Alpha Generation \u2014 IC-based dynamic weighting'; Recent commits: signals_log.jsonl just created",
+      "cowork_prompt": "Context: Decifer has a 9-dimension signal model. signals_log.jsonl was just created to log per-trade signal scores and outcomes. The typed Signal pipeline is live. We need to start measuring each dimension's Information Coefficient (IC) \u2014 the rank correlation between dimension score and forward return \u2014 so we can eventually weight dimensions dynamically.\n\nGoal: Build a scheduled weekly process that computes rolling IC for each of the 9 signal dimensions.\n\nTasks:\n1. Create a new module: signal_health.py.\n2. Implement compute_rolling_ic(dimension_name, window=20) that reads signals_log.jsonl, pairs each signal score with its forward 5-day return (already logged or derivable from exit price), and computes Spearman rank correlation between score and return for the most recent `window` trades.\n3. Implement get_all_dimension_health() that returns a dict: {dimension_name: {ic: float, ic_abs: float, n_obs: int, staleness_flag: bool}} where staleness_flag = True if IC < 0.02 for 3 consecutive windows.\n4. Add a /signal-health endpoint to dashboard.py that renders this dict as a simple HTML table (dimension, IC, observations, status: green/yellow/red).\n5. Persist IC history to signal_ic_log.jsonl with timestamp per computation run.\n6. Schedule compute via a weekly cron-style call inside the bot loop (check elapsed time, run once per 7 days).\n7. Write unit tests: (a) IC computation returns value in [-1, 1], (b) staleness flag triggers correctly, (c) endpoint returns 200 with expected keys.\n8. Do NOT implement IC-weighted scoring yet \u2014 this session is measurement only. The weighting will be a separate feature once 4+ weeks of IC data exists."
+    },
+    {
+      "action": "Fix the one failing test: agent JSON parse error path not handling malformed/empty responses gracefully",
+      "type": "fix",
+      "why_now": "Test suite is at 99% (1141/1142). The failing test and associated ERROR logs show that agents.py line 442 does not gracefully handle three distinct malformed response cases: 'Sorry, no recommendation.', empty string, and non-JSON text. This is a real production risk \u2014 if an LLM returns a refusal or network blip causes a partial response, the agent pipeline could crash or produce an unhandled exception mid-trade. It is also the only red item in an otherwise clean test suite and should be closed immediately.",
+      "source": "Test health: 'ERROR decifer.agents:agents.py:442 Final agent JSON parse error. Raw: Sorry, no recommendation.' and two related cases",
+      "cowork_prompt": "Context: Decifer has a 99% passing test suite (1141/1142). The single failing test exercises agents.py line 442, which is the final JSON parse attempt in the agent response pipeline. The test is checking three error cases: (1) LLM returns 'Sorry, no recommendation.', (2) LLM returns empty string, (3) LLM returns 'not json at all'.\n\nGoal: Make all three cases handled gracefully \u2014 no unhandled exceptions, deterministic fallback behaviour.\n\nTasks:\n1. Open agents.py and find the JSON parse block at line ~442.\n2. Wrap the parse in a try/except that catches json.JSONDecodeError and ValueError.\n3. For each failure case, return a safe default response object: {\"recommendation\": \"ABSTAIN\", \"confidence\": 0, \"reason\": \"parse_failure\", \"raw_response\": <truncated raw>}.\n4. Log the raw response at WARNING level (not ERROR) when it is a recognisable refusal string (e.g. starts with 'Sorry'), and at ERROR level for genuinely unexpected non-JSON.\n5. Ensure the agent is counted as a non-vote (abstain) in the consensus calculation \u2014 do NOT count it as a vote in any direction.\n6. Run the failing test and confirm it passes.\n7. Confirm overall test count stays at 1142 (no tests removed).\n8. Do not change any other agent logic in this session."
+    },
+    {
+      "action": "Decision: triage the 49 active pipeline features down to the 3 permitted by the WIP limit \u2014 explicitly park or cancel all others",
+      "type": "decision",
+      "why_now": "The WIP limit of 3 active features was just enforced in the backlog, yet there are 49 active features. This is a direct contradiction that will cause engineering attention to fragment. At the current stage (paper_trading_single_account), the majority of active features are multi-account, cloud, and multi-user features (MA1/MA2/MA3 tags) that are 2-3 stages away from being needed. Leaving them 'active' creates false urgency and clutters the decision space. This decision must be made explicitly before the next build session so developers know what is and isn't in scope.",
+      "source": "Feature pipeline: 49 active features vs. WIP limit of 3; Vision: current stage is paper_trading_single_account; Recent commit: 'feat(backlog): WIP limit enforcement \u2014 max 3 active features at a time'",
+      "cowork_prompt": "Context: Decifer just enforced a WIP limit of 3 active features in the backlog tooling. However, the active pipeline currently shows 49 features. The project is in paper_trading_single_account stage. The vision stages are: paper_trading_single_account \u2192 live_trading_single_account \u2192 cloud_hosted_single_account \u2192 multi_user_beta \u2192 multi_user_production.\n\nGoal: Produce a definitive triage decision \u2014 which 3 features are ACTIVE (in-progress this week), which are QUEUED (next up, single account stage), and which are PARKED (blocked by stage \u2014 do not touch until we reach that stage).\n\nTasks:\n1. Review all 49 active features. For each, classify by stage-relevance:\n   - ACTIVE: P1 features directly improving paper trading profitability or single-account reliability\n   - QUEUED: P1/P2 features needed before live trading but not urgent this week\n   - PARKED: Any feature tagged MA1/MA2/MA3 or requiring multi-account/cloud infrastructure\n2. Confirm the 3 ACTIVE slots are: (a) Z-Score Signal Composite, (b) Signal Decay Monitor, and (c) one additional P1 item \u2014 recommend 'Multi-Timeframe Signal Confirmation' or 'Regime-Gated Momentum/Mean-Reversion Signal Router' based on phase gate proximity.\n3. Move all MA1/MA2/MA3-tagged active features to BACKLOG with a 'parked_until: cloud_hosted_single_account' label.\n4. Move all P2 features that are not multi-account to QUEUED status.\n5. Document the decision in a brief DECISIONS.md entry with rationale.\n6. Do NOT delete any features \u2014 parking is reversible, deletion is not."
+    },
+    {
+      "action": "Promote research finding: implement ATR Volatility-Targeting Position Size Layer \u2014 research consensus identifies plain Kelly as dangerous without volatility scaling",
+      "type": "promote",
+      "why_now": "The research finding is explicit and strong: 'plain Kelly criterion is dangerous for live trading systems due to drawdown sensitivity and estimation error amplification \u2014 fractional Kelly with volatility targeting is the consensus recommendation.' Decifer is approaching the live trading phase gate. If Kelly is currently unscaled, the first live trades could be dangerously oversized in a high-volatility regime. This must be in place before live trading begins, not after. The feature exists in the active pipeline but needs to be confirmed as a pre-live-trading hard requirement.",
+      "source": "Research: 'Risk Management & Position Sizing \u2014 plain Kelly criterion is dangerous for live trading'; Active pipeline: '[B P2] ATR Volatility-Targeting Position Size Layer'",
+      "cowork_prompt": "Context: Decifer has a phase gate before live trading. Research strongly recommends fractional Kelly with ATR volatility targeting over plain Kelly. The feature '[B P2] ATR Volatility-Targeting Position Size Layer' exists in the active pipeline but is tagged P2. Current stage is paper_trading_single_account, approaching live trading phase gate.\n\nGoal: Promote this feature to P1, confirm it is a hard requirement before the live trading phase gate, and write a complete implementation spec.\n\nTasks:\n1. Open the existing feature entry for 'ATR Volatility-Targeting Position Size Layer'.\n2. Change priority to P1 and add gate tag: 'required_before_live_trading: true'.\n3. Write a concrete spec including:\n   a. Formula: w_t = \u03c3* / (\u221a252 \u00b7 \u03c3_t) where \u03c3* is target annualised vol (suggest 0.15 = 15%) and \u03c3_t is 20-day realised ATR-based volatility.\n   b. Kelly fraction cap: never exceed 0.25 (25% of Kelly full-size) regardless of formula output.\n   c. Minimum position scalar: 0.05 (never size below 5% of base Kelly to avoid micro-positions).\n   d. Integration point: this scalar multiplies the output of the existing Kelly/position sizing function in risk.py \u2014 it does not replace it.\n   e. Regime interaction: in a future HMM regime step, this scalar can be further multiplied by a regime coefficient \u2014 design the interface to allow this.\n4. Add a unit test specification: (a) high-vol input produces scalar < 1.0, (b) low-vol input produces scalar > 1.0 but capped at some maximum (suggest 2.0x), (c) zero-vol edge case handled without division error.\n5. Move the feature to QUEUED status (not active yet \u2014 finish the 3 active WIP items first) but flagged as next-in-line after current actives complete."
+    },
+    {
+      "action": "Spec: write a missing 'Paper Trading Exit Criteria' spec \u2014 define exactly what Decifer must prove before the phase gate passes",
+      "type": "spec",
+      "why_now": "The phase gate exists in code (requiring 50 trades and positive expectancy) but there is no written spec defining the full set of criteria that constitute paper trading success. 'Positive expectancy' alone is insufficient \u2014 a 51% win rate on tiny edges with a 10% drawdown is not the same as a system ready for live trading. Without a written exit criteria spec, the team will either pass the gate prematurely or argue endlessly about whether results are 'good enough.' This spec must exist before the phase gate is ever triggered.",
+      "source": "Vision: current stage paper_trading_single_account; Recent commit: 'feat(phase_gate): alpha validation gate \u2014 50 trades + positive expectancy'; gap: no written exit criteria spec found in any pipeline item",
+      "cowork_prompt": "Context: Decifer has a phase gate implemented in code that requires 50 completed paper trades and positive expectancy before allowing live trading. However, there is no written document defining the full set of paper trading exit criteria. The project is in paper_trading_single_account stage.\n\nGoal: Write a complete 'Paper Trading Exit Criteria' spec that defines exactly what must be true before Decifer advances to live_trading_single_account.\n\nTasks: Write a markdown document (PAPER_TRADING_EXIT_CRITERIA.md) covering:\n1. Minimum trade count: 50 completed round-trip trades (confirm this is the right number \u2014 consider whether 50 is sufficient for statistical significance given typical win rates).\n2. Expectancy threshold: define positive expectancy as expectancy > $0.10 per share or > 0.1% per trade (pick one and justify).\n3. Win rate floor: suggest minimum 45% win rate (below this, even positive expectancy may rely on outlier wins).\n4. Drawdown ceiling: maximum peak-to-trough paper P&L drawdown of 15% during the measurement period.\n5. Sharpe ratio: rolling 30-day Sharpe > 0.5 (annualised) over the final 30 trades.\n6. No single catastrophic loss: no single trade > 3% of paper capital.\n7. System stability: bot must run for 5 consecutive trading days without a crash or unhandled exception.\n8. Phase gate automation: confirm which of these are automated in the phase_gate code and which require manual review.\n9. Sign-off requirement: explicit human approval (founder) required even after all automated criteria pass.\nDocument should be < 2 pages. No ambiguous language \u2014 every criterion must be measurable."
+    },
+    {
+      "action": "Housekeeping: audit bot.py (2888 lines) for extraction opportunities \u2014 the brain loop is too large for safe ongoing development",
+      "type": "housekeeping",
+      "why_now": "bot.py at 2888 lines is the single largest module and contains the core brain loop. As the Signal pipeline evolves (typed Signals just shipped, IC weighting coming, regime gating coming), this file will continue to grow. Modules above ~1000 lines have significantly higher defect rates and merge conflict frequency. The recent commit 'feat(signals): typed Signal pipeline \u2014 dispatcher + signal_types' suggests signal logic is already being extracted \u2014 this audit should identify what else can be cleanly separated to keep bot.py focused on orchestration only.",
+      "source": "Code health: 'bot.py (2888L)' \u2014 largest module; recent commit: typed Signal pipeline extraction just began",
+      "cowork_prompt": "Context: bot.py is 2888 lines \u2014 the largest module in Decifer. The typed Signal pipeline was just extracted into separate modules (signal_types, dispatcher). The module contains the core brain loop, but likely also contains logic that should live elsewhere.\n\nGoal: Audit bot.py and identify extraction opportunities. This is a READ-ONLY audit session \u2014 do not refactor yet, produce a plan.\n\nTasks:\n1. Open bot.py and categorise every major block of code into one of: (a) orchestration/loop control \u2014 belongs in bot.py, (b) signal logic \u2014 belongs in signals.py or signal_dispatcher, (c) risk logic \u2014 belongs in risk.py, (d) order logic \u2014 belongs in orders.py, (e) data fetching \u2014 belongs in data_collector.py, (f) dashboard/reporting \u2014 belongs in dashboard.py.\n2. For each non-orchestration block, estimate line count and extraction complexity (trivial/moderate/complex).\n3. Identify the top 3 extractions that would reduce bot.py size the most with the least risk.\n4. Check whether the scan loop and the signal generation are now cleanly separated following the typed Signal pipeline commit \u2014 if not, document what's still entangled.\n5. Produce a written extraction plan: for each of the top 3, list (a) what gets moved, (b) destination module, (c) new function/class name, (d) test coverage needed.\n6. Do NOT make any code changes in this session. Output is a plan document only.\n7. Flag any code in bot.py that reads CONFIG['active_account'] directly \u2014 this is a known debt item that will block multi-account work later."
+    }
+  ],
+  "product_roadmap": [
+    {
+      "phase_name": "Phase 1: Signal Quality & Phase Gate Passage",
+      "goal": "Achieve the 50-trade / positive expectancy threshold with a statistically credible signal model, and exit paper_trading_single_account stage",
+      "rationale": "Nothing else matters until the bot is demonstrably profitable on paper. All multi-account, cloud, and UI work is wasted if the core signal model cannot pass the phase gate. This phase must complete before any infrastructure work begins.",
+      "features": [
+        "Validate phase gate progress (audit signals_log.jsonl)",
+        "Z-Score Normalised Signal Composite",
+        "Signal Decay Monitor & Freshness Dashboard",
+        "Multi-Timeframe Signal Confirmation (P1)",
+        "Regime-Gated Momentum / Mean-Reversion Signal Router (P1)",
+        "ATR Volatility-Targeting Position Size Layer (promote to P1, required before live)",
+        "Fix agent JSON parse error (failing test)",
+        "Write Paper Trading Exit Criteria spec"
+      ],
+      "exit_criteria": "Phase gate passes: 50+ completed paper trades, positive expectancy, Sharpe > 0.5 over last 30 trades, max drawdown < 15%, 5 consecutive stable trading days, founder sign-off",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 2: Live Trading Readiness \u2014 Single Account",
+      "goal": "Harden the single-account bot for real capital: kill switch, drawdown brakes, volatility-targeted sizing, and execution quality improvements",
+      "rationale": "Live trading with real capital requires safety mechanisms that paper trading tolerates being absent. The Telegram kill switch is already shipped. Drawdown brakes, proper Kelly sizing, and execution cost modelling must exist before a single real order is placed.",
+      "features": [
+        "Drawdown Brake \u2014 Tiered Equity Curve Circuit Breaker",
+        "VIX-Rank Adaptive Fractional Kelly Sizer",
+        "Dual-Tranche Exit Strategy",
+        "Slippage & Execution Cost Model for Backtester",
+        "Walk-Forward Backtesting",
+        "Anchored VWAP Entry Gate",
+        "Options Flow Proxy Signal via Put/Call Ratio (UOA dimension)",
+        "bot.py extraction / housekeeping (reduce to <1500L)"
+      ],
+      "exit_criteria": "Bot runs live for 30 days on a single account with real capital. Max drawdown stays below configured threshold. No unhandled exceptions. P&L positive or within acceptable loss budget defined by founder.",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 3: Cloud Hosting \u2014 Single Account",
+      "goal": "Move the single-account bot to a cloud VPS with Docker, so it runs 24/7 without the founder's laptop",
+      "rationale": "The founder cannot be tethered to a local machine for live trading. Cloud deployment is a prerequisite for reliability and for multi-user expansion. This phase deliberately does not add multi-user complexity \u2014 it just lifts the existing single-account bot to the cloud.",
+      "features": [
+        "Cloud VPS Setup and Deployment",
+        "Reconnection Logic \u2014 Backoff, Sequence, State Sync",
+        "Per-Account Local Dashboard (cloud-accessible)",
+        "WebSocket Signal Broadcaster (single account, foundation for multi)",
+        "Extract Signal Objects from Brain Loop (MA1 P0)"
+      ],
+      "exit_criteria": "Bot runs on cloud VPS for 30 days without manual intervention. Auto-restarts on crash. Dashboard accessible via browser from any device.",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 4: Multi-User Beta",
+      "goal": "Onboard first friends and family users \u2014 each with their own isolated IBKR account connection, risk profile, and dashboard",
+      "rationale": "Multi-user architecture requires account isolation, per-user config, and authentication. These cannot be bolted onto a single-account design \u2014 they require architectural changes that were deferred until now to avoid premature complexity.",
+      "features": [
+        "Per-Account Config Profiles (MA1 P0)",
+        "AccountDecisionAgent Class (MA1 P0)",
+        "Connection Manager \u2014 Multi-Account IBKR (MA1 P0)",
+        "Parameterise account_id Through Orders and Risk (MA1 P0)",
+        "Per-User Docker Compose Containers with Encrypted Credentials",
+        "Per-User Dashboard Authentication",
+        "One-Time User Setup Screen",
+        "Web Dashboard \u2014 Live Positions and P&L",
+        "Signal Registry \u2014 Per-User Favourite Symbols",
+        "Per-Account Risk Profile Config Schema with Multi-Tier Presets"
+      ],
+      "exit_criteria": "3+ friends/family users connected with their own IBKR accounts, each seeing their own positions and P&L, with independent risk limits enforced. No cross-account data leakage in any test.",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 5: Multi-User Production",
+      "goal": "Harden the platform for broader use: performance comparison, advanced risk dashboards, Telegram notifications, and operational stability",
+      "rationale": "Beta surfaces usability gaps and operational issues. Production phase addresses what beta reveals plus adds the polish and monitoring needed for a system managing real money for multiple people long-term.",
+      "features": [
+        "Telegram Bot \u2014 Notifications and Quick Commands",
+        "Account Performance Comparison",
+        "Unified Trade Journal",
+        "Cross-Account Correlation Guard",
+        "Rolling CVaR Dashboard Metric",
+        "IC-Weighted Dynamic Signal Scorer",
+        "Monte Carlo Stress Testing",
+        "Meta-Labeling Secondary Classifier"
+      ],
+      "exit_criteria": "System operates for 90 days with all beta users without a critical incident. P&L reporting is accurate. Telegram notifications delivered reliably. Founder satisfied with operational burden.",
+      "estimated_scope": "large"
+    }
+  ],
+  "risks": [
+    {
+      "risk": "Phase gate may never pass if paper trade volume is too low \u2014 the 3/6 agent consensus threshold combined with narrow scanner universe may produce fewer than 2-3 trades per week, meaning 50 trades takes 4+ months",
+      "severity": "high",
+      "mitigation": "Run the phase gate audit immediately (action #1). If trade frequency is below 5/week, evaluate reducing consensus to 2/6 for paper trading only (with a config flag), or expanding the scanner universe. Do not lower the bar permanently \u2014 just unblock paper trade accumulation."
+    },
+    {
+      "risk": "49 active pipeline features with a 3-item WIP limit creates decision paralysis and risks engineering work starting on multi-account features that are 2 stages away",
+      "severity": "high",
+      "mitigation": "Execute the triage decision (action #5) immediately. Park all MA1/MA2/MA3 features. Enforce the 3-item WIP limit in practice, not just in tooling."
+    },
+    {
+      "risk": "Position sizing with plain Kelly (unscaled by volatility) could produce catastrophically large positions when the bot transitions to live trading \u2014 one bad trade could wipe a significant fraction of account capital",
+      "severity": "high",
+      "mitigation": "Promote ATR Volatility-Targeting Position Size Layer to P1 and make it a hard phase gate requirement before any live order is placed. Implement before the paper trading phase gate passes."
+    },
+    {
+      "risk": "bot.py at 2888 lines is a maintainability and merge conflict risk \u2014 as signal quality features are added, this file will become increasingly difficult to reason about and test safely",
+      "severity": "medium",
+      "mitigation": "Complete the bot.py audit (action #8) and execute the top 3 extractions in a dedicated housekeeping session before Phase 2 work begins."
+    },
+    {
+      "risk": "Agent JSON parse failure in production could cause an agent to be miscounted in consensus, potentially allowing trades that lack genuine agreement or blocking valid trades",
+      "severity": "medium",
+      "mitigation": "Fix the failing test and implement ABSTAIN fallback (action #4). Treat parse failures as abstentions, not as errors that propagate up the call stack."
+    },
+    {
+      "risk": "IC measurement requires historical signal+outcome pairs that don't exist yet \u2014 if signals_log.jsonl is not capturing forward return outcomes correctly, Signal Decay Monitor will produce garbage IC values and IC-weighted scoring will be built on bad data",
+      "severity": "medium",
+      "mitigation": "During the Signal Decay Monitor build session, explicitly audit that signals_log.jsonl is logging the post-trade outcome (exit price, holding period return) linked to the signal that triggered the trade. If not, fix the logging before computing IC."
+    },
+    {
+      "risk": "No broker connectivity testing in CI \u2014 the test suite mocks IBKR connections, but real connection failures (TWS rejecting global cancel, openTrades timeout) are only discoverable in production",
+      "severity": "medium",
+      "mitigation": "Add integration test documentation for the known IBKR failure modes visible in test health logs. Create a manual test checklist that must be run before each phase gate transition."
+    },
+    {
+      "risk": "The paper trading exit criteria are currently only partially automated (50 trades + positive expectancy) \u2014 other critical criteria like drawdown ceiling and Sharpe have no gate implementation, meaning the bot could advance to live trading with a concerning drawdown profile",
+      "severity": "medium",
+      "mitigation": "Write the Paper Trading Exit Criteria spec (action #7) and then implement the missing automated checks in the phase gate code."
+    }
+  ],
+  "roadmap_gaps": "Several capabilities implied by the vision are missing from all specs and the pipeline: (1) Broker account linking UI \u2014 the vision describes users 'linking their own broker accounts' via a web interface, but there is no spec for a secure credential entry, IBKR account ID validation flow, or OAuth-style broker linking UX; (2) Risk profile onboarding \u2014 the vision describes users managing their 'risk profile,' but the Per-Account Risk Profile Config Schema only covers technical parameters, not a user-facing onboarding flow that maps plain-English risk tolerance to config values; (3) Billing / access control \u2014 the vision implies friends and family access, but there is no spec for how users are invited, how access is granted or revoked, or whether any payment or cost-sharing mechanism is needed; (4) Disaster recovery and data backup \u2014 there is no spec for what happens if the cloud VPS goes down mid-trade, how open positions are recovered, or how trade history is backed up; (5) Regulatory and compliance baseline \u2014 the system executes real trades on behalf of users linking their own accounts; there is no spec acknowledging the regulatory boundary (are users self-directing? is the founder acting as an investment adviser?), which is a pre-launch requirement even for a friends-and-family product; (6) Performance benchmark definition \u2014 the vision says 'profitable' but nowhere is the benchmark defined (profitable vs. cash? vs. SPY? vs. absolute return threshold?), which means there is no objective way to declare the bot 'ready' for live trading beyond the current phase gate's minimal criteria.",
+  "model": "claude-sonnet-4-6",
+  "data_sources": {
+    "specs": 79,
+    "sessions": 5,
+    "research": 6,
+    "commits": 20,
+    "tests": true,
+    "code": true
+  }
+}

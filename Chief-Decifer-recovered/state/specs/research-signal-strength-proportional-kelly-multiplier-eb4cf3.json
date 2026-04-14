@@ -1,0 +1,16 @@
+{
+  "id": "research-signal-strength-proportional-kelly-multiplier-eb4cf3",
+  "title": "Signal-Strength-Proportional Kelly Multiplier",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Modifies the Kelly position sizing to multiply the fractional Kelly output by a signal-strength scalar derived from Decifer's existing 9-dimension composite score. A score of 90+ maps to kelly_multiplier = 1.0 (full fractional Kelly), a score of 70 maps to 0.6, and a score below the consensus threshold maps to 0.0 (no trade). This directly operationalises the Bayesian Kelly principle that bet size should track edge conviction, and connects the signal scoring subsystem directly to the risk engine in a principled way. The formula is: final_size = base_kelly * signal_multiplier(score), where signal_multiplier = (score - min_threshold) / (100 - min_threshold) clamped to [0.25, 1.0].",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "impact_score": 3,
+  "impact_label": "Low Impact",
+  "expected_impact": "Aligns Kelly fraction directly with composite signal conviction (score 0\u2013100 mapped to a 0.25x\u20131.0x Kelly multiplier), expected to improve risk-adjusted returns by concentrating risk on highest-conviction trades; practitioner Bayesian framework shows integrating adaptive Kelly with ensemble signals 'can yield superior portfolio performance'",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-02T03:05:07.227293Z"
+}

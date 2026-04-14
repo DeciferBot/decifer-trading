@@ -1,0 +1,16 @@
+{
+  "id": "research-regime-gated-momentum-mean-reversion-signal-router-519a7e",
+  "title": "Regime-Gated Momentum / Mean-Reversion Signal Router",
+  "status": "archived",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Research consistently shows momentum dominates in low-volatility bull regimes while mean reversion captures high-volatility and transition periods \u2014 mixing the two without a gate actively destroys alpha. A regime-switching study (Giner & Zakamulin, ScienceDirect 2023) empirically confirmed short-term momentum followed by medium-term mean reversion as a semi-Markov process. A practitioner ETF backtest (MRMOM, priceactionlab.com, 2025) using this regime switch achieved Sharpe 1.15 and 10.3% annualised return over 22 years. This feature routes Decifer's existing signal dimensions through either a momentum-optimised or mean-reversion-optimised weighting profile depending on the current detected regime.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "Sharpe ratio improvement of 0.3\u20130.6; eliminates momentum crash risk during regime transitions",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-01T16:13:23.654075Z"
+}

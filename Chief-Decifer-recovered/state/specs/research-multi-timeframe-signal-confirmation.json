@@ -1,0 +1,11 @@
+{
+  "id": "research-multi-timeframe-signal-confirmation",
+  "title": "Multi-Timeframe Signal Confirmation",
+  "status": "archived",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Require daily/4H/1H alignment before entry. Reduces false signals and helps counter bullish bias by filtering long entries when higher timeframes are bearish.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 New Feature Research",
+  "created_at": "2026-03-29T10:57:08.141235Z"
+}

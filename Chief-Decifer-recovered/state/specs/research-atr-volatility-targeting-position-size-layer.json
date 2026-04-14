@@ -1,0 +1,11 @@
+{
+  "id": "research-atr-volatility-targeting-position-size-layer",
+  "title": "ATR Volatility-Targeting Position Size Layer",
+  "status": "archived",
+  "phase": "B",
+  "priority": "P0",
+  "summary": "Implement the volatility-targeting formula w_t = \u03c3* / (\u221a252 \u00b7 \u03c3_t) where \u03c3* is a target annualised volatility per trade (e.g. 1.5%) and \u03c3_t is the 14-day ATR expressed as a percentage of current price. This automatically shrinks position size when a stock is moving fast and grows it when volatility is compressed \u2014 the opposite of what emotional traders do. It is the most empirically validated position sizing technique in recent quantitative literature and requires only ATR, which yfinance provides.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "created_at": "2026-03-29T10:57:08.134083Z"
+}

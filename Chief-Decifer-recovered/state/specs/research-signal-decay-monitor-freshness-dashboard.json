@@ -1,0 +1,11 @@
+{
+  "id": "research-signal-decay-monitor-freshness-dashboard",
+  "title": "Signal Decay Monitor & Freshness Dashboard",
+  "status": "archived",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Build a scheduled weekly process that computes rolling IC for each of Decifer's 9 signal dimensions over the trailing 60-trade window, and flags any dimension where IC has dropped below 0.02 (near-zero predictive power) or gone negative. US equity momentum signals are shown to decay ~60% within 10 months at 5.6% annually \u2014 without monitoring, Decifer could be running degraded signals for months before noticing in P&L. This is a defensive, high-leverage feature.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "created_at": "2026-03-29T10:57:08.128824Z"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "research-time-of-day-execution-gate-open-close-avoidance-wi",
+  "title": "Time-of-Day Execution Gate (Open/Close Avoidance Window)",
+  "status": "future",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Add a configurable time-of-day filter that suppresses new order entry during the opening volatility window (default 9:30\u20139:40 ET) and optionally the closing window (3:55\u20134:00 ET). Signals can still be generated and queued but orders are not submitted until the gate opens. This is backed by well-documented intraday volume and spread patterns where opening 15 minutes carry the highest intraday risk, widest spreads, and most misleading price action.",
+  "source": "research",
+  "research_topic": "Order Execution & Market Microstructure",
+  "impact_score": 6,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "Eliminates wide-spread fills during market open chaos; empirical intraday research shows spreads are widest in first 5\u201315 minutes and last 5 minutes; avoiding these windows reduces adverse selection risk and prevents the most erratic fills",
+  "difficulty": "Easy",
+  "dev_days": 2,
+  "created_at": "2026-04-01T03:03:57.760086Z",
+  "deferral_reason": "not in paper_trading_single_account Active pipeline \u2014 deferred for future stage review"
+}

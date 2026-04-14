@@ -1,0 +1,17 @@
+{
+  "id": "research-claude-sentiment-scoring-pipeline",
+  "title": "Multi-Source Sentiment Scoring Pipeline (Claude + FinBERT + Regression)",
+  "status": "complete",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Structured sentiment from Yahoo RSS + Finviz scored via three methods: (1) zero-shot Claude direct prompt (no chain-of-thought for latency), (2) local FinBERT headline scorer as a cross-check, (3) regression-calibrated composite. Add as 10th signal dimension. SAPPO research shows Sharpe improvement when sentiment is combined with technical signals.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 New Feature Research",
+  "created_at": "2026-03-29T10:57:08.141994Z",
+  "completed_at": "2026-04-02T00:00:00.000000Z",
+  "merged_from": [
+    "research-claude-sentiment-scoring-pipeline",
+    "research-zero-shot-claude-sentiment-prompt-direct-no-cot-pa",
+    "research-news-sentiment-regression-scorer-yahoo-rss-finbert"
+  ]
+}

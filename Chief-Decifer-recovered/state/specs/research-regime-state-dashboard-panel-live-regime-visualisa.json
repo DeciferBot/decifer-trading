@@ -1,0 +1,17 @@
+{
+  "id": "research-regime-state-dashboard-panel-live-regime-visualisa",
+  "title": "Regime State Dashboard Panel \u2014 Live Regime Visualisation for Users",
+  "status": "future",
+  "phase": "D",
+  "priority": "P2",
+  "summary": "Add a 'Market Regime' panel to the existing per-account local dashboard showing: current HMM state with confidence probability, VIX/VIX3M ratio and contango/backwardation label, % of S&P 500 stocks above 200MA, composite risk multiplier (as a dial/gauge), and a 30-day history of regime transitions. This is the user-facing translation of all regime signals into a transparent, explainable display. For the multi-user SaaS vision, explainability of risk management is critical to user trust \u2014 especially for friends-and-family accounts where users are non-professional.",
+  "source": "research",
+  "research_topic": "Market Regime Detection & Adaptation",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "Zero trading impact; high trust and SaaS retention impact \u2014 users who can see WHY the bot is reducing exposure are more likely to stay invested through drawdowns rather than disconnecting (estimated reduction in user churn during volatile periods)",
+  "difficulty": "Easy",
+  "dev_days": 3,
+  "created_at": "2026-03-30T04:17:09.376696Z",
+  "deferral_reason": "Depends on regime features shipping first \u2014 deferred during paper_trading_single_account prioritisation"
+}

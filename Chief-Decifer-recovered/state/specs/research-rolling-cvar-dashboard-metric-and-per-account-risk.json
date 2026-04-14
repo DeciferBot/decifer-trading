@@ -1,0 +1,12 @@
+{
+  "id": "research-rolling-cvar-dashboard-metric-and-per-account-risk",
+  "title": "Rolling CVaR Dashboard Metric and Per-Account Risk Budget",
+  "status": "future",
+  "phase": "C",
+  "priority": "P2",
+  "summary": "Compute a rolling 30-day CVaR (Conditional Value at Risk, also called Expected Shortfall) for each account's position portfolio and display it on the per-account dashboard. CVaR tells users not just 'your worst 5% of days will be at least -X%' (VaR) but 'when you are in that worst 5%, you should expect to lose -Y%' \u2014 a meaningfully more informative metric for tail risk. Research consistently shows CVaR is a coherent risk measure that CVaR minimisation also minimises VaR, making it strictly superior for risk-budget display.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "created_at": "2026-03-29T10:57:08.134923Z",
+  "deferral_reason": "Future analytics \u2014 deferred during paper_trading_single_account prioritisation"
+}

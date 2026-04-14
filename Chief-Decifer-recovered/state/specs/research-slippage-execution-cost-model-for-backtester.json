@@ -1,0 +1,12 @@
+{
+  "id": "research-slippage-execution-cost-model-for-backtester",
+  "title": "Slippage & Execution Cost Model for Backtester",
+  "status": "future",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Add a realistic per-trade slippage model to the backtester based on average daily volume (ADV). Most retail algo backtests overstate performance by 0.3-0.8% per round-trip because they assume fills at the close price with no market impact. A proper slippage model calibrates fill degradation to trade size as a fraction of ADV \u2014 available for free via yfinance. This doesn't improve win rate directly but prevents curve-fitting to unrealistic backtest results.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Execution Quality & Exit Optimization",
+  "created_at": "2026-03-29T10:57:08.127949Z",
+  "deferral_reason": "Future; relevant at live trading stage \u2014 deferred during paper_trading_single_account prioritisation"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "research-vix-rank-adaptive-fractional-kelly-sizer",
+  "title": "VIX-Rank Adaptive Fractional Kelly Sizer",
+  "status": "archived",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Replace Decifer's current static Kelly fraction with a dynamic fraction that scales inversely with VIX-rank (a normalised percentile of the VIX over a trailing 126-252 day window). During low-VIX periods the system bets closer to half-Kelly; during high-VIX spikes it automatically drops to quarter-Kelly or lower. This directly addresses the core weakness of the current implementation \u2014 Kelly is theoretically optimal only under known, stable probabilities, and Decifer's 9-dimension signal scores are noisy estimates that will systematically overstate edge during volatile regimes.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "created_at": "2026-03-29T10:57:08.133641Z"
+}

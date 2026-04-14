@@ -1,0 +1,17 @@
+{
+  "id": "research-cross-sectional-momentum-rank-signal",
+  "title": "Cross-Sectional Momentum Rank Signal",
+  "status": "future",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Cross-sectional momentum ranks each stock's recent return against the universe of tracked symbols, rather than measuring its return in isolation. Research from Oxford (Poh et al., SSRN 3751012) shows that learning-to-rank algorithms applied to cross-sectional momentum can approximately triple Sharpe ratios compared to treating each asset's signal independently. The core insight is that a stock up +8% may look bullish in absolute terms, but if 90% of the watchlist gained more, it is a relative laggard \u2014 a bearish cross-sectional signal. Using yfinance to download a universe of 50\u2013100 S&P 500 stocks daily, the system can compute 21-day returns, rank them via pandas.qcut, and add the percentile rank as a new signal dimension. This is fully free-data compatible and computationally cheap.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 ML Feature Engineering & Predictive Signal Construction",
+  "impact_score": 10,
+  "impact_label": "High Impact",
+  "expected_impact": "+3\u20135% win rate",
+  "difficulty": "Easy",
+  "dev_days": 2,
+  "created_at": "2026-04-01T04:14:25.114074Z",
+  "deferral_reason": "not in paper_trading_single_account Active pipeline \u2014 deferred for future stage review"
+}

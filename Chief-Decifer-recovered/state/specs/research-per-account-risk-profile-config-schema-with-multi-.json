@@ -1,0 +1,12 @@
+{
+  "id": "research-per-account-risk-profile-config-schema-with-multi-",
+  "title": "Per-Account Risk Profile Config Schema with Multi-Tier Presets",
+  "status": "future",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Define a structured RiskProfile dataclass that encodes all risk parameters in one place: kelly_fraction (0.25 default), target_ann_vol (0.12), max_portfolio_heat (0.05), max_sector_concentration (0.30), max_single_position_pct (0.10), drawdown_tier1/2/halt thresholds, cvar_budget, and correlation_block_threshold. Ship three preset profiles: Conservative (friends/family, low risk tolerance), Moderate (default), and Aggressive (founder account). This is the foundational config layer that makes all the other risk features per-user-configurable \u2014 directly enabling the Per-Account Config Profiles and Per-Account Risk Limits backlog items.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "created_at": "2026-03-29T10:57:08.135862Z",
+  "deferral_reason": "Multi-account, future stage \u2014 deferred during paper_trading_single_account prioritisation"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "feat-consensus-threshold",
+  "title": "Raise Consensus Threshold",
+  "status": "complete",
+  "priority": "P0",
+  "phase": "A",
+  "designed_date": "2026-03-25",
+  "started_date": "2026-03-27",
+  "completed_date": "2026-03-28",
+  "summary": "Raised agents_required_to_agree from 2 to 3 in config.py. 3/6 agents must agree to trade (paper). Live threshold remains 4. Shipped in Phase A commit (620e75d).",
+  "approach": "Simple config change: agents_required_to_agree = 3. Verified in config.py line 68 with comment: '2/6 was rubber-stamping; 3/6 requires real consensus. (live: 4)'.",
+  "files_affected": ["config.py"],
+  "dependencies": [],
+  "roadmap_ref": "roadmap/01-consensus-threshold.md",
+  "branch": "feat/consensus-threshold",
+  "approved_by": "amit"
+}

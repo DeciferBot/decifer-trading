@@ -1,0 +1,23 @@
+{
+  "date": "2026-04-01",
+  "timestamp": "2026-04-01T14:39:31.081Z",
+  "branch": "master",
+  "phase": "unknown",
+  "last_commit": "6f63ca5 fix(agents): downgrade parse-fail log to WARNING, add abstain flag",
+  "files_changed": [
+    "onfig.py",
+    "data/orders.json",
+    "equity_history.json",
+    "fill_watcher.py",
+    "ic_calculator.py",
+    "orders.py",
+    "signals.py",
+    "CLAUDE.md.bak",
+    "bot_account.py",
+    "bot_ibkr.py"
+  ],
+  "test_status": "unknown",
+  "summary": "6f63ca5 fix(agents): downgrade parse-fail log to WARNING, add abstain flag",
+  "open_todos": [],
+  "session_count": 57
+}

@@ -1,0 +1,11 @@
+{
+  "id": "research-options-flow-proxy-signal-via-put-call-ratio",
+  "title": "Options Flow Proxy Signal via Put/Call Ratio",
+  "status": "archived",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Add a put/call ratio signal dimension using free data from yfinance options chains. A high put/call ratio (>1.2) is a sentiment-bearish signal; extreme ratios (>1.5) can act as a contrarian bullish indicator. Academic research (Journal of Portfolio Management) confirms certain unusual options activity conditions \u2014 particularly large, short-dated, OTM contracts with volume > open interest \u2014 are statistically associated with abnormal positive returns. This version uses free yfinance options data rather than paid flow feeds.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "created_at": "2026-03-29T10:57:08.129472Z"
+}

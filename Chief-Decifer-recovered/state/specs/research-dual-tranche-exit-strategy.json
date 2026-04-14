@@ -1,0 +1,11 @@
+{
+  "id": "research-dual-tranche-exit-strategy",
+  "title": "Dual-Tranche Exit Strategy",
+  "status": "archived",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Split every position into two equal tranches on entry. Exit Tranche 1 at a fixed profit target (1.5x ATR from entry), then switch Tranche 2 to a trailing ATR stop. This approach balances profit protection with trend capture: Tranche 1 ensures the trade is never a net loser once it moves, while Tranche 2 lets winners run. Research consistently shows dual-tranche improves profit factor by 15-25% versus single-exit strategies in trend-following systems.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Execution Quality & Exit Optimization",
+  "created_at": "2026-03-29T10:57:08.127675Z"
+}

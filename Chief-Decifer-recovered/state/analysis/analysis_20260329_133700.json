@@ -1,0 +1,177 @@
+{
+  "generated_at": "2026-03-29T04:11:18.298372+00:00",
+  "vision_statement": "Decifer will be a cloud-hosted, profitable trading bot that friends and family of the founder can access through a web interface, linking their own broker accounts and managing their own risk profiles. The path runs from a single-account paper trading proof of profitability through to a hardened, multi-user production platform.",
+  "current_stage_assessment": "Decifer is formally at paper_trading_single_account, with six shipped features focused on signal quality improvements (direction-agnostic scoring, mean reversion, short scanning, consensus threshold) and one multi-account infrastructure feature that appears premature for the current stage. The immediate priority must be validating that the signal pipeline actually generates profitable, reliable paper trades before any further infrastructure or multi-account work is justified. No dev session logs exist yet, meaning there is no empirical paper trading performance data to evaluate.",
+  "executive_summary": "Decifer has a well-articulated vision and a populated backlog, but the project is at a critical juncture: signal architecture work has been shipped, yet there is no recorded evidence of paper trading performance, win rate, or signal validity. The research findings strongly indicate that IC-based dynamic weight calibration and fractional Kelly position sizing are best practices, but neither is implemented. One shipped feature \u2014 Multi-Account Position Aggregation \u2014 belongs to a later stage and may have introduced complexity before the core bot is proven profitable. The backlog contains 23 items spanning four distinct roadmap phases, but they are not sequenced by stage, creating a risk of building multi-user infrastructure on an unvalidated alpha engine. The most urgent work is establishing a paper trading feedback loop: run the bot, measure outcomes, validate signals, and confirm profitability before advancing to live trading.",
+  "product_roadmap": [
+    {
+      "phase_name": "Phase 1 \u2014 Validate Alpha (Paper Trading)",
+      "goal": "Prove that the current signal pipeline generates profitable, reliable paper trades over a statistically meaningful sample. Establish a feedback loop between signal output and trade outcomes.",
+      "rationale": "Nothing else on the roadmap is worth building until the bot demonstrably works on paper. Live trading, cloud hosting, and multi-user features all depend on a proven alpha engine. This is the exit gate for the current stage.",
+      "features": [
+        "Run paper trading bot continuously and log all trades with entry/exit, P&L, signal scores, and agent votes",
+        "Build or activate a local dashboard showing live positions, P&L, and trade history (port 8080)",
+        "Signal Validation with Alphalens \u2014 IC scores per signal dimension to confirm each dimension has predictive power",
+        "Walk-Forward Weight Calibration \u2014 replace static equal weights with IC-calibrated dynamic weights",
+        "Per-Account Risk Limits (single account) \u2014 enforce max drawdown and position size limits in paper mode",
+        "Extract Signal Objects from Brain Loop \u2014 separate signal generation from execution in bot.py so signals are inspectable and loggable",
+        "Fractional Kelly position sizing \u2014 implement based on research finding that plain Kelly is dangerous"
+      ],
+      "exit_criteria": "Bot has completed at minimum 50 paper trades. Win rate, Sharpe ratio, and max drawdown are tracked and meet a pre-defined minimum threshold (e.g. win rate > 50%, Sharpe > 1.0 over 30-day window). Signal IC scores confirm at least the majority of dimensions are predictive.",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 2 \u2014 Live Trading, Single Account",
+      "goal": "Transition from paper to live trading on a single IBKR account with hardened execution, risk controls, and reconnection resilience.",
+      "rationale": "Only after paper profitability is confirmed does it make sense to risk real capital. This phase must harden execution quality and connection reliability before any scaling.",
+      "features": [
+        "Account-Aware Order Router (single account) \u2014 route orders correctly and confirm fills",
+        "Reconnection Logic \u2014 backoff, sequence, state sync for dropped IBKR connections",
+        "HMM Regime Detection \u2014 adjust signal thresholds based on detected market regime",
+        "Unified Trade Journal \u2014 log all entries/exits with full metadata for post-trade analysis",
+        "Per-Account Local Dashboard \u2014 live positions, P&L, and trade history for the single live account",
+        "Execution quality monitoring \u2014 slippage tracking, fill rate, order rejection logging"
+      ],
+      "exit_criteria": "Bot has traded live on a single account for at least 30 days with no critical execution failures, P&L is positive or within acceptable drawdown, and all trades are logged in the unified journal. Reconnection logic has been tested through at least one simulated outage.",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 3 \u2014 Cloud Hosted, Single Account",
+      "goal": "Move the single-account live bot off any local machine and onto a cloud VPS with Docker, so it runs 24/7 without founder intervention.",
+      "rationale": "Cloud hosting is a prerequisite for multi-user access. This phase isolates infrastructure concerns before users are added, reducing blast radius of configuration mistakes.",
+      "features": [
+        "Cloud VPS Setup and Deployment \u2014 Ubuntu 22, Docker, provisioned and secured",
+        "Per-User Docker Compose Containers with Encrypted Credentials (single user, founder account first)",
+        "Per-Account Config Profiles \u2014 replace flat global CONFIG with account-aware profile system",
+        "Connection Manager \u2014 Multi-Account IBKR (even for single account, this abstraction is needed for cloud)",
+        "Parameterise account_id Through Orders and Risk \u2014 audit orders.py and risk.py"
+      ],
+      "exit_criteria": "Bot runs on cloud VPS continuously for 14 days with no manual restarts required. Founder can monitor it entirely through the cloud dashboard. Credentials are encrypted at rest.",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 4 \u2014 Multi-User Beta",
+      "goal": "Onboard a small group of friends and family (beta users) with their own IBKR accounts, isolated containers, and a web dashboard they can use without technical help.",
+      "rationale": "This is the first time the system must handle multiple independent users. Beta scope is intentionally small to catch integration problems before a wider rollout.",
+      "features": [
+        "AccountDecisionAgent Class \u2014 one instance per IBKR sub-account",
+        "Per-User Dashboard Authentication \u2014 login, session isolation",
+        "One-Time User Setup Screen \u2014 guided IBKR credential entry and risk profile setup",
+        "Web Dashboard \u2014 Live Positions and P&L for each user",
+        "Signal Registry \u2014 Per-User Favourite Symbols",
+        "WebSocket Signal Broadcaster \u2014 real-time signal publication to user containers",
+        "Per-Account Local Dashboard \u2014 extended to web for each beta user",
+        "Telegram Bot \u2014 Notifications and Quick Commands",
+        "Cross-Account Correlation Guard \u2014 detect unintended correlated exposure across accounts",
+        "Account Performance Comparison \u2014 side-by-side Sharpe, drawdown dashboard"
+      ],
+      "exit_criteria": "At least 3 non-founder users have connected their own IBKR accounts, completed the setup screen without assistance, and have been trading (paper or live) for 14 days with no critical failures. Each user can see their own dashboard and receives trade notifications.",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 5 \u2014 Multi-User Production",
+      "goal": "Harden, monitor, and scale the platform for reliable ongoing operation across all users.",
+      "rationale": "Production readiness requires observability, alerting, automated recovery, and the kind of operational discipline that beta deliberately deferred.",
+      "features": [
+        "Platform-level monitoring and alerting (uptime, error rates, fill failures)",
+        "Automated container health checks and restart policies",
+        "User onboarding flow polish and documentation",
+        "Billing or access control layer if the platform expands beyond friends and family",
+        "Formal incident response and rollback procedures",
+        "Performance reporting for all accounts \u2014 periodic summaries"
+      ],
+      "exit_criteria": "Platform has operated for 60 days with zero unplanned outages exceeding 1 hour, all users are actively trading, and the founder can take a week off without the system requiring manual intervention.",
+      "estimated_scope": "medium"
+    }
+  ],
+  "immediate_next_action": {
+    "action": "Instrument the paper trading bot to log every trade, signal score, and agent vote to a persistent store, and wire up a minimal local dashboard so paper trading performance is visible and measurable.",
+    "rationale": "There is currently no evidence of paper trading performance \u2014 no session logs, no trade logs, no win rate data. Every other decision (whether to advance to live trading, which signals to trust, whether weights need calibrating) depends on having real output data. Without this, the team is flying blind. This is the single highest-leverage action because it unblocks all subsequent validation and go/no-go decisions.",
+    "cowork_prompt": "We are working on Decifer, a paper trading bot. The immediate goal is to establish a paper trading feedback loop. Here is what I need us to build or activate this session:\n\n1. Confirm that the bot is running paper trades and identify exactly where trade execution results are (or are not) being persisted.\n2. Add structured logging for every paper trade: timestamp, symbol, direction, entry price, signal scores per dimension, agent votes, position size, and exit P&L if available.\n3. Wire up or activate the local dashboard on port 8080 to display: open positions, cumulative P&L, trade count, and win rate.\n\nThe codebase uses ib_insync for IBKR connectivity, bot.py as the main loop, signals.py for signal generation, and a config.py for settings. Start by showing me the current state of trade logging in the codebase, then we will add what is missing."
+  },
+  "untracked_ideas": [
+    {
+      "title": "Fractional Kelly Position Sizing",
+      "source": "Research finding dated 2026-03-29 \u2014 Risk Management & Position Sizing",
+      "rationale": "Research explicitly flags that plain Kelly is dangerous for live trading due to drawdown sensitivity and estimation error amplification, and recommends fractional Kelly. This is not in any backlog item. Position sizing directly affects profitability and drawdown \u2014 it belongs in Phase 1 before live capital is risked.",
+      "suggested_phase": "Phase 1 \u2014 Validate Alpha (Paper Trading)"
+    },
+    {
+      "title": "IC-Based Dynamic Signal Weight Calibration (runtime, not just walk-forward)",
+      "source": "Research findings dated 2026-03-29 \u2014 Signal Quality & Alpha Generation (both entries)",
+      "rationale": "Two separate research findings emphasise that IC-weighted dynamic factor models substantially outperform static equal-weight models. Walk-Forward Weight Calibration is in the backlog, but real-time IC-based weighting during live operation is a distinct and more powerful capability. This should be tracked separately.",
+      "suggested_phase": "Phase 2 \u2014 Live Trading, Single Account"
+    },
+    {
+      "title": "Execution Quality & Exit Optimization",
+      "source": "Research finding dated 2026-03-29 \u2014 Win Rate Improvement \u2014 Execution Quality & Exit Optimization (content not populated)",
+      "rationale": "A research session was opened on this topic but no findings were recorded. Exit strategy (trailing stops, take-profit logic, time-based exits) is a known major driver of win rate and is not represented in any backlog feature. This gap needs to be filled with a concrete spec.",
+      "suggested_phase": "Phase 2 \u2014 Live Trading, Single Account"
+    },
+    {
+      "title": "Paper Trading Performance Report \u2014 Go/No-Go Gate",
+      "source": "Implied by vision and stage definition (paper_trading_single_account \u2192 live_trading_single_account)",
+      "rationale": "There is no explicit process or artefact defined for how the team decides to advance from paper to live trading. A formal go/no-go gate with defined criteria (minimum trades, minimum Sharpe, maximum drawdown) prevents premature advancement to live capital.",
+      "suggested_phase": "Phase 1 \u2014 Validate Alpha (Paper Trading)"
+    },
+    {
+      "title": "Secrets Management for Cloud Credentials",
+      "source": "Implied by cloud hosting vision and encrypted credentials backlog item",
+      "rationale": "The backlog mentions encrypted credentials but does not specify the mechanism. For a multi-user platform handling IBKR account credentials, a proper secrets management approach (e.g. HashiCorp Vault, AWS Secrets Manager, or at minimum Docker secrets) needs to be explicitly designed. A missing or weak implementation here is a high-severity security risk.",
+      "suggested_phase": "Phase 3 \u2014 Cloud Hosted, Single Account"
+    },
+    {
+      "title": "Win Rate Improvement \u2014 New Feature Research (findings not yet populated)",
+      "source": "Research finding dated 2026-03-27 \u2014 Win Rate Improvement \u2014 New Feature Research (content not populated)",
+      "rationale": "A research session was logged but produced no recorded output. Whatever was investigated here may contain ideas relevant to signal quality or execution that have not made it into the backlog. This session should be reviewed and its findings extracted.",
+      "suggested_phase": "Phase 1 \u2014 Validate Alpha (Paper Trading)"
+    }
+  ],
+  "risks": [
+    {
+      "risk": "No paper trading performance data exists \u2014 the team has no empirical basis to know whether the bot is profitable or whether any shipped signal features actually improve outcomes.",
+      "severity": "high",
+      "mitigation": "Immediately instrument trade logging and activate the local dashboard. Set a minimum paper trading run of 50 trades before any live trading discussion occurs. Define explicit go/no-go criteria."
+    },
+    {
+      "risk": "Multi-Account Position Aggregation was shipped at the paper_trading_single_account stage, introducing multi-account complexity before the core bot is proven. This may add debugging surface area and distract from the primary goal.",
+      "severity": "medium",
+      "mitigation": "Audit whether this feature is actively used or tested in the current single-account paper trading setup. If it is dormant, flag it as inactive and do not build further multi-account features until Phase 3."
+    },
+    {
+      "risk": "Signal weights are currently static and equal, while research strongly indicates IC-based dynamic weighting substantially outperforms this approach. The bot may be generating systematically suboptimal signals.",
+      "severity": "high",
+      "mitigation": "Prioritise Signal Validation with Alphalens and Walk-Forward Weight Calibration in Phase 1. Do not advance to live trading with unvalidated, static-weight signals."
+    },
+    {
+      "risk": "Two research sessions (Win Rate Improvement \u2014 Execution Quality & Exit Optimization, and Win Rate Improvement \u2014 New Feature Research) have no recorded findings, meaning potentially important insights have been lost.",
+      "severity": "medium",
+      "mitigation": "Review notes from those sessions and populate the findings before the next planning cycle. If notes are lost, re-run the research with a commitment to logging outputs immediately."
+    },
+    {
+      "risk": "There is no exit strategy (trailing stops, take-profit logic, time-based exits) defined or implemented in any backlog feature. Exit quality is a primary driver of win rate and drawdown.",
+      "severity": "high",
+      "mitigation": "Add an exit optimization feature to the Phase 1 backlog. Define at minimum a basic trailing stop and time-based exit rule before paper trading performance is evaluated."
+    },
+    {
+      "risk": "IBKR connection reliability is not addressed until Phase 2, but paper trading already depends on a live IBKR connection. An unhandled disconnection during paper trading could corrupt position state.",
+      "severity": "medium",
+      "mitigation": "Add basic connection error handling and state reconciliation to the paper trading bot now, even if the full Reconnection Logic feature is deferred to Phase 2."
+    },
+    {
+      "risk": "The backlog mixes features from four different roadmap phases without stage labels, creating a risk that developers pick up Phase 4 work while Phase 1 is incomplete.",
+      "severity": "medium",
+      "mitigation": "Tag every backlog item with its roadmap phase. Use a strict rule: no feature from Phase N+1 is started until Phase N exit criteria are met."
+    }
+  ],
+  "roadmap_gaps": "Several significant gaps exist. First, there is no exit strategy implementation anywhere in the backlog \u2014 no trailing stops, take-profit rules, or time-based exit logic, despite exit quality being a primary driver of win rate. Second, fractional Kelly or any sophisticated position sizing beyond basic risk limits is absent from the backlog despite clear research guidance. Third, there is no formal go/no-go process or artefact defining how the team decides to advance from paper to live trading. Fourth, real-time IC-based dynamic signal weighting (as distinct from periodic walk-forward calibration) is not specced. Fifth, there is no monitoring or alerting infrastructure defined for cloud-hosted operation, meaning production failures may go undetected. Sixth, user onboarding documentation and a guided setup flow are implied by the multi-user vision but not yet represented in any spec.",
+  "model": "claude-sonnet-4-6",
+  "data_sources": {
+    "specs": 29,
+    "sessions": 0,
+    "research": 6,
+    "commits": 0,
+    "tests": false,
+    "code": false
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "research-intra-portfolio-rolling-correlation-guard-with-sec",
+  "title": "Intra-Portfolio Rolling Correlation Guard with Sector Cap",
+  "status": "archived",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Compute rolling 30-day pairwise correlations between all open positions and flag when any two positions exceed 0.7 correlation, or when the portfolio's average pairwise correlation exceeds 0.5. Additionally, cap total risk exposure in any single GICS sector to 30% of portfolio heat. This upgrades the already-planned Cross-Account Correlation Guard backlog item with concrete formulas and thresholds. BlackRock (2025) and PGIM (2024) both cite shifting correlations as the central risk in modern portfolio construction.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "created_at": "2026-03-29T10:57:08.135197Z"
+}

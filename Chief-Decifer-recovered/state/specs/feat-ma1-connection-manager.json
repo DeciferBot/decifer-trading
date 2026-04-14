@@ -1,0 +1,27 @@
+{
+  "id": "feat-ma1-connection-manager",
+  "title": "Multi-Account IBKR Agent Architecture (Connection Manager + Decision Agent)",
+  "status": "future",
+  "priority": "P0",
+  "phase": "MA1",
+  "designed_date": "2026-03-29",
+  "started_date": null,
+  "completed_date": null,
+  "summary": "Two layers: (1) Connection Manager \u2014 manages multiple ib_insync IB() instances, one per IBKR sub-account, each with unique client ID and port. (2) AccountDecisionAgent \u2014 one instance per account, downstream of the 6-agent pipeline. Receives Signal objects, applies per-account config, and routes orders through the correct connection. Foundation for the full multi-account SaaS vision.",
+  "approach": "Create connection_manager.py with a ConnectionManager class. Holds a dict of account_id -> IB() instance. connect_all() starts each connection with its unique client_id from config. reconnect(account_id) retries with exponential backoff (1s, 2s, 4s, 8s). heartbeat loop pings each connection on 30s interval. On disconnect: triggers reconnect for that account only, other accounts unaffected. Refactor bot.py to use ConnectionManager instead of a single global IB().",
+  "files_affected": [
+    "connection_manager.py",
+    "bot.py"
+  ],
+  "dependencies": [
+    "feat-ma1-account-config-profiles"
+  ],
+  "roadmap_ref": "vision/Decifer_MultiAccount_Architecture.docx \u00a7 9.5",
+  "branch": null,
+  "approved_by": null,
+  "deferral_reason": "multi-account infrastructure \u2014 future stage (paper_trading_single_account prioritisation)",
+  "merged_from": [
+    "feat-ma1-connection-manager",
+    "feat-ma1-account-decision-agent"
+  ]
+}

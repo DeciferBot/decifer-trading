@@ -1,0 +1,11 @@
+{
+  "id": "research-drawdown-brake-tiered-equity-curve-circuit-breaker",
+  "title": "Drawdown Brake \u2014 Tiered Equity Curve Circuit Breaker",
+  "status": "archived",
+  "phase": "B",
+  "priority": "P0",
+  "summary": "Implement a three-tier drawdown brake that automatically reduces Kelly/ATR sizing multipliers as the account drawdown from its rolling peak deepens. Tier 1 (-5% from peak): reduce all position sizes by 25%. Tier 2 (-10% to -15%): reduce by 50% and restrict to highest-conviction signals only (score > 7.5). Tier 3 (> -15%): halt new trades for a configurable cooldown period and alert user via Telegram. This is a direct implementation of the risk-constrained Kelly constraint and the institutional drawdown protocol documented in practitioner literature.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "created_at": "2026-03-29T10:57:08.134665Z"
+}

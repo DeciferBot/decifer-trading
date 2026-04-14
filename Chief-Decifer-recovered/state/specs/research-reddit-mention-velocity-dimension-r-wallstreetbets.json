@@ -1,0 +1,16 @@
+{
+  "id": "research-reddit-mention-velocity-dimension-r-wallstreetbets",
+  "title": "Reddit Mention Velocity Signal (r/WSB + r/stocks \u2014 Surge Detection)",
+  "status": "future",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Upgrade existing social signal from qualitative to quantitative by tracking mention velocity (rate-of-change of mention count) across r/wallstreetbets + r/stocks. Detect velocity surges (not sentiment) as the leading signal. Published research shows WSB alpha is in the surge detection, not in bullish/bearish sentiment tone.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "created_at": "2026-03-29T10:57:08.129737Z",
+  "deferral_reason": "Future; reddit-mentions-surge covers this \u2014 deferred during paper_trading_single_account prioritisation",
+  "merged_from": [
+    "research-reddit-mention-velocity-dimension-r-wallstreetbets",
+    "research-reddit-mentions-surge-detector-velocity-not-sentim"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "feat-ma3-telegram-bot",
+  "title": "Telegram Bot \u2014 Notifications and Quick Commands",
+  "status": "future",
+  "priority": "P2",
+  "phase": "MA3",
+  "designed_date": "2026-03-29",
+  "started_date": null,
+  "completed_date": null,
+  "summary": "Each user gets trade notifications pushed to Telegram when a trade executes, with a brief AI rationale. Morning briefing at market open: daily portfolio summary, market regime, what Decifer is watching. Quick commands: /pause, /resume, /positions, /pnl. Telegram is NEVER used for order execution \u2014 notifications only.",
+  "approach": "Use python-telegram-bot (or aiogram \u2014 open question). One bot, per-user chat_id stored in strategy profile. On trade execute in AccountDecisionAgent: push notification with symbol, direction, price, rationale snippet (max 280 chars). Morning briefing job: fires at 09:20 ET, pulls portfolio snapshot, market regime from HMM, top 3 watched symbols. Commands: /pause sets kill_switch=True in container profile, /resume reverses. /positions and /pnl return formatted account summaries. Rate limit: batch notifications if multiple trades fire within 1 second \u2014 Telegram hard limit is 1 msg/sec per chat.",
+  "files_affected": [
+    "telegram_bot.py",
+    "account_agents.py"
+  ],
+  "dependencies": [
+    "feat-ma3-web-dashboard",
+    "feat-ma1-account-decision-agent"
+  ],
+  "roadmap_ref": "vision/Decifer_MultiAccount_Architecture.docx \u00a7 2 (Layer 3 Telegram) and \u00a7 6 (Known Problems)",
+  "branch": null,
+  "approved_by": null,
+  "deferral_reason": "multi-account infrastructure \u2014 future stage (paper_trading_single_account prioritisation)"
+}

@@ -8574,3 +8574,4 @@
 {"ts": "2026-04-14T17:33:43.667604Z", "event": "SUBMITTED", "symbol": "QQQ", "order_id": 4665, "side": "BUY", "qty": 191, "order_type": "LMT", "limit_price": 628.47, "fill_price": null}
 {"ts": "2026-04-14T17:33:44.884920Z", "event": "fill_watcher_started", "symbol": "QQQ", "order_id": 4665, "original_limit": 628.47, "price_boundary": 631.61, "side": "BUY"}
 {"ts": "2026-04-14T17:34:29.892130Z", "event": "fill_watcher_filled", "symbol": "QQQ", "order_id": 4665, "attempts": 0, "fill_limit": 628.47}
+{"ts": "2026-04-14T17:59:25.900966Z", "event": "VALIDATIONERROR", "symbol": "QQQ", "order_id": 4671, "side": "SELL", "qty": 191, "order_type": "STP", "limit_price": 614.84, "fill_price": null}

@@ -1,0 +1,12 @@
+{
+  "id": "research-order-flow-imbalance-detection",
+  "title": "Order Flow Imbalance Detection",
+  "status": "future",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Approximate institutional accumulation from volume on up/down closes. Leading indicator even with free data.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 New Feature Research",
+  "created_at": "2026-03-29T10:57:08.143642Z",
+  "deferral_reason": "Future; requires L2 data \u2014 deferred during paper_trading_single_account prioritisation"
+}

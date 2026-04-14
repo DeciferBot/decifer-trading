@@ -1,0 +1,16 @@
+{
+  "id": "research-rolling-3-month-signal-ic-health-check-with-auto-r-0866dc",
+  "title": "Rolling 3-Month Signal IC Health Check with Auto-Reweight Trigger",
+  "status": "spec_complete",
+  "phase": "C",
+  "priority": "P2",
+  "summary": "Implement a lightweight weekly job that computes per-dimension rolling Information Coefficient (Spearman correlation between signal score and forward 5-day return) over a 60-trading-day window. When any dimension's IC drops below a threshold (e.g., IC < 0.02 for 3 consecutive weeks), automatically reduce its weight in the composite score and flag it for human review. This directly addresses the finding that alpha decays to near zero by month 10-12 without active monitoring.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "impact_score": 10,
+  "impact_label": "High Impact",
+  "expected_impact": "QuantBench 2025 study on US stocks 2021-2023 shows 3-month rolling retraining consistently produced best out-of-sample performance vs 6-month, 12-month, and static; alpha decay costs US markets ~5.6% annually without adaptive updates \u2014 recovery of even 30% of this drag would represent meaningful Sharpe improvement.",
+  "difficulty": "Easy",
+  "dev_days": 3,
+  "created_at": "2026-04-03T14:31:52.546597Z"
+}

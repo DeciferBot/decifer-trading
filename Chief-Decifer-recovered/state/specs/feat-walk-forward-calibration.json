@@ -1,0 +1,33 @@
+{
+  "id": "feat-walk-forward-calibration",
+  "title": "Walk-Forward Optimization, Backtesting & WFE Validation",
+  "status": "backlog",
+  "priority": "P2",
+  "phase": "D",
+  "designed_date": null,
+  "started_date": null,
+  "completed_date": null,
+  "summary": "Rolling 6-month train / 1-month test windows to calibrate and validate 9-dimension signal weights. Implements Walk-Forward Efficiency (WFE) ratio metric: measures how well in-sample optimized parameters transfer out-of-sample. WFE > 0.5 required before deploying weight changes. Prevents overfit strategies from going live.",
+  "approach": "Rolling 60-day train / 20-day test windows. Optimize dimension weights via scipy.minimize on Sharpe. Constrain weights to prevent overfitting. Update weekly.",
+  "files_affected": [
+    "calibration.py",
+    "signals.py",
+    "backtest.py"
+  ],
+  "dependencies": [
+    "feat-hmm-regime-detection",
+    "feat-alphalens-validation"
+  ],
+  "roadmap_ref": "roadmap/08-walk-forward.md",
+  "branch": null,
+  "approved_by": null,
+  "dev_days": 5,
+  "difficulty": "Medium",
+  "expected_impact": "Prevents deploying overfit strategies; >90% of quant strategies fail without proper WFO",
+  "subsystem": "AI & Learning",
+  "merged_from": [
+    "feat-walk-forward-calibration",
+    "research-walk-forward-backtesting",
+    "research-walk-forward-efficiency-wfe-ratio-validator"
+  ]
+}

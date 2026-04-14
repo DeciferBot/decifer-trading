@@ -1,0 +1,17 @@
+{
+  "id": "research-gjr-garch-volatility-forecast-for-dynamic-signal-g",
+  "title": "GJR-GARCH Volatility Forecast for Dynamic Signal Gating",
+  "status": "future",
+  "phase": "C",
+  "priority": "P2",
+  "summary": "The GJR-GARCH (Glosten-Jagannathan-Runkle GARCH) model extends standard GARCH by adding an asymmetry parameter that gives extra weight to negative return shocks \u2014 capturing the well-known 'leverage effect' where bad news causes larger volatility spikes than equivalent good news. Using the Python `arch` library (pure Python, no C dependencies unlike TA-Lib) with yfinance price history, Decifer can generate a 1-day-ahead conditional volatility forecast for SPY and each position. This forecast can gate signal scoring: if forecast_vol > 1.5x the 30-day average, reduce signal dimension weights or widen the entry threshold. QuantInsti benchmarks from 2025 confirm GJR-GARCH out-of-sample accuracy on SPY is measurably better than plain GARCH. The `arch` library is pip-installable with no system C libraries required.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 ML Feature Engineering & Predictive Signal Construction",
+  "impact_score": 9,
+  "impact_label": "High Impact",
+  "expected_impact": "+3\u20134% win rate via false signal suppression in vol spikes",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-01T04:14:25.114643Z",
+  "deferral_reason": "not in paper_trading_single_account Active pipeline \u2014 deferred for future stage review"
+}

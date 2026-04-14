@@ -1,0 +1,12 @@
+{
+  "id": "research-monte-carlo-stress-testing",
+  "title": "Monte Carlo Stress Testing",
+  "status": "future",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Shuffle backtest trade sequences 1000x to find true drawdown distribution. Catches luck-dependent edges.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 New Feature Research",
+  "created_at": "2026-03-29T10:57:08.144079Z",
+  "deferral_reason": "Validation tool, not a live signal \u2014 deferred during paper_trading_single_account prioritisation"
+}

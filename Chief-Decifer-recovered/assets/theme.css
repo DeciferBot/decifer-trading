@@ -1,0 +1,330 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   CHIEF DECIFER — Theme System
+   CSS custom properties for dark (default) and light mode.
+   Toggle .light-mode on <body> to switch.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Page backgrounds */
+  --cd-bg:         #0a0f18;
+  --cd-card:       #1e2a3a;
+  --cd-card2:      #141c28;
+  --cd-deep:       #0d1520;
+  --cd-stripe:     #1a2332;
+
+  /* Borders */
+  --cd-border:     #2a3a4a;
+  --cd-border-sub: rgba(255,255,255,0.06);
+
+  /* Text */
+  --cd-text:       #e9ecef;
+  --cd-text2:      #adb5bd;
+  --cd-muted:      #868e96;
+  --cd-faint:      #495057;
+
+  /* Status backgrounds */
+  --cd-ok-bg:      rgba(81,207,102,0.07);
+  --cd-warn-bg:    rgba(255,212,59,0.07);
+  --cd-err-bg:     rgba(255,107,107,0.07);
+
+  /* Accent colours (unchanged across themes) */
+  --cd-blue:   #4dabf7;
+  --cd-green:  #51cf66;
+  --cd-yellow: #ffd43b;
+  --cd-red:    #ff6b6b;
+  --cd-purple: #da77f2;
+  --cd-teal:   #63e6be;
+  --cd-orange: #ffa94d;
+
+  /* Drag handle visual */
+  --cd-drag-handle: rgba(255,255,255,0.12);
+}
+
+/* ── Light mode ─────────────────────────────────────────────────────────── */
+body.light-mode {
+  --cd-bg:         #f0f4f9;
+  --cd-card:       #ffffff;
+  --cd-card2:      #edf2f8;
+  --cd-deep:       #e3eaf4;
+  --cd-stripe:     #f7f9fc;
+  --cd-border:     #ccd5e0;
+  --cd-border-sub: rgba(0,0,0,0.07);
+  --cd-text:       #1a202c;
+  --cd-text2:      #4a5568;
+  --cd-muted:      #718096;
+  --cd-faint:      #a0aec0;
+  --cd-ok-bg:      rgba(56,161,105,0.08);
+  --cd-warn-bg:    rgba(214,158,46,0.08);
+  --cd-err-bg:     rgba(229,62,62,0.08);
+  --cd-drag-handle: rgba(0,0,0,0.10);
+}
+
+/* ── Global transitions ──────────────────────────────────────────────────── */
+* { transition: background-color 0.25s ease, color 0.15s ease, border-color 0.25s ease; }
+*:focus { outline: none; }
+
+/* ── Body & container ────────────────────────────────────────────────────── */
+body {
+  background-color: var(--cd-bg) !important;
+  color: var(--cd-text) !important;
+}
+
+.container-fluid {
+  background-color: var(--cd-bg) !important;
+}
+
+/* ── Light mode Bootstrap overrides ─────────────────────────────────────── */
+body.light-mode .nav-tabs {
+  border-bottom-color: var(--cd-border) !important;
+}
+
+body.light-mode .nav-tabs .nav-link {
+  color: var(--cd-muted) !important;
+  background-color: transparent !important;
+}
+
+body.light-mode .nav-tabs .nav-link.active,
+body.light-mode .nav-tabs .nav-link.fw-bold {
+  color: var(--cd-blue) !important;
+  background-color: transparent !important;
+  border-bottom-color: var(--cd-blue) !important;
+}
+
+body.light-mode .text-muted    { color: var(--cd-muted)  !important; }
+body.light-mode .text-light    { color: var(--cd-text)   !important; }
+body.light-mode .border-bottom,
+body.light-mode .border-secondary { border-color: var(--cd-border) !important; }
+body.light-mode .text-secondary    { color: var(--cd-muted) !important; }
+
+/* ── Draggable grid tile shell ───────────────────────────────────────────── */
+.cd-tile {
+  background-color: var(--cd-card);
+  border: 1px solid var(--cd-border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.cd-tile:hover {
+  border-color: color-mix(in srgb, var(--cd-blue) 40%, var(--cd-border));
+}
+
+.cd-tile-header {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--cd-muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: grab;
+}
+
+.cd-tile-header:active { cursor: grabbing; }
+
+.cd-tile-header .drag-dots {
+  color: var(--cd-drag-handle);
+  font-size: 0.8rem;
+  cursor: grab;
+}
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
+.cd-card {
+  background-color: var(--cd-card);
+  border: 1px solid var(--cd-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.cd-card-deep {
+  background-color: var(--cd-deep);
+  border: 1px solid var(--cd-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.cd-section {
+  background-color: var(--cd-card2);
+  border: 1px solid var(--cd-border);
+  border-radius: 10px;
+  padding: 20px;
+}
+
+/* ── Stat pill ───────────────────────────────────────────────────────────── */
+.cd-stat-pill {
+  background-color: var(--cd-deep);
+  border: 1px solid var(--cd-border-sub);
+  border-radius: 8px;
+  padding: 10px 16px;
+  text-align: center;
+  min-width: 80px;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.cd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0 12px;
+  border-bottom: 1px solid var(--cd-border);
+  margin-bottom: 10px;
+}
+
+.cd-logo {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--cd-text);
+  font-family: 'Courier New', monospace;
+}
+
+.cd-logo-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--cd-green);
+  display: inline-block;
+  margin-right: 8px;
+  box-shadow: 0 0 6px var(--cd-green);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ── Theme toggle ────────────────────────────────────────────────────────── */
+.cd-theme-btn {
+  background: none;
+  border: 1px solid var(--cd-border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  color: var(--cd-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cd-theme-btn:hover {
+  border-color: var(--cd-blue);
+  color: var(--cd-blue);
+}
+
+/* ── Status strip ────────────────────────────────────────────────────────── */
+.cd-strip-pill {
+  display: flex;
+  align-items: center;
+  padding: 5px 14px;
+  background-color: var(--cd-deep);
+  border-radius: 20px;
+  border: 1px solid var(--cd-border-sub);
+  gap: 6px;
+  font-size: 0.65rem;
+}
+
+/* ── Pipeline / Kanban ───────────────────────────────────────────────────── */
+.cd-kanban-col {
+  flex: 1;
+  min-width: 240px;
+  max-width: 340px;
+  border-radius: 12px;
+  padding: 16px 14px;
+}
+
+.cd-feature-card {
+  border-radius: 9px;
+  padding: 13px 15px;
+  margin-bottom: 9px;
+  border: 1px solid var(--cd-border-sub);
+}
+
+/* ── Pillar cards ────────────────────────────────────────────────────────── */
+.cd-pillar {
+  background-color: var(--cd-card);
+  border: 1px solid var(--cd-border);
+  border-radius: 10px;
+  padding: 18px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cd-pillar:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+body.light-mode .cd-pillar:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+/* ── Scroll bars ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--cd-deep); }
+::-webkit-scrollbar-thumb { background: var(--cd-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--cd-muted); }
+
+/* ── Product Map ─────────────────────────────────────────────────────────── */
+.cd-map-stage {
+  background-color: var(--cd-card);
+  border: 1px solid var(--cd-border);
+  border-radius: 12px;
+  padding: 16px;
+  flex: 1;
+  min-width: 140px;
+  position: relative;
+}
+
+.cd-map-module {
+  background-color: var(--cd-deep);
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 0.65rem;
+  margin-bottom: 4px;
+  border: 1px solid var(--cd-border-sub);
+  color: var(--cd-text2);
+}
+
+.cd-map-arrow {
+  color: var(--cd-muted);
+  font-size: 1.2rem;
+  align-self: center;
+  flex-shrink: 0;
+  padding: 0 4px;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .cd-map-stage { min-width: 120px; }
+  .cd-kanban-col { min-width: 200px; }
+}
+
+/* ── Draggable grid react-grid-layout overrides ──────────────────────────── */
+.react-grid-item.react-grid-placeholder {
+  background: var(--cd-blue) !important;
+  opacity: 0.15 !important;
+  border-radius: 12px;
+}
+
+.react-resizable-handle {
+  opacity: 0;
+}
+.react-grid-item:hover .react-resizable-handle {
+  opacity: 0.4;
+}
+
+.react-grid-item {
+  cursor: default;
+}
+
+.react-grid-item.cssTransforms {
+  transition-property: transform !important;
+}

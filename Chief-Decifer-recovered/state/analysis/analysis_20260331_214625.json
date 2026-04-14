@@ -1,0 +1,211 @@
+{
+  "generated_at": "2026-03-31T17:45:39.108928+00:00",
+  "vision_statement": "Decifer will be a cloud-hosted, profitable trading bot where friends and family connect through a web interface, link their own broker accounts, and manage risk via settings \u2014 starting with a single paper-trading account and scaling to a hosted multi-user platform.",
+  "current_stage_assessment": "Decifer is in the paper_trading_single_account stage with significant feature velocity \u2014 35 source modules, 24K lines of code, and a dense active pipeline. However, the test suite is critically broken (0% pass rate, collection error on test_bot.py), which means no safety net exists for the rapid feature work happening in the last 24 hours. The bot cannot be responsibly advanced toward live trading without a functioning test harness.",
+  "executive_summary": "Decifer is shipping features at high velocity \u2014 regime routing, IC-weighted signals, alpha decay tracking, ATR trailing stops, and intraday adaptive modes all landed in the last 48 hours \u2014 but the test suite has collapsed to 0% pass rate with a collection error on the core test_bot.py file, leaving all of that new code unvalidated. The pipeline is heavily loaded with 77 active features, many of which overlap in intent (multiple HMM features, multiple IC-weighting features, multiple Reddit signal features), creating a deduplication and prioritisation debt that will slow decisions. Research findings on regime detection, IC-weighted scoring, and fractional Kelly are strong and partially implemented but not yet fully wired together into a coherent risk-adjusted execution stack. The path to live trading requires the test harness to be restored first, then a clean validation cycle on the regime router and signal composite before trusting any trade decisions with real capital. Multi-account and cloud infra features should be held until single-account paper trading is demonstrably profitable and stable.",
+  "recommended_actions": [
+    {
+      "action": "Fix the test_bot.py collection error to restore the test suite from 0% pass rate",
+      "type": "fix",
+      "why_now": "The test suite is at 0% pass rate with a pytest collection error on test_bot.py \u2014 not a test failure, a collection failure, meaning pytest cannot even load the file. At least 5 significant features landed in the last 24 hours (ATR trailing stop, M&A sentinel, adaptive strategy modes, IC-weighted composite, regime router). None of these have any automated validation. This is the single highest-risk state the project can be in before approaching live trading. Nothing else in the pipeline can be trusted until the harness is green.",
+      "source": "TEST HEALTH: Pass rate None%, ERROR collecting tests/test_bot.py",
+      "cowork_prompt": "CONTEXT: Decifer is a trading bot in paper_trading_single_account stage. The test suite has a critical collection error \u2014 pytest cannot load tests/test_bot.py at all, resulting in 0% pass rate across the entire suite. Multiple major features shipped in the last 24 hours with no test coverage.\n\nGOAL: Diagnose and fix the test_bot.py collection error. Restore the test suite to a runnable state. Get to at minimum a known baseline pass rate.\n\nTASKS:\n1. Run `pytest tests/test_bot.py --tb=long` and capture the full traceback from the collection error.\n2. Identify the root cause \u2014 likely a missing import, circular dependency, or breaking interface change in bot.py (3266 lines, the largest module) introduced by recent commits.\n3. Fix the import/interface issue. Do NOT rewrite tests to hide failures \u2014 fix the underlying cause.\n4. Run the full test suite and document which tests pass, which fail, and why.\n5. For any new failures introduced by recent commits (IC-weighted composite, regime router, ATR trailing stop, M&A sentinel, adaptive strategy modes), add minimal regression tests covering the core execution path.\n6. Report final pass/fail counts and any tests that are failing due to real logic bugs vs. stale test setup.\n\nCONSTRAINTS: Do not skip or xfail tests to inflate the pass rate. The goal is a truthful green baseline."
+    },
+    {
+      "action": "Deduplicate and resolve the overlapping HMM / regime detection features (4 active + 1 backlog items) into a single canonical spec",
+      "type": "decision",
+      "why_now": "There are currently 5 separate regime-detection feature entries: 'Gaussian HMM Regime Classifier', 'HMM Regime Detection \u2014 3-state HMM on vol + RSI', 'Hurst Exponent Per-Stock Regime Classifier', 'Statistical Jump Model (JM) Regime Identifier', and 'Walk-Forward HMM Retraining Pipeline' \u2014 plus the already-shipped 'Regime-Gated Momentum/Mean-Reversion Signal Router' and the 'Regime-Conditional Signal Weighting' active item. The regime router commit landed 22 hours ago but it is not clear which of these specs it implements or which remain. Without a decision on the canonical regime approach, dev sessions will continue building redundant or conflicting regime logic into the same codebase. Research findings strongly support HMM-based regime detection \u2014 this decision should be made now before more parallel work accumulates.",
+      "source": "Active pipeline: Gaussian HMM Regime Classifier [D P2], HMM Regime Detection [D P2], Hurst Exponent Per-Stock Regime Classifier [D P2], Statistical Jump Model [D P2], Walk-Forward HMM Retraining [D P2]; Research: Market Regime Detection & Adaptation [2026-03-30]; Recent commit: feat(signals): regime-gated momentum/mean-reversion signal router",
+      "cowork_prompt": "CONTEXT: Decifer has shipped a regime-gated signal router (commit 22 hours ago) but still has 4\u20135 overlapping regime detection feature specs in the active pipeline and backlog. Research consensus (2026-03-30 finding) confirms regime adaptation provides real edge. The codebase cannot absorb 4 separate regime implementations.\n\nGOAL: Make a single architectural decision on the regime detection stack and collapse the overlapping specs.\n\nTASKS:\n1. Review the current regime_router implementation from the recent commit \u2014 what signal does it use to determine regime state? VIX proxy? Something else?\n2. Evaluate the four competing approaches against practical constraints: (a) Gaussian HMM on SPY returns \u2014 academically validated, requires hmmlearn, monthly retrain, (b) Hurst Exponent \u2014 per-stock, rolling window, no training required, (c) Statistical Jump Model \u2014 newer, more robust to abrupt shifts, more complex, (d) Simple VIX-threshold proxy \u2014 already partially implemented in the regime router.\n3. Decision framework: For paper_trading_single_account stage, prefer the approach that is (i) already partially implemented, (ii) has no external training dependency, (iii) can be validated fastest. Recommend one primary approach and one future upgrade path.\n4. Write a single canonical 'Market Regime Detection' spec that supersedes all overlapping entries. Archive/close the redundant pipeline items.\n5. Identify which of the duplicate active items ([D P2] tags) should be closed vs. merged into the canonical spec.\n\nDELIVERABLE: A written decision record naming the canonical regime approach, the rationale, and a list of pipeline items to close."
+    },
+    {
+      "action": "Resolve the IC-weighted signal composite duplication \u2014 two near-identical active features exist \u2014 and validate the recently shipped rolling IC commit",
+      "type": "housekeeping",
+      "why_now": "There are two active features with nearly identical descriptions: 'IC-Weighted Dynamic Signal Scorer' [C P2] and 'IC-Weighted Dynamic Signal Scoring' [C P2]. A commit landed 22 hours ago \u2014 'feat(signals): rolling IC-weighted 9-dimension signal composite' \u2014 which appears to implement one or both. Without closing the duplicates and validating what was actually built, the pipeline is polluted with resolved items, and future sessions may build redundant versions. Research findings (2026-03-29) identify IC-weighting as the highest-leverage signal quality improvement, so getting the implementation right and confirmed matters.",
+      "source": "Active pipeline: IC-Weighted Dynamic Signal Scorer [C P2], IC-Weighted Dynamic Signal Scoring [C P2]; Recent commit: feat(signals): rolling IC-weighted 9-dimension signal composite; Research: Signal Quality & Alpha Generation [2026-03-29]",
+      "cowork_prompt": "CONTEXT: Two near-identical active pipeline features exist for IC-weighted signal scoring. A commit shipped 22 hours ago that appears to implement this. Research strongly supports IC weighting as the highest-leverage signal improvement available.\n\nGOAL: Validate the shipped implementation, close the duplicate specs, and confirm the feature is actually working correctly.\n\nTASKS:\n1. Read the recent commit diff for 'feat(signals): rolling IC-weighted 9-dimension signal composite'. Document exactly what was built: which module, what IC window, how weights are updated, how they are applied to the 9-dimension composite.\n2. Check whether the implementation matches either of the two active spec descriptions. Note any gaps.\n3. Write a targeted test: feed known signal dimension scores and known historical returns into the IC weighting logic and assert the output weights shift as expected over time.\n4. Determine which of the two duplicate active items ('IC-Weighted Dynamic Signal Scorer' vs 'IC-Weighted Dynamic Signal Scoring') was implemented and close the other with a note.\n5. If the implementation has gaps vs. the spec (e.g., no decay on stale IC, no floor on minimum weight), file a specific follow-up task \u2014 do not silently leave it incomplete.\n6. Check signals.py (1330L) to confirm the IC weights are actually being read by the signal composite path, not computed but unused.\n\nDELIVERABLE: Confirmed working IC-weighted composite, one closed duplicate spec, and a test in the suite."
+    },
+    {
+      "action": "Build the Multi-Source Sentiment Consensus Gate [A P0] \u2014 the only P0 active feature not yet shipped",
+      "type": "build",
+      "why_now": "This is the only [A P0] item in the active pipeline \u2014 the highest priority unshipped feature by the project's own classification. Research findings (2026-03-31) confirm LLM-based sentiment scoring achieves 72-74% directional accuracy. The Claude Sentiment Scoring Pipeline is already an active feature and the infrastructure (Yahoo RSS, Finviz, Claude integration) appears to exist in the codebase. A consensus gate that requires sentiment agreement before entry is a direct win-rate lever at the current paper trading stage. It is also architecturally simple enough to build and test quickly.",
+      "source": "Active pipeline: Multi-Source Sentiment Consensus Gate [A P0]; Research: Sentiment Analysis & NLP for Trading [2026-03-31]",
+      "cowork_prompt": "CONTEXT: Decifer is in paper_trading_single_account stage. The Multi-Source Sentiment Consensus Gate is the only [A P0] active pipeline item \u2014 highest priority unshipped feature. Research (2026-03-31) confirms LLM sentiment scoring produces statistically significant alpha at 72-74% directional accuracy. The Claude Sentiment Scoring Pipeline feature and Yahoo RSS/Finviz infrastructure appear to exist in the codebase.\n\nGOAL: Implement a consensus-gating layer that checks sentiment agreement across multiple sources before allowing trade entry.\n\nTASKS:\n1. Audit the existing codebase for sentiment-related code \u2014 locate Claude sentiment calls, Yahoo RSS feed handling, and any Finviz integration. Document what exists and what is mock vs. live.\n2. Design the consensus gate: define the minimum number of sources that must agree on direction (positive/negative) before a trade entry is permitted. Suggest: require 2 of 3 sources (Yahoo RSS headline score, Finviz news score, Claude composite) to agree with the trade direction.\n3. Implement a `sentiment_consensus_gate(ticker, direction)` function that returns (passed: bool, sources_checked: int, sources_agreeing: int, details: dict).\n4. Wire this gate into the brain loop entry logic \u2014 a trade should be blocked if the gate fails, with the reason logged.\n5. Add a fallback: if sentiment data is unavailable for a source, treat it as neutral (not as agreement). Do not fail-open.\n6. Write tests: (a) all sources agree \u2014 gate passes, (b) sources disagree \u2014 gate blocks, (c) one source unavailable \u2014 correct neutral fallback behaviour.\n7. Add a dashboard metric showing sentiment gate pass/block rate over the last 50 scans.\n\nCONSTRAINTS: Do not add new external API dependencies beyond what already exists. Claude calls must use the existing prompt caching infrastructure (see recent tiered scan commit)."
+    },
+    {
+      "action": "Extract Signal Objects from Brain Loop [B P1] \u2014 prerequisite for WebSocket broadcaster, per-account routing, and multi-user architecture",
+      "type": "build",
+      "why_now": "This item appears in BOTH the active pipeline [B P1] AND the backlog as [MA1 P0] \u2014 the highest multi-account priority. It is a structural prerequisite: until Signal objects are typed and separated from execution in bot.py, the WebSocket Signal Broadcaster cannot be built, the AccountDecisionAgent cannot receive typed signals, and the multi-account architecture cannot proceed. Bot.py is already the largest module at 3266 lines. This refactor also reduces the risk surface in the most complex file before live trading. The MA1 P0 backlog tag means this is gating the entire multi-account phase.",
+      "source": "Active pipeline: Extract Signal Objects from Brain Loop [B P1]; Backlog: Extract Signal Objects from Brain Loop [MA1 P0]; Code health: bot.py 3266L (largest module)",
+      "cowork_prompt": "CONTEXT: Decifer's bot.py is 3266 lines \u2014 the largest module \u2014 and currently mixes signal generation with execution logic. 'Extract Signal Objects from Brain Loop' appears as both [B P1] in active pipeline and [MA1 P0] in backlog, meaning it gates the entire multi-account architecture. The WebSocket Signal Broadcaster and AccountDecisionAgent both depend on this refactor.\n\nGOAL: Separate signal generation from execution in bot.py by introducing typed Signal objects.\n\nTASKS:\n1. Read bot.py's scan loop and identify the exact boundary between (a) signal computation and (b) decision/execution logic. Document the current data flow.\n2. Define a Signal dataclass with fields: ticker, direction (LONG/SHORT/NEUTRAL), conviction_score (float), dimension_scores (dict), regime_state (str), timestamp (datetime), source_agent (str), metadata (dict).\n3. Refactor the scan loop so that the signal generation phase produces a list of Signal objects, and the execution phase consumes them. No logic changes \u2014 pure structural separation.\n4. Place Signal class in a new signals_types.py or extend existing signals.py \u2014 do not create circular imports with bot.py.\n5. Update all callers that currently read raw signal data from the scan loop to consume Signal objects instead.\n6. Verify all existing tests still pass after the refactor. Add a test that asserts the scan loop produces Signal objects with required fields populated.\n7. Document the interface: what fields are guaranteed on every Signal, which are optional.\n\nCONSTRAINTS: This is a structural refactor \u2014 zero behaviour change. If any logic change is required to make it work, flag it separately rather than bundling it in. Keep bot.py imports clean."
+    },
+    {
+      "action": "Promote the Fractional Kelly + VIX-Adaptive Sizing research finding into a single canonical position sizing spec, replacing the three overlapping active sizing features",
+      "type": "promote",
+      "why_now": "Research finding (2026-03-29, Risk Management & Position Sizing) is unambiguous: plain Kelly is dangerous, fractional Kelly with volatility-targeting is the validated approach. There are currently three overlapping active sizing features: 'ATR Volatility-Targeting Position Size Layer [B P2]', 'VIX-Rank Adaptive Fractional Kelly Sizer [B P2]', and 'Dynamic Volatility-Based Position Sizing [C P2]'. Recent commits show ATR trailing stop work happening. Without a canonical sizing spec, these will be built as three separate partial implementations that conflict. Position sizing is one of the highest-leverage risk controls before live trading.",
+      "source": "Research: Risk Management & Position Sizing [2026-03-29]; Active pipeline: ATR Volatility-Targeting Position Size Layer [B P2], VIX-Rank Adaptive Fractional Kelly Sizer [B P2], Dynamic Volatility-Based Position Sizing [C P2]; Recent commit: feat(risk): ATR trailing stop",
+      "cowork_prompt": "CONTEXT: Research finding (2026-03-29) states plainly that fractional Kelly combined with volatility targeting is the validated approach for position sizing in live systems. Decifer has three overlapping active features covering this: ATR Volatility-Targeting, VIX-Rank Adaptive Fractional Kelly, and Dynamic Volatility-Based Sizing. A recent commit added ATR trailing stop logic to risk.py. Without a single canonical spec, these become three conflicting partial implementations.\n\nGOAL: Write a single canonical position sizing spec that supersedes the three overlapping features, grounded in the research finding.\n\nTASKS:\n1. Read the research finding summary for Risk Management & Position Sizing (2026-03-29) in full. Extract the core formula and the key parameters.\n2. Read the current position sizing logic in risk.py (943L). Document what is currently implemented: is there any Kelly logic? Any ATR sizing? What is the current default?\n3. Write a single spec document: 'Adaptive Fractional Kelly Position Sizer'. It should: (a) use the volatility-targeting formula w_t = \u03c3* / (\u221a252 \u00b7 \u03c3_t) as the ATR-based size ceiling, (b) apply a VIX-rank fractional Kelly multiplier that scales the fraction down as VIX percentile rises, (c) define concrete parameter defaults (\u03c3* target vol, Kelly fraction floor/ceiling, VIX percentile buckets).\n4. Identify which of the three existing active pipeline items this spec replaces and mark them for closure.\n5. Identify any gaps: what data does this require that is not currently available in the execution path?\n6. Add this spec to the pipeline as a single [B P1] item replacing the three [B P2] items.\n\nDELIVERABLE: A written spec document and a decision to close 3 active items in favour of the canonical one."
+    },
+    {
+      "action": "Validate that the regime router and IC-weighted composite are producing measurably different trade decisions than the prior equal-weight static system in paper trading",
+      "type": "validate",
+      "why_now": "Two major algorithmic changes shipped in the last 22-24 hours: the regime-gated signal router and the IC-weighted composite. These are the highest-leverage changes made to the bot. Before building more features on top of them, there should be a paper trading validation pass \u2014 are trades actually being filtered differently? Are regime states being detected and applied? Is the IC weighting shifting based on recent signal performance? If either feature is silently a no-op (e.g., IC weights not wired in, regime always returning the same state), all downstream work is built on a false foundation.",
+      "source": "Recent commits: feat(signals): rolling IC-weighted 9-dimension signal composite, feat(signals): regime-gated momentum/mean-reversion signal router; Research: Signal Quality & Alpha Generation [2026-03-29], Market Regime Detection [2026-03-30]",
+      "cowork_prompt": "CONTEXT: Two high-leverage features shipped in the last 24 hours: (1) regime-gated momentum/mean-reversion signal router, (2) rolling IC-weighted 9-dimension signal composite. These are the most impactful algorithmic changes to date. Before building more features on top of them, we need to confirm they are actually functioning as intended in paper trading \u2014 not silently no-ops.\n\nGOAL: Validate that both features are producing observable, measurable differences in trade decisions compared to the prior system.\n\nTASKS:\n1. For the regime router: add a debug log line (if not already present) that prints the detected regime state and the signal router branch taken (momentum or mean-reversion) for each scan cycle. Run 1 full paper trading session and capture the output. Verify: (a) regime state changes at least once during a session, (b) signal router is using different weighting for different regimes, (c) there are no constant-state issues.\n2. For IC-weighted composite: log the current IC weights for all 9 dimensions at the start of each session. Verify: (a) weights are not all equal (which would mean IC isn't updating), (b) weights sum to a predictable total or are normalised correctly, (c) a dimension with recent poor IC is weighted lower than one with strong IC.\n3. Run a 5-trade simulation (paper) and capture: old composite score (equal weight) vs. new composite score (IC-weighted) for each candidate. If they are identical, the feature is not wired in.\n4. Check for the edge case: if there is insufficient IC history (e.g., on first run), does the system fall back to equal weights gracefully? Test this.\n5. Document findings: what is working, what is not, what needs a follow-up fix.\n\nDELIVERABLE: A validation report with log evidence that both features are active and producing non-trivial effects on trade decisions."
+    },
+    {
+      "action": "Spec the Drawdown Brake \u2014 Tiered Equity Curve Circuit Breaker [B P2] as a P1 prerequisite for live trading",
+      "type": "spec",
+      "why_now": "The recent commit 'feat(risk): capital-agnostic daily loss limit + PDT-aware mode' addresses daily loss limits, but the Drawdown Brake (tiered equity curve circuit breaker) is a separate and more important control for live trading \u2014 it automatically reduces position sizing or halts trading when cumulative drawdown thresholds are breached. Without this, a losing streak in live trading has no automated backstop. The feature is currently marked [B P2] but should be elevated given the proximity to live trading stage. Research on fractional Kelly reinforces that drawdown controls are prerequisite to live deployment.",
+      "source": "Active pipeline: Drawdown Brake \u2014 Tiered Equity Curve Circuit Breaker [B P2]; Recent commit: feat(risk): capital-agnostic daily loss limit + PDT-aware mode; Research: Risk Management & Position Sizing [2026-03-29]",
+      "cowork_prompt": "CONTEXT: Decifer has a daily loss limit feature (just committed). The Drawdown Brake is a separate feature covering cumulative equity curve drawdown \u2014 when the account drops X% from peak, automatically reduce Kelly sizing or halt new entries. This is a standard live trading safety control. Currently marked [B P2] but should be P1 given the stage.\n\nGOAL: Write a detailed spec for the Drawdown Brake and re-prioritise it to P1.\n\nTASKS:\n1. Read the existing daily loss limit code from the recent commit (feat(risk): capital-agnostic daily loss limit). Understand what is already tracked (daily loss) vs. what is missing (rolling equity high-water mark, cumulative drawdown from peak).\n2. Design three tiers:\n   - Tier 1 (e.g., -5% from HWM): Reduce new position sizes by 50% via Kelly multiplier.\n   - Tier 2 (e.g., -10% from HWM): Halt all new entries. Only manage existing positions.\n   - Tier 3 (e.g., -15% from HWM): Close all positions and enter full halt mode. Require manual reset.\n3. Define: how is the high-water mark calculated (daily close equity)? How is drawdown measured (from all-time HWM or rolling 30-day HWM)? How is recovery from a tier handled (gradual re-entry or binary reset)?\n4. Identify where in the execution path the brake must be checked \u2014 before order submission in orders.py, or as a pre-check in the brain loop?\n5. Write the spec as a pipeline item with acceptance criteria. Re-classify as [B P1].\n6. Note any conflict or overlap with the existing daily loss limit \u2014 they should be complementary not duplicative.\n\nDELIVERABLE: A written spec document ready to hand to a developer, re-prioritised to P1."
+    },
+    {
+      "action": "Audit and close the duplicate active/backlog feature entries for Connection Manager, Per-Account Config Profiles, and Parameterise account_id \u2014 each appears in both active and backlog",
+      "type": "housekeeping",
+      "why_now": "At least 4 features appear in both the active pipeline and the backlog with near-identical descriptions: 'Connection Manager \u2014 Multi-Account IBKR', 'Per-Account Config Profiles', 'Parameterise account_id Through Orders and Risk', and 'Per-Account Local Dashboard'. This creates ambiguity about which version is the canonical spec, whether work is being tracked twice, and whether completions will be double-counted. A 77-item active pipeline is already hard to navigate \u2014 duplicates make it worse. Cleaning this up is a 1-session housekeeping task that materially improves pipeline clarity.",
+      "source": "Active pipeline vs. Backlog: Connection Manager [B P2] vs [MA1 P0], Per-Account Config Profiles [B P2] vs [MA1 P0], Parameterise account_id [B P2] vs [MA1 P0], Per-Account Local Dashboard [B P2] vs [MA1 P1]",
+      "cowork_prompt": "CONTEXT: Decifer's feature pipeline has a significant duplication problem. At least 4 features appear in both the active pipeline and the backlog with near-identical descriptions but different priority labels (e.g., active [B P2] vs backlog [MA1 P0]). This creates confusion about which is canonical, whether work is being tracked twice, and whether completions will be missed.\n\nGOAL: Audit all active + backlog items for duplicates and produce a clean, deduplicated pipeline.\n\nTASKS:\n1. Create a side-by-side comparison of all active and backlog items. Identify every pair or group that covers the same feature intent.\n2. Confirmed duplicate groups to resolve:\n   - 'Connection Manager \u2014 Multi-Account IBKR': active [B P2] vs backlog [MA1 P0]\n   - 'Per-Account Config Profiles': active [B P2] vs backlog [MA1 P0]\n   - 'Parameterise account_id Through Orders and Risk': active [B P2] vs backlog [MA1 P0]\n   - 'Per-Account Local Dashboard': active [B P2] vs backlog [MA1 P1]\n   - 'WebSocket Signal Broadcaster': active [B P1] vs backlog [MA2 P1]\n   - 'Reconnection Logic': active [C P2] vs backlog [MA2 P1]\n   - 'Cloud VPS Setup and Deployment': active [B P2] vs backlog [MA2 P1]\n   - 'Telegram Bot': active [C P2] vs backlog [MA3 P2]\n   - 'Web Dashboard': active [B P2] vs backlog [MA3 P1]\n   - 'Execution Agent': backlog [C P1] appears twice\n3. For each duplicate group: (a) identify which version has the more complete spec, (b) keep that one as canonical, (c) close the other with a reference note.\n4. After deduplication, re-count the active pipeline. Report the true count.\n5. Check for any features that are marked active but appear to have been shipped (compare against shipped list and recent commits).\n\nDELIVERABLE: A deduplicated pipeline with a written log of every item closed and why."
+    },
+    {
+      "action": "Promote the Opening Gap Signal and Options Flow Proxy [B P1] items to active build \u2014 both are low-dependency, high-signal-quality additions for the paper trading stage",
+      "type": "promote",
+      "why_now": "Both 'Opening Gap Size & Direction Signal Classifier [B P1]' and 'Options Flow Proxy Signal via Put/Call Ratio [B P1]' are in the active pipeline at P1 priority with clear, self-contained specs and no external infrastructure dependencies beyond yfinance. Research on win rate improvement (2026-03-31, intraday timing signals) supports gap signals. The options put/call ratio is cited as peer-reviewed alpha (Dr. Cuyler Strong). Both can be built and tested in a single session each, adding two new signal dimensions to the existing 9-dimension composite at low implementation risk. These are high-value, low-cost additions for the paper trading stage.",
+      "source": "Active pipeline: Opening Gap Size & Direction Signal Classifier [B P1], Options Flow Proxy Signal via Put/Call Ratio [B P1]; Research: Win Rate Improvement \u2014 Backtesting Robustness, Walk-Forward Validation & Intraday Timing Signals [2026-03-31]",
+      "cowork_prompt": "CONTEXT: Decifer has two [B P1] active pipeline items that are ready to build: (1) Opening Gap Size & Direction Signal Classifier \u2014 compute overnight gap at market open and use it as a signal dimension, (2) Options Flow Proxy via Put/Call Ratio \u2014 use yfinance options chain data to compute a PCR signal dimension. Both use free data (yfinance), have no new infrastructure dependencies, and add to the existing 9-dimension composite. Research supports both as alpha sources.\n\nGOAL: Implement both signal dimensions and integrate them into the existing signal composite.\n\nSESSION A \u2014 Opening Gap Signal:\n1. At market open, fetch previous close and current open for each candidate ticker via yfinance.\n2. Compute gap % = (open - prev_close) / prev_close.\n3. Score: large gap up + bullish direction \u2192 positive score, large gap down + bearish \u2192 negative score, gap fill setups (mean reversion context) \u2192 scored appropriately based on regime.\n4. Normalise to 0-10 scale consistent with existing dimensions.\n5. Add as dimension 10 (GAP_SIGNAL) to signals.py.\n6. Write tests: known gap values produce expected scores.\n\nSESSION B \u2014 Options PCR Signal:\n1. Use yfinance options chain for each candidate ticker. Compute put volume / call volume ratio.\n2. Score: elevated PCR (fear) \u2192 contrarian bullish signal in mean-reversion regime, low PCR (complacency) \u2192 caution in momentum regime.\n3. Handle tickers with no options data gracefully (return neutral score, do not crash).\n4. Add as dimension 11 (OPTIONS_PCR) to signals.py.\n5. Write tests: PCR above/below threshold produces expected directional scores.\n\nCONSTRAINTS: Both dimensions must integrate cleanly with the IC-weighted composite \u2014 they start with equal weight and accumulate IC history like all other dimensions."
+    }
+  ],
+  "product_roadmap": [
+    {
+      "phase_name": "Phase 0 \u2014 Foundation Integrity",
+      "goal": "Restore test suite to a passing baseline, eliminate pipeline duplication, and validate that the recent IC-weighted and regime routing changes are functioning correctly.",
+      "rationale": "All subsequent work builds on the assumption that the codebase is tested and the pipeline is clean. The test suite is currently at 0% \u2014 this is a pre-condition for trusting any trade logic before live capital is involved.",
+      "features": [
+        "Fix test_bot.py collection error \u2014 restore suite to runnable state",
+        "Validate IC-weighted composite is wired in and producing non-equal weights",
+        "Validate regime router is detecting and switching regime states",
+        "Deduplicate active pipeline and backlog (9+ confirmed duplicate pairs)",
+        "Resolve HMM / regime detection decision into single canonical spec"
+      ],
+      "exit_criteria": "Test suite passes at >80% with no collection errors. IC weights are demonstrably non-equal in paper trading logs. Regime state changes are logged. Pipeline deduplication complete with item count reduced.",
+      "estimated_scope": "small"
+    },
+    {
+      "phase_name": "Phase 1 \u2014 Signal Quality and Trade Selectivity",
+      "goal": "Implement the highest-priority signal quality improvements to increase paper trading win rate and build toward a demonstrably profitable track record.",
+      "rationale": "Cannot transition to live trading without evidence of profitability on paper. The signal stack is the core alpha engine \u2014 improving it here directly improves the paper trading results that justify moving to live.",
+      "features": [
+        "Multi-Source Sentiment Consensus Gate [A P0]",
+        "Opening Gap Size & Direction Signal Classifier [B P1]",
+        "Options Flow Proxy Signal via Put/Call Ratio [B P1]",
+        "Adaptive Fractional Kelly Position Sizer (canonical spec replacing 3 overlapping items)",
+        "Drawdown Brake \u2014 Tiered Equity Curve Circuit Breaker [B P1 re-prioritised]",
+        "SHAP-Based Signal Dimension Importance Audit [B P1]",
+        "Signal Decay Monitor & Freshness Dashboard [B P1]",
+        "Walk-Forward Backtesting [B P2]"
+      ],
+      "exit_criteria": "Paper trading shows positive Sharpe ratio over 60+ trading days. Win rate >52% sustained over 30 days. All signal dimensions have IC > 0.05 or are flagged for removal. Drawdown brake tested and triggering correctly in simulation.",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 2 \u2014 Live Trading Readiness (Single Account)",
+      "goal": "Harden execution, risk controls, and operational reliability for a single live IBKR account with real capital.",
+      "rationale": "Live trading requires a higher bar for execution quality, error handling, and risk controls than paper trading. Each item in this phase directly reduces the risk of real capital loss.",
+      "features": [
+        "Extract Signal Objects from Brain Loop [MA1 P0] \u2014 structural prerequisite",
+        "Parameterise account_id through orders and risk [MA1 P0]",
+        "Per-Account Config Profiles [MA1 P0]",
+        "Earnings Calendar Event Risk Gate [B P2]",
+        "Correlation-Aware Position Management [B P2]",
+        "Slippage & Execution Cost Model for Backtester [B P2]",
+        "ATR Trailing Stop \u2014 confirm wired correctly post-commit",
+        "PDT-aware mode \u2014 confirm correct for account type"
+      ],
+      "exit_criteria": "Single live account trading with real capital for 30 days. No unintended positions. Drawdown brake never triggered at Tier 2. All orders correctly routed to the right account. Execution cost model shows actual vs. modelled slippage within 20%.",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 3 \u2014 Cloud Hosted Single Account",
+      "goal": "Move the bot from local execution to a cloud VPS with Docker, enabling 24/7 operation without a local machine.",
+      "rationale": "Live trading cannot depend on a developer's laptop being on. Cloud hosting is a prerequisite for reliability and the eventual multi-user architecture.",
+      "features": [
+        "Cloud VPS Setup and Deployment [MA2 P1]",
+        "Per-User Docker Compose Containers [MA2 P1]",
+        "Reconnection Logic \u2014 Backoff, Sequence, State Sync [MA2 P1]",
+        "WebSocket Signal Broadcaster [MA2 P1]",
+        "Per-Account Local Dashboard [MA1 P1]"
+      ],
+      "exit_criteria": "Bot running continuously on cloud VPS for 14 days with zero manual restarts required. Reconnection logic tested with simulated network drops. Dashboard accessible remotely.",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 4 \u2014 Multi-User Beta",
+      "goal": "Extend the platform to support friends and family accounts with isolated containers, per-user dashboards, and authentication.",
+      "rationale": "This phase requires all prior phases to be stable. Multi-user introduces credential isolation, per-user risk profiles, and web-facing authentication \u2014 none of which are safe to build before single-account live trading is proven.",
+      "features": [
+        "AccountDecisionAgent Class [MA1 P0]",
+        "Connection Manager \u2014 Multi-Account IBKR [MA1 P0]",
+        "Per-Account Risk Profile Config Schema [B P2]",
+        "Per-User Dashboard Authentication [MA3 P1]",
+        "One-Time User Setup Screen [MA3 P1]",
+        "Web Dashboard \u2014 Live Positions and P&L [MA3 P1]",
+        "Signal Registry \u2014 Per-User Favourite Symbols [MA2 P1]",
+        "Telegram Bot \u2014 Notifications and Quick Commands [MA3 P2]"
+      ],
+      "exit_criteria": "3+ distinct user accounts running simultaneously on the cloud platform for 30 days. Each user can log in, see their own P&L, and adjust risk settings without affecting other users. Credentials are isolated per container.",
+      "estimated_scope": "large"
+    }
+  ],
+  "risks": [
+    {
+      "risk": "Test suite is at 0% pass rate with a collection error \u2014 all recent feature work (regime router, IC composite, ATR stops, M&A sentinel, adaptive strategy) is unvalidated and could contain silent bugs that cause real capital loss in live trading",
+      "severity": "high",
+      "mitigation": "Fix test_bot.py collection error immediately (Action 1). Do not advance to live trading until the suite is green at >80% pass rate."
+    },
+    {
+      "risk": "77 active pipeline features with significant duplication creates decision paralysis and risk of building redundant or conflicting implementations (4 regime detection approaches, 3 position sizing approaches, 2 IC weighting specs) into the same codebase simultaneously",
+      "severity": "high",
+      "mitigation": "Execute pipeline deduplication housekeeping (Action 8) and canonical spec decisions (Actions 2, 6) before starting new feature work."
+    },
+    {
+      "risk": "The IC-weighted composite and regime router \u2014 the two highest-leverage algorithmic changes \u2014 may be silently non-functional (weights equal, regime static) due to wiring bugs, meaning paper trading results do not reflect the intended system",
+      "severity": "high",
+      "mitigation": "Execute validation session (Action 7) to confirm both features produce observable, non-trivial effects on trade decisions before treating paper results as meaningful."
+    },
+    {
+      "risk": "No Drawdown Brake or equity curve circuit breaker is implemented \u2014 advancing to live trading without this means a losing streak has no automated backstop and could wipe a significant portion of capital before intervention",
+      "severity": "high",
+      "mitigation": "Spec and build the Drawdown Brake (Action 8) as a P1 item before live trading begins."
+    },
+    {
+      "risk": "Bot.py at 3266 lines is a monolith \u2014 the largest module, mixing signal generation, execution, and regime logic \u2014 making it fragile to change and likely to cause import/collection errors (as seen with the current test failure)",
+      "severity": "medium",
+      "mitigation": "Execute Extract Signal Objects refactor (Action 5) to begin decomposing bot.py. This is also a multi-account architectural prerequisite."
+    },
+    {
+      "risk": "Paper trading track record may be too short or not walk-forward validated to justify the move to live trading \u2014 a favorable paper result could be curve-fit to the current market regime",
+      "severity": "medium",
+      "mitigation": "Build Walk-Forward Backtesting [B P2] and define explicit exit criteria for the paper trading phase (60+ days, Sharpe > X, win rate > 52%) before the live trading go/no-go decision."
+    },
+    {
+      "risk": "The M&A catalyst sentinel (recent commit) and intraday adaptive DEFENSIVE/RECOVERY modes add significant new code paths with no tests \u2014 these could produce unexpected order behaviour during real trading",
+      "severity": "medium",
+      "mitigation": "Include regression tests for both features as part of the test suite restoration (Action 1). Add integration tests for the DEFENSIVE mode logic specifically, as it alters position sizing."
+    },
+    {
+      "risk": "Earnings Calendar Event Risk Gate is not yet built \u2014 without it, Decifer may enter positions immediately before earnings announcements, exposing accounts to binary gap risk that cannot be managed by stop-losses",
+      "severity": "medium",
+      "mitigation": "Prioritise Earnings Calendar Event Risk Gate [B P2] for Phase 2 (live trading readiness) and build it before any live account starts trading."
+    }
+  ],
+  "roadmap_gaps": "Several critical gaps exist between the vision and the current pipeline: (1) BROKER ACCOUNT LINKING UX \u2014 there is no spec for how a new user actually links their IBKR account credentials to the platform from the web UI. The One-Time User Setup Screen exists as a backlog item but has no detail on credential handling, IBKR OAuth/token flow, or security model. (2) PAPER TRADING EXIT CRITERIA \u2014 there is no formal definition of what 'profitable and reliable on paper' means. No Sharpe threshold, no minimum trade count, no drawdown ceiling. Without this, the live trading go/no-go decision will be made ad hoc. (3) BILLING AND SUBSCRIPTION \u2014 for multi_user_production, friends and family presumably run at some cost to the founder. There is zero coverage of billing, subscription tiers, or cost allocation in the pipeline. (4) AUDIT TRAIL AND COMPLIANCE \u2014 there is no spec for trade logging, audit trails, or the regulatory considerations of running a system that executes trades on behalf of others, even informally. (5) ERROR ALERTING AND OPERATIONAL MONITORING \u2014 beyond the Telegram bot (which is a user-facing feature), there is no spec for operational alerting when the bot crashes, loses IBKR connection, or hits an unhandled exception. (6) GRACEFUL SHUTDOWN AND POSITION SAFETY \u2014 no spec covers what happens to open positions if the bot process crashes or is restarted mid-session. (7) SECRETS MANAGEMENT \u2014 the pipeline mentions encrypted credentials for Docker containers but there is no spec for how IBKR credentials, Claude API keys, and other secrets are stored, rotated, and isolated per user at the cloud stage.",
+  "model": "claude-sonnet-4-6",
+  "data_sources": {
+    "specs": 111,
+    "sessions": 5,
+    "research": 8,
+    "commits": 20,
+    "tests": true,
+    "code": true
+  }
+}

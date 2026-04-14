@@ -1,0 +1,17 @@
+{
+  "id": "research-triple-barrier-meta-labeling",
+  "title": "Triple Barrier Meta-Labeling",
+  "status": "future",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Meta-labeling, introduced by Marcos L\u00f3pez de Prado in 'Advances in Financial Machine Learning', is a two-stage approach that separates the question of trade direction from the question of whether to take a trade at all. A primary model generates directional signals (long/short), and a secondary ML classifier is trained only to predict if each signal will be a winner \u2014 effectively filtering out false positives. The training labels are assigned via the Triple Barrier Method: a profit target, a stop-loss, and a maximum holding period define three barriers; whichever is hit first determines the label (1=win, -1=loss, 0=timeout). Empirical results from Hudson & Thames and a 2025 MDPI crypto study show consistent improvement in Sharpe ratio and win rate because the meta-model learns the market conditions under which the primary signal is reliable. This is distinct from Decifer's existing 9-dimension score, which combines signals linearly \u2014 meta-labeling adds a trained non-linear confidence gate on top of the aggregated score.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 ML Feature Engineering & Predictive Signal Construction",
+  "impact_score": 9,
+  "impact_label": "High Impact",
+  "expected_impact": "+5\u20138% win rate",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-01T04:14:25.113531Z",
+  "deferral_reason": "not in paper_trading_single_account Active pipeline \u2014 deferred for future stage review"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "research-regime-conditional-signal-weighting-momentum-vs-me",
+  "title": "Regime-Gated Strategy Router (Momentum vs Mean-Reversion + Position Sizing)",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Two-state market regime detector (VIX proxy + SPY 200-day MA + HMM) that dynamically routes between momentum and mean-reversion signal weighting, and scales position size via a VIX-regime scalar. In bull/low-vol regimes: amplify momentum signals. In choppy/high-vol: amplify mean-reversion signals and reduce position size. Connects to the HMM Regime Detection spec.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "created_at": "2026-03-29T10:57:08.129150Z",
+  "subsystem": "Signal Generation",
+  "merged_from": [
+    "research-regime-conditional-signal-weighting-momentum-vs-me",
+    "research-regime-gated-momentum-mean-reversion-signal-router",
+    "research-regime-conditioned-position-size-scalar-vix-regime"
+  ]
+}

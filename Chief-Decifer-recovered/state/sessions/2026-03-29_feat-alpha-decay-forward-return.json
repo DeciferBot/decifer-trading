@@ -1,0 +1,14 @@
+{
+  "date": "2026-03-29",
+  "timestamp": "2026-03-29T19:48:22.540Z",
+  "branch": "master",
+  "phase": "unknown",
+  "last_commit": "a512261 feat(alpha-decay): forward return distribution tracker + dashboard tab",
+  "files_changed": [
+    "CLAUDE.md.bak"
+  ],
+  "test_status": "unknown",
+  "summary": "a512261 feat(alpha-decay): forward return distribution tracker + dashboard tab",
+  "open_todos": [],
+  "session_count": 22
+}

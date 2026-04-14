@@ -1,0 +1,17 @@
+{
+  "id": "research-ic-weighted-dynamic-signal-scoring",
+  "title": "IC-Weighted Dynamic Signal Scoring with Z-Score Normalisation",
+  "status": "future",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Replace static equal-weight 9-dimension signal model with (1) Z-score normalisation of each dimension score before compositing so dimensions with wider numeric ranges do not dominate, and (2) rolling Information Coefficient (IC) weighting so dimensions with recent predictive power receive higher weight. Combined: improves Sharpe ratio and reduces noise from stale or low-IC signals.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "created_at": "2026-03-29T10:57:08.130565Z",
+  "deferral_reason": "Future; requires established IC history \u2014 deferred during paper_trading_single_account prioritisation",
+  "subsystem": "Signal Generation",
+  "merged_from": [
+    "research-ic-weighted-dynamic-signal-scoring",
+    "research-z-score-normalised-signal-composite-cross-sectiona"
+  ]
+}

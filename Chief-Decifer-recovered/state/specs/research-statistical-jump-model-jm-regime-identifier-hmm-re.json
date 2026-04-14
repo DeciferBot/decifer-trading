@@ -1,0 +1,17 @@
+{
+  "id": "research-statistical-jump-model-jm-regime-identifier-hmm-re",
+  "title": "Statistical Jump Model (JM) Regime Identifier \u2014 HMM Replacement Candidate",
+  "status": "future",
+  "phase": "D",
+  "priority": "P2",
+  "summary": "The Statistical Jump Model (JM) is a newer regime identification technique that applies a jump penalty at each state transition, making regimes more persistent and robust to noise than standard HMMs. A 2024 Springer Journal of Asset Management paper tested JMs out-of-sample on equity indices from 1990\u20132023 with realistic transaction costs and delays \u2014 showing consistent outperformance over HMMs and buy-and-hold. The JM uses only return-series-derived features (rolling return, volatility, Sharpe) making it computable entirely from yfinance data. This is worth implementing as a parallel model to validate whether it outperforms the HMM approach in Decifer's specific context.",
+  "source": "research",
+  "research_topic": "Market Regime Detection & Adaptation",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "JM-guided strategy improves annualised returns by 1\u20134% vs buy-and-hold across US/Germany/Japan out-of-sample 1990\u20132023; outperforms standard HMM on persistence and robustness to trading delays (Journal of Asset Management, Springer, 2024)",
+  "difficulty": "Hard",
+  "dev_days": 4,
+  "created_at": "2026-03-30T04:17:09.376017Z",
+  "deferral_reason": "Advanced regime model, future \u2014 deferred during paper_trading_single_account prioritisation"
+}

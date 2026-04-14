@@ -1,0 +1,17 @@
+{
+  "id": "research-hurst-exponent-per-stock-regime-classifier",
+  "title": "Hurst Exponent Per-Stock Regime Classifier",
+  "status": "future",
+  "phase": "D",
+  "priority": "P2",
+  "summary": "Compute a rolling Hurst exponent (H) for each candidate stock over a 100-bar lookback window using numpy's rescaled range (R/S) analysis. H < 0.45 indicates a mean-reverting stock (RSI oversold/overbought signals are more reliable), H > 0.55 indicates a trending stock (momentum signals dominate), and 0.45\u20130.55 is a random walk where signal quality is low. Unlike HMM regime detection which classifies the broad market, this classifier runs at the individual stock level, allowing the signal engine to weight momentum vs. mean-reversion dimensions differently per ticker before scoring.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Portfolio Construction, Trade Selectivity & Alternative Data",
+  "impact_score": 10,
+  "impact_label": "High Impact",
+  "expected_impact": "+5\u20138% win rate via strategy routing",
+  "difficulty": "Easy",
+  "dev_days": 1,
+  "created_at": "2026-03-30T04:17:09.371914Z",
+  "deferral_reason": "Per-stock variant; hurst-regime-filter covers this \u2014 deferred during paper_trading_single_account prioritisation"
+}

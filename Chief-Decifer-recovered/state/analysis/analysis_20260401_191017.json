@@ -1,0 +1,219 @@
+{
+  "generated_at": "2026-04-01T14:43:22.181567+00:00",
+  "vision_statement": "Decifer is a cloud-hosted profitable trading bot that friends and family can connect to via a web interface, linking their own broker accounts and managing risk through configurable settings. The path to that end state runs through proving profitability and reliability on paper first, then live, then scaled.",
+  "current_stage_assessment": "Decifer is in paper_trading_single_account stage. The core signal pipeline has just undergone a major refactor (10-dimension signals, alpha-decay tracking, drawdown brake, dual-tranche exits), giving the system its most complete architecture to date. The immediate mandate is to validate that this refactored system is actually profitable and reliable on paper before any live trading decisions are made.",
+  "executive_summary": "Decifer has had an extremely productive recent sprint: the signal pipeline was extracted and refactored to 10 dimensions, drawdown brakes and dual-tranche exits were shipped, and the test suite holds at 99% (1422/1432). However, the system is at a critical inflection point \u2014 multiple P0 features (ATR position sizing, multi-source sentiment gate) are active but unshipped, and the 10 failing tests are all in high-stakes paths: data collection failures and order flatten/cancel failures that represent real money risk in live trading. The research base is strong and well-aligned with the active pipeline, but several high-value research findings (particularly LLM sentiment scoring and regime-adaptive weighting) have not yet been promoted to specs. The core risk right now is shipping to live trading without validating that the newly refactored pipeline produces a positive expectancy on paper \u2014 that validation work is conspicuously absent from the pipeline.",
+  "recommended_actions": [
+    {
+      "action": "Fix the 4 FLATTEN failure test paths in orders.py \u2014 covering no-connection, global cancel rejection, and per-symbol fill errors",
+      "type": "fix",
+      "why_now": "The drawdown brake was just shipped and its terminal action is FLATTEN ALL. Three of the 10 failing tests are FLATTEN failures (reqGlobalCancel rejected, no IB connection, QQQ/AAPL fill errors). If the drawdown brake trips in paper trading and FLATTEN fails silently, positions remain open with no circuit breaker \u2014 this is a capital-destruction scenario in live trading. These must be hardened before any live transition.",
+      "source": "Test health: ERROR orders.py:1055 reqGlobalCancel failed, ERROR orders.py:1023 FLATTEN ALL FAILED \u2014 no IB connection, ERROR orders.py:1093 FLATTEN failed for QQQ/AAPL; recent commit feat(risk): drawdown brake \u2014 flatten all on breach",
+      "cowork_prompt": "CONTEXT: Decifer is a paper-trading bot currently in paper_trading_single_account stage. A drawdown brake was recently shipped (commit: feat(risk): drawdown brake \u2014 flatten all on breach + persist HWM across restarts). The brake's terminal action calls FLATTEN ALL via orders.py. Three test paths are currently failing that cover FLATTEN failure scenarios.\n\nFAILING TESTS:\n1. orders.py:1055 \u2014 reqGlobalCancel failed: TWS rejected global cancel\n2. orders.py:1023 \u2014 FLATTEN ALL FAILED \u2014 no IB connection available\n3. orders.py:1093 \u2014 FLATTEN failed for QQQ: fill error\n4. orders.py:1093 \u2014 FLATTEN failed for AAPL: order rejected\n\nGOAL: Harden all FLATTEN paths in orders.py so that:\n- If IBKR connection is unavailable when FLATTEN ALL is called, the system logs a critical alert, persists a 'flatten_pending' flag to disk, and retries on reconnect\n- If reqGlobalCancel is rejected by TWS, fall back to individual symbol market-order closes\n- If a per-symbol flatten fails (fill error, order rejected), log it as CRITICAL, mark that symbol in a failed_flatten set, and continue closing remaining positions (no silent swallow)\n- All four scenarios must have passing tests\n\nFILES: orders.py (2133L), risk.py (1017L)\nTASKS: 1) Trace the FLATTEN ALL call chain in orders.py starting at line ~1023. 2) Implement retry-on-reconnect for the no-connection path. 3) Add per-symbol fallback loop for reqGlobalCancel rejection. 4) Ensure per-symbol errors emit CRITICAL logs and populate a failed_flatten registry. 5) Fix or add tests for all four paths. Test suite must pass at 99%+ after changes."
+    },
+    {
+      "action": "Build ATR Volatility-Targeting Position Size Layer (P0 active feature) and integrate it with the existing Kelly sizer",
+      "type": "build",
+      "why_now": "This is the only P0 active feature not yet shipped. Position sizing is the single largest driver of drawdown and return volatility \u2014 an incorrectly sized position during a volatile period can trigger the drawdown brake and force a paper-trading halt, producing misleading profitability data. The formula is fully specified (w_t = \u03c3* / (\u221a252 \u00b7 \u03c3_t)). It must be in place before any meaningful paper-trading performance evaluation is possible.",
+      "source": "Active pipeline: [B P0] ATR Volatility-Targeting Position Size Layer",
+      "cowork_prompt": "CONTEXT: Decifer is a paper-trading bot. Position sizing currently uses a Kelly-based approach. A P0 feature \u2014 ATR Volatility-Targeting Position Size Layer \u2014 is specified but unbuilt. The formula is: w_t = \u03c3* / (\u221a252 \u00b7 \u03c3_t), where \u03c3* is a target annualised volatility (configurable, e.g. 0.15) and \u03c3_t is the realised ATR-based daily volatility of the instrument.\n\nGOAL: Implement ATR volatility-targeting position sizing as a layer that wraps (or replaces) the current Kelly fraction output.\n\nSPECIFICS:\n1. Add `target_annual_vol` param to config.py (default 0.15)\n2. Compute \u03c3_t for each candidate using 14-period ATR divided by current price (normalised daily vol)\n3. Compute w_t = target_annual_vol / (sqrt(252) * \u03c3_t) \u2014 this gives a volatility-scaled weight\n4. Apply this as a position size cap: final_size = min(kelly_size, atr_vol_size)\n5. If both Kelly and ATR sizing are active, the more conservative (smaller) size wins\n6. Log which constraint is binding for each trade decision\n7. Add unit tests: verify sizing shrinks in high-vol regime, grows in low-vol regime, and is capped by max_position_size from config\n\nFILES: risk.py (1017L), config.py, signals.py (1689L)\nRELATED ACTIVE FEATURE: [B P1] VIX-Rank Adaptive Fractional Kelly Sizer \u2014 do NOT build that in this session, but ensure the ATR layer is architecturally compatible with a dynamic Kelly fraction being plugged in later."
+    },
+    {
+      "action": "Build Multi-Source Sentiment Consensus Gate (P0 active feature) \u2014 the sentiment pipeline prerequisite before Claude scoring can be added",
+      "type": "build",
+      "why_now": "This is an active P0 feature and the research base is unambiguous: LLM-based sentiment scoring achieves 72-74% directional accuracy. The Claude Sentiment Scoring Pipeline (P1) depends on this gate existing first \u2014 the gate determines whether a trade can proceed based on sentiment consensus, and the Claude scorer feeds into it. The gate must exist before the scorer can be wired in. Both are active and unshipped.",
+      "source": "Active pipeline: [A P0] Multi-Source Sentiment Consensus Gate; Research: Sentiment Analysis & NLP for Trading [2026-03-31] \u2014 LLM-based sentiment scoring generates statistically significant alpha; Active pipeline: [B P1] Claude Sentiment Scoring Pipeline",
+      "cowork_prompt": "CONTEXT: Decifer is a paper-trading bot with a 10-dimension signal pipeline (recently refactored). Two related sentiment features are active and unshipped: [A P0] Multi-Source Sentiment Consensus Gate and [B P1] Claude Sentiment Scoring Pipeline. Research confirms LLM sentiment scoring generates statistically significant alpha (72-74% directional accuracy).\n\nGOAL FOR THIS SESSION: Build the Multi-Source Sentiment Consensus Gate \u2014 the blocking layer that checks whether a new trade entry is permitted based on sentiment signal consensus. The Claude scorer feeds into this gate; build the gate's interface so the Claude scorer can be plugged in next session.\n\nSPECIFICS:\n1. The gate checks sentiment signals from available sources (at minimum: Yahoo RSS headlines, Finviz) before allowing trade entry\n2. If sentiment is net negative beyond a configurable threshold, the gate blocks entry and logs the reason\n3. Define a `SentimentGateResult` datatype: {permitted: bool, score: float, sources: list, reason: str}\n4. Stub the Claude scoring slot: a `score_sentiment_claude(headlines: list) -> float` function that currently returns None (to be implemented next session) but is called if configured\n5. Wire the gate into the trade entry decision path in bot.py or signal_pipeline.py \u2014 it must be called after signal scoring but before order placement\n6. Add a config flag `sentiment_gate_enabled` (default True in paper trading)\n7. Add tests: gate blocks on negative sentiment, permits on positive, passes through when no data available (fail-open with warning)\n\nFILES: signal_pipeline.py, bot.py (3140L), config.py\nNOTE: Do not implement the full Claude API call in this session \u2014 stub it. The goal is the gate architecture."
+    },
+    {
+      "action": "Validate paper trading P&L and win rate \u2014 run a structured 2-week paper trading evaluation and document actual performance metrics",
+      "type": "validate",
+      "why_now": "The entire stage gate from paper_trading_single_account to live_trading_single_account depends on demonstrating profitability and reliability on paper. The signal pipeline was just significantly refactored (10 dimensions, new sizing, drawdown brake) but there is no evidence in the pipeline, commits, or research logs of a structured paper trading evaluation having been run or completed. Without this, any decision to go live is unsupported.",
+      "source": "Vision: 'The core bot must first be profitable and reliable on paper, then transition to live trading'; Stage: paper_trading_single_account; Recent commits show major refactor but no evaluation artifact",
+      "cowork_prompt": "CONTEXT: Decifer is in paper_trading_single_account stage. The signal pipeline was recently refactored to 10 dimensions with major new features (drawdown brake, dual-tranche exits, alpha decay tracker, ATR sizing incoming). The stage gate to live trading requires demonstrating profitability and reliability on paper. No structured evaluation has been documented.\n\nGOAL: Design and initiate a structured paper trading evaluation protocol, and build the tooling to capture and report the results.\n\nSPECIFICS:\n1. Define the evaluation criteria needed to pass the paper\u2192live gate:\n   - Minimum win rate threshold (e.g. >50%)\n   - Minimum Sharpe ratio over evaluation window (e.g. >1.0)\n   - Maximum drawdown not to exceed brake threshold\n   - Minimum number of completed trades (e.g. 30) for statistical validity\n   - No critical system errors (FLATTEN failures, missed fills, unhandled exceptions)\n2. Build or extend the dashboard to show a 'Paper Trading Scorecard' panel that displays these metrics live\n3. Document the evaluation window start date in a config or metadata file\n4. Ensure the alpha-decay dashboard (recently shipped) is feeding into this scorecard\n5. Create a simple evaluation report template (markdown or JSON) that will be the artifact reviewed before approving live trading\n\nFILES: dashboard.py (2581L), learning.py, risk.py (1017L), config.py\nOUTPUT: A live scorecard panel + a documented evaluation protocol that defines the paper\u2192live gate criteria."
+    },
+    {
+      "action": "Fix the 6 data collector and IBKR order-check failing tests \u2014 add retry logic and explicit fallback handling for network failures",
+      "type": "fix",
+      "why_now": "Six failing tests cover data_collector.py (yf-intraday, yf-daily, alphavantage, stooq network/timeout/HTTP errors) and orders.py IBKR connection loss during order status checks. These are not cosmetic \u2014 if data collection fails silently in production, the signal pipeline runs on stale data and makes bad trades. If IBKR order checks fail closed ('skipping order'), fills may be missed. Both failure modes corrupt paper trading results.",
+      "source": "Test health: 6 ERROR entries in data_collector.py and orders.py connection-loss paths",
+      "cowork_prompt": "CONTEXT: Decifer paper trading bot. The test suite has 10 failing tests; 6 are in data collection and IBKR order monitoring paths. These represent real operational risk.\n\nFAILING PATHS:\n1. data_collector.py:152 \u2014 yf-intraday AAPL: network error\n2. data_collector.py:200 \u2014 yf-daily AAPL: timeout\n3. data_collector.py:274 \u2014 alphavantage AAPL: network failure\n4. data_collector.py:235 \u2014 stooq AAPL: HTTP error\n5. orders.py:225 \u2014 _check_ibkr_open_order AAPL: IBKR openTrades() failed \u2014 connection lost\n6. orders.py:225 \u2014 _check_ibkr_open_order AAPL: IBKR openTrades() failed \u2014 timeout\n\nGOAL: Harden these paths with explicit retry logic and fallback behaviour.\n\nSPECIFICS FOR DATA COLLECTOR:\n1. All four data source failures should retry up to N times (configurable, default 3) with exponential backoff\n2. If all retries fail, return None and emit a WARNING (not ERROR) \u2014 the bot should proceed with cached/last-known data if available, or skip the symbol with a log entry\n3. Add a staleness flag to the returned data object if using cached data\n4. Tests must mock network failures and assert retry behaviour and fallback return\n\nSPECIFICS FOR ORDERS:\n1. _check_ibkr_open_order on connection loss: return a 'UNKNOWN' status rather than failing closed \u2014 log as WARNING and schedule a recheck in N seconds\n2. On timeout: same as above \u2014 do not silently skip; mark order as PENDING_RECHECK\n3. Tests must assert UNKNOWN status returned and recheck scheduled\n\nFILES: data_collector.py, orders.py (2133L)"
+    },
+    {
+      "action": "Promote the Regime-Conditional Signal Weighting research finding to a build spec and prioritise it above remaining P1 signal features",
+      "type": "promote",
+      "why_now": "The Market Regime Detection research [2026-03-30] states that systems adapting to regimes 'consistently outperform static strategies.' The Regime-Conditional Signal Weighting feature is already active in the pipeline (P1) but there is a recent architectural decision to lock VIX-proxy as sole regime detector (commit: fix(arch): lock VIX-proxy as sole regime detector, defer HMM). This decision needs to be reconciled with the active feature spec \u2014 the spec should be updated to reflect the VIX-proxy-only constraint before anyone builds it, and it should be elevated given the research strength.",
+      "source": "Active pipeline: [B P1] Regime-Conditional Signal Weighting (Momentum vs Mean-Reversion Gate); Research: Market Regime Detection & Adaptation [2026-03-30]; Commit: fix(arch): lock VIX-proxy as sole regime detector, defer HMM \u2014 Action #9",
+      "cowork_prompt": "CONTEXT: Decifer has an active pipeline feature [B P1] Regime-Conditional Signal Weighting (Momentum vs Mean-Reversion Gate). There is also a recent architectural commit that locked VIX-proxy as the sole regime detector and deferred HMM. The research base (2026-03-30, Market Regime Detection) strongly supports regime-adaptive systems. The feature spec may not reflect the VIX-proxy-only constraint.\n\nGOAL: Update and harden the spec for Regime-Conditional Signal Weighting to be immediately buildable, then implement it.\n\nSPECIFICS FOR SPEC UPDATE:\n1. Confirm regime detection uses VIX-proxy only (from yfinance ^VIX) \u2014 two states: HIGH_VOL (VIX > threshold, e.g. 20) and LOW_VOL\n2. In HIGH_VOL regime: upweight mean-reversion dimensions (REVERSION), downweight momentum dimensions\n3. In LOW_VOL regime: upweight momentum dimensions, downweight REVERSION\n4. Weights must be configurable multipliers in config.py, not hardcoded\n5. The regime state must be logged on each scan cycle\n6. The Hurst Exponent (active P1 feature) should be noted as a future enhancement to this detector \u2014 do not block on it\n\nSPECIFICS FOR BUILD:\n1. Add `get_current_regime(vix_proxy_ticker='^VIX') -> Literal['HIGH_VOL', 'LOW_VOL']` to a regime.py module (create if not exists)\n2. In signal_pipeline.py, apply regime-conditional weight multipliers to the 10-dimension score before aggregation\n3. Add regime state to dashboard display\n4. Add tests: HIGH_VOL regime upweights REVERSION, LOW_VOL upweights momentum\n\nFILES: signal_pipeline.py, config.py, dashboard.py (2581L)\nARCHITECTURAL CONSTRAINT: VIX-proxy only. Do not introduce HMM or Hurst in this session."
+    },
+    {
+      "action": "Deduplicate the Order Fill Watcher feature \u2014 it appears twice in Shipped with identical titles, and audit for any duplicate logic in orders.py",
+      "type": "housekeeping",
+      "why_now": "The Order Fill Watcher [B] appears twice in the Shipped list with identical titles. This is either a data entry error or indicates two separate implementations exist in orders.py (2133L is already very large). Duplicate execution logic is a serious correctness risk \u2014 two daemons monitoring the same order could double-cancel, double-fill, or create race conditions. This must be audited before the FLATTEN hardening work touches orders.py.",
+      "source": "Feature pipeline: two identical entries '\u2713 [B] Order Fill Watcher \u2014 Execution Management Layer' in Shipped; orders.py is 2133L",
+      "cowork_prompt": "CONTEXT: Decifer's feature pipeline shows the 'Order Fill Watcher \u2014 Execution Management Layer' shipped twice with identical titles. orders.py is 2133 lines. This may indicate duplicate code, a duplicate pipeline entry, or two related but distinct implementations that were not differentiated in the pipeline.\n\nGOAL: Audit and resolve the duplication.\n\nTASKS:\n1. Search orders.py for all fill watcher / order monitoring daemon implementations \u2014 identify if there are one or two running thread instances, and whether any monitoring logic is duplicated\n2. If two daemons exist, determine if they serve different purposes (e.g. one for limit orders, one for stop orders) \u2014 if so, rename them clearly and update the pipeline entry\n3. If genuinely duplicated, consolidate into a single implementation and remove dead code\n4. Search for any shared state (e.g. a shared dict of pending orders) that could be corrupted by two threads accessing it concurrently \u2014 add threading locks if missing\n5. Update the pipeline tracking to have only one entry per logical feature, with a clear description\n6. Run the full test suite after changes \u2014 must remain at 99%+\n\nFILES: orders.py (2133L)\nOUTPUT: A clean, single fill watcher implementation with no duplicate logic, and a corrected pipeline entry."
+    },
+    {
+      "action": "Spec the paper-to-live trading stage gate \u2014 define the exact criteria, approval process, and configuration changes required to transition from paper to live",
+      "type": "spec",
+      "why_now": "The vision defines a clear stage sequence and the next gate is paper\u2192live. There is currently no spec, checklist, or documented criteria for what 'profitable and reliable on paper' means in measurable terms. Without this spec, the transition decision will be made ad-hoc, which risks going live too early or too late. This spec is also the artifact needed to make the paper trading evaluation (action #4) meaningful.",
+      "source": "Vision: 'The core bot must first be profitable and reliable on paper, then transition to live trading'; Stage: paper_trading_single_account; Roadmap gap: no exit criteria defined for current stage",
+      "cowork_prompt": "CONTEXT: Decifer is in paper_trading_single_account stage. The vision requires proving profitability and reliability on paper before transitioning to live_trading_single_account. There is no documented stage gate \u2014 no criteria, no process, no config changes listed.\n\nGOAL: Write a paper\u2192live stage gate specification document.\n\nDOCUMENT MUST COVER:\n1. QUANTITATIVE EXIT CRITERIA (all must be met):\n   - Minimum completed trades: define the number\n   - Win rate floor: define the threshold\n   - Sharpe ratio floor over evaluation window: define\n   - Maximum peak-to-trough drawdown: define (must not have triggered the drawdown brake)\n   - No critical system errors in the last N trading days: define N\n   - Fill rate: what % of intended orders must have been filled at intended prices\n\n2. QUALITATIVE CHECKS:\n   - All P0 active features shipped and tested\n   - FLATTEN paths hardened and tested\n   - Data collector retry logic in place\n   - Paper trading scorecard reviewed and signed off by founder\n\n3. CONFIGURATION CHANGES FOR LIVE:\n   - Which config.py flags change (e.g. paper_trading: True \u2192 False)\n   - Position size limits for live (start smaller than paper?)\n   - Which broker account to use first\n   - Drawdown brake thresholds (tighter for live?)\n\n4. ROLLBACK CRITERIA:\n   - What triggers an automatic return to paper trading after going live\n\nFORMAT: A markdown document saved as docs/stage_gate_paper_to_live.md\nFILES: config.py (reference for all configurable parameters), risk.py (drawdown brake thresholds)"
+    },
+    {
+      "action": "Build the VIX-Rank Adaptive Fractional Kelly Sizer and integrate it with the ATR position sizing layer as the unified sizing stack",
+      "type": "build",
+      "why_now": "Once ATR sizing is built (action #2), the Kelly sizer is the remaining variable in the position sizing stack. The VIX-Rank Kelly feature is P1 active and directly complementary to ATR sizing \u2014 together they form a complete volatility-aware sizing system. Research supports dynamic Kelly fraction adjustment. Building both in sequence this week gives the paper trading evaluation (action #4) a stable, complete sizing stack to evaluate against.",
+      "source": "Active pipeline: [B P1] VIX-Rank Adaptive Fractional Kelly Sizer; Research: Win Rate Improvement \u2014 Portfolio Construction, Trade Selectivity [2026-03-30]; dependency on ATR sizing (action #2)",
+      "cowork_prompt": "CONTEXT: Decifer paper trading bot. ATR Volatility-Targeting Position Size Layer has just been built (prerequisite \u2014 complete action #2 first). The VIX-Rank Adaptive Fractional Kelly Sizer is the next layer in the sizing stack. Currently Decifer uses a static Kelly fraction.\n\nGOAL: Replace the static Kelly fraction with a VIX-rank-adaptive dynamic fraction.\n\nSPECIFICS:\n1. Compute VIX rank: percentile of current VIX reading within its trailing 252-day range, using ^VIX from yfinance\n2. Map VIX rank to Kelly fraction: low VIX rank (calm market) \u2192 higher fraction (e.g. 0.5 full Kelly); high VIX rank (fearful market) \u2192 lower fraction (e.g. 0.1 full Kelly). Make the mapping configurable in config.py.\n3. Kelly fraction = base_kelly * (1 - vix_rank_scalar), where vix_rank_scalar scales from 0 (VIX at 0th percentile) to configured_max_reduction at 100th percentile\n4. The dynamic Kelly fraction feeds into the existing Kelly sizing calculation, and the result is then subject to the ATR volatility cap (from action #2) \u2014 the more conservative of the two wins\n5. Log the VIX rank and resulting Kelly fraction on each sizing decision\n6. Add to dashboard: current VIX rank, current Kelly fraction in use\n7. Add unit tests: high VIX rank produces smaller fraction, low VIX rank produces larger fraction, ATR cap is respected\n\nFILES: risk.py (1017L), config.py, dashboard.py (2581L)\nPREREQUISITE: ATR Volatility-Targeting Position Size Layer must be complete before this session."
+    },
+    {
+      "action": "Promote the Signal Decay Monitor (IC rolling computation) to a build and connect its output to the regime-conditional weighting system",
+      "type": "promote",
+      "why_now": "Research [2026-03-29, Signal Quality & Alpha Generation] states: 'multi-factor signal models consistently outperform single-factor approaches, but only when factor weights are dynamically calibrated using Information Coefficient.' The Signal Decay Monitor is an active P1 feature. With regime-conditional weighting being built (action #6), the IC output from the decay monitor is the natural data source for calibrating those weights. Building the monitor now creates the feedback loop that makes the regime weighting empirically grounded rather than heuristic.",
+      "source": "Active pipeline: [B P1] Signal Decay Monitor & Freshness Dashboard; Research: Signal Quality & Alpha Generation [2026-03-29] \u2014 'factor weights dynamically calibrated using IC'; dependency on Regime-Conditional Signal Weighting (action #6)",
+      "cowork_prompt": "CONTEXT: Decifer has a 10-dimension signal pipeline. Research confirms that dynamic IC-based weight calibration is the differentiator for multi-factor alpha. The Signal Decay Monitor (active P1) is specified to compute rolling IC for each signal dimension weekly. The regime-conditional weighting system (action #6) currently uses configurable static multipliers \u2014 the IC output should inform those multipliers.\n\nGOAL: Build the Signal Decay Monitor and wire its IC output into the regime-conditional weighting system.\n\nSPECIFICS:\n1. For each of the 10 signal dimensions, compute rolling 4-week Information Coefficient (Spearman rank correlation between dimension score at entry and forward 5-day return)\n2. Store IC history per dimension in a lightweight local store (JSON or SQLite)\n3. Expose `get_dimension_ic_scores() -> dict[str, float]` in learning.py\n4. In signal_pipeline.py, use IC scores as weight multipliers on top of regime-conditional weights: final_weight = regime_multiplier * ic_score (normalised)\n5. Dimensions with IC near zero or negative get downweighted automatically\n6. Add a 'Signal Health' panel to dashboard showing per-dimension IC score, trend (improving/declining), and last-updated timestamp\n7. Add a staleness warning if IC hasn't been recomputed in >7 days\n8. Add unit tests: mock trade history, verify IC computation is correct, verify zero-IC dimension gets downweighted\n\nFILES: learning.py, signal_pipeline.py, dashboard.py (2581L)\nNOTE: This is a weekly scheduled computation, not real-time. Use the existing trade journal as the data source."
+    }
+  ],
+  "product_roadmap": [
+    {
+      "phase_name": "Phase 1 \u2014 Harden & Evaluate",
+      "goal": "Stabilise the newly refactored system, complete all P0 features, fix all critical failure paths, and run a structured paper trading evaluation to generate evidence of profitability",
+      "rationale": "The signal pipeline was just massively refactored. Before building any more signal features, the system must be demonstrably stable and the sizing stack complete. This phase produces the stage gate evidence needed to unlock live trading.",
+      "features": [
+        "Fix FLATTEN failure paths in orders.py (hardened retry + fallback)",
+        "Fix data collector network failure retry logic",
+        "Build ATR Volatility-Targeting Position Size Layer (P0)",
+        "Build Multi-Source Sentiment Consensus Gate (P0)",
+        "Audit and resolve Order Fill Watcher duplication",
+        "Write paper\u2192live stage gate specification",
+        "Run 2-week structured paper trading evaluation with scorecard"
+      ],
+      "exit_criteria": "All P0 features shipped, 0 failing tests, paper trading scorecard meets all quantitative criteria defined in the stage gate spec, FLATTEN paths pass all edge-case tests",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 2 \u2014 Signal Intelligence",
+      "goal": "Build the regime-adaptive, IC-calibrated, sentiment-enriched signal stack that gives Decifer a durable edge",
+      "rationale": "Once the bot is proven stable on paper, the priority shifts to improving the quality of the signal system so that live trading starts with the best possible edge. Regime weighting, IC calibration, and Claude sentiment are the three research-backed improvements most likely to improve win rate.",
+      "features": [
+        "VIX-Rank Adaptive Fractional Kelly Sizer",
+        "Regime-Conditional Signal Weighting (VIX-proxy only)",
+        "Signal Decay Monitor & IC-based weight calibration",
+        "Claude Sentiment Scoring Pipeline (wires into Sentiment Gate built in Phase 1)",
+        "Hurst Exponent Regime Filter (complement to VIX-proxy regime)",
+        "Multi-Timeframe Signal Confirmation (daily/4H/1H alignment)",
+        "Intra-Portfolio Rolling Correlation Guard with Sector Cap"
+      ],
+      "exit_criteria": "Win rate and Sharpe improve vs Phase 1 baseline over a 4-week forward paper trading window, IC scores for all 10 dimensions computed and dashboard-visible, regime state logged on every scan cycle",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 3 \u2014 Live Trading (Single Account)",
+      "goal": "Transition from paper to live trading on a single IBKR account with conservative position sizing and live monitoring",
+      "rationale": "Stage gate from paper to live requires demonstrated paper profitability. Live trading introduces real execution risk (slippage, partial fills, market impact) that paper trading cannot simulate \u2014 this phase must be entered with tight risk controls and a clear rollback trigger.",
+      "features": [
+        "Execute paper\u2192live config transition (paper_trading flag off, reduced initial position sizes)",
+        "Earnings Calendar Event Risk Gate (P2 \u2014 critical before live)",
+        "Opening Gap Size & Direction Signal Classifier (live open handling)",
+        "Dual-Tranche Exit Strategy (already partially shipped, verify live behaviour)",
+        "Live P&L dashboard with real-time drawdown monitoring",
+        "Drawdown brake live-mode validation (tighter thresholds for live)",
+        "Options Flow Proxy Signal (put/call ratio)"
+      ],
+      "exit_criteria": "30 completed live trades, win rate and Sharpe meet live-stage minimums, no critical system failures, drawdown brake has not triggered in first 30 days, rollback criteria not met",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 4 \u2014 Cloud Infrastructure",
+      "goal": "Move the bot from a locally-run process to a cloud-hosted, always-on service",
+      "rationale": "Multi-user beta requires cloud hosting. This phase is pure infrastructure \u2014 the trading logic should not change. Must happen before any external users are onboarded.",
+      "features": [
+        "Cloud deployment (containerised bot process)",
+        "Persistent storage for HWM, IC history, trade journal (currently local)",
+        "Health monitoring and alerting (uptime, IBKR connection status)",
+        "Secure configuration management (no secrets in code)",
+        "Web-accessible dashboard (currently likely localhost)",
+        "Automated restart on failure",
+        "Execution Agent \u2014 AI-Powered Order Execution Layer (C P0 backlog \u2014 unlocks better live execution)"
+      ],
+      "exit_criteria": "Bot runs for 30 days in cloud with 99%+ uptime, all state persisted across restarts, dashboard accessible from browser off the host machine, IBKR connection auto-recovers after network interruption",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 5 \u2014 Multi-User Beta",
+      "goal": "Onboard friends and family as users who connect their own broker accounts and configure their own risk profiles",
+      "rationale": "This is the target end state. Requires multi-account infrastructure, per-user risk isolation, a user-facing settings interface, and account-aware order routing \u2014 none of which are needed until Phase 4 is complete.",
+      "features": [
+        "Per-Account Risk Limits (E P1 backlog)",
+        "Account-Aware Order Router (E P1 backlog)",
+        "Cross-Account Correlation Guard (E P2 backlog)",
+        "Unified Trade Journal across accounts (E P2 backlog)",
+        "Account Performance Comparison dashboard (E P2 backlog)",
+        "User-facing web interface for settings (risk profile, broker config)",
+        "User authentication and session management",
+        "Walk-Forward Weight Calibration (D P2 backlog \u2014 per-user optimisation)",
+        "SHAP-Based Signal Dimension Importance Audit (for user-facing explanations)"
+      ],
+      "exit_criteria": "3+ friends/family accounts connected and trading, each with independent risk limits enforced, unified dashboard showing all accounts, no cross-account correlation violations in first 30 days",
+      "estimated_scope": "large"
+    }
+  ],
+  "risks": [
+    {
+      "risk": "FLATTEN ALL failure in live trading \u2014 the drawdown brake's terminal action cannot reliably close all positions when IBKR connection is lost or TWS rejects global cancel, as evidenced by 3 failing tests in orders.py",
+      "severity": "high",
+      "mitigation": "Build retry-on-reconnect and per-symbol fallback logic for all FLATTEN paths (action #1). Add a 'flatten_pending' persistent flag that fires on reconnect. This is a blocker before any live trading."
+    },
+    {
+      "risk": "Premature live trading transition \u2014 no documented, measurable criteria exist for what constitutes 'profitable and reliable on paper', creating risk of subjective or premature go-live decision",
+      "severity": "high",
+      "mitigation": "Write the paper\u2192live stage gate spec (action #8) immediately and run the structured evaluation (action #4). Do not make a live trading decision without a signed-off scorecard."
+    },
+    {
+      "risk": "Position sizing stack is incomplete during the evaluation period \u2014 ATR sizing is P0 and unshipped, meaning current paper trading results do not reflect the intended risk management behaviour",
+      "severity": "high",
+      "mitigation": "Build ATR sizing (action #2) as the second highest priority action. Do not begin the formal paper trading evaluation until ATR sizing is live."
+    },
+    {
+      "risk": "Signal pipeline refactored but not empirically validated \u2014 the 10-dimension refactor is recent and large, but no IC scores, alpha decay analysis, or forward return validation has been run on the new configuration",
+      "severity": "high",
+      "mitigation": "Build Signal Decay Monitor (action #10) to generate IC scores. Review alpha decay dashboard (recently shipped) for early signal on dimension quality. Run the paper trading evaluation against the new pipeline."
+    },
+    {
+      "risk": "orders.py at 2133 lines with possible duplicate daemon logic \u2014 complex concurrent code with thread safety risks that could cause silent order management failures",
+      "severity": "medium",
+      "mitigation": "Audit and resolve Order Fill Watcher duplication (action #7). Add threading lock audit to orders.py. Consider extracting fill watcher into its own module as a refactor milestone."
+    },
+    {
+      "risk": "Data collection failures fail silently or halt the scan cycle \u2014 4 failing test paths show network errors in all four data sources return without clear fallback behaviour, potentially running the signal pipeline on stale or missing data",
+      "severity": "medium",
+      "mitigation": "Fix data collector retry and fallback logic (action #5). Add data staleness flags to signal pipeline inputs. Alert on dashboard when any data source has been unavailable for >N minutes."
+    },
+    {
+      "risk": "Regime detection is VIX-proxy only by architectural decision but this constraint is not reflected in several active feature specs (Hurst Exponent, HMM) which may be built inconsistently",
+      "severity": "medium",
+      "mitigation": "Update all regime-related feature specs to explicitly reference the VIX-proxy-only constraint and mark HMM/Hurst as 'future enhancement' rather than current requirement. The recent commit locked this architecturally but the specs may still conflict."
+    },
+    {
+      "risk": "No earnings calendar gate before live trading \u2014 entering positions before earnings is a known source of unexpected volatility that can trigger drawdown brakes and invalidate paper trading comparisons",
+      "severity": "medium",
+      "mitigation": "Prioritise Earnings Calendar Event Risk Gate for Phase 3 (pre-live). It is currently P2 active \u2014 consider elevating to P1 given live trading context."
+    },
+    {
+      "risk": "bot.py at 3140 lines is a maintenance and testing liability \u2014 complex systems concentrated in one file are difficult to test, debug, and reason about, especially as multi-user features are added",
+      "severity": "low",
+      "mitigation": "The recent extraction of signal_pipeline.py is a good start. Plan a progressive decomposition of bot.py into named subsystems (e.g. scan_cycle.py, trade_decision.py) as a Phase 2 housekeeping task."
+    }
+  ],
+  "roadmap_gaps": "Several capabilities implied by the vision are absent from any spec or backlog: (1) User authentication and session management \u2014 multi-user beta requires users to log in and see only their own data, but there is no spec for this anywhere; (2) Broker account linking UI \u2014 users need a way to connect their IBKR accounts through the web interface, but the onboarding flow is entirely unspecced; (3) Risk profile settings UI \u2014 the vision explicitly mentions users managing their risk profile through settings, but there is no frontend spec for this; (4) Notifications and alerting for users \u2014 users need to know when trades are made, when drawdown brakes fire, or when the bot is offline; (5) Slippage and execution quality modelling for paper\u2192live comparison \u2014 paper trading results need to be adjusted for expected live execution costs to make the stage gate comparison valid; (6) Secrets and configuration management for cloud deployment \u2014 there is no spec for how IBKR credentials, API keys (Claude, AlphaVantage), and per-user broker tokens will be stored and managed securely in a hosted environment; (7) Legal and compliance layer \u2014 operating a hosted trading system for third parties (even friends and family) may have regulatory implications that are entirely absent from the roadmap; (8) Backtesting harness for new signal dimensions \u2014 several active features (PEAD, UOA, Options Flow) would benefit from being validated in backtest before paper trading, but there is no backtesting pipeline spec beyond the Signal Validation with Alphalens backlog item.",
+  "model": "claude-sonnet-4-6",
+  "data_sources": {
+    "specs": 125,
+    "sessions": 5,
+    "research": 8,
+    "commits": 20,
+    "tests": true,
+    "code": true
+  }
+}

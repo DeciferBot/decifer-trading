@@ -1,0 +1,11 @@
+{
+  "id": "research-alpha-decay-chart-per-trade-forward-return-distrib",
+  "title": "Alpha Decay Chart \u2014 Per-Trade Forward Return Distribution Tracker",
+  "status": "complete",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Practitioner research (markrbest.github.io, citing Timothy Masters) describes alpha decay charts as a technique to measure the distribution of returns over the lifetime of a trade, sampled at regular intervals. The key insight is that a trade with no drawdown going directly to profit is far superior to one that recovers after a deep intraday dip \u2014 and the alpha chart captures this. For Decifer, plotting forward return distribution at T+1, T+3, T+5, T+10 bars after entry for each signal type reveals the actual half-life of the signal and the optimal exit point before mean-reversion kicks in. Research from MicroAlphas (2025) confirmed swing-trade signal effectiveness diminishes after 3\u201310 days.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "created_at": "2026-03-29T10:57:08.133171Z"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "research-time-of-day-seasonality-filter",
+  "title": "Time-of-Day Seasonality Filter",
+  "status": "future",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Analyze 60 days of 1-hour OHLCV data (free via yfinance) to calculate the average hourly return for each hour of the trading day per ticker. Block new entries during historically losing hours. Market microstructure creates persistent intraday patterns: the opening 30 minutes are noisy and prone to fakeouts, midday (12-2pm EST) is typically choppy and low-follow-through, while the final hour tends to be directional. Filtering on hourly bias is a free, low-correlation edge.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Execution Quality & Exit Optimization",
+  "created_at": "2026-03-29T10:57:08.127402Z",
+  "deferral_reason": "not in paper_trading_single_account Active pipeline \u2014 deferred for future stage review"
+}

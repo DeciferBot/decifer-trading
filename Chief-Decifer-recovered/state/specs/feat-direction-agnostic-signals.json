@@ -1,0 +1,17 @@
+{
+  "id": "feat-direction-agnostic-signals",
+  "title": "Direction-Agnostic Signals",
+  "status": "complete",
+  "priority": "P1",
+  "phase": "A",
+  "designed_date": "2026-03-27",
+  "started_date": "2026-03-27",
+  "completed_date": "2026-03-28",
+  "summary": "All 9 signal dimensions now score conviction (setup quality, 0-10) separately from direction (long/short, +1/−1). A weighted majority vote across all dimensions determines final trade direction. A clean bearish breakdown scores identically to the equivalent bullish setup. Shipped in Phase A commit (620e75d).",
+  "approach": "Refactored score_universe() in signals.py. Each dimension appends (direction, weight) to dim_directions list. Weighted sum determines direction: positive = long, negative = short. Total score = sum of conviction scores. TREND, MOMENTUM, SQUEEZE, FLOW, BREAKOUT, CONFLUENCE, NEWS, SOCIAL, REVERSION all symmetric.",
+  "files_affected": ["signals.py"],
+  "dependencies": [],
+  "roadmap_ref": "roadmap/01-direction-agnostic-signals.md",
+  "branch": "feat/phase-a-roadmap",
+  "approved_by": "amit"
+}

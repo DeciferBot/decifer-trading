@@ -1,0 +1,24 @@
+{
+  "id": "feat-ma1-account-config-profiles",
+  "title": "Per-Account Risk Profile Config & account_id Parameterisation",
+  "status": "future",
+  "priority": "P0",
+  "phase": "MA1",
+  "designed_date": "2026-03-29",
+  "started_date": null,
+  "completed_date": null,
+  "summary": "Two linked tasks: (1) Replace flat global CONFIG with account-aware profile system \u2014 each account ID maps to its own strategy type, risk tolerance, and position limits. (2) Audit every function in orders.py and risk.py that reads CONFIG[active_account] directly and replace with account_id as a parameter. Both are required before multi-account routing works correctly.",
+  "approach": "Add account_profiles dict to config.py keyed by account ID. Each profile holds: strategy_type (options/longs/scalping), min_score_threshold, max_positions, risk_per_trade_pct, max_hold_time, stop_loss_rule, kill_switch_enabled, claude_api_key. Global CONFIG values serve as fallback when a profile key is absent.",
+  "files_affected": [
+    "config.py"
+  ],
+  "dependencies": [],
+  "roadmap_ref": "vision/Decifer_MultiAccount_Architecture.docx \u00a7 9.1",
+  "branch": null,
+  "approved_by": null,
+  "deferral_reason": "multi-account infrastructure \u2014 future stage (paper_trading_single_account prioritisation)",
+  "merged_from": [
+    "feat-ma1-account-config-profiles",
+    "feat-ma1-parameterise-account-id"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "date": "2026-03-31",
+  "timestamp": "2026-03-31T19:32:03.915Z",
+  "branch": "master",
+  "phase": "unknown",
+  "last_commit": "177544a feat(risk): drawdown brake — flatten all on breach + persist HWM across restarts",
+  "files_changed": [
+    "ashboard.py",
+    "data/orders.json",
+    "equity_history.json",
+    "ic_calculator.py",
+    "learning.py",
+    "tests/test_ic_calculator.py",
+    "CLAUDE.md.bak",
+    "data/audit_log.jsonl",
+    "data/sec_tickers.json",
+    "data/signals_log.jsonl"
+  ],
+  "test_status": "unknown",
+  "summary": "177544a feat(risk): drawdown brake — flatten all on breach + persist HWM across restarts",
+  "open_todos": [],
+  "session_count": 45
+}

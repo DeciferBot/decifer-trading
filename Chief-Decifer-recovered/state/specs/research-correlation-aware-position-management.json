@@ -1,0 +1,12 @@
+{
+  "id": "research-correlation-aware-position-management",
+  "title": "Correlation-Aware Position Management",
+  "status": "future",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "20-day rolling correlation matrix. Reduce correlated positions to prevent hidden concentration risk.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 New Feature Research",
+  "created_at": "2026-03-29T10:57:08.142777Z",
+  "deferral_reason": "Covered by research-intra-portfolio-rolling-corr \u2014 deferred during paper_trading_single_account prioritisation"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "research-dynamic-volatility-based-position-sizing",
+  "title": "Dynamic Volatility-Based Position Sizing",
+  "status": "future",
+  "phase": "C",
+  "priority": "P2",
+  "summary": "Cap Kelly output with ATR-based volatility ceiling. Shrinks positions in high-vol regimes automatically.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 New Feature Research",
+  "created_at": "2026-03-29T10:57:08.141608Z",
+  "deferral_reason": "Covered by research-atr-volatility-targeting \u2014 deferred during paper_trading_single_account prioritisation"
+}

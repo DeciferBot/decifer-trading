@@ -1,0 +1,16 @@
+{
+  "id": "research-z-score-normalised-signal-composite-cross-sectiona-cc7ae0",
+  "title": "Z-Score Normalised Signal Composite (Cross-Sectional Standardisation)",
+  "status": "archived",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Normalise each signal dimension score to a Z-score before compositing, so that dimensions with naturally wider numeric ranges don't structurally dominate the 9-score average. The multi-factor ETH trading research (ACM 2025) found optimal Z-score thresholds of \u00b11.0 for buy/sell signals. Cross-sectional standardisation is a standard quant technique validated across hundreds of studies \u2014 it ensures the composite reflects genuine signal quality rather than raw scale differences between dimensions.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "impact_score": 3,
+  "impact_label": "Low Impact",
+  "expected_impact": "+1-2% improvement in signal consistency; eliminates dimension-scale bias where larger raw scores from some dimensions dominate composite unfairly",
+  "difficulty": "Easy",
+  "dev_days": 2,
+  "created_at": "2026-04-01T16:13:23.640255Z"
+}

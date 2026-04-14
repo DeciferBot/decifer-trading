@@ -1,0 +1,16 @@
+{
+  "id": "research-regime-conditioned-position-size-scalar-vix-regime-798b59",
+  "title": "Regime-Conditioned Position Size Scalar (VIX Regime + HMM Integration)",
+  "status": "archived",
+  "phase": "D",
+  "priority": "P2",
+  "summary": "Connect the already-planned HMM Regime Detection backlog item to position sizing: when HMM detects a high-volatility or bear regime, apply an additional 0.5x multiplier to all position sizes. When HMM detects a low-volatility bull regime, allow sizes up to but not exceeding the ATR volatility-target level. This creates a two-layer regime-aware sizing system: ATR handles instrument-level volatility, HMM handles portfolio-level regime risk. Research from PHBS Working Paper (2024) and the MQL5 GARCH system (2026) both confirm this layered approach outperforms single-method sizing.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "Volatility-managed portfolios (Moreira & Muir 2017) reduce drawdowns in recessions and improve Sharpe; GARCH-regime system backtested 2015-2025 shows consistent improvement vs buy-and-hold across 8 asset classes; PortRSMs (MDPI 2025) achieves +0.03 Sharpe improvement in US markets",
+  "difficulty": "Medium",
+  "dev_days": 4,
+  "created_at": "2026-04-01T16:13:23.675094Z"
+}

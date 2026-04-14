@@ -1,0 +1,17 @@
+{
+  "id": "research-sentiment-volume-change-svc-reddit-signal",
+  "title": "Sentiment Volume Change (SVC) Reddit Signal",
+  "status": "future",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Build a Sentiment Volume Change (SVC) metric that combines r/wallstreetbets mention count delta with directional sentiment change for a given ticker. Research using 4 years of WSB comments (2020-2023) showed that SVC \u2014 not raw sentiment alone \u2014 was the key predictor of next-day returns, achieving 70% higher returns in 2023 and 84.4% higher in 2021 versus buy-and-hold. This replaces vague social scoring with a mathematically grounded, research-validated metric. Note: raw WSB buy-following produces negative alpha (BUZZ ETF -3.58% vs VOO +11.58% Apr 2021-Mar 2024), so the SVC delta signal, not raw mention count, is the critical implementation distinction.",
+  "source": "research",
+  "research_topic": "Sentiment Analysis & NLP for Trading",
+  "impact_score": 10,
+  "impact_label": "High Impact",
+  "expected_impact": "+70-84% return over buy-and-hold in bull markets (backtested 2020-2023 on 10 NASDAQ stocks); adds uncorrelated social signal to existing social dimension",
+  "difficulty": "Easy",
+  "dev_days": 3,
+  "created_at": "2026-03-31T04:35:09.280317Z",
+  "deferral_reason": "not in paper_trading_single_account Active pipeline \u2014 deferred for future stage review"
+}
