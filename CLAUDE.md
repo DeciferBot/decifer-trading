@@ -182,4 +182,33 @@ Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
 
 ---
 
+---
+
+## New Machine Setup
+
+**If the environment looks unconfigured (missing packages, no `.env`, empty state dirs), run setup before doing anything else:**
+
+```bash
+cd "/path/to/decifer trading"
+bash scripts/setup.sh
+```
+
+The script handles everything automatically:
+- Installs Homebrew, `python@3.11`, `ta-lib`, `uv`, and other system deps
+- Clones or pulls the repo
+- Installs all Python packages from both `requirements.txt` and `Chief-Decifer-recovered/requirements.txt` via `uv` (no manual pip install needed)
+- Restores `.env` from iCloud Keychain or iCloud Drive backup
+- Installs NLTK data, launch daemons, etc.
+
+**If `.env` is missing after setup** (no iCloud backup on new machine):
+1. Copy the template: `cp .env.example .env`
+2. Fill in all 9 keys: `ANTHROPIC_API_KEY`, `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`, `ALPACA_BASE_URL`, `FMP_API_KEY`, `ALPHA_VANTAGE_KEY`, `IBKR_ACTIVE_ACCOUNT`, `IBKR_PAPER_ACCOUNT`, `FRED_API_KEY`
+
+**Signs of an unconfigured environment to watch for:**
+- `ModuleNotFoundError` on import → run `bash scripts/setup.sh`
+- `ANTHROPIC_API_KEY` empty → `.env` not loaded; check root `.env` exists
+- Signal scripts writing to wrong paths → `config.py` auto-detects repo root via `__file__`, no `DECIFER_REPO_PATH` needed
+
+---
+
 *This file is the primary session context. Update "Current State" when phases change or new decisions are locked. Full reasoning lives in `docs/DECISIONS.md`.*

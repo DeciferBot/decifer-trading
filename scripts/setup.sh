@@ -62,9 +62,10 @@ cd "$INSTALL_DIR"
 echo "  ✓ Repo at: $INSTALL_DIR"
 
 # ── Step 4: Python dependencies ───────────────────────────────────────────────
-echo "[4/8] Installing Python packages..."
-python3.11 -m pip install -r requirements.txt --quiet
-python3.11 -c "import nltk; nltk.download('vader_lexicon', quiet=True)" 2>/dev/null || true
+echo "[4/8] Installing Python packages (via uv)..."
+# uv manages its own venv automatically — no manual activate needed
+uv pip install --python python3.11 -r requirements.txt -r Chief-Decifer-recovered/requirements.txt --quiet
+uv run --python python3.11 python -c "import nltk; nltk.download('vader_lexicon', quiet=True)" 2>/dev/null || true
 echo "  ✓ All packages installed"
 
 # ── Step 5: Restore .env secrets ──────────────────────────────────────────────
@@ -75,24 +76,26 @@ HAVE_SECRETS=false
 # Try iCloud Keychain first (syncs automatically across Macs)
 if security find-generic-password -a "$KEYCHAIN_ACCOUNT" -s "ANTHROPIC_API_KEY" -w &>/dev/null; then
     echo "  → Found secrets in iCloud Keychain"
-    ANTHROPIC_KEY=$(security find-generic-password -a "$KEYCHAIN_ACCOUNT" -s "ANTHROPIC_API_KEY" -w)
-    IBKR_ACTIVE=$(security find-generic-password -a "$KEYCHAIN_ACCOUNT" -s "IBKR_ACTIVE_ACCOUNT" -w)
-    IBKR_PAPER=$(security find-generic-password -a "$KEYCHAIN_ACCOUNT" -s "IBKR_PAPER_ACCOUNT" -w)
-    IBKR_LIVE1=$(security find-generic-password -a "$KEYCHAIN_ACCOUNT" -s "IBKR_LIVE_1_ACCOUNT" -w)
-    IBKR_LIVE2=$(security find-generic-password -a "$KEYCHAIN_ACCOUNT" -s "IBKR_LIVE_2_ACCOUNT" -w)
+    kc() { security find-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$1" -w 2>/dev/null || echo ""; }
     cat > .env << ENVEOF
 # Decifer Trading — Environment Variables
 # ⚠️ Never commit this file to version control
+# Written by setup.sh from iCloud Keychain
 
-ANTHROPIC_API_KEY=$ANTHROPIC_KEY
+ANTHROPIC_API_KEY=$(kc ANTHROPIC_API_KEY)
 
-# IBKR Account IDs
-IBKR_ACTIVE_ACCOUNT=$IBKR_ACTIVE
-IBKR_PAPER_ACCOUNT=$IBKR_PAPER
-IBKR_LIVE_1_ACCOUNT=$IBKR_LIVE1
-IBKR_LIVE_2_ACCOUNT=$IBKR_LIVE2
+ALPACA_API_KEY=$(kc ALPACA_API_KEY)
+ALPACA_SECRET_KEY=$(kc ALPACA_SECRET_KEY)
+ALPACA_BASE_URL=$(kc ALPACA_BASE_URL)
+
+FMP_API_KEY=$(kc FMP_API_KEY)
+ALPHA_VANTAGE_KEY=$(kc ALPHA_VANTAGE_KEY)
+FRED_API_KEY=$(kc FRED_API_KEY)
+
+IBKR_ACTIVE_ACCOUNT=$(kc IBKR_ACTIVE_ACCOUNT)
+IBKR_PAPER_ACCOUNT=$(kc IBKR_PAPER_ACCOUNT)
 ENVEOF
-    echo "  ✓ .env written from iCloud Keychain"
+    echo "  ✓ .env written from iCloud Keychain (9 keys)"
     HAVE_SECRETS=true
 fi
 

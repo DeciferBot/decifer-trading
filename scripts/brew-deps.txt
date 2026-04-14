@@ -5,3 +5,4 @@ python@3.11
 ta-lib
 node
 git
+uv
