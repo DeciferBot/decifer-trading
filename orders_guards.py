@@ -10,12 +10,10 @@ detect duplicate orders before submission. No writes to shared state.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from ib_async import IB
 
 from config import CONFIG
-from orders_state import log, open_orders, ORDER_DUPLICATE_CHECK_ENABLED_DEFAULT
+from orders_state import ORDER_DUPLICATE_CHECK_ENABLED_DEFAULT, log, open_orders
 
 
 def _is_duplicate_check_enabled() -> bool:
@@ -59,7 +57,7 @@ def _check_ibkr_open_order(
     ib: IB,
     symbol: str,
     side: str = "BUY",
-    option_key: Optional[str] = None,
+    option_key: str | None = None,
 ) -> bool:
     """Query IBKR directly for a live open order or open position.
 
@@ -95,7 +93,7 @@ def _check_ibkr_open_order(
                 # For FX pairs (6-char like "EURUSD"), IBKR reports just the base
                 # currency as trade_symbol (e.g. "EUR" or "USD"). Match either form.
                 ibkr_base = symbol[:3] if (len(symbol) == 6 and symbol.isalpha()) else symbol
-                if trade_symbol == symbol or trade_symbol == ibkr_base:
+                if trade_symbol in (symbol, ibkr_base):
                     return True
 
         # ── Portfolio position check (belt-and-suspenders) ────────────────────
@@ -105,6 +103,7 @@ def _check_ibkr_open_order(
         if option_key is None:
             try:
                 from config import CONFIG as _CFG
+
                 portfolio_items = ib.portfolio(_CFG.get("active_account", ""))
                 is_fx = len(symbol) == 6 and symbol.isalpha()
                 ibkr_base = symbol[:3] if is_fx else symbol
@@ -133,7 +132,6 @@ def _check_ibkr_open_order(
         return False
     except Exception as e:
         log.error(
-            f"_check_ibkr_open_order: IBKR openTrades() failed for {symbol} — "
-            f"failing closed (skipping order): {e}"
+            f"_check_ibkr_open_order: IBKR openTrades() failed for {symbol} — failing closed (skipping order): {e}"
         )
         return True

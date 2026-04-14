@@ -39,7 +39,7 @@ sleep 1
 osascript -e "
 tell application \"Terminal\"
     activate
-    do script \"cd \\\"$PROJ_DIR\\\" && source .env 2>/dev/null; export \\\$(grep -v '^#' .env | grep -v '^$' | xargs) && echo '' && echo '  <> Decifer Trading 2.0 — Starting...' && echo '  Dashboard: http://localhost:8080' && echo '' && python3 bot.py\"
+    do script \"cd \\\"$PROJ_DIR\\\" && source venv/bin/activate && source .env 2>/dev/null; export \\\$(grep -v '^#' .env | grep -v '^$' | xargs) && echo '' && echo '  <> Decifer Trading 2.0 — Starting...' && echo '  Dashboard: http://localhost:8080' && echo '' && python bot.py\"
 end tell
 "
 

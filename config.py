@@ -289,7 +289,7 @@ CONFIG = {
     # ── FX TRADING ────────────────────────────────────────────────
     # Disabled by default — enable after paper validation (2+ weeks).
     # IBKR Forex contract support already present in orders_contracts.py.
-    "fx_enabled": True,  # Master switch for FX scanning + trading
+    "fx_enabled": False,  # Master switch for FX scanning + trading (disabled — no IBKR FX market data subscription)
     "fx_pairs": ["EURUSD", "GBPUSD", "USDJPY"],  # Active pairs
     "fx_min_score": 20,  # Min composite score to generate FX signal (0-50)
     "fx_min_lot_size": 25000,  # Minimum lot size for FX orders (units of base currency) — IBKR IDEALPRO minimum

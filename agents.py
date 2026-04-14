@@ -236,7 +236,8 @@ def agent_final_decision(
     `macro` and `opportunity` are both the Trading Analyst output.
     `devils` is empty string (Devil's Advocate removed).
     """
-    from risk import calculate_position_size, calculate_stops
+    from position_sizing import calculate_stops
+    from risk import calculate_position_size
 
     _sm = strategy_mode or {}
     size_mult = _sm.get("size_multiplier", 1.0)
@@ -772,7 +773,8 @@ def agent_risk_manager(
     Deterministic risk assessment via risk.py functions.
     `devils_report` retained for API compatibility (unused — Devil's Advocate removed).
     """
-    from risk import calculate_position_size, calculate_stops, check_risk_conditions
+    from position_sizing import calculate_stops
+    from risk import calculate_position_size, check_risk_conditions
 
     _sm = strategy_mode or {}
     size_mult = _sm.get("size_multiplier", 1.0)

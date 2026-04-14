@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Sequence
+from collections.abc import Sequence
 
 log = logging.getLogger("decifer.sympathy")
 
@@ -26,36 +26,30 @@ log = logging.getLogger("decifer.sympathy")
 SYMPATHY_MAP: dict[str, list[str]] = {
     # Semiconductors
     "NVDA": ["AMD", "MU", "MRVL", "INTC", "QCOM", "ALAB"],
-    "AMD":  ["NVDA", "INTC", "MU", "MRVL"],
+    "AMD": ["NVDA", "INTC", "MU", "MRVL"],
     "INTC": ["AMD", "NVDA", "MU"],
-    "MU":   ["NVDA", "AMD", "WDC", "MRVL"],
+    "MU": ["NVDA", "AMD", "WDC", "MRVL"],
     "QCOM": ["SWKS", "MRVL", "AVGO"],
-
     # Mega-cap Tech
     "AAPL": ["QCOM", "SWKS", "CRUS", "AMZN"],
     "MSFT": ["ORCL", "CRM", "SNOW", "GOOGL"],
-    "GOOGL":["META", "MSFT", "SNAP", "PINS"],
+    "GOOGL": ["META", "MSFT", "SNAP", "PINS"],
     "META": ["SNAP", "PINS", "GOOGL", "RDDT"],
     "AMZN": ["SHOP", "EBAY", "AAPL"],
-
     # Cloud / SaaS
-    "CRM":  ["SNOW", "PLTR", "ORCL", "MSFT"],
+    "CRM": ["SNOW", "PLTR", "ORCL", "MSFT"],
     "SNOW": ["CRM", "PLTR", "DDOG", "MDB"],
     "PLTR": ["SNOW", "CRM", "AI"],
-
     # EV / Autos
     "TSLA": ["RIVN", "LCID", "F", "GM", "NIO"],
-
     # Financials
-    "JPM":  ["GS", "MS", "BAC", "C", "WFC"],
-    "GS":   ["MS", "JPM", "BX", "KKR"],
-
+    "JPM": ["GS", "MS", "BAC", "C", "WFC"],
+    "GS": ["MS", "JPM", "BX", "KKR"],
     # Energy
-    "XOM":  ["CVX", "COP", "SLB", "MPC"],
-    "CVX":  ["XOM", "COP", "PSX"],
-
+    "XOM": ["CVX", "COP", "SLB", "MPC"],
+    "CVX": ["XOM", "COP", "PSX"],
     # Biotech / Healthcare
-    "LLY":  ["NVO", "ABBV", "PFE", "MRK"],
+    "LLY": ["NVO", "ABBV", "PFE", "MRK"],
     "MRNA": ["BNTX", "PFE", "NVAX"],
 }
 
@@ -78,11 +72,13 @@ def get_sympathy_candidates(
     List of peer tickers not already in the universe. Empty on any error.
     """
     from config import CONFIG
+
     if not CONFIG.get("sympathy_scanner_enabled", True):
         return []
 
     try:
         from earnings_calendar import get_earnings_within_hours
+
         universe_set = set(scored_or_universe)
 
         # Which leaders in our universe have earnings within the window?

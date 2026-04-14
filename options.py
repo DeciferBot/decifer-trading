@@ -291,7 +291,7 @@ def find_best_contract(
     # If a stock position is already open, equity + options exposure stacks on
     # the same name. Halve the options budget so combined delta stays within limits.
     try:
-        from orders import open_trades as _open_trades_check
+        from orders_state import open_trades as _open_trades_check
 
         if symbol in _open_trades_check:
             max_risk = round(max_risk * 0.5, 2)

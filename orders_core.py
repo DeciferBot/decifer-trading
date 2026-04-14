@@ -1313,10 +1313,15 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             contract = get_contract(symbol, info.get("instrument", "stock"))
         ib.qualifyContracts(contract)
 
-        # 3-way price validation for accurate exit P&L logging
+        # Price validation for accurate exit P&L logging
         ibkr_price = _get_ibkr_price(ib, contract, fallback=0)
         entry = info.get("entry", 0)
-        validated_price, src_desc = _validate_position_price(symbol, ibkr_price, entry)
+        if info.get("instrument") == "fx":
+            # FX: IBKR is authoritative (Alpaca/TV don't carry forex)
+            validated_price = ibkr_price if ibkr_price > 0 else entry
+            src_desc = f"IBKR_FX=${ibkr_price:.4f}" if ibkr_price > 0 else "IBKR_FX fallback to entry"
+        else:
+            validated_price, src_desc = _validate_position_price(symbol, ibkr_price, entry)
         if validated_price > 0:
             info["current"] = validated_price
             log.info(f"Exit price {symbol}: ${validated_price:.2f} ({src_desc})")

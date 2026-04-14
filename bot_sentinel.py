@@ -20,7 +20,8 @@ from bot_state import clog, dash
 from config import CONFIG
 from orders_core import execute_buy, execute_sell
 from orders_portfolio import get_open_positions
-from risk import calculate_position_size, calculate_stops, check_risk_conditions, get_scan_interval, is_trading_day
+from position_sizing import calculate_stops
+from risk import calculate_position_size, check_risk_conditions, get_scan_interval, is_trading_day
 from sentinel_agents import run_sentinel_pipeline
 from theme_tracker import build_sentinel_universe
 

@@ -12,15 +12,15 @@ Safe to run while the bot is not running; do NOT run while the bot is live.
 Usage:
     python3 scripts/recover_pattern_ids.py [--dry-run]
 """
+
 import json
-import sys
 import os
-from datetime import datetime, timezone
+import sys
 from pathlib import Path
 
 POSITIONS_FILE = Path("data/positions.json")
-PATTERN_FILE   = Path("data/pattern_library.json")
-DRY_RUN        = "--dry-run" in sys.argv
+PATTERN_FILE = Path("data/pattern_library.json")
+DRY_RUN = "--dry-run" in sys.argv
 
 
 def load_json(path: Path) -> dict:
@@ -34,7 +34,6 @@ def load_json(path: Path) -> dict:
 
 
 def save_json(path: Path, data: dict) -> None:
-    import tempfile
     tmp = path.parent / (path.name + ".tmp")
     tmp.write_text(json.dumps(data, indent=2, default=str))
     tmp.replace(path)
@@ -47,7 +46,7 @@ def base_symbol(key: str) -> str:
 
 def main() -> None:
     positions = load_json(POSITIONS_FILE)
-    patterns  = load_json(PATTERN_FILE)
+    patterns = load_json(PATTERN_FILE)
 
     if not positions:
         print("No active positions. Nothing to do.")
@@ -69,8 +68,8 @@ def main() -> None:
 
     restored = 0
     skipped_ambiguous = 0
-    skipped_no_match  = 0
-    already_ok        = 0
+    skipped_no_match = 0
+    already_ok = 0
 
     for pos_key, pos in positions.items():
         sym = base_symbol(pos_key)
@@ -91,21 +90,24 @@ def main() -> None:
         elif len(candidates) > 1:
             # Sort by timestamp descending — most recent first for the log
             candidates.sort(key=lambda x: x[1].get("timestamp", ""), reverse=True)
-            print(f"  AMBIGUOUS      {pos_key}: {len(candidates)} candidates for '{sym}' "
-                  f"(most recent: {candidates[0][0]} @ {candidates[0][1].get('timestamp','?')[:16]})")
+            print(
+                f"  AMBIGUOUS      {pos_key}: {len(candidates)} candidates for '{sym}' "
+                f"(most recent: {candidates[0][0]} @ {candidates[0][1].get('timestamp', '?')[:16]})"
+            )
             skipped_ambiguous += 1
 
         else:
             pid, pat = candidates[0]
-            print(f"  RESTORING      {pos_key}: pattern_id={pid} "
-                  f"(recorded {pat.get('timestamp','?')[:16]})")
+            print(f"  RESTORING      {pos_key}: pattern_id={pid} (recorded {pat.get('timestamp', '?')[:16]})")
             if not DRY_RUN:
                 positions[pos_key]["pattern_id"] = pid
             restored += 1
 
     print()
-    print(f"Summary: {restored} restored, {skipped_ambiguous} ambiguous (skipped), "
-          f"{skipped_no_match} unrecoverable, {already_ok} already had pattern_id")
+    print(
+        f"Summary: {restored} restored, {skipped_ambiguous} ambiguous (skipped), "
+        f"{skipped_no_match} unrecoverable, {already_ok} already had pattern_id"
+    )
 
     if DRY_RUN:
         print("DRY RUN — no changes written.")

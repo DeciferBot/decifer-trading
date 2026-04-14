@@ -29,8 +29,8 @@ def get_live_prices() -> dict:
            = "bar"     — last 1-minute bar close from BAR_CACHE (~1-2 min lag)
            = "stale"   — neither cache has data; price unknown
     """
-    from alpaca_stream import QUOTE_CACHE, BAR_CACHE
-    from orders_state import active_trades, _trades_lock
+    from alpaca_stream import BAR_CACHE, QUOTE_CACHE
+    from orders_state import _trades_lock, active_trades
 
     with _trades_lock:
         # symbol field may differ from key for options (e.g. KOD_C_35.0_2026-04-17)
@@ -44,30 +44,30 @@ def get_live_prices() -> dict:
         if quote and quote.get("bid", 0) > 0 and quote.get("ask", 0) > 0:
             mid = round((quote["bid"] + quote["ask"]) / 2, 4)
             result[sym] = {
-                "mid":        mid,
-                "bid":        round(quote["bid"], 4),
-                "ask":        round(quote["ask"], 4),
+                "mid": mid,
+                "bid": round(quote["bid"], 4),
+                "ask": round(quote["ask"], 4),
                 "spread_pct": round(quote.get("spread_pct") or 0, 6),
-                "source":     "stream",
+                "source": "stream",
             }
         else:
             df = BAR_CACHE.get_5m(sym)
             if df is not None and not df.empty:
                 close = float(df.iloc[-1]["Close"])
                 result[sym] = {
-                    "mid":        round(close, 4),
-                    "bid":        0.0,
-                    "ask":        0.0,
+                    "mid": round(close, 4),
+                    "bid": 0.0,
+                    "ask": 0.0,
                     "spread_pct": 0.0,
-                    "source":     "bar",
+                    "source": "bar",
                 }
             else:
                 result[sym] = {
-                    "mid":        0.0,
-                    "bid":        0.0,
-                    "ask":        0.0,
+                    "mid": 0.0,
+                    "bid": 0.0,
+                    "ask": 0.0,
                     "spread_pct": 0.0,
-                    "source":     "stale",
+                    "source": "stale",
                 }
 
     return result
@@ -107,15 +107,17 @@ class PriceUpdater:
         log.info("PriceUpdater: stopped")
 
     def _run(self) -> None:
-        from alpaca_stream import QUOTE_CACHE, BAR_CACHE
-        from orders_state import active_trades, _trades_lock
         import bot_state
+        from alpaca_stream import BAR_CACHE, QUOTE_CACHE
+        from orders_state import _trades_lock, active_trades
 
         while not self._stop_event.wait(_INTERVAL):
             try:
                 self._update_once(
-                    QUOTE_CACHE, BAR_CACHE,
-                    active_trades, _trades_lock,
+                    QUOTE_CACHE,
+                    BAR_CACHE,
+                    active_trades,
+                    _trades_lock,
                     bot_state.dash,
                 )
             except Exception as exc:

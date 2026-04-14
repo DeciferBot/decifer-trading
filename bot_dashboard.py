@@ -573,6 +573,33 @@ class DashHandler(BaseHTTPRequestHandler):
                 log.warning("ic_weights error: %s", exc)
                 payload = {"error": str(exc), "weights": {}, "history": []}
             self.wfile.write(json.dumps(payload).encode())
+        elif self.path == "/api/analytics":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                from analytics import get_analytics
+                payload = get_analytics()
+            except Exception as exc:
+                log.warning("analytics error: %s", exc)
+                payload = {"error": str(exc)}
+            self.wfile.write(json.dumps(payload).encode())
+        elif self.path.startswith("/api/analytics/explain"):
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                from urllib.parse import parse_qs, urlparse
+                qs = parse_qs(urlparse(self.path).query)
+                force = qs.get("force", ["0"])[0].lower() in ("1", "true", "yes")
+                from analytics import explain_analytics
+                payload = explain_analytics(force=force)
+            except Exception as exc:
+                log.warning("analytics/explain error: %s", exc)
+                payload = {"error": str(exc)}
+            self.wfile.write(json.dumps(payload).encode())
         elif self.path == "/api/alpha_decay":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -597,7 +624,7 @@ class DashHandler(BaseHTTPRequestHandler):
 
                 summary = get_aggregate_summary(bot_state.ib)
                 # Enrich with trade_type/conviction/entry_regime from bot tracker
-                from orders import get_open_positions as _get_ops
+                from orders_portfolio import get_open_positions as _get_ops
 
                 _bot_pos = {p.get("symbol", "").upper(): p for p in (_get_ops() or [])}
                 for pos in summary.get("positions", {}).values():
@@ -891,7 +918,7 @@ class DashHandler(BaseHTTPRequestHandler):
                 # Execute immediately via emergency IB connection (no queuing!)
                 clog("TRADE", f"📤 Closing {symbol} immediately...")
                 try:
-                    from orders import close_position
+                    from orders_portfolio import close_position
 
                     result = close_position(ib, symbol)
                     if result:
@@ -936,7 +963,7 @@ class DashHandler(BaseHTTPRequestHandler):
                         update_order_status(order_id, "CANCELLED")
                         sync_orders_from_ibkr()
                         # Remove pending entry from open_trades tracker
-                        from orders import open_trades
+                        from orders_state import open_trades
 
                         cancelled_keys = [
                             k

@@ -49,7 +49,7 @@ from config import CONFIG
 # tests can call them directly, immune to later lambda replacement.
 from orders_core import execute_buy as _real_execute_buy
 from risk import calculate_position_size as _real_calculate_position_size
-from risk import calculate_stops as _real_calculate_stops
+from position_sizing import calculate_stops as _real_calculate_stops
 
 # ---------------------------------------------------------------------------
 # Shared test constants

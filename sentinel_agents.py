@@ -144,7 +144,8 @@ def agent_risk_gate(
     Uses risk.py functions to answer the same 5 questions the LLM was asked.
     Returns human-readable text compatible with agent_instant_decision input.
     """
-    from risk import calculate_position_size, calculate_stops, check_risk_conditions
+    from position_sizing import calculate_stops
+    from risk import calculate_position_size, check_risk_conditions
 
     sym = trigger["symbol"]
     direction = trigger.get("direction", "UNKNOWN")

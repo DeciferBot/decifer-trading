@@ -71,5 +71,8 @@ echo ""
 # Open dashboard in browser after 4 seconds
 (sleep 4 && open http://localhost:8080) &
 
+# Activate venv (Python 3.11)
+source venv/bin/activate
+
 # Run the bot (stays in foreground so you see output)
-python3 bot.py
+python bot.py

@@ -990,6 +990,20 @@ def _print_score_table(scored: list, n: int = 10) -> None:
     """Print a ranked score table to terminal after each scan."""
     if not scored:
         return
+
+    # ── DAR distribution across full universe (diagnostic) ────────
+    dar_vals = [s.get("dar", 1.0) for s in scored]
+    perfect = sum(1 for d in dar_vals if d >= 0.999)
+    partial = sum(1 for d in dar_vals if 0.5 <= d < 0.999)
+    low = sum(1 for d in dar_vals if d < 0.5)
+    dar_min = min(dar_vals)
+    dar_avg = sum(dar_vals) / len(dar_vals)
+    clog(
+        "DAR",
+        f"Universe={len(scored)}  perfect(1.0)={perfect}  partial(.5-.99)={partial}"
+        f"  low(<.5)={low}  min={dar_min:.2f}  avg={dar_avg:.2f}",
+    )
+
     top = sorted(scored, key=lambda s: s.get("score", 0), reverse=True)[:n]
     clog("SCAN", f"── Top {len(top)} Signals {'─' * 40}")
     for i, s in enumerate(top, 1):

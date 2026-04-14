@@ -82,16 +82,14 @@ def validate(df: pd.DataFrame, symbol: str = "") -> None:
     dupes = df.index.duplicated().sum()
     if dupes > 0:
         raise DataQualityError(
-            f"{label}{dupes} duplicate index entries in incoming data — "
-            "deduplicate before calling write()"
+            f"{label}{dupes} duplicate index entries in incoming data — deduplicate before calling write()"
         )
 
     # Zero-volume: warn but allow
     zero_vol = (df["volume"] == 0).sum()
     if zero_vol > 0:
         log.warning(
-            f"{label}{zero_vol}/{len(df)} bars have zero volume — "
-            "stored as-is (halted/pre-market bars are valid)"
+            f"{label}{zero_vol}/{len(df)} bars have zero volume — stored as-is (halted/pre-market bars are valid)"
         )
 
 
@@ -151,7 +149,5 @@ def read(symbol: str, timeframe: str) -> pd.DataFrame:
     """
     path = _path(symbol, timeframe)
     if not path.exists():
-        raise FileNotFoundError(
-            f"No raw data for {symbol}/{timeframe}. Run collect_all() first."
-        )
+        raise FileNotFoundError(f"No raw data for {symbol}/{timeframe}. Run collect_all() first.")
     return pd.read_parquet(path)

@@ -330,8 +330,21 @@ def backfill_equity_history_if_needed() -> bool:
 # ── Account data ──────────────────────────────────────────────────────────────
 
 
+def _prev_day_close_value() -> float | None:
+    """Return the last equity snapshot from the most recent previous day."""
+    history = dash.get("equity_history", [])
+    if not history:
+        return None
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    for entry in reversed(history):
+        d = entry.get("date", "")
+        if not d.startswith(today_str):
+            return entry.get("value")
+    return None
+
+
 def get_account_data():
-    """Fetch portfolio value and daily P&L from IBKR."""
+    """Fetch portfolio value and compute daily P&L from equity history."""
     ib = bot_state.ib
     try:
         vals = ib.accountValues(CONFIG["active_account"])
@@ -341,10 +354,10 @@ def get_account_data():
                 pv = float(v.value)
                 break
         pnl = 0.0
-        if bot_state._pnl_subscription is not None:
-            daily = bot_state._pnl_subscription.dailyPnL
-            if daily is not None and not math.isnan(daily):
-                pnl = round(float(daily), 2)
+        if pv > 0:
+            prev_close = _prev_day_close_value()
+            if prev_close is not None and prev_close > 0:
+                pnl = round(pv - prev_close, 2)
         return pv, pnl
     except Exception as e:
         clog("ERROR", f"Account data error: {e}")

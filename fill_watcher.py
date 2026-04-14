@@ -211,7 +211,7 @@ class FillWatcher:
     def _is_filled(self) -> bool:
         """Return True if the order is no longer PENDING (filled, cancelled, or gone)."""
         # Lazy import to avoid circular dependency (orders imports fill_watcher)
-        from orders import _trades_lock, active_trades
+        from orders_state import _trades_lock, active_trades
 
         try:
             # Layer 1: check in-memory tracker (fastest, no IBKR call)
@@ -263,7 +263,7 @@ class FillWatcher:
 
     def _cancel_order(self, reason: str) -> None:
         """Cancel the entry order and clean up all related state."""
-        from orders import _safe_del_trade
+        from orders_state import _safe_del_trade
 
         try:
             if self._ib.isConnected():

@@ -497,6 +497,15 @@ def reconcile_with_ibkr(ib: IB):
                         validated_price = ibkr_entry
                         src_desc = "IBKR returned no option price — using entry"
                         log.warning(f"Reconcile {key}: {src_desc}")
+                elif is_fx:
+                    # FX: IBKR is authoritative (Alpaca/TV don't carry forex)
+                    if ibkr_price_for_validation > 0:
+                        validated_price = ibkr_price_for_validation
+                        src_desc = f"IBKR_FX=${ibkr_price_for_validation:.4f}"
+                    else:
+                        validated_price = ibkr_entry
+                        src_desc = "IBKR returned no FX price — using entry"
+                        log.warning(f"Reconcile {key}: {src_desc}")
                 else:
                     validated_price, src_desc = _validate_position_price(sym, ibkr_price_for_validation, ibkr_entry)
                     if validated_price <= 0:
@@ -808,11 +817,10 @@ def reconcile_with_ibkr(ib: IB):
                     direction = "SHORT" if pos.position < 0 else "LONG"
                     qty = abs(int(pos.position))
                     ibkr_entry = round(float(pos.avgCost), 4)
-                    # Position objects lack marketPrice — use price validation
-                    validated_price, src_desc = _validate_position_price(sym, 0, ibkr_entry)
-                    if validated_price <= 0:
-                        validated_price = ibkr_entry
-                        src_desc = "no market price — using entry"
+                    # FX: IBKR is authoritative (Alpaca/TV don't carry forex).
+                    # Position objects lack marketPrice so fall back to entry.
+                    validated_price = ibkr_entry
+                    src_desc = "IBKR_FX entry (no marketPrice on Position object)"
                     if direction == "SHORT":
                         sl = round(ibkr_entry * 1.005, 4)
                         tp = round(ibkr_entry * 0.985, 4)
@@ -877,8 +885,8 @@ def reconcile_with_ibkr(ib: IB):
                 except Exception as fx_err:
                     failed_count += 1
                     log.error(f"FX positions() reconcile failed for {_pk}: {fx_err}")
-        except Exception:
-            pass  # ib.positions() unavailable — non-fatal
+        except Exception as pos_err:
+            log.warning(f"ib.positions() unavailable during FX reconciliation: {pos_err}")
 
         log.info(
             f"Reconciliation complete. Tracking {len(active_trades)} positions. (processed={reconciled_count}, failed={failed_count})"
@@ -944,21 +952,34 @@ def update_positions_from_ibkr(ib: IB):
         # Build a fallback set from ib.positions() so FX entries are not
         # incorrectly treated as stale or orphaned.
         _positions_keys: set = set()
+        _positions_fallback_ok = False
         try:
             for pos in ib.positions():
                 if pos.position != 0:
                     _positions_keys.add(_ibkr_item_to_key(pos))
-        except Exception:
-            pass
+            _positions_fallback_ok = True
+        except Exception as _pos_err:
+            log.warning(f"ib.positions() fallback failed: {_pos_err}")
 
-        # Remove positions no longer in IBKR (closed externally via SL/TP/manual)
+        # Remove positions no longer in IBKR (closed externally via SL/TP/manual).
+        # FX positions are ONLY protected by _positions_keys (they rarely appear
+        # in ib.portfolio()).  If the fallback failed, never purge FX — we'd be
+        # deleting a live position just because the callback hasn't arrived.
         stale_keys = []
         with _trades_lock:
-            stale_keys = [
-                k
-                for k in active_trades
-                if k not in price_map and k not in _positions_keys and active_trades[k].get("status") != "PENDING"
-            ]
+            for k in active_trades:
+                if k in price_map or k in _positions_keys:
+                    continue
+                if active_trades[k].get("status") == "PENDING":
+                    continue
+                # FX positions are unreliable in IBKR callbacks — they can
+                # temporarily vanish from both portfolio() and positions() due
+                # to reqAccountUpdates timing.  Never auto-purge FX; require
+                # manual close or an explicit close_position() call.
+                if active_trades[k].get("instrument") == "fx":
+                    log.debug(f"Keeping FX position {k} — FX exempt from stale-position purge")
+                    continue
+                stale_keys.append(k)
             for k in stale_keys:
                 log.warning(f"Position {k} no longer in IBKR portfolio — removing from tracker")
                 del active_trades[k]
@@ -1235,6 +1256,14 @@ def update_positions_from_ibkr(ib: IB):
                     src_desc = f"IBKR_OPT=${ibkr_price:.2f}"
                 else:
                     log.warning(f"No IBKR price for option {key} — keeping previous ${trade.get('current', 0):.2f}")
+                    continue
+            # FX: IBKR is the only reliable source (Alpaca/TV don't carry forex)
+            elif trade.get("instrument") == "fx":
+                if ibkr_price > 0:
+                    validated_price = ibkr_price
+                    src_desc = f"IBKR_FX=${ibkr_price:.4f}"
+                else:
+                    log.warning(f"No IBKR price for FX {key} — keeping previous ${trade.get('current', 0):.4f}")
                     continue
             else:
                 validated_price, src_desc = _validate_position_price(sym, ibkr_price, entry)

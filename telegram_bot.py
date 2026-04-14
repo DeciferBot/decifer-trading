@@ -20,17 +20,16 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
-from typing import Callable
+from collections.abc import Callable
 
 import requests
 
 log = logging.getLogger(__name__)
 
-_LONG_POLL_TIMEOUT = 30    # seconds — Telegram server holds open until update arrives
-_REQUEST_TIMEOUT   = 35    # slightly longer than long-poll timeout
-_POLL_INTERVAL     = 0.5   # seconds between polls (back-to-back after updates arrive)
-_MAX_BACKOFF       = 60    # seconds — cap on retry delay after errors
+_LONG_POLL_TIMEOUT = 30  # seconds — Telegram server holds open until update arrives
+_REQUEST_TIMEOUT = 35  # slightly longer than long-poll timeout
+_POLL_INTERVAL = 0.5  # seconds between polls (back-to-back after updates arrive)
+_MAX_BACKOFF = 60  # seconds — cap on retry delay after errors
 
 _stop_event: threading.Event = threading.Event()
 _bot_thread: threading.Thread | None = None
@@ -99,7 +98,9 @@ def _handle_update(
     if chat_id not in authorized_ids:
         log.warning(
             "Telegram: unauthorized command from chat_id=%s (@%s): %r",
-            chat_id, sender, text,
+            chat_id,
+            sender,
+            text,
         )
         _send_message(token, chat_id, "⛔ Unauthorized. Your chat ID is not in the allowed list.")
         return
@@ -120,11 +121,9 @@ def _handle_update(
 
     elif text.startswith("/"):
         _send_message(
-            token, chat_id,
-            "Commands:\n"
-            "/kill — flatten all positions and halt\n"
-            "/status — report bot state\n"
-            "/resume — clear kill flag",
+            token,
+            chat_id,
+            "Commands:\n/kill — flatten all positions and halt\n/status — report bot state\n/resume — clear kill flag",
         )
 
 
@@ -150,8 +149,12 @@ def _run_loop(
             for update in updates:
                 try:
                     _handle_update(
-                        update, token, authorized_ids,
-                        on_kill, on_status, on_resume,
+                        update,
+                        token,
+                        authorized_ids,
+                        on_kill,
+                        on_status,
+                        on_resume,
                     )
                 except Exception as exc:
                     log.error("Telegram update handler error: %s", exc)

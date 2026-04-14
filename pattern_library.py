@@ -31,15 +31,14 @@ import math
 import re
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 log = logging.getLogger("decifer.pattern_library")
 
-LIBRARY_PATH        = Path("data/pattern_library.json")
-_lock               = threading.Lock()
-_MAX_PATTERN_ENTRIES = 2000   # Hard cap: trim oldest pending-outcome entries first
+LIBRARY_PATH = Path("data/pattern_library.json")
+_lock = threading.Lock()
+_MAX_PATTERN_ENTRIES = 2000  # Hard cap: trim oldest pending-outcome entries first
 
 # ── Fingerprint ───────────────────────────────────────────────────────────────
 # A compact numeric vector derived from a MarketObservation.
@@ -48,18 +47,33 @@ _MAX_PATTERN_ENTRIES = 2000   # Hard cap: trim oldest pending-outcome entries fi
 
 _FINGERPRINT_KEYS = [
     # Equity direction
-    "SPY_1d", "QQQ_1d", "IWM_1d",
+    "SPY_1d",
+    "QQQ_1d",
+    "IWM_1d",
     # Macro instruments
-    "GLD_1d", "USO_1d", "TLT_1d", "HYG_1d",
+    "GLD_1d",
+    "USO_1d",
+    "TLT_1d",
+    "HYG_1d",
     # FX
-    "UUP_1d", "FXY_1d",
+    "UUP_1d",
+    "FXY_1d",
     # VIX
-    "vix_level", "vix_change",
+    "vix_level",
+    "vix_change",
     # Sector rotation (vs SPY)
-    "XLK_rel", "XLF_rel", "XLE_rel", "XLV_rel", "XLI_rel", "XLU_rel", "XLP_rel",
+    "XLK_rel",
+    "XLF_rel",
+    "XLE_rel",
+    "XLV_rel",
+    "XLI_rel",
+    "XLU_rel",
+    "XLP_rel",
     # MA context (binary: 1 = above, 0 = below)
-    "SPY_above_ma20", "SPY_above_ma50",
-    "QQQ_above_ma20", "TLT_above_ma20",
+    "SPY_above_ma20",
+    "SPY_above_ma50",
+    "QQQ_above_ma20",
+    "TLT_above_ma20",
 ]
 
 
@@ -69,8 +83,8 @@ def _build_fingerprint(observation) -> list[float]:
     Missing values default to 0.0 — partial observations are still usable.
     """
     fp: list[float] = []
-    assets      = observation.assets if observation else {}
-    sector_rel  = observation.sector_vs_spy if observation else {}
+    assets = observation.assets if observation else {}
+    sector_rel = observation.sector_vs_spy if observation else {}
 
     for key in _FINGERPRINT_KEYS:
         if key == "vix_level":
@@ -82,9 +96,9 @@ def _build_fingerprint(observation) -> list[float]:
             fp.append(float(sector_rel.get(sym, 0.0)))
         elif key.endswith("_above_ma20") or key.endswith("_above_ma50"):
             parts = key.rsplit("_above_", 1)
-            sym   = parts[0]
+            sym = parts[0]
             field = "above_ma20" if "ma20" in key else "above_ma50"
-            snap  = assets.get(sym)
+            snap = assets.get(sym)
             fp.append(1.0 if (snap and getattr(snap, field, False)) else 0.0)
         else:
             # e.g. "SPY_1d" → assets["SPY"].change_1d
@@ -99,7 +113,7 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     """Cosine similarity between two equal-length vectors."""
     if len(a) != len(b):
         return 0.0
-    dot   = sum(x * y for x, y in zip(a, b))
+    dot = sum(x * y for x, y in zip(a, b, strict=False))
     mag_a = math.sqrt(sum(x * x for x in a))
     mag_b = math.sqrt(sum(x * x for x in b))
     if mag_a == 0 or mag_b == 0:
@@ -108,6 +122,7 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
 
 
 # ── Storage helpers ───────────────────────────────────────────────────────────
+
 
 def _load() -> dict:
     if LIBRARY_PATH.exists():
@@ -126,11 +141,10 @@ def _save(data: dict) -> None:
     # likely to get outcomes the further back they go).
     if len(data) > _MAX_PATTERN_ENTRIES:
         with_outcome = {k: v for k, v in data.items() if v.get("pnl") is not None}
-        pending      = {k: v for k, v in data.items() if v.get("pnl") is None}
-        slots_left   = max(0, _MAX_PATTERN_ENTRIES - len(with_outcome))
+        pending = {k: v for k, v in data.items() if v.get("pnl") is None}
+        slots_left = max(0, _MAX_PATTERN_ENTRIES - len(with_outcome))
         keep_pending = dict(
-            sorted(pending.items(), key=lambda kv: kv[1].get("timestamp", ""), reverse=True)
-            [:slots_left]
+            sorted(pending.items(), key=lambda kv: kv[1].get("timestamp", ""), reverse=True)[:slots_left]
         )
         data = {**with_outcome, **keep_pending}
         log.debug(f"pattern_library: trimmed to {len(data)} entries ({len(with_outcome)} with outcomes)")
@@ -139,15 +153,16 @@ def _save(data: dict) -> None:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+
 def record_entry(
-    observation,            # MarketObservation from market_observer
-    symbol:       str,
-    direction:    str,
-    trade_type:   str,      # SCALP | SWING | HOLD
-    conviction:   float,
-    market_read:  str,      # intelligence layer's free-form interpretation
+    observation,  # MarketObservation from market_observer
+    symbol: str,
+    direction: str,
+    trade_type: str,  # SCALP | SWING | HOLD
+    conviction: float,
+    market_read: str,  # intelligence layer's free-form interpretation
     signal_score: float,
-    setup_type:   str = "", # dominant signal dimension (momentum, breakout, etc.)
+    setup_type: str = "",  # dominant signal dimension (momentum, breakout, etc.)
 ) -> str:
     """
     Record a trade entry against the current market observation.
@@ -156,21 +171,21 @@ def record_entry(
     pattern_id = str(uuid.uuid4())[:8]
 
     entry = {
-        "pattern_id":    pattern_id,
-        "timestamp":     datetime.now(timezone.utc).isoformat(),
-        "symbol":        symbol,
-        "direction":     direction,
-        "trade_type":    trade_type,
-        "conviction":    conviction,
-        "signal_score":  signal_score,
-        "setup_type":    setup_type or "unknown",
-        "market_read":   market_read[:500] if market_read else "",
-        "fingerprint":   _build_fingerprint(observation),
+        "pattern_id": pattern_id,
+        "timestamp": datetime.now(UTC).isoformat(),
+        "symbol": symbol,
+        "direction": direction,
+        "trade_type": trade_type,
+        "conviction": conviction,
+        "signal_score": signal_score,
+        "setup_type": setup_type or "unknown",
+        "market_read": market_read[:500] if market_read else "",
+        "fingerprint": _build_fingerprint(observation),
         # Outcome fields — filled by record_outcome()
-        "pnl":           None,
-        "pnl_pct":       None,
-        "exit_reason":   None,
-        "outcome_at":    None,
+        "pnl": None,
+        "pnl_pct": None,
+        "exit_reason": None,
+        "outcome_at": None,
     }
 
     with _lock:
@@ -184,8 +199,8 @@ def record_entry(
 
 def record_outcome(
     pattern_id: str,
-    pnl:        float,
-    pnl_pct:    float,
+    pnl: float,
+    pnl_pct: float,
     exit_reason: str,
 ) -> None:
     """
@@ -199,12 +214,14 @@ def record_outcome(
             data = _load()
             if pattern_id not in data:
                 return
-            data[pattern_id].update({
-                "pnl":        pnl,
-                "pnl_pct":   pnl_pct,
-                "exit_reason": exit_reason,
-                "outcome_at": datetime.now(timezone.utc).isoformat(),
-            })
+            data[pattern_id].update(
+                {
+                    "pnl": pnl,
+                    "pnl_pct": pnl_pct,
+                    "exit_reason": exit_reason,
+                    "outcome_at": datetime.now(UTC).isoformat(),
+                }
+            )
             _save(data)
         log.debug(f"pattern_library: outcome recorded {pattern_id} pnl={pnl:.2f}")
     except Exception as exc:
@@ -231,10 +248,7 @@ def get_relevant_patterns(
         with _lock:
             data = _load()
 
-        completed = [
-            r for r in data.values()
-            if r.get("pnl") is not None and r.get("fingerprint")
-        ]
+        completed = [r for r in data.values() if r.get("pnl") is not None and r.get("fingerprint")]
 
         if not completed:
             return []
@@ -284,13 +298,15 @@ def get_thesis_performance(min_samples: int = 3) -> list[dict]:
         for (trade_type, thesis_class), b in buckets.items():
             if b["count"] < min_samples:
                 continue
-            result.append({
-                "trade_type":   trade_type,
-                "thesis_class": thesis_class,
-                "count":        b["count"],
-                "win_rate":     round(b["wins"] / b["count"], 2),
-                "avg_pnl_pct":  round(b["pnl_pct_sum"] / b["count"], 2),
-            })
+            result.append(
+                {
+                    "trade_type": trade_type,
+                    "thesis_class": thesis_class,
+                    "count": b["count"],
+                    "win_rate": round(b["wins"] / b["count"], 2),
+                    "avg_pnl_pct": round(b["pnl_pct_sum"] / b["count"], 2),
+                }
+            )
 
         return sorted(result, key=lambda x: x["count"], reverse=True)
 
@@ -331,13 +347,15 @@ def get_setup_performance(min_samples: int = 3) -> list[dict]:
         for (trade_type, setup_type), b in buckets.items():
             if b["count"] < min_samples:
                 continue
-            result.append({
-                "trade_type":  trade_type,
-                "setup_type":  setup_type,
-                "count":       b["count"],
-                "win_rate":    round(b["wins"] / b["count"], 2),
-                "avg_pnl_pct": round(b["pnl_pct_sum"] / b["count"], 2),
-            })
+            result.append(
+                {
+                    "trade_type": trade_type,
+                    "setup_type": setup_type,
+                    "count": b["count"],
+                    "win_rate": round(b["wins"] / b["count"], 2),
+                    "avg_pnl_pct": round(b["pnl_pct_sum"] / b["count"], 2),
+                }
+            )
 
         return sorted(result, key=lambda x: x["count"], reverse=True)
 
@@ -355,9 +373,9 @@ def get_summary_stats() -> dict:
         with _lock:
             data = _load()
 
-        total     = len(data)
+        total = len(data)
         completed = [r for r in data.values() if r.get("pnl") is not None]
-        wins      = [r for r in completed if (r.get("pnl") or 0) > 0]
+        wins = [r for r in completed if (r.get("pnl") or 0) > 0]
 
         by_type: dict[str, dict] = {}
         for r in completed:
@@ -369,10 +387,10 @@ def get_summary_stats() -> dict:
                 by_type[tt]["wins"] += 1
 
         return {
-            "total":     total,
+            "total": total,
             "completed": len(completed),
-            "win_rate":  round(len(wins) / len(completed), 3) if completed else None,
-            "by_type":   by_type,
+            "win_rate": round(len(wins) / len(completed), 3) if completed else None,
+            "by_type": by_type,
         }
     except Exception as exc:
         log.warning(f"pattern_library: get_summary_stats failed: {exc}")

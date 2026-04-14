@@ -154,12 +154,21 @@ TWAP/VWAP/Iceberg only for orders above $10K notional or 500 shares. Smaller ord
 - Pre-existing errors in touched files must be fixed in the same session, not silently worked around.
 
 ### Data Contracts (paths are sacred — do not change)
+Chief has **one** state directory — `chief-decifer/state/`. No fallback. No split-brain.
+The session-start hook reads from this path; Chief's panels read from this path; Cowork writes here.
+
 | Data Type | Path | Written by | Read by |
 |-----------|------|-----------|---------|
-| Session logs | `chief-decifer/state/sessions/` | Cowork | Chief Decifer |
-| Research | `chief-decifer/state/research/` | Cowork | Chief Decifer |
-| Feature specs | `chief-decifer/state/specs/` | Cowork | Chief Decifer |
-| Backlog | `chief-decifer/state/backlog.json` | Cowork | Chief Decifer |
+| Session logs | `chief-decifer/state/sessions/` | Cowork | Chief Decifer, session-start hook |
+| Research | `chief-decifer/state/research/` | Cowork, `researcher.py` | Chief Decifer, session-start hook |
+| Feature specs | `chief-decifer/state/specs/` | Cowork | Chief Decifer, session-start hook |
+| Backlog | `chief-decifer/state/backlog.json` | Cowork | Chief Decifer, session-start hook |
+| Vision | `chief-decifer/state/vision.json` | Amit | Chief Decifer, Cowork |
+| Archived | `chief-decifer/state/archive/` | Cowork (on supersession) | humans only |
+| Chief-internal | `chief-decifer/state/internal/` | Chief's own jobs | Chief Decifer only |
+
+**Rule:** `research-*.json` belongs in `research/`, never in `specs/`. Specs describe
+feature intent or completed work; research files are knowledge-base entries.
 
 ### Commit Format
 ```

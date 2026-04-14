@@ -408,6 +408,7 @@ canvas{display:block;width:100% !important}
   <div class="tab" onclick="switchTab('news',this)">📰 News</div>
   <div class="tab" onclick="switchTab('portfolio',this)">🏦 Portfolio</div>
   <div class="tab" onclick="switchTab('alpha',this)">📉 Alpha Decay</div>
+  <div class="tab" onclick="switchTab('analytics',this)">📊 Analytics</div>
   <div class="tab" onclick="switchTab('settings',this)">⚙️ Settings</div>
 </div>
 
@@ -958,6 +959,98 @@ canvas{display:block;width:100% !important}
   <div style="font-size:10px;color:var(--muted);padding:4px 2px">
     ⚠ Forward returns fetched via yfinance. Chart uses cohort trades (those with data at every horizon) so all horizons reflect the same set of trades. Recent trades excluded until T+10 data is available.
     Signal half-life analysis requires ≥20 agent-scored trades for statistical significance.
+  </div>
+
+</div>
+
+<!-- VIEW: ANALYTICS (quantstats) -->
+<div class="view" id="view-analytics" style="flex-direction:column;padding:16px;gap:14px">
+
+  <!-- LLM Interpretation Panel -->
+  <div class="card" id="an-explain-card" style="border-left:3px solid var(--orange)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="card-title" style="margin:0">Plain-English Read <span style="font-size:9px;color:var(--muted2);letter-spacing:1px;margin-left:6px">CLAUDE SONNET</span></div>
+      <button id="an-explain-refresh" onclick="loadAnalyticsExplain(true)"
+              style="background:transparent;border:1px solid var(--muted);color:var(--muted2);font-size:10px;padding:3px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace">
+        ↻ REGENERATE
+      </button>
+    </div>
+    <div id="an-explain-body" style="font-size:12px;color:var(--muted2)">Loading interpretation…</div>
+  </div>
+
+  <!-- Metric cards row 1: Core ratios -->
+  <div class="metric-grid">
+    <div class="metric"><div class="metric-label">Sharpe Ratio</div><div class="metric-val" id="an-sharpe">—</div></div>
+    <div class="metric"><div class="metric-label">Sortino Ratio</div><div class="metric-val" id="an-sortino">—</div></div>
+    <div class="metric"><div class="metric-label">Max Drawdown</div><div class="metric-val cr" id="an-maxdd">—</div></div>
+    <div class="metric"><div class="metric-label">Calmar Ratio</div><div class="metric-val" id="an-calmar">—</div></div>
+    <div class="metric"><div class="metric-label">Volatility (ann.)</div><div class="metric-val" id="an-vol">—</div></div>
+    <div class="metric"><div class="metric-label">VaR (95%)</div><div class="metric-val cr" id="an-var">—</div></div>
+    <div class="metric"><div class="metric-label">Win Streak</div><div class="metric-val cg" id="an-wstreak">—</div></div>
+    <div class="metric"><div class="metric-label">Loss Streak</div><div class="metric-val cr" id="an-lstreak">—</div></div>
+  </div>
+
+  <!-- Cumulative Returns Chart -->
+  <div class="card">
+    <div class="card-title">Cumulative Returns (%)</div>
+    <div style="position:relative;height:180px"><canvas id="an-cum-chart"></canvas></div>
+  </div>
+
+  <!-- Drawdown Chart -->
+  <div class="card">
+    <div class="card-title">Drawdown (%)</div>
+    <div style="position:relative;height:150px"><canvas id="an-dd-chart"></canvas></div>
+  </div>
+
+  <!-- Monthly Returns Heatmap -->
+  <div class="card">
+    <div class="card-title">Monthly Returns (%)</div>
+    <div id="an-monthly" style="overflow-x:auto"></div>
+  </div>
+
+  <!-- Direction + Regime + Instrument breakdowns -->
+  <div style="display:flex;gap:14px;flex-wrap:wrap">
+
+    <!-- By Direction -->
+    <div class="card" style="flex:1;min-width:240px">
+      <div class="card-title">By Direction</div>
+      <div id="an-direction" style="font-size:11px"></div>
+    </div>
+
+    <!-- By Regime -->
+    <div class="card" style="flex:1;min-width:240px">
+      <div class="card-title">By Regime</div>
+      <div id="an-regime" style="font-size:11px"></div>
+    </div>
+
+    <!-- By Instrument -->
+    <div class="card" style="flex:1;min-width:240px">
+      <div class="card-title">By Instrument</div>
+      <div id="an-instrument" style="font-size:11px"></div>
+    </div>
+
+  </div>
+
+  <!-- Top Symbols -->
+  <div style="display:flex;gap:14px;flex-wrap:wrap">
+    <div class="card" style="flex:1;min-width:240px">
+      <div class="card-title">Top Winners (by symbol)</div>
+      <div id="an-winners" style="font-size:11px"></div>
+    </div>
+    <div class="card" style="flex:1;min-width:240px">
+      <div class="card-title">Top Losers (by symbol)</div>
+      <div id="an-losers" style="font-size:11px"></div>
+    </div>
+  </div>
+
+  <!-- Hold Time -->
+  <div class="card" style="max-width:400px">
+    <div class="card-title">Hold Time</div>
+    <div id="an-hold" style="font-size:11px"></div>
+  </div>
+
+  <div style="font-size:9px;color:var(--muted2);text-align:center;padding:8px 0">
+    Powered by quantstats · Cached 5 min · 137+ closed trades required for statistical significance
   </div>
 
 </div>
@@ -1517,6 +1610,261 @@ function renderAlphaDecay(d) {
     '<div style="padding:8px 0;color:var(--muted2)">No data with usable forward returns yet.</div>';
 }
 
+// ── Analytics (quantstats) ────────────────────────────────
+let _anCumChart = null, _anDdChart = null;
+
+async function loadAnalytics() {
+  try {
+    const resp = await fetch('/api/analytics');
+    const d = await resp.json();
+    if (d.error && !d.trade_count) {
+      document.getElementById('view-analytics').innerHTML =
+        '<div class="empty" style="padding:40px">' + d.error + '</div>';
+      return;
+    }
+    renderAnalytics(d);
+    // Load LLM interpretation after the metrics render (non-blocking)
+    loadAnalyticsExplain(false);
+  } catch (e) {
+    console.error('analytics load error', e);
+  }
+}
+
+async function loadAnalyticsExplain(forceRegen) {
+  const body = document.getElementById('an-explain-body');
+  const btn  = document.getElementById('an-explain-refresh');
+  if (!body) return;
+  body.innerHTML = '<span style="color:var(--muted2)">Reading the numbers…</span>';
+  if (btn) { btn.disabled = true; btn.textContent = '↻ WORKING…'; }
+  try {
+    // force=true bypasses the server-side cache; otherwise cache is keyed by trade_count
+    const url = '/api/analytics/explain' + (forceRegen ? '?force=true&t=' + Date.now() : '');
+    const resp = await fetch(url);
+    const d = await resp.json();
+    renderAnalyticsExplain(d);
+  } catch (e) {
+    body.innerHTML = '<span style="color:var(--red)">Could not load interpretation.</span>';
+    console.error('analytics explain error', e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ REGENERATE'; }
+  }
+}
+
+function renderAnalyticsExplain(d) {
+  const body = document.getElementById('an-explain-body');
+  if (!body) return;
+  if (d.error) {
+    body.innerHTML = '<span style="color:var(--red)">' + d.error + '</span>';
+    return;
+  }
+  const wins     = Array.isArray(d.wins)     ? d.wins     : [];
+  const concerns = Array.isArray(d.concerns) ? d.concerns : [];
+  const bottom   = d.bottom_line || '';
+
+  const bullet = (txt, color) =>
+    '<div style="display:flex;gap:8px;margin:5px 0;line-height:1.45">' +
+      '<span style="color:' + color + ';flex-shrink:0">▸</span>' +
+      '<span style="color:var(--text)">' + txt + '</span>' +
+    '</div>';
+
+  let html = '<div style="display:flex;gap:18px;flex-wrap:wrap">';
+
+  // Wins column
+  html += '<div style="flex:1;min-width:260px">';
+  html += '<div style="font-size:10px;letter-spacing:1.5px;color:var(--green);margin-bottom:6px;font-weight:600">✓ WHAT\'S WORKING</div>';
+  html += wins.length ? wins.map(w => bullet(w, 'var(--green)')).join('')
+                      : '<div style="color:var(--muted2);font-size:11px">—</div>';
+  html += '</div>';
+
+  // Concerns column
+  html += '<div style="flex:1;min-width:260px">';
+  html += '<div style="font-size:10px;letter-spacing:1.5px;color:var(--red);margin-bottom:6px;font-weight:600">⚠ WHAT NEEDS WORK</div>';
+  html += concerns.length ? concerns.map(c => bullet(c, 'var(--red)')).join('')
+                          : '<div style="color:var(--muted2);font-size:11px">—</div>';
+  html += '</div>';
+
+  html += '</div>';
+
+  // Bottom line
+  if (bottom) {
+    html += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--muted);' +
+            'font-size:12px;color:var(--text);font-style:italic">' +
+            '<span style="color:var(--orange);font-style:normal;font-weight:600;font-size:10px;letter-spacing:1.5px;margin-right:8px">BOTTOM LINE</span>' +
+            bottom + '</div>';
+  }
+
+  body.innerHTML = html;
+}
+
+function renderAnalytics(d) {
+  const m = d.metrics || {};
+
+  // Metric cards
+  const fmt = (v, suffix) => v != null ? v + (suffix || '') : '—';
+  document.getElementById('an-sharpe').textContent  = fmt(m.sharpe);
+  document.getElementById('an-sortino').textContent = fmt(m.sortino);
+  document.getElementById('an-maxdd').textContent   = fmt(m.max_drawdown, '%');
+  document.getElementById('an-calmar').textContent  = fmt(m.calmar);
+  document.getElementById('an-vol').textContent     = fmt(m.volatility, '%');
+  document.getElementById('an-var').textContent     = fmt(m.var_95, '%');
+  document.getElementById('an-wstreak').textContent = d.win_streak || '0';
+  document.getElementById('an-lstreak').textContent = d.loss_streak || '0';
+
+  // Color Sharpe/Sortino
+  const shEl = document.getElementById('an-sharpe');
+  const soEl = document.getElementById('an-sortino');
+  shEl.className = 'metric-val ' + (m.sharpe > 0 ? 'cg' : m.sharpe < 0 ? 'cr' : '');
+  soEl.className = 'metric-val ' + (m.sortino > 0 ? 'cg' : m.sortino < 0 ? 'cr' : '');
+
+  // Cumulative returns chart
+  const cumData = d.cumulative_curve || [];
+  if (cumData.length >= 2) {
+    const ctx = document.getElementById('an-cum-chart').getContext('2d');
+    if (_anCumChart) _anCumChart.destroy();
+    const vals = cumData.map(p => p.cumulative);
+    const lineColor = vals[vals.length-1] >= 0 ? '#00c853' : '#ff1744';
+    _anCumChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: cumData.map(p => p.date),
+        datasets: [{
+          data: vals,
+          borderColor: lineColor,
+          backgroundColor: lineColor + '18',
+          fill: true,
+          pointRadius: 0,
+          borderWidth: 1.5,
+          tension: 0.3,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y.toFixed(2) + '%' } } },
+        scales: {
+          x: { display: true, ticks: { maxTicksToShow: 6, font: { size: 9 }, color: '#666' }, grid: { display: false } },
+          y: { ticks: { font: { size: 9 }, color: '#666', callback: v => v + '%' }, grid: { color: '#222' } }
+        }
+      }
+    });
+  }
+
+  // Drawdown chart
+  const ddData = d.drawdown_curve || [];
+  if (ddData.length >= 2) {
+    const ctx2 = document.getElementById('an-dd-chart').getContext('2d');
+    if (_anDdChart) _anDdChart.destroy();
+    _anDdChart = new Chart(ctx2, {
+      type: 'line',
+      data: {
+        labels: ddData.map(p => p.date),
+        datasets: [{
+          data: ddData.map(p => p.drawdown),
+          borderColor: '#ff1744',
+          backgroundColor: '#ff174418',
+          fill: true,
+          pointRadius: 0,
+          borderWidth: 1.5,
+          tension: 0.3,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y.toFixed(2) + '%' } } },
+        scales: {
+          x: { display: true, ticks: { maxTicksToShow: 6, font: { size: 9 }, color: '#666' }, grid: { display: false } },
+          y: { ticks: { font: { size: 9 }, color: '#666', callback: v => v + '%' }, grid: { color: '#222' } }
+        }
+      }
+    });
+  }
+
+  // Monthly returns heatmap
+  const months = d.monthly_returns || [];
+  if (months.length > 0) {
+    const mNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    let html = '<table style="border-collapse:collapse;width:100%;font-size:10px">';
+    html += '<tr><th style="padding:4px 6px;color:var(--muted)">Year</th>';
+    for (let i = 1; i <= 12; i++) html += '<th style="padding:4px 6px;color:var(--muted)">' + mNames[i] + '</th>';
+    html += '<th style="padding:4px 6px;color:var(--muted)">Total</th></tr>';
+    const years = [...new Set(months.map(m => m.year))].sort();
+    for (const yr of years) {
+      html += '<tr><td style="padding:4px 6px;font-weight:600">' + yr + '</td>';
+      let yrTotal = 0;
+      for (let mo = 1; mo <= 12; mo++) {
+        const entry = months.find(m => m.year === yr && m.month === mo);
+        if (entry) {
+          yrTotal += entry.return;
+          const bg = entry.return >= 0
+            ? 'rgba(0,200,83,' + Math.min(Math.abs(entry.return)/20, 0.7) + ')'
+            : 'rgba(255,23,68,' + Math.min(Math.abs(entry.return)/20, 0.7) + ')';
+          html += '<td style="padding:4px 6px;text-align:center;background:' + bg + ';border-radius:3px">' +
+                  (entry.return >= 0 ? '+' : '') + entry.return.toFixed(1) + '%</td>';
+        } else {
+          html += '<td style="padding:4px 6px;text-align:center;color:var(--muted2)">—</td>';
+        }
+      }
+      const totBg = yrTotal >= 0
+        ? 'rgba(0,200,83,' + Math.min(Math.abs(yrTotal)/30, 0.7) + ')'
+        : 'rgba(255,23,68,' + Math.min(Math.abs(yrTotal)/30, 0.7) + ')';
+      html += '<td style="padding:4px 6px;text-align:center;font-weight:600;background:' + totBg + ';border-radius:3px">' +
+              (yrTotal >= 0 ? '+' : '') + yrTotal.toFixed(1) + '%</td></tr>';
+    }
+    html += '</table>';
+    document.getElementById('an-monthly').innerHTML = html;
+  }
+
+  // Breakdown tables helper
+  function breakdownTable(data, el) {
+    if (!data || !Object.keys(data).length) { el.innerHTML = '<span style="color:var(--muted2)">No data</span>'; return; }
+    let html = '<table style="width:100%;border-collapse:collapse">';
+    html += '<tr style="color:var(--muted);font-size:9px"><th style="text-align:left;padding:3px 4px">Segment</th>' +
+            '<th style="text-align:right;padding:3px 4px">Trades</th><th style="text-align:right;padding:3px 4px">Win%</th>' +
+            '<th style="text-align:right;padding:3px 4px">P&L</th><th style="text-align:right;padding:3px 4px">Avg</th></tr>';
+    for (const [k, v] of Object.entries(data)) {
+      const pnlColor = v.total_pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      html += '<tr style="border-top:1px solid #1a1a1a">' +
+              '<td style="padding:3px 4px;font-weight:500">' + k + '</td>' +
+              '<td style="padding:3px 4px;text-align:right">' + v.count + '</td>' +
+              '<td style="padding:3px 4px;text-align:right">' + v.win_rate + '%</td>' +
+              '<td style="padding:3px 4px;text-align:right;color:' + pnlColor + '">$' + v.total_pnl.toLocaleString() + '</td>' +
+              '<td style="padding:3px 4px;text-align:right;color:' + pnlColor + '">$' + (v.avg_pnl || 0).toLocaleString() + '</td></tr>';
+    }
+    html += '</table>';
+    el.innerHTML = html;
+  }
+
+  breakdownTable(d.by_direction, document.getElementById('an-direction'));
+  breakdownTable(d.by_regime, document.getElementById('an-regime'));
+  // Instrument doesn't have avg_pnl, adapt
+  const instData = {};
+  for (const [k, v] of Object.entries(d.by_instrument || {})) {
+    instData[k] = { count: v.count, win_rate: v.win_rate, total_pnl: v.total_pnl, avg_pnl: Math.round(v.total_pnl / (v.count || 1)) };
+  }
+  breakdownTable(instData, document.getElementById('an-instrument'));
+
+  // Top symbols
+  function symList(arr, el) {
+    if (!arr || !arr.length) { el.innerHTML = '<span style="color:var(--muted2)">No data</span>'; return; }
+    el.innerHTML = arr.map(s => {
+      const c = s.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      return '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1a1a1a">' +
+             '<span style="font-weight:500">' + s.symbol + ' <span style="color:var(--muted2);font-weight:400">(' + s.trades + ')</span></span>' +
+             '<span style="color:' + c + '">$' + s.pnl.toLocaleString() + '</span></div>';
+    }).join('');
+  }
+  symList((d.top_symbols || {}).best, document.getElementById('an-winners'));
+  symList((d.top_symbols || {}).worst, document.getElementById('an-losers'));
+
+  // Hold time
+  const h = d.hold_time || {};
+  document.getElementById('an-hold').innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">' +
+    '<div>Avg: <b>' + (h.avg_minutes || 0) + ' min</b></div>' +
+    '<div>Median: <b>' + (h.median_minutes || 0) + ' min</b></div>' +
+    '<div>Shortest: <b>' + (h.min_minutes || 0) + ' min</b></div>' +
+    '<div>Longest: <b>' + (h.max_minutes || 0) + ' min</b></div></div>';
+}
+
 // ── Tab switching ──────────────────────────────────────────
 function switchTab(id, el) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -1551,6 +1899,13 @@ function switchTab(id, el) {
         renderDailyChart(buildDailyPnL(allEquityData, dailyTF));
       }
     }, 50);
+  }
+
+  // Analytics: destroy charts and reload
+  if (id === 'analytics') {
+    if (_anCumChart) { _anCumChart.destroy(); _anCumChart = null; }
+    if (_anDdChart)  { _anDdChart.destroy();  _anDdChart  = null; }
+    setTimeout(loadAnalytics, 50);
   }
 }
 

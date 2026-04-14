@@ -17,7 +17,6 @@ import logging
 import os
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Optional
 
 import pytz
 
@@ -43,7 +42,7 @@ def _count_day_trades_remaining_local() -> int:
         return max_dt  # Can't read — don't block on uncertainty
 
     cutoff = datetime.now(EST) - timedelta(days=7)
-    opens_by_date: defaultdict  = defaultdict(set)
+    opens_by_date: defaultdict = defaultdict(set)
     closes_by_date: defaultdict = defaultdict(set)
 
     for o in orders:
@@ -59,22 +58,19 @@ def _count_day_trades_remaining_local() -> int:
         if ts < cutoff:
             continue
         date_key = ts.date()
-        symbol   = o.get("symbol", "")
+        symbol = o.get("symbol", "")
         if o.get("role") == "open":
             opens_by_date[date_key].add(symbol)
         elif o.get("role") == "close":
             closes_by_date[date_key].add(symbol)
 
     # A day trade occurred on any date where the same symbol was both opened and closed
-    day_trade_dates = sorted(
-        d for d in opens_by_date
-        if opens_by_date[d] & closes_by_date[d]
-    )
+    day_trade_dates = sorted(d for d in opens_by_date if opens_by_date[d] & closes_by_date[d])
     used = len(day_trade_dates[-5:]) if day_trade_dates else 0
     return max(0, max_dt - used)
 
 
-def _get_day_trades_remaining(ib, account: str) -> Optional[int]:
+def _get_day_trades_remaining(ib, account: str) -> int | None:
     """
     Return how many day trades remain in the rolling 5-day window.
     Primary: IBKR's DayTradesRemaining account value tag.

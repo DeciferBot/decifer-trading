@@ -27,7 +27,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 # ── Public exception ──────────────────────────────────────────────
 
 
@@ -52,6 +51,7 @@ PHASE_DESCRIPTIONS: dict[int, str] = {
 
 def _load_config() -> dict[str, Any]:
     from config import CONFIG  # local import avoids circular at module level
+
     return CONFIG
 
 
@@ -329,28 +329,26 @@ def validate(config: dict[str, Any] | None = None) -> list[str]:
         elif not ic_result.get("ready_for_live", False):
             gate_failures = ic_result.get("failures", [])
             summary = " | ".join(gate_failures) if gate_failures else "see data/ic_validation_result.json"
-            violations.append(
-                f"FROZEN [ic_walkforward_validation, Phase 4]: "
-                f"IC validation gate not passed — {summary}"
-            )
+            violations.append(f"FROZEN [ic_walkforward_validation, Phase 4]: IC validation gate not passed — {summary}")
 
     # Check any other explicitly frozen features via feature flags in config
     # (future-proof: if a key matching a frozen feature name appears in config
     #  and is truthy, warn)
     _handled = {
-        "live_account_trading", "multi_account_aggregation",
-        "telegram_kill_switch", "ic_walkforward_validation",
+        "live_account_trading",
+        "multi_account_aggregation",
+        "telegram_kill_switch",
+        "ic_walkforward_validation",
     }
     for feature, required_phase in frozen.items():
         if feature in _handled:
             continue  # Already checked above with richer context
         flag_value = config.get(feature)
-        if flag_value:
-            if current_phase < required_phase:
-                violations.append(
-                    f"FROZEN [{feature}, Phase {required_phase}]: "
-                    f"config['{feature}']={flag_value!r} is enabled but current_phase={current_phase}."
-                )
+        if flag_value and current_phase < required_phase:
+            violations.append(
+                f"FROZEN [{feature}, Phase {required_phase}]: "
+                f"config['{feature}']={flag_value!r} is enabled but current_phase={current_phase}."
+            )
 
     return violations
 

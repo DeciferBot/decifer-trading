@@ -370,7 +370,7 @@ def _on_ibkr_fill(trade, fill) -> None:
     No ib calls here — event callbacks must not block the ib event loop.
     """
     try:
-        from orders import _trades_lock, open_trades
+        from orders_state import _trades_lock, open_trades
 
         oid = getattr(fill.execution, "orderId", None)
         if oid is None:
@@ -519,7 +519,7 @@ def _on_commission_report(trade, fill, report) -> None:
 
 
 def connect_ibkr() -> bool:
-    from orders import reconcile_with_ibkr
+    from orders_portfolio import reconcile_with_ibkr
 
     ib = bot_state.ib
     try:
@@ -587,7 +587,7 @@ def backfill_trades_from_ibkr():
     Partial fills for the same order are consolidated using weighted-average price.
     """
     from learning import TRADE_LOG_FILE, load_trades
-    from orders import _is_option_contract
+    from orders_contracts import _is_option_contract
 
     ib = bot_state.ib
     try:
@@ -1149,7 +1149,7 @@ def sync_orders_from_ibkr():
             )
 
             if mapped_status == "FILLED" and fill_price > 0 and order.action == "BUY" and instrument == "stock":
-                from orders import _safe_update_trade
+                from orders_state import _safe_update_trade
 
                 sym = contract.symbol
                 total_qty = int(order.totalQuantity)
@@ -1204,7 +1204,7 @@ def cancel_orphan_stop_orders():
     active position. Runs once at startup after sync_orders_from_ibkr().
     Protects against stale exit orders left over from a crashed session.
     """
-    from orders import get_open_positions
+    from orders_portfolio import get_open_positions
 
     ib = bot_state.ib
     try:
@@ -1290,7 +1290,7 @@ def _on_order_status_event(trade):
         )
 
         if mapped_status == "FILLED" and fill_price > 0 and order.action == "BUY" and instrument == "stock":
-            from orders import _safe_update_trade
+            from orders_state import _safe_update_trade
 
             sym = contract.symbol
             total_qty = int(order.totalQuantity)

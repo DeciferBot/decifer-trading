@@ -18,14 +18,13 @@ functions read/write risk.py globals that tests access via risk.* attributes.
 from __future__ import annotations
 
 import logging
-from typing import Optional, Tuple
 
 from config import CONFIG
 
 log = logging.getLogger("decifer.risk")
 
 
-def calculate_stops(price: float, atr: float, direction: str) -> Tuple[float, float]:
+def calculate_stops(price: float, atr: float, direction: str) -> tuple[float, float]:
     """
     Calculate stop loss and first take profit using ATR.
     Returns (stop_loss, take_profit_1).
@@ -52,8 +51,7 @@ def calculate_stops(price: float, atr: float, direction: str) -> Tuple[float, fl
     return sl, tp
 
 
-def position_size(account_value: float, entry_price: float,
-                  stop_price: float, config: dict = None) -> int:
+def position_size(account_value: float, entry_price: float, stop_price: float, config: dict | None = None) -> int:
     """
     Fixed-risk position sizer.
 
@@ -84,6 +82,7 @@ def position_size(account_value: float, entry_price: float,
     # Macro-event gate: halve size within 24h of FOMC / CPI / NFP
     try:
         from macro_calendar import get_macro_size_multiplier
+
         macro_mult = get_macro_size_multiplier()
         if macro_mult < 1.0:
             shares = int(shares * macro_mult)
@@ -106,6 +105,7 @@ def get_short_size_multiplier() -> float:
     """
     try:
         from ic_calculator import get_short_quality_score
+
         short_quality = get_short_quality_score()
         if short_quality < 0.03:
             log.info(f"[sizing] Short IC unproven (quality={short_quality:.3f}) → 0.60x size mult")

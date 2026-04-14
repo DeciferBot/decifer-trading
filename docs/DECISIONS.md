@@ -236,3 +236,27 @@ These decisions are inferred from the current codebase. Future entries will be l
 **Decision**: `using_equal_weights` in `ic_calculator.py` uses `abs(w - 1/N) < 1e-9` tolerance check plus an explicit `CONFIG.get("force_equal_weights")` flag, not `weights == {d: round(1/N, 10)}`.
 
 **Reasoning**: `1/12 = 0.08333…3` (16 sig figs) and `round(1/12, 10) = 0.0833333333` (10 sig figs) are not equal under Python `==`, so the old check always returned False. The dashboard incorrectly showed IC weights as "active" even when `force_equal_weights=True`. This is a cosmetic bug but misleading for learning system diagnostics.
+
+---
+
+## 2026-04-14
+
+### Chief Decifer Has One Sacred State Path — No Fallback, No Split-Brain
+**Decision**: `chief-decifer/state/` is the single authoritative directory for all Cowork↔Chief data contracts. Chief's `config.py` no longer falls back to a local `state/` inside `Chief-Decifer-recovered/`. The session-start hook no longer reads from a configurable `CHIEF_STATE_PATH` env var pointing elsewhere. One path, one source of truth.
+
+**Context**: The brain was wired wrong in three places at once:
+1. `.claude/settings.json` set `CHIEF_STATE_PATH` to `/Users/amitchopra/Documents/Claude/Projects/Chief Designer/Chief-Decifer/state` — a directory that did not exist. The session-start hook silently `safeRead`-nulled everything. **249 sessions started with zero memory injection from Chief.** Cowork's apparent continuity came entirely from CLAUDE.md — not from session logs, specs, research, or the backlog.
+2. `Chief-Decifer-recovered/config.py` split reads between a local `state/` and the project's `chief-decifer/state/`, so `RESEARCH_DIR` pointed at recovered/state/research/ while `SESSIONS_DIR` pointed at chief-decifer/state/sessions/. Research files Cowork wrote never showed up in Chief's Research panel.
+3. The session-start hook's fallback default resolved to `../chief-decifer/state` relative to the repo root — i.e. *outside* the repo at `/Users/amitchopra/Desktop/chief-decifer/state`.
+
+**Implementation**:
+- Removed `env.CHIEF_STATE_PATH` from `.claude/settings.json`.
+- Hook default at `.claude/hooks/session-start-hook.mjs:26` now resolves to `REPO_ROOT/chief-decifer/state`.
+- `Chief-Decifer-recovered/config.py` collapsed to a single `STATE_DIR = DECIFER_REPO_PATH / "chief-decifer" / "state"`. Chief-only compute artifacts (catalyst, analysis, activity.jsonl, docs) moved under `state/internal/`.
+- Research files misfiled as specs (72 `research-*.json` files inside `chief-decifer/state/specs/`) moved to `chief-decifer/state/research/`.
+- Stale recovered backlog (`feat-019..026`, multi-account focus) archived to `chief-decifer/state/archive/backlog-recovered-2026-03-31.json`. The Phase A–E `BACK-*` backlog is canonical.
+- Older sessions (pre-2026-04-02) from recovered merged into sacred `sessions/`. 19 historical feat-specs + 14 dated research files copied from recovered to sacred.
+
+**Why one path**: A memory substrate with two locations is not memory — it is ambiguity. If the hook reads one place and Cowork writes another, the brain drifts and is silently stale. Chief's whole purpose is to be the single source of truth about bot state, past work, and intent. Two paths = two truths = no truth.
+
+**Rule**: `research-*.json` belongs in `research/`, never in `specs/`. Specs describe feature intent or completed work; research files are knowledge-base entries from `researcher.py` or Cowork investigations. Mixing them collapses the contract.

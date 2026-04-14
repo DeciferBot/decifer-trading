@@ -1,84 +1,84 @@
 {
-  "n_live_trades": 10,
+  "n_live_trades": 14,
   "ready": false,
-  "progress_pct": 20.0,
+  "progress_pct": 28.0,
   "agreement_r": null,
   "agreement_label": "PENDING",
   "dim_comparison": {
     "trend": {
-      "live": 0.215,
-      "hist": -0.0092,
+      "live": 0.085,
+      "hist": -0.0142,
       "agree": false
     },
     "momentum": {
-      "live": -0.2845,
-      "hist": 0.0189,
+      "live": -0.4119,
+      "hist": 0.0076,
       "agree": false
     },
     "squeeze": {
-      "live": 0.4318,
-      "hist": -0.0038,
+      "live": 0.4079,
+      "hist": -0.0031,
       "agree": false
     },
     "flow": {
-      "live": -0.2613,
-      "hist": 0.0377,
+      "live": -0.4451,
+      "hist": 0.0255,
       "agree": false
     },
     "breakout": {
       "live": 0.0,
-      "hist": 0.0272,
+      "hist": 0.0273,
       "agree": true
     },
     "mtf": {
-      "live": -0.4062,
-      "hist": 0.0386,
+      "live": -0.209,
+      "hist": 0.0362,
       "agree": false
     },
     "news": {
-      "live": -0.2635,
-      "hist": -0.0013,
-      "agree": true
+      "live": -0.2864,
+      "hist": 0.0527,
+      "agree": false
     },
     "social": {
-      "live": 0.0,
+      "live": 0.1519,
       "hist": 0.0,
       "agree": true
     },
     "reversion": {
-      "live": 0.1741,
-      "hist": -0.0227,
+      "live": 0.0344,
+      "hist": -0.0243,
       "agree": false
     }
   },
   "recommend_disable": false,
   "live_ic": {
-    "trend": 0.2149980144655904,
-    "momentum": -0.2844636008875038,
-    "squeeze": 0.4318209636051491,
-    "flow": -0.2613098319673951,
+    "trend": 0.08502540152475499,
+    "momentum": -0.41192986951307714,
+    "squeeze": 0.4078666469381175,
+    "flow": -0.445061518552492,
     "breakout": 0.0,
-    "mtf": -0.40618119722996154,
-    "news": -0.263545953215885,
-    "social": 0.0,
-    "reversion": 0.1740776559556978,
-    "iv_skew": 0.0,
+    "mtf": -0.2090366085074662,
+    "news": -0.2863962840844738,
+    "social": 0.15191090506254998,
+    "reversion": 0.034401045807689073,
+    "iv_skew": 0.15191090506254998,
     "pead": 0.0,
-    "short_squeeze": 0.0
+    "short_squeeze": 0.15191090506254998
   },
   "hist_ic": {
-    "trend": -0.009152134024271433,
-    "momentum": 0.018850888331586775,
-    "squeeze": -0.003796686736262059,
-    "flow": 0.037719386616174626,
-    "breakout": 0.027157079415339933,
-    "mtf": 0.038577180507195434,
-    "news": -0.001257104434170963,
+    "trend": -0.014245244444052847,
+    "momentum": 0.007637611760092871,
+    "squeeze": -0.003100963618571779,
+    "flow": 0.02547973371340553,
+    "breakout": 0.027290169298504228,
+    "mtf": 0.03623843209570421,
+    "news": 0.05266466159257957,
     "social": 0.0,
-    "reversion": -0.0226768908667427,
-    "iv_skew": 0.0,
+    "reversion": -0.024279281140722322,
+    "iv_skew": 0.008450070828812417,
     "pead": 0.0,
-    "short_squeeze": 0.0
+    "short_squeeze": 0.04241902828028202
   },
-  "timestamp": "2026-04-12T17:22:00.486631+00:00"
+  "timestamp": "2026-04-14T15:31:20.369198+00:00"
 }

@@ -12,7 +12,7 @@
  * Adapted from Ruflo context-persistence-hook.mjs patterns.
  */
 
-import { readFileSync, existsSync, readdirSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { join, resolve, dirname } from 'path';
 import { createHash } from 'crypto';
 import { fileURLToPath } from 'url';
@@ -23,7 +23,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Paths relative to the decifer-trading repo root
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const CHIEF_STATE = process.env.CHIEF_STATE_PATH
-  || resolve(REPO_ROOT, '..', 'chief-decifer', 'state');
+  || resolve(REPO_ROOT, 'chief-decifer', 'state');
 
 const PATHS = {
   sessions:      join(CHIEF_STATE, 'sessions'),
@@ -91,9 +91,6 @@ function buildPendingUpdateSection() {
 // ─── Check CLAUDE.md freshness vs recent git activity ─────────────────────────
 function buildFreshnessWarning() {
   try {
-    const { statSync, readdirSync: rd } = await import('fs').catch(() => ({ statSync: null }));
-    if (!statSync) return '';
-
     // Get CLAUDE.md last modified time
     const claudeStat = statSync(PATHS.claudeMd);
     const claudeAge = Date.now() - claudeStat.mtimeMs;
