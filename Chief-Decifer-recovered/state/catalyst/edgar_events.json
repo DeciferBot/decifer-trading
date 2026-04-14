@@ -1,6 +1,438 @@
 [
   {
     "form_type": "4",
+    "company_name": "485BPOS - SEPARATE ACCOUNT A OF PACIFIC LIFE INSURANCE CO",
+    "cik": null,
+    "ticker": null,
+    "title": "485BPOS - SEPARATE ACCOUNT A OF PACIFIC LIFE INSURANCE CO (0000935823) (Filer)",
+    "updated": "2026-04-14T14:24:15-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/935823/000110465926043107/0001104659-26-043107-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001104659-26-043107 <b>Size:</b> 6 MB\n",
+    "fetched_at": "2026-04-14T18:24:50.581176+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "497 - Gallery Trust",
+    "cik": null,
+    "ticker": null,
+    "title": "497 - Gallery Trust (0001651872) (Filer)",
+    "updated": "2026-04-14T14:23:05-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/1651872/000139834426006527/0001398344-26-006527-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001398344-26-006527 <b>Size:</b> 17 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.581203+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - JPMORGAN CHASE & CO",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - JPMORGAN CHASE & CO (0000019617) (Filer)",
+    "updated": "2026-04-14T14:22:16-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/19617/000121390026043417/0001213900-26-043417-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043417 <b>Size:</b> 289 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.581255+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485BPOS - PRUCO LIFE VARIABLE UNIVERSAL ACCOUNT",
+    "cik": null,
+    "ticker": null,
+    "title": "485BPOS - PRUCO LIFE VARIABLE UNIVERSAL ACCOUNT (0000851693) (Filer)",
+    "updated": "2026-04-14T14:22:14-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/851693/000085169326000022/0000851693-26-000022-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0000851693-26-000022 <b>Size:</b> 1 MB\n",
+    "fetched_at": "2026-04-14T18:24:50.581308+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - JPMORGAN CHASE & CO",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - JPMORGAN CHASE & CO (0000019617) (Filer)",
+    "updated": "2026-04-14T14:21:54-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/19617/000121390026043416/0001213900-26-043416-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043416 <b>Size:</b> 632 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.581360+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - JPMORGAN CHASE & CO",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - JPMORGAN CHASE & CO (0000019617) (Filer)",
+    "updated": "2026-04-14T14:21:25-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/19617/000183988226020104/0001839882-26-020104-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001839882-26-020104 <b>Size:</b> 297 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.581410+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - JPMORGAN CHASE & CO",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - JPMORGAN CHASE & CO (0000019617) (Filer)",
+    "updated": "2026-04-14T14:20:33-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/19617/000183988226020101/0001839882-26-020101-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001839882-26-020101 <b>Size:</b> 451 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.581463+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - JPMORGAN CHASE & CO",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - JPMORGAN CHASE & CO (0000019617) (Filer)",
+    "updated": "2026-04-14T14:19:34-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/19617/000183988226020100/0001839882-26-020100-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001839882-26-020100 <b>Size:</b> 452 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.581513+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "4 - S&T BANCORP INC",
+    "cik": null,
+    "ticker": null,
+    "title": "4 - S&T BANCORP INC (0000719220) (Issuer)",
+    "updated": "2026-04-14T14:18:53-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/719220/000071922026000035/0000719220-26-000035-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0000719220-26-000035 <b>Size:</b> 9 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.581567+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - JPMORGAN CHASE & CO",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - JPMORGAN CHASE & CO (0000019617) (Filer)",
+    "updated": "2026-04-14T14:17:59-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/19617/000121390026043412/0001213900-26-043412-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043412 <b>Size:</b> 326 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.581613+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - JPMORGAN CHASE & CO",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - JPMORGAN CHASE & CO (0000019617) (Filer)",
+    "updated": "2026-04-14T14:15:41-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/19617/000121390026043411/0001213900-26-043411-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043411 <b>Size:</b> 842 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.581688+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - GOLDMAN SACHS GROUP INC",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - GOLDMAN SACHS GROUP INC (0000886982) (Filer)",
+    "updated": "2026-04-14T14:13:56-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/886982/000119312526154608/0001193125-26-154608-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001193125-26-154608 <b>Size:</b> 1 MB\n",
+    "fetched_at": "2026-04-14T18:24:50.581752+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - JPMORGAN CHASE & CO",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - JPMORGAN CHASE & CO (0000019617) (Filer)",
+    "updated": "2026-04-14T14:12:50-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/19617/000121390026043409/0001213900-26-043409-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043409 <b>Size:</b> 780 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.582090+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "497VPU - SEPARATE ACCOUNT B OF VENERABLE INSURANCE & ANNUITY Co",
+    "cik": null,
+    "ticker": null,
+    "title": "497VPU - SEPARATE ACCOUNT B OF VENERABLE INSURANCE & ANNUITY Co (0000836687) (Filer)",
+    "updated": "2026-04-14T14:12:38-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/836687/000083668726000124/0000836687-26-000124-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0000836687-26-000124 <b>Size:</b> 365 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.582152+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - BANK OF AMERICA CORP /DE/",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - BANK OF AMERICA CORP /DE/ (0000070858) (Filer)",
+    "updated": "2026-04-14T14:11:28-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/70858/000191870426009894/0001918704-26-009894-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001918704-26-009894 <b>Size:</b> 623 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.582223+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - JPMORGAN CHASE & CO",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - JPMORGAN CHASE & CO (0000019617) (Filer)",
+    "updated": "2026-04-14T14:10:03-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/19617/000191870426009893/0001918704-26-009893-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001918704-26-009893 <b>Size:</b> 1 MB\n",
+    "fetched_at": "2026-04-14T18:24:50.582307+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "425 - AParadise Acquisition Corp.",
+    "cik": null,
+    "ticker": null,
+    "title": "425 - AParadise Acquisition Corp. (0001956439) (Subject)",
+    "updated": "2026-04-14T14:09:31-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/1956439/000162828026025050/0001628280-26-025050-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001628280-26-025050 <b>Size:</b> 18 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.582340+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - JPMORGAN CHASE & CO",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - JPMORGAN CHASE & CO (0000019617) (Filer)",
+    "updated": "2026-04-14T14:09:23-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/19617/000121390026043408/0001213900-26-043408-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043408 <b>Size:</b> 3 MB\n",
+    "fetched_at": "2026-04-14T18:24:50.582569+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "425 - AParadise Acquisition Corp.",
+    "cik": null,
+    "ticker": null,
+    "title": "425 - AParadise Acquisition Corp. (0001956439) (Subject)",
+    "updated": "2026-04-14T14:08:47-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/1956439/000162828026025049/0001628280-26-025049-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001628280-26-025049 <b>Size:</b> 28 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.582600+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "497 - Brighthouse Variable Annuity Account B",
+    "cik": null,
+    "ticker": null,
+    "title": "497 - Brighthouse Variable Annuity Account B (0000917952) (Filer)",
+    "updated": "2026-04-14T14:07:57-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/917952/000119312526154593/0001193125-26-154593-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001193125-26-154593 <b>Size:</b> 13 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.582625+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "497 - Brighthouse Variable Annuity Account B",
+    "cik": null,
+    "ticker": null,
+    "title": "497 - Brighthouse Variable Annuity Account B (0000917952) (Filer)",
+    "updated": "2026-04-14T14:07:56-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/917952/000119312526154592/0001193125-26-154592-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001193125-26-154592 <b>Size:</b> 12 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.582648+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "497 - BRIGHTHOUSE SEPARATE ACCOUNT A",
+    "cik": null,
+    "ticker": null,
+    "title": "497 - BRIGHTHOUSE SEPARATE ACCOUNT A (0000356475) (Filer)",
+    "updated": "2026-04-14T14:07:55-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/356475/000119312526154587/0001193125-26-154587-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001193125-26-154587 <b>Size:</b> 12 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.582700+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "497 - Brighthouse Variable Annuity Account B",
+    "cik": null,
+    "ticker": null,
+    "title": "497 - Brighthouse Variable Annuity Account B (0000917952) (Filer)",
+    "updated": "2026-04-14T14:07:54-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/917952/000119312526154581/0001193125-26-154581-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001193125-26-154581 <b>Size:</b> 12 KB\n",
+    "fetched_at": "2026-04-14T18:24:50.582791+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - HSBC USA INC /MD/",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - HSBC USA INC /MD/ (0000083246) (Filer)",
+    "updated": "2026-04-14T14:06:39-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/83246/000110465926043098/0001104659-26-043098-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001104659-26-043098 <b>Size:</b> 1 MB\n",
+    "fetched_at": "2026-04-14T18:14:41.022905+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485BPOS - SEPARATE ACCOUNT B OF VENERABLE INSURANCE & ANNUITY Co",
+    "cik": null,
+    "ticker": null,
+    "title": "485BPOS - SEPARATE ACCOUNT B OF VENERABLE INSURANCE & ANNUITY Co (0000836687) (Filer)",
+    "updated": "2026-04-14T14:06:29-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/836687/000083668726000122/0000836687-26-000122-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0000836687-26-000122 <b>Size:</b> 2 MB\n",
+    "fetched_at": "2026-04-14T18:14:41.022953+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "4 - NORWOOD FINANCIAL CORP",
+    "cik": null,
+    "ticker": null,
+    "title": "4 - NORWOOD FINANCIAL CORP (0001013272) (Issuer)",
+    "updated": "2026-04-14T14:06:02-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/1013272/000119312526154574/0001193125-26-154574-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001193125-26-154574 <b>Size:</b> 5 KB\n",
+    "fetched_at": "2026-04-14T18:14:41.023002+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485BPOS - PRUCO LIFE VARIABLE APPRECIABLE ACCOUNT",
+    "cik": null,
+    "ticker": null,
+    "title": "485BPOS - PRUCO LIFE VARIABLE APPRECIABLE ACCOUNT (0000740870) (Filer)",
+    "updated": "2026-04-14T14:04:59-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/740870/000074087026000013/0000740870-26-000013-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0000740870-26-000013 <b>Size:</b> 1 MB\n",
+    "fetched_at": "2026-04-14T18:14:41.023051+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - JPMORGAN CHASE & CO",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - JPMORGAN CHASE & CO (0000019617) (Filer)",
+    "updated": "2026-04-14T14:04:12-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/19617/000121390026043405/0001213900-26-043405-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043405 <b>Size:</b> 2 MB\n",
+    "fetched_at": "2026-04-14T18:14:41.023098+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - JPMORGAN CHASE & CO",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - JPMORGAN CHASE & CO (0000019617) (Filer)",
+    "updated": "2026-04-14T14:03:25-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/19617/000121390026043404/0001213900-26-043404-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043404 <b>Size:</b> 2 MB\n",
+    "fetched_at": "2026-04-14T18:14:41.023146+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "4 - ERICKSON JOHN D",
+    "cik": null,
+    "ticker": null,
+    "title": "4 - ERICKSON JOHN D (0001191483) (Reporting)",
+    "updated": "2026-04-14T14:02:19-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/1191483/000119148326000002/0001191483-26-000002-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001191483-26-000002 <b>Size:</b> 6 KB\n",
+    "fetched_at": "2026-04-14T18:14:41.023193+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485BPOS - PRUCO LIFE VARIABLE APPRECIABLE ACCOUNT",
+    "cik": null,
+    "ticker": null,
+    "title": "485BPOS - PRUCO LIFE VARIABLE APPRECIABLE ACCOUNT (0000740870) (Filer)",
+    "updated": "2026-04-14T14:01:09-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/740870/000074087026000011/0000740870-26-000011-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0000740870-26-000011 <b>Size:</b> 1 MB\n",
+    "fetched_at": "2026-04-14T18:14:41.023240+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485BPOS - HARTFORD SERIES FUND INC",
+    "cik": null,
+    "ticker": null,
+    "title": "485BPOS - HARTFORD SERIES FUND INC (0001053425) (Filer)",
+    "updated": "2026-04-14T14:01:03-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/1053425/000119312526154562/0001193125-26-154562-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001193125-26-154562 <b>Size:</b> 17 MB\n",
+    "fetched_at": "2026-04-14T18:14:41.023287+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "4 - NORWOOD FINANCIAL CORP",
+    "cik": null,
+    "ticker": null,
+    "title": "4 - NORWOOD FINANCIAL CORP (0001013272) (Issuer)",
+    "updated": "2026-04-14T14:01:01-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/1013272/000119312526154564/0001193125-26-154564-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001193125-26-154564 <b>Size:</b> 6 KB\n",
+    "fetched_at": "2026-04-14T18:14:41.023335+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "4 - NORWOOD FINANCIAL CORP",
+    "cik": null,
+    "ticker": null,
+    "title": "4 - NORWOOD FINANCIAL CORP (0001013272) (Issuer)",
+    "updated": "2026-04-14T13:59:26-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/1013272/000119312526154558/0001193125-26-154558-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001193125-26-154558 <b>Size:</b> 11 KB\n",
+    "fetched_at": "2026-04-14T18:14:41.023383+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "4 - NORWOOD FINANCIAL CORP",
+    "cik": null,
+    "ticker": null,
+    "title": "4 - NORWOOD FINANCIAL CORP (0001013272) (Issuer)",
+    "updated": "2026-04-14T13:57:26-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/1013272/000119312526154551/0001193125-26-154551-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001193125-26-154551 <b>Size:</b> 10 KB\n",
+    "fetched_at": "2026-04-14T18:04:34.453796+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "485BXT - NEIMAN FUNDS",
+    "cik": null,
+    "ticker": null,
+    "title": "485BXT - NEIMAN FUNDS (0001215880) (Filer)",
+    "updated": "2026-04-14T13:54:43-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/1215880/000141304226000293/0001413042-26-000293-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001413042-26-000293 <b>Size:</b> 25 KB\n",
+    "fetched_at": "2026-04-14T18:04:34.453839+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
     "company_name": "497VPU - SEPARATE ACCOUNT B OF VENERABLE INSURANCE & ANNUITY Co",
     "cik": null,
     "ticker": null,
@@ -8,7 +440,7 @@
     "updated": "2026-04-14T13:53:27-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/836687/000083668726000120/0000836687-26-000120-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0000836687-26-000120 <b>Size:</b> 382 KB\n",
-    "fetched_at": "2026-04-14T17:54:28.231302+00:00",
+    "fetched_at": "2026-04-14T18:04:34.453863+00:00",
     "on_watchlist": false
   },
   {
@@ -20,7 +452,7 @@
     "updated": "2026-04-14T13:53:13-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/19617/000121390026043397/0001213900-26-043397-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043397 <b>Size:</b> 130 KB\n",
-    "fetched_at": "2026-04-14T17:54:28.231455+00:00",
+    "fetched_at": "2026-04-14T18:04:34.453910+00:00",
     "on_watchlist": false
   },
   {
@@ -32,7 +464,7 @@
     "updated": "2026-04-14T13:51:48-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/1466593/000195939026000002/0001959390-26-000002-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001959390-26-000002 <b>Size:</b> 5 KB\n",
-    "fetched_at": "2026-04-14T17:54:28.231529+00:00",
+    "fetched_at": "2026-04-14T18:04:34.453962+00:00",
     "on_watchlist": false
   },
   {
@@ -44,7 +476,7 @@
     "updated": "2026-04-14T13:51:14-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/836687/000083668726000119/0000836687-26-000119-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0000836687-26-000119 <b>Size:</b> 3 MB\n",
-    "fetched_at": "2026-04-14T17:54:28.231605+00:00",
+    "fetched_at": "2026-04-14T18:04:34.454117+00:00",
     "on_watchlist": false
   },
   {
@@ -56,7 +488,7 @@
     "updated": "2026-04-14T13:49:50-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/19617/000121390026043389/0001213900-26-043389-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043389 <b>Size:</b> 2 MB\n",
-    "fetched_at": "2026-04-14T17:54:28.231683+00:00",
+    "fetched_at": "2026-04-14T18:04:34.454170+00:00",
     "on_watchlist": false
   },
   {
@@ -68,7 +500,7 @@
     "updated": "2026-04-14T13:49:29-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/886982/000119312526154545/0001193125-26-154545-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001193125-26-154545 <b>Size:</b> 636 KB\n",
-    "fetched_at": "2026-04-14T17:54:28.231774+00:00",
+    "fetched_at": "2026-04-14T18:04:34.454215+00:00",
     "on_watchlist": false
   },
   {
@@ -80,7 +512,7 @@
     "updated": "2026-04-14T13:47:05-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/1179875/000117987526000002/0001179875-26-000002-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001179875-26-000002 <b>Size:</b> 5 KB\n",
-    "fetched_at": "2026-04-14T17:54:28.231865+00:00",
+    "fetched_at": "2026-04-14T18:04:34.454260+00:00",
     "on_watchlist": false
   },
   {
@@ -92,7 +524,7 @@
     "updated": "2026-04-14T13:45:36-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/19617/000121390026043383/0001213900-26-043383-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043383 <b>Size:</b> 1 MB\n",
-    "fetched_at": "2026-04-14T17:54:28.232117+00:00",
+    "fetched_at": "2026-04-14T18:04:34.454304+00:00",
     "on_watchlist": false
   },
   {
@@ -104,7 +536,7 @@
     "updated": "2026-04-14T13:44:43-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/19617/000183988226020097/0001839882-26-020097-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001839882-26-020097 <b>Size:</b> 336 KB\n",
-    "fetched_at": "2026-04-14T17:54:28.232214+00:00",
+    "fetched_at": "2026-04-14T18:04:34.454347+00:00",
     "on_watchlist": false
   },
   {
@@ -116,7 +548,7 @@
     "updated": "2026-04-14T13:42:41-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/1297719/000129771926000005/0001297719-26-000005-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001297719-26-000005 <b>Size:</b> 5 KB\n",
-    "fetched_at": "2026-04-14T17:54:28.232299+00:00",
+    "fetched_at": "2026-04-14T18:04:34.454388+00:00",
     "on_watchlist": false
   },
   {
@@ -128,7 +560,7 @@
     "updated": "2026-04-14T13:41:14-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/1013272/000119312526154535/0001193125-26-154535-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001193125-26-154535 <b>Size:</b> 5 KB\n",
-    "fetched_at": "2026-04-14T17:54:28.232472+00:00",
+    "fetched_at": "2026-04-14T18:04:34.454429+00:00",
     "on_watchlist": false
   },
   {
@@ -140,19 +572,19 @@
     "updated": "2026-04-14T13:40:10-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/19617/000121390026043378/0001213900-26-043378-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001213900-26-043378 <b>Size:</b> 2 MB\n",
-    "fetched_at": "2026-04-14T17:54:28.232562+00:00",
+    "fetched_at": "2026-04-14T18:04:34.454472+00:00",
     "on_watchlist": false
   },
   {
     "form_type": "4",
-    "company_name": "4 - NORWOOD FINANCIAL CORP",
+    "company_name": "4 - Gifford Jeffrey S",
     "cik": null,
     "ticker": null,
-    "title": "4 - NORWOOD FINANCIAL CORP (0001013272) (Issuer)",
+    "title": "4 - Gifford Jeffrey S (0001815945) (Reporting)",
     "updated": "2026-04-14T13:39:47-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/1013272/000119312526154531/0001193125-26-154531-index.htm",
+    "link": "https://www.sec.gov/Archives/edgar/data/1815945/000119312526154531/0001193125-26-154531-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-14 <b>AccNo:</b> 0001193125-26-154531 <b>Size:</b> 13 KB\n",
-    "fetched_at": "2026-04-14T17:54:28.232640+00:00",
+    "fetched_at": "2026-04-14T18:04:34.454495+00:00",
     "on_watchlist": false
   },
   {

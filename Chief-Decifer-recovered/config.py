@@ -11,10 +11,11 @@ load_dotenv()
 
 # Path to the decifer-trading repo (for git history, test results, code health).
 # Required — no fallback. Chief's state is ALWAYS at $DECIFER_REPO_PATH/chief-decifer/state/.
-DECIFER_REPO_PATH = Path(os.getenv("DECIFER_REPO_PATH", "")).expanduser()
+_repo_env = os.getenv("DECIFER_REPO_PATH", "").strip()
+DECIFER_REPO_PATH = Path(_repo_env).expanduser() if _repo_env else None
 if not DECIFER_REPO_PATH or not DECIFER_REPO_PATH.exists():
-    # Fallback: assume this file lives inside the repo at chief-decifer/config.py or
-    # Chief-Decifer-recovered/config.py (both under the trading repo root).
+    # Fallback: config.py lives at Chief-Decifer-recovered/config.py,
+    # so parent.parent is the repo root regardless of CWD.
     DECIFER_REPO_PATH = Path(__file__).parent.parent
 
 # Single sacred state dir — everything Chief reads and Cowork writes.
