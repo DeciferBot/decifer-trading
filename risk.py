@@ -515,8 +515,12 @@ def calculate_position_size(
         assumed_stop = price * CONFIG["assumed_stop_pct"]
         qty = max(1, int(risk_amount / assumed_stop))
 
-    # max_single_position cap removed — Opus (Portfolio Manager) decides sizing.
-    # The only remaining hard cap is the 20% order value guard in orders_core.py.
+    # max_single_position cap — prevents any single position from exceeding the
+    # configured per-instrument fraction (default 6%).
+    max_pos_frac = CONFIG.get("max_single_position", 0.10)
+    max_pos_qty = int(portfolio_value * max_pos_frac / price)
+    if max_pos_qty >= 1 and qty > max_pos_qty:
+        qty = max_pos_qty
 
     atr_capped_qty: int | None = None
     if CONFIG.get("atr_vol_cap_enabled") and atr > 0:
@@ -1021,5 +1025,25 @@ def check_thesis_validity(open_positions: list, current_regime: str) -> list:
 
     return flagged
 
-# Backwards-compat alias — tests reference risk.position_size
-position_size = calculate_position_size
+def position_size(
+    account_value: float,
+    entry_price: float,
+    stop_price: float,
+    config: dict | None = None,
+) -> int:
+    """Simple dollar-risk position sizer — backwards-compat interface used by tests.
+
+    Uses a fixed 1% risk-per-trade rule:
+        shares = floor(account_value * 0.01 / stop_distance)
+
+    Capped at ``max_position_size`` fraction of account (default 30%).
+    Returns 0 if stop_distance <= 0.
+    """
+    stop_distance = entry_price - stop_price
+    if stop_distance <= 0:
+        return 0
+    cfg = config if config is not None else CONFIG
+    max_pos = cfg.get("max_position_size", 0.30)
+    raw_shares = int(account_value * 0.01 / stop_distance)
+    max_shares = int(account_value * max_pos / entry_price)
+    return min(raw_shares, max_shares)

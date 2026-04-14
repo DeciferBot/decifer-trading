@@ -199,6 +199,14 @@ def _execute_trigger_buy(
 
         sig = fetch_multi_timeframe(sym)
         if sig:
+            # Enrich signal_scores with CATALYST dimension (0–10 scale, same as other dims)
+            ic_context = trigger.get("ic_context", {})
+            screener_ctx = trigger.get("screener_context", {})
+            catalyst_score = screener_ctx.get("catalyst_score", 0)
+            base_scores = dict(sig.get("score_breakdown", {}))
+            if catalyst_score:
+                base_scores["CATALYST"] = round(float(catalyst_score), 1)
+
             success = execute_buy(
                 ib=ib,
                 symbol=sym,
@@ -209,8 +217,8 @@ def _execute_trigger_buy(
                 portfolio_value=portfolio_value,
                 regime=regime,
                 reasoning=f"{tag} {reasoning}",
-                signal_scores=sig.get("score_breakdown", {}),
-                agent_outputs={},
+                signal_scores=base_scores,
+                agent_outputs={"catalyst_ic_context": ic_context} if ic_context else {},
                 open_time=datetime.now(UTC).isoformat(),
                 advice_size_mult=size_mult,
             )

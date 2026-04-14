@@ -380,6 +380,7 @@ class TestPanicMomentumInconsistency:
             "iv_skew",
             "pead",
             "short_squeeze",
+            "overnight_drift",
         }
 
         for regime in ("momentum", "mean_reversion", "unknown"):

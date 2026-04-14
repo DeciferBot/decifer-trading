@@ -35,6 +35,119 @@ log = logging.getLogger("decifer.catalyst_engine")
 # File written by _edgar_runner (via signals/edgar_monitor.py) — rolling 7-day window.
 # _edgar_monitor reads from here instead of polling SEC directly.
 _EDGAR_FILE = CATALYST_DIR / "edgar_events.json"
+
+
+# ── M&A keyword lists ──────────────────────────────────────────────────────────
+# Inlined from catalyst_sentinel — CatalystEngine is self-contained; no shared
+# module-level state with the retired CatalystSentinel process.
+
+MA_ANNOUNCEMENT_KEYWORDS = {
+    # Definitive deal language
+    "to be acquired", "acquisition agreement", "merger agreement",
+    "definitive agreement", "definitive merger", "agreed to be acquired",
+    "agreed to acquire", "deal to acquire", "agree to buy",
+    # Offer language
+    "tender offer", "per share in cash", "per share in an all-cash",
+    "takeover bid", "unsolicited bid", "hostile takeover",
+    "going private", "take-private", "management buyout", "mbo",
+    # Strategic language
+    "strategic alternatives", "exploring a sale", "sale process",
+    "received a buyout", "received an offer to acquire",
+}
+MA_SOFT_KEYWORDS = {
+    "buyout", "takeover", "acquired by", "buys", "purchase price",
+    "premium", "acquirer", "strategic review", "due diligence",
+    "merger talks", "acquisition talks", "in talks to acquire",
+}
+MA_NEGATIVE_KEYWORDS = {
+    "acquires technology", "acquires talent", "acquires domain",
+    "acquires content", "acquires license", "acquires rights",
+}
+
+
+def _check_ma_keywords(headline: str) -> tuple[bool, str, bool]:
+    """
+    Check a headline for M&A keywords.
+    Returns (is_match, matched_keyword, is_definitive).
+    """
+    text = headline.lower()
+    for neg in MA_NEGATIVE_KEYWORDS:
+        if neg in text:
+            return False, "", False
+    for kw in MA_ANNOUNCEMENT_KEYWORDS:
+        if kw in text:
+            is_def = any(
+                x in kw
+                for x in ["definitive", "agreement", "per share", "tender offer",
+                           "going private", "agreed to", "merger agreement"]
+            )
+            return True, kw, is_def
+    soft_hits = [kw for kw in MA_SOFT_KEYWORDS if kw in text]
+    if len(soft_hits) >= 2:
+        return True, " + ".join(soft_hits[:2]), False
+    return False, "", False
+
+
+def _build_news_trigger(news_hit: dict) -> dict:
+    """Build a standardised catalyst trigger dict from a Yahoo RSS news hit."""
+    return {
+        "symbol":            news_hit["symbol"],
+        "trigger_type":      "ma_announcement",
+        "headlines":         [news_hit["headline"]],
+        "keyword":           news_hit["keyword"],
+        "is_definitive":     news_hit["is_definitive"],
+        "direction":         "BULLISH",
+        "urgency":           "CRITICAL" if news_hit["is_definitive"] else "HIGH",
+        "age_hours":         news_hit["age_hours"],
+        "source":            news_hit["source"],
+        "claude_sentiment":  "BULLISH",
+        "claude_confidence": 8 if news_hit["is_definitive"] else 5,
+        "claude_catalyst":   f"M&A signal: {news_hit['keyword']}",
+        "triggered_at":      datetime.now(_UTC).isoformat(),
+    }
+
+
+def _build_edgar_trigger(edgar_event: dict) -> dict:
+    """Build a standardised catalyst trigger dict from a resolved EDGAR event."""
+    form    = edgar_event["form_type"]
+    ticker  = edgar_event.get("ticker") or ""
+    company = edgar_event.get("company_name", "")
+
+    if form == "SC 13D":
+        urgency, confidence = "HIGH", 6
+        catalyst = f"Activist investor SC 13D filed: {company}"
+    elif form == "SC 13G":
+        urgency, confidence = "MODERATE", 4
+        catalyst = f"Passive investor SC 13G (>5% stake): {company}"
+    else:  # Form 4
+        urgency, confidence = "MODERATE", 3
+        catalyst = f"Insider Form 4 filing: {company}"
+
+    return {
+        "symbol":            ticker,
+        "trigger_type":      f"edgar_{form.lower().replace(' ', '')}",
+        "headlines":         [edgar_event["title"]],
+        "keyword":           form,
+        "is_definitive":     False,
+        "direction":         "BULLISH",
+        "urgency":           urgency,
+        "age_hours":         0,
+        "source":            "sec_edgar",
+        "edgar_link":        edgar_event.get("link", ""),
+        "claude_sentiment":  "BULLISH",
+        "claude_confidence": confidence,
+        "claude_catalyst":   catalyst,
+        "triggered_at":      datetime.now(_UTC).isoformat(),
+    }
+
+
+def _trigger_confidence(score: float | None) -> str:
+    """Translate catalyst_score into a confidence tier for IC logging."""
+    if score is None:  return "speculative"
+    if score >= 8.5:   return "high"
+    if score >= 6.5:   return "medium"
+    if score >= 5.0:   return "low"
+    return "speculative"
 _UTC = timezone.utc
 
 
@@ -55,6 +168,7 @@ class WatchlistStore:
         self._lock = threading.RLock()
         self._candidates: dict[str, dict] = {}   # ticker → candidate dict
         self._loaded_at: datetime | None = None
+        self._first_seen: dict[str, str] = {}    # ticker → ISO datetime of first load
 
     def load_from_file(self) -> int:
         """
@@ -69,6 +183,7 @@ class WatchlistStore:
         try:
             payload = json.loads(path.read_text())
             candidates = payload.get("candidates", [])
+            now_iso = datetime.now(_UTC).isoformat()
             with self._lock:
                 self._candidates = {
                     c["ticker"].upper(): c
@@ -76,6 +191,10 @@ class WatchlistStore:
                     if c.get("ticker")
                 }
                 self._loaded_at = datetime.now(_UTC)
+                # Populate first_seen only for tickers not yet tracked
+                for ticker in self._candidates:
+                    if ticker not in self._first_seen:
+                        self._first_seen[ticker] = now_iso
             log.info(f"WatchlistStore: loaded {len(self._candidates)} candidates from {path.name}")
             return len(self._candidates)
         except Exception as exc:
@@ -99,6 +218,17 @@ class WatchlistStore:
     def count(self) -> int:
         with self._lock:
             return len(self._candidates)
+
+    def days_in_screener(self, ticker: str) -> int:
+        """Days since ticker first appeared in the WatchlistStore this session."""
+        first = self._first_seen.get(ticker.upper())
+        if not first:
+            return 0
+        try:
+            delta = datetime.now(_UTC) - datetime.fromisoformat(first)
+            return max(0, delta.days)
+        except Exception:
+            return 0
 
     def snapshot(self) -> list[dict]:
         """Sorted candidate list for stats — highest catalyst_score first."""
@@ -181,6 +311,7 @@ class CatalystEngine:
         # Real-time monitor dedup — instance-level so engine is self-contained
         self._headline_dedup = HeadlineDeduplicator(max_size=5000)
         self._seen_edgar_events: set[str] = set()
+        self._threshold_fired: set[str] = set()   # tickers that fired score-threshold trigger this session
         self._cooldown = SymbolCooldown(
             cooldown_minutes=CONFIG.get("catalyst_cooldown_minutes", 60)
         )
@@ -199,9 +330,11 @@ class CatalystEngine:
             "edgar_runs":          0,
             "options_runs":        0,
             "sentiment_runs":      0,
-            "news_polls":          0,
-            "edgar_monitor_polls": 0,
-            "triggers_fired":      0,
+            "news_polls":            0,
+            "edgar_monitor_polls":   0,
+            "score_threshold_runs":  0,
+            "last_score_threshold":  None,
+            "triggers_fired":        0,
         }
 
     # ── Lifecycle ───────────────────────────────────────────────
@@ -224,13 +357,16 @@ class CatalystEngine:
         news_interval  = CONFIG.get("catalyst_news_poll_seconds", 60)
         edgar_interval = CONFIG.get("catalyst_edgar_poll_seconds", 600)
 
+        score_threshold_interval = CONFIG.get("catalyst_score_threshold_interval", 300)
+
         runner_specs = [
-            ("fundamental",   self._fundamental_runner, CATALYST_SCREEN_INTERVAL),
-            ("edgar_scorer",  self._edgar_runner,       EDGAR_POLL_INTERVAL),
-            ("options",       self._options_runner,     OPTIONS_ANOMALY_INTERVAL),
-            ("sentiment",     self._sentiment_runner,   SENTIMENT_SCORER_INTERVAL),
-            ("news_monitor",  self._news_monitor,       news_interval),
-            ("edgar_monitor", self._edgar_monitor,      edgar_interval),
+            ("fundamental",      self._fundamental_runner,      CATALYST_SCREEN_INTERVAL),
+            ("edgar_scorer",     self._edgar_runner,            EDGAR_POLL_INTERVAL),
+            ("options",          self._options_runner,          OPTIONS_ANOMALY_INTERVAL),
+            ("sentiment",        self._sentiment_runner,        SENTIMENT_SCORER_INTERVAL),
+            ("news_monitor",     self._news_monitor,            news_interval),
+            ("edgar_monitor",    self._edgar_monitor,           edgar_interval),
+            ("score_threshold",  self._score_threshold_checker, score_threshold_interval),
         ]
         for name, target, interval in runner_specs:
             t = threading.Thread(
@@ -430,7 +566,23 @@ class CatalystEngine:
             }
             trigger["size_multiplier"] = compute_size_multiplier(catalyst_score)
         else:
+            catalyst_score = None
             trigger["size_multiplier"] = 1.0  # not pre-identified — baseline sizing
+
+        # ── IC context — persisted into the trade record via agent_outputs ───
+        # Consumed by _execute_trigger_buy → execute_buy → log_order.
+        # _announcement_lag_hours and _trigger_type_detail are set by each
+        # monitor before calling _fire() and popped here (not passed downstream).
+        trigger["ic_context"] = {
+            "trigger_source":          trigger.get("trigger_type", "unknown"),
+            "catalyst_score_at_entry": catalyst_score,
+            "size_multiplier_applied": trigger["size_multiplier"],
+            "days_in_screener":        self.store.days_in_screener(sym),
+            "trigger_confidence":      _trigger_confidence(catalyst_score),
+            "announcement_lag_hours":  trigger.pop("_announcement_lag_hours", None),
+            "trigger_type_detail":     trigger.pop("_trigger_type_detail",
+                                                   trigger.get("trigger_type", "")),
+        }
 
         self.stats["triggers_fired"] += 1
         self.stats["last_trigger"] = {
@@ -471,7 +623,6 @@ class CatalystEngine:
         from email.utils import parsedate_to_datetime
 
         import requests
-        from catalyst_sentinel import _check_ma_keywords
 
         now = datetime.now(_UTC)
 
@@ -552,13 +703,14 @@ class CatalystEngine:
                     continue
                 universe = self.get_universe()
                 if universe:
-                    from catalyst_sentinel import _build_news_trigger
                     hits = self._fetch_news(universe)
                     for hit in hits:
                         sym = hit["symbol"]
                         if self._cooldown.is_on_cooldown(sym):
                             continue
                         trigger = _build_news_trigger(hit)
+                        trigger["_trigger_type_detail"]    = f"keyword:{hit['keyword']}"
+                        trigger["_announcement_lag_hours"] = hit.get("age_hours")
                         self._fire(trigger)
                 self.stats["news_polls"] += 1
                 self.stats["last_news_poll"] = datetime.now(_UTC).strftime("%H:%M UTC")
@@ -581,8 +733,6 @@ class CatalystEngine:
         """
         from datetime import timedelta
         from risk import is_trading_day
-        from catalyst_sentinel import _build_edgar_trigger
-
         time.sleep(45)
         while self._running:
             try:
@@ -625,10 +775,82 @@ class CatalystEngine:
                     ev["on_watchlist"] = on_watchlist
                     ev["ticker"] = ticker  # ensure uppercase for downstream consumers
                     trigger = _build_edgar_trigger(ev)
+                    trigger["_trigger_type_detail"] = (
+                        f"{ev.get('form_type', '')}:{ev.get('company_name', '')}"
+                    )
                     self._fire(trigger)
 
                 self.stats["edgar_monitor_polls"] += 1
                 self.stats["last_edgar_monitor"] = datetime.now(_UTC).strftime("%H:%M UTC")
             except Exception as exc:
                 log.error(f"CatalystEngine [edgar_monitor] error: {exc}", exc_info=True)
+            time.sleep(interval)
+
+    def _score_threshold_checker(self, interval: int) -> None:
+        """
+        Fires a score-threshold trigger when a watchlist candidate first crosses
+        catalyst_score ≥ 5.0, without requiring a news headline or EDGAR filing.
+
+        This gives agents early visibility on high-conviction screener candidates
+        before any news breaks, generating IC training data for pure-screener setups.
+
+        Dedup: once a ticker fires, it's added to _threshold_fired and won't fire
+        again this session, even if the score keeps rising. Bot restart resets the
+        session state. The cooldown gate still applies — a ticker on cooldown from a
+        news trigger won't get a second threshold trigger within the cooldown window.
+
+        Staggered 300s after startup so the fundamental screen has had time to run.
+        """
+        from risk import is_trading_day
+
+        time.sleep(300)  # wait for first fundamental screen to populate the store
+        while self._running:
+            try:
+                if not is_trading_day():
+                    time.sleep(3600)
+                    continue
+
+                threshold = 5.0
+                fired_count = 0
+                for candidate in self.store.snapshot():
+                    score = candidate.get("catalyst_score", 0)
+                    ticker = (candidate.get("ticker") or "").upper()
+                    if not ticker or score < threshold:
+                        continue
+                    if ticker in self._threshold_fired:
+                        continue
+                    if self._cooldown.is_on_cooldown(ticker):
+                        continue
+
+                    self._threshold_fired.add(ticker)
+                    fired_count += 1
+                    trigger = {
+                        "symbol":            ticker,
+                        "trigger_type":      "score_threshold",
+                        "headlines":         [],
+                        "direction":         "BULLISH",
+                        "urgency":           "HIGH" if score >= 7.0 else "MODERATE",
+                        "source":            "catalyst_engine",
+                        "claude_sentiment":  "BULLISH",
+                        "claude_confidence": min(10, int(score)),
+                        "claude_catalyst":   (
+                            f"Score-threshold trigger: catalyst_score={score:.1f} ≥ {threshold}"
+                        ),
+                        "triggered_at":      datetime.now(_UTC).isoformat(),
+                        # Consumed by _fire() to build ic_context
+                        "_trigger_type_detail":    f"score_threshold:{score:.1f}",
+                        "_announcement_lag_hours": None,
+                    }
+                    log.info(
+                        f"⚡ CATALYST score-threshold: {ticker} | "
+                        f"score={score:.1f} ≥ {threshold} | "
+                        f"urgency={trigger['urgency']}"
+                    )
+                    self._fire(trigger)
+
+                if fired_count:
+                    self.stats["score_threshold_runs"] += fired_count
+                    self.stats["last_score_threshold"] = datetime.now(_UTC).strftime("%H:%M UTC")
+            except Exception as exc:
+                log.error(f"CatalystEngine [score_threshold] error: {exc}", exc_info=True)
             time.sleep(interval)
