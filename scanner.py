@@ -89,28 +89,29 @@ CORE_SYMBOLS = [
 ]
 
 # ── Momentum watchlist — always scored as a floor ─────────────
+# Sector-balanced: 3-5 names per sector so the bot always has
+# non-tech candidates in its minimum universe.
 MOMENTUM_FALLBACK = [
-    "AAPL",
-    "NVDA",
-    "TSLA",
-    "AMZN",
-    "MSFT",
-    "META",
-    "GOOGL",
-    "AMD",
-    "ORCL",
-    "NFLX",
-    "CRM",
-    "SHOP",
-    "SNOW",
-    "PLTR",
-    "WDC",
-    "MU",
-    "NBIS",
-    "OSCR",
-    "ASTS",
-    "HIMS",
-    "ALAB",
+    # Technology (5) — kept intentionally lean; TV scans surface more
+    "NVDA", "AAPL", "MSFT", "AMD", "CRM",
+    # Communication Services (2)
+    "GOOGL", "META",
+    # Pharma / Biotech (5)
+    "LLY", "ABBV", "MRNA", "BIIB", "REGN",
+    # Healthcare devices / managed care (3)
+    "UNH", "MDT", "ABT",
+    # Consumer Discretionary (4)
+    "AMZN", "NKE", "MCD", "TGT",
+    # Consumer Staples (3)
+    "WMT", "COST", "PG",
+    # Energy (4)
+    "XOM", "CVX", "OXY", "COP",
+    # Industrials (3)
+    "CAT", "GE", "HON",
+    # Materials (3)
+    "FCX", "NEM", "LIN",
+    # Financials (3)
+    "JPM", "GS", "V",
 ]
 
 # ── TV signal cache — populated each scan cycle ───────────────
@@ -230,6 +231,23 @@ _SECTOR_ETFS = {
     "XLB": "Materials",
     "XLU": "Utilities",
     "XLC": "Communication Services",
+}
+
+# ── Individual stocks added when their sector ETF leads ────────
+# When XLV is a top-3 sector, these healthcare names join the
+# scoring universe — not just the ETF wrapper.
+_SECTOR_STOCKS: dict[str, list[str]] = {
+    "XLK": ["NVDA", "AAPL", "MSFT", "AMD", "CRM", "ORCL"],
+    "XLF": ["JPM", "GS", "MS", "V", "MA", "BAC"],
+    "XLE": ["XOM", "CVX", "OXY", "COP", "SLB"],
+    "XLV": ["LLY", "ABBV", "MRNA", "UNH", "MDT", "ABT", "BIIB", "REGN"],
+    "XLI": ["CAT", "GE", "HON", "BA", "UPS"],
+    "XLY": ["AMZN", "TSLA", "NKE", "MCD", "TGT", "SBUX"],
+    "XLP": ["WMT", "COST", "PG", "KO", "PEP"],
+    "XLRE": ["PLD", "AMT", "SPG", "EQIX"],
+    "XLB": ["FCX", "NEM", "LIN", "APD"],
+    "XLU": ["NEE", "DUK", "SO", "AEP"],
+    "XLC": ["GOOGL", "META", "NFLX", "DIS", "T"],
 }
 
 _sector_bias_cache: dict | None = None
@@ -368,12 +386,21 @@ def get_dynamic_universe(ib: IB, regime: dict | None = None) -> list[str]:
 
     symbols: set[str] = set(CORE_SYMBOLS)
 
-    # ── Sector rotation: add leading sector ETFs to universe ───
+    # ── Sector rotation: add leading sector ETFs + their stocks ──
     sector_bias = get_sector_rotation_bias()
     if sector_bias.get("available"):
         for etf in sector_bias.get("leaders", []):
             symbols.add(etf)
             log.debug("Sector rotation: adding leader %s to universe", etf)
+            # Also add individual names from the leading sector so the bot
+            # can trade the stocks driving the sector move, not just the wrapper.
+            for stock in _SECTOR_STOCKS.get(etf, []):
+                symbols.add(stock)
+        log.info(
+            "Sector rotation leaders: %s — added %d sector stocks",
+            sector_bias.get("leaders", []),
+            sum(len(_SECTOR_STOCKS.get(e, [])) for e in sector_bias.get("leaders", [])),
+        )
 
     # ── Circuit breaker — extreme VIX only ────────────────────
     _vix = (regime or {}).get("vix", 0)

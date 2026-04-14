@@ -806,25 +806,69 @@ def check_sector_concentration(
 
 
 def check_correlation(new_symbol: str, open_positions: list) -> tuple[bool, str]:
-    """Basic correlation check — avoid highly correlated positions."""
-    tech = {"AAPL", "NVDA", "MSFT", "META", "GOOGL", "AMD", "INTC", "ORCL"}
-    semis = {"NVDA", "AMD", "MU", "INTC", "AMAT", "LRCX", "KLAC", "QCOM"}
-    indices = {"SPY", "QQQ", "IWM", "DIA"}
+    """Within-sector correlation check — cap concentration per sector group.
+
+    Each group has its own cap. Cross-sector holdings never block each other:
+    a pharma position cannot be blocked by a tech holding.
+    Cap of 2 per group keeps single-sector exposure diversified without being
+    so tight it kills all opportunity in a trending sector.
+    """
+    # (group_name, symbols, max_allowed)
+    _GROUPS: list[tuple[str, set, int]] = [
+        # Broad index ETFs — 1 max (SPY + QQQ is just leveraged beta)
+        ("broad index ETF",     {"SPY", "QQQ", "IWM", "DIA"}, 1),
+        # Inverse ETFs — 2 max
+        ("inverse ETF",         {"SPXS", "SQQQ", "SDOW", "SH"}, 2),
+        # Tech mega-cap & software
+        ("tech",                {"AAPL", "MSFT", "NVDA", "AMD", "INTC", "ORCL",
+                                 "CRM", "SHOP", "SNOW", "PLTR", "NOW", "ADBE"}, 2),
+        # Semiconductors (tighter — highly co-moving)
+        ("semiconductors",      {"NVDA", "AMD", "MU", "INTC", "AMAT", "LRCX",
+                                 "KLAC", "QCOM", "AVGO", "MRVL", "ON"}, 2),
+        # Communication / internet
+        ("communication",       {"GOOGL", "META", "NFLX", "DIS", "SNAP", "PINS",
+                                 "TWTR", "T", "VZ"}, 2),
+        # Consumer discretionary / e-commerce
+        ("consumer disc",       {"AMZN", "TSLA", "NKE", "MCD", "SBUX", "TGT",
+                                 "HD", "LOW", "BKNG"}, 2),
+        # Consumer staples
+        ("consumer staples",    {"WMT", "COST", "PG", "KO", "PEP", "PM",
+                                 "MDLZ", "CL"}, 2),
+        # Pharma / biotech
+        ("pharma/biotech",      {"LLY", "ABBV", "MRNA", "PFE", "JNJ", "MRK",
+                                 "BIIB", "REGN", "VRTX", "GILD", "BMY", "AMGN"}, 2),
+        # Healthcare services / devices
+        ("healthcare",          {"UNH", "MDT", "ABT", "CVS", "HUM", "ELV",
+                                 "ISRG", "TMO", "DHR"}, 2),
+        # Energy
+        ("energy",              {"XOM", "CVX", "OXY", "COP", "SLB", "MPC",
+                                 "PSX", "VLO", "EOG"}, 2),
+        # Financials / banks
+        ("financials",          {"JPM", "BAC", "GS", "MS", "WFC", "C",
+                                 "V", "MA", "AXP", "SCHW"}, 2),
+        # Industrials
+        ("industrials",         {"CAT", "GE", "HON", "BA", "UPS", "FDX",
+                                 "RTX", "DE", "LMT"}, 2),
+        # Materials / mining
+        ("materials",           {"FCX", "NEM", "LIN", "APD", "NUE", "CF"}, 2),
+        # Utilities
+        ("utilities",           {"NEE", "DUK", "SO", "AEP", "D", "EXC"}, 2),
+        # Real estate / REITs
+        ("REITs",               {"PLD", "AMT", "SPG", "EQIX", "O", "VICI"}, 2),
+        # Crypto proxies
+        ("crypto proxy",        {"IBIT", "BITO", "MSTR", "COIN", "MARA"}, 2),
+    ]
 
     open_syms = {p["symbol"] for p in open_positions}
 
-    if new_symbol in indices and len(open_syms & indices) >= 1:
-        return False, f"Already hold a broad index ETF — {new_symbol} too correlated"
-
-    if new_symbol in tech:
-        tech_count = len(open_syms & tech)
-        if tech_count >= 2:
-            return False, f"Already hold {tech_count} tech stocks — too concentrated"
-
-    if new_symbol in semis:
-        semi_count = len(open_syms & semis)
-        if semi_count >= 2:
-            return False, f"Already hold {semi_count} semiconductor stocks — too concentrated"
+    for group_name, group_set, max_count in _GROUPS:
+        if new_symbol in group_set:
+            held = len(open_syms & group_set)
+            if held >= max_count:
+                return False, (
+                    f"Already hold {held} {group_name} position(s) — "
+                    f"adding {new_symbol} would exceed the {max_count}-per-group limit"
+                )
 
     return True, "OK"
 
