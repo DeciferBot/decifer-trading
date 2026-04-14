@@ -602,3 +602,129 @@ class TestICInitializationEdgeCases:
         assert w2["trend"] == pytest.approx(1.0 / N, abs=1e-6), (
             "Mutating the returned dict polluted the next call — fallback must return a fresh copy"
         )
+
+
+# ---------------------------------------------------------------------------
+# Numerical correctness: synthetic dataset with hand-computed IC values
+# ---------------------------------------------------------------------------
+
+
+class TestICCorrectnessWithKnownValues:
+    """
+    End-to-end numerical correctness: IC values must match hand-computed
+    Spearman rank correlations to machine precision.
+
+    Synthetic dataset — N=5 records, unique scores, no ties:
+
+        trend scores:    [1.0, 2.0, 3.0, 4.0, 5.0]
+        momentum scores: [5.0, 4.0, 3.0, 2.0, 1.0]
+        all other dims:  constant 5.0 across all records
+        fwd_returns:     [0.03, 0.01, 0.04, 0.02, 0.05]
+
+    Hand-computed Spearman (formula: 1 - 6·Σd²/n(n²-1), n=5, n(n²-1)=120):
+
+        trend ranks:    [0, 1, 2, 3, 4]
+        momentum ranks: [4, 3, 2, 1, 0]
+        fwd ranks:      [2, 0, 3, 1, 4]  (0 = smallest return)
+
+        trend IC:
+            d = [-2, 1, -1, 2, 0]  →  Σd²=10
+            IC = 1 - 6·10/120 = +0.5
+
+        momentum IC:
+            d = [2, 3, -1, 0, -4]  →  Σd²=30
+            IC = 1 - 6·30/120 = -0.5
+
+        constant dims (std=0 → z-scores all-zero → short-circuit guard in core.py):
+            IC = 0.0  (not computed via Spearman, explicitly zeroed)
+
+    scipy.stats.spearmanr is replaced with the real numpy formula to bypass
+    the conftest mock. z-scoring is a monotone linear transformation so it
+    cannot change rank order; these expected values hold pre- and post-z-score.
+    """
+
+    _N = 5
+    _TREND_SCORES = [1.0, 2.0, 3.0, 4.0, 5.0]
+    _MOMENTUM_SCORES = [5.0, 4.0, 3.0, 2.0, 1.0]
+    _FWD_RETURNS = [0.03, 0.01, 0.04, 0.02, 0.05]
+
+    # Hand-computed expected values (Σd²=10 → +0.5; Σd²=30 → -0.5)
+    _EXPECTED_TREND_IC = 0.5
+    _EXPECTED_MOMENTUM_IC = -0.5
+    _EXPECTED_CONSTANT_IC = 0.0
+
+    def _write_log(self, tmp_path):
+        """Write the synthetic records to a temp jsonl and return (path, fwd_map)."""
+        records = []
+        for i in range(self._N):
+            bd = {d: 5.0 for d in DIMS}
+            bd["trend"] = self._TREND_SCORES[i]
+            bd["momentum"] = self._MOMENTUM_SCORES[i]
+            records.append(_make_record(symbol=f"SYN{i:02d}", breakdown=bd))
+        log_file = tmp_path / "signals_log.jsonl"
+        with open(log_file, "w") as f:
+            for rec in records:
+                f.write(json.dumps(rec) + "\n")
+        fwd_map = {i: self._FWD_RETURNS[i] for i in range(self._N)}
+        return str(log_file), fwd_map
+
+    def _run_pipeline(self, tmp_path):
+        log_path, fwd_map = self._write_log(tmp_path)
+        with (
+            patch.object(ic_core, "_fetch_forward_returns_batch", return_value=fwd_map),
+            patch.object(ic_core, "_spearman", side_effect=_real_spearman),
+        ):
+            return ic.compute_rolling_ic(
+                signals_log_path=log_path,
+                window=self._N,
+                min_valid=1,
+            )
+
+    def test_trend_ic_matches_hand_computed_value(self, tmp_path):
+        """
+        trend scores [1,2,3,4,5] vs fwd_returns [0.03,0.01,0.04,0.02,0.05]:
+        Σd²=10 → Spearman = 1 - 6·10/120 = +0.5 exactly.
+        """
+        raw = self._run_pipeline(tmp_path)
+        assert raw["trend"] == pytest.approx(self._EXPECTED_TREND_IC, abs=1e-9), (
+            f"trend IC={raw['trend']:.10f}, expected {self._EXPECTED_TREND_IC}"
+        )
+
+    def test_momentum_ic_matches_hand_computed_value(self, tmp_path):
+        """
+        momentum scores [5,4,3,2,1] vs same fwd_returns:
+        Σd²=30 → Spearman = 1 - 6·30/120 = -0.5 exactly.
+        """
+        raw = self._run_pipeline(tmp_path)
+        assert raw["momentum"] == pytest.approx(self._EXPECTED_MOMENTUM_IC, abs=1e-9), (
+            f"momentum IC={raw['momentum']:.10f}, expected {self._EXPECTED_MOMENTUM_IC}"
+        )
+
+    def test_constant_dimension_scores_yield_zero_ic(self, tmp_path):
+        """
+        All remaining dims have constant scores (5.0 across all records).
+        std=0 → z-scores are all-zero → core.py short-circuit guard sets IC=0.0.
+        This test confirms the guard fires, not that Spearman(zeros, fwd)=0.
+        """
+        raw = self._run_pipeline(tmp_path)
+        constant_dims = [d for d in DIMS if d not in ("trend", "momentum")]
+        for d in constant_dims:
+            assert raw[d] == pytest.approx(self._EXPECTED_CONSTANT_IC, abs=1e-9), (
+                f"{d!r} has constant scores: expected IC=0.0, got {raw[d]}"
+            )
+
+    def test_output_matches_direct_numpy_spearman_formula(self, tmp_path):
+        """
+        The pipeline IC must equal a direct _real_spearman call on the
+        z-scored scores vs fwd_returns — confirming no pipeline arithmetic
+        error between raw scores and reported IC.
+        """
+        raw = self._run_pipeline(tmp_path)
+        fwd_arr = np.array(self._FWD_RETURNS, dtype=float)
+        for dim, scores in [("trend", self._TREND_SCORES), ("momentum", self._MOMENTUM_SCORES)]:
+            arr = np.array(scores, dtype=float)
+            z = (arr - np.mean(arr)) / float(np.std(arr))
+            ref = _real_spearman(z, fwd_arr)
+            assert raw[dim] == pytest.approx(ref, abs=1e-9), (
+                f"Pipeline IC for {dim!r}: {raw[dim]:.10f} != direct formula {ref:.10f}"
+            )
