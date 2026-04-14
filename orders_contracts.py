@@ -11,16 +11,15 @@ Imports from orders_state (log) and stdlib/third-party only.
 from __future__ import annotations
 
 import threading
-from datetime import datetime, time as dtime
-from typing import Optional, Tuple
 import zoneinfo
+from datetime import datetime
+from datetime import time as dtime
 
-from ib_async import IB, Stock, Forex
-from ib_async import LimitOrder, StopOrder, MarketOrder  # re-exported for callers
+from ib_async import IB, Forex, Stock  # re-exported for callers
 
 from config import CONFIG
-from scanner import get_tv_signal_cache
 from orders_state import log
+from scanner import get_tv_signal_cache  # load-bearing: rebind pattern below does _om.get_tv_signal_cache
 
 # ── Timezone ───────────────────────────────────────────────────────────────────
 _ET = zoneinfo.ZoneInfo("America/New_York")
@@ -61,6 +60,7 @@ def _get_emergency_ib() -> IB:
 def _cancel_ibkr_order_by_id(ib, order_id: int) -> None:
     """Cancel a live IBKR order by orderId only. Safe to call if order is already gone."""
     from ib_async import Order as _Order
+
     try:
         if not ib.isConnected():
             log.warning(f"_cancel_ibkr_order_by_id: IBKR disconnected — cannot cancel #{order_id}")
@@ -77,10 +77,11 @@ def _cancel_ibkr_order_by_id(ib, order_id: int) -> None:
 def is_options_market_open() -> bool:
     """Options trade 9:30 AM – 4:00 PM ET, Mon–Fri, trading days only."""
     from risk import is_trading_day
+
     if not is_trading_day():
         return False
     now_et = datetime.now(_ET)
-    if now_et.weekday() >= 5:          # Saturday=5, Sunday=6
+    if now_et.weekday() >= 5:  # Saturday=5, Sunday=6
         return False
     t = now_et.time()
     return dtime(9, 30) <= t < dtime(16, 0)
@@ -90,10 +91,11 @@ def is_equities_extended_hours() -> bool:
     """Equity extended hours: 4:00 AM – 8:00 PM ET, Mon–Fri, trading days only.
     Use this to gate MKT close orders — IBKR cancels them outside this window."""
     from risk import is_trading_day
+
     if not is_trading_day():
         return False
     now_et = datetime.now(_ET)
-    if now_et.weekday() >= 5:          # Saturday=5, Sunday=6
+    if now_et.weekday() >= 5:  # Saturday=5, Sunday=6
         return False
     t = now_et.time()
     return dtime(4, 0) <= t < dtime(20, 0)
@@ -101,7 +103,7 @@ def is_equities_extended_hours() -> bool:
 
 def get_contract(symbol: str, instrument: str = "stock"):
     """Build the correct IBKR contract for any instrument type."""
-    if instrument == "fx" or len(symbol) == 6 and symbol.isalpha():
+    if instrument == "fx" or (len(symbol) == 6 and symbol.isalpha()):
         return Forex(symbol)
     else:
         return Stock(symbol, "SMART", "USD")
@@ -119,7 +121,7 @@ def _get_ibkr_price(ib: IB, contract, fallback: float = 0) -> float:
         ib.sleep(0.5)  # slightly longer for delayed data to arrive
         # Try market price first, then last, then close
         mkt = ticker.marketPrice()
-        if mkt and mkt > 0 and not (hasattr(mkt, '__float__') and float(mkt) != float(mkt)):
+        if mkt and mkt > 0 and not (hasattr(mkt, "__float__") and float(mkt) != float(mkt)):
             return float(mkt)
         last = ticker.last
         if last and last > 0:
@@ -128,11 +130,16 @@ def _get_ibkr_price(ib: IB, contract, fallback: float = 0) -> float:
         if close and close > 0:
             return float(close)
     except Exception as _e:
-        log.warning("_get_ibkr_price: reqTickers failed for %s — %s (using fallback=%s)", getattr(contract, 'symbol', '?'), _e, fallback)
+        log.warning(
+            "_get_ibkr_price: reqTickers failed for %s — %s (using fallback=%s)",
+            getattr(contract, "symbol", "?"),
+            _e,
+            fallback,
+        )
     return fallback
 
 
-def _get_ibkr_bid_ask(ib: IB, contract) -> Tuple[float, float]:
+def _get_ibkr_bid_ask(ib: IB, contract) -> tuple[float, float]:
     """
     Fetch current bid/ask for execution agent context. Returns (0.0, 0.0) on failure.
     Reuses the same delayed market data subscription already active for _get_ibkr_price.
@@ -144,7 +151,7 @@ def _get_ibkr_bid_ask(ib: IB, contract) -> Tuple[float, float]:
         ask = float(ticker.ask) if getattr(ticker, "ask", None) and ticker.ask > 0 else 0.0
         return bid, ask
     except Exception as _e:
-        log.warning("_get_ibkr_bid_ask: reqTickers failed for %s — %s", getattr(contract, 'symbol', '?'), _e)
+        log.warning("_get_ibkr_bid_ask: reqTickers failed for %s — %s", getattr(contract, "symbol", "?"), _e)
         return 0.0, 0.0
 
 
@@ -155,6 +162,7 @@ def _get_alpaca_price(symbol: str) -> float:
     """
     try:
         from alpaca_data import fetch_bars
+
         df = fetch_bars(symbol, period="2d", interval="1d")
         if df is not None and not df.empty and "Close" in df.columns:
             price = float(df["Close"].iloc[-1])
@@ -172,18 +180,16 @@ def _is_option_contract(contract) -> bool:
     Check all possible indicators to be robust.
     """
     # Check secType (works for both subclass and generic Contract)
-    sec = getattr(contract, 'secType', '')
-    if sec and sec.upper() in ('OPT', 'FOP'):
+    sec = getattr(contract, "secType", "")
+    if sec and sec.upper() in ("OPT", "FOP"):
         return True
     # Check class name (ib_async uses Option subclass for portfolio items)
-    if type(contract).__name__ in ('Option', 'FuturesOption'):
+    if type(contract).__name__ in ("Option", "FuturesOption"):
         return True
     # Check option-specific attributes — if strike > 0 AND right is set, it's an option
-    strike = getattr(contract, 'strike', 0)
-    right = getattr(contract, 'right', '')
-    if strike and strike > 0 and right and right in ('C', 'P', 'CALL', 'PUT'):
-        return True
-    return False
+    strike = getattr(contract, "strike", 0)
+    right = getattr(contract, "right", "")
+    return bool(strike and strike > 0 and right and right in ("C", "P", "CALL", "PUT"))
 
 
 def _ibkr_item_to_key(item) -> str:
@@ -198,26 +204,26 @@ def _ibkr_item_to_key(item) -> str:
     c = item.contract
     if _is_option_contract(c):
         # Convert IBKR date format (YYYYMMDD) to our format (YYYY-MM-DD)
-        raw_exp = str(getattr(c, 'lastTradeDateOrContractMonth', ''))
+        raw_exp = str(getattr(c, "lastTradeDateOrContractMonth", ""))
         if len(raw_exp) == 8 and raw_exp.isdigit():
             expiry_str = f"{raw_exp[:4]}-{raw_exp[4:6]}-{raw_exp[6:]}"
         else:
             expiry_str = raw_exp
-        right_raw = getattr(c, 'right', 'C')
+        right_raw = getattr(c, "right", "C")
         right = "C" if right_raw in ("C", "CALL") else "P"
-        strike = getattr(c, 'strike', 0)
+        strike = getattr(c, "strike", 0)
         return f"{c.symbol}_{right}_{strike}_{expiry_str}"
     # Forex: IBKR stores secType='CASH' with symbol=base currency (e.g. 'EUR', 'USD').
     # Reconstruct the 6-char pair (e.g. 'EURUSD', 'USDJPY') so active_trades keys
     # match the symbol used at order entry time.
-    if getattr(c, 'secType', '') == 'CASH':
-        currency = getattr(c, 'currency', '')
+    if getattr(c, "secType", "") == "CASH":
+        currency = getattr(c, "currency", "")
         if currency:
             return c.symbol + currency
     return c.symbol
 
 
-def _validate_position_price(symbol: str, ibkr_price: float, entry: float) -> Tuple[float, str]:
+def _validate_position_price(symbol: str, ibkr_price: float, entry: float) -> tuple[float, str]:
     """
     3-way price consensus for position monitoring (IBKR + Alpaca + TV).
     Same logic used at order entry — now applied to ongoing updates and closes.
@@ -237,7 +243,8 @@ def _validate_position_price(symbol: str, ibkr_price: float, entry: float) -> Tu
     # @patch('orders.*') works even when this module object differs from
     # sys.modules['orders'] (can happen during pytest collection cycles).
     import sys as _sys
-    _om = _sys.modules.get('orders_contracts', _sys.modules[__name__])
+
+    _om = _sys.modules.get("orders_contracts", _sys.modules[__name__])
     _gtsc = _om.get_tv_signal_cache
     _gap = _om._get_alpaca_price
 
@@ -291,7 +298,7 @@ def _validate_position_price(symbol: str, ibkr_price: float, entry: float) -> Tu
     # Three sources — find the outlier (if any) and use median
     vals = list(prices.values())
     names = list(prices.keys())
-    sorted_prices = sorted(zip(names, vals), key=lambda x: x[1])
+    sorted_prices = sorted(zip(names, vals, strict=False), key=lambda x: x[1])
 
     low_name, low_val = sorted_prices[0]
     mid_name, mid_val = sorted_prices[1]
@@ -309,18 +316,24 @@ def _validate_position_price(symbol: str, ibkr_price: float, entry: float) -> Tu
 
     # One outlier — the two that agree win
     if low_mid_div <= 0.20 and mid_hi_div > 0.50:
-        log.warning(f"Price outlier {symbol}: rejecting {hi_name}=${hi_val:.2f} — "
-                    f"{low_name}=${low_val:.2f} and {mid_name}=${mid_val:.2f} agree")
+        log.warning(
+            f"Price outlier {symbol}: rejecting {hi_name}=${hi_val:.2f} — "
+            f"{low_name}=${low_val:.2f} and {mid_name}=${mid_val:.2f} agree"
+        )
         consensus = (low_val + mid_val) / 2
         return round(consensus, 4), f"{low_name}+{mid_name} consensus (rejected {hi_name})"
 
     if mid_hi_div <= 0.20 and low_mid_div > 0.50:
-        log.warning(f"Price outlier {symbol}: rejecting {low_name}=${low_val:.2f} — "
-                    f"{mid_name}=${mid_val:.2f} and {hi_name}=${hi_val:.2f} agree")
+        log.warning(
+            f"Price outlier {symbol}: rejecting {low_name}=${low_val:.2f} — "
+            f"{mid_name}=${mid_val:.2f} and {hi_name}=${hi_val:.2f} agree"
+        )
         consensus = (mid_val + hi_val) / 2
         return round(consensus, 4), f"{mid_name}+{hi_name} consensus (rejected {low_name})"
 
     # All three disagree badly — reject everything
-    log.error(f"PRICE CHAOS {symbol}: {names[0]}=${vals[0]:.2f}, {names[1]}=${vals[1]:.2f}, "
-              f"{names[2]}=${vals[2]:.2f} — no consensus, keeping previous price")
+    log.error(
+        f"PRICE CHAOS {symbol}: {names[0]}=${vals[0]:.2f}, {names[1]}=${vals[1]:.2f}, "
+        f"{names[2]}=${vals[2]:.2f} — no consensus, keeping previous price"
+    )
     return 0, "All 3 sources disagree"

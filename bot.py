@@ -51,10 +51,19 @@ colorama_init()
 logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
+# Rotating file handler — 50MB per file, keep 10 backups (500MB ceiling).
+# Prevents decifer.log from ballooning (9.4GB on 2026-04-14 before the OOM crash).
+from logging.handlers import RotatingFileHandler as _RotatingFileHandler
+
+_file_handler = _RotatingFileHandler(
+    CONFIG["log_file"],
+    maxBytes=50 * 1024 * 1024,
+    backupCount=10,
+)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(message)s",
-    handlers=[logging.FileHandler(CONFIG["log_file"]), logging.StreamHandler(sys.stdout)],
+    handlers=[_file_handler, logging.StreamHandler(sys.stdout)],
 )
 log = logging.getLogger("decifer.bot")
 
@@ -165,6 +174,15 @@ def save_settings_overrides(settings: dict):
 # Re-exported here so that callers using `bot.check_and_reload()`,
 # `bot._file_hash()`, etc. continue to work unchanged.
 # Tests access `bot._file_hashes` as a dict mutation — shared by reference.
+# LOAD-BEARING: do NOT strip as "unused" — bot_trading.py:1039 does
+# sys.modules.get("bot").check_and_reload(); tests do bot.check_and_reload().
+# Ruff respects the noqa comments below.
+from bot_hot_reload import (  # noqa: F401
+    _file_hash,
+    _file_hashes,
+    _init_hashes,
+    check_and_reload,
+)
 
 
 # ── Module __class__ shim ─────────────────────────────────────────────────────
@@ -496,7 +514,7 @@ def main():
                 dash["killed"] = True
                 clog("RISK", "🚨 Telegram KILL — executing FLATTEN ALL...")
                 try:
-                    from orders import flatten_all
+                    from orders_portfolio import flatten_all
 
                     flatten_all(bot_state.ib)
                     clog("RISK", "🚨 Telegram FLATTEN ALL complete")
