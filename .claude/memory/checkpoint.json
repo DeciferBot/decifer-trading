@@ -1,21 +1,17 @@
 {
-  "timestamp": "2026-04-14T15:44:16.729Z",
+  "timestamp": "2026-04-14T17:47:57.435Z",
   "branch": "master",
-  "lastCommit": "a99e252 fix(imports): restore load-bearing re-exports stripped by Ruff + add log rotation",
+  "lastCommit": "67d6019 fix(test): retarget ic_calculator patches to ic submodules",
   "roadmapPhase": null,
   "lastFilesTouched": [
-    "claude/hooks/session-start-hook.mjs",
-    ".claude/memory/checkpoint.json",
+    "claude/memory/checkpoint.json",
     ".claude/memory/session-history.jsonl",
-    ".claude/settings.json",
-    "CLAUDE.md",
-    "\"Decifer Trading.app/Contents/MacOS/launch\"",
-    "Decifer.command",
-    "agents.py",
-    "bot_account.py",
-    "bot_dashboard.py"
+    "data/audit_log.jsonl",
+    "data/live_ic_report.json",
+    "data/signals_log.jsonl",
+    "Chief-Decifer-recovered/"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 252
+  "sessionCount": 255
 }
