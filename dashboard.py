@@ -3934,7 +3934,7 @@ function renderFavTags() {
     return;
   }
   el.innerHTML = favourites.map(t =>
-    `<span class="fav-tag">${esc(t)}<span onclick="removeFav(${JSON.stringify(t)})" title="Remove">×</span></span>`
+    `<span class="fav-tag">${esc(t)}<span onclick='removeFav(${JSON.stringify(t)})' title="Remove">×</span></span>`
   ).join('');
 }
 
