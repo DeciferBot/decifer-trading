@@ -432,19 +432,13 @@ def main():
     else:
         clog("INFO", "📡 News Sentinel disabled (sentinel_enabled=False in config)")
 
-    # ── Start Catalyst Sentinel (M&A / acquisition monitor) ──────────────────
-    if CONFIG.get("catalyst_sentinel_enabled", True):
-        bot_state._catalyst_sentinel = start_catalyst_sentinel(bot_state.ib)
-        dash["catalyst_triggers"] = []
-        dash["catalyst_sentinel_stats"] = bot_state._catalyst_sentinel.stats
-        clog(
-            "INFO",
-            f"⚡ Catalyst Sentinel active | "
-            f"news every {CONFIG.get('catalyst_news_poll_seconds', 60)}s | "
-            f"EDGAR every {CONFIG.get('catalyst_edgar_poll_seconds', 600)}s",
-        )
-    else:
-        clog("INFO", "⚡ Catalyst Sentinel disabled (catalyst_sentinel_enabled=False in config)")
+    # ── CatalystSentinel retired (Session 2) ─────────────────────────────────
+    # CatalystEngine now owns all real-time M&A monitoring (news + EDGAR) and
+    # enriches every trigger with screener_context + size_multiplier.
+    # catalyst_sentinel.py is kept but no longer started.
+    # if CONFIG.get("catalyst_sentinel_enabled", True):
+    #     bot_state._catalyst_sentinel = start_catalyst_sentinel(bot_state.ib)
+    clog("INFO", "⚡ CatalystSentinel retired — CatalystEngine owns real-time monitoring")
 
     # ── Start Catalyst Engine (M&A intelligence layer) ───────────────────────
     # Session 1: WatchlistStore + 4 scoring runners (fundamental/EDGAR/options/sentiment).

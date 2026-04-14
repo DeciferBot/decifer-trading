@@ -113,24 +113,22 @@ class WatchlistStore:
 def compute_size_multiplier(catalyst_score: float | None) -> float:
     """
     Translate catalyst score into a position size multiplier.
-    Applied to the base catalyst_risk_multiplier already set in config.
+    Applied on top of catalyst_risk_multiplier in handle_catalyst_trigger.
 
-    Score bands (note: fundamentals-only max is 3.5, so 5.0+ requires
-    at least one additional scoring tier):
-        < 5.0  → 0.75×  (below threshold — standard sentinel sizing)
-        5.0–6.9 → 1.00× (threshold met)
-        7.0–8.4 → 1.10× (strong multi-tier conviction)
-        ≥ 8.5  → 1.25× (high conviction)
+    For news/EDGAR triggers: score never reduces sizing — only boosts it.
+    Partial scores (fundamentals-only max = 3.5) stay at 1.0× baseline.
+    Score-threshold trigger (Session 3) gates on ≥ 5.0.
+
+        None / < 5.0  → 1.00× (baseline — no change from current sentinel)
+        5.0 – 6.9     → 1.00× (threshold met, screener_context passed to agents)
+        7.0 – 8.4     → 1.10× (strong multi-tier conviction)
+        ≥ 8.5         → 1.25× (high conviction)
     """
-    if catalyst_score is None:
-        return 0.75
+    if catalyst_score is None or catalyst_score < 7.0:
+        return 1.00
     if catalyst_score >= 8.5:
         return 1.25
-    if catalyst_score >= 7.0:
-        return 1.10
-    if catalyst_score >= 5.0:
-        return 1.00
-    return 0.75
+    return 1.10
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -167,23 +165,39 @@ class CatalystEngine:
         get_universe_fn: Callable,
         on_trigger_fn: Callable | None = None,
     ) -> None:
+        from config import CONFIG
+        from news_infrastructure import HeadlineDeduplicator, SymbolCooldown
+
         self.get_universe = get_universe_fn
-        self.on_trigger = on_trigger_fn          # wired in Session 2
+        self.on_trigger = on_trigger_fn
         self.store = WatchlistStore()
         self._running = False
         self._threads: list[threading.Thread] = []
 
+        # Real-time monitor dedup — instance-level so engine is self-contained
+        self._headline_dedup = HeadlineDeduplicator(max_size=5000)
+        self._seen_edgar_events: set[str] = set()
+        self._cooldown = SymbolCooldown(
+            cooldown_minutes=CONFIG.get("catalyst_cooldown_minutes", 60)
+        )
+
         self.stats: dict = {
             "status": "stopped",
             "candidates": 0,
-            "last_screen":    None,
-            "last_edgar":     None,
-            "last_options":   None,
-            "last_sentiment": None,
-            "screen_runs":    0,
-            "edgar_runs":     0,
-            "options_runs":   0,
-            "sentiment_runs": 0,
+            "last_screen":         None,
+            "last_edgar":          None,
+            "last_options":        None,
+            "last_sentiment":      None,
+            "last_news_poll":      None,
+            "last_edgar_monitor":  None,
+            "last_trigger":        None,
+            "screen_runs":         0,
+            "edgar_runs":          0,
+            "options_runs":        0,
+            "sentiment_runs":      0,
+            "news_polls":          0,
+            "edgar_monitor_polls": 0,
+            "triggers_fired":      0,
         }
 
     # ── Lifecycle ───────────────────────────────────────────────
@@ -201,11 +215,18 @@ class CatalystEngine:
         self._running = True
         self.stats["status"] = "running"
 
+        from config import CONFIG
+
+        news_interval  = CONFIG.get("catalyst_news_poll_seconds", 60)
+        edgar_interval = CONFIG.get("catalyst_edgar_poll_seconds", 600)
+
         runner_specs = [
-            ("fundamental", self._fundamental_runner, CATALYST_SCREEN_INTERVAL),
-            ("edgar",       self._edgar_runner,       EDGAR_POLL_INTERVAL),
-            ("options",     self._options_runner,     OPTIONS_ANOMALY_INTERVAL),
-            ("sentiment",   self._sentiment_runner,   SENTIMENT_SCORER_INTERVAL),
+            ("fundamental",   self._fundamental_runner, CATALYST_SCREEN_INTERVAL),
+            ("edgar_scorer",  self._edgar_runner,       EDGAR_POLL_INTERVAL),
+            ("options",       self._options_runner,     OPTIONS_ANOMALY_INTERVAL),
+            ("sentiment",     self._sentiment_runner,   SENTIMENT_SCORER_INTERVAL),
+            ("news_monitor",  self._news_monitor,       news_interval),
+            ("edgar_monitor", self._edgar_monitor,      edgar_interval),
         ]
         for name, target, interval in runner_specs:
             t = threading.Thread(
@@ -216,7 +237,7 @@ class CatalystEngine:
             )
             t.start()
             self._threads.append(t)
-            log.info(f"CatalystEngine: {name} runner started (interval={interval}s)")
+            log.info(f"CatalystEngine: {name} started (interval={interval}s)")
 
         log.info(
             f"⚡ CatalystEngine started | "
@@ -224,7 +245,8 @@ class CatalystEngine:
             f"screen={CATALYST_SCREEN_INTERVAL}s "
             f"edgar={EDGAR_POLL_INTERVAL}s "
             f"options={OPTIONS_ANOMALY_INTERVAL}s "
-            f"sentiment={SENTIMENT_SCORER_INTERVAL}s"
+            f"sentiment={SENTIMENT_SCORER_INTERVAL}s | "
+            f"news={news_interval}s edgar_rt={edgar_interval}s"
         )
 
     def stop(self) -> None:
@@ -246,7 +268,7 @@ class CatalystEngine:
     def get_size_multiplier(self, ticker: str) -> float:
         """
         Return the size multiplier for ticker based on its current catalyst score.
-        Returns 0.75 (standard sentinel sizing) if ticker is not in watchlist.
+        Returns 1.0 (baseline — no change) if ticker is not in watchlist.
         """
         candidate = self.store.get(ticker)
         score = candidate.get("catalyst_score") if candidate else None
@@ -371,4 +393,213 @@ class CatalystEngine:
                 log.info(f"CatalystEngine [sentiment]: done — {updated} candidates updated")
             except Exception as exc:
                 log.error(f"CatalystEngine [sentiment] error: {exc}", exc_info=True)
+            time.sleep(interval)
+
+    # ── Real-time monitors (Session 2) ──────────────────────────
+
+    def _fire(self, trigger: dict) -> None:
+        """
+        Enrich trigger with WatchlistStore context + size_multiplier, fire callback.
+        O(1) in-memory lookup — no file I/O on the hot path.
+        """
+        if not self.on_trigger:
+            return
+
+        sym = trigger.get("symbol", "")
+        self._cooldown.set_cooldown(sym)
+
+        candidate = self.store.get(sym) if sym else None
+        if candidate:
+            catalyst_score = candidate.get("catalyst_score", 0)
+            trigger["screener_context"] = {
+                "catalyst_score":        catalyst_score,
+                "fundamental_score":     candidate.get("fundamental_score", 0),
+                "options_anomaly_score": candidate.get("options_anomaly_score", 0),
+                "edgar_score":           candidate.get("edgar_score", 0),
+                "sentiment_score":       candidate.get("sentiment_score", 0.0),
+                "all_tiers_scored": (
+                    candidate.get("options_anomaly_score", 0) > 0
+                    and candidate.get("edgar_score", 0) > 0
+                    and candidate.get("sentiment_score", 0.0) > 0
+                ),
+                "flags": candidate.get("flags", []),
+            }
+            trigger["size_multiplier"] = compute_size_multiplier(catalyst_score)
+        else:
+            trigger["size_multiplier"] = 1.0  # not pre-identified — baseline sizing
+
+        self.stats["triggers_fired"] += 1
+        self.stats["last_trigger"] = {
+            "symbol":             sym,
+            "type":               trigger.get("trigger_type"),
+            "urgency":            trigger.get("urgency"),
+            "size_multiplier":    trigger["size_multiplier"],
+            "has_screener_context": "screener_context" in trigger,
+            "catalyst_score":     trigger.get("screener_context", {}).get("catalyst_score"),
+            "time":               datetime.now(_UTC).strftime("%H:%M UTC"),
+        }
+
+        log.info(
+            f"⚡ CATALYST ENGINE FIRE: {sym} | "
+            f"type={trigger.get('trigger_type')} | "
+            f"urgency={trigger.get('urgency')} | "
+            f"size_mult={trigger['size_multiplier']}x | "
+            f"screener={'score=' + str(trigger['screener_context']['catalyst_score']) if 'screener_context' in trigger else 'not tracked'}"
+        )
+
+        from risk import is_trading_day
+        if not is_trading_day():
+            log.info(f"Catalyst trigger for {sym} — not a trading day, skipping execution")
+            return
+
+        try:
+            self.on_trigger(trigger)
+        except Exception as exc:
+            log.error(f"CatalystEngine trigger callback error ({sym}): {exc}")
+
+    def _fetch_news(self, symbols: list[str]) -> list[dict]:
+        """
+        Poll Yahoo RSS for M&A keywords across universe symbols.
+        Uses instance-level headline dedup — no shared state with CatalystSentinel.
+        """
+        import xml.etree.ElementTree as ET
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from email.utils import parsedate_to_datetime
+
+        import requests
+        from catalyst_sentinel import _check_ma_keywords
+
+        now = datetime.now(_UTC)
+
+        def _check_symbol(sym: str) -> list[dict]:
+            url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={sym}&region=US&lang=en-US"
+            try:
+                resp = requests.get(
+                    url, timeout=2.0,
+                    headers={"User-Agent": "Decifer/2.0 CatalystEngine"},
+                )
+                if resp.status_code != 200:
+                    return []
+                root = ET.fromstring(resp.content)
+                hits = []
+                for item in root.findall(".//item")[:6]:
+                    title = item.findtext("title", "").strip()
+                    if not title:
+                        continue
+                    if not self._headline_dedup.add_if_new(title):
+                        continue
+                    pub_date = item.findtext("pubDate", "")
+                    age_hours = 999.0
+                    if pub_date:
+                        try:
+                            age_hours = (now - parsedate_to_datetime(pub_date)).total_seconds() / 3600
+                        except Exception:
+                            pass
+                    if age_hours > 4:
+                        continue
+                    is_match, keyword, is_definitive = _check_ma_keywords(title)
+                    if not is_match:
+                        continue
+                    hits.append({
+                        "symbol":       sym,
+                        "headline":     title,
+                        "keyword":      keyword,
+                        "is_definitive": is_definitive,
+                        "age_hours":    round(age_hours, 2),
+                        "source":       "yahoo_rss",
+                    })
+                return hits
+            except Exception as exc:
+                log.debug(f"CatalystEngine news fetch ({sym}): {exc}")
+                return []
+
+        results: list[dict] = []
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {pool.submit(_check_symbol, sym): sym for sym in symbols}
+            for future in as_completed(futures):
+                try:
+                    results.extend(future.result())
+                except Exception:
+                    pass
+        return results
+
+    def _news_monitor(self, interval: int) -> None:
+        """
+        Polls Yahoo RSS every `interval` seconds for M&A announcement keywords.
+        Fires enriched triggers immediately on match.
+        """
+        while self._running:
+            try:
+                universe = self.get_universe()
+                if universe:
+                    from catalyst_sentinel import _build_news_trigger
+                    hits = self._fetch_news(universe)
+                    for hit in hits:
+                        sym = hit["symbol"]
+                        if self._cooldown.is_on_cooldown(sym):
+                            continue
+                        trigger = _build_news_trigger(hit)
+                        self._fire(trigger)
+                self.stats["news_polls"] += 1
+                self.stats["last_news_poll"] = datetime.now(_UTC).strftime("%H:%M UTC")
+            except Exception as exc:
+                log.error(f"CatalystEngine [news_monitor] error: {exc}", exc_info=True)
+            time.sleep(interval)
+
+    def _edgar_monitor(self, interval: int) -> None:
+        """
+        Polls SEC EDGAR RSS (SC 13D / SC 13G / Form 4) every `interval` seconds.
+        Fires enriched triggers for watchlist hits and all 13D activist filings.
+        Staggered 45s after startup.
+        """
+        from catalyst_sentinel import (
+            _parse_edgar_feed,
+            _load_sec_tickers,
+            _build_edgar_trigger,
+            _EDGAR_FEEDS,
+        )
+
+        time.sleep(45)
+        while self._running:
+            try:
+                cik_map   = _load_sec_tickers()
+                watchlist = set(self.store.all_tickers())
+
+                for form_type, url in _EDGAR_FEEDS.items():
+                    events = _parse_edgar_feed(form_type, url)
+                    time.sleep(0.5)
+
+                    for ev in events:
+                        # Resolve CIK → ticker
+                        ticker = cik_map.get(ev.get("cik") or "") or None
+                        ev["ticker"] = ticker
+
+                        # Dedup — same event key as catalyst_sentinel for consistency
+                        dedup_key = f"{form_type}|{ev.get('cik')}|{(ev.get('updated') or '')[:10]}"
+                        if dedup_key in self._seen_edgar_events:
+                            continue
+                        self._seen_edgar_events.add(dedup_key)
+                        if len(self._seen_edgar_events) > 2000:
+                            stale = list(self._seen_edgar_events)[:500]
+                            for k in stale:
+                                self._seen_edgar_events.discard(k)
+
+                        if not ticker:
+                            continue
+
+                        on_watchlist = ticker.upper() in watchlist
+                        if form_type != "SC 13D" and not on_watchlist:
+                            continue  # 13G and Form 4 only interesting for pre-identified targets
+
+                        if self._cooldown.is_on_cooldown(ticker):
+                            continue
+
+                        ev["on_watchlist"] = on_watchlist
+                        trigger = _build_edgar_trigger(ev)
+                        self._fire(trigger)
+
+                self.stats["edgar_monitor_polls"] += 1
+                self.stats["last_edgar_monitor"] = datetime.now(_UTC).strftime("%H:%M UTC")
+            except Exception as exc:
+                log.error(f"CatalystEngine [edgar_monitor] error: {exc}", exc_info=True)
             time.sleep(interval)

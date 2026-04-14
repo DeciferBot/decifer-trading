@@ -375,7 +375,8 @@ def handle_catalyst_trigger(trigger: dict):
         if action == "BUY":
             catalyst_mult = CONFIG.get("catalyst_risk_multiplier", 0.50)
             sentinel_mult = CONFIG.get("sentinel_risk_multiplier", 0.75)
-            decision["_trigger_size_mult"] = catalyst_mult * sentinel_mult
+            engine_mult   = trigger.get("size_multiplier", 1.0)  # 1.0 = no change (CatalystSentinel compat)
+            decision["_trigger_size_mult"] = catalyst_mult * engine_mult * sentinel_mult
             _execute_trigger_buy(decision, pv, regime, trigger, label="CATALYST")
             bot_state._catalyst_trades_today += 1
         elif action == "SELL":
@@ -444,17 +445,17 @@ def start_catalyst_sentinel(ib):
 
 def start_catalyst_engine():
     """
-    Initialise and start the CatalystEngine intelligence layer.
+    Initialise and start the CatalystEngine — unified M&A intelligence service.
     Returns the running engine instance; caller stores in bot_state._catalyst_engine.
 
-    Session 1: WatchlistStore + 4 scoring runners only.
-    Session 2: real-time monitors added, CatalystSentinel retired.
+    Owns: WatchlistStore + 4 scoring runners + news monitor + EDGAR monitor.
+    Fires handle_catalyst_trigger() with screener_context + size_multiplier enrichment.
     """
     from catalyst_engine import CatalystEngine
 
     engine = CatalystEngine(
         get_universe_fn=_get_sentinel_universe,
-        on_trigger_fn=None,  # wired in Session 2
+        on_trigger_fn=handle_catalyst_trigger,
     )
     engine.start()
     return engine
