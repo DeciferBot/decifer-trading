@@ -390,7 +390,7 @@ canvas{display:block;width:100% !important}
 
 <!-- DECISION BAR -->
 <div class="decision-bar">
-  <div class="decision-bar-label">Last Decision</div>
+  <div class="decision-bar-label" id="decision-bar-label">Last Decision</div>
   <div class="decision-bar-actions" id="decision-bar-actions">
     <span style="color:var(--muted2);font-size:11px">Awaiting first scan…</span>
   </div>
@@ -2483,36 +2483,83 @@ function renderTradeActions(trades) {
 }
 
 // ── Decision Bar (always-visible top strip) ─────────────────
-function renderDecisionBar(convo, lastScan) {
+function renderDecisionBar(convo, lastScan, executed, skipReasons) {
   const actionsEl = document.getElementById('decision-bar-actions');
   const timeEl    = document.getElementById('decision-bar-time');
+  const labelEl   = document.getElementById('decision-bar-label');
   if (!actionsEl) return;
 
   const finalEntry = convo.find(m => m.agent === 'Final Decision Maker') || convo[convo.length - 1];
   if (!finalEntry) return;
 
   const lines = (finalEntry.output || '').split('\n').map(l => l.trim()).filter(Boolean);
-  if (timeEl) timeEl.textContent = finalEntry.time || lastScan || '—';
 
   if (!lines.length || lines[0] === 'No trades this cycle.') {
     actionsEl.innerHTML = '<span style="color:var(--muted2);font-size:11px">No trades this cycle.</span>';
+    if (labelEl) { labelEl.textContent = 'Last Decision'; labelEl.style.color = ''; labelEl.title = ''; }
+    if (timeEl) timeEl.textContent = finalEntry.time || lastScan || '—';
     return;
+  }
+
+  // Build skip-reason lookup: symbol → reason (most recent entry wins)
+  const skipMap = {};
+  (skipReasons || []).forEach(sr => {
+    if (sr.symbol && sr.reason && !skipMap[sr.symbol]) skipMap[sr.symbol] = sr.reason;
+  });
+
+  // Update label to reflect whether the suggestion was actually executed
+  if (labelEl) {
+    if (executed === false) {
+      labelEl.textContent = 'Suggested — Not Taken';
+      labelEl.style.color = 'var(--orange)';
+    } else if (executed === true) {
+      labelEl.textContent = 'Last Executed';
+      labelEl.style.color = 'var(--green)';
+      labelEl.title = '';
+    } else {
+      labelEl.textContent = 'Last Decision';
+      labelEl.style.color = '';
+      labelEl.title = '';
+    }
   }
 
   const ACTION_COLOR = { BUY: 'var(--green)', SELL: 'var(--red)', HOLD: 'var(--orange)' };
   const ACTION_BG    = { BUY: 'rgba(0,200,83,.15)', SELL: 'rgba(255,82,82,.15)', HOLD: 'rgba(255,107,0,.15)' };
+  const pillOpacity  = executed === false ? '0.45' : '1';
 
-  actionsEl.innerHTML = lines.map(line => {
+  // Build pills — attach skip reason as hover tooltip when available
+  const pills = lines.map(line => {
     const parts  = line.split(/\s+/);
     const action = (parts[0] || '').toUpperCase();
     const ticker = parts.slice(1).join(' ');
+    const sym    = (parts[1] || '').replace(/[^A-Za-z]/g, '').toUpperCase();
     const color  = ACTION_COLOR[action] || 'var(--muted2)';
     const bg     = ACTION_BG[action]    || 'rgba(80,80,80,.1)';
-    return `<div class="decision-pill" style="border-color:${color};background:${bg}">
+    const reason = skipMap[sym] || '';
+    return `<div class="decision-pill" style="border-color:${color};background:${bg};opacity:${pillOpacity};cursor:${reason?'help':'default'}" title="${reason ? esc(reason) : ''}">
       <span class="decision-pill-action" style="color:${color}">${esc(action)}</span>
       <span class="decision-pill-ticker">${esc(ticker)}</span>
     </div>`;
   }).join('');
+
+  // When not executed, replace timestamp with the primary skip reason (truncated, full on hover)
+  if (timeEl) {
+    let primaryReason = '';
+    if (executed === false) {
+      for (const line of lines) {
+        const sym = (line.split(/\s+/)[1] || '').replace(/[^A-Za-z]/g, '').toUpperCase();
+        if (skipMap[sym]) { primaryReason = skipMap[sym]; break; }
+      }
+    }
+    if (primaryReason) {
+      const truncated = primaryReason.length > 80 ? primaryReason.slice(0, 80) + '\u2026' : primaryReason;
+      timeEl.innerHTML = `<span style="color:var(--orange);font-style:italic" title="${esc(primaryReason)}">${esc(truncated)}</span>`;
+    } else {
+      timeEl.textContent = finalEntry.time || lastScan || '—';
+    }
+  }
+
+  actionsEl.innerHTML = pills;
 }
 
 // ── Chart instances ────────────────────────────────────────
@@ -2964,7 +3011,7 @@ async function poll() {
     // Agents view — conversation + executed trade actions
     if (d.agent_conversation && d.agent_conversation.length) {
       window._totalAgents = d.agent_conversation.length;
-      renderDecisionBar(d.agent_conversation, d.last_scan);
+      renderDecisionBar(d.agent_conversation, d.last_scan, d.last_decision_executed, d.last_skip_reasons);
     }
     // Trade Actions: show only orders actually submitted this session (not recommendations)
     renderTradeActions(d.trades);
@@ -3365,6 +3412,7 @@ async function loadNews() {
       news_score:       a.news_score || 0,
       image_url:        a.image_url  || '',
       url:              a.url        || '#',
+      source:           a.source     || '',
       macro_event:      a.macro_event      || false,
       macro_type:       a.macro_type       || '',
       macro_label:      a.macro_label      || '',
@@ -3399,12 +3447,28 @@ function renderNews(newsData) {
       news_score: nd.news_score || 0,
       image_url: nd.image_url || '',
       url: 'https://finance.yahoo.com/quote/' + encodeURIComponent(sym) + '/news/',
+      source: 'Yahoo RSS',
     });
   }
   if (!scanItems.length) return;
-  // Merge: deduplicate by headline, scan items take precedence
-  const seen = new Set(scanItems.map(i => i.headline));
-  const merged = [...scanItems, ..._allNewsItems.filter(i => !seen.has(i.headline))];
+  // Merge: deduplicate by headline, scan items take precedence.
+  // Preserve macro classification from existing items so events survive poll updates.
+  const existingByHl = new Map(_allNewsItems.map(i => [i.headline, i]));
+  const enrichedScan = scanItems.map(si => {
+    const ex = existingByHl.get(si.headline);
+    if (!ex || !ex.macro_event) return si;
+    return Object.assign({}, si, {
+      macro_event:      ex.macro_event,
+      macro_type:       ex.macro_type,
+      macro_label:      ex.macro_label,
+      macro_color:      ex.macro_color,
+      macro_impact:     ex.macro_impact,
+      macro_direction:  ex.macro_direction,
+      macro_implication:ex.macro_implication,
+    });
+  });
+  const seen = new Set(enrichedScan.map(i => i.headline));
+  const merged = [...enrichedScan, ..._allNewsItems.filter(i => !seen.has(i.headline))];
   _allNewsItems = merged;
   window._newsItems = _allNewsItems;
   filterNews();

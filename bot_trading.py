@@ -1732,6 +1732,7 @@ def run_scan():
         return
 
     _all_buys = decision.get("buys", [])
+    _executed_any_buy = False
 
     for buy in _all_buys:
         sym = buy.get("symbol") if isinstance(buy, dict) else buy
@@ -1784,6 +1785,28 @@ def run_scan():
             agent_outputs=decision.get("_agent_outputs", {}),
         )
         stock_success = any(r["success"] for r in dispatch_results)
+
+        # Surface skip reason for any signal that was blocked before execution
+        for _dr in dispatch_results:
+            _skip = _dr.get("skip_reason", "")
+            if not _dr["success"] and _skip:
+                _skip_entry = {
+                    "symbol": sym,
+                    "side": _dr.get("side", ""),
+                    "reason": _skip,
+                    "timestamp": datetime.now(_ET).isoformat(timespec="seconds"),
+                }
+                dash.setdefault("last_skip_reasons", []).insert(0, _skip_entry)
+                dash["last_skip_reasons"] = dash["last_skip_reasons"][:20]  # keep last 20
+                # Persist to skip_log.jsonl for post-session review
+                try:
+                    _skip_path = Path(__file__).parent / "data" / "skip_log.jsonl"
+                    with _skip_path.open("a") as _sf:
+                        _sf.write(json.dumps(_skip_entry) + "\n")
+                except Exception as _se:
+                    clog("WARN", f"Could not write skip_log.jsonl: {_se}")
+                clog("INFO", f"Trade skip logged — {sym}: {_skip[:120]}")
+
         if stock_success:
             trade_side = "SHORT" if buy.get("direction") == "SHORT" else "BUY"
             clog("TRADE", f"{trade_side} {sym} | Score={sig['score']} | {reason[:80]}")
@@ -1807,6 +1830,7 @@ def run_scan():
                 },
             )
             _write_last_decision(sym, buy, sig, decision, pv)
+            _executed_any_buy = True
 
         from orders_contracts import is_options_market_open
 
@@ -1867,10 +1891,15 @@ def run_scan():
                                     )
                                     if not stock_success:
                                         _write_last_decision(sym, buy, sig, decision, pv)
+                                    _executed_any_buy = True
                             else:
                                 clog("INFO", f"No suitable options contract for {sym}")
                         except Exception as _opt_err:
                             clog("ERROR", f"Options evaluation failed for {sym}: {_opt_err}")
+
+    # Record whether any agent-recommended buy actually executed this cycle.
+    # None = no buys were recommended; True/False = recommended and executed/not.
+    dash["last_decision_executed"] = _executed_any_buy if _all_buys else None
 
     # ── FX direct dispatch ────────────────────────────────────────────────────────
     # FX signals bypass the equity intelligence gate — the fx_signals scorer is the

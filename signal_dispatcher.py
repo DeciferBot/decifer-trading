@@ -110,6 +110,7 @@ def dispatch_signals(
             "price": signal.price,
             "trade_type": "",
             "conviction": 0.0,
+            "skip_reason": "",
         }
 
         # ── Cooldown / exit guard ──────────────────────────────
@@ -119,6 +120,7 @@ def dispatch_signals(
             _existing = _ord.active_trades.get(signal.symbol, {})
         if _existing.get("status") == "EXITING" or _ord._is_recently_closed(signal.symbol):
             log.debug(f"dispatch: skipping {signal.symbol} — exiting or in cooldown")
+            result["skip_reason"] = "In cooldown — position recently closed or still exiting"
             results.append(result)
             continue
 
@@ -131,6 +133,7 @@ def dispatch_signals(
         if _existing_dir and _existing_dir != signal.direction:
             log.warning(f"dispatch: {signal.symbol} straddle blocked — open={_existing_dir} new={signal.direction}")
             result["side"] = "BLOCKED_STRADDLE"
+            result["skip_reason"] = f"Straddle blocked — already holding {_existing_dir} position"
             results.append(result)
             continue
 
@@ -141,12 +144,14 @@ def dispatch_signals(
             # Treat as AVOID to be safe.
             log.warning(f"dispatch: no classification for {signal.symbol} — skipping")
             result["side"] = "AVOIDED"
+            result["skip_reason"] = "Intelligence gate: no classification returned (fallback AVOID)"
             results.append(result)
             continue
 
         if cls.trade_type == "AVOID":
             log.info(f"dispatch: {signal.symbol} AVOIDED by intelligence | {cls.reasoning[:80]}")
             result["side"] = "AVOIDED"
+            result["skip_reason"] = cls.reasoning  # full Opus reasoning, up to 300 chars
             results.append(result)
             continue
 
