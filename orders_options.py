@@ -739,69 +739,6 @@ def update_trailing_stops(ib: IB) -> None:
             continue
 
 
-# ── Session-scoped options attempt ledger ────────────────────────────────────
-# Tracks which (symbol, direction) pairs have already been attempted today.
-# Key  : "{symbol}_{direction}"  e.g. "NKE_LONG"
-# Value: ISO date string         e.g. "2026-04-02"
-#
-# Design rationale (industry standard for DAY orders):
-#   A cancelled DAY order is TERMINAL for that signal instance. Retrying the
-#   same symbol+direction on the same session date is almost always wrong —
-#   if IBKR couldn't fill it once, market conditions haven't changed enough
-#   in 5 minutes to justify another attempt.
-#   The natural retry boundary is the NEXT session when a fresh signal fires.
-#
-# Disk-persisted and auto-expires by date — no manual clearing needed.
-import json as _json
-import pathlib as _pathlib
-
-_OPTIONS_LEDGER_PATH = _pathlib.Path("data/options_attempt_ledger.json")
-
-
-def _load_options_ledger() -> dict:
-    """Load ledger from disk. Returns {} on any error."""
-    try:
-        if _OPTIONS_LEDGER_PATH.exists():
-            return _json.loads(_OPTIONS_LEDGER_PATH.read_text())
-    except Exception:
-        pass
-    return {}
-
-
-def _save_options_ledger(ledger: dict) -> None:
-    """Persist ledger to disk. Silently ignores write errors."""
-    try:
-        _OPTIONS_LEDGER_PATH.write_text(_json.dumps(ledger))
-    except Exception:
-        pass
-
-
-def _options_attempted_today(symbol: str, direction: str) -> bool:
-    """Return True if we already attempted options on this symbol+direction today."""
-    from datetime import datetime as _dt
-
-    key = f"{symbol}_{direction}"
-    today = _dt.now().strftime("%Y-%m-%d")
-    return _options_ledger.get(key) == today
-
-
-def _record_options_attempt(symbol: str, direction: str) -> None:
-    """Mark this symbol+direction as attempted today and persist."""
-    from datetime import datetime as _dt
-
-    key = f"{symbol}_{direction}"
-    today = _dt.now().strftime("%Y-%m-%d")
-    _options_ledger[key] = today
-    # Prune stale entries (any date != today) to keep the file tidy
-    stale = [k for k, v in _options_ledger.items() if v != today]
-    for k in stale:
-        del _options_ledger[k]
-    _save_options_ledger(_options_ledger)
-
-
-_options_ledger: dict = _load_options_ledger()
-
-
 # ── Add-to-position helpers ──────────────────────────────────────────────────
 
 def _get_open_option_position(symbol: str) -> tuple[str, dict] | None:
