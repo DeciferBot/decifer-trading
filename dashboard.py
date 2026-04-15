@@ -2936,7 +2936,7 @@ async function poll() {
     window._agentsRequired   = _req;
     window._lastAgentsAgreed = _agreed;
     window._lastScanTime     = d.last_scan || '';
-    const _total = window._totalAgents || (d.agent_conversation || []).length || '';
+    const _total = 4;  // Fixed: 3 analysis agents + 1 Final Decision Maker
     document.getElementById('agents-req').textContent = _req != null ? _req + (_total ? '/' + _total : '') : '—';
     const agreeEl = document.getElementById('last-agree');
     agreeEl.textContent = _agreed != null ? _agreed + (_total ? '/' + _total : '') : '—';
@@ -3751,7 +3751,7 @@ function renderTradeCard(ld) {
   const edge    = esc(ld.edge_why_now || '');
   const risk    = esc(ld.risk || '');
   const exp     = ld.expected_returns || {};
-  const _tot    = window._totalAgents || '';
+  const _tot    = 4;  // Fixed: 3 analysis agents + 1 Final Decision Maker
   const agents  = ld.agents_agreed != null ? ld.agents_agreed + (_tot ? '/' + _tot : '') + ' agents agreed' : '';
   const ts      = ld.timestamp ? esc(ld.timestamp.replace('T', ' ').slice(0, 16)) : '';
 
