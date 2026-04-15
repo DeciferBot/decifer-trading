@@ -66,18 +66,9 @@ def handle_news_trigger(trigger: dict):
         clog("INFO", f"Sentinel trigger for {sym} — not a trading day, skipping")
         return
 
-    now = datetime.now(_ET)
-    if bot_state._sentinel_hour_start is None or (now - bot_state._sentinel_hour_start).total_seconds() > 3600:
-        bot_state._sentinel_trades_this_hour = 0
-        bot_state._sentinel_hour_start = now
-
-    max_per_hour = CONFIG.get("sentinel_max_trades_per_hour", 3)
-    if bot_state._sentinel_trades_this_hour >= max_per_hour:
-        clog(
-            "RISK",
-            f"Sentinel rate limit: {bot_state._sentinel_trades_this_hour}/{max_per_hour} trades this hour — skipping {sym}",
-        )
-        return
+    # Rate-cap removed: duplicate-event suppression is handled upstream by
+    # HeadlineDeduplicator / SymbolCooldown. Risk is capped by check_risk_conditions
+    # + downstream order-level gates (cash floor, sector cap, correlation).
 
     if dash.get("paused") or dash.get("killed"):
         clog("INFO", f"Sentinel trigger for {sym} — bot paused/killed, skipping")
@@ -135,10 +126,8 @@ def handle_news_trigger(trigger: dict):
         if action == "BUY":
             decision["_trigger_size_mult"] = CONFIG.get("sentinel_risk_multiplier", 0.75)
             _execute_trigger_buy(decision, pv, regime, trigger, label="SENTINEL")
-            bot_state._sentinel_trades_this_hour += 1
         elif action == "SELL":
             _execute_sentinel_sell(decision, open_pos, regime, trigger)
-            bot_state._sentinel_trades_this_hour += 1
         elif action == "HOLD":
             clog("INFO", f"Sentinel {sym}: HOLD — {decision.get('reasoning', '')[:80]}")
         else:
@@ -295,18 +284,10 @@ def handle_catalyst_trigger(trigger: dict):
     sym = trigger.get("symbol", "?")
     trigger_type = trigger.get("trigger_type", "unknown")
 
-    today = datetime.now(_ET).strftime("%Y-%m-%d")
-    if bot_state._catalyst_trade_date != today:
-        bot_state._catalyst_trades_today = 0
-        bot_state._catalyst_trade_date = today
-
-    max_per_day = CONFIG.get("catalyst_max_trades_per_day", 2)
-    if bot_state._catalyst_trades_today >= max_per_day:
-        clog(
-            "RISK",
-            f"Catalyst rate limit: {bot_state._catalyst_trades_today}/{max_per_day} trades today — skipping {sym}",
-        )
-        return
+    # Daily rate-cap removed: EDGAR events are deduped upstream by `_seen_edgar_events`
+    # (keyed on form_type|cik|updated[:10]), headline-driven catalysts by
+    # HeadlineDeduplicator, and per-ticker re-firing by `_threshold_fired`. Risk is
+    # capped by check_risk_conditions + downstream order-level gates.
 
     if dash.get("paused") or dash.get("killed"):
         clog("INFO", f"Catalyst trigger for {sym} ({trigger_type}) — bot paused/killed, skipping")
@@ -387,10 +368,8 @@ def handle_catalyst_trigger(trigger: dict):
             engine_mult   = trigger.get("size_multiplier", 1.0)  # 1.0 = no change (CatalystSentinel compat)
             decision["_trigger_size_mult"] = catalyst_mult * engine_mult * sentinel_mult
             _execute_trigger_buy(decision, pv, regime, trigger, label="CATALYST")
-            bot_state._catalyst_trades_today += 1
         elif action == "SELL":
             _execute_sentinel_sell(decision, open_pos, regime, trigger)
-            bot_state._catalyst_trades_today += 1
         elif action == "HOLD":
             clog("INFO", f"Catalyst {sym}: HOLD — {decision.get('reasoning', '')[:80]}")
         else:

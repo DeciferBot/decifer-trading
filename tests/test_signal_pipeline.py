@@ -154,7 +154,6 @@ def _default_strategy_mode() -> dict:
         "score_threshold_adj": 0,
         "daily_pnl_pct": 0.0,
         "size_multiplier": 1.0,
-        "max_new_trades": 5,
     }
 
 

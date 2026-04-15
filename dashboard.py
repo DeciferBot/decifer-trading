@@ -840,7 +840,6 @@ canvas{display:block;width:100% !important}
     </div>
     <div class="setting-row"><span class="setting-label">Poll interval (sec)</span><input class="setting-input" id="cfg-sentinel-poll" type="number" step="5" min="15" max="120"></div>
     <div class="setting-row"><span class="setting-label">Cooldown per symbol (min)</span><input class="setting-input" id="cfg-sentinel-cooldown" type="number" step="1" min="1" max="60"></div>
-    <div class="setting-row"><span class="setting-label">Max trades / hour</span><input class="setting-input" id="cfg-sentinel-max-trades" type="number" step="1" min="1" max="10"></div>
     <div class="setting-row"><span class="setting-label">Position size multiplier</span><input class="setting-input" id="cfg-sentinel-risk-mult" type="number" step="0.05" min="0.25" max="1.5"></div>
     <div class="setting-row"><span class="setting-label">Keyword threshold</span><input class="setting-input" id="cfg-sentinel-kw-thresh" type="number" step="1" min="1" max="10"></div>
     <div class="setting-row"><span class="setting-label">Min confidence to trade</span><input class="setting-input" id="cfg-sentinel-min-conf" type="number" step="1" min="1" max="10"></div>
@@ -3053,7 +3052,7 @@ async function poll() {
         document.getElementById('r-mode-label').textContent  = mode + ' MODE';
         const mp = d.strategy_mode_params;
         const modeDetail = mp
-          ? `Score threshold +${mp.score_threshold_adj} · Size ×${mp.size_multiplier} · Max ${mp.max_new_trades} new trades${mode === 'RECOVERY' ? ' — capital preservation' : ''}`
+          ? `Score threshold +${mp.score_threshold_adj} · Size ×${mp.size_multiplier}${mode === 'RECOVERY' ? ' — capital preservation' : ''}`
           : mode + ' MODE';
         document.getElementById('r-mode-detail').textContent = modeDetail;
       }
@@ -3184,7 +3183,6 @@ async function poll() {
         document.getElementById('cfg-sentinel-enabled').value  = String(s.sentinel_enabled);
         document.getElementById('cfg-sentinel-poll').value     = s.sentinel_poll_seconds;
         document.getElementById('cfg-sentinel-cooldown').value = s.sentinel_cooldown_minutes;
-        document.getElementById('cfg-sentinel-max-trades').value = s.sentinel_max_trades_per_hour;
         document.getElementById('cfg-sentinel-risk-mult').value  = s.sentinel_risk_multiplier;
         document.getElementById('cfg-sentinel-kw-thresh').value  = s.sentinel_keyword_threshold;
         document.getElementById('cfg-sentinel-min-conf').value   = s.sentinel_min_confidence;
@@ -3890,7 +3888,6 @@ function applySettings() {
     sentinel_enabled:             document.getElementById('cfg-sentinel-enabled').value === 'true',
     sentinel_poll_seconds:        parseInt(document.getElementById('cfg-sentinel-poll').value),
     sentinel_cooldown_minutes:    parseInt(document.getElementById('cfg-sentinel-cooldown').value),
-    sentinel_max_trades_per_hour: parseInt(document.getElementById('cfg-sentinel-max-trades').value),
     sentinel_risk_multiplier:     parseFloat(document.getElementById('cfg-sentinel-risk-mult').value),
     sentinel_keyword_threshold:   parseInt(document.getElementById('cfg-sentinel-kw-thresh').value),
     sentinel_min_confidence:      parseInt(document.getElementById('cfg-sentinel-min-conf').value),

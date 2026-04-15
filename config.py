@@ -155,7 +155,11 @@ CONFIG = {
     "max_position_size": 0.30,  # Informational only — not enforced in sizing (see risk.py comment). Hard cap is 20% in orders_core.py. (live: re-evaluate enforcement)
     "max_daily_loss_pct": 0.05,  # 5% max daily loss before halting
     "correlation_threshold": 0.75,  # Block new trade if correlation > this
-    "max_positions": 15,
+    "max_positions": 100,  # Sanity ceiling only — NOT a portfolio construction tool.
+    # Real position-count constraints are emergent from min_cash_reserve (10%),
+    # max_single_position (6%), and max_sector_exposure (40%). Count caps are
+    # weak proxies for risk; percent caps express risk directly. Keep this key
+    # present because multiple readers do direct CONFIG["max_positions"] access.
     "daily_loss_limit": 0.10,  # 10% daily loss limit
     "max_drawdown_alert": 0.25,  # 25% drawdown alert
     "min_cash_reserve": 0.10,  # 10% cash floor — hard stop on new entries
@@ -586,7 +590,10 @@ CONFIG = {
     "sentinel_use_ibkr": True,  # Use IBKR news API as a source
     "sentinel_use_finviz": True,  # Use Finviz news scraping as a source
     "sentinel_risk_multiplier": 0.75,  # Position size multiplier for sentinel trades (smaller = safer)
-    "sentinel_max_trades_per_hour": 3,  # Max sentinel trades per hour (rate limit)
+    # Removed: sentinel_max_trades_per_hour. Duplicate-event suppression is handled
+    # upstream by news_infrastructure.HeadlineDeduplicator (used in news_sentinel,
+    # alpaca_news, catalyst_engine, catalyst_sentinel). A count cap on top of working
+    # dedup is redundant and silently discards distinct-event alpha.
     # ── ML ENGINE (scikit-learn learning loop) ─────────────────────
     # Learns from trade history to identify winning patterns and enhance signals.
     # Requires: scikit-learn, joblib (pip install scikit-learn joblib)
@@ -695,7 +702,11 @@ CONFIG = {
     "catalyst_edgar_poll_seconds": 600,  # EDGAR polling interval (10 minutes)
     "catalyst_cooldown_minutes": 60,  # Re-trigger cooldown per symbol (minutes)
     "catalyst_min_confidence": 5,  # Min agent confidence to execute trade
-    "catalyst_max_trades_per_day": 2,  # Hard cap: catalyst-driven trades per trading day
+    # Removed: catalyst_max_trades_per_day. EDGAR events are deduped upstream by
+    # `_seen_edgar_events` keyed on (form_type, cik, updated[:10]) in catalyst_engine
+    # and catalyst_sentinel; headline-driven catalysts are deduped by HeadlineDeduplicator.
+    # A separate daily count cap would reject 5 genuinely distinct catalysts to
+    # prevent duplicates that dedup already prevents.
     "catalyst_risk_multiplier": 0.50,  # Size multiplier vs normal sentinel (0.5 = ~1.5% portfolio)
     # ── SETTINGS OVERRIDE (written by IC auto-disable) ───────────────────────
     # data/settings_override.json may contain {"dimension_flags": {"dim": false}}

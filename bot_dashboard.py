@@ -517,7 +517,6 @@ class DashHandler(BaseHTTPRequestHandler):
                 "sentinel_enabled": CONFIG["sentinel_enabled"],
                 "sentinel_poll_seconds": CONFIG["sentinel_poll_seconds"],
                 "sentinel_cooldown_minutes": CONFIG["sentinel_cooldown_minutes"],
-                "sentinel_max_trades_per_hour": CONFIG["sentinel_max_trades_per_hour"],
                 "sentinel_risk_multiplier": CONFIG["sentinel_risk_multiplier"],
                 "sentinel_keyword_threshold": CONFIG["sentinel_keyword_threshold"],
                 "sentinel_min_confidence": CONFIG["sentinel_min_confidence"],

@@ -42,10 +42,16 @@ _session_regime_set: bool = False  # Guard: only set once per trading day
 _strategy_size_multiplier: float = 1.0  # Applied inside calculate_position_size()
 
 # ── Strategy mode params (module-level so dashboard can read them) ──
+# `max_new_trades` was previously defined here (6/4/2 per mode) but was never
+# enforced in agents.py — only surfaced to dashboard/logs. Count caps are weak
+# proxies for risk; deployment is governed by min_cash_reserve, max_single_position,
+# max_sector_exposure, daily_loss_limit, and the Risk Manager veto. Mode effects are
+# expressed through score_threshold_adj (bar to trade) and size_multiplier (dollars
+# per trade) — both risk-denominated.
 MODE_PARAMS = {
-    "NORMAL": {"score_threshold_adj": 0, "size_multiplier": 1.0, "max_new_trades": 6},
-    "DEFENSIVE": {"score_threshold_adj": 5, "size_multiplier": 0.7, "max_new_trades": 4},
-    "RECOVERY": {"score_threshold_adj": 10, "size_multiplier": 0.5, "max_new_trades": 2},
+    "NORMAL": {"score_threshold_adj": 0, "size_multiplier": 1.0},
+    "DEFENSIVE": {"score_threshold_adj": 5, "size_multiplier": 0.7},
+    "RECOVERY": {"score_threshold_adj": 10, "size_multiplier": 0.5},
 }
 
 # ── VIX-rank Kelly state ────────────────────────────────────────
@@ -941,7 +947,7 @@ def get_intraday_strategy_mode(portfolio_value: float, daily_pnl: float, current
     """
     global _strategy_size_multiplier, _current_strategy_mode
 
-    _MODE_PARAMS = MODE_PARAMS  # Paper: NORMAL=6, DEFENSIVE=4, RECOVERY=2 max_new_trades
+    _MODE_PARAMS = MODE_PARAMS  # score_threshold_adj + size_multiplier only (no count caps)
 
     daily_pnl_pct = (daily_pnl / portfolio_value) if portfolio_value > 0 else 0.0
 
@@ -965,14 +971,14 @@ def get_intraday_strategy_mode(portfolio_value: float, daily_pnl: float, current
             f"STRATEGY MODE: DEFENSIVE — We have lost {abs(daily_pnl_pct * 100):.1f}% today "
             f"({_consecutive_losses} consecutive losses). "
             "Entry bar is ELEVATED. Only trade exceptional setups — no marginal trades. "
-            "Reduce all recommended position sizes to 70% of normal. Max 2 new positions this scan."
+            "Position sizes at 70% of normal. Be selective; conviction bar is higher than usual."
         )
     elif mode == "RECOVERY":
         context = (
             f"STRATEGY MODE: RECOVERY — We have lost {abs(daily_pnl_pct * 100):.1f}% today "
             f"({_consecutive_losses} consecutive losses). "
-            "We are in capital preservation mode. ONE new position maximum, and only if the setup is "
-            "outstanding with high conviction. Position sizes at 50% of normal. "
+            "We are in capital preservation mode. Only outstanding, high-conviction setups. "
+            "Position sizes at 50% of normal. "
             "If there is any doubt, the answer is NO TRADE. Cash is a valid and preferred position."
         )
     else:
@@ -983,7 +989,7 @@ def get_intraday_strategy_mode(portfolio_value: float, daily_pnl: float, current
         log.info(
             f"Strategy mode: {_current_strategy_mode}→{mode} | PnL={daily_pnl_pct * 100:+.2f}% | "
             f"Streak={_consecutive_losses} | ScoreAdj=+{params['score_threshold_adj']} | "
-            f"SizeMult={params['size_multiplier']}x | MaxTrades={params['max_new_trades']}"
+            f"SizeMult={params['size_multiplier']}x"
         )
     _strategy_size_multiplier = params["size_multiplier"]
     _current_strategy_mode = mode
@@ -992,7 +998,6 @@ def get_intraday_strategy_mode(portfolio_value: float, daily_pnl: float, current
         "mode": mode,
         "score_threshold_adj": params["score_threshold_adj"],
         "size_multiplier": params["size_multiplier"],
-        "max_new_trades": params["max_new_trades"],
         "context": context,
         "daily_pnl_pct": daily_pnl_pct,
         "regime_changed": get_regime_changed(current_regime),

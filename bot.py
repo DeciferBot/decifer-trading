@@ -113,7 +113,6 @@ _DASHBOARD_SETTINGS_KEYS = {
     "sentinel_use_ibkr",
     "sentinel_use_finviz",
     "sentinel_risk_multiplier",
-    "sentinel_max_trades_per_hour",
 }
 
 

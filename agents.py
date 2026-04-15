@@ -106,7 +106,6 @@ def run_all_agents(
             "mode": "NORMAL",
             "context": "",
             "size_multiplier": 1.0,
-            "max_new_trades": 3,
             "score_threshold_adj": 0,
             "regime_changed": False,
         }
@@ -138,8 +137,8 @@ def run_all_agents(
         }
 
     # ── Fresh-first ordering: unheld candidates surface before already-held ──
-    # Agents see top-N signals. If held symbols dominate the top, agents waste
-    # their 3-recommendation budget re-proposing names already in the portfolio.
+    # Agents see a wide signal window. If held symbols dominate the top, the analyst
+    # wastes recommendation bandwidth re-proposing names already in the portfolio.
     # Placing fresh candidates first ensures new opportunities are seen and acted on.
     _held_syms_set = set(open_syms)
     fresh_qualified = [s for s in qualified if s["symbol"] not in _held_syms_set]
@@ -407,8 +406,8 @@ def _extract_proposed_symbols(opportunity_text: str, signals: list) -> list:
         if sym in sig_map and sym not in seen:
             seen.add(sym)
             result.append(sig_map[sym])
-        if len(result) >= 3:
-            break
+    # No count cap on proposals. Downstream risk gates (cash floor, single-position
+    # cap, sector cap, correlation, Risk Manager veto) govern what actually executes.
     return result
 
 
@@ -633,7 +632,7 @@ MACRO: [BULLISH | BEARISH | NEUTRAL | UNCERTAIN]
 <2-3 sentences on the macro environment: regime, VIX trajectory, cross-asset signals, risk-on/off verdict>
 
 OPPORTUNITIES:
-For each opportunity (up to 3; fewer if genuine setups are scarce — never force trades):
+Emit one SYMBOL block per opportunity. Recommend as many or as few as the signals, regime, and account state justify — there is no fixed count. Calibrate against the ACCOUNT block (slots_remaining, available_cash, day_pnl): if slots are scarce or cash is tight, be selective; if the regime is TRENDING and multiple strong signals align, propose broadly. Cash is a valid output when conviction is absent.
 
 SYMBOL: <ticker>
 DIRECTION: LONG | SHORT
@@ -646,7 +645,8 @@ COUNTER-ARGUMENT: <The single strongest reason this trade fails. Be honest. One 
 KEY RISK: <Binary events, crowding, macro headwind>
 
 RULES:
-- If fewer than 3 genuine setups exist, say so. Cash is a valid output.
+- Do not self-impose a count cap. Operational constraints (cash floor 10%, single-position cap 6%, sector cap 40%, correlation, cooldown, Risk Manager veto) are enforced downstream — you do not need to anticipate them. Your job is conviction-weighted recommendations; the system filters by risk.
+- Cash is a valid output when conviction is absent. Quality bar is CONVICTION and the min_score_to_trade floor, not trade count.
 - Options flow: CALL_BUYER = smart money bullish. PUT_BUYER = smart money bearish. Low IVR = cheap premium.
 - In CAPITULATION regime: output MACRO: BEARISH and no OPPORTUNITIES. Capital preservation.
 - RANGE_BOUND regime: raise your conviction bar — only HIGH conviction setups.
@@ -683,7 +683,9 @@ def agent_trading_analyst(
     size_mult = regime.get("position_size_multiplier", 1.0)
 
     sig_lines = []
-    for s in signals[:10]:
+    # Wide input window — let Opus pick from a meaningful candidate set. Token cost
+    # is trivial (≈40 tokens/row) against the 200K context window.
+    for s in signals[:50]:
         sym = s["symbol"]
         score = s["score"]
         sig = s.get("signal", "?")
@@ -839,7 +841,9 @@ def agent_risk_manager(
     lines.append(f"RISK GATE: OPEN -- {gate_reason}")
     lines.append("")
 
-    candidates = signals[:5] if signals else []
+    # Risk Manager is deterministic (no LLM cost) — size every qualifying candidate.
+    # min_score_to_trade already bounds the list upstream.
+    candidates = signals or []
     for s in candidates:
         sym = s["symbol"]
         price = s.get("price", 0)

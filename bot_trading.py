@@ -1167,8 +1167,7 @@ def run_scan():
             f"PnL={strategy_mode['daily_pnl_pct'] * 100:+.1f}% | "
             f"Streak={get_consecutive_losses()} | "
             f"ScoreAdj=+{strategy_mode['score_threshold_adj']} | "
-            f"SizeMult={strategy_mode['size_multiplier']}x | "
-            f"MaxTrades={strategy_mode['max_new_trades']}",
+            f"SizeMult={strategy_mode['size_multiplier']}x",
         )
     if strategy_mode["regime_changed"]:
         clog("RISK", "Regime changed since session open — thesis check active for open positions")

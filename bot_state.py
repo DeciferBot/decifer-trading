@@ -119,13 +119,11 @@ _sl_fill_events: set = set()
 
 # ── News Sentinel state ───────────────────────────────────────────────────────
 _sentinel = None
-_sentinel_trades_this_hour = 0
-_sentinel_hour_start = None
+# Hourly trade counter removed — see bot_sentinel.handle_news_trigger for rationale.
 
 # ── Catalyst Sentinel state ───────────────────────────────────────────────────
 _catalyst_sentinel = None
-_catalyst_trades_today = 0
-_catalyst_trade_date = ""
+# Daily trade counter removed — see bot_sentinel.handle_catalyst_trigger for rationale.
 
 # ── Catalyst Engine state ─────────────────────────────────────────────────────
 _catalyst_engine = None   # CatalystEngine instance

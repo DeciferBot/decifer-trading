@@ -280,12 +280,52 @@ class TestPositionCap:
 
     def test_recovery_mode_size_multiplier_applied(self):
         """RECOVERY mode reduces size_multiplier to 0.5 — no trade count block."""
-        sm = {"mode": "RECOVERY", "context": "", "size_multiplier": 0.5, "max_new_trades": 0}
+        sm = {"mode": "RECOVERY", "context": "", "size_multiplier": 0.5}
         with patch.dict(agents.CONFIG, _AGENTS_CFG):
             result = agents.agent_final_decision(**_final_kwargs(strategy_mode=sm))
         # Result is a valid dict — agents still run, size_multiplier applied downstream
         assert isinstance(result, dict)
         assert "buys" in result
+
+
+# ---------------------------------------------------------------------------
+# _extract_proposed_symbols — parser has no count cap
+# ---------------------------------------------------------------------------
+
+
+class TestExtractProposedSymbolsUncapped:
+    """Parser returns every distinct symbol the analyst names, bounded only by
+    membership in `sig_map` and `seen` dedup — no hardcoded count cap."""
+
+    # Parser regex `SYMBOL[:\s]+([A-Z]{1,5})` requires pure-alpha ticker strings.
+    _TEN_TICKERS = ["AAPL", "MSFT", "GOOG", "AMZN", "META", "TSLA", "NVDA", "AMD", "INTC", "NFLX"]
+
+    def _make_signals(self, tickers: list) -> list:
+        return [{"symbol": s, "score": 30, "signal": "BUY"} for s in tickers]
+
+    def test_returns_more_than_three_when_analyst_names_many(self):
+        """Analyst names 10 symbols — parser returns all 10 (was capped at 3)."""
+        tickers = self._TEN_TICKERS
+        signals = self._make_signals(tickers)
+        text = "\n".join(f"SYMBOL: {t}\nDIRECTION: LONG" for t in tickers)
+        result = agents._extract_proposed_symbols(text, signals)
+        assert len(result) == 10
+        assert [r["symbol"] for r in result] == tickers
+
+    def test_returns_empty_when_no_symbols_match_sig_map(self):
+        """Symbols named but not in sig_map are ignored."""
+        signals = [{"symbol": "AAPL", "score": 30, "signal": "BUY"}]
+        text = "SYMBOL: NVDA\nSYMBOL: TSLA"
+        result = agents._extract_proposed_symbols(text, signals)
+        assert result == []
+
+    def test_dedups_repeated_symbols(self):
+        """Parser dedups via `seen` set — repeated mentions don't inflate the list."""
+        tickers = ["AAPL", "MSFT", "GOOG"]
+        signals = self._make_signals(tickers)
+        text = "SYMBOL: AAPL\nSYMBOL: MSFT\nSYMBOL: AAPL\nSYMBOL: GOOG"
+        result = agents._extract_proposed_symbols(text, signals)
+        assert [r["symbol"] for r in result] == ["AAPL", "MSFT", "GOOG"]
 
 
 # ---------------------------------------------------------------------------
