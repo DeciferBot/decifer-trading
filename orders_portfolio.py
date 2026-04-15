@@ -1085,9 +1085,17 @@ def update_positions_from_ibkr(ib: IB):
         for _key in _pending_keys:
             _trade_instrument = active_trades.get(_key, {}).get("instrument", "stock")
 
-            if _trade_instrument == "option":
-                # Options don't use FillWatcher — use a longer per-session timeout so
-                # DAY orders get cleaned up if the bot misses the IBKR cancellation callback.
+            if _trade_instrument == "option" and (_key in price_map or _key in _positions_keys):
+                # Option order filled — IBKR shows an active position.
+                with _trades_lock:
+                    if _key in active_trades:
+                        active_trades[_key]["status"] = "ACTIVE"
+                _src = "portfolio" if _key in price_map else "positions"
+                log.info(f"PENDING option {_key} found in IBKR {_src} — marking ACTIVE (fill confirmed)")
+                continue
+            elif _trade_instrument == "option":
+                # Not yet in portfolio — use longer timeout so DAY orders get
+                # cleaned up if the bot misses the IBKR cancellation callback.
                 # Default 480 min (8 h) covers a full extended-hours session.
                 _effective_timeout = CONFIG.get("fill_watcher", {}).get("option_orphan_timeout_mins", 480)
             elif _key in price_map or _key in _positions_keys:
