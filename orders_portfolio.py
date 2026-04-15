@@ -1362,7 +1362,22 @@ def update_positions_from_ibkr(ib: IB):
                     validated_price = ibkr_price
                     src_desc = f"IBKR_OPT=${ibkr_price:.2f}"
                 else:
-                    log.warning(f"No IBKR price for option {key} — keeping previous ${trade.get('current', 0):.2f}")
+                    # Validation rejected the IBKR price (e.g. IBKR returned the
+                    # underlying stock price instead of the option premium — a known
+                    # paper-account quirk).  If the stored `current` is also suspect
+                    # (looks like an underlying price: > 20× entry), reset it to entry
+                    # so it stops poisoning the notional calculation and P&L display.
+                    stored = trade.get("current", 0)
+                    if entry > 0 and stored > entry * 20:
+                        log.warning(
+                            f"Option {key}: stored current ${stored:.2f} looks like "
+                            f"underlying price (>{20}× entry ${entry:.4f}) — resetting to entry"
+                        )
+                        trade["current"] = entry
+                        trade["current_premium"] = entry
+                        trade["pnl"] = 0.0
+                    else:
+                        log.warning(f"No IBKR price for option {key} — keeping previous ${stored:.2f}")
                     continue
             # FX: IBKR is the only reliable source (Alpaca/TV don't carry forex)
             elif trade.get("instrument") == "fx":
