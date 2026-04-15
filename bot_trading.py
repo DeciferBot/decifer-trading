@@ -762,6 +762,14 @@ def _eod_options_review(regime: dict):
                 result = close_position(ib, key) or close_position(ib, sym)
                 if result:
                     clog("TRADE", f"EOD closed: {key} — {result}")
+                    from bot_voice import speak_natural as _speak_eod
+                    _speak_eod(
+                        "exit_pm",
+                        fallback=f"Closing {sym} into the bell.",
+                        symbol=sym,
+                        reason=reason or "end of day review",
+                        news="none",
+                    )
                 else:
                     clog("ERROR", f"EOD close failed for {key}")
             except Exception as e:
@@ -1491,14 +1499,6 @@ def run_scan():
                         clog("INFO", f"Portfolio manager EXIT: {sym_pm} already exiting — skipping duplicate")
                     else:
                         clog("TRADE", f"Portfolio manager EXIT: {sym_pm} — {reason_pm}")
-                        _news_pm = (dash.get("news_data") or {}).get(sym_pm, {})
-                        speak_natural(
-                            "exit_pm",
-                            fallback=f"I'm closing {sym_pm}.",
-                            symbol=sym_pm,
-                            reason=reason_pm or "portfolio review",
-                            news=_news_pm.get("claude_catalyst") or "none",
-                        )
                     pos_pm = next((p for p in open_pos if p["symbol"] == sym_pm), None)
                     ep_pm = pos_pm["current"] if pos_pm else 0
                     _opt_keys_pm = [
@@ -1507,14 +1507,26 @@ def run_scan():
                         if k.startswith(sym_pm + "_") and _pm_trades[k].get("instrument") == "option"
                     ]
                     if not _already_exiting:
+                        _pm_order_placed = False
                         if _opt_keys_pm:
                             for _ok in _opt_keys_pm:
                                 clog("TRADE", f"PM EXIT routing to option sell: {_ok}")
                                 _exit_reason_pm = _build_pm_exit_reason(pos_pm or {}, regime, pm_trigger, reason_pm)
-                                execute_sell_option(ib, _ok, reason=_exit_reason_pm)
+                                if execute_sell_option(ib, _ok, reason=_exit_reason_pm):
+                                    _pm_order_placed = True
                         if sym_pm in _pm_trades:
                             _exit_reason_pm = _build_pm_exit_reason(pos_pm or {}, regime, pm_trigger, reason_pm)
-                            execute_sell(ib, sym_pm, reason=_exit_reason_pm)
+                            if execute_sell(ib, sym_pm, reason=_exit_reason_pm):
+                                _pm_order_placed = True
+                        if _pm_order_placed:
+                            _news_pm = (dash.get("news_data") or {}).get(sym_pm, {})
+                            speak_natural(
+                                "exit_pm",
+                                fallback=f"I'm closing {sym_pm}.",
+                                symbol=sym_pm,
+                                reason=reason_pm or "portfolio review",
+                                news=_news_pm.get("claude_catalyst") or "none",
+                            )
                     if not _already_exiting and not _opt_keys_pm and sym_pm not in _pm_trades:
                         clog(
                             "WARN",
@@ -1576,28 +1588,38 @@ def run_scan():
                     else:
                         clog("TRADE", f"Portfolio manager TRIM: {sym_pm} — {reason_pm}")
                         _trimmed_today.add(sym_pm)
+                        _trim_order_placed = False
+                        _trim_pct_used = action.get("trim_pct", 50)
                         if _opt_keys_pm:
                             for _ok in _opt_keys_pm:
                                 with _pm_lock:
                                     _c = _pm_trades.get(_ok, {}).get("contracts", 0)
-                                _trim_pct = action.get("trim_pct", 50)
-                                _trim_c = max(1, round(_c * _trim_pct / 100))
-                                execute_sell_option(
+                                _trim_c = max(1, round(_c * _trim_pct_used / 100))
+                                if execute_sell_option(
                                     ib,
                                     _ok,
                                     reason=f"portfolio_manager_trim:{pm_trigger}",
                                     contracts_override=_trim_c if _trim_c < _c else None,
-                                )
+                                ):
+                                    _trim_order_placed = True
                         if sym_pm in _pm_trades:
                             with _pm_lock:
                                 _q = _pm_trades.get(sym_pm, {}).get("qty", 0)
-                            _trim_pct = action.get("trim_pct", 50)
-                            _trim_q = max(1, round(_q * _trim_pct / 100))
+                            _trim_q = max(1, round(_q * _trim_pct_used / 100))
                             _trim_reason = _build_pm_exit_reason(
                                 pos_pm or {}, regime, pm_trigger, reason_pm, exit_tag="pm_trim"
                             )
-                            execute_sell(
+                            if execute_sell(
                                 ib, sym_pm, reason=_trim_reason, qty_override=_trim_q if _trim_q < _q else None
+                            ):
+                                _trim_order_placed = True
+                        if _trim_order_placed:
+                            speak_natural(
+                                "trim",
+                                fallback=f"I trimmed {sym_pm}.",
+                                symbol=sym_pm,
+                                pct=_trim_pct_used,
+                                reason=reason_pm or "portfolio review",
                             )
                             if pos_pm:
                                 _ep_trim = pos_pm.get("current", pos_pm.get("entry", 0))
@@ -1730,8 +1752,17 @@ def run_scan():
                                         # TRIM again if the signal later collapses.
                                         if _added:
                                             _trimmed_today.discard(sym_pm)
+                                            speak_natural(
+                                                "add",
+                                                fallback=f"I added to {sym_pm}.",
+                                                symbol=sym_pm,
+                                                qty=_add_qty,
+                                                reason=reason_pm or "conviction strengthened",
+                                            )
                 else:
                     clog("INFO", f"Portfolio manager HOLD: {sym_pm} — {reason_pm}")
+                    from bot_voice import speak as _speak_hold
+                    _speak_hold(f"Holding {sym_pm}. {reason_pm or 'Thesis intact.'}")
             # Log all actions to audit log
             import json as _json
 
@@ -1880,17 +1911,18 @@ def run_scan():
 
     for sym in decision.get("sells", []):
         clog("TRADE", f"Selling {sym} on agent signal")
-        _news_ctx = (dash.get("news_data") or {}).get(sym, {})
-        speak_natural(
-            "exit_agent",
-            fallback=f"I'm closing out {sym}.",
-            symbol=sym,
-            reason=decision.get("reasoning", "agent signal"),
-            news=_news_ctx.get("claude_catalyst") or _news_ctx.get("headlines", [""])[0] if _news_ctx else "none",
-        )
         pos = next((p for p in open_pos if p["symbol"] == sym), None)
         exit_price = pos["current"] if pos else 0
-        execute_sell(ib, sym, reason="Agent sell signal")
+        _sell_placed = execute_sell(ib, sym, reason="Agent sell signal")
+        if _sell_placed:
+            _news_ctx = (dash.get("news_data") or {}).get(sym, {})
+            speak_natural(
+                "exit_agent",
+                fallback=f"I'm closing out {sym}.",
+                symbol=sym,
+                reason=decision.get("reasoning", "agent signal"),
+                news=_news_ctx.get("claude_catalyst") or _news_ctx.get("headlines", [""])[0] if _news_ctx else "none",
+            )
         dash["trades"].insert(
             0, {"side": "SELL", "symbol": sym, "price": str(exit_price), "time": datetime.now(_ET).strftime("%H:%M:%S")}
         )

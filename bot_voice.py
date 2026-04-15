@@ -136,6 +136,24 @@ def _generate_natural(event: str, fallback: str, **ctx) -> str:
                 "The bot just bought a {option_type} option on {symbol} at the {strike} strike. Score: {score}. "
                 "Write a friendly first-person spoken alert, 1 sentence."
             ),
+            "trim": (
+                "The bot just trimmed its {symbol} position — sold roughly {pct} percent of the position. "
+                "Reason: {reason}. "
+                "Write a friendly first-person spoken alert, 1 sentence. "
+                "Example: 'I trimmed half my Apple position — locking in some gains while keeping exposure.'"
+            ),
+            "add": (
+                "The bot just added {qty} shares to its existing {symbol} position. "
+                "Reason: {reason}. "
+                "Write a friendly first-person spoken alert, 1 sentence. "
+                "Example: 'I added to my Nvidia position — conviction is building and the setup looks strong.'"
+            ),
+            "deferred_exit": (
+                "An option position in {symbol} was queued for exit while the market was closed. "
+                "The market just opened and the exit order has now been placed. Original reason: {reason}. "
+                "Write a friendly first-person spoken alert, 1 sentence. "
+                "Example: 'Closing the MRNA option now — I queued this exit last night when the market was closed.'"
+            ),
         }
 
         template = _prompts.get(event, "Describe this trading event naturally in one sentence: {event}")
