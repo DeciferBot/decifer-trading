@@ -27,8 +27,10 @@ Three actors:
 - **Phase A — Complete ✅** (shipped 2026-03-28): Direction-agnostic signals, short-candidate scanner, directional skew tracking, consensus threshold set to 3/4 agents, mean-reversion dimension (10th signal)
 - **IC scoring — Active**: Information Coefficient tracking is running. Gate for Phase C = 200 closed trades.
 - **PM ADD verb — Activated ✅** (2026-04-15): Portfolio Manager now shows Opus the full decision surface (entry thesis, per-dimension entry→current deltas with IC-weight annotations, setup type, pattern, regime, news) and lets Opus decide ADD/TRIM/EXIT/HOLD. Code (`calculate_position_size()`) sizes ADDs — same function entries use. Opus no longer emits `ADD_NOTIONAL`. Hardcoded safety floors: `check_risk_conditions`, earnings-48h, single-position-cap clamp (downgrades to HOLD if no headroom).
+- **Three-tier universe — Active ✅**: TV Screener ripped out. Universe is now: committed universe (top-1000 by dollar volume, weekly refresh) + dynamic adds (catalyst hits, held positions, favourites, sympathy plays, news-driven). Scanner pulls from committed universe; dynamic tiers bypass the gate.
+- **Catalyst screener — Active ✅**: `catalyst_engine.py` scores EDGAR filings, earnings surprises, and analyst actions in real-time. High-conviction catalyst hits get a flat score boost to clear `min_score_to_trade`. Wired into both the main signal engine and the Chief Decifer dashboard.
 - **Phase B / C / D — Not yet built**: Signal validation (Alphalens), HMM regime detection, walk-forward weight calibration. All blocked on trade data volume.
-- **Test suite**: ~60% pass rate. Tests and code diverged during rapid development. Runtime is unaffected — do not spend sessions fixing tests unless directly related to the work.
+- **Test suite**: 1704/1705 passing (2026-04-16). Tests are current with the codebase.
 - **Regime detector**: VIX-proxy + SPY EMA (locked). HMM explicitly deferred until ≥200 closed trades.
 
 ---
@@ -81,7 +83,7 @@ TWAP/VWAP/Iceberg only for orders above $10K notional or 500 shares. Smaller ord
 2. **Alpha Vantage** (paid, active): earnings calendar, fundamentals, macroeconomic data.
 3. **IBKR TWS**: execution and order management. Historical data only when Alpaca is insufficient.
 4. **yfinance**: daily bars and index data, fallback only — never preferred over Alpaca.
-5. TradingView Screener, Yahoo RSS, Finviz — supplementary screening and news.
+5. Yahoo RSS, Finviz — supplementary news and short-float data. TradingView Screener was removed (replaced by three-tier committed universe).
 
 ---
 
