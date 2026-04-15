@@ -162,7 +162,7 @@ def _load_requirements():
 # Library descriptions (plain English)
 LIB_DESCRIPTIONS = {
     "ib_async": "Interactive Brokers API",
-    "anthropic": "Claude API for 6-agent pipeline + news sentiment",
+    "anthropic": "Claude API for 4-agent pipeline + news sentiment",
     "yfinance": "Free market data — OHLCV, options chains, fundamentals",
     "pandas": "DataFrames",
     "numpy": "Numerical computation",

@@ -452,7 +452,7 @@ def _render_last_trade_card():
         html.Div([
             html.Span(f"Trade taken {age}" if age else "",
                       style={"fontSize": "0.6rem", "color": "var(--cd-faint)"}),
-            html.Span(f"  \u00b7  {agents}/6 agents agreed",
+            html.Span(f"  \u00b7  {agents}/4 agents agreed",
                       style={"fontSize": "0.6rem", "color": "var(--cd-faint)"}),
         ], style={"marginTop": "14px"}),
 

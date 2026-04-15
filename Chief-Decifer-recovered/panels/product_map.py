@@ -30,9 +30,9 @@ STAGES = [
     },
     {
         "num": "2", "name": "Score", "color": "#51cf66",
-        "icon": "📊", "tagline": "9-dimension analysis",
+        "icon": "📊", "tagline": "10-dimension analysis",
         "modules": ["signals.py", "news_sentinel.py", "social_sentiment.py"],
-        "how": "Trend · Momentum · Squeeze · Flow · Breakout · Confluence · News · Social · Mean Reversion",
+        "how": "Directional · Momentum · Squeeze · Flow · Breakout · PEAD · News · Short Squeeze · Reversion · Overnight Drift",
     },
     {
         "num": "3", "name": "Decide", "color": "#ffd43b",

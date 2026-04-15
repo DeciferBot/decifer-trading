@@ -9,7 +9,7 @@
 # ║   • Call/put skew (directional flow bias)                    ║
 # ║   • Max pain levels (OI concentration)                       ║
 # ║                                                              ║
-# ║   Output feeds directly into the 6-agent pipeline alongside  ║
+# ║   Output feeds directly into the 4-agent pipeline alongside  ║
 # ║   stock signals — agents can recommend options as instrument  ║
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝

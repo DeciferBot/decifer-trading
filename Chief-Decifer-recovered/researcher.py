@@ -268,9 +268,9 @@ Search for peer-reviewed papers, quantitative research, practitioner blogs, back
 
 **Current stage:** {vision.get('current_stage', 'paper_trading_single_account')}
 The bot currently runs on a paper IBKR account with:
-- 9-dimension signal scoring (trend, momentum, squeeze, flow, breakout, confluence, news, social, mean reversion)
+- 10-dimension signal scoring (directional, momentum, squeeze, flow, breakout, PEAD, news, short squeeze, reversion, overnight drift)
 - Kelly criterion position sizing
-- 6 Claude agents for trade decisions
+- 4 Claude agents for trade decisions
 - Free data stack: yfinance, TradingView Screener, Yahoo RSS, Finviz
 
 **STRICT DEDUPLICATION RULE — READ CAREFULLY:**

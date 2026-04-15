@@ -436,7 +436,7 @@ canvas{display:block;width:100% !important}
       <button class="pause-btn" style="border-color:#FF6B00;color:#FF6B00;background:rgba(255,107,0,.08)" onclick="forceScan()">⚡ FORCE SCAN</button>
         <div style="padding:8px 10px;border-top:1px solid var(--border);margin-top:4px">
           <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Agent Agreement</div>
-          <div style="font-size:11px;color:var(--muted2)">Required: <span style="color:var(--orange);font-weight:700" id="agents-req">4/6</span></div>
+          <div style="font-size:11px;color:var(--muted2)">Required: <span style="color:var(--orange);font-weight:700" id="agents-req">3/4</span></div>
           <div style="font-size:11px;color:var(--muted2);margin-top:3px">Last scan: <span style="color:var(--text)" id="last-agree">—</span></div>
         </div>
         <div style="padding:8px 10px;border-top:1px solid var(--border)">
@@ -815,11 +815,9 @@ canvas{display:block;width:100% !important}
     <div class="setting-row">
       <span class="setting-label">Agents required to agree</span>
       <select id="agree-select" class="setting-input" style="width:60px">
-        <option value="2">2/6</option>
-        <option value="3">3/6</option>
-        <option value="4">4/6</option>
-        <option value="5">5/6</option>
-        <option value="6">6/6</option>
+        <option value="2">2/4</option>
+        <option value="3">3/4</option>
+        <option value="4">4/4</option>
       </select>
     </div>
   </div>

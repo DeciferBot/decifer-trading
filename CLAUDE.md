@@ -5,7 +5,7 @@
 
 ## North Star
 
-Decifer is an autonomous paper-trading system that uses a 9-dimension signal engine and a 6-agent Claude AI pipeline to scan, score, and execute trades on IBKR (paper account DUP481326). The goal: generate high-quality training data across market regimes to eventually validate a live system.
+Decifer is an autonomous paper-trading system that uses a 10-dimension signal engine and a 4-agent Claude AI pipeline to scan, score, and execute trades on IBKR (paper account DUP481326). The goal: generate high-quality training data across market regimes to eventually validate a live system.
 
 **We are not building a live trading system yet. Every paper trade is a data point.**
 
@@ -24,7 +24,7 @@ Three actors:
 
 ## Current State (update this when phases change)
 
-- **Phase A — Complete ✅** (shipped 2026-03-28): Direction-agnostic signals, short-candidate scanner, directional skew tracking, consensus threshold raised to 3/6, mean-reversion dimension (9th signal)
+- **Phase A — Complete ✅** (shipped 2026-03-28): Direction-agnostic signals, short-candidate scanner, directional skew tracking, consensus threshold set to 3/4 agents, mean-reversion dimension (10th signal)
 - **IC scoring — Active**: Information Coefficient tracking is running. Gate for Phase C = 200 closed trades.
 - **PM ADD verb — Activated ✅** (2026-04-15): Portfolio Manager now shows Opus the full decision surface (entry thesis, per-dimension entry→current deltas with IC-weight annotations, setup type, pattern, regime, news) and lets Opus decide ADD/TRIM/EXIT/HOLD. Code (`calculate_position_size()`) sizes ADDs — same function entries use. Opus no longer emits `ADD_NOTIONAL`. Hardcoded safety floors: `check_risk_conditions`, earnings-48h, single-position-cap clamp (downgrades to HOLD if no headroom).
 - **Phase B / C / D — Not yet built**: Signal validation (Alphalens), HMM regime detection, walk-forward weight calibration. All blocked on trade data volume.
@@ -37,11 +37,11 @@ Three actors:
 
 These decisions are LOCKED. Do not second-guess them without reading `docs/DECISIONS.md` first and flagging Amit.
 
-### Signal Engine: 9 Independent Dimensions, Not Overlapping Oscillators
-RSI + Stochastic + CCI all measure momentum — using all three is one signal dressed up as three. Each of Decifer's 9 dimensions (Trend, Momentum, Squeeze, Flow, Breakout, Confluence, News, Social, Reversion) measures something fundamentally different. Adding a 10th dimension requires the same standard: it must be orthogonal to the existing 9.
+### Signal Engine: 10 Independent Dimensions, Not Overlapping Oscillators
+RSI + Stochastic + CCI all measure momentum — using all three is one signal dressed up as three. Each of Decifer's 10 dimensions (Directional, Momentum, Squeeze, Flow, Breakout, PEAD, News, Short Squeeze, Reversion, Overnight Drift) measures something fundamentally different. Two optional dimensions (Social, IV Skew) are config-gated. Adding a new dimension requires the same standard: it must be orthogonal to the existing ones.
 
 ### Direction-Agnostic Scoring, Not Regime-Switched Agent Prompts
-We do not tell agents "you're in a bear market, be more bearish." That replaces bullish groupthink with regime-driven groupthink — one bad regime call cascades through all 6 agents. Instead, the signal engine scores setup *conviction* independently of direction. Bearish setups score identically to equivalent bullish setups. The market determines the long/short ratio naturally.
+We do not tell agents "you're in a bear market, be more bearish." That replaces bullish groupthink with regime-driven groupthink — one bad regime call cascades through all agents. Instead, the signal engine scores setup *conviction* independently of direction. Bearish setups score identically to equivalent bullish setups. The market determines the long/short ratio naturally.
 
 ### Regime Detection: VIX-Proxy Locked, HMM Deferred
 Hard classifier (BULL_TRENDING / BEAR_TRENDING / CHOPPY / PANIC) via VIX levels + SPY EMA. HMM is NOT running in production — `PRODUCTION_LOCKED = True`. Gate to reopen HMM: ≥200 closed trades AND IC Phase 2 review complete. Running two regime detectors in parallel is architecturally incoherent. HMM replaces VIX-proxy entirely when the gate is met, does not run alongside it.
@@ -49,14 +49,14 @@ Hard classifier (BULL_TRENDING / BEAR_TRENDING / CHOPPY / PANIC) via VIX levels 
 ### Skew Tracking: Diagnostic Only, Never a Feedback Loop
 `get_directional_skew()` in `learning.py` tracks % long vs short. This is a dashboard metric and alert for Amit — it is NOT fed back into agent prompts. Feeding skew back ("you've been 80% long, correct") creates forced trades to balance a statistic. The market is structurally long-biased. Fighting that base rate is wrong.
 
-### 6-Agent Pipeline: Devil's Advocate Is Mandatory
-The Devil's Advocate agent exists specifically to counterbalance confirmation bias. The Risk Manager has hardcoded veto power — no agent can override risk limits. Paper threshold = 3/6 agents agree (aggressive for data generation). Live threshold = 4/6 (conservative).
+### 4-Agent Pipeline: Risk Manager Has Veto Power
+The pipeline is: Technical Analyst (deterministic) + Trading Analyst (Opus, 1 LLM call) + Risk Manager (deterministic, hardcoded veto) + Final Decision Maker (deterministic). Devil's Advocate was removed — the Trading Analyst sees all data simultaneously, eliminating the anchoring bias the DA was meant to counter. Paper threshold = 3/4 agents agree (aggressive for data generation). Live threshold = 4/4 (conservative).
 
 ### Paper Config: Aggressive for Data Generation
-Paper trading thresholds are deliberately loose (min_score 18, agents_required 3, max_positions 20). Cost of a bad paper trade = zero. Value = training data. Every parameter that differs from live config is preserved as an inline comment in `config.py`. When switching to live, revert ALL of them.
+Paper trading thresholds are deliberately loose (min_score 14, agents_required 3, max_positions 100 sanity ceiling). Cost of a bad paper trade = zero. Value = training data. Every parameter that differs from live config is preserved as an inline comment in `config.py`. When switching to live, revert ALL of them (live: min_score 28, agents_required 4).
 
-### ProcessPoolExecutor, Not ThreadPoolExecutor
-yfinance is not thread-safe (GitHub issue #2557). Concurrent threads share a global `_DFS` dict causing cross-symbol data contamination. The fix uses separate processes (each gets its own Python globals). Do not use `ThreadPoolExecutor` for `score_universe()` — ever.
+### ThreadPoolExecutor for score_universe()
+`score_universe()` uses `ThreadPoolExecutor`. IBKR `reqHistoricalData` is thread-safe via a shared IB connection — the original yfinance thread-safety concern (GitHub issue #2557) no longer applies since Alpaca is the primary data source. Do not revert to ProcessPoolExecutor without verifying the data source in use.
 
 ### REVERSION Dimension: ADF Gate Is Non-Negotiable
 The ADF test (p < 0.05) is the safety gate for mean-reversion scoring. Without it, 32% of random walks score positive on VR/OU/Z-score metrics. If ADF p ≥ 0.05, REVERSION scores 0 — no exceptions.
@@ -67,8 +67,8 @@ Bearish exposure uses SPXS, SQQQ, UVXY. No borrow costs, no margin complications
 ### Options: ATM Delta 0.50 Targeting
 ATM options provide maximum leverage per dollar of premium. Better probability and more responsive Greeks than the common 0.30-0.40 delta targeting.
 
-### News Sentinel: 3-Agent Pipeline, Not 6
-Speed matters for breaking news (15-30 second window). Full 6-agent pipeline takes 5-10 minutes. Sentinel uses Catalyst Analyst + Risk Gate + Instant Decision. Position sizing is 0.75× to compensate for lighter analysis. Hardcoded risk limits still apply.
+### News Sentinel: 3-Agent Pipeline, Not 4
+Speed matters for breaking news (15-30 second window). Full 4-agent pipeline takes 5-10 minutes. Sentinel uses Catalyst Analyst + Risk Gate + Instant Decision. Position sizing is 0.75× to compensate for lighter analysis. Hardcoded risk limits still apply.
 
 ### Smart Execution: $10K / 500-Share Threshold
 TWAP/VWAP/Iceberg only for orders above $10K notional or 500 shares. Smaller orders use simple limit orders. Smart execution adds latency — for small orders the market impact is negligible.

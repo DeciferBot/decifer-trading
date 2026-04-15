@@ -89,7 +89,7 @@ PILLARS = [
     {
         "id": "score", "num": "2", "name": "Score Signals", "color": "#51cf66",
         "icon": "📊",
-        "short": "9 dimensions of analysis",
+        "short": "10 dimensions of analysis",
         "detail": [
             ("Trend", "Are the moving averages aligned? Uses 50/200 MA crossover and slope."),
             ("Momentum", "How strong is the current move? RSI, MACD, and rate of change."),
@@ -165,7 +165,7 @@ MODULE_CATEGORIES = {
     "Signal Generation": {
         "color": "#51cf66", "icon": "📊",
         "modules": {
-            "signals.py": ("9-Dimension Signal Engine", "Scores each stock across 9 dimensions: trend, momentum, squeeze, flow, breakout, confluence, news, social, reversion."),
+            "signals.py": ("10-Dimension Signal Engine", "Scores each stock across 10 dimensions: directional, momentum, squeeze, flow, breakout, PEAD, news, short squeeze, reversion, overnight drift."),
             "scanner.py": ("TradingView Screener", "Scans 3,000+ stocks using real-time screener data."),
             "options_scanner.py": ("Options Scanner", "Finds unusual options activity — volume spikes, IV changes."),
         },
@@ -439,7 +439,7 @@ SIMULATOR_GATES = [
     },
     {
         "name": "Signal Scoring",
-        "question": "NVDA scores 76/100 across 9 dimensions. Trend confirmed, momentum surging, news positive. Strong enough?",
+        "question": "NVDA scores 76/100 across 10 dimensions. Trend confirmed, momentum surging, news positive. Strong enough?",
         "color": "#4dabf7",
         "yes_text": "Yes — send to AI agents",
         "no_text": "No — score isn't high enough",

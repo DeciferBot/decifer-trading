@@ -252,10 +252,10 @@ CONFIG = {
     "min_reward_risk_ratio": 1.5,  # Minimum R:R to enter trade
     "gap_protection_pct": 0.03,  # Exit if opens 3% against position
     # ── DISAGREEMENT PROTOCOL ─────────────────────────────────
-    # How many of 6 agents must agree before a trade is taken
-    # 4 = conservative, 3 = standard (paper), 2 = aggressive
+    # How many of 4 agents must agree before a trade is taken
+    # 4 = conservative (live), 3 = standard (paper), 2 = aggressive
     # Raised from 2→3 (Phase A, 2026-03-28) to filter low-conviction trades.
-    # 2/6 was rubber-stamping; 3/6 requires real consensus. (live: 4)
+    # 2/4 was rubber-stamping; 3/4 requires real consensus. (live: 4)
     "agents_required_to_agree": 3,
     # ── MOMENTUM SENTINEL ──────────────────────────────────────
     # Background thread monitoring SPY 1m bars via BAR_CACHE (live Alpaca stream).

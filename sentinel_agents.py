@@ -2,7 +2,7 @@
 # ║   <>  DECIFER 2.0  —  sentinel_agents.py                   ║
 # ║   Lightweight 3-agent pipeline for news-triggered trades    ║
 # ║                                                              ║
-# ║   Unlike the full 6-agent pipeline (5-10 min), this runs    ║
+# ║   Unlike the full 4-agent pipeline (5-10 min), this runs    ║
 # ║   in ~15-30 seconds for immediate news-driven decisions.    ║
 # ║                                                              ║
 # ║   Agents:                                                    ║
