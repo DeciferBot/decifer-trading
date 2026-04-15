@@ -303,7 +303,8 @@ class TWAPExecutor:
                     order.orderType = "LMT"
                     order.lmtPrice = limit_price
                     order.transmit = True
-                    order.account = self.ib.client.account  # Use current account
+                    # account omitted: IB routes to the default managed account
+                    # (matches orders_core.py, which also never sets order.account)
 
                     # Submit order
                     trade = self.ib.placeOrder(contract, order)

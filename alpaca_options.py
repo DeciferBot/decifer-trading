@@ -53,15 +53,15 @@ def _get_client():
             return None
         try:
             from alpaca.data.historical.option import OptionHistoricalDataClient
-
+        except ImportError as exc:
+            log.error(f"alpaca_options: alpaca-py import failed ({exc}) — run: pip3 install alpaca-py")
+            return None
+        try:
             _options_client = OptionHistoricalDataClient(api_key, secret_key)
             log.info("alpaca_options: OptionHistoricalDataClient initialised")
             return _options_client
-        except ImportError:
-            log.error("alpaca_options: alpaca-py not installed — run: pip3 install alpaca-py")
-            return None
         except Exception as exc:
-            log.error(f"alpaca_options: client init failed — {exc}")
+            log.error(f"alpaca_options: client init failed — {type(exc).__name__}: {exc}")
             return None
 
 
