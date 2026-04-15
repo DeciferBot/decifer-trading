@@ -240,14 +240,39 @@ class TWAPExecutor:
 
         self.stats.total_slices = len(self.slices)
 
-        # Execute slices sequentially — each slice waits for its scheduled time internally
+        # Execute slices sequentially — each slice waits for its scheduled time internally.
+        # last_fill_price carries the most recent successful fill price forward so each new
+        # slice starts at a price we know the market accepted, not the stale arrival price.
+        last_fill_price = current_price
         try:
             for i in range(len(self.slices)):
+                self.slices[i].limit_price = last_fill_price
                 self._execute_slice(contract, self.slices[i], i)
+                if self.slices[i].is_fully_filled() and self.slices[i].filled_prices:
+                    last_fill_price = self.slices[i].filled_prices[-1]
         except Exception as e:
             logger.error(f"TWAP execution failed: {e}")
             self.cancel_all_slices()
             raise
+
+        # Fix 2: reconcile fill accounting against IBKR's actual execution report.
+        # The in-loop poll can miss fills (race between isDone() and fill event delivery).
+        # ib.fills() is authoritative — always cross-check before finalising.
+        try:
+            symbol = contract.symbol
+            ibkr_filled = sum(
+                f.execution.shares
+                for f in self.ib.fills()
+                if f.contract.symbol == symbol
+            )
+            if ibkr_filled > self.stats.filled_quantity:
+                logger.warning(
+                    f"TWAP fill accounting mismatch for {symbol}: "
+                    f"poll={self.stats.filled_quantity}, IBKR={ibkr_filled} — using IBKR value"
+                )
+                self.stats.filled_quantity = ibkr_filled
+        except Exception as e:
+            logger.warning(f"TWAP fill reconciliation failed: {e}")
 
         # Finalize stats
         self.stats.finalize(current_price)
@@ -337,16 +362,24 @@ class TWAPExecutor:
                         if not trade.isDone():
                             self.ib.sleep(1)
                         else:
-                            # Order complete
+                            # Order complete — distinguish fill from cancel/error
+                            status = trade.orderStatus.status
                             filled = trade.orderStatus.filled
-                            if filled > 0:
-                                slice_obj.filled_quantity = filled
-                                # Record fill prices (simplified: use limit price)
-                                slice_obj.filled_prices.extend([limit_price] * filled)
-                                self.stats.filled_quantity += filled
+                            if status == "Filled" and filled > 0:
+                                slice_obj.filled_quantity = int(filled)
+                                fill_px = trade.orderStatus.avgFillPrice or limit_price
+                                slice_obj.filled_prices.extend([fill_px] * int(filled))
+                                self.stats.filled_quantity += int(filled)
                                 self.stats.slices_filled += 1
-                                self.stats.fill_prices.extend([limit_price] * filled)
-                                logger.info(f"Slice {slice_index}: Filled {filled} shares")
+                                self.stats.fill_prices.extend([fill_px] * int(filled))
+                                logger.info(
+                                    f"Slice {slice_index}: Filled {int(filled)} shares @ ${fill_px:.2f}"
+                                )
+                            elif status in ("Cancelled", "ApiCancelled", "Inactive"):
+                                # Terminal non-fill (e.g. error 10349 TIF override flicker)
+                                logger.debug(
+                                    f"Slice {slice_index}: order {status} with filled={filled} — retrying"
+                                )
                             break
 
                     attempt += 1
