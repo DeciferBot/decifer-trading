@@ -116,6 +116,11 @@ function evaluate(hookData) {
     }
   }
 
+  // Block worktree creation — this project pushes directly to master (CLAUDE.md)
+  if (toolName === 'EnterWorktree') {
+    return { block: true, reason: 'Worktrees are disabled for this project. Push directly to master per CLAUDE.md protocol.' };
+  }
+
   return { allow: true };
 }
 
