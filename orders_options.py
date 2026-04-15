@@ -81,7 +81,13 @@ _load_pending_exits()
 
 
 def execute_buy_option(
-    ib: IB, contract_info: dict, portfolio_value: float, reasoning: str = "", score: int = 0
+    ib: IB,
+    contract_info: dict,
+    portfolio_value: float,
+    reasoning: str = "",
+    score: int = 0,
+    trade_type: str = "SCALP",
+    conviction: float = 0.0,
 ) -> bool:
     """
     Buy an options contract (call or put).
@@ -222,7 +228,20 @@ def execute_buy_option(
             "status": "PENDING",
             "order_id": trade.order.orderId,
             "ic_weights_at_entry": _icw_at_entry_opt,
+            "trade_type": trade_type,
+            "conviction": conviction,
+            "open_time": datetime.now(UTC).isoformat(),
         }
+
+        from orders_state import _save_positions_file
+
+        _save_positions_file()
+        try:
+            from trade_store import ledger_write as _ledger_write
+
+            _ledger_write(opt_key, active_trades.get(opt_key, {}))
+        except Exception as _lw_err:
+            log.error(f"execute_buy_option {symbol}: ledger_write failed: {_lw_err}")
 
         log.info(
             f"✅ BUY {contract_info['right']} {symbol} "
@@ -753,9 +772,13 @@ def update_trailing_stops(ib: IB) -> None:
 #
 # Disk-persisted and auto-expires by date — no manual clearing needed.
 import json as _json
+import os as _os
 import pathlib as _pathlib
+import tempfile as _tempfile
+import threading as _threading
 
 _OPTIONS_LEDGER_PATH = _pathlib.Path("data/options_attempt_ledger.json")
+_ledger_lock = _threading.Lock()
 
 
 def _load_options_ledger() -> dict:
@@ -769,11 +792,20 @@ def _load_options_ledger() -> dict:
 
 
 def _save_options_ledger(ledger: dict) -> None:
-    """Persist ledger to disk. Silently ignores write errors."""
+    """Persist ledger to disk atomically (tmp + os.replace). Caller must hold _ledger_lock."""
     try:
-        _OPTIONS_LEDGER_PATH.write_text(_json.dumps(ledger))
+        _OPTIONS_LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with _tempfile.NamedTemporaryFile(
+            "w", dir=str(_OPTIONS_LEDGER_PATH.parent), delete=False, suffix=".tmp"
+        ) as f:
+            _json.dump(ledger, f)
+            tmp = f.name
+        _os.replace(tmp, str(_OPTIONS_LEDGER_PATH))
     except Exception:
-        pass
+        try:
+            _os.unlink(tmp)
+        except Exception:
+            pass
 
 
 def _options_attempted_today(symbol: str, direction: str) -> bool:
@@ -782,7 +814,8 @@ def _options_attempted_today(symbol: str, direction: str) -> bool:
 
     key = f"{symbol}_{direction}"
     today = _dt.now().strftime("%Y-%m-%d")
-    return _options_ledger.get(key) == today
+    with _ledger_lock:
+        return _options_ledger.get(key) == today
 
 
 def _record_options_attempt(symbol: str, direction: str) -> None:
@@ -791,12 +824,13 @@ def _record_options_attempt(symbol: str, direction: str) -> None:
 
     key = f"{symbol}_{direction}"
     today = _dt.now().strftime("%Y-%m-%d")
-    _options_ledger[key] = today
-    # Prune stale entries (any date != today) to keep the file tidy
-    stale = [k for k, v in _options_ledger.items() if v != today]
-    for k in stale:
-        del _options_ledger[k]
-    _save_options_ledger(_options_ledger)
+    with _ledger_lock:
+        _options_ledger[key] = today
+        # Prune stale entries (any date != today) to keep the file tidy
+        stale = [k for k, v in _options_ledger.items() if v != today]
+        for k in stale:
+            del _options_ledger[k]
+        _save_options_ledger(_options_ledger)
 
 
 _options_ledger: dict = _load_options_ledger()
@@ -968,6 +1002,10 @@ def execute_add_to_option(
             if opt_key in active_trades:
                 active_trades[opt_key]["contracts"] = active_trades[opt_key].get("contracts", 0) + add_contracts
                 active_trades[opt_key]["qty"] = active_trades[opt_key]["contracts"]
+
+        from orders_state import _save_positions_file
+
+        _save_positions_file()
 
         log.info(
             f"✅ ADD {add_contracts} contracts {opt_key} @ ${limit_price:.2f} "
