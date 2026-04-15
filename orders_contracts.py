@@ -19,7 +19,6 @@ from ib_async import IB, Forex, Stock  # re-exported for callers
 
 from config import CONFIG
 from orders_state import log
-from scanner import get_tv_signal_cache  # load-bearing: rebind pattern below does _om.get_tv_signal_cache
 
 # ── Timezone ───────────────────────────────────────────────────────────────────
 _ET = zoneinfo.ZoneInfo("America/New_York")
@@ -245,12 +244,7 @@ def _validate_position_price(symbol: str, ibkr_price: float, entry: float) -> tu
     import sys as _sys
 
     _om = _sys.modules.get("orders_contracts", _sys.modules[__name__])
-    _gtsc = _om.get_tv_signal_cache
     _gap = _om._get_alpaca_price
-
-    tv_cache = _gtsc()
-    tv_data = tv_cache.get(symbol) if tv_cache else None
-    tv_close = float(tv_data.get("tv_close")) if tv_data and tv_data.get("tv_close") else 0
 
     alpaca_price = _gap(symbol)
 
@@ -259,8 +253,6 @@ def _validate_position_price(symbol: str, ibkr_price: float, entry: float) -> tu
         prices["IBKR"] = ibkr_price
     if alpaca_price > 0:
         prices["Alpaca"] = alpaca_price
-    if tv_close > 0:
-        prices["TV"] = tv_close
 
     if not prices:
         return 0, f"No price data from any source for {symbol}"

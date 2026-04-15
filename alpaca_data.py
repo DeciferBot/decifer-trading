@@ -1,10 +1,15 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║   <>  DECIFER  —  alpaca_data.py                            ║
-# ║   Single responsibility: fetch historical OHLCV bars from   ║
-# ║   Alpaca REST API (SIP feed, split-adjusted).               ║
+# ║   Single responsibility: fetch market data from Alpaca REST.║
 # ║                                                              ║
-# ║   Used by: signals._safe_download                           ║
-# ║   Nothing else lives here. No streaming, no trading logic.  ║
+# ║   Provides:                                                  ║
+# ║     fetch_bars            — historical OHLCV (SIP)          ║
+# ║     fetch_snapshots       — live price + 1d change          ║
+# ║     fetch_snapshots_batched — chunked richer snapshots      ║
+# ║     get_all_tradable_equities — enumerate US equities       ║
+# ║                                                              ║
+# ║   Used by: signals, universe_committed, universe_promoter   ║
+# ║   No streaming, no trading logic.                           ║
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
@@ -189,3 +194,192 @@ def fetch_snapshots(symbols: list[str]) -> dict[str, dict]:
     except Exception as exc:
         log.debug(f"fetch_snapshots: batch request failed — {exc}")
         return {}
+
+
+# ── Rich batched snapshots (promoter needs volume + prior_close) ─────────────
+
+
+def fetch_snapshots_batched(symbols: list[str], batch_size: int = 100) -> dict[str, dict]:
+    """
+    Chunked snapshot fetcher returning rich fields for the universe promoter.
+
+    Returns per symbol:
+      price            — latest_trade.price (live or last traded)
+      prior_close      — previous_daily_bar.close
+      today_open       — daily_bar.open (today's regular-session open, if open)
+      today_high       — daily_bar.high
+      today_low        — daily_bar.low
+      today_volume     — daily_bar.volume (regular-session volume to date; 0 on weekends)
+      prev_volume      — previous_daily_bar.volume (last regular session, always populated)
+      minute_volume    — minute_bar.volume (last minute bar; premarket if pre-open)
+      change_1d        — (price - prior_close) / prior_close
+      gap_pct          — (today_open - prior_close) / prior_close if daily_bar else change_1d
+
+    Missing symbols are absent from the returned dict. Batches of `batch_size`
+    are used to stay under Alpaca URL-length / payload limits. On any batch
+    failure the function logs and continues with the remaining batches — no
+    global failure.
+    """
+    if not symbols:
+        return {}
+    client = _get_client()
+    if client is None:
+        return {}
+
+    try:
+        from alpaca.data.requests import StockSnapshotRequest
+    except ImportError:
+        log.debug("fetch_snapshots_batched: alpaca-py not installed")
+        return {}
+
+    out: dict[str, dict] = {}
+    # Dedupe while preserving order
+    seen: set[str] = set()
+    unique_syms = [s for s in symbols if not (s in seen or seen.add(s))]
+
+    for i in range(0, len(unique_syms), batch_size):
+        chunk = unique_syms[i : i + batch_size]
+        try:
+            request = StockSnapshotRequest(symbol_or_symbols=chunk, feed="sip")
+            raw = client.get_stock_snapshot(request)
+        except Exception as exc:
+            log.warning(f"fetch_snapshots_batched: batch {i // batch_size} failed — {exc}")
+            continue
+
+        for sym, snap in raw.items():
+            try:
+                price = float(snap.latest_trade.price) if snap.latest_trade else None
+                prev_bar = snap.previous_daily_bar
+                daily_bar = snap.daily_bar
+                min_bar = snap.minute_bar
+
+                prior_close = float(prev_bar.close) if prev_bar else None
+                prev_volume = int(prev_bar.volume) if prev_bar else 0
+                today_open = float(daily_bar.open) if daily_bar else None
+                today_high = float(daily_bar.high) if daily_bar else None
+                today_low = float(daily_bar.low) if daily_bar else None
+                today_volume = int(daily_bar.volume) if daily_bar else 0
+                minute_volume = int(min_bar.volume) if min_bar else 0
+
+                change_1d = None
+                gap_pct = None
+                if price is not None and prior_close and prior_close > 0:
+                    change_1d = (price - prior_close) / prior_close
+                if today_open is not None and prior_close and prior_close > 0:
+                    gap_pct = (today_open - prior_close) / prior_close
+                elif change_1d is not None:
+                    gap_pct = change_1d  # fallback: use intraday change as gap proxy
+
+                out[sym] = {
+                    "price": price,
+                    "prior_close": prior_close,
+                    "prev_volume": prev_volume,
+                    "today_open": today_open,
+                    "today_high": today_high,
+                    "today_low": today_low,
+                    "today_volume": today_volume,
+                    "minute_volume": minute_volume,
+                    "change_1d": change_1d,
+                    "gap_pct": gap_pct,
+                }
+            except Exception as exc:
+                log.debug(f"fetch_snapshots_batched: parse failed for {sym} — {exc}")
+
+    return out
+
+
+# ── Tradable equity enumeration (Alpaca assets endpoint) ─────────────────────
+
+_trading_client = None
+_trading_client_lock = threading.Lock()
+
+
+def _get_trading_client():
+    """Return a cached TradingClient, or None if keys not set."""
+    global _trading_client
+    if _trading_client is not None:
+        return _trading_client
+    with _trading_client_lock:
+        if _trading_client is not None:
+            return _trading_client
+        api_key = CONFIG.get("alpaca_api_key", "")
+        secret_key = CONFIG.get("alpaca_secret_key", "")
+        if not api_key or not secret_key:
+            return None
+        try:
+            from alpaca.trading.client import TradingClient
+
+            # paper=True works for asset enumeration regardless of account env
+            _trading_client = TradingClient(api_key, secret_key, paper=True)
+            log.debug("alpaca_data: TradingClient initialised")
+        except ImportError:
+            log.debug("alpaca_data: alpaca-py not installed")
+        except Exception as exc:
+            log.debug(f"alpaca_data: trading client init failed — {exc}")
+    return _trading_client
+
+
+def get_all_tradable_equities() -> list[dict]:
+    """
+    Enumerate all tradable US equities via Alpaca /v2/assets.
+
+    Filters to: status=ACTIVE, tradable=True, exchange in {NYSE, NASDAQ, AMEX,
+    ARCA, BATS}, asset_class=us_equity. Excludes OTC by exchange filter.
+
+    Returns a list of dicts:
+      {symbol, name, exchange, marginable, shortable, fractionable, easy_to_borrow}
+
+    Returns [] if Alpaca unavailable. Typical call returns 8000–11000 equities;
+    downstream (universe_committed) ranks by dollar volume and keeps top N.
+    """
+    client = _get_trading_client()
+    if client is None:
+        return []
+
+    try:
+        from alpaca.trading.enums import AssetClass, AssetStatus
+        from alpaca.trading.requests import GetAssetsRequest
+
+        request = GetAssetsRequest(
+            status=AssetStatus.ACTIVE,
+            asset_class=AssetClass.US_EQUITY,
+        )
+        assets = client.get_all_assets(request)
+    except ImportError:
+        log.debug("get_all_tradable_equities: alpaca-py not installed")
+        return []
+    except Exception as exc:
+        log.warning(f"get_all_tradable_equities: request failed — {exc}")
+        return []
+
+    allowed_exchanges = {"NYSE", "NASDAQ", "AMEX", "ARCA", "BATS"}
+    out: list[dict] = []
+    for a in assets:
+        try:
+            if not getattr(a, "tradable", False):
+                continue
+            exch = str(getattr(a, "exchange", "")).upper()
+            # alpaca-py returns an enum; .value gives the string
+            if hasattr(a.exchange, "value"):
+                exch = str(a.exchange.value).upper()
+            if exch not in allowed_exchanges:
+                continue
+            sym = str(a.symbol)
+            # Skip obvious non-commons: warrants, rights, units (heuristic)
+            if any(sym.endswith(suf) for suf in (".WS", ".U", ".R", ".WT")):
+                continue
+            out.append(
+                {
+                    "symbol": sym,
+                    "name": getattr(a, "name", "") or "",
+                    "exchange": exch,
+                    "marginable": bool(getattr(a, "marginable", False)),
+                    "shortable": bool(getattr(a, "shortable", False)),
+                    "fractionable": bool(getattr(a, "fractionable", False)),
+                    "easy_to_borrow": bool(getattr(a, "easy_to_borrow", False)),
+                }
+            )
+        except Exception as exc:
+            log.debug(f"get_all_tradable_equities: row parse failed — {exc}")
+    log.info(f"get_all_tradable_equities: {len(out)} tradable US equities")
+    return out

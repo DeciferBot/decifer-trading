@@ -1,32 +1,26 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║   <>  DECIFER  —  scanner.py                                 ║
-# ║   Dynamic universe via TradingView Screener library          ║
-# ║   github.com/shner-elmo/TradingView-Screener                 ║
 # ║                                                              ║
-# ║   3,000+ fields · RSI/MACD/EMA on any timeframe             ║
-# ║   Pre-market/gap scans · No API key · Free                   ║
+# ║   Three-tier universe assembler:                             ║
+# ║     Tier A — inline floor (CORE_SYMBOLS + CORE_EQUITIES)    ║
+# ║     Tier B — daily promoted list (universe_promoter)        ║
+# ║     Tier C — dynamic per-cycle adds (catalyst/held/etc)     ║
+# ║                                                              ║
+# ║   Also owns market regime classification.                    ║
+# ║   TV screener removed 2026-04-15 — replaced with own Python ║
+# ║   screening on Alpaca data. See universe_committed.py +     ║
+# ║   universe_promoter.py.                                      ║
+# ║                                                              ║
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
 from __future__ import annotations
 
-import concurrent.futures as _cf
 import logging
 
 from ib_async import IB
 
 from config import CONFIG
-
-try:
-    from tradingview_screener import Query, col
-
-    _TV_AVAILABLE = True
-except ImportError:
-    _TV_AVAILABLE = False
-    logging.getLogger("decifer.scanner").warning(
-        "tradingview-screener not installed — run: pip install tradingview-screener  "
-        "Falling back to core + momentum symbols only."
-    )
 
 log = logging.getLogger("decifer.scanner")
 
@@ -122,109 +116,6 @@ CORE_EQUITIES = [
 # Backward-compat alias — existing callers still import MOMENTUM_FALLBACK.
 # Keep this until all references (bot_dashboard, theme_tracker, tests) migrate.
 MOMENTUM_FALLBACK = CORE_EQUITIES
-
-# ── TV signal cache — populated each scan cycle ───────────────
-# signals.py reads this to skip re-fetching fields already computed here.
-# Keys are plain tickers (e.g. "NVDA"). Values are indicator dicts.
-_tv_cache: dict[str, dict] = {}
-
-
-def get_tv_signal_cache() -> dict[str, dict]:
-    """
-    Return the most recent TradingView indicator snapshot.
-    signals.py calls this to reuse pre-fetched RSI/MACD/ATR values
-    instead of re-downloading them from yfinance.
-    """
-    return _tv_cache
-
-
-# ── Field set fetched on every query ──────────────────────────
-_COLS = [
-    "name",
-    "close",
-    "volume",
-    "change",  # daily % change
-    "gap",  # gap from prior close %
-    "relative_volume_10d_calc",  # rel. volume vs 10d avg
-    "RSI|60",  # 1h RSI
-    "MACD.macd|60",  # 1h MACD line
-    "MACD.signal|60",  # 1h MACD signal
-    "EMA9|60",  # 1h EMA9
-    "EMA21|60",  # 1h EMA21
-    "ATR|60",  # 1h ATR (position sizing)
-    "VWAP",  # intraday VWAP
-    "premarket_change",  # pre-market % change
-    "premarket_volume",  # pre-market volume
-    "Recommend.All",  # TV composite signal (-1 → +1)
-    "market_cap_basic",
-    "change_from_open",  # Intraday % change from open (short scanner)
-    "EMA20",  # 20-period EMA (breakdown scanner)
-    "EMA50",  # 50-period EMA (breakdown scanner)
-]
-
-# ── Base filter applied to every query ────────────────────────
-if _TV_AVAILABLE:
-    _BASE = [
-        col("exchange").isin(["NYSE", "NASDAQ", "AMEX"]),
-        col("type") == "stock",
-        col("market_cap_basic") > 100_000_000,  # $100M+ market cap
-        col("volume") > 500_000,  # minimum liquidity
-        col("close").between(2.0, 500.0),  # no pennies, no extreme prices
-    ]
-else:
-    _BASE = []
-
-
-def _query(extra_filters: list, sort_by: str, ascending: bool, limit: int):
-    """Run a single TV screener query, return a DataFrame."""
-    return (
-        Query()
-        .select(*_COLS)
-        .where(*(_BASE + extra_filters))
-        .order_by(sort_by, ascending=ascending)
-        .limit(limit)
-        .get_scanner_data()
-    )
-
-
-def _extract(df, source_name: str, symbols: set) -> int:
-    """
-    Pull tickers from a DataFrame into the symbols set.
-    Also populate the TV signal cache with indicator values.
-    """
-    global _tv_cache
-    added = 0
-    for row in df.to_dict("records"):
-        raw = row.get("ticker", "")
-        sym = raw.split(":")[-1] if ":" in raw else str(row.get("name", ""))
-        if not sym or len(sym) > 6 or not sym.replace(".", "").isalpha():
-            continue
-        symbols.add(sym)
-        added += 1
-        # Cache every indicator field TV returned for this symbol
-        _tv_cache[sym] = {
-            "tv_close": row.get("close"),
-            "tv_volume": row.get("volume"),
-            "tv_change": row.get("change"),
-            "tv_gap": row.get("gap"),
-            "tv_rel_vol": row.get("relative_volume_10d_calc"),
-            "tv_rsi_1h": row.get("RSI|60"),
-            "tv_macd_1h": row.get("MACD.macd|60"),
-            "tv_macd_sig_1h": row.get("MACD.signal|60"),
-            "tv_ema9_1h": row.get("EMA9|60"),
-            "tv_ema21_1h": row.get("EMA21|60"),
-            "tv_atr_1h": row.get("ATR|60"),
-            "tv_vwap": row.get("VWAP"),
-            "tv_pm_change": row.get("premarket_change"),
-            "tv_pm_volume": row.get("premarket_volume"),
-            "tv_recommend": row.get("Recommend.All"),
-            "tv_market_cap": row.get("market_cap_basic"),
-            "tv_change_open": row.get("change_from_open"),
-            "tv_ema20": row.get("EMA20"),
-            "tv_ema50": row.get("EMA50"),
-            "tv_source": source_name,
-        }
-    return added
 
 
 # ── Sector ETF universe for rotation scoring ──────────────────
@@ -361,274 +252,82 @@ def get_sector_rotation_bias() -> dict:
 
 def get_dynamic_universe(ib: IB, regime: dict | None = None) -> list[str]:
     """
-    Build a dynamic universe using TradingView Screener.
+    Build the per-cycle scan universe from three tiers:
 
-    Runs ten targeted queries every scan cycle:
-      ALWAYS:
-        1. Volume leaders        — most active by raw volume
-        2. Relative vol surge    — rel_vol > 1.5×, momentum confirmation
-      DIRECTIONAL (always, at fixed limits):
-        3. Momentum longs        — RSI 1h 45–68, MACD positive
-        4. Momentum shorts       — RSI 1h 32–55, MACD negative
-      SHORT-CANDIDATE PIPELINE:
-        5. Breakdown             — price below EMA20/50, bearish alignment
-        6. Volume distribution   — heavy selling on 2x+ volume
-        7. Bearish momentum      — RSI < 40, MACD bearish crossover
-        8. Intraday breakdown    — down > 3% from open
-      CATALYST:
-        9. Gap & go + gap-down   — overnight gaps > 3%
-       10. Pre-market movers     — pm_change > 3%
+      Tier A — inline floor (always scanned):
+        CORE_SYMBOLS (15 macro/vol/inverse/crypto/commodity ETFs)
+        + CORE_EQUITIES (41 mega-cap equities)
 
-    All scans run every cycle at fixed limits — regime is not a behavioral gate.
-    Regime context is passed to the Opus reasoning layer which decides signal by
-    signal what to trade.
+      Tier B — daily promoted list (top 50 from universe_promoter):
+        Read from data/daily_promoted.json. Refreshed 16:15 ET + 08:00 ET
+        by universe_promoter. Stale files (>18h) are ignored and the bot
+        runs on Tier A only.
 
-    Circuit breaker: if VIX is in extreme panic territory (> vix_panic_min or
-    +20% spike), only the non-directional watchlist scans run (volume_leaders,
-    rel_vol_surge). Directional scans are skipped — this is a safety stop, not
-    a reasoning gate.
+      Tier C — dynamic per-cycle adds:
+        Sector-rotation leaders and their constituent stocks.
+        Other Tier C paths (catalyst candidates, held positions, favourites,
+        sympathy, news hits) are unioned in by the caller (bot_trading
+        union logic) — not this function.
+
+    Circuit breaker: if VIX is in extreme panic territory, we do not restrict
+    the universe here. Risk gating happens downstream (risk.check_risk_conditions,
+    PM exit triggers). Keeping the universe wide during capitulation lets the
+    scoring engine see the full set of candidates.
 
     The `ib` parameter is retained for API compatibility.
     """
-    global _tv_cache
-    _tv_cache = {}  # Fresh cache each scan cycle
+    # Tier A — always-on floor
+    symbols: set[str] = set(CORE_SYMBOLS) | set(CORE_EQUITIES)
+    n_core = len(CORE_SYMBOLS)
+    n_equities = len(CORE_EQUITIES)
 
-    symbols: set[str] = set(CORE_SYMBOLS)
+    # Tier B — promoted
+    n_promoted = 0
+    try:
+        from universe_promoter import load_promoted_universe
 
-    # ── Sector rotation: add leading sector ETFs + their stocks ──
+        promoted = load_promoted_universe()
+        if promoted:
+            before = len(symbols)
+            symbols.update(promoted)
+            n_promoted = len(symbols) - before
+        else:
+            log.warning(
+                "Universe: daily_promoted.json missing/stale — running Tier A only. "
+                "Check universe_promoter schedule (16:15 ET / 08:00 ET)."
+            )
+    except Exception as exc:
+        log.warning(f"Universe: promoter load failed — {exc}. Running Tier A only.")
+
+    # Tier C — sector rotation leaders (other Tier C paths union'd in by caller)
+    n_sector = 0
     sector_bias = get_sector_rotation_bias()
     if sector_bias.get("available"):
+        before = len(symbols)
         for etf in sector_bias.get("leaders", []):
             symbols.add(etf)
-            log.debug("Sector rotation: adding leader %s to universe", etf)
-            # Also add individual names from the leading sector so the bot
-            # can trade the stocks driving the sector move, not just the wrapper.
             for stock in _SECTOR_STOCKS.get(etf, []):
                 symbols.add(stock)
+        n_sector = len(symbols) - before
         log.info(
-            "Sector rotation leaders: %s — added %d sector stocks",
+            "Sector rotation leaders: %s — added %d new sector stocks",
             sector_bias.get("leaders", []),
-            sum(len(_SECTOR_STOCKS.get(e, [])) for e in sector_bias.get("leaders", [])),
+            n_sector,
         )
 
-    # ── Circuit breaker — extreme VIX only ────────────────────
     _vix = (regime or {}).get("vix", 0)
     _vix_1h = (regime or {}).get("vix_1h_change", 0)
     _is_extreme = _vix > CONFIG.get("vix_panic_min", 35) or _vix_1h > CONFIG.get("vix_spike_pct", 0.20)
     if _is_extreme:
         log.warning(
-            f"Universe: EXTREME_STRESS circuit breaker — VIX={_vix:.1f} spike={_vix_1h:.1%}. Directional scans skipped."
+            f"Universe: EXTREME_STRESS flag set — VIX={_vix:.1f} spike={_vix_1h:.1%}. "
+            "Universe unchanged; risk gating occurs downstream."
         )
 
-    total_from_tv = 0
-
-    if not _TV_AVAILABLE:
-        log.warning(
-            "tradingview-screener not available — skipping TV scans. Install with: pip install tradingview-screener"
-        )
-        symbols.update(CORE_EQUITIES)
-        log.info(f"Universe (fallback): {len(symbols)} symbols")
-        return list(symbols)
-
-    # ── Build query list ──────────────────────────────────────────────────────
-    # Each entry: (name, _query kwargs).  Queries are independent — run in parallel.
-    # _extract() modifies shared state so it runs serially after all fetches.
-    _scan_tasks: list[tuple[str, dict]] = []
-
-    # 1. Volume leaders (always)
-    _scan_tasks.append(
-        (
-            "volume_leaders",
-            dict(
-                extra_filters=[col("volume") > 1_000_000],
-                sort_by="volume",
-                ascending=False,
-                limit=30,
-            ),
-        )
+    log.info(
+        f"Universe: {len(symbols)} symbols | core={n_core} equities={n_equities} "
+        f"promoted={n_promoted} sector+={n_sector} | vix={_vix:.1f} extreme={_is_extreme}"
     )
-
-    # 2. Relative volume surge (always)
-    _scan_tasks.append(
-        (
-            "rel_vol_surge",
-            dict(
-                extra_filters=[col("relative_volume_10d_calc") > 1.5, col("volume") > 300_000],
-                sort_by="relative_volume_10d_calc",
-                ascending=False,
-                limit=25,
-            ),
-        )
-    )
-
-    if not _is_extreme:
-        # 3. Momentum longs
-        _scan_tasks.append(
-            (
-                "momentum_long",
-                dict(
-                    extra_filters=[
-                        col("RSI|60").between(45, 68),
-                        col("MACD.macd|60") > col("MACD.signal|60"),
-                        col("relative_volume_10d_calc") > 1.2,
-                    ],
-                    sort_by="relative_volume_10d_calc",
-                    ascending=False,
-                    limit=20,
-                ),
-            )
-        )
-
-        # 4. Momentum shorts
-        _scan_tasks.append(
-            (
-                "momentum_short",
-                dict(
-                    extra_filters=[
-                        col("RSI|60").between(32, 55),
-                        col("MACD.macd|60") < col("MACD.signal|60"),
-                        col("relative_volume_10d_calc") > 1.2,
-                    ],
-                    sort_by="relative_volume_10d_calc",
-                    ascending=False,
-                    limit=20,
-                ),
-            )
-        )
-
-        # 5. Breakdown — below EMA20/50
-        _scan_tasks.append(
-            (
-                "breakdown",
-                dict(
-                    extra_filters=[
-                        col("close") < col("EMA20"),
-                        col("close") < col("EMA50"),
-                        col("change") < -1.0,
-                        col("relative_volume_10d_calc") > 1.2,
-                    ],
-                    sort_by="change",
-                    ascending=True,
-                    limit=15,
-                ),
-            )
-        )
-
-        # 6. Volume distribution — heavy selling
-        _scan_tasks.append(
-            (
-                "volume_distribution",
-                dict(
-                    extra_filters=[
-                        col("relative_volume_10d_calc") > 2.0,
-                        col("change") < -2.0,
-                    ],
-                    sort_by="relative_volume_10d_calc",
-                    ascending=False,
-                    limit=12,
-                ),
-            )
-        )
-
-        # 7. Bearish momentum
-        _scan_tasks.append(
-            (
-                "bearish_momentum",
-                dict(
-                    extra_filters=[
-                        col("RSI|60") < 40,
-                        col("MACD.macd|60") < col("MACD.signal|60"),
-                        col("change") < -0.5,
-                        col("relative_volume_10d_calc") > 1.0,
-                    ],
-                    sort_by="RSI|60",
-                    ascending=True,
-                    limit=12,
-                ),
-            )
-        )
-
-        # 8. Intraday breakdown
-        _scan_tasks.append(
-            (
-                "intraday_breakdown",
-                dict(
-                    extra_filters=[col("change_from_open") < -3.0, col("volume") > 500_000],
-                    sort_by="change_from_open",
-                    ascending=True,
-                    limit=15,
-                ),
-            )
-        )
-
-        # 9a. Gap up — catalyst longs
-        _scan_tasks.append(
-            (
-                "gap_go",
-                dict(
-                    extra_filters=[col("gap").between(3.0, 50.0), col("volume") > 1_000_000],
-                    sort_by="gap",
-                    ascending=False,
-                    limit=15,
-                ),
-            )
-        )
-
-        # 9b. Gap down — short candidates
-        _scan_tasks.append(
-            (
-                "gap_down",
-                dict(
-                    extra_filters=[col("gap").between(-50.0, -3.0), col("volume") > 1_000_000],
-                    sort_by="gap",
-                    ascending=True,
-                    limit=15,
-                ),
-            )
-        )
-
-        # 10. Pre-market movers
-        _scan_tasks.append(
-            (
-                "premarket_movers",
-                dict(
-                    extra_filters=[
-                        col("premarket_change").between(3.0, 200.0),
-                        col("premarket_volume") > 50_000,
-                    ],
-                    sort_by="premarket_change",
-                    ascending=False,
-                    limit=15,
-                ),
-            )
-        )
-
-    # ── Execute all queries in parallel, extract serially ────────────────────
-    def _run_scan_task(task):
-        name, kwargs = task
-        try:
-            _, df = _query(**kwargs)
-            return name, df
-        except Exception as exc:
-            log.warning("TV %s scan failed: %s", name, exc)
-            return name, None
-
-    workers = min(len(_scan_tasks), 8)
-    with _cf.ThreadPoolExecutor(max_workers=workers) as pool:
-        for name, df in pool.map(_run_scan_task, _scan_tasks):
-            if df is not None:
-                total_from_tv += _extract(df, name, symbols)
-                log.debug("TV scan (%s): %d rows", name, len(df))
-
-    if total_from_tv == 0:
-        log.warning("All TradingView scans returned zero results — running on core + fallback only")
-
-    # ── Core equity floor (always included regardless of TV results) ───────────
-    # These mega-caps must reach score_universe() even when TV's RSI/MACD
-    # filters exclude them (e.g. RSI > 68 mid-rally — the Apr 14 META case).
-    symbols.update(CORE_EQUITIES)
-
-    log.info(f"Universe: {len(symbols)} symbols | {total_from_tv} TV hits | vix={_vix:.1f} extreme={_is_extreme}")
     return list(symbols)
 
 
@@ -969,51 +668,7 @@ def _regime_size_mult(regime: str) -> float:
     }.get(regime, 0.75)
 
 
-def get_small_cap_universe() -> list[str]:
-    """
-    Supplemental small / micro cap universe via TradingView Screener.
-
-    Market cap $50M–$2B: less efficient, fewer institutional participants,
-    anomalies like PEAD and short squeeze persist longer than in large caps.
-
-    Filters:
-      - Market cap $50M–$2B
-      - Volume > 200K (minimum liquidity)
-      - Price $2–$50 (excludes sub-penny and high-priced names)
-      - Relative volume > 1.5× (must have an active catalyst today)
-      - TV recommendation > 0.2 (bullish lean — squeeze/drift plays are long-only)
-
-    Returns up to 20 tickers, or [] if TV unavailable.
-    Also populates _tv_cache for downstream use.
-    """
-    if not _TV_AVAILABLE:
-        log.debug("get_small_cap_universe: tradingview-screener not available")
-        return []
-
-    try:
-        _, df = (
-            Query()
-            .select(*_COLS)
-            .where(
-                col("exchange").isin(["NYSE", "NASDAQ", "AMEX"]),
-                col("type") == "stock",
-                col("market_cap_basic").between(50_000_000, 2_000_000_000),
-                col("volume") > 200_000,
-                col("close").between(2.0, 50.0),
-                col("relative_volume_10d_calc") > 1.5,
-                col("Recommend.All") > 0.2,
-            )
-            .order_by("relative_volume_10d_calc", ascending=False)
-            .limit(20)
-            .get_scanner_data()
-        )
-
-        symbols: set[str] = set()
-        _extract(df, "small_cap", symbols)
-        result = list(symbols)
-        log.info(f"Small cap universe: {len(result)} symbols (rel_vol filtered, $50M-$2B)")
-        return result
-
-    except Exception as e:
-        log.debug(f"get_small_cap_universe failed: {e}")
-        return []
+# get_small_cap_universe() was removed 2026-04-15 as part of the TV rip.
+# Small-cap coverage now comes from universe_committed.json (ranked by dollar
+# volume, naturally includes $50M–$2B names meeting the liquidity floor) and
+# universe_promoter surfaces the movers each day.

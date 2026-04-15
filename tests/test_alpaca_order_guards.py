@@ -33,7 +33,6 @@ for _m in (
     "anthropic",
     "praw",
     "feedparser",
-    "tradingview_screener",
     "cvxpy",
     "alpaca",
     "alpaca.data",

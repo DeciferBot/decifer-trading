@@ -93,7 +93,6 @@ from risk import (
     record_loss,
     record_win,
 )
-from scanner import get_tv_signal_cache
 
 
 def cancel_order_by_id(ib, order_id) -> bool:
@@ -170,7 +169,6 @@ __all__ = [
     "flush_pending_option_exits",
     "get_contract",
     "get_open_positions",
-    "get_tv_signal_cache",
     "has_open_order_for",
     "is_equities_extended_hours",
     "is_options_market_open",

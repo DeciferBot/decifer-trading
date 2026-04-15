@@ -88,7 +88,6 @@ _ORDERS_CORE_REBIND = [
     "calculate_position_size",
     "calculate_stops",
     "log_order",
-    "get_tv_signal_cache",
     "_get_alpaca_price",
     "MarketOrder",
     "LimitOrder",
@@ -172,17 +171,16 @@ def test_orders_facade_attr(attr):
 
 
 # ---------------------------------------------------------------------------
-# 3.  orders_contracts.py self-rebind: get_tv_signal_cache and _get_alpaca_price
+# 3.  orders_contracts.py self-rebind: _get_alpaca_price
 #
 #     _validate_position_price() does:
 #         _om = sys.modules.get("orders_contracts", sys.modules[__name__])
-#         _gtsc = _om.get_tv_signal_cache
 #         _gap  = _om._get_alpaca_price
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("attr", ["get_tv_signal_cache", "_get_alpaca_price"])
+@pytest.mark.parametrize("attr", ["_get_alpaca_price"])
 def test_orders_contracts_self_rebind(attr):
-    """orders_contracts must expose get_tv_signal_cache and _get_alpaca_price for its own rebind."""
+    """orders_contracts must expose _get_alpaca_price for its own rebind."""
     import orders_contracts
 
     assert hasattr(orders_contracts, attr), (
@@ -305,16 +303,16 @@ def test_orders_core_rebind_resolves():
 
 
 def test_orders_contracts_rebind_resolves():
-    """The _om rebind in _validate_position_price must resolve get_tv_signal_cache."""
+    """The _om rebind in _validate_position_price must resolve _get_alpaca_price."""
     import orders_contracts  # noqa: F401
 
     _om = sys.modules.get("orders_contracts", sys.modules["orders_contracts"])
 
-    for attr in ["get_tv_signal_cache", "_get_alpaca_price"]:
+    for attr in ["_get_alpaca_price"]:
         try:
             getattr(_om, attr)
         except AttributeError as exc:
             pytest.fail(
                 f"orders_contracts rebind would crash: {exc}. "
-                "Ensure orders_contracts.py imports get_tv_signal_cache and _get_alpaca_price."
+                "Ensure orders_contracts.py imports _get_alpaca_price."
             )

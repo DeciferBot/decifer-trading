@@ -114,7 +114,6 @@ for _mod_name in [
     _stub = _make_stub(_mod_name)
     _stub.get_dynamic_universe = MagicMock(return_value=[])
     _stub.get_market_regime = MagicMock(return_value={})
-    _stub.get_tv_signal_cache = MagicMock(return_value={})
     _stub.score_universe = MagicMock(return_value=([], []))
     _stub.fetch_multi_timeframe = MagicMock(return_value={})
     _stub.batch_news_sentiment = MagicMock(return_value={})

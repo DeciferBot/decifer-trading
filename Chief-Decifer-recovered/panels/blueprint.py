@@ -164,7 +164,6 @@ LIB_DESCRIPTIONS = {
     "ib_async": "Interactive Brokers API",
     "anthropic": "Claude API for 6-agent pipeline + news sentiment",
     "yfinance": "Free market data — OHLCV, options chains, fundamentals",
-    "tradingview-screener": "TradingView screener API — dynamic universe builder",
     "pandas": "DataFrames",
     "numpy": "Numerical computation",
     "pyarrow": "Parquet file format for historical ML training data",

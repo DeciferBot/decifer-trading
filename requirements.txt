@@ -13,7 +13,6 @@ anthropic>=0.25.0            # Claude API for 6-agent pipeline + news sentiment 
 # ── Market Data ──
 alpaca-py>=0.13.0            # Alpaca Algo Trader Plus — real-time quotes, options chains, OPRA feed (alpaca_options.py, alpaca_data.py, alpaca_stream.py)
 yfinance>=0.2.40             # Free market data — OHLCV, options chains, fundamentals (signals.py, scanner.py, options.py, options_scanner.py, data_collector.py, portfolio_optimizer.py)
-tradingview-screener>=0.3.0  # TradingView screener API — dynamic universe builder (scanner.py). Free, no API key
 
 # ── Data / Numerical ──
 pandas>=2.0.0                # DataFrames (signals.py, data_collector.py, ml_engine.py, backtester.py, portfolio_optimizer.py, ibkr_streaming.py)

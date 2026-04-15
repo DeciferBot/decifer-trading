@@ -109,131 +109,43 @@ def low_volume_data():
 
 
 # ---------------------------------------------------------------------------
-# Filter tests — get_dynamic_universe behaviour by regime / TV availability
+# get_dynamic_universe — Tier-A floor + promoted-list behaviour
 # ---------------------------------------------------------------------------
-
-_TV_ROW_COLS = [
-    "ticker",
-    "name",
-    "close",
-    "volume",
-    "change",
-    "gap",
-    "relative_volume_10d_calc",
-    "RSI|60",
-    "MACD.macd|60",
-    "MACD.signal|60",
-    "EMA9|60",
-    "EMA21|60",
-    "ATR|60",
-    "VWAP",
-    "premarket_change",
-    "premarket_volume",
-    "Recommend.All",
-    "market_cap_basic",
-    "change_from_open",
-    "EMA20",
-    "EMA50",
-]
-
-
-def _tv_df(tickers=("AAPL", "MSFT")):
-    """Minimal DataFrame that _extract() can consume without errors."""
-    n = len(tickers)
-    data = {
-        "ticker": [f"NASDAQ:{t}" for t in tickers],
-        "name": list(tickers),
-        "close": [150.0] * n,
-        "volume": [5_000_000] * n,
-        "change": [1.0] * n,
-        "gap": [0.0] * n,
-        "relative_volume_10d_calc": [2.0] * n,
-        "RSI|60": [55.0] * n,
-        "MACD.macd|60": [0.5] * n,
-        "MACD.signal|60": [0.3] * n,
-        "EMA9|60": [149.0] * n,
-        "EMA21|60": [148.0] * n,
-        "ATR|60": [2.0] * n,
-        "VWAP": [150.0] * n,
-        "premarket_change": [0.5] * n,
-        "premarket_volume": [100_000] * n,
-        "Recommend.All": [0.5] * n,
-        "market_cap_basic": [1e9] * n,
-        "change_from_open": [0.5] * n,
-        "EMA20": [149.0] * n,
-        "EMA50": [148.0] * n,
-    }
-    return pd.DataFrame(data)
-
-
-class _FakeColResult:
-    """Stub for a tradingview_screener Column expression — supports all comparison ops."""
-
-    def __gt__(self, o):
-        return self
-
-    def __lt__(self, o):
-        return self
-
-    def __ge__(self, o):
-        return self
-
-    def __le__(self, o):
-        return self
-
-    def __eq__(self, o):
-        return self
-
-    def between(self, a, b):
-        return self
-
-    def isin(self, lst):
-        return self
-
-
-class _FakeCol:
-    def __call__(self, name):
-        return _FakeColResult()
-
-
-_FAKE_COL = _FakeCol()
 
 
 class TestScannerFilters:
-    """Tests get_dynamic_universe filtering behaviour by regime and TV availability."""
+    """Tests get_dynamic_universe Tier-A floor behaviour."""
 
-    def test_filter_by_volume_removes_low_volume(self):
-        """EXTREME_STRESS circuit breaker (VIX > panic_min) runs only the 2 always-on scans."""
+    def test_universe_includes_core_floor(self):
+        """Tier-A floor (CORE_SYMBOLS + CORE_EQUITIES) is always present in the universe."""
         ib = MagicMock()
-        mock_df = _tv_df(["TVSPY", "TVQQQ"])
-        # Trigger circuit breaker via raw VIX value, not the regime label
-        extreme_regime = {"regime": "PANIC", "vix": 40.0, "vix_1h_change": 0.05}
-        # col may not be importable when tradingview-screener is absent — inject a stub
-        with patch.object(scanner, "col", _FAKE_COL, create=True), patch.object(scanner, "_TV_AVAILABLE", True):
-            with patch.object(scanner, "_query", return_value=(2, mock_df)) as mock_q:
-                result = scanner.get_dynamic_universe(ib, regime=extreme_regime)
-        # Only volume_leaders + rel_vol_surge run when circuit breaker fires
-        assert mock_q.call_count == 2, f"Expected 2 always-on scans, got {mock_q.call_count}"
+        # Force promoter to return empty so we exercise pure Tier-A.
+        with patch("universe_promoter.load_promoted_universe", return_value=[]):
+            result = scanner.get_dynamic_universe(ib, regime={"regime": "TRENDING_UP", "vix": 15.0})
         for sym in scanner.CORE_SYMBOLS:
             assert sym in result
-        for sym in scanner.MOMENTUM_FALLBACK:
+        for sym in scanner.CORE_EQUITIES:
             assert sym in result
 
-    def test_filter_by_volume_keeps_high_volume(self):
-        """TV unavailable → universe equals CORE + MOMENTUM_FALLBACK."""
+    def test_universe_under_extreme_vix_unchanged(self):
+        """EXTREME_STRESS no longer prunes the universe — risk gating happens downstream."""
         ib = MagicMock()
-        with patch.object(scanner, "_TV_AVAILABLE", False):
-            result = scanner.get_dynamic_universe(ib, regime={"regime": "TRENDING_UP"})
-        assert set(result) == set(scanner.CORE_SYMBOLS) | set(scanner.MOMENTUM_FALLBACK)
+        extreme_regime = {"regime": "PANIC", "vix": 40.0, "vix_1h_change": 0.05}
+        with patch("universe_promoter.load_promoted_universe", return_value=[]):
+            result = scanner.get_dynamic_universe(ib, regime=extreme_regime)
+        for sym in scanner.CORE_SYMBOLS:
+            assert sym in result
+        for sym in scanner.CORE_EQUITIES:
+            assert sym in result
 
-    def test_empty_symbol_list_returns_empty(self, config):
-        """When every TV query raises an exception, falls back to CORE + MOMENTUM_FALLBACK."""
+    def test_promoted_symbols_unioned_into_universe(self):
+        """Tier-B promoted symbols are added on top of Tier-A floor."""
         ib = MagicMock()
-        with patch.object(scanner, "col", _FAKE_COL, create=True), patch.object(scanner, "_TV_AVAILABLE", True):
-            with patch.object(scanner, "_query", side_effect=Exception("TV offline")):
-                result = scanner.get_dynamic_universe(ib, regime={"regime": "TRENDING_DOWN"})
-        expected = set(scanner.CORE_SYMBOLS) | set(scanner.MOMENTUM_FALLBACK)
-        assert set(result) == expected
+        promoted = ["ZZZA", "ZZZB", "ZZZC"]
+        with patch("universe_promoter.load_promoted_universe", return_value=promoted):
+            result = scanner.get_dynamic_universe(ib, regime={"regime": "TRENDING_UP", "vix": 15.0})
+        for sym in promoted:
+            assert sym in result
 
 
 # ---------------------------------------------------------------------------

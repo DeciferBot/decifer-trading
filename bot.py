@@ -487,6 +487,28 @@ def main():
     else:
         clog("INFO", "⏰ Pre-session catalyst pipeline disabled (presession_enabled=False)")
 
+    # ── Tier B promoter schedules ─────────────────────────────────────────────
+    # 16:15 ET (post-close): promote top-50 from committed universe for next day.
+    # 08:00 ET (pre-open): re-promote so overnight gappers surface in the PM scan.
+    # Sunday 23:00 ET: weekly refresh of the ~1000-symbol committed universe.
+    if CONFIG.get("promoter_enabled", True):
+        try:
+            from universe_committed import refresh_committed_universe
+            from universe_promoter import run_promoter
+
+            schedule.every().day.at("16:15").do(run_promoter).tag("promoter_eod")
+            schedule.every().day.at("08:00").do(run_promoter).tag("promoter_premarket")
+            schedule.every().sunday.at("23:00").do(refresh_committed_universe).tag("universe_refresh")
+            clog(
+                "INFO",
+                "⏰ Universe promoter scheduled — 16:15 ET (EOD), 08:00 ET (pre-open), "
+                "Sundays 23:00 ET (committed refresh)",
+            )
+        except Exception as _pr_err:
+            clog("WARN", f"⏰ Universe promoter registration failed: {_pr_err}")
+    else:
+        clog("INFO", "⏰ Universe promoter disabled (promoter_enabled=False)")
+
     # ── Start Social Sentiment background polling ─────────────────────────────
     try:
         from social_sentiment import start_sentiment_polling

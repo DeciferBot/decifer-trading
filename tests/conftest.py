@@ -349,14 +349,6 @@ _praw = _fake_module("praw")
 _praw.Reddit = MagicMock()
 
 # ---------------------------------------------------------------------------
-# tradingview_ta stub
-# ---------------------------------------------------------------------------
-_tv_ta = _fake_module("tradingview_ta")
-_tv_ta.TA_Handler = MagicMock()
-_tv_ta.Interval = MagicMock()
-_tv_ta.Exchange = MagicMock()
-
-# ---------------------------------------------------------------------------
 # cvxpy stub
 # ---------------------------------------------------------------------------
 _cvxpy = _fake_module("cvxpy")

@@ -66,12 +66,6 @@ for _mod_name in [
 for _mod_name in ["httpx", "feedparser", "praw"]:
     sys.modules.setdefault(_mod_name, types.ModuleType(_mod_name))
 
-# Stub tradingview_screener
-tv_mod = types.ModuleType("tradingview_screener")
-tv_mod.Scanner = MagicMock()
-tv_mod.Column = MagicMock()
-sys.modules.setdefault("tradingview_screener", tv_mod)
-
 # Stub py_vollib family
 for _m in [
     "py_vollib",

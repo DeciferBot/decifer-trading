@@ -191,6 +191,23 @@ CONFIG = {
     "presession_catalyst_score_floor": 7.0,  # 0-10 scale; reject below this
     "presession_earnings_lookahead_hours": 24,  # Flag earnings within this window
     "premarket_fill_score_threshold": 8.5,  # (Phase 3b) pre-market fill gate — unused in 3a
+    # ── TIER B UNIVERSE PROMOTER (Phase 6) ────────────────────────
+    # Three-tier universe: Tier A = inline floor (CORE_SYMBOLS + CORE_EQUITIES),
+    # Tier B = committed ~1000-symbol list promoted daily to top-50, Tier C =
+    # dynamic adds (catalyst, held, favs, sympathy, news). Replaces TV screener.
+    "promoter_enabled": True,  # Master gate — disables 16:15/08:00 fires + Sunday refresh
+    "promoter_top_n": 50,  # How many symbols to promote into the daily scan universe
+    "promoter_weight_gap": 3.0,  # Weight on |overnight gap %|
+    "promoter_weight_pm_volume": 2.0,  # Weight on minute-bar relative volume (vs 30d avg)
+    "promoter_weight_5d_return": 1.0,  # v2 — unused until 30d bar fetcher ships
+    "promoter_weight_atr_exp": 1.0,  # v2 — unused until 30d bar fetcher ships
+    "promoter_weight_catalyst": 2.0,  # Weight on CatalystEngine catalyst_score (0–10)
+    "promoted_max_staleness_hours": 18,  # Reject daily_promoted.json if older than this
+    "committed_universe_size": 1000,  # Top-N by dollar volume kept in committed_universe.json
+    "committed_universe_refresh_day": "sunday",  # Weekly refresh day
+    "committed_min_price": 1.0,  # Filter: min prior-close price to enter committed universe
+    "committed_min_prev_volume": 50_000,  # Filter: min last-session share volume
+    "committed_min_dollar_volume": 1_000_000,  # Filter: min last-session dollar volume
     # ── OPENING-GAP FOLLOW-THROUGH (Phase 4) ──────────────────────
     # First hour on gap days has more alpha than midday — same scoring across
     # sessions under-weights it. When we're in OPEN_BUFFER (9:30–9:45 ET) AND

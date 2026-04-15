@@ -147,7 +147,6 @@ def execute_buy(
     calculate_position_size = _om.calculate_position_size
     calculate_stops = _om.calculate_stops
     log_order = _om.log_order
-    get_tv_signal_cache = _om.get_tv_signal_cache
     _get_alpaca_price = _om._get_alpaca_price
     MarketOrder = _om.MarketOrder
     LimitOrder = _om.LimitOrder
@@ -242,17 +241,11 @@ def execute_buy(
         # ── MULTI-SOURCE PRICE VALIDATION ──
         # Collect prices from all available sources (IBKR may be 15-min delayed).
         # Use the freshest/highest for the limit order so it actually fills.
-        tv_cache = get_tv_signal_cache()
-        tv_data = tv_cache.get(symbol) if tv_cache else None
-        tv_close = float(tv_data.get("tv_close")) if tv_data and tv_data.get("tv_close") else 0
-
         prices = {}
         if ibkr_price > 0:
             prices["IBKR"] = ibkr_price
         if yf_price > 0:
             prices["yfinance"] = yf_price
-        if tv_close > 0:
-            prices["TV"] = tv_close
 
         if not prices:
             log.error(f"No price data available for {symbol} from any source — aborting")
@@ -370,9 +363,10 @@ def execute_buy(
         from execution_agent import get_execution_plan
 
         _et_now = datetime.now(zoneinfo.ZoneInfo("America/New_York")).strftime("%H:%M")
-        _tv_vol = float(tv_data.get("tv_rel_vol") or 1.0) if tv_data else 1.0
-        _tv_vwap = float(tv_data.get("tv_vwap") or 0) if tv_data else 0.0
-        _vwap_dist = ((price - _tv_vwap) / _tv_vwap * 100) if _tv_vwap > 0 else 0.0
+        # TV screener removed — rel_volume and VWAP distance are no longer plumbed
+        # here. Default to neutral values; execution_agent tolerates these.
+        _rel_vol = 1.0
+        _vwap_dist = 0.0
         _spread = ((ibkr_ask - ibkr_bid) / ibkr_ask * 100) if ibkr_ask > 0 else 0.0
 
         exec_plan = get_execution_plan(
@@ -383,7 +377,7 @@ def execute_buy(
             bid=ibkr_bid,
             ask=ibkr_ask,
             spread_pct=_spread,
-            rel_volume=_tv_vol,
+            rel_volume=_rel_vol,
             vwap_dist_pct=_vwap_dist,
             time_of_day_str=_et_now,
             regime_name=regime.get("regime", "UNKNOWN"),
@@ -912,7 +906,6 @@ def execute_short(
     calculate_position_size = _om.calculate_position_size
     calculate_stops = _om.calculate_stops
     log_order = _om.log_order
-    get_tv_signal_cache = _om.get_tv_signal_cache
     _get_alpaca_price = _om._get_alpaca_price
     MarketOrder = _om.MarketOrder  # noqa: F841
     LimitOrder = _om.LimitOrder
@@ -983,17 +976,11 @@ def execute_short(
         ibkr_price = _get_ibkr_price(ib, contract, fallback=0)
         _ibkr_bid, _ibkr_ask = _get_ibkr_bid_ask(ib, contract)
 
-        tv_cache = get_tv_signal_cache()
-        tv_data = tv_cache.get(symbol) if tv_cache else None
-        tv_close = float(tv_data.get("tv_close")) if tv_data and tv_data.get("tv_close") else 0
-
         prices = {}
         if ibkr_price > 0:
             prices["IBKR"] = ibkr_price
         if yf_price > 0:
             prices["yfinance"] = yf_price
-        if tv_close > 0:
-            prices["TV"] = tv_close
 
         if not prices:
             log.error(f"No price data for {symbol} — aborting short")

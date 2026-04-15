@@ -21,11 +21,10 @@ from signals import get_regime_threshold, score_universe
 
 log = logging.getLogger("decifer.pipeline")
 
-# Symbols always preserved through the TV pre-filter regardless of TV data.
-# Authoritative — computed from scanner's CORE_SYMBOLS + CORE_EQUITIES so the
-# two lists can never drift. Mega-caps in CORE_EQUITIES (META, AAPL, NVDA, ...)
-# must pass through even when TV's RSI<68 filter excludes them mid-rally
-# (Apr 14 2026 META miss was caused by this exact gap).
+# Symbols that must always be in the scan universe. Authoritative — computed
+# from scanner's CORE_SYMBOLS + CORE_EQUITIES so the two lists can never drift.
+# Used as an always-in-universe assertion for tests; Tier A (scanner.get_dynamic_universe)
+# is responsible for actually injecting these symbols.
 try:
     from scanner import CORE_EQUITIES as _SCANNER_CORE_EQUITIES
     from scanner import CORE_SYMBOLS as _SCANNER_CORE_SYMBOLS
@@ -66,7 +65,7 @@ class SignalPipelineResult:
                     the full picture.
     news_sentiment: dict — symbol → sentiment dict from Yahoo RSS scoring.
                     Written to dash["news_data"] by the bot orchestrator.
-    universe      : list — final filtered symbol list after TV pre-filter.
+    universe      : list — the scan universe used for scoring.
                     Consumed by the options scanner.
     regime_name   : str  — regime label at scoring time (e.g. "BULL_TRENDING").
     """
@@ -80,110 +79,6 @@ class SignalPipelineResult:
 
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
-
-
-def _apply_tv_prefilter(universe: list, tv_cache: dict, favourites: list) -> list:
-    """
-    Use pre-fetched TradingView indicator data to cut universe before the
-    expensive yfinance multi-timeframe scoring pass.
-
-    Goal: ~97 symbols → ~10-25 high-potential candidates.
-    Returns universe unchanged when tv_cache is empty (no TV data available).
-
-    All inputs are parameters — no globals, no side effects.
-    """
-    if not tv_cache:
-        return universe
-
-    pre_universe = len(universe)
-    ranked = []
-    rejected = {"no_tv_data": 0, "price": 0, "rec": 0, "rel_vol": 0, "rsi_dead": 0, "flat": 0, "no_structure": 0}
-
-    for sym in universe:
-        tv = tv_cache.get(sym)
-        if not tv:
-            rejected["no_tv_data"] += 1
-            continue  # No TV data → skip (CORE_SYMBOLS without TV hits)
-
-        close = tv.get("tv_close")
-        rec = tv.get("tv_recommend")
-        rel_vol = tv.get("tv_rel_vol")
-        rsi = tv.get("tv_rsi_1h")
-        ema9 = tv.get("tv_ema9_1h")
-        ema21 = tv.get("tv_ema21_1h")
-        macd = tv.get("tv_macd_1h")
-        macd_s = tv.get("tv_macd_sig_1h")
-        change = tv.get("tv_change")
-        vwap = tv.get("tv_vwap")
-
-        # ── Hard kills — no edge, don't waste yfinance calls ──────────────
-        if close is None or close <= 0:
-            rejected["price"] += 1
-            continue
-        if rec is None or abs(rec) < 0.05:
-            rejected["rec"] += 1
-            continue  # Dead neutral
-        if rel_vol is not None and rel_vol < 0.5:
-            rejected["rel_vol"] += 1
-            continue  # Very low volume
-        if rsi is not None and 47 < rsi < 53:
-            rejected["rsi_dead"] += 1
-            continue  # RSI dead zone
-        if change is not None and abs(change) < 0.1:
-            rejected["flat"] += 1
-            continue  # Truly flat
-
-        # ── EMA alignment — need some trend structure ──────────────────────
-        ema_aligned = (
-            ema9 is not None
-            and ema21 is not None
-            and ema9 != 0
-            and ema21 != 0
-            and abs(ema9 - ema21) / max(ema9, ema21) > 0.001
-        )
-
-        # ── MACD thrust — need some acceleration ───────────────────────────
-        macd_thrust = macd is not None and macd_s is not None and abs(macd - macd_s) > 0.01
-
-        if not ema_aligned and not macd_thrust:
-            rejected["no_structure"] += 1
-            continue
-
-        # ── Rank score: |signal| × unusual volume, VWAP-confirmed ─────────
-        # Treat missing rel_vol as neutral (1.0) so the symbol isn't penalised
-        # for a TV data gap while still participating in ranking.
-        rank_score = abs(rec) * (rel_vol if rel_vol is not None else 1.0)
-        if vwap and close and vwap > 0 and ((rec > 0 and close > vwap) or (rec < 0 and close < vwap)):
-            rank_score *= 1.3  # 30% VWAP alignment bonus
-
-        ranked.append((sym, rank_score))
-
-    # Top 25 by rank score
-    ranked.sort(key=lambda x: x[1], reverse=True)
-    result = [sym for sym, _ in ranked[:25]]
-
-    # Always preserve favourites — never let pre-filter drop them
-    favs_set = set(favourites)
-    missed_favs = favs_set - set(result)
-    if missed_favs:
-        result = list(set(result) | missed_favs)
-        log.info(f"Favourites preserved through TV pre-filter: {sorted(missed_favs)}")
-
-    # Always preserve the floor that was in the input universe:
-    #   - Macro/volatility/inverse/crypto/commodity ETFs (CORE_SYMBOLS)
-    #   - Mega-cap equity floor (CORE_EQUITIES) — mega-caps that MUST score every
-    #     cycle regardless of TV's RSI/MACD gates (Apr 14 2026 META miss fix).
-    missed_core = (_PREFILTER_CORE & set(universe)) - set(result)
-    if missed_core:
-        result = list(set(result) | missed_core)
-        log.info(f"Core floor preserved through TV pre-filter ({len(missed_core)} syms): {sorted(missed_core)}")
-
-    kills_summary = ", ".join(f"{k}={v}" for k, v in rejected.items() if v > 0)
-    log.info(
-        f"TV pre-filter: {pre_universe} → {len(result)} symbols "
-        f"(top by |signal| × rel_vol, VWAP-confirmed) | kills: {kills_summary}"
-    )
-    return result
 
 
 def _fetch_news(universe: list, timeout_sec: int = 8) -> dict:
@@ -416,7 +311,6 @@ def run_signal_pipeline(
     strategy_mode: dict,
     session: str,
     favourites: list,
-    tv_cache: dict,
     signals_log_path: str = SIGNALS_LOG,
     ib=None,
 ) -> SignalPipelineResult:
@@ -425,11 +319,10 @@ def run_signal_pipeline(
 
     Pipeline stages
     ---------------
-    1. TV pre-filter      — cuts universe using TradingView indicators
+    1. Sympathy scanner   — add sector peers when a leader has earnings within 48h
     2. News sentiment     — Yahoo RSS + keyword scoring
     3. Social sentiment   — Reddit/ApeWisdom (skipped in extended hours + when disabled)
     4. Score universe     — 10-dimension yfinance scoring (alpha-pipeline-v2)
-    4b. Small cap track   — supplemental $50M-$2B universe (if enabled)
     5. Strategy threshold — raise bar in defensive strategy modes
     6. IC audit log       — write all_scored to learning log (side effect)
     7. Typed signals      — convert scored dicts → Signal objects
@@ -437,12 +330,11 @@ def run_signal_pipeline(
 
     Parameters
     ----------
-    universe         : symbol list (pre-TV-filter)
+    universe         : symbol list (Tier A ∪ Tier B promoted ∪ Tier C)
     regime           : dict from get_market_regime()
     strategy_mode    : dict from get_intraday_strategy_mode()
     session          : session label from get_session()
     favourites       : always-included symbols from dash["favourites"]
-    tv_cache         : dict from get_tv_signal_cache()
     signals_log_path : path to the typed signals JSONL log
 
     Returns
@@ -456,9 +348,11 @@ def run_signal_pipeline(
     - No order execution
     - All side effects are file writes (signals_log, IC log)
     """
-    # 1. TV pre-filter
-    filtered = _apply_tv_prefilter(universe, tv_cache, favourites)
-    log.info(f"Universe after TV pre-filter: {len(filtered)} symbols")
+    # 1. Universe flows directly into scoring — screening is done upstream
+    #    by scanner.get_dynamic_universe() (Tier A hardcoded + Tier B promoter
+    #    top-50 + Tier C dynamic adds). No TV pre-filter.
+    filtered = list(universe)
+    log.info(f"Universe: {len(filtered)} symbols entering scoring")
 
     # 1b. Sympathy scanner — add sector peers when a leader has earnings within 48h
     try:
@@ -491,40 +385,7 @@ def run_signal_pipeline(
     )
     log.info(f"score_universe: {len(scored)} above threshold, {len(all_scored)} total")
 
-    # 4b. Small cap supplemental track ($50M–$2B market cap)
-    try:
-        from config import CONFIG as _cfg
-
-        if _cfg.get("small_cap_enabled", False):
-            from scanner import get_small_cap_universe
-
-            sc_symbols = get_small_cap_universe()
-            if sc_symbols:
-                sc_threshold = _cfg.get("small_cap_min_score", 22)
-                sc_scored, sc_all = score_universe(
-                    sc_symbols,
-                    regime_name,
-                    news_data=news_sentiment,
-                    social_data=social_sentiment,
-                    regime_router=regime.get("regime_router", "unknown"),
-                    ib=ib,
-                )
-                # Tag small cap results so downstream can apply tighter position sizing
-                for s in sc_scored:
-                    s["universe_track"] = "small_cap"
-                for s in sc_all:
-                    s["universe_track"] = "small_cap"
-                # Filter by small cap threshold and merge (dedup by symbol)
-                existing_syms = {s["symbol"] for s in scored}
-                sc_above = [s for s in sc_scored if s["score"] >= sc_threshold and s["symbol"] not in existing_syms]
-                scored.extend(sc_above)
-                sc_all_new = [s for s in sc_all if s["symbol"] not in {x["symbol"] for x in all_scored}]
-                all_scored.extend(sc_all_new)
-                log.info(f"Small cap track: {len(sc_above)} new candidates above {sc_threshold}")
-    except Exception as _sc_e:
-        log.debug(f"Small cap track skipped: {_sc_e}")
-
-    # 4c. FX track — score major currency pairs (disabled by default)
+    # 4b. FX track — score major currency pairs (disabled by default)
     try:
         from config import CONFIG as _cfg
 

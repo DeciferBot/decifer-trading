@@ -251,14 +251,12 @@ class TestExecuteBuy:
     @patch("orders.check_correlation")
     @patch("orders.check_combined_exposure")
     @patch("orders.check_sector_concentration")
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
     @patch("orders.log_order")
     def test_execute_buy_happy_path_returns_true(
         self,
         mock_log_order,
         mock_yf_price,
-        mock_tv_cache,
         mock_sector,
         mock_exposure,
         mock_correlation,
@@ -272,7 +270,6 @@ class TestExecuteBuy:
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
 
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
         mock_exposure.return_value = (True, "OK")
@@ -368,14 +365,12 @@ class TestExecuteBuy:
     @patch("orders.check_correlation")
     @patch("orders.check_combined_exposure")
     @patch("orders.check_sector_concentration")
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
     @patch("orders.log_order")
     def test_execute_buy_poor_rr_returns_false(
         self,
         mock_log_order,
         mock_yf_price,
-        mock_tv_cache,
         mock_sector,
         mock_exposure,
         mock_correlation,
@@ -389,7 +384,6 @@ class TestExecuteBuy:
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
 
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
         mock_exposure.return_value = (True, "OK")
@@ -418,14 +412,12 @@ class TestExecuteBuy:
     @patch("orders.check_correlation")
     @patch("orders.check_combined_exposure")
     @patch("orders.check_sector_concentration")
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
     @patch("orders.log_order")
     def test_execute_buy_price_too_low_returns_false(
         self,
         mock_log_order,
         mock_yf_price,
-        mock_tv_cache,
         mock_sector,
         mock_exposure,
         mock_correlation,
@@ -439,7 +431,6 @@ class TestExecuteBuy:
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
 
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 0.50  # Too low
         mock_correlation.return_value = (True, "OK")
         mock_exposure.return_value = (True, "OK")
@@ -463,14 +454,12 @@ class TestExecuteBuy:
     @patch("orders.check_correlation")
     @patch("orders.check_combined_exposure")
     @patch("orders.check_sector_concentration")
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
     @patch("orders.log_order")
     def test_execute_buy_price_too_high_returns_false(
         self,
         mock_log_order,
         mock_yf_price,
-        mock_tv_cache,
         mock_sector,
         mock_exposure,
         mock_correlation,
@@ -484,7 +473,6 @@ class TestExecuteBuy:
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
 
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 50000.0  # Too high
         mock_correlation.return_value = (True, "OK")
         mock_exposure.return_value = (True, "OK")
@@ -508,14 +496,12 @@ class TestExecuteBuy:
     @patch("orders.check_correlation")
     @patch("orders.check_combined_exposure")
     @patch("orders.check_sector_concentration")
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
     @patch("orders.log_order")
     def test_execute_buy_no_price_data_returns_false(
         self,
         mock_log_order,
         mock_yf_price,
-        mock_tv_cache,
         mock_sector,
         mock_exposure,
         mock_correlation,
@@ -535,7 +521,6 @@ class TestExecuteBuy:
         mock_position_size.return_value = 10
 
         # All sources return 0
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 0
         # Patch at the call site (orders_core imports _get_ibkr_price directly)
         with (
@@ -560,14 +545,12 @@ class TestExecuteBuy:
     @patch("orders.check_correlation")
     @patch("orders.check_combined_exposure")
     @patch("orders.check_sector_concentration")
-    @patch("orders.get_tv_signal_cache")
-    @patch("orders._get_alpaca_price")
+    @patch("orders_contracts._get_alpaca_price")
     @patch("orders.log_order")
     def test_execute_buy_price_contamination_blocks_trade(
         self,
         mock_log_order,
         mock_yf_price,
-        mock_tv_cache,
         mock_sector,
         mock_exposure,
         mock_correlation,
@@ -586,12 +569,12 @@ class TestExecuteBuy:
         mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (98.0, 104.0)
         mock_position_size.return_value = 10
-        # Diverging sources: 100 vs 210 = >50% divergence (triggers contamination guard)
-        mock_tv_cache.return_value = {"SYM": {"tv_close": 210.0}}
+        # Diverging sources: yfinance(price arg)=100 vs IBKR=210 = >50% divergence
+        # (triggers contamination guard inside execute_buy)
         mock_yf_price.return_value = 100.0
         with (
-            patch("orders_core._get_ibkr_price", return_value=100.0),
-            patch("orders_core._get_ibkr_bid_ask", return_value=(99.9, 100.1)),
+            patch("orders_core._get_ibkr_price", return_value=210.0),
+            patch("orders_core._get_ibkr_bid_ask", return_value=(209.9, 210.1)),
         ):
             result = orders.execute_buy(
                 ib=mock_ib,
@@ -755,13 +738,11 @@ class TestExecuteSell:
 
 
 class TestValidatePositionPrice:
-    """Test 3-way price consensus validation."""
+    """Test 2-way price consensus validation (IBKR + Alpaca)."""
 
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
-    def test_validate_position_price_no_sources_returns_zero(self, mock_yf_price, mock_tv_cache):
+    def test_validate_position_price_no_sources_returns_zero(self, mock_yf_price):
         """If all sources invalid, return (0, reason)."""
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 0
 
         price, src = orders._validate_position_price("SYM", ibkr_price=0, entry=100.0)
@@ -769,11 +750,9 @@ class TestValidatePositionPrice:
         assert price == 0
         assert "No price data" in src
 
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
-    def test_validate_position_price_single_source_works(self, mock_yf_price, mock_tv_cache):
+    def test_validate_position_price_single_source_works(self, mock_yf_price):
         """Single valid source should be accepted if within 50% of entry."""
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 0
 
         price, src = orders._validate_position_price("SYM", ibkr_price=100.0, entry=100.0)
@@ -781,11 +760,9 @@ class TestValidatePositionPrice:
         assert price == 100.0
         assert "IBKR" in src
 
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
-    def test_validate_position_price_single_source_outlier_rejected(self, mock_yf_price, mock_tv_cache):
+    def test_validate_position_price_single_source_outlier_rejected(self, mock_yf_price):
         """Single source >50% from entry should be rejected."""
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 0
 
         # 49/100 = 51% divergence from entry, exceeds 50% threshold
@@ -794,11 +771,9 @@ class TestValidatePositionPrice:
         assert price == 0
         assert "too far from entry" in src
 
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
-    def test_validate_position_price_two_sources_agreeing(self, mock_yf_price, mock_tv_cache):
+    def test_validate_position_price_two_sources_agreeing(self, mock_yf_price):
         """Two sources within 50% should use closest to entry."""
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 100.5
 
         price, _src = orders._validate_position_price("SYM", ibkr_price=100.0, entry=100.0)
@@ -806,43 +781,15 @@ class TestValidatePositionPrice:
         assert price > 0
         assert price in (100.0, 100.5) or price == round((100.0 + 100.5) / 2, 4)
 
-    @patch("orders_contracts.get_tv_signal_cache")
     @patch("orders_contracts._get_alpaca_price")
-    def test_validate_position_price_two_sources_diverging(self, mock_yf_price, mock_tv_cache):
+    def test_validate_position_price_two_sources_diverging(self, mock_yf_price):
         """Two sources diverging >50% should be rejected."""
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 210.0  # 52.4% divergence from IBKR (>50%)
 
         price, src = orders._validate_position_price("SYM", ibkr_price=100.0, entry=100.0)
 
         assert price == 0
         assert "divergence" in src.lower()
-
-    @patch("orders_contracts.get_tv_signal_cache")
-    @patch("orders_contracts._get_alpaca_price")
-    def test_validate_position_price_three_sources_consensus(self, mock_yf_price, mock_tv_cache):
-        """Three sources within 50% should use median."""
-        mock_tv_cache.return_value = {"SYM": {"tv_close": 101.0}}
-        mock_yf_price.return_value = 100.5
-
-        price, src = orders._validate_position_price("SYM", ibkr_price=100.0, entry=100.0)
-
-        assert price > 0
-        assert "consensus" in src.lower() or price == 100.5  # median
-
-    @patch("orders.get_tv_signal_cache")
-    @patch("orders._get_alpaca_price")
-    def test_validate_position_price_three_sources_one_outlier(self, mock_yf_price, mock_tv_cache):
-        """Three sources with one outlier should reject outlier and use other two."""
-        mock_tv_cache.return_value = {"SYM": {"tv_close": 300.0}}  # Outlier
-        mock_yf_price.return_value = 100.5
-
-        price, _src = orders._validate_position_price("SYM", ibkr_price=100.0, entry=100.0)
-
-        assert price > 0
-        # Should use IBKR + yfinance, not TV
-        assert price in (100.0, 100.5) or abs(price - 100.25) < 0.01
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TESTS: Thread Safety
@@ -954,14 +901,12 @@ class TestEdgeCases:
     @patch("orders.check_correlation")
     @patch("orders.check_combined_exposure")
     @patch("orders.check_sector_concentration")
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
     @patch("orders.log_order")
     def test_execute_buy_qty_capped_at_20pct_portfolio(
         self,
         mock_log_order,
         mock_yf_price,
-        mock_tv_cache,
         mock_sector,
         mock_exposure,
         mock_correlation,
@@ -975,7 +920,6 @@ class TestEdgeCases:
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
 
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 0  # No yfinance fallback
         mock_correlation.return_value = (True, "OK")
         mock_exposure.return_value = (True, "OK")
@@ -1003,14 +947,12 @@ class TestEdgeCases:
     @patch("orders.check_correlation")
     @patch("orders.check_combined_exposure")
     @patch("orders.check_sector_concentration")
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
     @patch("orders.log_order")
     def test_execute_buy_order_value_capped_at_20pct_portfolio(
         self,
         mock_log_order,
         mock_yf_price,
-        mock_tv_cache,
         mock_sector,
         mock_exposure,
         mock_correlation,
@@ -1027,7 +969,6 @@ class TestEdgeCases:
         portfolio = 100_000
         price = 100.0
 
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = price
         mock_correlation.return_value = (True, "OK")
         mock_exposure.return_value = (True, "OK")
@@ -1062,14 +1003,12 @@ class TestEdgeCases:
     @patch("orders.check_correlation")
     @patch("orders.check_combined_exposure")
     @patch("orders.check_sector_concentration")
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
     @patch("orders.log_order")
     def test_execute_buy_reason_parameter_stored(
         self,
         mock_log_order,
         mock_yf_price,
-        mock_tv_cache,
         mock_sector,
         mock_exposure,
         mock_correlation,
@@ -1083,7 +1022,6 @@ class TestEdgeCases:
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
 
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
         mock_exposure.return_value = (True, "OK")
@@ -1112,14 +1050,12 @@ class TestEdgeCases:
     @patch("orders.check_correlation")
     @patch("orders.check_combined_exposure")
     @patch("orders.check_sector_concentration")
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
     @patch("orders.log_order")
     def test_execute_buy_stores_entry_regime(
         self,
         mock_log_order,
         mock_yf_price,
-        mock_tv_cache,
         mock_sector,
         mock_exposure,
         mock_correlation,
@@ -1133,7 +1069,6 @@ class TestEdgeCases:
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
 
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
         mock_exposure.return_value = (True, "OK")
@@ -1160,14 +1095,12 @@ class TestEdgeCases:
     @patch("orders.check_correlation")
     @patch("orders.check_combined_exposure")
     @patch("orders.check_sector_concentration")
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
     @patch("orders.log_order")
     def test_execute_buy_entry_regime_unknown_when_regime_missing(
         self,
         mock_log_order,
         mock_yf_price,
-        mock_tv_cache,
         mock_sector,
         mock_exposure,
         mock_correlation,
@@ -1181,7 +1114,6 @@ class TestEdgeCases:
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
 
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
         mock_exposure.return_value = (True, "OK")
@@ -1208,14 +1140,12 @@ class TestEdgeCases:
     @patch("orders.check_correlation")
     @patch("orders.check_combined_exposure")
     @patch("orders.check_sector_concentration")
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
     @patch("orders.log_order")
     def test_execute_buy_stores_tp_order_id_for_scalp(
         self,
         mock_log_order,
         mock_yf_price,
-        mock_tv_cache,
         mock_sector,
         mock_exposure,
         mock_correlation,
@@ -1230,7 +1160,6 @@ class TestEdgeCases:
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
 
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
         mock_exposure.return_value = (True, "OK")
@@ -1259,14 +1188,12 @@ class TestEdgeCases:
     @patch("orders.check_correlation")
     @patch("orders.check_combined_exposure")
     @patch("orders.check_sector_concentration")
-    @patch("orders.get_tv_signal_cache")
     @patch("orders._get_alpaca_price")
     @patch("orders.log_order")
     def test_execute_buy_tp_order_id_none_for_swing(
         self,
         mock_log_order,
         mock_yf_price,
-        mock_tv_cache,
         mock_sector,
         mock_exposure,
         mock_correlation,
@@ -1280,7 +1207,6 @@ class TestEdgeCases:
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
 
-        mock_tv_cache.return_value = {}
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
         mock_exposure.return_value = (True, "OK")

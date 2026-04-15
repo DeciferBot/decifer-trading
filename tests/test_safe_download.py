@@ -38,7 +38,6 @@ for _mod_name in (
     "anthropic",
     "praw",
     "feedparser",
-    "tradingview_screener",
     "alpaca",
     "alpaca.data",
     "alpaca.data.historical",

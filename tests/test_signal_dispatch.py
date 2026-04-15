@@ -76,9 +76,8 @@ learning_mod.log_order = MagicMock()
 learning_mod.log_signal_scan = MagicMock()
 sys.modules.setdefault("learning", learning_mod)
 
-# scanner (stub for get_tv_signal_cache)
+# scanner (stub)
 scanner_mod = types.ModuleType("scanner")
-scanner_mod.get_tv_signal_cache = MagicMock(return_value={})
 sys.modules.setdefault("scanner", scanner_mod)
 
 # trade_advisor (stub) — advise_trade is called inside dispatch before execute_buy

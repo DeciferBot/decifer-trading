@@ -101,7 +101,6 @@ sys.modules.setdefault("learning", learning_stub)
 # scanner stub — scanner.py imports signals which imports talib;
 # stub to prevent the whole chain at import time.
 scanner_stub = MagicMock()
-scanner_stub.get_tv_signal_cache = MagicMock(return_value={})
 scanner_stub.get_dynamic_universe = MagicMock(return_value=[])
 scanner_stub.get_market_regime = MagicMock(return_value="neutral")
 sys.modules["scanner"] = scanner_stub
@@ -268,7 +267,7 @@ class TestValidatePrice:
 
     Signature: _validate_position_price(symbol, ibkr_price, entry) -> (float, str)
     Returns (0, reason) when no valid price; (price, description) when valid.
-    Internal sources: ibkr_price param + _get_alpaca_price() + get_tv_signal_cache().
+    Internal sources: ibkr_price param + _get_alpaca_price().
     """
 
     def _fn(self):
@@ -277,42 +276,36 @@ class TestValidatePrice:
         return o._validate_position_price
 
     def test_both_sources_none_returns_falsy(self):
-        """When ibkr_price=0 and yfinance returns 0 and TV cache is empty,
+        """When ibkr_price=0 and Alpaca returns 0,
         the function must return a zero price rather than silently passing
         bad data downstream."""
         fn = self._fn()
-        with patch("orders._get_alpaca_price", return_value=0.0), patch("orders.get_tv_signal_cache", return_value={}):
+        with patch("orders._get_alpaca_price", return_value=0.0):
             price, desc = fn("AAPL", 0.0, 150.0)
         assert price == 0, f"Expected zero price when all sources are empty, got {price!r} ({desc})"
 
     def test_zero_ibkr_falls_back_to_yfinance(self):
-        """When ibkr_price=0 (excluded), yfinance provides the fallback price."""
+        """When ibkr_price=0 (excluded), Alpaca provides the fallback price."""
         fn = self._fn()
         fallback = 123.45
-        with (
-            patch("orders_contracts._get_alpaca_price", return_value=fallback),
-            patch("orders_contracts.get_tv_signal_cache", return_value={}),
-        ):
+        with patch("orders_contracts._get_alpaca_price", return_value=fallback):
             price, desc = fn("MSFT", 0.0, 0.0)
-        assert price == pytest.approx(fallback), f"Expected yfinance fallback {fallback}, got {price!r} ({desc})"
+        assert price == pytest.approx(fallback), f"Expected Alpaca fallback {fallback}, got {price!r} ({desc})"
 
     def test_negative_price_excluded(self):
-        """Negative ibkr_price and negative yfinance price are both excluded;
+        """Negative ibkr_price and negative Alpaca price are both excluded;
         result must be a zero price, never a negative value."""
         fn = self._fn()
-        with patch("orders._get_alpaca_price", return_value=-1.0), patch("orders.get_tv_signal_cache", return_value={}):
+        with patch("orders._get_alpaca_price", return_value=-1.0):
             price, desc = fn("TSLA", -5.0, 200.0)
         assert price == 0 or price > 0, f"Negative prices must never be returned, got {price!r} ({desc})"
         assert price >= 0, f"Price must be non-negative, got {price!r}"
 
     def test_valid_price_passes_through(self):
-        """When ibkr and yfinance agree on a healthy price, it passes through."""
+        """When ibkr and Alpaca agree on a healthy price, it passes through."""
         fn = self._fn()
         expected = 250.00
-        with (
-            patch("orders._get_alpaca_price", return_value=expected),
-            patch("orders.get_tv_signal_cache", return_value={}),
-        ):
+        with patch("orders._get_alpaca_price", return_value=expected):
             price, desc = fn("NVDA", expected, expected)
         assert price == pytest.approx(expected), f"Expected {expected} to pass consensus check, got {price!r} ({desc})"
 

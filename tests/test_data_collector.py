@@ -35,13 +35,6 @@ yf_stub.Ticker = MagicMock
 yf_stub.download = MagicMock(return_value=pd.DataFrame())
 sys.modules["yfinance"] = yf_stub
 
-# tradingview_screener
-tv_stub = types.ModuleType("tradingview_screener")
-tv_stub.Scanner = MagicMock
-tv_stub.Column = MagicMock
-sys.modules.setdefault("tradingview_screener", tv_stub)
-sys.modules.setdefault("tradingview_screener.scanner", tv_stub)
-
 # py_vollib
 for mod in [
     "py_vollib",

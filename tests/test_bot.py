@@ -80,11 +80,6 @@ schedule_mod.every = lambda *a, **kw: types.SimpleNamespace(
 schedule_mod.run_pending = lambda: None
 sys.modules.setdefault("schedule", schedule_mod)
 
-# tradingview_screener
-tv_mod = types.ModuleType("tradingview_screener")
-tv_mod.Query = type("Query", (), {"select": lambda *a, **kw: None})
-sys.modules.setdefault("tradingview_screener", tv_mod)
-
 # pandas_ta
 pta_mod = types.ModuleType("pandas_ta")
 sys.modules.setdefault("pandas_ta", pta_mod)
@@ -214,7 +209,6 @@ for _mod_name in [
 scanner_stub = sys.modules["scanner"]
 scanner_stub.get_dynamic_universe = lambda *a, **kw: []
 scanner_stub.get_market_regime = lambda *a, **kw: {"regime": "NEUTRAL", "vix": 15, "spy_price": 450}
-scanner_stub.get_tv_signal_cache = lambda: {}
 
 # signals
 signals_stub = sys.modules["signals"]

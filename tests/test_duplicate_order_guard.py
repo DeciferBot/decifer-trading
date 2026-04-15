@@ -69,12 +69,6 @@ for _pv in (
 ):
     sys.modules.setdefault(_pv, types.ModuleType(_pv))
 
-# tradingview_screener stub
-_tv = types.ModuleType("tradingview_screener")
-_tv.Scanner = MagicMock
-_tv.Query = MagicMock
-sys.modules.setdefault("tradingview_screener", _tv)
-
 # pandas_ta stub
 sys.modules.setdefault("pandas_ta", types.ModuleType("pandas_ta"))
 
@@ -134,7 +128,6 @@ _learning_stub.log_trade = MagicMock()
 sys.modules.setdefault("learning", _learning_stub)
 
 _scanner_stub = types.ModuleType("scanner")
-_scanner_stub.get_tv_signal_cache = MagicMock(return_value={})
 _scanner_stub.CORE_SYMBOLS = []
 _scanner_stub.MOMENTUM_FALLBACK = []
 sys.modules.setdefault("scanner", _scanner_stub)

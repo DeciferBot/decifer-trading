@@ -66,7 +66,7 @@ from risk import (
     update_equity_high_water_mark,
 )
 from risk_gates import auto_rebalance_cash
-from scanner import get_dynamic_universe, get_market_regime, get_tv_signal_cache
+from scanner import get_dynamic_universe, get_market_regime
 from signal_dispatcher import dispatch_signals as _dispatch_signals
 from signal_pipeline import run_signal_pipeline
 from signal_types import Signal
@@ -1216,18 +1216,25 @@ def run_scan():
     except Exception:
         pass
 
-    # Capture per-layer universe composition BEFORE merges for coverage telemetry.
+    # Capture per-tier universe composition BEFORE merges for coverage telemetry.
     # Used below at the pipeline-summary log and written to universe_coverage.jsonl.
+    # Tier A = CORE_SYMBOLS (macro/ETF) + CORE_EQUITIES (mega-cap equities).
+    # Tier B = promoted top-50 from data/daily_promoted.json.
+    # Rest = sector-rotation leaders + constituents (dynamic Tier C adds happen below).
     try:
         from scanner import CORE_EQUITIES as _CORE_EQ
         from scanner import CORE_SYMBOLS as _CORE_SYM
+        from universe_promoter import load_promoted_universe as _load_promoted
 
         _universe_pre_merge = set(universe)
         _cov_core = len(set(_CORE_SYM) & _universe_pre_merge)
         _cov_equities = len(set(_CORE_EQ) & _universe_pre_merge)
-        _cov_tv = max(0, len(_universe_pre_merge) - _cov_core - _cov_equities)
+        _promoted_set = set(_load_promoted())
+        _cov_promoted = len(_promoted_set & _universe_pre_merge)
+        _tierA = set(_CORE_SYM) | set(_CORE_EQ)
+        _cov_other = max(0, len(_universe_pre_merge) - len(_tierA & _universe_pre_merge) - _cov_promoted)
     except Exception:
-        _cov_core = _cov_equities = _cov_tv = -1
+        _cov_core = _cov_equities = _cov_promoted = _cov_other = -1
 
     favs = dash.get("favourites", [])
     if favs:
@@ -1239,7 +1246,7 @@ def run_scan():
 
     # Pull open positions BEFORE the pipeline so held symbols are always scored.
     # This prevents the portfolio manager from seeing "not_in_universe" on reboot
-    # simply because today's TV screener didn't surface a still-valid position.
+    # simply because the promoter didn't surface a still-valid position today.
     open_pos = get_open_positions()
     held_syms = [p["symbol"] for p in open_pos if p.get("instrument") != "option"]
     if held_syms:
@@ -1247,7 +1254,7 @@ def run_scan():
         new_held = [s for s in held_syms if s not in favs]
         if new_held:
             clog("INFO", f"Held positions pinned into pipeline universe: {new_held}")
-    # Merge held symbols into the protected set so _apply_tv_prefilter never drops them
+    # Merge held symbols with favourites for downstream protected-set consumers.
     pipeline_favs = list(set(favs + held_syms))
 
     _cov_favs = len(favs)
@@ -1263,14 +1270,13 @@ def run_scan():
     except Exception:
         pass
 
-    clog("SCAN", "Running signal pipeline (TV pre-filter → sentiment → 9-dim score)...")
+    clog("SCAN", "Running signal pipeline (sympathy → sentiment → 9-dim score)...")
     pipeline = run_signal_pipeline(
         universe=universe,
         regime=regime,
         strategy_mode=strategy_mode,
         session=get_session(),
         favourites=pipeline_favs,
-        tv_cache=get_tv_signal_cache(),
         ib=ib,
     )
     signals = pipeline.signals
@@ -1291,8 +1297,8 @@ def run_scan():
 
     clog(
         "SCAN",
-        f"Pipeline: core={_cov_core} equities={_cov_equities} tv={_cov_tv} "
-        f"favs={_cov_favs} held={_cov_held} → universe={len(universe)} "
+        f"Pipeline: core={_cov_core} equities={_cov_equities} promoted={_cov_promoted} "
+        f"other={_cov_other} favs={_cov_favs} held={_cov_held} → universe={len(universe)} "
         f"→ scored={len(scored)} → signals={len(signals)} [{regime_name}]",
     )
     # Coverage audit log — per-cycle layer breakdown for universe health monitoring.
@@ -1308,7 +1314,8 @@ def run_scan():
             "regime": regime_name,
             "core": _cov_core,
             "equities": _cov_equities,
-            "tv": _cov_tv,
+            "promoted": _cov_promoted,
+            "other": _cov_other,
             "favs": _cov_favs,
             "held": _cov_held,
             "universe": len(universe),
