@@ -1296,19 +1296,112 @@ def _on_order_status_event(trade):
             }
         )
 
-        if mapped_status == "FILLED" and fill_price > 0 and order.action == "BUY" and instrument == "stock":
-            from orders_state import _safe_update_trade
+        if mapped_status == "FILLED" and fill_price > 0 and instrument == "stock":
+            from orders_state import _safe_update_trade, _trades_lock, active_trades
 
             sym = contract.symbol
-            total_qty = int(order.totalQuantity)
-            updates = {"entry": fill_price, "status": "FILLED"}
-            if 0 < filled_qty < total_qty:
-                updates["qty"] = filled_qty
-                clog(
-                    "WARNING",
-                    f"Partial fill event: {sym} ordered {total_qty} filled {filled_qty} @ ${fill_price:.2f} — tracker qty adjusted",
-                )
-            _safe_update_trade(sym, updates)
+
+            if order.action == "BUY":
+                # Long entry fill — update tracker and announce
+                total_qty = int(order.totalQuantity)
+                updates = {"entry": fill_price, "status": "FILLED"}
+                if 0 < filled_qty < total_qty:
+                    updates["qty"] = filled_qty
+                    clog(
+                        "WARNING",
+                        f"Partial fill event: {sym} ordered {total_qty} filled {filled_qty} @ ${fill_price:.2f} — tracker qty adjusted",
+                    )
+                _safe_update_trade(sym, updates)
+
+                # Snapshot trade record after update
+                with _trades_lock:
+                    _t = dict(active_trades.get(sym, {}))
+
+                # Post-fill SL for extended-hours entries (bracket not placed at entry time)
+                if _t.get("extended_hours_entry") and _t.get("sl_order_id") is None:
+                    _sl_val = _t.get("sl", 0)
+                    _fill_qty = filled_qty or int(order.totalQuantity)
+                    if _sl_val > 0:
+                        def _place_long_sl(_sym=sym, _sl=_sl_val, _qty=_fill_qty):
+                            try:
+                                import bot_state as _bs
+                                from ib_async import StopLimitOrder as _SLO
+                                from orders_contracts import get_contract as _gc
+                                _ib = _bs.ib
+                                _c = _gc(_sym)
+                                _ib.qualifyContracts(_c)
+                                _sl_lmt = round(_sl * 0.99, 2)
+                                _sl_ord = _SLO("SELL", _qty, _sl, _sl_lmt,
+                                               account=CONFIG["active_account"], tif="GTC", outsideRth=True)
+                                _sl_trade = _ib.placeOrder(_c, _sl_ord)
+                                _ib.sleep(0.3)
+                                _safe_update_trade(_sym, {"sl_order_id": _sl_trade.order.orderId})
+                                clog("TRADE", f"[EXT-HRS] SL placed post-fill for {_sym} @ ${_sl:.2f} (#{_sl_trade.order.orderId})")
+                            except Exception as _e:
+                                clog("ERROR", f"Post-fill SL placement failed for {_sym}: {_e}")
+                        threading.Thread(target=_place_long_sl, daemon=True, name=f"ext_sl_{sym}").start()
+
+                # Voice: fires on confirmed fill, not at submission
+                try:
+                    from bot_voice import speak_natural as _speak_natural
+                    if _t.get("direction") == "LONG":
+                        _news = (dash.get("news_data") or {}).get(sym, {})
+                        _speak_natural(
+                            "entry",
+                            fallback=f"Long on {sym} filled at {fill_price:.2f}.",
+                            symbol=sym,
+                            direction="long",
+                            score=_t.get("score", 0),
+                            reason=_t.get("reasoning", "strong signal")[:200],
+                            news=_news.get("claude_catalyst") or "none",
+                        )
+                except Exception as _ve:
+                    clog("WARNING", f"Voice entry alert failed for {sym}: {_ve}")
+
+            elif order.action == "SELL":
+                with _trades_lock:
+                    _t = dict(active_trades.get(sym, {}))
+
+                # Post-fill SL for extended-hours short entries
+                if _t.get("extended_hours_entry") and _t.get("sl_order_id") is None and _t.get("direction") == "SHORT":
+                    _sl_val = _t.get("sl", 0)
+                    _fill_qty = filled_qty or int(order.totalQuantity)
+                    if _sl_val > 0:
+                        def _place_short_sl(_sym=sym, _sl=_sl_val, _qty=_fill_qty):
+                            try:
+                                import bot_state as _bs
+                                from ib_async import StopLimitOrder as _SLO
+                                from orders_contracts import get_contract as _gc
+                                _ib = _bs.ib
+                                _c = _gc(_sym)
+                                _ib.qualifyContracts(_c)
+                                _sl_lmt = round(_sl * 1.01, 2)
+                                _sl_ord = _SLO("BUY", _qty, _sl, _sl_lmt,
+                                               account=CONFIG["active_account"], tif="GTC", outsideRth=True)
+                                _sl_trade = _ib.placeOrder(_c, _sl_ord)
+                                _ib.sleep(0.3)
+                                _safe_update_trade(_sym, {"sl_order_id": _sl_trade.order.orderId})
+                                clog("TRADE", f"[EXT-HRS] SL placed post-fill for short {_sym} @ ${_sl:.2f} (#{_sl_trade.order.orderId})")
+                            except Exception as _e:
+                                clog("ERROR", f"Post-fill short SL placement failed for {_sym}: {_e}")
+                        threading.Thread(target=_place_short_sl, daemon=True, name=f"ext_sl_{sym}").start()
+
+                # Voice for short entry fill
+                try:
+                    from bot_voice import speak_natural as _speak_natural
+                    if _t.get("direction") == "SHORT" and _t.get("status") == "PENDING":
+                        _news = (dash.get("news_data") or {}).get(sym, {})
+                        _speak_natural(
+                            "entry",
+                            fallback=f"Short on {sym} filled at {fill_price:.2f}.",
+                            symbol=sym,
+                            direction="short",
+                            score=_t.get("score", 0),
+                            reason=_t.get("reasoning", "strong signal")[:200],
+                            news=_news.get("claude_catalyst") or "none",
+                        )
+                except Exception as _ve:
+                    clog("WARNING", f"Voice short entry alert failed for {sym}: {_ve}")
 
     except Exception as e:
         clog("ERROR", f"Order status event error: {e}")

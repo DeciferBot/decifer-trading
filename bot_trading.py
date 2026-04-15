@@ -2013,16 +2013,8 @@ def run_scan():
         if stock_success:
             trade_side = "SHORT" if buy.get("direction") == "SHORT" else "BUY"
             clog("TRADE", f"{trade_side} {sym} | Score={sig['score']} | {reason[:80]}")
-            _news_entry = (dash.get("news_data") or {}).get(sym, {})
-            speak_natural(
-                "entry",
-                fallback=f"I just {'shorted' if trade_side == 'SHORT' else 'went long on'} {sym}.",
-                symbol=sym,
-                direction="short" if trade_side == "SHORT" else "long",
-                score=sig["score"],
-                reason=reason[:200] if reason else "strong signal",
-                news=_news_entry.get("claude_catalyst") or "none",
-            )
+            # Voice fires on fill confirmation in bot_ibkr._on_order_status_event,
+            # not here — so it announces when IBKR confirms the fill, not on submission.
             dash["trades"].insert(
                 0,
                 {

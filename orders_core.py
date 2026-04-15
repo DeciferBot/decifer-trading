@@ -29,6 +29,7 @@ from orders_contracts import (
     _get_ibkr_price,
     get_contract,
     is_equities_extended_hours,
+    is_options_market_open,
 )
 from orders_guards import (
     _check_ibkr_open_order,
@@ -520,6 +521,109 @@ def execute_buy(
             except Exception as _se:
                 log.warning(f"execute_buy {symbol}: smart execution failed ({_se}), falling through to atomic bracket")
 
+        # ── EXTENDED HOURS: standalone entry, SL placed post-fill ────────────
+        # StopLimitOrder bracket children are rejected by IBKR outside 9:30–16:00 ET,
+        # which drags the parent entry down with them. Instead: submit a standalone
+        # GTC LimitOrder now; _on_order_status_event places the SL once IBKR confirms
+        # the fill. TP is omitted — Portfolio Manager handles exits.
+        _in_extended_hours = is_equities_extended_hours() and not is_options_market_open()
+        if _in_extended_hours:
+            limit_price = round(price * 1.002, 2)
+            _eff_limit = exec_plan.limit_price if exec_plan.limit_price > 0 else limit_price
+            entry_order = LimitOrder("BUY", qty, _eff_limit, account=account, tif="GTC", outsideRth=True)
+            entry_order.orderRef = f"DEC:{score}"[:20]
+            entry_order.transmit = True  # standalone — no bracket children
+            trade = ib.placeOrder(contract, entry_order)
+            ib.sleep(0.4)
+            parent_id = trade.order.orderId
+
+            order_status = trade.orderStatus.status
+            if order_status in ("Cancelled", "Inactive", "ApiCancelled", "ValidationError"):
+                log.error(f"execute_buy {symbol}: extended-hours entry rejected ({order_status}) — cooldown applied")
+                with _trades_lock:
+                    recently_closed[symbol] = datetime.now(UTC).isoformat()
+                _safe_del_trade(symbol)
+                return False
+
+            log_order({
+                "order_id": parent_id, "symbol": symbol, "side": "BUY",
+                "order_type": "LMT", "qty": qty, "price": _eff_limit,
+                "status": "SUBMITTED", "instrument": "stock", "direction": "LONG",
+                "sl": sl, "tp": tp, "score": score, "reasoning": reasoning,
+                "candle_gate": candle_gate or "UNKNOWN",
+                "timestamp": datetime.now(UTC).isoformat(),
+            })
+
+            try:
+                _open_time = open_time or datetime.now(UTC).isoformat()
+                try:
+                    from ic_calculator import get_current_weights as _get_icw
+                    _icw_at_entry = _get_icw()
+                except Exception:
+                    _icw_at_entry = None
+                _entry_regime = (
+                    (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
+                    if isinstance(regime, dict) else "UNKNOWN"
+                )
+                with _trades_lock:
+                    active_trades[symbol] = {
+                        "symbol": symbol, "instrument": instrument,
+                        "entry": price, "current": price, "qty": qty,
+                        "sl": sl, "tp": tp, "score": score, "entry_score": score,
+                        "reasoning": reasoning, "direction": "LONG", "pnl": 0.0,
+                        "status": "PENDING", "order_id": parent_id,
+                        "open_time": _open_time,
+                        "signal_scores": signal_scores or {},
+                        "ic_weights_at_entry": _icw_at_entry,
+                        "agent_outputs": agent_outputs or {},
+                        "atr": atr, "advice_id": advice_id,
+                        "trade_type": trade_type or "SCALP",
+                        "conviction": conviction,
+                        "setup_type": _derive_setup_type(signal_scores or {}),
+                        "entry_regime": _entry_regime,
+                        "entry_thesis": _build_entry_thesis(
+                            trade_type or "SCALP", symbol, "LONG", conviction, score,
+                            _entry_regime, market_read=market_read, rationale=reasoning,
+                        ),
+                        "pattern_id": pattern_id,
+                        "sl_order_id": None,   # placed post-fill by _on_order_status_event
+                        "tp_order_id": None,
+                        "high_water_mark": price,
+                        "agents_agreed": agents_agreed,
+                        "tranche_mode": False,
+                        "extended_hours_entry": True,
+                    }
+                _save_positions_file()
+                try:
+                    from trade_store import ledger_write as _ledger_write
+                    _ledger_write(symbol, active_trades.get(symbol, {}))
+                except Exception as _lw_err:
+                    log.error(f"execute_buy {symbol}: ledger_write failed: {_lw_err}")
+                from learning import log_trade
+                log_trade(trade=active_trades[symbol], agent_outputs=agent_outputs or {}, regime=regime, action="OPEN")
+            except Exception as record_err:
+                log.error(
+                    f"GHOST POSITION RISK {symbol}: extended-hours order submitted (id={parent_id}) "
+                    f"but failed to record: {record_err}"
+                )
+                raise
+
+            log.info(f"✅ BUY {symbol} qty={qty} @ ${price:.2f} [EXT-HRS] SL=${sl:.2f} placed post-fill")
+
+            if CONFIG.get("fill_watcher", {}).get("enabled", True):
+                from fill_watcher import FillWatcher, _active_watchers, _watchers_lock
+                if symbol not in _active_watchers:
+                    watcher = FillWatcher(
+                        ib=ib, symbol=symbol, order_id=parent_id,
+                        entry_trade=trade, original_limit=_eff_limit,
+                        contract=contract, qty=qty,
+                        watcher_params=exec_plan.fill_watcher_params,
+                    )
+                    with _watchers_lock:
+                        _active_watchers[symbol] = watcher
+                    threading.Thread(target=watcher.run, name=f"fill_watcher_{symbol}", daemon=True).start()
+            return True
+
         # ── ATOMIC BRACKET ORDER ──────────────────────────────────
         # All 3 legs (entry + SL + TP) are submitted as one atomic bracket.
         # Parent transmit=False prevents it from filling before children are attached.
@@ -633,6 +737,11 @@ def execute_buy(
             _cancel_ibkr_order_by_id(ib, sl_trade.order.orderId)
             if tp_trade is not None:
                 _cancel_ibkr_order_by_id(ib, tp_trade.order.orderId)
+            # Add to recently_closed so the reentry cooldown blocks the next scan
+            # from immediately resubmitting — without this, the loop retries every
+            # scan cycle indefinitely.
+            with _trades_lock:
+                recently_closed[symbol] = datetime.now(UTC).isoformat()
             _safe_del_trade(symbol)
             return False
 
@@ -1054,6 +1163,105 @@ def execute_short(
             return False
 
         account = CONFIG["active_account"]
+
+        # ── EXTENDED HOURS: standalone short entry, SL placed post-fill ──────
+        _in_extended_hours = is_equities_extended_hours() and not is_options_market_open()
+        if _in_extended_hours:
+            limit_price = round(price * 0.998, 2)
+            entry_order = LimitOrder("SELL", qty, limit_price, account=account, tif="GTC", outsideRth=True)
+            entry_order.orderRef = f"DEC:{score}"[:20]
+            entry_order.transmit = True
+            trade = ib.placeOrder(contract, entry_order)
+            ib.sleep(0.4)
+            parent_id = trade.order.orderId
+
+            order_status = trade.orderStatus.status
+            if order_status in ("Cancelled", "Inactive", "ApiCancelled", "ValidationError"):
+                log.error(f"execute_short {symbol}: extended-hours entry rejected ({order_status}) — cooldown applied")
+                with _trades_lock:
+                    recently_closed[symbol] = datetime.now(UTC).isoformat()
+                _safe_del_trade(symbol)
+                return False
+
+            log_order({
+                "order_id": parent_id, "symbol": symbol, "side": "SELL",
+                "order_type": "LMT", "qty": qty, "price": limit_price,
+                "status": "SUBMITTED", "instrument": "stock", "direction": "SHORT",
+                "sl": sl, "tp": tp, "score": score, "reasoning": reasoning,
+                "candle_gate": candle_gate or "UNKNOWN",
+                "timestamp": datetime.now(UTC).isoformat(),
+            })
+
+            try:
+                _open_time = open_time or datetime.now(UTC).isoformat()
+                try:
+                    from ic_calculator import get_current_weights as _get_icw
+                    _icw_at_entry = _get_icw()
+                except Exception:
+                    _icw_at_entry = None
+                _entry_regime = (
+                    (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
+                    if isinstance(regime, dict) else "UNKNOWN"
+                )
+                with _trades_lock:
+                    active_trades[symbol] = {
+                        "symbol": symbol, "instrument": instrument,
+                        "entry": price, "current": price, "qty": qty,
+                        "sl": sl, "tp": tp, "score": score, "entry_score": score,
+                        "reasoning": reasoning, "direction": "SHORT", "pnl": 0.0,
+                        "status": "PENDING", "order_id": parent_id,
+                        "open_time": _open_time,
+                        "signal_scores": signal_scores or {},
+                        "ic_weights_at_entry": _icw_at_entry,
+                        "agent_outputs": agent_outputs or {},
+                        "atr": atr, "advice_id": advice_id,
+                        "trade_type": trade_type or "SCALP",
+                        "conviction": conviction,
+                        "setup_type": _derive_setup_type(signal_scores or {}),
+                        "entry_regime": _entry_regime,
+                        "entry_thesis": _build_entry_thesis(
+                            trade_type or "SCALP", symbol, "SHORT", conviction, score,
+                            _entry_regime, market_read=market_read, rationale=reasoning,
+                        ),
+                        "pattern_id": pattern_id,
+                        "sl_order_id": None,   # placed post-fill by _on_order_status_event
+                        "tp_order_id": None,
+                        "high_water_mark": price,
+                        "agents_agreed": agents_agreed,
+                        "tranche_mode": False,
+                        "extended_hours_entry": True,
+                    }
+                _save_positions_file()
+                try:
+                    from trade_store import ledger_write as _ledger_write
+                    _ledger_write(symbol, active_trades.get(symbol, {}))
+                except Exception as _lw_err:
+                    log.error(f"execute_short {symbol}: ledger_write failed: {_lw_err}")
+                from learning import log_trade
+                log_trade(trade=active_trades[symbol], agent_outputs=agent_outputs or {}, regime=regime, action="OPEN")
+            except Exception as record_err:
+                log.error(
+                    f"GHOST POSITION RISK {symbol}: extended-hours short submitted (id={parent_id}) "
+                    f"but failed to record: {record_err}"
+                )
+                raise
+
+            log.info(f"✅ SHORT {symbol} qty={qty} @ ${price:.2f} [EXT-HRS] SL=${sl:.2f} placed post-fill")
+
+            if CONFIG.get("fill_watcher", {}).get("enabled", True):
+                from fill_watcher import FillWatcher, _active_watchers, _watchers_lock
+                if symbol not in _active_watchers:
+                    watcher = FillWatcher(
+                        ib=ib, symbol=symbol, order_id=parent_id,
+                        entry_trade=trade, original_limit=limit_price,
+                        contract=contract, qty=qty, side="SELL",
+                        instrument=instrument,
+                    )
+                    with _watchers_lock:
+                        _active_watchers[symbol] = watcher
+                    threading.Thread(target=watcher.run, name=f"fill_watcher_{symbol}", daemon=True).start()
+            return True
+
         # Sell slightly below bid to improve fill probability
         limit_price = round(price * 0.998, 2)
 
@@ -1093,6 +1301,9 @@ def execute_short(
             _cancel_ibkr_order_by_id(ib, sl_trade.order.orderId)
             if tp_trade is not None:
                 _cancel_ibkr_order_by_id(ib, tp_trade.order.orderId)
+            # Cooldown guard — prevents retry loop on next scan cycle
+            with _trades_lock:
+                recently_closed[symbol] = datetime.now(UTC).isoformat()
             _safe_del_trade(symbol)
             return False
 
@@ -1349,8 +1560,33 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
         # Direction-aware close: LONG positions close with SELL, SHORT positions close with BUY
         direction = info.get("direction", "LONG")
         close_action = "BUY" if direction == "SHORT" else "SELL"
-        close_order = MarketOrder(close_action, sell_qty, account=CONFIG["active_account"])
-        close_order.outsideRth = True
+
+        # IBKR does not support MarketOrder during extended hours (pre-market / after-hours).
+        # Outside 9:30 AM – 4:00 PM ET, use an aggressive LimitOrder so the close can fill
+        # immediately instead of being queued for the next regular-session open.
+        if is_options_market_open():
+            # Regular session — plain market order, fills at best available price
+            close_order = MarketOrder(close_action, sell_qty, account=CONFIG["active_account"])
+            close_order.outsideRth = True
+        else:
+            # Extended hours — limit order priced aggressively at the current market price.
+            # Sell slightly below (SELL) / buy slightly above (BUY) to maximise fill
+            # probability in thin after-hours markets; GTC so it stays live if not
+            # filled immediately.
+            _exit_price = validated_price if validated_price > 0 else info.get("current", info.get("entry", 0))
+            if close_action == "SELL":
+                _limit = round(_exit_price * 0.998, 2)  # slightly below — taker price on thin book
+            else:
+                _limit = round(_exit_price * 1.002, 2)  # slightly above — taker price on thin book
+            from ib_async import LimitOrder as _LimitOrder
+            close_order = _LimitOrder(close_action, sell_qty, _limit, account=CONFIG["active_account"])
+            close_order.outsideRth = True
+            close_order.tif = "GTC"
+            log.info(
+                f"execute_sell {symbol}: extended-hours close — using LimitOrder {close_action} @ ${_limit:.2f} "
+                f"(MktOrder not supported outside regular session)"
+            )
+
         sell_trade = ib.placeOrder(contract, close_order)
         ib.sleep(2)
 

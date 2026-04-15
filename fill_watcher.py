@@ -345,10 +345,25 @@ class FillWatcher:
                 except Exception:
                     pass
 
-                # Place standalone market order
-                mkt_order = MarketOrder(self._side, self._qty, account=CONFIG["active_account"])
-                mkt_order.outsideRth = True
-                mkt_trade = self._ib.placeOrder(self._contract, mkt_order)
+                # Place standalone order — MKT during regular session, LMT during extended hours.
+                # IBKR queues MarketOrder outside 9:30 AM–4 PM ET; use an aggressive limit instead.
+                from orders_contracts import is_options_market_open
+
+                if is_options_market_open():
+                    fallback_order = MarketOrder(self._side, self._qty, account=CONFIG["active_account"])
+                    fallback_order.outsideRth = True
+                else:
+                    # Aggressive limit: +0.3% for BUY (chase ask), -0.3% for SELL (hit bid)
+                    _sign = 1 if self._side == "BUY" else -1
+                    _lmt = round(final_limit * (1 + _sign * 0.003), 2)
+                    fallback_order = LimitOrder(self._side, self._qty, _lmt, account=CONFIG["active_account"])
+                    fallback_order.outsideRth = True
+                    fallback_order.tif = "GTC"
+                    log.info(
+                        f"FillWatcher._fallback: {self._symbol} extended-hours — "
+                        f"using LimitOrder {self._side} @ ${_lmt:.2f} instead of MarketOrder"
+                    )
+                mkt_trade = self._ib.placeOrder(self._contract, fallback_order)
                 self._ib.sleep(1.0)
 
                 new_oid = mkt_trade.order.orderId
@@ -361,7 +376,7 @@ class FillWatcher:
                         "order_id": new_oid,
                         "symbol": self._symbol,
                         "side": self._side,
-                        "order_type": "MKT",
+                        "order_type": "MKT" if is_options_market_open() else "LMT",
                         "qty": self._qty,
                         "price": final_limit,
                         "status": "SUBMITTED",
