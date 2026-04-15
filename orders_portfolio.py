@@ -930,6 +930,75 @@ def _reattach_sl_order(
         log.warning(f"Reconcile {key}: could not restore SL order: {_e}")
 
 
+def _validate_option_market_price(
+    mkt_price: float,
+    sym: str,
+    right: str,
+    strike: float,
+    entry: float,
+    context: str = "",
+) -> float:
+    """
+    Validate an IBKR marketPrice value for an option position.
+
+    Returns the price (rounded to 4dp) when valid, or 0 when it should be
+    rejected.  Callers treat 0 as "keep previous price".
+
+    Validation strategy — two layers:
+
+    Layer 1 — structural bounds (options theory, no threshold needed):
+      CALL premium < underlying_price   (can never cost more than buying the stock)
+      PUT  premium < strike_price       (maximum put value = strike when underlying → 0)
+      These bounds are violated only if IBKR returns the stock price instead of the
+      option premium — a known paper-account quirk for illiquid / deeply OTM options.
+
+    Layer 2 — 20× entry heuristic (fallback when underlying price is unavailable):
+      If the Alpaca price fetch fails we still need a safety net.  An option moving
+      20× from its recorded entry in a single monitoring interval is implausible for
+      normal ETF options; reject to avoid poisoning position P&L and agent context.
+    """
+    if mkt_price <= 0:
+        return 0
+
+    tag = f" [{context}]" if context else ""
+
+    # ── Layer 1: structural bounds ────────────────────────────────────────────
+    underlying: float | None = None
+    try:
+        from alpaca_options import get_underlying_price as _get_ul
+
+        underlying = _get_ul(sym)
+    except Exception:
+        pass
+
+    if underlying and underlying > 0:
+        if right == "C" and mkt_price >= underlying:
+            log.warning(
+                f"Option price rejected{tag} {sym} CALL: IBKR ${mkt_price:.2f} ≥ "
+                f"underlying ${underlying:.2f} — structurally impossible for a call premium"
+            )
+            return 0
+        if right == "P" and strike > 0 and mkt_price >= strike:
+            log.warning(
+                f"Option price rejected{tag} {sym} PUT: IBKR ${mkt_price:.2f} ≥ "
+                f"strike ${strike:.2f} — structurally impossible for a put premium"
+            )
+            return 0
+        # Passed structural check — price is valid
+        return round(mkt_price, 4)
+
+    # ── Layer 2: 20× entry heuristic (underlying fetch failed) ───────────────
+    if entry > 0 and mkt_price > entry * 20:
+        log.warning(
+            f"Option price suspect{tag} {sym}: IBKR ${mkt_price:.2f} is "
+            f"{mkt_price / entry:.0f}× entry ${entry:.4f} — "
+            f"underlying unavailable; rejecting on 20× fallback"
+        )
+        return 0
+
+    return round(mkt_price, 4)
+
+
 def update_positions_from_ibkr(ib: IB):
     """
     Refresh current price and P&L for all tracked positions using 3-way price
@@ -1125,14 +1194,19 @@ def update_positions_from_ibkr(ib: IB):
 
                     if is_opt:
                         entry = round(float(item.averageCost) / 100, 4)
-                        validated = round(ibkr_mkt, 4) if ibkr_mkt > 0 else entry
                         c = item.contract
                         raw_exp = str(c.lastTradeDateOrContractMonth)
+                        _right = "C" if c.right in ("C", "CALL") else "P"
+                        _strike = float(c.strike)
+                        _validated_mkt = _validate_option_market_price(
+                            ibkr_mkt, sym, _right, _strike, entry, context="re-sync"
+                        )
+                        validated = _validated_mkt if _validated_mkt > 0 else entry
                         if len(raw_exp) == 8 and raw_exp.isdigit():
                             expiry_str = f"{raw_exp[:4]}-{raw_exp[4:6]}-{raw_exp[6:]}"
                         else:
                             expiry_str = raw_exp
-                        right = "C" if c.right in ("C", "CALL") else "P"
+                        right = _right
                         mult = 100
                         if direction == "SHORT":
                             pnl = round((entry - validated) * qty * mult, 2)
@@ -1250,8 +1324,17 @@ def update_positions_from_ibkr(ib: IB):
                 mkt_price = float(item.marketPrice)
                 if mkt_price > 0:
                     if is_option:
-                        # IBKR marketPrice for options is already per-share premium
-                        ibkr_price = round(mkt_price, 4)
+                        # Validate via structural bounds (call < underlying, put < strike).
+                        # Falls back to 20× heuristic if underlying unavailable.
+                        # Returns 0 → "No IBKR price" branch keeps previous price.
+                        ibkr_price = _validate_option_market_price(
+                            mkt_price,
+                            sym,
+                            trade.get("right", ""),
+                            float(trade.get("strike", 0) or 0),
+                            entry,
+                            context=key,
+                        )
                     else:
                         ibkr_price = mkt_price
 
