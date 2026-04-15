@@ -465,6 +465,28 @@ def main():
     except Exception as _ce_err:
         clog("WARN", f"⚡ Catalyst Engine failed to start: {_ce_err}")
 
+    # ── Pre-session catalyst pipeline (08:00 ET daily) ────────────────────────
+    # Phase 3a: Pulls top catalyst candidates, runs 3-agent sentinel, logs
+    # decisions to data/presession_log.jsonl. Dry-run only — no orders.
+    # Phase 3b (deferred) will add MOO execution once dry-run data is clean.
+    # Requires the catalyst engine above; wrap in try so a registration failure
+    # doesn't block the rest of startup.
+    if CONFIG.get("presession_enabled", True):
+        try:
+            from presession import presession_catalyst_pipeline
+
+            fire_time = CONFIG.get("presession_fire_time_et", "08:00")
+            schedule.every().day.at(fire_time).do(presession_catalyst_pipeline).tag("presession")
+            clog(
+                "INFO",
+                f"⏰ Pre-session catalyst pipeline scheduled for {fire_time} ET "
+                f"(dry_run={CONFIG.get('presession_dry_run', True)})",
+            )
+        except Exception as _ps_err:
+            clog("WARN", f"⏰ Pre-session pipeline registration failed: {_ps_err}")
+    else:
+        clog("INFO", "⏰ Pre-session catalyst pipeline disabled (presession_enabled=False)")
+
     # ── Start Social Sentiment background polling ─────────────────────────────
     try:
         from social_sentiment import start_sentiment_polling

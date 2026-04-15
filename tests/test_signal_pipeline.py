@@ -173,10 +173,27 @@ class TestApplyTvPrefilter(unittest.TestCase):
         self.assertEqual(result, [])
 
     def test_symbol_missing_from_cache_excluded(self):
-        """Symbol not in tv_cache is excluded when other symbols have TV data."""
-        cache = {"MSFT": _tv_entry()}  # cache exists but AAPL has no entry
-        result = _apply_tv_prefilter(["AAPL"], cache, [])
-        self.assertNotIn("AAPL", result)
+        """Non-floor symbol not in tv_cache is excluded when other symbols have TV data.
+
+        Floor symbols (CORE_SYMBOLS + CORE_EQUITIES) are preserved by design —
+        see test_core_equity_missing_from_cache_still_preserved below. Use a
+        symbol that's definitively outside the floor for this exclusion test.
+        """
+        cache = {"MSFT": _tv_entry()}  # cache exists but ZZZZ has no entry
+        result = _apply_tv_prefilter(["ZZZZ"], cache, [])  # ZZZZ is not a real symbol
+        self.assertNotIn("ZZZZ", result)
+
+    def test_core_equity_missing_from_cache_still_preserved(self):
+        """CORE_EQUITIES (e.g. META) must be preserved even when TV cache has no entry.
+
+        This is the Apr 14 2026 mega-cap rally fix: TV's RSI<68 filter was
+        excluding mega-caps mid-rally, leaving them with empty cache entries
+        and causing the pre-filter to drop them entirely. Core equities now
+        pass through unconditionally via the _PREFILTER_CORE preservation.
+        """
+        cache = {"MSFT": _tv_entry()}  # META not in cache
+        result = _apply_tv_prefilter(["META", "MSFT"], cache, [])
+        self.assertIn("META", result)
 
     # ── Hard kills ──────────────────────────────────────────────────────────
 

@@ -8,13 +8,15 @@ Watches open positions for thesis drift. Runs on event triggers,
 not on a fixed interval — only fires when information has actually changed.
 
 Trigger sources (checked in bot_trading.py):
-  1. pre_market      — once per day before the open
-  2. regime_change   — market regime flips
-  3. score_collapse  — position's signal score drops 15+ pts from entry
-  4. news_hit        — significant keyword score on a held symbol
-  5. earnings_risk   — earnings within 48 hours on a held symbol
-  6. cascade         — 2+ positions hit stops in the same session
-  7. drawdown        — daily P&L < -1.5% of portfolio
+  1. pre_market        — once per day before the open
+  2. regime_change     — market regime flips
+  3. score_collapse    — position's signal score drops 15+ pts from entry
+  3b. held_score_rise  — position's score rises 15+ pts AND reaches >=45
+                         (symmetric to score_collapse, for ADD consideration)
+  4. news_hit          — significant keyword score on a held symbol
+  5. earnings_risk     — earnings within 48 hours on a held symbol
+  6. cascade           — 2+ positions hit stops in the same session
+  7. drawdown          — daily P&L < -1.5% of portfolio
 
 Uses Opus (claude_model_alpha) — same model as Trading Analyst.
 Mechanical stops still handle adverse price moves. This agent handles
@@ -39,6 +41,34 @@ def _get_client() -> anthropic.Anthropic:
     if _client is None:
         _client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
     return _client
+
+
+# Conviction bands mirror the regime thresholds used in the signal engine.
+# A band *cross* is a stronger signal than a same-band score change because it
+# reflects a qualitative shift in setup strength, not just a number moving.
+_CONVICTION_BANDS = (
+    (60, "HIGH"),  # >= 60 — very strong conviction
+    (45, "STRONG"),  # 45-59
+    (30, "STANDARD"),  # 30-44
+    (18, "WEAK"),  # 18-29 (paper entry threshold)
+    (0, "BELOW_THRESHOLD"),
+)
+
+
+def _conviction_band(score: int | float | None) -> str:
+    """Classify a signal score into a named conviction band.
+
+    Used in the PM prompt to annotate entry→current band crosses so Opus sees
+    "STANDARD → HIGH" as an explicit upgrade signal, not just "28 → 65".
+    """
+    try:
+        s = float(score) if score is not None else 0.0
+    except (TypeError, ValueError):
+        return "BELOW_THRESHOLD"
+    for threshold, label in _CONVICTION_BANDS:
+        if s >= threshold:
+            return label
+    return "BELOW_THRESHOLD"
 
 
 # ══════════════════════════════════════════════════════════════
@@ -213,6 +243,14 @@ def run_portfolio_review(
         if current_score is not None:
             delta = current_score - entry_score
             score_line += f" → current={current_score} (delta={delta:+d})"
+            # Annotate conviction-band cross (entry vs current band). Helps Opus
+            # decide ADD vs HOLD: a cross from STANDARD→HIGH is a materially
+            # stronger signal than a same-band rise from 46→58.
+            entry_band = _conviction_band(entry_score)
+            current_band = _conviction_band(current_score)
+            if entry_band != current_band:
+                direction_tag = "↑" if current_score > entry_score else "↓"
+                score_line += f"  [band {direction_tag} {entry_band}→{current_band}]"
         else:
             score_line += " → current=unscored_today (scanner did not rescore this cycle)"
 

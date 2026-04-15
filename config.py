@@ -168,6 +168,41 @@ CONFIG = {
     "max_sector_exposure": 0.40,  # 40% sector cap
     "consecutive_loss_pause": 999,  # Paper learning mode: effectively disabled (live: 5)
     "reentry_cooldown_minutes": 30,  # Block re-entry after close (lifecycle gate)
+    # ── HELD-POSITION SCALE-UP TRIGGER ────────────────────────────
+    # When a held position's score rises materially since entry (or since the
+    # last PM review), re-run PM so Opus can consider an ADD.  Addresses the
+    # 2026-04-14 "AMZN scored 65 while held, position size stayed frozen"
+    # failure — PM never fired because no trigger covered upward score moves.
+    # Opus still owns the verb; this trigger just wakes PM up to look.
+    "add_trigger_score_delta": 15,  # current_score − entry_score ≥ this fires PM review
+    "add_trigger_redfire_delta": 5,  # Edge-trigger: only re-fire if score rises further by ≥ this since last review
+    "add_trigger_min_score": 45,  # Don't fire for held weakling upticks (score must reach at least here)
+    # ── PRE-SESSION CATALYST PIPELINE (08:00 ET) ─────────────────
+    # Runs before market open: pulls top candidates from CatalystEngine,
+    # enriches with earnings + pre-market snapshot, runs 3-agent sentinel,
+    # logs decisions to data/presession_log.jsonl for IC analysis.
+    # Phase 3a ships in DRY-RUN mode only — no orders placed. Phase 3b
+    # will add MOO execution once 5 sessions of dry-run output validates
+    # the candidate quality.
+    "presession_enabled": True,  # Master gate for the 08:00 pipeline
+    "presession_dry_run": True,  # No orders; only log candidate + sentinel decision
+    "presession_fire_time_et": "08:00",  # When to fire each trading day
+    "presession_top_n": 20,  # Max candidates to sentinel-review per run
+    "presession_catalyst_score_floor": 7.0,  # 0-10 scale; reject below this
+    "presession_earnings_lookahead_hours": 24,  # Flag earnings within this window
+    "premarket_fill_score_threshold": 8.5,  # (Phase 3b) pre-market fill gate — unused in 3a
+    # ── OPENING-GAP FOLLOW-THROUGH (Phase 4) ──────────────────────
+    # First hour on gap days has more alpha than midday — same scoring across
+    # sessions under-weights it. When we're in OPEN_BUFFER (9:30–9:45 ET) AND
+    # the symbol gapped ≥ gap_boost_threshold from prior close to pre-market,
+    # multiply BREAKOUT and MTF (multi-timeframe alignment) dim scores by
+    # open_buffer_gap_boost. Rationale: classic "gap-and-go" setups want the
+    # daily trend to align with the gap direction (MTF) and a 5-min channel
+    # breach on open (BREAKOUT). Boost is narrow by design — 15-minute window,
+    # gated by actual gap magnitude, so damage on false breakouts is capped.
+    "open_buffer_gap_boost": 1.5,  # Multiplier on BREAKOUT + MTF during OPEN_BUFFER when gap triggers
+    "gap_boost_threshold": 0.02,  # 2% minimum gap (|pre-market last - prior close| / prior close)
+    "scan_interval_pre_open": 2,  # Minutes — PRE_OPEN 9:00–9:30 (tighter than PRE_MARKET so first scan lands ~09:25)
     # ── MACRO EVENT GATE ──────────────────────────────────────────
     # Halve position sizing within 24 hours of FOMC, CPI, or NFP.
     # Controlled by macro_calendar.get_macro_size_multiplier().

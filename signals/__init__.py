@@ -849,6 +849,45 @@ def fetch_multi_timeframe(
         if not sig_5m:
             return None
 
+        # ── PRE-MARKET / OPENING GAP PCT (Phase 4) ─────────────────────────
+        # Used by the OPEN_BUFFER gap-boost applied to BREAKOUT + DIRECTIONAL.
+        # Definition: (current_price - prior_session_close) / prior_session_close.
+        # During OPEN_BUFFER (9:30–9:45 ET), df_1d's last bar is today's in-progress
+        # bar; iloc[-2] is yesterday's close. Pre-9:30 today's bar may not exist,
+        # so we fall back to iloc[-1] for the prior close in that case. Failures
+        # leave the gap at 0.0 — boost simply won't trigger, which is the safe
+        # behaviour.
+        _premarket_gap_pct = 0.0
+        try:
+            if df_1d is not None and len(df_1d) >= 2 and sig_5m.get("price"):
+                # Use last daily close if today's partial bar isn't there; else
+                # use the prior day's close so we don't compare today to itself.
+                import pandas as _pd  # local import keeps fetch_multi_timeframe safe to import
+                idx_last = df_1d.index[-1]
+                today_et = _pd.Timestamp.now(tz="US/Eastern").date()
+                idx_last_date = idx_last.date() if hasattr(idx_last, "date") else None
+                prior_close_idx = -2 if idx_last_date == today_et and len(df_1d) >= 2 else -1
+                prior_close = float(df_1d["close"].iloc[prior_close_idx])
+                current_px = float(sig_5m["price"])
+                if prior_close > 0:
+                    _premarket_gap_pct = (current_px - prior_close) / prior_close
+        except Exception:
+            _premarket_gap_pct = 0.0
+
+        # Gap-boost multiplier — only active in OPEN_BUFFER and only when the
+        # absolute gap meets gap_boost_threshold. Applied to BREAKOUT +
+        # DIRECTIONAL dims below. Returns 1.0 (no-op) outside the window.
+        _gap_mult = 1.0
+        try:
+            from risk import get_session as _get_session_phase4
+
+            if _get_session_phase4() == "OPEN_BUFFER":
+                _gap_thr = float(CONFIG.get("gap_boost_threshold", 0.02))
+                if abs(_premarket_gap_pct) >= _gap_thr:
+                    _gap_mult = float(CONFIG.get("open_buffer_gap_boost", 1.5))
+        except Exception:
+            _gap_mult = 1.0
+
         # ── PRICE CROSS-VALIDATION — catch data contamination ──────
         # If daily price and 5m price differ by more than 50%, data is corrupt.
         # This catches yfinance returning wrong data (options premiums, adjusted errors, etc.)
@@ -882,6 +921,9 @@ def fetch_multi_timeframe(
             pass
 
         # Multi-timeframe confluence score (with news + social + iv_skew dimensions)
+        # Phase 4: pass pre-computed gap pct + boost multiplier so compute_confluence
+        # can apply the OPEN_BUFFER gap-and-go boost to BREAKOUT + DIRECTIONAL + MTF
+        # without re-fetching data or duplicating the session check.
         confluence = compute_confluence(
             sig_5m,
             sig_1d,
@@ -892,6 +934,8 @@ def fetch_multi_timeframe(
             iv_skew_score=_iv_skew_score,
             iv_skew_dir=_iv_skew_dir,
             symbol=symbol,
+            premarket_gap_pct=_premarket_gap_pct,
+            gap_boost_mult=_gap_mult,
         )
 
         return {
@@ -919,6 +963,10 @@ def fetch_multi_timeframe(
             "candle_gate": confluence.get("candle_gate", "PASS"),
             # Regime router state (for logging / dashboard)
             "regime_router": regime_router,
+            # Phase 4: propagate gap-boost state up so callers (logs, IC analysis,
+            # dashboard) can see what was boosted and by how much.
+            "premarket_gap_pct": confluence.get("premarket_gap_pct", round(_premarket_gap_pct, 4)),
+            "gap_boost_mult": confluence.get("gap_boost_mult", _gap_mult),
         }
 
     except Exception as e:
@@ -1830,6 +1878,8 @@ def compute_confluence(
     iv_skew_score: int = 0,
     iv_skew_dir: int = 0,
     symbol: str | None = None,
+    premarket_gap_pct: float = 0.0,
+    gap_boost_mult: float = 1.0,
 ) -> dict:
     """
     Decifer 2.0 — 10-dimension scoring engine (alpha-pipeline-v2).
@@ -1939,6 +1989,14 @@ def compute_confluence(
     # disabled (config flag) or regime is unknown — zero-cost no-op.
     _rmult = _regime_multipliers(regime_router)
 
+    # Phase 4 gap-boost multiplier: computed by the caller (fetch_multi_timeframe)
+    # which has access to df_1d + current-session state. Pre-set to 1.0 here in
+    # case a caller skips the kwarg. Applied to BREAKOUT + DIRECTIONAL + MTF so
+    # the classic gap-and-go pattern (aligned trend + channel breach on a real
+    # gap during the first 15 min) scores proportionally higher than the same
+    # setup at midday.
+    _gap_mult = float(gap_boost_mult) if gap_boost_mult else 1.0
+
     # ── 1. DIRECTIONAL (0-10) — EMA alignment × ADX + timeframe vote ──
     # Merges the old TREND (EMA+ADX) and MTF (timeframe consensus) dimensions.
     # Eliminates correlated IC weight splitting. See score_directional().
@@ -1946,7 +2004,9 @@ def compute_confluence(
     trend_dir = 0
     if _enabled("directional"):
         trend_pts, trend_dir = score_directional(sig_5m, sig_1d, sig_1w)
-        trend_pts = round(trend_pts * _rmult.get("trend", 1.0))
+        # Phase 4: boost DIRECTIONAL in OPEN_BUFFER when gap is real — a gap
+        # that aligns with a prior daily trend is the classic gap-and-go.
+        trend_pts = round(trend_pts * _rmult.get("trend", 1.0) * _gap_mult)
         score += trend_pts
         dim_directions.append((trend_dir, trend_pts))
 
@@ -2073,7 +2133,10 @@ def compute_confluence(
                 breakout_score = 4
             elif vr >= 1.5:
                 breakout_score = 2
-        breakout_score = round(min(breakout_score, 10) * _rmult["breakout"])
+        # Phase 4: OPEN_BUFFER gap-boost. A Donchian breach on a gap day is the
+        # cleanest gap-and-go confirmation — the signal is doing exactly what
+        # this boost is meant to reward.
+        breakout_score = round(min(breakout_score, 10) * _rmult["breakout"] * _gap_mult)
         score += breakout_score
         dim_directions.append((breakout_dir, breakout_score))
 
@@ -2097,7 +2160,10 @@ def compute_confluence(
                 w_bear = sig_1w.get("bear_aligned", False)
                 if (w_bull and d_bull) or (w_bear and d_bear):
                     mtf_score = 10  # Full weekly+daily confirmation
-        mtf_score = round(min(mtf_score, 10) * _rmult.get("mtf", 1.0))
+        # Phase 4: OPEN_BUFFER gap-boost also applies to MTF when the dimension
+        # is enabled — higher-timeframe confirmation on a gapper is exactly
+        # what we want to amplify.
+        mtf_score = round(min(mtf_score, 10) * _rmult.get("mtf", 1.0) * _gap_mult)
         score += mtf_score
         dim_directions.append((mtf_dir, mtf_score))
 
@@ -2489,6 +2555,11 @@ def compute_confluence(
         "disabled_dimensions": disabled_dimensions,
         # Regime routing state that produced these scores
         "regime_router": regime_router,
+        # Phase 4: gap state observed at score time — surfaced so logs and IC
+        # analysis can segment returns by gap magnitude and confirm the boost
+        # fired only where intended.
+        "premarket_gap_pct": round(float(premarket_gap_pct or 0.0), 4),
+        "gap_boost_mult": _gap_mult,
     }
 
 

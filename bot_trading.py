@@ -92,6 +92,7 @@ _last_pm_review_ts_by_symbol: dict = {}  # symbol → datetime when that positio
 # persistent conditions (e.g. GLD news never clears) don't re-fire every cooldown cycle.
 _last_news_scores: dict = {}  # symbol → keyword_score at last news_hit review
 _last_collapse_scores: dict = {}  # symbol → current_score at last score_collapse review
+_last_rise_scores: dict = {}  # symbol → current_score at last held_score_rise review (edge dedup)
 
 # ── Last-decision writer (for Chief Decifer trade card) ───────────────────────
 
@@ -793,6 +794,7 @@ def _maybe_eod_options_review(regime: dict):
             _last_pm_review_ts, \
             _last_news_scores, \
             _last_collapse_scores, \
+            _last_rise_scores, \
             _last_pm_review_ts_by_symbol
         _portfolio_review_done_today = False
         _session_stop_count = 0
@@ -802,6 +804,7 @@ def _maybe_eod_options_review(regime: dict):
         _last_pm_review_ts = None
         _last_news_scores = {}
         _last_collapse_scores = {}
+        _last_rise_scores = {}
         _last_pm_review_ts_by_symbol = {}
     # Fire once in the pre-close window
     if dtime(15, 30) <= t < dtime(15, 55) and not _eod_options_review_done:
@@ -880,7 +883,7 @@ def _should_run_portfolio_review(
     the PM on every scan cycle.
     """
     global _portfolio_review_done_today, _last_known_regime, _last_pm_review_ts
-    global _last_news_scores, _last_collapse_scores, _last_pm_review_ts_by_symbol
+    global _last_news_scores, _last_collapse_scores, _last_rise_scores, _last_pm_review_ts_by_symbol
     pm_cfg = CONFIG.get("portfolio_manager", {})
     if not pm_cfg.get("enabled", True):
         return False, ""
@@ -926,6 +929,33 @@ def _should_run_portfolio_review(
         last_sc = _last_collapse_scores.get(sym)
         if last_sc is None or (last_sc - current_sc) >= re_collapse_delta:
             return True, "score_collapse"
+
+    # 3b. Held-score rise — edge trigger: fires when a held position's score has
+    #     risen materially since entry AND reached a minimum conviction threshold.
+    #     Symmetric to score_collapse, but for the UP side. Lets PM consider ADD
+    #     when conviction strengthens on an existing winner. Only re-fires if
+    #     score continues to rise further than the last review's snapshot.
+    #     Addresses 2026-04-14 "AMZN 28→65 scored but never ADDed" gap — there
+    #     was no trigger for upward moves, so PM simply never woke up on winners.
+    rise_delta = CONFIG.get("add_trigger_score_delta", 15)
+    rise_redfire = CONFIG.get("add_trigger_redfire_delta", 5)
+    rise_min_score = CONFIG.get("add_trigger_min_score", 45)
+    for pos in open_positions:
+        sym = pos.get("symbol", "")
+        entry_sc = pos.get("entry_score", pos.get("score", 0)) or 0
+        current_sc = scored_map.get(sym)
+        if current_sc is None:
+            continue
+        if current_sc < rise_min_score:
+            continue
+        if (current_sc - entry_sc) < rise_delta:
+            continue
+        # Score is elevated. Only fire if it's risen further than the last review
+        # already saw — prevents a position scoring 65 on every cycle from
+        # re-triggering PM endlessly after the first ADD decision.
+        last_sc = _last_rise_scores.get(sym)
+        if last_sc is None or (current_sc - last_sc) >= rise_redfire:
+            return True, "held_score_rise"
 
     # 4. News hit — edge trigger: fires only when keyword_score has changed
     #    materially since the last review for that symbol.
@@ -1396,6 +1426,7 @@ def run_scan():
         _last_pm_review_ts, \
         _last_news_scores, \
         _last_collapse_scores, \
+        _last_rise_scores, \
         _last_pm_review_ts_by_symbol
     should_review, pm_trigger = _should_run_portfolio_review(
         session=get_session(),
@@ -1736,6 +1767,10 @@ def run_scan():
                 _cs = _scored_map_snap.get(_rsym)
                 if _cs is not None:
                     _last_collapse_scores[_rsym] = _cs
+                    # Snapshot current score for held_score_rise edge dedup too.
+                    # Without this, a position scoring 65 on every cycle would
+                    # re-fire PM every cycle; with it, only further rises fire.
+                    _last_rise_scores[_rsym] = _cs
             # Record which regime each reviewed position was reviewed under so cycle_check
             # does not re-queue the same REVIEW on subsequent cycles for the same regime state.
             _reviewed_regime_label = regime.get("session_character") or regime.get("regime", "UNKNOWN")

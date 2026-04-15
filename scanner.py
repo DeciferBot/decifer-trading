@@ -88,10 +88,15 @@ CORE_SYMBOLS = [
     "COPX",
 ]
 
-# ── Momentum watchlist — always scored as a floor ─────────────
+# ── Core equity floor — always scored every cycle ─────────────
+# These are the mega-caps and sector leaders that must be visible to the
+# scoring engine regardless of what TV's RSI/MACD filters decide to surface.
+# Historically named MOMENTUM_FALLBACK and only used when TV was unavailable;
+# promoted to the always-on equity floor on 2026-04-15 after the Apr 14 rally
+# miss (META/AAPL/NVDA filtered out by TV's RSI<68 gate mid-rally).
 # Sector-balanced: 3-5 names per sector so the bot always has
 # non-tech candidates in its minimum universe.
-MOMENTUM_FALLBACK = [
+CORE_EQUITIES = [
     # Technology (5) — kept intentionally lean; TV scans surface more
     "NVDA", "AAPL", "MSFT", "AMD", "CRM",
     # Communication Services (2)
@@ -100,8 +105,8 @@ MOMENTUM_FALLBACK = [
     "LLY", "ABBV", "MRNA", "BIIB", "REGN",
     # Healthcare devices / managed care (3)
     "UNH", "MDT", "ABT",
-    # Consumer Discretionary (4)
-    "AMZN", "NKE", "MCD", "TGT",
+    # Consumer Discretionary (5) — TSLA added 2026-04-15 after mega-cap rally miss
+    "AMZN", "TSLA", "NKE", "MCD", "TGT",
     # Consumer Staples (3)
     "WMT", "COST", "PG",
     # Energy (4)
@@ -113,6 +118,10 @@ MOMENTUM_FALLBACK = [
     # Financials (3)
     "JPM", "GS", "V",
 ]
+
+# Backward-compat alias — existing callers still import MOMENTUM_FALLBACK.
+# Keep this until all references (bot_dashboard, theme_tracker, tests) migrate.
+MOMENTUM_FALLBACK = CORE_EQUITIES
 
 # ── TV signal cache — populated each scan cycle ───────────────
 # signals.py reads this to skip re-fetching fields already computed here.
@@ -417,7 +426,7 @@ def get_dynamic_universe(ib: IB, regime: dict | None = None) -> list[str]:
         log.warning(
             "tradingview-screener not available — skipping TV scans. Install with: pip install tradingview-screener"
         )
-        symbols.update(MOMENTUM_FALLBACK)
+        symbols.update(CORE_EQUITIES)
         log.info(f"Universe (fallback): {len(symbols)} symbols")
         return list(symbols)
 
@@ -614,8 +623,10 @@ def get_dynamic_universe(ib: IB, regime: dict | None = None) -> list[str]:
     if total_from_tv == 0:
         log.warning("All TradingView scans returned zero results — running on core + fallback only")
 
-    # ── Momentum fallback (floor — always included) ───────────
-    symbols.update(MOMENTUM_FALLBACK)
+    # ── Core equity floor (always included regardless of TV results) ───────────
+    # These mega-caps must reach score_universe() even when TV's RSI/MACD
+    # filters exclude them (e.g. RSI > 68 mid-rally — the Apr 14 META case).
+    symbols.update(CORE_EQUITIES)
 
     log.info(f"Universe: {len(symbols)} symbols | {total_from_tv} TV hits | vix={_vix:.1f} extreme={_is_extreme}")
     return list(symbols)

@@ -321,6 +321,7 @@ def get_session() -> str:
         return "WEEKEND" if now_et.weekday() >= 5 else "CLOSED"
     now_est = datetime.now(EST).time()
     pre = time(4, 0)
+    pre_open = time(9, 0)  # 9:00 — final 30 min before the bell, pre_open band
     open_ = time(9, 30)
     prime = time(9, 45)
     lunch = time(11, 30)
@@ -331,8 +332,13 @@ def get_session() -> str:
 
     if now_est < pre:
         return "CLOSED"
-    elif now_est < open_:
+    elif now_est < pre_open:
         return "PRE_MARKET"
+    elif now_est < open_:
+        # PRE_OPEN: 9:00–9:30 — tightened cadence so the first scan of the day
+        # lands well before the bell with fresh pre-market data. Keeps the
+        # OPEN_BUFFER cycle primed instead of cold-starting at 9:30.
+        return "PRE_OPEN"
     elif now_est < prime:
         return "OPEN_BUFFER"
     elif now_est < lunch:
@@ -354,6 +360,7 @@ def get_scan_interval() -> int:
     session = get_session()
     intervals = {
         "PRE_MARKET": CONFIG["scan_interval_pre_market"] * 60,
+        "PRE_OPEN": CONFIG.get("scan_interval_pre_open", 2) * 60,
         "OPEN_BUFFER": CONFIG["scan_interval_extended"] * 60,
         "PRIME_AM": CONFIG["scan_interval_prime"] * 60,
         "LUNCH": CONFIG["scan_interval_standard"] * 60,
