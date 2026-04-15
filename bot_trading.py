@@ -1827,17 +1827,17 @@ def run_scan():
         ("risk", "Risk Manager", "Sizes positions and flags portfolio-level risk"),
     ]
     outputs = decision.get("_agent_outputs", {})
+    _skip_reason = decision.get("summary", "")
     for key, name, role_desc in agent_names:
-        raw = outputs.get(key, "")
-        if raw:
-            agent_convo.append(
-                {
-                    "agent": name,
-                    "role": role_desc,
-                    "time": now_str,
-                    "output": raw[:800],
-                }
-            )
+        raw = outputs.get(key, "") or (_skip_reason and f"Agent skipped — {_skip_reason}")
+        agent_convo.append(
+            {
+                "agent": name,
+                "role": role_desc,
+                "time": now_str,
+                "output": (raw or "No output this cycle.")[:800],
+            }
+        )
     _buys = decision.get("buys", [])
     _sells = decision.get("sells", [])
     _holds = decision.get("hold", [])

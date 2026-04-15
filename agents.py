@@ -125,6 +125,7 @@ def run_all_agents(
     qualified = [s for s in signals if s.get("score", 0) >= threshold]
     if not qualified and not positions_to_reconsider:
         log.info("Agents: No signals above threshold — skipping LLM calls")
+        _skip_msg = f"No signals above threshold ({threshold} pts) this cycle — agent skipped."
         return {
             "buys": [],
             "sells": [],
@@ -133,7 +134,11 @@ def run_all_agents(
             "agents_agreed": 0,
             "summary": f"No signals >= {threshold} — agents skipped",
             "claude_reasoning": "No qualifying signals this cycle. No LLM agents called.",
-            "_agent_outputs": {},
+            "_agent_outputs": {
+                "technical": _skip_msg,
+                "trading_analyst": _skip_msg,
+                "risk": _skip_msg,
+            },
         }
 
     # ── Fresh-first ordering: unheld candidates surface before already-held ──
