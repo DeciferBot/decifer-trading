@@ -332,8 +332,9 @@ class TWAPExecutor:
                             slice_obj.price_adjustments += 1
                             break
 
-                        # Check fill status
-                        if trade.isAlive():
+                        # Check fill status (ib_async renamed isAlive → isDone;
+                        # flip the boolean to preserve the original semantics).
+                        if not trade.isDone():
                             self.ib.sleep(1)
                         else:
                             # Order complete
@@ -556,7 +557,8 @@ class IcebergOrder:
 
             # Monitor and refill as shares are filled
             while self.remaining_quantity > 0:
-                if not trade.isAlive():
+                # ib_async renamed isAlive → isDone (same meaning, opposite boolean).
+                if trade.isDone():
                     filled = trade.orderStatus.filled
                     self.filled_quantity = filled
                     self.remaining_quantity = max(0, quantity - filled)
