@@ -529,6 +529,7 @@ def reconcile_with_ibkr(ib: IB):
                     with _trades_lock:
                         active_trades[key]["current"] = round(validated_price, 4)
                         active_trades[key]["pnl"] = pnl
+                        active_trades[key]["realized_pnl"] = round(float(getattr(item, "realizedPNL", 0) or 0), 2)
                         active_trades[key]["status"] = "ACTIVE"
                         active_trades[key]["_price_sources"] = src_desc
                         if is_option:
