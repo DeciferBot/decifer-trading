@@ -26,6 +26,7 @@ Three actors:
 
 - **Phase A — Complete ✅** (shipped 2026-03-28): Direction-agnostic signals, short-candidate scanner, directional skew tracking, consensus threshold raised to 3/6, mean-reversion dimension (9th signal)
 - **IC scoring — Active**: Information Coefficient tracking is running. Gate for Phase C = 200 closed trades.
+- **PM ADD verb — Activated ✅** (2026-04-15): Portfolio Manager now shows Opus the full decision surface (entry thesis, per-dimension entry→current deltas with IC-weight annotations, setup type, pattern, regime, news) and lets Opus decide ADD/TRIM/EXIT/HOLD. Code (`calculate_position_size()`) sizes ADDs — same function entries use. Opus no longer emits `ADD_NOTIONAL`. Hardcoded safety floors: `check_risk_conditions`, earnings-48h, single-position-cap clamp (downgrades to HOLD if no headroom).
 - **Phase B / C / D — Not yet built**: Signal validation (Alphalens), HMM regime detection, walk-forward weight calibration. All blocked on trade data volume.
 - **Test suite**: ~60% pass rate. Tests and code diverged during rapid development. Runtime is unaffected — do not spend sessions fixing tests unless directly related to the work.
 - **Regime detector**: VIX-proxy + SPY EMA (locked). HMM explicitly deferred until ≥200 closed trades.

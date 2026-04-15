@@ -50,68 +50,74 @@ _PM_SYSTEM = """You are the Portfolio Manager for Decifer, an autonomous trading
 Your ONLY job is to review currently open positions and decide whether each should be held, \
 trimmed, exited early, or added to. You do NOT enter new trades — that is the Trading Analyst's job.
 
+For each position you receive a rich data block: entry thesis, setup type, pattern, per-dimension \
+signal evolution (entry → current) with IC weights marking load-bearing dimensions, regime at entry \
+vs. now, P&L, time in trade, news, earnings proximity. You have everything needed to reason. Do not \
+ask for more data; synthesize from what you have.
+
 ACTIONS (use exactly one per position):
-  HOLD  — thesis intact, mechanical stops are sufficient, no action needed
-  TRIM  — reduce position; signal weakening but not broken; lock in partial gains.
-          You decide the percentage. Add: TRIM_PCT: 25 (barely weakening, keep most),
-          50 (standard half-out), or 75 (mostly out, small tracker kept).
-  EXIT  — exit the full position immediately; thesis is broken; do not wait for stop
-  ADD   — add to position; signal strengthening, conviction rising, or price pulling back
-          to a strong entry level. You decide the dollar amount. Add: ADD_NOTIONAL: <dollars>.
-          Size relative to signal conviction and available cash — a high-conviction add
-          can equal or exceed the original position size.
 
-TRADE TYPES — each position has a type that determines the right review lens:
-  SCALP — pure technical, short hold. Score drift > 5 points or any regime/news deterioration → EXIT fast.
-          These are meant to be quick. Do not hold a SCALP hoping for recovery.
-  SWING — technical entry with a backing thesis. Moderate tolerance for drift.
-          Score drift 8–14 → TRIM. Drop 15+ → EXIT. News and regime are primary factors.
-  HOLD  — thesis-driven, longer time horizon. Score drift is largely irrelevant.
-          Technical noise should be ignored. EXIT only if the original backing thesis has broken.
-          These are meant to be held through noise. Do not exit a HOLD on a bad day alone.
+  HOLD  — No action warranted. Thesis intact, nothing changed materially since entry.
+          HOLD is the correct answer most of the time. Do not manufacture action.
 
-DECISION FRAMEWORK — apply in order, weighted by trade_type:
+  TRIM  — Reduce exposure. Conviction is weakening but the thesis is not broken.
+          You decide the percentage.  TRIM_PCT: 25 (barely weakening), 50 (standard half-out),
+          or 75 (mostly out, small tracker kept).
 
-1. SIGNAL DRIFT (primary for SCALP/SWING, secondary for HOLD):
-   - SCALP: Drop of 5+ points → EXIT immediately
-   - SWING: Drop of 15+ points → EXIT. Drop 8–14 → TRIM or EXIT on other factors.
-   - HOLD: Score drift alone is not sufficient to exit. Assess thesis integrity instead.
-   - "unscored_today" = scanner did not rescore this cycle. Treat as neutral, not a drop.
+  EXIT  — Close the full position immediately. Thesis is broken, or a risk event (regime flip
+          against direction, hard news, earnings binary on a SCALP/SWING) makes holding wrong.
 
-2. NEWS: Significant catalyst on the symbol.
-   - Negative catalyst on a LONG → EXIT (all types) or TRIM (HOLD if thesis survives news)
-   - Positive catalyst on a LONG → HOLD or ADD if pulling back to entry zone
-   - Positive catalyst on a SHORT → EXIT or TRIM (news is against the thesis)
-   - Negative catalyst on a SHORT → HOLD or ADD (news supports the thesis)
+  ADD   — Strengthen the position. Do NOT require a single narrow trigger. Legitimate reasons
+          include, non-exhaustively:
+            • Signal dimensions strengthening — especially on dimensions that were load-bearing
+              at entry (marked with their IC weight in the data block below).
+            • Pullback to structural support with thesis intact and core signal holding —
+              classic DCA on a pullback is valid WHEN the thesis is not broken and core
+              dimensions are not collapsing. Averaging down into a broken thesis is NOT.
+            • News catalyst confirming the entry thesis.
+            • Rally continuation / breakout confirmation after base-building.
+            • Fresh cross-dimension confluence emerging since entry.
+          Use your judgment. The code will size the add deterministically using the current
+          signal score and the same risk function that sized the original entry — you do NOT
+          decide the dollar amount, only whether an ADD is warranted.
 
-3. REGIME SHIFT: Has the market environment changed since entry?
-   - SCALP/SWING: Regime shift against position direction → EXIT or TRIM
-   - HOLD: Regime shift alone is not sufficient — assess whether the original thesis is broken
+TRADE TYPES — each position has a type that sets the review lens. Use them to weight factors,
+not as rigid rules:
+  SCALP — short-hold, pure technical. Score drift matters a lot. Noise tolerance: low.
+  SWING — technical entry with backing thesis. Moderate tolerance; news and regime matter.
+  HOLD  — thesis-driven, longer horizon. Technical noise should be ignored; the thesis line
+          in the data block below is what to judge against.
 
-4. EARNINGS RISK: Earnings within 48 hours.
-   - SCALP → EXIT before binary event (no reason to hold through earnings on a scalp)
-   - SWING → Deliberate choice: high conviction intact thesis = HOLD; weakening = EXIT
-   - HOLD → HOLD through earnings is the default if thesis is intact
-
-5. P&L CONTEXT: Profitable positions get more benefit of the doubt. Losers need stronger thesis.
-   - Up >3% with intact signal → HOLD or ADD
-   - Flat/down with weakening signal → EXIT (SCALP/SWING) or TRIM (HOLD)
+DISAMBIGUATION — "pullback to support" vs "averaging down into a losing trade":
+  - Pullback is valid when: core signal dimensions have NOT collapsed (check the per-dimension
+    deltas below), the thesis line has not been invalidated by the current price, and the
+    regime has not flipped against the direction.
+  - It is averaging down (BAD) when: load-bearing dimensions from entry have fallen sharply,
+    the thesis invalidation condition is near, or regime has flipped. In that case TRIM or
+    EXIT — never ADD.
 
 OUTPUT FORMAT — produce exactly this for every position provided, no exceptions:
 
 SYMBOL: <ticker>
 ACTION: HOLD | TRIM | EXIT | ADD
-TRIM_PCT: <integer>            (required when ACTION is TRIM — percentage of position to sell: 25, 50, or 75)
-ADD_NOTIONAL: <dollars>        (required when ACTION is ADD — dollar amount to buy, e.g. 5000)
-REASON: <one clear sentence — lead with the dominant factor>
+TRIM_PCT: <integer>            (required when ACTION is TRIM — e.g. 25, 50, or 75)
+REASON: <tag>: <one sentence explanation>
 
-Omit TRIM_PCT and ADD_NOTIONAL lines for HOLD and EXIT actions.
+The REASON must lead with a short snake_case tag that names the dominant factor, followed
+by a colon, followed by one sentence of detail. Examples of good tags:
+  signal_strengthening, pullback_to_support, news_catalyst_confirms, rally_continuation,
+  confluence_emerging, thesis_intact, signal_drift, regime_flip, thesis_broken,
+  earnings_risk, stop_protection. You pick the tag — it doesn't have to come from this list.
+
+Omit TRIM_PCT for HOLD, EXIT, and ADD actions. Do NOT output ADD_NOTIONAL — the code sizes
+the add itself.
 
 RULES:
 - Every position in the input must get an output entry.
-- HOLD is the correct answer when the thesis is intact. Do not manufacture action.
 - Be decisive. Vague answers ("maybe trim", "consider exiting") are not allowed.
-- Do not recommend new symbols or comment on market conditions generally."""
+- Do not recommend new symbols or comment on market conditions generally.
+- Trust the data block. If the entry thesis, per-dimension deltas, and regime all agree
+  that something should happen, act. If they disagree, default to HOLD."""
 
 
 # ══════════════════════════════════════════════════════════════
@@ -153,8 +159,11 @@ def run_portfolio_review(
     regime_name = regime.get("regime", "UNKNOWN")
     vix = regime.get("vix", 0)
 
-    # Build score lookup from all_scored
+    # Build score lookup from all_scored. Each scored row carries a composite score
+    # and a per-dimension score_breakdown (signals.py:2473). We keep both so the
+    # prompt can show Opus the composite delta AND the per-dimension evolution.
     score_map = {s["symbol"]: s.get("score", 0) for s in (all_scored or [])}
+    breakdown_map = {s["symbol"]: (s.get("score_breakdown") or {}) for s in (all_scored or [])}
 
     # Check earnings (stocks only — options and FX have no earnings events)
     stock_syms = [p["symbol"] for p in open_positions if p.get("instrument") not in ("option", "fx")]
@@ -211,17 +220,64 @@ def run_portfolio_review(
 
         trade_type = p.get("trade_type", "SCALP")
         conviction = p.get("conviction", 0.0)
+        setup_type = p.get("setup_type", "")
+        pattern_id = p.get("pattern_id", "")
+        entry_thesis = (p.get("entry_thesis") or "").strip()
 
         notional = current_price * qty
         pos_pct = (notional / portfolio_value * 100) if portfolio_value > 0 else 0
 
+        # Per-dimension score evolution (entry signal_scores → current score_breakdown),
+        # with IC weights at entry annotating which dimensions were load-bearing. This
+        # is the decision surface for ADD/TRIM/EXIT — Opus can see WHERE conviction is
+        # rising or collapsing, not just the composite delta.
+        entry_dim = p.get("signal_scores") or {}
+        current_dim = breakdown_map.get(sym) or {}
+        ic_weights = p.get("ic_weights_at_entry") or {}
+        dim_lines = []
+        if entry_dim or current_dim:
+            all_dims = sorted(set(entry_dim.keys()) | set(current_dim.keys()))
+            for dim in all_dims:
+                try:
+                    e_val = float(entry_dim.get(dim, 0) or 0)
+                    c_val = float(current_dim.get(dim, 0) or 0) if current_dim else None
+                except (TypeError, ValueError):
+                    continue
+                if c_val is None:
+                    # Not rescored this cycle — show entry only
+                    dim_lines.append(f"    {dim:<18} {e_val:5.1f} → unscored")
+                else:
+                    delta = c_val - e_val
+                    w = ic_weights.get(dim)
+                    w_tag = ""
+                    try:
+                        if w is not None and float(w) > 0:
+                            w_tag = f"  [load-bearing w={float(w):.2f}]"
+                    except (TypeError, ValueError):
+                        pass
+                    dim_lines.append(
+                        f"    {dim:<18} {e_val:5.1f} → {c_val:5.1f} ({delta:+5.1f}){w_tag}"
+                    )
+
+        setup_bits = []
+        if setup_type:
+            setup_bits.append(f"setup={setup_type}")
+        if pattern_id:
+            setup_bits.append(f"pattern={pattern_id}")
+        setup_line = ("  " + "  ".join(setup_bits)) if setup_bits else ""
+
+        thesis_line = f"\n  THESIS: {entry_thesis}" if entry_thesis else ""
+        dim_block = ("\n  DIMENSION EVOLUTION (entry → current):\n" + "\n".join(dim_lines)) if dim_lines else ""
+
         pos_lines.append(
-            f"POSITION: {sym} ({instrument}) {direction}  trade_type={trade_type}  conviction={conviction:.2f}\n"
+            f"POSITION: {sym} ({instrument}) {direction}  trade_type={trade_type}  conviction={conviction:.2f}{setup_line}\n"
             f"  entry=${entry_price:.2f} current=${current_price:.2f} "
             f"qty={qty} notional=${notional:,.0f} position_pct={pos_pct:.1f}% pnl={pnl_pct:+.1f}%\n"
             f"  {score_line}\n"
             f"  entry_regime={entry_regime} current_regime={regime_name}\n"
             f"  days_held={days_held}"
+            + thesis_line
+            + dim_block
             + (f"\n{news_str}" if news_str else "")
             + (f"\n{earnings_str}" if earnings_str else "")
         )
@@ -233,7 +289,9 @@ PORTFOLIO VALUE: ${portfolio_value:,.2f} | AVAILABLE CASH: ${available_cash:,.0f
 OPEN POSITIONS ({len(open_positions)}):
 {chr(10).join(pos_lines)}
 
-Review each position and output SYMBOL / ACTION / TRIM_PCT (if TRIM) / ADD_NOTIONAL (if ADD) / REASON for every one."""
+Review each position and output SYMBOL / ACTION / TRIM_PCT (if TRIM) / REASON for every one.
+Do NOT output ADD_NOTIONAL — if ACTION is ADD, the code sizes it using the same risk function
+that sized the original entry. Your job is the verb and the reasoning tag, not the dollar amount."""
 
     try:
         client = _get_client()
@@ -447,14 +505,10 @@ def _parse_actions(text: str, open_positions: list) -> list:
                     entry["trim_pct"] = 50  # safe default
                     log.warning(f"portfolio_manager: {sym} TRIM missing TRIM_PCT — defaulting 50%")
 
-            # ADD_NOTIONAL — dollar amount to add
-            if action == "ADD":
-                add_m = re.search(r"ADD_NOTIONAL:\s*\$?([\d,]+(?:\.\d+)?)", block)
-                if add_m:
-                    entry["add_notional"] = float(add_m.group(1).replace(",", ""))
-                else:
-                    entry["add_notional"] = 0.0
-                    log.warning(f"portfolio_manager: {sym} ADD missing ADD_NOTIONAL — will skip execution")
+            # ADD sizing is no longer Opus's responsibility — the bot sizes ADDs
+            # deterministically via calculate_position_size() using the current signal
+            # score, same risk function that sized the original entry. See
+            # bot_trading.py ADD handler. Opus only decides the verb and the reason.
 
             results[sym] = entry
         elif sym_m:

@@ -56,6 +56,7 @@ from orders_portfolio import (
 )
 from portfolio_manager import lightweight_cycle_check, run_portfolio_review
 from risk import (
+    calculate_position_size,
     check_risk_conditions,
     check_thesis_validity,
     get_consecutive_losses,
@@ -1187,6 +1188,20 @@ def run_scan():
         dash["sector_bias"] = _get_sbias()
     except Exception:
         pass
+
+    # Capture per-layer universe composition BEFORE merges for coverage telemetry.
+    # Used below at the pipeline-summary log and written to universe_coverage.jsonl.
+    try:
+        from scanner import CORE_EQUITIES as _CORE_EQ
+        from scanner import CORE_SYMBOLS as _CORE_SYM
+
+        _universe_pre_merge = set(universe)
+        _cov_core = len(set(_CORE_SYM) & _universe_pre_merge)
+        _cov_equities = len(set(_CORE_EQ) & _universe_pre_merge)
+        _cov_tv = max(0, len(_universe_pre_merge) - _cov_core - _cov_equities)
+    except Exception:
+        _cov_core = _cov_equities = _cov_tv = -1
+
     favs = dash.get("favourites", [])
     if favs:
         before = len(universe)
@@ -1207,6 +1222,9 @@ def run_scan():
             clog("INFO", f"Held positions pinned into pipeline universe: {new_held}")
     # Merge held symbols into the protected set so _apply_tv_prefilter never drops them
     pipeline_favs = list(set(favs + held_syms))
+
+    _cov_favs = len(favs)
+    _cov_held = len(held_syms)
 
     # Refresh Alpaca stream subscriptions to match the finalised universe.
     # update_symbols() is a no-op if the symbol list hasn't changed.
@@ -1244,7 +1262,37 @@ def run_scan():
     except Exception as _skew_err:
         log.debug(f"Skew update skipped: {_skew_err}")
 
-    clog("SCAN", f"Pipeline: {len(universe)} symbols → {len(scored)} scored → {len(signals)} signals [{regime_name}]")
+    clog(
+        "SCAN",
+        f"Pipeline: core={_cov_core} equities={_cov_equities} tv={_cov_tv} "
+        f"favs={_cov_favs} held={_cov_held} → universe={len(universe)} "
+        f"→ scored={len(scored)} → signals={len(signals)} [{regime_name}]",
+    )
+    # Coverage audit log — per-cycle layer breakdown for universe health monitoring.
+    # If `core + equities` drops below ~45 on any cycle, the floor is broken.
+    try:
+        import json as _json
+        from datetime import UTC as _UTC
+        from datetime import datetime as _dt
+
+        _cov_path = "data/universe_coverage.jsonl"
+        _cov_record = {
+            "ts": _dt.now(_UTC).isoformat(),
+            "regime": regime_name,
+            "core": _cov_core,
+            "equities": _cov_equities,
+            "tv": _cov_tv,
+            "favs": _cov_favs,
+            "held": _cov_held,
+            "universe": len(universe),
+            "scored": len(scored),
+            "signals": len(signals),
+        }
+        with open(_cov_path, "a") as _cov_f:
+            _cov_f.write(_json.dumps(_cov_record) + "\n")
+    except Exception as _cov_err:
+        log.debug(f"Universe coverage log skipped: {_cov_err}")
+
     _print_score_table(scored)
 
     update_position_prices(pipeline.scored)
@@ -1548,39 +1596,105 @@ def run_scan():
                                     },
                                 )
                 elif act_pm == "ADD" and sym_pm:
+                    # PM ADD path — Opus decides the verb, code decides the size.
+                    # Sizing flows through calculate_position_size() on the current
+                    # signal score (not entry score) — weaker signal now = smaller add.
+                    # Every hardcoded risk gate that entries respect applies here too:
+                    # daily loss limit, drawdown CB, min cash reserve, market hours,
+                    # PDT rule, CAPITULATION regime, single-position cap, earnings 48h.
                     from orders_core import execute_add_to_position as _execute_add
 
                     pos_pm = next((p for p in open_pos if p["symbol"] == sym_pm), None)
                     if not pos_pm:
                         clog("WARN", f"PM ADD: no active position found for {sym_pm} — skipping")
                     else:
-                        _add_notional = action.get("add_notional", 0.0)
-                        if _add_notional <= 0:
-                            clog("WARN", f"PM ADD: {sym_pm} — Opus did not specify ADD_NOTIONAL, skipping")
+                        _add_price = pos_pm.get("current", 0)
+                        if _add_price <= 0:
+                            clog("WARN", f"PM ADD: {sym_pm} — invalid current price, skipping")
                         else:
-                            _add_price = pos_pm.get("current", 0)
-                            if _add_price <= 0:
-                                clog("WARN", f"PM ADD: {sym_pm} — invalid current price, skipping")
+                            # Gate 1: same portfolio-level risk checks as entries.
+                            _risk_ok, _risk_reason = check_risk_conditions(
+                                pv, pnl, regime, open_pos, ib=ib
+                            )
+                            if not _risk_ok:
+                                clog("WARN", f"PM ADD: {sym_pm} blocked — {_risk_reason}")
                             else:
-                                _add_qty = max(1, int(_add_notional / _add_price))
-                                clog(
-                                    "TRADE",
-                                    f"Portfolio manager ADD: {sym_pm} +{_add_qty} shares "
-                                    f"(~${_add_notional:,.0f} @ ${_add_price:.2f}) — {reason_pm}",
+                                # Gate 2: earnings within lookahead window — no ADD
+                                # into a binary event, even if Opus asked for it.
+                                from earnings_calendar import (
+                                    get_earnings_within_hours as _gew_add,
                                 )
-                                _added = _execute_add(
-                                    ib=ib,
-                                    symbol=sym_pm,
-                                    add_qty=_add_qty,
-                                    current_price=_add_price,
-                                    regime=regime,
-                                    reason=f"portfolio_manager_add:{pm_trigger}",
+
+                                _pm_cfg = CONFIG.get("portfolio_manager", {})
+                                _earnings_lookahead = _pm_cfg.get("earnings_lookahead_hours", 48)
+                                _earnings_flagged = (
+                                    _gew_add([sym_pm], _earnings_lookahead)
+                                    if pos_pm.get("instrument") not in ("option", "fx")
+                                    else set()
                                 )
-                                # A successful ADD represents a fresh conviction re-entry.
-                                # Clear the trim-once guard so Opus can TRIM again if the
-                                # signal later collapses after the add.
-                                if _added:
-                                    _trimmed_today.discard(sym_pm)
+                                if sym_pm in _earnings_flagged:
+                                    clog(
+                                        "WARN",
+                                        f"PM ADD: {sym_pm} blocked — earnings within "
+                                        f"{_earnings_lookahead}h; do not add into binary event",
+                                    )
+                                else:
+                                    # Size deterministically — current score, current ATR.
+                                    _score_map_pm = {
+                                        s["symbol"]: s.get("score", 0)
+                                        for s in (pipeline.all_scored or [])
+                                    }
+                                    _current_score = int(
+                                        _score_map_pm.get(sym_pm, pos_pm.get("entry_score", 0) or 0)
+                                    )
+                                    _current_atr = float(pos_pm.get("atr", 0) or 0)
+                                    _add_qty = calculate_position_size(
+                                        pv, _add_price, _current_score, regime, atr=_current_atr
+                                    )
+                                    # Single-position cap clamp: existing_qty + add_qty
+                                    # must not push total exposure beyond max_single_position.
+                                    # If no headroom, downgrade to HOLD (logged).
+                                    _max_pos_frac = CONFIG.get("max_single_position", 0.10)
+                                    _max_single_notional = pv * _max_pos_frac
+                                    _existing_notional = pos_pm.get("qty", 0) * _add_price
+                                    _headroom = max(0.0, _max_single_notional - _existing_notional)
+                                    _max_add_qty = int(_headroom / _add_price) if _add_price > 0 else 0
+                                    if _max_add_qty <= 0:
+                                        clog(
+                                            "INFO",
+                                            f"PM ADD: {sym_pm} — single-position cap "
+                                            f"({_max_pos_frac * 100:.0f}%) already met "
+                                            f"(existing=${_existing_notional:,.0f}); "
+                                            "downgrading to HOLD",
+                                        )
+                                    else:
+                                        if _add_qty > _max_add_qty:
+                                            clog(
+                                                "INFO",
+                                                f"PM ADD: {sym_pm} — sized {_add_qty} clamped "
+                                                f"to {_max_add_qty} by single-position cap",
+                                            )
+                                            _add_qty = _max_add_qty
+                                        _add_notional_final = _add_qty * _add_price
+                                        clog(
+                                            "TRADE",
+                                            f"Portfolio manager ADD: {sym_pm} +{_add_qty} shares "
+                                            f"(~${_add_notional_final:,.0f} @ ${_add_price:.2f}, "
+                                            f"score={_current_score}) — {reason_pm}",
+                                        )
+                                        _added = _execute_add(
+                                            ib=ib,
+                                            symbol=sym_pm,
+                                            add_qty=_add_qty,
+                                            current_price=_add_price,
+                                            regime=regime,
+                                            reason=f"portfolio_manager_add:{pm_trigger}",
+                                        )
+                                        # A successful ADD represents a fresh conviction
+                                        # re-entry.  Clear the trim-once guard so Opus can
+                                        # TRIM again if the signal later collapses.
+                                        if _added:
+                                            _trimmed_today.discard(sym_pm)
                 else:
                     clog("INFO", f"Portfolio manager HOLD: {sym_pm} — {reason_pm}")
             # Log all actions to audit log

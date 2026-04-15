@@ -6,6 +6,30 @@
 
 ---
 
+## 2026-04-15 — PM ADD: Data-Driven, Not Rule-Driven; Code Sizes, Opus Decides
+
+**Decision**: The Portfolio Manager's ADD verb is now fully data-driven — Opus decides **whether** to ADD based on a rich position block (entry thesis, per-dimension entry→current deltas with IC-weight annotations on load-bearing dims, setup type, pattern, regime, news, earnings). The **size** is computed in code via `calculate_position_size()` — the same function that sized the original entry — using the current signal score (not the entry score) and the current ATR. Opus no longer emits `ADD_NOTIONAL`.
+
+**Why the split**:
+- *Opus decides the verb*, because synthesizing across 13 dimensions + thesis text + regime + catalysts is the kind of judgment LLMs do well and hardcoded rules do poorly. Giving Opus more data and fewer rules is more faithful to the "9 orthogonal dimensions, synthesize" architecture than telling it "ADD when dim X +5 AND dim Y crossed threshold."
+- *Code decides the size*, because sizing is a risk contract — not a judgment call. Entries flow through `calculate_position_size()` with Kelly/VIX/drawdown scalars, ATR vol cap, single-position cap, and the 20% hard cap. ADDs previously bypassed all of that and ran on Opus's dollar amount, which could violate `max_single_position` silently. That was strictly less safe than entry; now they match.
+
+**Safety floors (hardcoded, applied before ADD execution)**:
+1. `check_risk_conditions()` — daily loss limit, drawdown CB, cash reserve, market hours, PDT rule, CAPITULATION regime
+2. `get_earnings_within_hours(48)` — no ADD into a binary event
+3. Single-position cap clamp — if existing notional + add_qty would exceed `max_single_position`, clamp add_qty to the headroom; if headroom ≤ 0, downgrade to HOLD (logged)
+4. Only LONG stocks — options / FX / SHORT not supported by `execute_add_to_position` (unchanged)
+
+**DCA into pullbacks**: explicitly allowed when the thesis is intact and core signal dimensions have not collapsed. The distinction between "legitimate DCA on pullback" and "averaging down into a broken thesis" is made by Opus reading the data block (per-dimension deltas + thesis text), NOT by a prompt rule.
+
+**REASON tag convention**: Opus leads its one-line REASON with a snake_case tag (e.g., `signal_strengthening`, `pullback_to_support`, `news_catalyst_confirms`, `rally_continuation`, `thesis_intact`). Post-hoc we can cluster ADDs by tag and measure which trigger types are alpha-positive, without requiring a separate `triggered_rule` field.
+
+**What was already built and just needed wiring**: ADD vocabulary in the prompt, parser, routing in `bot_trading.py`, and `execute_add_to_position()` in `orders_core.py` were all already in place. This session expanded the data surface Opus sees, removed `ADD_NOTIONAL` as Opus's decision, and routed ADD through the same risk/sizing stack as entries.
+
+**Files touched**: `portfolio_manager.py` (prompt + render + parser), `bot_trading.py` (ADD handler + import).
+
+---
+
 ## 2026-04-01 — Action #9: Regime Approach Decision
 
 ### VIX-Proxy Locked as Sole Regime Detector
