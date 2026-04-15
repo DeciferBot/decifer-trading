@@ -38,6 +38,7 @@ WATCHED_MODULES: dict = {
     "news_sentinel": "news_sentinel",
     "theme_tracker": "theme_tracker",
     "sentinel_agents": "sentinel_agents",
+    "bot_dashboard": "bot_dashboard",
 }
 
 _file_hashes: dict = {}

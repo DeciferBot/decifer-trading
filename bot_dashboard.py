@@ -34,6 +34,9 @@ from datetime import UTC
 _news_payload_cache: dict = {"data": None, "fetched_at": 0.0}
 _NEWS_CACHE_TTL = 60  # seconds
 
+_catalyst_payload_cache: dict = {"data": None, "fetched_at": 0.0}
+_CATALYST_CACHE_TTL = 30  # seconds
+
 # ── Macro event classifier cache ──────────────────────────────────────────────
 _macro_cache: dict = {}  # headline_hash → list of macro classifications
 
@@ -72,11 +75,18 @@ def _fetch_alpaca_news() -> list[dict]:
                 continue
 
             # Pick best image: large > small > thumb
-            # Skip Benzinga branding/logo images — they are not article-specific content
+            # Skip Benzinga branding/logo images — they are not article-specific content.
+            # BZ serves generic images via /sites/all/ or /sites/default/ paths (imagecache CDN).
+            # Article-specific photos live under /files/images/story/ — those are kept.
             _BZ_SKIP = (
-                "/sites/default/",
+                "/sites/",           # catches /sites/all/ AND /sites/default/ BZ CDN paths
+                "/imagecache/",      # Benzinga's resized-image CDN; never an original article photo
                 "benzinga-logo",
+                "benzinga_logo",
                 "bz-logo",
+                "bz_logo",
+                "bz-icon",
+                "bz_icon",
                 "/logo.",
                 "/logos/",
                 "default_image",
@@ -226,6 +236,52 @@ def _enrich_macro_events(articles: list) -> None:
                 "macro_implication": item.get("implication", ""),
             }
         )
+
+
+def _get_catalyst_payload() -> dict:
+    """
+    Build the /api/catalyst payload from chief-decifer/state/internal/catalyst/.
+    Reads the most recent candidates file + edgar_events.json.
+    Cached for 30 seconds.
+    """
+    import time as _time_mod
+
+    now = _time_mod.time()
+    if _catalyst_payload_cache["data"] and now - _catalyst_payload_cache["fetched_at"] < _CATALYST_CACHE_TTL:
+        return _catalyst_payload_cache["data"]
+
+    from config import CATALYST_DIR
+
+    candidates: list = []
+    date_str: str = ""
+    edgar_events: list = []
+
+    if CATALYST_DIR.exists():
+        files = sorted(CATALYST_DIR.glob("candidates_*.json"), reverse=True)
+        if files:
+            try:
+                raw = json.loads(files[0].read_text())
+                candidates = raw.get("candidates", [])
+                date_str = raw.get("date", files[0].stem.replace("candidates_", ""))
+            except Exception:
+                pass
+
+        edgar_file = CATALYST_DIR / "edgar_events.json"
+        if edgar_file.exists():
+            try:
+                edgar_events = json.loads(edgar_file.read_text())
+            except Exception:
+                pass
+
+    payload = {
+        "candidates": sorted(candidates, key=lambda c: c.get("catalyst_score", 0), reverse=True)[:15],
+        "edgar_events": edgar_events[:40],
+        "date_str": date_str,
+        "total_candidates": len(candidates),
+    }
+    _catalyst_payload_cache["data"] = payload
+    _catalyst_payload_cache["fetched_at"] = now
+    return payload
 
 
 def _get_news_payload() -> dict:
@@ -769,6 +825,17 @@ class DashHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 log.warning("news API error: %s", exc)
                 payload = {"articles": [], "sentinel_triggers": [], "catalyst_triggers": [], "error": str(exc)}
+            self.wfile.write(json.dumps(payload, default=str).encode())
+        elif self.path == "/api/catalyst":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                payload = _get_catalyst_payload()
+            except Exception as exc:
+                log.warning("catalyst API error: %s", exc)
+                payload = {"candidates": [], "edgar_events": [], "date_str": "", "total_candidates": 0, "error": str(exc)}
             self.wfile.write(json.dumps(payload, default=str).encode())
         elif self.path == "/api/alpha-gate":
             self.send_response(200)
