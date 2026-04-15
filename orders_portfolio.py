@@ -966,26 +966,41 @@ def update_positions_from_ibkr(ib: IB):
         # FX positions are ONLY protected by _positions_keys (they rarely appear
         # in ib.portfolio()).  If the fallback failed, never purge FX — we'd be
         # deleting a live position just because the callback hasn't arrived.
-        stale_keys = []
-        with _trades_lock:
-            for k in active_trades:
-                if k in price_map or k in _positions_keys:
-                    continue
-                if active_trades[k].get("status") == "PENDING":
-                    continue
-                # FX positions are unreliable in IBKR callbacks — they can
-                # temporarily vanish from both portfolio() and positions() due
-                # to reqAccountUpdates timing.  Never auto-purge FX; require
-                # manual close or an explicit close_position() call.
-                if active_trades[k].get("instrument") == "fx":
-                    log.debug(f"Keeping FX position {k} — FX exempt from stale-position purge")
-                    continue
-                stale_keys.append(k)
-            for k in stale_keys:
-                log.warning(f"Position {k} no longer in IBKR portfolio — removing from tracker")
-                del active_trades[k]
-        if stale_keys:
-            _save_positions_file()
+        #
+        # SAFETY GATE: if IBKR returned no data at all (price_map empty AND
+        # _positions_keys empty), it is far more likely that the API call
+        # returned stale/empty than that every position was simultaneously
+        # closed.  Skip the purge entirely to prevent wiping positions.json.
+        _active_non_pending = sum(
+            1 for v in active_trades.values()
+            if v.get("status") not in ("PENDING", "RESERVED") and v.get("instrument") != "fx"
+        )
+        if _active_non_pending > 0 and not price_map and not _positions_keys:
+            log.warning(
+                f"IBKR returned empty portfolio AND empty positions — skipping stale purge "
+                f"to protect {_active_non_pending} tracked position(s) from false deletion"
+            )
+        else:
+            stale_keys = []
+            with _trades_lock:
+                for k in active_trades:
+                    if k in price_map or k in _positions_keys:
+                        continue
+                    if active_trades[k].get("status") == "PENDING":
+                        continue
+                    # FX positions are unreliable in IBKR callbacks — they can
+                    # temporarily vanish from both portfolio() and positions() due
+                    # to reqAccountUpdates timing.  Never auto-purge FX; require
+                    # manual close or an explicit close_position() call.
+                    if active_trades[k].get("instrument") == "fx":
+                        log.debug(f"Keeping FX position {k} — FX exempt from stale-position purge")
+                        continue
+                    stale_keys.append(k)
+                for k in stale_keys:
+                    log.warning(f"Position {k} no longer in IBKR portfolio — removing from tracker")
+                    del active_trades[k]
+            if stale_keys:
+                _save_positions_file()
 
         # ── Orphaned PENDING detection ────────────────────────────────────────
         # A PENDING entry with no active FillWatcher and past orphan_timeout_mins

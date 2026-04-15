@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
+import threading
 from datetime import UTC, datetime, timedelta
 
 import anthropic
@@ -22,6 +24,7 @@ ORDER_LOG_FILE = CONFIG.get("order_log", "data/orders.json")
 SIGNALS_LOG_FILE = CONFIG.get("signals_log", "data/signals_log.jsonl")
 AUDIT_LOG_FILE = CONFIG.get("audit_log", "data/audit_log.jsonl")
 CAPITAL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "capital_base.json")
+_capital_lock = threading.Lock()
 
 # Rotate signals_log.jsonl once it exceeds this size to prevent the file growing forever.
 # Archived files are named  data/signals_log_archive_YYYYMMDD_HHMMSS.jsonl  and kept
@@ -71,12 +74,24 @@ def get_effective_capital() -> float:
 
 
 def record_capital_adjustment(amount: float, note: str = ""):
-    """Record a deposit (+) or withdrawal (-) adjustment."""
-    data = load_capital_base()
-    data["adjustments"].append({"amount": amount, "note": note, "timestamp": datetime.now().isoformat()})
-    os.makedirs(os.path.dirname(CAPITAL_FILE) or ".", exist_ok=True)
-    with open(CAPITAL_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+    """Record a deposit (+) or withdrawal (-) adjustment. Atomic write + locked."""
+    with _capital_lock:
+        data = load_capital_base()
+        data["adjustments"].append({"amount": amount, "note": note, "timestamp": datetime.now().isoformat()})
+        dir_path = os.path.dirname(CAPITAL_FILE) or "."
+        os.makedirs(dir_path, exist_ok=True)
+        try:
+            with tempfile.NamedTemporaryFile("w", dir=dir_path, delete=False, suffix=".tmp") as f:
+                json.dump(data, f, indent=2)
+                tmp_path = f.name
+            os.replace(tmp_path, CAPITAL_FILE)
+        except Exception as e:
+            log.error(f"record_capital_adjustment: failed to write {CAPITAL_FILE}: {e}")
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+            return
     log.info(f"Capital adjustment: ${amount:+,.2f} ({note}). New base: ${get_effective_capital():,.2f}")
 
 

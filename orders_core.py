@@ -501,6 +501,11 @@ def execute_buy(
                         }
                     _save_positions_file()
                     try:
+                        from trade_store import ledger_write as _ledger_write
+                        _ledger_write(symbol, active_trades.get(symbol, {}))
+                    except Exception as _lw_err:
+                        log.error(f"execute_buy {symbol}: ledger_write failed: {_lw_err}")
+                    try:
                         from learning import log_trade as _log_trade
 
                         _log_trade(
@@ -796,6 +801,11 @@ def execute_buy(
                     "t2_sl_order_id": None,  # set by update_tranche_status after T1 fills
                 }
             _save_positions_file()
+            try:
+                from trade_store import ledger_write as _ledger_write
+                _ledger_write(symbol, active_trades.get(symbol, {}))
+            except Exception as _lw_err:
+                log.error(f"execute_buy {symbol}: ledger_write failed: {_lw_err}")
             # Log OPEN record to trades.json for feedback loop
             from learning import log_trade
 
@@ -1201,6 +1211,11 @@ def execute_short(
                     "tranche_mode": False,
                 }
             _save_positions_file()
+            try:
+                from trade_store import ledger_write as _ledger_write
+                _ledger_write(symbol, active_trades.get(symbol, {}))
+            except Exception as _lw_err:
+                log.error(f"execute_short {symbol}: ledger_write failed: {_lw_err}")
             from learning import log_trade
 
             log_trade(

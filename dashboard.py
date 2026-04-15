@@ -2012,9 +2012,9 @@ function renderPositions(positions) {
   lastPositions = positions;
 
   // Skip full DOM rebuild when only live prices changed — fetchPrices() handles those.
-  // Fingerprint covers structural fields only (symbol, qty, entry, status, SL, TP, tranche).
+  // Fingerprint covers structural fields only (symbol, qty, entry, status, SL, TP, tranche, trade_type).
   const fingerprint = positions.map(p =>
-    `${p.symbol}|${p.qty}|${p.direction}|${p.entry}|${p.status}|${p.sl}|${p.tp}|${p.tranche_mode}|${p.t1_status}`
+    `${p.symbol}|${p.qty}|${p.direction}|${p.entry}|${p.status}|${p.sl}|${p.tp}|${p.tranche_mode}|${p.t1_status}|${p.trade_type}`
   ).join(',') + '|sort:' + posSort;
   if (fingerprint === _lastPositionsFingerprint) return;
   _lastPositionsFingerprint = fingerprint;

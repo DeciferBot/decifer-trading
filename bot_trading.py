@@ -2119,7 +2119,13 @@ def run_scan():
                             contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
                             if contract_info:
                                 opt_success = execute_buy_option(
-                                    ib, contract_info, pv, reasoning=reason, score=sig["score"]
+                                    ib,
+                                    contract_info,
+                                    pv,
+                                    reasoning=reason,
+                                    score=sig["score"],
+                                    trade_type=buy.get("trade_type", "SCALP"),
+                                    conviction=float(buy.get("conviction", 0.0)),
                                 )
                                 if opt_success:
                                     dash["trades"].insert(

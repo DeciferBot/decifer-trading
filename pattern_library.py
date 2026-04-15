@@ -28,7 +28,9 @@ from __future__ import annotations
 import json
 import logging
 import math
+import os
 import re
+import tempfile
 import threading
 import uuid
 from datetime import UTC, datetime
@@ -148,7 +150,18 @@ def _save(data: dict) -> None:
         )
         data = {**with_outcome, **keep_pending}
         log.debug(f"pattern_library: trimmed to {len(data)} entries ({len(with_outcome)} with outcomes)")
-    LIBRARY_PATH.write_text(json.dumps(data, indent=2))
+    try:
+        dir_path = str(LIBRARY_PATH.parent)
+        with tempfile.NamedTemporaryFile("w", dir=dir_path, delete=False, suffix=".tmp") as f:
+            json.dump(data, f, indent=2)
+            tmp_path = f.name
+        os.replace(tmp_path, str(LIBRARY_PATH))
+    except Exception as e:
+        log.error(f"pattern_library: failed to save: {e}")
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
