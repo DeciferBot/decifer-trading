@@ -39,8 +39,6 @@ from options_scanner import scan_options_universe
 from orders_core import execute_buy, execute_sell, execute_short
 from orders_options import (
     _get_open_option_position,
-    _options_attempted_today,
-    _record_options_attempt,
     ask_opus_add_to_option,
     execute_add_to_option,
     execute_buy_option,
@@ -783,8 +781,6 @@ def _maybe_eod_options_review(regime: dict):
     # Reset each morning before the session opens
     if t < dtime(9, 30):
         _eod_options_review_done = False
-        # Ledger auto-expires by date — no explicit clear needed.
-        # Pruning of stale entries happens inside _record_options_attempt.
         global \
             _portfolio_review_done_today, \
             _session_stop_count, \
@@ -2058,63 +2054,54 @@ def run_scan():
                     )
                 else:
                     direction = _sig_dir
-                    if _options_attempted_today(sym, direction):
-                        # Already attempted today — check if there's an open position Opus can add to.
-                        _open_pos = _get_open_option_position(sym)
-                        if _open_pos:
-                            _opt_key, _pos_dict = _open_pos
-                            clog("INFO", f"Open option position for {sym} — asking Opus whether to add")
-                            _add_decision = ask_opus_add_to_option(
-                                symbol=sym,
-                                position=_pos_dict,
-                                signal_score=sig["score"],
-                                signal_breakdown=sig.get("score_breakdown", {}),
-                                direction=direction,
-                                regime=regime.get("regime", "UNKNOWN"),
-                            )
-                            if _add_decision["action"] == "ADD":
-                                try:
-                                    contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
-                                    if contract_info:
-                                        _add_ok = execute_add_to_option(
-                                            ib=ib,
-                                            opt_key=_opt_key,
-                                            contract_info=contract_info,
-                                            add_contracts=_add_decision["contracts"],
-                                            reasoning=_add_decision["reasoning"],
-                                            score=sig["score"],
+                    _open_pos = _get_open_option_position(sym)
+                    if _open_pos:
+                        _opt_key, _pos_dict = _open_pos
+                        clog("INFO", f"Open option position for {sym} — asking Opus whether to add")
+                        _add_decision = ask_opus_add_to_option(
+                            symbol=sym,
+                            position=_pos_dict,
+                            signal_score=sig["score"],
+                            signal_breakdown=sig.get("score_breakdown", {}),
+                            direction=direction,
+                            regime=regime.get("regime", "UNKNOWN"),
+                        )
+                        if _add_decision["action"] == "ADD":
+                            try:
+                                contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
+                                if contract_info:
+                                    _add_ok = execute_add_to_option(
+                                        ib=ib,
+                                        opt_key=_opt_key,
+                                        contract_info=contract_info,
+                                        add_contracts=_add_decision["contracts"],
+                                        reasoning=_add_decision["reasoning"],
+                                        score=sig["score"],
+                                    )
+                                    if _add_ok:
+                                        dash["trades"].insert(
+                                            0,
+                                            {
+                                                "side": f"ADD {contract_info['right']} OPT",
+                                                "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
+                                                "price": str(contract_info["mid"]),
+                                                "time": datetime.now(_ET).strftime("%H:%M:%S"),
+                                            },
                                         )
-                                        if _add_ok:
-                                            dash["trades"].insert(
-                                                0,
-                                                {
-                                                    "side": f"ADD {contract_info['right']} OPT",
-                                                    "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
-                                                    "price": str(contract_info["mid"]),
-                                                    "time": datetime.now(_ET).strftime("%H:%M:%S"),
-                                                },
-                                            )
-                                            clog("TRADE", f"Added {_add_decision['contracts']} contracts to {sym} options position")
-                                            _executed_any_buy = True
-                                        else:
-                                            clog("WARN", f"Add-to-option order rejected for {sym} — check logs for IBKR reason")
+                                        clog("TRADE", f"Added {_add_decision['contracts']} contracts to {sym} options position")
+                                        _executed_any_buy = True
                                     else:
-                                        clog("INFO", f"Opus said ADD for {sym} but no contract available now")
-                                except Exception as _add_err:
-                                    clog("ERROR", f"Add-to-option failed for {sym}: {_add_err}")
-                            elif _add_decision.get("_opus_failed"):
-                                clog("WARN", f"Opus add-to-option call failed for {sym} — defaulting to HOLD ({_add_decision['reasoning']})")
-                            else:
-                                clog("INFO", f"Opus HOLD on {sym} add — {_add_decision['reasoning'][:100]}")
+                                        clog("WARN", f"Add-to-option order rejected for {sym} — check logs for IBKR reason")
+                                else:
+                                    clog("INFO", f"Opus said ADD for {sym} but no contract available now")
+                            except Exception as _add_err:
+                                clog("ERROR", f"Add-to-option failed for {sym}: {_add_err}")
+                        elif _add_decision.get("_opus_failed"):
+                            clog("WARN", f"Opus add-to-option call failed for {sym} — defaulting to HOLD ({_add_decision['reasoning']})")
                         else:
-                            clog("INFO", f"Options attempt already recorded for {sym} {direction} today — skipping (duplicate order guard)")
+                            clog("INFO", f"Opus HOLD on {sym} add — {_add_decision['reasoning'][:100]}")
                     else:
                         clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
-                        # Record before evaluation so any failure reason (no data, no chain,
-                        # IVR too high) blocks retries for the rest of the day. Conditions
-                        # that cause find_best_contract to return None are stable intraday
-                        # and retrying every cycle wastes API calls and agent time.
-                        _record_options_attempt(sym, direction)
                         try:
                             contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
                             if contract_info:
