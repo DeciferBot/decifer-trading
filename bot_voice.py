@@ -8,6 +8,7 @@ STT: handled by the browser (Web Speech API); only text arrives here.
 from __future__ import annotations
 
 import logging
+import queue
 import subprocess
 import threading
 
@@ -15,6 +16,29 @@ log = logging.getLogger("decifer.voice")
 
 _VOICE_RATE = 180
 _VOICE_NAME = "Daniel"
+
+# Single-worker speech queue — serializes all TTS calls so alerts never overlap.
+# Max 8 items: if the queue is full, new alerts are silently dropped to avoid
+# a multi-minute backlog after a burst of simultaneous trade events.
+_speech_queue: queue.Queue[str] = queue.Queue(maxsize=8)
+
+
+def _speech_worker() -> None:
+    while True:
+        text = _speech_queue.get()
+        try:
+            subprocess.run(
+                ["say", "-v", _VOICE_NAME, "-r", str(_VOICE_RATE), text],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception as e:
+            log.warning("Voice TTS error: %s", e)
+        finally:
+            _speech_queue.task_done()
+
+
+threading.Thread(target=_speech_worker, daemon=True, name="voice-worker").start()
 
 # Human-readable labels for internal codes
 _REGIME_LABELS = {
@@ -56,17 +80,13 @@ def _clean(text: str) -> str:
 
 
 def speak(msg: str) -> None:
-    """Non-blocking TTS. Fires and forgets — never blocks the trading loop."""
+    """Non-blocking TTS. Enqueues text for the single speech worker — never blocks the trading loop."""
     if not msg:
         return
     try:
-        subprocess.Popen(
-            ["say", "-v", _VOICE_NAME, "-r", str(_VOICE_RATE), _clean(msg)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    except Exception as e:
-        log.warning("Voice TTS error: %s", e)
+        _speech_queue.put_nowait(_clean(msg))
+    except queue.Full:
+        log.debug("Voice queue full — dropping alert: %.60s…", msg)
 
 
 def _generate_natural(event: str, fallback: str, **ctx) -> str:
