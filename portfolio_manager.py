@@ -96,6 +96,10 @@ ACTIONS (use exactly one per position):
 
   EXIT  — Close the full position immediately. Thesis is broken, or a risk event (regime flip
           against direction, hard news, earnings binary on a SCALP/SWING) makes holding wrong.
+          Also EXIT when realized_pnl is materially negative (e.g. >-$500) AND current
+          technical signals are not decisively strengthening — large realized losses on a symbol
+          are empirical evidence that the thesis keeps failing in practice, even if it looks
+          intact on paper. Do not keep re-entering the same broken name.
 
   ADD   — Strengthen the position. Do NOT require a single narrow trigger. Legitimate reasons
           include, non-exhaustively:
@@ -215,8 +219,8 @@ def run_portfolio_review(
         entry_score = p.get("entry_score", p.get("score", 0))
         current_score = score_map.get(sym)
 
-        p.get("pnl", 0)
         pnl_pct = ((current_price - entry_price) / entry_price * 100) if entry_price > 0 else 0
+        realized_pnl = p.get("realized_pnl", 0) or 0
 
         # Days held
         try:
@@ -310,7 +314,9 @@ def run_portfolio_review(
         pos_lines.append(
             f"POSITION: {sym} ({instrument}) {direction}  trade_type={trade_type}  conviction={conviction:.2f}{setup_line}\n"
             f"  entry=${entry_price:.2f} current=${current_price:.2f} "
-            f"qty={qty} notional=${notional:,.0f} position_pct={pos_pct:.1f}% pnl={pnl_pct:+.1f}%\n"
+            f"qty={qty} notional=${notional:,.0f} position_pct={pos_pct:.1f}% pnl={pnl_pct:+.1f}%"
+            + (f"  realized_pnl=${realized_pnl:+,.2f}" if realized_pnl != 0 else "")
+            + "\n"
             f"  {score_line}\n"
             f"  entry_regime={entry_regime} current_regime={regime_name}\n"
             f"  days_held={days_held}"
