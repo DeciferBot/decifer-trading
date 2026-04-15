@@ -760,6 +760,13 @@ CONFIG = {
     # A separate daily count cap would reject 5 genuinely distinct catalysts to
     # prevent duplicates that dedup already prevents.
     "catalyst_risk_multiplier": 0.50,  # Size multiplier vs normal sentinel (0.5 = ~1.5% portfolio)
+    # ── CATALYST → SIGNAL ENGINE ────────────────────────────────────────────────
+    # When a ticker appears in the catalyst screener with catalyst_score >=
+    # catalyst_signal_min_score, its composite signal score gets a flat boost.
+    # This lets M&A setups with strong fundamentals + options anomaly + EDGAR
+    # clear the min_score_to_trade threshold more easily.
+    "catalyst_signal_min_score": 7.0,   # catalyst_score floor to trigger boost (0-10)
+    "catalyst_signal_boost": 4,         # points added to composite signal score
     # ── SETTINGS OVERRIDE (written by IC auto-disable) ───────────────────────
     # data/settings_override.json may contain {"dimension_flags": {"dim": false}}
     # entries written by ic_calculator._check_ic_auto_disable(). These are merged

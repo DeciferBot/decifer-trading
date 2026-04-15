@@ -734,6 +734,54 @@ def agent_trading_analyst(
     except Exception:
         pass
 
+    # ── Catalyst candidates block ─────────────────────────────────────────────
+    # Cross-reference scored signals against the M&A catalyst screener.
+    # Only show candidates that appear in the current signal set so the block
+    # stays tight and Opus doesn't get distracted by irrelevant tickers.
+    catalyst_block = ""
+    try:
+        from signals import _get_catalyst_lookup
+        from config import CATALYST_DIR
+        import json as _json
+
+        cat_lookup = _get_catalyst_lookup()  # {ticker: catalyst_score} for score >= threshold
+        if cat_lookup:
+            # Also pull full candidate record for richer context
+            files = sorted(CATALYST_DIR.glob("candidates_*.json"), reverse=True)
+            full_candidates: dict[str, dict] = {}
+            if files:
+                raw = _json.loads(files[0].read_text())
+                full_candidates = {c["ticker"]: c for c in raw.get("candidates", [])}
+
+            signal_syms = {s["symbol"] for s in signals[:50]}
+            hits = [t for t in cat_lookup if t in signal_syms]
+            if hits:
+                lines = []
+                for t in sorted(hits, key=lambda x: -cat_lookup[x]):
+                    c = full_candidates.get(t, {})
+                    score = cat_lookup[t]
+                    f = c.get("fundamental_score", "?")
+                    o = c.get("options_anomaly_score", "?")
+                    e = c.get("edgar_score", "?")
+                    s_sent = c.get("sentiment_score", "?")
+                    flags = "; ".join(
+                        (c.get("options_anomaly_flags") or [])[:2]
+                        + (c.get("edgar_events") or [])[:1]
+                    )
+                    lines.append(
+                        f"  {t}: catalyst={score:.1f}/10 | F={f}/5 O={o}/10 E={e}/10 S={s_sent}/10"
+                        + (f" | {flags}" if flags else "")
+                    )
+                catalyst_block = (
+                    "\nCATALYST CANDIDATES (M&A screener — high-conviction setups "
+                    "with fundamental + options anomaly + EDGAR signals):\n"
+                    + "\n".join(lines)
+                    + "\nNote: these tickers already received a score boost from the signal engine. "
+                    "Weight their setups accordingly — options anomaly + EDGAR hits are live signals.\n"
+                )
+    except Exception:
+        pass
+
     # ── Account state block ───────────────────────────────────────────────────
     max_pos = CONFIG["max_positions"]
     slots_used = len(open_positions or [])
@@ -775,7 +823,7 @@ def agent_trading_analyst(
 
     prompt = f"""REGIME: {regime_name} | VIX={vix:.1f} ({vix_1h:+.1f}%/1h) | size_mult={size_mult:.1f}x
 SPY=${spy} ({"above" if spy_above else "below"} 200d MA) | QQQ=${qqq} ({"above" if qqq_above else "below"} 200d MA)
-{account_block}{overnight_block}{held_block}
+{account_block}{overnight_block}{catalyst_block}{held_block}
 SCORED SIGNALS — fresh candidates first (NOT already held):
 {chr(10).join(sig_lines) or "  None above threshold"}
 

@@ -48,6 +48,40 @@ except ImportError:
     STATSMODELS_AVAILABLE = False
 from config import CONFIG
 
+# ── Catalyst candidate cache (for score boost) ────────────────────────────────
+_catalyst_cache: dict = {"data": {}, "ts": 0.0}
+_CATALYST_CACHE_TTL = 60.0  # seconds
+
+
+def _get_catalyst_lookup() -> dict[str, float]:
+    """
+    Return {ticker: catalyst_score} for candidates with catalyst_score >=
+    CONFIG["catalyst_signal_min_score"]. Refreshed every 60 s from disk.
+    """
+    now = _time.time()
+    if _catalyst_cache["ts"] and now - _catalyst_cache["ts"] < _CATALYST_CACHE_TTL:
+        return _catalyst_cache["data"]
+    try:
+        from config import CATALYST_DIR
+        import json as _json
+
+        files = sorted(CATALYST_DIR.glob("candidates_*.json"), reverse=True)
+        if not files:
+            _catalyst_cache.update({"data": {}, "ts": now})
+            return {}
+        raw = _json.loads(files[0].read_text())
+        min_score = CONFIG.get("catalyst_signal_min_score", 7.0)
+        lookup = {
+            c["ticker"]: c["catalyst_score"]
+            for c in raw.get("candidates", [])
+            if c.get("catalyst_score", 0) >= min_score
+        }
+        _catalyst_cache.update({"data": lookup, "ts": now})
+        return lookup
+    except Exception:
+        return {}
+
+
 # yfinance now requires its own curl_cffi session — do not pass requests.Session.
 
 # ── REGIME SIGNAL ROUTER ─────────────────────────────────────────────────────
@@ -2497,6 +2531,24 @@ def compute_confluence(
     else:
         final_signal = "HOLD"
 
+    # ── CATALYST BOOST ───────────────────────────────────────
+    # If this ticker is a high-conviction M&A catalyst candidate
+    # (catalyst_score >= catalyst_signal_min_score), add a flat boost
+    # so it clears the min_score_to_trade threshold more easily.
+    # The boost is stored in score_breakdown["catalyst"] for IC logging.
+    _catalyst_boost_pts = 0
+    _ticker = sig_5m.get("symbol", "")
+    if _ticker:
+        _cat_lookup = _get_catalyst_lookup()
+        _cat_score = _cat_lookup.get(_ticker)
+        if _cat_score is not None:
+            _catalyst_boost_pts = CONFIG.get("catalyst_signal_boost", 4)
+            score += _catalyst_boost_pts
+            log.info(
+                f"CATALYST BOOST {_ticker}: +{_catalyst_boost_pts}pts "
+                f"(catalyst_score={_cat_score:.1f}) → composite={score}"
+            )
+
     # ── CANDLESTICK CONFIRMATION GATE ───────────────────────
     # If candle_required is True, any directional entry (BUY/SELL)
     # without a confirming candlestick pattern is downgraded to HOLD.
@@ -2547,6 +2599,7 @@ def compute_confluence(
             "social": social_pts,
             "reversion": rev_score_capped,
             "iv_skew": iv_skew_pts,
+            "catalyst": _catalyst_boost_pts,
             "pead": pead_pts,
             "short_squeeze": ss_pts,
             "overnight_drift": ov_pts,

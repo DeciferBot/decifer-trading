@@ -186,6 +186,39 @@ canvas{display:block;width:100% !important}
 .r-pos-table-hdr{display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:0 0 6px;border-bottom:1px solid var(--border);font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2)}
 .r-pos-total{display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:6px 0 0;border-top:1px solid var(--border);font-size:11px;font-weight:600}
 
+/* ── VIEW: CATALYST ── */
+.catalyst-view{flex-direction:column;height:calc(100vh - 46px - 66px - 32px - 34px);overflow:hidden}
+.cat-hdr{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.cat-body{flex:1;overflow-y:auto;padding:12px 14px;min-height:0}
+.cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cat-card{border-radius:6px;border:1px solid var(--border);background:var(--bg2);padding:10px 12px;display:flex;flex-direction:column;gap:4px;cursor:default;transition:border-color .15s}
+.cat-card.live{border-color:rgba(255,23,68,.35);border-left:3px solid var(--red)}
+.cat-card.warm{border-left:3px solid var(--yellow)}
+.cat-card.cool{border-left:3px solid #4dabf7}
+.cat-ticker{font-family:'Syne',sans-serif;font-size:14px;font-weight:800}
+.cat-name{font-size:10px;color:var(--muted2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat-score-row{display:flex;align-items:baseline;gap:4px;margin-top:2px}
+.cat-score{font-family:'Syne',sans-serif;font-size:18px;font-weight:800}
+.cat-score-max{font-size:9px;color:var(--muted2)}
+.cat-bar-track{width:100%;height:3px;background:var(--border2);border-radius:2px;margin-top:3px}
+.cat-bar-fill{height:3px;border-radius:2px;transition:width .3s}
+.cat-dims{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
+.cat-dim{font-size:9px;color:var(--muted2)}
+.cat-dim.active{color:var(--orange)}
+.cat-badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.cat-badge{font-size:9px;padding:1px 6px;border-radius:3px;border:1px solid}
+.cat-badge.opt{border-color:rgba(255,214,0,.35);color:var(--yellow);background:rgba(255,214,0,.06)}
+.cat-badge.edgar{border-color:rgba(255,23,68,.3);color:var(--red);background:rgba(255,23,68,.06)}
+.cat-badge.senti-bull{border-color:rgba(0,200,83,.3);color:var(--green);background:rgba(0,200,83,.06)}
+.cat-badge.senti-bear{border-color:rgba(255,23,68,.25);color:var(--red);background:rgba(255,23,68,.05)}
+.cat-badge.sector{border-color:rgba(74,192,251,.25);color:#74c0fc;background:rgba(74,192,251,.05)}
+.cat-pulse{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--red);margin-right:5px;animation:pulse 1.5s infinite}
+/* EDGAR table */
+.edgar-tbl{width:100%;border-collapse:collapse;font-size:10px}
+.edgar-tbl th{font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted2);padding:4px 6px;border-bottom:1px solid var(--border);text-align:left}
+.edgar-tbl td{padding:5px 6px;border-bottom:1px solid var(--border);vertical-align:middle}
+.edgar-tbl tr.wl{background:rgba(255,23,68,.04)}
+
 /* ── VIEW 7: NEWS ── */
 .news-view{flex-direction:column;height:calc(100vh - 46px - 66px - 32px - 34px);overflow:hidden}
 .news-hdr{flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2)}
@@ -406,6 +439,7 @@ canvas{display:block;width:100% !important}
   <div class="tab" onclick="switchTab('agents',this)">🧠 Agents</div>
   <div class="tab" onclick="switchTab('risk',this)">🛡 Risk</div>
   <div class="tab" onclick="switchTab('news',this)">📰 News</div>
+  <div class="tab" onclick="switchTab('catalyst',this)">⚡ Catalyst</div>
   <div class="tab" onclick="switchTab('portfolio',this)">🏦 Portfolio</div>
   <div class="tab" onclick="switchTab('alpha',this)">📉 Alpha Decay</div>
   <div class="tab" onclick="switchTab('analytics',this)">📊 Analytics</div>
@@ -641,6 +675,19 @@ canvas{display:block;width:100% !important}
   <div class="card">
     <div class="card-title">Open Position Risk</div>
     <div id="r-pos-detail"><div class="empty">No open positions</div></div>
+  </div>
+</div>
+
+<!-- VIEW: CATALYST -->
+<div class="view catalyst-view" id="view-catalyst">
+  <div class="cat-hdr">
+    <span id="cat-count" style="font-weight:600;color:var(--orange)">— candidates</span>
+    <span id="cat-live-count" style="font-size:10px;color:var(--muted2)"></span>
+    <span id="cat-date" style="font-size:10px;color:var(--muted2);margin-left:auto"></span>
+    <button onclick="loadCatalyst()" style="background:none;border:1px solid var(--border);color:var(--muted2);padding:3px 10px;border-radius:3px;font-size:10px;font-family:'JetBrains Mono',monospace;cursor:pointer">⟳ Refresh</button>
+  </div>
+  <div class="cat-body">
+    <div id="cat-feed"><div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">Loading catalyst data…</div></div>
   </div>
 </div>
 
@@ -1874,6 +1921,9 @@ function switchTab(id, el) {
 
   // Load news when switching to news tab
   if (id === 'news') loadNews();
+
+  // Load catalyst data when switching to catalyst tab
+  if (id === 'catalyst') loadCatalyst();
 
   // Alpha decay + IC weights: load fresh data each time the tab opens
   if (id === 'alpha') {
@@ -3512,6 +3562,120 @@ function _renderMacroStrip(allItems) {
       <span style="font-size:10px;color:var(--muted2)">${macroItems.length} identified by Sonnet</span>
     </div>
     <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin">${cards}</div>`;
+}
+
+// ── Catalyst ────────────────────────────────────────────────
+async function loadCatalyst() {
+  const feed = document.getElementById('cat-feed');
+  if (!feed) return;
+  feed.innerHTML = '<div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">Loading…</div>';
+  try {
+    const r = await fetch('/api/catalyst');
+    const j = await r.json();
+    const candidates = j.candidates || [];
+    const edgar = j.edgar_events || [];
+    const dateStr = j.date_str || '';
+    const total = j.total_candidates || 0;
+
+    document.getElementById('cat-count').textContent = total + ' candidates screened';
+    const live = candidates.filter(c => (c.options_anomaly_score||0) > 0 || (c.edgar_score||0) > 0);
+    const liveEl = document.getElementById('cat-live-count');
+    if (liveEl) liveEl.textContent = live.length ? live.length + ' live anomalies' : '';
+    const dateEl = document.getElementById('cat-date');
+    if (dateEl) dateEl.textContent = dateStr ? 'Screened: ' + dateStr : 'Not yet screened';
+
+    if (!candidates.length && !edgar.length) {
+      feed.innerHTML = '<div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">No catalyst data yet.<br><span style="font-size:10px">Run: python -m signals.catalyst_screen -v</span></div>';
+      return;
+    }
+
+    // Score colour helper
+    function catColor(s) { return s >= 7 ? 'var(--red)' : s >= 4 ? 'var(--yellow)' : '#4dabf7'; }
+    function catClass(s) { return s >= 7 ? 'live' : s >= 4 ? 'warm' : 'cool'; }
+
+    // Candidate cards
+    let cardsHtml = '<div class="cat-grid">';
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      const score = c.catalyst_score || 0;
+      const col = catColor(score);
+      const cls = catClass(score);
+      const hasAnomaly = (c.options_anomaly_score||0) > 0 || (c.edgar_score||0) > 0;
+      const pct = Math.min(100, Math.round(score / 10 * 100));
+
+      // Badges
+      let badges = '';
+      if (c.sector) badges += `<span class="cat-badge sector">${c.sector}</span>`;
+      (c.options_anomaly_flags||[]).filter(f => f && !f.startsWith('No ')).slice(0,2).forEach(f => {
+        badges += `<span class="cat-badge opt">${f.length > 40 ? f.slice(0,40)+'…' : f}</span>`;
+      });
+      (c.edgar_events||[]).slice(0,2).forEach(e => {
+        badges += `<span class="cat-badge edgar">${e.length > 40 ? e.slice(0,40)+'…' : e}</span>`;
+      });
+      const sentLabel = (c.sentiment_flags||[]).find(f => ['Bullish','Bearish','Neutral'].includes(f));
+      if (sentLabel) badges += `<span class="cat-badge ${sentLabel==='Bullish'?'senti-bull':'senti-bear'}">Senti: ${sentLabel}</span>`;
+
+      cardsHtml += `
+      <div class="cat-card ${cls}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="cat-ticker" style="color:${col}">${hasAnomaly ? '<span class="cat-pulse"></span>' : ''}${c.ticker||'?'}</div>
+            <div class="cat-name" title="${c.name||''}">${(c.name||c.ticker||'').slice(0,38)}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="cat-score-row"><span class="cat-score" style="color:${col}">${score}</span><span class="cat-score-max">/10</span></div>
+            <div class="cat-dims">
+              <span class="cat-dim ${(c.fundamental_score||0)>0?'active':''}">F:${c.fundamental_score||0}/5</span>
+              <span class="cat-dim ${(c.options_anomaly_score||0)>0?'active':''}" style="${(c.options_anomaly_score||0)>0?'color:var(--yellow)':''}">O:${c.options_anomaly_score||0}/10</span>
+              <span class="cat-dim ${(c.edgar_score||0)>0?'active':''}" style="${(c.edgar_score||0)>0?'color:var(--red)':''}">E:${c.edgar_score||0}/10</span>
+              <span class="cat-dim ${(c.sentiment_score||0)>5.5?'active':''}">S:${(c.sentiment_score||0).toFixed ? (c.sentiment_score||0).toFixed(1) : c.sentiment_score||0}/10</span>
+            </div>
+          </div>
+        </div>
+        <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        ${badges ? `<div class="cat-badges">${badges}</div>` : ''}
+      </div>`;
+    }
+    cardsHtml += '</div>';
+
+    // EDGAR table
+    let edgarHtml = '';
+    if (edgar.length) {
+      const sorted = edgar.slice().sort((a,b) => (b.on_watchlist?1:0) - (a.on_watchlist?1:0)).slice(0,20);
+      const formColor = {'SC 13D':'var(--red)','SC 13G':'var(--yellow)','4':'#74c0fc'};
+      let rows = sorted.map(e => {
+        const fc = formColor[e.form_type||''] || 'var(--muted2)';
+        return `<tr class="${e.on_watchlist?'wl':''}">
+          <td>${e.on_watchlist ? '<span style="font-size:9px;color:var(--red);font-weight:700">★ WL</span>' : ''}</td>
+          <td style="font-weight:700;color:${e.on_watchlist?'var(--red)':'var(--text)'}">${e.ticker||'—'}</td>
+          <td><span style="font-size:9px;padding:1px 5px;border-radius:2px;background:${fc}18;color:${fc};border:1px solid ${fc}40">${e.form_type||''}</span></td>
+          <td style="color:var(--muted2)">${(e.company_name||'').slice(0,38)}</td>
+          <td style="color:var(--muted2)">${(e.updated||'').slice(0,10)}</td>
+        </tr>`;
+      }).join('');
+      edgarHtml = `
+      <div style="margin-top:16px">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);padding:6px 0 8px;border-bottom:1px solid var(--border)">SEC EDGAR Events — 13D / 13G / Form 4</div>
+        <table class="edgar-tbl">
+          <thead><tr><th></th><th>Ticker</th><th>Form</th><th>Company</th><th>Date</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    }
+
+    // Score key legend
+    const legend = `
+    <div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 12px;border-radius:5px;background:var(--bg2);border:1px solid var(--border);margin-top:14px;font-size:9px;color:var(--muted2)">
+      <span><span style="color:#4dabf7">●</span> F: fundamental (EV/Rev, cash, growth) · 35%</span>
+      <span><span style="color:var(--yellow)">●</span> O: options anomaly (OTM spike, IV, P/C) · 35%</span>
+      <span><span style="color:var(--red)">●</span> E: EDGAR 13D/13G/Form 4 · 15%</span>
+      <span><span style="color:var(--green)">●</span> S: sentiment (Claude + FinBERT) · 15%</span>
+    </div>`;
+
+    feed.innerHTML = cardsHtml + edgarHtml + legend;
+  } catch(e) {
+    feed.innerHTML = '<div class="empty" style="padding:40px 0;text-align:center;color:var(--muted2)">Error loading catalyst data: ' + e.message + '</div>';
+  }
 }
 
 function filterNews() {
