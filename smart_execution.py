@@ -348,11 +348,11 @@ class TWAPExecutor:
                             self.ib.cancelOrder(trade.order)
                             self.ib.sleep(0.5)
 
-                            # Adjust price (more aggressive)
+                            # Adjust price (more aggressive); re-round to avoid float drift
                             if slice_obj.action == "BUY":
-                                limit_price += self.config.twap_tick_adjustment
+                                limit_price = round(limit_price + self.config.twap_tick_adjustment, 2)
                             else:
-                                limit_price -= self.config.twap_tick_adjustment
+                                limit_price = round(limit_price - self.config.twap_tick_adjustment, 2)
 
                             slice_obj.price_adjustments += 1
                             break
@@ -740,6 +740,10 @@ def smart_execute(
     """
     if config is None:
         config = ExecutionConfig()
+
+    # Round to 2 decimal places — IBKR Error 110 fires when float artifacts
+    # produce sub-cent precision (e.g. 314.6100000001).
+    current_price = round(current_price, 2)
 
     logger.info(f"Smart execute: {action} {quantity} {contract.symbol} using {strategy.upper()}")
 
