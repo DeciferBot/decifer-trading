@@ -1631,6 +1631,23 @@ def score_pead(symbol: str, sig_1d: dict | None, vol_ratio: float = 0.0) -> tupl
             earnings_df = None
 
         if earnings_df is None:
+            # ── AV earnings calendar pre-filter ──────────────────────────────
+            # Alpha Vantage returns upcoming earnings dates (next 3 months).
+            # If AV has NO upcoming entry for this symbol it means the next
+            # earnings is > 3 months away, so the last earnings are also > 3
+            # months ago — outside the 60-day PEAD window.  Skip the yfinance
+            # call entirely and return early (saves one HTTP round-trip).
+            try:
+                from alpha_vantage_client import get_earnings_calendar as _av_cal
+                av_calendar = _av_cal()
+                if av_calendar and symbol.upper() not in av_calendar:
+                    # No upcoming earnings within 3 months → last earnings also
+                    # outside PEAD window.  Cache a sentinel so we skip again.
+                    _PEAD_CACHE[symbol] = (None, now)
+                    return (0, 0)
+            except Exception:
+                pass  # AV unavailable — fall through to yfinance
+
             try:
                 ticker = yf.Ticker(symbol)
                 earnings_df = ticker.get_earnings_dates(limit=8)
@@ -1656,7 +1673,18 @@ def score_pead(symbol: str, sig_1d: dict | None, vol_ratio: float = 0.0) -> tupl
             return (0, 0)
 
         latest = past.iloc[0]  # Most recent (index is sorted descending)
-        surprise_pct = float(latest[surprise_col])
+        raw_surprise = latest[surprise_col]
+
+        # yfinance occasionally returns non-numeric values (strings, None, NaN
+        # variants) that survive dropna.  Guard explicitly before using.
+        if raw_surprise is None or (hasattr(raw_surprise, "__float__") is False and not isinstance(raw_surprise, (int, float))):
+            return (0, 0)
+        try:
+            surprise_pct = float(raw_surprise)
+        except (TypeError, ValueError):
+            return (0, 0)
+        if pd.isna(surprise_pct):
+            return (0, 0)
 
         if surprise_pct < 3.0:  # Below noise threshold
             return (0, 0)

@@ -38,6 +38,25 @@ log = logging.getLogger("decifer.news")
 _news_cache = {}  # {symbol: {"data": {...}, "fetched_at": datetime}}
 _CACHE_TTL_MIN = 15  # Cache results for 15 minutes (sentinel handles real-time news)
 
+# ── ALPACA REAL-TIME ARTICLE CACHE ──────────────────────────
+# Populated by AlpacaNewsStream._process_article() as articles arrive.
+# batch_news_sentiment() merges these with Yahoo RSS before scoring —
+# gives zero-latency Benzinga headlines in the dimension score.
+_ALPACA_ARTICLE_CACHE: dict[str, list[dict]] = {}  # {symbol: [{"title": str, "age_hours": float}]}
+_ALPACA_CACHE_TTL_MIN = 30  # Alpaca articles expire after 30 minutes
+
+
+def push_alpaca_article(symbol: str, headline: str, age_hours: float = 0.0) -> None:
+    """
+    Called by AlpacaNewsStream to push a real-time Benzinga article into
+    the scoring cache.  Thread-safe via GIL (dict insert + slice).
+    Keeps the 10 most recent articles per symbol.
+    """
+    entry = {"title": headline, "age_hours": round(age_hours, 2)}
+    bucket = _ALPACA_ARTICLE_CACHE.setdefault(symbol, [])
+    bucket.insert(0, entry)
+    _ALPACA_ARTICLE_CACHE[symbol] = bucket[:10]
+
 # ── SENTIMENT KEYWORD DICTIONARIES ───────────────────────────
 # Curated for financial news. Weighted: strong words = 2, normal = 1.
 BULLISH_STRONG = {
@@ -541,9 +560,24 @@ def batch_news_sentiment(symbols: list[str], directions: dict[str, str] | None =
 
     # ── Phase 1: Parallel RSS fetch + keyword scoring ──────────
     def fetch_one(sym):
-        """Fetch RSS and do tier-1 keyword scoring (no Claude call yet)."""
+        """Fetch RSS and do tier-1 keyword scoring (no Claude call yet).
+        Alpaca real-time articles (from push cache) are prepended so the
+        dimension score reflects breaking news with zero polling lag.
+        """
         try:
             articles = fetch_yahoo_rss(sym)
+
+            # Merge Alpaca real-time articles (freshest first, already age-tagged)
+            alpaca_articles = _ALPACA_ARTICLE_CACHE.get(sym, [])
+            now_dt = datetime.now(UTC)
+            fresh_alpaca = [
+                a for a in alpaca_articles
+                if a["age_hours"] < _ALPACA_CACHE_TTL_MIN / 60
+            ]
+            if fresh_alpaca:
+                articles = fresh_alpaca + articles
+                log.debug("news(%s): merged %d Alpaca articles with RSS", sym, len(fresh_alpaca))
+
             headlines = [a["title"] for a in articles]
             recency = min([a["age_hours"] for a in articles]) if articles else 999
             kw = keyword_score(headlines)

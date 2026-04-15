@@ -129,6 +129,24 @@ class AlpacaNewsStream:
         if not relevant:
             return
 
+        # ── 1b. Push into NEWS scoring cache (zero-latency dimension score) ──
+        # Feeds batch_news_sentiment() so the scan-cycle NEWS dimension reflects
+        # breaking Benzinga articles without waiting for the 15-min Yahoo RSS poll.
+        try:
+            from news import push_alpaca_article
+            created = getattr(article, "created_at", None)
+            from datetime import UTC, datetime as _dt
+            age_h = 0.0
+            if created is not None:
+                try:
+                    age_h = (_dt.now(UTC) - created).total_seconds() / 3600
+                except Exception:
+                    pass
+            for sym in relevant:
+                push_alpaca_article(sym, headline, age_hours=max(0.0, age_h))
+        except Exception as _pe:
+            log.debug("AlpacaNewsStream: push_alpaca_article failed — %s", _pe)
+
         # ── 2. Dedup ──────────────────────────────────────────
         if not self._dedup.add_if_new(headline):
             return

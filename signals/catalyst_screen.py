@@ -96,15 +96,26 @@ def _load_watchlist() -> list[str]:
 
 def _fetch_info(ticker: str) -> dict | None:
     """
-    Fetch yfinance Ticker.info.  Returns None on error.
-    Throttles to avoid rate-limiting.
+    Fetch yfinance Ticker.info.  Returns None on any error or empty response.
+
+    yfinance quirks handled:
+    - Returns {} or {"trailingPegRatio": None} for unknown/delisted tickers
+    - Raises HTTPError 404 for invalid symbols
+    - Returns a dict missing price fields for ETFs / non-equity instruments
     """
     try:
         import yfinance as yf
         info = yf.Ticker(ticker).info
-        # yfinance returns a near-empty dict for unknown tickers
-        if not info or info.get("regularMarketPrice") is None and info.get("currentPrice") is None:
+
+        # yfinance returns a near-empty dict (1–3 keys) for unknown tickers
+        if not info or len(info) < 5:
             return None
+
+        # Must have a valid price field — rules out delisted and ETF-only symbols
+        price = info.get("regularMarketPrice") or info.get("currentPrice") or info.get("previousClose")
+        if not price:
+            return None
+
         return info
     except Exception:
         return None
@@ -186,7 +197,7 @@ def _score_ticker(ticker: str, info: dict, thr: dict) -> dict | None:
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
-def run_screen(tickers: list[str] | None = None, verbose: bool = False) -> list[dict]:
+def run_screen(tickers: list[str] | None = None, verbose: bool = False, force: bool = False) -> list[dict]:
     """
     Run the fundamental M&A target screen.
 
@@ -194,6 +205,7 @@ def run_screen(tickers: list[str] | None = None, verbose: bool = False) -> list[
     ----------
     tickers : list of ticker strings, or None to auto-load S&P 500 + watchlist.
     verbose : print progress to stdout.
+    force   : re-run even if today's candidates file already exists.
 
     Returns
     -------
@@ -201,6 +213,20 @@ def run_screen(tickers: list[str] | None = None, verbose: bool = False) -> list[
     """
     CATALYST_DIR.mkdir(parents=True, exist_ok=True)
     thr = _thresholds()
+
+    # ── Skip if today's file already exists (avoid re-scraping 500 tickers) ──
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    out_path = CATALYST_DIR / f"candidates_{today}.json"
+    if not force and out_path.exists():
+        try:
+            existing = json.loads(out_path.read_text())
+            candidates = existing.get("candidates", [])
+            if candidates:
+                if verbose:
+                    print(f"  [catalyst_screen] Today's file already exists ({len(candidates)} candidates) — skipping re-scan. Pass force=True to override.")
+                return candidates
+        except Exception:
+            pass  # corrupt file — fall through and re-run
 
     if tickers is None:
         sp500    = _load_sp500_tickers()
@@ -233,8 +259,6 @@ def run_screen(tickers: list[str] | None = None, verbose: bool = False) -> list[
     candidates.sort(key=lambda c: c["fundamental_score"], reverse=True)
 
     # Persist
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    out_path = CATALYST_DIR / f"candidates_{today}.json"
     payload = {
         "date":        today,
         "generated_at": datetime.utcnow().isoformat() + "Z",
