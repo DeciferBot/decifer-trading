@@ -114,7 +114,14 @@ class TradeLabeler:
         """
         Extract features from trade at entry time.
         Includes: score, regime, VIX, volume, momentum, sector, time info.
+        Only processes CLOSE records with a real pnl outcome.
         """
+        # Skip OPEN records — they have no pnl outcome to learn from.
+        if trade.get("action") not in ("CLOSE", "close") and trade.get("action") in ("OPEN", "open"):
+            return None
+        # Skip records with no pnl — nothing to label.
+        if trade.get("pnl") is None:
+            return None
         try:
             entry_time = datetime.fromisoformat(trade.get("entry_time", "").replace(" ", "T"))
         except Exception:
@@ -152,14 +159,18 @@ class TradeLabeler:
             return 0.0
 
     def _extract_agents_count(self, trade: dict) -> int:
-        """Extract agents agreement count from reasoning field."""
-        reasoning = trade.get("reasoning", "")
-        # Look for "Agents agreed N/6" pattern
+        """Extract agents agreement count from trade record."""
+        # Prefer the directly stored field (written by log_trade since fix).
+        if trade.get("agents_agreed") and isinstance(trade["agents_agreed"], int):
+            return trade["agents_agreed"]
+        # Legacy fallback: parse from reasoning string.
+        # Supports: "Agents agreed N/6", "N agents aligned"
         import re
-
-        match = re.search(r"Agents agreed (\d+)/\d+", reasoning)
-        if match:
-            return int(match.group(1))
+        reasoning = trade.get("reasoning") or ""
+        for pattern in (r"Agents agreed (\d+)/\d+", r"(\d+) agents aligned"):
+            match = re.search(pattern, reasoning, re.IGNORECASE)
+            if match:
+                return int(match.group(1))
         return 0
 
     def create_dataset(self) -> pd.DataFrame | None:

@@ -42,6 +42,9 @@ CANONICAL = {
     "symbol": None,
     "direction": "LONG",
     "qty": None,
+    "shares": None,       # ML alias for qty — added 2026-04-16
+    "entry_time": None,   # ML engine requires this (was missing pre-fix)
+    "exit_time": None,    # ML engine requires this (was missing pre-fix)
     "entry_price": None,
     "exit_price": None,
     "sl": None,
@@ -52,6 +55,7 @@ CANONICAL = {
     "reasoning": None,
     "regime": None,
     "vix": None,
+    "agents_agreed": 0,   # agent vote count — added 2026-04-16
     "pnl": None,
     "pnl_pct": None,
     "exit_reason": None,
@@ -155,7 +159,36 @@ def migrate_trade(trade: dict) -> dict:
         if pp is not None:
             result["pnl_pct"] = pp
 
-    # 5. Mark legacy trades
+    # 5. Derive shares from qty if missing (ML engine alias)
+    if result.get("shares") is None and result.get("qty") is not None:
+        result["shares"] = result["qty"]
+
+    # 6. Derive entry_time if missing (ML engine requires this to parse records)
+    #    For CLOSE records: use open_time (entry) if available, else timestamp (best approximation).
+    #    For OPEN records: timestamp IS the entry time.
+    #    For legacy records: use existing entry_time / time / timestamp fields.
+    if result.get("entry_time") is None:
+        action = result.get("action", "")
+        if action == "CLOSE":
+            result["entry_time"] = (
+                trade.get("open_time")
+                or trade.get("entry_time")
+                or trade.get("time")
+                or trade.get("timestamp")
+            )
+        else:
+            result["entry_time"] = (
+                trade.get("entry_time")
+                or trade.get("time")
+                or trade.get("open_time")
+                or trade.get("timestamp")
+            )
+
+    # 7. Derive exit_time if missing on CLOSE records
+    if result.get("exit_time") is None and result.get("action") == "CLOSE":
+        result["exit_time"] = trade.get("exit_time") or trade.get("timestamp")
+
+    # 8. Mark legacy trades
     src = trade.get("source", "")
     if src in LEGACY_SOURCES:
         result["legacy"] = True
@@ -180,6 +213,15 @@ def main(apply: bool = False) -> None:
     pct_derived = sum(
         1 for o, m in zip(trades, migrated, strict=False) if o.get("pnl_pct") is None and m.get("pnl_pct") is not None
     )
+    entry_time_derived = sum(
+        1 for o, m in zip(trades, migrated, strict=False) if o.get("entry_time") is None and m.get("entry_time") is not None
+    )
+    exit_time_derived = sum(
+        1 for o, m in zip(trades, migrated, strict=False) if o.get("exit_time") is None and m.get("exit_time") is not None
+    )
+    shares_derived = sum(
+        1 for o, m in zip(trades, migrated, strict=False) if o.get("shares") is None and m.get("shares") is not None
+    )
 
     # Verify all trades now have the full canonical set
     missing_any = []
@@ -188,10 +230,20 @@ def main(apply: bool = False) -> None:
         if missing:
             missing_any.append((i, t.get("symbol"), missing))
 
-    print(f"Trades processed   : {original_count}")
-    print(f"Legacy flagged     : {legacy_count}  (source in {sorted(LEGACY_SOURCES)})")
+    # How many CLOSE records are now ML-usable (have entry_time + pnl)
+    ml_usable = sum(
+        1 for t in migrated
+        if t.get("action") == "CLOSE" and t.get("pnl") is not None and t.get("entry_time") is not None
+    )
+
+    print(f"Trades processed    : {original_count}")
+    print(f"Legacy flagged      : {legacy_count}  (source in {sorted(LEGACY_SOURCES)})")
     print(f"hold_minutes derived: {hold_derived}")
-    print(f"pnl_pct derived    : {pct_derived}")
+    print(f"pnl_pct derived     : {pct_derived}")
+    print(f"entry_time derived  : {entry_time_derived}")
+    print(f"exit_time derived   : {exit_time_derived}")
+    print(f"shares derived      : {shares_derived}")
+    print(f"ML-usable CLOSE recs: {ml_usable}  (have entry_time + pnl)")
     print(f"Still missing fields: {len(missing_any)}")
     if missing_any:
         for idx, sym, fields in missing_any[:5]:

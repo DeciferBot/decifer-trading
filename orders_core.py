@@ -126,6 +126,7 @@ def execute_buy(
     conviction: float = 0.0,
     pattern_id: str = "",
     market_read: str = "",
+    agents_agreed: int = 0,
 ) -> bool:
     """
     Place a buy order with full OCO bracket.
@@ -490,6 +491,7 @@ def execute_buy(
                             "sl_order_id": None,
                             "tp_order_id": None,
                             "high_water_mark": _fill_price,
+                            "agents_agreed": agents_agreed,
                             "tranche_mode": False,
                             "execution_method": "twap",
                         }
@@ -786,6 +788,7 @@ def execute_buy(
                     "sl_order_id": _sl_order_id,
                     "tp_order_id": tp_trade.order.orderId if tp_trade is not None else None,
                     "high_water_mark": price,
+                    "agents_agreed": agents_agreed,
                     # ── Tranche tracking ──────────────────────────────────
                     "tranche_mode": tranche_mode,
                     "t1_qty": t1_qty,
@@ -888,6 +891,7 @@ def execute_short(
     conviction: float = 0.0,
     pattern_id: str = "",
     market_read: str = "",
+    agents_agreed: int = 0,
 ) -> bool:
     """
     Place a short-sell order with OCO bracket (sell-to-open + buy-to-cover SL + TP).
@@ -1195,6 +1199,7 @@ def execute_short(
                     "sl_order_id": _sl_order_id,
                     "tp_order_id": tp_trade.order.orderId if tp_trade is not None else None,
                     "high_water_mark": price,
+                    "agents_agreed": agents_agreed,
                     "tranche_mode": False,
                 }
             _save_positions_file()

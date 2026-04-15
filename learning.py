@@ -317,12 +317,22 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
                 f"hold_minutes unavailable for {trade.get('symbol')} (open_time={trade.get('open_time')!r}): {_e}"
             )
 
+    _now_iso = datetime.now(UTC).isoformat()
+    # entry_time = when position was opened (open_time on the active trade dict).
+    # Falls back to current timestamp for OPEN records so the ML engine can parse it.
+    _entry_time = trade.get("open_time") or trade.get("entry_time") or _now_iso
+    # exit_time only meaningful on CLOSE records.
+    _exit_time = _now_iso if action == "CLOSE" else None
+
     record = {
-        "timestamp": datetime.now(UTC).isoformat(),
+        "timestamp": _now_iso,
         "action": action,
         "symbol": trade.get("symbol"),
         "direction": trade.get("direction", "LONG"),
         "qty": trade.get("qty"),
+        "shares": trade.get("qty"),  # ML engine alias — TradeLabeler reads "shares"
+        "entry_time": _entry_time,
+        "exit_time": _exit_time,
         "entry_price": trade.get("entry"),
         "exit_price": outcome.get("exit_price") if outcome else None,
         "sl": trade.get("sl"),
@@ -333,6 +343,7 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
         "reasoning": trade.get("reasoning"),
         "regime": regime.get("session_character") or regime.get("regime"),
         "vix": regime.get("vix"),
+        "agents_agreed": trade.get("agents_agreed", 0),
         "pnl": outcome.get("pnl") if outcome else None,
         "pnl_pct": outcome.get("pnl_pct") if outcome else None,
         "exit_reason": outcome.get("reason") if outcome else None,

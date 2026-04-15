@@ -217,6 +217,7 @@ def dispatch_signals(
                     conviction=cls.conviction,
                     pattern_id=pattern_id,
                     market_read=market_read,
+                    agents_agreed=len(signal.source_agents or []),
                 )
             except Exception as exc:
                 log.error(f"dispatch execute_buy failed {signal.symbol}: {exc}")
@@ -261,6 +262,7 @@ def dispatch_signals(
                     conviction=cls.conviction,
                     pattern_id=pattern_id,
                     market_read=market_read,
+                    agents_agreed=len(signal.source_agents or []),
                 )
             except Exception as exc:
                 log.error(f"dispatch execute_short failed {signal.symbol}: {exc}")

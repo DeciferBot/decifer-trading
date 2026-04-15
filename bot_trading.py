@@ -1206,7 +1206,7 @@ def run_scan():
             vix=regime.get("vix", "?"),
         )
 
-    clog("SCAN", "Building dynamic universe from TradingView screener...")
+    clog("SCAN", "Building dynamic universe (Alpaca screening)...")
     universe = get_dynamic_universe(ib, regime)
     # Sector bias is cached inside get_dynamic_universe — fetch the cached result for the dashboard.
     try:
