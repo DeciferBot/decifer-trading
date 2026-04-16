@@ -26,9 +26,22 @@ except ImportError:
     HAS_DRAGGABLE = False
 
 from config import PORT, REFRESH_INTERVAL_MS, EDGAR_POLL_INTERVAL, CATALYST_SCREEN_INTERVAL, OPTIONS_ANOMALY_INTERVAL, SENTIMENT_SCORER_INTERVAL
+
+# ── Version (always read from source — never cached at import time) ────────────
+def _get_version() -> str:
+    """Read __version__ and __codename__ directly from version.py so the dashboard
+    always reflects the current release without needing a restart."""
+    import importlib.util, sys
+    from pathlib import Path
+    vpath = Path(__file__).parent.parent / "version.py"
+    spec = importlib.util.spec_from_file_location("_decifer_version", vpath)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return f"v{mod.__version__} · {mod.__codename__}"
 from panels import (
     overview, pipeline, research, git_history, test_results,
     code_health, blueprint, kanban, product_map, brain, catalyst,
+    knowledge_graph,
 )
 from panels import status_strip
 from panels.scanner import run_scan
@@ -112,6 +125,15 @@ def serve_layout():
                     " · Decifer Trading Monitor",
                     style={"fontSize": "0.7rem", "color": "var(--cd-muted)", "marginLeft": "8px"},
                 ),
+                html.Span(
+                    _get_version(),
+                    style={
+                        "fontSize": "0.65rem", "color": "#4dabf7",
+                        "marginLeft": "10px", "fontFamily": "monospace",
+                        "background": "rgba(77,171,247,0.1)", "borderRadius": "6px",
+                        "padding": "2px 7px",
+                    },
+                ),
             ], style={"display": "flex", "alignItems": "center"}),
 
             # Right: theme toggle + refresh + research + timestamp
@@ -169,6 +191,7 @@ def serve_layout():
             _tab("Code Health",      "heart-pulse",      "health-content",   "tab-health",   code_health.layout()),
             _tab("Overview",         "house",            "overview-content", "tab-overview", overview.layout()),
             _tab("Architecture",     "diagram-3",        "blueprint-content","tab-blueprint",blueprint.layout()),
+            _tab("Knowledge Graph",  "diagram-2",        "kg-content",       "tab-kg",       knowledge_graph.layout()),
         ], id="main-tabs", active_tab="tab-brain",
            className="mb-3",
            style={"borderBottom": "1px solid var(--cd-border)"}),
@@ -267,6 +290,7 @@ status_strip.register_callbacks(app)
 product_map.register_callbacks(app)
 brain.register_callbacks(app)
 catalyst.register_callbacks(app)
+knowledge_graph.register_callbacks(app)
 
 
 # ── Scan on refresh button ─────────────────────────────────────────────────
