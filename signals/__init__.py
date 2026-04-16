@@ -47,6 +47,7 @@ try:
 except ImportError:
     STATSMODELS_AVAILABLE = False
 from config import CONFIG
+import schemas as _schemas
 
 # ── Catalyst candidate cache (for score boost) ────────────────────────────────
 _catalyst_cache: dict = {"data": {}, "ts": 0.0}
@@ -72,11 +73,15 @@ def _get_catalyst_lookup() -> dict[str, float]:
             return {}
         raw = _json.loads(files[0].read_text())
         min_score = CONFIG.get("catalyst_signal_min_score", 7.0)
-        lookup = {
-            c["ticker"]: c["catalyst_score"]
-            for c in raw.get("candidates", [])
-            if c.get("catalyst_score", 0) >= min_score
-        }
+        lookup = {}
+        for c in raw.get("candidates", []):
+            try:
+                _schemas.validate_catalyst_record(c)
+            except ValueError as _ve:
+                log.warning("[signals][_get_catalyst_lookup] skipping bad record: %s", _ve)
+                continue
+            if c.get("catalyst_score", 0) >= min_score:
+                lookup[c["ticker"]] = c["catalyst_score"]
         _catalyst_cache.update({"data": lookup, "ts": now})
         return lookup
     except Exception as e:

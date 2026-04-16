@@ -27,6 +27,7 @@ import os
 import threading
 from pathlib import Path
 
+import schemas
 from config import CONFIG
 
 log = logging.getLogger("decifer.trade_store")
@@ -202,8 +203,15 @@ def restore() -> dict:
             if raw:
                 data = json.loads(raw)
                 if isinstance(data, dict):
-                    log.info(f"trade_store: restored {len(data)} open position(s) from {_POSITIONS_FILE}")
-                    return data
+                    valid = {}
+                    for sym, pos in data.items():
+                        try:
+                            schemas.validate_position(pos)
+                            valid[sym] = pos
+                        except ValueError as e:
+                            log.warning("trade_store: skipping bad position record for %s: %s", sym, e)
+                    log.info(f"trade_store: restored {len(valid)} open position(s) from {_POSITIONS_FILE}")
+                    return valid
     except Exception as e:
         log.error(f"trade_store: failed to restore positions: {e}")
     return {}

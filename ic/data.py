@@ -10,6 +10,8 @@ import json
 import os
 from datetime import UTC, datetime, timedelta
 
+import schemas
+
 from ic.constants import (
     DIMENSIONS,
     ROLLING_WINDOW,
@@ -46,6 +48,11 @@ def _load_signal_records(
                     continue
                 try:
                     rec = json.loads(line)
+                    try:
+                        schemas.validate_signal(rec)
+                    except ValueError as _ve:
+                        log.warning("_load_signal_records: skipping bad signal record: %s", _ve)
+                        continue
                     bd = rec.get("score_breakdown", {})
                     # Accept records with at least the 9 core dimensions.
                     # Newer dimensions (iv_skew, pead, short_squeeze) are

@@ -101,9 +101,15 @@ Not a refactor sweep — apply only to new fixes in T1-B. Existing untouched cod
 
 ---
 
-#### T2-A: Schema validators for the 4 most-read JSON files
+#### T2-A: Schema validators for the 4 most-read JSON files ✅ (shipped 2026-04-16)
 
-Add a `schemas.py` module (new file, ~80 lines) with one function per file:
+**What shipped:**
+- `schemas.py` — 4 validators: `validate_catalyst_record`, `validate_position`, `validate_trade`, `validate_signal`
+- Wired into 5 call sites: `signals/__init__.py`, `trade_store.restore()`, `ic/live.py`, `ic/data.py`, `bot_dashboard._get_catalyst_payload()`
+- `tests/test_schemas.py` — 42 tests (7 helper + 7 catalyst + 10 position + 8 trade + 10 signal + 1 call-site pattern)
+- Test count: 1760 passing (was 1718, +42)
+
+**Add a `schemas.py` module (new file, ~80 lines) with one function per file:**
 
 ```python
 def validate_catalyst_record(record: dict) -> None: ...

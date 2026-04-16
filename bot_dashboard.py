@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import bot_state
+import schemas
 from bot_account import get_account_details
 from bot_ibkr import sync_orders_from_ibkr
 from bot_state import clog, dash
@@ -261,7 +262,14 @@ def _get_catalyst_payload() -> dict:
         if files:
             try:
                 raw = json.loads(files[0].read_text())
-                candidates = raw.get("candidates", [])
+                _raw_candidates = raw.get("candidates", [])
+                candidates = []
+                for _c in _raw_candidates:
+                    try:
+                        schemas.validate_catalyst_record(_c)
+                        candidates.append(_c)
+                    except ValueError as _ve:
+                        log.warning("[dashboard][_get_catalyst_payload] skipping bad candidate record: %s", _ve)
                 date_str = raw.get("date", files[0].stem.replace("candidates_", ""))
             except Exception as e:
                 log.warning("[dashboard][_get_catalyst_payload] failed to read %s: %s", files[0].name, e)

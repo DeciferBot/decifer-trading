@@ -10,6 +10,8 @@ import json
 import os
 from datetime import UTC, datetime
 
+import schemas
+
 import numpy as np
 
 from ic.constants import (
@@ -110,6 +112,11 @@ def compute_live_trade_ic(trades_path: str | None = None) -> dict:
 
     eligible = []
     for t in items:
+        try:
+            schemas.validate_trade(t)
+        except ValueError as _ve:
+            log.warning("compute_live_trade_ic: skipping bad trade record: %s", _ve)
+            continue
         scores = t.get("signal_scores")
         if not scores or not isinstance(scores, dict):
             continue
