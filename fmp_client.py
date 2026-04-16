@@ -997,6 +997,94 @@ def get_stock_news(symbol: str, limit: int = 5) -> list[dict]:
     return results
 
 
+_fmp_articles_cache: tuple = (None, 0.0)  # (articles, mono_time)
+_FMP_ARTICLES_TTL = 15 * 60  # 15 min — matches _TTL_NEWS
+
+
+def get_fmp_news_articles(symbols: list[str], limit: int = 50) -> list[dict]:
+    """
+    Batch news fetch from FMP for the dashboard news feed.
+
+    Returns list of dicts matching the dashboard article schema:
+      headline, summary, url, source, author, symbols, image_url,
+      sentiment, age_hours, created_ts, news_score, catalyst
+
+    FMP returns article-specific images on every article — no logo fallback needed.
+    Cached for 15 min. Returns [] on failure.
+    """
+    import time as _t
+
+    global _fmp_articles_cache
+    cached, cached_at = _fmp_articles_cache
+    if cached is not None and _t.monotonic() - cached_at < _FMP_ARTICLES_TTL:
+        return cached
+
+    if not symbols:
+        return []
+
+    sym_str = ",".join(s.upper() for s in symbols[:50])
+    raw = _get("news/stock", {"symbols": sym_str, "limit": limit}, ttl=0)  # ttl=0 — use module cache above
+    if not raw or not isinstance(raw, list):
+        return []
+
+    now_utc = datetime.now(UTC)
+    articles = []
+    for item in raw[:limit]:
+        headline = (item.get("title") or "").strip()
+        if not headline:
+            continue
+
+        # Parse publishedDate: "YYYY-MM-DD HH:MM:SS" or ISO
+        age_hours, created_ts = 0.0, 0
+        ts_str = item.get("publishedDate") or ""
+        try:
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%SZ"):
+                try:
+                    dt = datetime.strptime(ts_str[:19], fmt).replace(tzinfo=UTC)
+                    age_hours = (now_utc - dt).total_seconds() / 3600
+                    created_ts = int(dt.timestamp() * 1000)
+                    break
+                except ValueError:
+                    continue
+        except Exception:
+            pass
+
+        raw_sent = (item.get("sentiment") or "").upper()
+        sentiment = raw_sent if raw_sent in ("BULLISH", "BEARISH", "NEUTRAL") else "NEUTRAL"
+        news_score = {"BULLISH": 6, "BEARISH": 6, "NEUTRAL": 0}.get(sentiment, 0)
+
+        syms = []
+        raw_sym = item.get("symbol") or ""
+        if isinstance(raw_sym, str) and raw_sym.strip():
+            syms = [raw_sym.strip().upper()]
+        elif isinstance(raw_sym, list):
+            syms = [s.upper() for s in raw_sym if s]
+
+        articles.append({
+            "headline":   headline,
+            "summary":    (item.get("text") or "").strip()[:300],
+            "url":        (item.get("url") or "").strip(),
+            "source":     (item.get("site") or "").strip(),
+            "author":     (item.get("author") or "").strip(),
+            "symbols":    syms,
+            "image_url":  (item.get("image") or "").strip() or None,
+            "sentiment":  sentiment,
+            "age_hours":  round(age_hours, 2),
+            "created_ts": created_ts,
+            "news_score": news_score,
+            "catalyst":   "",
+        })
+
+    import logging as _log
+    _log.getLogger("decifer.fmp").info(
+        "FMP news articles: %d fetched (%d with images)",
+        len(articles),
+        sum(1 for a in articles if a["image_url"]),
+    )
+    _fmp_articles_cache = (articles, _t.monotonic())
+    return articles
+
+
 # ── Shares Float ──────────────────────────────────────────────────────────────
 
 

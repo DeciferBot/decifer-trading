@@ -377,29 +377,43 @@ def _get_news_payload() -> dict:
     """
     Build the /api/news payload.
     Source priority:
-      1. Alpha Vantage NEWS_SENTIMENT — real article images (banner_image), paid key
-      2. Alpaca/Benzinga — fallback when AV unavailable
-      3. Yahoo RSS — last resort
+      1. FMP stock news — article-specific images, reliable, 15-min cache
+      2. Alpha Vantage NEWS_SENTIMENT — fallback with banner_image
+      3. Alpaca/Benzinga — fallback when both above unavailable
+      4. Yahoo RSS — last resort
     Payload cached for 60 seconds.
     """
     now = _time.time()
     if _news_payload_cache["data"] and now - _news_payload_cache["fetched_at"] < _NEWS_CACHE_TTL:
         return _news_payload_cache["data"]
 
-    # ── Primary: Alpha Vantage (has banner_image on every article) ──────────────
+    # ── Primary: FMP (article-specific images, stable API) ─────────────────────
     articles = []
     try:
-        from alpha_vantage_client import get_news_articles as _av_articles
+        from fmp_client import get_fmp_news_articles as _fmp_articles
         from scanner import CORE_SYMBOLS, MOMENTUM_FALLBACK
 
         open_syms = [p.get("symbol", "") for p in dash.get("positions", [])]
         favs = list(dash.get("favourites", []))
-        av_syms = list(dict.fromkeys([s for s in open_syms if s] + favs + MOMENTUM_FALLBACK + CORE_SYMBOLS))[:50]
-        articles = _av_articles(av_syms, limit=50)
+        syms = list(dict.fromkeys([s for s in open_syms if s] + favs + MOMENTUM_FALLBACK + CORE_SYMBOLS))[:50]
+        articles = _fmp_articles(syms, limit=50)
     except Exception as _e:
-        log.debug("AV articles fetch failed: %s", _e)
+        log.debug("FMP articles fetch failed: %s", _e)
 
-    # ── Secondary: Alpaca/Benzinga ──────────────────────────────────────────────
+    # ── Secondary: Alpha Vantage ────────────────────────────────────────────────
+    if not articles:
+        try:
+            from alpha_vantage_client import get_news_articles as _av_articles
+            from scanner import CORE_SYMBOLS, MOMENTUM_FALLBACK
+
+            open_syms = [p.get("symbol", "") for p in dash.get("positions", [])]
+            favs = list(dash.get("favourites", []))
+            av_syms = list(dict.fromkeys([s for s in open_syms if s] + favs + MOMENTUM_FALLBACK + CORE_SYMBOLS))[:50]
+            articles = _av_articles(av_syms, limit=50)
+        except Exception as _e:
+            log.debug("AV articles fetch failed: %s", _e)
+
+    # ── Tertiary: Alpaca/Benzinga ───────────────────────────────────────────────
     if not articles:
         articles = _fetch_alpaca_news()
         articles = [a for a in articles if a.get("headline", "").strip()]
