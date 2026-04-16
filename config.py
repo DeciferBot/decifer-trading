@@ -839,3 +839,113 @@ def _apply_settings_override() -> None:
 
 
 _apply_settings_override()
+
+
+# ── CONFIG STARTUP VALIDATION ─────────────────────────────────────────────────
+# Catches missing or mistyped keys at import time rather than deep in a scan
+# cycle. Add a key here whenever a new CONFIG key is added that other modules
+# depend on. Format: (key_path, expected_type, description)
+#
+# key_path supports dot-notation for nested keys: "ic_calculator.rolling_window"
+# Raises ConfigValidationError immediately — bot must not start with broken config.
+
+class ConfigValidationError(Exception):
+    pass
+
+
+def _get_nested(cfg: dict, key_path: str):
+    """Walk dot-notation key path. Returns (value, True) or (None, False)."""
+    parts = key_path.split(".")
+    node = cfg
+    for part in parts:
+        if not isinstance(node, dict) or part not in node:
+            return None, False
+        node = node[part]
+    return node, True
+
+
+# (key_path, expected_type_or_types, human_readable_description)
+_REQUIRED_KEYS: list[tuple] = [
+    # Core trading thresholds
+    ("min_score_to_trade",              (int, float), "minimum signal score to enter a trade"),
+    ("agents_required_to_agree",        int,          "number of agents that must agree"),
+    ("max_positions",                   int,          "maximum open positions allowed"),
+    ("risk_pct_per_trade",              float,        "fraction of portfolio at risk per trade"),
+    ("max_single_position",             float,        "max single-position exposure fraction"),
+    ("min_cash_reserve",                float,        "minimum cash floor fraction"),
+    ("max_daily_loss_pct",              float,        "max daily loss before halt"),
+    # Catalyst integration (added 2026-04 — previously caused silent divergence)
+    ("catalyst_signal_min_score",       (int, float), "catalyst score floor for signal boost"),
+    ("catalyst_signal_boost",           (int, float), "points added to score on catalyst hit"),
+    # Dimension flags block
+    ("dimension_flags",                 dict,         "per-dimension enable/disable flags"),
+    ("dimension_flags.directional",     bool,         "directional dimension flag"),
+    ("dimension_flags.momentum",        bool,         "momentum dimension flag"),
+    ("dimension_flags.squeeze",         bool,         "squeeze dimension flag"),
+    ("dimension_flags.flow",            bool,         "flow dimension flag"),
+    ("dimension_flags.breakout",        bool,         "breakout dimension flag"),
+    ("dimension_flags.reversion",       bool,         "reversion dimension flag"),
+    ("dimension_flags.overnight_drift", bool,         "overnight drift dimension flag"),
+    # IC calculator
+    ("ic_calculator",                   dict,         "IC calculator config block"),
+    ("ic_calculator.rolling_window",    int,          "IC rolling window in trading dates"),
+    ("ic_calculator.force_equal_weights", bool,       "force equal weights in paper mode"),
+    # Options
+    ("options_enabled",                 bool,         "options trading master switch"),
+    ("options_min_score",               (int, float), "minimum score to consider options"),
+    ("options_target_delta",            float,        "target option delta"),
+    # Regime
+    ("regime_detector",                 str,          "which regime detector is active"),
+    ("regime_states",                   tuple,        "canonical regime state names"),
+    # Fill watcher
+    ("fill_watcher",                    dict,         "fill watcher config block"),
+    ("fill_watcher.enabled",            bool,         "fill watcher master switch"),
+    ("fill_watcher.max_attempts",       int,          "max price-chase attempts"),
+    # Portfolio manager
+    ("portfolio_manager",               dict,         "portfolio manager config block"),
+    ("portfolio_manager.enabled",       bool,         "portfolio manager master switch"),
+    # Paths
+    ("trade_log",                       str,          "path to trades.json"),
+    ("signals_log",                     str,          "path to signals_log.jsonl"),
+    ("ml_models_dir",                   str,          "path to ML models directory"),
+]
+
+
+def validate_config(cfg: dict = CONFIG) -> None:
+    """
+    Validate that all required CONFIG keys exist and are the right type.
+    Called at import time. Raises ConfigValidationError on first failure.
+    Add new entries to _REQUIRED_KEYS whenever a new CONFIG key is added
+    that other modules depend on.
+    """
+    errors: list[str] = []
+
+    for key_path, expected_type, description in _REQUIRED_KEYS:
+        value, found = _get_nested(cfg, key_path)
+
+        if not found:
+            errors.append(f"  MISSING    '{key_path}' — {description}")
+            continue
+
+        if not isinstance(value, expected_type):
+            actual = type(value).__name__
+            if isinstance(expected_type, tuple):
+                expected_name = " or ".join(t.__name__ for t in expected_type)
+            else:
+                expected_name = expected_type.__name__
+            repr_val = repr(value)[:60]
+            errors.append(
+                f"  WRONG TYPE '{key_path}' — expected {expected_name}, "
+                f"got {actual} ({repr_val}) — {description}"
+            )
+
+    if errors:
+        raise ConfigValidationError(
+            "\n\nConfig validation failed — bot cannot start.\n"
+            "Fix these issues in config.py:\n\n"
+            + "\n".join(errors)
+            + "\n"
+        )
+
+
+validate_config()

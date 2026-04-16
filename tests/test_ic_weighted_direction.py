@@ -371,6 +371,7 @@ class TestScoreBreakdownPresent:
         "pead",
         "short_squeeze",
         "overnight_drift",
+        "catalyst",  # added T1-B-1: catalyst boost ported to signals/__init__.py
     }
 
     def test_score_breakdown_keys_present_bullish(self):

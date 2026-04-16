@@ -491,3 +491,86 @@ class TestSignalWeightBoundaries:
         }
         score = _call_confluence(indicators, config)
         assert 0.0 <= score <= 1.0, f"Score {score} out of range for sentiment={sentiment}"
+
+
+# ---------------------------------------------------------------------------
+# T1-B-1: _get_catalyst_lookup() silent failure fix
+# ---------------------------------------------------------------------------
+
+class TestGetCatalystLookup:
+    """
+    _get_catalyst_lookup() must always return a dict and never swallow errors
+    silently. On any failure the exception must be logged at WARNING level and
+    an empty dict returned so the caller degrades gracefully.
+    """
+
+    def setup_method(self):
+        # Reset the module-level cache before each test so disk state doesn't leak.
+        # signals resolves to signals/__init__.py (package), which has _catalyst_cache
+        # after the T1-B-1 port from signals.py.
+        if hasattr(signals, "_catalyst_cache"):
+            signals._catalyst_cache.update({"data": {}, "ts": 0.0})
+
+    def test_missing_catalyst_dir_returns_empty_dict(self, tmp_path, caplog):
+        """When CATALYST_DIR points at an empty directory, return {} without raising."""
+        import config as cfg
+        original = cfg.CATALYST_DIR
+        cfg.CATALYST_DIR = tmp_path  # exists but has no candidate files
+        try:
+            import logging
+            with caplog.at_level(logging.DEBUG, logger="decifer.signals"):
+                result = signals._get_catalyst_lookup()
+        finally:
+            cfg.CATALYST_DIR = original
+
+        assert result == {}, "Expected empty dict when no candidate files exist"
+
+    def test_corrupt_json_returns_empty_dict_and_logs_warning(self, tmp_path, caplog):
+        """Corrupt JSON in the candidate file must log a WARNING and return {}."""
+        import config as cfg
+        bad_file = tmp_path / "candidates_2026-01-01.json"
+        bad_file.write_text("{ not valid json <<<")
+
+        original = cfg.CATALYST_DIR
+        cfg.CATALYST_DIR = tmp_path
+        try:
+            import logging
+            with caplog.at_level(logging.WARNING, logger="decifer.signals"):
+                result = signals._get_catalyst_lookup()
+        finally:
+            cfg.CATALYST_DIR = original
+
+        assert result == {}, "Expected empty dict on JSON parse error"
+        assert any("_get_catalyst_lookup" in r.message for r in caplog.records), (
+            "Expected a WARNING log from _get_catalyst_lookup on corrupt file"
+        )
+
+    def test_valid_file_returns_lookup_above_threshold(self, tmp_path):
+        """Valid candidate file returns tickers whose catalyst_score >= min_score."""
+        import json
+        import config as cfg
+
+        candidates = {
+            "candidates": [
+                {"ticker": "AAPL", "catalyst_score": 8.5},
+                {"ticker": "MSFT", "catalyst_score": 3.0},  # below threshold
+                {"ticker": "NVDA", "catalyst_score": 9.0},
+            ]
+        }
+        (tmp_path / "candidates_2026-01-01.json").write_text(json.dumps(candidates))
+
+        original_dir = cfg.CATALYST_DIR
+        original_min = cfg.CONFIG.get("catalyst_signal_min_score", 7.0)
+        cfg.CATALYST_DIR = tmp_path
+        cfg.CONFIG["catalyst_signal_min_score"] = 7.0
+        try:
+            result = signals._get_catalyst_lookup()
+        finally:
+            cfg.CATALYST_DIR = original_dir
+            cfg.CONFIG["catalyst_signal_min_score"] = original_min
+
+        assert "AAPL" in result, "AAPL (score 8.5) should be in lookup"
+        assert "NVDA" in result, "NVDA (score 9.0) should be in lookup"
+        assert "MSFT" not in result, "MSFT (score 3.0) is below threshold and must be excluded"
+        assert result["AAPL"] == pytest.approx(8.5)
+        assert result["NVDA"] == pytest.approx(9.0)
