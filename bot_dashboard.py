@@ -263,15 +263,15 @@ def _get_catalyst_payload() -> dict:
                 raw = json.loads(files[0].read_text())
                 candidates = raw.get("candidates", [])
                 date_str = raw.get("date", files[0].stem.replace("candidates_", ""))
-            except Exception:
-                pass
+            except Exception as e:
+                log.warning("[dashboard][_get_catalyst_payload] failed to read %s: %s", files[0].name, e)
 
         edgar_file = CATALYST_DIR / "edgar_events.json"
         if edgar_file.exists():
             try:
                 edgar_events = json.loads(edgar_file.read_text())
-            except Exception:
-                pass
+            except Exception as e:
+                log.warning("[dashboard][_get_catalyst_payload] failed to read edgar_events.json: %s", e)
 
     payload = {
         "candidates": sorted(candidates, key=lambda c: c.get("catalyst_score", 0), reverse=True)[:15],
@@ -630,8 +630,8 @@ class DashHandler(BaseHTTPRequestHandler):
                         updated = _d.get("updated")
                         n_records = _d.get("n_records", 0)
                         using_equal = _d.get("using_equal_weights", True)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        log.warning("[dashboard][/api/ic-weights] failed to read ic_weights.json: %s", e)
                 payload = {
                     "weights": weights,
                     "raw_ic": raw_ic,
