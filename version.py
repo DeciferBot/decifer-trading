@@ -6,5 +6,5 @@
 #   MINOR — new feature shipped (new signal dimension, new agent, new gate)
 #   PATCH — bug fix, parameter tweak, test fix
 
-__version__ = "1.3.0"
-__codename__ = "Regime Router"
+__version__ = "2.0.0"
+__codename__ = "Paper Alpha"

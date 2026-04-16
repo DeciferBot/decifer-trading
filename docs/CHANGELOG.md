@@ -5,6 +5,66 @@ Format: newest entries at the top. Each entry includes the date, what changed, a
 
 ---
 
+## v2.0.0 — 2026-04-16 — "Paper Alpha" (Version 2 baseline)
+
+This release marks the official v2 baseline. The system has been rebuilt from first principles since
+the v1 series. The architecture, signal engine, agent pipeline, and data infrastructure are now stable
+enough to begin treating paper trades as real training data.
+
+### Signal Engine — 10 Dimensions (up from 8)
+- **Added**: Mean-Reversion dimension (#9) — ADF-gated (p < 0.05); scores VR, OU speed, Z-score. Zero score if ADF fails — no exceptions.
+- **Added**: Overnight Drift dimension (#10) — captures gap opens and pre-market momentum.
+- **Changed**: All 10 dimensions are orthogonal (no overlapping oscillators). Each measures a fundamentally different market phenomenon.
+
+### Direction-Agnostic Scoring
+- **Changed**: Signal engine scores setup *conviction*, not direction. Bearish and bullish setups score identically. The long/short ratio is determined by the market, not by regime-switched prompts.
+- **Added**: Short-candidate scanner. Bearish exposure uses inverse ETFs (SPXS, SQQQ, UVXY) — no borrow, no margin.
+
+### 4-Agent Pipeline
+- **Changed**: Devil's Advocate removed. Trading Analyst (Opus) sees all data simultaneously — eliminates anchoring bias.
+- **Changed**: Paper threshold = 3/4 agents agree (aggressive, for data generation). Live threshold stays 4/4.
+- **Added**: Risk Manager hardcoded veto — earnings-48h block, single-position cap clamp, check_risk_conditions gate.
+- **Added**: PM ADD verb — Portfolio Manager can now emit ADD/TRIM/EXIT/HOLD. Opus decides; `calculate_position_size()` sizes ADDs.
+
+### Three-Tier Universe
+- **Removed**: TradingView Screener dependency ripped out entirely.
+- **Added**: Committed universe — top-1000 symbols by dollar volume, weekly refresh.
+- **Added**: Dynamic tier — catalyst hits, held positions, favourites, sympathy plays bypass the committed-universe gate.
+
+### Catalyst Engine
+- **Added**: `catalyst_engine.py` — scores EDGAR filings, earnings surprises, analyst actions in real-time.
+- **Added**: High-conviction catalyst hits receive a flat score boost to clear `min_score_to_trade`.
+- **Wired into**: main signal engine + Chief Decifer dashboard.
+
+### Regime Detector (locked)
+- **Added**: VIX-proxy + SPY EMA hard classifier: BULL_TRENDING / BEAR_TRENDING / CHOPPY / PANIC.
+- **Locked**: HMM explicitly deferred. Gate: ≥200 closed trades + IC Phase 2 review complete. `PRODUCTION_LOCKED = True`.
+
+### IC Scoring (active)
+- **Added**: Information Coefficient tracking is running. Gate for Phase C = 200 closed trades.
+
+### Data Infrastructure
+- **Replaced**: yfinance → Alpaca Algo Trader Plus (primary, real-time).
+- **Added**: FMP Financial Modeling Prep (primary for fundamentals/events — analyst consensus, insider trades, earnings, DCF).
+- **Added**: Three-tier data source priority enforced in code: Alpaca → FMP → Alpha Vantage → IBKR → yfinance.
+
+### Execution
+- **Added**: Smart execution threshold — TWAP/VWAP/Iceberg for orders >$10K or >500 shares. Simple limit below that.
+- **Added**: News Sentinel — 3-agent fast pipeline (15-30s window). Position sizing 0.75× to compensate for lighter analysis.
+
+### Stability
+- **Added**: Config validation on startup — all required keys checked before any trading logic runs.
+- **Added**: Rotating log handler — 50MB per file, 10 backups (500MB ceiling). Prevents log OOM.
+- **Added**: fd soft limit raised to 4096 on boot.
+- **Fixed**: VIX 1h change unit mismatch in regime detector.
+- **Fixed**: EXTREME_STRESS circuit breaker removed (was incorrectly blocking valid PANIC-regime trades).
+
+### Release Infrastructure
+- **Added**: `scripts/bump-version.sh` — one-command release: updates version.py, gates on CHANGELOG edit, commits, tags, pushes.
+- **Added**: Version logged to `decifer.log` on every startup.
+
+---
+
 ## 2026-03-26 — Documentation Overhaul (Rebuild Guide)
 
 ### README.md — Complete Rewrite
