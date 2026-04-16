@@ -137,3 +137,60 @@ class TestSafeTradeHelpers:
             orders._safe_update_trade("AAPL", {"stop": 140.0})
             assert orders_state.active_trades["AAPL"]["stop"] == 140.0
             assert orders_state.active_trades["AAPL"]["qty"] == 10
+
+
+# ---------------------------------------------------------------------------
+# T1-B-5: _persist_positions failure creates flag file + logs ERROR
+# ---------------------------------------------------------------------------
+
+class TestPersistFailureFlagFile:
+    """
+    T1-B-5: When trade_store.persist raises, _persist_positions must:
+    1. Log at ERROR level (was already doing this).
+    2. Write data/persist_failure.flag so the failure survives a restart.
+    """
+
+    def test_persist_failure_creates_flag_file(self, tmp_path, caplog):
+        """persist() raises → flag file written, ERROR logged."""
+        import orders_state as os_mod
+
+        # Point POSITIONS_FILE into tmp_path so flag file lands there
+        flag_path = tmp_path / "persist_failure.flag"
+        original_positions_file = os_mod.POSITIONS_FILE
+        os_mod.POSITIONS_FILE = str(tmp_path / "positions.json")
+
+        try:
+            with patch("orders_state.active_trades", {"AAPL": {"qty": 10}}):
+                with patch("trade_store.persist", side_effect=OSError("disk full")):
+                    with caplog.at_level(logging.ERROR, logger="decifer.orders"):
+                        os_mod._persist_positions()
+        finally:
+            os_mod.POSITIONS_FILE = original_positions_file
+
+        # Flag file must exist
+        assert flag_path.exists(), "persist_failure.flag must be created on persist error"
+        content = flag_path.read_text()
+        assert "persist failed" in content
+        assert "disk full" in content
+
+        # ERROR must be logged
+        msgs = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+        assert any("persist failed" in m for m in msgs), \
+            f"Expected ERROR log about persist failure, got: {msgs}"
+
+    def test_persist_success_does_not_create_flag_file(self, tmp_path):
+        """Successful persist → no flag file."""
+        import orders_state as os_mod
+
+        flag_path = tmp_path / "persist_failure.flag"
+        original_positions_file = os_mod.POSITIONS_FILE
+        os_mod.POSITIONS_FILE = str(tmp_path / "positions.json")
+
+        try:
+            with patch("orders_state.active_trades", {"AAPL": {"qty": 10}}):
+                with patch("trade_store.persist"):  # succeeds, no side_effect
+                    os_mod._persist_positions()
+        finally:
+            os_mod.POSITIONS_FILE = original_positions_file
+
+        assert not flag_path.exists(), "No flag file should be created on successful persist"

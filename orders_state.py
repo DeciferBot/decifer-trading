@@ -89,7 +89,22 @@ def _persist_positions() -> None:
             snapshot = dict(active_trades)  # O(n) copy, fast — lock scope ends here
         persist(snapshot)  # I/O outside lock
     except Exception as e:
-        log.error(f"trade_store persist failed: {e}")
+        log.error(
+            "[orders_state][_persist_positions] trade_store persist failed — "
+            "positions.json may be stale. Check data/persist_failure.flag. Error: %s",
+            e, exc_info=True,
+        )
+        # Write a flag file so the failure is visible even after a bot restart.
+        # The flag file is cheap to write and survives process exit — a human or
+        # startup check can detect it and alert before stale positions cause harm.
+        try:
+            import os as _os
+            from datetime import datetime as _dt
+            _flag = _os.path.join(_os.path.dirname(POSITIONS_FILE), "persist_failure.flag")
+            with open(_flag, "w") as _f:
+                _f.write(f"{_dt.now(UTC).isoformat()} persist failed: {e}\n")
+        except Exception as _fe:
+            log.error("[orders_state][_persist_positions] could not write flag file: %s", _fe)
 
 
 # ── Decision metadata — these fields are written ONCE at trade entry ──────────
