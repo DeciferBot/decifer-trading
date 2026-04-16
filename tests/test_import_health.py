@@ -49,7 +49,7 @@ CORE_MODULE_FILES = [
     "phase_gate.py",
     "risk.py",
     "scanner.py",
-    "signals.py",
+    "signals/__init__.py",
     "telegram_bot.py",
     "wip_tracker.py",
 ]
@@ -86,6 +86,32 @@ def _has_bare_union_annotation(source: str) -> bool:
             if "|" in ann_src:
                 return True
     return False
+
+
+def test_signals_resolves_to_package() -> None:
+    """
+    Regression guard: `import signals` must resolve to signals/__init__.py,
+    not any signals.py at the repo root.
+
+    Python silently prefers a package (signals/) over a same-named module
+    (signals.py) with no warning. If signals.py ever reappears at the repo
+    root, edits to it will be dead code — exactly what happened with the
+    catalyst boost in commit 8a589df. This test makes that mistake visible
+    immediately rather than after a silent production outage.
+    """
+    import importlib, sys
+
+    # Force a fresh import so no stale sys.modules entry interferes.
+    sys.modules.pop("signals", None)
+    import signals  # noqa: PLC0415
+
+    expected_suffix = str(Path("signals") / "__init__.py")
+    actual = signals.__file__ or ""
+    assert actual.endswith(expected_suffix), (
+        f"`import signals` resolved to {actual!r}.\n"
+        f"Expected it to end with {expected_suffix!r}.\n"
+        "A signals.py at the repo root is shadowing the package — delete it."
+    )
 
 
 @pytest.mark.parametrize("filename", CORE_MODULE_FILES)
