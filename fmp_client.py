@@ -10,6 +10,9 @@
 # ║   Set env var: FMP_API_KEY                                   ║
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
+#
+# API base: https://financialmodelingprep.com/stable/
+# (Migrated from legacy /api/v3/ and /api/v4/ — those return HTTP 403 for new keys)
 
 from __future__ import annotations
 
@@ -25,7 +28,7 @@ from config import CONFIG
 
 log = logging.getLogger("decifer.fmp")
 
-_BASE = "https://financialmodelingprep.com/api"
+_BASE = "https://financialmodelingprep.com/stable"
 _CACHE_TTL = 4 * 3600  # 4 hours — same cadence as Alpha Vantage
 
 # ── Tiered cache TTLs (premium: 750 calls/min — refresh aggressively) ────────
@@ -47,24 +50,25 @@ def is_available() -> bool:
     return bool(_api_key())
 
 
-def _get(endpoint: str, params: dict, version: str = "v3", ttl: float | None = None) -> list | dict | None:
+def _get(endpoint: str, params: dict, version: str = "", ttl: float | None = None) -> list | dict | None:
     """
-    Make a GET request to the FMP API.
+    Make a GET request to the FMP stable API.
     Returns parsed JSON or None on any failure.
     Premium: 750 calls/min. ttl overrides global _CACHE_TTL.
+    version param retained for call-site compatibility but ignored — all calls use /stable/.
     """
     key = _api_key()
     if not key:
         log.debug("fmp_client: FMP_API_KEY not set — skipping")
         return None
 
-    cache_key = f"{version}/{endpoint}?{json.dumps(params, sort_keys=True)}"
+    cache_key = f"{endpoint}?{json.dumps(params, sort_keys=True)}"
     cached, fetched_at = _cache.get(cache_key, (None, 0.0))
     effective_ttl = ttl if ttl is not None else _CACHE_TTL
     if cached is not None and (_time.time() - fetched_at) < effective_ttl:
         return cached
 
-    url = f"{_BASE}/{version}/{endpoint}"
+    url = f"{_BASE}/{endpoint}"
     try:
         resp = requests.get(url, params={**params, "apikey": key}, timeout=10)
         resp.raise_for_status()
@@ -101,7 +105,7 @@ def get_economic_calendar(days_ahead: int = 7) -> list[dict]:
     today = date.today()
     end_dt = today + timedelta(days=days_ahead)
     raw = _get(
-        "economic_calendar",
+        "economic-calendar",
         {"from": str(today), "to": str(end_dt)},
         ttl=_TTL_ANALYST,
     )
@@ -154,7 +158,7 @@ def get_earnings_calendar(symbols: list[str] | None = None, days_ahead: int = 5)
     today = date.today()
     end_dt = today + timedelta(days=days_ahead)
     raw = _get(
-        "earning_calendar",
+        "earning-calendar",
         {"from": str(today), "to": str(end_dt)},
         ttl=_TTL_ANALYST,
     )
@@ -203,7 +207,7 @@ def get_analyst_changes(symbols: list[str] | None = None, hours_back: int = 24) 
 
     Returns empty list if endpoint unavailable (premium-only on some plans).
     """
-    raw = _get("upgrades-downgrades-rss-feed", {"page": 0}, version="v4", ttl=_TTL_ANALYST)
+    raw = _get("upgrades-downgrades-rss-feed", {"page": 0}, ttl=_TTL_ANALYST)
     if not raw or not isinstance(raw, list):
         return []
 
@@ -285,11 +289,11 @@ def get_analyst_consensus(symbol: str) -> dict | None:
 
     Returns None if endpoint unavailable (premium) or no data.
     """
-    raw = _get("upgrades-downgrades-consensus", {"symbol": symbol.upper()}, version="v4", ttl=_TTL_ANALYST)
+    raw = _get("grades-consensus", {"symbol": symbol.upper()}, ttl=_TTL_ANALYST)
     if not raw:
         return None
 
-    # v4 endpoint returns a dict with a "consensus" key
+    # stable endpoint returns a dict or list
     item = raw if isinstance(raw, dict) else (raw[0] if isinstance(raw, list) and raw else None)
     if not item:
         return None
@@ -333,29 +337,28 @@ def get_price_target(symbol: str, limit: int = 5) -> dict | None:
         symbol (str)
         latest_pt (float|None)         — most recent individual price target
         pt_consensus (float|None)      — consensus/average across all analysts
-        pt_upside_pct (float|None)     — (pt_consensus - current) / current * 100 [caller must supply price]
+        pt_upside_pct (float|None)     — None here; caller computes against live price
         analyst_count (int)
         last_firm (str)
         last_date (str ISO)
 
-    Note: pt_upside_pct is None here — caller computes it against live price.
     Returns None if unavailable.
     """
-    raw = _get("price-target", {"symbol": symbol.upper(), "limit": limit}, version="v4", ttl=_TTL_ANALYST)
+    raw = _get("price-target", {"symbol": symbol.upper(), "limit": limit}, ttl=_TTL_ANALYST)
     if not raw or not isinstance(raw, list) or not raw:
-        # Fallback: try price-target-consensus
-        consensus_raw = _get("price-target-consensus", {"symbol": symbol.upper()}, version="v4", ttl=_TTL_ANALYST)
+        # Fallback: try price-target-summary
+        consensus_raw = _get("price-target-summary", {"symbol": symbol.upper()}, ttl=_TTL_ANALYST)
         if consensus_raw:
             item = consensus_raw if isinstance(consensus_raw, dict) else (consensus_raw[0] if consensus_raw else None)
             if item:
                 return {
                     "symbol":         symbol.upper(),
-                    "latest_pt":      _safe_float(item.get("priceTargetAverage")),
-                    "pt_consensus":   _safe_float(item.get("priceTargetAverage")),
+                    "latest_pt":      _safe_float(item.get("priceTargetAverage") or item.get("targetConsensus")),
+                    "pt_consensus":   _safe_float(item.get("priceTargetAverage") or item.get("targetConsensus")),
                     "pt_upside_pct":  None,
-                    "analyst_count":  int(item.get("numberOfAnalysts") or 0),
+                    "analyst_count":  int(item.get("numberOfAnalysts") or item.get("analysts") or 0),
                     "last_firm":      "",
-                    "last_date":      (item.get("lastUpdated") or "")[:10],
+                    "last_date":      (item.get("lastUpdated") or item.get("date") or "")[:10],
                 }
         return None
 
@@ -383,42 +386,22 @@ def get_short_interest(symbol: str) -> dict | None:
     """
     Fetch short float percentage for a symbol.
 
-    Tries FMP short-float endpoint first (direct % of float held short).
-    Falls back to short-volume ratio if unavailable.
+    Tries FMP short-volume endpoint (short volume ratio proxy).
+    Note: FMP stable does not expose a direct short-float % endpoint;
+    short_float_pct returned here is short_volume / total_volume * 100
+    (a daily proxy, NOT the FINRA bi-monthly short float %).
 
     Returns dict with:
         symbol (str)
-        short_float_pct (float|None)    — short interest as % of float (0–100)
-                                          e.g. 5.24 means 5.24% of float is short
+        short_float_pct (float|None)    — proxy: short vol / total vol * 100
         short_shares (int|None)
         settlement_date (str)
-        source (str)                    — "short_float" | "short_volume_ratio"
+        source (str)                    — "short_volume_ratio"
 
-    Note: short_float endpoint data is bi-monthly (FINRA settlement).
-          short_volume ratio is a proxy — NOT the same as short float %.
-    Returns None if both endpoints fail.
+    Returns None if unavailable.
     """
-    # Primary: direct short-float percentage (bi-monthly FINRA data)
-    raw_sf = _get(f"short-float", {"symbol": symbol.upper()}, version="v3", ttl=_TTL_FUNDAMENTALS)
-    if raw_sf:
-        item = raw_sf if isinstance(raw_sf, dict) else (raw_sf[0] if isinstance(raw_sf, list) and raw_sf else None)
-        if item:
-            sf_pct = _safe_float(
-                item.get("shortFloat") or item.get("shortPercent") or item.get("short_float")
-            )
-            if sf_pct is not None:
-                return {
-                    "symbol":          symbol.upper(),
-                    "short_float_pct": round(sf_pct, 2),
-                    "short_shares":    int(_safe_float(item.get("shortShares") or 0) or 0) or None,
-                    "settlement_date": (item.get("date") or item.get("settlementDate") or "")[:10],
-                    "source":          "short_float",
-                }
-
-    # Fallback: short-volume ratio (shortVolume / totalVolume)
-    # NOTE: this is NOT short float % — it is the fraction of today's
-    # volume that was short. Typical range 40–60%. Treat as approximate proxy only.
-    raw_sv = _get("short-volume", {"symbol": symbol.upper()}, version="v4", ttl=_TTL_FUNDAMENTALS)
+    # FMP stable: short-selling/daily-volume (symbol-level short volume)
+    raw_sv = _get("short-selling/daily-volume", {"symbol": symbol.upper()}, ttl=_TTL_FUNDAMENTALS)
     if not raw_sv or not isinstance(raw_sv, list) or not raw_sv:
         return None
 
@@ -460,8 +443,8 @@ def get_revenue_growth(symbol: str) -> dict | None:
     """
     # ── Primary: pre-calculated growth rates ─────────────────────────────────
     growth_raw = _get(
-        f"income-statement-growth/{symbol.upper()}",
-        {"period": "quarter", "limit": 3},
+        "income-statement-growth",
+        {"symbol": symbol.upper(), "period": "quarter", "limit": 3},
     )
     if growth_raw and isinstance(growth_raw, list) and len(growth_raw) >= 2:
         cur  = growth_raw[0]
@@ -471,7 +454,6 @@ def get_revenue_growth(symbol: str) -> dict | None:
             yoy = round(yoy * 100, 2)  # FMP returns decimal e.g. 0.31 → 31%
         qoq_raw = _safe_float(cur.get("growthRevenueQoQ") or cur.get("growthRevenueq"))
         if qoq_raw is None:
-            # Approximate QoQ from sequential revenue if not directly available
             qoq_raw = None
         else:
             qoq_raw = round(qoq_raw * 100, 2)
@@ -496,8 +478,8 @@ def get_revenue_growth(symbol: str) -> dict | None:
 
     # ── Fallback: manual computation from raw income statements ──────────────
     raw = _get(
-        f"income-statement/{symbol.upper()}",
-        {"period": "quarter", "limit": 5},
+        "income-statement",
+        {"symbol": symbol.upper(), "period": "quarter", "limit": 5},
     )
     if not raw or not isinstance(raw, list) or len(raw) < 4:
         return None
@@ -558,7 +540,7 @@ def get_eps_acceleration(symbol: str) -> dict | None:
 
     Returns None if insufficient data.
     """
-    raw = _get(f"historical/earning_calendar/{symbol.upper()}", {"limit": 8})
+    raw = _get("historical-earning-calendar", {"symbol": symbol.upper(), "limit": 8})
     if not raw or not isinstance(raw, list) or len(raw) < 4:
         return None
 
@@ -614,7 +596,7 @@ def get_company_sector(symbol: str) -> str | None:
     Fetches company profile from FMP and maps sector name to SPDR ETF.
     Returns None if unavailable or unmapped.
     """
-    raw = _get(f"profile/{symbol.upper()}", {})
+    raw = _get("profile", {"symbol": symbol.upper()})
     if not raw:
         return None
 
@@ -641,7 +623,7 @@ def get_company_profile(symbol: str) -> dict | None:
 
     Returns None on failure.
     """
-    raw = _get(f"profile/{symbol.upper()}", {})
+    raw = _get("profile", {"symbol": symbol.upper()})
     if not raw:
         return None
 
@@ -678,7 +660,7 @@ def get_analyst_grades(symbol: str) -> dict | None:
 
     Returns None if unavailable.
     """
-    raw = _get(f"grades-summary/{symbol.upper()}", {}, version="v4", ttl=_TTL_ANALYST)
+    raw = _get("grades-consensus", {"symbol": symbol.upper()}, ttl=_TTL_ANALYST)
     if not raw:
         return None
 
@@ -728,7 +710,7 @@ def get_insider_sentiment(symbol: str, days: int = 90) -> dict | None:
 
     Returns None if no filings found or endpoint unavailable.
     """
-    raw = _get("insider-trading", {"symbol": symbol.upper(), "page": 0}, version="v4", ttl=_TTL_INSIDER)
+    raw = _get("insider-trading/search", {"symbol": symbol.upper()}, ttl=_TTL_INSIDER)
     if not raw or not isinstance(raw, list):
         return None
 
@@ -802,8 +784,8 @@ def get_congressional_trades(symbol: str, days: int = 90) -> dict | None:
 
     Returns None if no recent congressional trades found.
     """
-    senate = _get("senate-trading",    {"symbol": symbol.upper()}, version="v4", ttl=_TTL_CONGRESS)
-    house  = _get("house-disclosure",  {"symbol": symbol.upper()}, version="v4", ttl=_TTL_CONGRESS)
+    senate = _get("senate-trades",    {"symbol": symbol.upper()}, ttl=_TTL_CONGRESS)
+    house  = _get("house-trades",     {"symbol": symbol.upper()}, ttl=_TTL_CONGRESS)
 
     cutoff = datetime.now(UTC) - timedelta(days=days)
     buy_count = sell_count = 0
@@ -885,7 +867,7 @@ def get_key_metrics_ttm(symbol: str) -> dict | None:
 
     Returns None if unavailable.
     """
-    raw = _get(f"key-metrics-ttm/{symbol.upper()}", {}, ttl=_TTL_FUNDAMENTALS)
+    raw = _get("key-metrics-ttm", {"symbol": symbol.upper()}, ttl=_TTL_FUNDAMENTALS)
     if not raw:
         return None
 
@@ -925,9 +907,8 @@ def get_analyst_estimates(symbol: str) -> dict | None:
     Returns None if unavailable.
     """
     raw = _get(
-        f"analyst-estimates/{symbol.upper()}",
-        {"period": "quarter", "limit": 1},
-        version="v4",
+        "analyst-estimates",
+        {"symbol": symbol.upper(), "period": "quarter", "limit": 1},
         ttl=_TTL_ANALYST,
     )
     if not raw or not isinstance(raw, list) or not raw:
@@ -945,51 +926,12 @@ def get_analyst_estimates(symbol: str) -> dict | None:
     }
 
 
-# ── Key Financial Metrics (TTM) ───────────────────────────────────────────────
-
-
-def get_key_metrics_ttm(symbol: str) -> dict | None:
-    """
-    Fetch trailing 12-month (TTM) key financial metrics: margins, FCF yield, P/E, ROE.
-
-    Returns dict with:
-        symbol (str)
-        gross_margin (float|None)      — gross margin % (e.g. 45.0 for 45%)
-        operating_margin (float|None)  — operating margin %
-        net_margin (float|None)        — net profit margin %
-        fcf_yield (float|None)         — free cash flow yield %
-        pe_ratio (float|None)          — trailing P/E
-        roe (float|None)               — return on equity %
-        debt_to_equity (float|None)    — D/E ratio
-
-    Returns None if unavailable.
-    """
-    raw = _get(f"key-metrics-ttm/{symbol.upper()}", {}, ttl=_TTL_FUNDAMENTALS)
-    if not raw:
-        return None
-
-    item = raw if isinstance(raw, dict) else (raw[0] if isinstance(raw, list) and raw else None)
-    if not item:
-        return None
-
-    return {
-        "symbol":           symbol.upper(),
-        "gross_margin":     _safe_pct(item.get("grossProfitMarginTTM") or item.get("grossProfitMargin")),
-        "operating_margin": _safe_pct(item.get("operatingProfitMarginTTM") or item.get("operatingProfitMargin")),
-        "net_margin":       _safe_pct(item.get("netProfitMarginTTM") or item.get("netProfitMargin")),
-        "fcf_yield":        _safe_pct(item.get("fcfYieldTTM") or item.get("freeCashFlowYieldTTM")),
-        "pe_ratio":         _safe_float(item.get("peRatioTTM") or item.get("peRatio")),
-        "roe":              _safe_pct(item.get("roeTTM") or item.get("returnOnEquityTTM")),
-        "debt_to_equity":   _safe_float(item.get("debtToEquityTTM") or item.get("debtToEquity")),
-    }
-
-
 # ── DCF Valuation ─────────────────────────────────────────────────────────────
 
 
 def get_dcf_value(symbol: str) -> dict | None:
     """
-    Fetch FMP's levered DCF-implied intrinsic value per share.
+    Fetch FMP's DCF-implied intrinsic value per share.
     Useful for POSITION entries — provides margin-of-safety check.
 
     Returns dict with:
@@ -1001,9 +943,8 @@ def get_dcf_value(symbol: str) -> dict | None:
     Returns None if unavailable (model requires full fundamental data).
     """
     raw = _get(
-        "advanced_discounted_cash_flow",
+        "discounted-cash-flow",
         {"symbol": symbol.upper()},
-        version="v4",
         ttl=_TTL_FUNDAMENTALS,
     )
     if not raw:
@@ -1040,7 +981,7 @@ def get_stock_news(symbol: str, limit: int = 5) -> list[dict]:
 
     Returns empty list on failure.
     """
-    raw = _get("stock_news", {"tickers": symbol.upper(), "limit": limit}, ttl=_TTL_NEWS)
+    raw = _get("news/stock", {"symbols": symbol.upper(), "limit": limit}, ttl=_TTL_NEWS)
     if not raw or not isinstance(raw, list):
         return []
 
@@ -1072,7 +1013,7 @@ def get_shares_float(symbol: str) -> dict | None:
 
     Returns None if unavailable.
     """
-    raw = _get("shares_float", {"symbol": symbol.upper()}, version="v4", ttl=_TTL_FUNDAMENTALS)
+    raw = _get("shares-float", {"symbol": symbol.upper()}, ttl=_TTL_FUNDAMENTALS)
     if not raw:
         return None
 
@@ -1112,9 +1053,8 @@ def get_institutional_ownership(symbol: str) -> dict | None:
     Returns None if unavailable.
     """
     raw = _get(
-        "institutional-ownership/institutional-holders",
-        {"symbol": symbol.upper(), "page": 0, "includeCurrentQuarter": "false"},
-        version="v4",
+        "institutional-ownership/symbol-positions-summary",
+        {"symbol": symbol.upper()},
         ttl=_TTL_FUNDAMENTALS,
     )
     if not raw or not isinstance(raw, list) or not raw:
@@ -1127,11 +1067,6 @@ def get_institutional_ownership(symbol: str) -> dict | None:
     if not current:
         return None
 
-    # Aggregate shares / total outstanding to get ownership %
-    inst_shares = _safe_float(
-        current.get("totalShares") or current.get("sharesHeld") or current.get("shares")
-    )
-    # Try direct % field first
     own_pct = _safe_pct(
         current.get("ownershipPercent") or current.get("institutionalOwnershipPercentage")
     )
