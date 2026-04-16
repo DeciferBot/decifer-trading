@@ -548,6 +548,33 @@ def reconcile_with_ibkr(ib: IB):
                             active_trades[key]["current_premium"] = round(validated_price, 4)
                     log.debug(f"Reconcile {key}: price updated to ${validated_price:.4f} via {src_desc}")
 
+                    # ── Metadata recovery for known positions with UNKNOWN trade_type ──
+                    # Positions loaded from positions.json with UNKNOWN (e.g. after a
+                    # migration or crash that cleared the store) get a second chance here.
+                    stored_tt = active_trades[key].get("trade_type", "")
+                    if not stored_tt or stored_tt == "UNKNOWN":
+                        instrument_type = "option" if is_option else ("fx" if is_fx else "stock")
+                        _saved = _find_saved(key, sym, instrument_type)
+                        if _saved and _saved.get("trade_type") and _saved["trade_type"] != "UNKNOWN":
+                            log.info(
+                                f"Reconcile {key}: late metadata recovery (trade_type={_saved.get('trade_type', '?')})"
+                            )
+                            with _trades_lock:
+                                for _mf in (
+                                    "trade_type", "conviction", "reasoning", "signal_scores",
+                                    "agent_outputs", "entry_score", "open_time", "atr",
+                                    "entry_regime", "entry_thesis", "pattern_id", "setup_type",
+                                    "ic_weights_at_entry", "advice_id", "high_water_mark",
+                                    "tranche_mode", "t1_qty", "t2_qty", "t1_status", "t1_order_id",
+                                ):
+                                    if _mf in _saved:
+                                        active_trades[key][_mf] = _saved[_mf]
+                                if _saved.get("score", 0) > 0:
+                                    active_trades[key]["score"] = _saved["score"]
+                                active_trades[key].pop("metadata_status", None)
+                                active_trades[key]["_metadata_restored"] = True
+                            _save_positions_file()
+
                     # Reattach SL bracket order ID if we didn't carry one.
                     # FX skipped: _reattach_sl_order matches by contract.symbol
                     # which is base currency ("EUR") not the pair ("EURUSD"),
