@@ -100,6 +100,12 @@ ACTIONS (use exactly one per position):
           technical signals are not decisively strengthening — large realized losses on a symbol
           are empirical evidence that the thesis keeps failing in practice, even if it looks
           intact on paper. Do not keep re-entering the same broken name.
+          NEWS RULE: Absence of news (no signal, silent news dimension) is NOT a reason to
+          exit — it is silence, not contradiction. Bear/negative news coverage on a held LONG
+          (or bull news on a SHORT) CAN support an EXIT — use judgment on severity.
+          SCORE RULE: Entry score is an entry filter only. A low current score does not mean
+          the thesis is broken — it means no fresh entry setup exists right now. Exit on thesis
+          invalidation, not on score level.
 
   ADD   — Strengthen the position. Do NOT require a single narrow trigger. Legitimate reasons
           include, non-exhaustively:
@@ -117,8 +123,11 @@ ACTIONS (use exactly one per position):
 
 TRADE TYPES — each position has a type that sets the review lens. Use them to weight factors,
 not as rigid rules:
-  SCALP — short-hold, pure technical. Score drift matters a lot. Noise tolerance: low.
+  SCALP — short-hold, pure technical. Momentum and direction are what matter.
+          If momentum has not fired and direction has flipped against you, thesis is stale → EXIT.
+          Score level alone is not grounds for exit — only momentum failure and direction flip are.
   SWING — technical entry with backing thesis. Moderate tolerance; news and regime matter.
+          Score drift is noise. Regime flip against entry direction is the thesis invalidation signal.
   HOLD  — thesis-driven, longer horizon. Technical noise should be ignored; the thesis line
           in the data block below is what to judge against.
 
@@ -277,8 +286,14 @@ def run_portfolio_review(
         current_dim = breakdown_map.get(sym) or {}
         ic_weights = p.get("ic_weights_at_entry") or {}
         dim_lines = []
+        # overnight_drift is an entry-only signal — it scores the overnight positioning
+        # window and is spent once the trade is open.  Showing its delta (always negative
+        # as the session progresses) misleads Opus into treating decay as thesis failure.
+        _ENTRY_ONLY_DIMS = {"overnight_drift"}
         if entry_dim or current_dim:
-            all_dims = sorted(set(entry_dim.keys()) | set(current_dim.keys()))
+            all_dims = sorted(
+                (set(entry_dim.keys()) | set(current_dim.keys())) - _ENTRY_ONLY_DIMS
+            )
             for dim in all_dims:
                 try:
                     e_val = float(entry_dim.get(dim, 0) or 0)
@@ -398,6 +413,8 @@ def lightweight_cycle_check(
     Rules by trade_type:
       SCALP — time_in_trade > scalp_max_hold_minutes AND pnl < scalp_min_pnl_pct
                → EXIT: momentum thesis did not fire; free the capital.
+      SCALP — direction flipped against entry OR momentum collapsed (was load-bearing, now zero)
+               → REVIEW: thesis driver not playing out; Opus review required.
       SWING — regime changed since entry (entry_regime != current_regime)
                → REVIEW: queue for full Opus PM review this cycle.
       HOLD  — polar regime flip (BULL→BEAR or BEAR→BULL) since entry
@@ -414,18 +431,23 @@ def lightweight_cycle_check(
     current_regime = regime.get("session_character") or regime.get("regime", "UNKNOWN")
     scalp_max_mins = pm_cfg.get("scalp_max_hold_minutes", 90)
     scalp_min_pnl = pm_cfg.get("scalp_min_pnl_pct", 0.003)  # 0.3%
-    score_collapse_delta = pm_cfg.get("cycle_score_collapse_threshold", 10)
+    scalp_mom_entry_min = pm_cfg.get("scalp_momentum_entry_min", 4)
+    scalp_mom_current_max = pm_cfg.get("scalp_momentum_current_max", 1)
 
-    # Build current-score lookup from latest scan results (symbol → score)
+    # Build current-score, direction, and momentum lookups from latest scan results
     scored_map: dict = {}
+    direction_map: dict = {}
+    momentum_map: dict = {}
     for s in all_scored or []:
         sym_key = s.get("symbol") or s.get("ticker")
-        score_val = s.get("score") or s.get("conviction_score", 0)
-        if sym_key:
-            try:
-                scored_map[sym_key] = float(score_val)
-            except (TypeError, ValueError):
-                pass
+        if not sym_key:
+            continue
+        try:
+            scored_map[sym_key] = float(s.get("score") or s.get("conviction_score", 0))
+        except (TypeError, ValueError):
+            pass
+        direction_map[sym_key] = s.get("direction", "NEUTRAL")
+        momentum_map[sym_key] = float((s.get("score_breakdown") or {}).get("momentum", 0) or 0)
 
     now_utc = datetime.now(UTC)
     actions = []
@@ -447,6 +469,7 @@ def lightweight_cycle_check(
         pnl_pct = ((current_price - entry_price) / entry_price) if entry_price > 0 else 0
 
         if trade_type == "SCALP":
+            # Timeout: momentum never fired → mechanical exit
             if mins_held > scalp_max_mins and pnl_pct < scalp_min_pnl:
                 actions.append(
                     {
@@ -460,6 +483,31 @@ def lightweight_cycle_check(
                     }
                 )
                 actioned_syms.add(sym)
+            else:
+                # Thesis check: direction flipped OR momentum collapsed → Opus review
+                entry_dir = pos.get("direction", "LONG")
+                current_dir = direction_map.get(sym, "NEUTRAL")
+                entry_mom = float((pos.get("signal_scores") or {}).get("momentum", 0) or 0)
+                current_mom = momentum_map.get(sym, 0)
+                dir_flipped = (
+                    (entry_dir == "LONG" and current_dir == "SHORT")
+                    or (entry_dir == "SHORT" and current_dir == "LONG")
+                )
+                mom_lost = entry_mom >= scalp_mom_entry_min and current_mom <= scalp_mom_current_max
+                if dir_flipped or mom_lost:
+                    reason = "direction_flipped" if dir_flipped else "momentum_lost"
+                    actions.append(
+                        {
+                            "symbol": sym,
+                            "action": "REVIEW",
+                            "reasoning": (
+                                f"SCALP {reason}: entry_dir={entry_dir} current_dir={current_dir} "
+                                f"entry_mom={entry_mom:.0f} current_mom={current_mom:.0f} — "
+                                "thesis driver not playing out; Opus review required"
+                            ),
+                        }
+                    )
+                    actioned_syms.add(sym)
 
         elif trade_type == "SWING":
             if entry_regime and current_regime and entry_regime != current_regime:
@@ -491,28 +539,6 @@ def lightweight_cycle_check(
                 )
                 actioned_syms.add(sym)
 
-        # Score collapse check — applies to all trade types not already actioned.
-        # If signal quality has materially deteriorated since entry, queue a review
-        # before the bracket fires so the exit can be thesis-driven, not price-driven.
-        if sym not in actioned_syms and sym in scored_map:
-            entry_sc = pos.get("entry_score") or pos.get("score") or 0
-            current_sc = scored_map[sym]
-            try:
-                drop = float(entry_sc) - float(current_sc)
-            except (TypeError, ValueError):
-                drop = 0
-            if drop >= score_collapse_delta:
-                actions.append(
-                    {
-                        "symbol": sym,
-                        "action": "REVIEW",
-                        "reasoning": (
-                            f"Signal quality collapsed: entry_score={entry_sc:.0f} → "
-                            f"current={current_sc:.0f} (drop={drop:.0f}pts ≥ threshold={score_collapse_delta}); "
-                            "original setup may no longer be valid — review thesis before bracket fires"
-                        ),
-                    }
-                )
 
     return actions
 

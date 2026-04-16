@@ -874,13 +874,13 @@ def _should_run_portfolio_review(
     Triggers (checked in priority order):
       pre_market    — once per day before session open
       regime_change — current regime differs from last known
-      score_collapse — any held position score collapsed further since last review
+      scalp_signal_lost — held SCALP: direction flipped against entry OR momentum collapsed
       news_hit      — keyword_score on a held symbol changed materially since last review
       earnings_risk — any held symbol has earnings within 48 hours
       cascade       — 2+ stop losses hit this session
       drawdown      — daily PnL / portfolio < -1.5%
 
-    news_hit and score_collapse are EDGE triggers: they only fire when the
+    news_hit and scalp_signal_lost are EDGE triggers: they only fire when the
     underlying value has changed materially since the last review, not simply
     because the condition persists. This prevents a single persistent news event
     (e.g. tariff headlines keeping GLD keyword_score elevated) from re-triggering
@@ -915,24 +915,34 @@ def _should_run_portfolio_review(
     if not open_positions:
         return False, ""
 
-    # 3. Score collapse — edge trigger: fires only when score has collapsed
-    #    FURTHER (by >= re_collapse_delta) since the last review.
-    #    Once reviewed at a collapsed score, don't re-fire just because it stays collapsed.
-    collapse_thresh = pm_cfg.get("score_collapse_threshold", 15)
-    re_collapse_delta = pm_cfg.get("score_collapse_redfire_delta", 5)
+    # 3. SCALP signal lost — direction flipped against entry OR momentum
+    #    (the primary SCALP driver) collapsed from load-bearing at entry to zero.
+    #    Score level alone is not a trigger — entry score is an entry filter, not
+    #    an exit driver.  Absence of signal (no news, overnight_drift fading) is
+    #    silence, not thesis change.  Only fire for SCALP positions.
+    scalp_mom_entry_min = pm_cfg.get("scalp_momentum_entry_min", 4)
+    scalp_mom_current_max = pm_cfg.get("scalp_momentum_current_max", 1)
     scored_map = {s["symbol"]: s.get("score", 0) for s in all_scored}
+    _dir_map = {s["symbol"]: s.get("direction", "NEUTRAL") for s in all_scored if s.get("symbol")}
+    _mom_map = {
+        s["symbol"]: float((s.get("score_breakdown") or {}).get("momentum", 0) or 0)
+        for s in all_scored if s.get("symbol")
+    }
     for pos in open_positions:
+        if pos.get("trade_type", "SCALP") != "SCALP":
+            continue
         sym = pos.get("symbol", "")
-        entry_sc = pos.get("entry_score", pos.get("score", 0))
-        current_sc = scored_map.get(sym)
-        if current_sc is None:
-            continue
-        if (entry_sc - current_sc) < collapse_thresh:
-            continue
-        # Score is collapsed. Only fire if it's dropped further than last review.
-        last_sc = _last_collapse_scores.get(sym)
-        if last_sc is None or (last_sc - current_sc) >= re_collapse_delta:
-            return True, "score_collapse"
+        entry_dir = pos.get("direction", "LONG")
+        current_dir = _dir_map.get(sym, "NEUTRAL")
+        entry_mom = float((pos.get("signal_scores") or {}).get("momentum", 0) or 0)
+        current_mom = _mom_map.get(sym, 0)
+        dir_flipped = (
+            (entry_dir == "LONG" and current_dir == "SHORT")
+            or (entry_dir == "SHORT" and current_dir == "LONG")
+        )
+        mom_lost = entry_mom >= scalp_mom_entry_min and current_mom <= scalp_mom_current_max
+        if dir_flipped or mom_lost:
+            return True, "scalp_signal_lost"
 
     # 3b. Held-score rise — edge trigger: fires when a held position's score has
     #     risen materially since entry AND reached a minimum conviction threshold.

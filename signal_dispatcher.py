@@ -96,6 +96,30 @@ def dispatch_signals(
     if isinstance(regime, dict):
         regime["session_character"] = session_character
 
+    # ── Circuit breaker hard gate ──────────────────────────────────────────────
+    # EXTREME_STRESS / CAPITULATION: score_universe() runs before this call and
+    # uses the VIX-proxy regime string (TRENDING_UP etc.) — its threshold check
+    # of 99 never fires here.  This gate is the actual enforcement point.
+    if session_character in ("EXTREME_STRESS", "CAPITULATION"):
+        log.warning(
+            "[dispatch] Circuit breaker active: %s — blocking all %d signals. %s",
+            session_character,
+            len(signals),
+            market_read[:120],
+        )
+        return [
+            {
+                "signal": s,
+                "success": False,
+                "side": "AVOIDED",
+                "price": s.price,
+                "trade_type": "",
+                "conviction": 0.0,
+                "skip_reason": f"circuit_breaker:{session_character}",
+            }
+            for s in signals
+        ]
+
     # Build lookup: symbol → SignalClassification
     # If a symbol appears more than once (shouldn't), last entry wins.
     class_map = {c.symbol: c for c in classifications}

@@ -271,6 +271,7 @@ def log_signal_scan(scored: list, regime: dict) -> None:
     try:
         with open(SIGNALS_LOG_FILE, "a") as f:
             for sig in scored:
+                _nd = sig.get("news") or {}
                 record = {
                     "ts": datetime.now(UTC).isoformat(),
                     "scan_id": scan_id,
@@ -282,6 +283,14 @@ def log_signal_scan(scored: list, regime: dict) -> None:
                     "vix": regime.get("vix"),
                     "score_breakdown": sig.get("score_breakdown", {}),
                     "disabled_dims": sig.get("disabled_dimensions", []),
+                    "news_debug": {
+                        "headline_count": _nd.get("headline_count", 0),
+                        "recency_hours": _nd.get("recency_hours", 999),
+                        "keyword_score": _nd.get("keyword_score", 0),
+                        "keyword_hits": _nd.get("keyword_hits", []),
+                        "claude_sentiment": _nd.get("claude_sentiment", ""),
+                        "av_sentiment_label": _nd.get("av_sentiment_label", ""),
+                    } if _nd else {},
                 }
                 f.write(json.dumps(record) + "\n")
     except Exception as e:
