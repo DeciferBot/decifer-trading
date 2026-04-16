@@ -128,7 +128,27 @@ TWAP/VWAP/Iceberg only for orders above $10K notional or 500 shares. Smaller ord
    - Add the decision + reasoning to `docs/DECISIONS.md`
    - Update `memory/project_decifer.md` if phase or gates changed
    - The Stop hook will catch misses and prompt you automatically
-6. **DRAFT SUMMARY** — write session log for Amit to approve before committing
+6. **DRAFT SUMMARY** — write session log for Amit to approve before committing. Use this format every time:
+
+```
+DATE: [today]
+
+WHAT CHANGED:
+  - [file or feature]: [what was built/fixed and why]
+
+WHAT WAS DELETED:
+  - [file or function removed, or "nothing deleted"]
+
+DECISIONS MADE:
+  - [any locked architectural decision, or "none"]
+
+TESTS:
+  - [pass/fail count, or "tests not applicable"]
+
+WHAT IS NEXT:
+  - [next logical task, or "nothing — phase gate not met"]
+```
+
 7. **COMMIT & PUSH** — only after Amit approves
 
 ---

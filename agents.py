@@ -734,6 +734,17 @@ def agent_trading_analyst(
     except Exception:
         pass
 
+    voice_block = ""
+    try:
+        import os as _os
+        _vm = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "data", "voice_memos.md")
+        if _os.path.exists(_vm):
+            _vm_text = open(_vm).read().strip()
+            if _vm_text:
+                voice_block = f"\nUSER VOICE NOTES (written today by the trader):\n{_vm_text}\n"
+    except Exception:
+        pass
+
     # ── Catalyst candidates block ─────────────────────────────────────────────
     # Cross-reference scored signals against the M&A catalyst screener.
     # Only show candidates that appear in the current signal set so the block
@@ -823,7 +834,7 @@ def agent_trading_analyst(
 
     prompt = f"""REGIME: {regime_name} | VIX={vix:.1f} ({vix_1h:+.1f}%/1h) | size_mult={size_mult:.1f}x
 SPY=${spy} ({"above" if spy_above else "below"} 200d MA) | QQQ=${qqq} ({"above" if qqq_above else "below"} 200d MA)
-{account_block}{overnight_block}{catalyst_block}{held_block}
+{account_block}{overnight_block}{voice_block}{catalyst_block}{held_block}
 SCORED SIGNALS — fresh candidates first (NOT already held):
 {chr(10).join(sig_lines) or "  None above threshold"}
 

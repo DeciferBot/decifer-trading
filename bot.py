@@ -132,6 +132,158 @@ def save_favourites(favs: list):
         json.dump(favs, f)
 
 
+# ── Voice command execution (main-thread, called from the main loop) ──────────
+
+def _log_voice_audit_bot(action: str, symbol, voice_text: str, result: str) -> None:
+    """Append a voice execution event to data/audit_log.jsonl (main-thread scope)."""
+    import json as _json
+    from datetime import datetime, timezone
+
+    _path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "audit_log.jsonl")
+    try:
+        with open(_path, "a") as f:
+            f.write(_json.dumps({
+                "type": "voice_execution",
+                "action": action,
+                "symbol": symbol,
+                "voice_text": voice_text,
+                "result": result,
+                "ts": datetime.now(timezone.utc).isoformat(),
+            }) + "\n")
+    except Exception:
+        pass
+
+
+def _execute_voice_sell(ib, dash: dict, symbol: str, cmd: dict) -> None:
+    from orders_core import execute_sell
+    from bot_voice import speak as _speak
+
+    clog("TRADE", f"[VOICE] Executing sell for {symbol}")
+    success = execute_sell(ib, symbol, reason="voice_command")
+    if success:
+        _speak(f"Closing {symbol}.")
+        _log_voice_audit_bot("execute_sell", symbol, cmd.get("voice_text", ""), "success")
+    else:
+        _speak(f"Could not close {symbol}. It may not be in the portfolio.")
+        _log_voice_audit_bot("execute_sell", symbol, cmd.get("voice_text", ""), "failed")
+
+
+def _execute_voice_buy(ib, dash: dict, symbol: str, cmd: dict) -> None:
+    import pandas as pd
+    from bot_voice import speak as _speak
+
+    clog("TRADE", f"[VOICE] Executing buy for {symbol}")
+
+    # 1. Get live price (IBKR first, Alpaca fallback)
+    price = 0.0
+    try:
+        from orders_contracts import get_contract, _get_ibkr_price
+        contract = get_contract(symbol, "stock")
+        ib.qualifyContracts(contract)
+        price = _get_ibkr_price(ib, contract, fallback=0)
+    except Exception as e:
+        clog("WARN", f"[VOICE] IBKR price failed for {symbol}: {e}")
+
+    if price <= 0:
+        try:
+            from alpaca_data import fetch_snapshots
+            snap = fetch_snapshots([symbol])
+            price = (snap.get(symbol) or {}).get("price", 0.0)
+        except Exception as e:
+            clog("WARN", f"[VOICE] Alpaca price failed for {symbol}: {e}")
+
+    if price <= 0:
+        _speak(f"Could not get a price for {symbol}. Trade aborted.")
+        _log_voice_audit_bot("execute_buy", symbol, cmd.get("voice_text", ""), "no_price")
+        return
+
+    # 2. Compute ATR from 10 days of daily bars (fallback: 2% of price)
+    atr = price * 0.02
+    try:
+        from alpaca_data import fetch_bars
+        bars = fetch_bars(symbol, period="10d", interval="1d")
+        if bars is not None and len(bars) >= 5:
+            hi = bars["High"]
+            lo = bars["Low"]
+            cl = bars["Close"]
+            tr = pd.concat([
+                hi - lo,
+                (hi - cl.shift()).abs(),
+                (lo - cl.shift()).abs(),
+            ], axis=1).max(axis=1)
+            atr_val = float(tr.rolling(10).mean().dropna().iloc[-1])
+            if atr_val > 0:
+                atr = atr_val
+    except Exception as e:
+        clog("WARN", f"[VOICE] ATR calculation failed for {symbol}: {e}")
+
+    # 3. Execute — all guards inside execute_buy run normally
+    portfolio_value = dash.get("portfolio_value", 0)
+    regime = dash.get("regime", {})
+
+    from orders_core import execute_buy
+    success = execute_buy(
+        ib=ib,
+        symbol=symbol,
+        price=price,
+        atr=atr,
+        score=30,  # minimum viable — no Kelly boost, all risk guards still apply
+        portfolio_value=portfolio_value,
+        regime=regime,
+        reasoning="voice_command",
+    )
+    if success:
+        _speak(f"Buy order placed for {symbol}.")
+        _log_voice_audit_bot("execute_buy", symbol, cmd.get("voice_text", ""), "success")
+    else:
+        _speak(f"Could not buy {symbol}. Check the logs for details.")
+        _log_voice_audit_bot("execute_buy", symbol, cmd.get("voice_text", ""), "failed_guards")
+
+
+def _process_voice_commands(ib, dash: dict) -> None:
+    """Process confirmed voice trade commands. Called on the main thread every tick.
+
+    Skipped while a scan is in progress — prevents stale-data races on dash and
+    active_trades. Commands wait in bot_state._pending_voice_commands until the
+    scan finishes (typically 15–45 s delay, acceptable for a paper account).
+    """
+    from datetime import datetime, timezone
+    from bot_voice import speak as _speak
+
+    if dash.get("scanning") or dash.get("killed"):
+        return
+
+    q = bot_state._pending_voice_commands
+    if not q:
+        return
+
+    now = datetime.now(timezone.utc)
+
+    # Expire stale commands (older than 120 s) — scan can take 45 s, 120 s gives
+    # the user comfortable room to say "confirm" even if a scan starts immediately.
+    expired = [c for c in list(q) if (now - c["created_at"]).total_seconds() > 120]
+    for cmd in expired:
+        try:
+            q.remove(cmd)
+        except ValueError:
+            pass
+        sym = cmd.get("symbol", "unknown")
+        _speak(f"The pending {cmd['type'].lower().replace('_', ' ')} for {sym} expired. Please try again.")
+        _log_voice_audit_bot("expired", sym, cmd.get("voice_text", ""), "expired")
+
+    # Process confirmed commands from the front of the queue
+    while q:
+        cmd = q[0]
+        if not cmd.get("confirmed"):
+            break  # Front is unconfirmed — wait for user to say "confirm"
+        q.popleft()
+        sym = cmd.get("symbol", "").upper()
+        if cmd["type"] == "TRADE_SELL":
+            _execute_voice_sell(ib, dash, sym, cmd)
+        elif cmd["type"] == "TRADE_BUY":
+            _execute_voice_buy(ib, dash, sym, cmd)
+
+
 def load_settings_overrides():
     """Load persisted settings overrides and apply them to CONFIG."""
     try:
@@ -665,6 +817,9 @@ def main():
 
             # ── Process individual position close requests ──
             _process_close_queue()
+
+            # ── Process confirmed voice trade commands (main-thread IBKR safety) ──
+            _process_voice_commands(bot_state.ib, dash)
 
             # ── Sync sentinel state to dashboard ──
             if bot_state._sentinel:

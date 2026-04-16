@@ -1155,13 +1155,29 @@ class DashHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({"ok": False, "error": "No question provided"}).encode())
             else:
                 try:
-                    from bot_voice import answer_voice_query
+                    from bot_voice import (
+                        answer_voice_query,
+                        classify_voice_intent,
+                        handle_voice_command,
+                        speak,
+                    )
 
-                    answer = answer_voice_query(question, dash)
+                    intent = classify_voice_intent(question)
+                    if intent["intent"] == "QA":
+                        # answer_voice_query already calls speak() internally
+                        answer = answer_voice_query(question, dash)
+                    else:
+                        answer = handle_voice_command(intent, dash)
+                        speak(answer)
+
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
-                    self.wfile.write(json.dumps({"ok": True, "answer": answer}).encode())
+                    self.wfile.write(json.dumps({
+                        "ok": True,
+                        "answer": answer,
+                        "intent": intent["intent"],
+                    }).encode())
                 except Exception as e:
                     self.send_response(500)
                     self.send_header("Content-Type", "application/json")

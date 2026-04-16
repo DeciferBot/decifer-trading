@@ -49,6 +49,21 @@ const WARNED_COMMANDS = [
   { pattern: /chmod\s+777/i,            warning: 'chmod 777 is overly permissive — use 755 or 644' },
 ];
 
+// ─── Architecture decision gate ──────────────────────────────────────────────
+// These files are locked architectural areas. Any edit requires an explicit
+// statement of DECISION, RISK, ARCHITECTURE FIT, and AMIT AWARENESS.
+const ARCHITECTURE_GATE_PATHS = [
+  { pattern: /\/signals\/__init__\.py$|\/signals\.py$/,  area: 'Signal Engine (10-dimension scoring — orthogonality rule applies)' },
+  { pattern: /\/orders_core\.py$/,                       area: 'Order Submission Pipeline (trace full path before touching)' },
+  { pattern: /\/config\.py$/,                            area: 'Config / Thresholds (live vs paper params — inline comments are the live values)' },
+  { pattern: /\/learning\.py$/,                          area: 'IC Scoring / Learning Engine' },
+  { pattern: /\/catalyst_engine\.py$/,                   area: 'Catalyst Screener' },
+  { pattern: /\/bot_ibkr\.py$|\/bot\.py$/,               area: 'Main Bot Loop' },
+  { pattern: /\/regime.*\.py$/,                          area: 'Regime Detection (VIX-proxy LOCKED — HMM deferred until ≥200 trades)' },
+  { pattern: /\/universe.*\.py$/,                        area: 'Three-Tier Universe Engine' },
+  { pattern: /\/portfolio_manager\.py$|\/pm\.py$/,       area: 'Portfolio Manager / Position Sizing' },
+];
+
 // ─── File path safety rules ───────────────────────────────────────────────────
 const BLOCKED_WRITE_PATHS = [
   { pattern: /\.env($|\.)/i,                     reason: 'Writing .env files blocked — never commit secrets.' },
@@ -96,11 +111,39 @@ function evaluate(hookData) {
       }
     }
 
-    // Discipline gate: remind Claude of read-before-write rule on Python files
+    // Architecture decision gate — locked files require explicit justification
+    const archGate = ARCHITECTURE_GATE_PATHS.find(r => r.pattern.test(path));
+    if (archGate) {
+      return {
+        warn: true,
+        warning: [
+          `ARCHITECTURE GATE — editing locked area: ${archGate.area}`,
+          `File: ${path}`,
+          ``,
+          `Before proceeding, state all four:`,
+          `  DECISION: What specifically is changing in this file, and why`,
+          `  RISK:     What could break or have unintended effects on the signal/order pipeline`,
+          `  FIT:      Confirm this does not violate any locked decision in CLAUDE.md`,
+          `  SCOPE:    Is this Tier 1 (read/check), Tier 2 (implement), or Tier 3 (multi-file refactor)?`,
+          `            Tier 3 requires Amit approval of approach BEFORE any code.`,
+          ``,
+          `If you cannot answer all four, stop and ask Amit first.`,
+        ].join('\n'),
+      };
+    }
+
+    // Plan gate: read-before-write + scope/risk declaration for all Python files
     if (/\.py$/.test(path)) {
       return {
         warn: true,
-        warning: `DISCIPLINE GATE — editing ${path}\nBefore this edit you must have stated:\n  1. "I read [file] lines [X–Y]"\n  2. "Current implementation does: [...]"\n  3. "This change is safe because: [...]"\nIf you have not done this, stop and read the file first.`,
+        warning: [
+          `PLAN GATE — editing ${path}`,
+          `Before this edit, confirm you have stated:`,
+          `  READ:  "I read [file] lines [X–Y] — it currently does [...]"`,
+          `  SCOPE: What specifically is changing and why`,
+          `  RISK:  What could break as a result of this change`,
+          `If you have not done this, stop and read the file first.`,
+        ].join('\n'),
       };
     }
   }

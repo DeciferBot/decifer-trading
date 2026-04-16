@@ -298,3 +298,221 @@ def answer_voice_query(question: str, dash: dict) -> str:
         err = "Error processing your question."
         speak(err)
         return err
+
+
+# ── Voice command infrastructure ─────────────────────────────────────────────
+
+def _log_voice_audit(action: str, symbol: str | None, voice_text: str, result: str) -> None:
+    """Append a voice command event to data/audit_log.jsonl."""
+    import json
+    import os
+    from datetime import datetime, timezone
+
+    _path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "audit_log.jsonl")
+    try:
+        with open(_path, "a") as f:
+            f.write(json.dumps({
+                "type": "voice_command",
+                "action": action,
+                "symbol": symbol,
+                "voice_text": voice_text,
+                "result": result,
+                "ts": datetime.now(timezone.utc).isoformat(),
+            }) + "\n")
+    except Exception:
+        pass
+
+
+def write_voice_memo(text: str) -> None:
+    """Append a timestamped voice memo to data/voice_memos.md.
+
+    The file is auto-created on first write. Opus reads it at the start of
+    each scan cycle via agents.py (voice_block injection).
+    """
+    import os
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    stamp = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d %H:%M ET")
+    line = f"[{stamp}] {text.strip()}\n"
+    _vm_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "voice_memos.md")
+    with open(_vm_path, "a") as f:
+        f.write(line)
+
+
+def classify_voice_intent(text: str) -> dict:
+    """Classify raw voice text into a structured intent via Claude Haiku.
+
+    Returns: {"intent": str, "params": dict}
+
+    Intents:
+      QA            — questions about portfolio, P&L, regime, news (default)
+      MEMO          — "remember that...", "note that...", "don't forget..."
+      PAUSE         — pause scanning
+      RESUME        — resume scanning
+      WATCHLIST_ADD — add symbol to favourites
+      TRADE_BUY     — buy a symbol (params: {symbol, qty_hint: null})
+      TRADE_SELL    — close a position (params: {symbol, full_close: true})
+      SKIP_SYMBOL   — skip a symbol this session (treated as MEMO)
+      CONFIRM       — confirm a pending trade command
+      CANCEL        — cancel a pending trade command
+
+    On any failure, returns {"intent": "QA", "params": {}}.
+    """
+    try:
+        import json as _json
+        from agents import client
+        from config import CONFIG as _CONFIG
+
+        system = (
+            "You are an intent classifier for a trading bot voice interface.\n"
+            "Classify the user's spoken text into exactly one intent and return JSON only.\n"
+            "\n"
+            "RULES:\n"
+            "1. Default to 'QA' when ambiguous. NEVER assume a trade intent.\n"
+            "2. TRADE_BUY requires an explicit buy/purchase/long verb AND a recognisable ticker symbol.\n"
+            "3. TRADE_SELL requires an explicit sell/close/exit/short verb AND a recognisable ticker.\n"
+            "4. CONFIRM: only when the text is essentially just 'confirm' or 'yes proceed'.\n"
+            "5. CANCEL: only when the text is essentially just 'cancel' or 'abort' or 'never mind'.\n"
+            "6. MEMO: phrases like 'remember that', 'note that', 'don't forget', 'write down'.\n"
+            "7. WATCHLIST_ADD: 'add X to my watchlist' or 'track X' or 'watch X'.\n"
+            "8. PAUSE / RESUME: explicit pause or resume scanning commands.\n"
+            "9. SKIP_SYMBOL: 'skip X today' or 'ignore X' — treat like MEMO.\n"
+            "\n"
+            "Respond with JSON only, no prose:\n"
+            '{"intent": "QA", "params": {}}\n'
+            '{"intent": "MEMO", "params": {"text": "original text here"}}\n'
+            '{"intent": "PAUSE", "params": {}}\n'
+            '{"intent": "RESUME", "params": {}}\n'
+            '{"intent": "WATCHLIST_ADD", "params": {"symbol": "AAPL"}}\n'
+            '{"intent": "TRADE_BUY", "params": {"symbol": "AAPL", "qty_hint": null}}\n'
+            '{"intent": "TRADE_SELL", "params": {"symbol": "AAPL", "full_close": true}}\n'
+            '{"intent": "CONFIRM", "params": {}}\n'
+            '{"intent": "CANCEL", "params": {}}\n'
+        )
+
+        resp = client.messages.create(
+            model=_CONFIG.get("claude_model_haiku", "claude-haiku-4-5-20251001"),
+            max_tokens=80,
+            system=system,
+            messages=[{"role": "user", "content": text}],
+        )
+        raw = resp.content[0].text.strip()
+        result = _json.loads(raw)
+        if "intent" not in result:
+            return {"intent": "QA", "params": {}}
+        return result
+    except Exception as e:
+        log.warning("classify_voice_intent failed (%s) — defaulting to QA", e)
+        return {"intent": "QA", "params": {}}
+
+
+def handle_voice_command(intent: dict, dash: dict) -> str:
+    """Route a classified non-QA intent to the appropriate action.
+
+    Returns a spoken response string. Does NOT call speak() — the caller does.
+    Trade commands (TRADE_BUY / TRADE_SELL) are queued for main-loop execution;
+    they are NOT executed here (HTTP thread ≠ main thread).
+    """
+    import json as _json
+    import os
+    from datetime import datetime, timezone
+    import bot_state
+
+    kind = intent.get("intent", "QA")
+    params = intent.get("params", {})
+
+    # ── MEMO ─────────────────────────────────────────────────────────────────
+    if kind == "MEMO":
+        text = params.get("text", "")
+        if text:
+            write_voice_memo(text)
+            _log_voice_audit("memo", None, text, "written")
+            return "Got it. I'll remember that."
+        return "I didn't catch what to remember."
+
+    # ── PAUSE / RESUME ────────────────────────────────────────────────────────
+    if kind == "PAUSE":
+        dash["paused"] = True
+        _log_voice_audit("pause", None, "", "paused")
+        return "Scanning paused."
+
+    if kind == "RESUME":
+        dash["paused"] = False
+        _log_voice_audit("resume", None, "", "resumed")
+        return "Resuming scans."
+
+    # ── WATCHLIST_ADD ─────────────────────────────────────────────────────────
+    if kind == "WATCHLIST_ADD":
+        symbol = params.get("symbol", "").upper().strip()
+        if not symbol:
+            return "I didn't catch the symbol to add."
+        favs = dash.get("favourites", [])
+        if symbol not in favs:
+            favs.append(symbol)
+            dash["favourites"] = favs
+            try:
+                _fav_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "favourites.json")
+                with open(_fav_path, "w") as f:
+                    _json.dump(favs, f)
+            except Exception as e:
+                log.warning("Could not save favourites: %s", e)
+        _log_voice_audit("watchlist_add", symbol, "", "added")
+        return f"Added {symbol} to your watchlist."
+
+    # ── TRADE_BUY / TRADE_SELL ────────────────────────────────────────────────
+    if kind in ("TRADE_BUY", "TRADE_SELL"):
+        symbol = params.get("symbol", "").upper().strip()
+        if not symbol:
+            return "I didn't catch the symbol. Please try again."
+
+        # Block duplicate pending commands for the same symbol
+        for existing in bot_state._pending_voice_commands:
+            if existing.get("symbol") == symbol and not existing.get("confirmed"):
+                return (
+                    f"You already have a pending command for {symbol}. "
+                    "Say cancel to clear it first."
+                )
+
+        cmd = {
+            "type": kind,
+            "symbol": symbol,
+            "params": params,
+            "confirmed": False,
+            "created_at": datetime.now(timezone.utc),
+            "voice_text": f"{kind} {symbol}",
+        }
+        bot_state._pending_voice_commands.append(cmd)
+        _log_voice_audit(kind.lower(), symbol, cmd["voice_text"], "queued_unconfirmed")
+
+        verb = "buy" if kind == "TRADE_BUY" else "close"
+        return (
+            f"You said {verb} {symbol}. "
+            "Say confirm to proceed or cancel to abort."
+        )
+
+    # ── CONFIRM ───────────────────────────────────────────────────────────────
+    if kind == "CONFIRM":
+        for cmd in bot_state._pending_voice_commands:
+            if not cmd.get("confirmed"):
+                cmd["confirmed"] = True
+                sym = cmd.get("symbol", "")
+                _log_voice_audit("confirm", sym, "", "confirmed")
+                return "Trade queued. Will execute between scans."
+        return "Nothing to confirm."
+
+    # ── CANCEL ────────────────────────────────────────────────────────────────
+    if kind == "CANCEL":
+        for cmd in list(bot_state._pending_voice_commands):
+            if not cmd.get("confirmed"):
+                try:
+                    bot_state._pending_voice_commands.remove(cmd)
+                except ValueError:
+                    pass
+                sym = cmd.get("symbol", "")
+                _log_voice_audit("cancel", sym, "", "cancelled")
+                return "Cancelled."
+        return "Nothing to cancel."
+
+    # Fallback — should not reach here
+    return "I didn't understand that command."

@@ -138,6 +138,12 @@ _momentum_sentinel = None  # MomentumSentinel instance
 _momentum_scan_requested = threading.Event()  # Set by sentinel; cleared by main loop
 _scheduled_scan_fn = None  # Reference to bot.py's scheduled_scan closure
 
+# ── Voice command queue ───────────────────────────────────────────────────────
+# Thread-safe deque. HTTP handler appends; main loop consumes on every tick.
+# Each entry: {type, symbol, params, confirmed, created_at, voice_text}
+from collections import deque
+_pending_voice_commands: deque = deque()
+
 # ── IBKR account / position ground truth ─────────────────────────────────────
 # Populated by _on_account_value() when reqAccountUpdates is active.
 # Keys mirror IBKR Account Value Keys: NetLiquidation, BuyingPower,
