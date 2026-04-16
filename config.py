@@ -118,7 +118,7 @@ CONFIG = {
     "claude_max_tokens": 800,  # Default token cap
     # Alpha agents use Opus — regime/sentiment judgment and nuanced trade decisions.
     "claude_model_alpha": "claude-opus-4-6",  # Opus for alpha-generating agents
-    "claude_max_tokens_alpha": 4096,  # Unconstrained — let Opus reason fully
+    "claude_max_tokens_alpha": 8192,  # Raised from 4096 — dimension evolution blocks per position made 4096 too tight at 13+ positions
     # Haiku — text generation for voice alerts, trade cards, speech.
     "claude_model_haiku": "claude-haiku-4-5-20251001",
     # ── INTELLIGENCE LAYER ────────────────────────────────────
@@ -810,6 +810,37 @@ CONFIG = {
         "drawdown_trigger_pct": -0.015,  # daily_pnl / portfolio_value → trigger
         "earnings_lookahead_hours": 48,  # flag earnings within this window
         "max_tokens": 600,
+    },
+
+    # ── ENTRY GATE ────────────────────────────────────────────────────────────
+    # Per-trade-type validation thresholds. All values configurable here.
+    # entry_gate.py reads these via _cfg() — change here, no code changes needed.
+    "entry_gate": {
+
+        # INTRADAY thresholds
+        "intraday_max_signal_age_minutes":   15,    # signal older than this → reject
+        "intraday_min_rel_volume":           1.3,   # below this → score penalty
+        "intraday_hard_fail_rel_volume":     0.8,   # below this → hard reject
+        "intraday_max_spread_pct":           0.4,   # above this → score penalty
+        "intraday_hard_fail_spread_pct":     0.8,   # above this → hard reject
+        "intraday_hod_noman_low":           -4.0,   # HOD no-man's land lower bound (%)
+        "intraday_hod_noman_high":          -1.0,   # HOD no-man's land upper bound (%)
+        "intraday_long_min_vwap_dist":      -1.5,   # LONG: reject if >1.5% below VWAP
+        "intraday_short_max_vwap_dist":      1.5,   # SHORT: reject if >1.5% above VWAP
+        "intraday_dead_window_penalty":      8,     # extra score pts required 11:00–14:30
+        "intraday_low_volume_penalty":       5,     # extra score pts if rel_vol < min
+        "intraday_wide_spread_penalty":      4,     # extra score pts if spread elevated
+
+        # SWING thresholds
+        "swing_min_earnings_days_away":      5,     # earnings closer than this → reject
+        "swing_max_short_float_pct":        30.0,   # short float above this → reject (no squeeze)
+        "swing_sector_rotation_max_days":   10,     # sector ETF breakout must be < N days old
+        "swing_min_catalyst_score":         30,     # catalyst_engine score floor for news catalyst
+
+        # POSITION thresholds
+        "position_min_earnings_days_away":  30,     # earnings must be > 30 days away
+        "position_min_revenue_growth_yoy":  15.0,   # YoY revenue growth floor (%)
+        "position_min_sector_vs_spy":        5.0,   # sector ETF 3m outperformance vs SPY (%)
     },
 }
 
