@@ -236,8 +236,77 @@ def _select_strike(df, flag: str, S: float, dte: int, target_delta: float, delta
         "volume": int(best["volume"]),
         "open_interest": int(best["openInterest"]),
         "iv": round(iv, 4),
+        "delta_dist": round(float(best["delta_dist"]), 4),
         **greeks,
     }
+
+
+# ── Contract scoring ─────────────────────────────────────────────────
+
+
+def _pick_best_contract(candidates: list[tuple[int, dict]], target_dte: int, dte_range: int, d_range: float) -> dict:
+    """
+    Score all candidate contracts across expiries and return the best one.
+
+    Weighted composite (sums to 1.0):
+      0.35 — spread quality   (lower spread = cheaper to enter and exit)
+      0.25 — delta accuracy   (closer to target = better directional exposure)
+      0.20 — liquidity        (volume + OI, log-scaled to avoid domination by mega-caps)
+      0.10 — DTE proximity    (prefer regime-tuned target DTE, not always the nearest)
+      0.10 — gamma            (higher gamma = more responsive to underlying move)
+
+    This replaces the previous nearest-first (break-on-first) logic which
+    systematically picked the shortest-dated liquid contract regardless of
+    spread, liquidity quality, or gamma efficiency.
+    """
+    import math
+
+    best_score = -1.0
+    best = None
+
+    for dte, c in candidates:
+        # Spread: 0 = at hard cap (worst), 1 = zero spread (best)
+        max_spread = CONFIG.get("options_max_spread_pct", 0.35)
+        spread_score = max(0.0, 1.0 - c.get("spread_pct", max_spread) / max_spread)
+
+        # Delta: 0 = at edge of window, 1 = exact target match
+        delta_dist = c.get("delta_dist", d_range)
+        delta_score = max(0.0, 1.0 - delta_dist / max(d_range, 1e-6))
+
+        # Liquidity: log-scaled so small-cap contracts aren't unfairly penalised
+        vol_score = math.log1p(c.get("volume", 0)) / math.log1p(10_000)
+        oi_score = math.log1p(c.get("open_interest", 0)) / math.log1p(50_000)
+        liquidity_score = (min(vol_score, 1.0) + min(oi_score, 1.0)) / 2
+
+        # DTE: 0 = furthest from target, 1 = exact target DTE
+        dte_score = max(0.0, 1.0 - abs(dte - target_dte) / max(dte_range, 1))
+
+        # Gamma: higher = more responsive for directional breakout/momentum plays.
+        # Gamma is None when py_vollib is unavailable — default to 0 (neutral, not punished).
+        gamma = abs(c.get("gamma") or 0.0)
+        gamma_score = min(1.0, gamma * 200)  # gamma typically 0.002–0.05 → maps to 0.4–1.0
+
+        composite = (
+            0.35 * spread_score
+            + 0.25 * delta_score
+            + 0.20 * liquidity_score
+            + 0.10 * dte_score
+            + 0.10 * gamma_score
+        )
+
+        log.debug(
+            f"  candidate: {c.get('right','?')} ${c.get('strike',0):.0f} "
+            f"exp={c.get('expiry_str','')} dte={dte} "
+            f"spread={c.get('spread_pct',0):.1%} delta_dist={delta_dist:.3f} "
+            f"vol={c.get('volume',0)} oi={c.get('open_interest',0)} "
+            f"gamma={gamma:.4f} → score={composite:.3f}"
+        )
+
+        if composite > best_score:
+            best_score = composite
+            best = c
+
+    return best
 
 
 # ── Main entry point ──────────────────────────────────────────────────
@@ -265,11 +334,36 @@ def find_best_contract(
     """
     flag = "c" if direction == "LONG" else "p"
     min_dte = CONFIG.get("options_min_dte", 7)
-    max_dte = CONFIG.get("options_max_dte", 21)
-    max_ivr = CONFIG.get("options_max_ivr", 50)
-    t_delta = CONFIG.get("options_target_delta", 0.40)
-    d_range = CONFIG.get("options_delta_range", 0.15)
-    hard_cap = CONFIG.get("options_max_risk_pct", 0.01) * portfolio_value
+    max_dte = CONFIG.get("options_max_dte", 45)
+    max_ivr = CONFIG.get("options_max_ivr", 65)
+    t_delta = CONFIG.get("options_target_delta", 0.50)
+    d_range = CONFIG.get("options_delta_range", 0.35)
+    hard_cap = CONFIG.get("options_max_risk_pct", 0.025) * portfolio_value
+
+    # ── Regime-aware adjustments ──────────────────────────────────────────────
+    # target_dte: preferred DTE used by the composite scorer — not a hard filter.
+    # Adjustments tighten delta toward ATM and prefer faster-decaying strikes
+    # in trending/panic regimes where the signal has higher time-urgency.
+    target_dte = (min_dte + max_dte) // 2  # default: middle of window
+
+    regime_name = (regime or {}).get("regime", "UNKNOWN")
+    if regime_name == "PANIC":
+        # Fast, high-magnitude moves — go ATM, prefer short-dated for max gamma
+        t_delta = max(t_delta, 0.50)
+        max_dte = min(max_dte, 14)
+        target_dte = 7
+        log.info(f"Options {symbol}: PANIC regime → ATM delta={t_delta:.2f}, max_dte capped at {max_dte}")
+    elif regime_name == "BEAR_TRENDING":
+        # Sustained trend — ATM, moderate DTE
+        t_delta = max(t_delta, 0.50)
+        target_dte = 21
+    elif regime_name == "CHOPPY":
+        # Uncertain direction — tighten IVR gate (don't overpay in elevated vol),
+        # prefer longer DTE to survive whipsaws
+        max_ivr = round(max_ivr * 0.75)
+        target_dte = min_dte + int((max_dte - min_dte) * 0.70)
+        log.info(f"Options {symbol}: CHOPPY regime → IVR cap tightened to {max_ivr}, target_dte={target_dte}")
+    # BULL_TRENDING / UNKNOWN: use config defaults
 
     # ── Conviction scaling — within the hard cap, never above it ─────────────
     # options_max_risk_pct is an ABSOLUTE ceiling on premium at risk per trade.
@@ -321,8 +415,14 @@ def find_best_contract(
             log.info(f"Options: no Alpaca price for {symbol} — cannot evaluate")
             return None
 
-        # ── Options chain: Alpaca primary (real-time OPRA), yfinance fallback ──
-        best_contract = None
+        # ── Options chain: Alpaca primary (real-time OPRA) ───────────────────────
+        # Collect ALL passing contracts across the full DTE window, then pick the
+        # best by composite score (spread + delta + liquidity + DTE + gamma).
+        # Previous logic took the first passing expiry (nearest-first break), which
+        # systematically picked the shortest-dated liquid contract regardless of
+        # spread quality, liquidity, or gamma efficiency.
+        candidates: list[tuple[int, dict]] = []
+        chains = []
 
         try:
             from alpaca_options import get_all_chains as _alpaca_chains
@@ -340,13 +440,11 @@ def find_best_contract(
                     continue
                 contract["expiry_str"] = exp_str
                 contract["expiry_ibkr"] = exp_date.strftime("%Y%m%d")
-                best_contract = contract
-                break
+                candidates.append((dte, contract))
         except Exception as _ae:
             log.warning(f"Options Alpaca chain fetch failed for {symbol}: {_ae}")
-            chains = []
 
-        if best_contract is None:
+        if not candidates:
             if not chains:
                 log.info(
                     f"Options: no contract for {symbol} — Alpaca returned no chains in {min_dte}-{max_dte} DTE window"
@@ -357,6 +455,14 @@ def find_best_contract(
                     f"all {len(chains)} expiries filtered out by liquidity/delta"
                 )
             return None
+
+        best_contract = _pick_best_contract(candidates, target_dte, max_dte - min_dte, d_range)
+        log.info(
+            f"Options scoring: {len(candidates)} candidate(s) evaluated → "
+            f"selected {best_contract['right']} ${best_contract['strike']:.0f} "
+            f"exp={best_contract['expiry_str']} ({best_contract['dte']} DTE) "
+            f"spread={best_contract['spread_pct']:.1%}"
+        )
 
         # IV Rank check — bail if options too expensive
         iv_rank = get_iv_rank(symbol, best_contract["iv"])

@@ -67,7 +67,10 @@ The ADF test (p < 0.05) is the safety gate for mean-reversion scoring. Without i
 Bearish exposure uses SPXS, SQQQ, UVXY. No borrow costs, no margin complications. Tracking error on leveraged products is acceptable for short-duration trades.
 
 ### Options: ATM Delta 0.50 Targeting
-ATM options provide maximum leverage per dollar of premium. Better probability and more responsive Greeks than the common 0.30-0.40 delta targeting.
+OTM options (δ 0.30–0.40) have higher leverage per dollar of premium — but ATM (δ 0.50) is the correct choice for this system for three reasons:
+1. **Liquidity** — ATM options have the highest volume, tightest spreads, and most open interest. Fill quality matters more than theoretical leverage.
+2. **Gamma/theta ratio** — ATM options have maximum gamma per unit of theta. OTM options at short DTE decay catastrophically fast and require a large move AND correct timing; ATM only requires directional correctness.
+3. **Signal type** — Decifer's momentum/breakout signals fire when a stock is already moving. ATM captures that move immediately. OTM requires the move to exceed the strike before theta erodes the position.
 
 ### News Sentinel: 3-Agent Pipeline, Not 4
 Speed matters for breaking news (15-30 second window). Full 4-agent pipeline takes 5-10 minutes. Sentinel uses Catalyst Analyst + Risk Gate + Instant Decision. Position sizing is 0.75× to compensate for lighter analysis. Hardcoded risk limits still apply.
