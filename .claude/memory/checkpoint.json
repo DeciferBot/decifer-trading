@@ -1,17 +1,21 @@
 {
-  "timestamp": "2026-04-14T19:02:10.207Z",
+  "timestamp": "2026-04-16T20:16:51.287Z",
   "branch": "master",
-  "lastCommit": "f28d69f fix(catalyst): wire signal scripts to config.CATALYST_DIR + fix .env loading",
+  "lastCommit": "9747eb4 feat(options): force-flatten INTRADAY options at EOD, no AI review",
   "roadmapPhase": null,
   "lastFilesTouched": [
-    "claude/memory/checkpoint.json",
-    ".claude/memory/session-history.jsonl",
-    "Chief-Decifer-recovered/app.py",
-    "Chief-Decifer-recovered/state/catalyst/edgar_events.json",
-    "data/audit_log.jsonl",
-    "data/signals_log.jsonl"
+    "ata/metadata_ledger.json",
+    "earnings_calendar.py",
+    "reachability.py",
+    "tests/test_atr_sizer_integration.py",
+    "tests/test_tranche_exits.py",
+    "data/models/",
+    "data/presession_log.jsonl",
+    "data/skip_log.jsonl",
+    "data/trades.json.pre_migration_bak",
+    "data/universe_coverage.jsonl"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 269
+  "sessionCount": 270
 }
