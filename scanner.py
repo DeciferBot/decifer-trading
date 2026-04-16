@@ -614,7 +614,7 @@ def get_market_regime(ib: IB) -> dict:
         result = {
             "regime": regime,
             "vix": round(vix_now, 2),
-            "vix_1h_change": round(vix_1h_change * 100, 2),
+            "vix_1h_change": round(vix_1h_change, 4),
             "spy_price": round(spy_price_now, 2),
             "spy_above_200d": spy_above_200d,
             "spy_200d_ma": round(spy_200d_ma, 2) if spy_200d_ma else None,

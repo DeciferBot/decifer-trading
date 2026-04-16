@@ -54,7 +54,6 @@ SESSION_CHARACTER_VOCAB = {
     "FEAR_ELEVATED",  # VIX rising, cautious but not extreme
     "DISTRIBUTION",  # selling pressure, SPY declining or losing breadth
     "TRENDING_BEAR",  # sustained downtrend, shorts working
-    "EXTREME_STRESS",  # VIX spiked hard — circuit breaker territory
 }
 _DEFAULT_SESSION_CHARACTER = "FEAR_ELEVATED"  # conservative fallback if Opus omits
 
@@ -108,7 +107,7 @@ _SIGNIFICANCE_KEYWORDS = {
 @dataclass
 class SignalClassification:
     symbol: str
-    trade_type: str  # SCALP | SWING | HOLD | AVOID
+    trade_type: str  # INTRADAY | SWING | POSITION | AVOID
     conviction: float  # 0.0–1.0, evidence-based — not LLM self-reported confidence
     reasoning: str  # Opus rationale (logged only, never acted upon mechanically)
     source: str  # "opus" | "fallback"
@@ -351,10 +350,109 @@ def _build_regime_context_block(regime: dict) -> str:
     )
 
 
+def _format_trade_context_block(trade_contexts: dict[str, dict]) -> str:
+    """
+    Format per-symbol TradeContext as a compact text block for the Opus prompt.
+    Only renders symbols that have a context dict.
+    """
+    if not trade_contexts:
+        return ""
+
+    lines = ["## Per-symbol entry context (live data — use this to inform trade_type and conviction)"]
+    for sym, ctx in trade_contexts.items():
+        if not ctx:
+            continue
+        dq = ctx.get("data_quality", "unknown")
+        direction = ctx.get("direction", "?")
+        lines.append(f"\n{sym} {direction}  [data_quality={dq}]")
+
+        # Analyst block
+        consensus   = ctx.get("analyst_consensus") or "n/a"
+        upside      = ctx.get("analyst_upside_pct")
+        buy_ct      = ctx.get("analyst_buy_count")
+        sell_ct     = ctx.get("analyst_sell_count")
+        earnings_d  = ctx.get("earnings_days_away")
+        upside_str  = f" | PT upside {upside:+.1f}%" if upside is not None else ""
+        grade_str   = f" | {buy_ct}↑/{sell_ct}↓" if buy_ct is not None else ""
+        earn_str    = f" | earnings {earnings_d}d" if earnings_d is not None else ""
+        lines.append(f"  Analyst: {consensus}{grade_str}{upside_str}{earn_str}")
+
+        # Smart money
+        insider     = ctx.get("insider_net_sentiment")
+        ins_val     = ctx.get("insider_buy_value_3m")
+        congress    = ctx.get("congressional_sentiment")
+        ins_str     = f"insider={insider}" if insider else ""
+        ins_val_str = f" (${ins_val:.1f}M net)" if ins_val is not None else ""
+        cong_str    = f" | congress={congress}" if congress and congress != "NONE" else ""
+        if ins_str or cong_str:
+            lines.append(f"  Smart money: {ins_str}{ins_val_str}{cong_str}")
+
+        # Fundamentals
+        rev_yoy     = ctx.get("revenue_growth_yoy")
+        eps_accel   = ctx.get("eps_accelerating")
+        beat_rate   = ctx.get("eps_beat_rate")
+        gm          = ctx.get("gross_margin")
+        fcf         = ctx.get("fcf_yield")
+        dcf_up      = ctx.get("dcf_upside_pct")
+        rev_decel   = ctx.get("revenue_decelerating", False)
+        if rev_yoy is not None:
+            accel_str  = " EPS↑" if eps_accel else ""
+            beat_str   = f" beat={beat_rate:.0f}%" if beat_rate is not None else ""
+            gm_str     = f" | margin={gm:.1f}%" if gm is not None else ""
+            fcf_str    = f" | FCF_yield={fcf:.1f}%" if fcf is not None else ""
+            dcf_str    = f" | DCF_upside={dcf_up:+.1f}%" if dcf_up is not None else ""
+            decel_flag = " ⚠DECEL" if rev_decel else ""
+            lines.append(
+                f"  Fundamentals: rev_yoy={rev_yoy:+.1f}%{decel_flag}{accel_str}{beat_str}"
+                f"{gm_str}{fcf_str}{dcf_str}"
+            )
+
+        # Sector
+        etf         = ctx.get("sector_etf")
+        above_50d   = ctx.get("sector_above_50d")
+        vs_spy      = ctx.get("sector_3m_vs_spy")
+        if etf:
+            above_str = "above_50d ✓" if above_50d else ("below_50d ✗" if above_50d is False else "50d=n/a")
+            spy_str   = f" | {vs_spy:+.1f}% vs SPY 3m" if vs_spy is not None else ""
+            lines.append(f"  Sector {etf}: {above_str}{spy_str}")
+
+        # Intraday
+        hod_d  = ctx.get("hod_distance_pct")
+        vwap_d = ctx.get("vwap_distance_pct")
+        rvol   = ctx.get("rel_volume")
+        dead   = ctx.get("in_dead_window", False)
+        spread = ctx.get("bid_ask_spread_pct")
+        age    = ctx.get("signal_age_minutes")
+        sf     = ctx.get("short_float_pct")
+        intra_parts = []
+        if hod_d  is not None: intra_parts.append(f"HOD_dist={hod_d:+.1f}%")
+        if vwap_d is not None: intra_parts.append(f"VWAP_dist={vwap_d:+.1f}%")
+        if rvol   is not None: intra_parts.append(f"rel_vol={rvol:.1f}x")
+        if dead:               intra_parts.append("dead_window=Y")
+        if spread is not None: intra_parts.append(f"spread={spread:.2f}%")
+        if age    is not None: intra_parts.append(f"age={age:.1f}min")
+        if sf     is not None: intra_parts.append(f"short_float={sf:.1f}%")
+        if intra_parts:
+            lines.append(f"  Intraday: {' | '.join(intra_parts)}")
+
+        # Institutional + 52wk
+        inst_pct  = ctx.get("institutional_ownership_pct")
+        inst_chg  = ctx.get("institutional_ownership_change")
+        w52_dist  = ctx.get("week52_high_distance_pct")
+        extra = []
+        if inst_pct  is not None: extra.append(f"inst_own={inst_pct:.1f}%{f' ({inst_chg:+.1f}pp QoQ)' if inst_chg is not None else ''}")
+        if w52_dist  is not None: extra.append(f"52wk_high_dist={w52_dist:+.1f}%")
+        if extra:
+            lines.append(f"  Structure: {' | '.join(extra)}")
+
+    return "\n".join(lines)
+
+
 def _build_classification_prompt(
     ctx: SessionContext,
     candidates: list[dict],
     regime: dict | None = None,
+    trade_contexts: dict[str, dict] | None = None,
 ) -> str:
     """Build the full classification prompt for Opus."""
 
@@ -375,6 +473,10 @@ def _build_classification_prompt(
     vocab_str = " | ".join(sorted(SESSION_CHARACTER_VOCAB))
 
     overnight_block = f"\n## Overnight research notes\n{ctx.overnight_text}\n" if ctx.overnight_text else ""
+    entry_ctx_block = (
+        f"\n{_format_trade_context_block(trade_contexts)}\n"
+        if trade_contexts else ""
+    )
 
     return f"""You are the intelligence layer for Decifer, an autonomous trading system. \
 Before any trade is placed, you reason about the market and classify each signal.
@@ -393,8 +495,10 @@ Before any trade is placed, you reason about the market and classify each signal
 ## {ctx.thesis_perf_text}
 
 ## {ctx.setup_perf_text}
-
+{entry_ctx_block}
 ## Signal candidates (technically scored by the scanner)
+Scores are on a 0–50 scale. Minimum to reach this stage: 14/50 (28%). \
+A score of 35+ (70%) is high-conviction. Do not treat these as percentages out of 100.
 {candidates_block}
 
 ## Your task
@@ -558,6 +662,7 @@ def classify_signals(
     candidates: list[dict],
     force_context_refresh: bool = False,
     regime: dict | None = None,
+    trade_contexts: dict[str, dict] | None = None,
 ) -> tuple[str, str, list[SignalClassification]]:
     """
     Classify a batch of scored signal candidates.
@@ -586,20 +691,6 @@ def classify_signals(
         obs = get_market_observation()
         return _DEFAULT_SESSION_CHARACTER, "", [_fallback_classify(c, obs) for c in candidates]
 
-    # ── Circuit breaker — extreme VIX: skip Opus, mark EXTREME_STRESS ─────────
-    if regime:
-        vix = regime.get("vix", 0)
-        vix_spike = regime.get("vix_1h_change", 0)
-        if vix > CONFIG.get("vix_panic_min", 35) or vix_spike > CONFIG.get("vix_spike_pct", 0.20):
-            log.warning(f"[intelligence] EXTREME_STRESS circuit breaker — VIX={vix:.1f} spike={vix_spike:.1%}")
-            obs = get_market_observation()
-            _last_session_character = "EXTREME_STRESS"
-            return (
-                "EXTREME_STRESS",
-                "EXTREME_STRESS — VIX circuit breaker active. No new entries.",
-                [_fallback_classify(c, obs) for c in candidates],
-            )
-
     # ── Rebuild session context if needed ─────────────────────
     with _ctx_lock:
         needs_rebuild = force_context_refresh or not _context_valid()
@@ -627,7 +718,7 @@ def classify_signals(
 
     # ── Tier 1: Opus classification ────────────────────────────
     try:
-        prompt = _build_classification_prompt(ctx, candidates, regime=regime)
+        prompt = _build_classification_prompt(ctx, candidates, regime=regime, trade_contexts=trade_contexts)
         client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
         resp = client.messages.create(
             model=CONFIG.get("intelligence_model", "claude-opus-4-6"),

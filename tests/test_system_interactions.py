@@ -102,7 +102,7 @@ def _panic_regime(vix: float = 45.0) -> dict:
     return {
         "regime": "CAPITULATION",
         "vix": vix,
-        "vix_1h_change": 25.0,
+        "vix_1h_change": 0.25,
         "spy_price": 490.0,
         "spy_above_ema": False,
         "qqq_price": 380.0,
@@ -116,7 +116,7 @@ def _bull_regime(vix: float = 15.0) -> dict:
     return {
         "regime": "TRENDING_UP",
         "vix": vix,
-        "vix_1h_change": -2.0,
+        "vix_1h_change": -0.02,
         "spy_price": 550.0,
         "spy_above_ema": True,
         "qqq_price": 460.0,
