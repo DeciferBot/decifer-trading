@@ -6,7 +6,7 @@
 # ╚══════════════════════════════════════════════════════════════╝
 """
 Single responsibility: classify every incoming signal with a trade_type
-(SCALP | SWING | HOLD | AVOID) and an evidence-based conviction score
+(INTRADAY | SWING | POSITION | AVOID) and an evidence-based conviction score
 before any order is placed.
 
 Two-tier design — always produces a classification:
@@ -510,9 +510,20 @@ Then write a brief market_read (2-4 sentences): what is the market environment \
 right now? What dynamics are active? What does the cross-asset picture tell you?
 
 Then, for each candidate, decide:
-1. trade_type: SCALP (minutes to hours, pure technical), SWING (days, technical + \
-backing thesis), HOLD (weeks, thesis-driven — only when the fundamental and \
-environmental case is strong), or AVOID (does not fit the environment).
+1. trade_type — choose exactly one:
+   - INTRADAY: same-session technical play. Requires fresh signal (<15 min), \
+confirming volume (rel_vol ≥ 1.3×), clean VWAP position, and NOT in HOD no-man's \
+land (-1% to -4% from day high). Use for pure momentum setups with no fundamental \
+anchor. Has a mechanical TP bracket and 90-min max hold.
+   - SWING: catalyst-backed, days to a week. Requires at least one qualifying catalyst \
+(earnings beat + guidance raise, analyst upgrade + PT raise, sector rotation breakout, \
+high-conviction news, insider buying, or congressional buying). Analyst consensus must \
+not be SELL for longs. Avoid if earnings < 5 days away. Held until catalyst resolves.
+   - POSITION: fundamental thesis, weeks to months. Requires ALL of: revenue growth \
+>15% YoY AND not decelerating, sector ETF in structural uptrend (above 50d MA, \
+outperforming SPY 3m), and technical breakout from base. No new POSITION entries \
+in BEAR_TRENDING or PANIC regimes.
+   - AVOID: does not qualify for any type above, or environment is hostile.
 2. conviction: 0.0–1.0. This is NOT your confidence — it is the count of \
 independent observations that support this trade divided by total possible support \
 points. Base it only on observable facts in the data above. Do not inflate.
@@ -521,7 +532,8 @@ points. Base it only on observable facts in the data above. Do not inflate.
 - AVOID if the macro calendar shows a high-impact event within 6 hours
 - AVOID if the market observation shows acute stress (multiple assets in sharp \
 coordinated move that contradicts the signal direction)
-- HOLD requires both strong environmental fit AND a clear backing thesis — rare
+- POSITION requires ALL three primary conditions (revenue growth + sector trend + \
+technical base) — if any is missing, fall through to SWING or INTRADAY
 - conviction above 0.8 requires at least 4 independent supporting observations
 - Every candidate must get a classification — no omissions
 
@@ -575,7 +587,7 @@ def _fallback_classify(
     if score >= 40:
         trade_type = "SWING"
     elif score >= 28 or score >= CONFIG.get("min_score_to_trade", 14):
-        trade_type = "SCALP"
+        trade_type = "INTRADAY"
     else:
         trade_type = "AVOID"
         conviction = 0.0
@@ -633,9 +645,12 @@ def _parse_response(
             results.append(_fallback_classify(c, obs))
             continue
 
-        tt = str(r.get("trade_type", "SCALP")).upper()
-        if tt not in ("SCALP", "SWING", "HOLD", "AVOID"):
-            tt = "SCALP"
+        tt = str(r.get("trade_type", "INTRADAY")).upper()
+        # Accept both old vocab (SCALP→INTRADAY, HOLD→POSITION) and new
+        _tt_remap = {"SCALP": "INTRADAY", "HOLD": "POSITION"}
+        tt = _tt_remap.get(tt, tt)
+        if tt not in ("INTRADAY", "SWING", "POSITION", "AVOID"):
+            tt = "INTRADAY"
 
         try:
             conviction = max(0.0, min(1.0, float(r.get("conviction", 0.5))))

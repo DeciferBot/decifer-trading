@@ -80,12 +80,12 @@ def _build_entry_thesis(
     scalp_mins = pm.get("scalp_max_hold_minutes", 90)
     scalp_pnl = pm.get("scalp_min_pnl_pct", 0.003) * 100
 
-    tt = (trade_type or "SCALP").upper()
-    if tt == "SCALP":
+    tt = (trade_type or "INTRADAY").upper()
+    if tt in ("SCALP", "INTRADAY"):
         condition = f"momentum does not produce >{scalp_pnl:.1f}% move within {scalp_mins}min"
     elif tt == "SWING":
         condition = "regime shifts against entry direction"
-    elif tt == "HOLD":
+    elif tt in ("HOLD", "POSITION"):
         condition = "macro polarity flips (BULL/BEAR) against entry"
     else:
         condition = "score collapses or regime contradicts entry direction"
@@ -128,6 +128,7 @@ def execute_buy(
     pattern_id: str = "",
     market_read: str = "",
     agents_agreed: int = 0,
+    entry_context: dict | None = None,
 ) -> bool:
     """
     Place a buy order with full OCO bracket.
@@ -345,9 +346,9 @@ def execute_buy(
             log.warning(f"[TRANCHE] qty={qty} too small for dual-tranche — falling back to legacy for {symbol}")
             tranche_mode = False
 
-        # Non-SCALP trades are managed by Portfolio Manager — no mechanical TP.
+        # Non-INTRADAY trades are managed by Portfolio Manager — no mechanical TP.
         # Tranche mode relies on a T1 TP bracket; without it there is no reason to split.
-        if trade_type and trade_type != "SCALP":
+        if trade_type and trade_type not in ("SCALP", "INTRADAY"):
             tranche_mode = False
 
         if tranche_mode:
@@ -365,10 +366,19 @@ def execute_buy(
         from execution_agent import get_execution_plan
 
         _et_now = datetime.now(zoneinfo.ZoneInfo("America/New_York")).strftime("%H:%M")
-        # TV screener removed — rel_volume and VWAP distance are no longer plumbed
-        # here. Default to neutral values; execution_agent tolerates these.
-        _rel_vol = 1.0
+        # Attempt to recover VWAP distance and rel_volume from the live signal
+        # engine data (computed in TradeContext). Defaults to neutral if unavailable.
+        _rel_vol   = 1.0
         _vwap_dist = 0.0
+        try:
+            from alpaca_stream import QUOTE_CACHE as _QC
+            # rel_volume: use Alpaca snapshot volume / 20-day avg if available
+            # (best-effort — execution_agent tolerates neutral 1.0 on failure)
+            _snap = _QC.get(symbol) if hasattr(_QC, "get") else None
+            if _snap and _snap.get("vwap") and price > 0:
+                _vwap_dist = round((_snap["vwap"] and (price - _snap["vwap"]) / _snap["vwap"] * 100) or 0.0, 3)
+        except Exception:
+            pass
         _spread = ((ibkr_ask - ibkr_bid) / ibkr_ask * 100) if ibkr_ask > 0 else 0.0
 
         exec_plan = get_execution_plan(
@@ -474,12 +484,12 @@ def execute_buy(
                             "agent_outputs": agent_outputs or {},
                             "atr": atr,
                             "advice_id": advice_id,
-                            "trade_type": trade_type or "SCALP",
+                            "trade_type": trade_type or "INTRADAY",
                             "conviction": conviction,
                             "setup_type": _derive_setup_type(signal_scores or {}),
                             "entry_regime": _entry_regime,
                             "entry_thesis": _build_entry_thesis(
-                                trade_type or "SCALP",
+                                trade_type or "INTRADAY",
                                 symbol,
                                 "LONG",
                                 conviction,
@@ -495,6 +505,7 @@ def execute_buy(
                             "agents_agreed": agents_agreed,
                             "tranche_mode": False,
                             "execution_method": "twap",
+                            "entry_context": entry_context,
                         }
                     _save_positions_file()
                     try:
@@ -577,12 +588,12 @@ def execute_buy(
                         "ic_weights_at_entry": _icw_at_entry,
                         "agent_outputs": agent_outputs or {},
                         "atr": atr, "advice_id": advice_id,
-                        "trade_type": trade_type or "SCALP",
+                        "trade_type": trade_type or "INTRADAY",
                         "conviction": conviction,
                         "setup_type": _derive_setup_type(signal_scores or {}),
                         "entry_regime": _entry_regime,
                         "entry_thesis": _build_entry_thesis(
-                            trade_type or "SCALP", symbol, "LONG", conviction, score,
+                            trade_type or "INTRADAY", symbol, "LONG", conviction, score,
                             _entry_regime, market_read=market_read, rationale=reasoning,
                         ),
                         "pattern_id": pattern_id,
@@ -592,6 +603,7 @@ def execute_buy(
                         "agents_agreed": agents_agreed,
                         "tranche_mode": False,
                         "extended_hours_entry": True,
+                        "entry_context": entry_context,
                     }
                 _save_positions_file()
                 try:
@@ -655,9 +667,9 @@ def execute_buy(
         sl_limit = round(sl * 0.99, 2)
         sl_order = StopLimitOrder("SELL", qty, sl, sl_limit, account=account, tif="GTC", outsideRth=True)
         sl_order.parentId = parent_id
-        # Empty trade_type falls back to SCALP behaviour (legacy callers, tests)
-        place_tp = not trade_type or trade_type == "SCALP"
-        sl_order.transmit = not place_tp  # SCALP: False (TP follows); SWING/HOLD: True (transmit entry+SL)
+        # Empty trade_type falls back to INTRADAY behaviour (legacy callers, tests)
+        place_tp = not trade_type or trade_type in ("SCALP", "INTRADAY")
+        sl_order.transmit = not place_tp  # INTRADAY: False (TP follows); SWING/POSITION: True (transmit entry+SL)
         sl_trade = ib.placeOrder(contract, sl_order)
         ib.sleep(0.1)
         _sl_order_id = sl_trade.order.orderId  # captured for trailing stop modifications
@@ -879,14 +891,14 @@ def execute_buy(
                     "agent_outputs": agent_outputs or {},
                     "atr": atr,
                     "advice_id": advice_id,
-                    "trade_type": trade_type or "SCALP",
+                    "trade_type": trade_type or "INTRADAY",
                     "conviction": conviction,
                     "setup_type": _derive_setup_type(signal_scores or {}),
                     "entry_regime": (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
                     if isinstance(regime, dict)
                     else "UNKNOWN",
                     "entry_thesis": _build_entry_thesis(
-                        trade_type or "SCALP",
+                        trade_type or "INTRADAY",
                         symbol,
                         "LONG",
                         conviction,
@@ -909,6 +921,7 @@ def execute_buy(
                     "t1_status": "OPEN" if tranche_mode else "N/A",
                     "t1_order_id": tp_trade.order.orderId if tranche_mode else None,
                     "t2_sl_order_id": None,  # set by update_tranche_status after T1 fills
+                    "entry_context": entry_context,
                 }
             _save_positions_file()
             try:
@@ -1005,6 +1018,7 @@ def execute_short(
     pattern_id: str = "",
     market_read: str = "",
     agents_agreed: int = 0,
+    entry_context: dict | None = None,
 ) -> bool:
     """
     Place a short-sell order with OCO bracket (sell-to-open + buy-to-cover SL + TP).
@@ -1148,8 +1162,8 @@ def execute_short(
         else:
             sl, tp = calculate_stops(price, atr, "SHORT")  # sl > price, tp < price
 
-        # Empty trade_type falls back to SCALP behaviour (legacy callers, tests)
-        place_tp = not trade_type or trade_type == "SCALP"
+        # Empty trade_type falls back to INTRADAY behaviour (legacy callers, tests)
+        place_tp = not trade_type or trade_type in ("SCALP", "INTRADAY")
 
         reward = price - tp
         risk = sl - price
@@ -1219,12 +1233,12 @@ def execute_short(
                         "ic_weights_at_entry": _icw_at_entry,
                         "agent_outputs": agent_outputs or {},
                         "atr": atr, "advice_id": advice_id,
-                        "trade_type": trade_type or "SCALP",
+                        "trade_type": trade_type or "INTRADAY",
                         "conviction": conviction,
                         "setup_type": _derive_setup_type(signal_scores or {}),
                         "entry_regime": _entry_regime,
                         "entry_thesis": _build_entry_thesis(
-                            trade_type or "SCALP", symbol, "SHORT", conviction, score,
+                            trade_type or "INTRADAY", symbol, "SHORT", conviction, score,
                             _entry_regime, market_read=market_read, rationale=reasoning,
                         ),
                         "pattern_id": pattern_id,
@@ -1234,6 +1248,7 @@ def execute_short(
                         "agents_agreed": agents_agreed,
                         "tranche_mode": False,
                         "extended_hours_entry": True,
+                        "entry_context": entry_context,
                     }
                 _save_positions_file()
                 try:
@@ -1392,14 +1407,14 @@ def execute_short(
                     "agent_outputs": agent_outputs or {},
                     "atr": atr,
                     "advice_id": advice_id,
-                    "trade_type": trade_type or "SCALP",
+                    "trade_type": trade_type or "INTRADAY",
                     "conviction": conviction,
                     "setup_type": _derive_setup_type(signal_scores or {}),
                     "entry_regime": (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
                     if isinstance(regime, dict)
                     else "UNKNOWN",
                     "entry_thesis": _build_entry_thesis(
-                        trade_type or "SCALP",
+                        trade_type or "INTRADAY",
                         symbol,
                         "SHORT",
                         conviction,
@@ -1416,6 +1431,7 @@ def execute_short(
                     "high_water_mark": price,
                     "agents_agreed": agents_agreed,
                     "tranche_mode": False,
+                    "entry_context": entry_context,
                 }
             _save_positions_file()
             try:

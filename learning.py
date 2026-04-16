@@ -380,6 +380,7 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
         "trade_type": trade.get("trade_type"),
         "conviction": trade.get("conviction"),
         "entry_thesis": trade.get("entry_thesis"),
+        "entry_context": trade.get("entry_context"),  # TradeContext snapshot for post-trade IC analysis
     }
 
     # ── Options metadata — store if present so dashboard can display correctly ──

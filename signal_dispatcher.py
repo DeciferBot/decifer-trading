@@ -298,6 +298,7 @@ def dispatch_signals(
                     dimension_scores=signal.dimension_scores,
                     rationale=signal.rationale,
                     regime_context=signal.regime_context,
+                    trade_type=cls.trade_type,
                 )
                 _entry_ctx = None
                 try:
@@ -350,6 +351,7 @@ def dispatch_signals(
                     dimension_scores=signal.dimension_scores,
                     rationale=signal.rationale,
                     regime_context=signal.regime_context,
+                    trade_type=cls.trade_type,
                 )
                 _entry_ctx = None
                 try:

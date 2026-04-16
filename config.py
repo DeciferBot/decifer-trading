@@ -846,27 +846,60 @@ CONFIG = {
 
 
 # ── SETTINGS OVERRIDE MERGE ───────────────────────────────────────────────────
-# Load data/settings_override.json (written by IC auto-disable) and merge only
-# the dimension_flags section into CONFIG. Runs once at import time. The running
-# bot picks up changes on the next scan cycle when config.py is re-evaluated.
+# Load data/settings_override.json and merge into CONFIG. Runs once at import time.
+# The running bot picks up changes on the next scan cycle when config.py is re-evaluated.
+#
+# Two sections are merged:
+#   1. Top-level scalar keys (int/float/bool/str) — any key that already exists in CONFIG
+#      as a scalar can be overridden. Nested dicts (portfolio_manager, dimension_weights,
+#      etc.) are intentionally excluded to prevent structural corruption.
+#   2. dimension_flags — individual bool flags merged into CONFIG["dimension_flags"].
 def _apply_settings_override() -> None:
     import json
+    import logging
     import os
 
+    _log = logging.getLogger("decifer.config")
     path = CONFIG.get("settings_override_path", "data/settings_override.json")
     if not os.path.exists(path):
         return
     try:
         with open(path) as f:
             override = json.load(f)
-        dim_overrides = override.get("dimension_flags", {})
-        if not isinstance(dim_overrides, dict):
+        if not isinstance(override, dict):
             return
-        for dim, enabled in dim_overrides.items():
-            if dim in CONFIG["dimension_flags"] and isinstance(enabled, bool):
-                CONFIG["dimension_flags"][dim] = enabled
-    except Exception:
-        pass  # Never let a corrupt override file crash the bot
+
+        # ── 1. Top-level scalar overrides ────────────────────────────────────
+        _SCALAR_TYPES = (int, float, bool, str)
+        applied = []
+        for key, val in override.items():
+            if key in ("dimension_flags", "settings_override_path"):
+                continue  # handled separately or skip meta-key
+            if key not in CONFIG:
+                _log.warning("settings_override: unknown key %r — ignored", key)
+                continue
+            if not isinstance(CONFIG[key], _SCALAR_TYPES):
+                _log.warning("settings_override: key %r is a nested structure — ignored", key)
+                continue
+            if not isinstance(val, _SCALAR_TYPES):
+                _log.warning("settings_override: value for %r is not a scalar — ignored", key)
+                continue
+            CONFIG[key] = val
+            applied.append(f"{key}={val}")
+        if applied:
+            _log.info("settings_override: applied %s", ", ".join(applied))
+
+        # ── 2. dimension_flags overrides ──────────────────────────────────────
+        dim_overrides = override.get("dimension_flags", {})
+        if isinstance(dim_overrides, dict):
+            for dim, enabled in dim_overrides.items():
+                if dim in CONFIG["dimension_flags"] and isinstance(enabled, bool):
+                    CONFIG["dimension_flags"][dim] = enabled
+
+    except Exception as exc:
+        logging.getLogger("decifer.config").warning(
+            "settings_override: failed to apply — %s", exc
+        )  # Never let a corrupt override file crash the bot
 
 
 _apply_settings_override()

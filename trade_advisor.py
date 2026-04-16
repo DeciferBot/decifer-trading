@@ -95,6 +95,7 @@ def _build_prompt(
     rationale: str,
     regime_context: str,
     history: list,
+    trade_type: str = "INTRADAY",
 ) -> str:
     # Format dimension scores compactly
     dims = ", ".join(f"{k}={v:.1f}" for k, v in dimension_scores.items() if v != 0)
@@ -132,6 +133,8 @@ Signal rationale: {rationale}
 
 ## {history_block}
 
+## Trade type: {trade_type}
+
 ## Your four decisions
 
 1. **instrument** — "COMMON" (stock), "CALL" (long call option), or "PUT" (long put option).
@@ -139,15 +142,22 @@ Signal rationale: {rationale}
 and it is before 12:00 ET. Otherwise use "COMMON".
 
 2. **size_multiplier** — scale factor (0.25 to 2.0) applied to the formula-calculated base size.
-   1.0 = standard. Increase for high-conviction trending setups. Decrease for borderline scores \
-or choppy regimes.
+   Defaults by trade type:
+   - INTRADAY: 1.0 (standard). Scale down for borderline scores or choppy regimes.
+   - SWING: 1.5 (catalyst-backed thesis earns larger size). Scale to 1.0 if catalyst is weak.
+   - POSITION: 2.0 (strong fundamental thesis). Scale down only if regime is uncertain.
 
-3. **profit_target** — an absolute price (not a percentage). Anchor to daily ATR: a typical \
-target is entry ± (daily_ATR × 0.4 to 0.6). Extend in strong trends, tighten near end-of-day \
-or approaching known resistance.
+3. **profit_target** — an absolute price (not a percentage). Anchor by trade type:
+   - INTRADAY: entry ± (daily_ATR × 0.4 to 0.6). Tighten near end-of-day or known resistance.
+   - SWING: entry ± (daily_ATR × 1.5 to 3.0) or analyst price target if known. Minimum 3% move \
+from entry. Exit target is catalyst resolution, not a fixed ATR multiple.
+   - POSITION: entry ± (daily_ATR × 5.0 to 10.0) or analyst price target (15%+ upside). \
+This is a thesis-driven hold — target the fundamental value, not a short-term ATR level.
 
-4. **stop_loss** — an absolute price. Anchor to 5-min ATR × 1.0 as the minimum distance \
-(prevents noise-outs). Widen slightly in high-VIX or choppy regimes.
+4. **stop_loss** — an absolute price. Anchor by trade type:
+   - INTRADAY: 5-min ATR × 1.0 minimum (prevents noise-outs).
+   - SWING: daily ATR × 0.5 to 1.0 (give the thesis room to develop). Wider in choppy regimes.
+   - POSITION: daily ATR × 1.0 to 2.0 (structural hold — stop should be below key support).
 
 ## Hard constraints (enforced by validation — your output will be overridden if violated)
 - LONG: profit_target > entry_price AND stop_loss < entry_price
@@ -281,6 +291,7 @@ def advise_trade(
     dimension_scores: dict,
     rationale: str,
     regime_context: str,
+    trade_type: str = "INTRADAY",
 ) -> TradeAdvice:
     """
     Ask Opus for PT, SL, size multiplier, and instrument recommendation.
@@ -312,6 +323,7 @@ def advise_trade(
             rationale,
             regime_context,
             history,
+            trade_type=trade_type,
         )
 
         client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
@@ -348,6 +360,7 @@ def advise_trade(
             "timestamp": datetime.now(UTC).isoformat(),
             "symbol": symbol,
             "direction": direction,
+            "trade_type": trade_type,
             "entry_price": entry_price,
             "atr_5m": atr_5m,
             "atr_daily": atr_daily,

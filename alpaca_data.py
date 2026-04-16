@@ -158,6 +158,208 @@ def fetch_bars(symbol: str, period: str = "60d", interval: str = "1d") -> pd.Dat
         return None
 
 
+def get_intraday_hod(symbol: str) -> float | None:
+    """
+    Return the high-of-day for symbol from market open (09:30 ET) to now.
+
+    Uses 1-minute bars. Returns the max(High) seen so far today.
+    Returns None if Alpaca unavailable or bars empty.
+
+    Used by TradeContext to compute hod_distance_pct at entry time.
+    """
+    try:
+        from datetime import date as _date
+        import pytz
+
+        et = pytz.timezone("America/New_York")
+        today = _date.today().isoformat()
+
+        # fetch_bars with 1m interval for today — period "1d" gives ~1 trading day
+        df = fetch_bars(symbol, period="1d", interval="1m")
+        if df is None or df.empty:
+            return None
+
+        # Filter to today only (handles cases where 1d includes yesterday's close)
+        df.index = pd.to_datetime(df.index, utc=True)
+        today_bars = df[df.index.date == pd.Timestamp(today).date()]
+        if today_bars.empty:
+            today_bars = df  # fallback to all returned bars
+
+        return float(today_bars["High"].max())
+    except Exception as exc:
+        log.debug(f"get_intraday_hod: {symbol} failed — {exc}")
+        return None
+
+
+def get_sector_etf_context(etf_ticker: str) -> dict | None:
+    """
+    Compute sector ETF context for POSITION trade classification.
+
+    Returns dict with:
+        etf (str)
+        above_50d (bool)              — closing price > 50-day SMA
+        return_3m_vs_spy (float)      — ETF 3-month return minus SPY 3-month return (pct)
+        days_since_breakout (int|None)— trading days since ETF last crossed above 50-day MA
+                                        None if already above for entire 90d window
+
+    Returns None if data unavailable.
+    Used by TradeContext for POSITION and SWING sector condition checks.
+    """
+    try:
+        # Fetch 90 trading days (~4.5 months) of daily bars for ETF and SPY
+        etf_df = fetch_bars(etf_ticker, period="6mo", interval="1d")
+        spy_df = fetch_bars("SPY",       period="6mo", interval="1d")
+
+        if etf_df is None or etf_df.empty or len(etf_df) < 50:
+            return None
+
+        # 50-day SMA
+        close = etf_df["Close"]
+        sma50 = close.rolling(50).mean()
+        above_50d = bool(close.iloc[-1] > sma50.iloc[-1])
+
+        # 3-month return (≈63 trading days)
+        lookback = min(63, len(close) - 1)
+        etf_3m = (close.iloc[-1] / close.iloc[-lookback] - 1) * 100
+
+        spy_3m = 0.0
+        if spy_df is not None and not spy_df.empty and len(spy_df) >= lookback:
+            spy_close = spy_df["Close"]
+            spy_3m = (spy_close.iloc[-1] / spy_close.iloc[-lookback] - 1) * 100
+
+        return_vs_spy = round(etf_3m - spy_3m, 2)
+
+        # Days since last 50d crossover (when price crossed from below to above)
+        days_since_breakout = None
+        if above_50d and len(close) >= 50:
+            # Walk back to find when it crossed above
+            above_series = close > sma50
+            for i in range(1, min(90, len(above_series))):
+                idx = -(i + 1)
+                if not above_series.iloc[idx]:
+                    days_since_breakout = i
+                    break
+
+        return {
+            "etf":                etf_ticker,
+            "above_50d":          above_50d,
+            "return_3m_vs_spy":   return_vs_spy,
+            "days_since_breakout": days_since_breakout,
+        }
+    except Exception as exc:
+        log.debug(f"get_sector_etf_context: {etf_ticker} failed — {exc}")
+        return None
+
+
+def get_intraday_vwap(symbol: str) -> float | None:
+    """
+    Compute session VWAP from today's 1-minute bars.
+    VWAP = sum(typical_price * volume) / sum(volume)
+    where typical_price = (High + Low + Close) / 3
+
+    Returns VWAP as float, or None if unavailable.
+    Used by TradeContext.build_context() as fast-path VWAP when the
+    signal engine hasn't passed one in.
+    """
+    try:
+        df = fetch_bars(symbol, period="1d", interval="1m")
+        if df is None or df.empty:
+            return None
+
+        import pandas as pd
+        df.index = pd.to_datetime(df.index, utc=True)
+
+        from datetime import date as _date
+        today_bars = df[df.index.date == _date.today()]
+        if today_bars.empty:
+            today_bars = df  # fallback
+
+        typical = (today_bars["High"] + today_bars["Low"] + today_bars["Close"]) / 3
+        vol = today_bars["Volume"]
+        total_vol = vol.sum()
+        if total_vol == 0:
+            return None
+        vwap = float((typical * vol).sum() / total_vol)
+        return round(vwap, 4)
+    except Exception as exc:
+        log.debug("get_intraday_vwap: %s failed — %s", symbol, exc)
+        return None
+
+
+def get_relative_volume(symbol: str) -> float | None:
+    """
+    Compute today's relative volume vs 20-day average, adjusted for time of day.
+
+    Method:
+      1. Sum today's 1-minute bar volumes to get volume so far
+      2. Compute 20-day average daily volume from daily bars
+      3. Estimate expected volume at this intraday time:
+           expected = 20d_avg_daily_vol * (elapsed_minutes / 390)
+      4. Return today_vol_so_far / expected
+
+    Returns float (e.g. 1.5 means 1.5× expected), or None if unavailable.
+    Used by TradeContext.build_context() to populate rel_volume.
+    """
+    try:
+        import pandas as pd
+        from datetime import date as _date
+        import pytz
+
+        # Today's cumulative volume from 1m bars
+        intraday = fetch_bars(symbol, period="1d", interval="1m")
+        if intraday is None or intraday.empty:
+            return None
+
+        intraday.index = pd.to_datetime(intraday.index, utc=True)
+        today_bars = intraday[intraday.index.date == _date.today()]
+        if today_bars.empty:
+            today_bars = intraday
+        today_vol = float(today_bars["Volume"].sum())
+        if today_vol == 0:
+            return None
+
+        # 20-day average daily volume
+        daily = fetch_bars(symbol, period="30d", interval="1d")
+        if daily is None or len(daily) < 5:
+            return None
+        avg_daily_vol = float(daily["Volume"].iloc[:-1].mean())  # exclude today
+        if avg_daily_vol == 0:
+            return None
+
+        # Elapsed minutes since 09:30 ET
+        et = pytz.timezone("America/New_York")
+        now_et = pd.Timestamp.now(tz=et)
+        market_open = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
+        elapsed = max(1.0, (now_et - market_open).total_seconds() / 60.0)
+        elapsed = min(elapsed, 390.0)  # cap at full day (390 min)
+
+        expected_vol = avg_daily_vol * (elapsed / 390.0)
+        if expected_vol == 0:
+            return None
+
+        rel_vol = round(today_vol / expected_vol, 2)
+        return rel_vol
+    except Exception as exc:
+        log.debug("get_relative_volume: %s failed — %s", symbol, exc)
+        return None
+
+
+def get_52wk_high(symbol: str) -> float | None:
+    """
+    Return the 52-week high (max daily High over last 252 trading days).
+    Used by TradeContext to compute ath_distance_pct.
+    Returns None if unavailable.
+    """
+    try:
+        df = fetch_bars(symbol, period="1y", interval="1d")
+        if df is None or df.empty:
+            return None
+        return float(df["High"].max())
+    except Exception as exc:
+        log.debug("get_52wk_high: %s failed — %s", symbol, exc)
+        return None
+
+
 def fetch_snapshots(symbols: list[str]) -> dict[str, dict]:
     """
     Fetch live price + 1-day change for a batch of symbols via Alpaca snapshots.

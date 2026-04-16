@@ -95,7 +95,11 @@ class TestAtrPrimaryEffect:
         price = 50.0
         score = 30
 
-        with patch.object(risk, "get_vix_rank", return_value=0.0):
+        # Pin risk_pct_per_trade to a small value so neither qty hits the
+        # max_single_position cap — the test is checking the ATR scaling formula,
+        # not position-limit clamping behaviour.
+        with patch.object(risk, "get_vix_rank", return_value=0.0), \
+             patch.dict(risk.CONFIG, {"risk_pct_per_trade": 0.005}):
             qty_tight = risk.calculate_position_size(portfolio, price, score, _REGIME_NEUTRAL, atr=2.0)
             qty_wide = risk.calculate_position_size(portfolio, price, score, _REGIME_NEUTRAL, atr=4.0)
 

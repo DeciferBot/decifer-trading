@@ -98,7 +98,7 @@ from market_intelligence import SignalClassification
 from signal_types import Signal
 
 
-def _make_scalp_classify(candidates, regime=None):
+def _make_scalp_classify(candidates, regime=None, trade_contexts=None):
     """Stub for classify_signals: passes every signal as SCALP, no AVOID."""
     return (
         "TRENDING_UP",
@@ -227,6 +227,16 @@ class TestDispatchSignals(unittest.TestCase):
         patcher = patch.object(signal_dispatcher, "classify_signals", side_effect=_make_scalp_classify)
         self.mock_classify = patcher.start()
         self.addCleanup(patcher.stop)
+
+        # Patch the entry_gate so it approves all signals in dispatch tests.
+        # Entry gate logic is covered separately in test_entry_gate.py.
+        gate_patcher = patch("entry_gate.validate_entry", return_value=(True, "INTRADAY", "gate mocked in test", 35))
+        gate_patcher.start()
+        self.addCleanup(gate_patcher.stop)
+
+        ctx_patcher = patch("trade_context.build_context", return_value=None)
+        ctx_patcher.start()
+        self.addCleanup(ctx_patcher.stop)
 
     def test_five_long_signals_produce_five_results(self):
         """DOD: mock 5 Signal objects → dispatch_signals() produces 5 order results."""

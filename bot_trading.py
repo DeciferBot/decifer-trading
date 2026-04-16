@@ -340,7 +340,7 @@ def _build_pm_exit_reason(pos: dict, regime: dict, pm_trigger: str, reason_pm: s
     exit_regime = (
         (regime.get("session_character") or regime.get("regime", "UNKNOWN")) if isinstance(regime, dict) else "UNKNOWN"
     )
-    trade_type_ex = pos.get("trade_type", "SCALP")
+    trade_type_ex = pos.get("trade_type", "INTRADAY")
     try:
         held_mins = int(
             (datetime.now(UTC) - datetime.fromisoformat(pos["open_time"].replace("Z", "+00:00"))).total_seconds() / 60
@@ -351,7 +351,7 @@ def _build_pm_exit_reason(pos: dict, regime: dict, pm_trigger: str, reason_pm: s
     exit_pol = _polarity(exit_regime)
     if entry_pol and exit_pol and entry_pol != exit_pol:
         thesis_class = "breached_regime_shift"
-    elif trade_type_ex == "SCALP" and held_mins > CONFIG.get("scalp_max_hold_minutes", 90):
+    elif trade_type_ex in ("SCALP", "INTRADAY") and held_mins > CONFIG.get("scalp_max_hold_minutes", 90):
         thesis_class = "breached_stale_scalp"
     else:
         thesis_class = "noise_stop"
@@ -506,7 +506,7 @@ def check_external_closes(regime: dict):
                     if isinstance(regime, dict)
                     else "UNKNOWN"
                 )
-                trade_type_ex = trade.get("trade_type", "SCALP")
+                trade_type_ex = trade.get("trade_type", "INTRADAY")
                 try:
                     held_mins = int(
                         (
@@ -522,7 +522,7 @@ def check_external_closes(regime: dict):
                     thesis_class = "confirmed"
                 elif entry_pol and exit_pol and entry_pol != exit_pol:
                     thesis_class = "breached_regime_shift"
-                elif trade_type_ex == "SCALP" and held_mins > CONFIG.get("scalp_max_hold_minutes", 90):
+                elif trade_type_ex in ("SCALP", "INTRADAY") and held_mins > CONFIG.get("scalp_max_hold_minutes", 90):
                     thesis_class = "breached_stale_scalp"
                 else:
                     thesis_class = "noise_stop"
@@ -929,7 +929,7 @@ def _should_run_portfolio_review(
         for s in all_scored if s.get("symbol")
     }
     for pos in open_positions:
-        if pos.get("trade_type", "SCALP") != "SCALP":
+        if pos.get("trade_type", "INTRADAY") not in ("SCALP", "INTRADAY"):
             continue
         sym = pos.get("symbol", "")
         entry_dir = pos.get("direction", "LONG")
@@ -2152,7 +2152,7 @@ def run_scan():
                                     pv,
                                     reasoning=reason,
                                     score=sig["score"],
-                                    trade_type=buy.get("trade_type", "SCALP"),
+                                    trade_type=buy.get("trade_type", "INTRADAY"),
                                     conviction=float(buy.get("conviction", 0.0)),
                                 )
                                 if opt_success:
