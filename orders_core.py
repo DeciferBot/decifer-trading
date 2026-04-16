@@ -763,8 +763,12 @@ def execute_buy(
                 if tp_status in ("Inactive", "Cancelled", "ApiCancelled"):
                     ib.cancelOrder(tp_trade.order)
                 ib.sleep(0.5)
-            except Exception:
-                pass
+            except Exception as e:
+                log.warning(
+                    "[orders_core][execute_buy] cancelOrder before OCA fallback failed "
+                    "for %s — original bracket orders may still be active alongside new OCA: %s",
+                    symbol, e, exc_info=True,
+                )
 
             # Place standalone SL + TP as OCA group (one-cancels-all)
             # so if TP fills, SL is auto-cancelled and vice versa
@@ -1658,8 +1662,11 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                 reason=reason,
                 note="execute_sell raised an exception — position may still be open in IBKR.",
             )
-        except Exception:
-            pass
+        except Exception as _audit_err:
+            log.warning(
+                "[orders_core][execute_sell] audit log failed for %s: %s",
+                symbol, _audit_err,
+            )
         return False
 
 
