@@ -299,6 +299,80 @@ def _get_catalyst_payload() -> dict:
     return payload
 
 
+_CALENDAR_META = {
+    "FOMC": {
+        "impact": 9,
+        "direction": "NEUTRAL",
+        "implication": "Federal Reserve rate decision — expect elevated volatility around 14:00 ET. Risk-off positioning likely pre-announcement.",
+        "headline": "FOMC Rate Decision Today — Federal Reserve Policy Announcement",
+    },
+    "CPI": {
+        "impact": 8,
+        "direction": "NEUTRAL",
+        "implication": "Consumer Price Index release — inflation data directly drives rate expectations and bond/equity repricing.",
+        "headline": "CPI Inflation Data Release Today — Markets Pricing Rate Path Impact",
+    },
+    "NFP": {
+        "impact": 8,
+        "direction": "NEUTRAL",
+        "implication": "Non-Farm Payrolls release — labor market strength shapes Fed policy outlook for the next meeting.",
+        "headline": "Non-Farm Payrolls Report Today — Labor Market Data Drives Fed Expectations",
+    },
+}
+
+
+def _calendar_macro_fallback(articles: list) -> None:
+    """
+    Fallback: if Sonnet tagged zero macro events, check macro_calendar for a
+    scheduled FOMC/CPI/NFP event within 24h and inject a synthetic article so
+    the macro strip is never blank on high-impact days.
+    """
+    if any(a.get("macro_event") for a in articles):
+        return  # LLM already found something — no fallback needed
+
+    try:
+        from macro_calendar import get_next_event, hours_to_next_event
+
+        hours = hours_to_next_event()
+        if hours is None or not (0 <= hours <= 24):
+            return
+
+        event = get_next_event()
+        if not event:
+            return
+
+        etype = event["type"]
+        meta = _CALENDAR_META.get(etype, _CALENDAR_META["FOMC"])
+        label, color = _MACRO_TYPES.get(etype, ("MACRO", "#888"))
+        h_str = f"{hours:.1f}h" if hours >= 1 else f"{int(hours * 60)}min"
+
+        synthetic = {
+            "headline": meta["headline"],
+            "summary": f"{meta['implication']} — {h_str} away.",
+            "url": "",
+            "source": "macro_calendar",
+            "author": "",
+            "symbols": [],
+            "image_url": None,
+            "age_hours": 0.0,
+            "created_ts": 0,
+            "sentiment": "NEUTRAL",
+            "news_score": 0,
+            "catalyst": "",
+            "macro_event": True,
+            "macro_type": etype,
+            "macro_label": label,
+            "macro_color": color,
+            "macro_impact": meta["impact"],
+            "macro_direction": meta["direction"],
+            "macro_implication": meta["implication"],
+        }
+        articles.insert(0, synthetic)
+        log.info("Macro fallback: injected %s calendar event (%.1fh away)", etype, hours)
+    except Exception as exc:
+        log.debug("Macro calendar fallback error: %s", exc)
+
+
 def _get_news_payload() -> dict:
     """
     Build the /api/news payload.
@@ -406,6 +480,10 @@ def _get_news_payload() -> dict:
     if len(_macro_cache) > 30:
         _macro_cache.clear()
     _enrich_macro_events(articles)
+
+    # If Sonnet found nothing, inject a calendar-backed synthetic macro article
+    # so the macro strip always surfaces scheduled FOMC/CPI/NFP events.
+    _calendar_macro_fallback(articles)
 
     payload = {
         "articles": articles,
