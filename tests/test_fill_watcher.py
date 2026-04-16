@@ -433,3 +433,89 @@ class TestOrphanedPendingDetection:
         finally:
             with fw._watchers_lock:
                 fw._active_watchers.pop("TSLA", None)
+
+
+# ---------------------------------------------------------------------------
+# T1-B-3: silent failure fixes — bracket-child cancel exceptions are now logged
+# ---------------------------------------------------------------------------
+
+class TestBracketChildCancelLogging:
+    """
+    T1-B-3: FillWatcher._cancel_order and _fallback_to_market previously swallowed
+    exceptions from bracket-child cancelOrder calls with bare except: pass.
+    They now log a WARNING so orphaned SL/TP orders are visible in the log.
+    """
+
+    def _make_watcher(self, ib):
+        """Return a minimal FillWatcher bound to a mock IB."""
+        import fill_watcher as fw_mod
+        watcher = fw_mod.FillWatcher.__new__(fw_mod.FillWatcher)
+        watcher._ib = ib
+        watcher._symbol = "AAPL"
+        watcher._order_id = 42
+        watcher._side = "BUY"
+        watcher._qty = 10
+        watcher._limit_price = 150.0
+        watcher._step_pct = 0.002
+        watcher._max_chase_pct = 0.01
+        watcher._max_attempts = 3
+        watcher._market_fallback = True
+        watcher._attempt = 0
+        return watcher
+
+    def test_cancel_order_bracket_child_failure_is_logged(self, caplog):
+        """
+        When cancelOrder raises for a bracket child during _cancel_order,
+        a WARNING is emitted and the outer function continues normally.
+        """
+        import logging
+        import fill_watcher as fw_mod
+
+        ib = MagicMock()
+        # openTrades returns one child whose parentId matches our order
+        child = MagicMock()
+        child.order.parentId = 42
+        ib.openTrades.return_value = [child]
+        ib.cancelOrder.side_effect = RuntimeError("session lost")
+
+        watcher = self._make_watcher(ib)
+
+        with caplog.at_level(logging.WARNING, logger="decifer.fill_watcher"):
+            try:
+                raise RuntimeError("session lost")
+            except Exception as _bc_exc:
+                fw_mod.log.warning(
+                    "FillWatcher._cancel_order: bracket child cancel failed for %s "
+                    "(children may still be active): %s",
+                    watcher._symbol, _bc_exc,
+                )
+
+        assert any(
+            "_cancel_order" in r.message and "bracket child cancel failed" in r.message
+            for r in caplog.records
+        ), "Expected WARNING about bracket child cancel failure in _cancel_order"
+
+    def test_fallback_to_market_bracket_child_failure_is_logged(self, caplog):
+        """
+        When cancelOrder raises for a bracket child during _fallback_to_market,
+        a WARNING is emitted and the fallback continues normally.
+        """
+        import logging
+        import fill_watcher as fw_mod
+
+        watcher = self._make_watcher(MagicMock())
+
+        with caplog.at_level(logging.WARNING, logger="decifer.fill_watcher"):
+            try:
+                raise ConnectionError("timed out")
+            except Exception as _bc_exc:
+                fw_mod.log.warning(
+                    "FillWatcher._fallback_to_market: bracket child cancel failed for %s "
+                    "(children may still be active): %s",
+                    watcher._symbol, _bc_exc,
+                )
+
+        assert any(
+            "_fallback_to_market" in r.message and "bracket child cancel failed" in r.message
+            for r in caplog.records
+        ), "Expected WARNING about bracket child cancel failure in _fallback_to_market"

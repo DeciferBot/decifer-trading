@@ -285,8 +285,12 @@ class FillWatcher:
                     for t in self._ib.openTrades():
                         if getattr(t.order, "parentId", None) == self._order_id:
                             self._ib.cancelOrder(t.order)
-                except Exception:
-                    pass
+                except Exception as _bc_exc:
+                    log.warning(
+                        "FillWatcher._cancel_order: bracket child cancel failed for %s "
+                        "(children may still be active): %s",
+                        self._symbol, _bc_exc,
+                    )
 
         except Exception as exc:
             log.error(f"FillWatcher._cancel_order: IBKR calls failed for {self._symbol}: {exc}")
@@ -342,8 +346,12 @@ class FillWatcher:
                     for t in self._ib.openTrades():
                         if getattr(t.order, "parentId", None) == self._order_id:
                             self._ib.cancelOrder(t.order)
-                except Exception:
-                    pass
+                except Exception as _bc_exc:
+                    log.warning(
+                        "FillWatcher._fallback_to_market: bracket child cancel failed for %s "
+                        "(children may still be active): %s",
+                        self._symbol, _bc_exc,
+                    )
 
                 # Place standalone order — MKT during regular session, LMT during extended hours.
                 # IBKR queues MarketOrder outside 9:30 AM–4 PM ET; use an aggressive limit instead.
