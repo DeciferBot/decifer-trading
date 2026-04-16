@@ -10,7 +10,7 @@ Imports from orders_state (shared state) and orders_contracts (utilities).
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from ib_async import IB, LimitOrder, MarketOrder, StopOrder
 
@@ -520,7 +520,19 @@ def reconcile_with_ibkr(ib: IB):
                     # signal_scores, agent_outputs, pattern_id, etc.
                     stored_entry = active_trades[key].get("entry", ibkr_entry)
                     stored_direction = active_trades[key].get("direction", "LONG")
-                    stored_qty = active_trades[key].get("qty", abs(int(item.position)))
+                    ibkr_qty = abs(int(item.position))
+                    stored_qty = active_trades[key].get("qty", ibkr_qty)
+                    # Reconcile qty: partial fills mean IBKR holds fewer contracts
+                    # than we submitted. Trust IBKR as ground truth.
+                    if is_option and ibkr_qty != stored_qty:
+                        log.warning(
+                            f"Reconcile {key}: qty mismatch — tracked={stored_qty}, "
+                            f"IBKR={ibkr_qty} (partial fill). Correcting to {ibkr_qty}."
+                        )
+                        stored_qty = ibkr_qty
+                        with _trades_lock:
+                            active_trades[key]["qty"] = ibkr_qty
+                            active_trades[key]["contracts"] = ibkr_qty
                     mult = 100 if is_option else 1
                     if stored_direction == "SHORT":
                         pnl = round((stored_entry - validated_price) * stored_qty * mult, 2)
@@ -610,6 +622,11 @@ def reconcile_with_ibkr(ib: IB):
                         else:
                             pnl = round((validated_price - ibkr_entry) * qty * 100, 2)
                         _saved = _find_saved(key, sym, "option")
+                        try:
+                            _exp_d = datetime.strptime(expiry_str, "%Y-%m-%d").date()
+                            _dte_calc = (_exp_d - date.today()).days
+                        except Exception:
+                            _dte_calc = 0
                         new_entry = {
                             "symbol": sym,
                             "instrument": "option",
@@ -617,7 +634,7 @@ def reconcile_with_ibkr(ib: IB):
                             "strike": c.strike,
                             "expiry_str": expiry_str,
                             "expiry_ibkr": raw_exp,
-                            "dte": 0,
+                            "dte": _dte_calc,
                             "contracts": qty,
                             "entry_premium": ibkr_entry,
                             "current_premium": validated_price,
@@ -1087,9 +1104,23 @@ def update_positions_from_ibkr(ib: IB):
 
             if _trade_instrument == "option" and (_key in price_map or _key in _positions_keys):
                 # Option order filled — IBKR shows an active position.
+                # Sync qty from IBKR to catch partial fills: submitted order may have
+                # been for N contracts but only M actually filled.
+                _ibkr_item = price_map.get(_key)
+                _ibkr_filled_qty = abs(int(_ibkr_item.position)) if _ibkr_item is not None else None
                 with _trades_lock:
                     if _key in active_trades:
                         active_trades[_key]["status"] = "ACTIVE"
+                        if _ibkr_filled_qty is not None:
+                            _tracked_qty = active_trades[_key].get("qty", _ibkr_filled_qty)
+                            if _ibkr_filled_qty != _tracked_qty:
+                                log.warning(
+                                    f"PENDING option {_key}: qty mismatch on fill confirmation — "
+                                    f"tracked={_tracked_qty}, IBKR={_ibkr_filled_qty} (partial fill). "
+                                    f"Correcting to {_ibkr_filled_qty}."
+                                )
+                            active_trades[_key]["qty"] = _ibkr_filled_qty
+                            active_trades[_key]["contracts"] = _ibkr_filled_qty
                 _src = "portfolio" if _key in price_map else "positions"
                 log.info(f"PENDING option {_key} found in IBKR {_src} — marking ACTIVE (fill confirmed)")
                 continue
@@ -1222,6 +1253,11 @@ def update_positions_from_ibkr(ib: IB):
                             pnl = round((validated - entry) * qty * mult, 2)
 
                         # Build the authoritative IBKR structural fields.
+                        try:
+                            _exp_d2 = datetime.strptime(expiry_str, "%Y-%m-%d").date()
+                            _dte_calc2 = (_exp_d2 - date.today()).days
+                        except Exception:
+                            _dte_calc2 = 0
                         ibkr_fields = {
                             "symbol": sym,
                             "instrument": "option",
@@ -1229,7 +1265,7 @@ def update_positions_from_ibkr(ib: IB):
                             "strike": c.strike,
                             "expiry_str": expiry_str,
                             "expiry_ibkr": raw_exp,
-                            "dte": 0,
+                            "dte": _dte_calc2,
                             "contracts": qty,
                             "entry_premium": entry,
                             "current_premium": validated,

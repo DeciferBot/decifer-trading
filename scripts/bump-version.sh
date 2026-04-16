@@ -12,16 +12,31 @@ VERSION=$1
 CODENAME=$2
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION_FILE="$REPO_ROOT/version.py"
+CHANGELOG="$REPO_ROOT/docs/CHANGELOG.md"
 
-# Update version.py
+# ── CHANGELOG gate ────────────────────────────────────────────────────────────
+# Check if CHANGELOG.md has been edited since last commit (staged or unstaged)
+cd "$REPO_ROOT"
+if git diff --quiet HEAD -- "$CHANGELOG" && git diff --cached --quiet -- "$CHANGELOG"; then
+    echo ""
+    echo "  CHANGELOG not updated. Open it now? [y/N]"
+    read -r OPEN_IT
+    if [ "$OPEN_IT" = "y" ] || [ "$OPEN_IT" = "Y" ]; then
+        "${EDITOR:-nano}" "$CHANGELOG"
+    else
+        echo "Aborted. Update docs/CHANGELOG.md before releasing."
+        exit 1
+    fi
+fi
+
+# ── Update version.py ─────────────────────────────────────────────────────────
 sed -i '' "s/__version__ = .*/__version__ = \"$VERSION\"/" "$VERSION_FILE"
 sed -i '' "s/__codename__ = .*/__codename__ = \"$CODENAME\"/" "$VERSION_FILE"
 
 echo "✓ version.py updated to v$VERSION ($CODENAME)"
 
-# Commit + tag
-cd "$REPO_ROOT"
-git add version.py
+# ── Commit + tag ──────────────────────────────────────────────────────────────
+git add version.py "$CHANGELOG"
 git commit -m "chore(version): bump to v$VERSION — $CODENAME
 
 Approved-by: Amit"
