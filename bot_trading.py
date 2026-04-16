@@ -2109,7 +2109,7 @@ def run_scan():
                         )
                         if _add_decision["action"] == "ADD":
                             try:
-                                contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
+                                contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"], trade_type=_pos_dict.get("trade_type", "SWING"))
                                 if contract_info:
                                     _add_ok = execute_add_to_option(
                                         ib=ib,
@@ -2144,7 +2144,7 @@ def run_scan():
                     else:
                         clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
                         try:
-                            contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"])
+                            contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"], trade_type=buy.get("trade_type", "SWING"))
                             if contract_info:
                                 opt_success = execute_buy_option(
                                     ib,

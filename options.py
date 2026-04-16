@@ -313,7 +313,8 @@ def _pick_best_contract(candidates: list[tuple[int, dict]], target_dte: int, dte
 
 
 def find_best_contract(
-    symbol: str, direction: str, portfolio_value: float, ib=None, regime: dict | None = None, score: int = 0
+    symbol: str, direction: str, portfolio_value: float, ib=None, regime: dict | None = None, score: int = 0,
+    trade_type: str = "SWING",
 ) -> dict | None:
     """
     Given a high-conviction signal, find the best options contract.
@@ -333,18 +334,21 @@ def find_best_contract(
       contracts (position-sized), max_risk_dollars
     """
     flag = "c" if direction == "LONG" else "p"
-    min_dte = CONFIG.get("options_min_dte", 7)
-    max_dte = CONFIG.get("options_max_dte", 45)
     max_ivr = CONFIG.get("options_max_ivr", 65)
     t_delta = CONFIG.get("options_target_delta", 0.50)
     d_range = CONFIG.get("options_delta_range", 0.35)
     hard_cap = CONFIG.get("options_max_risk_pct", 0.025) * portfolio_value
 
+    # ── Trade-type DTE window — applied before regime adjustments ────────────
+    _dte_map = CONFIG.get("options_dte_by_trade_type", {})
+    _dte_cfg = _dte_map.get(trade_type, {})
+    min_dte = _dte_cfg.get("min", CONFIG.get("options_min_dte", 7))
+    max_dte = _dte_cfg.get("max", CONFIG.get("options_max_dte", 45))
+    target_dte = _dte_cfg.get("target", (min_dte + max_dte) // 2)
+    log.info(f"Options {symbol}: trade_type={trade_type} → DTE [{min_dte},{max_dte}] target={target_dte}")
+
     # ── Regime-aware adjustments ──────────────────────────────────────────────
-    # target_dte: preferred DTE used by the composite scorer — not a hard filter.
-    # Adjustments tighten delta toward ATM and prefer faster-decaying strikes
-    # in trending/panic regimes where the signal has higher time-urgency.
-    target_dte = (min_dte + max_dte) // 2  # default: middle of window
+    # Regime adjustments narrow or shift the window set above by trade_type.
 
     regime_name = (regime or {}).get("regime", "UNKNOWN")
     if regime_name == "PANIC":

@@ -615,8 +615,15 @@ CONFIG = {
     "options_delta_range": 0.35,  # Acceptable window either side of target (0.15-0.85)
     #                                     Wider range needed for biotechs/small-caps
     #                                     with $5 strike spacing where ATM doesn't exist
-    "options_min_dte": 5,  # Minimum days to expiry
-    "options_max_dte": 45,  # Maximum days to expiry
+    "options_min_dte": 5,  # Minimum days to expiry (fallback when trade_type unknown)
+    "options_max_dte": 45,  # Maximum days to expiry (fallback when trade_type unknown)
+    # DTE window per trade type — overrides min/max above when trade_type is known.
+    # Regime adjustments apply on top of these (e.g. PANIC caps INTRADAY further to 7 DTE).
+    "options_dte_by_trade_type": {
+        "INTRADAY": {"min": 7,  "max": 14, "target": 10},  # Same-day move; minimal theta burn
+        "SWING":    {"min": 14, "max": 30, "target": 21},  # 2-10 day thesis; avoid weekly gamma crush
+        "POSITION": {"min": 30, "max": 60, "target": 45},  # Multi-week hold; buy time, don't fight theta
+    },
     # Liquidity filters
     "options_min_volume": 25,  # Minimum contracts traded today (was 50, relaxed for mid-cap)
     "options_min_oi": 100,  # Minimum open interest (was 200, relaxed for mid-cap)
