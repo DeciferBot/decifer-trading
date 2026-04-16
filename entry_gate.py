@@ -63,6 +63,10 @@ def _validate_intraday(direction: str, ctx: TradeContext) -> tuple[bool, str, in
 
     # ── Hard disqualifiers ────────────────────────────────────────────────────
 
+    # Market is closed — no intraday entries post-close or pre-open
+    if ctx.time_of_day_window == "CLOSE":
+        return False, "market closed — INTRADAY entry requires open market (OPEN/MIDDAY/PRIME_PM)", 0
+
     # Earnings same day or pre-market tomorrow
     if ctx.earnings_days_away is not None and ctx.earnings_days_away <= 0:
         return False, "earnings same day — binary event, not a technical trade", 0
@@ -223,6 +227,10 @@ def _validate_swing(direction: str, ctx: TradeContext) -> tuple[bool, str, int]:
         catalyst_reasons.append("congressional buying (Senate/House trades, last 90 days)")
     if direction == "SHORT" and cong == "SELLING":
         catalyst_reasons.append("congressional selling (Senate/House trades, last 90 days)")
+
+    # 7. Overnight drift — strong overnight_drift signal is itself the catalyst for EOD/post-close entries
+    if ctx.catalyst_type == "overnight_drift":
+        catalyst_reasons.append("overnight drift signal — price dislocation setup for next open")
 
     if not catalyst_reasons:
         return (

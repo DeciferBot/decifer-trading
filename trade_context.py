@@ -230,6 +230,16 @@ def build_context(
     ctx.catalyst_score = catalyst_score
     ctx.catalyst_type  = catalyst_type or "none"
     ctx.earnings_days_away = earnings_days_away
+
+    # Overnight drift: when the signal's overnight_drift dimension is dominant (≥6)
+    # and no stronger catalyst is present, mark it so _validate_swing can qualify
+    # it as a SWING candidate (EOD/post-close entries are SWING, never INTRADAY).
+    try:
+        _od = getattr(signal, "dimension_scores", {}).get("overnight_drift", 0)
+        if _od >= 6 and ctx.catalyst_type in (None, "none"):
+            ctx.catalyst_type = "overnight_drift"
+    except Exception:
+        pass
     ctx.regime = regime or (signal.regime_context if hasattr(signal, "regime_context") else None)
 
     # ── 8. FMP: analyst consensus + price target ──────────────────────────────

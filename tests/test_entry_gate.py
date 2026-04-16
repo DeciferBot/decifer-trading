@@ -157,6 +157,12 @@ class TestIntradayGate(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("wrong side", reason)
 
+    def test_close_window_hard_rejects_intraday(self):
+        ctx = _intraday_ctx(time_of_day_window="CLOSE")
+        ok, reason, _ = _validate_intraday("LONG", ctx)
+        self.assertFalse(ok)
+        self.assertIn("market closed", reason)
+
     def test_dead_window_adds_penalty(self):
         ctx = _intraday_ctx(in_dead_window=True)
         ok, reason, penalty = _validate_intraday("LONG", ctx)
@@ -192,6 +198,28 @@ class TestSwingGate(unittest.TestCase):
         ok, reason, _ = _validate_swing("LONG", ctx)
         self.assertTrue(ok)
         self.assertIn("earnings", reason.lower())
+
+    def test_overnight_drift_qualifies_swing(self):
+        ctx = _swing_ctx(
+            catalyst_type="overnight_drift",
+            catalyst_score=None,
+            recent_upgrade=False,
+            sector_days_since_breakout=15,
+        )
+        ok, reason, _ = _validate_swing("LONG", ctx)
+        self.assertTrue(ok)
+        self.assertIn("overnight drift", reason.lower())
+
+    def test_close_window_overnight_drift_routes_to_swing(self):
+        ctx = _swing_ctx(
+            time_of_day_window="CLOSE",
+            catalyst_type="overnight_drift",
+            catalyst_score=None,
+            recent_upgrade=False,
+            sector_days_since_breakout=15,
+        )
+        trade_type, reason, _ = classify_trade_type("LONG", ctx, score=33)
+        self.assertEqual(trade_type, "SWING")
 
     def test_no_catalyst_rejected(self):
         ctx = _swing_ctx(
