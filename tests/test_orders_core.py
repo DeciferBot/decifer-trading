@@ -1134,6 +1134,8 @@ class TestEdgeCases:
         assert result is True
         assert orders.open_trades["AAPL"]["entry_regime"] == "UNKNOWN"
 
+    @patch("orders_core.is_equities_extended_hours", return_value=False)
+    @patch("orders_core.is_options_market_open", return_value=False)
     @patch("orders.CONFIG")
     @patch("orders.calculate_position_size")
     @patch("orders.calculate_stops")
@@ -1152,6 +1154,8 @@ class TestEdgeCases:
         mock_stops,
         mock_position_size,
         mock_config_obj,
+        mock_options_open,
+        mock_ext_hours,
         mock_config,
         mock_ib,
     ):

@@ -160,6 +160,9 @@ def _run_execute_buy(
         "orders.check_combined_exposure": MagicMock(return_value=(True, "ok")),
         "orders.check_sector_concentration": MagicMock(return_value=(True, "ok")),
         "execution_agent.get_execution_plan": MagicMock(return_value=_default_plan()),
+        # Force market-hours path — tests must not depend on wall-clock time
+        "orders_core.is_equities_extended_hours": MagicMock(return_value=False),
+        "orders_core.is_options_market_open": MagicMock(return_value=False),
         # Stub file I/O so tests never write to disk regardless of what
         # collection-time mutations set learning.ORDER_LOG_FILE / TRADE_LOG_FILE to.
         # orders.log_order: rebound from orders module namespace at call time (line ~482)

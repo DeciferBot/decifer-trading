@@ -105,13 +105,6 @@ CONFIG = {
     # Sign up at https://financialmodelingprep.com/register (free, no credit card).
     # Set env var: FMP_API_KEY
     "fmp_api_key": os.environ.get("FMP_API_KEY", ""),
-    # ── FINNHUB (free tier: 60 calls/min) ────────────────────
-    # Sign up at https://finnhub.io — free API key, no credit card required.
-    # Free tier covers: stock quotes + company news articles (/company-news).
-    # Used for: supplementing Yahoo RSS with a second news feed per symbol.
-    # Set to "" (or omit FINNHUB_API_KEY env var) to disable all Finnhub calls.
-    "finnhub_api_key": os.environ.get("FINNHUB_API_KEY", ""),
-    "use_finnhub": True,  # Master switch; also gated by finnhub_api_key
     # ── AI BRAIN ──────────────────────────────────────────────
     "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", "YOUR_API_KEY_HERE"),
     "claude_model": "claude-sonnet-4-6",  # Sonnet — number crunching, structured data

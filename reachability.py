@@ -111,7 +111,6 @@ STDLIB_PREFIXES = {
     "torch",
     "tensorflow",
     "yfinance",
-    "finnhub",
     "ta",
     "tulipy",
     "colorama",

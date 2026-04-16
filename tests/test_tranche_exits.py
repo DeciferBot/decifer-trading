@@ -94,12 +94,15 @@ def _run_execute_buy(ib, qty, tranche_mode=True, atr=1.0, price=100.0):
         patch("orders.calculate_stops", return_value=(price - atr * 1.5, price + atr * 3.375)),
         patch("orders.get_contract", return_value=MagicMock()),
         patch("orders._get_ibkr_price", return_value=price),
+        patch("orders._get_ibkr_bid_ask", return_value=(price - 0.05, price + 0.05)),
         patch("orders.check_correlation", return_value=(True, "")),
         patch("orders.check_combined_exposure", return_value=(True, "")),
         patch("orders.check_sector_concentration", return_value=(True, "")),
         patch("orders._is_duplicate_check_enabled", return_value=False),
         patch("orders.log_order"),
         patch("learning.log_trade"),
+        patch("orders_core.is_equities_extended_hours", return_value=False),
+        patch("orders_core.is_options_market_open", return_value=False),
     ):
         return orders.execute_buy(
             ib,
@@ -358,12 +361,14 @@ class TestJournalAtOpen:
             patch("orders.calculate_stops", return_value=(98.5, 103.375)),
             patch("orders.get_contract", return_value=MagicMock()),
             patch("orders._get_ibkr_price", return_value=100.0),
-                patch("orders.check_correlation", return_value=(True, "")),
+            patch("orders.check_correlation", return_value=(True, "")),
             patch("orders.check_combined_exposure", return_value=(True, "")),
             patch("orders.check_sector_concentration", return_value=(True, "")),
             patch("orders._is_duplicate_check_enabled", return_value=False),
             patch("orders.log_order"),
             patch("learning.log_trade", side_effect=lambda **kw: logged.append(kw)),
+            patch("orders_core.is_equities_extended_hours", return_value=False),
+            patch("orders_core.is_options_market_open", return_value=False),
         ):
             orders.execute_buy(
                 ib,
@@ -378,7 +383,7 @@ class TestJournalAtOpen:
 
         open_calls = [c for c in logged if c.get("action") == "OPEN"]
         assert len(open_calls) == 2
-        ids = {c["trade"]["tranche_id"] for c in open_calls}
+        ids = {c["trade"].get("tranche_id") for c in open_calls}
         assert ids == {1, 2}
 
     def test_single_log_trade_open_call_in_legacy_mode(self):
@@ -507,12 +512,14 @@ class TestLegacyMode:
             patch("orders.calculate_stops", return_value=(98.5, 103.375)),
             patch("orders.get_contract", return_value=MagicMock()),
             patch("orders._get_ibkr_price", return_value=100.0),
-                patch("orders.check_correlation", return_value=(True, "")),
+            patch("orders.check_correlation", return_value=(True, "")),
             patch("orders.check_combined_exposure", return_value=(True, "")),
             patch("orders.check_sector_concentration", return_value=(True, "")),
             patch("orders._is_duplicate_check_enabled", return_value=False),
             patch("orders.log_order"),
             patch("learning.log_trade"),
+            patch("orders_core.is_equities_extended_hours", return_value=False),
+            patch("orders_core.is_options_market_open", return_value=False),
             patch.object(orders, "LimitOrder", mock_limit),
             patch.object(orders, "StopOrder", MagicMock(return_value=MagicMock(parentId=None, transmit=False))),
         ):
