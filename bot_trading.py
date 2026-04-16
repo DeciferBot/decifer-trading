@@ -701,11 +701,34 @@ def _eod_options_review(regime: dict):
         clog("INFO", "EOD options review: no open options positions")
         return
 
-    clog("ANALYSIS", f"EOD options review: evaluating {len(opts)} position(s) at 3:30 PM")
+    # INTRADAY positions are always closed at EOD — no AI judgment needed.
+    intraday_opts = [p for p in opts if p.get("trade_type") == "INTRADAY"]
+    claude_opts   = [p for p in opts if p.get("trade_type") != "INTRADAY"]
+
+    for p in intraday_opts:
+        key = p.get("_trade_key", p.get("symbol"))
+        sym = key.split("_")[0]
+        clog("TRADE", f"EOD INTRADAY force-close: {key}")
+        try:
+            result = close_position(ib, key) or close_position(ib, sym)
+            if result:
+                from bot_voice import speak_natural as _speak_eod
+                _speak_eod("exit_pm", fallback=f"Closing {sym} into the bell.", symbol=sym,
+                           reason="intraday flat EOD", news="none")
+            else:
+                clog("ERROR", f"EOD INTRADAY close failed for {key}")
+        except Exception as e:
+            clog("ERROR", f"EOD INTRADAY close error for {key}: {e}")
+
+    if not claude_opts:
+        clog("INFO", f"EOD options review: {len(intraday_opts)} INTRADAY closed, no SWING/POSITION to review")
+        return
+
+    clog("ANALYSIS", f"EOD options review: {len(intraday_opts)} INTRADAY closed, evaluating {len(claude_opts)} SWING/POSITION position(s)")
 
     # Build a readable context block for each position
     pos_lines = []
-    for p in opts:
+    for p in claude_opts:
         entry_prem = p.get("entry_premium", 0)
         curr_prem = p.get("current_premium", entry_prem)
         pnl_pct = ((curr_prem - entry_prem) / entry_prem * 100) if entry_prem else 0
