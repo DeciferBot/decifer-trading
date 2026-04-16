@@ -72,6 +72,9 @@ def _get_catalyst_lookup() -> dict[str, float]:
             _catalyst_cache.update({"data": {}, "ts": now})
             return {}
         raw = _json.loads(files[0].read_text())
+        _ver = raw.get("_schema_version")
+        if _ver is not None and _ver != 1:
+            log.warning("[signals][_get_catalyst_lookup] unrecognised _schema_version=%s in %s — processing anyway", _ver, files[0].name)
         min_score = CONFIG.get("catalyst_signal_min_score", 7.0)
         lookup = {}
         for c in raw.get("candidates", []):

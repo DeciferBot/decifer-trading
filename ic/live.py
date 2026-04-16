@@ -100,6 +100,8 @@ def compute_live_trade_ic(trades_path: str | None = None) -> dict:
       "n_trades"  — number of eligible closed trades
       "raw_ic"    — {dim: float or None}
       "timestamp" — ISO timestamp
+    On any load failure returns {"n_trades": 0, "raw_ic": {dim: None}, "timestamp": <now>}
+    and logs at WARNING level. Bad individual records are skipped and logged at WARNING.
     """
     path = trades_path or _TRADES_FILE
     try:
@@ -108,7 +110,11 @@ def compute_live_trade_ic(trades_path: str | None = None) -> dict:
         items = list(raw.values()) if isinstance(raw, dict) else raw
     except Exception as e:
         log.warning("compute_live_trade_ic: cannot load trades: %s", e)
-        return {"n_trades": 0, "raw_ic": {d: None for d in DIMENSIONS}}
+        return {
+            "n_trades": 0,
+            "raw_ic": {d: None for d in DIMENSIONS},
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
 
     eligible = []
     for t in items:

@@ -195,7 +195,9 @@ def ledger_lookup(key: str, symbol: str = "", instrument: str = "") -> dict:
 def restore() -> dict:
     """
     Load active_trades snapshot from disk.
-    Returns an empty dict if the file is missing or corrupt.
+    Returns an empty dict if the file is missing, corrupt, or has no valid records.
+    Bad individual records are skipped and logged at WARNING level.
+    Load errors are logged at ERROR level.
     """
     try:
         if _POSITIONS_FILE.exists():

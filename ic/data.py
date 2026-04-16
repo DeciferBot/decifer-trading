@@ -26,7 +26,7 @@ def _load_signal_records(
     signals_log_path: str | None = None,
     window: int = ROLLING_WINDOW,
     min_age_days: int = 0,
-) -> list:
+) -> list[dict]:
     """
     Load the most recent `window` records that have a fully-populated
     score_breakdown (all 9 dimensions present).
@@ -34,6 +34,9 @@ def _load_signal_records(
     If *min_age_days* > 0, only records at least that many calendar days old
     are included.  This ensures forward-return data can actually be fetched
     before a record enters the IC computation window.
+
+    Returns an empty list if the file is missing or unreadable (logged at WARNING).
+    Bad individual records are skipped and logged at WARNING level.
     """
     path = signals_log_path or SIGNALS_LOG_FILE
     if not os.path.exists(path):

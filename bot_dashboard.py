@@ -244,6 +244,10 @@ def _get_catalyst_payload() -> dict:
     Build the /api/catalyst payload from chief-decifer/state/internal/catalyst/.
     Reads the most recent candidates file + edgar_events.json.
     Cached for 30 seconds.
+
+    Always returns a valid dict with keys: candidates, edgar_events, date_str,
+    total_candidates. File read failures are logged at WARNING; bad individual
+    records are skipped. Never raises.
     """
     import time as _time_mod
 
@@ -262,6 +266,9 @@ def _get_catalyst_payload() -> dict:
         if files:
             try:
                 raw = json.loads(files[0].read_text())
+                _ver = raw.get("_schema_version")
+                if _ver is not None and _ver != 1:
+                    log.warning("[dashboard][_get_catalyst_payload] unrecognised _schema_version=%s in %s — processing anyway", _ver, files[0].name)
                 _raw_candidates = raw.get("candidates", [])
                 candidates = []
                 for _c in _raw_candidates:

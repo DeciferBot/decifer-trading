@@ -132,7 +132,10 @@ Each function raises `ValueError("missing key X in Y")` if required keys are abs
 
 ---
 
-#### T2-B: Sentinel return values — replace `None` with typed results
+#### T2-B: Sentinel return values — replace `None` with typed results ✅ (shipped 2026-04-16)
+
+**What shipped:** Docstrings + return types updated for all 5 functions touched in T2-A.
+Fixed real bug in `ic/live.py compute_live_trade_ic`: failure sentinel was missing `"timestamp"` key despite docstring promising it — now included. `_load_signal_records` return type tightened from `list` to `list[dict]`.
 
 Functions that can fail should return a typed result, not `None`:
 
@@ -155,8 +158,15 @@ This is documentation + logging, not a type system. Apply only during T2-A edits
 
 ---
 
-#### T2-C: Add schema version markers to written JSON files
+#### T2-C: Add schema version markers to written JSON files ✅ (shipped 2026-04-16)
 
+**What shipped:**
+- `signals/catalyst_screen.py` `run_screen()` — adds `"_schema_version": 1` to `candidates_*.json`
+- `learning.py` `log_signal_scan()` — adds `"_schema_version": 1` to each `signals_log.jsonl` record
+- `signals/__init__.py` + `bot_dashboard.py` — check `_schema_version` on read; warn if present and ≠ 1 (missing = old file, silently fine)
+- `positions.json` and `trades.json` deferred: flat-dict-keyed and list formats can't have a top-level version key without a breaking change to all readers. Noted for Tier 3 if a wrapper format is ever adopted.
+
+**Original description:**
 When a writer creates/updates a JSON file, add `"_schema_version": 1` to the top level.
 
 Readers check: if `_schema_version` is missing or lower than expected, log a warning and use safe defaults rather than crashing.

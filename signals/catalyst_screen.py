@@ -260,6 +260,7 @@ def run_screen(tickers: list[str] | None = None, verbose: bool = False, force: b
 
     # Persist
     payload = {
+        "_schema_version": 1,
         "date":        today,
         "generated_at": datetime.utcnow().isoformat() + "Z",
         "tickers_scanned": len(tickers),

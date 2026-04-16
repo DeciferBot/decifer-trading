@@ -273,6 +273,7 @@ def log_signal_scan(scored: list, regime: dict) -> None:
             for sig in scored:
                 _nd = sig.get("news") or {}
                 record = {
+                    "_schema_version": 1,
                     "ts": datetime.now(UTC).isoformat(),
                     "scan_id": scan_id,
                     "symbol": sig.get("symbol"),
