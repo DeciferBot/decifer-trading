@@ -381,6 +381,8 @@ class TestPanicMomentumInconsistency:
             "pead",
             "short_squeeze",
             "overnight_drift",
+            "analyst_revision",
+            "insider_buying",
         }
 
         for regime in ("momentum", "mean_reversion", "unknown"):

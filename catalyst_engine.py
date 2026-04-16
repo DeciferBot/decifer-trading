@@ -141,6 +141,32 @@ def _build_edgar_trigger(edgar_event: dict) -> dict:
     }
 
 
+def _build_congressional_trigger(symbol: str, data: dict) -> dict:
+    """Build a standardised catalyst trigger from congressional trade data."""
+    sentiment = data.get("net_sentiment", "BUYING")
+    politicians = ", ".join(data.get("politicians", [])[:3]) or "unknown"
+    buy_count = data.get("buy_count", 0)
+    direction = "BULLISH" if sentiment == "BUYING" else "BEARISH"
+    catalyst = (
+        f"Congressional {sentiment.lower()}: {buy_count} purchase(s) by {politicians}"
+    )
+    return {
+        "symbol":            symbol.upper(),
+        "trigger_type":      "congressional_trade",
+        "headlines":         [catalyst],
+        "keyword":           "congressional_trade",
+        "is_definitive":     False,
+        "direction":         direction,
+        "urgency":           "MODERATE",
+        "age_hours":         0,
+        "source":            "fmp_congressional",
+        "claude_sentiment":  direction,
+        "claude_confidence": 5,
+        "claude_catalyst":   catalyst,
+        "triggered_at":      datetime.now(_UTC).isoformat(),
+    }
+
+
 def _trigger_confidence(score: float | None) -> str:
     """Translate catalyst_score into a confidence tier for IC logging."""
     if score is None:  return "speculative"
@@ -366,6 +392,7 @@ class CatalystEngine:
             ("sentiment",        self._sentiment_runner,        SENTIMENT_SCORER_INTERVAL),
             ("news_monitor",     self._news_monitor,            news_interval),
             ("edgar_monitor",    self._edgar_monitor,           edgar_interval),
+            ("congressional",    self._congressional_monitor,   21600),  # 6h — data is lagged
             ("score_threshold",  self._score_threshold_checker, score_threshold_interval),
         ]
         for name, target, interval in runner_specs:
@@ -784,6 +811,74 @@ class CatalystEngine:
                 self.stats["last_edgar_monitor"] = datetime.now(_UTC).strftime("%H:%M UTC")
             except Exception as exc:
                 log.error(f"CatalystEngine [edgar_monitor] error: {exc}", exc_info=True)
+            time.sleep(interval)
+
+    def _congressional_monitor(self, interval: int) -> None:
+        """
+        Fires catalyst triggers when politicians buy or sell watchlist symbols.
+
+        Congressional trading has historically outperformed by ~12% annually.
+        Polls FMP get_congressional_trades() for each watchlist symbol every 6h.
+        Only fires for activity within the last 30 days (congressional disclosure
+        has up to a 45-day lag — we surface it once the filing appears in FMP).
+
+        Dedup key: congressional|{symbol}|{last_trade_date}
+        Skips polling outside trading days.
+        """
+        from datetime import timedelta
+        from risk import is_trading_day
+        time.sleep(120)  # stagger 2 min after startup
+        while self._running:
+            try:
+                if not is_trading_day():
+                    time.sleep(interval)
+                    continue
+
+                from fmp_client import get_congressional_trades as _fmp_congress
+                from fmp_client import is_available as _fmp_ok
+
+                if not _fmp_ok():
+                    time.sleep(interval)
+                    continue
+
+                watchlist = list(self.store.all_tickers())
+                cutoff_days = 30
+                for ticker in watchlist:
+                    if not self._running:
+                        break
+                    try:
+                        data = _fmp_congress(ticker, days=cutoff_days)
+                        if not data or data.get("net_sentiment") == "NONE":
+                            continue
+
+                        last_date = data.get("last_trade_date", "")
+                        dedup_key = f"congressional|{ticker}|{last_date}"
+                        if dedup_key in self._seen_edgar_events:
+                            continue
+
+                        if self._cooldown.is_on_cooldown(ticker):
+                            continue
+
+                        self._seen_edgar_events.add(dedup_key)
+                        trigger = _build_congressional_trigger(ticker, data)
+                        trigger["_trigger_type_detail"] = (
+                            f"congressional_{data.get('net_sentiment', '').lower()}"
+                            f"|buy={data.get('buy_count', 0)}"
+                            f"|sell={data.get('sell_count', 0)}"
+                        )
+                        self._fire(trigger)
+                        log.info(
+                            "CatalystEngine [congressional] %s %s buy=%d sell=%d politicians=%s",
+                            ticker, data.get("net_sentiment"),
+                            data.get("buy_count", 0), data.get("sell_count", 0),
+                            data.get("politicians", []),
+                        )
+                    except Exception as _sym_exc:
+                        log.debug("CatalystEngine [congressional] %s error: %s", ticker, _sym_exc)
+
+                self.stats["last_edgar_monitor"] = datetime.now(_UTC).strftime("%H:%M UTC")
+            except Exception as exc:
+                log.error(f"CatalystEngine [congressional_monitor] error: {exc}", exc_info=True)
             time.sleep(interval)
 
     def _score_threshold_checker(self, interval: int) -> None:

@@ -1311,6 +1311,14 @@ def run_scan():
     except Exception:
         pass
 
+    # Pre-warm FMP fundamentals cache for the full universe so that
+    # trade_context.py finds revenue growth and EPS data without blocking.
+    try:
+        from fmp_client import warm_fundamentals_cache as _fmp_warm
+        _fmp_warm(universe)
+    except Exception:
+        pass
+
     clog("SCAN", "Running signal pipeline (sympathy → sentiment → 9-dim score)...")
     pipeline = run_signal_pipeline(
         universe=universe,

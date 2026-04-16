@@ -95,7 +95,7 @@ import signals
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-N_DIMS = 12  # canonical dimension count
+N_DIMS = 15  # canonical dimension count (15 IC dims + catalyst in score_breakdown)
 
 
 def _equal_weights() -> dict:
@@ -113,6 +113,9 @@ def _equal_weights() -> dict:
         "iv_skew",
         "pead",
         "short_squeeze",
+        "overnight_drift",
+        "analyst_revision",
+        "insider_buying",
     ]
     return {d: 1.0 / N_DIMS for d in dims}
 
@@ -372,6 +375,8 @@ class TestScoreBreakdownPresent:
         "short_squeeze",
         "overnight_drift",
         "catalyst",  # added T1-B-1: catalyst boost ported to signals/__init__.py
+        "analyst_revision",
+        "insider_buying",
     }
 
     def test_score_breakdown_keys_present_bullish(self):

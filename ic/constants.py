@@ -28,6 +28,8 @@ DIMENSIONS = [
     "pead",
     "short_squeeze",
     "overnight_drift",
+    "analyst_revision",
+    "insider_buying",
 ]
 # Core 9 dimensions that have always been logged — the minimum required to
 # admit a record into IC calculation.  Newer dimensions (iv_skew, pead,

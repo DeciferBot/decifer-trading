@@ -1103,6 +1103,32 @@ def _safe_float(val) -> float | None:
         return None
 
 
+def warm_fundamentals_cache(symbols: list[str]) -> None:
+    """
+    Pre-populate the in-memory FMP cache for a universe of symbols.
+
+    Call once at session open so that score_universe() and trade_context.py
+    find cached revenue growth and EPS data without blocking per-symbol calls.
+    Uses _TTL_FUNDAMENTALS (24h) — each symbol is fetched at most once per day.
+    Failures per symbol are silently skipped; partial warming is fine.
+    """
+    if not is_available():
+        return
+    for sym in symbols:
+        try:
+            get_revenue_growth(sym)
+        except Exception:
+            pass
+        try:
+            get_eps_acceleration(sym)
+        except Exception:
+            pass
+        try:
+            get_key_metrics_ttm(sym)
+        except Exception:
+            pass
+
+
 def _safe_pct(val) -> float | None:
     """
     Convert FMP decimal fraction (0.35) to percentage (35.0).

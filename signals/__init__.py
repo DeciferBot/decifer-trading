@@ -147,6 +147,8 @@ def _regime_multipliers(regime_router: str) -> dict:
         "pead": 1.0,
         "short_squeeze": 1.0,
         "overnight_drift": 1.0,
+        "analyst_revision": 1.0,
+        "insider_buying": 1.0,
     }
 
     if not CONFIG.get("regime_routing_enabled", True):
@@ -170,6 +172,8 @@ def _regime_multipliers(regime_router: str) -> dict:
             "pead": 1.0,
             "short_squeeze": 1.0,
             "overnight_drift": 1.0,
+            "analyst_revision": 1.0,
+            "insider_buying": 1.0,
         }
     if regime_router == "mean_reversion":
         return {
@@ -186,6 +190,8 @@ def _regime_multipliers(regime_router: str) -> dict:
             "pead": 1.0,
             "short_squeeze": 1.0,
             "overnight_drift": 1.0,
+            "analyst_revision": 1.0,
+            "insider_buying": 1.0,
         }
     return _all_ones
 
@@ -629,8 +635,12 @@ import time as _cache_time
 
 _PEAD_CACHE: dict = {}  # symbol → (earnings_df, timestamp)
 _SHORT_FLOAT_CACHE: dict = {}  # symbol → (short_float_pct, timestamp)
+_ANALYST_REVISION_CACHE: dict = {}  # symbol → ((score, dir), timestamp)
+_INSIDER_BUYING_CACHE: dict = {}  # symbol → ((score, dir), timestamp)
 _PEAD_CACHE_TTL = 6 * 3600  # 6 hours (earnings data changes quarterly)
 _SHORT_FLOAT_CACHE_TTL = 4 * 3600  # 4 hours (short float updates daily)
+_ANALYST_REVISION_CACHE_TTL = 1800  # 30 min — analyst revisions happen intraday
+_INSIDER_BUYING_CACHE_TTL = 7200  # 2h — Form 4 filings lag ~2 business days
 
 
 def _safe_download(symbol: str, **kwargs) -> pd.DataFrame | None:
@@ -1776,51 +1786,12 @@ def score_pead(symbol: str, sig_1d: dict | None, vol_ratio: float = 0.0) -> tupl
         return (0, 0)
 
 
-def _parse_finviz_short_float(html: str) -> float | None:
-    """
-    Extract short float % from Finviz HTML.
-
-    Finviz wraps the value in nested tags:
-      Short Float</a></td><td ...><a href="..."><b>15.76%</b></a></td>
-
-    Method 1: find the <b> tag within ~350 chars after the "Short Float" label.
-    Method 2: broader regex (any chars, DOTALL) as final fallback.
-    """
-    import re as _re
-
-    idx = html.find("Short Float")
-    if idx == -1:
-        return None
-
-    window = html[idx : idx + 400]
-
-    # ── Method 1: value is inside <b>…%</b> near the label ────
-    m = _re.search(r"<b>(\d{1,3}(?:\.\d{1,2})?)\s*%\s*</b>", window)
-    if m:
-        try:
-            return float(m.group(1))
-        except ValueError:
-            pass
-
-    # ── Method 2: bare text %  (e.g. plain <td>15.76%</td>) ───
-    m = _re.search(r">(\d{1,3}(?:\.\d{1,2})?)\s*%\s*<", window)
-    if m:
-        try:
-            return float(m.group(1))
-        except ValueError:
-            pass
-
-    return None
-
-
 def _fetch_short_float(symbol: str) -> float | None:
     """
-    Fetch short float % for a symbol.
-    Source: Finviz quote page (DOM + regex backup for resilience).
+    Fetch short float % for a symbol via FMP stable API.
+    Returns short_volume/total_volume ratio as a proxy (0-100 scale).
     Cached per symbol with 4-hour TTL.
-    Returns float (e.g. 15.2 for 15.2%) or None on failure.
     """
-
     now = _cache_time.time()
     if symbol in _SHORT_FLOAT_CACHE:
         cached_val, cached_ts = _SHORT_FLOAT_CACHE[symbol]
@@ -1828,14 +1799,12 @@ def _fetch_short_float(symbol: str) -> float | None:
             return cached_val
 
     try:
-        url = f"https://finviz.com/quote.ashx?t={symbol}"
-        headers = {"User-Agent": "Mozilla/5.0 (compatible; Decifer/1.0)"}
-        resp = _requests.get(url, headers=headers, timeout=5)
-        if resp.status_code == 200:
-            val = _parse_finviz_short_float(resp.text)
-            if val is not None:
-                _SHORT_FLOAT_CACHE[symbol] = (val, now)
-                return val
+        from fmp_client import get_short_interest as _fmp_short
+        result = _fmp_short(symbol)
+        if result and result.get("short_float_pct") is not None:
+            val = float(result["short_float_pct"])
+            _SHORT_FLOAT_CACHE[symbol] = (val, now)
+            return val
     except Exception:
         pass
 
@@ -1888,6 +1857,130 @@ def score_short_squeeze(symbol: str, sig_5m: dict) -> tuple:
     score = min(10, raw)
     direction = +1 if score > 0 else 0
     return (score, direction)
+
+
+def score_analyst_revision(symbol: str, sig_5m: dict | None = None) -> tuple:
+    """
+    ANALYST_REVISION — Recent analyst upgrades / downgrades.
+
+    Analyst revisions predict post-revision drift independent of PEAD
+    (Womack 1996; Jegadeesh & Kim 2010). Upgrades signal informed
+    re-evaluation of fundamentals; downgrades predict underperformance.
+    Bidirectional: net upgrades → LONG, net downgrades → SHORT.
+
+    Score components:
+      A. Recency-weighted net upgrade count  (0-6 pts, signed)
+      B. Consensus distribution confirmation (0-4 pts)
+    """
+    now = _cache_time.time()
+    if symbol in _ANALYST_REVISION_CACHE:
+        cached_val, cached_ts = _ANALYST_REVISION_CACHE[symbol]
+        if now - cached_ts < _ANALYST_REVISION_CACHE_TTL:
+            return cached_val
+
+    try:
+        from fmp_client import get_analyst_changes as _fmp_changes
+        from fmp_client import get_analyst_grades as _fmp_grades
+        from datetime import UTC as _UTC2, datetime as _dt2
+
+        # Component A: recency-weighted net revision score
+        changes = _fmp_changes(symbols=[symbol], hours_back=240)  # 10-day window
+        net = 0
+        for ch in changes:
+            action = (ch.get("action") or "").lower()
+            pub_str = ch.get("published_date", "")
+            try:
+                pub_dt = _dt2.fromisoformat(pub_str.replace("Z", "+00:00"))
+                age_h = (_dt2.now(_UTC2) - pub_dt).total_seconds() / 3600
+            except Exception:
+                age_h = 999
+            weight = 3 if age_h <= 24 else (2 if age_h <= 72 else 1)
+            if "upgrade" in action or action in ("init", "initiated"):
+                net += weight
+            elif "downgrade" in action:
+                net -= weight
+        net = max(-6, min(6, net))
+
+        if net == 0:
+            result = (0, 0)
+        else:
+            # Component B: consensus strength confirms direction
+            grades = _fmp_grades(symbol)
+            conf_pts = 0
+            if grades and grades.get("consensus_score") is not None:
+                cs = grades["consensus_score"]  # 1.0 (all strong sell) → 5.0 (all strong buy)
+                if net > 0:
+                    conf_pts = 4 if cs >= 4.5 else (3 if cs >= 4.0 else (2 if cs >= 3.7 else (1 if cs >= 3.5 else 0)))
+                else:
+                    conf_pts = 4 if cs <= 1.5 else (3 if cs <= 2.0 else (2 if cs <= 2.3 else (1 if cs <= 2.5 else 0)))
+
+            raw = abs(net) + conf_pts
+            score = min(10, raw)
+            direction = +1 if net > 0 else -1
+            result = (score, direction)
+    except Exception:
+        result = (0, 0)
+
+    _ANALYST_REVISION_CACHE[symbol] = (result, now)
+    return result
+
+
+def score_insider_buying(symbol: str, sig_5m: dict | None = None) -> tuple:
+    """
+    INSIDER_BUYING — Net insider Form 4 open-market buy / sell sentiment.
+
+    Insiders buy on private conviction; open-market purchases predict
+    3-12 month outperformance (Seyhun 1986; Lakonishok & Lee 2001).
+    Selling is less informative (often diversification / tax planning) —
+    buying is the decisive signal, but net selling still scores SHORT.
+    Bidirectional: net buying → LONG, net selling → SHORT.
+
+    Score components:
+      A. Net sentiment tier   (0-5 pts)
+      B. Transaction count    (0-3 pts)
+      C. Net value magnitude  (0-2 pts)
+    """
+    now = _cache_time.time()
+    if symbol in _INSIDER_BUYING_CACHE:
+        cached_val, cached_ts = _INSIDER_BUYING_CACHE[symbol]
+        if now - cached_ts < _INSIDER_BUYING_CACHE_TTL:
+            return cached_val
+
+    try:
+        from fmp_client import get_insider_sentiment as _fmp_insider
+        data = _fmp_insider(symbol, days=90)
+        if data is None:
+            result = (0, 0)
+        else:
+            sentiment = data.get("net_sentiment", "NEUTRAL")
+            buy_tx = data.get("buy_transactions", 0)
+            sell_tx = data.get("sell_transactions", 0)
+            net_val = abs(data.get("net_value_usd", 0))
+
+            if sentiment == "BUYING":
+                sentiment_pts, direction = 5, +1
+            elif sentiment == "SELLING":
+                sentiment_pts, direction = 3, -1  # sells less informative → lower base
+            else:
+                result = (0, 0)
+                _INSIDER_BUYING_CACHE[symbol] = (result, now)
+                return result
+
+            # Component B: transaction count
+            total_tx = buy_tx + sell_tx
+            tx_pts = 3 if total_tx >= 5 else (2 if total_tx >= 3 else (1 if total_tx >= 1 else 0))
+
+            # Component C: net value magnitude
+            val_pts = 2 if net_val >= 2_000_000 else (1 if net_val >= 500_000 else 0)
+
+            raw = sentiment_pts + tx_pts + val_pts
+            score = min(10, raw)
+            result = (score, direction)
+    except Exception:
+        result = (0, 0)
+
+    _INSIDER_BUYING_CACHE[symbol] = (result, now)
+    return result
 
 
 def score_overnight_drift(sig_1d: dict | None) -> tuple:
@@ -2407,6 +2500,28 @@ def compute_confluence(
         score += ov_pts
         dim_directions.append((ov_dir, ov_pts))
 
+    # ── 15. ANALYST_REVISION (0-10) — Recent analyst upgrades / downgrades ──
+    # Post-revision drift is orthogonal to PEAD: it persists across non-earnings
+    # periods and reflects ongoing analyst conviction shifts (Womack 1996).
+    ar_pts = 0
+    ar_dir = 0
+    if _enabled("analyst_revision") and symbol is not None:
+        ar_pts, ar_dir = score_analyst_revision(symbol)
+        ar_pts = round(min(ar_pts, 10) * _rmult.get("analyst_revision", 1.0))
+        score += ar_pts
+        dim_directions.append((ar_dir, ar_pts))
+
+    # ── 16. INSIDER_BUYING (0-10) — Net insider Form 4 open-market sentiment ──
+    # Insider open-market purchases predict 3-12 month outperformance
+    # (Seyhun 1986; Lakonishok & Lee 2001). Bidirectional signal.
+    ib_pts = 0
+    ib_dir = 0
+    if _enabled("insider_buying") and symbol is not None:
+        ib_pts, ib_dir = score_insider_buying(symbol)
+        ib_pts = round(min(ib_pts, 10) * _rmult.get("insider_buying", 1.0))
+        score += ib_pts
+        dim_directions.append((ib_dir, ib_pts))
+
     # ── BONUS: Candlestick confirmation (+3 max) ────────
     # Direction-agnostic: both bull and bear candles add bonus points.
     # Direction already captured in dim_directions.
@@ -2458,6 +2573,8 @@ def compute_confluence(
             "pead": pead_pts,
             "short_squeeze": ss_pts,
             "overnight_drift": ov_pts,
+            "analyst_revision": ar_pts,
+            "insider_buying": ib_pts,
         }
         _ic_sum = sum(_icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v for k, v in _ic_breakdown.items())
         # candle_bonus is a non-dimension extra (0-3); add it on top of the
@@ -2481,6 +2598,8 @@ def compute_confluence(
             "iv_skew": _iv_skew_dir,
             "pead": pead_dir,
             "short_squeeze": ss_dir,
+            "analyst_revision": ar_dir,
+            "insider_buying": ib_dir,
         }
         _ic_dir_sum = (
             sum(_dim_dirs.get(k, 0) * _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v for k, v in _ic_breakdown.items())
@@ -2640,6 +2759,8 @@ def compute_confluence(
             "pead": pead_pts,
             "short_squeeze": ss_pts,
             "overnight_drift": ov_pts,
+            "analyst_revision": ar_pts,
+            "insider_buying": ib_pts,
             "catalyst": _catalyst_boost_pts,
         },
         # Dimensions that were zeroed by a False flag (for diagnostics / dashboard)

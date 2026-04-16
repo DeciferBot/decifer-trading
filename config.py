@@ -291,6 +291,8 @@ CONFIG = {
         "overnight_drift": True,  # Dim 10 — 90-day close-to-open drift statistics
         "social": True,  # Reddit velocity + VADER — IC auto-disable if harmful
         "iv_skew": True,  # Dim 11 — OTM put / ATM call IV skew (Alpaca, enabled)
+        "analyst_revision": True,  # Dim 15 — Recent analyst upgrades/downgrades (FMP)
+        "insider_buying": True,    # Dim 16 — Net insider Form 4 buy/sell (FMP)
     },
     # ── IV SKEW (Alpaca options chain) ────────────────────────────
     # Requires Algo Trader Plus ($99/mo) for OPRA real-time options data.
