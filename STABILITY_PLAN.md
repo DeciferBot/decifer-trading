@@ -177,35 +177,17 @@ This gives future-you a way to detect stale files without guessing.
 
 ---
 
-### TIER 3 — Regression Safety Net (ongoing, one test file per session)
+### TIER 3 — Regression Safety Net ✅ COMPLETE (session 2026-04-16)
 
 **Goal:** make it impossible to break the most-broken things without a test catching it.
 
-**Prerequisite:** T2 complete.
+1795 tests passing (was 1760 at T2 completion, +35).
 
-**Priority order (highest breakage frequency first):**
-
-1. **`test_dashboard.py`** — currently exists but likely thin. Add:
-   - One test per `/api/*` route: valid data → correct schema returned
-   - One test per `/api/*` route: missing/corrupt data → `{"error": ..., "data": []}` returned
-   - One test: catalyst file stale → `/api/catalyst` returns stale flag
-
-2. **`test_trade_store.py`** — new file. Test:
-   - Happy path: write trade, read back, all keys present
-   - Missing file: read returns empty list, no crash
-   - Corrupt JSON: read returns empty list, logs warning
-   - Missing required key in record: validator raises `ValueError`, record is skipped
-
-3. **`test_catalyst_pipeline.py`** — new file. Test end-to-end:
-   - Catalyst file present, valid → signals get boost
-   - Catalyst file missing → signals get no boost, no crash
-   - Catalyst file corrupt → signals get no boost, warning logged
-   - Catalyst score below threshold → no boost applied
-
-4. **`test_positions_persistence.py`** — new file. Test:
-   - Write position, read back, keys match
-   - Persist failure → flag file created
-   - Concurrent-style: write A, write B, read back → both present
+| File | Tests | What it covers |
+|------|-------|---------------|
+| `tests/test_trade_store.py` | 14 | `persist` (write, RESERVED filter, instrument filter, overwrite, empty), `restore` (missing, corrupt, valid, bad-record skip+WARNING, roundtrip), `ledger_write`/`ledger_lookup` (roundtrip, first-write-wins, missing key, UNKNOWN trade_type) |
+| `tests/test_catalyst_pipeline.py` | 8 | Bad record skip + WARNING (missing ticker, missing score, all bad), schema version (v1 silent, unknown warns+processes, missing silent), cache hit, cache reset |
+| `tests/test_positions_persistence.py` | 13 | `_save_positions_file` (create, roundtrip, RESERVED excluded, missing→`{}`, corrupt→`{}`, non-dict→`{}`, parent dir created), `_is_recently_closed` (absent, within cooldown, past cooldown), `cleanup_recently_closed` (evicts stale, keeps fresh, empty) |
 
 ---
 
