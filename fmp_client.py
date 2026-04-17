@@ -80,7 +80,12 @@ def _get(endpoint: str, params: dict, version: str = "", ttl: float | None = Non
         _cache[cache_key] = (data, _time.time())
         return data
     except requests.exceptions.HTTPError as exc:
-        log.warning("fmp_client: HTTP %s for %s", exc.response.status_code, endpoint)
+        status = exc.response.status_code
+        # 403/404 on legacy endpoints expected after Aug 2025 — demote to debug
+        if status in (403, 404):
+            log.debug("fmp_client: HTTP %s for %s (legacy endpoint)", status, endpoint)
+        else:
+            log.warning("fmp_client: HTTP %s for %s", status, endpoint)
         return None
     except Exception as exc:
         log.debug("fmp_client: request failed — %s", exc)
@@ -1050,7 +1055,26 @@ def get_fmp_news_articles(symbols: list[str], limit: int = 50) -> list[dict]:
             pass
 
         raw_sent = (item.get("sentiment") or "").upper()
-        sentiment = raw_sent if raw_sent in ("BULLISH", "BEARISH", "NEUTRAL") else "NEUTRAL"
+        if raw_sent in ("BULLISH", "BEARISH"):
+            sentiment = raw_sent
+        else:
+            # FMP stock news endpoint doesn't include sentiment — infer from headline+text
+            _text = (headline + " " + (item.get("text") or "")).lower()
+            _bull = ("beat", "beats", "upgrade", "upgraded", "raises guidance", "record high",
+                     "surges", "strong earnings", "outperform", "buy rating", "new contract",
+                     "partnership", "wins deal", "accelerat", "exceeds", "better than expected")
+            _bear = ("miss", "misses", "downgrade", "downgraded", "cuts guidance", "falls",
+                     "warning", "net loss", "decline", "weak", "sell rating", "underperform",
+                     "layoff", "investigation", "lawsuit", "recall", "delay", "concern",
+                     "worse than expected", "disappoints", "charges", "writedown")
+            bull_hits = sum(1 for w in _bull if w in _text)
+            bear_hits = sum(1 for w in _bear if w in _text)
+            if bull_hits > bear_hits:
+                sentiment = "BULLISH"
+            elif bear_hits > bull_hits:
+                sentiment = "BEARISH"
+            else:
+                sentiment = "NEUTRAL"
         news_score = {"BULLISH": 6, "BEARISH": 6, "NEUTRAL": 0}.get(sentiment, 0)
 
         syms = []

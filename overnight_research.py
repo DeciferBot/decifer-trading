@@ -387,7 +387,16 @@ def _get_earnings_calendar(universe: list[str] | None) -> str:
         if av_raw:
             today = date.today()
             cutoff = today + timedelta(days=5)
-            sym_set = {s.upper() for s in universe} if universe else None
+            # When no explicit universe given, filter to committed universe so we
+            # don't dump 8000 OTC tickers into the output
+            if universe:
+                sym_set: set[str] | None = {s.upper() for s in universe}
+            elif os.path.exists(UNIVERSE_PATH):
+                with open(UNIVERSE_PATH) as _uf:
+                    _u = json.load(_uf)
+                sym_set = {e["symbol"].upper() for e in (_u.get("symbols") or [])}
+            else:
+                sym_set = None
             items = []
             for sym, d_str in av_raw.items():
                 sym_up = sym.upper()
@@ -519,8 +528,11 @@ def _get_market_news(universe_syms: list[str] | None = None) -> str:
                     break
             return out
 
-        favor = _top_syms(bull_arts)
         avoid = _top_syms(bear_arts)
+        avoid_syms = {sym for sym, _ in avoid}
+        # Exclude from FAVOR any symbol already in AVOID — mixed signal, net unclear
+        favor = _top_syms([a for a in bull_arts
+                           if not a.get("symbols") or a["symbols"][0] not in avoid_syms])
 
         if avoid:
             lines.append("  AVOID (bearish catalyst):")
@@ -756,7 +768,9 @@ def _build_overnight_json(universe: list[str] | None, gen_time: str) -> dict:
                         for a in recent[:12]
                     ],
                     "avoid": _top(bear),
-                    "favor": _top(bull),
+                    "favor": _top([a for a in bull
+                                   if not a.get("symbols") or
+                                   a["symbols"][0] not in {x["sym"] for x in _top(bear)}]),
                 }
         data["news"] = news_data
     except Exception:
