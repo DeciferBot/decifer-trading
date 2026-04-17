@@ -82,10 +82,10 @@ TWAP/VWAP/Iceberg only for orders above $10K notional or 500 shares. Smaller ord
 
 ## Data Source Priority (always check this order)
 
-1. **Alpaca Algo Trader Plus** (PRIMARY for market data — paid, active): real-time quotes, historical bars, streaming, options Greeks. Use first for ALL price/volume/intraday data.
-2. **FMP — Financial Modeling Prep** (PRIMARY for fundamentals/events — paid premium, 750 calls/min, MCP server connected): analyst consensus, price targets, grade breakdowns, insider trades (Form 4), congressional trades (Senate/House), income statements, revenue growth, EPS acceleration, key metrics TTM, DCF valuations, earnings calendar, earnings estimates, short interest, shares float, sector performance, stock news, press releases, 30 years history. **Use FMP first for anything fundamental, event-driven, or analyst-related.** Client: `fmp_client.py`. MCP server: `fmp` (connected via `~/.claude.json`).
+1. **Alpaca Algo Trader Plus** (PRIMARY for market data — paid, active): real-time quotes, historical bars, streaming, options Greeks. Use first for ALL price/volume/intraday data. **MCP is data-only — never use `mcp__alpaca__get_all_positions` or any Alpaca MCP position/order tool to check portfolio state. Positions and trades live in IBKR.**
+2. **FMP — Financial Modeling Prep** (PRIMARY for fundamentals/events — paid premium, 750 calls/min, MCP server connected): analyst consensus, price targets, grade breakdowns, insider trades (Form 4), congressional trades (Senate/House), income statements, revenue growth, EPS acceleration, key metrics TTM, DCF valuations, earnings calendar, earnings estimates, short interest, shares float, sector performance, stock news, press releases, 30 years history. **Use FMP first for anything fundamental, event-driven, or analyst-related.** Client: `fmp_client.py`. MCP server: `fmp` (connected via `~/.claude.json`). **MCP is data-only — never use FMP MCP to infer portfolio or position state.**
 3. **Alpha Vantage** (paid, active): macroeconomic indicators, economic calendar. Fallback for fundamentals if FMP is unavailable.
-4. **IBKR TWS**: execution and order management. Historical data only when Alpaca is insufficient.
+4. **IBKR TWS**: execution, order management, and **the source of truth for all portfolio positions and trade history**. To check current positions ask Amit to query TWS directly or read `data/trades.json`. Historical data only when Alpaca is insufficient.
 5. **yfinance**: daily bars and index data, fallback only — never preferred over Alpaca or FMP.
 6. Yahoo RSS, Finviz — supplementary news only. TradingView Screener was removed (replaced by three-tier committed universe).
 

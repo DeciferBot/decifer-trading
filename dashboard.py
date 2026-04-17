@@ -707,6 +707,9 @@ canvas{display:block;width:100% !important}
       <option value="BULLISH">Bullish</option>
       <option value="BEARISH">Bearish</option>
     </select>
+    <select id="news-sector-filter" onchange="filterNews()" style="background:var(--bg1);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:11px;font-family:'JetBrains Mono',monospace">
+      <option value="all">All Sectors</option>
+    </select>
     <span id="news-updated" style="color:var(--muted2);font-size:10px;margin-left:auto"></span>
     <button class="news-fetch-btn" id="news-fetch-btn" onclick="loadNews()">⟳ Fetch News</button>
   </div>
@@ -3466,6 +3469,8 @@ async function loadNews() {
       macro_impact:     a.macro_impact     || 0,
       macro_direction:  a.macro_direction  || '',
       macro_implication:a.macro_implication|| '',
+      top_story:        a.top_story        || false,
+      sector:           a.sector           || '',
     }));
     window._newsItems = _allNewsItems;
     filterNews();
@@ -3525,12 +3530,56 @@ function _renderMacroStrip(allItems) {
   const macroItems = allItems.filter(i => i.macro_event && i.macro_impact >= 1)
                              .sort((a, b) => b.macro_impact - a.macro_impact);
   if (!macroItems.length) {
+    const topStories = allItems.filter(i => i.top_story);
+    if (!topStories.length) {
+      strip.style.display = 'block';
+      strip.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+          <span style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--muted2)">⚡ MARKET EVENTS</span>
+          <span style="font-size:10px;color:var(--muted2);font-style:italic">— No market-moving events identified by Sonnet</span>
+        </div>`;
+      return;
+    }
+    const _SECTOR_SHORT = {
+      'Technology':'TECH','Health Care':'HEALTH','Healthcare':'HEALTH',
+      'Financials':'FIN','Financial Services':'FIN',
+      'Consumer Discretionary':'DISC','Consumer Cyclical':'DISC',
+      'Consumer Staples':'STAPLES','Consumer Defensive':'STAPLES',
+      'Energy':'ENERGY','Industrials':'INDUST',
+      'Materials':'MATL','Basic Materials':'MATL',
+      'Real Estate':'REIT','Utilities':'UTILS',
+      'Communication Services':'COMMS',
+    };
+    const sentColor = s => s === 'BULLISH' ? 'var(--green)' : s === 'BEARISH' ? 'var(--red)' : 'var(--muted2)';
+    const sentIcon  = s => s === 'BULLISH' ? '▲' : s === 'BEARISH' ? '▼' : '—';
+    window._topStoryItems = topStories;
+    const cards = topStories.map((item, idx) => {
+      const sc  = sentColor(item.sentiment);
+      const src = (item.source || '').slice(0, 10);
+      const sym = item.symbol && item.symbol !== '—'
+        ? `<span style="background:var(--bg2);color:var(--text);font-size:9px;font-weight:700;padding:2px 4px;border-radius:3px">${esc(item.symbol)}</span>` : '';
+      const sec = item.sector
+        ? `<span style="background:var(--bg2);color:var(--muted2);font-size:9px;padding:2px 4px;border-radius:3px">${esc(_SECTOR_SHORT[item.sector]||item.sector.slice(0,6))}</span>` : '';
+      const cat = item.catalyst
+        ? `<div style="font-size:10px;color:var(--muted2);line-height:1.35;margin-top:4px">${esc(item.catalyst.slice(0,80))}</div>` : '';
+      return `
+        <div onclick="_populateNewsDrawer(window._topStoryItems[${idx}])" style="flex-shrink:0;width:180px;background:var(--bg1);border:1px solid var(--border);border-left:3px solid ${sc};border-radius:6px;padding:9px 10px;cursor:pointer">
+          <div style="display:flex;align-items:center;gap:4px;margin-bottom:5px;flex-wrap:wrap">
+            <span style="background:var(--bg2);color:var(--muted2);font-size:9px;font-weight:700;padding:2px 4px;border-radius:3px;letter-spacing:.04em">${esc(src)}</span>
+            ${sym}${sec}
+            <span style="margin-left:auto;color:${sc};font-size:11px;font-weight:700">${sentIcon(item.sentiment)}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text);font-weight:600;line-height:1.3">${esc(item.headline)}</div>
+          ${cat}
+        </div>`;
+    }).join('');
     strip.style.display = 'block';
     strip.innerHTML = `
-      <div style="display:flex;align-items:center;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--border)">
-        <span style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--muted2)">⚡ MARKET EVENTS</span>
-        <span style="font-size:10px;color:var(--muted2);font-style:italic">— No market-moving events identified by Sonnet</span>
-      </div>`;
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--muted2)">📰 TOP STORIES</span>
+        <span style="font-size:10px;color:var(--muted2)">${topStories.length} stories</span>
+      </div>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin">${cards}</div>`;
     return;
   }
 
@@ -3544,7 +3593,7 @@ function _renderMacroStrip(allItems) {
 
   window._macroDrawerItems = macroItems;
   const cards = macroItems.map((item, i) => `
-    <div onclick="openMacroDrawerItem(${i})" style="flex-shrink:0;width:240px;background:var(--bg1);border:1px solid ${item.macro_color};border-top:3px solid ${item.macro_color};border-radius:6px;padding:10px 12px;display:block;cursor:pointer">
+    <div onclick="openMacroDrawerItem(${i})" style="flex-shrink:0;width:180px;background:var(--bg1);border:1px solid ${item.macro_color};border-top:3px solid ${item.macro_color};border-radius:6px;padding:10px 12px;display:block;cursor:pointer">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
         <span style="background:${item.macro_color};color:#000;font-size:9px;font-weight:800;padding:2px 6px;border-radius:3px;letter-spacing:.05em">${esc(item.macro_label)}</span>
         <span style="color:${dirColor(item.macro_direction)};font-size:11px;font-weight:700">${dirIcon(item.macro_direction)}</span>
@@ -3678,17 +3727,30 @@ async function loadCatalyst() {
   }
 }
 
+function _updateSectorDropdown() {
+  const sectors = [...new Set(_allNewsItems.map(i => i.sector).filter(Boolean))].sort();
+  const sel = document.getElementById('news-sector-filter');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="all">All Sectors</option>' +
+    sectors.map(s => `<option value="${esc(s)}"${s === cur ? ' selected' : ''}>${esc(s)}</option>`).join('');
+}
+
 function filterNews() {
   const feed    = document.getElementById('news-feed');
   const keyword = (document.getElementById('news-keyword').value || '').toLowerCase();
   const ticker  = (document.getElementById('news-ticker').value || '').toUpperCase().trim();
   const sortBy  = document.getElementById('news-sort').value;
-  const sentFilter = document.getElementById('news-sentiment-filter').value;
+  const sentFilter   = document.getElementById('news-sentiment-filter').value;
+  const sectorFilter = (document.getElementById('news-sector-filter') || {}).value || 'all';
+
+  _updateSectorDropdown();
 
   let items = [..._allNewsItems];
-  if (keyword)            items = items.filter(i => i.headline.toLowerCase().includes(keyword) || i.catalyst.toLowerCase().includes(keyword));
-  if (ticker)             items = items.filter(i => i.symbol.includes(ticker));
-  if (sentFilter !== 'all') items = items.filter(i => i.sentiment === sentFilter);
+  if (keyword)               items = items.filter(i => i.headline.toLowerCase().includes(keyword) || i.catalyst.toLowerCase().includes(keyword));
+  if (ticker)                items = items.filter(i => i.symbol.includes(ticker));
+  if (sentFilter !== 'all')  items = items.filter(i => i.sentiment === sentFilter);
+  if (sectorFilter !== 'all') items = items.filter(i => i.sector === sectorFilter);
 
   if (sortBy === 'time')  items.sort((a, b) => a.recency - b.recency);
   if (sortBy === 'score') items.sort((a, b) => b.news_score - a.news_score);

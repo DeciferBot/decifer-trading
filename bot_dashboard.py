@@ -41,6 +41,9 @@ _CATALYST_CACHE_TTL = 30  # seconds
 # ── Macro event classifier cache ──────────────────────────────────────────────
 _macro_cache: dict = {}  # headline_hash → list of macro classifications
 
+# ── Sector cache ──────────────────────────────────────────────────────────────
+_sector_cache: dict[str, str] = {}  # symbol → raw FMP sector name, permanent in-process
+
 
 def _fetch_alpaca_news() -> list[dict]:
     """
@@ -149,6 +152,41 @@ _MACRO_TYPES = {
     "CREDIT": ("CREDIT", "#cc0000"),
     "OTHER_MACRO": ("MACRO", "#888"),
 }
+
+
+def _enrich_sectors(articles: list) -> None:
+    """
+    Add sector field to articles using FMP company profile (cached per symbol).
+    Only fetches symbols not already in _sector_cache; FMP has its own 4h cache
+    so repeated in-process lookups are free.
+    """
+    from fmp_client import get_company_metadata
+
+    new_syms = {
+        sym
+        for a in articles
+        for sym in (a.get("symbols") or [])
+        if sym and sym not in _sector_cache
+    }
+
+    if new_syms:
+        def _fetch(sym: str) -> tuple[str, str]:
+            try:
+                meta = get_company_metadata(sym)
+                return sym, (meta or {}).get("sector") or ""
+            except Exception:
+                return sym, ""
+
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for sym, sector in ex.map(_fetch, list(new_syms)[:20]):
+                _sector_cache[sym] = sector
+
+    for a in articles:
+        for sym in (a.get("symbols") or []):
+            s = _sector_cache.get(sym, "")
+            if s:
+                a["sector"] = s
+                break
 
 
 def _enrich_macro_events(articles: list) -> None:
@@ -373,6 +411,36 @@ def _calendar_macro_fallback(articles: list) -> None:
         log.debug("Macro calendar fallback error: %s", exc)
 
 
+def _get_held_symbols() -> set[str]:
+    """Return symbols with currently open positions from data/trades.json."""
+    try:
+        trades_path = os.path.join(os.path.dirname(__file__), "data", "trades.json")
+        with open(trades_path) as f:
+            trades = json.load(f)
+        opened = {t["symbol"] for t in trades if t.get("action") in ("OPEN", "ENTRY", "BUY")}
+        closed = {t["symbol"] for t in trades if t.get("action") in ("CLOSE", "SELL")}
+        return opened - closed
+    except Exception:
+        return set()
+
+
+def _tag_top_news_cards(articles: list, held_symbols: set[str]) -> None:
+    """
+    Mark the top 8 news articles with top_story=True for strip display.
+    Held-symbol articles ranked first, then by news_score descending.
+    Only runs when no macro_event articles exist.
+    """
+    if any(a.get("macro_event") for a in articles):
+        return
+    eligible = [a for a in articles if a.get("headline")]
+    eligible.sort(key=lambda a: (
+        1 if any(s in held_symbols for s in (a.get("symbols") or [])) else 0,
+        a.get("news_score", 0),
+    ), reverse=True)
+    for a in eligible[:8]:
+        a["top_story"] = True
+
+
 def _get_news_payload() -> dict:
     """
     Build the /api/news payload.
@@ -489,6 +557,9 @@ def _get_news_payload() -> dict:
     # Fill in article images via og:image scraping
     _enrich_images(articles)
 
+    # Enrich articles with sector tags from FMP (cached per symbol, permanent in-process)
+    _enrich_sectors(articles)
+
     # Identify macro market-moving events via Sonnet (cached by content hash)
     # Evict stale cache entries older than 30 articles to prevent empty-list lock-in
     if len(_macro_cache) > 30:
@@ -498,6 +569,10 @@ def _get_news_payload() -> dict:
     # If Sonnet found nothing, inject a calendar-backed synthetic macro article
     # so the macro strip always surfaces scheduled FOMC/CPI/NFP events.
     _calendar_macro_fallback(articles)
+
+    # Tier-3 fallback: both above found nothing — promote top news as strip cards,
+    # boosting articles that mention currently held positions.
+    _tag_top_news_cards(articles, _get_held_symbols())
 
     payload = {
         "articles": articles,
