@@ -1,8 +1,8 @@
 # ╔══════════════════════════════════════════════════════════════╗
 # ║   <>  DECIFER  —  overnight_research.py                     ║
-# ║   Generates data/overnight_notes.md after market close.     ║
-# ║   Opus reads this file at the start of each trading day     ║
-# ║   before making any trade decisions.                         ║
+# ║   Generates data/overnight_notes.md at 6:00 AM ET.          ║
+# ║   Runs pre-market so Opus has real gap data, overnight       ║
+# ║   news, and catalyst context before the 9:30 AM open.       ║
 # ║                                                              ║
 # ║   Sources:                                                   ║
 # ║     • Alpaca — pre-market / after-hours price gaps          ║
@@ -13,7 +13,7 @@
 # ║     • FRED — macro snapshot (CPI, rates, spread, crude)     ║
 # ║     • macro_calendar — FOMC/CPI/NFP 5-day window            ║
 # ║                                                              ║
-# ║   Run automatically at ~4:15pm ET via bot_trading.py.       ║
+# ║   Run automatically at 6:00 AM ET via bot_trading.py.       ║
 # ║   Can also be run standalone: python overnight_research.py  ║
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
@@ -32,7 +32,9 @@ log = logging.getLogger("decifer.overnight")
 _ET = zoneinfo.ZoneInfo("America/New_York")
 NOTES_PATH = "data/overnight_notes.md"
 TRADES_FILE = "data/trades.json"
+UNIVERSE_PATH = "data/committed_universe.json"
 _TONE_SYMS = ["SPY", "QQQ", "IWM"]  # market breadth proxies
+_SECTOR_ETFS = ["XLF", "XLK", "XLE", "XLV", "XLI", "XLU", "XLB", "XLRE"]  # sector rotation
 
 
 # ── Pre-market / after-hours tone ─────────────────────────────────────────────
@@ -40,34 +42,96 @@ _TONE_SYMS = ["SPY", "QQQ", "IWM"]  # market breadth proxies
 
 def _get_price_tone() -> str:
     """
-    Fetch latest price vs previous close for SPY, QQQ, IWM via Alpaca snapshots.
+    Fetch latest price vs previous close for market breadth proxies and sector ETFs.
     Returns a formatted string block. Never raises.
     """
     try:
         from alpaca_data import fetch_snapshots
 
-        snaps = fetch_snapshots(_TONE_SYMS)
+        all_syms = _TONE_SYMS + _SECTOR_ETFS
+        snaps = fetch_snapshots(all_syms)
         if not snaps:
             return "Pre-market tone: unavailable (Alpaca not connected)"
 
-        lines = []
-        for sym in _TONE_SYMS:
+        def _fmt_sym(sym: str, width: int = 5) -> str:
             s = snaps.get(sym)
             if not s:
-                continue
+                return f"  {sym:<{width}} n/a"
             price = s.get("price") or 0
             chg = s.get("change_1d")
             if chg is None:
-                lines.append(f"  {sym:<4} ${price:.2f}  (gap vs close: n/a)")
-            else:
-                pct = chg * 100
-                tag = "gap-up" if pct > 0.15 else ("gap-down" if pct < -0.15 else "flat")
-                lines.append(f"  {sym:<4} ${price:.2f}  {pct:+.2f}% vs close  ({tag})")
+                return f"  {sym:<{width}} ${price:.2f}  n/a"
+            pct = chg * 100
+            tag = "gap-up" if pct > 0.15 else ("gap-down" if pct < -0.15 else "flat")
+            return f"  {sym:<{width}} ${price:.2f}  {pct:+.2f}%  ({tag})"
 
-        return "PRE-MARKET / AFTER-HOURS TONE:\n" + "\n".join(lines) if lines else "Pre-market tone: no data returned"
+        breadth_lines = [_fmt_sym(s) for s in _TONE_SYMS if s in snaps]
+        sector_lines = [_fmt_sym(s) for s in _SECTOR_ETFS if s in snaps]
+
+        out = ["PRE-MARKET / AFTER-HOURS TONE:"]
+        if breadth_lines:
+            out += breadth_lines
+        if sector_lines:
+            out += ["  ---  sector ETFs  ---"]
+            out += sector_lines
+        return "\n".join(out) if len(out) > 1 else "Pre-market tone: no data returned"
     except Exception as exc:
         log.debug("overnight: price tone failed — %s", exc)
         return "Pre-market tone: unavailable"
+
+
+# ── Pre-market universe movers ────────────────────────────────────────────────
+
+
+def _get_universe_movers(extra_syms: list[str] | None = None) -> str:
+    """
+    Fetch pre-market movers from the committed universe.
+    Takes top 75 by dollar volume from committed_universe.json plus any extra
+    symbols (e.g. open positions). Flags those with abs gap > 1.5%.
+    Returns formatted string. Never raises.
+    """
+    try:
+        from alpaca_data import fetch_snapshots
+
+        syms: list[str] = []
+        if os.path.exists(UNIVERSE_PATH):
+            with open(UNIVERSE_PATH) as f:
+                u = json.load(f)
+            syms = [entry["symbol"] for entry in (u.get("symbols") or [])[:75]]
+
+        if extra_syms:
+            extra_upper = [s.upper() for s in extra_syms]
+            existing = set(syms)
+            syms += [s for s in extra_upper if s not in existing]
+
+        if not syms:
+            return ""
+
+        snaps = fetch_snapshots(syms)
+        if not snaps:
+            return ""
+
+        movers = []
+        for sym, s in snaps.items():
+            chg = s.get("change_1d")
+            if chg is None:
+                continue
+            pct = chg * 100
+            if abs(pct) >= 1.5:
+                movers.append((sym, s.get("price") or 0, pct))
+
+        if not movers:
+            return "PRE-MARKET MOVERS:\n  No significant gaps (>1.5%) in top universe"
+
+        movers.sort(key=lambda x: abs(x[2]), reverse=True)
+        lines = ["PRE-MARKET MOVERS (>1.5% gap vs yesterday's close):"]
+        for sym, price, pct in movers[:15]:
+            direction = "gap-up" if pct > 0 else "gap-down"
+            lines.append(f"  {sym:<6} ${price:>8.2f}  {pct:+.2f}%  ({direction})")
+        return "\n".join(lines)
+    except Exception as exc:
+        log.debug("overnight: universe movers failed — %s", exc)
+        return ""
 
 
 # ── Yesterday's performance summary ──────────────────────────────────────────
@@ -148,6 +212,31 @@ def _get_performance_summary() -> str:
             lines.append("  By regime:")
             lines.extend(regime_notes)
 
+        # Dimension-level P&L (requires signal_scores on trade records)
+        dim_stats: dict[str, dict] = defaultdict(lambda: {"count": 0, "wins": 0, "pnl": 0.0})
+        for t in day_trades:
+            scores = t.get("signal_scores") or {}
+            if not scores:
+                continue
+            # Only credit dimensions that were actually non-zero at entry
+            for dim, score in scores.items():
+                if score and score != 0:
+                    dim_stats[dim]["count"] += 1
+                    dim_stats[dim]["pnl"] += t["pnl"]
+                    if t["pnl"] > 0:
+                        dim_stats[dim]["wins"] += 1
+
+        if dim_stats:
+            sorted_dims = sorted(dim_stats.items(), key=lambda x: x[1]["pnl"], reverse=True)
+            lines.append("  By dimension (non-zero entry scores):")
+            for dim, data in sorted_dims:
+                if data["count"] < 2:
+                    continue
+                dwr = data["wins"] / data["count"] * 100
+                lines.append(
+                    f"    {dim:<16} {data['count']:>2} trades  {dwr:.0f}% WR  ${data['pnl']:+,.0f}"
+                )
+
         # Flags
         if len(day_trades) > 12:
             lines.append("  FLAG: High trade count — overtrading risk")
@@ -164,9 +253,13 @@ def _get_performance_summary() -> str:
 # ── Macro snapshot (FRED recent values) ──────────────────────────────────────
 
 
+_DAILY_MACRO_NAMES = {"10Y-2Y Spread", "10Y Treasury", "WTI Crude"}
+
+
 def _get_macro_snapshot() -> str:
     """
-    Fetch recent values of key macro indicators from FRED.
+    Fetch daily-moving macro indicators from FRED (yield spread, crude).
+    Monthly series (CPI, unemployment, Fed funds) omitted — too stale for daily use.
     Returns a formatted string block. Never raises.
     """
     try:
@@ -175,10 +268,10 @@ def _get_macro_snapshot() -> str:
 
         if not fred_ok():
             return ""
-        items = get_macro_snapshot()
+        items = [i for i in get_macro_snapshot() if i.get("name") in _DAILY_MACRO_NAMES]
         if not items:
             return ""
-        lines = ["MACRO INDICATORS (latest FRED):"]
+        lines = ["MACRO (daily):"]
         for item in items:
             val_str = f"{item['value']:.2f}{item['unit']}"
             prior_str = f"  prior: {item['prior']:.2f}" if item.get("prior") is not None else ""
@@ -189,15 +282,15 @@ def _get_macro_snapshot() -> str:
         return ""
 
 
-# ── Economic calendar (macro_calendar + FRED primary + FMP fallback) ──────────
+# ── Economic calendar (macro_calendar + FMP primary + FRED fallback) ──────────
 
 
 def _get_economic_calendar() -> str:
     """
     Build a 5-day economic calendar.
     Layer 1: hardcoded macro_calendar (FOMC/CPI/NFP — always available).
-    Layer 2: FRED releases/dates (primary — broader set, requires FRED_API_KEY).
-    Layer 3: FMP economic calendar (fallback — only used when FRED is unavailable).
+    Layer 2: FMP economic calendar (primary — US events with estimates, High/Medium only).
+    Layer 3: FRED releases/dates (fallback — only when FMP unavailable).
     Returns a formatted string block. Never raises.
     """
     today = date.today()
@@ -222,34 +315,33 @@ def _get_economic_calendar() -> str:
     except Exception as exc:
         log.debug("overnight: macro_calendar layer failed — %s", exc)
 
-    # ── Layer 2: FRED (primary) ───────────────────────────────────
-    fred_populated = False
+    # ── Layer 2: FMP (primary — US events with estimates) ────────────────────
+    fmp_populated = False
     try:
-        from fred_client import get_upcoming_releases
-        from fred_client import is_available as fred_ok
+        from fmp_client import get_economic_calendar
+        from fmp_client import is_available as fmp_ok
 
-        if fred_ok():
-            fred_events = get_upcoming_releases(days_ahead=5)
-            for ev in fred_events:
-                _add_event(ev["date"], ev["name"], ev["impact"])
-            fred_populated = bool(fred_events)
-    except Exception as exc:
-        log.debug("overnight: FRED calendar layer failed — %s", exc)
-
-    # ── Layer 3: FMP (fallback — only when FRED unavailable/empty) ────────────
-    if not fred_populated:
-        try:
-            from fmp_client import get_economic_calendar
-            from fmp_client import is_available as fmp_ok
-
-            if fmp_ok():
-                fmp_events = get_economic_calendar(days_ahead=5)
-                for ev in fmp_events:
+        if fmp_ok():
+            fmp_events = get_economic_calendar(days_ahead=5)
+            for ev in fmp_events:
+                if ev.get("impact", "").lower() in ("high", "medium"):
                     _add_event(ev["date"], ev["event"], ev["impact"])
-                if fmp_events:
-                    log.debug("overnight: economic calendar using FMP fallback (%d events)", len(fmp_events))
+            fmp_populated = bool(fmp_events)
+    except Exception as exc:
+        log.debug("overnight: FMP calendar layer failed — %s", exc)
+
+    # ── Layer 3: FRED (fallback — only when FMP unavailable/empty) ───────────
+    if not fmp_populated:
+        try:
+            from fred_client import get_upcoming_releases
+            from fred_client import is_available as fred_ok
+
+            if fred_ok():
+                fred_events = get_upcoming_releases(days_ahead=5)
+                for ev in fred_events:
+                    _add_event(ev["date"], ev["name"], ev["impact"])
         except Exception as exc:
-            log.debug("overnight: FMP calendar fallback failed — %s", exc)
+            log.debug("overnight: FRED calendar fallback failed — %s", exc)
 
     lines = ["ECONOMIC CALENDAR — Next 5 Days:"]
     for d in days:
@@ -347,88 +439,103 @@ def _format_earnings(items: list[dict], source: str = "") -> str:
     return "\n".join(lines)
 
 
-# ── Market news + AI interpretation ──────────────────────────────────────────
+# ── Market news (FMP symbol-tagged) ──────────────────────────────────────────
 
 
-def _get_market_news() -> str:
+def _get_market_news(universe_syms: list[str] | None = None) -> str:
     """
-    Fetch last 16h of headlines from Alpaca historical news REST API.
-    Claude Haiku interprets the top stories and flags geopolitical/macro risks.
-    Falls back to raw headlines if Haiku call fails. Never raises.
+    Fetch last 16h of symbol-tagged news from FMP for the committed universe.
+    Articles are pre-sentiment-scored by FMP. No LLM call required.
+    Falls back to empty string if FMP unavailable. Never raises.
     """
-    headlines: list[str] = []
     try:
-        from alpaca.data.historical import NewsClient
-        from alpaca.data.requests import NewsRequest
+        from fmp_client import get_fmp_news_articles
+        from fmp_client import is_available as fmp_ok
 
-        from config import CONFIG
+        if not fmp_ok():
+            return "Market news: FMP not available"
 
-        api_key = CONFIG.get("alpaca_api_key", "")
-        secret_key = CONFIG.get("alpaca_secret_key", "")
-        if not api_key or not secret_key:
-            return "Market news: Alpaca credentials not set"
+        # Build symbol list: top 50 from committed universe + any open positions
+        syms: list[str] = []
+        if os.path.exists(UNIVERSE_PATH):
+            with open(UNIVERSE_PATH) as f:
+                u = json.load(f)
+            syms = [entry["symbol"] for entry in (u.get("symbols") or [])[:50]]
+        if universe_syms:
+            existing = set(syms)
+            syms += [s.upper() for s in universe_syms if s.upper() not in existing]
 
-        client = NewsClient(api_key, secret_key)
-        start_dt = datetime.now(UTC) - timedelta(hours=16)
-        req = NewsRequest(start=start_dt, limit=30, include_content=False)
-        news = client.get_news(req)
-        articles = (news.data or {}).get("news", [])
-        for a in articles:
-            h = getattr(a, "headline", "") or ""
-            if h:
-                headlines.append(h)
+        if not syms:
+            return "Market news: no universe symbols available"
+
+        articles = get_fmp_news_articles(syms, limit=60)
+        # Filter to last 16h
+        recent = [a for a in articles if a.get("age_hours", 999) <= 16]
+        if not recent:
+            return "Market news: no FMP articles in last 16h"
+
+        # Sort: BULLISH/BEARISH first (non-neutral), then by recency
+        recent.sort(key=lambda a: (a["sentiment"] == "NEUTRAL", a.get("age_hours", 999)))
+
+        bull_arts = [a for a in recent if a["sentiment"] == "BULLISH"]
+        bear_arts = [a for a in recent if a["sentiment"] == "BEARISH"]
+        neutral_arts = [a for a in recent if a["sentiment"] == "NEUTRAL"]
+        bull, bear, neutral = len(bull_arts), len(bear_arts), len(neutral_arts)
+
+        if bull > bear * 1.3:
+            net_bias = "bullish"
+        elif bear > bull * 1.3:
+            net_bias = "bearish"
+        else:
+            net_bias = "neutral"
+
+        lines = [f"MARKET NEWS — Last 16h (FMP, {len(recent)} articles):"]
+        for a in recent[:12]:
+            sym_tag = f"[{a['symbols'][0]}]" if a.get("symbols") else "[MACRO]"
+            sent = a["sentiment"]
+            sent_tag = "▲" if sent == "BULLISH" else ("▼" if sent == "BEARISH" else "─")
+            age_h = a.get("age_hours", 0)
+            age_str = f"{age_h:.0f}h ago" if age_h >= 1 else f"{age_h*60:.0f}m ago"
+            lines.append(f"  {sent_tag} {sym_tag:<8} {age_str:<8} {a['headline'][:90]}")
+
+        # ── Symbol-mapped net bias — tells Opus which stocks to act on ──────
+        lines.append("")
+        lines.append(f"Net bias: {net_bias}  ({bull} bullish / {bear} bearish / {neutral} neutral)")
+
+        # Collect top symbols per sentiment (deduplicated, max 5 each)
+        def _top_syms(arts: list[dict], n: int = 5) -> list[tuple[str, str]]:
+            seen: set[str] = set()
+            out = []
+            for a in arts:
+                sym = a["symbols"][0] if a.get("symbols") else ""
+                if not sym or sym in seen:
+                    continue
+                seen.add(sym)
+                # Extract a short reason from the headline (first clause before comma/semicolon)
+                headline = a.get("headline", "")
+                reason = headline.split(";")[0].split(",")[0][:60].strip()
+                out.append((sym, reason))
+                if len(out) >= n:
+                    break
+            return out
+
+        favor = _top_syms(bull_arts)
+        avoid = _top_syms(bear_arts)
+
+        if avoid:
+            lines.append("  AVOID (bearish catalyst):")
+            for sym, reason in avoid:
+                lines.append(f"    {sym:<6} — {reason}")
+        if favor:
+            lines.append("  FAVOR (bullish catalyst):")
+            for sym, reason in favor:
+                lines.append(f"    {sym:<6} — {reason}")
+
+        return "\n".join(lines)
+
     except Exception as exc:
-        log.debug("overnight: news fetch failed — %s", exc)
-        return "Market news: unavailable (Alpaca news fetch failed)"
-
-    if not headlines:
-        return "Market news: no headlines in last 16h"
-
-    # ── Claude Haiku interpretation ───────────────────────────────
-    try:
-        import anthropic
-
-        from config import CONFIG
-
-        # Config may hold the placeholder if .env was loaded after module import;
-        # always prefer the live env var for overnight standalone runs.
-        _cfg_key = CONFIG.get("anthropic_api_key", "")
-        api_key = (
-            _cfg_key if (_cfg_key and _cfg_key != "YOUR_API_KEY_HERE") else os.environ.get("ANTHROPIC_API_KEY", "")
-        )
-        if not api_key:
-            raise ValueError("Anthropic API key not configured")
-        ai = anthropic.Anthropic(api_key=api_key)
-        prompt = (
-            "You are a market analyst reviewing overnight news for an AI trading system.\n\n"
-            f"Below are {len(headlines)} headlines from the last 16 hours. Your job:\n"
-            "1. Identify the 3-5 most market-moving stories\n"
-            "2. For each: write the story in one line, then one line on price impact\n"
-            "3. Flag CRITICAL geopolitical/macro events with *** prefix\n"
-            "4. End with: 'Net bias: [bullish/bearish/neutral] — [one-line reason]'\n\n"
-            "Output plain text only. No markdown. Be direct and specific.\n"
-            "Format:\n"
-            "MARKET NEWS INTERPRETATION:\n"
-            "  [CRITICAL/HIGH/MEDIUM] <story summary>\n"
-            "    Impact: <sector/direction in one line>\n"
-            "  ...\n"
-            "Net bias: <bullish/bearish/neutral> — <brief reason>\n\n"
-            "HEADLINES:\n" + "\n".join(f"- {h}" for h in headlines[:30])
-        )
-        resp = ai.messages.create(
-            model=CONFIG.get("claude_model_haiku", "claude-haiku-4-5-20251001"),
-            max_tokens=500,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return resp.content[0].text.strip()
-    except Exception as exc:
-        log.debug("overnight: Haiku news interpretation failed — %s", exc)
-
-    # ── Raw fallback (no AI) ──────────────────────────────────────
-    lines = ["MARKET NEWS (last 16h):"]
-    for h in headlines[:12]:
-        lines.append(f"  • {h}")
-    return "\n".join(lines)
+        log.debug("overnight: FMP news failed — %s", exc)
+        return "Market news: unavailable"
 
 
 # ── Analyst changes ───────────────────────────────────────────────────────────
@@ -467,6 +574,272 @@ def _get_analyst_changes(universe: list[str] | None) -> str:
         return "Analyst changes: unavailable"
 
 
+JSON_PATH = "data/overnight_notes.json"
+
+
+# ── Structured JSON builder ───────────────────────────────────────────────────
+
+
+def _build_overnight_json(universe: list[str] | None, gen_time: str) -> dict:
+    """
+    Build structured JSON for the dashboard.  All data sources are already
+    cached by Alpaca/FMP clients so re-calling them here is zero-cost.
+    """
+    data: dict = {"generated": gen_time, "available": True}
+
+    # ── Market tone ───────────────────────────────────────────────
+    try:
+        from alpaca_data import fetch_snapshots
+
+        snaps = fetch_snapshots(_TONE_SYMS + _SECTOR_ETFS)
+
+        def _snap_entry(sym: str) -> dict | None:
+            s = snaps.get(sym)
+            if not s:
+                return None
+            price = s.get("price") or 0
+            chg = s.get("change_1d")
+            pct = round(chg * 100, 2) if chg is not None else None
+            tag = "up" if (pct or 0) > 0.15 else ("down" if (pct or 0) < -0.15 else "flat")
+            return {"sym": sym, "price": round(price, 2), "pct": pct, "tag": tag}
+
+        data["market_tone"] = [e for s in _TONE_SYMS if (e := _snap_entry(s))]
+        data["sector_tone"] = [e for s in _SECTOR_ETFS if (e := _snap_entry(s))]
+    except Exception:
+        data["market_tone"] = []
+        data["sector_tone"] = []
+
+    # ── Pre-market movers ─────────────────────────────────────────
+    try:
+        from alpaca_data import fetch_snapshots as _fs
+
+        syms: list[str] = []
+        if os.path.exists(UNIVERSE_PATH):
+            with open(UNIVERSE_PATH) as f:
+                u = json.load(f)
+            syms = [entry["symbol"] for entry in (u.get("symbols") or [])[:75]]
+        if universe:
+            existing = set(syms)
+            syms += [s.upper() for s in universe if s.upper() not in existing]
+
+        snaps = _fs(syms) if syms else {}
+        movers = []
+        for sym, s in snaps.items():
+            chg = s.get("change_1d")
+            if chg is None:
+                continue
+            pct = round(chg * 100, 2)
+            if abs(pct) >= 1.5:
+                movers.append({"sym": sym, "price": round(s.get("price") or 0, 2), "pct": pct,
+                                "tag": "up" if pct > 0 else "down"})
+        movers.sort(key=lambda x: abs(x["pct"]), reverse=True)
+        data["movers"] = movers[:15]
+    except Exception:
+        data["movers"] = []
+
+    # ── Yesterday's performance ───────────────────────────────────
+    try:
+        perf: dict = {}
+        if os.path.exists(TRADES_FILE):
+            with open(TRADES_FILE) as f:
+                all_trades = json.load(f)
+            yesterday = (datetime.now(_ET) - timedelta(days=1)).strftime("%Y-%m-%d")
+            today_str = datetime.now(_ET).strftime("%Y-%m-%d")
+            day_trades = []
+            for t in all_trades:
+                for key in ("exit_time", "entry_time", "timestamp"):
+                    val = (t.get(key) or "")[:10]
+                    if val in (yesterday, today_str) and t.get("pnl") is not None:
+                        day_trades.append(t)
+                        break
+            wins = [t for t in day_trades if t["pnl"] > 0]
+            by_regime: dict[str, dict] = defaultdict(lambda: {"count": 0, "pnl": 0.0, "wins": 0})
+            dim_stats: dict[str, dict] = defaultdict(lambda: {"count": 0, "wins": 0, "pnl": 0.0})
+            for t in day_trades:
+                r = t.get("regime", "UNKNOWN")
+                by_regime[r]["count"] += 1
+                by_regime[r]["pnl"] += t["pnl"]
+                if t["pnl"] > 0:
+                    by_regime[r]["wins"] += 1
+                for dim, score in (t.get("signal_scores") or {}).items():
+                    if score:
+                        dim_stats[dim]["count"] += 1
+                        dim_stats[dim]["pnl"] += t["pnl"]
+                        if t["pnl"] > 0:
+                            dim_stats[dim]["wins"] += 1
+
+            best = max(day_trades, key=lambda x: x["pnl"]) if day_trades else None
+            worst = min(day_trades, key=lambda x: x["pnl"]) if day_trades else None
+            perf = {
+                "trades": len(day_trades),
+                "wins": len(wins),
+                "losses": len(day_trades) - len(wins),
+                "win_rate": round(len(wins) / len(day_trades) * 100) if day_trades else 0,
+                "pnl": round(sum(t["pnl"] for t in day_trades), 2),
+                "best": {"sym": best.get("symbol"), "pnl": round(best["pnl"], 2),
+                         "exit_reason": best.get("exit_reason", "")} if best else None,
+                "worst": {"sym": worst.get("symbol"), "pnl": round(worst["pnl"], 2),
+                          "exit_reason": worst.get("exit_reason", "")} if worst else None,
+                "by_regime": [
+                    {"regime": r, "count": d["count"],
+                     "win_rate": round(d["wins"] / d["count"] * 100),
+                     "pnl": round(d["pnl"], 2)}
+                    for r, d in sorted(by_regime.items(), key=lambda x: x[1]["pnl"], reverse=True)
+                    if d["count"] >= 2
+                ],
+                "by_dimension": sorted(
+                    [{"dim": dim, "count": d["count"],
+                      "win_rate": round(d["wins"] / d["count"] * 100) if d["count"] else 0,
+                      "pnl": round(d["pnl"], 2)}
+                     for dim, d in dim_stats.items() if d["count"] >= 2],
+                    key=lambda x: x["pnl"], reverse=True
+                ),
+                "flags": (
+                    (["High trade count — overtrading risk"] if len(day_trades) > 12 else []) +
+                    (["Win rate < 40% — entry selectivity concern"]
+                     if (len(wins) / len(day_trades) * 100 < 40 if day_trades else False) else [])
+                ),
+            }
+        data["performance"] = perf
+    except Exception:
+        data["performance"] = {}
+
+    # ── News structured data ──────────────────────────────────────
+    try:
+        from fmp_client import get_fmp_news_articles
+        from fmp_client import is_available as fmp_ok
+
+        news_data: dict = {"count": 0, "net_bias": "neutral", "articles": [], "avoid": [], "favor": []}
+        if fmp_ok():
+            syms_for_news: list[str] = []
+            if os.path.exists(UNIVERSE_PATH):
+                with open(UNIVERSE_PATH) as f:
+                    u = json.load(f)
+                syms_for_news = [e["symbol"] for e in (u.get("symbols") or [])[:50]]
+            if universe:
+                existing = set(syms_for_news)
+                syms_for_news += [s.upper() for s in universe if s.upper() not in existing]
+
+            if syms_for_news:
+                articles = get_fmp_news_articles(syms_for_news, limit=60)
+                recent = [a for a in articles if a.get("age_hours", 999) <= 16]
+                bull = [a for a in recent if a["sentiment"] == "BULLISH"]
+                bear = [a for a in recent if a["sentiment"] == "BEARISH"]
+                net = "bullish" if len(bull) > len(bear) * 1.3 else (
+                    "bearish" if len(bear) > len(bull) * 1.3 else "neutral")
+
+                def _top(arts: list[dict], n: int = 5) -> list[dict]:
+                    seen: set[str] = set()
+                    out = []
+                    for a in arts:
+                        sym = a["symbols"][0] if a.get("symbols") else ""
+                        if not sym or sym in seen:
+                            continue
+                        seen.add(sym)
+                        reason = a.get("headline", "").split(";")[0].split(",")[0][:60].strip()
+                        out.append({"sym": sym, "reason": reason})
+                        if len(out) >= n:
+                            break
+                    return out
+
+                news_data = {
+                    "count": len(recent),
+                    "net_bias": net,
+                    "bull_count": len(bull),
+                    "bear_count": len(bear),
+                    "neutral_count": len(recent) - len(bull) - len(bear),
+                    "articles": [
+                        {"sym": a["symbols"][0] if a.get("symbols") else "",
+                         "sentiment": a["sentiment"],
+                         "age_hours": a.get("age_hours", 0),
+                         "headline": a.get("headline", "")[:120]}
+                        for a in recent[:12]
+                    ],
+                    "avoid": _top(bear),
+                    "favor": _top(bull),
+                }
+        data["news"] = news_data
+    except Exception:
+        data["news"] = {"count": 0, "net_bias": "neutral", "articles": [], "avoid": [], "favor": []}
+
+    # ── Macro ─────────────────────────────────────────────────────
+    try:
+        from fred_client import get_macro_snapshot
+        from fred_client import is_available as fred_ok
+
+        macro = []
+        if fred_ok():
+            macro = [
+                {"name": i["name"], "value": i["value"], "unit": i["unit"],
+                 "date": i["date"], "prior": i.get("prior")}
+                for i in get_macro_snapshot()
+                if i.get("name") in _DAILY_MACRO_NAMES
+            ]
+        data["macro"] = macro
+    except Exception:
+        data["macro"] = []
+
+    # ── Economic calendar ─────────────────────────────────────────
+    try:
+        from fmp_client import get_economic_calendar
+        from fmp_client import is_available as fmp_ok
+
+        cal_events = []
+        if fmp_ok():
+            for ev in get_economic_calendar(days_ahead=5):
+                if ev.get("impact", "").lower() in ("high", "medium"):
+                    cal_events.append({
+                        "date": ev["date"],
+                        "event": ev["event"],
+                        "impact": ev["impact"],
+                        "estimate": ev.get("estimate"),
+                        "previous": ev.get("previous"),
+                    })
+        data["calendar"] = cal_events
+    except Exception:
+        data["calendar"] = []
+
+    # ── Earnings ──────────────────────────────────────────────────
+    try:
+        from fmp_client import get_earnings_calendar
+        from fmp_client import is_available as fmp_ok
+
+        earnings = []
+        if fmp_ok():
+            for item in get_earnings_calendar(symbols=universe, days_ahead=5):
+                earnings.append({
+                    "date": item["date"],
+                    "symbol": item["symbol"],
+                    "timing": item.get("timing", ""),
+                    "eps_est": item.get("eps_est"),
+                    "eps_prior": item.get("eps_prior"),
+                })
+        data["earnings"] = earnings
+    except Exception:
+        data["earnings"] = []
+
+    # ── Analyst changes ───────────────────────────────────────────
+    try:
+        from fmp_client import get_analyst_changes
+        from fmp_client import is_available as fmp_ok
+
+        changes = []
+        if fmp_ok():
+            for item in get_analyst_changes(symbols=universe, hours_back=24)[:15]:
+                changes.append({
+                    "symbol": item["symbol"],
+                    "action": item["action"].upper(),
+                    "from_grade": item.get("from_grade", ""),
+                    "to_grade": item.get("to_grade", ""),
+                    "firm": item.get("firm", ""),
+                })
+        data["analyst_changes"] = changes
+    except Exception:
+        data["analyst_changes"] = []
+
+    return data
+
+
 # ── Main generator ────────────────────────────────────────────────────────────
 
 
@@ -486,11 +859,16 @@ def generate_overnight_notes(universe: list[str] | None = None) -> str:
     gen_time = now_et.strftime("%Y-%m-%d %H:%M ET")
 
     macro_snapshot = _get_macro_snapshot()
+    universe_movers = _get_universe_movers(extra_syms=universe)
     sections = [
         f"OVERNIGHT RESEARCH NOTES — {date_str}",
         f"Generated: {gen_time}",
         "",
         _get_price_tone(),
+    ]
+    if universe_movers:
+        sections += ["", universe_movers]
+    sections += [
         "",
         _get_performance_summary(),
         "",
@@ -500,7 +878,7 @@ def generate_overnight_notes(universe: list[str] | None = None) -> str:
         "",
         _get_analyst_changes(universe),
         "",
-        _get_market_news(),
+        _get_market_news(universe_syms=universe),
     ]
     if macro_snapshot:
         sections += ["", macro_snapshot]
@@ -514,6 +892,14 @@ def generate_overnight_notes(universe: list[str] | None = None) -> str:
         log.info("overnight: notes written to %s", NOTES_PATH)
     except Exception as exc:
         log.warning("overnight: could not write notes file — %s", exc)
+
+    try:
+        structured = _build_overnight_json(universe, gen_time)
+        with open(JSON_PATH, "w") as f:
+            json.dump(structured, f)
+        log.info("overnight: structured JSON written to %s", JSON_PATH)
+    except Exception as exc:
+        log.warning("overnight: could not write JSON file — %s", exc)
 
     return text
 

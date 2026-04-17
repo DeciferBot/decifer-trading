@@ -754,14 +754,45 @@ canvas{display:block;width:100% !important}
 <!-- VIEW 7: PORTFOLIO (multi-account aggregation) -->
 <div class="view" id="view-portfolio" style="flex-direction:column;padding:16px;gap:14px">
 
-  <!-- Overnight Research Notes -->
+  <!-- Morning Brief (structured overnight research) -->
   <div class="setting-card" style="margin:0;padding:0;overflow:hidden">
-    <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted2);display:flex;justify-content:space-between;align-items:center">
-      <span>OVERNIGHT RESEARCH</span>
-      <span id="overnight-meta" style="color:var(--muted2);font-size:9px;font-weight:400"></span>
+    <!-- Header -->
+    <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:9px;font-weight:700;letter-spacing:2px;color:var(--orange)">MORNING BRIEF</span>
+      <span id="overnight-meta" style="font-size:9px;color:var(--muted2)"></span>
     </div>
-    <div id="overnight-body" style="padding:12px 16px;font-size:11px;font-family:'JetBrains Mono',monospace;white-space:pre-wrap;line-height:1.6;color:var(--text)">
-      <span style="color:var(--muted2)">Loading overnight research…</span>
+
+    <!-- Market tone row -->
+    <div id="on-tone-row" style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px">
+      <span style="color:var(--muted2);font-size:10px">Loading…</span>
+    </div>
+
+    <!-- Sector row -->
+    <div id="on-sector-row" style="padding:6px 16px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:5px"></div>
+
+    <!-- Two-column: movers | calendar+earnings -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
+      <div style="border-right:1px solid var(--border);padding:10px 14px">
+        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px">PRE-MARKET MOVERS</div>
+        <div id="on-movers"></div>
+      </div>
+      <div style="padding:10px 14px">
+        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px">UPCOMING EVENTS</div>
+        <div id="on-calendar"></div>
+      </div>
+    </div>
+
+    <!-- Yesterday performance -->
+    <div id="on-perf-section" style="padding:10px 16px;border-bottom:1px solid var(--border)">
+      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px">YESTERDAY</div>
+      <div id="on-perf"></div>
+    </div>
+
+    <!-- News + bias -->
+    <div style="padding:10px 16px">
+      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);margin-bottom:7px" id="on-news-label">NEWS</div>
+      <div id="on-news"></div>
+      <div id="on-bias" style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap"></div>
     </div>
   </div>
 
@@ -1225,39 +1256,204 @@ async function loadPortfolio() {
 }
 
 async function loadOvernightNotes() {
-  const body = document.getElementById('overnight-body');
   const meta = document.getElementById('overnight-meta');
-  if (!body) return;
   try {
     const resp = await fetch('/api/overnight-notes');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const d = await resp.json();
-    if (!d.available || !d.notes) {
-      body.innerHTML = '<span style="color:var(--muted2)">No overnight notes yet — generated automatically at 4:15pm ET after market close.</span>';
-      if (meta) meta.textContent = '';
+
+    if (!d.available) {
+      document.getElementById('on-tone-row').innerHTML =
+        '<span style="color:var(--muted2);font-size:10px">No morning brief yet — generated automatically at 6:00 AM ET.</span>';
       return;
     }
-    // Extract generated timestamp from first lines
-    const lines = d.notes.split('\n');
-    const genLine = lines.find(l => l.startsWith('Generated:'));
-    if (meta && genLine) meta.textContent = genLine.replace('Generated:', '').trim();
 
-    // Colour-code key lines
-    const coloured = d.notes
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/(OVERNIGHT RESEARCH NOTES.*)/g,     '<span style="color:var(--orange);font-weight:700">$1</span>')
-      .replace(/(PRE-MARKET.*|YESTERDAY.*|ECONOMIC CALENDAR.*|EARNINGS.*|ANALYST CHANGES.*|MACRO INDICATORS.*)/g,
-               '<span style="color:var(--muted2);letter-spacing:1px;font-size:10px">$1</span>')
-      .replace(/(\[\bHIGH\b\])/g,  '<span style="color:var(--red)">$1</span>')
-      .replace(/(\[MEDIUM\])/g,    '<span style="color:var(--orange)">$1</span>')
-      .replace(/(\*\*\*.*?\*\*\*)/g,'<span style="color:var(--red);font-weight:700">$1</span>')
-      .replace(/(gap-up)/g,        '<span style="color:var(--green)">$1</span>')
-      .replace(/(gap-down)/g,      '<span style="color:var(--red)">$1</span>')
-      .replace(/(FLAG:.*)/g,       '<span style="color:var(--red)">$1</span>');
+    const D = d.data || {};
+    if (meta && D.generated) meta.textContent = D.generated;
 
-    body.innerHTML = coloured;
+    // ── Tone badge helper ──────────────────────────────────────
+    function toneBadge(item) {
+      if (!item) return '';
+      const pct = item.pct != null ? item.pct : null;
+      const col = pct === null ? 'var(--muted2)' : pct > 0.15 ? 'var(--green)' : pct < -0.15 ? 'var(--red)' : 'var(--muted2)';
+      const sign = pct > 0 ? '+' : '';
+      const pctStr = pct != null ? `${sign}${pct.toFixed(2)}%` : 'n/a';
+      return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:4px;border:1px solid ${col};background:${col}18;font-size:10px;font-family:'JetBrains Mono',monospace">
+        <span style="color:#fff;font-weight:600">${esc(item.sym)}</span>
+        <span style="color:${col}">${pctStr}</span>
+      </span>`;
+    }
+
+    // ── Market tone row ────────────────────────────────────────
+    const toneRow = document.getElementById('on-tone-row');
+    if (toneRow) {
+      const tones = (D.market_tone || []);
+      toneRow.innerHTML = tones.length
+        ? tones.map(toneBadge).join('')
+        : '<span style="color:var(--muted2);font-size:10px">No tone data</span>';
+    }
+
+    // ── Sector row ─────────────────────────────────────────────
+    const sectorRow = document.getElementById('on-sector-row');
+    if (sectorRow) {
+      sectorRow.innerHTML = (D.sector_tone || []).map(toneBadge).join('') ||
+        '<span style="color:var(--muted2);font-size:9px">No sector data</span>';
+    }
+
+    // ── Pre-market movers ──────────────────────────────────────
+    const moversEl = document.getElementById('on-movers');
+    if (moversEl) {
+      const movers = D.movers || [];
+      if (!movers.length) {
+        moversEl.innerHTML = '<span style="color:var(--muted2);font-size:10px">No significant gaps</span>';
+      } else {
+        moversEl.innerHTML = movers.map(m => {
+          const col = m.pct > 0 ? 'var(--green)' : 'var(--red)';
+          const sign = m.pct > 0 ? '+' : '';
+          return `<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:11px;font-family:'JetBrains Mono',monospace">
+            <span style="color:#fff;font-weight:600">${esc(m.sym)}</span>
+            <span style="color:var(--muted2)">$${m.price.toFixed(2)}</span>
+            <span style="color:${col};font-weight:700">${sign}${m.pct.toFixed(2)}%</span>
+          </div>`;
+        }).join('');
+      }
+    }
+
+    // ── Calendar + earnings ────────────────────────────────────
+    const calEl = document.getElementById('on-calendar');
+    if (calEl) {
+      const calEvents = (D.calendar || []).map(ev => {
+        const impCol = ev.impact === 'High' ? 'var(--red)' : 'var(--orange)';
+        const estStr = ev.estimate != null ? ` est ${ev.estimate}` : '';
+        return `<div style="font-size:10px;padding:2px 0;display:flex;gap:6px;align-items:baseline">
+          <span style="color:${impCol};font-size:8px;flex-shrink:0">●</span>
+          <span style="color:var(--muted2);flex-shrink:0">${esc(ev.date.slice(5))}</span>
+          <span style="color:var(--text)">${esc(ev.event)}${esc(estStr)}</span>
+        </div>`;
+      });
+      const earnEvents = (D.earnings || []).map(ev => {
+        const epsStr = ev.eps_est != null ? ` EPS est $${ev.eps_est}` : '';
+        const timingStr = ev.timing ? ` ${ev.timing}` : '';
+        return `<div style="font-size:10px;padding:2px 0;display:flex;gap:6px;align-items:baseline">
+          <span style="color:var(--orange);font-size:8px;flex-shrink:0">◆</span>
+          <span style="color:var(--muted2);flex-shrink:0">${esc(ev.date.slice(5))}</span>
+          <span style="color:var(--orange);font-weight:600">${esc(ev.symbol)}</span>
+          <span style="color:var(--muted2)">${esc(timingStr + epsStr)}</span>
+        </div>`;
+      });
+      const allItems = [...calEvents, ...earnEvents];
+      calEl.innerHTML = allItems.length
+        ? allItems.slice(0, 12).join('')
+        : '<span style="color:var(--muted2);font-size:10px">No events this week</span>';
+    }
+
+    // ── Analyst changes ────────────────────────────────────────
+    const analystChanges = D.analyst_changes || [];
+    if (analystChanges.length) {
+      const calEl2 = document.getElementById('on-calendar');
+      if (calEl2) {
+        const acHtml = analystChanges.slice(0, 5).map(ac => {
+          const col = ac.action === 'UPGRADE' ? 'var(--green)' : ac.action === 'DOWNGRADE' ? 'var(--red)' : 'var(--muted2)';
+          const grade = ac.from_grade && ac.to_grade ? `${ac.from_grade}→${ac.to_grade}` : (ac.to_grade || ac.from_grade || '');
+          return `<div style="font-size:10px;padding:2px 0;display:flex;gap:6px;align-items:baseline">
+            <span style="color:${col};font-size:8px;flex-shrink:0">▸</span>
+            <span style="color:${col};font-weight:600">${esc(ac.symbol)}</span>
+            <span style="color:var(--muted2)">${esc(ac.action)} ${esc(grade)} (${esc(ac.firm)})</span>
+          </div>`;
+        }).join('');
+        calEl2.innerHTML += `<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">
+          <div style="font-size:9px;letter-spacing:1px;color:var(--muted2);margin-bottom:4px">ANALYST</div>${acHtml}</div>`;
+      }
+    }
+
+    // ── Performance ────────────────────────────────────────────
+    const perfEl = document.getElementById('on-perf');
+    const perf = D.performance || {};
+    if (perfEl && perf.trades) {
+      const wr = perf.win_rate || 0;
+      const wrCol = wr >= 50 ? 'var(--green)' : wr >= 40 ? 'var(--orange)' : 'var(--red)';
+      const pnlCol = (perf.pnl || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+      const pnlStr = `$${perf.pnl >= 0 ? '+' : ''}${perf.pnl.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0})}`;
+
+      let html = `<div style="display:flex;gap:16px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:700;color:${pnlCol};font-family:'JetBrains Mono',monospace">${pnlStr}</span>
+        <span style="font-size:11px;color:var(--muted2)">${perf.trades} trades</span>
+        <span style="font-size:11px;font-weight:600;color:${wrCol}">${wr}% WR</span>
+        <span style="font-size:10px;color:var(--muted2)">${perf.wins}W / ${perf.losses}L</span>
+      </div>`;
+
+      // Win rate bar
+      html += `<div style="height:4px;background:var(--bg3);border-radius:2px;margin-bottom:8px">
+        <div style="height:4px;width:${wr}%;background:${wrCol};border-radius:2px;transition:width .5s"></div>
+      </div>`;
+
+      // Dimension table
+      if ((perf.by_dimension || []).length) {
+        html += `<div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:2px 10px;font-size:10px;font-family:'JetBrains Mono',monospace">`;
+        for (const d of perf.by_dimension.slice(0, 8)) {
+          const dc = d.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+          const dwr = d.win_rate >= 50 ? 'var(--green)' : d.win_rate >= 40 ? 'var(--orange)' : 'var(--red)';
+          html += `<span style="color:var(--muted2)">${esc(d.dim)}</span>
+            <span style="color:var(--muted2);font-size:9px">${d.count}tr</span>
+            <span style="color:${dwr}">${d.win_rate}%</span>
+            <span style="color:${dc}">${d.pnl >= 0 ? '+' : ''}$${Math.round(d.pnl).toLocaleString()}</span>`;
+        }
+        html += '</div>';
+      }
+
+      // Flags
+      for (const flag of (perf.flags || [])) {
+        html += `<div style="margin-top:5px;font-size:10px;color:var(--red)">⚠ ${esc(flag)}</div>`;
+      }
+      perfEl.innerHTML = html;
+    } else if (perfEl) {
+      perfEl.innerHTML = '<span style="color:var(--muted2);font-size:10px">No trade data for yesterday</span>';
+    }
+
+    // ── News ───────────────────────────────────────────────────
+    const news = D.news || {};
+    const newsLabel = document.getElementById('on-news-label');
+    const newsEl = document.getElementById('on-news');
+    const biasEl = document.getElementById('on-bias');
+
+    if (newsLabel && news.count) {
+      const biasCol = news.net_bias === 'bullish' ? 'var(--green)' : news.net_bias === 'bearish' ? 'var(--red)' : 'var(--muted2)';
+      newsLabel.innerHTML = `NEWS <span style="color:${biasCol};font-weight:700;margin-left:6px">${(news.net_bias||'').toUpperCase()}</span>
+        <span style="color:var(--muted2);font-size:9px;margin-left:6px">${news.bull_count||0}▲ ${news.bear_count||0}▼ ${news.neutral_count||0}─</span>`;
+    }
+
+    if (newsEl) {
+      newsEl.innerHTML = (news.articles || []).map(a => {
+        const col = a.sentiment === 'BULLISH' ? 'var(--green)' : a.sentiment === 'BEARISH' ? 'var(--red)' : 'var(--muted2)';
+        const icon = a.sentiment === 'BULLISH' ? '▲' : a.sentiment === 'BEARISH' ? '▼' : '─';
+        const ageStr = a.age_hours < 1 ? `${Math.round(a.age_hours*60)}m` : `${Math.round(a.age_hours)}h`;
+        const symTag = a.sym ? `<span style="color:var(--orange);font-weight:700">[${esc(a.sym)}]</span> ` : '';
+        return `<div style="padding:3px 0;font-size:10px;display:flex;gap:6px;align-items:baseline;border-bottom:1px solid var(--border)">
+          <span style="color:${col};flex-shrink:0">${icon}</span>
+          <span style="color:var(--muted2);font-size:9px;flex-shrink:0;min-width:24px">${ageStr}</span>
+          <span>${symTag}<span style="color:var(--text)">${esc(a.headline)}</span></span>
+        </div>`;
+      }).join('') || '<span style="color:var(--muted2);font-size:10px">No news in last 16h</span>';
+    }
+
+    if (biasEl) {
+      const avoid = (news.avoid || []);
+      const favor = (news.favor || []);
+      let biasHtml = '';
+      if (avoid.length) {
+        biasHtml += `<div><span style="font-size:9px;color:var(--red);letter-spacing:1px">AVOID </span>` +
+          avoid.map(x => `<span style="font-size:10px;color:var(--red);font-family:'JetBrains Mono',monospace;margin-right:4px" title="${esc(x.reason)}">${esc(x.sym)}</span>`).join('') + '</div>';
+      }
+      if (favor.length) {
+        biasHtml += `<div><span style="font-size:9px;color:var(--green);letter-spacing:1px">FAVOR </span>` +
+          favor.map(x => `<span style="font-size:10px;color:var(--green);font-family:'JetBrains Mono',monospace;margin-right:4px" title="${esc(x.reason)}">${esc(x.sym)}</span>`).join('') + '</div>';
+      }
+      biasEl.innerHTML = biasHtml;
+    }
+
   } catch (err) {
-    body.innerHTML = `<span style="color:var(--red)">Could not load overnight notes: ${esc(err.message)}</span>`;
+    const tone = document.getElementById('on-tone-row');
+    if (tone) tone.innerHTML = `<span style="color:var(--red);font-size:10px">Could not load morning brief: ${esc(err.message)}</span>`;
   }
 }
 

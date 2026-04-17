@@ -160,7 +160,7 @@ def _enrich_sectors(articles: list) -> None:
     Only fetches symbols not already in _sector_cache; FMP has its own 4h cache
     so repeated in-process lookups are free.
     """
-    from fmp_client import get_company_metadata
+    from fmp_client import get_company_profile as get_company_metadata
 
     new_syms = {
         sym
@@ -558,7 +558,10 @@ def _get_news_payload() -> dict:
     _enrich_images(articles)
 
     # Enrich articles with sector tags from FMP (cached per symbol, permanent in-process)
-    _enrich_sectors(articles)
+    try:
+        _enrich_sectors(articles)
+    except Exception as _se:
+        log.warning("sector enrich skipped: %s", _se)
 
     # Identify macro market-moving events via Sonnet (cached by content hash)
     # Evict stale cache entries older than 30 articles to prevent empty-list lock-in
@@ -1115,12 +1118,25 @@ class DashHandler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             try:
-                from overnight_research import load_overnight_notes
+                import time as _t
+                import zoneinfo as _zi
+                from datetime import datetime as _dt
+                from overnight_research import JSON_PATH, load_overnight_notes
 
+                payload: dict = {"available": False, "notes": "", "data": None}
+                if os.path.exists(JSON_PATH):
+                    weekday = _dt.now(_zi.ZoneInfo("America/New_York")).weekday()
+                    max_age = 80 * 3600 if weekday in (0, 6) else 20 * 3600
+                    if _t.time() - os.path.getmtime(JSON_PATH) <= max_age:
+                        with open(JSON_PATH) as _jf:
+                            payload["data"] = json.load(_jf)
+                        payload["available"] = True
                 notes = load_overnight_notes()
-                payload = {"notes": notes, "available": bool(notes)}
+                if notes:
+                    payload["notes"] = notes
+                    payload["available"] = True
             except Exception as exc:
-                payload = {"notes": "", "available": False, "error": str(exc)}
+                payload = {"notes": "", "available": False, "data": None, "error": str(exc)}
             self.wfile.write(json.dumps(payload).encode())
         elif self.path == "/api/prices":
             self.send_response(200)

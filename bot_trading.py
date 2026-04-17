@@ -846,8 +846,9 @@ _overnight_research_done: bool = False
 
 def _maybe_generate_overnight_research():
     """
-    Fire once per day in the AFTER_HOURS window (4:15–8:00 PM ET).
-    Generates data/overnight_notes.md — read by Opus at the start of next session.
+    Fire once per day at 6:00–9:00 AM ET (pre-market window).
+    At 6 AM real pre-market prices, overnight news, and catalyst data are all available.
+    Generates data/overnight_notes.md — read by Opus before the 9:30 AM open.
     Runs in a background thread so it doesn't block the scan loop.
     """
     global _overnight_research_done
@@ -859,10 +860,11 @@ def _maybe_generate_overnight_research():
 
     t = datetime.now(_ET).time()
 
-    if t < dtime(9, 30):
+    # Reset after 9 PM so next morning's 6 AM run fires cleanly
+    if t >= dtime(21, 0):
         _overnight_research_done = False
 
-    if dtime(16, 15) <= t < dtime(20, 0) and not _overnight_research_done:
+    if dtime(6, 0) <= t < dtime(9, 0) and not _overnight_research_done:
         _overnight_research_done = True
 
         def _run():
