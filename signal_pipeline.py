@@ -276,12 +276,20 @@ def _apply_persistence_gate(scored: list, all_scored: list, persistence_scans: i
     """
     Filter signals that haven't been above threshold for persistence_scans consecutive scans.
 
+    High-conviction signals (score >= persistence_conviction_bypass) bypass the gate and
+    pass immediately on scan 1 — strong setups shouldn't be held back by history warmup.
+    Marginal signals (below the bypass threshold) still require persistence_scans
+    consecutive above-threshold scans to filter single-scan DAR spikes.
+
     Updates _THRESHOLD_HISTORY for every symbol in all_scored (not just above-threshold)
     so the history accurately reflects when a signal dropped below threshold.
     Catalyst/sentinel entries bypass this gate in signal_dispatcher before reaching here.
     """
     if persistence_scans <= 1:
         return scored
+
+    from config import CONFIG as _cfg
+    bypass_score = _cfg.get("persistence_conviction_bypass", _cfg.get("high_conviction_score", 36))
 
     above = {s["symbol"] for s in scored}
 
@@ -292,8 +300,13 @@ def _apply_persistence_gate(scored: list, all_scored: list, persistence_scans: i
         _THRESHOLD_HISTORY[sym].append(sym in above)
 
     passed = []
+    bypassed = []
     for s in scored:
         sym = s["symbol"]
+        if s.get("score", 0) >= bypass_score:
+            passed.append(s)
+            bypassed.append(sym)
+            continue
         history = list(_THRESHOLD_HISTORY.get(sym, []))
         recent = history[-persistence_scans:]
         if len(recent) >= persistence_scans and all(recent):
@@ -304,6 +317,8 @@ def _apply_persistence_gate(scored: list, all_scored: list, persistence_scans: i
                 sym, persistence_scans, recent,
             )
 
+    if bypassed:
+        log.info("Persistence gate: %d high-conviction bypass (score >= %d): %s", len(bypassed), bypass_score, bypassed)
     if len(passed) < len(scored):
         log.info(
             "Persistence gate: %d/%d signals passed (need %d consecutive scans above threshold)",

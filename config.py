@@ -163,6 +163,7 @@ CONFIG = {
     "reentry_cooldown_minutes": 30,  # Block re-entry after close (lifecycle gate)
     "failed_thesis_cooldown_hours": 4,  # Extended cooldown when INTRADAY wrong_if was triggered
     "score_persistence_scans": 2,  # Consecutive above-threshold scans required before entry
+    "persistence_conviction_bypass": 36,  # Score >= this passes persistence gate immediately (scan-1 safe)
     # ── HELD-POSITION SCALE-UP TRIGGER ────────────────────────────
     # When a held position's score rises materially since entry (or since the
     # last PM review), re-run PM so Opus can consider an ADD.  Addresses the
