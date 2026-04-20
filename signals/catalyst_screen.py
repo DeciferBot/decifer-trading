@@ -96,26 +96,54 @@ def _load_watchlist() -> list[str]:
 
 def _fetch_info(ticker: str) -> dict | None:
     """
-    Fetch yfinance Ticker.info.  Returns None on any error or empty response.
-
-    yfinance quirks handled:
-    - Returns {} or {"trailingPegRatio": None} for unknown/delisted tickers
-    - Raises HTTPError 404 for invalid symbols
-    - Returns a dict missing price fields for ETFs / non-equity instruments
+    Fetch fundamental data for M&A screening.
+    FMP Premium primary (same-day from SEC); yfinance fallback (1-2 day lag).
+    Returns a normalised info dict or None.
     """
+    # Primary: FMP (paid, current)
+    try:
+        import fmp_client as fmp
+        if fmp.is_available():
+            profile = fmp.get_company_profile(ticker)
+            if not profile or not profile.get("market_cap"):
+                return None
+            metrics = fmp.get_key_metrics_ttm(ticker)
+            growth  = fmp.get_revenue_growth(ticker)
+
+            ev_revenue     = metrics.get("ev_to_sales") if metrics else None
+            net_debt_ebitda = metrics.get("net_debt_to_ebitda") if metrics else None
+            # Negative net-debt/EBITDA = net cash positive (debt < cash)
+            net_cash_positive = (net_debt_ebitda < 0) if net_debt_ebitda is not None else None
+
+            rev_growth_pct = growth.get("revenue_growth_yoy") if growth else None
+            # get_revenue_growth returns %, convert to decimal for threshold comparison
+            rev_growth = rev_growth_pct / 100.0 if rev_growth_pct is not None else None
+
+            return {
+                "_source":      "fmp",
+                "sector":       profile.get("sector", ""),
+                "shortName":    ticker,
+                "marketCap":    profile.get("market_cap"),
+                "enterpriseToRevenue": ev_revenue,
+                "revenueGrowth":       rev_growth,
+                "_net_cash_positive":  net_cash_positive,
+                # sentinel values so _score_ticker net-cash branch works for both sources
+                "totalCash": 1.0 if net_cash_positive else 0.0,
+                "totalDebt": 0.0 if net_cash_positive else 1.0,
+            }
+    except Exception:
+        pass
+
+    # Fallback: yfinance (1-2 day lag)
     try:
         import yfinance as yf
         info = yf.Ticker(ticker).info
-
-        # yfinance returns a near-empty dict (1–3 keys) for unknown tickers
         if not info or len(info) < 5:
             return None
-
-        # Must have a valid price field — rules out delisted and ETF-only symbols
         price = info.get("regularMarketPrice") or info.get("currentPrice") or info.get("previousClose")
         if not price:
             return None
-
+        info["_source"] = "yfinance"
         return info
     except Exception:
         return None
@@ -253,8 +281,7 @@ def run_screen(tickers: list[str] | None = None, verbose: bool = False, force: b
         if candidate:
             candidates.append(candidate)
 
-        # Polite throttle — yfinance is a free service
-        time.sleep(0.15)
+        time.sleep(0.05)  # FMP: 750 calls/min; yfinance fallback is rare
 
     candidates.sort(key=lambda c: c["fundamental_score"], reverse=True)
 

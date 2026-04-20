@@ -881,14 +881,16 @@ def get_key_metrics_ttm(symbol: str) -> dict | None:
         return None
 
     return {
-        "symbol":           symbol.upper(),
-        "gross_margin":     _safe_pct(item.get("grossProfitMarginTTM") or item.get("grossProfitMargin")),
-        "operating_margin": _safe_pct(item.get("operatingProfitMarginTTM") or item.get("operatingProfitMargin")),
-        "net_margin":       _safe_pct(item.get("netProfitMarginTTM") or item.get("netProfitMargin")),
-        "fcf_yield":        _safe_pct(item.get("fcfYieldTTM") or item.get("freeCashFlowYieldTTM")),
-        "pe_ratio":         _safe_float(item.get("peRatioTTM") or item.get("peRatio")),
-        "roe":              _safe_pct(item.get("roeTTM") or item.get("returnOnEquityTTM")),
-        "debt_to_equity":   _safe_float(item.get("debtToEquityTTM") or item.get("debtToEquity")),
+        "symbol":              symbol.upper(),
+        "gross_margin":        _safe_pct(item.get("grossProfitMarginTTM") or item.get("grossProfitMargin")),
+        "operating_margin":    _safe_pct(item.get("operatingProfitMarginTTM") or item.get("operatingProfitMargin")),
+        "net_margin":          _safe_pct(item.get("netProfitMarginTTM") or item.get("netProfitMargin")),
+        "fcf_yield":           _safe_pct(item.get("fcfYieldTTM") or item.get("freeCashFlowYieldTTM")),
+        "pe_ratio":            _safe_float(item.get("peRatioTTM") or item.get("peRatio")),
+        "roe":                 _safe_pct(item.get("roeTTM") or item.get("returnOnEquityTTM")),
+        "debt_to_equity":      _safe_float(item.get("debtToEquityTTM") or item.get("debtToEquity")),
+        "ev_to_sales":         _safe_float(item.get("evToSalesTTM") or item.get("evToRevenueTTM") or item.get("enterpriseValueOverRevenueTTM")),
+        "net_debt_to_ebitda":  _safe_float(item.get("netDebtToEBITDATTM") or item.get("netDebtToEbitdaTTM")),
     }
 
 

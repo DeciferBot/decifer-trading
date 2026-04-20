@@ -76,6 +76,18 @@ def _get_finbert_pipeline():
 
 # ── News fetchers ─────────────────────────────────────────────────────────────
 
+def _fetch_fmp_headlines(ticker: str) -> list[str]:
+    """FMP stock news — 15min TTL, sourced from major financial wire services."""
+    try:
+        import fmp_client as fmp
+        if not fmp.is_available():
+            return []
+        articles = fmp.get_stock_news(ticker, limit=10)
+        return [a["title"] for a in articles if a.get("title")]
+    except Exception:
+        return []
+
+
 def _fetch_yahoo_rss(ticker: str) -> list[str]:
     """Return up to 15 headline titles from Yahoo Finance RSS for ticker."""
     url = f"https://finance.yahoo.com/rss/headline?s={ticker}"
@@ -139,14 +151,15 @@ def _fetch_finviz_headlines(ticker: str) -> list[str]:
 
 def _collect_headlines(ticker: str) -> list[str]:
     """
-    Fetch and merge headlines from Yahoo RSS and Finviz.
+    Fetch and merge headlines. FMP primary (15min TTL), Yahoo RSS + Finviz fallback.
     Deduplicates by first-60-chars of lowercased text.
     """
-    yahoo  = _fetch_yahoo_rss(ticker)
-    finviz = _fetch_finviz_headlines(ticker)
+    fmp    = _fetch_fmp_headlines(ticker)
+    yahoo  = _fetch_yahoo_rss(ticker) if len(fmp) < 5 else []
+    finviz = _fetch_finviz_headlines(ticker) if len(fmp) < 5 else []
     seen: set[str] = set()
     merged: list[str] = []
-    for h in yahoo + finviz:
+    for h in fmp + yahoo + finviz:
         key = h.lower()[:60]
         if key not in seen:
             seen.add(key)
@@ -173,8 +186,13 @@ def _score_with_claude(headlines: list[str], ticker: str) -> float | None:
         bullet_list = "\n".join(f"- {h}" for h in headlines[:10])
         prompt = (
             f"Ticker: {ticker}\n"
-            "Rate aggregate market sentiment from these headlines.\n"
-            "Scale: -1.0 = very bearish, 0.0 = neutral, 1.0 = very bullish.\n"
+            "Rate how strongly these headlines suggest this company is an M&A target "
+            "or subject to significant corporate action (activist stake, strategic review, "
+            "buyout rumour, takeover bid, merger talks).\n"
+            "0.0 = no M&A signal (routine earnings, product launches, analyst ratings, "
+            "company acquiring small assets). "
+            "1.0 = strong M&A target signal (activist SC 13D, takeover bid, "
+            "exploring strategic alternatives, acquisition offer received).\n"
             "Reply with a single decimal number only.\n\n"
             f"{bullet_list}"
         )

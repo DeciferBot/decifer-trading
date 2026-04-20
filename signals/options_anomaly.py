@@ -9,9 +9,14 @@ often precedes acquisition announcements:
   3. Near-term IV spike  — nearest expiry IV significantly elevated
   4. IV term compression — front-month IV / back-month IV > 1.20
 
-Detection is run against the live chain (yfinance) so no historical storage
-is needed for v1.  Daily snapshots are appended to
-state/catalyst/options_snapshots.jsonl so IC can be measured over time.
+Data source priority:
+  1. Alpaca OPRA (paid, real-time) — used when client is available
+  2. yfinance (free, 15-20min delayed) — fallback only
+
+NOTE: Alpaca snapshot "volume" is bid_size + ask_size (quoted liquidity),
+not daily trade volume. It's real-time and accurate for OTM interest
+detection; semantically different from yfinance daily volume but more
+timely.
 
 Run standalone:  python -m signals.options_anomaly --tickers AAPL MSFT
 Called from app: from signals.options_anomaly import run_anomaly_scan
@@ -20,34 +25,52 @@ Called from app: from signals.options_anomaly import run_anomaly_scan
 from __future__ import annotations
 
 import json
-import time
+import logging
 from datetime import datetime
 from pathlib import Path
 
 from config import CATALYST_DIR  # noqa: E402  chief-decifer/state/internal/catalyst/
+
+log = logging.getLogger("decifer.options_anomaly")
+
 SNAPSHOTS_FILE = CATALYST_DIR / "options_snapshots.jsonl"
 
 
 # ── Options chain fetcher ─────────────────────────────────────────────────────
 
-def _fetch_chain(ticker: str) -> dict | None:
+def _fetch_chain(ticker: str) -> list[dict] | None:
     """
     Fetch options chain for the nearest two expiry dates.
-    Returns dict {expiry: {calls: DataFrame, puts: DataFrame}} or None on error.
+    Returns list of dicts: [{"calls": df, "puts": df, "expiry_str": str, "dte": int}, ...]
+    Tries Alpaca OPRA first; falls back to yfinance.
     """
+    # Primary: Alpaca OPRA (real-time)
+    try:
+        from alpaca_options import get_all_chains
+        chains = get_all_chains(ticker, min_dte=0, max_dte=60)
+        if chains:
+            return chains[:2]
+    except Exception as exc:
+        log.debug(f"options_anomaly: Alpaca chain fetch failed for {ticker} — {exc}")
+
+    # Fallback: yfinance (15-20min delayed)
     try:
         import yfinance as yf
         t = yf.Ticker(ticker)
         expirations = t.options
         if not expirations:
             return None
-        # Use nearest two expirations to compute IV term structure
         selected = expirations[:2]
-        chain = {}
+        result = []
         for exp in selected:
             oc = t.option_chain(exp)
-            chain[exp] = {"calls": oc.calls, "puts": oc.puts}
-        return chain
+            result.append({
+                "calls": oc.calls,
+                "puts": oc.puts,
+                "expiry_str": exp,
+                "dte": None,
+            })
+        return result if result else None
     except Exception:
         return None
 
@@ -55,6 +78,16 @@ def _fetch_chain(ticker: str) -> dict | None:
 # ── Current price ─────────────────────────────────────────────────────────────
 
 def _current_price(ticker: str) -> float | None:
+    # Primary: Alpaca (real-time)
+    try:
+        from alpaca_options import get_underlying_price
+        price = get_underlying_price(ticker)
+        if price and price > 0:
+            return price
+    except Exception:
+        pass
+
+    # Fallback: yfinance
     try:
         import yfinance as yf
         info = yf.Ticker(ticker).fast_info
@@ -65,17 +98,18 @@ def _current_price(ticker: str) -> float | None:
 
 # ── Anomaly scorer ────────────────────────────────────────────────────────────
 
-def _score_options(ticker: str, chain: dict, price: float | None) -> dict:
+def _score_options(ticker: str, chains: list[dict], price: float | None) -> dict:
     """
     Compute options anomaly score (0–10) and flags for a single ticker.
+    chains: list of {"calls": df, "puts": df, "expiry_str": str, "dte": int}
     """
-    expirations = list(chain.keys())
-    if not expirations:
+    if not chains:
         return {"options_anomaly_score": 0, "options_anomaly_flags": []}
 
-    front_exp = expirations[0]
-    front_calls = chain[front_exp]["calls"]
-    front_puts  = chain[front_exp]["puts"]
+    front = chains[0]
+    front_calls = front["calls"]
+    front_puts  = front["puts"]
+    front_exp   = front["expiry_str"]
 
     flags  = []
     points = 0  # max 4 → normalised to 0–10
@@ -113,9 +147,8 @@ def _score_options(ticker: str, chain: dict, price: float | None) -> dict:
             flags.append(f"Call/put ratio {pc_ratio:.1f}x (≥2.0)")
 
     # ── Signal 3: IV term structure compression ───────────────────────────────
-    if len(expirations) >= 2 and "impliedVolatility" in front_calls.columns:
-        back_exp   = expirations[1]
-        back_calls = chain[back_exp]["calls"].copy()
+    if len(chains) >= 2 and "impliedVolatility" in front_calls.columns:
+        back_calls = chains[1]["calls"].copy()
         back_calls["impliedVolatility"] = back_calls["impliedVolatility"].fillna(0)
 
         front_iv = front_calls["impliedVolatility"].median()
@@ -163,17 +196,17 @@ def run_anomaly_scan(
         if verbose:
             print(f"  [options_anomaly] {ticker} ({i+1}/{len(tickers)}) …", end=" ", flush=True)
 
-        price = _current_price(ticker)
-        chain = _fetch_chain(ticker)
+        price  = _current_price(ticker)
+        chains = _fetch_chain(ticker)
 
-        if chain is None:
+        if chains is None:
             result = {"options_anomaly_score": 0, "options_anomaly_flags": ["No options data"]}
         else:
-            result = _score_options(ticker, chain, price)
+            result = _score_options(ticker, chains, price)
 
-        result["ticker"] = ticker
+        result["ticker"]     = ticker
         result["scanned_at"] = datetime.utcnow().isoformat() + "Z"
-        results[ticker] = result
+        results[ticker]      = result
 
         # Append snapshot for historical IC tracking
         snapshot = {"date": today, **result}
@@ -184,8 +217,6 @@ def run_anomaly_scan(
             score = result["options_anomaly_score"]
             flags = result.get("options_anomaly_flags", [])
             print(f"score={score}/10  {'; '.join(flags) or 'no anomaly'}")
-
-        time.sleep(0.2)
 
     return results
 
