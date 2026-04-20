@@ -158,6 +158,9 @@ def mock_config():
         "options_min_oi": 100,
         "options_max_spread_pct": 0.35,
         "options_max_risk_pct": 0.025,
+        # Smart execution — set thresholds very high so unit tests use simple order path
+        "smart_execution_min_shares": 999_999,
+        "smart_execution_min_notional": 999_999_999.0,
     }
 
 
