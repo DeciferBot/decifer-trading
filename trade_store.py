@@ -130,18 +130,35 @@ _LEDGER_FIELDS = frozenset(
 )
 
 
-def ledger_write(key: str, position: dict) -> None:
+def ledger_write(key: str, position: dict, *, force: bool = False) -> None:
     """
     Persist decision metadata for one position to the ledger file.
-    Called once at trade entry.  Existing entries for the same key are
-    never overwritten — first write wins, matching the immutability rule.
+
+    Immutability rule: non-null fields already in the ledger are NEVER
+    overwritten by a subsequent write — they represent the original decision
+    context and must remain sacrosanct.
+
+    Enrichment rule: fields that are null, missing, or empty ({}) in an
+    existing entry ARE filled in by a subsequent write that has the value.
+    This handles sparse recovery writes (e.g. from reconcile) that capture
+    trade_type but not signal_scores — the write-ahead or post-fill path then
+    completes the record without destroying anything already known.
+
+    force=True bypasses the trade_type guard so reconcile-created UNKNOWN
+    entries are persisted; prevents the "EXTERNAL POSITION" cycle on restart.
     """
     trade_type = position.get("trade_type")
-    if not trade_type or trade_type == "UNKNOWN":
+    if not force and (not trade_type or trade_type == "UNKNOWN"):
         return  # nothing worth ledgering
 
     entry = {f: position[f] for f in _LEDGER_FIELDS if f in position}
-    entry["_ledgered_at"] = position.get("open_time", "")
+    open_time = position.get("open_time", "")
+    entry["_ledgered_at"] = open_time
+
+    # Unique storage key: symbol_<open_time> so re-entries on the same symbol in
+    # the same session each get their own ledger record rather than silently
+    # colliding with the previous trade's entry.
+    storage_key = f"{key}_{open_time}" if open_time else key
 
     _LEDGER_FILE.parent.mkdir(parents=True, exist_ok=True)
     with _ledger_lock:
@@ -151,8 +168,27 @@ def ledger_write(key: str, position: dict) -> None:
                 raw = _LEDGER_FILE.read_text().strip()
                 if raw:
                     ledger = json.loads(raw)
+            key = storage_key
             if key in ledger:
-                log.debug(f"ledger: {key} already recorded — skipping (first write wins)")
+                existing = ledger[key]
+                # Enrich missing/null fields — never touch fields that already have a value.
+                enriched_fields = []
+                for field, value in entry.items():
+                    if field == "_ledgered_at":
+                        continue
+                    existing_val = existing.get(field)
+                    _is_empty = existing_val is None or existing_val in ({}, [], "", "UNKNOWN")
+                    _has_value = value is not None and value not in ({}, [], "", "UNKNOWN")
+                    if _is_empty and _has_value:
+                        existing[field] = value
+                        enriched_fields.append(field)
+                if enriched_fields:
+                    log.info(f"ledger: enriched {key} — filled {enriched_fields}")
+                    tmp = _LEDGER_FILE.with_suffix(".tmp")
+                    tmp.write_text(json.dumps(ledger, indent=2, default=str))
+                    os.replace(str(tmp), str(_LEDGER_FILE))
+                else:
+                    log.debug(f"ledger: {key} already complete — skipping enrichment")
                 return
             ledger[key] = entry
             tmp = _LEDGER_FILE.with_suffix(".tmp")
@@ -178,14 +214,17 @@ def ledger_lookup(key: str, symbol: str = "", instrument: str = "") -> dict:
         if key in ledger:
             return ledger[key]
         if symbol and instrument:
-            for v in ledger.values():
+            matches = [
+                v for v in ledger.values()
                 if (
                     v.get("symbol") == symbol
                     and v.get("instrument") == instrument
                     and v.get("trade_type")
                     and v["trade_type"] != "UNKNOWN"
-                ):
-                    return v
+                )
+            ]
+            if matches:
+                return max(matches, key=lambda v: v.get("_ledgered_at") or "")
         return {}
     except Exception as e:
         log.error(f"ledger: lookup failed for {key}: {e}")

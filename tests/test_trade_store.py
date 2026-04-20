@@ -256,13 +256,13 @@ class TestRestore:
 class TestLedger:
 
     def test_ledger_write_and_lookup(self, tmp_path):
-        """ledger_write() records a position; ledger_lookup() retrieves it by key."""
+        """ledger_write() records a position; ledger_lookup() retrieves it via symbol+instrument scan."""
         ledger_file = tmp_path / "metadata_ledger.json"
         position = _valid_ledger_pos()
 
         with patch.object(trade_store, "_LEDGER_FILE", ledger_file):
-            trade_store.ledger_write("AAPL-1", position)
-            result = trade_store.ledger_lookup("AAPL-1")
+            trade_store.ledger_write("AAPL", position)
+            result = trade_store.ledger_lookup("AAPL", symbol="AAPL", instrument="stock")
 
         assert result["symbol"] == "AAPL"
         assert result["instrument"] == "stock"
@@ -270,17 +270,36 @@ class TestLedger:
         assert result["direction"] == "LONG"
 
     def test_ledger_first_write_wins(self, tmp_path):
-        """A second write for the same key is silently ignored; original value is kept."""
+        """A second write for the same open_time is silently ignored; original value is kept."""
         ledger_file = tmp_path / "metadata_ledger.json"
         first = _valid_ledger_pos(entry=150.0)
-        second = _valid_ledger_pos(entry=999.0)
+        second = _valid_ledger_pos(entry=999.0)  # same open_time → same storage key
 
         with patch.object(trade_store, "_LEDGER_FILE", ledger_file):
-            trade_store.ledger_write("AAPL-1", first)
-            trade_store.ledger_write("AAPL-1", second)
-            result = trade_store.ledger_lookup("AAPL-1")
+            trade_store.ledger_write("AAPL", first)
+            trade_store.ledger_write("AAPL", second)
+            result = trade_store.ledger_lookup("AAPL", symbol="AAPL", instrument="stock")
 
         assert result["entry"] == 150.0
+
+    def test_ledger_reentry_same_symbol_gets_new_record(self, tmp_path):
+        """Two trades on the same symbol with different open_times each get their own ledger entry.
+        Lookup returns the most recently ledgered one (the current open position)."""
+        ledger_file = tmp_path / "metadata_ledger.json"
+        first_trade = _valid_ledger_pos(entry=100.0, open_time="2026-04-20T09:30:00")
+        second_trade = _valid_ledger_pos(entry=200.0, open_time="2026-04-20T14:00:00")
+
+        with patch.object(trade_store, "_LEDGER_FILE", ledger_file):
+            trade_store.ledger_write("AAPL", first_trade)
+            trade_store.ledger_write("AAPL", second_trade)
+
+            data = json.loads(ledger_file.read_text())
+            assert len(data) == 2, "Each re-entry must produce a distinct ledger record"
+
+            result = trade_store.ledger_lookup("AAPL", symbol="AAPL", instrument="stock")
+
+        # Scan fallback returns the most recently ledgered entry — the second trade
+        assert result["entry"] == 200.0
 
     def test_ledger_lookup_missing_key_returns_empty(self, tmp_path):
         """ledger_lookup() returns {} when the key has never been written."""
@@ -297,11 +316,41 @@ class TestLedger:
         position = _valid_ledger_pos(trade_type="UNKNOWN")
 
         with patch.object(trade_store, "_LEDGER_FILE", ledger_file):
-            trade_store.ledger_write("AAPL-UNKNOWN", position)
-            result = trade_store.ledger_lookup("AAPL-UNKNOWN")
+            trade_store.ledger_write("AAPL", position)
+            result = trade_store.ledger_lookup("AAPL", symbol="AAPL", instrument="stock")
 
         assert result == {}
-        # Ledger file either doesn't exist or doesn't contain the key
+        # Nothing should have been written to disk
         if ledger_file.exists():
             data = json.loads(ledger_file.read_text())
-            assert "AAPL-UNKNOWN" not in data
+            assert len(data) == 0
+
+    def test_ledger_enriches_null_fields(self, tmp_path):
+        """A second write fills in null/missing fields without overwriting existing ones."""
+        ledger_file = tmp_path / "metadata_ledger.json"
+        sparse = _valid_ledger_pos(signal_scores=None, conviction=None)
+        enrichment = _valid_ledger_pos(entry=999.0, signal_scores={"trend": 8}, conviction=0.7)
+
+        with patch.object(trade_store, "_LEDGER_FILE", ledger_file):
+            trade_store.ledger_write("AAPL", sparse)
+            trade_store.ledger_write("AAPL", enrichment)
+            result = trade_store.ledger_lookup("AAPL", symbol="AAPL", instrument="stock")
+
+        # entry must not be overwritten (first write wins for non-null)
+        assert result["entry"] == 150.0
+        # null fields must be filled in
+        assert result["signal_scores"] == {"trend": 8}
+        assert result["conviction"] == 0.7
+
+    def test_ledger_does_not_overwrite_existing_signal_scores(self, tmp_path):
+        """A second write must NOT overwrite signal_scores that are already set."""
+        ledger_file = tmp_path / "metadata_ledger.json"
+        first = _valid_ledger_pos(signal_scores={"trend": 5, "momentum": 3})
+        second = _valid_ledger_pos(signal_scores={"trend": 9, "momentum": 9})
+
+        with patch.object(trade_store, "_LEDGER_FILE", ledger_file):
+            trade_store.ledger_write("AAPL", first)
+            trade_store.ledger_write("AAPL", second)
+            result = trade_store.ledger_lookup("AAPL", symbol="AAPL", instrument="stock")
+
+        assert result["signal_scores"] == {"trend": 5, "momentum": 3}
