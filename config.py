@@ -649,7 +649,7 @@ CONFIG = {
     "sentinel_risk_multiplier": 0.75,  # Position size multiplier for sentinel trades (smaller = safer)
     # Removed: sentinel_max_trades_per_hour. Duplicate-event suppression is handled
     # upstream by news_infrastructure.HeadlineDeduplicator (used in news_sentinel,
-    # alpaca_news, catalyst_engine, catalyst_sentinel). A count cap on top of working
+    # alpaca_news, catalyst_engine). A count cap on top of working
     # dedup is redundant and silently discards distinct-event alpha.
     # ── ML ENGINE (scikit-learn learning loop) ─────────────────────
     # Learns from trade history to identify winning patterns and enhance signals.
@@ -749,19 +749,17 @@ CONFIG = {
             "hosted_dashboard": 5,  # Public-facing dashboard
         },
     },
-    # ── CATALYST SENTINEL (real-time M&A / acquisition monitor) ──────────────
-    # Two daemon threads alongside the News Sentinel:
+    # ── CATALYST ENGINE (real-time M&A / acquisition monitor) ───────────────
+    # CatalystEngine runs two daemon threads:
     #   1. News thread  — polls Yahoo RSS for M&A keywords (60s interval)
     #   2. EDGAR thread — polls SEC RSS for 13D/13G/Form 4 filings (10 min)
-    # Fires handle_catalyst_trigger() immediately on detection.
-    "catalyst_sentinel_enabled": True,
     "catalyst_news_poll_seconds": 60,  # News polling interval (seconds)
     "catalyst_edgar_poll_seconds": 600,  # EDGAR polling interval (10 minutes)
     "catalyst_cooldown_minutes": 60,  # Re-trigger cooldown per symbol (minutes)
     "catalyst_min_confidence": 5,  # Min agent confidence to execute trade
     # Removed: catalyst_max_trades_per_day. EDGAR events are deduped upstream by
-    # `_seen_edgar_events` keyed on (form_type, cik, updated[:10]) in catalyst_engine
-    # and catalyst_sentinel; headline-driven catalysts are deduped by HeadlineDeduplicator.
+    # `_seen_edgar_events` keyed on (form_type, cik, updated[:10]) in catalyst_engine;
+    # headline-driven catalysts are deduped by HeadlineDeduplicator.
     # A separate daily count cap would reject 5 genuinely distinct catalysts to
     # prevent duplicates that dedup already prevents.
     "catalyst_risk_multiplier": 0.50,  # Size multiplier vs normal sentinel (0.5 = ~1.5% portfolio)

@@ -416,7 +416,6 @@ def main():
         countdown_tick,
         start_alpaca_news_stream,
         start_catalyst_engine,
-        start_catalyst_sentinel,
         start_news_sentinel,
     )
     from bot_trading import _check_kill, _process_close_queue, run_scan
@@ -599,14 +598,6 @@ def main():
         clog("INFO", f"📡 News Sentinel active (IBKR) | polling every {CONFIG.get('sentinel_poll_seconds', 45)}s")
     else:
         clog("INFO", "📡 News Sentinel disabled (sentinel_enabled=False in config)")
-
-    # ── CatalystSentinel retired (Session 2) ─────────────────────────────────
-    # CatalystEngine now owns all real-time M&A monitoring (news + EDGAR) and
-    # enriches every trigger with screener_context + size_multiplier.
-    # catalyst_sentinel.py is kept but no longer started.
-    # if CONFIG.get("catalyst_sentinel_enabled", True):
-    #     bot_state._catalyst_sentinel = start_catalyst_sentinel(bot_state.ib)
-    clog("INFO", "⚡ CatalystSentinel retired — CatalystEngine owns real-time monitoring")
 
     # ── Start Catalyst Engine (M&A intelligence layer) ───────────────────────
     # Session 1: WatchlistStore + 4 scoring runners (fundamental/EDGAR/options/sentiment).
@@ -826,10 +817,6 @@ def main():
                 dash["sentinel_stats"] = bot_state._sentinel.stats
                 dash["sentinel_status"] = bot_state._sentinel.stats.get("status", "unknown")
 
-            # ── Sync catalyst sentinel state to dashboard ──
-            if bot_state._catalyst_sentinel:
-                dash["catalyst_sentinel_stats"] = bot_state._catalyst_sentinel.stats
-
             # ── Sync catalyst engine stats to dashboard ──
             if bot_state._catalyst_engine:
                 dash["catalyst_engine_stats"] = bot_state._catalyst_engine.get_stats()
@@ -864,8 +851,6 @@ def main():
             bot_state._alpaca_news_stream.stop()
         if bot_state._sentinel:
             bot_state._sentinel.stop()
-        if bot_state._catalyst_sentinel:
-            bot_state._catalyst_sentinel.stop()
         if bot_state._catalyst_engine:
             bot_state._catalyst_engine.stop()
         try:

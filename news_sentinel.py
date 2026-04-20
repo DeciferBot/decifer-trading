@@ -17,15 +17,16 @@ from datetime import UTC, datetime, timedelta
 
 from config import CONFIG
 from news import BEARISH_STRONG, BULLISH_STRONG, claude_sentiment, keyword_score
-from news_infrastructure import HeadlineDeduplicator, SymbolCooldown, headline_hash
+from news_infrastructure import headline_hash, shared_cooldown, shared_dedup
 
 log = logging.getLogger("decifer.sentinel")
 
 # ═══════════════════════════════════════════════════════════════
 # SHARED INFRASTRUCTURE INSTANCES
 # ═══════════════════════════════════════════════════════════════
-_dedup = HeadlineDeduplicator(max_size=5000)
-_cooldown = SymbolCooldown(cooldown_minutes=CONFIG.get("sentinel_cooldown_minutes", 10))
+# Shared with AlpacaNewsStream so headlines seen on either feed are not re-fired.
+_dedup = shared_dedup
+_cooldown = shared_cooldown
 _headline_history: deque = deque(maxlen=200)  # recent triggers for dashboard
 
 # ═══════════════════════════════════════════════════════════════

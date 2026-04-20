@@ -15,7 +15,7 @@ import logging
 import threading
 
 from config import CONFIG
-from news_infrastructure import HeadlineDeduplicator, SymbolCooldown
+from news_infrastructure import shared_cooldown, shared_dedup
 
 log = logging.getLogger("decifer.alpaca_news")
 
@@ -48,8 +48,8 @@ class AlpacaNewsStream:
         self._stream = None
         self._thread: threading.Thread | None = None
         self._running = False
-        self._dedup = HeadlineDeduplicator(max_size=5000)
-        self._cooldown = SymbolCooldown(cooldown_minutes=CONFIG.get("sentinel_cooldown_minutes", 10))
+        self._dedup = shared_dedup
+        self._cooldown = shared_cooldown
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 

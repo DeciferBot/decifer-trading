@@ -415,22 +415,6 @@ def start_alpaca_news_stream():
     return stream
 
 
-def start_catalyst_sentinel(ib):
-    """
-    Initialise and start the CatalystSentinel background thread.
-    Returns the running sentinel instance; caller should store in bot_state._catalyst_sentinel.
-    """
-    from catalyst_sentinel import CatalystSentinel
-
-    sentinel = CatalystSentinel(
-        get_universe_fn=_get_sentinel_universe,
-        on_trigger_fn=handle_catalyst_trigger,
-        ib=ib,
-    )
-    sentinel.start()
-    return sentinel
-
-
 def start_catalyst_engine():
     """
     Initialise and start the CatalystEngine — unified M&A intelligence service.

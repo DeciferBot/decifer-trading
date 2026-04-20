@@ -1,13 +1,15 @@
 """
-news_infrastructure.py — Shared infrastructure for news and catalyst sentinels.
+news_infrastructure.py — Shared infrastructure for news sentinels.
 
 Provides:
   headline_hash(text)     — normalise and hash a headline for dedup
   HeadlineDeduplicator    — tracks seen headlines, prevents re-triggering
   SymbolCooldown          — prevents firing on the same symbol twice in N minutes
+  shared_dedup            — module-level singleton shared by all sentinel feeds
+  shared_cooldown         — module-level singleton shared by all sentinel feeds
 
-Both NewsSentinel and CatalystSentinel use these classes with independent instances.
-This eliminates the exact code duplication that previously existed between them.
+AlpacaNewsStream and NewsSentinel share the same dedup+cooldown instances so a
+headline arriving on one feed cannot re-fire via the other.
 """
 
 from __future__ import annotations
@@ -59,7 +61,6 @@ class HeadlineDeduplicator:
 class SymbolCooldown:
     """
     Prevents firing on the same symbol twice within cooldown_minutes.
-    Each sentinel maintains its own instance with its own cooldown duration.
     """
 
     def __init__(self, cooldown_minutes: int = 10):
@@ -75,3 +76,19 @@ class SymbolCooldown:
 
     def set_cooldown(self, symbol: str) -> None:
         self._cooldowns[symbol] = datetime.now(UTC)
+
+
+# ── Shared singletons ─────────────────────────────────────────────────────────
+# All sentinel feeds (AlpacaNewsStream, NewsSentinel) share these instances so a
+# headline seen on one feed cannot re-fire via the other.
+# Cooldown duration is read lazily from config to avoid import cycles.
+def _default_cooldown_minutes() -> int:
+    try:
+        from config import CONFIG
+        return int(CONFIG.get("sentinel_cooldown_minutes", 10))
+    except Exception:
+        return 10
+
+
+shared_dedup: HeadlineDeduplicator = HeadlineDeduplicator(max_size=10000)
+shared_cooldown: SymbolCooldown = SymbolCooldown(cooldown_minutes=_default_cooldown_minutes())

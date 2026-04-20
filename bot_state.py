@@ -82,10 +82,8 @@ dash = {
     "sentinel_stats": {},
     "sentinel_triggers": [],
     "sentinel_themes": {},
-    # ── Catalyst Sentinel state ────────────────────────────────────────────
-    "catalyst_triggers": [],
-    "catalyst_sentinel_stats": {},
     # ── Catalyst Engine state ──────────────────────────────────────────────
+    "catalyst_triggers": [],
     "catalyst_engine_stats": {},
     # ── Directional skew (BACK-007) ─────────────────────────────────────────
     "skew": {},
@@ -120,10 +118,6 @@ _sl_fill_events: set = set()
 # ── News Sentinel state ───────────────────────────────────────────────────────
 _sentinel = None
 # Hourly trade counter removed — see bot_sentinel.handle_news_trigger for rationale.
-
-# ── Catalyst Sentinel state ───────────────────────────────────────────────────
-_catalyst_sentinel = None
-# Daily trade counter removed — see bot_sentinel.handle_catalyst_trigger for rationale.
 
 # ── Catalyst Engine state ─────────────────────────────────────────────────────
 _catalyst_engine = None   # CatalystEngine instance

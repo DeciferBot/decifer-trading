@@ -38,7 +38,6 @@ CORE_MODULE_FILES = [
     "bot_sentinel.py",
     "bot_state.py",
     "bot_trading.py",
-    "catalyst_sentinel.py",
     "config.py",
     "execution_agent.py",
     "ic_validator.py",

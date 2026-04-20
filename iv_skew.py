@@ -17,42 +17,12 @@ from __future__ import annotations
 
 import logging
 import re
-import threading
 from datetime import date, timedelta
 
+from alpaca_options import _get_client
 from config import CONFIG
 
 log = logging.getLogger("decifer.iv_skew")
-
-# ── Lazy client singleton ─────────────────────────────────────────────────────
-# Thread-safe: double-checked lock guards initialisation.
-
-_client = None
-_client_lock = threading.Lock()
-
-
-def _get_client():
-    """Return a cached OptionHistoricalDataClient, or None if keys are not set."""
-    global _client
-    if _client is not None:
-        return _client
-    with _client_lock:
-        if _client is not None:
-            return _client
-        api_key = CONFIG.get("alpaca_api_key", "")
-        secret_key = CONFIG.get("alpaca_secret_key", "")
-        if not api_key or not secret_key:
-            return None
-        try:
-            from alpaca.data.historical.option import OptionHistoricalDataClient
-
-            _client = OptionHistoricalDataClient(api_key, secret_key)
-            log.debug("iv_skew: OptionHistoricalDataClient initialised")
-        except ImportError:
-            log.debug("iv_skew: alpaca-py not installed — pip install alpaca-py")
-        except Exception as exc:
-            log.debug(f"iv_skew: client init failed — {exc}")
-    return _client
 
 
 # ── OCC option symbol parser ─────────────────────────────────────────────────
