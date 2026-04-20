@@ -121,15 +121,23 @@ def record_win():
 
 def _get_ibkr_cash(ib, account: str) -> float | None:
     """
-    Get actual cash from IBKR account.
-    Uses TotalCashValue — the real USD cash in the account.
+    Get deployable cash from IBKR account.
+    Uses AvailableFunds (not TotalCashValue) — AvailableFunds is net of short
+    sale proceeds and margin requirements, so it correctly reflects how much
+    capital can actually be deployed. TotalCashValue includes short proceeds
+    which are pledged as collateral and not freely spendable.
     """
+    from bot_state import account_values as _av
+    val = _av.get("AvailableFunds")
+    if val is not None:
+        return float(val)
+    # Fallback: live query if subscription hasn't fired yet
     if ib is None:
         return None
     try:
         vals = ib.accountValues(account)
         for v in vals:
-            if v.tag == "TotalCashValue" and v.currency == "USD":
+            if v.tag == "AvailableFunds" and v.currency == "USD":
                 return float(v.value)
     except Exception as e:
         log.warning(f"Could not fetch IBKR cash: {e}")

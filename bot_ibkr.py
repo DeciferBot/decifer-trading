@@ -784,6 +784,11 @@ def backfill_trades_from_ibkr():
                 except Exception:
                     hold_mins = 0
 
+                try:
+                    from trade_store import ledger_lookup as _bf_ll
+                    _bf_meta = _bf_ll(sym, sym, "stock")
+                except Exception:
+                    _bf_meta = {}
                 trade = {
                     "symbol": sym,
                     "action": "BUY",
@@ -797,13 +802,16 @@ def backfill_trades_from_ibkr():
                     "exit_time": sell["time"],
                     "hold_minutes": hold_mins,
                     "exit_reason": "stop_loss" if pnl < 0 else "take_profit",
-                    "regime": "UNKNOWN",
+                    "regime": _bf_meta.get("entry_regime", "UNKNOWN"),
                     "vix": 0.0,
-                    "score": 0,
+                    "score": _bf_meta.get("entry_score", 0),
+                    "trade_type": _bf_meta.get("trade_type") or None,
+                    "conviction": _bf_meta.get("conviction", 0.0),
+                    "signal_scores": _bf_meta.get("signal_scores", {}),
+                    "reasoning": _bf_meta.get("reasoning") or "Backfilled from IBKR execution history on startup.",
                     "order_id": sell["order_id"],
                     "exec_id": sell["exec_ids"][0],
                     "timestamp": sell["time"].replace(" ", "T"),
-                    "reasoning": "Backfilled from IBKR execution history on startup.",
                     "source": "ibkr_backfill",
                 }
                 new_trades.append(trade)
@@ -868,6 +876,11 @@ def backfill_trades_from_ibkr():
                 except Exception:
                     hold_mins = 0
 
+                try:
+                    from trade_store import ledger_lookup as _bf_ll_s
+                    _bf_meta_s = _bf_ll_s(sym, sym, "stock")
+                except Exception:
+                    _bf_meta_s = {}
                 trade = {
                     "symbol": sym,
                     "action": "SELL",
@@ -881,13 +894,16 @@ def backfill_trades_from_ibkr():
                     "exit_time": buy_cover["time"],
                     "hold_minutes": hold_mins,
                     "exit_reason": "stop_loss" if pnl < 0 else "take_profit",
-                    "regime": "UNKNOWN",
+                    "regime": _bf_meta_s.get("entry_regime", "UNKNOWN"),
                     "vix": 0.0,
-                    "score": 0,
+                    "score": _bf_meta_s.get("entry_score", 0),
+                    "trade_type": _bf_meta_s.get("trade_type") or None,
+                    "conviction": _bf_meta_s.get("conviction", 0.0),
+                    "signal_scores": _bf_meta_s.get("signal_scores", {}),
+                    "reasoning": _bf_meta_s.get("reasoning") or "Backfilled from IBKR execution history on startup.",
                     "order_id": buy_cover["order_id"],
                     "exec_id": buy_cover["exec_ids"][0],
                     "timestamp": buy_cover["time"].replace(" ", "T"),
-                    "reasoning": "Backfilled from IBKR execution history on startup.",
                     "source": "ibkr_backfill",
                 }
                 new_trades.append(trade)
@@ -981,6 +997,12 @@ def backfill_trades_from_ibkr():
                 except Exception:
                     hold_mins = 0
 
+                _opt_key_bf = f"{sell['underlying']}_{sell['right']}_{sell['strike']}_{sell['expiry']}"
+                try:
+                    from trade_store import ledger_lookup as _bf_ll_opt
+                    _bf_meta_opt = _bf_ll_opt(_opt_key_bf, sell["underlying"], "option")
+                except Exception:
+                    _bf_meta_opt = {}
                 trade = {
                     "symbol": sell["underlying"],
                     "action": "BUY",
@@ -998,13 +1020,16 @@ def backfill_trades_from_ibkr():
                     "exit_time": sell["time"],
                     "hold_minutes": hold_mins,
                     "exit_reason": "stop_loss" if pnl < 0 else "take_profit",
-                    "regime": "UNKNOWN",
+                    "regime": _bf_meta_opt.get("entry_regime", "UNKNOWN"),
                     "vix": 0.0,
-                    "score": 0,
+                    "score": _bf_meta_opt.get("entry_score", 0),
+                    "trade_type": _bf_meta_opt.get("trade_type") or None,
+                    "conviction": _bf_meta_opt.get("conviction", 0.0),
+                    "signal_scores": _bf_meta_opt.get("signal_scores", {}),
+                    "reasoning": _bf_meta_opt.get("reasoning") or "Backfilled from IBKR execution history on startup.",
                     "order_id": sell["order_id"],
                     "exec_id": sell["exec_ids"][0],
                     "timestamp": sell["time"].replace(" ", "T"),
-                    "reasoning": "Backfilled from IBKR execution history on startup.",
                     "source": "ibkr_backfill",
                 }
                 new_trades.append(trade)

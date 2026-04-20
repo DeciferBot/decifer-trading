@@ -36,8 +36,11 @@ from orders_state import (
     _trades_lock,
     active_trades,
     log,
+    recently_closed,
 )
+import orders_state as _orders_state
 from trade_store import ledger_lookup as _ledger_lookup
+from trade_store import ledger_write as _ledger_write
 from trade_store import restore as _ts_restore
 
 # ── flatten_all order-book wait constants ─────────────────────────────────────
@@ -343,6 +346,7 @@ def reconcile_with_ibkr(ib: IB):
     Nothing IBKR returns ever overwrites stored metadata fields.
     """
     log.info("Reconciling positions with IBKR (3-way price validation)...")
+    _orders_state._reconcile_in_progress = True
     saved_positions = _load_positions_file()
     if saved_positions:
         log.info(f"Loaded {len(saved_positions)} saved position(s) from disk for metadata restore")
@@ -402,47 +406,73 @@ def reconcile_with_ibkr(ib: IB):
 
         # ── Step 3: detect positions closed while bot was down ────────────────
         # In our store but not in IBKR → SL/TP was triggered or manually closed.
+        #
+        # Safety guard: if IBKR returned 0 items but we have stored positions,
+        # this is almost certainly an account-data timing issue (TWS hasn't
+        # pushed updatePortfolio callbacks yet), NOT that every position closed.
+        # Purging everything in this case would destroy our entire position state.
+        # Skip the purge and let the next reconcile cycle handle it correctly.
         keys_to_remove = []
         closed_while_down = []  # collect (advice_id, exit_price, pnl) to close Opus loop after lock
-        with _trades_lock:
-            for key in list(active_trades.keys()):
-                if key not in ibkr_keys:
-                    trade = active_trades[key]
-                    if trade.get("status") == "PENDING":
-                        order_id = trade.get("order_id")
-                        still_live = False
-                        if order_id:
-                            try:
-                                for t in ib.openTrades():
-                                    if t.order.orderId == order_id:
-                                        still_live = True
-                                        break
-                            except Exception:
-                                still_live = True  # err on side of keeping it
-                        if still_live:
-                            log.debug(f"Reconcile: PENDING {key} order #{order_id} still live in IBKR — keeping")
-                            continue
+        # Safety guard: if IBKR returned 0 items but we have ACTIVE positions with
+        # real decision metadata, that is almost certainly an account-data timing
+        # issue (TWS hasn't pushed updatePortfolio yet), not that everything closed.
+        # Purging real positions here would destroy metadata-rich state we cannot
+        # recover from IBKR. PENDING positions are excluded — an unfilled order
+        # truly not in IBKR must still be cancelled regardless.
+        _active_with_metadata = [
+            k for k, v in active_trades.items()
+            if v.get("status") == "ACTIVE"
+            and v.get("trade_type")
+            and v["trade_type"] != "UNKNOWN"
+        ]
+        if not ibkr_keys and _active_with_metadata:
+            log.error(
+                "Reconcile: IBKR returned 0 portfolio positions but we have %d ACTIVE positions "
+                "with real metadata — skipping closed-while-down purge (likely account data not ready). "
+                "Positions will be re-checked on next reconcile cycle.",
+                len(_active_with_metadata),
+            )
+        else:
+            with _trades_lock:
+                for key in list(active_trades.keys()):
+                    if key not in ibkr_keys:
+                        trade = active_trades[key]
+                        if trade.get("status") == "PENDING":
+                            order_id = trade.get("order_id")
+                            still_live = False
+                            if order_id:
+                                try:
+                                    for t in ib.openTrades():
+                                        if t.order.orderId == order_id:
+                                            still_live = True
+                                            break
+                                except Exception:
+                                    still_live = True  # err on side of keeping it
+                            if still_live:
+                                log.debug(f"Reconcile: PENDING {key} order #{order_id} still live in IBKR — keeping")
+                                continue
+                            else:
+                                log.warning(
+                                    f"Reconcile: PENDING {key} order #{order_id} not in IBKR open orders "
+                                    f"— cancelling and removing from tracker"
+                                )
+                                if order_id:
+                                    _cancel_ibkr_order_by_id(ib, order_id)
+                                keys_to_remove.append(key)
                         else:
                             log.warning(
-                                f"Reconcile: PENDING {key} order #{order_id} not in IBKR open orders "
-                                f"— cancelling and removing from tracker"
+                                f"Position {key} in our store but not in IBKR — was closed while bot was down, removing"
                             )
-                            if order_id:
-                                _cancel_ibkr_order_by_id(ib, order_id)
                             keys_to_remove.append(key)
-                    else:
-                        log.warning(
-                            f"Position {key} in our store but not in IBKR — was closed while bot was down, removing"
-                        )
-                        keys_to_remove.append(key)
-                        if trade.get("advice_id"):
-                            closed_while_down.append(
-                                {
-                                    "advice_id": trade["advice_id"],
-                                    "exit_price": float(trade.get("current") or trade.get("entry", 0)),
-                                    "pnl": float(trade.get("pnl", 0.0)),
-                                }
-                            )
+                            if trade.get("advice_id"):
+                                closed_while_down.append(
+                                    {
+                                        "advice_id": trade["advice_id"],
+                                        "exit_price": float(trade.get("current") or trade.get("entry", 0)),
+                                        "pnl": float(trade.get("pnl", 0.0)),
+                                    }
+                                )
 
         for key in keys_to_remove:
             _safe_del_trade(key)
@@ -703,6 +733,10 @@ def reconcile_with_ibkr(ib: IB):
                                 new_entry["score"] = _saved["score"]
                             new_entry["_metadata_restored"] = True
                         _safe_set_trade(key, new_entry)
+                        try:
+                            _ledger_write(key, new_entry, force=True)
+                        except Exception as _lw_e:
+                            log.warning(f"Reconcile {key}: ledger_write failed: {_lw_e}")
                     elif is_fx:
                         # FX position — tighter SL/TP (0.5%/1.5%) and 4-decimal precision
                         if direction == "SHORT":
@@ -765,6 +799,10 @@ def reconcile_with_ibkr(ib: IB):
                                 new_entry["score"] = _saved["score"]
                             new_entry["_metadata_restored"] = True
                         _safe_set_trade(key, new_entry)
+                        try:
+                            _ledger_write(key, new_entry, force=True)
+                        except Exception as _lw_e:
+                            log.warning(f"Reconcile {key}: ledger_write failed: {_lw_e}")
                     else:
                         # Stock position
                         if direction == "SHORT":
@@ -827,6 +865,10 @@ def reconcile_with_ibkr(ib: IB):
                                 new_entry["score"] = _saved["score"]
                             new_entry["_metadata_restored"] = True
                         _safe_set_trade(key, new_entry)
+                        try:
+                            _ledger_write(key, new_entry, force=True)
+                        except Exception as _lw_e:
+                            log.warning(f"Reconcile {key}: ledger_write failed: {_lw_e}")
 
                     if not is_option and not is_fx:
                         close_action = "BUY" if direction == "SHORT" else "SELL"
@@ -936,10 +978,56 @@ def reconcile_with_ibkr(ib: IB):
         log.info(
             f"Reconciliation complete. Tracking {len(active_trades)} positions. (processed={reconciled_count}, failed={failed_count})"
         )
-        _save_positions_file()
+        _orders_state._reconcile_in_progress = False
+        _save_positions_file()  # positions.json now reflects full IBKR-reconciled state
+
+        # ── Step 6: orphan alerting ───────────────────────────────────────────
+        # Any position that ended up with trade_type UNKNOWN after all lookup
+        # tiers means the bot made this trade but lost the metadata on restart.
+        # Write to data/orphaned_positions.json so the gap is visible and
+        # actionable (dashboard card, manual classify via ledger_write).
+        try:
+            import json as _json
+            from pathlib import Path as _Path
+            _orphan_file = _Path(CONFIG.get("positions_file", "data/positions.json")).parent / "orphaned_positions.json"
+            _now_str = datetime.now(UTC).isoformat()
+            _existing_orphans: dict = {}
+            if _orphan_file.exists():
+                try:
+                    _existing_orphans = _json.loads(_orphan_file.read_text())
+                except Exception:
+                    _existing_orphans = {}
+            _new_orphans: dict = {}
+            with _trades_lock:
+                for _ok, _ov in active_trades.items():
+                    if _ov.get("trade_type", "UNKNOWN") in ("UNKNOWN", "", None):
+                        _new_orphans[_ok] = {
+                            "symbol": _ov.get("symbol", _ok),
+                            "instrument": _ov.get("instrument", "stock"),
+                            "direction": _ov.get("direction", "?"),
+                            "qty": _ov.get("qty", 0),
+                            "entry": _ov.get("entry", 0),
+                            "detected_at": _existing_orphans.get(_ok, {}).get("detected_at", _now_str),
+                            "reason": "metadata_lost_on_restart",
+                        }
+            if _new_orphans != _existing_orphans:
+                _orphan_file.write_text(_json.dumps(_new_orphans, indent=2, default=str))
+            if _new_orphans:
+                log.warning(
+                    "Reconcile: %d position(s) have UNKNOWN trade_type — metadata was lost on a prior restart. "
+                    "Keys: %s. See data/orphaned_positions.json. Use ledger_write() with force=True to recover.",
+                    len(_new_orphans),
+                    list(_new_orphans.keys()),
+                )
+            elif _orphan_file.exists() and not _new_orphans:
+                _orphan_file.unlink()
+        except Exception as _oe:
+            log.warning(f"Reconcile: orphan alerting failed: {_oe}")
 
     except Exception as e:
         log.error(f"Reconciliation error: {e}")
+    finally:
+        _orders_state._reconcile_in_progress = False
 
 
 def _reattach_sl_order(
@@ -1209,6 +1297,8 @@ def update_positions_from_ibkr(ib: IB):
             )
             if _oid:
                 _cancel_ibkr_order_by_id(ib, _oid)
+            with _trades_lock:
+                recently_closed[_key] = datetime.now(UTC).isoformat()
             _safe_del_trade(_key)
 
         # Re-add positions that IBKR has but tracker is missing.

@@ -159,6 +159,22 @@ def execute_buy_option(
         ib.qualifyContracts(option_contract)
         account = CONFIG["active_account"]
 
+        # ── Write-ahead metadata commit ───────────────────────────────────────
+        try:
+            from trade_store import ledger_write as _wal_write_opt
+            _wal_write_opt(opt_key, {
+                "symbol": symbol, "instrument": "option", "direction": "LONG",
+                "trade_type": trade_type or "SCALP",
+                "right": contract_info["right"], "strike": contract_info["strike"],
+                "expiry_str": contract_info["expiry_str"],
+                "entry": contract_info.get("mid_price", 0.0),
+                "qty": n_contracts, "entry_score": score,
+                "conviction": conviction, "reasoning": reasoning,
+                "open_time": datetime.now(UTC).isoformat(),
+            })
+        except Exception as _wal_err_opt:
+            log.warning(f"execute_buy_option {opt_key}: write-ahead metadata commit failed: {_wal_err_opt}")
+
         # Options only trade during regular hours — outsideRth must be False
         entry_order = LimitOrder("BUY", n_contracts, limit_price, account=account, tif="DAY", outsideRth=False)
         trade = ib.placeOrder(option_contract, entry_order)

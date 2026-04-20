@@ -11,6 +11,7 @@
 # ╚══════════════════════════════════════════════════════════════╝
 
 import logging
+from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -20,6 +21,13 @@ from signal_types import SIGNALS_LOG, Signal
 from signals import get_regime_threshold, score_universe
 
 log = logging.getLogger("decifer.pipeline")
+
+# ── Score persistence tracking ─────────────────────────────────────────────────
+# Tracks whether each symbol was above the score threshold in recent scan cycles.
+# Populated every scan regardless of threshold outcome so the history is accurate.
+# Resets naturally when the bot restarts (in-memory only — no persistence needed).
+_THRESHOLD_HISTORY: dict = {}  # symbol → deque[bool]
+_THRESHOLD_HISTORY_MAXLEN = 4   # keep last 4 scans (enough for persistence_scans=3)
 
 # Symbols that must always be in the scan universe. Authoritative — computed
 # from scanner's CORE_SYMBOLS + CORE_EQUITIES so the two lists can never drift.
@@ -264,6 +272,46 @@ def _apply_short_quality_gate(scored: list, regime_name: str) -> list:
     return result
 
 
+def _apply_persistence_gate(scored: list, all_scored: list, persistence_scans: int) -> list:
+    """
+    Filter signals that haven't been above threshold for persistence_scans consecutive scans.
+
+    Updates _THRESHOLD_HISTORY for every symbol in all_scored (not just above-threshold)
+    so the history accurately reflects when a signal dropped below threshold.
+    Catalyst/sentinel entries bypass this gate in signal_dispatcher before reaching here.
+    """
+    if persistence_scans <= 1:
+        return scored
+
+    above = {s["symbol"] for s in scored}
+
+    for s in all_scored:
+        sym = s["symbol"]
+        if sym not in _THRESHOLD_HISTORY:
+            _THRESHOLD_HISTORY[sym] = deque(maxlen=_THRESHOLD_HISTORY_MAXLEN)
+        _THRESHOLD_HISTORY[sym].append(sym in above)
+
+    passed = []
+    for s in scored:
+        sym = s["symbol"]
+        history = list(_THRESHOLD_HISTORY.get(sym, []))
+        recent = history[-persistence_scans:]
+        if len(recent) >= persistence_scans and all(recent):
+            passed.append(s)
+        else:
+            log.debug(
+                "Persistence gate blocked %s: needed %d consecutive above-threshold, got %s",
+                sym, persistence_scans, recent,
+            )
+
+    if len(passed) < len(scored):
+        log.info(
+            "Persistence gate: %d/%d signals passed (need %d consecutive scans above threshold)",
+            len(passed), len(scored), persistence_scans,
+        )
+    return passed
+
+
 def _scored_to_signals(scored: list, regime_name: str) -> list:
     """Convert score_universe() raw dicts → typed Signal objects."""
     now = datetime.now(UTC)
@@ -300,6 +348,20 @@ def _append_signals_log(signals: list, log_path: str) -> None:
                 f.write(s.to_json() + "\n")
     except Exception as e:
         log.warning(f"typed signals_log write failed: {e}")
+    try:
+        from trade_log import append_signal as _tl_append_signal
+        scan_id = signals[0].timestamp.strftime("%Y%m%d_%H%M%S")
+        for s in signals:
+            _tl_append_signal(
+                scan_id=scan_id,
+                symbol=s.symbol,
+                score=round(s.conviction_score * 5),
+                direction=s.direction,
+                regime=s.regime_context,
+                breakdown=s.dimension_scores,
+            )
+    except Exception as _tl_e:
+        log.debug("trade_log.append_signal failed: %s", _tl_e)
 
 
 # ── Public entry point ─────────────────────────────────────────────────────────
@@ -408,6 +470,13 @@ def run_signal_pipeline(
 
     # 5b. Short quality gate — raise bar for SHORT signals when IC is unproven
     scored = _apply_short_quality_gate(scored, regime_name)
+
+    # 5c. Score persistence gate — require signal above threshold for N consecutive scans.
+    # Prevents single-scan DAR spikes from triggering entries.
+    # Catalyst/sentinel entries are routed through signal_dispatcher separately and bypass this.
+    from config import CONFIG as _cfg
+    _persistence = _cfg.get("score_persistence_scans", 2)
+    scored = _apply_persistence_gate(scored, all_scored, _persistence)
 
     # 6. IC audit log — write all scored symbols for forward-return tracking
     log_signal_scan(all_scored, regime)

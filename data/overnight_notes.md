@@ -1,28 +1,66 @@
-OVERNIGHT RESEARCH NOTES — 2026-04-16
-Generated: 2026-04-16 16:23 ET
+OVERNIGHT RESEARCH NOTES — 2026-04-20
+Generated: 2026-04-20 07:18 ET
 
 PRE-MARKET / AFTER-HOURS TONE:
-  SPY  $701.60  +0.24% vs close  (gap-up)
-  QQQ  $639.72  +0.36% vs close  (gap-up)
-  IWM  $270.29  +0.33% vs close  (gap-up)
+  SPY   $706.57  +0.70%  (gap-up)
+  QQQ   $645.65  +0.81%  (gap-up)
+  IWM   $273.17  +1.19%  (gap-up)
+  ---  sector ETFs  ---
+  XLF   $52.12  +0.17%  (gap-up)
+  XLK   $153.55  +1.01%  (gap-up)
+  XLE   $55.75  -1.47%  (gap-down)
+  XLV   $148.46  +1.26%  (gap-up)
+  XLI   $172.26  +1.13%  (gap-up)
+  XLU   $46.00  -0.76%  (gap-down)
+  XLB   $51.75  +0.00%  (flat)
+  XLRE  $44.17  +0.82%  (gap-up)
+
+PRE-MARKET MOVERS (>1.5% gap vs yesterday's close):
+  ASTS   $   72.45  -20.33%  (gap-down)
+  MRVL   $  149.79  +12.31%  (gap-up)
+  ONTO   $  293.97  +10.04%  (gap-up)
+  NFLX   $   97.37  -9.67%  (gap-down)
+  MSTR   $  162.70  +9.24%  (gap-up)
+  NBIS   $  152.72  -7.63%  (gap-down)
+  PII    $   56.87  +7.26%  (gap-up)
+  SOXL   $   94.23  +6.63%  (gap-up)
+  CAR    $  476.12  +6.04%  (gap-up)
+  CVNA   $  382.22  +5.52%  (gap-up)
+  CRWV   $  114.56  -4.18%  (gap-down)
+  STX    $  551.00  +3.61%  (gap-up)
+  ORCL   $  173.01  -2.99%  (gap-down)
+  WDC    $  371.97  +2.84%  (gap-up)
+  BE     $  204.10  -2.84%  (gap-down)
 
 YESTERDAY'S PERFORMANCE:
-  Trades: 34 (12W/22L)  Win rate: 35%  P&L: $+23,835.85
-  Best:  IWM LONG +$36,325.60  (pm_exit | SCALP | regime:UNKNOWN→TRENDING_UP | held:23min | thesis:noise_stop | news_hit: stop_protection: SCALP option showing +12872.3% — whether pricing is accurate or anomalous, an unscored zero-conviction  / TRENDING_UP)
-  Worst: IWM LONG $-6,211.49  (stop_loss / UNKNOWN)
+  Trades: 3 (2W/1L)  Win rate: 67%  P&L: $-424.95
+  Best:  AMD SHORT +$144.29  (take_profit / UNKNOWN)
+  Worst: AMD LONG $-578.76  (pm_exit | INTRADAY | regime:TRENDING_UP→TRENDING_UP | held:5200min | thesis:breached_stale_scalp | pre_market: thesis_stale: INTRADAY trade held 3 days far beyond 90min momentum window, conviction=0.00, score dropping to WEAK band, / TRENDING_UP)
   By regime:
-    UNKNOWN: 15 trades  27% WR  $-19,233.62
-    TRENDING_UP: 19 trades  42% WR  $+43,069.47
-  FLAG: High trade count — overtrading risk
-  FLAG: Win rate < 40% — entry selectivity concern
+    TRENDING_UP: 2 trades  50% WR  $-569.24
 
 ECONOMIC CALENDAR — Next 5 Days:
-  Fri Apr 17: No high-impact events
-  Sat Apr 18: No high-impact events
-  Sun Apr 19: No high-impact events
   Mon Apr 20: No high-impact events
-  Tue Apr 21: Retail Sales [HIGH]
-  Wed Apr 22: No high-impact events
+  Tue Apr 21: API Crude Oil Stock Change (Apr/17) [MEDIUM]
+  Tue Apr 21: Fed Waller Speech [MEDIUM]
+  Tue Apr 21: Pending Home Sales YoY (Mar) [MEDIUM]
+  Tue Apr 21: Pending Home Sales MoM (Mar) [MEDIUM]
+  Tue Apr 21: Business Inventories MoM (Feb) [MEDIUM]
+  Tue Apr 21: Retail Sales MoM (Mar) [HIGH]
+  Tue Apr 21: Retail Sales Ex Autos MoM (Mar) [MEDIUM]
+  Wed Apr 22: EIA Crude Oil Stocks Change (Apr/17) [MEDIUM]
+  Wed Apr 22: EIA Gasoline Stocks Change (Apr/17) [MEDIUM]
+  Wed Apr 22: MBA 30-Year Mortgage Rate (Apr/17) [MEDIUM]
+  Thu Apr 23: S&P Global Composite PMI (Apr) [MEDIUM]
+  Thu Apr 23: S&P Global Services PMI (Apr) [MEDIUM]
+  Thu Apr 23: S&P Global Manufacturing PMI (Apr) [MEDIUM]
+  Thu Apr 23: Chicago Fed National Activity Index (Mar) [MEDIUM]
+  Thu Apr 23: Initial Jobless Claims (Apr/18) [MEDIUM]
+  Fri Apr 24: CFTC S&P 500 speculative net positions [MEDIUM]
+  Fri Apr 24: CFTC Gold Speculative net positions [MEDIUM]
+  Fri Apr 24: CFTC Crude Oil speculative net positions [MEDIUM]
+  Fri Apr 24: CFTC Nasdaq 100 speculative net positions [MEDIUM]
+  Sat Apr 25: No high-impact events
 
 EARNINGS — Next 5 Days:  (Alpha Vantage — dates only)
   Mon Apr 20: CCBG  
@@ -30,29 +68,32 @@ EARNINGS — Next 5 Days:  (Alpha Vantage — dates only)
 
 Analyst changes: none in last 24h for tracked universe
 
-MARKET NEWS INTERPRETATION:
+MARKET NEWS — Last 16h (FMP, 40 articles):
+  ▼ [NVDA]   4h ago   Machine learning algorithm predicts Nvidia stock price on May 1, 2026
+  ▼ [MSFT]   5h ago   Why Wall Street Loves Microsoft Stock Despite It Falling 23%
+  ▼ [AAPL]   6h ago   Apple withholds data in India antitrust case, watchdog sets final hearing
+  ▼ [ABT]    6h ago   Market Crash: 2 Healthcare Stocks Worth Loading Up on at a Discount
+  ▲ [META]   8h ago   The Zacks Analyst Blog Broadcom, Meta, IGM, QQQ and AIQ
+  ▲ [GOOGL]  11h ago  If I Had $10,000 to Put Into AI Stocks Right Now, Here's Exactly How I'd Invest It
+  ▲ [AMD]    11h ago  If I Had $10,000 to Put Into AI Stocks Right Now, Here's Exactly How I'd Invest It
+  ▲ [MSFT]   14h ago  I've Been Buying Artificial Intelligence (AI) Stocks for 10 Years. Here's the 1 Lesson Thi
+  ▲ [GOOGL]  14h ago  I've Been Buying Artificial Intelligence (AI) Stocks for 10 Years. Here's the 1 Lesson Thi
+  ▲ [AMD]    15h ago  AMD: $600 Bullseye
+  ─ [ABT]    4h ago   Has the Abbott Laboratories Sell-Off Finally Created an Entry Point?
+  ─ [WMT]    4h ago   Wall Street Breakfast Podcast: Tariff Refund Rush Begins
 
-HIGH Knight-Swift Transportation Slashes Q1 EPS Guidance to $0.08-$0.10 from $0.28-$0.32; Q2 Guidance $0.45-$0.49 Also Below Prior Expectations
-  Impact: Transportation/logistics sector bearish; signals freight demand weakness and margin compression across industry
+Net bias: bullish  (6 bullish / 4 bearish / 30 neutral)
+  AVOID (bearish catalyst):
+    NVDA   — Machine learning algorithm predicts Nvidia stock price on Ma
+    MSFT   — Why Wall Street Loves Microsoft Stock Despite It Falling 23%
+    AAPL   — Apple withholds data in India antitrust case
+    ABT    — Market Crash: 2 Healthcare Stocks Worth Loading Up on at a D
+  FAVOR (bullish catalyst):
+    META   — The Zacks Analyst Blog Broadcom
+    GOOGL  — If I Had $10
+    AMD    — If I Had $10
 
-HIGH Netflix Raises 2026 FCF Guidance to $12.5B Driven by Price Increases and Warner Bros Termination Fee Benefit; Launches Vertical Video Discovery to Drive Engagement
-  Impact: Tech/streaming bullish; demonstrates pricing power and margin expansion capability offsetting content costs
-
-HIGH Alcoa Q1 EPS Miss at $1.40 vs $1.49 Est with Sales $3.193B Below $3.297B; Reflects Aluminum Demand Softness
-  Impact: Industrials/commodities bearish; suggests weakening global manufacturing demand and pricing environment
-
-MEDIUM *** NAACP Files Lawsuit Against xAI for Data Center Air Pollution
-  Impact: AI infrastructure/clean energy regulatory risk; potential litigation costs and operational constraints on AI expansion
-
-MEDIUM Janus Henderson Shareholders Approve Trian/General Catalyst Acquisition at $52/Cash; Multiple JP Morgan Rating Changes on Renewables (Brookfield Raised to $49, Array Tech Lowered to $9)
-  Impact: Asset management consolidation neutral; renewable energy sector mixed with competing thesis on capacity valuations
-
-Net bias: bearish — Knight-Swift freight collapse signals demand destruction across logistics and industrial supply chains, offsetting Netflix upside and outweighing isolated positive earnings beats
-
-MACRO INDICATORS (latest FRED):
-  CPI YoY: 3.29%  (as of 2026-03-01)  prior: 2.43
-  Unemployment Rate: 4.30%  (as of 2026-03-01)  prior: 4.40
-  Fed Funds Rate: 3.64%  (as of 2026-03-01)  prior: 3.64
-  10Y-2Y Spread: 0.53%  (as of 2026-04-15)  prior: 0.50
-  10Y Treasury: 4.29%  (as of 2026-04-15)  prior: 4.26
+MACRO (daily):
+  10Y-2Y Spread: 0.55%  (as of 2026-04-17)  prior: 0.54
+  10Y Treasury: 4.32%  (as of 2026-04-16)  prior: 4.29
   WTI Crude: 100.72$/bbl  (as of 2026-04-13)  prior: 98.34

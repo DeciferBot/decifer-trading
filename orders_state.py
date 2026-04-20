@@ -39,6 +39,13 @@ open_orders: dict = {}
 # Blocks re-entry for reentry_cooldown_minutes after a position is closed.
 recently_closed: dict = {}
 
+# ── Thesis-failure extended cooldown registry ─────────────────────────────────
+# symbol → ISO timestamp of close when the INTRADAY wrong_if condition fired.
+# Blocks re-entry for failed_thesis_cooldown_hours (default 4h) and requires
+# a 1% price dislocation from the close price before allowing re-entry.
+# symbol → {"ts": ISO str, "close_price": float}
+failed_thesis_closed: dict = {}
+
 # ── Duplicate-check default (flag only — logic lives in orders_guards) ────────
 ORDER_DUPLICATE_CHECK_ENABLED_DEFAULT = True
 
@@ -54,6 +61,14 @@ _trades_lock = threading.RLock()
 # only the first should proceed.
 _flatten_lock = threading.Lock()
 _flatten_in_progress: bool = False
+
+# ── Reconcile-in-progress flag ────────────────────────────────────────────────
+# Set to True by reconcile_with_ibkr during the window between loading
+# positions.json (Step 1) and completing the IBKR pass (end of Step 4).
+# _persist_positions() skips the write during this window so a partially-loaded
+# active_trades state (positions.json data merged but IBKR not yet applied)
+# can never overwrite a valid positions.json with stale intermediate state.
+_reconcile_in_progress: bool = False
 
 # ── Per-symbol lock registry ───────────────────────────────────────────────────
 # Closes the TOCTOU gap between openOrders check and submission.
@@ -82,6 +97,9 @@ def _persist_positions() -> None:
     Lock discipline: snapshot is taken under the lock, but the actual I/O (persist)
     runs OUTSIDE the lock so a slow disk write never blocks the order execution path.
     """
+    if _reconcile_in_progress:
+        log.debug("_persist_positions: suppressed — reconcile in progress, positions.json will be written at reconcile end")
+        return
     try:
         from trade_store import persist
 
@@ -195,8 +213,15 @@ def _safe_update_trade(key: str, updates: dict) -> None:
 def _safe_del_trade(key: str) -> None:
     """Thread-safe delete from active_trades dict. Always persists."""
     with _trades_lock:
-        active_trades.pop(key, None)
+        _pos = active_trades.pop(key, None)
     _persist_positions()
+    if _pos and _pos.get("trade_id") and _pos.get("status") != "RESERVED":
+        try:
+            from trade_log import append_event as _tl_ae
+            _tl_ae("POSITION_REMOVED", _pos["trade_id"], _pos.get("symbol", key),
+                   status=_pos.get("status", "UNKNOWN"), pnl=_pos.get("pnl", 0.0))
+        except Exception:
+            pass
 
 
 def _save_positions_file() -> None:
@@ -244,6 +269,31 @@ def _is_recently_closed(symbol: str) -> bool:
     cooldown = CONFIG.get("reentry_cooldown_minutes", 30)
     closed_at = datetime.fromisoformat(ts_str)
     return (datetime.now(UTC) - closed_at).total_seconds() < cooldown * 60
+
+
+def is_failed_thesis_blocked(symbol: str, current_price: float) -> tuple:
+    """
+    Return (blocked: bool, reason: str).
+    Blocks re-entry when the INTRADAY wrong_if condition previously fired for this symbol:
+      - Within failed_thesis_cooldown_hours of the thesis-failure close, OR
+      - Price has not dislocated ≥ 1% from the close price (even after cooldown expires).
+    Both conditions must clear for re-entry to be allowed.
+    """
+    entry = failed_thesis_closed.get(symbol)
+    if not entry:
+        return False, ""
+    cooldown_h = CONFIG.get("failed_thesis_cooldown_hours", 4)
+    closed_at = datetime.fromisoformat(entry["ts"])
+    elapsed_h = (datetime.now(UTC) - closed_at).total_seconds() / 3600
+    if elapsed_h < cooldown_h:
+        return True, f"thesis-failure cooldown ({elapsed_h:.1f}h of {cooldown_h}h elapsed)"
+    close_px = entry.get("close_price", 0.0)
+    if close_px > 0 and current_price > 0:
+        dislocation = abs(current_price - close_px) / close_px
+        if dislocation < 0.01:
+            return True, f"price not dislocated from thesis-failure close (Δ={dislocation:.1%} < 1%)"
+    failed_thesis_closed.pop(symbol, None)  # both gates cleared — release
+    return False, ""
 
 
 def cleanup_recently_closed() -> int:

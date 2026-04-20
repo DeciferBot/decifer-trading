@@ -44,6 +44,8 @@ from orders_state import (
     _save_positions_file,
     _trades_lock,
     active_trades,
+    failed_thesis_closed,
+    is_failed_thesis_blocked,
     log,
     recently_closed,
 )
@@ -184,6 +186,10 @@ def execute_buy(
             if _is_recently_closed(symbol):
                 cooldown = CONFIG.get("reentry_cooldown_minutes", 30)
                 log.info(f"Skipping {symbol} — re-entry cooldown ({cooldown} min after recent close)")
+                return False
+            _ftc_blocked, _ftc_reason = is_failed_thesis_blocked(symbol, price or 0.0)
+            if _ftc_blocked:
+                log.info(f"Skipping {symbol} — thesis-failure gate: {_ftc_reason}")
                 return False
             if len(active_trades) >= CONFIG["max_positions"]:
                 log.warning(f"Max positions ({CONFIG['max_positions']}) reached — skipping {symbol}")
@@ -362,6 +368,53 @@ def execute_buy(
             t1_qty = tp_qty
             t2_qty = qty - tp_qty
 
+        # ── Write-ahead metadata commit ───────────────────────────────────────
+        # All decision context is fully known before the order touches IBKR.
+        # Writing here means a crash anywhere in the execution path cannot destroy
+        # trade metadata. IBKR reconciliation must never be the source of truth
+        # for why we entered — that is sacrosanct and lives here first.
+        _trade_id = f"{symbol}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
+        try:
+            from trade_store import ledger_write as _wal_write
+            _wal_icw = None
+            try:
+                from ic_calculator import get_current_weights as _wal_icw_fn
+                _wal_icw = _wal_icw_fn()
+            except Exception:
+                pass
+            _wal_regime = (
+                (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
+                if isinstance(regime, dict) else "UNKNOWN"
+            )
+            _wal_write(symbol, {
+                "symbol": symbol, "instrument": instrument, "direction": "LONG",
+                "trade_type": trade_type or "INTRADAY",
+                "entry": price, "qty": qty, "sl": sl, "tp": tp,
+                "entry_score": score, "conviction": conviction, "reasoning": reasoning,
+                "signal_scores": signal_scores or {}, "agent_outputs": agent_outputs or {},
+                "entry_regime": _wal_regime,
+                "entry_thesis": _build_entry_thesis(
+                    trade_type or "INTRADAY", symbol, "LONG", conviction, score,
+                    _wal_regime, market_read=market_read, rationale=reasoning,
+                ),
+                "setup_type": _derive_setup_type(signal_scores or {}),
+                "pattern_id": pattern_id, "atr": atr, "advice_id": advice_id,
+                "ic_weights_at_entry": _wal_icw, "tranche_mode": tranche_mode,
+                "t1_qty": t1_qty, "t2_qty": t2_qty,
+                "open_time": open_time or datetime.now(UTC).isoformat(),
+            })
+            try:
+                from trade_log import append_event as _tl_ae
+                _tl_ae("ORDER_INTENT", _trade_id, symbol,
+                       direction="LONG", trade_type=trade_type or "INTRADAY",
+                       entry=price, qty=qty, sl=sl, tp=tp,
+                       score=score, conviction=conviction, entry_regime=_wal_regime,
+                       signal_scores=signal_scores or {})
+            except Exception:
+                pass
+        except Exception as _wal_err:
+            log.warning(f"execute_buy {symbol}: write-ahead metadata commit failed: {_wal_err}")
+
         # ── Execution Agent — decide HOW to fill this trade ──────────────────
         from execution_agent import get_execution_plan
 
@@ -506,6 +559,7 @@ def execute_buy(
                             "tranche_mode": False,
                             "execution_method": "twap",
                             "entry_context": entry_context,
+                            "trade_id": _trade_id,
                         }
                     _save_positions_file()
                     try:
@@ -544,6 +598,7 @@ def execute_buy(
             entry_order = LimitOrder("BUY", qty, _eff_limit, account=account, tif="GTC", outsideRth=True)
             entry_order.orderRef = f"DEC:{score}"[:20]
             entry_order.transmit = True  # standalone — no bracket children
+            log.info(f"[EXT-HRS DEBUG] {symbol} order outsideRth={entry_order.outsideRth} tif={entry_order.tif} lmtPrice={entry_order.lmtPrice}")
             trade = ib.placeOrder(contract, entry_order)
             ib.sleep(0.4)
             parent_id = trade.order.orderId
@@ -604,6 +659,7 @@ def execute_buy(
                         "tranche_mode": False,
                         "extended_hours_entry": True,
                         "entry_context": entry_context,
+                        "trade_id": _trade_id,
                     }
                 _save_positions_file()
                 try:
@@ -922,6 +978,7 @@ def execute_buy(
                     "t1_order_id": tp_trade.order.orderId if tranche_mode else None,
                     "t2_sl_order_id": None,  # set by update_tranche_status after T1 fills
                     "entry_context": entry_context,
+                    "trade_id": _trade_id,
                 }
             _save_positions_file()
             try:
@@ -1070,6 +1127,10 @@ def execute_short(
                 cooldown = CONFIG.get("reentry_cooldown_minutes", 30)
                 log.info(f"Skipping {symbol} — re-entry cooldown ({cooldown} min after recent close)")
                 return False
+            _ftc_blocked, _ftc_reason = is_failed_thesis_blocked(symbol, price or 0.0)
+            if _ftc_blocked:
+                log.info(f"Skipping {symbol} — thesis-failure gate: {_ftc_reason}")
+                return False
             if len(active_trades) >= CONFIG["max_positions"]:
                 log.warning(f"Max positions ({CONFIG['max_positions']}) reached — skipping {symbol}")
                 return False
@@ -1182,6 +1243,48 @@ def execute_short(
 
         account = CONFIG["active_account"]
 
+        # ── Write-ahead metadata commit ───────────────────────────────────────
+        _trade_id = f"{symbol}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
+        try:
+            from trade_store import ledger_write as _wal_write_s
+            _wal_icw_s = None
+            try:
+                from ic_calculator import get_current_weights as _wal_icw_fn_s
+                _wal_icw_s = _wal_icw_fn_s()
+            except Exception:
+                pass
+            _wal_regime_s = (
+                (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
+                if isinstance(regime, dict) else "UNKNOWN"
+            )
+            _wal_write_s(symbol, {
+                "symbol": symbol, "instrument": instrument, "direction": "SHORT",
+                "trade_type": trade_type or "INTRADAY",
+                "entry": price, "qty": qty, "sl": sl, "tp": tp,
+                "entry_score": score, "conviction": conviction, "reasoning": reasoning,
+                "signal_scores": signal_scores or {}, "agent_outputs": agent_outputs or {},
+                "entry_regime": _wal_regime_s,
+                "entry_thesis": _build_entry_thesis(
+                    trade_type or "INTRADAY", symbol, "SHORT", conviction, score,
+                    _wal_regime_s, market_read=market_read, rationale=reasoning,
+                ),
+                "setup_type": _derive_setup_type(signal_scores or {}),
+                "pattern_id": pattern_id, "atr": atr, "advice_id": advice_id,
+                "ic_weights_at_entry": _wal_icw_s,
+                "open_time": open_time or datetime.now(UTC).isoformat(),
+            })
+            try:
+                from trade_log import append_event as _tl_ae
+                _tl_ae("ORDER_INTENT", _trade_id, symbol,
+                       direction="SHORT", trade_type=trade_type or "INTRADAY",
+                       entry=price, qty=qty, sl=sl, tp=tp,
+                       score=score, conviction=conviction, entry_regime=_wal_regime_s,
+                       signal_scores=signal_scores or {})
+            except Exception:
+                pass
+        except Exception as _wal_err_s:
+            log.warning(f"execute_short {symbol}: write-ahead metadata commit failed: {_wal_err_s}")
+
         # ── EXTENDED HOURS: standalone short entry, SL placed post-fill ──────
         _in_extended_hours = is_equities_extended_hours() and not is_options_market_open()
         if _in_extended_hours:
@@ -1249,6 +1352,7 @@ def execute_short(
                         "tranche_mode": False,
                         "extended_hours_entry": True,
                         "entry_context": entry_context,
+                        "trade_id": _trade_id,
                     }
                 _save_positions_file()
                 try:
@@ -1432,6 +1536,7 @@ def execute_short(
                     "agents_agreed": agents_agreed,
                     "tranche_mode": False,
                     "entry_context": entry_context,
+                    "trade_id": _trade_id,
                 }
             _save_positions_file()
             try:
@@ -1659,9 +1764,28 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             _safe_update_trade(_trade_key, {"qty": info["qty"] - sell_qty, "status": "ACTIVE"})
             log.info(f"[TRIM] {symbol}: sold {sell_qty}, {info['qty'] - sell_qty} remaining")
         else:
+            now_ts = datetime.now(UTC).isoformat()
+            _close_trade_id = info.get("trade_id")
+            if _close_trade_id:
+                try:
+                    from trade_log import close_trade as _tl_close
+                    _tl_close(_close_trade_id, symbol, info.get("current", 0.0), pnl, reason)
+                except Exception:
+                    pass
             with _trades_lock:
-                recently_closed[symbol] = datetime.now(UTC).isoformat()
+                recently_closed[symbol] = now_ts
                 active_trades.pop(_trade_key, None)
+            # If the INTRADAY wrong_if condition fired, register the extended cooldown.
+            # Reason strings from the PM contain "stale" or "thesis_broken" in these cases.
+            _reason_lower = (reason or "").lower()
+            if info.get("trade_type") == "INTRADAY" and (
+                "stale" in _reason_lower or "thesis_broken" in _reason_lower or "wrong_if" in _reason_lower
+            ):
+                failed_thesis_closed[symbol] = {"ts": now_ts, "close_price": float(_exit_price or 0)}
+                log.info(
+                    f"Thesis-failure gate armed for {symbol}: "
+                    f"{CONFIG.get('failed_thesis_cooldown_hours', 4)}h cooldown + 1% dislocation required"
+                )
             _save_positions_file()
         return True
 

@@ -161,6 +161,8 @@ CONFIG = {
     "max_sector_exposure": 0.40,  # 40% sector cap
     "consecutive_loss_pause": 999,  # Paper learning mode: effectively disabled (live: 5)
     "reentry_cooldown_minutes": 30,  # Block re-entry after close (lifecycle gate)
+    "failed_thesis_cooldown_hours": 4,  # Extended cooldown when INTRADAY wrong_if was triggered
+    "score_persistence_scans": 2,  # Consecutive above-threshold scans required before entry
     # ── HELD-POSITION SCALE-UP TRIGGER ────────────────────────────
     # When a held position's score rises materially since entry (or since the
     # last PM review), re-run PM so Opus can consider an ADD.  Addresses the
@@ -593,6 +595,7 @@ CONFIG = {
     # ── LOGGING ───────────────────────────────────────────────
     "log_file": "logs/decifer.log",
     "trade_log": "data/trades.json",
+    "trade_log_db": "data/decifer.db",
     "order_log": "data/orders.json",
     "signals_log": "data/signals_log.jsonl",
     # ── OPTIONS TRADING ───────────────────────────────────────

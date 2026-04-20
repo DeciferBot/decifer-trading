@@ -2552,6 +2552,13 @@ def compute_confluence(
     # the consensus direction.  Without this fix, a high-scoring dimension
     # with negative IC would still dominate the direction vote even though its
     # score contribution has been correctly suppressed.
+    # Flags set inside the IC try-block; used by the DAR section below.
+    _two_tier_applied = False
+    _tactical_dar = 1.0
+    _structural_direction = "NEUTRAL"  # "LONG" | "SHORT" | "NEUTRAL"
+    _structural_score_val = 0.0
+    _tactical_score_val = 0.0
+
     _ic_dir_sum = None  # None → fall back to raw score-weighted vote below
     try:
         from ic_calculator import DIMENSIONS as _IC_DIMS
@@ -2600,11 +2607,64 @@ def compute_confluence(
             "short_squeeze": ss_dir,
             "analyst_revision": ar_dir,
             "insider_buying": ib_dir,
+            "overnight_drift": ov_dir,
         }
         _ic_dir_sum = (
             sum(_dim_dirs.get(k, 0) * _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v for k, v in _ic_breakdown.items())
             + candle_dir * candle_bonus  # candlestick bonus preserves its direction influence
         )
+        # ── TWO-TIER SCORING: Structural anchors direction, Tactical scores timing ──
+        # Research: Di Mascio et al. (JF 2016) — signal horizon mismatch guarantees
+        # failure. Structural dims (daily/weekly cadence) anchor direction and are
+        # stable intraday. Tactical dims (5m cadence) score entry quality.
+        # DAR applies ONLY within tactical dims — cross-tier conflict is not a
+        # disagreement signal, it is the normal coexistence of different timescales.
+        _STRUCTURAL = frozenset({"mtf", "overnight_drift", "pead", "analyst_revision", "insider_buying"})
+        _TACTICAL = frozenset(_ic_breakdown.keys()) - _STRUCTURAL
+
+        def _ic_weighted(keys, breakdown, icw, n):
+            return sum(icw.get(k, 1.0 / n) * n * breakdown.get(k, 0) for k in keys)
+
+        def _ic_dir_weighted(keys, breakdown, dirs, icw, n):
+            return sum(dirs.get(k, 0) * icw.get(k, 1.0 / n) * n * breakdown.get(k, 0) for k in keys)
+
+        _s_score = _ic_weighted(_STRUCTURAL, _ic_breakdown, _icw, _N_DIMS)
+        _s_dir_net = _ic_dir_weighted(_STRUCTURAL, _ic_breakdown, _dim_dirs, _icw, _N_DIMS)
+        _struct_sign = +1 if _s_dir_net > 2 else (-1 if _s_dir_net < -2 else 0)
+
+        # Tactical DAR — computed within tactical dims only
+        _t_dir_net = _ic_dir_weighted(_TACTICAL, _ic_breakdown, _dim_dirs, _icw, _N_DIMS)
+        _t_dir_abs = sum(
+            abs(_dim_dirs.get(k, 0)) * _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * _ic_breakdown.get(k, 0)
+            for k in _TACTICAL
+        )
+        _tactical_dar = abs(_t_dir_net) / _t_dir_abs if _t_dir_abs > 0 else 1.0
+
+        if _struct_sign != 0:
+            # Structural direction is clear: opposed tactical dims contribute nothing
+            _aligned = frozenset(k for k in _TACTICAL if _dim_dirs.get(k, 0) * _struct_sign >= 0)
+            _t_aligned_score = _ic_weighted(_aligned, _ic_breakdown, _icw, _N_DIMS)
+            _ta_net = _ic_dir_weighted(_aligned, _ic_breakdown, _dim_dirs, _icw, _N_DIMS)
+            _ta_abs = sum(
+                abs(_dim_dirs.get(k, 0)) * _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * _ic_breakdown.get(k, 0)
+                for k in _aligned
+            )
+            _tactical_dar = abs(_ta_net) / _ta_abs if _ta_abs > 0 else 1.0
+            _t_score_final = round(_t_aligned_score * _tactical_dar)
+        else:
+            _t_score_final = round(_ic_weighted(_TACTICAL, _ic_breakdown, _icw, _N_DIMS) * _tactical_dar)
+
+        score = round(_s_score) + _t_score_final + candle_bonus
+
+        # Direction: structural anchors when clear; tactical vote otherwise
+        _ic_dir_sum = _s_dir_net if _struct_sign != 0 else _t_dir_net
+
+        # Expose for output dict + learning log
+        _structural_direction = "LONG" if _struct_sign > 0 else ("SHORT" if _struct_sign < 0 else "NEUTRAL")
+        _structural_score_val = round(_s_score, 1)
+        _tactical_score_val = float(_t_score_final)
+        _two_tier_applied = True
+
     except Exception:
         pass  # keep the incrementally-accumulated score if IC module unavailable
 
@@ -2615,19 +2675,23 @@ def compute_confluence(
     # Perfect agreement → DAR=1.0 (full score preserved).
     # Split directions → DAR→0 (score penalised proportionally).
     # Neutral dimensions (dir=0) are agnostic, not conflicting.
-    if _ic_dir_sum is not None:
-        # IC-weighted path
-        _dar_num = abs(_ic_dir_sum)
-        _dar_den = (
-            sum(abs(_dim_dirs.get(k, 0)) * _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v for k, v in _ic_breakdown.items())
-            + abs(candle_dir) * candle_bonus
-        )
+    if _two_tier_applied:
+        # Two-tier already applied tactical DAR within the correct scope.
+        # Report the tactical DAR for diagnostics but do NOT re-apply it.
+        dar = round(_tactical_dar, 3)
     else:
-        # Equal-weight path
-        _dar_num = abs(sum(d * w for d, w in dim_directions))
-        _dar_den = sum(abs(d) * w for d, w in dim_directions)
-    dar = _dar_num / _dar_den if _dar_den > 0 else 1.0
-    score = round(score * dar)
+        # Fallback: original cross-tier DAR (IC module unavailable)
+        if _ic_dir_sum is not None:
+            _dar_num = abs(_ic_dir_sum)
+            _dar_den = (
+                sum(abs(_dim_dirs.get(k, 0)) * _icw.get(k, 1.0 / _N_DIMS) * _N_DIMS * v for k, v in _ic_breakdown.items())
+                + abs(candle_dir) * candle_bonus
+            )
+        else:
+            _dar_num = abs(sum(d * w for d, w in dim_directions))
+            _dar_den = sum(abs(d) * w for d, w in dim_directions)
+        dar = _dar_num / _dar_den if _dar_den > 0 else 1.0
+        score = round(score * dar)
 
     # ── SOFT GATE: MTF penalty (applied after DAR) ──────
     mtf_gate_status = "PASS"
@@ -2731,8 +2795,12 @@ def compute_confluence(
         "mtf_conflict": mtf_conflict_msg,
         "mtf_daily_trend": mtf_alignment["daily_trend"],
         "mtf_weekly_trend": mtf_alignment.get("weekly_trend", "N/A"),
-        # Direction Agreement Ratio (1.0 = all dims agree, <1 = disagreement penalty)
+        # Direction Agreement Ratio — tactical-only when two-tier is active
         "dar": round(dar, 3),
+        # Two-tier architecture diagnostics
+        "structural_direction": _structural_direction,
+        "structural_score": _structural_score_val,
+        "tactical_score": _tactical_score_val,
         # Candlestick confirmation gate
         "candle_gate": candle_gate_status,
         # Sentiment consensus gate (True when news+social agree directionally)

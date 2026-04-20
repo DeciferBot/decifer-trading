@@ -1,21 +1,21 @@
 {
-  "timestamp": "2026-04-16T20:16:51.287Z",
+  "timestamp": "2026-04-20T17:05:27.708Z",
   "branch": "master",
-  "lastCommit": "9747eb4 feat(options): force-flatten INTRADAY options at EOD, no AI review",
+  "lastCommit": "4ef3f86 feat(catalyst): wire Alpaca OPRA + FMP into catalyst screener",
   "roadmapPhase": null,
   "lastFilesTouched": [
-    "ata/metadata_ledger.json",
-    "earnings_calendar.py",
-    "reachability.py",
-    "tests/test_atr_sizer_integration.py",
-    "tests/test_tranche_exits.py",
-    "data/models/",
-    "data/presession_log.jsonl",
-    "data/skip_log.jsonl",
-    "data/trades.json.pre_migration_bak",
-    "data/universe_coverage.jsonl"
+    "claude/memory/checkpoint.json",
+    ".claude/memory/session-history.jsonl",
+    "bot_ibkr.py",
+    "config.py",
+    "data/audit_log.jsonl",
+    "data/daily_promoted.json",
+    "data/metadata_ledger.json",
+    "data/overnight_notes.md",
+    "data/pending_option_exits.json",
+    "data/signals_log.jsonl"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 270
+  "sessionCount": 284
 }
