@@ -2798,9 +2798,10 @@ function renderDecisionBar(convo, lastScan, executed, skipReasons) {
       }
     }
     if (primaryReason) {
-      const truncated = primaryReason.length > 80 ? primaryReason.slice(0, 80) + '\u2026' : primaryReason;
-      timeEl.innerHTML = `<span style="color:var(--orange);font-style:italic" title="${esc(primaryReason)}">${esc(truncated)}</span>`;
+      timeEl.style.cssText = 'flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:9px;color:var(--muted2)';
+      timeEl.innerHTML = `<span style="color:var(--orange);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block" title="${esc(primaryReason)}">${esc(primaryReason)}</span>`;
     } else {
+      timeEl.style.cssText = '';
       timeEl.textContent = finalEntry.time || lastScan || '—';
     }
   }
@@ -3142,7 +3143,7 @@ async function poll() {
       const pv = d.portfolio_value || 1;
 
       // Available Cash
-      const cash = ad.total_cash || ad.available_cash || 0;
+      const cash = ad.available_cash || ad.total_cash || 0;
       document.getElementById('s-cash').textContent = fmt$(cash);
       document.getElementById('s-cash').className = 'sv ' + (cash > 0 ? 'cg' : 'cr');
       const cashPct = (cash / pv * 100).toFixed(1);
