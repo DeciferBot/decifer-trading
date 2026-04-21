@@ -199,6 +199,28 @@ def run_portfolio_review(
     if not open_positions:
         return []
 
+    # Force-exit any SHORT position on a long_only_symbol before Opus sees it.
+    long_only = CONFIG.get("long_only_symbols", set())
+    forced_exits = []
+    filtered_positions = []
+    for p in open_positions:
+        sym = p.get("symbol", "")
+        if sym in long_only and p.get("direction", "LONG").upper() == "SHORT":
+            log.warning(
+                "PM review: SHORT %s is architecturally invalid (long_only_symbols) — forcing EXIT",
+                sym,
+            )
+            forced_exits.append({
+                "symbol": sym,
+                "action": "EXIT",
+                "reasoning": f"architecturally invalid: {sym} is a long-only inverse ETF; SHORT position must be closed",
+            })
+        else:
+            filtered_positions.append(p)
+    open_positions = filtered_positions
+    if not open_positions:
+        return forced_exits
+
     regime_name = regime.get("regime", "UNKNOWN")
     vix = regime.get("vix", 0)
 
@@ -368,11 +390,11 @@ that sized the original entry. Your job is the verb and the reasoning tag, not t
         )
         raw = resp.content[0].text.strip()
         log.info(f"Portfolio review ({trigger}): {len(open_positions)} positions reviewed")
-        return _parse_actions(raw, open_positions)
+        return forced_exits + _parse_actions(raw, open_positions)
 
     except Exception as exc:
         log.error(f"portfolio_manager: LLM call failed ({exc}) — returning all HOLD")
-        return [{"symbol": p["symbol"], "action": "HOLD", "reasoning": "review_failed"} for p in open_positions]
+        return forced_exits + [{"symbol": p["symbol"], "action": "HOLD", "reasoning": "review_failed"} for p in open_positions]
 
 
 # ══════════════════════════════════════════════════════════════
@@ -426,6 +448,23 @@ def lightweight_cycle_check(
     if not open_positions:
         return []
 
+    long_only = CONFIG.get("long_only_symbols", set())
+    forced_exit_syms: set = set()
+    forced_exits = []
+    for pos in open_positions:
+        sym = pos.get("symbol", "")
+        if sym in long_only and pos.get("direction", "LONG").upper() == "SHORT":
+            log.warning(
+                "PM: SHORT %s is architecturally invalid (long_only_symbols) — forcing EXIT",
+                sym,
+            )
+            forced_exits.append({
+                "symbol": sym,
+                "action": "EXIT",
+                "reasoning": f"architecturally invalid: {sym} is a long-only inverse ETF; SHORT position must be closed",
+            })
+            forced_exit_syms.add(sym)
+
     # Prefer session_character (Opus-generated) over mechanical label so that
     # the cycle check compares the same vocabulary as entry_regime.
     current_regime = regime.get("session_character") or regime.get("regime", "UNKNOWN")
@@ -450,11 +489,13 @@ def lightweight_cycle_check(
         momentum_map[sym_key] = float((s.get("score_breakdown") or {}).get("momentum", 0) or 0)
 
     now_utc = datetime.now(UTC)
-    actions = []
-    actioned_syms: set = set()
+    actions = list(forced_exits)
+    actioned_syms: set = set(forced_exit_syms)
 
     for pos in open_positions:
         sym = pos.get("symbol", "")
+        if sym in actioned_syms:
+            continue
         trade_type = pos.get("trade_type", "SCALP")
         entry_price = pos.get("entry", 0)
         current_price = pos.get("current", entry_price)
