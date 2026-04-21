@@ -503,10 +503,16 @@ Then write a brief market_read (2-4 sentences): what is the market environment \
 right now? What dynamics are active? What does the cross-asset picture tell you?
 
 Then, for each candidate:
-1. trade_type — label the natural hold horizon. Default to INTRADAY when unclear.
-   - INTRADAY: purely technical, same-session character
-   - SWING: catalyst or momentum setup with a 2–10 day thesis
-   - POSITION: fundamental thesis, weeks or longer
+1. trade_type — label the natural hold horizon. Use the signal dimensions and \
+entry context to decide. When in doubt, lean SWING over INTRADAY.
+   - INTRADAY: purely technical, no news/catalyst/fundamental anchor. \
+     Breakout or momentum with no story behind it. Same-session only.
+   - SWING: anything with an elevated news dim, catalyst score, short_squeeze, \
+     pead, overnight_drift, analyst action, insider/congressional activity, \
+     or a stock in a confirmed multi-day trend. 2–10 day hold. This is the \
+     DEFAULT when a signal has any non-technical dimension contributing.
+   - POSITION: strong fundamental thesis — sustained revenue growth, sector \
+     leadership, multi-week conviction. Weeks or longer.
    - AVOID: genuine exception only — see rules below
 
 2. conviction: 0.0–1.0. Count of independent supporting observations divided by \
