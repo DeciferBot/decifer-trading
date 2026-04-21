@@ -3,11 +3,11 @@
 Unit tests for entry_gate.py and trade_context.py.
 
 Covers:
-  - INTRADAY gate: signal age, rel volume, HOD no-man's land, VWAP, spread, dead window penalty
-  - SWING gate: catalyst requirement, earnings proximity, analyst headwind, short float
-  - POSITION gate: revenue growth, sector uptrend, regime, earnings proximity
-  - classify_trade_type: hierarchy (POSITION > SWING > INTRADAY > REJECT)
-  - validate_entry: effective score with dead-window penalty
+  - INTRADAY gate: only hard blocks — market closed and earnings same day
+  - SWING gate: only hard blocks — PANIC regime and earnings < 5 days
+  - POSITION gate: only hard blocks — hostile regime and earnings < 30 days
+  - classify_trade_type: hierarchy (POSITION > SWING > INTRADAY), INTRADAY fallback (no REJECT)
+  - validate_entry: approved unless hard-blocked
 """
 
 import os
@@ -103,11 +103,11 @@ class TestIntradayGate(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(penalty, 0)
 
-    def test_stale_signal_rejected(self):
+    def test_stale_signal_passes(self):
+        # Stale signal no longer blocked — label only
         ctx = _intraday_ctx(signal_age_minutes=20.0)
         ok, reason, _ = _validate_intraday("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("stale", reason)
+        self.assertTrue(ok)
 
     def test_earnings_same_day_rejected(self):
         ctx = _intraday_ctx(earnings_days_away=0)
@@ -115,48 +115,34 @@ class TestIntradayGate(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("earnings same day", reason)
 
-    def test_very_low_volume_hard_rejected(self):
+    def test_low_volume_passes(self):
+        # Volume no longer a gate — note only
         ctx = _intraday_ctx(rel_volume=0.6)
-        ok, reason, _ = _validate_intraday("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("hard floor", reason)
-
-    def test_moderate_low_volume_penalised(self):
-        ctx = _intraday_ctx(rel_volume=0.9)
-        ok, reason, penalty = _validate_intraday("LONG", ctx)
+        ok, _, _ = _validate_intraday("LONG", ctx)
         self.assertTrue(ok)
-        self.assertGreater(penalty, 0)
 
-    def test_hod_noman_land_rejected(self):
-        # -2% is between -4% and -1% → no-man's land
+    def test_hod_noman_land_passes(self):
+        # HOD no-man's land no longer blocked
         ctx = _intraday_ctx(hod_distance_pct=-2.0)
-        ok, reason, _ = _validate_intraday("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("no-man's land", reason)
+        ok, _, _ = _validate_intraday("LONG", ctx)
+        self.assertTrue(ok)
 
     def test_at_hod_passes(self):
-        # -0.5% is above the -1% upper bound → fine
         ctx = _intraday_ctx(hod_distance_pct=-0.5)
         ok, _, _ = _validate_intraday("LONG", ctx)
         self.assertTrue(ok)
 
-    def test_well_below_hod_passes(self):
-        # -6% is below the -4% lower bound → fine (deep pullback entry)
-        ctx = _intraday_ctx(hod_distance_pct=-6.0)
+    def test_below_vwap_long_passes(self):
+        # VWAP position no longer a gate
+        ctx = _intraday_ctx(vwap_distance_pct=-2.0)
         ok, _, _ = _validate_intraday("LONG", ctx)
         self.assertTrue(ok)
 
-    def test_long_below_vwap_rejected(self):
-        ctx = _intraday_ctx(vwap_distance_pct=-2.0)
-        ok, reason, _ = _validate_intraday("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("wrong side", reason)
-
-    def test_short_above_vwap_rejected(self):
+    def test_above_vwap_short_passes(self):
+        # VWAP position no longer a gate
         ctx = _intraday_ctx(vwap_distance_pct=2.0)
-        ok, reason, _ = _validate_intraday("SHORT", ctx)
-        self.assertFalse(ok)
-        self.assertIn("wrong side", reason)
+        ok, _, _ = _validate_intraday("SHORT", ctx)
+        self.assertTrue(ok)
 
     def test_close_window_hard_rejects_intraday(self):
         ctx = _intraday_ctx(time_of_day_window="CLOSE")
@@ -164,18 +150,18 @@ class TestIntradayGate(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("market closed", reason)
 
-    def test_dead_window_adds_penalty(self):
-        from config import CONFIG
-        expected = CONFIG.get("entry_gate", {}).get("intraday_dead_window_penalty", 8)
+    def test_dead_window_no_penalty(self):
+        # Dead window no longer adds a penalty
         ctx = _intraday_ctx(in_dead_window=True)
         ok, reason, penalty = _validate_intraday("LONG", ctx)
         self.assertTrue(ok)
-        self.assertEqual(penalty, expected)
+        self.assertEqual(penalty, 0)
 
-    def test_wide_spread_hard_rejected(self):
+    def test_wide_spread_passes(self):
+        # Spread no longer a gate
         ctx = _intraday_ctx(bid_ask_spread_pct=1.2)
         ok, _, _ = _validate_intraday("LONG", ctx)
-        self.assertFalse(ok)
+        self.assertTrue(ok)
 
     def test_none_fields_do_not_crash(self):
         """Gate must not raise on None values — degrades gracefully."""
@@ -188,7 +174,6 @@ class TestIntradayGate(unittest.TestCase):
             earnings_days_away=None,
         )
         ok, reason, penalty = _validate_intraday("LONG", ctx)
-        # With no data, gate should pass (unknown ≠ fail) with no penalty
         self.assertIsInstance(ok, bool)
 
 
@@ -196,50 +181,33 @@ class TestIntradayGate(unittest.TestCase):
 
 class TestSwingGate(unittest.TestCase):
 
-    def test_valid_swing_earnings_catalyst_passes(self):
+    def test_valid_swing_passes(self):
         ctx = _swing_ctx()
         ok, reason, _ = _validate_swing("LONG", ctx)
         self.assertTrue(ok)
-        self.assertIn("earnings", reason.lower())
 
-    def test_overnight_drift_qualifies_swing(self):
-        ctx = _swing_ctx(
-            catalyst_type="overnight_drift",
-            catalyst_score=None,
-            recent_upgrade=False,
-            sector_days_since_breakout=15,
-        )
-        ok, reason, _ = _validate_swing("LONG", ctx)
-        self.assertTrue(ok)
-        self.assertIn("overnight drift", reason.lower())
-
-    def test_close_window_overnight_drift_routes_to_swing(self):
-        ctx = _swing_ctx(
-            time_of_day_window="CLOSE",
-            catalyst_type="overnight_drift",
-            catalyst_score=None,
-            recent_upgrade=False,
-            sector_days_since_breakout=15,
-        )
-        trade_type, reason, _ = classify_trade_type("LONG", ctx, score=33)
-        self.assertEqual(trade_type, "SWING")
-
-    def test_no_catalyst_rejected(self):
+    def test_no_catalyst_still_passes(self):
+        # Catalyst no longer required — SWING is a label, not a gate
         ctx = _swing_ctx(
             catalyst_type="none",
             catalyst_score=5.0,
             recent_upgrade=False,
-            sector_days_since_breakout=15,  # > 10 day limit
+            sector_days_since_breakout=15,
         )
         ok, reason, _ = _validate_swing("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("no qualifying catalyst", reason.lower())
-
-    def test_analyst_upgrade_qualifies(self):
-        ctx = _swing_ctx(catalyst_type="none", catalyst_score=5.0, recent_upgrade=True)
-        ok, reason, _ = _validate_swing("LONG", ctx)
         self.assertTrue(ok)
-        self.assertIn("upgrade", reason.lower())
+
+    def test_sell_consensus_long_passes(self):
+        # Analyst consensus no longer a gate
+        ctx = _swing_ctx(analyst_consensus="SELL")
+        ok, _, _ = _validate_swing("LONG", ctx)
+        self.assertTrue(ok)
+
+    def test_high_short_float_passes(self):
+        # Short float no longer a gate
+        ctx = _swing_ctx(short_float_pct=35.0, catalyst_type="earnings_beat")
+        ok, _, _ = _validate_swing("LONG", ctx)
+        self.assertTrue(ok)
 
     def test_earnings_too_close_rejected(self):
         ctx = _swing_ctx(earnings_days_away=2)
@@ -247,35 +215,17 @@ class TestSwingGate(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("earnings", reason)
 
-    def test_sell_consensus_long_rejected(self):
-        ctx = _swing_ctx(analyst_consensus="SELL")
-        ok, reason, _ = _validate_swing("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("SELL", reason)
-
-    def test_high_short_float_no_squeeze_rejected(self):
-        ctx = _swing_ctx(short_float_pct=35.0, catalyst_type="earnings_beat")
-        ok, reason, _ = _validate_swing("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("short float", reason)
-
     def test_panic_regime_rejected(self):
         ctx = _swing_ctx(regime="PANIC")
         ok, reason, _ = _validate_swing("LONG", ctx)
         self.assertFalse(ok)
         self.assertIn("panic", reason.lower())
 
-    def test_sector_rotation_qualifies(self):
-        ctx = _swing_ctx(
-            catalyst_type="none",
-            catalyst_score=5.0,
-            recent_upgrade=False,
-            sector_above_50d=True,
-            sector_days_since_breakout=7,  # within 10-day window
-        )
-        ok, reason, _ = _validate_swing("LONG", ctx)
-        self.assertTrue(ok)
-        self.assertIn("sector rotation", reason.lower())
+    def test_close_window_routes_to_swing(self):
+        # Market closed → entry_gate returns SWING for any overnight/post-close entry
+        ctx = _swing_ctx(time_of_day_window="CLOSE", earnings_days_away=10)
+        trade_type, reason, _ = classify_trade_type("LONG", ctx, score=33)
+        self.assertEqual(trade_type, "SWING")
 
 
 # ── POSITION gate tests ───────────────────────────────────────────────────────
@@ -286,43 +236,24 @@ class TestPositionGate(unittest.TestCase):
         ctx = _position_ctx()
         ok, reason, _ = _validate_position("LONG", ctx)
         self.assertTrue(ok)
-        self.assertIn("rev_growth_yoy", reason)
 
-    def test_insufficient_revenue_growth_rejected(self):
+    def test_low_revenue_growth_passes(self):
+        # Revenue growth no longer a gate
         ctx = _position_ctx(revenue_growth_yoy=8.0)
-        ok, reason, _ = _validate_position("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("revenue growth", reason.lower())
+        ok, _, _ = _validate_position("LONG", ctx)
+        self.assertTrue(ok)
 
-    def test_missing_revenue_data_rejected(self):
-        ctx = _position_ctx(revenue_growth_yoy=None)
-        ok, reason, _ = _validate_position("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("unavailable", reason.lower())
-
-    def test_revenue_decelerating_rejected(self):
-        ctx = _position_ctx(revenue_decelerating=True)
-        ok, reason, _ = _validate_position("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("decelerating", reason)
-
-    def test_sector_below_50d_rejected(self):
+    def test_sector_below_50d_passes(self):
+        # Sector condition no longer a gate
         ctx = _position_ctx(sector_above_50d=False)
-        ok, reason, _ = _validate_position("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("below 50-day", reason)
+        ok, _, _ = _validate_position("LONG", ctx)
+        self.assertTrue(ok)
 
-    def test_sector_data_missing_rejected(self):
-        ctx = _position_ctx(sector_above_50d=None)
-        ok, reason, _ = _validate_position("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("unavailable", reason.lower())
-
-    def test_sector_underperforming_spy_rejected(self):
-        ctx = _position_ctx(sector_3m_vs_spy=2.0)  # below 5% threshold
-        ok, reason, _ = _validate_position("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("outperformance threshold", reason)
+    def test_sell_consensus_passes(self):
+        # Analyst consensus no longer a gate
+        ctx = _position_ctx(analyst_consensus="STRONG_SELL")
+        ok, _, _ = _validate_position("LONG", ctx)
+        self.assertTrue(ok)
 
     def test_panic_regime_rejected(self):
         ctx = _position_ctx(regime="PANIC")
@@ -342,131 +273,89 @@ class TestPositionGate(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("30-day gate", reason)
 
-    def test_sell_consensus_long_rejected(self):
-        ctx = _position_ctx(analyst_consensus="STRONG_SELL")
-        ok, reason, _ = _validate_position("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("STRONG_SELL", reason)
-
 
 # ── Hierarchy tests ───────────────────────────────────────────────────────────
 
 class TestClassifyHierarchy(unittest.TestCase):
 
-    def test_position_wins_when_all_conditions_met(self):
-        ctx = _position_ctx()
+    def test_normal_market_hours_returns_intraday(self):
+        # entry_gate returns INTRADAY as neutral default — Opus owns classification
+        ctx = _intraday_ctx()
         trade_type, reason, _ = classify_trade_type("LONG", ctx, score=40)
-        self.assertEqual(trade_type, "POSITION")
+        self.assertEqual(trade_type, "INTRADAY")
 
-    def test_swing_when_position_fails(self):
-        # Revenue growth too low for POSITION → falls to SWING
-        ctx = _swing_ctx(
-            revenue_growth_yoy=5.0,
-            sector_above_50d=True,
-            sector_3m_vs_spy=8.0,
-        )
+    def test_earnings_same_day_rejected(self):
+        ctx = _intraday_ctx(earnings_days_away=0)
+        trade_type, reason, _ = classify_trade_type("LONG", ctx, score=35)
+        self.assertEqual(trade_type, "REJECT")
+        self.assertIn("earnings same day", reason)
+
+    def test_market_closed_returns_swing(self):
+        # Closed market → SWING to allow overnight/post-close entries
+        ctx = _intraday_ctx(time_of_day_window="CLOSE", earnings_days_away=10)
         trade_type, reason, _ = classify_trade_type("LONG", ctx, score=35)
         self.assertEqual(trade_type, "SWING")
 
-    def test_intraday_when_swing_fails(self):
-        # No catalyst → SWING fails → falls to INTRADAY
-        ctx = _intraday_ctx(
-            catalyst_type="none",
-            catalyst_score=5.0,
-            recent_upgrade=False,
-            earnings_days_away=10,
-        )
-        trade_type, reason, _ = classify_trade_type("LONG", ctx, score=35)
-        self.assertEqual(trade_type, "INTRADAY")
-
-    def test_reject_when_all_fail(self):
-        # No catalyst, stale signal → all types fail
-        ctx = _intraday_ctx(
-            signal_age_minutes=30.0,
-            catalyst_type="none",
-            catalyst_score=5.0,
-            recent_upgrade=False,
-            revenue_growth_yoy=5.0,
-        )
+    def test_market_closed_near_earnings_rejected(self):
+        # Closed market + earnings < 5d → block
+        ctx = _intraday_ctx(time_of_day_window="CLOSE", earnings_days_away=3)
         trade_type, reason, _ = classify_trade_type("LONG", ctx, score=35)
         self.assertEqual(trade_type, "REJECT")
-        self.assertIn("REJECT", reason)
 
 
 # ── validate_entry tests ──────────────────────────────────────────────────────
 
 class TestValidateEntry(unittest.TestCase):
 
-    def test_approved_intraday_returns_true(self):
+    def test_approved_entry_returns_true(self):
         ctx = _intraday_ctx()
         allowed, trade_type, reason, eff_score = validate_entry("LONG", ctx, score=35)
         self.assertTrue(allowed)
-        self.assertEqual(trade_type, "INTRADAY")
+        self.assertIn(trade_type, ("INTRADAY", "SWING", "POSITION"))
         self.assertEqual(eff_score, 35)
 
-    def test_dead_window_penalty_reduces_effective_score(self):
-        from config import CONFIG
-        penalty = CONFIG.get("entry_gate", {}).get("intraday_dead_window_penalty", 8)
-        min_score = CONFIG.get("min_score_to_trade", 14)
-        # Pick a score that is above min but below min+penalty → rejected after deduction
-        score = min_score + penalty - 2
+    def test_dead_window_no_penalty(self):
+        # Dead window no longer penalises — effective score equals raw score
         ctx = _intraday_ctx(in_dead_window=True)
-        allowed, trade_type, reason, eff_score = validate_entry("LONG", ctx, score=score)
-        self.assertFalse(allowed)
-        self.assertIn("effective score", reason)
-
-    def test_dead_window_with_high_score_passes(self):
-        from config import CONFIG
-        penalty = CONFIG.get("entry_gate", {}).get("intraday_dead_window_penalty", 8)
-        ctx = _intraday_ctx(in_dead_window=True)
-        allowed, trade_type, reason, eff_score = validate_entry("LONG", ctx, score=30)
-        # 30 - penalty ≥ 14 → passes
+        allowed, trade_type, reason, eff_score = validate_entry("LONG", ctx, score=16)
         self.assertTrue(allowed)
-        self.assertEqual(eff_score, 30 - penalty)
+        self.assertEqual(eff_score, 16)
 
-    def test_reject_returns_false(self):
+    def test_formerly_rejected_signal_now_approved(self):
+        # Stale signal + no catalyst used to REJECT — now INTRADAY fallback
         ctx = _intraday_ctx(signal_age_minutes=30.0, catalyst_type="none",
                             catalyst_score=1.0, recent_upgrade=False,
                             revenue_growth_yoy=3.0)
         allowed, trade_type, _, _ = validate_entry("LONG", ctx, score=35)
-        self.assertFalse(allowed)
-        self.assertEqual(trade_type, "REJECT")
+        self.assertTrue(allowed)
+        self.assertIn(trade_type, ("INTRADAY", "SWING", "POSITION"))
 
-    def test_position_approved_with_full_context(self):
+    def test_position_context_approved(self):
+        # entry_gate returns INTRADAY as neutral default — Opus owns POSITION labeling
         ctx = _position_ctx()
         allowed, trade_type, reason, eff_score = validate_entry("LONG", ctx, score=40)
         self.assertTrue(allowed)
-        self.assertEqual(trade_type, "POSITION")
+        self.assertIn(trade_type, ("INTRADAY", "SWING", "POSITION"))
 
 
-# ── Session-aware rel_vol threshold tests ─────────────────────────────────────
+# ── Session-aware rel_vol tests (volume no longer gates) ─────────────────────
 
 class TestSessionAwareRelVolThresholds(unittest.TestCase):
-    """Verify that entry_gate selects the correct rel_vol thresholds per session."""
+    """Volume no longer gates trades — all rel_vol values pass INTRADAY."""
 
-    def test_after_hours_hard_fail_at_0_2x(self):
-        """AFTER_HOURS: rel_vol 0.2× < hard_fail 0.3× → rejected."""
+    def test_after_hours_low_volume_passes(self):
+        """Volume is not a gate — any rel_vol passes INTRADAY."""
         ctx = _intraday_ctx(rel_volume=0.2)
         with patch("risk.get_session", return_value="AFTER_HOURS"):
             ok, reason, _ = _validate_intraday("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("hard floor", reason)
+        self.assertTrue(ok)
 
-    def test_after_hours_passes_at_0_4x(self):
-        """AFTER_HOURS: rel_vol 0.4× > hard_fail 0.3× → clears hard fail gate."""
-        ctx = _intraday_ctx(rel_volume=0.4)
-        with patch("risk.get_session", return_value="AFTER_HOURS"):
-            ok, reason, _ = _validate_intraday("LONG", ctx)
-        # Hard-fail gate should pass (0.4 > 0.3); other gates may still apply
-        self.assertNotIn("hard floor", reason)
-
-    def test_regular_session_thresholds_unchanged(self):
-        """REGULAR session: rel_vol 0.6× < hard_fail 0.8× → rejected at regular threshold."""
+    def test_regular_session_low_volume_passes(self):
+        """Volume is not a gate — low rel_vol no longer hard-fails."""
         ctx = _intraday_ctx(rel_volume=0.6)
         with patch("risk.get_session", return_value="PRIME_AM"):
             ok, reason, _ = _validate_intraday("LONG", ctx)
-        self.assertFalse(ok)
-        self.assertIn("hard floor", reason)
+        self.assertTrue(ok)
 
 
 if __name__ == "__main__":

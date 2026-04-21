@@ -416,24 +416,17 @@ def _format_trade_context_block(trade_contexts: dict[str, dict]) -> str:
             spy_str   = f" | {vs_spy:+.1f}% vs SPY 3m" if vs_spy is not None else ""
             lines.append(f"  Sector {etf}: {above_str}{spy_str}")
 
-        # Intraday
-        hod_d  = ctx.get("hod_distance_pct")
-        vwap_d = ctx.get("vwap_distance_pct")
-        rvol   = ctx.get("rel_volume")
-        dead   = ctx.get("in_dead_window", False)
+        # Execution-quality metrics (rel_vol, HOD_dist, dead_window, signal_age) are
+        # intentionally excluded here — they are INTRADAY-only and caused Opus to
+        # misuse them as AVOID justifications for SWING/POSITION candidates.
+        # The entry gate enforces those checks deterministically after classification.
         spread = ctx.get("bid_ask_spread_pct")
-        age    = ctx.get("signal_age_minutes")
         sf     = ctx.get("short_float_pct")
-        intra_parts = []
-        if hod_d  is not None: intra_parts.append(f"HOD_dist={hod_d:+.1f}%")
-        if vwap_d is not None: intra_parts.append(f"VWAP_dist={vwap_d:+.1f}%")
-        if rvol   is not None: intra_parts.append(f"rel_vol={rvol:.1f}x")
-        if dead:               intra_parts.append("dead_window=Y")
-        if spread is not None: intra_parts.append(f"spread={spread:.2f}%")
-        if age    is not None: intra_parts.append(f"age={age:.1f}min")
-        if sf     is not None: intra_parts.append(f"short_float={sf:.1f}%")
-        if intra_parts:
-            lines.append(f"  Intraday: {' | '.join(intra_parts)}")
+        exec_parts = []
+        if spread is not None: exec_parts.append(f"spread={spread:.2f}%")
+        if sf     is not None: exec_parts.append(f"short_float={sf:.1f}%")
+        if exec_parts:
+            lines.append(f"  Execution: {' | '.join(exec_parts)}")
 
         # Institutional + 52wk
         inst_pct  = ctx.get("institutional_ownership_pct")

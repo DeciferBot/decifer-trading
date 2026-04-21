@@ -247,8 +247,14 @@ def dispatch_signals(
                 results.append(result)
                 continue
 
-            # Promote gate-classified trade type if more specific than Opus
-            if gate_type != "REJECT" and gate_type != cls.trade_type:
+            # entry_gate may override trade_type only for special cases (e.g. market-closed
+            # → SWING for overnight entries). Never let entry_gate demote Opus's label:
+            # INTRADAY < SWING < POSITION — only override if gate_type ranks higher.
+            _type_rank = {"INTRADAY": 0, "SWING": 1, "POSITION": 2}
+            if (
+                gate_type not in ("REJECT", cls.trade_type)
+                and _type_rank.get(gate_type, 0) > _type_rank.get(cls.trade_type, 0)
+            ):
                 log.debug(
                     "dispatch: %s trade_type promoted %s → %s by entry_gate",
                     signal.symbol, cls.trade_type, gate_type,
