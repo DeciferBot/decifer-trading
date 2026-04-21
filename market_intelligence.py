@@ -511,8 +511,11 @@ entry context to decide. When in doubt, lean SWING over INTRADAY.
      pead, overnight_drift, analyst action, insider/congressional activity, \
      or a stock in a confirmed multi-day trend. 2–10 day hold. This is the \
      DEFAULT when a signal has any non-technical dimension contributing.
-   - POSITION: strong fundamental thesis — sustained revenue growth, sector \
-     leadership, multi-week conviction. Weeks or longer.
+   - POSITION: high conviction, hold weeks or longer. Use when: score ≥ 38 AND \
+     directional or MTF dim is elevated (confirmed multi-timeframe trend) AND \
+     the thesis isn't a single catalyst that resolves in days. A sustained \
+     trend with news/insider/sector support qualifies. This is not a \
+     fundamental purity test — it is a hold-horizon decision.
    - AVOID: genuine exception only — see rules below
 
 2. conviction: 0.0–1.0. Count of independent supporting observations divided by \
