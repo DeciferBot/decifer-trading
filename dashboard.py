@@ -51,9 +51,9 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .tab.active{color:var(--orange);border-bottom-color:var(--orange)}
 
 /* DECISION BAR */
-.decision-bar{display:flex;align-items:center;gap:12px;padding:0 16px;height:32px;border-bottom:1px solid var(--border);background:var(--bg2);overflow:hidden;flex-shrink:0}
+.decision-bar{display:flex;align-items:center;gap:6px 12px;padding:5px 16px;min-height:32px;height:auto;border-bottom:1px solid var(--border);background:var(--bg2);overflow:visible;flex-shrink:0;flex-wrap:wrap}
 .decision-bar-label{font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;white-space:nowrap;flex-shrink:0}
-.decision-bar-actions{display:flex;flex-wrap:nowrap;gap:6px;align-items:center;overflow:hidden;flex:1;min-width:0}
+.decision-bar-actions{display:flex;flex-wrap:nowrap;gap:6px;align-items:center;flex:1;min-width:0}
 .decision-bar-time{font-size:9px;color:var(--muted2);white-space:nowrap;flex-shrink:0}
 .decision-pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:3px;border:1px solid;white-space:nowrap;flex-shrink:0}
 .decision-pill-action{font-size:9px;font-weight:700;letter-spacing:1px}
@@ -638,6 +638,15 @@ canvas{display:block;width:100% !important}
     <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:10px">Trade Actions</div>
     <div id="agents-grid">
       <div class="empty">Trade actions appear here after the first scan.</div>
+    </div>
+  </div>
+  <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase">Opus Portfolio Review</div>
+      <div style="font-size:10px;color:var(--muted2)" id="pm-review-ts">—</div>
+    </div>
+    <div id="pm-decisions-list">
+      <div class="empty">Opus portfolio review decisions appear here after the next review cycle.</div>
     </div>
   </div>
 </div>
@@ -2735,7 +2744,7 @@ function renderDecisionBar(convo, lastScan, executed, skipReasons) {
   const labelEl   = document.getElementById('decision-bar-label');
   if (!actionsEl) return;
 
-  const finalEntry = convo.find(m => m.agent === 'Final Decision Maker') || convo[convo.length - 1];
+  const finalEntry = convo.find(m => m.agent === 'Trade Synthesiser') || convo[convo.length - 1];
   if (!finalEntry) return;
 
   const lines = (finalEntry.output || '').split('\n').map(l => l.trim()).filter(Boolean);
@@ -2773,33 +2782,43 @@ function renderDecisionBar(convo, lastScan, executed, skipReasons) {
   const ACTION_BG    = { BUY: 'rgba(0,200,83,.15)', SELL: 'rgba(255,82,82,.15)', HOLD: 'rgba(255,107,0,.15)' };
   const pillOpacity  = executed === false ? '0.45' : '1';
 
-  // Build pills — attach skip reason as hover tooltip when available
-  const pills = lines.map(line => {
+  // Build pills — pill shows only the action + ticker symbol; description goes to timeEl
+  let firstLineDesc = '';
+  const pills = lines.map((line, i) => {
     const parts  = line.split(/\s+/);
     const action = (parts[0] || '').toUpperCase();
-    const ticker = parts.slice(1).join(' ');
     const sym    = (parts[1] || '').replace(/[^A-Za-z]/g, '').toUpperCase();
+    // Description: everything after the symbol, strip leading dash/em-dash
+    const desc   = parts.slice(2).join(' ').replace(/^[-\u2013\u2014]\s*/, '');
+    if (i === 0 && desc) firstLineDesc = desc;
     const color  = ACTION_COLOR[action] || 'var(--muted2)';
     const bg     = ACTION_BG[action]    || 'rgba(80,80,80,.1)';
     const reason = skipMap[sym] || '';
-    return `<div class="decision-pill" style="border-color:${color};background:${bg};opacity:${pillOpacity};cursor:${reason?'help':'default'}" title="${reason ? esc(reason) : ''}">
+    const tip    = reason || desc;
+    return `<div class="decision-pill" style="border-color:${color};background:${bg};opacity:${pillOpacity};cursor:${tip?'help':'default'}" title="${esc(tip)}">
       <span class="decision-pill-action" style="color:${color}">${esc(action)}</span>
-      <span class="decision-pill-ticker">${esc(ticker)}</span>
+      <span class="decision-pill-ticker">${esc(sym)}</span>
     </div>`;
   }).join('');
 
-  // When not executed, replace timestamp with the primary skip reason (truncated, full on hover)
+  // Show description / skip reason / timestamp below the pills (full-width second row)
   if (timeEl) {
-    let primaryReason = '';
+    let subText = '';
+    let subColor = 'var(--muted2)';
     if (executed === false) {
+      // prefer skip-map reason, fall back to inline description
       for (const line of lines) {
         const sym = (line.split(/\s+/)[1] || '').replace(/[^A-Za-z]/g, '').toUpperCase();
-        if (skipMap[sym]) { primaryReason = skipMap[sym]; break; }
+        if (skipMap[sym]) { subText = skipMap[sym]; break; }
       }
+      if (!subText) subText = firstLineDesc;
+      subColor = 'var(--orange)';
+    } else {
+      subText = firstLineDesc;
     }
-    if (primaryReason) {
-      timeEl.style.cssText = 'flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:9px;color:var(--muted2)';
-      timeEl.innerHTML = `<span style="color:var(--orange);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block" title="${esc(primaryReason)}">${esc(primaryReason)}</span>`;
+    if (subText) {
+      timeEl.style.cssText = 'width:100%;font-size:9px;padding-top:3px;word-break:break-word;white-space:normal';
+      timeEl.innerHTML = `<span style="color:${subColor};font-style:italic">${esc(subText)}</span>`;
     } else {
       timeEl.style.cssText = '';
       timeEl.textContent = finalEntry.time || lastScan || '—';
@@ -2807,6 +2826,18 @@ function renderDecisionBar(convo, lastScan, executed, skipReasons) {
   }
 
   actionsEl.innerHTML = pills;
+  _syncViewHeights();
+}
+
+// ── Decision bar height sync ───────────────────────────────
+function _syncViewHeights() {
+  const bar = document.querySelector('.decision-bar');
+  if (!bar) return;
+  const h = bar.offsetHeight;
+  const withStats2 = `calc(100vh - ${46 + 66 + 58 + h + 34}px)`;
+  const noStats2   = `calc(100vh - ${46 + 66 + h + 34}px)`;
+  document.querySelectorAll('.view, #view-portfolio, .risk-view').forEach(v => { v.style.height = withStats2; });
+  document.querySelectorAll('.growth-view, .catalyst-view, .news-view').forEach(v => { v.style.height = noStats2; });
 }
 
 // ── Chart instances ────────────────────────────────────────
@@ -3186,7 +3217,7 @@ async function poll() {
     window._agentsRequired   = _req;
     window._lastAgentsAgreed = _agreed;
     window._lastScanTime     = d.last_scan || '';
-    const _total = 4;  // Fixed: 3 analysis agents + 1 Final Decision Maker
+    const _total = 4;  // Fixed: 3 analysis agents + 1 Trade Synthesiser
     document.getElementById('agents-req').textContent = _req != null ? _req + (_total ? '/' + _total : '') : '—';
     const agreeEl = document.getElementById('last-agree');
     agreeEl.textContent = _agreed != null ? _agreed + (_total ? '/' + _total : '') : '—';
@@ -3278,6 +3309,7 @@ async function poll() {
     if (d.agent_conversation && d.agent_conversation.length) {
       renderAgentConvoFull(d.agent_conversation, d.last_scan);
     }
+    renderPmDecisions(d.pm_decisions);
 
     // News view
     if (d.news_data) renderNews(d.news_data);
@@ -3546,7 +3578,8 @@ async function twsReconnect() {
 
 let _pollInFlight = false;
 let _lastLogCount = 0;
-poll();
+poll().then(_syncViewHeights);
+window.addEventListener('resize', _syncViewHeights);
 setInterval(async () => {
   if (_pollInFlight) return;
   _pollInFlight = true;
@@ -4174,7 +4207,7 @@ function renderTradeCard(ld) {
   const edge    = esc(ld.edge_why_now || '');
   const risk    = esc(ld.risk || '');
   const exp     = ld.expected_returns || {};
-  const _tot    = 4;  // Fixed: 3 analysis agents + 1 Final Decision Maker
+  const _tot    = 4;  // Fixed: 3 analysis agents + 1 Trade Synthesiser
   const agents  = ld.agents_agreed != null ? ld.agents_agreed + (_tot ? '/' + _tot : '') + ' agents agreed' : '';
   const ts      = ld.timestamp ? esc(ld.timestamp.replace('T', ' ').slice(0, 16)) : '';
 
@@ -4233,7 +4266,7 @@ function renderAgentConvoFull(convo, lastScan) {
   const ACTION_BG    = { BUY: 'rgba(0,200,83,.12)', SELL: 'rgba(255,82,82,.12)', HOLD: 'rgba(255,107,0,.12)' };
 
   el.innerHTML = convo.map((msg, i) => {
-    const isFinal = msg.agent === 'Final Decision Maker';
+    const isFinal = msg.agent === 'Trade Synthesiser';
     const borderColor = isFinal ? 'var(--green)' : `hsl(${25 + i * 40}, 85%, 55%)`;
 
     let outputHtml;
@@ -4264,6 +4297,38 @@ function renderAgentConvoFull(convo, lastScan) {
       <div class="agent-name" style="color:${borderColor}">${isFinal ? '⚡' : 'Agent ' + (i+1) + ':'} ${esc(msg.agent)}</div>
       <div class="agent-role">${esc(msg.role)}</div>
       ${outputHtml}
+    </div>`;
+  }).join('');
+}
+
+function renderPmDecisions(pm) {
+  const el   = document.getElementById('pm-decisions-list');
+  const tsEl = document.getElementById('pm-review-ts');
+  if (!el) return;
+
+  if (!pm || !pm.actions || !pm.actions.length) {
+    el.innerHTML = '<div class="empty">Opus portfolio review decisions appear here after the next review cycle.</div>';
+    if (tsEl) tsEl.textContent = '—';
+    return;
+  }
+
+  if (tsEl) tsEl.textContent = (pm.trigger ? pm.trigger + '  ·  ' : '') + (pm.ts || '—');
+
+  const ACTION_COLOR = { ADD: 'var(--green)', EXIT: 'var(--red)', TRIM: 'var(--orange)', HOLD: 'var(--muted2)' };
+  const ACTION_BG    = { ADD: 'rgba(0,200,83,.10)', EXIT: 'rgba(255,82,82,.10)', TRIM: 'rgba(255,107,0,.10)', HOLD: 'rgba(100,100,100,.08)' };
+
+  el.innerHTML = pm.actions.map(a => {
+    const act    = (a.action || 'HOLD').toUpperCase();
+    const color  = ACTION_COLOR[act] || 'var(--muted2)';
+    const bg     = ACTION_BG[act]    || 'rgba(100,100,100,.08)';
+    const reason = a.reasoning || a.reason || '';
+    const trimPct = a.trim_pct ? `  ${a.trim_pct}%` : '';
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;margin-bottom:6px;border-radius:4px;background:${bg};border:1px solid ${color}33">
+      <div style="min-width:80px;display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:${color}">${esc(act)}${esc(trimPct)}</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text)">${esc(a.symbol || '')}</span>
+      </div>
+      ${reason ? `<div style="font-size:10px;color:var(--muted2);line-height:1.5">${esc(reason)}</div>` : ''}
     </div>`;
   }).join('');
 }
