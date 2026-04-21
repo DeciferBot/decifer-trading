@@ -835,8 +835,6 @@ CONFIG = {
 
         # INTRADAY thresholds
         "intraday_max_signal_age_minutes":   15,    # signal older than this → reject
-        "intraday_min_rel_volume":           1.0,   # below this → score penalty (live: 1.3)
-        "intraday_hard_fail_rel_volume":     0.8,   # below this → hard reject
         "intraday_max_spread_pct":           0.4,   # above this → score penalty
         "intraday_hard_fail_spread_pct":     0.8,   # above this → hard reject
         "intraday_hod_noman_low":           -4.0,   # HOD no-man's land lower bound (%)
@@ -844,17 +842,7 @@ CONFIG = {
         "intraday_long_min_vwap_dist":      -1.5,   # LONG: reject if >1.5% below VWAP
         "intraday_short_max_vwap_dist":      1.5,   # SHORT: reject if >1.5% above VWAP
         "intraday_dead_window_penalty":      4,     # extra score pts required 11:00–14:30 (live: 8)
-        "intraday_low_volume_penalty":       5,     # extra score pts if rel_vol < min
         "intraday_wide_spread_penalty":      4,     # extra score pts if spread elevated
-
-        # Extended-hours rel volume thresholds (AFTER_HOURS / PRE_MARKET sessions)
-        # Baselines are now session-matched, so 1.0× = average activity for that session.
-        # Thresholds are lower than regular session because the corrected baseline
-        # already accounts for structurally thin after-hours liquidity.
-        "after_hours_min_rel_volume":        0.8,   # below this → score penalty
-        "after_hours_hard_fail_rel_volume":  0.3,   # below this → hard reject
-        "pre_market_min_rel_volume":         0.7,   # below this → score penalty
-        "pre_market_hard_fail_rel_volume":   0.25,  # below this → hard reject
 
         # SWING thresholds
         "swing_min_earnings_days_away":      5,     # earnings closer than this → reject
