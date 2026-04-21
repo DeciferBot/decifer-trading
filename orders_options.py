@@ -747,19 +747,25 @@ def update_trailing_stops(ib: IB) -> None:
                 new_sl = round(new_hwm - trail_mult * atr, 2)
                 if new_sl <= old_sl:
                     continue
+                if new_sl >= current:
+                    continue
             else:  # SHORT
                 new_hwm = min(hwm, current)
                 new_sl = round(new_hwm + trail_mult * atr, 2)
                 if new_sl >= old_sl:
+                    continue
+                if new_sl <= current:
+                    # SL is already below current price — no protection; skip until trade moves in favor
                     continue
 
             if not ib.isConnected():
                 log.warning("[TRAIL] IBKR disconnected — skipping trailing stop update")
                 return
 
+            close_action = "BUY" if direction == "SHORT" else "SELL"
             contract = get_contract(symbol)
             modified_stop = StopOrder(
-                "SELL",
+                close_action,
                 qty,
                 new_sl,
                 account=CONFIG["active_account"],
