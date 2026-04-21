@@ -1,0 +1,26 @@
+{
+  "date": "2026-04-08",
+  "topic": "gap-003-004-thesis-feedback-loop",
+  "phase": "North Star — GAP-003 (Pillar 1: Entry with Thesis) + GAP-004 (Pillar 5: Learn from Outcomes)",
+  "status": "complete",
+  "summary": "Closed GAP-003 and GAP-004. Every new position now has a falsifiable entry thesis string stored at open. The intelligence layer now receives historical win rates per (trade_type, thesis_class) combination at classification time, closing the entry→exit feedback loop.",
+
+  "changes": {
+    "orders_core.py": "_build_entry_thesis() helper added. Derives a falsifiable statement from trade_type, symbol, direction, conviction, score, and entry_regime. SCALP: 'momentum does not produce >0.3% move within 90min'. SWING: 'regime shifts against entry direction'. HOLD: 'macro polarity flips (BULL/BEAR) against entry'. Stored as entry_thesis on every new position in both execute_buy and execute_short.",
+    "learning.py": "entry_thesis added to log_trade() record so it persists in trades.json alongside exit_reason for future correlation.",
+    "pattern_library.py": "get_thesis_performance(min_samples=3) added. Aggregates completed patterns by (trade_type, thesis_class), extracting thesis_class from the 'thesis:...' token in structured exit_reason strings (e.g. 'thesis:noise_stop'). Falls back to raw exit_reason if no token present. Returns list of {trade_type, thesis_class, count, win_rate, avg_pnl_pct} sorted by count.",
+    "market_intelligence.py": "_format_thesis_performance() added. thesis_perf_text field added to SessionContext dataclass. _build_session_context() now calls get_thesis_performance() and includes the formatted result in the classification prompt under '## Historical thesis performance'. Opus now sees 'SCALP / noise_stop: 40% WR, avg -0.3% (12 trades)' and can reason: this thesis class has historically underperformed."
+  },
+
+  "pre_existing_errors_fixed": [],
+
+  "north_star_update": {
+    "entry_with_thesis.status": "PARTIAL → SHIPPED",
+    "learn_from_outcomes.status": "PARTIAL → SHIPPED",
+    "gap_register.GAP-003.status": "open → shipped",
+    "gap_register.GAP-004.status": "open → shipped"
+  },
+
+  "test_results": "28/28 new tests passed (7 in test_entry_thesis.py, 9 in test_thesis_performance.py, 13 in test_cycle_check.py). Full suite: 1797 passed, 111 failed (all pre-existing).",
+  "approved_by": "pending"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "research-cboe-equity-put-call-ratio-pcr-daily-market-sentim-199a9b",
+  "title": "CBOE Equity Put/Call Ratio (PCR) Daily Market Sentiment Gate",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Download the CBOE daily equity put/call ratio from CBOE's free historical data page (cboe.com/us/options/market_statistics/historical_data) and use it as a daily market sentiment gate. The equity PCR baseline is approximately 0.7 (calls dominate). PCR >1.1 indicates elevated put buying relative to calls \u2014 historically a contrarian bullish signal as fear peaks. PCR <0.5 signals extreme complacency (too many calls vs puts) and is a caution flag for new long entries. QuantifiedStrategies backtested a simple PCR strategy (buy when equity PCR >1.1, hold N days) and found statistically significant positive forward returns over a 20+ year window \u2014 particularly robust as a confirmation filter rather than a standalone signal.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Backtesting Robustness, Walk-Forward Validation & Intraday Timing Signals",
+  "impact_score": 6,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "+2\u20133% win rate by filtering out entries during extreme market complacency (low PCR) when downside risk is highest; contrarian PCR >1.1 is a documented precursor to market rallies; equity baseline ~0.7 (source: CBOE 2025)",
+  "difficulty": "Medium",
+  "dev_days": 2,
+  "created_at": "2026-04-14T05:25:49.041704Z"
+}

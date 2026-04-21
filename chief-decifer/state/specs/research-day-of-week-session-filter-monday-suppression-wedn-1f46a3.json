@@ -1,0 +1,16 @@
+{
+  "id": "research-day-of-week-session-filter-monday-suppression-wedn-1f46a3",
+  "title": "Day-of-Week Session Filter (Monday Suppression + Wednesday Boost)",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Add a day-of-week multiplier to the brain loop's entry confidence scoring. Statistical backtests across multiple sources show consistent intraday seasonality: Monday opens \u2014 especially gap-down opens \u2014 have the worst risk/reward of any weekday (negative mean reversion, no follow-through). Wednesday shows the strongest gap continuation behaviour (67% of 1%+ gap-ups continued higher open-to-close). Friday is strongest for gap-fill strategies. The 'Turnaround Tuesday' pattern has a documented +7.7% annualised CAGR when isolated and traded mechanically (1993\u20132026 backtest, QuantifiedStrategies). This is a free, parameter-light edge that requires only checking datetime.weekday() \u2014 no additional data sources needed.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Backtesting Robustness, Walk-Forward Validation & Intraday Timing Signals",
+  "impact_score": 5,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "Avoiding Monday morning gap-down entries eliminates a consistently negative-expectancy setup; SPY 1%+ Monday gap-downs averaged an additional -0.20% open-to-close (vs +0.21% on other days); Wednesday gap-ups continued upward 67% of the time",
+  "difficulty": "Easy",
+  "dev_days": 1,
+  "created_at": "2026-04-14T15:27:10.627070Z"
+}

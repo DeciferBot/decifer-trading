@@ -1,0 +1,16 @@
+{
+  "id": "research-walk-forward-hmm-retraining-pipeline-preventing-mo-1b84cd",
+  "title": "Walk-Forward HMM Retraining Pipeline \u2014 Preventing Model Staleness in Live Trading",
+  "status": "spec_complete",
+  "phase": "D",
+  "priority": "P2",
+  "summary": "Implement a scheduled monthly job that retrains the Gaussian HMM on a rolling 5-year window of SPY log-returns and automatically validates the new model against the last 90 days of held-out data before replacing the production model. This ensures the regime classifier stays calibrated to current market structure. The QuantInsti walk-forward backtesting research confirms that regime-adaptive models must remain adaptive over time \u2014 a model trained once will degrade as market structure evolves. The validation gate (compare IC of old vs new model on held-out data) prevents a degraded model from going live.",
+  "source": "research",
+  "research_topic": "Market Regime Detection & Adaptation",
+  "impact_score": 3,
+  "impact_label": "Low Impact",
+  "expected_impact": "Prevents out-of-sample regime model decay; the QuantStart HMM study explicitly warns that models trained on 1993-2004 data and applied to 2005-2014 without retraining still worked \u2014 but that was a static market structure period; post-2020 regime shifts (COVID, rate cycle) require periodic retraining",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-14T15:27:10.781359Z"
+}

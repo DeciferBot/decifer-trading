@@ -1,0 +1,16 @@
+{
+  "id": "research-finbert-local-headline-scorer-e44bdd",
+  "title": "FinBERT Local Headline Scorer",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Replace or augment the current Yahoo RSS / Claude news scoring with the free ProsusAI/finbert model from HuggingFace. FinBERT is pre-trained on financial corpora and returns positive/negative/neutral softmax probabilities per headline, producing a clean [-1, +1] sentiment score. Kirtac & Germano (Finance Research Letters, 2024) found LLM-class models achieve 72-74% accuracy on 965K news articles versus 50.1% for legacy dictionaries \u2014 FinBERT sits at 72.2% \u2014 making it a near-free, high-accuracy scoring layer that runs locally without API latency or cost.",
+  "source": "research",
+  "research_topic": "Sentiment Analysis & NLP for Trading",
+  "impact_score": 6,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "+3-5% signal accuracy on news dimension; reduces Claude API cost by offloading bulk article scoring to local model; 72%+ directional accuracy on financial headlines (Kirtac & Germano 2024)",
+  "difficulty": "Easy",
+  "dev_days": 2,
+  "created_at": "2026-04-14T15:27:10.635077Z"
+}

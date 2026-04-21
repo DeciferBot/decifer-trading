@@ -1,0 +1,16 @@
+{
+  "id": "research-sentiment-hype-adjustment-and-news-source-weightin-87a897",
+  "title": "Sentiment Hype-Adjustment and News Source Weighting",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Implement a news coverage normalisation layer that adjusts raw sentiment scores for over-representation bias. A 2025 PMC paper introduced a Hype-Adjusted Probability Measure, finding that NVDA received 24.52% of semiconductor sector news coverage over 15 months despite being only ~8% of market weight \u2014 meaning raw positive NVDA sentiment is inflated by sheer volume. The fix is to weight each ticker's sentiment score by (market_weight / news_coverage_weight). Similarly, weight news sources by credibility tier: major wires > analyst blogs > aggregators. This directly addresses the 'distraction effect' documented by Glasserman & Lin (2023).",
+  "source": "research",
+  "research_topic": "Sentiment Analysis & NLP for Trading",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "Reduces false signals from hyper-covered tickers (e.g. NVDA with 24.5% of semiconductor news but only 8% of market weight); improves signal-to-noise ratio by 15-25% estimated on momentum-heavy watchlists",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-14T15:27:10.644069Z"
+}

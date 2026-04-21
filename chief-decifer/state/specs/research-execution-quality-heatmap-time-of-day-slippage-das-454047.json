@@ -1,0 +1,16 @@
+{
+  "id": "research-execution-quality-heatmap-time-of-day-slippage-das-454047",
+  "title": "Execution Quality Heatmap \u2014 Time-of-Day Slippage Dashboard",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Build a simple analytics view from TCA logger data (Feature 2) showing mean slippage in bps as a heatmap by hour-of-day and by symbol. This converts raw TCA log data into actionable visualisation \u2014 the same feedback loop that professional desks use to tune execution strategies. For Decifer specifically, this also builds the foundation for the per-user dashboard requirement in the future roadmap.",
+  "source": "research",
+  "research_topic": "Order Execution & Market Microstructure",
+  "impact_score": 3,
+  "impact_label": "Low Impact",
+  "expected_impact": "Surfaces which time slots, symbols, and order types produce the worst fills; enables data-driven refinement of execution parameters; industry TCA data shows slippage patterns are highly non-uniform across the day and discovering them typically yields 3\u20138 bps improvement once acted upon",
+  "difficulty": "Easy",
+  "dev_days": 3,
+  "created_at": "2026-04-14T15:27:10.616815Z"
+}

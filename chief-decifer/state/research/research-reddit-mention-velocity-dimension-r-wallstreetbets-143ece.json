@@ -1,0 +1,16 @@
+{
+  "id": "research-reddit-mention-velocity-dimension-r-wallstreetbets-143ece",
+  "title": "Reddit Mention Velocity Dimension (r/wallstreetbets + r/stocks)",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Upgrade the existing social signal dimension from qualitative to quantitative by tracking mention velocity (rate-of-change in mentions, not raw count) for watchlist symbols across Reddit. Academic research is clear: WSB sentiment alone does not generate tradeable alpha (the BUZZ ETF underperformed SPY by 15% over 2021-2024), but surge in mention velocity preceding a technical breakout is a reliable confluence amplifier. The signal is most valuable as a corroborating boost, not as a standalone trigger.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "impact_score": 6,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "Modest standalone alpha (WSB alone generates no reliable alpha per academic studies), but +1-2% win rate as a confluence accelerator when combined with technical signals",
+  "difficulty": "Easy",
+  "dev_days": 2,
+  "created_at": "2026-04-14T05:25:49.076484Z"
+}

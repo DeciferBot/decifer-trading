@@ -1,0 +1,16 @@
+{
+  "id": "research-bayesian-self-updating-kelly-sizer-401c7a",
+  "title": "Bayesian Self-Updating Kelly Sizer",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Replaces Decifer's static Kelly formula with a Beta-distribution Bayesian updater: after each closed trade, alpha (wins) and beta (losses) are incremented, and the win probability estimate p = alpha/(alpha+beta) feeds the Kelly formula alongside a sample-confidence shrinkage factor (f_adjusted = f_kelly \u00d7 confidence + 0.25 \u00d7 (1 - confidence)). This directly addresses the core failure mode documented in multiple 2024\u20132025 papers \u2014 that full Kelly with misestimated inputs leads to catastrophic drawdowns, as MacLean, Ziemba and Blazenko showed empirically. For Decifer specifically, the 9-dimension signal scorer already produces a directional conviction signal that maps naturally onto the p input.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "Reduces parameter-estimation-driven overbetting; empirical Bayesian shrinkage converges fractional Kelly toward quarter-Kelly on small samples, cutting max drawdown 10\u201320% vs static Kelly while preserving ~75% of long-run growth rate",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-14T15:27:10.541696Z"
+}

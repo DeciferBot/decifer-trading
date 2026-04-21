@@ -1,0 +1,181 @@
+{
+  "generated_at": "2026-04-14T15:51:23.797261+00:00",
+  "vision_statement": "Decifer's sole objective at this stage is to prove a durable statistical edge on paper trades — every decision, feature, and build session exists to validate the 9-dimension signal engine and 6-agent pipeline before any live capital is committed. Nothing downstream (live trading, cloud hosting, multi-user) becomes real until that edge is demonstrated.",
+  "current_stage_assessment": "Decifer is in paper_trading_single_account. The signal engine and agent pipeline are running, the Order Fill Watcher and DAR are shipped, and the IC calculator was just split into a package with an analytics dashboard tab. The system is structurally operational but alpha is unmeasured — there is no IC report, no win-rate baseline, and no trade volume yet sufficient to evaluate edge. The immediate priority is closing the feedback loop between trade output and signal quality measurement so the paper phase can actually prove or disprove the edge.",
+  "executive_summary": "The core bot is running and the most recent sessions have been high-velocity: 6 bugs fixed, Ruff linting applied across 148 files, the durable metadata ledger shipped, and the IC calculator just landed with an analytics tab. The architecture is now clean enough to start generating real measurement data. However, the Alpha Validation Gate (P0) remains open — there is no defined process for declaring that edge has been proven, and without that, the paper phase has no exit criteria. The feature pipeline is extremely long (75 active features) and needs triage: many P2 features are speculative and should not consume attention until P0 and P1 items are settled. Two specific structural concerns are present: the IC analytics dashboard was just built but has never been exercised against real trade data, and the recent import-stripping by Ruff (requiring a fix commit restoring load-bearing re-exports) indicates that automated tooling modified semantically critical code — this warrants a targeted hot-path import audit.",
+  "recommended_actions": [
+    {
+      "action": "Validate the IC analytics dashboard against real paper trade data — confirm ic_calculator produces correct output end-to-end",
+      "type": "validate",
+      "why_now": "The IC calculator was just split into a package and an analytics dashboard tab was added (most recent commit, 2 minutes ago). This is brand new code that has never been exercised against real trade data. IC measurement is the primary instrument for validating signal quality — if it produces wrong numbers, all downstream alpha validation conclusions will be wrong. This must be confirmed working before any IC-based decisions are made.",
+      "source": "Commit: 'feat(ic): split ic_calculator into ic/ package + add analytics dashboard tab'; Pipeline: Signal Decay Monitor & Freshness Dashboard [P1]; Pipeline: Alpha Validation Gate [P0]",
+      "cowork_prompt": "Session goal: Confirm that the new ic/ package and analytics dashboard tab produce correct, trustworthy IC values against real paper trade data.\n\nContext: The IC calculator was just refactored from a single file into an ic/ package, and a new analytics dashboard tab was added. This is the measurement instrument for alpha validation. If it is broken or producing wrong numbers, every signal quality conclusion will be invalid.\n\nTasks:\n1. Identify all files in the new ic/ package. Map what each module does.\n2. Construct a synthetic test dataset: 50 closed trades with known signal scores and known forward returns. Manually calculate the expected IC for each signal dimension.\n3. Run the ic_calculator against the synthetic dataset and compare output to manual calculation. Confirm correctness.\n4. Run against the actual paper trade ledger (however many trades exist). Confirm the dashboard tab renders without errors.\n5. Check for edge cases: what happens when there are <10 trades (insufficient data)? Does it return NaN gracefully or crash?\n6. Confirm the IC values shown on the dashboard tab match the values computed by the ic/ package directly (no display transformation bugs).\n7. If any bugs are found, fix them in this session.\n\nOutput: A committed test in the ic/ package that validates correctness + a screenshot or log confirming the dashboard tab renders correctly on real data."
+    },
+    {
+      "action": "Build the Multi-Source Sentiment Consensus Gate [P0] — the highest-priority unbuilt signal feature",
+      "type": "build",
+      "why_now": "This is the only A-tier P0 feature not yet shipped. The research consensus (2026-03-31, 2026-04-03) is unambiguous that LLM sentiment scoring generates statistically significant alpha. The 9-dimension signal engine already exists but sentiment consensus gating is missing. This directly improves signal quality before the Alpha Validation Gate needs to fire. It is P0, A-tier, and blocked by nothing.",
+      "source": "Pipeline: Multi-Source Sentiment Consensus Gate [A P0]; Research: Sentiment Analysis & NLP 2026-03-31; Research: Signal Quality 2026-04-03",
+      "cowork_prompt": "Session goal: Build the Multi-Source Sentiment Consensus Gate — a consensus-gating layer that checks whether news sentiment from multiple sources agrees before allowing trade entry.\n\nContext: This is the highest-priority unbuilt feature (A-tier, P0). The bot currently has some sentiment signal infrastructure but no consensus gate. Research confirms LLM-based sentiment scoring produces statistically significant alpha. This feature adds a gate: if multiple sentiment sources disagree, suppress the entry.\n\nTasks:\n1. Review existing sentiment infrastructure in signals.py and any Claude sentiment modules. Identify what sources are currently scoring sentiment (Yahoo RSS, Claude, Reddit).\n2. Define 'consensus': at least 2 of 3 sources must agree on direction (positive/negative/neutral) for the gate to pass. Neutral counts as non-blocking.\n3. Add the gate as a binary pre-entry check in the signal scoring pipeline. If consensus fails, the trade is suppressed and logged with reason='sentiment_no_consensus'.\n4. Add a config flag sentiment_consensus_required (default: True for paper) so it can be toggled.\n5. Log all suppression events to the metadata ledger (which already exists from the durable ledger commit).\n6. Add a counter to the dashboard showing sentiment consensus pass/fail rate over the last 50 candidates.\n7. Write a unit test covering: all-agree-long passes, all-agree-short passes, 2/3 agree passes, 1/3 agree fails, all-neutral passes.\n\nOutput: Committed feature + tests + dashboard counter."
+    },
+    {
+      "action": "Build the Implied Volatility Skew Signal [A P1] — the highest-priority A-tier P1 signal dimension",
+      "type": "build",
+      "why_now": "IV skew is an A-tier P1 feature using free yfinance options data — no new data subscription needed. Research (2026-04-03) confirms behavioral price-volume and options-derived signals outperform single-source models. IV skew directly expands the 9-dimension signal engine with a tenth dimension that is orthogonal to existing price/volume signals. With the IC calculator now live, each new dimension will immediately get its IC tracked, creating a tight feedback loop.",
+      "source": "Pipeline: Implied Volatility Skew Signal (yfinance Options Chain) [A P1]; Research: Signal Quality & Alpha Generation 2026-04-03",
+      "cowork_prompt": "Session goal: Add IV Skew as a new signal dimension to signals.py using yfinance options chain data.\n\nContext: The signal engine currently has 9 dimensions. IV skew (put IV minus call IV at equivalent strikes) is a well-documented options-derived alpha signal. It uses yfinance which is already a dependency. It is A-tier P1 and directly adds to signal edge.\n\nTasks:\n1. In signals.py, add a new function compute_iv_skew(ticker) that:\n   a. Fetches the nearest-expiry options chain via yfinance.\n   b. Selects the ATM strike (closest to current price).\n   c. Computes: put_iv - call_iv at ATM. Positive skew = bearish hedging demand. Negative skew = bullish.\n   d. Normalises to a 0-10 conviction score: high positive skew (bearish signal for longs) scores low; high negative skew (bullish) scores high.\n   e. Returns 0 if options data is unavailable (graceful fallback).\n2. Add IV_SKEW as a new signal dimension in the SIGNAL_DIMENSIONS enum/config.\n3. Wire it into the composite signal scorer alongside the existing 9 dimensions.\n4. Add a feature flag iv_skew_enabled in config.py (default: True).\n5. Update the IC calculator to track IV_SKEW dimension IC separately.\n6. Write unit tests: mock yfinance response, confirm scoring logic, confirm graceful fallback on missing data.\n7. Log the raw IV skew value to the metadata ledger alongside other signal scores.\n\nOutput: Committed dimension + tests + config flag."
+    },
+    {
+      "action": "Build the Signal-Strength-Proportional Kelly Multiplier [B P1] — fix incorrect position sizing before trade volume grows",
+      "type": "build",
+      "why_now": "Research (2026-04-02) is unambiguous: static Kelly sizing is the most dangerous thing a systematic equity bot can do. The current bot uses a static formula. This feature scales Kelly output by signal score strength — it is a direct risk management improvement that makes position sizing adaptive to the quality of each signal. It is B-tier P1 and modifies only the sizing module, not the signal pipeline. Fixing this before trade volume grows means every paper trade from this point forward tests the correct sizing behavior.",
+      "source": "Pipeline: Signal-Strength-Proportional Kelly Multiplier [B P1]; Research: Risk Management & Position Sizing 2026-04-02",
+      "cowork_prompt": "Session goal: Modify the Kelly position sizer to scale position size proportionally to the composite signal score.\n\nContext: Current Kelly sizing is static — it uses win rate and payoff ratio but ignores signal conviction. Research consensus says this is the highest-risk mistake in systematic trading. The fix is to multiply the fractional Kelly output by a signal strength scalar derived from the composite score.\n\nTasks:\n1. Locate the Kelly sizing function (likely in risk.py or orders_portfolio.py).\n2. Add a parameter signal_score (float, 0-100 after uncapped DAR change) to the sizing function.\n3. Define a scaling curve: score < 30 → multiplier 0.5, 30-60 → multiplier 0.75, 60-80 → multiplier 1.0, >80 → multiplier 1.25 (capped). Make thresholds configurable in config.py.\n4. Apply: final_size = kelly_size * signal_multiplier.\n5. Ensure the multiplier never causes position size to exceed max_position_pct from config.\n6. Log the signal_multiplier value to the metadata ledger per trade.\n7. Add a dashboard stat showing mean signal multiplier over last 50 trades (to detect if bot is consistently trading at low conviction).\n8. Write unit tests covering each multiplier band and the cap behavior.\n\nOutput: Committed sizing update + tests + dashboard stat."
+    },
+    {
+      "action": "Build the Hurst Exponent Regime Filter [B P1] — add trend vs mean-reversion classification to gate signal type",
+      "type": "build",
+      "why_now": "The research consensus (2026-03-30 market regime detection) confirms regime-adaptive systems consistently outperform static ones. The Hurst exponent is a computationally cheap, free-data regime classifier that determines whether a stock is trending (H>0.5) or mean-reverting (H<0.5). With both momentum and mean-reversion signal dimensions already in the engine, the Hurst filter is the natural gate that decides which signal type should dominate scoring for a given stock at a given time. This is B-tier P1 and uses only existing OHLCV data.",
+      "source": "Pipeline: Hurst Exponent Regime Filter [B P1]; Pipeline: Regime-Conditional Signal Weighting [B P1]; Research: Market Regime Detection 2026-03-30",
+      "cowork_prompt": "Session goal: Implement the Hurst Exponent Regime Filter to classify each candidate stock as trending or mean-reverting and weight signal dimensions accordingly.\n\nContext: The signal engine has both momentum and mean-reversion dimensions. The Hurst exponent (H) tells us which regime a stock is in: H>0.5 = trending, H<0.5 = mean-reverting, H≈0.5 = random walk. This filter gates which signal type should dominate for each stock.\n\nTasks:\n1. Add a function compute_hurst_exponent(prices, window=100) in a new file regime/hurst.py. Use the R/S (rescaled range) method — implement from scratch using numpy, no new dependencies.\n2. Output: H value (float 0-1) + regime label ('trending', 'mean_reverting', 'random').\n3. In signals.py, after computing all 9 signal dimensions, apply a regime weighting:\n   - If trending: boost momentum/breakout dimensions by 1.2x, discount mean-reversion dimension by 0.7x.\n   - If mean_reverting: boost REVERSION dimension by 1.2x, discount momentum dimensions by 0.7x.\n   - If random: no adjustment.\n4. Make multipliers configurable in config.py under hurst_regime_weights.\n5. Add hurst_h and hurst_regime to the metadata ledger per trade.\n6. Add a dashboard stat showing regime distribution across current candidates (% trending vs mean-reverting).\n7. Write unit tests: known trending series (geometric walk) should return H>0.5, known mean-reverting series (Ornstein-Uhlenbeck) should return H<0.5.\n\nOutput: Committed regime filter + tests + dashboard stat."
+    },
+    {
+      "action": "Triage and prune the active feature pipeline — move speculative P2 D-tier features to a 'deferred' backlog",
+      "type": "housekeeping",
+      "why_now": "The active pipeline has 75 features. Many are D-tier P2 (Walk-Forward HMM, Statistical Jump Model, Regime-Conditioned Kelly Multiplier Table, Momentum Duration Detector) which are explicitly conditional on 200+ closed trades and IC Phase 2 review — the same gate as HMM, which is already locked in OPERATIONAL STATE. These should not be in 'active' status as they create cognitive load and distort priority. Pruning to a clean active list of 15-20 items makes every future session more focused.",
+      "source": "Pipeline: 75 active features including multiple D-tier P2 items; Operational State: 'HMM regime detection deferred; locked until >=200 closed trades + IC Phase 2 review'",
+      "cowork_prompt": "Session goal: Triage the active feature pipeline and move items that are explicitly blocked by the 200-trade / IC Phase 2 gate into a 'deferred' state.\n\nContext: The active pipeline has 75 features. Many are D-tier P2 and depend on HMM, walk-forward validation, or IC health checks that cannot run until 200+ trades are closed. These should not compete for attention with P0/P1 items that can be built now.\n\nTasks:\n1. Review all 75 active features.\n2. Apply the following rules:\n   a. Any feature explicitly requiring HMM → move to 'deferred_post_200_trades'.\n   b. Any D-tier feature with no dependency on current infrastructure → move to 'deferred_post_200_trades'.\n   c. Any C-tier P2 feature that requires IC history to be meaningful (e.g., IC-Weighted Dynamic Signal Scorer, Rolling IC Health Check) → move to 'deferred_post_ic_baseline'.\n   d. Any feature that duplicates another active feature (e.g., multiple Reddit signal features) → consolidate into one spec, move duplicates to backlog.\n3. After triage, the active list should contain only items buildable with current data and infrastructure.\n4. Update the feature tracking document (or equivalent) with the new states and the reason for deferral.\n5. Produce a clean priority-ordered list of the remaining active features grouped by tier (A, B, C) and priority (P0, P1, P2).\n\nOutput: Updated pipeline state + a written triage log explaining each deferral decision."
+    },
+    {
+      "action": "Build the Opening Gap Size & Direction Signal Classifier [B P1] — high-signal intraday timing dimension",
+      "type": "build",
+      "why_now": "Research (2026-03-31 backtesting robustness and intraday timing signals) identifies opening gap analysis as one of the highest-IC intraday timing signals available from free OHLCV data. It is B-tier P1, uses only yfinance daily data (no new dependency), and adds a dimension that is completely orthogonal to all existing 9 signal dimensions. With the IC calculator now live, its predictive power will be tracked immediately from first trade.",
+      "source": "Pipeline: Opening Gap Size & Direction Signal Classifier [B P1]; Research: Backtesting Robustness, Walk-Forward Validation & Intraday Timing Signals 2026-03-31",
+      "cowork_prompt": "Session goal: Build the Opening Gap Signal Classifier — compute the overnight gap for each candidate and use it as a signal dimension.\n\nContext: Gap size and direction at open is a well-documented intraday timing signal. Large gap-ups in a trending stock confirm momentum; gap-downs can signal exhaustion. This is B-tier P1 and uses only existing yfinance daily OHLCV data.\n\nTasks:\n1. Add a function compute_opening_gap(ticker) in signals.py that:\n   a. Fetches the last 2 days of daily OHLCV via yfinance.\n   b. Computes: gap_pct = (today_open - yesterday_close) / yesterday_close.\n   c. Classifies: gap > +1% = bullish_gap, gap < -1% = bearish_gap, else = flat.\n   d. Also computes SPY gap for the same day as a baseline.\n   e. Scores 0-10: large bullish gap + SPY also gapping up = 8-10 (strong momentum confirmation), large bearish gap = 1-3, flat = 5.\n2. Add GAP_SIGNAL as a new signal dimension wired into the composite scorer.\n3. Add gap_pct and gap_class to the metadata ledger per trade.\n4. Add a feature flag gap_signal_enabled in config.py.\n5. Write unit tests: mock OHLCV response, confirm gap calculation, confirm scoring at each classification boundary.\n\nOutput: Committed dimension + tests + config flag."
+    },
+    {
+      "action": "Promote the Drawdown-Proportional Position Scaler to an explicit implementation decision — resolve conflict with Signal-Strength Kelly Multiplier",
+      "type": "decision",
+      "why_now": "Two active P2 features modify position sizing in ways that could compound or conflict: Signal-Strength-Proportional Kelly Multiplier (recommended above) and Drawdown-Proportional Position Scaler. Both apply a multiplier to the Kelly output. If both are built independently and naively composed, the combined multiplier could produce extreme position sizes (too large in bull runs, too small in drawdowns). A deliberate decision on the composition order and combined cap must be made before the second sizer is built.",
+      "source": "Pipeline: Drawdown-Proportional Position Scaler [B P2]; Pipeline: Signal-Strength-Proportional Kelly Multiplier [B P1]; Research: Risk Management & Position Sizing 2026-04-02",
+      "cowork_prompt": "Session goal: Make an explicit architectural decision on how multiple position-sizing multipliers compose, and document it as a design constraint for all future sizing features.\n\nContext: We are about to build the Signal-Strength Kelly Multiplier (P1). There is also a Drawdown-Proportional Position Scaler (P2) in the pipeline. Both apply multipliers to the Kelly base size. If composed naively, they interact. We need a decision on architecture before both are live.\n\nTasks:\n1. Review the current Kelly sizing implementation and identify where multipliers will be applied.\n2. Define the composition model — recommended: Kelly_base × signal_multiplier × drawdown_multiplier, with a combined floor (e.g., 0.25× Kelly) and ceiling (e.g., 1.5× Kelly) applied after all multipliers.\n3. Decide whether multipliers are applied sequentially or as a weighted sum.\n4. Define the combined cap in config.py: max_sizing_multiplier and min_sizing_multiplier.\n5. Write this as a comment block in the sizing function and as a design note in architecture.md (or equivalent).\n6. Confirm this design is compatible with the Bayesian Self-Updating Kelly Sizer (also in pipeline) so that future addition does not require a refactor.\n7. Document the decision: what was chosen, what was rejected, and why.\n\nOutput: Design decision document + updated sizing function with composition architecture in place."
+    }
+  ],
+  "product_roadmap": [
+    {
+      "phase_name": "Phase 1 — Measurement Infrastructure & Signal Expansion",
+      "goal": "Establish trustworthy alpha measurement (IC dashboard, trade ledger, alpha validation gate) and expand the signal engine with the highest-priority orthogonal dimensions.",
+      "rationale": "You cannot prove edge without measuring it. The IC calculator and metadata ledger just landed but have never been exercised against real data. Before adding more features, the measurement layer must be confirmed correct. Signal expansion (IV skew, gap classifier, Hurst) then feeds directly into measurement, creating the feedback loop needed to evaluate edge.",
+      "features": [
+        "Alpha Validation Gate — spec and implement exit criteria for paper phase",
+        "Validate IC analytics dashboard against real paper trade data",
+        "Hot-path import audit after Ruff linter changes",
+        "Multi-Source Sentiment Consensus Gate [A P0]",
+        "Implied Volatility Skew Signal [A P1]",
+        "Opening Gap Size & Direction Signal Classifier [B P1]",
+        "Hurst Exponent Regime Filter [B P1]",
+        "Signal-Strength-Proportional Kelly Multiplier [B P1]",
+        "Sizing multiplier composition decision and architecture"
+      ],
+      "exit_criteria": "Alpha Validation Gate spec is committed; IC dashboard confirmed correct on real data; all 4 new signal dimensions live and IC-tracked; sizing multiplier architecture decided and implemented.",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 2 — Edge Hardening & Trade Selectivity",
+      "goal": "Add regime-conditional signal weighting, cross-sectional momentum ranking, PEAD signal, and options flow proxy to improve win rate and reduce false positives before trade count accumulates.",
+      "rationale": "Once measurement is confirmed working and baseline signal dimensions are live, the next layer is improving selectivity — ensuring the bot only takes the highest-conviction trades. This phase targets the remaining B P1 features and begins IC-informed reweighting.",
+      "features": [
+        "Regime-Conditional Signal Weighting (Momentum vs Mean-Reversion Gate) [B P1]",
+        "Cross-Sectional Momentum Rank Signal [B P1]",
+        "Post-Earnings Announcement Drift (PEAD) Signal Dimension [B P1]",
+        "Options Flow Proxy Signal via Put/Call Ratio [B P1]",
+        "Z-Score Normalised Signal Composite [B P1]",
+        "Signal Decay Monitor & Freshness Dashboard [B P1]",
+        "SHAP-Based Signal Dimension Importance Audit [B P1]",
+        "Alpha Decay Chart — Per-Trade Forward Return Distribution Tracker [B P1]"
+      ],
+      "exit_criteria": "All B P1 features live; rolling IC tracked per dimension; SHAP audit run on first 100+ trades; win rate baseline established.",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 3 — Alpha Validation Gate Evaluation",
+      "goal": "Accumulate 200 closed paper trades, run the Alpha Validation Gate checklist, and make the go/no-go decision for live trading.",
+      "rationale": "This is the gating phase. No infrastructure work, no new features. Pure trade accumulation and measurement. The gate criteria defined in Phase 1 are evaluated here. If they pass, live trading is unlocked. If they fail, the signal engine is iterated on before proceeding.",
+      "features": [
+        "Accumulate 200 closed paper trades",
+        "Run Alpha Validation Gate checklist (win rate, IC, Sharpe, drawdown, regime coverage)",
+        "IC Phase 2 review — evaluate per-dimension rolling IC against threshold",
+        "Go/no-go decision: paper_trading → live_trading"
+      ],
+      "exit_criteria": "200 closed trades; all Alpha Validation Gate criteria met; explicit go/no-go decision documented.",
+      "estimated_scope": "small"
+    },
+    {
+      "phase_name": "Phase 4 — Live Trading Preparation (conditional on Phase 3 pass)",
+      "goal": "Tighten execution quality, switch to live config thresholds, add slippage modeling, and deploy risk guardrails before first live dollar.",
+      "rationale": "Live trading introduces real costs (slippage, commissions, market impact) that paper trading does not. The execution layer must be hardened and config thresholds restored to their live values before any capital is at risk.",
+      "features": [
+        "IBKR Adaptive Algo Order Router [B P2]",
+        "Passive Limit-Order Entry Mode [B P2]",
+        "Slippage & Execution Cost Model for Backtester [B P2]",
+        "Time-of-Day Execution Gate (Open/Close Avoidance) [B P2]",
+        "Portfolio-Level Volatility Target Enforcer [B P2]",
+        "Rolling CVaR Position Budget Enforcement Gate [B P2]",
+        "Drawdown-Proportional Position Scaler [B P2]",
+        "Bayesian Self-Updating Kelly Sizer [B P2]",
+        "Earnings Calendar Event Risk Gate [B P2]",
+        "Restore live config thresholds (min_score, agents_required, max_positions)"
+      ],
+      "exit_criteria": "All execution hardening features live; live config values active; first live trade placed with full risk guardrails operational.",
+      "estimated_scope": "large"
+    }
+  ],
+  "risks": [
+    {
+      "risk": "Ruff linter may have silently removed additional load-bearing re-exports beyond what the fix commit restored — any missed import will cause a runtime AttributeError or ImportError that only surfaces when that code branch executes",
+      "category": "execution",
+      "severity": "high",
+      "evidence": "Commit sequence: 'chore(lint): add Ruff linter + fix all 1,700 lint issues across 148 files' followed immediately by 'fix(imports): restore load-bearing re-exports stripped by Ruff'. The fix was reactive and may be incomplete. No smoke-test or import-coverage test exists to confirm the repair was exhaustive across all 82 source modules.",
+      "mitigation": "Run a full hot-path import chain test (bot_trading, orders_core, orders_portfolio, signals, bot_ibkr) and commit a test_imports.py smoke test that asserts all critical symbols are importable. This is cowork_prompt item 2 above."
+    },
+    {
+      "risk": "The IC calculator (ic/ package) has never been exercised against real trade data — if it produces incorrect IC values, all alpha validation conclusions will be based on wrong measurements and the paper phase exit decision will be invalid",
+      "category": "alpha",
+      "severity": "high",
+      "evidence": "The IC calculator was just refactored (most recent commit: 'feat(ic): split ic_calculator into ic/ package + add analytics dashboard tab'). There are no commits showing the new package was validated against known-correct output. No test in the ic/ package appears to verify mathematical correctness of IC computation against synthetic data with known answers.",
+      "mitigation": "Run the IC calculator against a synthetic dataset with manually computed IC values. Confirm output matches. Commit a correctness test. See cowork_prompt item 3 above."
+    }
+  ],
+  "observations": [
+    {
+      "observation": "DAR (Direction Agreement Ratio) was just shipped and the composite score cap was removed (signals.py). Score distribution under the new uncapped regime has never been observed in production — it is unknown whether scores are now clustering at extremes, compressing, or distributing normally.",
+      "why_watch": "If scores cluster at high values (most signals agree on direction trivially), the scoring system loses selectivity and every candidate looks like a high-conviction trade. If this happens, min_score threshold (currently 18) becomes meaningless. Watch the score distribution histogram on the first 50 paper trade signals. If mean composite score > 70 or std < 10, the threshold needs recalibration."
+    },
+    {
+      "observation": "dashboard.py is the largest module at 4,148 lines. The recent addition of an IC analytics tab and trade_type pills adds further complexity to an already large file.",
+      "why_watch": "A 4,000+ line dashboard module is a maintenance risk. If two features in the same session both modify dashboard.py (which is likely given how many pipeline features add dashboard stats), merge conflicts and accidental overwrites become likely. Watch for sessions that touch dashboard.py alongside other feature work — consider splitting into sub-modules before the file reaches 5,000 lines."
+    },
+    {
+      "observation": "signals.py is 2,581 lines and is the target of multiple active P1 pipeline features (IV Skew, Gap Classifier, Hurst weighting, Regime-Conditional Weighting). Several of these features modify the same composite scoring section.",
+      "why_watch": "If two sessions both add signal dimensions to signals.py's composite scorer in the same week, they may step on each other. This is the specific WIP collision pattern flagged in OPERATIONAL STATE. Watch the signals.py change log — if more than one feature PR touches the composite score aggregation function simultaneously, serialize them."
+    },
+    {
+      "observation": "The recent commit 'fix(pm): unbound pos_pm in TRIM branch crashes portfolio review' indicates a code path in portfolio review (orders_portfolio.py) had an unbound variable bug that would crash on TRIM operations.",
+      "why_watch": "TRIM logic handles position reduction. If the fix was incomplete or the underlying cause (unbound variable in a conditional branch) appears elsewhere in orders_portfolio.py, a similar crash could silently suppress portfolio reviews. Worth verifying the fix is comprehensive and that no other branches in the same function have similar unbound-variable patterns."
+    },
+    {
+      "observation": "No recent dev session notes (2026-04-08 through 2026-04-14) contain any content — all 5 entries are empty.",
+      "why_watch": "Session notes are the primary source of context about decisions made during development. If they remain empty, the rationale behind recent choices (Ruff adoption, IC package refactor, DAR shipping) exists only in commit messages, which are incomplete. If a bug surfaces in a recent feature, there will be no session log to reference for context. This makes debugging slower and riskier."
+    }
+  ],
+  "roadmap_gaps": "Three gaps are visible in the current roadmap that are implied by the vision but absent from any spec or backlog:\n\n1. PAPER PHASE EXIT CRITERIA — The vision explicitly says live trading is conditional on proving edge, but there is no written document defining what 'proven' means. This is the most critical gap: without it, the paper phase has no exit condition and could run indefinitely or be exited prematurely on gut feel rather than data.\n\n2. TRADE LIFECYCLE OBSERVABILITY — The metadata ledger just shipped, but there is no spec for a 'closed trade analyzer' that aggregates ledger entries into the statistics needed for the Alpha Validation Gate (per-signal IC, win rate by regime, average holding period, fill quality vs signal score). The IC calculator is one piece, but a full closed-trade analytics pipeline is missing.\n\n3. CONFIG GOVERNANCE FOR PAPER→LIVE TRANSITION — The operational state notes that live config values are 'preserved as inline comments in config.py'. There is no spec for how the paper→live config switch is executed safely (e.g., a config_live.py with the tight thresholds, a CLI flag, a gated config loader that reads from the phase gate). Without this, the transition from paper to live is a manual, error-prone config edit rather than a governed, auditable switch.",
+  "model": "claude-sonnet-4-6",
+  "data_sources": {
+    "specs": 105,
+    "sessions": 5,
+    "research": 8,
+    "commits": 20,
+    "tests": false,
+    "code": true
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": "research-volume-profile-vwap-entry-filter-intraday-timing-e-e52192",
+  "title": "Volume-Profile VWAP Entry Filter (Intraday Timing Enhancer)",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Compute intraday VWAP from yfinance 5-minute data and add a pre-execution check: for long entries, only allow if current price is within N% of VWAP (or below); for short entries, only if at or above VWAP. This builds on the already-spec'd Anchored VWAP Entry Gate (spec_complete) and extends it into the execution layer as a dynamic filter rather than just a signal. VWAP is used by 74% of hedge funds as an execution benchmark \u2014 buying below VWAP statistically represents better-than-average entry pricing.",
+  "source": "research",
+  "research_topic": "Order Execution & Market Microstructure",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "Filters entries that occur when price is more than 0.5% above VWAP on a buy or below VWAP on a sell, reducing adverse selection on momentum-chasing fills; backtesting studies suggest this eliminates 10\u201320% of worst-timing entries while keeping most high-quality ones",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-14T15:27:10.601993Z"
+}

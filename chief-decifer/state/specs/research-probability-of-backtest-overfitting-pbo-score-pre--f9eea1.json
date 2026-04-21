@@ -1,0 +1,16 @@
+{
+  "id": "research-probability-of-backtest-overfitting-pbo-score-pre--f9eea1",
+  "title": "Probability of Backtest Overfitting (PBO) Score \u2014 Pre-Deployment Gate",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Implement the Probability of Backtest Overfitting (PBO) metric from Bailey, Borwein, Lopez de Prado & Zhu (Journal of Computational Finance, 2015) inside backtester.py. PBO works by generating a matrix of IS/OOS performance across multiple parameter perturbations and computing the probability that the selected (best IS) parameters rank below median on OOS data. A PBO > 0.5 means the strategy is more likely overfit than not. The 2025 ScienceDirect paper comparing backtesting methods confirms PBO remains the most theoretically grounded single-number overfitting test. Implementation requires only scipy and numpy \u2014 no TA-Lib or paid data. This directly complements the WFE validator as a second independent overfitting test.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Backtesting Robustness, Walk-Forward Validation & Intraday Timing Signals",
+  "impact_score": 3,
+  "impact_label": "Low Impact",
+  "expected_impact": "Catches parameter-optimized strategies where positive performance is statistically attributable to overfitting rather than genuine edge; Bailey & Lopez de Prado (2015) showed PBO >0.5 is the key threshold \u2014 above it, the strategy is more likely to fail OOS than succeed",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-14T15:27:10.633618Z"
+}

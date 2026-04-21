@@ -1,0 +1,51 @@
+{
+  "date": "2026-04-02",
+  "timestamp": "2026-04-02T00:00:00.000Z",
+  "branch": "master",
+  "phase": "B",
+  "spec_id": "research-claude-sentiment-scoring-pipeline",
+  "priority": "P1",
+  "summary": "Built multi-source sentiment scoring pipeline as the 10th signal dimension in the Catalyst layer.",
+  "what_was_built": [
+    "signals/sentiment_scorer.py — full pipeline: Yahoo RSS + Finviz headline fetch, Claude zero-shot direct prompt (Haiku, no CoT), FinBERT local scorer (ProsusAI/finbert, lazy-loaded singleton), regression-calibrated composite (FinBERT 60% + Claude 40%), maps [-1,1] → 0–10",
+    "signals/auto_runner.py — added _sentiment_loop() + 4th daemon thread; start() signature extended with sentiment_interval arg",
+    "signals/catalyst_screen.py — seeded sentiment_score=0.0, sentiment_claude, sentiment_finbert, sentiment_flags fields on candidate creation; updated initial catalyst_score formula to 4-signal weighting",
+    "signals/options_anomaly.py — merge_into_candidates() composite formula updated to F:35% + O:35% + E:15% + S:15%",
+    "signals/edgar_monitor.py — merge_into_candidates() composite formula updated to F:35% + O:35% + E:15% + S:15%",
+    "config.py — added SENTIMENT_SCORER_INTERVAL (default 900s / 15 min)",
+    "requirements.txt — added transformers>=4.35.0 and torch>=2.0.0 for FinBERT",
+    "panels/catalyst.py — candidate rows now show S:score/10 sub-score and sentiment badge (Bullish/Bearish/Neutral); score legend updated with 4-signal breakdown and weights",
+    "app.py — imports SENTIMENT_SCORER_INTERVAL, passes to start_auto_runner()",
+    "tests/test_sentiment_scorer.py — 29 tests: composite score math, calibration weights, FinBERT mock, Claude mock, Yahoo RSS mock, merge_into_candidates file I/O, smoke integration test"
+  ],
+  "design_decisions": [
+    "No chain-of-thought in Claude prompt: ACM ICAIF 2025 found direct prompts outperform CoT for financial sentiment; also reduces latency and token cost",
+    "FinBERT weighted 60% vs Claude 40%: FinBERT 72.2% directional accuracy (Kirtac & Germano 2024) vs Claude zero-shot ~65%",
+    "FinBERT pipeline is lazy-loaded singleton: avoids 1-2s model load blocking app startup; gracefully degrades to Claude-only if transformers/torch not installed",
+    "Composite formula changed from F40+O40+E20 to F35+O35+E15+S15: sentiment is a new signal so conservative 15% weight until IC can be validated",
+    "Finviz fetch is best-effort: returns [] silently if Cloudflare blocks; Yahoo RSS is primary source",
+    "sentiment_snapshots.jsonl: parallel to options_snapshots.jsonl for IC health tracking over time",
+    "S score 5.0 = neutral (maps 0 on [-1,1] scale); deliberately non-zero default so neutral sentiment doesn't suppress composite"
+  ],
+  "test_status": "29/29 passed",
+  "files_changed": [
+    "signals/sentiment_scorer.py",
+    "signals/auto_runner.py",
+    "signals/catalyst_screen.py",
+    "signals/options_anomaly.py",
+    "signals/edgar_monitor.py",
+    "config.py",
+    "requirements.txt",
+    "panels/catalyst.py",
+    "app.py",
+    "tests/test_sentiment_scorer.py",
+    "state/specs/research-claude-sentiment-scoring-pipeline.json",
+    "state/sessions/2026-04-02_feat-sentiment-scoring-pipeline.json"
+  ],
+  "open_todos": [
+    "pip install transformers torch (or torch-cpu) to enable FinBERT locally — pipeline degrades gracefully to Claude-only without it",
+    "Paper-trade run: confirm sentiment_score populates in candidates JSON and S: column visible in Catalyst Alerts panel",
+    "After 30+ days of snapshots in sentiment_snapshots.jsonl, compute rolling IC to validate 15% weight vs re-calibrate"
+  ],
+  "session_count": 57
+}

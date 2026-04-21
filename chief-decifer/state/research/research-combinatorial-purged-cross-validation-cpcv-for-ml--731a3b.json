@@ -1,0 +1,16 @@
+{
+  "id": "research-combinatorial-purged-cross-validation-cpcv-for-ml--731a3b",
+  "title": "Combinatorial Purged Cross-Validation (CPCV) for ML Engine",
+  "status": "spec_complete",
+  "phase": "C",
+  "priority": "P2",
+  "summary": "Replace the simple chronological train/test split in ml_engine.py with Combinatorial Purged Cross-Validation (CPCV), as developed by Marcos Lopez de Prado (Advances in Financial Machine Learning). CPCV prevents information leakage in two ways: (1) it 'purges' training observations whose triple-barrier labels overlap with test period dates, and (2) it adds an 'embargo' \u2014 a gap of N bars after each test fold before the next training fold starts. A 2025 ScienceDirect paper comparing CV methods for financial ML found CPCV has the lowest PBO score across all tested approaches, outperforming standard k-fold, time-series split, and purged k-fold. Critical for Decifer because the existing meta-labeling and triple barrier labels inherently overlap in time.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Backtesting Robustness, Walk-Forward Validation & Intraday Timing Signals",
+  "impact_score": 8,
+  "impact_label": "High Impact",
+  "expected_impact": "+2\u20134% OOS win rate by eliminating label leakage in triple barrier and meta-labeling training; ScienceDirect 2025 paper shows CPCV has materially lower Probability of Backtest Overfitting (PBO) vs all other CV methods tested",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-14T05:25:49.039171Z"
+}

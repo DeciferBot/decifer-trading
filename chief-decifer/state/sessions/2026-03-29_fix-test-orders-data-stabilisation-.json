@@ -1,0 +1,23 @@
+{
+  "date": "2026-03-29",
+  "timestamp": "2026-03-29T15:57:47.076Z",
+  "branch": "master",
+  "phase": "unknown",
+  "last_commit": "df3b432 fix(test,orders,data): stabilisation — reqPnL stub, flatten logging, retry backoff",
+  "files_changed": [
+    "claude/hooks/session-end-hook.mjs",
+    ".claude/settings.json",
+    "pytest.ini",
+    "tests/conftest.py",
+    "tests/test_agents.py",
+    "tests/test_news_sentinel.py",
+    "tests/test_orders_execute.py",
+    "tests/test_scanner.py",
+    "tests/test_social_sentiment.py",
+    "CLAUDE.md.bak"
+  ],
+  "test_status": "unknown",
+  "summary": "df3b432 fix(test,orders,data): stabilisation — reqPnL stub, flatten logging, retry backoff",
+  "open_todos": [],
+  "session_count": 9
+}

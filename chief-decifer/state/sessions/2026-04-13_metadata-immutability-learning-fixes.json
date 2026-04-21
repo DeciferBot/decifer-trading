@@ -1,0 +1,63 @@
+{
+  "session_id": "2026-04-13_metadata-immutability-learning-fixes",
+  "date": "2026-04-13",
+  "approved_by": "PENDING",
+  "topic": "Trade metadata immutability + learning system bug fixes",
+  "north_star_pillars": [3, 4],
+  "summary": "Hardened the learning system against data loss. IBKR re-sync can no longer overwrite trade decision metadata. Fixed pnl_pct formula for options across all 5 close paths. Fixed log_trade dedup killing legitimate second closes of the same symbol. Fixed IC equal-weights display bug. Added pnl_pct to trades.json records. Wrote retroactive pattern_id recovery script.",
+
+  "motivation": "Position detail cards were showing 'Re-synced from IBKR (was missing from tracker)' as the trade rationale — the entire decision context for the trade was being erased by the IBKR reconciliation loop. Without trade metadata, the learning system cannot compute IC or record pattern outcomes. Every closed trade without metadata is wasted training data.",
+
+  "changes": [
+    {
+      "file": "orders_state.py",
+      "change": "Added DECISION_METADATA_FIELDS frozenset (15 fields). Rewrote _safe_set_trade() with immutability guard: if an existing position has a non-UNKNOWN trade_type, the 15 protected fields are preserved regardless of what the caller passes. IBKR can only update: current, current_premium, pnl, _price_sources, status."
+    },
+    {
+      "file": "orders_portfolio.py",
+      "change": "Added _find_saved() and _find_saved_metadata() helpers. Startup reconciliation and live re-sync now perform saved-metadata-wins merge: {**ibkr_fields, **saved_meta}. Positions without any local metadata are flagged metadata_status=MISSING (not silently given SCALP as trade_type)."
+    },
+    {
+      "file": "dashboard.py",
+      "change": "Position modal now shows trade_type (colour-coded), conviction, entry_regime. Positions with metadata_status=MISSING show a red banner warning. Positions reconciled from IBKR without metadata are visually flagged."
+    },
+    {
+      "file": "bot_trading.py",
+      "change": "Fixed pnl_pct formula in all 5 close paths (external_close, cycle_check exit, PM exit, PM trim, agent sell). Options were missing the x100 contract multiplier in the denominator — percentage returns were inflated 100x."
+    },
+    {
+      "file": "learning.py",
+      "change": "Fixed log_trade dedup: added pattern_id guard before the 24h same-symbol window. Different pattern_ids = different trade cycles, never duplicates. Also added pnl_pct to the trades.json CLOSE record so it is stored for analysis."
+    },
+    {
+      "file": "ic_calculator.py",
+      "change": "Fixed using_equal_weights display: replaced exact float == comparison with tolerance-based check (abs(w - 1/N) < 1e-9) plus force_equal_weights config flag. Dashboard now correctly shows 'Equal Weights (learning mode)'."
+    },
+    {
+      "file": "scripts/recover_pattern_ids.py",
+      "change": "New script (read-only until run). Retroactively restores pattern_id to active positions that lost it via IBKR re-sync. Only restores when exactly 1 unambiguous candidate exists in pattern_library (CCBG and AMZN qualify). Skips ambiguous and unrecoverable cases. Run with --dry-run first, then without when bot is stopped."
+    },
+    {
+      "file": "docs/DECISIONS.md",
+      "change": "Logged 4 new decisions: metadata immutability, dedup pattern_id guard, pnl_pct in trades.json, IC float comparison fix."
+    }
+  ],
+
+  "learning_system_state": {
+    "pattern_library_entries": 518,
+    "pattern_library_completed": 0,
+    "root_cause_completed_zero": "Pattern entries exist from 2026-04-09 onwards. All current active positions (except MSTR) lost their pattern_id through IBKR re-sync before the immutability guard was in place. MSTR (opened 2026-04-13) is the first position with intact metadata under the new guard.",
+    "ic_records": 60,
+    "ic_equal_weights": true,
+    "ic_note": "force_equal_weights=True in config. By design for cold-start. Gate to activate real IC weights: 200 closed trades.",
+    "pattern_recovery_available": "Run: python3 scripts/recover_pattern_ids.py (bot must be stopped). Will restore CCBG and AMZN pattern_ids. 4 positions ambiguous, 4 unrecoverable."
+  },
+
+  "tests_run": "py_compile across all 6 modified files, 3 passes each — all OK. Runtime unaffected.",
+
+  "next_steps": [
+    "Run: python3 scripts/recover_pattern_ids.py (after bot restart, to restore CCBG+AMZN pattern_ids)",
+    "Monitor: first MSTR close will be the first clean end-to-end learning loop (open→pattern→close→IC)",
+    "Gate: 200 closed trades needed before HMM or Alphalens work begins"
+  ]
+}

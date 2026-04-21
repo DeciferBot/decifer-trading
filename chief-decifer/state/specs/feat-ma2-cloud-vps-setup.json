@@ -1,0 +1,29 @@
+{
+  "id": "feat-ma2-cloud-vps-setup",
+  "title": "Cloud VPS + Per-User Docker Container Infrastructure",
+  "status": "future",
+  "priority": "P1",
+  "phase": "MA2",
+  "designed_date": "2026-03-29",
+  "started_date": null,
+  "completed_date": null,
+  "summary": "Provision cloud VPS (Ubuntu 22, Docker) to host the shared brain container plus per-user containers. Each user runs in a fully isolated Docker container with account agents, IBKR Gateway connection, and encrypted credentials. docker-compose handles orchestration. VPS setup is a prerequisite for all MA2+ multi-user deployment.",
+  "approach": "Decide cloud provider (DigitalOcean, Hetzner, or AWS \u2014 open question). Provision Ubuntu 22 VPS with 8+ vCPUs. Install Docker, Docker Compose, nginx (reverse proxy). Set up IBKR Gateway headless container using IBC automation. Configure ufw firewall: allow 443 (dashboard), 8765 (WebSocket), block all else. Deploy Decifer brain container. Write a deploy.sh bootstrap script so the whole setup is reproducible.",
+  "files_affected": [
+    "deploy.sh",
+    "docker-compose.brain.yml",
+    "nginx.conf"
+  ],
+  "dependencies": [
+    "feat-ma1-account-decision-agent",
+    "feat-ma1-connection-manager"
+  ],
+  "roadmap_ref": "vision/Decifer_MultiAccount_Architecture.docx \u00a7 Phase 2",
+  "branch": null,
+  "approved_by": null,
+  "deferral_reason": "multi-account infrastructure \u2014 future stage (paper_trading_single_account prioritisation)",
+  "merged_from": [
+    "feat-ma2-cloud-vps-setup",
+    "feat-ma2-docker-compose-containers"
+  ]
+}

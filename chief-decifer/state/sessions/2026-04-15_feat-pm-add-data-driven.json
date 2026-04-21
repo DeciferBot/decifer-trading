@@ -1,0 +1,31 @@
+{
+  "session_id": "2026-04-15_feat-pm-add-data-driven",
+  "date": "2026-04-15",
+  "approved_by": "Amit",
+  "topic": "PM ADD verb — make it data-driven, not rule-driven: Opus decides whether, code decides size",
+  "north_star_pillars": [1, 2],
+  "summary": "Amit's observation: 'portfolio manager does not add if it can. it should review position and the outcome add, trim, close should come from opus based on all the data the PM has.' Investigation revealed ADD was architecturally wired end-to-end (prompt vocabulary, parser, bot routing, execute_add_to_position in orders_core) but Opus rarely emitted it, and when it did the sizing bypassed the entry risk/sizing stack. Two root causes: (1) the rendered position block Opus read was a thin projection — signal_scores, ic_weights_at_entry, entry_thesis, setup_type, pattern_id were all stored on the position but never shown to Opus; (2) ADD sizing ran on Opus-picked ADD_NOTIONAL / current_price, skipping calculate_position_size() and violating max_single_position silently. This session expanded the data surface and moved sizing into code.",
+  "motivation": "ADD is the biggest alpha lever on the PM. A PM that never adds to winners leaves conviction capital on the table, and one that lets Opus pick dollar amounts can blow through the single-position cap. The fix is architectural symmetry with entries: Opus provides the judgment, calculate_position_size() provides the risk contract. Same function, same caps, same scalars.",
+  "changes": [
+    {"file": "portfolio_manager.py", "change": "Rewrote _PM_SYSTEM prompt: removed rigid per-verb numeric rubric (SCALP drop 5+ → EXIT, SWING 15+ → EXIT, etc.), replaced with data-driven verb definitions that enumerate multiple legitimate ADD triggers (signal strengthening, pullback to support, news catalyst, rally continuation, confluence emerging) and explicitly disambiguate DCA-into-pullback (valid when thesis intact, core signals not collapsing) from averaging-down (bad). Removed ADD_NOTIONAL output requirement — prompt now states the code sizes ADDs. Asks Opus to lead REASON with a snake_case tag."},
+    {"file": "portfolio_manager.py", "change": "Expanded position rendering: added setup=, pattern=, THESIS line (full entry_thesis string), and a DIMENSION EVOLUTION block showing per-dimension entry→current score deltas with [load-bearing w=X.XX] annotations on dimensions that had IC weight at entry. Data comes from score_breakdown on all_scored + signal_scores + ic_weights_at_entry stored on the position."},
+    {"file": "portfolio_manager.py", "change": "Removed ADD_NOTIONAL parsing from _parse_actions (lines 451-457). Parser no longer extracts or emits an add_notional field on the action dict."},
+    {"file": "bot_trading.py", "change": "Added calculate_position_size to the risk imports at line 58."},
+    {"file": "bot_trading.py", "change": "Rewrote the ADD handler (previously lines 1550-1583, now ~1550-1640): removed _add_notional / int(notional/price) sizing; added check_risk_conditions() gate (same as entries — daily loss limit, drawdown CB, cash reserve, market hours, PDT, CAPITULATION); added earnings-48h gate via get_earnings_within_hours; sizes via calculate_position_size(pv, price, current_score, regime, atr) using the current scan's composite score (not entry score); clamps add_qty to single-position cap headroom and downgrades to HOLD if headroom is zero."}
+  ],
+  "decisions_locked": [
+    "PM ADD sizing goes through calculate_position_size() — same function entries use. Opus decides whether to ADD, code decides how much.",
+    "DCA into pullbacks is explicitly allowed; the distinction from averaging-down is made by Opus reading the data (per-dim deltas + thesis text), not by a prompt rule.",
+    "Hardcoded safety floors on ADD: check_risk_conditions, earnings-within-48h, single-position-cap clamp. If a floor blocks, ADD is downgraded to HOLD with a logged reason (no silent failure).",
+    "REASON field convention: snake_case tag + ':' + one-line explanation. Post-hoc clustering can regex on the leading tag without needing a separate triggered_rule field."
+  ],
+  "learning_system_state": "No changes to the learning system. IC tracker, phase gate, pattern library, trade journal — all untouched. ADD events will flow through the same log_order path as before (orders_core.py:1491) and the audit_log.jsonl entries now reflect the deterministic size decision path.",
+  "tests_run": "(1) python3.11 import check on both touched files — pass. (2) AST parse check on both files — pass. (3) PM smoke test: constructed synthetic position with signal_scores, ic_weights_at_entry, entry_thesis, setup_type, pattern_id; ran run_portfolio_review with a fake Opus client that returns ADD; verified the user prompt contains THESIS line, DIMENSION EVOLUTION block with per-dim deltas and [load-bearing w=X.XX] annotations on breakout(0.28), momentum(0.22), trend(0.15); verified the parser returned {symbol, action=ADD, reasoning} with no add_notional key. (4) Ran tests/test_cycle_check.py + test_pm_exit_reason.py + test_imports.py — PM tests pass. Pre-existing test_imports failures (MagicMock conftest artifacts on orders/signals/bot_ibkr/bot_state/scanner/agents/risk/learning) and one test_agents failure (CONFIG['vix_kelly'] missing) are unrelated to this change — present on master before these edits.",
+  "next_steps": [
+    "Monitor audit_log.jsonl over the next few trading days for action='ADD' entries. Zero ADDs in a week = prompt is still not triggering Opus and we iterate.",
+    "Once we have ≥10 closed trades that received an ADD leg, cluster by REASON tag prefix to see which trigger types (signal_strengthening / pullback_to_support / news_catalyst / rally_continuation / ...) are alpha-positive.",
+    "Optional later: surface a pm_added=True flag on the trade journal entry so the IC tracker can measure ADD vs no-ADD performance directly.",
+    "Deferred: execute_add_to_position only supports LONG stocks. Options and FX ADDs are out of scope — revisit if we see enough option positions that never getting an ADD is leaving alpha on the table."
+  ],
+  "pre_existing_errors_fixed": []
+}

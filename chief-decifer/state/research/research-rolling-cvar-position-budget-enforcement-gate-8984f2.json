@@ -1,0 +1,16 @@
+{
+  "id": "research-rolling-cvar-position-budget-enforcement-gate-8984f2",
+  "title": "Rolling CVaR Position Budget Enforcement Gate",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Computes the portfolio's rolling 95% CVaR using historical simulation over the trailing 60 trading days of equity curve returns. CVaR@95 = average of the worst 5% of daily portfolio returns. If CVaR@95 exceeds a per-user budget (e.g., \u20132.5% expected daily loss in the tail), new position opens are blocked until the metric recovers. This is distinct from the existing 'Rolling CVaR Dashboard Metric and Per-Account Risk Budget' (which is analytics-only) by adding an actual enforcement gate that prevents order submission. VaR cannot fill this role because it ignores losses beyond the threshold and is not sub-additive across positions.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "Provides a mathematically coherent tail-risk cap that prevents new positions from being opened when the portfolio's expected tail loss (CVaR@95) exceeds a configurable budget; CVaR is sub-additive and captures average loss beyond VaR, making it 10\u201330% more conservative than VaR during stress periods as empirically documented in 2024\u20132025 research",
+  "difficulty": "Medium",
+  "dev_days": 4,
+  "created_at": "2026-04-14T05:25:49.023507Z"
+}

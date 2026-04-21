@@ -1,0 +1,16 @@
+{
+  "id": "research-walk-forward-efficiency-wfe-ratio-validator-498d6f",
+  "title": "Walk-Forward Efficiency (WFE) Ratio Validator",
+  "status": "spec_complete",
+  "phase": "C",
+  "priority": "P2",
+  "summary": "Add a Walk-Forward Efficiency (WFE) metric to backtester.py that measures how well in-sample (IS) optimized parameters translate to out-of-sample (OOS) performance. WFE = OOS_annualized_return / IS_annualized_return. A WFE > 0.8 indicates robust parameters; WFE 0.5\u20130.8 is marginal; WFE < 0.5 signals likely overfitting and the strategy should be discarded or re-specified. IBKR's deep dive on walk-forward analysis (2025) confirms this is the industry-standard check for live deployment readiness. The backtester already computes returns \u2014 this feature adds a rolling-window OOS split and a single pass/fail flag before any strategy is promoted to the brain loop.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Backtesting Robustness, Walk-Forward Validation & Intraday Timing Signals",
+  "impact_score": 6,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "Prevents deploying overfit strategies; research shows >90% of academic quant strategies with positive IS Sharpe produce negative OOS Sharpe \u2014 WFE < 0.5 is an early discard flag",
+  "difficulty": "Easy",
+  "dev_days": 2,
+  "created_at": "2026-04-14T15:27:10.624611Z"
+}

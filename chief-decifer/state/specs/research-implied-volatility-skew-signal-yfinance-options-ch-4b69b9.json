@@ -1,0 +1,16 @@
+{
+  "id": "research-implied-volatility-skew-signal-yfinance-options-ch-4b69b9",
+  "title": "Implied Volatility Skew Signal (yfinance Options Chain)",
+  "status": "spec_complete",
+  "phase": "A",
+  "priority": "P1",
+  "summary": "Extract put-call implied volatility skew from yfinance option chains \u2014 the difference between OTM put IV and ATM call IV \u2014 as a daily signal dimension for optionable stocks. A 2024 Management Science paper (Wu & Tian) confirms IV skew reflects both structural risk characteristics and short-term informed order flow, making it predictive of next-period returns. yfinance exposes full option chains with implied volatility natively, making this free to implement.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "impact_score": 5,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "Academic studies document 0.5% lower next-month returns per unit increase in RVol-IVol spread; IV skew is a statistically significant cross-sectional return predictor after controlling for momentum, size, and value (Management Science 2024). Expected directional accuracy uplift of +3-5% on optionable stocks.",
+  "difficulty": "Medium",
+  "dev_days": 4,
+  "created_at": "2026-04-14T15:27:10.482527Z"
+}

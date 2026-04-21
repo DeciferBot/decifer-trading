@@ -1,0 +1,16 @@
+{
+  "id": "research-momentum-duration-detector-regime-age-signal-dd45f9",
+  "title": "Momentum Duration Detector \u2014 Regime Age Signal",
+  "status": "spec_complete",
+  "phase": "D",
+  "priority": "P2",
+  "summary": "Track the 'age' of the current momentum regime for each stock by measuring how many consecutive days the 12-month return has remained positive (or negative). As duration increases beyond 8 months, reduce momentum signal weight and simultaneously increase mean-reversion signal weight \u2014 implementing the semi-Markov insight that state termination probability increases with age. This is distinct from HMM regime detection (which uses volatility clustering) because it uses return duration, not volatility state.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "Giner & Zakamulin (Economic Modelling 2023, Journal of Asset Management 2024) show that momentum lasts ~12 months then reverses; their semi-Markov model correctly predicts duration-dependent state termination. Detecting when a momentum trend is 'old' (>8 months) should reduce momentum false positives by an estimated 15-20% and improve mean-reversion entry timing.",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-14T15:27:10.517467Z"
+}

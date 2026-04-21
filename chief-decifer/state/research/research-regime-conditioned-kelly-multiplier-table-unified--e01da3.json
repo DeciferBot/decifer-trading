@@ -1,0 +1,16 @@
+{
+  "id": "research-regime-conditioned-kelly-multiplier-table-unified--e01da3",
+  "title": "Regime-Conditioned Kelly Multiplier Table \u2014 Unified Regime Risk Overlay",
+  "status": "spec_complete",
+  "phase": "D",
+  "priority": "P2",
+  "summary": "Consolidate the HMM state, VIX term-structure flag, and breadth gate into a single RegimeContext object that emits a composite risk multiplier (0.0\u20131.0) applied to the Kelly fraction before each position is sized. This is the integration layer that makes the three regime signals above operate as a unified system rather than independent checks. A 2025 arXiv paper (arXiv:2508.16598 'Sizing the Risk: Kelly, VIX, and Hybrid Approaches') empirically validated that hybrid Kelly+VIX sizing outperforms pure Kelly across multiple regime environments.",
+  "source": "research",
+  "research_topic": "Market Regime Detection & Adaptation",
+  "impact_score": 5,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "A hybrid Kelly+VIX sizing strategy demonstrated annualised returns of 14\u201323% with materially lower volatility and drawdowns than buy-and-hold in 2024 out-of-sample testing (arXiv 2508.16598); combining regime signal with Kelly reduces tail risk without sacrificing expected return in favourable regimes",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-14T05:25:49.056766Z"
+}

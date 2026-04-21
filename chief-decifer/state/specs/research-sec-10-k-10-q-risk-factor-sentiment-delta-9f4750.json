@@ -1,0 +1,16 @@
+{
+  "id": "research-sec-10-k-10-q-risk-factor-sentiment-delta-9f4750",
+  "title": "SEC 10-K / 10-Q Risk Factor Sentiment Delta",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Build a lightweight SEC filing sentiment monitor that downloads Item 1A (Risk Factors) from 10-K/10-Q filings via EDGAR's free API, scores them with FinBERT or Claude, and flags when a company's tone has shifted meaningfully from its prior filing. Research on 21,421 10-K reports (2002-2024) shows that a more optimistic tone in risk factors predicts higher returns, and that stocks with the lowest 'positive language similarity' to their prior filings (i.e. language changed most) generate the strongest alpha \u2014 consistent with Lazy Prices research. This is a weekly/quarterly signal, not daily, making it a position bias layer rather than an entry trigger.",
+  "source": "research",
+  "research_topic": "Sentiment Analysis & NLP for Trading",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "ScienceDirect 2025 study (21K reports, 2002-2024): more optimistic risk-factor tone predicts higher returns at 5% significance; 'low positive similarity' decile outperforms 'high positive similarity' \u2014 adds slow-burn fundamental signal",
+  "difficulty": "Medium",
+  "dev_days": 4,
+  "created_at": "2026-04-14T15:27:10.642130Z"
+}

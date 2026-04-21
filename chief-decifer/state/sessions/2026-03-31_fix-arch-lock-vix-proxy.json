@@ -1,0 +1,23 @@
+{
+  "date": "2026-03-31",
+  "timestamp": "2026-03-31T21:36:52.413Z",
+  "branch": "master",
+  "phase": "unknown",
+  "last_commit": "5b0fef4 fix(arch): lock VIX-proxy as sole regime detector, defer HMM — Action #9",
+  "files_changed": [
+    "ot.py",
+    "dashboard.py",
+    "data/orders.json",
+    "equity_history.json",
+    "learning.py",
+    "orders.py",
+    "phase_gate.py",
+    "tests/test_bot.py",
+    "tests/test_phase_gate.py",
+    "CLAUDE.md.bak"
+  ],
+  "test_status": "unknown",
+  "summary": "5b0fef4 fix(arch): lock VIX-proxy as sole regime detector, defer HMM — Action #9",
+  "open_todos": [],
+  "session_count": 51
+}

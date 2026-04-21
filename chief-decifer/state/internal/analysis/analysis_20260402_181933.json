@@ -1,0 +1,198 @@
+{
+  "generated_at": "2026-04-02T10:19:56.157465+00:00",
+  "vision_statement": "Decifer will be a cloud-hosted, profitable trading bot where friends and family connect via a web UI, link their own broker accounts, and control their own risk profiles. The path runs through provably profitable paper trading first, then live single-account, then hosted multi-user.",
+  "current_stage_assessment": "Decifer is in paper_trading_single_account. The codebase has grown rapidly \u2014 27,464 lines across 45 modules \u2014 with significant recent activity in risk management, regime detection, execution, and architecture. The core mandate at this stage is to prove the bot is profitable and reliable on paper before any live money touches it. That means signal quality, position sizing correctness, execution reliability, and measurable paper P&L all need to be trustworthy before we advance.",
+  "executive_summary": "Decifer has shipped an impressive amount of infrastructure in a short window: 9-dimension signals, sentiment pipeline, regime detection seeds, Kelly sizing, execution agent, and a major bot.py refactor. However, the project is at a critical inflection point: the pipeline is loaded with 9 active risk/sizing features (many overlapping), none of which have been validated against actual paper trading outcomes. There is no evidence of a systematic paper trading performance review, no walk-forward backtest, and no signal IC validation \u2014 meaning the bot could be trading on noise with multiple complex sizing layers stacked on top. The biggest risk right now is complexity without proof: we are building toward a live money product without establishing that the underlying signals work. The two P1 active features (Regime-Gated Router and Signal-Strength Kelly Multiplier) are the highest-leverage unfinished items and should ship before the P2 risk stack is finalised. The backlog also contains a critical gap: no spec for paper trading performance reporting, which is the exit criterion for the current stage.",
+  "recommended_actions": [
+    {
+      "action": "Ship Regime-Gated Strategy Router (Momentum vs Mean-Reversion + Position Sizing) \u2014 the highest-priority active feature",
+      "type": "build",
+      "why_now": "This is a P1 active feature and the single highest-leverage item in the pipeline. The 2026-03-30 regime research is unambiguous: regime-adaptive systems consistently outperform static ones. All the directional signal infrastructure (Direction-Agnostic Signals, REVERSION dimension, Short-Candidate Scanner) is live but being applied in a single-mode context. The Regime Router is the feature that makes all of them work together correctly. Without it, the bot is applying momentum logic in mean-reversion regimes and vice versa \u2014 which is a direct source of losses. It also gates the position sizing decisions: the Signal-Strength Kelly Multiplier (the other P1) depends on regime context to be calibrated correctly.",
+      "source": "Active pipeline: Regime-Gated Strategy Router (B P1); Research: Market Regime Detection & Adaptation [2026-03-30]; Active pipeline: Signal-Strength-Proportional Kelly Multiplier (B P1)",
+      "cowork_prompt": "SESSION BRIEF: Ship Regime-Gated Strategy Router\n\nContext: Decifer is in paper_trading_single_account stage. We have shipped Direction-Agnostic Signals, a REVERSION dimension, and Short-Candidate Scanner \u2014 but all signals are being evaluated in a single strategy mode. The Regime-Gated Strategy Router is a P1 active feature that gates which strategy (momentum vs mean-reversion) is active based on market regime, and adjusts position sizing accordingly.\n\nWhat's already in the codebase: A DFA Hurst Layer 2 regime signal was shipped disabled 17 hours ago (see commit: 'feat(regime): add DFA Hurst Layer 2 regime signal (shipped disabled)'). VIX-rank adaptive Kelly fraction is live. The HMM regime detection is in the backlog as a separate D-tier feature.\n\nGoal: Implement the two-state market regime detector (VIX proxy + SPY 200-day MA, with optional HMM hook) that dynamically routes signal evaluation to momentum or mean-reversion mode, and scales position sizing accordingly. Enable the Hurst signal that was shipped disabled.\n\nSpecific tasks:\n1. Review the current regime signal code shipped disabled \u2014 understand what's there\n2. Implement the regime gate in bot_trading.py (or the appropriate sub-module post-refactor) that reads regime state and routes to momentum vs mean-reversion signal weighting\n3. Wire the regime state into position sizing \u2014 momentum regime uses standard Kelly, mean-reversion regime reduces size or uses different multipliers\n4. Add a regime state indicator to the dashboard\n5. Write tests: regime classification under known VIX/SPY conditions, routing logic, sizing output under each regime\n\nConstraints: Do not ship to live. Paper trading only. Keep the HMM as a future enhancement hook, not a dependency."
+    },
+    {
+      "action": "Ship Signal-Strength-Proportional Kelly Multiplier \u2014 complete the P1 sizing stack",
+      "type": "build",
+      "why_now": "This is the second P1 active feature and directly complements the Regime Router. The 2026-04-02 risk research is explicit: static Kelly is the most dangerous thing a systematic bot can do. We already have VIX-rank adaptive Kelly (shipped 19 hours ago) but the signal-strength multiplier is the piece that ties conviction (signal score 0-10) to size. Without it, a 6/10 signal and a 9/10 signal get the same position \u2014 which wastes edge on weak setups and under-bets strong ones. This should ship immediately after the Regime Router because the regime context is an input to the multiplier calibration.",
+      "source": "Active pipeline: Signal-Strength-Proportional Kelly Multiplier (B P1); Research: Risk Management & Position Sizing [2026-04-02]; Shipped: Direction-Agnostic Signals",
+      "cowork_prompt": "SESSION BRIEF: Ship Signal-Strength-Proportional Kelly Multiplier\n\nContext: Decifer is in paper_trading_single_account. We have shipped Direction-Agnostic Signals (0-10 conviction scoring per dimension), VIX-rank adaptive Kelly, and ATR volatility cap. The Signal-Strength Kelly Multiplier is a P1 active feature that scales the fractional Kelly output by the normalised signal strength score.\n\nGoal: Modify the Kelly position sizing logic so that the fractional Kelly output is multiplied by a signal-strength scalar derived from the aggregate signal score. A full-strength signal (e.g. 9/10) should get close to full fractional Kelly; a weak signal (e.g. 4/10) should get a significantly reduced multiplier.\n\nSpecific tasks:\n1. Locate the current Kelly sizing logic (likely in risk.py \u2014 1,119 lines, review the relevant section)\n2. Implement a signal_strength_multiplier(score, min_score, max_score) function that maps [min_score, max_score] to a multiplier range (e.g. 0.3x to 1.0x) \u2014 make the range configurable in config.py\n3. Apply the multiplier after fractional Kelly is computed, before the ATR cap and VIX scalar are applied \u2014 document the order of operations clearly\n4. Add the signal strength multiplier value to the trade log so it can be reviewed in paper trading analysis\n5. Write unit tests: multiplier output at min/mid/max scores, full sizing pipeline integration test with all scalars applied in correct order\n\nConstraints: The multiplier must not be applied before the consensus threshold check \u2014 only signals that have passed the 3/6 agents threshold should reach sizing. Paper trading only."
+    },
+    {
+      "action": "Spec and build a Paper Trading Performance Report \u2014 the exit criterion for the current stage",
+      "type": "spec",
+      "why_now": "There is no spec, no backlog item, and no shipped feature for systematically measuring whether the bot is actually profitable in paper trading. The entire current stage (paper_trading_single_account) has a single job: prove the bot works on paper before touching live money. Without a defined performance report, we have no exit criterion, no way to know when we've passed, and no data to show stakeholders. This is the most dangerous gap in the project \u2014 we could ship a dozen more features and still not know if the bot makes money.",
+      "source": "Vision: current stage paper_trading_single_account; Roadmap gap: no paper trading performance reporting feature exists anywhere in shipped/active/backlog",
+      "cowork_prompt": "SESSION BRIEF: Spec the Paper Trading Performance Report\n\nContext: Decifer is in paper_trading_single_account. The entire purpose of this stage is to prove the bot is profitable and reliable on paper before advancing to live trading. There is currently no spec, no backlog item, and no shipped feature that defines what 'profitable and reliable on paper' means or how to measure it.\n\nGoal: Write a complete product spec for the Paper Trading Performance Report. This becomes the exit criterion for the current stage.\n\nThe spec must define:\n1. The key metrics to track: total return, Sharpe ratio, max drawdown, win rate, average win/loss ratio, profit factor, number of trades, average holding period, regime-split performance (if regime router is live)\n2. The minimum thresholds that constitute 'passing' (e.g. Sharpe > 1.0 over 60 trading days, max drawdown < 15%, win rate > 50%)\n3. The reporting cadence (daily summary, weekly review)\n4. Where the data comes from (trade journal, existing dashboard, new module?)\n5. What the dashboard surface looks like \u2014 what charts, what tables\n6. How this data is persisted so it can be reviewed over time\n\nAlso document the explicit exit criteria for paper_trading_single_account stage:\n- Minimum trading history required (suggest: 60 trading days / ~3 months)\n- Minimum number of completed round-trip trades (suggest: 50)\n- Performance thresholds to be defined in the spec\n\nOutput: A written spec document (markdown) that can be added to the project and implemented as a feature. Also add the implementation as a backlog item."
+    },
+    {
+      "action": "Rationalise and sequence the 9 active P2 risk features \u2014 make an explicit prioritisation decision before more are built",
+      "type": "decision",
+      "why_now": "There are 9 active features, 7 of which are P2 risk/sizing features: Adaptive Tail-Risk Stress Gate, Bayesian Kelly, CDaR Sizer, Drawdown-Proportional Scaler, Cross-Asset Correlation Decay, Portfolio Volatility Target Enforcer, and Rolling CVaR Budget Gate. These are all in-flight simultaneously. Several overlap (CDaR, CVaR, and Kelly are all sizing constraints). Running all of them in production simultaneously will create a sizing stack so conservative it may never trade, or their interactions will be impossible to debug. A decision must be made: which 2-3 of these ship first, which are deferred, and what is the sequencing logic.",
+      "source": "Active pipeline: 7 P2 risk features; Research: Risk Management & Position Sizing [2026-04-02]; Code health: risk.py already 1,119 lines",
+      "cowork_prompt": "SESSION BRIEF: Rationalise the P2 Risk Feature Stack\n\nContext: Decifer has 7 active P2 risk/sizing features simultaneously in development: Adaptive Tail-Risk Stress Scenario Gate, Bayesian Self-Updating Kelly Sizer, Conditional Drawdown at Risk (CDaR) Trade Sizer, Drawdown-Proportional Position Scaler, Live Cross-Asset Rolling Correlation Decay Alert, Portfolio-Level Volatility Target Enforcer, and Rolling CVaR Position Budget Gate.\n\nThe problem: These features overlap significantly. CDaR and CVaR are both tail-risk sizing constraints. Bayesian Kelly and Signal-Strength Kelly are both Kelly modifiers. Drawdown-Proportional Scaler and Volatility Target Enforcer both scale position size based on portfolio state. Shipping all simultaneously creates an untestable interaction surface and likely a system that rarely trades.\n\nGoal: Produce a prioritised sequencing plan for these 7 features.\n\nTasks:\n1. Map each feature to its role: (a) pre-trade gate (blocks trade entirely), (b) sizing scalar (reduces size), (c) monitoring/alert only\n2. Identify overlapping features \u2014 for each overlap, decide which one ships first and which is deferred or merged\n3. Define the order of operations for the sizing pipeline: what runs first, second, third in the chain\n4. Select 2 features to ship in the next sprint, defer the rest to backlog with explicit reasoning\n5. Document the decision as an ADR (Architecture Decision Record) in the project\n\nRecommended evaluation criteria: (1) Does it prevent ruin? (2) Does it have the least interaction surface? (3) Is it independently testable?\n\nSuggested candidates for immediate ship: Drawdown-Proportional Position Scaler (simple, well-understood, independently testable) and Portfolio-Level Volatility Target Enforcer (standard institutional practice, clear parameter). All others deferred pending paper trading data."
+    },
+    {
+      "action": "Validate that the bot is actually generating and completing paper trades \u2014 run a live paper trading audit",
+      "type": "validate",
+      "why_now": "The recent commit history shows a series of critical bug fixes: 'fix(orders): correct combined_exposure est_value \u2014 was 1.5x portfolio, blocking trades', 'fix(dashboard): repair empty HTML + execute_buy candle_gate TypeError', '5-bug patch from brute-force audit'. These fixes suggest the bot was not trading correctly until very recently. Before building more features, we need to confirm the bot is actually generating trades, filling them, and logging them correctly in paper mode. If it isn't, everything else is moot.",
+      "source": "Git commits: combined_exposure bug blocking trades; candle_gate TypeError; 5-bug brute-force patch; orders.py ATR sizer regression suite",
+      "cowork_prompt": "SESSION BRIEF: Paper Trading Live Audit\n\nContext: Decifer is in paper_trading_single_account. Recent commits include: 'fix(orders): correct combined_exposure est_value \u2014 was 1.5x portfolio, blocking trades', 'fix(dashboard): repair empty HTML + execute_buy candle_gate TypeError', and a '5-bug patch from brute-force audit'. These fixes imply the bot had multiple blocking bugs until very recently.\n\nGoal: Run a structured audit to confirm the bot is actually working end-to-end in paper trading mode.\n\nSpecific tasks:\n1. Start the bot in paper trading mode and let it run for a full market session (or simulate one)\n2. Confirm: scanner is finding candidates, agents are evaluating them, consensus threshold (3/6) is being reached on some trades\n3. Confirm: orders are being placed (not blocked by combined_exposure or other gates)\n4. Confirm: the order fill watcher is monitoring pending orders and detecting fills\n5. Confirm: filled trades are being logged in the trade journal with correct entry price, size, and timestamp\n6. Confirm: the dashboard is rendering correctly and showing current positions and P&L\n7. Document any failures found as bugs with reproduction steps\n8. Produce a one-page audit summary: 'X trades scanned, Y passed consensus, Z orders placed, W filled, V logged correctly'\n\nIf no trades are generated in a session, diagnose why \u2014 is the consensus threshold too high? Are all positions blocked by exposure limits? Is the scanner returning no candidates?\n\nThis audit must be completed before the paper trading performance report can be meaningful."
+    },
+    {
+      "action": "Promote Walk-Forward Backtesting & WFE Validation from backlog to active \u2014 it is a prerequisite for stage exit",
+      "type": "promote",
+      "why_now": "The 2026-03-31 research on backtesting robustness is in the research findings. Walk-Forward Optimization is in the backlog as a D P2 item, which means it is deprioritised. This is wrong for the current stage. We cannot confidently advance from paper_trading to live_trading without knowing whether our signal parameters are overfit to recent data. Walk-forward validation is the standard method for this. With 9 signal dimensions and multiple sizing layers, overfitting risk is high. It needs to be elevated to active and scheduled before stage exit.",
+      "source": "Backlog: Walk-Forward Optimization, Backtesting & WFE Validation (D P2); Research: Win Rate Improvement \u2014 Backtesting Robustness [2026-03-31]; Vision: stage exit criteria",
+      "cowork_prompt": "SESSION BRIEF: Promote Walk-Forward Backtesting to Active Pipeline\n\nContext: Decifer has a 9-dimension signal system, Bayesian Kelly sizing, and regime detection \u2014 all with calibrated parameters. None of these have been validated via walk-forward testing. Walk-Forward Optimization & WFE Validation is currently in the backlog as D P2 (deprioritised). The 2026-03-31 research on backtesting robustness supports this being a prerequisite for stage exit.\n\nGoal: Promote this backlog item to active pipeline, elevate its priority to P1, and write a complete implementation spec.\n\nTasks:\n1. Review the existing backlog item description: 'Rolling 6-month train / 1-month test windows to calibrate and validate 9-dimensional signal weights'\n2. Write a full spec covering: data requirements, train/test window sizes, what parameters are being optimised (signal weights? Kelly fraction? regime thresholds?), what metrics define a valid out-of-sample result, and what the output report looks like\n3. Identify what historical data is currently available in the codebase (check ml_engine.py at 970 lines and portfolio_optimizer.py at 919 lines \u2014 these likely contain relevant infrastructure)\n4. Define the minimum WFE result threshold required to advance to live_trading_single_account (e.g. out-of-sample Sharpe > 0.8 over 3 walk-forward folds)\n5. Update the pipeline: move this item from backlog to active, set priority P1, assign it to the next available sprint after the paper trading audit is complete\n\nDo not implement yet \u2014 just spec and promote. The spec becomes the work order."
+    },
+    {
+      "action": "Add integration tests for the complete trade lifecycle \u2014 scan \u2192 signal \u2192 consensus \u2192 size \u2192 order \u2192 fill \u2192 log",
+      "type": "fix",
+      "why_now": "The recent commit history shows multiple blocking bugs found through manual audits ('5-bug patch from brute-force audit', combined_exposure blocking all trades, candle_gate TypeError). There are 53 test files but the bugs being caught are in the integration path \u2014 the end-to-end flow from scanner to filled order. An integration test suite for the complete trade lifecycle would have caught these bugs before they shipped. With live trading as the next stage, finding bugs in production means real money losses.",
+      "source": "Git commits: 5-bug brute-force audit, combined_exposure blocking bug, candle_gate TypeError; Code health: 53 test files but bugs in integration path; Vision: advancing to live_trading",
+      "cowork_prompt": "SESSION BRIEF: Add End-to-End Trade Lifecycle Integration Tests\n\nContext: Decifer has 53 test files but has had multiple blocking bugs caught through manual 'brute-force audits' rather than automated tests \u2014 specifically in the orders.py combined_exposure calculation (was blocking all trades), the candle_gate (TypeError), and a 5-bug patch. The bot was recently refactored from a single 3,140-line bot.py into 6 sub-modules. Integration tests are missing for the complete trade flow.\n\nGoal: Write integration tests that cover the complete trade lifecycle from scan to log.\n\nThe lifecycle to test:\n1. Scanner returns candidates \u2192 signals.py evaluates all 9 dimensions \u2192 scores are computed\n2. Agents evaluate signal scores \u2192 consensus threshold (3/6) check\n3. If consensus reached \u2192 Kelly sizer computes position size (with all active scalars: VIX rank, ATR cap, signal-strength multiplier)\n4. Exposure check \u2192 order is placed (not blocked)\n5. Order fill watcher detects fill\n6. Trade is logged in the journal with correct fields\n\nSpecific tests to write:\n- Happy path: valid signal passes all gates, correct order size is computed, order is placed and logged\n- Consensus failure: only 2/6 agents agree, no order is placed\n- Exposure block: portfolio is at max exposure, order is correctly blocked\n- Fill detection: mock a fill event, confirm journal entry is created\n- Size boundary: signal score at minimum threshold produces non-zero but reduced size\n\nUse mocks for IBKR API calls. Target the modules: scanner.py, signals.py, bot_trading.py, orders.py, risk.py. Add these as a dedicated test file: test_trade_lifecycle_integration.py."
+    },
+    {
+      "action": "Deduplicate the Order Fill Watcher \u2014 it appears twice in the shipped features list",
+      "type": "housekeeping",
+      "why_now": "The shipped features list contains 'Order Fill Watcher \u2014 Execution Management Layer' twice with identical descriptions. This is either a data integrity issue in the feature pipeline or a genuine code duplication. Given that order execution is a critical path (bugs here mean missed fills or duplicate orders), this must be investigated and resolved. It is a small task but the risk of leaving it ambiguous is high.",
+      "source": "Feature pipeline: Order Fill Watcher appears twice in Shipped features list",
+      "cowork_prompt": "SESSION BRIEF: Resolve Order Fill Watcher Duplication\n\nContext: The Decifer feature pipeline shows 'Order Fill Watcher \u2014 Execution Management Layer' listed twice in the Shipped features list with identical descriptions: 'Background daemon thread that monitors a PENDING limit buy order after placement'. This could mean (a) it was accidentally logged twice, (b) there are two different implementations that were both shipped, or (c) the feature was re-implemented and both entries were retained.\n\nGoal: Investigate and resolve.\n\nTasks:\n1. Search orders.py and bot_ibkr.py for all fill-watching / order monitoring code\n2. Determine if there are two implementations (e.g. the original daemon thread AND the newer AI-powered execution agent shipped 19 hours ago)\n3. If two implementations exist: document which one is active, which is deprecated, and remove or clearly disable the deprecated one\n4. If it's a duplicate log entry: remove the duplicate from the feature pipeline tracking\n5. Confirm that the execution agent (shipped: 'feat(execution): add AI-powered execution agent as 7th Claude agent') and the Order Fill Watcher are correctly differentiated \u2014 the execution agent is a separate feature from the fill watcher and both should be clearly documented\n6. Update the feature pipeline to accurately reflect what is shipped\n\nThis should take less than 1 hour but must be done cleanly given execution is a critical path."
+    },
+    {
+      "action": "Promote Signal Validation with Alphalens \u2014 validate that the 9 signal dimensions actually have predictive power before building more on top of them",
+      "type": "promote",
+      "why_now": "Alphalens signal validation (C P2) is in the backlog and deprioritised. This is a strategic mistake. We have shipped 9 signal dimensions, an AI sentiment pipeline, a REVERSION dimension, and direction-agnostic scoring \u2014 but there is no evidence any of these dimensions predict forward returns. The 2026-04-01 ML feature engineering research covers IC scores and factor validation directly. If signal dimensions have zero IC, all the Kelly sizing, regime routing, and risk management built on top of them is worthless. This validation should happen before we advance to live trading.",
+      "source": "Backlog: Signal Validation with Alphalens (C P2); Research: Win Rate Improvement \u2014 ML Feature Engineering [2026-04-01]; Vision: must be profitable before live trading",
+      "cowork_prompt": "SESSION BRIEF: Promote and Spec Alphalens Signal Validation\n\nContext: Decifer has 9 signal dimensions (shipped), a direction-agnostic scoring system, and a REVERSION dimension. None of these have been validated for predictive power. The Alphalens validation feature is in the backlog at C P2 (low priority). The 2026-04-01 ML feature engineering research covers IC scores and factor validation.\n\nGoal: Elevate this to active pipeline at P1, and write a spec for the validation run.\n\nTasks:\n1. Review the backlog item: 'Use Alphalens to validate each signal dimension's predictive power \u2014 IC scores'\n2. Write a spec that defines: which signal dimensions to test, what forward return windows to use (T+1, T+3, T+5, T+10), what IC threshold constitutes a 'useful' signal (suggest: |IC| > 0.05 consistently), what to do with dimensions that fail (disable, reduce weight, or investigate)\n3. Identify what historical data pipeline is available \u2014 the alpha_decay module (Phase B shipped 18 hours ago) and the ML engine (970 lines) likely have relevant infrastructure\n4. Define the output: a table of IC scores by dimension by forward return window, with a clear pass/fail for each dimension\n5. Define the action plan: if fewer than 5 dimensions pass IC validation, halt feature development and investigate signal construction before proceeding\n6. Move to active pipeline at P1, schedule after the paper trading audit\n\nThis is a prerequisite for the walk-forward backtest \u2014 you cannot walk-forward validate signals that haven't been IC-tested."
+    }
+  ],
+  "product_roadmap": [
+    {
+      "phase_name": "Phase 1 \u2014 Prove It Works (Current)",
+      "goal": "Confirm the bot is generating, executing, and logging paper trades correctly, and that the core signal/sizing stack is functionally correct end-to-end",
+      "rationale": "Multiple blocking bugs were found and fixed in the last 48 hours. Before validating profitability, we must confirm the system is actually trading. A broken execution path makes all performance data meaningless.",
+      "features": [
+        "Paper Trading Live Audit (validate end-to-end trade lifecycle)",
+        "End-to-End Trade Lifecycle Integration Tests",
+        "Order Fill Watcher deduplication and execution agent clarification",
+        "Regime-Gated Strategy Router (P1 active)",
+        "Signal-Strength-Proportional Kelly Multiplier (P1 active)"
+      ],
+      "exit_criteria": "Bot completes 20+ round-trip paper trades with correct logging, no blocking bugs in the trade lifecycle, and P1 active features shipped and tested",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 2 \u2014 Prove It's Profitable (Paper)",
+      "goal": "Establish that the bot generates positive risk-adjusted returns over a statistically meaningful paper trading period",
+      "rationale": "This is the explicit exit criterion for paper_trading_single_account. Without measurable paper performance against defined thresholds, advancing to live trading is irresponsible.",
+      "features": [
+        "Paper Trading Performance Report (spec + build)",
+        "Alphalens Signal IC Validation",
+        "Walk-Forward Optimization & WFE Validation (promoted to P1)",
+        "P2 Risk Feature stack rationalised to 2 features: Drawdown-Proportional Scaler + Portfolio Volatility Target Enforcer",
+        "Alpha Decay optimal horizon confirmation from paper trading data"
+      ],
+      "exit_criteria": "60+ trading days of paper data, 50+ completed trades, Sharpe > 1.0, max drawdown < 15%, walk-forward out-of-sample Sharpe > 0.8 over 3 folds, all 9 signal dimensions IC-tested",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 3 \u2014 Live Trading Single Account",
+      "goal": "Transition to live trading with a single IBKR account with hard capital limits and robust execution",
+      "rationale": "Only after paper trading profitability is proven. Live trading introduces execution costs, slippage, and real capital risk that paper trading cannot simulate perfectly.",
+      "features": [
+        "Live trading mode toggle with hard capital limit in config",
+        "Execution Agent full activation (AI-powered, currently shipped but role needs clarification)",
+        "Remaining P2 risk features: Bayesian Kelly, CDaR/CVaR (one of the two), Tail-Risk Stress Gate",
+        "Execution quality tracking (slippage vs paper benchmark)",
+        "Kill switch / emergency flatten all positions"
+      ],
+      "exit_criteria": "30 days live trading, Sharpe within 20% of paper baseline, max drawdown limit never breached, no execution errors, kill switch tested",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 4 \u2014 Cloud-Hosted Single Account",
+      "goal": "Move the bot from local to cloud infrastructure with reliability, monitoring, and remote access",
+      "rationale": "Cloud hosting is required before multi-user. Infrastructure must be proven stable for a single account before multi-tenancy is introduced.",
+      "features": [
+        "Cloud deployment (containerisation, secrets management)",
+        "Uptime monitoring and alerting",
+        "Web-based dashboard accessible remotely",
+        "Automated daily performance report delivery",
+        "Disaster recovery: state persistence and restart-safe bot"
+      ],
+      "exit_criteria": "Bot runs continuously in cloud for 30 days with < 1 hour unplanned downtime, dashboard accessible via web, performance report delivered daily",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 5 \u2014 Multi-User Beta",
+      "goal": "Enable friends and family to connect their own broker accounts, configure risk profiles, and run the bot independently",
+      "rationale": "This is the first time other people's money is involved. All E-tier features (per-account risk limits, account-aware order routing, cross-account correlation guard) become critical here.",
+      "features": [
+        "User authentication and account management",
+        "Per-Account Risk Limits (E P1)",
+        "Account-Aware Order Router (E P1)",
+        "Cross-Account Correlation Guard (E P2)",
+        "Unified Trade Journal across accounts (E P2)",
+        "Account Performance Comparison Dashboard (E P2)",
+        "Broker account linking UI (IBKR credentials per user)",
+        "Risk profile settings UI (conservative / moderate / aggressive)"
+      ],
+      "exit_criteria": "3+ beta users connected, each with independent positions, independent risk limits enforced, no cross-account bleed, unified dashboard working",
+      "estimated_scope": "large"
+    }
+  ],
+  "risks": [
+    {
+      "risk": "The bot may not be generating any trades due to blocking conditions (consensus threshold too high, exposure limits too restrictive, or scanner returning no candidates) \u2014 making all paper trading performance data empty or meaningless",
+      "severity": "high",
+      "mitigation": "Run the paper trading live audit immediately (recommended action #5). Confirm trades are being generated and logged. If not, diagnose the blocking condition and fix before any other feature work."
+    },
+    {
+      "risk": "9 active P2 risk features running simultaneously will create a position sizing stack that never trades, or whose interactions are impossible to debug or attribute when something goes wrong",
+      "severity": "high",
+      "mitigation": "Execute the P2 risk feature rationalisation decision (recommended action #4). Select 2 to ship, defer the rest. Document the order of operations for the sizing pipeline explicitly."
+    },
+    {
+      "risk": "None of the 9 signal dimensions have been validated for predictive power (IC). The bot could be trading on noise with sophisticated risk management layered on top of zero-alpha signals",
+      "severity": "high",
+      "mitigation": "Promote Alphalens validation to active P1 (recommended action #9). Run IC tests before advancing to live trading. If fewer than 5 dimensions pass, halt feature development and revisit signal construction."
+    },
+    {
+      "risk": "No defined exit criteria for paper_trading_single_account stage \u2014 the team could build indefinitely without knowing when the bot is 'ready' for live trading",
+      "severity": "high",
+      "mitigation": "Spec the Paper Trading Performance Report with explicit exit thresholds (recommended action #3). Make the thresholds visible to all stakeholders."
+    },
+    {
+      "risk": "The codebase grew from 3,140 lines in a single bot.py to 27,464 lines across 45 modules very rapidly. The architecture refactor is recent (19 hours ago) and bugs are still being found via brute-force audits rather than automated tests",
+      "severity": "medium",
+      "mitigation": "Add end-to-end integration tests for the trade lifecycle (recommended action #7). Prioritise test coverage on the critical path (scanner \u2192 signal \u2192 sizing \u2192 order \u2192 fill \u2192 log) before adding more features."
+    },
+    {
+      "risk": "dashboard.py is 2,748 lines \u2014 the largest module in the codebase. Dashboard bugs have been found recently (empty HTML bug). A monolithic dashboard is hard to maintain and test",
+      "severity": "medium",
+      "mitigation": "After the paper trading audit is complete, schedule a dashboard.py refactor to split it into logical sub-components. Not urgent now but should happen before cloud hosting."
+    },
+    {
+      "risk": "The AI-powered execution agent (7th Claude agent, shipped 19 hours ago) overlaps with the Order Fill Watcher. The relationship between these two is unclear, creating a risk of duplicate orders or missed fills",
+      "severity": "medium",
+      "mitigation": "Complete the Order Fill Watcher deduplication housekeeping task (recommended action #8). Clearly document which component owns order monitoring and fill detection."
+    },
+    {
+      "risk": "Extended-hours trading was added in the most recent commit ('Add extended-hours stock-only mode and pre-close Claude options review'). Extended hours have different liquidity, wider spreads, and higher slippage \u2014 this could generate misleading paper trading results if not controlled",
+      "severity": "medium",
+      "mitigation": "Review the extended-hours mode configuration. Ensure paper trading performance reporting separates extended-hours trades from regular-hours trades for analysis. Consider disabling extended hours until regular-hours performance is validated."
+    }
+  ],
+  "roadmap_gaps": "Several capabilities implied by the vision are missing from all tiers of the pipeline: (1) A kill switch / emergency flatten-all-positions feature \u2014 essential before live trading, not specced anywhere. (2) A live trading mode toggle with hard capital limits \u2014 the transition mechanism from paper to live is not specced. (3) Slippage and execution cost tracking \u2014 no feature exists to compare actual fill prices against expected prices, which is critical for validating the paper-to-live transition. (4) Bot health monitoring and alerting \u2014 no spec for uptime monitoring, error alerting, or automated restart, which is required before cloud hosting. (5) State persistence and crash recovery \u2014 if the bot restarts, does it know about open positions? Not specced. (6) A user-facing web interface \u2014 the vision explicitly states 'web-based interface' for friends and family, but there is no spec or backlog item for any user-facing UI beyond the internal dashboard. (7) Broker account linking flow \u2014 how a user connects their IBKR account to Decifer is not specced anywhere despite being core to the multi-user vision. (8) Risk profile settings UI \u2014 the vision mentions users managing their own risk profile, but no spec exists. (9) Regular-hours vs extended-hours performance separation in reporting \u2014 now that extended hours mode exists, reporting needs to account for it. (10) A formal 'paper-to-live checklist' \u2014 a documented set of conditions that must all be true before the mode switch, preventing premature live trading.",
+  "model": "claude-sonnet-4-6",
+  "data_sources": {
+    "specs": 113,
+    "sessions": 5,
+    "research": 8,
+    "commits": 20,
+    "tests": false,
+    "code": true
+  }
+}

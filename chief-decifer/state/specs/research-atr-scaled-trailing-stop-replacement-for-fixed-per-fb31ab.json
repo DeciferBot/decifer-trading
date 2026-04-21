@@ -1,0 +1,16 @@
+{
+  "id": "research-atr-scaled-trailing-stop-replacement-for-fixed-per-fb31ab",
+  "title": "ATR-Scaled Trailing Stop Replacement for Fixed-Percentage Stops",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Replace fixed-percentage bracket stop-losses with ATR-scaled trailing stops that widen in volatile markets and tighten in calm ones. Research from practitioner sources (ForexTester, QuantifiedStrategies 2024\u20132025) consistently recommends stop-loss at 2\u20133x ATR and trailing take-profit at 1\u20131.5x ATR for trend-following strategies. This builds directly on the already-spec'd ATR Volatility-Targeting Position Size Layer and creates a coherent volatility-aware execution stack.",
+  "source": "research",
+  "research_topic": "Order Execution & Market Microstructure",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "ATR-based trailing stops adapt to current volatility, avoiding premature stops in high-volatility regimes and keeping stops tight in low-volatility regimes; backtesting practitioner evidence suggests 1x\u20132x ATR trailing stops reduce premature exits by 15\u201325% vs fixed-percentage stops on trending instruments",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-14T15:27:10.612972Z"
+}

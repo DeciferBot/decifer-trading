@@ -1,0 +1,16 @@
+{
+  "id": "research-gaussian-hmm-regime-classifier-3-state-spy-volatil-2f1357",
+  "title": "Gaussian HMM Regime Classifier \u2014 3-State SPY Volatility Filter",
+  "status": "spec_complete",
+  "phase": "D",
+  "priority": "P2",
+  "summary": "Train a 3-state Gaussian HMM (hmmlearn) on SPY daily log-returns to classify each day as Low-Vol/Trending, Medium, or High-Vol/Crisis. The model is trained on historical data and serialised; at runtime it predicts the current regime and gates or sizes new long trades accordingly. This directly implements the planned HMM Regime Detection backlog item with a concrete risk-management hook into the brain loop rather than just a label. MDPI's regime-switching factor paper found out-of-sample higher returns and lower drawdown versus individual factor models by routing capital to regime-appropriate strategies.",
+  "source": "research",
+  "research_topic": "Market Regime Detection & Adaptation",
+  "impact_score": 7,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "Reduces max drawdown 15\u201350% vs unfiltered strategy; eliminates trades in high-vol regimes where trend-following loses money; win rate lift ~5% in backtests (QuantStart, MDPI 2020 study)",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-14T15:27:10.681117Z"
+}

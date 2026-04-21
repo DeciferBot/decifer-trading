@@ -1,0 +1,16 @@
+{
+  "id": "research-triple-barrier-method-for-ml-training-labels-094b35",
+  "title": "Triple Barrier Method for ML Training Labels",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Replace simple binary up/down labels used in ML training with Triple Barrier labels that reflect real trade viability: upper barrier (take-profit hit), lower barrier (stop-loss hit), or vertical barrier (time expiry). This aligns ML training targets with actual profit-and-loss outcomes rather than directional correctness, which reduces overfitting and improves out-of-sample signal quality.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Execution Quality & Exit Optimization",
+  "impact_score": 6,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "+1-2% win rate",
+  "difficulty": "Medium",
+  "dev_days": 2,
+  "created_at": "2026-04-14T05:25:49.063869Z"
+}

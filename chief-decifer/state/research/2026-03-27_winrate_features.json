@@ -1,0 +1,125 @@
+{
+  "date": "2026-03-27",
+  "topic": "Win Rate Improvement — New Feature Research",
+  "status": "complete",
+  "source": "Web research + codebase analysis",
+  "findings": [
+    {
+      "feature": "Multi-Timeframe Signal Confirmation",
+      "tier": 1,
+      "expected_impact": "+2-3% win rate",
+      "dev_days": 3,
+      "difficulty": "Easy",
+      "summary": "Require daily/4H/1H alignment before entry. Reduces false signals and helps counter bullish bias by filtering long entries when higher timeframes are bearish.",
+      "module": "signals.py",
+      "upgrades": "Signal Engine — adds timeframe confluence check before the 9-dimension scoring runs",
+      "subsystem": "Signal Generation",
+      "what_changes": "Adds a new timeframe_confluence() function that checks daily, 4-hour, and 1-hour alignment. Only passes candidates to signal scoring when all three agree on direction.",
+      "why_it_matters": "The bot currently scores signals on one timeframe. This is a major source of false signals and the bullish bias — noisy hourly data triggers longs even when the daily trend is bearish."
+    },
+    {
+      "feature": "Dynamic Volatility-Based Position Sizing",
+      "tier": 1,
+      "expected_impact": "+1-3% win rate, -10-30% drawdown",
+      "dev_days": 1,
+      "difficulty": "Easy",
+      "summary": "Cap Kelly output with ATR-based volatility ceiling. Shrinks positions in high-vol regimes automatically.",
+      "module": "risk.py",
+      "upgrades": "Risk Management — wraps existing Kelly criterion with a volatility cap",
+      "subsystem": "Risk & Portfolio",
+      "what_changes": "Adds a volatility_adjusted_size() wrapper around the Kelly output. When 20-day ATR spikes, positions shrink. When markets calm down, positions expand.",
+      "why_it_matters": "The current Kelly sizing doesn't account for regime changes. A 2% position in calm markets carries the same dollar risk as 2% during a VIX spike — but the actual risk is very different."
+    },
+    {
+      "feature": "Claude Sentiment Scoring Pipeline",
+      "tier": 1,
+      "expected_impact": "+2-4% win rate",
+      "dev_days": 2,
+      "difficulty": "Easy",
+      "summary": "Structured sentiment from Yahoo RSS + Finviz via Claude. Add as 10th signal dimension. SAPPO research shows Sharpe improvement 1.55 to 1.90.",
+      "module": "signals.py",
+      "upgrades": "Signal Engine — adds a 10th scoring dimension for news sentiment",
+      "subsystem": "Signal Generation",
+      "what_changes": "New sentiment_score() function that sends 2-3 headlines per ticker to Claude, gets a -1 to +1 score, and wires it as dimension #10 in the signal scoring system.",
+      "why_it_matters": "The bot currently has 9 signal dimensions but no structured sentiment input. News can move stocks 5-10% in minutes. This gives the bot a leading indicator instead of reacting after the move."
+    },
+    {
+      "feature": "Walk-Forward Backtesting",
+      "tier": 1,
+      "expected_impact": "Prevents overfitting (protects existing edge)",
+      "dev_days": 2,
+      "difficulty": "Medium",
+      "summary": "Rolling 6mo train / 1mo test windows. Gold standard for validating the 9-dimension scoring weights.",
+      "module": "backtester.py",
+      "upgrades": "Backtester — adds walk-forward validation mode alongside existing backtest",
+      "subsystem": "Analytics & UI",
+      "what_changes": "New walk_forward_test() function that splits history into rolling train/test windows, optimises signal weights on train data, and validates on unseen test data.",
+      "why_it_matters": "The 9-dimension scoring system has many tunable weights. Without walk-forward testing, those weights may be curve-fit to past data that won't repeat. This is the #1 way algo traders lose their edge."
+    },
+    {
+      "feature": "Correlation-Aware Position Management",
+      "tier": 1,
+      "expected_impact": "+1-2% win rate",
+      "dev_days": 1,
+      "difficulty": "Easy",
+      "summary": "20-day rolling correlation matrix. Reduce correlated positions to prevent hidden concentration risk.",
+      "module": "risk.py",
+      "upgrades": "Risk Management — adds Layer 6: correlation guard for open positions",
+      "subsystem": "Risk & Portfolio",
+      "what_changes": "New correlation_check() function that calculates rolling 20-day correlations between all open positions. If correlation > 0.7, the smaller position gets reduced by 50%.",
+      "why_it_matters": "If the bot holds 4 tech stocks that are all 0.85 correlated, it effectively has one massive position disguised as four. One bad day wipes out weeks of gains."
+    },
+    {
+      "feature": "HMM Regime Detection",
+      "tier": 2,
+      "expected_impact": "+1-2% win rate",
+      "dev_days": 4,
+      "difficulty": "Hard",
+      "summary": "3-state HMM on vol + RSI. Adapts strategy aggressiveness to bull/bear/choppy. Detects regime shifts 1-2 weeks before MAs.",
+      "module": "ml_engine.py",
+      "upgrades": "ML Engine — adds market regime classification that adapts all signal weights",
+      "subsystem": "AI & Learning",
+      "what_changes": "Trains a Hidden Markov Model on 20-day volatility + RSI to classify markets as bull, bear, or choppy. In bull mode: favour momentum. In bear mode: favour mean reversion. In choppy: reduce size 50%.",
+      "why_it_matters": "A strategy optimised for bull markets bleeds money in choppy or bear markets. Regime detection catches the shift before moving averages confirm it, giving the bot a 1-2 week head start."
+    },
+    {
+      "feature": "Order Flow Imbalance Detection",
+      "tier": 2,
+      "expected_impact": "+1-2% win rate",
+      "dev_days": 2,
+      "difficulty": "Medium",
+      "summary": "Approximate institutional accumulation from volume on up/down closes. Leading indicator even with free data.",
+      "module": "signals.py",
+      "upgrades": "Signal Engine — adds order flow as a new indicator alongside existing 9 dimensions",
+      "subsystem": "Signal Generation",
+      "what_changes": "New order_flow_imbalance() function that calculates buy/sell volume ratio from up-close vs down-close bars. Extreme imbalance + technical confirmation signals institutional accumulation.",
+      "why_it_matters": "Volume tells you how much traded, but not who's buying or selling. Even with free data, the up-close/down-close split approximates institutional order flow — a leading indicator."
+    },
+    {
+      "feature": "Monte Carlo Stress Testing",
+      "tier": 2,
+      "expected_impact": "Risk validation",
+      "dev_days": 1,
+      "difficulty": "Easy",
+      "summary": "Shuffle backtest trade sequences 1000x to find true drawdown distribution. Catches luck-dependent edges.",
+      "module": "backtester.py",
+      "upgrades": "Backtester — adds Monte Carlo simulation to validate backtest results",
+      "subsystem": "Analytics & UI",
+      "what_changes": "After a backtest runs, shuffles the trade sequence 1000 times and calculates the 95th percentile max drawdown. If it exceeds the in-sample drawdown by >50%, the edge may be luck.",
+      "why_it_matters": "A great backtest doesn't mean a great strategy — the order of trades matters. Monte Carlo reveals if your results depend on a lucky sequence or hold up under any ordering."
+    }
+  ],
+  "total_dev_days": 15,
+  "top_3_quick_wins": [
+    "Multi-timeframe confirmation (2-3 days, +2-3%)",
+    "Volatility sizing (1 day, +1-3%)",
+    "Claude sentiment scoring (2 days, +2-4%)"
+  ],
+  "urls": [
+    "https://aclanthology.org/2025.realm-1.12/",
+    "https://internationaltradinginstitute.com/blog/dynamic-position-sizing-and-risk-management-in-volatile-markets/",
+    "https://www.luxalgo.com/blog/5-steps-to-confirm-entries-with-multi-timeframes/",
+    "https://www.luxalgo.com/blog/survivorship-bias-in-backtesting-explained/",
+    "https://arxiv.org/html/2512.12924v1"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "research-sentiment-technical-z-score-composite-fusion-gate-faa964",
+  "title": "Sentiment-Technical Z-Score Composite Fusion Gate",
+  "status": "spec_complete",
+  "phase": "C",
+  "priority": "P2",
+  "summary": "Implement a formal Z-score normalization and weighted linear fusion of the technical composite score and the multi-source sentiment score before they enter the Claude agent decision layer. Currently Decifer combines signals additively without cross-normalizing them, which means that a high-volatility sentiment day can swamp technical signals. Research from a January 2026 paper (arXiv:2601.19504) using the identical yfinance + sentiment stack found that normalized fusion of both signal types outperformed each in isolation.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "impact_score": 6,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "A 2026 ComSIA-accepted paper using yfinance on 100 S&P 500 stocks showed hybrid technical+sentiment model outperformed NASDAQ-100 by >43% over 2023-2025; sentiment-enhanced MACD (ScienceDirect 2025) showed 'substantial improvements in profitability and stability' vs technical-only baseline.",
+  "difficulty": "Easy",
+  "dev_days": 3,
+  "created_at": "2026-04-14T05:25:49.013383Z"
+}

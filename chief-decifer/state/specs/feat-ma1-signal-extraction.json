@@ -1,0 +1,28 @@
+{
+  "id": "feat-ma1-signal-extraction",
+  "title": "Signal Distribution Layer (Extract \u2192 Registry \u2192 WebSocket Broadcast)",
+  "status": "future",
+  "priority": "P0",
+  "phase": "MA1",
+  "designed_date": "2026-03-29",
+  "started_date": null,
+  "completed_date": null,
+  "summary": "Three-layer signal pipeline for multi-account: (1) Extract \u2014 separate signal generation from execution in bot.py; scan loop produces typed Signal objects (symbol, direction, score, rationale). (2) Registry \u2014 brain maintains per-user favourite symbol subscriptions beyond standard scan universe. (3) Broadcast \u2014 brain publishes every Signal to all connected user containers in real time via WebSocket, with sequence number for reliable delivery.",
+  "approach": "Create signal_types.py with a Signal dataclass. Refactor the scan loop in bot.py so each scored opportunity is wrapped in a Signal and appended to a signals list. Remove all direct order calls from the scan loop \u2014 execution will live entirely in AccountDecisionAgent. Add unit tests for Signal construction and field validation.",
+  "files_affected": [
+    "bot.py",
+    "signal_types.py"
+  ],
+  "dependencies": [
+    "feat-ma1-account-config-profiles"
+  ],
+  "roadmap_ref": "vision/Decifer_MultiAccount_Architecture.docx \u00a7 9.4",
+  "branch": null,
+  "approved_by": null,
+  "deferral_reason": "multi-account infrastructure \u2014 future stage (paper_trading_single_account prioritisation)",
+  "merged_from": [
+    "feat-ma1-signal-extraction",
+    "feat-ma2-signal-registry",
+    "feat-ma2-websocket-broadcaster"
+  ]
+}

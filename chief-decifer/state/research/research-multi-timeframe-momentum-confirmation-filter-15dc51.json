@@ -1,0 +1,16 @@
+{
+  "id": "research-multi-timeframe-momentum-confirmation-filter-15dc51",
+  "title": "Multi-Timeframe Momentum Confirmation Filter",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Implement a multi-timeframe momentum check (daily, weekly, monthly) that requires at least 2 of 3 timeframes to confirm momentum direction before the momentum dimension scores above 7. Research on time-series momentum shows that combining short-run momentum with fundamentals and multi-horizon confirmation significantly outperforms single-horizon momentum both in-sample and out-of-sample. This is practical with yfinance and directly addresses the known problem of trend signals firing during intraday noise.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "impact_score": 7,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "+2-3% win rate by requiring momentum alignment across 3 timeframes before issuing long signal; reduces false positives from single-timeframe noise",
+  "difficulty": "Easy",
+  "dev_days": 3,
+  "created_at": "2026-04-14T05:25:49.078067Z"
+}

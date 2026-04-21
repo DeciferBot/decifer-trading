@@ -1,0 +1,212 @@
+{
+  "generated_at": "2026-03-29T18:43:41.125499+00:00",
+  "vision_statement": "Decifer will be a cloud-hosted, profitable trading bot where friends and family connect via a web interface, link their own broker accounts, and manage risk through configurable profiles. The path runs from a proven paper-trading single account through live trading, cloud hosting, and finally a multi-user beta.",
+  "current_stage_assessment": "Decifer is at the paper_trading_single_account stage \u2014 the core signal engine has been meaningfully upgraded (9 dimensions, raised consensus threshold, direction-agnostic scoring, short scanning) but the system has not yet proven consistent paper profitability. The next gate is live_trading_single_account, which requires the bot to demonstrate reliable, measurable edge on paper before any real capital is risked. Until that gate is cleared, multi-account and cloud infrastructure work is premature.",
+  "executive_summary": "The signal layer has received significant investment across six shipped features and a large active backlog, but the project is missing the validation loop that would confirm whether those signals actually produce edge \u2014 there is no mention of paper trading P&L results, IC scores, or win rate data anywhere in the project record. The pipeline is dense with speculative alpha ideas (Reddit mentions, HMM, meta-labeling) while foundational plumbing \u2014 signal object extraction from the brain loop, regime-conditional routing, and a proper backtester with slippage \u2014 remains unbuilt. There is also serious structural duplication: several features appear in both Active and Backlog with near-identical specs (Per-Account Config Profiles, AccountDecisionAgent, Connection Manager, WebSocket Signal Broadcaster, Reconnection Logic), which creates ambiguity about what is actually being built. The most urgent work is (1) extracting Signal objects from bot.py to unblock every downstream feature, (2) validating whether the current 9-dimension composite has measurable IC, and (3) implementing regime-conditional signal routing as the highest-conviction research-backed improvement before adding more dimensions.",
+  "recommended_actions": [
+    {
+      "action": "Build: Extract Signal Objects from Brain Loop (bot.py refactor)",
+      "type": "build",
+      "why_now": "This is explicitly marked [B P1] and [MA1 P0] and is the single most blocking structural item in the codebase. Every downstream feature \u2014 WebSocket Signal Broadcaster, AccountDecisionAgent, IC-Weighted Scoring, Meta-Labeling, Alpha Decay Monitor \u2014 depends on signals being typed objects rather than inline execution logic inside bot.py. Nothing in the multi-account or signal quality tracks can be properly built until this separation exists. It is P0 in the backlog and P1 in active, meaning it has already been specced twice without being resolved.",
+      "source": "Active pipeline: 'Extract Signal Objects from Brain Loop [B P1]'; Backlog: 'Extract Signal Objects from Brain Loop [MA1 P0]'",
+      "cowork_prompt": "SESSION GOAL: Refactor bot.py so that the scan loop produces typed Signal objects rather than directly triggering execution inline.\n\nCONTEXT: Decifer's brain loop currently generates signals and acts on them in the same execution path inside bot.py. This makes it impossible to broadcast signals to multiple account containers, apply per-account filters, log signals independently of trades, or feed signals into an IC tracker. Two separate pipeline specs (Active [B P1] and Backlog [MA1 P0]) call for this separation \u2014 it is the most blocking structural item in the project.\n\nTASKS:\n1. Define a Signal dataclass (or TypedDict) with fields: symbol, direction (LONG/SHORT/NEUTRAL), conviction_score (0-10), dimension_scores (dict of 9 dimension values), timestamp, regime_context (placeholder), source_agents (list of agent IDs that agreed).\n2. Refactor the scan loop in bot.py to collect Signal objects into a list/queue rather than calling order functions directly.\n3. Create a separate signal_dispatcher.py (or method) that receives Signal objects and routes them to the order layer \u2014 this is where per-account logic will eventually plug in.\n4. Ensure existing behaviour is preserved: the dispatcher should replicate current single-account order logic exactly so nothing breaks.\n5. Add a simple signal log: append each Signal object as a JSON line to signals_log.jsonl with timestamp \u2014 this becomes the foundation for IC tracking.\n\nDEFINITION OF DONE: Bot runs paper trading with identical behaviour to before, but signals are now typed objects logged to disk, and the order call is separated from signal generation by at least one function boundary."
+    },
+    {
+      "action": "Validate: Measure current paper trading P&L, win rate, and per-dimension IC \u2014 confirm the system has edge before adding more signals",
+      "type": "validate",
+      "why_now": "The project is at paper_trading_single_account stage and the gate to live trading requires demonstrated profitability on paper. There is zero mention of actual paper trading results, win rate, Sharpe, or IC scores anywhere in the project record. The pipeline contains 50 active features, many of them signal additions \u2014 but if the existing 9 dimensions have no measurable IC, adding more dimensions is noise. This validation determines whether the next priority is signal improvement or execution/risk improvement, and it de-risks the live trading transition.",
+      "source": "Vision stage gate: paper_trading_single_account \u2192 live_trading_single_account; Research finding [2026-03-29] Signal Quality: 'IC-based dynamic weighting substantially outperforms static equal-weight signal models'; Active pipeline: 'Signal Decay Monitor & Freshness Dashboard [B P1]'; Active pipeline: 'Alpha Decay Chart [B P1]'",
+      "cowork_prompt": "SESSION GOAL: Audit the current paper trading system to produce a baseline performance report \u2014 win rate, P&L, and a rough per-dimension IC estimate.\n\nCONTEXT: Decifer has shipped 6 signal features and is running paper trades, but no performance data exists in the project record. Before building more signal dimensions or transitioning to live trading, we need to know if the current system has measurable edge. The signal log created in the Signal Object Extraction session (signals_log.jsonl) feeds directly into this.\n\nTASKS:\n1. Pull all paper trades from the existing trade log (identify the log file/database being used). Calculate: total trades, win rate, average win/loss, P&L curve, max drawdown.\n2. For each of the 9 signal dimensions, compute a rough IC: correlate the dimension score at entry with the 5-day forward return for each trade. Even 20-30 trades gives directional signal.\n3. Produce a single markdown report: baseline_performance.md with these metrics and a plain-English interpretation.\n4. Flag any dimension with IC near zero or negative \u2014 these are candidates for removal or recalibration, not addition of more weight.\n5. Document how many trades are in the dataset and whether the sample is large enough to be statistically meaningful (flag if N < 30).\n\nDEFINITION OF DONE: A baseline_performance.md file exists with win rate, P&L summary, max drawdown, and per-dimension IC table. The CPO (you) can read it and make a go/no-go decision on adding more signal complexity vs. fixing what exists."
+    },
+    {
+      "action": "Housekeeping: Deduplicate Active vs Backlog feature specs \u2014 resolve the six features that appear in both lists",
+      "type": "housekeeping",
+      "why_now": "At least six features appear in both Active and Backlog with near-identical descriptions: Per-Account Config Profiles, AccountDecisionAgent Class, Connection Manager, WebSocket Signal Broadcaster, Reconnection Logic, Per-Account Local Dashboard. This creates real ambiguity \u2014 developers don't know which spec to follow, which is canonical, or whether work has already started. This confusion will cause duplicate implementation or missed dependencies. It must be resolved before assigning any of these items to a dev session.",
+      "source": "Active pipeline items [B P2] vs Backlog items [MA1 P0/P1/MA2 P1]: Per-Account Config Profiles, AccountDecisionAgent Class, Connection Manager \u2014 Multi-Account IBKR, WebSocket Signal Broadcaster, Reconnection Logic, Per-Account Local Dashboard",
+      "cowork_prompt": "SESSION GOAL: Audit the feature pipeline and backlog to eliminate duplicate specs, establish a single canonical entry per feature, and tag each with its correct stage dependency.\n\nCONTEXT: The following features exist in BOTH the Active pipeline and the Backlog with different tags and slightly different descriptions. This is causing spec ambiguity:\n- Per-Account Config Profiles (Active [B P2] vs Backlog [MA1 P0])\n- AccountDecisionAgent Class (Active [B P2] vs Backlog [MA1 P0])\n- Connection Manager \u2014 Multi-Account IBKR (Active [B P2] vs Backlog [MA1 P0])\n- WebSocket Signal Broadcaster (Active [B P1] vs Backlog [MA2 P1])\n- Reconnection Logic (Active [C P2] vs Backlog [MA2 P1])\n- Per-Account Local Dashboard (Active [B P2] vs Backlog [MA1 P1])\n\nTASKS:\n1. For each duplicate pair, read both descriptions and determine: (a) are they the same feature, (b) is one a subset of the other, or (c) are they genuinely different scopes?\n2. For true duplicates: keep the more detailed spec, archive the other, and update the pipeline tool/document.\n3. For scope variants: split into a 'single-account version' (needed now) and 'multi-account version' (needed at cloud_hosted_single_account or later), and tag each with its stage dependency.\n4. For each resolved feature, write one sentence confirming: 'This feature is required at stage X and is blocked by Y.'\n5. Output a clean deduplication_log.md documenting decisions made.\n\nDEFINITION OF DONE: Zero features appear in both Active and Backlog. Every feature has exactly one canonical spec. Pipeline document is updated."
+    },
+    {
+      "action": "Build: Regime-Gated Momentum / Mean-Reversion Signal Router",
+      "type": "build",
+      "why_now": "This is the highest-conviction research-backed signal improvement available. Three separate active pipeline items converge on the same finding: research consistently shows momentum dominates in low-volatility bull regimes and mean-reversion dominates in high-volatility or choppy regimes. Decifer already has a Mean-Reversion dimension (shipped) and Momentum dimensions \u2014 the router would activate the right ones contextually rather than blending all 9 equally. This is P1, requires no external data (VIX proxy from yfinance is free), and directly improves edge without adding speculative new data sources. It also unblocks the IC-Weighted Dynamic Signal Scorer by giving the weighting layer a regime context to condition on.",
+      "source": "Active pipeline: 'Regime-Gated Momentum / Mean-Reversion Signal Router [B P1]'; 'Regime-Conditional Signal Weighting [B P1]'; Research finding [2026-03-29] Signal Quality: 'IC-based dynamic weighting substantially outperforms static equal-weight signal models'",
+      "cowork_prompt": "SESSION GOAL: Implement a two-state regime detector that gates which signal dimensions are active \u2014 momentum dimensions in trending regimes, mean-reversion dimensions in choppy/high-vol regimes.\n\nCONTEXT: Decifer currently blends all 9 signal dimensions with equal weight regardless of market regime. Research strongly supports that momentum signals have positive IC in trending markets and negative IC in mean-reverting markets (and vice versa). Decifer already has a shipped Mean-Reversion dimension and multiple momentum-type dimensions. This router makes those dimensions conditional on regime, improving composite signal quality without adding new data.\n\nTASKS:\n1. Implement get_market_regime() in a new regime.py module. Use yfinance to fetch VIX (^VIX) daily. Define:\n   - TRENDING: VIX < 20 and 20-day SPY return > 0\n   - CHOPPY/MEAN-REVERTING: VIX > 25 or 20-day SPY return is flat/negative\n   - NEUTRAL: everything else\n2. In the signal composite calculation, apply a regime multiplier to dimension weights:\n   - TRENDING regime: boost momentum dimensions (e.g., trend, breakout) by 1.3x, reduce REVERSION by 0.5x\n   - MEAN-REVERTING regime: boost REVERSION by 1.5x, reduce momentum dimensions by 0.6x\n   - NEUTRAL: equal weights (current behaviour)\n3. Log the regime state alongside each Signal object in signals_log.jsonl.\n4. Add regime state to the local dashboard (port 8080) as a single status line: 'Current Regime: TRENDING / CHOPPY / NEUTRAL'\n5. Do NOT implement HMM yet \u2014 that is a separate backlog item. Use only the VIX + SPY return heuristic.\n\nDEFINITION OF DONE: The system detects regime at scan time, adjusts signal weights accordingly, logs regime with each signal, and displays current regime on dashboard. Existing paper trading continues uninterrupted."
+    },
+    {
+      "action": "Build: Z-Score Normalised Signal Composite (Cross-Sectional Standardisation)",
+      "type": "build",
+      "why_now": "This is P1 and is a prerequisite for the IC-Weighted Dynamic Signal Scorer, which is the most research-validated improvement in the pipeline. Without Z-score normalisation, raw dimension scores (which can have different ranges and distributions) dominate the composite in ways unrelated to their actual predictive value. This is a small, self-contained build that immediately improves composite quality and enables proper IC measurement across dimensions. It directly follows from the validation session which will expose whether any dimension is dominating unfairly.",
+      "source": "Active pipeline: 'Z-Score Normalised Signal Composite [B P1]'; Research finding [2026-03-29] Signal Quality: 'multi-factor signal models consistently outperform single-factor approaches, but only when factor weights are dynamically calibrated using Information Coefficient'",
+      "cowork_prompt": "SESSION GOAL: Replace the raw dimension score summation in the signal composite with Z-score normalised scores so that no single dimension dominates due to scale differences.\n\nCONTEXT: Decifer's current 9-dimension signal composite adds raw scores (0-10 per dimension). If one dimension is consistently scoring 8-10 while another scores 2-4, the first dimension dominates the composite in a way that has nothing to do with predictive power. Z-score normalisation fixes this by expressing each dimension score relative to its recent cross-sectional distribution. This is a prerequisite for the IC-Weighted Dynamic Signal Scorer.\n\nTASKS:\n1. Maintain a rolling window (default: last 60 signals or 20 trading days, whichever is larger) of raw scores per dimension. Store this in a lightweight in-memory deque per dimension, persisted to a JSON file on shutdown.\n2. At composite calculation time, for each dimension score x: z = (x - mean) / std. Clip z to [-3, 3] to prevent outlier domination.\n3. Sum the Z-scores across dimensions (optionally multiplied by equal weights for now) to produce the composite signal score.\n4. If the rolling window has fewer than 20 data points for a dimension, fall back to the raw score divided by 10 (normalised to 0-1 range) to avoid Z-score instability at startup.\n5. Update the Signal object dataclass to include both raw_dimension_scores and z_scores as separate fields.\n6. Run the paper trading system for one session and confirm composite scores are reasonable \u2014 flag if any dimension has near-zero variance (meaning the rolling window is not diverse enough).\n\nDEFINITION OF DONE: Signal composite uses Z-score normalised dimension scores. Signal objects log both raw and Z-score values. Existing paper trading behaviour is not disrupted."
+    },
+    {
+      "action": "Build: Drawdown Brake \u2014 Tiered Equity Curve Circuit Breaker",
+      "type": "build",
+      "why_now": "This is the most critical risk management feature before transitioning from paper to live trading. Research [2026-03-29] explicitly flags that plain Kelly is dangerous due to drawdown sensitivity. The Drawdown Brake is P2 but it is a live trading prerequisite \u2014 without it, a bad run of paper trades could carry forward unchecked into live capital with no automatic reduction. It is also self-contained (no dependencies on multi-account or cloud infra) and protects all future trading. The ATR Volatility-Targeting and VIX-Rank Kelly features are more sophisticated but the Drawdown Brake is the minimum viable risk control.",
+      "source": "Active pipeline: 'Drawdown Brake \u2014 Tiered Equity Curve Circuit Breaker [B P2]'; Research finding [2026-03-29] Risk Management: 'plain Kelly criterion is dangerous for live trading systems due to drawdown sensitivity and estimation error amplification \u2014 fractional Kelly'",
+      "cowork_prompt": "SESSION GOAL: Implement a three-tier drawdown brake that automatically reduces position sizing and eventually halts trading when equity curve drawdown exceeds defined thresholds.\n\nCONTEXT: Decifer currently has no automatic protection against drawdown sequences. Before transitioning to live trading, the system must be able to detect deteriorating equity performance and respond by shrinking exposure \u2014 protecting capital while the signal edge is re-evaluated. Research confirms plain Kelly without drawdown protection is dangerous for live systems.\n\nTASKS:\n1. In risk.py (or a new drawdown_brake.py), implement a DrawdownBrake class that:\n   - Tracks the rolling equity high-water mark from the paper/live trade log\n   - Computes current drawdown as: (HWM - current_equity) / HWM\n2. Define three tiers:\n   - TIER 1 (drawdown 5-10%): Reduce Kelly fraction / position size by 50%. Log warning.\n   - TIER 2 (drawdown 10-15%): Reduce position size by 75%. Send dashboard alert. Log error.\n   - TIER 3 (drawdown > 15%): Halt all new entries. Existing positions managed to exit only. Log critical. Require manual reset.\n3. Check DrawdownBrake state before every order submission \u2014 if TIER 3, reject the order and log the reason.\n4. Add brake state to the local dashboard: current drawdown %, current tier, HWM value.\n5. Implement a manual reset function (e.g., CLI command or dashboard button placeholder) for TIER 3 \u2014 document that this requires human review before re-enabling.\n6. Write a unit test with a synthetic equity curve that hits each tier threshold and confirm the correct tier activates.\n\nDEFINITION OF DONE: Drawdown is tracked in real time. All three tiers activate correctly in unit tests. Brake state is visible on dashboard. Orders are blocked at TIER 3. Manual reset is documented."
+    },
+    {
+      "action": "Decision: Establish the paper trading exit criteria \u2014 define what 'profitable and reliable on paper' means before any live trading prep begins",
+      "type": "decision",
+      "why_now": "The vision explicitly states 'the core bot must first be profitable and reliable on paper, then transition to live trading' \u2014 but there is no defined exit criteria for the paper trading stage anywhere in the project record. Without this, the team cannot know when to stop adding paper trading features and start live trading prep, leading to indefinite paper trading or premature live transition. This decision must be made now before more features are added to the paper trading stage.",
+      "source": "Vision: 'The core bot must first be profitable and reliable on paper, then transition to live trading'; Stage gate: paper_trading_single_account \u2192 live_trading_single_account; No exit criteria defined in any pipeline item",
+      "cowork_prompt": "SESSION GOAL: Define and document the explicit exit criteria for the paper_trading_single_account stage \u2014 the specific measurable thresholds that, when met, greenlight transition to live_trading_single_account.\n\nCONTEXT: Decifer's vision requires paper trading profitability before live capital is risked, but no exit criteria have been defined. This means the team has no target to optimise toward and no clear signal for when to stop building paper trading features. This session is a product decision session \u2014 no code, just clear documented criteria.\n\nTASKS:\n1. Define minimum thresholds across these dimensions (research and document reasoning for each number):\n   a. Trade count: minimum N trades in the paper sample (suggest: 50+ to have statistical meaning)\n   b. Win rate: minimum acceptable (suggest: >52% for a momentum system)\n   c. Profit factor: gross profit / gross loss (suggest: >1.3)\n   d. Max drawdown: must not exceed X% on paper (suggest: <15%)\n   e. Sharpe ratio: annualised, if calculable (suggest: >0.8)\n   f. Consistency: must be profitable in at least Y of the last Z weeks (suggest: 3 of last 4 weeks)\n2. Define the observation window: how many weeks of paper trading data are required minimum before exit criteria are evaluated (suggest: 8 weeks minimum).\n3. Define the failure mode: if after 12 weeks the system does not meet criteria, what happens? (Options: signal overhaul, parameter tuning, extended paper period.)\n4. Write exit_criteria.md with all decisions, rationale, and the current paper trading metric snapshot from the validation session.\n5. Identify which pipeline features are 'must-have before live' vs 'nice-to-have on paper' and tag them accordingly.\n\nDEFINITION OF DONE: exit_criteria.md exists with specific numeric thresholds, observation window, and failure protocol. The CPO has signed off. Every active pipeline item is tagged as either 'paper-required', 'live-required', or 'post-live'."
+    },
+    {
+      "action": "Promote: Evaluate Multi-Timeframe Signal Confirmation [B P1] for immediate build \u2014 highest-conviction win rate improvement",
+      "type": "promote",
+      "why_now": "Multi-Timeframe Signal Confirmation (daily/4H/1H alignment before entry) is P1 in the active pipeline and is described as reducing false signals \u2014 directly improving win rate. The research finding [2026-03-29] on win rate improvement is present but its content is empty/missing. This feature requires only yfinance multi-timeframe data (already in use) and the Signal object layer (being built in action 1). It is one of the most practical win rate improvements available before live trading and should be confirmed as the next build after the Signal Object Extraction is done.",
+      "source": "Active pipeline: 'Multi-Timeframe Signal Confirmation [B P1]'; Research finding [2026-03-29] 'Win Rate Improvement \u2014 Execution Quality & Exit Optimization' (content empty \u2014 needs promotion evaluation)",
+      "cowork_prompt": "SESSION GOAL: Evaluate the Multi-Timeframe Signal Confirmation feature spec and either (a) confirm it as the next build after Signal Object Extraction, or (b) identify gaps in the spec that need filling before it can be built.\n\nCONTEXT: The Active pipeline contains 'Multi-Timeframe Signal Confirmation [B P1]' \u2014 requiring daily/4H/1H alignment before entry. The associated Win Rate Improvement research finding has no content populated, which means the spec may be based on intuition rather than validated research. Before building, we need to confirm the spec is complete and the rationale is sound.\n\nTASKS:\n1. Read the full spec for 'Multi-Timeframe Signal Confirmation [B P1]' from the pipeline.\n2. Answer these questions in a spec_review.md doc:\n   a. What exact data is needed? (daily, 4H, 1H OHLCV \u2014 available from yfinance?)\n   b. What constitutes 'alignment'? (e.g., all three timeframes show positive momentum? Same direction? Define precisely.)\n   c. Is this a hard gate (must pass to enter) or a score modifier?\n   d. What is the expected impact on trade frequency? (If 3-timeframe alignment is rare, trade count could drop significantly \u2014 test on historical data.)\n   e. Does yfinance provide reliable 1H and 4H data for the symbols Decifer scans?\n3. If the spec answers all five questions cleanly, write a build-ready task list (5-7 implementation steps) and flag it as 'ready to build.'\n4. If the spec has gaps, write the missing spec sections and flag it as 'needs one more spec pass.'\n5. Also: pull whatever content exists for the 'Win Rate Improvement' research finding and evaluate whether it supports or contradicts multi-timeframe confirmation \u2014 document the finding.\n\nDEFINITION OF DONE: spec_review.md exists. Feature is either tagged 'build-ready' with implementation steps, or has updated spec filling identified gaps. Research finding is evaluated and linked."
+    },
+    {
+      "action": "Spec: Write a missing spec for Slippage & Execution Cost Model for Backtester \u2014 required before any backtest result is trusted",
+      "type": "spec",
+      "why_now": "The backtester currently has no slippage model, meaning all backtest results overestimate performance. Before any walk-forward validation, Monte Carlo stress testing, or IC measurement is trusted, the backtester must model realistic execution costs. The feature exists in Active pipeline but the research content for it is not populated \u2014 indicating the spec needs to be written from first principles. Without this, the performance validation session (action 2) cannot trust backtest outputs.",
+      "source": "Active pipeline: 'Slippage & Execution Cost Model for Backtester [B P2]'; Vision: paper trading must be reliable before live \u2014 reliability requires accurate simulation",
+      "cowork_prompt": "SESSION GOAL: Write a complete, build-ready spec for the Slippage & Execution Cost Model that will be added to the backtester.\n\nCONTEXT: Decifer's backtester currently has no model for slippage or trading costs, meaning backtest P&L numbers are optimistic. Any IC score, win rate, or Sharpe ratio calculated from backtest data is inflated. Before trusting any backtest output for the live trading decision, a realistic cost model must be in place. The Active pipeline has this feature but no detailed spec content.\n\nTASKS:\n1. Research and document the realistic cost components for IBKR stock trading:\n   a. Commission: IBKR tiered pricing for the expected trade sizes (e.g., $0.005/share, min $1.00)\n   b. Bid-ask spread slippage: model as a fraction of ATR or as half-spread based on average daily volume\n   c. Market impact: for small retail-size orders, this is minimal \u2014 document the assumption and threshold where it would matter\n2. Define the slippage model formula: proposed_fill_price = signal_price \u00b1 (slippage_factor \u00d7 ATR_14) where slippage_factor is configurable in config.py (default: 0.1 \u00d7 ATR14 for liquid stocks)\n3. Write the spec as slippage_model_spec.md with: problem statement, formula, configurable parameters, implementation location (which file/function in the backtester), and test cases (3 example trades with expected cost deductions)\n4. Define what 'liquid stock' means in Decifer's universe \u2014 propose a minimum ADV (average daily volume) filter below which the slippage factor should be increased (e.g., ADV < 500k shares = 2x slippage factor)\n5. Identify which existing backtest results should be re-run with the model once it is built \u2014 flag these as 'needs revalidation.'\n\nDEFINITION OF DONE: slippage_model_spec.md is written, reviewed, and added to the pipeline as a build-ready item with implementation steps. Existing backtest results are flagged as 'pre-slippage-model' and marked for revalidation."
+    },
+    {
+      "action": "Decision: Resolve the Options Flow / UOA signal dimension priority \u2014 two overlapping P1 options signal features need consolidation",
+      "type": "decision",
+      "why_now": "There are two P1 active pipeline items targeting options-derived signals: 'Options Flow Proxy Signal via Put/Call Ratio [B P1]' (uses free yfinance options chain data) and 'Unusual Options Activity (UOA) Signal Dimension [B P1]' (cites peer-reviewed research by Dr. Cuyler Strong). These overlap significantly \u2014 both add an options-derived signal dimension, both are P1, and building both would create a correlated signal pair that violates the Signal Correlation De-Duplication Guard. A decision is needed: build one, merge them, or sequence them.",
+      "source": "Active pipeline: 'Options Flow Proxy Signal via Put/Call Ratio [B P1]'; 'Unusual Options Activity (UOA) Signal Dimension [B P1]'; Active pipeline: 'Signal Correlation De-Duplication Guard [C P2]'",
+      "cowork_prompt": "SESSION GOAL: Evaluate the two overlapping P1 options signal features and make a consolidation decision \u2014 either merge into one spec, choose one to build first, or explicitly sequence them.\n\nCONTEXT: Decifer has two P1 active pipeline items that both add options-derived signal dimensions:\n1. 'Options Flow Proxy Signal via Put/Call Ratio' \u2014 uses free yfinance options chain data to approximate options flow\n2. 'Unusual Options Activity (UOA) Signal Dimension' \u2014 cites peer-reviewed research (Dr. Cuyler Strong, Journal of Portfolio Management), presumably requires more specific data\n\nBuilding both creates a correlated signal problem \u2014 two dimensions measuring similar things inflate the composite without adding independent information, which the Signal Correlation De-Duplication Guard is designed to prevent.\n\nTASKS:\n1. Read both specs in full. List: (a) what data each requires, (b) what exactly each measures, (c) whether yfinance can supply both, (d) whether they are measuring the same underlying phenomenon or genuinely different aspects of options flow.\n2. Compute the likely correlation between put/call ratio and UOA signals \u2014 if they're both driven by the same options market signal, they will be highly correlated and only one should be in the composite.\n3. Make one of these decisions and document the rationale:\n   OPTION A: Merge into a single 'Options Flow Signal Dimension' that combines put/call ratio with UOA detection in one sub-metric framework\n   OPTION B: Build Put/Call Ratio now (simpler, free data), defer UOA to a later iteration once IC of P/C ratio is validated\n   OPTION C: Build UOA as the primary (stronger research backing), skip Put/Call Ratio as redundant\n4. Write the decision and rationale in options_signal_decision.md.\n5. Update the pipeline: remove the losing spec or merge specs accordingly.\n\nDEFINITION OF DONE: options_signal_decision.md exists with a clear decision and rationale. Pipeline has exactly one options-signal feature spec. Dev team has a single build target."
+    }
+  ],
+  "product_roadmap": [
+    {
+      "phase_name": "Phase 1 \u2014 Signal Foundation & Validation",
+      "goal": "Establish a clean signal architecture, validate that the existing 9 dimensions have measurable IC, and implement the highest-conviction single-account improvements needed to prove paper trading edge",
+      "rationale": "No transition to live trading should happen without evidence of edge. The signal object extraction unblocks everything downstream. The validation session tells us whether we're building on a real foundation or noise. Regime routing and Z-score normalisation are research-backed improvements that work within the existing architecture.",
+      "features": [
+        "Extract Signal Objects from Brain Loop (bot.py refactor)",
+        "Validate paper trading P&L, win rate, and per-dimension IC",
+        "Z-Score Normalised Signal Composite",
+        "Regime-Gated Momentum / Mean-Reversion Signal Router",
+        "Drawdown Brake \u2014 Tiered Equity Curve Circuit Breaker",
+        "Slippage & Execution Cost Model for Backtester (spec + build)",
+        "Define paper trading exit criteria (exit_criteria.md)",
+        "Deduplicate Active vs Backlog feature specs"
+      ],
+      "exit_criteria": "Paper trading system demonstrates defined exit criteria (win rate, profit factor, drawdown, Sharpe) over minimum 8-week observation window. Signal objects are typed and logged. Regime router is live. Drawdown brake is active. No duplicate specs in pipeline.",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 2 \u2014 Signal Quality Upgrade & Live Transition",
+      "goal": "Upgrade signal quality using IC-weighted dynamic scoring, multi-timeframe confirmation, and options flow signal. Transition from paper to live trading with a single account.",
+      "rationale": "Once the foundation is validated and exit criteria are met, signal quality improvements directly improve live P&L. These features require the Signal Object layer from Phase 1. Live trading requires the Drawdown Brake and exit criteria from Phase 1 to already be in place.",
+      "features": [
+        "Multi-Timeframe Signal Confirmation [B P1]",
+        "IC-Weighted Dynamic Signal Scorer",
+        "Options Flow Signal Dimension (consolidated from P/C Ratio + UOA decision)",
+        "ATR Volatility-Targeting Position Size Layer",
+        "VIX-Rank Adaptive Fractional Kelly Sizer",
+        "Walk-Forward Backtesting",
+        "Alpha Decay Chart \u2014 Per-Trade Forward Return Distribution",
+        "Signal Decay Monitor & Freshness Dashboard"
+      ],
+      "exit_criteria": "System is running live trades on a single IBKR account. Live P&L is tracked and meets minimum profitability thresholds for 4 consecutive weeks. Drawdown brake has not triggered TIER 3. Walk-forward backtest validates IC-weighted model over rolling windows.",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 3 \u2014 Cloud & Single-User Hosting",
+      "goal": "Move the live trading system to a cloud VPS with Docker, accessible remotely, with a web dashboard and Telegram notifications",
+      "rationale": "Cloud hosting is required before any other user can connect. The architecture decisions (Docker, WebSocket broadcaster, connection manager) should only be built after the single-account system is proven live \u2014 building cloud infra on an unproven signal system is premature.",
+      "features": [
+        "Cloud VPS Setup and Deployment",
+        "Connection Manager \u2014 Multi-Account IBKR (single-account version first)",
+        "WebSocket Signal Broadcaster",
+        "Reconnection Logic \u2014 Backoff, Sequence, State Sync",
+        "Per-Account Config Profiles",
+        "Web Dashboard \u2014 Live Positions and P&L",
+        "Telegram Bot \u2014 Notifications and Quick Commands"
+      ],
+      "exit_criteria": "Founder can access live trading bot remotely via web dashboard. System survives VPS restarts and reconnects automatically. Telegram notifications arrive on trade execution. Uptime > 99% over 2 weeks.",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 4 \u2014 Multi-User Beta",
+      "goal": "Extend the cloud platform to support multiple users (friends and family), each with isolated containers, their own IBKR account connections, and per-user risk profiles",
+      "rationale": "Multi-user architecture is the final stage of the vision but requires the cloud foundation from Phase 3 to exist first. Per-user isolation, authentication, and risk profiles are meaningless without a working single-user cloud system.",
+      "features": [
+        "Per-User Docker Compose Containers with Encrypted Credentials",
+        "AccountDecisionAgent Class (multi-account version)",
+        "Per-Account Risk Profile Config Schema with Multi-Tier Presets",
+        "Per-Account Local Dashboard",
+        "Per-User Dashboard Authentication",
+        "One-Time User Setup Screen",
+        "Account-Aware Order Router",
+        "Per-Account Risk Limits",
+        "Cross-Account Correlation Guard",
+        "Unified Trade Journal",
+        "Account Performance Comparison"
+      ],
+      "exit_criteria": "3+ friends/family members are connected with their own IBKR accounts, isolated containers, and independent risk profiles. Each user can see only their own dashboard. System handles simultaneous connections without cross-contamination. All users are trading live with drawdown protection.",
+      "estimated_scope": "large"
+    }
+  ],
+  "risks": [
+    {
+      "risk": "Paper trading results have never been measured \u2014 the system may have no measurable edge and all 50 active features are being built on an unvalidated foundation",
+      "severity": "high",
+      "mitigation": "Run the validation session immediately (recommended action 2) to compute win rate, P&L, and per-dimension IC before any new signal features are added. Establish exit criteria (recommended action 7) to create a forcing function."
+    },
+    {
+      "risk": "Six features are duplicated between Active and Backlog with conflicting tags \u2014 developers may build the wrong version or build the same thing twice",
+      "severity": "high",
+      "mitigation": "Complete the deduplication housekeeping session (recommended action 3) before assigning any of the affected features to a dev session."
+    },
+    {
+      "risk": "No paper trading exit criteria exist \u2014 the system could stay in paper trading indefinitely, delaying live trading and the overall roadmap",
+      "severity": "high",
+      "mitigation": "Make the explicit exit criteria decision (recommended action 7) and write exit_criteria.md with numeric thresholds and a maximum observation window."
+    },
+    {
+      "risk": "The Drawdown Brake does not exist \u2014 if paper trading transitions to live without it, a bad run of live trades will not be automatically contained",
+      "severity": "high",
+      "mitigation": "Build the Drawdown Brake (recommended action 6) as a live trading prerequisite, before any live trading prep begins."
+    },
+    {
+      "risk": "The backtester has no slippage model \u2014 all backtest-derived IC scores, win rates, and Sharpe ratios are overstated, making performance projections unreliable",
+      "severity": "medium",
+      "mitigation": "Write and build the Slippage & Execution Cost Model spec (recommended action 8) and re-run all existing backtest results after it is implemented."
+    },
+    {
+      "risk": "The signal composite uses equal weights with no IC validation \u2014 underperforming or negatively predictive dimensions are dragging the composite down without any feedback mechanism",
+      "severity": "medium",
+      "mitigation": "Complete per-dimension IC measurement in the validation session (action 2), implement Z-score normalisation (action 5), and promote IC-Weighted Dynamic Signal Scorer to next build after normalisation is confirmed."
+    },
+    {
+      "risk": "The Win Rate Improvement and Multi-Account Platform Architecture research findings have no content populated \u2014 specs built on empty research are assumptions, not evidence",
+      "severity": "medium",
+      "mitigation": "Before promoting any feature tagged to these research areas, explicitly source the evidence (arXiv, peer-reviewed papers, practitioner blogs) and populate the research finding content."
+    },
+    {
+      "risk": "50 active pipeline features create context overload \u2014 with no stage tagging, all features compete equally for development time regardless of what stage they are actually needed",
+      "severity": "medium",
+      "mitigation": "Tag every active feature with its required stage (paper_required, live_required, cloud_required, multi_user_required) as part of the exit criteria decision session."
+    },
+    {
+      "risk": "Two overlapping P1 options signal features (Put/Call Ratio and UOA) will produce a correlated signal pair if both are built, inflating the composite without adding information",
+      "severity": "low",
+      "mitigation": "Make the options signal consolidation decision (recommended action 10) before either feature is built."
+    },
+    {
+      "risk": "Cloud and multi-user infrastructure features (Docker, VPS, WebSocket) are in the Active pipeline alongside paper trading signal features \u2014 risk of premature infrastructure investment before signal edge is proven",
+      "severity": "medium",
+      "mitigation": "Enforce phase gates: no cloud/multi-user features are built until paper trading exit criteria are met and live trading is running. Tag these features as 'cloud_required' stage."
+    }
+  ],
+  "roadmap_gaps": "Several capabilities implied by the vision are either unspecced or absent from the pipeline: (1) A formal paper trading performance dashboard \u2014 there is a local dashboard spec but no spec for a structured paper-trading-specific P&L tracker that shows whether exit criteria are being met in real time. (2) Position management rules for existing trades \u2014 the pipeline has many entry signal features but almost nothing on exit timing other than the Dual-Tranche Exit, which itself has no entry in the exit criteria discussion. (3) A symbol universe definition \u2014 there is a scanner but no spec defining which stocks are eligible for scanning (market cap minimum, ADV minimum, sector exclusions), which directly affects signal quality and liquidity risk. (4) A data quality and staleness monitor \u2014 if yfinance returns stale or erroneous data, the system would silently generate bad signals; no watchdog spec exists. (5) IBKR connection health monitoring for the single-account case \u2014 the Reconnection Logic spec is in both Active and Backlog but framed for multi-account; a simpler single-account reconnection spec is missing. (6) A manual override / kill switch \u2014 nothing in the pipeline specifies how the founder can halt all trading immediately in an emergency without SSH access to the server. (7) Audit logging for regulatory purposes \u2014 as the platform approaches multi-user with real money, trade audit logs with timestamps and decision rationale will be required; no spec exists for compliance-grade logging. (8) Tax lot tracking and reporting \u2014 implied by multi-user live trading but absent from the pipeline entirely.",
+  "model": "claude-sonnet-4-6",
+  "data_sources": {
+    "specs": 79,
+    "sessions": 5,
+    "research": 6,
+    "commits": 0,
+    "tests": false,
+    "code": false
+  }
+}

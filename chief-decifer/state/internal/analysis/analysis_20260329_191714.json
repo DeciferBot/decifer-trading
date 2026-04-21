@@ -1,0 +1,237 @@
+{
+  "generated_at": "2026-03-29T14:10:41.281008+00:00",
+  "vision_statement": "Decifer is a cloud-hosted, multi-user profitable trading bot where friends and family connect via a web interface, link their own IBKR accounts, and manage risk through personal settings. The path runs from paper trading profitability through live single-account trading to a hosted multi-user platform.",
+  "current_stage_assessment": "Decifer is in paper_trading_single_account stage. Recent commits show active stabilisation work (bug fixes, dedup logic, logging improvements, test API reconciliation) alongside the first multi-account scaffolding (Phase E position aggregation). The bot appears to be running and generating paper trades, but test infrastructure shows 0% pass rate due to network/connection errors in CI rather than logic failures \u2014 indicating the test environment is not mocked or isolated properly. The next priority must be proving paper trading profitability before any live or cloud work begins.",
+  "executive_summary": "Decifer has meaningful signal infrastructure (9 dimensions, direction-agnostic scoring, short scanner, regime gates) and a functioning paper trading loop, but the project is carrying serious sequencing risk: 50 active features span everything from signal quality to multi-user Docker containers, with no clear gating on profitability first. The test suite shows 0 passing tests \u2014 not because logic is broken but because network calls are hitting real endpoints in tests, which is a structural gap that will mask real regressions. The feature pipeline contains several near-duplicate items (IC-Weighted Signal Scoring appears twice, Connection Manager appears in both active and backlog, Reddit Surge Detector appears twice) suggesting spec management has drifted. The strongest near-term leverage is in the P1 signal quality cluster (multi-timeframe confirmation, regime-gated routing, Z-score normalisation, options flow) because research consistently shows these are the highest-lift improvements for win rate before going live. Cloud and multi-user work (MA1-MA3) should not begin until a single-account paper trading edge is demonstrated.",
+  "product_roadmap": [
+    {
+      "phase_name": "Phase 1 \u2014 Test Infrastructure Hardening",
+      "goal": "Achieve a reliable, passing test suite with all external I/O mocked so regressions are detectable and CI is trustworthy.",
+      "rationale": "0% pass rate means the project is flying blind. Every subsequent feature addition risks silently breaking existing behaviour. This must be fixed before any signal or architecture work so that changes can be validated with confidence.",
+      "features": [
+        "Mock all yfinance, AlphaVantage, Stooq, and IBKR network calls in tests using unittest.mock or pytest fixtures",
+        "Fix data_collector test harness \u2014 stub HTTP responses for all four data sources",
+        "Fix orders.py test harness \u2014 stub IBKR openTrades(), reqGlobalCancel(), and flatten order flow",
+        "Establish baseline pass rate target (100% of existing tests green before any new feature merges)",
+        "Add CI gate: tests must pass before any commit lands on main"
+      ],
+      "exit_criteria": "All existing tests pass with mocked I/O. No ERROR-level log entries from network calls during test runs. CI gate is enforced.",
+      "estimated_scope": "small"
+    },
+    {
+      "phase_name": "Phase 2 \u2014 Signal Quality Core (P1 Cluster)",
+      "goal": "Improve signal quality and composite scoring so the paper trading bot has a demonstrable edge before any live capital is risked.",
+      "rationale": "Research findings confirm IC-weighted dynamic scoring and regime-conditional routing are the highest-leverage improvements. These must be in place and validated on paper before live trading begins. The current equal-weight static composite is the weakest link in the alpha chain.",
+      "features": [
+        "Z-Score Normalised Signal Composite \u2014 cross-sectional standardisation before compositing",
+        "Multi-Timeframe Signal Confirmation \u2014 daily/4H/1H alignment gate",
+        "Regime-Gated Momentum / Mean-Reversion Signal Router \u2014 VIX proxy two-state regime detector",
+        "Options Flow Proxy Signal via Put/Call Ratio \u2014 yfinance options chain, new signal dimension",
+        "Unusual Options Activity (UOA) Signal Dimension \u2014 per Dr. Cuyler Strong research",
+        "IC-Weighted Dynamic Signal Scorer \u2014 replace equal-weight composite with rolling IC weights (consolidate the two duplicate specs into one implementation)",
+        "Signal Decay Monitor & Freshness Dashboard \u2014 weekly rolling IC per dimension",
+        "Alpha Decay Chart \u2014 per-trade forward return distribution tracker"
+      ],
+      "exit_criteria": "Paper trading composite signal uses IC-weighted, Z-score normalised, regime-gated scoring. Rolling IC dashboard shows at least 4 of 9 dimensions with positive IC over a 30-day window. Signal Decay Monitor is running and logging weekly.",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 3 \u2014 Risk & Execution Hardening",
+      "goal": "Ensure position sizing, drawdown management, and execution quality are robust enough for live trading.",
+      "rationale": "Research findings flag plain Kelly as dangerous for live systems. Before a single dollar of live capital is committed, the sizing and drawdown brake systems must be in place and validated on paper. Execution cost modelling is required to accurately assess paper P&L.",
+      "features": [
+        "ATR Volatility-Targeting Position Size Layer \u2014 volatility-targeting formula replacing or capping static sizing",
+        "VIX-Rank Adaptive Fractional Kelly Sizer \u2014 dynamic Kelly fraction, replaces static",
+        "Drawdown Brake \u2014 Tiered Equity Curve Circuit Breaker \u2014 three-tier auto-reduction",
+        "Dual-Tranche Exit Strategy \u2014 split positions into two tranches on entry",
+        "Correlation-Aware Position Management \u2014 20-day rolling correlation matrix, reduce correlated exposure",
+        "Portfolio Heat Monitor with Correlation-Adjusted Exposure Cap \u2014 pre-order correlation-adjusted exposure check",
+        "Anchored VWAP Entry Gate \u2014 weekly AVWAP binary gate",
+        "Multi-Timeframe Momentum Confirmation Filter \u2014 daily/weekly/monthly momentum alignment",
+        "Slippage & Execution Cost Model for Backtester \u2014 realistic per-trade slippage based on ADTV",
+        "Walk-Forward Backtesting \u2014 rolling 6mo train / 1mo test windows",
+        "Monte Carlo Stress Testing \u2014 1000x trade sequence shuffle for drawdown distribution"
+      ],
+      "exit_criteria": "Paper trading shows positive Sharpe (>0.5) over 60+ trading days with drawdown brake never triggered more than twice. Walk-forward backtest validates edge across at least 3 out-of-sample windows. Slippage model is applied to all paper P&L calculations.",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 4 \u2014 Live Trading Single Account",
+      "goal": "Transition from paper to live trading on a single IBKR account with full safety rails active.",
+      "rationale": "Only after demonstrated paper profitability and hardened risk management should real capital be deployed. This phase is the live_trading_single_account milestone.",
+      "features": [
+        "Extract Signal Objects from Brain Loop \u2014 typed Signal objects separate from execution (MA1 P0 / B P1 duplicate \u2014 one implementation)",
+        "Regime-Conditional Signal Weighting \u2014 ensure live regime gate is active",
+        "Time-of-Day Seasonality Filter \u2014 avoid low-quality execution windows",
+        "Order Flow Imbalance Detection \u2014 institutional accumulation proxy",
+        "Live paper-to-live account switch with kill switch and manual override",
+        "Confirm all capital safety checks (position limits, drawdown brake, correlation guard) are enforced on live orders"
+      ],
+      "exit_criteria": "Bot executes live trades on a single IBKR account. Drawdown brake has been tested and fires correctly in staging. At least 30 live trades completed with P&L tracked and matching expected slippage model. No critical order errors in production logs for 14 days.",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 5 \u2014 Cloud Hosting Single Account",
+      "goal": "Move the single-account bot from local to a cloud VPS so it runs 24/7 without developer machine dependency.",
+      "rationale": "This is the cloud_hosted_single_account milestone. Must be stable at single-account live trading before adding cloud complexity.",
+      "features": [
+        "Cloud VPS Setup and Deployment \u2014 Ubuntu 22, Docker, shared brain container (consolidate MA2 and B P2 duplicate specs)",
+        "Reconnection Logic \u2014 Backoff, Sequence, State Sync \u2014 exponential backoff, state sync on reconnect (consolidate MA2 and C P2 duplicates)",
+        "Telegram Bot \u2014 Notifications and Quick Commands \u2014 trade notifications, morning brief, emergency stop (consolidate MA3 and B P2 duplicates)",
+        "Per-Account Local Dashboard (cloud-accessible) \u2014 positions, P&L, trade history on port 8080",
+        "Automated restart on crash with alerting",
+        "Secrets management for IBKR credentials in cloud environment"
+      ],
+      "exit_criteria": "Bot runs continuously on cloud VPS for 14 days with no manual restarts. Telegram notifications fire on every trade. Dashboard accessible remotely. Reconnection logic survives a simulated network drop.",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 6 \u2014 Multi-User Beta (MA1 + MA2 + MA3)",
+      "goal": "Extend the cloud-hosted bot to support multiple users, each with their own IBKR account, risk profile, and isolated container.",
+      "rationale": "This is the multi_user_beta milestone. All MA-tagged backlog items belong here. Must not begin until the single-account cloud system is proven stable.",
+      "features": [
+        "Per-Account Config Profiles \u2014 account-aware profile system replacing flat CONFIG (consolidate MA1 P0 and B P2 duplicates)",
+        "AccountDecisionAgent Class \u2014 one instance per IBKR sub-account (consolidate MA1 P0 and B P2 duplicates)",
+        "Connection Manager Multi-Account IBKR \u2014 multiple ib_insync instances (consolidate MA1 P0 and B P2 duplicates)",
+        "Parameterise account_id Through Orders and Risk \u2014 audit and replace all CONFIG['active_account'] reads (consolidate MA1 P0 and B P2 duplicates)",
+        "Per-Account Risk Profile Config Schema with Multi-Tier Presets \u2014 RiskProfile dataclass",
+        "Per-User Docker Compose Containers with Encrypted Credentials",
+        "WebSocket Signal Broadcaster \u2014 brain publishes signals to all connected containers (consolidate MA2 and B P1 duplicates)",
+        "Signal Registry \u2014 Per-User Favourite Symbols",
+        "Per-User Dashboard Authentication \u2014 login, sessions, isolation",
+        "One-Time User Setup Screen \u2014 guided IBKR credential and risk profile setup",
+        "Web Dashboard \u2014 Live Positions and P&L per user (consolidate MA3 and B P2 duplicates)",
+        "Per-Account Local Dashboard update for multi-user context",
+        "Cross-Account Correlation Guard",
+        "Unified Trade Journal \u2014 cross-account with account tags",
+        "Account Performance Comparison Dashboard"
+      ],
+      "exit_criteria": "At least 3 users (founder + 2 friends/family) running independently on the platform with isolated containers, separate IBKR accounts, and independent risk profiles. Each user can see only their own data. All accounts have been live trading for at least 14 days without cross-account interference.",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 7 \u2014 Multi-User Production & Advanced Alpha",
+      "goal": "Harden the platform for broader use, add advanced alpha sources, and complete the remaining research-backed signal improvements.",
+      "rationale": "This is the multi_user_production milestone. Advanced features like ML meta-labeling, HMM regime detection, and sentiment pipelines add complexity and require a stable platform foundation.",
+      "features": [
+        "Meta-Labeling Secondary Classifier \u2014 binary ML meta-model on top of primary signal pipeline",
+        "HMM Regime Detection \u2014 3-state HMM on vol + RSI (consolidate D P2 duplicates)",
+        "Regime-Conditioned Position Size Scalar \u2014 HMM integration with position sizing",
+        "Claude Sentiment Scoring Pipeline \u2014 Yahoo RSS + Finviz via Claude as 10th signal dimension",
+        "News Sentiment Regression Scorer (FinBERT) \u2014 arXiv:2507.03350 approach",
+        "SEC Form 4 Insider Cluster Buying Dimension \u2014 EDGAR RSS free feed",
+        "Reddit Mention Velocity Dimension \u2014 quantitative surge detector (consolidate two duplicate Reddit specs)",
+        "Triple Barrier Method for ML Training Labels \u2014 replace binary up/down labels",
+        "IC-Weighted Walk-Forward Weight Calibration",
+        "Signal Validation with Alphalens \u2014 IC scores, decay curves per dimension",
+        "Signal Correlation De-Duplication Guard",
+        "Rolling CVaR Dashboard Metric and Per-Account Risk Budget",
+        "Per-User Risk Limits enforcement",
+        "Account-Aware Order Router"
+      ],
+      "exit_criteria": "Platform supports 5+ concurrent users. All advanced signal dimensions are live and IC-validated. HMM regime detection is active and influencing position sizing. Platform has run continuously for 30 days with no critical incidents.",
+      "estimated_scope": "large"
+    }
+  ],
+  "immediate_next_action": {
+    "action": "Fix the test suite \u2014 mock all external network calls so tests pass reliably in CI.",
+    "rationale": "The test suite currently shows 0 passing tests entirely due to unmocked network calls (yfinance, AlphaVantage, Stooq, IBKR). This means every feature change is unverifiable and silent regressions are invisible. No other work \u2014 signal improvements, risk hardening, or architecture changes \u2014 can be trusted without a green test baseline. This is the single highest-leverage action because it unblocks everything else.",
+    "cowork_prompt": "We need to fix the Decifer test suite. Currently all tests are failing due to unmocked external network calls \u2014 yfinance, AlphaVantage, Stooq, and IBKR connections are hitting real endpoints during tests. Here is what I need you to do:\n\n1. Audit all 32 test files and identify every test that makes a real network call to yfinance, AlphaVantage, Stooq, or IBKR.\n2. Add proper mock/stub fixtures for each \u2014 use unittest.mock.patch or pytest monkeypatch as appropriate. Return realistic dummy data structures that match what the real APIs return.\n3. Specifically fix the four data_collector errors (yf-intraday, yf-daily, alphavantage, stooq \u2014 all for AAPL) and the four orders.py errors (openTrades, reqGlobalCancel, flatten IBKR connection, flatten order rejected).\n4. Run the full test suite and confirm all tests pass.\n5. Do not change any production logic \u2014 only fix the test harness.\n\nWe want 100% of existing tests passing with fully mocked I/O before any new features are added."
+  },
+  "untracked_ideas": [
+    {
+      "title": "Paper Trading Profitability Report \u2014 Formal Go/No-Go Gate",
+      "source": "Implied by vision (paper trading must be profitable before live trading) and current stage definition",
+      "rationale": "There is no spec or feature for a formal evaluation process that determines when paper trading results are good enough to justify moving to live. Without this gate, the transition to live trading could happen prematurely. A minimum threshold (e.g. Sharpe > 0.5, win rate > 52%, max drawdown < 15% over 60 trading days) should be defined and tracked.",
+      "suggested_phase": "Phase 3 \u2014 Risk & Execution Hardening"
+    },
+    {
+      "title": "Duplicate Feature Spec Consolidation \u2014 Housekeeping Sprint",
+      "source": "Observed in feature pipeline \u2014 IC-Weighted Signal Scoring (two entries), Connection Manager (active + backlog), Reddit Surge Detector (two entries), Cloud VPS (active + backlog), Reconnection Logic (active + backlog), WebSocket Broadcaster (active + backlog), Web Dashboard (active + backlog), Telegram Bot (active + backlog), Per-Account Dashboard (active + backlog), AccountDecisionAgent (active + backlog), Per-Account Config Profiles (active + backlog), Parameterise account_id (active + backlog), Extract Signal Objects (active + backlog)",
+      "rationale": "At least 13 features appear in both Active and Backlog with slightly different descriptions. This creates confusion about which spec is canonical, risks duplicate implementation effort, and makes the pipeline unreliable as a planning tool. A consolidation pass is needed to designate one spec per feature and archive the duplicate.",
+      "suggested_phase": "Phase 1 \u2014 Test Infrastructure Hardening (do alongside, low effort)"
+    },
+    {
+      "title": "Live vs Paper Trading Toggle with Audit Log",
+      "source": "Implied by vision \u2014 transition from paper to live trading must be controlled and reversible",
+      "rationale": "There is no spec for the mechanism that switches the bot from paper to live mode. This needs to be explicit, logged, and reversible \u2014 a config flag with an audit trail, not an ad-hoc code change. Should include a confirmation step and automatic notification.",
+      "suggested_phase": "Phase 4 \u2014 Live Trading Single Account"
+    },
+    {
+      "title": "Broker Account Verification Flow \u2014 IBKR Credential Validation on Setup",
+      "source": "Implied by multi-user vision \u2014 One-Time User Setup Screen exists but no spec for credential validation",
+      "rationale": "When friends and family connect their IBKR accounts, the system needs to verify the connection works, the account has sufficient capital, and paper/live mode is correctly configured before any bot activity starts. A failed connection should produce a clear error, not a silent failure.",
+      "suggested_phase": "Phase 6 \u2014 Multi-User Beta"
+    },
+    {
+      "title": "Emergency Kill Switch \u2014 Global and Per-User",
+      "source": "Implied by vision (safety for friends and family capital) and current orders.py flatten logic",
+      "rationale": "There is flatten/global cancel logic in orders.py but no explicit product spec for a user-facing emergency stop \u2014 both global (all accounts) and per-user. This is a critical safety feature that should exist before any live trading. The Telegram bot mentions an 'emergency stop' command but it is not specified as a standalone safety feature.",
+      "suggested_phase": "Phase 4 \u2014 Live Trading Single Account"
+    },
+    {
+      "title": "Performance Attribution Dashboard \u2014 Which Signals Are Generating P&L",
+      "source": "Implied by IC-weighted signal research and the Alpha Decay / Signal Decay Monitor features",
+      "rationale": "As the signal pipeline grows to 9-10 dimensions with IC weighting, there is no spec for showing the founder which specific signal dimensions have contributed most to closed-trade P&L. This is distinct from IC (forward return correlation) \u2014 it is actual realised attribution. Critical for knowing what to keep, tune, and cut.",
+      "suggested_phase": "Phase 3 \u2014 Risk & Execution Hardening"
+    },
+    {
+      "title": "Rate Limiting and API Cost Management for External Data Sources",
+      "source": "Implied by adding Claude Sentiment, FinBERT, SEC EDGAR, Reddit, and yfinance simultaneously",
+      "rationale": "With 5+ external data sources planned, there is no spec for managing API rate limits, costs (especially Claude), or fallback behaviour when a source is unavailable. Without this, adding sentiment and alternative data sources risks API bans, unexpected costs, or silent data gaps that corrupt signal quality.",
+      "suggested_phase": "Phase 7 \u2014 Multi-User Production & Advanced Alpha"
+    }
+  ],
+  "risks": [
+    {
+      "risk": "0% test pass rate means regressions are invisible \u2014 any code change could silently break trading logic and no automated check would catch it",
+      "severity": "high",
+      "mitigation": "Immediately mock all external I/O in tests (Phase 1). Enforce CI gate: no merge to main unless all tests pass. This is the single highest-priority action."
+    },
+    {
+      "risk": "50 active features with no clear prioritisation gate on paper trading profitability \u2014 the project could reach multi-user architecture work before the core bot has proven it can make money",
+      "severity": "high",
+      "mitigation": "Define and enforce a formal Go/No-Go gate with quantitative paper trading thresholds (Sharpe, win rate, max drawdown over minimum observation period) before Phase 4 work begins. Freeze MA1-MA3 architecture work until gate is passed."
+    },
+    {
+      "risk": "13+ duplicate feature specs across Active and Backlog create planning ambiguity \u2014 risk of double implementation or conflicting specs being built simultaneously",
+      "severity": "medium",
+      "mitigation": "Conduct a spec consolidation sprint to designate one canonical spec per feature and archive duplicates. Apply a naming convention to prevent future duplication. Can be done alongside Phase 1 test work."
+    },
+    {
+      "risk": "bot.py at 2787 lines and dashboard.py at 2149 lines \u2014 monolithic modules with high change frequency risk merge conflicts, hard-to-test logic, and cascading failures",
+      "severity": "medium",
+      "mitigation": "The Extract Signal Objects from Brain Loop feature (already in pipeline) directly addresses bot.py bloat. Prioritise this in Phase 2. Dashboard should be split into API layer and UI layer as part of Phase 5 cloud work."
+    },
+    {
+      "risk": "Friends and family capital will be managed by the live bot \u2014 a single risk management bug (sizing error, position limit bypass, runaway order) could cause significant real losses and relationship damage",
+      "severity": "high",
+      "mitigation": "All three risk layers (ATR sizing, drawdown brake, correlation guard) must be implemented AND tested against edge cases before any live trading begins. Add an emergency kill switch spec. Require 60 days of clean paper trading with no brake triggers before going live."
+    },
+    {
+      "risk": "Multi-user architecture (Docker, WebSocket, per-user containers) is being designed in parallel with early paper trading signal work \u2014 premature architecture complexity before the alpha is validated",
+      "severity": "medium",
+      "mitigation": "Strictly sequence phases. No MA1-MA3 implementation work until Phase 4 live trading is stable. Use the current single-account architecture as long as possible. Do not let cloud architecture work crowd out signal quality work."
+    },
+    {
+      "risk": "IBKR connection reliability \u2014 orders.py logs show FLATTEN failures, reqGlobalCancel rejections, and connection loss errors. If this happens in live trading with real capital, positions could be stranded",
+      "severity": "high",
+      "mitigation": "Reconnection Logic (backoff, state sync) must be completed and stress-tested before live trading. Add explicit test coverage for IBKR disconnection scenarios. Define the bot's behaviour when it cannot confirm a position is closed."
+    },
+    {
+      "risk": "No session logs yet \u2014 without recorded development context, product decisions are not traceable and it is impossible to know why specific implementation choices were made",
+      "severity": "low",
+      "mitigation": "Begin logging Cowork session summaries in the project after each significant session. The CLAUDE.md governance file is a good start \u2014 extend it to capture decision rationale."
+    }
+  ],
+  "roadmap_gaps": "Several gaps exist between the current feature pipeline and the full vision. (1) No formal paper trading profitability evaluation process or Go/No-Go gate is specified anywhere \u2014 the transition to live trading lacks a defined trigger. (2) No emergency kill switch spec exists as a standalone feature despite being implied by every live trading stage. (3) No credential validation or IBKR connection health check flow is specified for the user onboarding path. (4) No rate limiting or API cost management spec exists despite 5+ external data sources being planned. (5) No performance attribution spec exists \u2014 which signals are actually generating closed-trade P&L is distinct from IC and is currently untracked. (6) The live-to-paper trading toggle mechanism has no spec \u2014 how the bot switches modes, with what audit trail, and by whom is undefined. (7) There is no user notification system spec for risk events (drawdown brake fired, correlation guard triggered, position limit hit) separate from trade execution notifications. (8) The backtester's relationship to live signal validation is unclear \u2014 there is no spec for a continuous validation loop that re-runs the backtester as new market data arrives and alerts if edge has degraded. (9) No data retention or GDPR/privacy consideration spec exists for when the platform holds multiple users' trading data and broker credentials. (10) No spec exists for handling IBKR API version updates or TWS/Gateway version compatibility, which is a recurring operational risk for IBKR-dependent bots.",
+  "model": "claude-sonnet-4-6",
+  "data_sources": {
+    "specs": 79,
+    "sessions": 0,
+    "research": 6,
+    "commits": 17,
+    "tests": true,
+    "code": true
+  }
+}

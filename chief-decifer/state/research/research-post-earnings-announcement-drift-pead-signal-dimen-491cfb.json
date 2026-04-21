@@ -1,0 +1,16 @@
+{
+  "id": "research-post-earnings-announcement-drift-pead-signal-dimen-491cfb",
+  "title": "Post-Earnings Announcement Drift (PEAD) Signal Dimension",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Calculate Standardized Unexpected Earnings (SUE) for each candidate stock using quarterly EPS data from yfinance. SUE = (EPS_q - EPS_{q-4}) / std(EPS_delta over last 8 quarters). A high positive SUE (>1.5) indicates a strong positive earnings surprise and is associated with 30\u201360 days of upward price drift (PEAD effect, documented since Ball & Brown 1968 and persistent in quantitative studies). Add SUE as the 10th scoring dimension in signals.py, weighted most heavily in the 3\u20138 weeks following an earnings announcement. Only fire if the earnings announcement was within the last 10 trading days.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Portfolio Construction, Trade Selectivity & Alternative Data",
+  "impact_score": 10,
+  "impact_label": "High Impact",
+  "expected_impact": "+3\u20136% win rate for earnings-quarter entries",
+  "difficulty": "Easy",
+  "dev_days": 2,
+  "created_at": "2026-04-14T05:25:49.051723Z"
+}

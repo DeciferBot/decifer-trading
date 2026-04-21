@@ -1,0 +1,16 @@
+{
+  "id": "research-shap-based-signal-dimension-importance-audit-657be2",
+  "title": "SHAP-Based Signal Dimension Importance Audit",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "After each batch of completed trades in the backtester, run SHAP (SHapley Additive exPlanations) on the ml_engine.py model to compute per-feature importance values for each signal dimension. Identify dimensions with mean |SHAP| < 0.01 across the last 100 trades \u2014 these are dead-weight features contributing noise rather than signal. Surface these in a weekly audit report written to the state folder, and provide a suggested reweighting vector. This allows the system to continuously self-diagnose signal quality degradation without manual inspection.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Portfolio Construction, Trade Selectivity & Alternative Data",
+  "impact_score": 9,
+  "impact_label": "High Impact",
+  "expected_impact": "+3\u20135% win rate via signal pruning and reweighting",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-14T05:25:49.054052Z"
+}

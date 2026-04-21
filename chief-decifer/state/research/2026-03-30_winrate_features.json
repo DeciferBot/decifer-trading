@@ -1,0 +1,107 @@
+{
+  "date": "2026-03-30",
+  "topic": "Win Rate Improvement — Portfolio Construction, Trade Selectivity & Alternative Data",
+  "status": "complete",
+  "source": "Web research",
+  "findings": [
+    {
+      "feature": "Earnings Calendar Event Risk Gate",
+      "tier": 1,
+      "expected_impact": "-15% low-quality trades filtered",
+      "dev_days": 1,
+      "difficulty": "Easy",
+      "summary": "Before entering any new position, query the Yahoo Finance earnings calendar (via yfinance ticker.calendar or Yahoo RSS) to check whether earnings are due within the next 3 trading days. Block new entries during this blackout window to avoid unquantified overnight gap risk from earnings surprises. The current system has no awareness of upcoming binary events, which causes the structural bullish bias to fire into earnings — a known trap where even correct signals are overwhelmed by event-driven volatility.",
+      "module": "risk.py",
+      "upgrades": "Pre-Trade Event Filter — blocks entries into earnings blackout windows",
+      "subsystem": "Risk & Portfolio",
+      "what_changes": "Add a function `is_earnings_blackout(ticker, days=3)` in risk.py that calls `yf.Ticker(ticker).calendar` to fetch the next earnings date. Return True if earnings fall within `days` trading days. Gate every new entry signal through this check before order submission in the brain loop.",
+      "why_it_matters": "Binary earnings events introduce gap risk that no stop-loss can protect against. The current system fires on momentum signals without awareness of upcoming announcements, causing outsized losses on gap-down/gap-up surprises. A 3-day blackout removes this class of loss entirely at near-zero implementation cost."
+    },
+    {
+      "feature": "Hurst Exponent Per-Stock Regime Classifier",
+      "tier": 1,
+      "expected_impact": "+5–8% win rate via strategy routing",
+      "dev_days": 1,
+      "difficulty": "Easy",
+      "summary": "Compute a rolling Hurst exponent (H) for each candidate stock over a 100-bar lookback window using numpy's rescaled range (R/S) analysis. H < 0.45 indicates a mean-reverting stock (RSI oversold/overbought signals are more reliable), H > 0.55 indicates a trending stock (momentum signals dominate), and 0.45–0.55 is a random walk where signal quality is low. Unlike HMM regime detection which classifies the broad market, this classifier runs at the individual stock level, allowing the signal engine to weight momentum vs. mean-reversion dimensions differently per ticker before scoring.",
+      "module": "signals.py",
+      "upgrades": "Per-Stock Regime Classifier — Hurst-based momentum/mean-reversion gate",
+      "subsystem": "Signal Generation",
+      "what_changes": "Add `compute_hurst(prices: pd.Series, lags: int = 100) -> float` using R/S analysis or variance-ratio method (pure numpy, no TA-Lib needed). Call this per ticker during the score() pipeline. Return a `hurst_regime` field ('trending', 'mean_reverting', 'random') and use it to conditionally boost or suppress relevant signal dimension weights in the composite score.",
+      "why_it_matters": "The current 9-dimension signal engine applies a fixed weighting regardless of whether a stock is in a trending or mean-reverting phase. This causes momentum signals to fire in choppy stocks (whipsaws) and mean-reversion signals to fire in strong trends (counter-trend losses). The Hurst gate corrects this mismatch at the individual stock level — a known cause of reduced win rate in mixed-regime environments."
+    },
+    {
+      "feature": "Sector Rotation Relative Strength Filter",
+      "tier": 1,
+      "expected_impact": "+4–7% win rate by trading with sector tailwinds",
+      "dev_days": 2,
+      "difficulty": "Easy",
+      "summary": "Each morning, pull 1-month and 3-month price returns for the 9 SPDR sector ETFs (XLK, XLF, XLE, XLV, XLI, XLY, XLP, XLRE, XLU) using yfinance. Rank them by composite momentum (weighted average of 1M and 3M returns). Only allow long entries for stocks whose sector ranks in the top 3; only allow short entries for stocks in the bottom 3 sectors. Stocks in the middle 3 sectors are treated as neutral — signal must exceed a higher threshold to enter. This exploits the well-documented sector momentum anomaly (persistence of sector-level relative strength over 1–6 months) using entirely free data.",
+      "module": "signals.py",
+      "upgrades": "Sector Rotation Gate — relative strength sector ranking filter",
+      "subsystem": "Signal Generation",
+      "what_changes": "Add `get_sector_rankings() -> dict` that downloads 3M OHLC for all 9 sector ETFs via yfinance, computes (0.4 * 1M_return + 0.6 * 3M_return) composite momentum, ranks 1–9, and returns a mapping of sector_etf → rank. Add a `get_ticker_sector(ticker)` lookup using yf.Ticker(ticker).info['sector']. Gate entries in brain.py: longs only in top-3 sectors, shorts only in bottom-3. Cache sector rankings for the session.",
+      "why_it_matters": "Trading against sector momentum is one of the largest sources of false positives in any stock-level system. The current Decifer signal engine scores stocks in isolation without accounting for sector-level tailwinds or headwinds. A stock with a strong individual signal in a deeply out-of-favour sector is far more likely to underperform than the same signal in a leading sector."
+    },
+    {
+      "feature": "Post-Earnings Announcement Drift (PEAD) Signal Dimension",
+      "tier": 1,
+      "expected_impact": "+3–6% win rate for earnings-quarter entries",
+      "dev_days": 2,
+      "difficulty": "Easy",
+      "summary": "Calculate Standardized Unexpected Earnings (SUE) for each candidate stock using quarterly EPS data from yfinance. SUE = (EPS_q - EPS_{q-4}) / std(EPS_delta over last 8 quarters). A high positive SUE (>1.5) indicates a strong positive earnings surprise and is associated with 30–60 days of upward price drift (PEAD effect, documented since Ball & Brown 1968 and persistent in quantitative studies). Add SUE as the 10th scoring dimension in signals.py, weighted most heavily in the 3–8 weeks following an earnings announcement. Only fire if the earnings announcement was within the last 10 trading days.",
+      "module": "signals.py",
+      "upgrades": "PEAD/SUE Signal — 10th scoring dimension for earnings drift",
+      "subsystem": "Signal Generation",
+      "what_changes": "Add `compute_sue(ticker: str) -> float` that fetches `yf.Ticker(ticker).quarterly_earnings` (EPS per quarter), computes the 4-quarter EPS delta, normalizes by rolling 8-quarter std dev of deltas, and returns the SUE z-score. Integrate as dimension 10 in the score pipeline with a recency decay: weight = max(0, 1 - (days_since_earnings / 10)). SUE > 1.5 scores positive; SUE < -1.5 scores negative.",
+      "why_it_matters": "PEAD is one of the most robust documented anomalies in academic finance — stocks with positive earnings surprises continue to drift upward for 4–8 weeks post-announcement on average. The current system has no awareness of recent earnings surprises, meaning it misses a persistent, low-risk edge that requires only free yfinance data to exploit."
+    },
+    {
+      "feature": "Google Trends Retail Attention Surge Detector",
+      "tier": 2,
+      "expected_impact": "+2–4% win rate for retail-driven momentum setups",
+      "dev_days": 2,
+      "difficulty": "Medium",
+      "summary": "Use the pytrends library (free, unofficial Google Trends API) to pull weekly Google search volume for a stock's ticker symbol and company name. Compute a normalized attention score: (current_week_volume - 52W_avg) / 52W_std. A spike > 2 standard deviations above the 52-week average indicates a surge in retail attention that historically precedes short-term price momentum (documented in multiple academic studies). Add as an optional signal boost in signals.py for momentum-regime stocks (H > 0.55). Rate-limit to one API call per ticker per day to avoid pytrends throttling.",
+      "module": "signals.py",
+      "upgrades": "Google Trends Attention Score — retail search volume momentum proxy",
+      "subsystem": "Signal Generation",
+      "what_changes": "Install pytrends (`pip install pytrends`). Add `get_trends_score(ticker: str, company_name: str) -> float` that builds a TrendReq, calls `build_payload([ticker, company_name], timeframe='today 12-m')`, fetches `interest_over_time()`, and returns z-score of latest week vs. 52W mean. Cache results per ticker with a 24h TTL. Apply as a +0.5 score multiplier in the composite if z-score > 2.0 and Hurst regime is 'trending'.",
+      "why_it_matters": "Retail investor attention is a well-documented leading indicator for short-term price momentum in mid/small-cap stocks (see Da et al., 2011). Spikes in search volume precede abnormal returns over the next 2 weeks. The current system has no retail sentiment proxy beyond Reddit mention velocity, and Google Trends provides a broader, less noise-prone signal with weekly granularity."
+    },
+    {
+      "feature": "SHAP-Based Signal Dimension Importance Audit",
+      "tier": 2,
+      "expected_impact": "+3–5% win rate via signal pruning and reweighting",
+      "dev_days": 3,
+      "difficulty": "Medium",
+      "summary": "After each batch of completed trades in the backtester, run SHAP (SHapley Additive exPlanations) on the ml_engine.py model to compute per-feature importance values for each signal dimension. Identify dimensions with mean |SHAP| < 0.01 across the last 100 trades — these are dead-weight features contributing noise rather than signal. Surface these in a weekly audit report written to the state folder, and provide a suggested reweighting vector. This allows the system to continuously self-diagnose signal quality degradation without manual inspection.",
+      "module": "ml_engine.py",
+      "upgrades": "SHAP Signal Audit — automated feature importance and dead-weight detection",
+      "subsystem": "AI & Learning",
+      "what_changes": "Install shap (`pip install shap`). After each backtester run or after accumulating 100 new completed trades, call `shap.TreeExplainer(model).shap_values(X_recent)` where X_recent is the last N trade feature vectors. Compute mean absolute SHAP per signal dimension. Write a JSON report to `state/signal_audit/YYYY-MM-DD_shap_audit.json` with dimension rankings and a flag for any dimension with importance < 0.01. Add a `prune_suggested` boolean per dimension.",
+      "why_it_matters": "The current 9-dimension signal engine has no mechanism to detect when individual dimensions have decayed in predictive power. Signal dimensions that worked 12 months ago may now be noise or inversely correlated with outcomes (alpha decay). Without SHAP auditing, dead signals reduce the composite score quality and increase false positives. This is the first step toward an auto-adapting signal engine."
+    }
+  ],
+  "total_dev_days": 11,
+  "top_3_quick_wins": [
+    "Earnings Calendar Event Risk Gate (1 day, -15% bad trades filtered)",
+    "Hurst Exponent Per-Stock Regime Classifier (1 day, +5–8% win rate)",
+    "Sector Rotation Relative Strength Filter (2 days, +4–7% win rate)"
+  ],
+  "urls": [
+    "https://macrosynergy.com/research/detecting-trends-and-mean-reversion-with-the-hurst-exponent/",
+    "https://robotwealth.com/demystifying-the-hurst-exponent-part-1/",
+    "https://en.wikipedia.org/wiki/Post%E2%80%93earnings-announcement_drift",
+    "https://github.com/aniketnmishra/PEAD",
+    "https://quantpedia.com/strategies/post-earnings-announcement-effect",
+    "https://quantpedia.com/how-to-improve-post-earnings-announcement-drift-with-nlp-analysis/",
+    "https://meetglimpse.com/google-trends/stock-trading/",
+    "https://www.researchgate.net/publication/326503702_Algorithmic_Trading_Systems_Based_on_Google_Trends",
+    "https://github.com/evilpegasus/google-trends-financial-modeling",
+    "https://chartmini.com/blog/portfolio-heat-management-the-hidden-risk-that-destroys-traders-2026",
+    "https://medium.com/@deepml1818/python-for-regime-switching-models-in-quantitative-finance-c54d2710f71b",
+    "https://chartswatcher.com/pages/blog/top-algorithmic-trading-strategies-for-2025",
+    "https://www.quantconnect.com/research/15369/standardized-unexpected-earnings/"
+  ]
+}

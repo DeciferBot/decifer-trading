@@ -1,0 +1,17 @@
+{
+  "id": "feat-mean-reversion-dimension",
+  "title": "Mean-Reversion Dimension",
+  "status": "complete",
+  "priority": "P1",
+  "phase": "A",
+  "designed_date": "2026-03-26",
+  "started_date": "2026-03-26",
+  "completed_date": "2026-03-26",
+  "summary": "Added 9th signal dimension REVERSION (0-10 pts) to signals.py. Three sub-metrics gated by ADF statistical test: Variance Ratio (Lo-MacKinlay, 0-3 pts), OU Half-Life (Ernie Chan method, 0-4 pts), Z-Score deviation from mean (0-3 pts). ADF gate (p < 0.05) is the critical safety mechanism — prevents false positives on random walks. Fully direction-agnostic. Shipped in v3 baseline commit (d640a1e).",
+  "approach": "ADF gate → Variance Ratio + OU Half-Life + Z-Score. Prefers daily data (more stable), falls back to 5m. Calibrated via Monte Carlo: 5000 random walk simulations. FP rate: ~7.7% with ADF gate (down from ~32% without). TP rate on strong OU: 75%. statsmodels added to requirements.txt.",
+  "files_affected": ["signals.py", "requirements.txt"],
+  "dependencies": [],
+  "roadmap_ref": "roadmap/04-mean-reversion-dimension.md",
+  "branch": "feat/phase-a-roadmap",
+  "approved_by": "amit"
+}

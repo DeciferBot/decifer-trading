@@ -1,0 +1,16 @@
+{
+  "id": "research-anchored-vwap-entry-gate-a9a79a",
+  "title": "Anchored VWAP Entry Gate",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Add weekly Anchored VWAP as a binary gate before trade entry. Only allow long entries when price is above the weekly VWAP (trading with institutional flow); only allow shorts below it. VWAP represents the average price institutions paid during the period \u2014 being on the right side of it filters out counter-institutional trades. A 2025-2026 backtest of VWAP-confirmed entries showed a 77.78% win rate across 72 trades.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Execution Quality & Exit Optimization",
+  "impact_score": 8,
+  "impact_label": "High Impact",
+  "expected_impact": "+2-3% win rate",
+  "difficulty": "Easy",
+  "dev_days": 1,
+  "created_at": "2026-04-14T05:25:49.065581Z"
+}

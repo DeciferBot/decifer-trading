@@ -1,0 +1,16 @@
+{
+  "id": "research-drawdown-proportional-position-scaler-550a3c",
+  "title": "Drawdown-Proportional Position Scaler",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Implements a simple but powerful drawdown-aware position scaler that multiplies the final position size by risk_scaling = max(0, 1 - (current_drawdown / max_drawdown_threshold)). When the bot is at peak equity, risk_scaling = 1.0 (no reduction). At 10% drawdown with a 20% threshold, risk_scaling = 0.5 (half size). At the threshold, risk_scaling = 0 (no new positions). This is documented with working Python code in published practitioner research and is validated by Chekhlov et al.'s CDaR framework. It directly replaces the archived 'Drawdown Brake \u2014 Tiered Equity Curve Circuit Breaker' which used discrete tiers; this uses a continuous scalar that avoids cliff-edge behaviour.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "impact_score": 5,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "Reduces catastrophic loss scenarios by linearly scaling new allocations to zero as drawdown approaches max threshold; practitioner code shows risk_scaling = 1 - (drawdown / max_drawdown), preserving capital during drawdown periods while avoiding the 'locking in losses' problem if max_drawdown threshold is set generously (e.g., 20%)",
+  "difficulty": "Easy",
+  "dev_days": 2,
+  "created_at": "2026-04-14T05:25:49.020517Z"
+}

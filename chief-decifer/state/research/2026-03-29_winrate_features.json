@@ -1,0 +1,103 @@
+{
+  "date": "2026-03-29",
+  "topic": "Win Rate Improvement — Execution Quality & Exit Optimization",
+  "status": "complete",
+  "source": "Web research",
+  "findings": [
+    {
+      "feature": "Triple Barrier Method for ML Training Labels",
+      "tier": 1,
+      "expected_impact": "+1-2% win rate",
+      "dev_days": 2,
+      "difficulty": "Medium",
+      "summary": "Replace simple binary up/down labels used in ML training with Triple Barrier labels that reflect real trade viability: upper barrier (take-profit hit), lower barrier (stop-loss hit), or vertical barrier (time expiry). This aligns ML training targets with actual profit-and-loss outcomes rather than directional correctness, which reduces overfitting and improves out-of-sample signal quality.",
+      "module": "ml_engine.py",
+      "upgrades": "ML Engine — replaces raw price-direction labels with trade-outcome labels for all classifiers",
+      "subsystem": "AI & Learning",
+      "what_changes": "New label_triple_barrier(df, pt_sl=[1, 1], max_hold_days=10) function. For each candidate signal bar, sets a take-profit barrier at entry + 1*ATR and a stop-loss at entry - 1*ATR. If price touches TP first → label +1. If SL first → label -1. If neither within max_hold_days → label 0. These labels replace the existing binary targets fed to the ML classifiers.",
+      "why_it_matters": "If ml_engine.py currently trains on simple next-bar or N-day direction labels, the model learns 'which way does price go?' rather than 'is this trade profitable given our risk parameters?' Triple Barrier directly encodes the system's own TP/SL logic into the training data, closing the gap between what the model learns and what it actually trades."
+    },
+    {
+      "feature": "Meta-Labeling Secondary Classifier",
+      "tier": 1,
+      "expected_impact": "+2-4% win rate",
+      "dev_days": 3,
+      "difficulty": "Medium",
+      "summary": "Train a secondary binary ML classifier (the 'meta-model') on top of the primary 9-dimension signal engine. The meta-model's only job is to predict whether a given primary signal will be profitable or not — it does not pick direction. By combining the primary signal with the meta-model's confidence score, the system can selectively skip low-confidence trades, raising precision at the cost of some recall. Hudson & Thames research confirms meta-labeling consistently improves precision and F1 scores.",
+      "module": "ml_engine.py",
+      "upgrades": "ML Engine — adds a secondary confidence-filter layer that wraps the primary signal output",
+      "subsystem": "AI & Learning",
+      "what_changes": "New MetaLabelClassifier class with fit(X_primary_features, y_triple_barrier) and predict_proba(X) methods. Features fed to M2 include: primary signal score, current ATR, volume ratio, RSI, and time-of-day. At runtime: primary engine produces direction + score, meta-model scores probability of trade success (0-1), only trades above threshold (e.g. 0.60) get placed. Threshold is a tunable parameter.",
+      "why_it_matters": "The current 9-dimension scoring system treats all signals above the threshold equally. Meta-labeling adds a dynamic, learned filter that can distinguish between 'strong signal in good conditions' and 'strong signal in hostile conditions.' This directly attacks the system's known bullish bias — the meta-model learns to downweight long signals when conditions historically produce losing longs."
+    },
+    {
+      "feature": "Anchored VWAP Entry Gate",
+      "tier": 1,
+      "expected_impact": "+2-3% win rate",
+      "dev_days": 1,
+      "difficulty": "Easy",
+      "summary": "Add weekly Anchored VWAP as a binary gate before trade entry. Only allow long entries when price is above the weekly VWAP (trading with institutional flow); only allow shorts below it. VWAP represents the average price institutions paid during the period — being on the right side of it filters out counter-institutional trades. A 2025-2026 backtest of VWAP-confirmed entries showed a 77.78% win rate across 72 trades.",
+      "module": "signals.py",
+      "upgrades": "Signal Engine — adds an institutional flow gate as a pre-entry filter before the 9-dimension scoring runs",
+      "subsystem": "Signal Generation",
+      "what_changes": "New anchored_vwap_gate(ticker, direction, anchor='weekly') function. Downloads 5m intraday data for the current week via yfinance (yf.download(ticker, period='5d', interval='5m')). Calculates cumulative (price * volume) / cumulative volume from Monday open. Returns True if price > weekly VWAP for long, or price < weekly VWAP for short. Wired as a boolean pre-filter: if gate returns False, the signal is suppressed regardless of score.",
+      "why_it_matters": "The current signal engine scores opportunities but has no concept of whether price is above or below institutional value. Stocks trading below their weekly VWAP are distributing; those above are accumulating. This is the single most common institutional-grade filter absent from retail algo systems."
+    },
+    {
+      "feature": "Time-of-Day Seasonality Filter",
+      "tier": 1,
+      "expected_impact": "+1-2% win rate",
+      "dev_days": 1,
+      "difficulty": "Easy",
+      "summary": "Analyze 60 days of 1-hour OHLCV data (free via yfinance) to calculate the average hourly return for each hour of the trading day per ticker. Block new entries during historically losing hours. Market microstructure creates persistent intraday patterns: the opening 30 minutes are noisy and prone to fakeouts, midday (12-2pm EST) is typically choppy and low-follow-through, while the final hour tends to be directional. Filtering on hourly bias is a free, low-correlation edge.",
+      "module": "signals.py",
+      "upgrades": "Signal Engine — adds a time-of-day bias gate that blocks entries during historically unprofitable hours",
+      "subsystem": "Signal Generation",
+      "what_changes": "New hourly_bias_filter(ticker, lookback_days=60) function. Downloads 1h data via yf.download(ticker, period='60d', interval='1h'). For each bar, calculates pct_change(). Groups by hour-of-day and computes mean return. Returns a dict {hour: avg_return}. At runtime, if the current hour's avg_return is below -0.05% for the trade direction, the signal is suppressed. Pre-computed daily and cached to avoid repeated yfinance calls.",
+      "why_it_matters": "The current system has no awareness of intraday time patterns. Entering a long at 9:45am EST when that hour has historically been -0.15% on average for the stock is avoidable noise. This filter costs nothing to implement and adds a zero-correlation layer on top of the existing signal dimensions."
+    },
+    {
+      "feature": "Dual-Tranche Exit Strategy",
+      "tier": 1,
+      "expected_impact": "+1-2% win rate, +15-25% profit factor",
+      "dev_days": 2,
+      "difficulty": "Easy",
+      "summary": "Split every position into two equal tranches on entry. Exit Tranche 1 at a fixed profit target (1.5x ATR from entry), then switch Tranche 2 to a trailing ATR stop. This approach balances profit protection with trend capture: Tranche 1 ensures the trade is never a net loser once it moves, while Tranche 2 lets winners run. Research consistently shows dual-tranche improves profit factor by 15-25% versus single-exit strategies in trend-following systems.",
+      "module": "risk.py",
+      "upgrades": "Risk Management — replaces single take-profit/stop-loss exits with a two-stage tranche system",
+      "subsystem": "Risk & Portfolio",
+      "what_changes": "New dual_tranche_exit(position_size, entry_price, atr, current_price, highest_price) function. Tranche 1 (50%): exits when current_price >= entry_price + 1.5 * atr. Tranche 2 (50%): after Tranche 1 exits, activates a trailing stop at highest_price - 2.0 * atr, tightening to highest_price - 1.0 * atr once profit exceeds 3%. Returns a tuple of (tranche1_exit, tranche2_exit) signals each bar.",
+      "why_it_matters": "If the current risk.py uses fixed TP/SL levels, it forces a binary outcome: full win or full loss. In trending markets, fixed TP cuts winners short. In choppy markets, fixed TP gets hit but the position immediately reverses. Dual tranche adapts to both: securing gains quickly and staying in trend. This addresses the system's known difficulty holding through short-term pullbacks."
+    },
+    {
+      "feature": "Slippage & Execution Cost Model for Backtester",
+      "tier": 2,
+      "expected_impact": "Realistic validation — prevents live underperformance vs backtest",
+      "dev_days": 1,
+      "difficulty": "Easy",
+      "summary": "Add a realistic per-trade slippage model to the backtester based on average daily volume (ADV). Most retail algo backtests overstate performance by 0.3-0.8% per round-trip because they assume fills at the close price with no market impact. A proper slippage model calibrates fill degradation to trade size as a fraction of ADV — available for free via yfinance. This doesn't improve win rate directly but prevents curve-fitting to unrealistic backtest results.",
+      "module": "backtester.py",
+      "upgrades": "Backtester — adds realistic execution cost modeling to all simulated fills",
+      "subsystem": "Analytics & UI",
+      "what_changes": "New slippage_model(ticker, trade_value_usd, adv_usd) function. Fetches 20-day average daily volume via yfinance. Calculates: participation_rate = trade_value_usd / adv_usd. Slippage = 0.05% base (half bid-ask spread) + participation_rate * 0.10 (market impact). Applied to every simulated entry and exit fill. Also adds a commission_model(trade_value_usd, rate=0.001) for broker costs. Exposed as config parameters.",
+      "why_it_matters": "A strategy trading $50k in a $500k ADV stock consumes 10% of daily volume — this moves the price by roughly 0.5-1%. Without modeling this, the backtester shows inflated returns that the live system can never replicate. This is particularly important for mid/small cap signals where volume is lower and market impact is higher."
+    }
+  ],
+  "total_dev_days": 10,
+  "top_3_quick_wins": [
+    "Anchored VWAP Entry Gate (1 day, +2-3%)",
+    "Time-of-Day Seasonality Filter (1 day, +1-2%)",
+    "Dual-Tranche Exit Strategy (2 days, +1-2% win rate, +15-25% profit factor)"
+  ],
+  "urls": [
+    "https://hudsonthames.org/does-meta-labeling-add-to-signal-efficacy-triple-barrier-method/",
+    "https://algoedgeinsights.beehiiv.com/p/labeling-stock-prices-for-ml-with-triple-barrier-method",
+    "https://blog.quantinsti.com/triple-barrier-method-gpu-python/",
+    "https://whatworksintrading.substack.com/p/meta-labeling-the-technique-that",
+    "https://chartswatcher.com/pages/blog/6-powerful-vwap-trading-strategies-for-2025",
+    "https://trendspider.com/learning-center/anchored-vwap-trading-strategies/",
+    "https://ungeracademy.com/posts/bias-systems-trading-seasonal-market-patterns",
+    "https://medium.com/@jpolec_72972/stop-loss-take-profit-triple-barrier-time-exit-advanced-strategies-for-backtesting-8b51836ec5a2",
+    "https://medium.com/@redsword_23261/dynamic-atr-trailing-stop-trading-strategy-market-volatility-adaptive-system-2c2df9f778f2"
+  ]
+}

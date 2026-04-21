@@ -1,0 +1,23 @@
+{
+  "date": "2026-04-01",
+  "timestamp": "2026-04-01T15:06:20.521Z",
+  "branch": "master",
+  "phase": "unknown",
+  "last_commit": "1f454a0 fix(candle-gate): repair broken gate, add candle_gate audit trail",
+  "files_changed": [
+    "gents.py",
+    "bot.py",
+    "config.py",
+    "data/orders.json",
+    "equity_history.json",
+    "fill_watcher.py",
+    "learning.py",
+    "orders.py",
+    "risk.py",
+    "sentinel_agents.py"
+  ],
+  "test_status": "unknown",
+  "summary": "1f454a0 fix(candle-gate): repair broken gate, add candle_gate audit trail",
+  "open_todos": [],
+  "session_count": 58
+}

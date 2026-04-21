@@ -1,0 +1,16 @@
+{
+  "id": "research-adaptive-tail-risk-stress-scenario-pre-trade-gate-96a7ef",
+  "title": "Adaptive Tail-Risk Stress Scenario Pre-Trade Gate",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Implements a lightweight pre-trade stress test that applies three shock scenarios to the proposed new position and existing portfolio before order submission. If any scenario produces a simulated loss exceeding the user's stress_loss_budget (e.g., \u201315% in a single shock), the trade size is reduced proportionally. This is not Monte Carlo (which exists in the backlog) but rather a fast deterministic scenario engine using configurable shock vectors. It operationalises the 'Diagnose Vulnerabilities' step from Resonanz Capital's institutional tail-hedging framework (July 2025), making it accessible for retail users without requiring options or derivatives.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "Before opening a new position, simulates the portfolio's exposure to three standardised stress scenarios (equity \u201320%, VIX +100%, correlation flip to +0.8); blocks or reduces trades that would push scenario loss beyond per-user budget; Resonanz Capital framework shows institutional allocators dedicate 0.5\u20131% NAV to structured hedging once this diagnostic is in place",
+  "difficulty": "Medium",
+  "dev_days": 2,
+  "created_at": "2026-04-14T05:25:49.026002Z"
+}

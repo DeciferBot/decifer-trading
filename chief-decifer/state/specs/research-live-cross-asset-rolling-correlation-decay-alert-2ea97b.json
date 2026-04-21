@@ -1,0 +1,16 @@
+{
+  "id": "research-live-cross-asset-rolling-correlation-decay-alert-2ea97b",
+  "title": "Live Cross-Asset Rolling Correlation Decay Alert",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Computes rolling 30-day and 90-day pairwise return correlations between all current open positions using yfinance daily returns, and flags when correlation has shifted materially from the baseline (e.g., more than 0.3 absolute change). When the cross-position average correlation exceeds a threshold (e.g., 0.6), a Correlation Surge flag is emitted that reduces new position sizes by a configurable factor. This is distinct from the existing 'Correlation-Aware Position Management' feature, which manages static sector-level correlation caps \u2014 this feature specifically monitors the dynamic regime shift in correlations over time and generates alerts when the assumed diversification structure has broken down. The CFA Institute (February 2026) and BlackRock (Fall 2025) research both flag this as the dominant risk management blind spot in current portfolios.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "Detects correlation regime breaks (stock-bond correlation hit +0.66 in December 2024 vs \u20130.10 historical average) that make diversification assumptions invalid; prevents position sizing that assumes normal correlation when hedging relationships have broken down, potentially avoiding 15\u201325% drawdowns experienced in 2022-style regime shifts",
+  "difficulty": "Medium",
+  "dev_days": 4,
+  "created_at": "2026-04-14T15:27:10.559383Z"
+}

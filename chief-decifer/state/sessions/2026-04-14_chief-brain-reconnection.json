@@ -1,0 +1,40 @@
+{
+  "session_id": "2026-04-14_chief-brain-reconnection",
+  "date": "2026-04-14",
+  "approved_by": "PENDING",
+  "topic": "Reconnect Chief Decifer as Cowork's memory substrate — fix broken hook, collapse three state dirs into one sacred path",
+  "north_star_pillars": [1, 2, 3, 4, 5],
+  "summary": "Amit's theory: Chief Decifer is his brain. It should remember the full state of the bot AND feed that memory into Cowork before any code is written. Reality: the brain had been disconnected for 249 sessions. The session-start hook was configured via settings.json to read from /Users/amitchopra/Documents/Claude/Projects/Chief Designer/Chief-Decifer/state — a directory that does not exist. Cowork's apparent continuity came entirely from CLAUDE.md; not from session logs, specs, research, or the backlog. This session reconnected the brain.",
+  "motivation": "Without a working memory injection, every session re-explains context from scratch. Without one sacred state path, Chief's dashboard, the session-start hook, and Cowork's writes drift into different locations. The whole 'Chief is my brain' premise requires one path, one truth, one injection pipeline that actually fires.",
+  "changes": [
+    {"file": ".claude/settings.json", "change": "Removed broken env.CHIEF_STATE_PATH that pointed at a non-existent directory"},
+    {"file": ".claude/hooks/session-start-hook.mjs", "change": "Fixed fallback default to resolve to REPO_ROOT/chief-decifer/state (was ../chief-decifer/state, outside the repo). Also fixed pre-existing syntax error in buildFreshnessWarning (top-level await in sync function)"},
+    {"file": "Chief-Decifer-recovered/config.py", "change": "Collapsed split-brain _LOCAL_STATE_DIR vs _LIVE_STATE_DIR into one STATE_DIR. Chief-internal artifacts (catalyst, analysis, activity.jsonl, docs) moved under state/internal/. Added VISION_FILE."},
+    {"file": "Chief-Decifer-recovered/app.py", "change": "Updated docstring to describe the new unified state layout"},
+    {"file": "chief-decifer/state/research/", "change": "Created; 72 research-*.json files moved here out of specs/"},
+    {"file": "chief-decifer/state/archive/", "change": "Created; stale recovered backlog (feat-019..026) archived as backlog-recovered-2026-03-31.json"},
+    {"file": "chief-decifer/state/internal/", "change": "Created; copy of recovered catalyst/, analysis/, docs/, activity.jsonl"},
+    {"file": "chief-decifer/state/sessions/", "change": "Merged 36 older session logs (pre-2026-04-02) from recovered path. Now 60 total."},
+    {"file": "chief-decifer/state/specs/", "change": "Copied 19 historical feat-*.json specs from recovered (execution-agent, fill-watcher, hmm-regime-detection, multi-account MA1/MA2/MA3 series, alphalens-validation, walk-forward-calibration, etc.). Now 105 total."},
+    {"file": "chief-decifer/state/vision.json", "change": "Copied from recovered. Now lives in sacred path where Cowork and Chief both read it."},
+    {"file": "CLAUDE.md", "change": "Data Contracts section updated: added research/, archive/, internal/, vision.json to the table; added the 'one sacred path' rule and the research-vs-specs hygiene rule"},
+    {"file": "docs/DECISIONS.md", "change": "Added 2026-04-14 entry: 'Chief Decifer Has One Sacred State Path — No Fallback, No Split-Brain' with full context of the three broken wirings"}
+  ],
+  "decisions_locked": [
+    "Chief has one sacred state path: chief-decifer/state/. No fallback, no split-brain.",
+    "research-*.json belongs in research/, never in specs/.",
+    "Stale backlog schemas go to state/archive/; the canonical Phase A–E BACK-* backlog is the single source of truth."
+  ],
+  "learning_system_state": "No changes to the learning system this session. IC tracker, phase gate, pattern library, trade journal — all untouched. The fix was memory infrastructure, not alpha code.",
+  "tests_run": "Manual verification: (1) session-start hook runs cleanly and injects checkpoint + 5 active specs + 2 recent sessions. (2) Chief's config.py resolves all 7 paths — SESSIONS_DIR=60 files, RESEARCH_DIR=86 files, SPECS_DIR=105 files, backlog/vision/catalyst/activity all exist. (3) Chief launches via python3.11 app.py and serves HTTP 200 on port 8181 with no startup errors. (4) Panels (kanban, research, sessions, catalyst, product_map) import cleanly and find their data at sacred path.",
+  "next_steps": [
+    "P2: Teach Chief the bot's runtime state. Bot writes data/chief_snapshot.json each scan cycle (regime, phase_gate progress, per-dimension IC, open positions, recent closes). Session-start hook injects it as ## Current Bot State. Chief dashboard adds a Phase Gate panel.",
+    "P3: Build a chief-decifer/query.py CLI so Cowork can query Chief mid-session for decisions, specs by phase, IC state. Promote to MCP server only if usage proves it out.",
+    "P4: Decompose panels/brain.py (83KB monolith, violates 200-line rule in CLAUDE.md) into panels/brain/{memory,synthesis,ui}.py.",
+    "P4: Add chief-decifer/state/README.md documenting the schema of each subdir.",
+    "Deferred: rename Chief-Decifer-recovered/ → chief-decifer/app/. Cosmetic hygiene, no functional benefit now that state is unified."
+  ],
+  "pre_existing_errors_fixed": [
+    ".claude/hooks/session-start-hook.mjs:94 — top-level await inside sync function buildFreshnessWarning. Removed the dynamic import; added statSync to the top-level fs import."
+  ]
+}

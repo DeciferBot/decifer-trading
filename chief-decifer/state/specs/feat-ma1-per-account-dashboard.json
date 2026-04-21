@@ -1,0 +1,27 @@
+{
+  "id": "feat-ma1-per-account-dashboard",
+  "title": "Per-Account Dashboard \u2014 Local (MA1) to Cloud Web (MA3)",
+  "status": "future",
+  "priority": "P1",
+  "phase": "MA1",
+  "designed_date": "2026-03-29",
+  "started_date": null,
+  "completed_date": null,
+  "summary": "Phased dashboard work: MA1 \u2014 update local dashboard (port 8080) to show positions, P&L, and trade history broken out per account rather than one aggregated view. MA3 \u2014 cloud web dashboard each user opens in any browser, showing live positions and P&L per account with AI rationale. Same data model, different deployment targets.",
+  "approach": "Update dashboard.py to query positions per account_id from ConnectionManager. Render three side-by-side panels: options account, longs account, scalping account. Each shows: live positions, today P&L, last 5 trades with AI rationale snippet, agent accept/discard log. No new data storage needed \u2014 read from existing ib_insync portfolio() calls per account.",
+  "files_affected": [
+    "dashboard.py"
+  ],
+  "dependencies": [
+    "feat-ma1-connection-manager",
+    "feat-ma1-account-decision-agent"
+  ],
+  "roadmap_ref": "vision/Decifer_MultiAccount_Architecture.docx \u00a7 9 and Phase 1 table",
+  "branch": null,
+  "approved_by": null,
+  "deferral_reason": "multi-account infrastructure \u2014 future stage (paper_trading_single_account prioritisation)",
+  "merged_from": [
+    "feat-ma1-per-account-dashboard",
+    "feat-ma3-web-dashboard"
+  ]
+}

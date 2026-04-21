@@ -1,0 +1,33 @@
+{
+  "id": "feat-execution-agent",
+  "title": "Execution Agent \u2014 AI-Powered Order Execution Layer",
+  "status": "backlog",
+  "priority": "P0",
+  "phase": "C",
+  "designed_date": "2026-03-31",
+  "started_date": null,
+  "completed_date": null,
+  "summary": "Replace the rule-based fill watcher with a Claude-powered execution agent that reasons about market microstructure before deciding HOW to execute each trade. Sits between the 6-agent signal pipeline and IBKR \u2014 receives the trade decision and autonomously manages order type, aggression, size splitting, and fill chasing based on real-time spread, volume, VWAP position, and time-of-day context.",
+  "motivation": "The current system naively places all entries as limit orders at price\u00d71.002 with fixed step chasing. In live trading this leads to unnecessary slippage on liquid names and missed fills on fast-moving breakouts. Execution quality becomes material once real capital is deployed \u2014 a 0.2% execution improvement on $50k trades is $100/trade.",
+  "approach": "New execution_agent.py module with a single Claude agent call per trade. Agent receives: symbol, direction, size, conviction score, current bid/ask/spread, relative volume, VWAP position, time of day, and market regime. Returns a structured execution plan: {order_type, limit_price, aggression, split_into_n_tranches, timeout_secs, fallback_strategy}. Fill watcher becomes a sub-strategy within the agent's plan rather than a standalone module.",
+  "execution_strategies": [
+    "aggressive_limit: price at ask, short timeout \u2014 for high-conviction breakouts",
+    "passive_limit: price at bid+spread/2, longer timeout \u2014 for mean-reversion entries",
+    "twap_split: split large orders into N tranches over T minutes \u2014 for illiquid names",
+    "market_on_open: route to MOO for pre-market signals",
+    "cancel_on_move: cancel if price moves >X% before fill \u2014 entry thesis invalidated"
+  ],
+  "phase_gate": "Must be complete before Phase 4 (live trading). Rule-based fill watcher covers paper trading adequately. Execution alpha matters when real capital is at risk.",
+  "files_affected": [
+    "execution_agent.py",
+    "orders.py",
+    "fill_watcher.py",
+    "config.py",
+    "tests/test_execution_agent.py"
+  ],
+  "dependencies": [
+    "feat-fill-watcher"
+  ],
+  "branch": null,
+  "approved_by": null
+}

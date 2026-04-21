@@ -1,0 +1,195 @@
+{
+  "generated_at": "2026-04-01T15:30:06.445272+00:00",
+  "vision_statement": "Decifer is a cloud-hosted profitable trading bot that friends and family can connect to via a web interface, linking their own broker accounts and managing risk profiles. The path runs through proven paper-trading profitability, then live single-account trading, then cloud hosting, then multi-user scale.",
+  "current_stage_assessment": "Decifer is in the paper_trading_single_account stage. The codebase has matured significantly \u2014 a major bot.py refactor into 6 sub-modules just landed, a 10-dimension signal pipeline is live, ATR volatility sizing and VIX-rank Kelly are committed, and test coverage sits at 1453 passing with 0 failures. The immediate priority is validating that the system is actually generating profitable paper signals before advancing to live trading \u2014 no live money should move until paper performance is measured and validated.",
+  "executive_summary": "Decifer has had an extremely productive recent sprint: the architecture was split from a 3,140-line monolith into focused modules, the signal pipeline was extended to 10 dimensions, ATR position sizing and VIX-rank Kelly are both committed, and dual-tranche exits are tested. The system is structurally sound and the test suite is healthy at 100% pass rate. However, there is a critical gap: there is no evidence in the data of actual paper trading performance being measured, reported, or validated \u2014 the entire premise of advancing beyond this stage requires demonstrable profitability on paper, and that measurement infrastructure must be the next focus. Two P0 active features (ATR Volatility-Targeting and Drawdown Brake) are partially addressed by recent commits but the Drawdown Brake is still listed as active/unshipped and is a prerequisite for responsible live trading. The Multi-Source Sentiment Consensus Gate (A P0) is also unshipped and represents the highest-priority signal quality unlock given research consensus on LLM sentiment alpha.",
+  "recommended_actions": [
+    {
+      "action": "Validate paper trading P&L pipeline: confirm that completed paper trades are being logged, performance metrics (win rate, Sharpe, max drawdown, expectancy) are computed, and a baseline performance report can be generated",
+      "type": "validate",
+      "why_now": "The entire project advancement criterion for leaving paper_trading_single_account is demonstrable profitability on paper. There is no evidence in recent commits, dev sessions, or the dashboard spec that a coherent P&L report exists. Without this, every other feature built has no feedback loop and the decision to go live cannot be made with any confidence. This is the single most important thing to confirm right now.",
+      "source": "Vision: 'core bot must first be profitable and reliable on paper' \u2014 no commits or features address paper trade performance reporting; alpha-decay chart and signal decay monitor are partial but not a full P&L pipeline",
+      "cowork_prompt": "Context: Decifer is a paper-trading bot at stage paper_trading_single_account. The codebase was just refactored from bot.py into 6 sub-modules. A 10-dimension signal pipeline is live. Test suite: 1453 passing, 0 failures.\n\nGoal: Validate and if necessary build the paper trading performance measurement pipeline.\n\nTasks:\n1. Trace through the codebase to confirm paper trades (entries + exits) are being written to the trade journal with all required fields: entry price, exit price, direction, size, signal scores at entry, P&L, hold duration.\n2. Confirm that a performance report can be generated on demand showing: total trades, win rate, average win/loss, expectancy, Sharpe ratio, max drawdown, and current equity curve.\n3. If the trade journal is incomplete or the performance report does not exist, build the minimum viable version \u2014 a generate_performance_report() function that reads completed trades and outputs these metrics.\n4. Run the bot in paper mode for at least one session and confirm the output report is populated with real trade data.\n5. Document what the current paper trading baseline looks like \u2014 even if it is early data.\n\nDo not build new signal features in this session. The only goal is to confirm we can measure whether the bot is profitable."
+    },
+    {
+      "action": "Ship the Drawdown Brake \u2014 Tiered Equity Curve Circuit Breaker (B P0)",
+      "type": "build",
+      "why_now": "This is listed as P0 in the active pipeline and remains unshipped. It is the single most important risk control before any capital \u2014 even paper capital scaled to real money equivalents \u2014 is at risk. Without a drawdown brake, a bad signal cluster or regime shift can blow through the account unchecked. The ATR sizer and VIX-Kelly are now committed, which means position sizes are real \u2014 the brake must exist before those sizes matter. It also directly gates the live_trading_single_account transition.",
+      "source": "Active pipeline: 'Drawdown Brake \u2014 Tiered Equity Curve Circuit Breaker [B P0]'",
+      "cowork_prompt": "Context: Decifer is in paper_trading_single_account stage. ATR volatility-targeting position sizing and VIX-rank adaptive Kelly are both now committed (see recent commits). The Drawdown Brake is the last P0 risk control not yet shipped.\n\nGoal: Implement the three-tier drawdown brake in risk.py.\n\nSpec (from pipeline): Implement a three-tier drawdown brake that automatically reduces Kelly/ATR sizing or halts trading when equity drawdown from high-water mark crosses thresholds.\n\nTasks:\n1. In risk.py, add a DrawdownBrake class or function that reads the current equity and high-water mark (HWM already has persistence per recent commits \u2014 confirm HWM is being tracked).\n2. Implement three tiers: Tier 1 (e.g., -5% from HWM) = reduce position size by 50%; Tier 2 (e.g., -10% from HWM) = reduce position size by 75%; Tier 3 (e.g., -15% from HWM) = halt all new entries.\n3. Wire the brake into the position sizing path so that ATR/Kelly output is multiplied by the brake factor before order submission.\n4. Add a brake status indicator to the dashboard so the current tier is always visible.\n5. Write tests covering all three tier transitions and the reset condition (equity recovers above tier threshold).\n6. Confirm the brake state persists across bot restarts.\n\nReference modules: risk.py (1118L), bot_ibkr.py (874L), dashboard.py (2583L)."
+    },
+    {
+      "action": "Ship Multi-Source Sentiment Consensus Gate (A P0) \u2014 the highest-priority signal quality feature",
+      "type": "build",
+      "why_now": "This is the only A-tier P0 feature still in the active pipeline. Research from 2026-03-31 is unambiguous: LLM-based sentiment scoring achieves 72-74% directional accuracy. The Claude Sentiment Scoring Pipeline (B P1) is also in active \u2014 but the Consensus Gate (A P0) is the gating layer that prevents bad-sentiment trades from executing regardless of other signal scores. This is a trade filter, not just a signal dimension, which makes it higher impact than adding another dimension. It should ship before the sentiment dimension to ensure the gate exists from day one.",
+      "source": "Active pipeline: 'Multi-Source Sentiment Consensus Gate [A P0]'; Research: 'Sentiment Analysis & NLP for Trading [2026-03-31]'",
+      "cowork_prompt": "Context: Decifer has a 10-dimension signal pipeline. The Claude Sentiment Scoring Pipeline (B P1) is in active development. The Multi-Source Sentiment Consensus Gate (A P0) is a trade execution filter \u2014 it checks sentiment consensus before allowing any new entry.\n\nGoal: Implement the Multi-Source Sentiment Consensus Gate as a pre-entry filter in the signal pipeline.\n\nTasks:\n1. In signal_pipeline.py, add a sentiment_consensus_gate() function that is called as a final check before any trade entry is approved.\n2. The gate should query at minimum two sentiment sources (Yahoo RSS and Finviz are already referenced in the Claude Sentiment Scoring Pipeline spec). Use Claude to score each source's sentiment for the candidate ticker as POSITIVE / NEUTRAL / NEGATIVE.\n3. Define the consensus rule: if the majority of sources return NEGATIVE sentiment, block the entry regardless of signal score. If sources conflict, apply a configurable penalty to the Kelly fraction (not a full block).\n4. Add a 'SENTIMENT_GATE_BLOCKED' reason to the trade decision audit trail so we can track how often it fires.\n5. Wire the gate into the existing phase_gate / candle_gate execution path (see recent fix to candle_gate).\n6. Write tests: gate blocks on majority negative, gate passes on majority positive, gate applies penalty on mixed, gate fails open (does not block) if Claude API is unavailable.\n7. Add gate status to the dashboard decision panel.\n\nResearch grounding: 2024-2025 research shows LLM sentiment scoring at 72-74% directional accuracy. This gate should meaningfully improve win rate by filtering entries on negative consensus days."
+    },
+    {
+      "action": "Audit and resolve the FLATTEN failure and IBKR connection loss error paths in orders.py \u2014 these are silent failure modes in production",
+      "type": "fix",
+      "why_now": "The test health section shows multiple ERROR-level log lines from orders.py: FLATTEN ALL FAILED (no IB connection), FLATTEN failed for QQQ and AAPL (fill error, order rejected), and IBKR openTrades() failing closed. These are not test failures \u2014 they are error-handling paths that exist in the code. But 'failing closed' and 'continuing to close positions' after a global cancel failure are dangerous behaviors that could leave open positions unmanaged in a real account. Before moving to live_trading_single_account, every flatten/emergency-exit path must be audited for correctness and must have explicit test coverage.",
+      "source": "Test health: ERROR decifer.orders:orders.py \u2014 FLATTEN ALL FAILED, FLATTEN failed for QQQ/AAPL, reqGlobalCancel failed, IBKR connection lost",
+      "cowork_prompt": "Context: Decifer's orders.py (2165 lines) handles all IBKR order submission, fill watching, and emergency position flattening. The test suite passes 1453 tests but the logs show ERROR-level events from orders.py in several critical paths: (1) FLATTEN ALL FAILED \u2014 no IB connection available, (2) FLATTEN failed for QQQ: fill error, (3) FLATTEN failed for AAPL: order rejected, (4) reqGlobalCancel failed: TWS rejected global cancel, (5) _check_ibkr_open_order failing closed on IBKR connection loss.\n\nGoal: Audit every emergency exit / flatten code path in orders.py and ensure each has: correct failure behavior, explicit test coverage, and dashboard/alert visibility.\n\nTasks:\n1. Map every flatten/emergency-exit function in orders.py. List each function, its failure modes, and what it does on failure.\n2. For each failure mode, verify the behavior is correct: does 'failing closed' on a fill check mean we assume the order filled or did not fill? Is that the right assumption? Document the decision.\n3. For FLATTEN ALL FAILED (no IB connection): confirm there is a retry mechanism or at minimum a persistent alert that a human must acknowledge. Add one if missing.\n4. For reqGlobalCancel failure: confirm the fallback (continuing to close positions individually) actually works and is tested.\n5. Write explicit tests for: flatten with no connection, flatten with partial fills, flatten with order rejection, global cancel rejection fallback.\n6. Add a FLATTEN_FAILURE alert to the dashboard that persists until manually cleared.\n\nThis work is a prerequisite for live trading \u2014 these paths will be hit in production."
+    },
+    {
+      "action": "Promote the Hurst Exponent Regime Filter (B P1) to a formal build spec and sequence it before Regime-Conditional Signal Weighting",
+      "type": "promote",
+      "why_now": "Research from 2026-03-30 confirms market regimes are statistically real and persistent, and adaptive systems consistently outperform static ones. The Hurst Exponent is already in the active pipeline as a classifier (H>0.5 = trending, H<0.5 = mean-reverting). The Regime-Conditional Signal Weighting feature (also active, B P1) explicitly depends on having a regime classifier. The VIX-proxy was locked as the sole regime detector in a recent commit ('lock VIX-proxy as sole regime detector, defer HMM'), but the Hurst Exponent is a complementary classifier that works on price series structure, not just volatility. A formal spec is needed that defines: which features consume the Hurst output, how it combines with VIX-proxy, and what the regime state enum looks like.",
+      "source": "Active pipeline: 'Hurst Exponent Regime Filter [B P1]', 'Regime-Conditional Signal Weighting [B P1]'; Research: 'Market Regime Detection & Adaptation [2026-03-30]'; Commit: 'fix(arch): lock VIX-proxy as sole regime detector, defer HMM'",
+      "cowork_prompt": "Context: Decifer has a VIX-proxy regime detector locked in as the sole regime signal (per recent commit). The Hurst Exponent Regime Filter is active in the pipeline as a separate classifier. Regime-Conditional Signal Weighting depends on a regime classifier existing. Research consensus (2026-03-30) is that regime-adaptive systems outperform static ones.\n\nGoal: Write a complete build spec for the Hurst Exponent Regime Filter that can be handed directly to a developer.\n\nTasks:\n1. Define the regime state enum: what are the named states? Suggestion: TRENDING_BULL, TRENDING_BEAR, MEAN_REVERTING, UNDEFINED.\n2. Specify the Hurst calculation: rolling window size (e.g., 100 bars), method (R/S analysis or DFA), data source (daily closes).\n3. Specify how Hurst output combines with VIX-proxy: is it AND logic (both must agree), OR logic, or a weighted vote? Make a decision and document the rationale.\n4. Define the interface: regime_detector.get_regime(ticker) returns a RegimeState enum value. This is the contract that Regime-Conditional Signal Weighting will consume.\n5. Specify which signal dimensions should be upweighted in TRENDING vs MEAN_REVERTING regimes \u2014 reference the existing 10 signal dimensions in signals.py.\n6. Define test cases: known trending series (e.g., SPY 2020-2021 bull) should return H>0.5; known mean-reverting series should return H<0.5.\n7. Output: a written spec document (can be a markdown block) that is ready to be added to the pipeline as a formal build ticket."
+    },
+    {
+      "action": "Ship Claude Sentiment Scoring Pipeline as 10th signal dimension (B P1) immediately after Sentiment Consensus Gate is live",
+      "type": "build",
+      "why_now": "The research finding from 2026-03-31 is the strongest signal-quality finding in the entire research corpus: LLM sentiment at 72-74% directional accuracy. The Sentiment Consensus Gate (action #3) creates the execution filter; this feature adds the scored dimension to the signal pipeline so sentiment conviction is reflected in position sizing. The 10-dimension refactor already shipped ('feat(signals): alpha-pipeline-v2 \u2014 10-dimension signal refactor') but the Claude sentiment dimension may or may not be wired in \u2014 this session confirms and completes it.",
+      "source": "Active pipeline: 'Claude Sentiment Scoring Pipeline [B P1]'; Research: 'Sentiment Analysis & NLP for Trading [2026-03-31]'; Commit: 'feat(signals): alpha-pipeline-v2 \u2014 10-dimension signal refactor'",
+      "cowork_prompt": "Context: Decifer's signal pipeline was refactored to 10 dimensions in a recent commit. The Claude Sentiment Scoring Pipeline is listed as active [B P1]. Research shows LLM sentiment scoring achieves 72-74% directional accuracy. The Sentiment Consensus Gate (a separate feature) is being built in parallel as a pre-entry filter.\n\nGoal: Confirm or complete the Claude sentiment scoring as a scored signal dimension (0-10 pts) in signals.py.\n\nTasks:\n1. Check signals.py \u2014 confirm whether a SENTIMENT dimension already exists in the 10-dimension array after the recent alpha-pipeline-v2 refactor. If it exists, verify it is actually calling Claude and not returning a stub.\n2. If not wired: implement get_sentiment_score(ticker) in signals.py that: (a) fetches Yahoo RSS headlines for the ticker, (b) fetches Finviz news for the ticker, (c) sends headlines to Claude with a structured prompt asking for BULLISH / BEARISH / NEUTRAL scoring with confidence 0-10, (d) returns a normalized 0-10 conviction score.\n3. Add a BULLISH bias correction: if the score is NEUTRAL, return 5. If BULLISH, scale 6-10 by confidence. If BEARISH, scale 0-4 by confidence.\n4. Add caching: sentiment scores should be cached for 30 minutes to avoid repeated Claude API calls during a single session.\n5. Handle Claude API failures gracefully \u2014 return 5 (neutral) and log a WARNING, do not crash the signal pipeline.\n6. Write tests: mock Claude response BULLISH/high-confidence returns score >= 7; BEARISH/high-confidence returns score <= 3; API failure returns 5.\n7. Confirm the dimension appears in the dashboard signal breakdown."
+    },
+    {
+      "action": "Deduplicate the Order Fill Watcher feature \u2014 it appears twice as shipped in the pipeline",
+      "type": "housekeeping",
+      "why_now": "The shipped features list contains 'Order Fill Watcher \u2014 Execution Management Layer' twice with identical descriptions. This is a data integrity issue in the feature pipeline that will cause confusion when auditing what is and isn't shipped, especially as the Execution Agent (backlog) is being evaluated as a replacement. Clean this up and confirm the canonical shipped state of the fill watcher before the Execution Agent spec work proceeds.",
+      "source": "Pipeline: \u2713 [B] Order Fill Watcher appears twice in shipped features list",
+      "cowork_prompt": "Context: The Decifer feature pipeline has a duplicate entry. 'Order Fill Watcher \u2014 Execution Management Layer' appears twice in the shipped features list. There is also a 'Execution Agent \u2014 AI-Powered Order Execution Layer' in both the backlog (C P0) and (C P1), which appears to be a planned replacement for the fill watcher.\n\nGoal: Clean up the pipeline metadata and clarify the canonical state of execution management.\n\nTasks:\n1. Remove the duplicate Order Fill Watcher entry from the shipped features list. Keep one entry.\n2. Review the two Execution Agent backlog entries (C P0 and C P1) \u2014 they appear to be duplicates with slightly different descriptions. Merge them into a single entry with the correct priority.\n3. Confirm whether the AI-powered execution agent committed in 'feat(execution): add AI-powered execution agent as 7th Claude agent' means the backlog Execution Agent is now partially or fully shipped. If shipped, move it to shipped. If partially shipped, note what remains.\n4. Update any documentation or config that references the fill watcher to clarify it is the current production mechanism and the AI execution agent is an enhancement layer on top of it.\n5. Output: a clean pipeline state with no duplicates and accurate shipped/active/backlog status for all execution-related features."
+    },
+    {
+      "action": "Spec the paper trading performance gate: define the exact exit criteria for leaving paper_trading_single_account and entering live_trading_single_account",
+      "type": "spec",
+      "why_now": "There is no documented definition of what 'profitable and reliable on paper' means for Decifer. Without explicit exit criteria, the team cannot make a defensible decision to go live. This spec must define minimum trade count, minimum win rate, minimum Sharpe, maximum drawdown, and minimum consecutive weeks without a drawdown breach before live trading is authorized. Writing this now \u2014 while paper trading is active \u2014 anchors the decision in advance and prevents premature live trading.",
+      "source": "Vision: 'core bot must first be profitable and reliable on paper, then transition to live trading' \u2014 no exit criteria exist anywhere in the pipeline, backlog, or research findings",
+      "cowork_prompt": "Context: Decifer is at stage paper_trading_single_account. The vision requires the bot to be 'profitable and reliable on paper' before moving to live_trading_single_account. There are no documented exit criteria anywhere in the project data.\n\nGoal: Write a formal stage exit criteria document for paper_trading_single_account.\n\nTasks:\n1. Define minimum sample size: how many completed round-trip paper trades are required before the performance is considered statistically meaningful? (Suggested starting point: 30 trades minimum, ideally 50+.)\n2. Define performance thresholds that must ALL be met: (a) Win rate >= X%, (b) Expectancy (avg win * win rate - avg loss * loss rate) > 0, (c) Annualized Sharpe >= Y, (d) Max drawdown from HWM < Z%, (e) No Drawdown Brake Tier 3 triggers in the last N sessions.\n3. Define a stability window: the bot must meet all thresholds for at least 2 consecutive weeks without human intervention.\n4. Define a review checklist: what manual checks must pass before going live? (e.g., flatten-all tested successfully, IBKR paper account reconciles with bot trade journal, no orphaned orders).\n5. Define who approves the go-live decision (currently: founder only).\n6. Output: a written spec that can be committed to the repo as docs/stage_exit_criteria.md and referenced in future go/no-go decisions.\n\nThis document is a prerequisite for any live trading conversation."
+    }
+  ],
+  "product_roadmap": [
+    {
+      "phase_name": "Phase 1: Paper Trading Validation",
+      "goal": "Prove the bot generates measurable positive expectancy on paper with all core risk controls in place",
+      "rationale": "No live capital should be risked until there is a clear, measured performance baseline. All structural features must be complete before the paper record is meaningful \u2014 adding features mid-sample invalidates the sample.",
+      "features": [
+        "Validate paper trading P&L pipeline and performance reporting",
+        "Ship Drawdown Brake \u2014 Tiered Equity Curve Circuit Breaker (P0)",
+        "Ship Multi-Source Sentiment Consensus Gate (A P0)",
+        "Ship Claude Sentiment Scoring Pipeline as 10th signal dimension (B P1)",
+        "Audit and fix FLATTEN failure paths in orders.py",
+        "Spec and document stage exit criteria for paper \u2192 live transition",
+        "Hurst Exponent Regime Filter spec and build",
+        "Regime-Conditional Signal Weighting",
+        "Multi-Timeframe Signal Confirmation (B P1)",
+        "Intra-Portfolio Rolling Correlation Guard (B P1)"
+      ],
+      "exit_criteria": "30+ completed paper trades, win rate and expectancy positive over 2+ consecutive weeks, Drawdown Brake never hitting Tier 3, all flatten paths tested, stage exit criteria document approved",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 2: Live Trading \u2014 Single Account",
+      "goal": "Transition to live trading on a single IBKR account with small real capital, using all paper-validated controls",
+      "rationale": "Paper trading removes execution risk from the feedback loop. Live trading will surface slippage, margin behavior, and real fill quality that paper cannot simulate. Must start small.",
+      "features": [
+        "Live account IBKR connection validation and go-live checklist",
+        "ATR Volatility-Targeting Position Size Layer (confirm live behavior matches paper)",
+        "VIX-Rank Adaptive Fractional Kelly Sizer (confirm live behavior)",
+        "Dual-Tranche Exit Strategy (B P2)",
+        "Earnings Calendar Event Risk Gate (B P2)",
+        "Opening Gap Size & Direction Signal Classifier (B P1)",
+        "Signal Decay Monitor & Freshness Dashboard (B P1)",
+        "Alpha Decay Chart \u2014 Per-Trade Forward Return Distribution (B P1)",
+        "Options Flow Proxy Signal via Put/Call Ratio (B P1)"
+      ],
+      "exit_criteria": "Live account running for 4+ weeks, real P&L positive, max drawdown within spec, no unhandled order failures, all positions reconcile with IBKR statements daily",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 3: Cloud Hosting \u2014 Single Account",
+      "goal": "Move the bot off a local machine onto cloud infrastructure with uptime monitoring and remote access",
+      "rationale": "The founder cannot babysit a local process indefinitely. Cloud hosting enables 24/7 operation, is a prerequisite for multi-user, and forces the architecture to be stateless and restartable.",
+      "features": [
+        "Cloud deployment (containerized bot, managed restarts)",
+        "Remote dashboard access (web-based, read-only for now)",
+        "Uptime and health monitoring with alerting",
+        "Secrets management for IBKR credentials",
+        "SHAP-Based Signal Dimension Importance Audit (B P2)",
+        "Signal Validation with Alphalens (C P2)",
+        "Walk-Forward Weight Calibration (D P2)"
+      ],
+      "exit_criteria": "Bot runs unattended in cloud for 2+ weeks, dashboard accessible remotely, restarts automatically on failure, founder can monitor and intervene from any device",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 4: Multi-User Beta",
+      "goal": "Allow friends and family to connect their own broker accounts and use the bot via a web interface",
+      "rationale": "This is the first multi-user stage and requires user authentication, per-user risk settings, account isolation, and a real web UI \u2014 fundamentally different infrastructure from single-user.",
+      "features": [
+        "Web-based user interface for settings and monitoring",
+        "Per-Account Risk Limits (E P1)",
+        "Account-Aware Order Router (E P1)",
+        "Multi-Account Position Aggregation (already shipped \u2014 wire into UI)",
+        "Cross-Account Correlation Guard (E P2)",
+        "Unified Trade Journal across accounts (E P2)",
+        "Account Performance Comparison Dashboard (E P2)",
+        "User authentication and broker account linking flow",
+        "Post-Earnings Announcement Drift (PEAD) Signal (B P1)",
+        "Unusual Options Activity (UOA) Signal (B P1)"
+      ],
+      "exit_criteria": "At least 2 external users (friends/family) connected with their own IBKR accounts, each with independent risk limits, running for 4+ weeks without cross-account interference or data leakage",
+      "estimated_scope": "large"
+    }
+  ],
+  "risks": [
+    {
+      "risk": "No documented exit criteria for paper \u2192 live transition means the go-live decision could be made prematurely or arbitrarily, exposing real capital before the bot is validated",
+      "severity": "high",
+      "mitigation": "Write and commit stage exit criteria spec (Action #8) before any live trading conversation begins. Gate the live trading decision on that document."
+    },
+    {
+      "risk": "FLATTEN ALL FAILED and IBKR connection loss error paths in orders.py are silent failure modes \u2014 in live trading, these could leave open positions unmanaged with no human alert",
+      "severity": "high",
+      "mitigation": "Audit and fix all flatten failure paths (Action #4), add persistent dashboard alerts for flatten failures, and test every failure mode explicitly before going live."
+    },
+    {
+      "risk": "The Drawdown Brake (P0) is not yet shipped, meaning the ATR sizer and VIX-Kelly now in production have no circuit breaker \u2014 a bad signal cluster in paper trading has no automatic stop",
+      "severity": "high",
+      "mitigation": "Ship the Drawdown Brake as Action #2, immediately after the P&L validation session."
+    },
+    {
+      "risk": "There is no evidence the paper trading performance is being measured \u2014 the bot may have been running without a feedback loop, making it impossible to know if signals are working",
+      "severity": "high",
+      "mitigation": "Run the paper trading P&L validation session (Action #1) immediately. If measurement infrastructure is missing, build it before any other feature work."
+    },
+    {
+      "risk": "The codebase has grown to 26,680 lines across 45 modules. dashboard.py at 2,583 lines and orders.py at 2,165 lines are approaching maintenance risk thresholds, especially given the recent bot.py split was just completed",
+      "severity": "medium",
+      "mitigation": "Flag dashboard.py and orders.py for a split-review session after Phase 1 is complete. Do not split during active feature development \u2014 wait for a stable moment."
+    },
+    {
+      "risk": "Regime detection has two competing implementations (VIX-proxy locked, Hurst deferred, HMM explicitly deferred) with no clear arbitration spec \u2014 features consuming regime state may be building against an interface that will change",
+      "severity": "medium",
+      "mitigation": "Write the Hurst Exponent spec (Action #6) and define the canonical regime interface contract before any downstream feature (Regime-Conditional Signal Weighting) is built against it."
+    },
+    {
+      "risk": "The Claude API is used for multiple signal dimensions and the execution agent \u2014 a Claude API outage or rate limit would degrade signal quality and execution simultaneously with no fallback defined",
+      "severity": "medium",
+      "mitigation": "Spec a Claude API failure fallback policy: sentiment gate fails open, sentiment score returns neutral (5), execution agent falls back to rule-based fill watcher. Confirm each Claude-dependent feature has a graceful degradation path."
+    },
+    {
+      "risk": "The Earnings Calendar Event Risk Gate is unshipped \u2014 the bot may be entering positions immediately before earnings announcements, which is a known source of outsized adverse moves",
+      "severity": "medium",
+      "mitigation": "Prioritize the Earnings Calendar Gate in Phase 2 before position sizes are meaningful. As a short-term measure, manually check earnings calendar for any open paper positions."
+    },
+    {
+      "risk": "Multi-user infrastructure (auth, per-user account isolation, web UI) has no specs written and is not in any active pipeline item \u2014 it is assumed to be 'Phase 4 work' but the gap between current architecture and multi-user is very large",
+      "severity": "low",
+      "mitigation": "Begin writing multi-user architecture spec at the start of Phase 3 so that cloud hosting decisions do not bake in assumptions that block multi-user later."
+    }
+  ],
+  "roadmap_gaps": "1. Web UI / Frontend: The vision explicitly includes 'web-based interface' for friends and family but there is not a single feature, spec, backlog item, or commit related to frontend development. This is the largest unaddressed gap in the entire roadmap. 2. User authentication and broker account linking: Multi-user requires users to authenticate and securely link their own IBKR credentials. No spec exists for this flow. 3. Claude API resilience and fallback policy: Multiple features depend on Claude but there is no system-level spec for what happens when Claude is unavailable, rate-limited, or returns unexpected output. 4. Notification / alerting system: There is no spec for how the bot alerts the operator (or future users) to critical events \u2014 drawdown breaches, flatten failures, large losses. The dashboard exists but push notifications or email alerts are not specced. 5. Backtesting validation of the full 10-dimension signal pipeline: The backtester.py module exists (844L) but there is no evidence that the new 10-dimension pipeline has been backtested end-to-end. Walk-Forward Weight Calibration is in the backlog but no forward-looking backtest spec exists. 6. Operational runbook: There is no documented procedure for daily bot operation, emergency shutdown, IBKR connection loss recovery, or go-live checklist. This is critical before live trading. 7. Data feed resilience: Multiple data sources are failing in logs (yfinance, AlphaVantage, Stooq) with no documented fallback priority chain \u2014 if the primary data source is down, which source takes over and how is this tested?",
+  "model": "claude-sonnet-4-6",
+  "data_sources": {
+    "specs": 125,
+    "sessions": 5,
+    "research": 8,
+    "commits": 20,
+    "tests": true,
+    "code": true
+  }
+}

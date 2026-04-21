@@ -1,0 +1,23 @@
+{
+  "date": "2026-03-30",
+  "timestamp": "2026-03-30T19:14:41.845Z",
+  "branch": "master",
+  "phase": "unknown",
+  "last_commit": "14670f2 feat(signals): regime-gated momentum/mean-reversion signal router",
+  "files_changed": [
+    "ot.py",
+    "data/orders.json",
+    "equity_history.json",
+    "learning.py",
+    "options.py",
+    "orders.py",
+    "CLAUDE.md.bak",
+    "data/audit_log.jsonl",
+    "data/signals_log.jsonl",
+    "journals/2026-03-30.md"
+  ],
+  "test_status": "unknown",
+  "summary": "14670f2 feat(signals): regime-gated momentum/mean-reversion signal router",
+  "open_todos": [],
+  "session_count": 33
+}

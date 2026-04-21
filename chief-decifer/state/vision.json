@@ -1,0 +1,24 @@
+{
+  "statement": "Decifer's single objective is to build alpha — a statistical edge durable enough to remain profitable after costs, slippage, and regime changes. The current phase is proving that edge on a paper account: every paper trade is a data point used to validate the 9-dimension signal engine and 6-agent pipeline. Live trading, cloud hosting, and any multi-user future are conditional consequences that only become real if paper-trading alpha is proven first. If the edge is not real, nothing downstream matters.",
+  "end_state_capabilities": [
+    "Measurable, persistent alpha — Information Coefficient tracked per signal dimension and per regime",
+    "Reliable bot execution — no silent failures, state drift, broker desyncs, or hot-path regressions",
+    "Sufficient closed-trade volume across regimes to statistically validate the edge (Phase C gate: \u2265200 closed trades)",
+    "Walk-forward validated signal weights — not static, not overfit, honest about regime dependence",
+    "Regime-aware performance reporting — separate PnL and IC by BULL_TRENDING / BEAR_TRENDING / CHOPPY / PANIC",
+    "Live trading on a single real-money account, only after paper alpha is proven",
+    "Cloud hosting and multi-user platform — conditional on live-account alpha holding up"
+  ],
+  "success_definition": "Paper alpha is proven when IC is positive and stable across regimes over \u2265200 closed trades, signal weights hold up under walk-forward testing, and the bot runs autonomously for extended periods without execution regressions. Only then does the live-trading question become worth asking. Everything beyond live trading is conditional on that question being answered affirmatively with real money.",
+  "current_stage": "paper_trading_single_account",
+  "stages": [
+    "paper_trading_single_account",
+    "live_trading_single_account",
+    "cloud_hosted_single_account",
+    "multi_user_beta",
+    "multi_user_production"
+  ],
+  "stage_gate_note": "Stages beyond paper_trading_single_account are not on a roadmap — they are gated. Each transition requires statistical proof from the prior stage, not a calendar date. The bot does not advance because time passes; it advances because the edge is demonstrated.",
+  "set_by": "amit",
+  "set_date": "2026-04-14"
+}

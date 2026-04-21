@@ -1,0 +1,16 @@
+{
+  "id": "research-conditional-drawdown-at-risk-cdar-trade-sizer-23b09d",
+  "title": "Conditional Drawdown at Risk (CDaR) Trade Sizer",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Implements the CDaR-based trade sizing algorithm from Strub (SSRN): instead of using return volatility to size positions, it applies Extreme Value Theory (EVT) to fit a generalised Pareto distribution to the tail of the historical drawdown distribution, and uses CDaR (mean of worst-alpha drawdowns) as the sizing denominator. This produces a leverage factor that is smooth, adapts to changing drawdown risk, and is more robust to fat-tailed return distributions than simple vol-scaling. The CDaR approach is distinct from all existing features because it operates on the drawdown time-series directly rather than on returns or volatility.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "Applies Extreme Value Theory to the drawdown distribution rather than the returns distribution, computing a smooth leverage factor based on CDaR that produces 'a Sharpe ratio slightly higher than for the original strategies' and evolves smoothly to avoid high transaction costs \u2014 documented in Strub's SSRN paper across 10 years of live trading data",
+  "difficulty": "Hard",
+  "dev_days": 4,
+  "created_at": "2026-04-14T15:27:10.579096Z"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "research-sentiment-decay-tracker-with-ic-rolling-health-che-17bede",
+  "title": "Sentiment Decay Tracker with IC Rolling Health Check",
+  "status": "spec_complete",
+  "phase": "C",
+  "priority": "P2",
+  "summary": "Add a per-signal Information Coefficient (IC) tracker specifically for the news and social sentiment dimensions. Research consistently shows sentiment alpha decays rapidly \u2014 effective window is 1-3 days for social signals and up to 1 week for news signals per multiple 2024-2025 studies. The SAPPO paper (ACL 2025) found the optimal sentiment influence weight was lambda=0.1, validated through ablation \u2014 suggesting sentiment should be modulated dynamically, not used at fixed weight. Track rolling 20-trade IC for news_score and social_score separately. If IC drops below threshold (e.g. 0.03), automatically reduce the dimension weight in the aggregation and alert.",
+  "source": "research",
+  "research_topic": "Sentiment Analysis & NLP for Trading",
+  "impact_score": 4,
+  "impact_label": "Low Impact",
+  "expected_impact": "Enables automatic detection of sentiment signal degradation; prevents the system from trading on stale sentiment alphas; aligns with already-planned Alpha Decay Monitor subsystem",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-14T05:25:49.048389Z"
+}

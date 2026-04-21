@@ -1,0 +1,16 @@
+{
+  "id": "research-opening-gap-size-direction-signal-classifier-8a02c4",
+  "title": "Opening Gap Size & Direction Signal Classifier",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "At market open, compute the overnight gap for each candidate ticker and for SPY as a market-level context signal. Classify the gap into one of four buckets: small gap-down (<0.35%), large gap-down (>0.35%), small gap-up (<0.35%), large gap-up (>0.35%). Each bucket has a different statistically-supported entry bias: small gaps of either direction have 69\u201392% fill rates (mean-reversion favour), large gap-downs on non-Mondays have a contrarian long opportunity after the first 30 minutes, and large gap-ups (>1%) on Monday have historically been poor continuation entries. This data is already computable via yfinance's prev_close vs current open \u2014 zero additional data cost.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Backtesting Robustness, Walk-Forward Validation & Intraday Timing Signals",
+  "impact_score": 10,
+  "impact_label": "High Impact",
+  "expected_impact": "+3\u20135% win rate improvement by routing gap setups to the statistically correct strategy; gap-downs <0.35% have 69%+ same-day fill rate; large Monday gap-downs (>1%) have negative mean-reversion expectancy and should be suppressed",
+  "difficulty": "Easy",
+  "dev_days": 2,
+  "created_at": "2026-04-14T05:25:49.040736Z"
+}

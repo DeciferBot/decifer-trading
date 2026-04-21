@@ -1,0 +1,23 @@
+{
+  "id": "feat-ma3-dashboard-auth",
+  "title": "Per-User Dashboard Authentication",
+  "status": "future",
+  "priority": "P1",
+  "phase": "MA3",
+  "designed_date": "2026-03-29",
+  "started_date": null,
+  "completed_date": null,
+  "summary": "Each user logs into the web dashboard with their own credentials. Sessions are isolated \u2014 one user can never see another user's positions, P&L, or settings. First-time login triggers the one-time setup screen.",
+  "approach": "Add FastAPI session middleware with per-user JWT tokens. User table: username, hashed password (bcrypt), container_id, setup_complete flag. On login: verify password, issue short-lived JWT, store in httpOnly cookie. All dashboard routes require valid JWT. If setup_complete is false: redirect to setup screen instead of main dashboard. Add admin route (owner only) to create new user accounts. No OAuth needed at this scale \u2014 simple username/password is sufficient.",
+  "files_affected": [
+    "dashboard_web/auth.py",
+    "dashboard_web/models.py"
+  ],
+  "dependencies": [
+    "feat-ma3-web-dashboard"
+  ],
+  "roadmap_ref": "vision/Decifer_MultiAccount_Architecture.docx \u00a7 Phase 3",
+  "branch": null,
+  "approved_by": null,
+  "deferral_reason": "multi-account infrastructure \u2014 future stage (paper_trading_single_account prioritisation)"
+}

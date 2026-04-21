@@ -1,0 +1,103 @@
+{
+  "session_id": "2026-04-15_smart-execution-trade-isalive-fix",
+  "date": "2026-04-15",
+  "approved_by": "Amit",
+  "topic": "Fix smart_execution Trade.isAlive() API mismatch — TWAP/Iceberg slices were silently abandoning all chunky orders",
+  "north_star_pillars": [1, 2, 3],
+
+  "summary": "Investigated user concern that bot is sitting on 77% cash and not aggressively deploying. After several corrected false leads, root cause identified: smart_execution.py calls trade.isAlive(), a method that ib_async removed in favor of isDone(). Every TWAP/Iceberg slice was raising AttributeError and abandoning the slice with 0/N filled. Since smart execution fires on orders > $10K or > 500 shares (per CLAUDE.md threshold), this silently killed every high-conviction chunky entry. Fix: 2-line swap to isDone() with flipped boolean to preserve semantics. Committed as de15379 and restarted the bot.",
+
+  "motivation": "User asked the bot to aggressively find positions that build alpha rather than hold 77% cash. Investigation revealed this wasn't a scoring, consensus, or sizing problem — it was a broken execution path. The bot was generating candidates and proposing trades, but the execution layer for large orders was a dead end. Fixing this is a prerequisite to evaluating whether any other gates (sizing cascade, agent consensus, short-side dampeners) are actually binding.",
+
+  "investigation_arc_with_corrections": [
+    {
+      "claim": "Bot is over-gated by consensus threshold and cash reserve floor",
+      "status": "WRONG — cash floor inactive (77% cash >> 10% min); consensus produces ~35 qualified per scan",
+      "evidence": "audit_log + live log showed 35 fresh-first candidates reaching agents per cycle"
+    },
+    {
+      "claim": "Sizing cascade (7+ multipliers) produces 1.8% positions",
+      "status": "PARTIALLY WRONG — cascade is real, but live positions include $133k AMZN, $127k GOOGL, $93k QQQ. Sizing is uneven, not uniformly tiny. 1.8% average was a misleading division (23% deployed / 13 positions)",
+      "evidence": "ib_async portfolio updates in live log"
+    },
+    {
+      "claim": "55 phantom GTC orders sit unmanaged at IBKR",
+      "status": "WRONG — inferred from absence of terminal events in audit_log, but audit_log is 31% test-data polluted (SYM1/SYM2/SYM3, AAPL order_id=12345). Bot restart logged 'cancel_orphan_stop_orders: no orphan stop orders found'",
+      "evidence": "Counter over audit_log event types; grep for test symbols"
+    },
+    {
+      "claim": "Bot is not running — crashed Apr 14 and never restarted",
+      "status": "WRONG — ps grep looked for bot_trading.py, but launcher runs bot.py. Bot was alive and actively writing logs throughout the session",
+      "evidence": "ps -ef | grep bot showed active python bot.py process"
+    },
+    {
+      "claim": "Apr 14 crash log holds a traceback explaining what killed the bot",
+      "status": "WRONG — 10GB log ended benignly mid-data-collection with no Error/Exception/Traceback. Indicates external termination (OOM, Terminal closed, sleep) rather than code crash",
+      "evidence": "tail of decifer-crash-2026-04-14T14-33-57Z.log showed normal [yf-intraday] XLV bar logs at tail"
+    },
+    {
+      "claim": "smart_execution.py line 306 has a Client.account AttributeError",
+      "status": "CONFIRMED bug but ALREADY FIXED in commit cb3dfb2 before this session — the fix was on disk but the running bot had loaded the pre-fix module into memory",
+      "evidence": "git log --oneline -- smart_execution.py; 684 Client.account errors in live log despite clean file on disk"
+    },
+    {
+      "claim": "smart_execution.py also calls trade.isAlive(), which ib_async removed",
+      "status": "CORRECT — live log at 22:10 showed 'TWAP execution complete: 0/518 filled at avg $0.00' with isAlive AttributeError on every slice. Confirmed isDone() is the current API",
+      "evidence": "grep in venv/lib/python3.11/site-packages/ib_async/order.py showed def isDone() at line 456, no isAlive()"
+    }
+  ],
+
+  "changes": {
+    "smart_execution.py": {
+      "description": "Two sites replaced. Line 336: `if trade.isAlive():` → `if not trade.isDone():` (TWAPExecutor._execute_slice loop: wait while order still working). Line 559: `if not trade.isAlive():` → `if trade.isDone():` (IcebergOrder.execute refill loop: trigger refill when current visible batch completes). Both preserve original semantics by flipping the boolean; isDone() is the inverse of the removed isAlive().",
+      "impact": "TWAP/Iceberg paths no longer raise AttributeError on every slice. Large orders (>$10K or >500 shares) can now actually execute via smart-routing. Prior behavior silently abandoned every chunky order — high-conviction entries were the ones hurt most since those are what get sized large enough to trigger smart execution.",
+      "commit": "de15379"
+    }
+  },
+
+  "what_did_not_change": [
+    "Agent consensus threshold (3/4) — candidate flow is healthy; changing this pre-fix would just multiply a broken pipe.",
+    "Position sizing cascade (kelly × conviction × regime × session × strategy × drawdown × macro × short_IC) — still 7+ multipliers, but live positions demonstrate sizing works at max conviction (e.g. AMZN $133k, GOOGL $127k). Revisit only if post-fix deployment doesn't rise.",
+    "min_cash_reserve (10%), max_single_position (6% soft / 20% hard), max_positions (100 sanity) — none binding at 77% cash.",
+    "IC validation status (7/9 dimensions disagree with backtest in live_ic_report.json) — this is a Phase 1 research finding, not a bug. Gate for Phase 2 remains 200 closed trades + IC walk-forward validation.",
+    "PM ADD trigger (commit 6e6f351) — already implements data-driven ADD when held score rises ≥15pts to ≥45. No additional rotation logic needed yet.",
+    "Universe floor, presession dry-run pipeline, opening-gap boost (all 6e6f351) — recent additions are correct; no changes here."
+  ],
+
+  "verification_plan": {
+    "owner": "Cowork, next session during market hours",
+    "checks": [
+      "Grep bot_output.log for 'Client object has no attribute account' since 2026-04-15 22:18 — should be zero.",
+      "Grep bot_output.log for 'Trade object has no attribute isAlive' since 2026-04-15 22:18 — should be zero.",
+      "Grep for 'TWAP execution complete' lines — should show N/N filled with N>0, not 0/N.",
+      "Observe portfolio deployment % trend through the next trading day — expect cash to drop below 77% as previously-dying chunky orders now fill.",
+      "If deployment does NOT rise meaningfully even with smart exec working, that's evidence the sizing cascade IS binding on low-VIX days and needs revisiting. Pull 3 real filled trades, reconstruct risk math, compare actual notional to max_single_position cap."
+    ]
+  },
+
+  "open_items_deferred": [
+    "Sizing cascade analysis — defer until post-fix market day gives us data on whether deployment actually rises. If it does, cascade was never binding. If it doesn't, revisit.",
+    "Apr 14 crash root cause — log ended cleanly with no error. Most likely external termination (OOM/sleep/Terminal close). Not reproducible from available artifacts; revisit if it happens again with fresh evidence.",
+    "IBKR STP bracket behavior — the earlier subagent flagged STP children as rejected, but memory note says VALIDATIONERROR is benign IBKR warning 2109. Orphan-stop scan at restart returned zero orphans, supporting the benign interpretation. No action needed unless it recurs with real rejection evidence."
+  ],
+
+  "process_notes": [
+    "Multiple wrong diagnoses during this session, all corrected by direct verification rather than trusting subagent summaries. Lesson: when a subagent reports counts from a log file, spot-check the raw log before building a narrative on top. This session wasted ~3 investigation rounds on inferences from a log that turned out to be 31% test-polluted.",
+    "Bot runs from main repo (/Users/amitchopra/Desktop/decifer trading/), not from worktrees. Code edits for runtime fixes must land on master directly. This was done correctly here.",
+    "Graceful restart via SIGTERM (not SIGKILL) worked cleanly — bot exited within 8s, port 8080 freed, positions reconciled on relaunch (11 loaded from disk, 869 orders tracked, zero orphan stops)."
+  ],
+
+  "live_state_snapshot_at_restart": {
+    "timestamp": "2026-04-15T22:18:18Z",
+    "equity": 1141572.94,
+    "day_pnl": -2511.88,
+    "positions": 11,
+    "cash_pct_approx": 77,
+    "hwm": 1211995.33,
+    "ibkr_account": "DUP481326",
+    "market_data": "DELAYED (free)",
+    "orphan_stops_found_and_cancelled": 0
+  },
+
+  "commits": ["de15379 fix(smart_execution): replace removed ib_async Trade.isAlive() with isDone()"]
+}

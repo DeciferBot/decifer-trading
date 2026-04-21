@@ -1,0 +1,21 @@
+{
+  "date": "2026-03-31",
+  "timestamp": "2026-03-31T16:46:07.337Z",
+  "branch": "master",
+  "phase": "unknown",
+  "last_commit": "fd39f16 feat(session): tiered scan intervals, overnight sleep, prompt caching",
+  "files_changed": [
+    "ata/orders.json",
+    "equity_history.json",
+    "ic_calculator.py",
+    "tests/test_ic_calculator.py",
+    "CLAUDE.md.bak",
+    "data/audit_log.jsonl",
+    "data/signals_log.jsonl",
+    "signals_log.jsonl"
+  ],
+  "test_status": "unknown",
+  "summary": "fd39f16 feat(session): tiered scan intervals, overnight sleep, prompt caching",
+  "open_todos": [],
+  "session_count": 38
+}

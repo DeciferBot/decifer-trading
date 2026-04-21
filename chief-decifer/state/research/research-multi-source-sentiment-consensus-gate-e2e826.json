@@ -1,0 +1,16 @@
+{
+  "id": "research-multi-source-sentiment-consensus-gate-e2e826",
+  "title": "Multi-Source Sentiment Consensus Gate",
+  "status": "spec_complete",
+  "phase": "A",
+  "priority": "P0",
+  "summary": "Add a consensus-gating layer to Decifer's trade execution that checks whether news sentiment (FinBERT/Claude), social sentiment (Reddit SVC), and any third signal (e.g. Finviz analyst sentiment or put/call ratio) all point in the same direction. Context Analytics (2025) showed Twitter vs. News correlation is near zero, and Stocktwits vs. News is similarly uncorrelated \u2014 meaning cross-source agreement is a genuine independent vote, not a correlated echo. Their 2025 live portfolio data shows the 'all sources' agreement subset returned +33% YTD. This is the cheapest-to-build, highest-impact layer because it uses signals already computed in the pipeline.",
+  "source": "research",
+  "research_topic": "Sentiment Analysis & NLP for Trading",
+  "impact_score": 8,
+  "impact_label": "High Impact",
+  "expected_impact": "Practitioner evidence: long 'all sources agree' portfolio +33% YTD 2025, outperforming SPY by 16%; reduces false positives by requiring cross-source agreement before entry",
+  "difficulty": "Easy",
+  "dev_days": 2,
+  "created_at": "2026-04-14T05:25:49.045188Z"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "feat-alphalens-validation",
+  "title": "Signal Validation with Alphalens",
+  "status": "backlog",
+  "priority": "P2",
+  "phase": "C",
+  "designed_date": null,
+  "started_date": null,
+  "completed_date": null,
+  "summary": "Use Alphalens to validate each signal dimension's predictive power — IC scores, turnover analysis, and factor-weighted returns. Proves which signals actually work.",
+  "approach": "Build a validation harness that feeds each signal dimension through Alphalens. Generate IC tearsheets per dimension. Kill dimensions with IC < 0.02.",
+  "files_affected": ["validation.py", "signals.py", "backtest.py"],
+  "dependencies": ["feat-direction-agnostic-signals", "feat-mean-reversion-dimension"],
+  "roadmap_ref": "roadmap/06-alphalens.md",
+  "branch": null,
+  "approved_by": null
+}

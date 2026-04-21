@@ -1,0 +1,16 @@
+{
+  "id": "research-synthetic-market-scenario-stress-test-for-signal-r-0bc30c",
+  "title": "Synthetic Market Scenario Stress-Test for Signal Robustness",
+  "status": "spec_complete",
+  "phase": "C",
+  "priority": "P2",
+  "summary": "Build a lightweight synthetic scenario generator using bootstrapped and permuted historical yfinance data to test how the 9-dimension signal model performs under stressed market conditions (flash crash, volatility spike, momentum reversal). Bloch (2023) formally demonstrates that standard backtesting overfits to a single historical path, and that probabilistic 'futuretesting' across multiple synthetic paths yields dramatically more reliable strategy assessments before live deployment.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "impact_score": 3,
+  "impact_label": "Low Impact",
+  "expected_impact": "SSRN Futuretesting paper (Bloch 2023) shows backtesting on a single historical path dramatically overestimates strategy robustness; distributional stress testing across synthetic scenarios reduces probability of live-trading blowups. Expected reduction in tail-event drawdowns of 15-25% by identifying signal combinations that fail under adversarial conditions.",
+  "difficulty": "Hard",
+  "dev_days": 5,
+  "created_at": "2026-04-14T15:27:10.536674Z"
+}

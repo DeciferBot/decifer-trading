@@ -1,0 +1,16 @@
+{
+  "id": "research-regime-conditional-signal-weighting-momentum-vs-me-998da9",
+  "title": "Regime-Conditional Signal Weighting (Momentum vs Mean-Reversion Gate)",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P1",
+  "summary": "Implement a simple two-state market regime detector (using VIX proxy from yfinance and SPY 200-day MA) that dynamically gates which signal dimensions get amplified. Research clearly shows momentum dominates in low-volatility bull markets while mean reversion is more effective in high-volatility or transitional regimes. Rather than waiting for the backlog HMM Regime Detection (which is more complex), this is a lightweight rule-based gate that can be live in days.",
+  "source": "research",
+  "research_topic": "Signal Quality & Alpha Generation",
+  "impact_score": 8,
+  "impact_label": "High Impact",
+  "expected_impact": "+2-4% win rate improvement by suppressing wrong-regime signals; momentum in bull/low-vol, mean-reversion in bear/high-vol",
+  "difficulty": "Medium",
+  "dev_days": 4,
+  "created_at": "2026-04-14T15:27:10.928424Z"
+}

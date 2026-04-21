@@ -1,0 +1,16 @@
+{
+  "id": "research-additive-hybrid-score-ml-prediction-rule-based-gat-e19b11",
+  "title": "Additive Hybrid Score: ML Prediction + Rule-Based Gate Threshold",
+  "status": "spec_complete",
+  "phase": "C",
+  "priority": "P2",
+  "summary": "The ArXiv 2025 paper on hybrid AI trading (2601.19504) achieved a 61.5% win rate (vs 53.4% baseline) by combining an XGBoost classifier prediction with additive rule-based confirmation gates, requiring a composite score \u2265 2 before entry. Each confirmation layer adds +1 to a running tally: ML prediction = buy (+1), price > EMA50 AND MACD crossover (+1), RSI < 30 (+1). Trade only executes if total \u2265 2. This prevents the ML model from firing alone on low-confidence predictions and prevents rule-based signals from firing in isolation when the ML model disagrees. Decifer already has a 9-dimension composite score; integrating a binary ML prediction (+1 if P(win) > 0.55, else 0) as an additional gate creates this multi-modal confirmation structure without requiring full architectural changes.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 ML Feature Engineering & Predictive Signal Construction",
+  "impact_score": 9,
+  "impact_label": "High Impact",
+  "expected_impact": "+4\u20136% win rate via reduced false positives",
+  "difficulty": "Medium",
+  "dev_days": 2,
+  "created_at": "2026-04-14T05:25:49.030225Z"
+}

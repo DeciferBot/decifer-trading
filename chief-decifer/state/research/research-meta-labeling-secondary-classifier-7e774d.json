@@ -1,0 +1,16 @@
+{
+  "id": "research-meta-labeling-secondary-classifier-7e774d",
+  "title": "Meta-Labeling Secondary Classifier",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Train a secondary binary ML classifier (the 'meta-model') on top of the primary 9-dimension signal engine. The meta-model's only job is to predict whether a given primary signal will be profitable or not \u2014 it does not pick direction. By combining the primary signal with the meta-model's confidence score, the system can selectively skip low-confidence trades, raising precision at the cost of some recall. Hudson & Thames research confirms meta-labeling consistently improves precision and F1 scores.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Execution Quality & Exit Optimization",
+  "impact_score": 8,
+  "impact_label": "High Impact",
+  "expected_impact": "+2-4% win rate",
+  "difficulty": "Medium",
+  "dev_days": 3,
+  "created_at": "2026-04-14T05:25:49.064662Z"
+}

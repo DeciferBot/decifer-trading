@@ -1,0 +1,205 @@
+{
+  "generated_at": "2026-04-14T15:16:46.668024+00:00",
+  "vision_statement": "Decifer is building a statistically durable alpha edge through a 9-dimension signal engine and 6-agent pipeline, validated entirely on paper trading before any live capital is committed. Every decision made now is in service of proving or disproving that edge \u2014 nothing else matters yet.",
+  "current_stage_assessment": "Decifer is in paper_trading_single_account stage with a functioning trading pipeline: signals fire, orders route, fills are monitored, and a durable metadata ledger now records decision state to disk. The last 24 hours of commits show the codebase is being actively stabilized \u2014 6 verified bugs fixed, 1,700 lint issues cleared, and several FX/reconciliation edge cases patched. The immediate blocker to progressing toward live trading is not feature count but signal validation: the 9-dimension engine is producing scores but there is no automated measurement of whether those scores actually predict forward returns.",
+  "executive_summary": "The codebase is in a healthy stabilization moment \u2014 a burst of bug fixes across FX handling, dashboard state, order submission, and phase gate logic suggests the team has been doing triage rather than feature work, which is exactly right. The risk posture is currently dominated by two silent threats: (1) the signal engine is scoring trades but no IC (Information Coefficient) measurement is running in production to confirm those scores have predictive power, and (2) position sizing is still static Kelly per the active feature list, which every piece of research in the project warns is the most dangerous configuration. The active pipeline has 17 features in flight simultaneously \u2014 this is too many; prioritization and sequencing is urgently needed to avoid diffuse, low-depth progress. The highest-leverage path forward is: close the signal validation loop first (IC health check, Alphalens), then lock in adaptive sizing (Bayesian Kelly or drawdown scaler), then add regime gating \u2014 this is the minimum viable stack to generate trustworthy paper-trade alpha data.",
+  "recommended_actions": [
+    {
+      "action": "Build: Rolling 3-Month Signal IC Health Check with Auto-Reweight Trigger",
+      "type": "build",
+      "why_now": "The entire paper-trading phase exists to validate whether the 9-dimension signal engine has a real edge. Without a running IC health check, every paper trade is a data point that goes unmeasured. The ic_calculator.py module already exists at 1,254 lines \u2014 this feature can likely wire into existing infrastructure. Until IC is measured per dimension on a rolling basis, the team cannot distinguish signal from noise, cannot reweight dimensions that are decaying, and cannot make a go/no-go decision for live trading. This is the single most important thing for proving alpha exists.",
+      "source": "Active feature: 'Rolling 3-Month Signal IC Health Check with Auto-Reweight Trigger' [C P2]; Vision: paper trading exists to validate the signal engine; Research: 2026-04-03 Signal Quality findings; ic_calculator.py module (1,254L) already exists",
+      "cowork_prompt": "We are building Decifer, a paper-trading bot at stage paper_trading_single_account. The entire purpose of this stage is to validate the 9-dimension signal engine. We have a large ic_calculator.py module (1,254 lines) already in the codebase.\n\nGoal: Implement the Rolling 3-Month Signal IC Health Check with Auto-Reweight Trigger.\n\nSpec:\n1. Weekly job that computes per-dimension rolling IC (Spearman rank correlation between signal score at entry and forward return at exit) over a 90-day trailing window.\n2. Uses the durable metadata ledger (feat(ledger) committed yesterday) as the data source \u2014 it already writes decision metadata to disk at trade time.\n3. Flags any dimension with rolling IC < 0.02 as 'decaying' and logs an alert.\n4. Auto-reweight trigger: if a dimension's IC falls below threshold for 2 consecutive weeks, reduce its weight in the composite score by 25% and log the reweight event.\n5. Output a per-dimension IC table to the dashboard (or a dedicated /ic_health endpoint).\n6. Wire into the existing ic_calculator.py \u2014 do not rewrite, extend it.\n\nConstraints:\n- Must use trade records from the existing metadata ledger on disk\n- Must not block the trading hot path \u2014 run as a background job\n- Output must be human-readable in the dashboard\n\nStart by reading ic_calculator.py and the ledger write path in the recent feat(ledger) commit to understand the data schema."
+    },
+    {
+      "action": "Build: Regime-Gated Strategy Router (Momentum vs Mean-Reversion + Position Sizing)",
+      "type": "build",
+      "why_now": "Research from 2026-03-30 and 2026-04-03 is unambiguous: trading systems that adapt to regimes consistently outperform static strategies. Decifer currently runs both momentum and mean-reversion signals (the 9th REVERSION dimension was shipped) without any regime gate \u2014 this means signals that work in trending markets fire equally in mean-reverting markets and vice versa, systematically diluting edge. The Regime Router is P1 and gates multiple downstream features (Bayesian Kelly, CVaR sizing). The HMM Regime Detection is in the backlog as a more complex variant \u2014 this active P1 feature uses VIX proxy + SPY 200-day MA which can be built now without hmmlearn.",
+      "source": "Active feature: 'Regime-Gated Strategy Router (Momentum vs Mean-Reversion + Position Sizing)' [B P1]; Research: 2026-03-30 Market Regime Detection findings; Shipped feature: REVERSION dimension creates signal conflict without regime gate",
+      "cowork_prompt": "We are building Decifer, a paper-trading bot. We have 9 signal dimensions including a recently shipped REVERSION dimension. The problem: momentum and mean-reversion signals fire simultaneously with no regime gate, which systematically dilutes edge in both regime types.\n\nGoal: Build the Regime-Gated Strategy Router \u2014 a two-state market regime detector that dynamically routes which signal dimensions are active and adjusts position sizing.\n\nSpec:\n1. Regime detector uses three inputs available via yfinance: (a) VIX level threshold (>20 = risk-off/mean-reversion regime, <20 = risk-on/momentum regime), (b) SPY price vs 200-day MA (above = trending, below = defensive), (c) SPY 20-day realized volatility percentile.\n2. Combine these into a binary regime label: TRENDING or MEAN_REVERTING.\n3. In TRENDING regime: momentum dimensions (trend, breakout, volume confirmation, sentiment) get full weight; REVERSION dimension weight is cut to 0.3x.\n4. In MEAN_REVERTING regime: REVERSION dimension gets 1.5x weight; pure momentum breakout signals are suppressed (minimum score threshold raised).\n5. Position sizing scalar: in MEAN_REVERTING regime, reduce base position size by 20% (higher uncertainty).\n6. Regime state is computed once per day at market open and cached.\n7. Log regime transitions to the metadata ledger.\n\nConstraints:\n- Regime state must be accessible to signals.py composite score calculation\n- Do not require hmmlearn \u2014 use the VIX/SPY rule-based approach only\n- Must be testable with mocked yfinance data\n\nRead signals.py (2,581 lines) to understand the current composite scoring pipeline before writing any code."
+    },
+    {
+      "action": "Build: Bayesian Self-Updating Kelly Sizer (replace static Kelly)",
+      "type": "build",
+      "why_now": "Every research finding in the project on risk management (2026-04-02) warns that static Kelly is the single most dangerous configuration \u2014 it over-bets due to parameter estimation error and causes drawdowns that destroy accounts. The refactor/risk commit two days ago replaced position-count cap with cash-floor and risk-sizing control, meaning the sizing architecture is being actively changed right now. This is the ideal moment to swap in the Bayesian Kelly before more paper trades accumulate under the broken static version. Bayesian Kelly is P2 but the research urgency makes it effectively P1 \u2014 every paper trade sized wrong produces misleading alpha metrics.",
+      "source": "Active feature: 'Bayesian Self-Updating Kelly Sizer' [B P2]; Research: 2026-04-02 Risk Management findings ('static Kelly is the most dangerous thing a systematic equity bot can do'); Recent commit: 'refactor(risk): replace position-count cap with cash-floor + risk-sizing control'",
+      "cowork_prompt": "We are building Decifer, a paper-trading bot. Our research is unambiguous: static Kelly over-bets due to parameter estimation error and is the most dangerous configuration for a systematic bot. We just refactored the risk module two days ago (replaced position-count cap with cash-floor + risk-sizing control), so the architecture is in flux and this is the right moment to upgrade the sizer.\n\nGoal: Replace the static Kelly formula with a Bayesian Self-Updating Kelly Sizer.\n\nSpec:\n1. Maintain a Beta distribution per strategy/regime that tracks win rate: Beta(alpha=wins+1, beta=losses+1) initialized at Beta(1,1) (uniform prior).\n2. After each closed trade, update the Beta distribution with the outcome (win=1, loss=0). Read outcomes from the durable metadata ledger.\n3. Kelly fraction = (mean_win_rate * mean_win_size - mean_loss_rate * mean_loss_size) / mean_win_size \u2014 compute dynamically from posterior mean.\n4. Apply fractional Kelly multiplier of 0.25 (quarter Kelly) as a hard cap \u2014 this is non-negotiable per the research.\n5. Output: a position size scalar between 0.1 and 1.0 that multiplies the base dollar risk.\n6. Expose current Beta distribution parameters (alpha, beta, posterior mean win rate, 90% CI) in the dashboard.\n7. Fall back to 0.25x fixed Kelly if fewer than 10 closed trades exist (cold start).\n\nConstraints:\n- Must read from the durable metadata ledger (committed yesterday) for historical outcomes\n- scipy.stats.beta is available; no new ML dependencies\n- Must not change the order submission interface \u2014 only the sizing scalar changes\n\nStart by reading orders_core.py and orders_portfolio.py to understand how position size is currently calculated before making changes."
+    },
+    {
+      "action": "Build: Signal-Strength-Proportional Kelly Multiplier",
+      "type": "build",
+      "why_now": "This is a P1 active feature that directly connects signal conviction to capital deployment \u2014 the core insight being that a 7/10 signal should size differently than a 4/10 signal. It is architecturally simpler than the full Bayesian Kelly (action #3) and can be built in parallel or immediately after as a multiplier layer on top of the Bayesian output. Without this, the system bets the same fraction regardless of signal strength, which wastes edge on low-conviction setups and under-bets high-conviction ones. The Direction Agreement Ratio (DAR) was just shipped in the last commit \u2014 it is a natural input to this multiplier.",
+      "source": "Active feature: 'Signal-Strength-Proportional Kelly Multiplier' [B P1]; Recent commit: 'feat(signals): add Direction Agreement Ratio (DAR) + remove composite score cap'",
+      "cowork_prompt": "We are building Decifer, a paper-trading bot. We just shipped Direction Agreement Ratio (DAR) \u2014 a metric of how many signal dimensions agree on direction. The Signal-Strength-Proportional Kelly Multiplier uses this and the composite signal score to scale position size.\n\nGoal: Modify the Kelly position sizing so that the fractional Kelly output is multiplied by a signal-strength scalar.\n\nSpec:\n1. Signal strength scalar = f(composite_score, DAR) where:\n   - composite_score is the 0-100 (or 0-10) normalized score from the signal engine\n   - DAR is the direction agreement ratio (0.0 to 1.0) from the new DAR field\n2. scalar = (composite_score / max_score) * DAR \u2014 this produces 0.0 to 1.0\n3. Apply a floor of 0.3 (never size below 30% of Kelly even on weakest signals that pass threshold)\n4. Apply a ceiling of 1.0 (never exceed full fractional Kelly)\n5. Final position size = kelly_fraction * signal_strength_scalar * base_dollar_risk\n6. Log the scalar value to the metadata ledger alongside the trade decision\n7. Add a unit test: given composite_score=8, DAR=0.85, verify scalar is in expected range\n\nConstraints:\n- This is a multiplier on top of whatever Kelly base is in use \u2014 do not rewrite the Kelly formula\n- The composite score cap was just removed in the last commit \u2014 confirm the score range before implementing the normalization\n- Must be wired into the order sizing path in orders_core.py or orders_portfolio.py\n\nRead the DAR implementation in signals.py and the sizing path in orders_core.py before writing any code."
+    },
+    {
+      "action": "Validate: Confirm phase gate (200-trade threshold) is correctly counting paper trades and check current trade count",
+      "type": "validate",
+      "why_now": "A bug was fixed two days ago: 'fix(phase_gate): count production CLOSE records toward 200-trade gate'. This means the phase gate was previously undercounting trades. The question that must be answered NOW is: (1) how many trades does the gate currently show, (2) were any trades miscounted before the fix that need to be reconciled, and (3) is the 200-trade target still the right threshold for proving the edge? This is a go/no-go gating mechanism for the entire live trading progression. If the count is wrong, the team may believe they are further from or closer to live trading than they actually are.",
+      "source": "Recent commit: 'fix(phase_gate): count production CLOSE records toward 200-trade gate'; Vision: paper_trading_single_account stage gate to live_trading_single_account",
+      "cowork_prompt": "We are building Decifer at paper_trading_single_account stage. A bug was fixed two days ago in the phase gate \u2014 it was not counting CLOSE records correctly toward the 200-trade gate that gates progression to live trading.\n\nGoal: Validate that the phase gate is now working correctly and report the current state.\n\nTasks:\n1. Read the phase_gate logic and confirm the fix is correctly counting all production CLOSE records\n2. Query the metadata ledger and/or trade journal to get the current count of closed paper trades\n3. Check if there are any trades from before the fix that were miscounted \u2014 are they now being counted, or did the fix only apply to future trades?\n4. Verify the gate does not double-count: each unique trade (entry + matching exit) should count as 1\n5. Output a simple report: current_closed_trade_count, trades_needed_to_gate, estimated_days_to_gate_at_current_rate\n6. If the count appears incorrect, identify the exact reconciliation gap\n\nConstraints:\n- Do not modify any trading logic \u2014 read only\n- The metadata ledger was committed as a durable disk write \u2014 it is the authoritative source\n\nStart by reading the phase_gate module and the recent fix commit diff before querying any data."
+    },
+    {
+      "action": "Decision: Prioritize and sequence the 17 active features \u2014 reduce WIP to maximum 5 in-flight",
+      "type": "decision",
+      "why_now": "There are 17 features in the active pipeline simultaneously. This is a work-in-progress (WIP) crisis \u2014 it means development effort is spread across 17 fronts with no clear sequencing, creating risk of partially-built features that interact badly with each other (e.g., three different position sizing approaches all in-flight at once: Bayesian Kelly, CDaR Sizer, Drawdown Proportional Scaler, Portfolio Volatility Target, CVaR Budget Gate). Before any more features are started, a clear sequencing decision must be made about which 4-5 features constitute the minimum viable alpha-proving stack. Everything else should be explicitly deferred.",
+      "source": "Active features list (17 items); Vision: paper trading stage requires proving edge before anything else; Multiple overlapping position-sizing features in simultaneous active state",
+      "cowork_prompt": "We have 17 features in the active pipeline simultaneously. This is too many. We need to make an explicit sequencing decision.\n\nGoal: Reduce active WIP to a maximum of 5 features by explicitly sequencing or deferring the rest.\n\nContext: Decifer is in paper_trading_single_account stage. The only thing that matters is proving alpha. The minimum viable alpha-proving stack is: (1) signal validation (IC), (2) regime gating (signal routing), (3) adaptive sizing (Kelly variant), (4) signal-strength sizing, (5) Reddit contrarian signal or IV skew (for signal diversity).\n\nTask: Review all 17 active features and produce a sequenced list:\n- Tier 1 (build now, max 5): features that directly prove or improve alpha measurement\n- Tier 2 (build next sprint): features that depend on Tier 1 being complete\n- Tier 3 (defer until live trading stage): features that are only relevant after edge is proven\n\nFor each deferral, write one sentence explaining why it is being deferred rather than cut.\n\nSpecific tension to resolve: We have three overlapping position-sizing approaches all active (Bayesian Kelly, CDaR Sizer, Drawdown Proportional Scaler, Portfolio Volatility Target Enforcer, CVaR Budget Gate, Adaptive Tail-Risk Gate). We cannot build all six simultaneously. Decide: which ONE sizing approach is the anchor, and which are additive layers vs. alternatives?\n\nOutput a clean prioritized list with tier assignments and a brief rationale for each decision."
+    },
+    {
+      "action": "Build: Implied Volatility Skew Signal (yfinance Options Chain)",
+      "type": "build",
+      "why_now": "This is a P1 active feature that adds a 10th signal dimension from a genuinely orthogonal data source \u2014 options market implied volatility skew captures institutional hedging behavior that is not present in any of the 9 current dimensions (which are all derived from price, volume, and sentiment). The research consensus on multi-factor hybrid models (2026-04-03) specifically highlights complementary signal sources. yfinance options chain data is already available in the stack. This is a high signal-to-effort ratio addition.",
+      "source": "Active feature: 'Implied Volatility Skew Signal (yfinance Options Chain)' [A P1]; Research: 2026-04-03 Signal Quality findings on multi-factor hybrid models",
+      "cowork_prompt": "We are building Decifer, a paper-trading bot with a 9-dimension signal engine in signals.py (2,581 lines). We want to add a 10th dimension: Implied Volatility Skew from yfinance options chains.\n\nGoal: Add IV_SKEW as a 10th signal dimension (0-10 points) to the composite score.\n\nSpec:\n1. Use yfinance Ticker.option_chain() to fetch the nearest-expiry options chain (14-30 days to expiry)\n2. IV Skew = IV of 10-delta put minus IV of 10-delta call (or nearest available strikes)\n3. Normalize the raw skew to 0-10 score: high positive skew (puts more expensive than calls) = bearish institutional hedging = BEARISH signal for longs (score 0-3), neutral skew = score 5, negative skew (calls more expensive) = bullish = score 7-10\n4. Handle missing options data gracefully \u2014 not all tickers have liquid options chains. If chain is unavailable, return score=5 (neutral) and flag as 'no_options_data'\n5. Cache the options chain fetch per ticker per day (avoid re-fetching intraday)\n6. Add IV_SKEW to the dimension weight config in config.py\n7. Add a unit test with a mocked yfinance options chain response\n\nConstraints:\n- Must integrate into the existing signals.py scoring architecture \u2014 follow the pattern of the REVERSION dimension that was shipped recently\n- yfinance is already a dependency \u2014 no new packages\n- The score cap on composite was recently removed \u2014 do not re-add it\n\nRead signals.py starting from the REVERSION dimension implementation to understand the pattern before writing any code."
+    },
+    {
+      "action": "Fix: Audit and close the FX reconciliation and order edge cases surfaced in recent commits",
+      "type": "fix",
+      "why_now": "Five FX-related fixes were committed in the last 24 hours: FX positions invisible on dashboard (7-path reconciliation fix), FX re-entry loop with orphan stop canceller, FX price bounds, duplicate guard, and close handling. This volume of FX fixes in a single session is a signal that the FX order path has systemic issues, not isolated bugs. Before more paper trades execute against FX instruments, a deliberate audit of the entire FX order lifecycle should confirm there are no remaining silent failure modes \u2014 particularly orphaned stops and reconciliation drift which can cause ghost positions.",
+      "source": "Recent commits: 'fix(fx): FX positions invisible on dashboard', 'fix(fx): close FX re-entry loop \u2014 orphan stop canceller + price fetch + test fix', 'fix(orders): FX price bounds, stock duplicate guard, FX close handling'",
+      "cowork_prompt": "We are building Decifer, a paper-trading bot. In the last 24 hours, 5 separate FX-related bugs were fixed: (1) FX positions invisible on dashboard due to 7-path reconciliation gap, (2) FX re-entry loop caused by orphan stop canceller, (3) FX price bounds error, (4) stock duplicate guard issue, (5) FX close handling bug.\n\nGoal: Audit the complete FX order lifecycle to confirm no silent failure modes remain.\n\nTasks:\n1. Map the full FX order lifecycle: entry signal \u2192 order submission \u2192 fill watcher \u2192 position tracking \u2192 stop placement \u2192 dashboard display \u2192 close/exit. For each step, identify what can fail silently.\n2. Specifically verify: can an FX stop order become orphaned (parent trade closed but stop still active in broker)? Is there a reconciliation check that would catch this?\n3. Verify the 7-path reconciliation fix covers ALL the paths it claims \u2014 read the fix and enumerate the 7 paths explicitly\n4. Check: does the Order Fill Watcher correctly handle FX pairs vs equities? Are there any equity-specific assumptions baked into the watcher that would misbehave on FX?\n5. Run the full test suite against FX-related test files and report any failures\n6. If silent failure modes exist, file them as specific bug tickets with reproduction steps\n\nConstraints:\n- Do not change trading logic during this audit \u2014 read and test only, then report\n- Focus specifically on state corruption risks: orphaned orders, ghost positions, mismatched fills\n\nStart by reading orders_core.py and the Order Fill Watcher implementation, then trace through the recent fix commits."
+    },
+    {
+      "action": "Promote: Reddit Attention-to-Volume Divergence Signal as Contrarian Fade",
+      "type": "build",
+      "why_now": "This P1 active feature reframes the existing Reddit mention velocity signal \u2014 which is already built and shipping \u2014 from a directional alpha source into a contrarian fade signal. This is a zero-new-data-source upgrade: it uses infrastructure already in the stack to generate a signal with genuinely different information content (crowd-vs-price divergence). Research from 2026-03-30 on alternative data and 2026-04-03 on multi-factor models both support behavioral divergence signals. Converting an existing momentum-framed signal into a contrarian one also directly improves signal dimension diversity without adding a new data dependency.",
+      "source": "Active feature: 'Reddit Attention-to-Volume Divergence Signal (Contrarian Fade)' [B P1]; Shipped: Multi-Source Sentiment Scoring Pipeline (Reddit data already flowing); Research: 2026-03-30 alternative data findings",
+      "cowork_prompt": "We are building Decifer, a paper-trading bot. We have a shipped Multi-Source Sentiment Scoring Pipeline that includes Reddit mention velocity as an input. Currently it is used as a directional alpha signal (high mentions = bullish). The research suggests this is backwards for retail-dominated Reddit: high Reddit attention relative to actual volume is a contrarian fade signal, not a momentum signal.\n\nGoal: Reframe the Reddit mention velocity signal as an Attention-to-Volume Divergence (contrarian) signal in the signal scoring pipeline.\n\nSpec:\n1. Compute Reddit Attention Ratio = 7-day Reddit mention velocity / 20-day average daily volume (normalized to z-score)\n2. Divergence signal: when Reddit attention z-score > 2.0 AND price is up >5% in same window = BEARISH fade signal (crowded long, retail exhaustion)\n3. Divergence signal: when Reddit attention z-score > 2.0 AND price is flat or down = NEUTRAL (no edge, skip)\n4. When Reddit attention is low (z-score < 0.5) = mild BULLISH signal (under-attention, not crowded)\n5. Score 0-10: low attention=7, neutral=5, high attention with price up=2, high attention with price down=5\n6. This replaces or supplements the current directional Reddit sentiment score \u2014 decide which and document the decision\n7. Add a backtest note: log the score and outcome to the metadata ledger so IC can be computed for this dimension\n\nConstraints:\n- Reddit data is already flowing through the sentiment pipeline \u2014 do not change the data fetch layer\n- Must integrate into signals.py composite scoring\n- The contrarian framing should be clearly commented in the code so future developers understand the logic\n\nRead the existing Reddit mention velocity implementation in the sentiment pipeline before writing any code."
+    },
+    {
+      "action": "Housekeeping: Deduplicate the 'Order Fill Watcher \u2014 Execution Management Layer' feature which appears twice in Shipped",
+      "type": "housekeeping",
+      "why_now": "The Shipped features list contains the Order Fill Watcher listed twice as identical entries. This is a data integrity issue in the feature pipeline \u2014 it may indicate the feature tracking system has duplication bugs, or there are actually two different implementations of the fill watcher that need to be reconciled. Given that FX order handling just had 5 bugs fixed, confirming there is one canonical fill watcher implementation (not two competing ones) is directly relevant to execution reliability.",
+      "source": "Feature pipeline: Order Fill Watcher appears twice in Shipped list; Recent commits: 5 FX order fixes in 24 hours suggest execution path complexity",
+      "cowork_prompt": "We are building Decifer, a paper-trading bot. The feature pipeline shows 'Order Fill Watcher \u2014 Execution Management Layer' listed twice in the Shipped features. We also just fixed 5 FX order bugs in 24 hours.\n\nGoal: Confirm there is one canonical Order Fill Watcher implementation and clean up the duplication.\n\nTasks:\n1. Search the codebase for all implementations of order fill watching / fill monitoring logic\n2. Determine if there are one or two active fill watcher implementations \u2014 if two, document their differences\n3. If two exist: determine which is authoritative and whether the other is dead code or a parallel path\n4. Check: does the fill watcher handle both equity and FX fills through the same code path, or are there separate paths? This is directly relevant to the recent FX bugs.\n5. Clean up the feature pipeline record to remove the duplicate entry and add a note explaining what was found\n6. If dead code is found, delete it and add a comment in the PR explaining why\n\nConstraints:\n- Do not change the behavior of the canonical fill watcher \u2014 cleanup only\n- Document findings before making any deletions\n\nStart by searching for 'fill watcher', 'fill_watcher', 'PENDING' order monitoring patterns across orders_core.py, bot_trading.py, and bot_ibkr.py."
+    }
+  ],
+  "product_roadmap": [
+    {
+      "phase_name": "Phase 1: Signal Validation Infrastructure",
+      "goal": "Establish automated measurement of whether the 9-dimension signal engine actually predicts forward returns, so every paper trade generates a measurable alpha data point",
+      "rationale": "Without IC measurement, paper trading is anecdotal. The 200-trade gate to live trading is meaningless unless each trade is producing validated signal data. This phase creates the feedback loop that makes all other phases meaningful.",
+      "features": [
+        "Rolling 3-Month Signal IC Health Check with Auto-Reweight Trigger",
+        "Phase gate count validation and reconciliation",
+        "Signal-Strength-Proportional Kelly Multiplier (connects signal conviction to sizing)",
+        "Implied Volatility Skew Signal (10th orthogonal dimension)",
+        "Reddit Attention-to-Volume Divergence Signal (contrarian reframe of existing data)"
+      ],
+      "exit_criteria": "IC is computed per-dimension weekly, at least 3 dimensions show IC > 0.03, auto-reweight has fired at least once, phase gate count is verified correct",
+      "estimated_scope": "medium"
+    },
+    {
+      "phase_name": "Phase 2: Adaptive Risk & Regime Awareness",
+      "goal": "Replace static Kelly with a regime-aware, signal-strength-proportional adaptive sizer that prevents ruin and scales with edge",
+      "rationale": "Research is unambiguous that static Kelly is dangerous. Regime gating prevents momentum signals from firing in mean-reverting markets and vice versa. These two changes together are the highest expected-value improvements to the paper-trading alpha metrics.",
+      "features": [
+        "Regime-Gated Strategy Router (Momentum vs Mean-Reversion)",
+        "Bayesian Self-Updating Kelly Sizer",
+        "Drawdown-Proportional Position Scaler",
+        "ADX Trend Strength Pre-Filter Gate",
+        "Adaptive Tail-Risk Stress Scenario Pre-Trade Gate"
+      ],
+      "exit_criteria": "Regime state is computed and logged daily, Bayesian Kelly is updating from closed trade outcomes, drawdown scaler is reducing size during drawdown periods, ADX gate is filtering low-conviction setups",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 3: Alpha Validation & Walk-Forward Proof",
+      "goal": "Produce statistically rigorous evidence that the signal engine generates alpha above transaction costs across multiple market regimes",
+      "rationale": "This is the gate to live trading. Paper trades alone are insufficient \u2014 walk-forward validation across historical regimes is required to distinguish skill from luck in the paper period.",
+      "features": [
+        "Walk-Forward Optimization, Backtesting & WFE Validation",
+        "Signal Validation with Alphalens",
+        "Alpha Decay Chart analysis across paper trades",
+        "Synthetic Market Scenario Stress-Test for Signal Robustness",
+        "Rolling CVaR Position Budget Enforcement Gate",
+        "Sentiment-Technical Z-Score Composite Fusion Gate"
+      ],
+      "exit_criteria": "Walk-forward validation shows positive Sharpe > 1.0 on out-of-sample windows, Alphalens IC > 0.05 on at least 5 dimensions, alpha decay chart shows edge persists beyond 5 days",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 4: Execution Hardening for Live Trading",
+      "goal": "Replace rule-based execution with an AI-powered execution agent and harden all order paths for real capital",
+      "rationale": "Paper trading has zero execution cost and zero slippage. The research on market microstructure (2026-04-01) identifies specific execution advantages available to retail algos. These must be implemented before live capital is deployed.",
+      "features": [
+        "Execution Agent \u2014 AI-Powered Order Execution Layer (Claude-powered)",
+        "HMM Regime Detection & Volatility Classification (upgrade from rule-based regime router)",
+        "Momentum Duration Detector \u2014 Regime Age Signal",
+        "Live Cross-Asset Rolling Correlation Decay Alert",
+        "Portfolio-Level Volatility Target Enforcer"
+      ],
+      "exit_criteria": "Execution agent is routing and managing orders autonomously, HMM regime labels match rule-based labels on >80% of days, all order paths have integration test coverage, zero silent failure modes in FX or equity order lifecycle",
+      "estimated_scope": "large"
+    },
+    {
+      "phase_name": "Phase 5: Multi-Account Infrastructure",
+      "goal": "Extend the proven single-account system to support multiple accounts with independent risk limits, order routing, and performance attribution",
+      "rationale": "Multi-account features are irrelevant until the single-account edge is proven. All E-tagged features are deferred to this phase by design.",
+      "features": [
+        "Per-Account Risk Limits",
+        "Account-Aware Order Router",
+        "Cross-Account Correlation Guard",
+        "Unified Trade Journal",
+        "Account Performance Comparison Dashboard"
+      ],
+      "exit_criteria": "Two accounts trading independently with no correlated exposure breaches, unified journal capturing all trades, performance comparison dashboard live",
+      "estimated_scope": "medium"
+    }
+  ],
+  "risks": [
+    {
+      "risk": "Signal IC is unmeasured \u2014 the 9-dimension composite score may have zero or negative predictive power and we would not know it. Every paper trade is producing signal data that is not being validated against forward returns. The ic_calculator.py module exists but is not running a rolling production health check.",
+      "category": "alpha",
+      "severity": "high",
+      "mitigation": "Build and deploy the Rolling 3-Month Signal IC Health Check immediately (action #1). Wire it to the metadata ledger that was just shipped. Until IC is measured, treat all alpha metrics as unvalidated."
+    },
+    {
+      "risk": "Static Kelly position sizing causes systematic over-betting, especially during the early paper-trading phase when win rate estimates are noisy and unreliable. Per the research findings, full Kelly with estimated parameters consistently over-bets by 2-3x, generating drawdowns that distort the paper-trading alpha signal.",
+      "category": "alpha",
+      "severity": "high",
+      "mitigation": "Build Bayesian Self-Updating Kelly Sizer (action #3) immediately. Apply a hard 0.25x fractional Kelly cap as a floor regardless of posterior. Every paper trade sized with static Kelly is producing misleading alpha data."
+    },
+    {
+      "risk": "Momentum and mean-reversion signals fire simultaneously with no regime gate. The shipped REVERSION dimension and momentum dimensions are both contributing to the composite score in all market conditions, systematically diluting edge in both regime types.",
+      "category": "alpha",
+      "severity": "high",
+      "mitigation": "Build Regime-Gated Strategy Router (action #2). Until it is live, the composite score is a regime-blind average of conflicting signals."
+    },
+    {
+      "risk": "Five FX order bugs fixed in a single 24-hour session suggests the FX order lifecycle has uncharted failure modes. Orphaned stop orders on FX positions could cause ghost positions that are invisible to the risk management layer, resulting in untracked exposure.",
+      "category": "execution",
+      "severity": "high",
+      "mitigation": "Complete the FX lifecycle audit (action #8). Specifically verify that no orphaned stops can exist after a position is closed. Add a reconciliation job that cross-checks open stops against open positions at each market open."
+    },
+    {
+      "risk": "The metadata ledger (committed yesterday) is the data source for IC calculation, Bayesian Kelly updates, and phase gate counting. If the ledger write fails silently (disk full, permission error, schema mismatch on older records), all downstream analytics will be computed on incomplete data without any visible error.",
+      "category": "execution",
+      "severity": "medium",
+      "mitigation": "Add a ledger write health check: on each write, verify the record is readable back from disk. Add a startup check that verifies ledger file integrity and record count matches expected count. Alert on any write failure."
+    },
+    {
+      "risk": "17 features simultaneously in-flight with overlapping concerns (6 position-sizing features, 2 regime detection features, multiple signal fusion approaches). This creates integration risk: features built in parallel against the same modules (signals.py, orders_core.py) will conflict at merge time, and composite behavior of combined-but-untested feature interactions may produce unexpected alpha degradation.",
+      "category": "alpha",
+      "severity": "medium",
+      "mitigation": "Execute the WIP reduction decision (action #6) to reduce active features to maximum 5. Sequence the position-sizing features explicitly so only one is built at a time: Bayesian Kelly first, signal-strength multiplier second, drawdown scaler third."
+    },
+    {
+      "risk": "The Direction Agreement Ratio (DAR) was shipped in the last commit with the composite score cap removed simultaneously. Removing the score cap changes the distribution of composite scores \u2014 all downstream logic that was calibrated against the capped score range (thresholds, kelly sizing, agent agreement gates) may now be operating on out-of-distribution inputs.",
+      "category": "alpha",
+      "severity": "medium",
+      "mitigation": "Validate that the composite score distribution after the cap removal is behaving as expected. Check that the agents_required_to_agree threshold (raised to 3/6) is still calibrated correctly against the new uncapped score range. Log score distributions for the first 50 trades after this change."
+    }
+  ],
+  "roadmap_gaps": "1. EXIT SIGNAL FRAMEWORK: There is no spec for how Decifer decides to close a position. Every feature in the pipeline concerns entry sizing, signal generation, or risk gates \u2014 but the exit decision (profit target, trailing stop, signal reversal trigger, time-based decay exit) is entirely unspecified. Without a principled exit framework, the alpha measurement from paper trades is incomplete since edge is a function of both entry and exit quality.\n\n2. PAPER TRADE PERFORMANCE DASHBOARD: There is no specified feature for a running paper-trade alpha dashboard \u2014 showing rolling Sharpe, win rate, average hold time, per-dimension IC, and regime-conditional performance. The individual components (ic_calculator, alpha decay chart, directional skew dashboard) exist but there is no unified alpha scorecard that answers the question 'is the edge real?'\n\n3. SIGNAL DIMENSION CORRELATION AUDIT: Nine signal dimensions may be highly correlated with each other (e.g., momentum and breakout likely share variance). No feature in the pipeline addresses dimension orthogonality \u2014 building toward an optimally diversified signal composite requires a correlation matrix of dimension scores and explicit de-duplication of correlated dimensions.\n\n4. DATA FEED FAILURE RECOVERY SPECIFICATION: There is no spec for what happens when yfinance data is stale, missing, or returns bad data during a live scoring cycle. Given the system makes position sizing decisions from yfinance data, a silent data feed failure could cause mispricings or null signals to flow into the composite score.\n\n5. PAPER-TO-LIVE TRANSITION CHECKLIST: The roadmap transitions from paper_trading_single_account to live_trading_single_account with only a 200-trade gate as the criterion. There is no spec for what live-trading-specific changes are needed (real order submission mode, latency requirements, execution cost modeling, slippage budgets). This transition spec needs to be written before Phase 4 work begins.\n\n6. SIGNAL FRESHNESS / STALENESS TRACKING: No feature addresses how the system handles stale signals \u2014 if a signal was computed 4 hours ago and market conditions have changed, should it still gate a new order? Signal freshness TTLs are unspecified across all 9 dimensions.",
+  "model": "claude-sonnet-4-6",
+  "data_sources": {
+    "specs": 121,
+    "sessions": 5,
+    "research": 8,
+    "commits": 20,
+    "tests": false,
+    "code": true
+  }
+}

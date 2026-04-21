@@ -1,0 +1,16 @@
+{
+  "id": "research-vix-vix3m-term-structure-ratio-real-time-contango--5248af",
+  "title": "VIX/VIX3M Term-Structure Ratio \u2014 Real-Time Contango/Backwardation Stress Flag",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Compute the daily VIX/VIX3M ratio using ^VIX and ^VIX3M tickers from yfinance (both free). When ratio >1.0 (backwardation), the system flags a stress regime; when ratio <1.0 (contango), it confirms a favourable environment for long positions. Macrosynergy research confirms VIX backwardation slope has statistically significant predictive power for subsequent S&P 500 returns as a contrarian mean-reversion indicator. This is a single-number, real-time regime check that costs nothing to compute and can gate the entire signal pipeline.",
+  "source": "research",
+  "research_topic": "Market Regime Detection & Adaptation",
+  "impact_score": 5,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "Provides early crisis detection ~2\u20135 days before price-based signals; backwardation (ratio >1.0) historically coincides with market stress and elevated drawdown risk; contango regime (ratio <1.0) shows statistical edge for long strategies (85.2% of days 2013\u20132024 per Harbourfront study)",
+  "difficulty": "Easy",
+  "dev_days": 2,
+  "created_at": "2026-04-14T05:25:49.055056Z"
+}

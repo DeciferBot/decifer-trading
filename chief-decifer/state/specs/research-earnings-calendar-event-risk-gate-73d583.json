@@ -1,0 +1,16 @@
+{
+  "id": "research-earnings-calendar-event-risk-gate-73d583",
+  "title": "Earnings Calendar Event Risk Gate",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Before entering any new position, query the Yahoo Finance earnings calendar (via yfinance ticker.calendar or Yahoo RSS) to check whether earnings are due within the next 3 trading days. Block new entries during this blackout window to avoid unquantified overnight gap risk from earnings surprises. The current system has no awareness of upcoming binary events, which causes the structural bullish bias to fire into earnings \u2014 a known trap where even correct signals are overwhelmed by event-driven volatility.",
+  "source": "research",
+  "research_topic": "Win Rate Improvement \u2014 Portfolio Construction, Trade Selectivity & Alternative Data",
+  "impact_score": 5,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "-15% low-quality trades filtered",
+  "difficulty": "Easy",
+  "dev_days": 1,
+  "created_at": "2026-04-14T15:27:10.657140Z"
+}

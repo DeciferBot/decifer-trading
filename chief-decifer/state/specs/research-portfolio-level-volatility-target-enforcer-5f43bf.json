@@ -1,0 +1,16 @@
+{
+  "id": "research-portfolio-level-volatility-target-enforcer-5f43bf",
+  "title": "Portfolio-Level Volatility Target Enforcer",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Adds a portfolio-level volatility scalar that computes a 21-day exponentially weighted realised volatility estimate for the portfolio's equity curve, then scales all new position sizes by (target_vol / realised_vol), capped at 1.5x leverage. When markets are calm, the multiplier slightly increases exposure; when volatility spikes (as in March 2020 or August 2024), it automatically reduces all new sizing before the next bar. This is distinct from the archived ATR Volatility-Targeting Position Size Layer, which was per-instrument ATR-based \u2014 this feature operates at the portfolio equity curve level using exponentially weighted variance. The Springer Nature 2025 paper adds the crucial insight that a rebalancing band (\u00b14%) eliminates unnecessary transaction costs without sacrificing risk control.",
+  "source": "research",
+  "research_topic": "Risk Management & Position Sizing",
+  "impact_score": 9,
+  "impact_label": "High Impact",
+  "expected_impact": "Man Group / Research Affiliates research shows volatility-targeted equity portfolios improve Sharpe ratios vs unscaled portfolios, reduce left-tail severity, and produce smoother equity curves with volatility-of-volatility significantly reduced; PHBS working paper (1990\u20132023) shows Sharpe improvement from 1.54 to 1.76 for volatility-managed portfolios",
+  "difficulty": "Easy",
+  "dev_days": 3,
+  "created_at": "2026-04-14T15:27:10.556108Z"
+}

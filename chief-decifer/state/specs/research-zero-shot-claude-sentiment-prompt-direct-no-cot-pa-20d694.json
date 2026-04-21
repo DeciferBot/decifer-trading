@@ -1,0 +1,16 @@
+{
+  "id": "research-zero-shot-claude-sentiment-prompt-direct-no-cot-pa-20d694",
+  "title": "Zero-Shot Claude Sentiment Prompt \u2014 Direct (No CoT) Pattern",
+  "status": "spec_complete",
+  "phase": "B",
+  "priority": "P2",
+  "summary": "Audit and update all Claude sentiment-scoring prompts in the existing Claude Sentiment Scoring Pipeline to remove Chain-of-Thought instructions. A June 2025 ACM ICAIF paper ('Reasoning or Overthinking', Vamvourellis et al.) directly tested CoT vs direct prompting for financial sentiment on the Financial PhraseBank dataset and found CoT introduces 'overthinking' that degrades performance \u2014 GPT-4o without any CoT achieved the best accuracy and human alignment. This counter-intuitive finding means Decifer's Claude calls should use concise, direct sentiment prompts: 'Rate the sentiment of this financial headline for [TICKER] as bullish, neutral, or bearish. Return only the label and a confidence score 0-1.' This also directly reduces API token usage and latency per call.",
+  "source": "research",
+  "research_topic": "Sentiment Analysis & NLP for Trading",
+  "impact_score": 5,
+  "impact_label": "Moderate Impact",
+  "expected_impact": "Removes Chain-of-Thought overhead from sentiment calls, reducing latency by ~40% and token cost; June 2025 ACM paper shows CoT does NOT improve financial sentiment accuracy \u2014 GPT-4o without CoT was best",
+  "difficulty": "Easy",
+  "dev_days": 2,
+  "created_at": "2026-04-14T15:27:10.656381Z"
+}

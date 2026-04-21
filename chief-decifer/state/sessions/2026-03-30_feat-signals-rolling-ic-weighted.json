@@ -1,0 +1,23 @@
+{
+  "date": "2026-03-30",
+  "timestamp": "2026-03-30T19:39:27.115Z",
+  "branch": "master",
+  "phase": "unknown",
+  "last_commit": "36f9166 feat(signals): rolling IC-weighted 9-dimension signal composite",
+  "files_changed": [
+    "ata/orders.json",
+    "equity_history.json",
+    "learning.py",
+    "options.py",
+    "orders.py",
+    "CLAUDE.md.bak",
+    "data/audit_log.jsonl",
+    "data/signals_log.jsonl",
+    "journals/2026-03-30.md",
+    "signals_log.jsonl"
+  ],
+  "test_status": "unknown",
+  "summary": "36f9166 feat(signals): rolling IC-weighted 9-dimension signal composite",
+  "open_todos": [],
+  "session_count": 34
+}

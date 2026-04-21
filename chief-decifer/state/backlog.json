@@ -1,0 +1,179 @@
+{
+  "version": "1.2",
+  "description": "Decifer Trading feature backlog \u2014 dependency-gated execution order",
+  "wip_policy": {
+    "max_in_progress": 2,
+    "terminal_statuses": [
+      "shipped",
+      "validated",
+      "resolved",
+      "superseded"
+    ],
+    "phases": {
+      "A": "Direction-agnostic signals + short scanner \u2014 complete",
+      "B": "Alpha pipeline (IC weighting, regime router, entry thesis) \u2014 complete",
+      "C": "Signal validation (Alphalens / IC) \u2014 needs 200+ trades",
+      "D": "Regime intelligence (HMM, walk-forward calibration) \u2014 needs Phase C",
+      "E": "ML scoring layer (LightGBM, SHAP, LSTM, GT-Score) \u2014 needs Phase D"
+    }
+  },
+  "items": [
+    {
+      "id": "BACK-001",
+      "title": "Direction-agnostic signal engine (Phase A)",
+      "status": "shipped",
+      "depends_on": []
+    },
+    {
+      "id": "BACK-002",
+      "title": "Short-candidate scanner (Phase A)",
+      "status": "shipped",
+      "depends_on": []
+    },
+    {
+      "id": "BACK-003",
+      "title": "Mean-reversion dimension \u2014 9th signal (Phase A)",
+      "status": "shipped",
+      "depends_on": []
+    },
+    {
+      "id": "BACK-004",
+      "title": "Directional skew tracking (Phase A)",
+      "status": "shipped",
+      "depends_on": []
+    },
+    {
+      "id": "BACK-005",
+      "title": "Consensus threshold raised to 3/4 agents (Phase A)",
+      "status": "shipped",
+      "depends_on": []
+    },
+    {
+      "id": "BACK-006",
+      "title": "IC-weighted signal scoring (Phase B)",
+      "status": "shipped",
+      "depends_on": [
+        "BACK-001",
+        "BACK-003"
+      ]
+    },
+    {
+      "id": "BACK-007",
+      "title": "Regime router \u2014 continuous multipliers replacing hard gates (Phase B)",
+      "status": "shipped",
+      "depends_on": [
+        "BACK-001"
+      ]
+    },
+    {
+      "id": "BACK-008",
+      "title": "North Star: entry thesis + hold monitoring + exit with reason (Phase B)",
+      "status": "shipped",
+      "depends_on": [
+        "BACK-005",
+        "BACK-006"
+      ]
+    },
+    {
+      "id": "BACK-009",
+      "title": "Regime as reasoning input \u2014 demote labels to Opus context (Phase B)",
+      "status": "shipped",
+      "depends_on": [
+        "BACK-007",
+        "BACK-008"
+      ]
+    },
+    {
+      "id": "BACK-010",
+      "title": "Setup-type entry learning loop \u2014 track dominant dimension vs outcome (Phase B)",
+      "status": "shipped",
+      "depends_on": [
+        "BACK-008"
+      ]
+    },
+    {
+      "id": "BACK-011",
+      "title": "Signal validation \u2014 Alphalens / IC per dimension (Phase C)",
+      "status": "pending",
+      "depends_on": [
+        "BACK-006",
+        "BACK-010"
+      ]
+    },
+    {
+      "id": "BACK-012",
+      "title": "IC Phase 2 \u2014 walk-forward IC weights updated from live trades (Phase C)",
+      "status": "pending",
+      "depends_on": [
+        "BACK-011"
+      ]
+    },
+    {
+      "id": "BACK-013",
+      "title": "HMM regime detection \u2014 hidden Markov model on SPY/VIX (Phase D)",
+      "status": "pending",
+      "depends_on": [
+        "BACK-011"
+      ]
+    },
+    {
+      "id": "BACK-014",
+      "title": "Walk-forward weight calibration \u2014 regime-conditional IC weights (Phase D)",
+      "status": "pending",
+      "depends_on": [
+        "BACK-012",
+        "BACK-013"
+      ]
+    },
+    {
+      "id": "BACK-015",
+      "title": "Options edge validation \u2014 IC per options setup type vs underlying (Phase D)",
+      "status": "pending",
+      "depends_on": [
+        "BACK-011"
+      ]
+    },
+    {
+      "id": "BACK-016",
+      "title": "LightGBM signal classifier \u2014 replace heuristic scoring (Phase E)",
+      "status": "pending",
+      "depends_on": [
+        "BACK-011",
+        "BACK-003"
+      ]
+    },
+    {
+      "id": "BACK-017",
+      "title": "SHAP pruner \u2014 eliminate low-importance dimensions per regime (Phase E)",
+      "status": "pending",
+      "depends_on": [
+        "BACK-016"
+      ]
+    },
+    {
+      "id": "BACK-018",
+      "title": "LSTM sequence model \u2014 pattern detection across intraday bars (Phase E)",
+      "status": "pending",
+      "depends_on": [
+        "BACK-016"
+      ]
+    },
+    {
+      "id": "BACK-019",
+      "title": "GT-Score \u2014 ensemble of LightGBM + SHAP + LSTM for final conviction score (Phase E)",
+      "status": "pending",
+      "depends_on": [
+        "BACK-017",
+        "BACK-018"
+      ]
+    },
+    {
+      "id": "BACK-020",
+      "title": "Repo housekeeping \u2014 module reorganisation",
+      "status": "backlog",
+      "priority": "low",
+      "depends_on": [],
+      "notes": "87 flat .py files in root create navigation noise and weaken import graph boundaries. Primary value: cognitive clarity + circular-import risk reduction. Group into bot/, orders/, data/clients/, universe/, news/ packages. Tier 3 \u2014 requires full test run after. Do not attempt during active trading phases. Zero alpha value \u2014 pure housekeeping."
+    }
+  ]
+}
