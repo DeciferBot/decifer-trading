@@ -1843,6 +1843,11 @@ def run_scan():
                     )
             except Exception:
                 pass
+            dash["pm_decisions"] = {
+                "actions": pm_actions,
+                "trigger": pm_trigger,
+                "ts": datetime.now(_ET).strftime("%H:%M:%S"),
+            }
         except Exception as _pm_err:
             clog("ERROR", f"Portfolio review error: {_pm_err}")
         finally:
@@ -1948,8 +1953,8 @@ def run_scan():
     _final_output = "\n".join(_action_lines) if _action_lines else "No trades this cycle."
     agent_convo.append(
         {
-            "agent": "Final Decision Maker",
-            "role": "Synthesises all agent reports into executable trade instructions",
+            "agent": "Trade Synthesiser",
+            "role": "Counts agent votes and compiles executable trade instructions (deterministic)",
             "time": now_str,
             "output": _final_output,
         }
@@ -2072,6 +2077,17 @@ def run_scan():
         buy_signal.rationale = reason
         buy_signal.source_agents = list(range(decision.get("agents_agreed", 0)))
 
+        from orders_contracts import is_options_market_open
+
+        # Score tier: score >= options_min_score → options only; below → stock only.
+        _opts_min = CONFIG.get("options_min_score", 35)
+        _opts_eligible = (
+            CONFIG.get("options_enabled")
+            and get_session() not in ("PRE_MARKET", "AFTER_HOURS")
+            and is_options_market_open()
+            and sig["score"] >= _opts_min
+        )
+
         dispatch_results = _dispatch_signals(
             [buy_signal],
             ib=ib,
@@ -2079,6 +2095,7 @@ def run_scan():
             regime=regime,
             account_id=CONFIG.get("active_account", ""),
             agent_outputs=decision.get("_agent_outputs", {}),
+            execute=not _opts_eligible,
         )
         stock_success = any(r["success"] for r in dispatch_results)
 
@@ -2120,119 +2137,106 @@ def run_scan():
             _write_last_decision(sym, buy, sig, decision, pv)
             _executed_any_buy = True
 
-        from orders_contracts import is_options_market_open
+        _gate_blocked = any(r.get("side") in ("AVOIDED", "REJECTED") for r in dispatch_results)
+        if _gate_blocked and _opts_eligible:
+            _block_reason = next((r.get("skip_reason", r.get("side", "")) for r in dispatch_results if r.get("side") in ("AVOIDED", "REJECTED")), "gate blocked")
+            clog("INFO", f"Options skipped for {sym} — {_block_reason[:100]}")
 
-        _intel_avoided = any(r.get("side") == "AVOIDED" for r in dispatch_results)
-        if _intel_avoided:
-            clog("INFO", f"Options skipped for {sym} — intelligence gate returned AVOID (applies to all instruments)")
-
-        if (
-            not _intel_avoided
-            and CONFIG.get("options_enabled")
-            and get_session() not in ("PRE_MARKET", "AFTER_HOURS")
-            and sig["score"] >= CONFIG.get("options_min_score", 35)
-        ):
-            if not is_options_market_open():
+        if _opts_eligible and not _gate_blocked:
+            _sig_dir = buy.get("direction", "LONG")  # use agent direction (matches scanner via hard gate)
+            if _sig_dir not in ("LONG", "SHORT"):
                 clog(
                     "INFO",
-                    f"Score {sig['score']} qualifies for options — market closed until 9:30 ET. Stock trade executed.",
+                    f"Score {sig['score']} qualifies for options but direction={_sig_dir!r} — skipping (no clear conviction)",
                 )
             else:
-                _sig_dir = buy.get("direction", "LONG")  # use agent direction (matches scanner via hard gate)
-                if _sig_dir not in ("LONG", "SHORT"):
-                    clog(
-                        "INFO",
-                        f"Score {sig['score']} qualifies for options but direction={_sig_dir!r} — skipping (no clear conviction)",
+                direction = _sig_dir
+                _open_pos = _get_open_option_position(sym)
+                if _open_pos:
+                    _opt_key, _pos_dict = _open_pos
+                    clog("INFO", f"Open option position for {sym} — asking Opus whether to add")
+                    _add_decision = ask_opus_add_to_option(
+                        symbol=sym,
+                        position=_pos_dict,
+                        signal_score=sig["score"],
+                        signal_breakdown=sig.get("score_breakdown", {}),
+                        direction=direction,
+                        regime=regime.get("regime", "UNKNOWN"),
                     )
-                else:
-                    direction = _sig_dir
-                    _open_pos = _get_open_option_position(sym)
-                    if _open_pos:
-                        _opt_key, _pos_dict = _open_pos
-                        clog("INFO", f"Open option position for {sym} — asking Opus whether to add")
-                        _add_decision = ask_opus_add_to_option(
-                            symbol=sym,
-                            position=_pos_dict,
-                            signal_score=sig["score"],
-                            signal_breakdown=sig.get("score_breakdown", {}),
-                            direction=direction,
-                            regime=regime.get("regime", "UNKNOWN"),
-                        )
-                        if _add_decision["action"] == "ADD":
-                            try:
-                                contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"], trade_type=_pos_dict.get("trade_type", "SWING"))
-                                if contract_info:
-                                    _add_ok = execute_add_to_option(
-                                        ib=ib,
-                                        opt_key=_opt_key,
-                                        contract_info=contract_info,
-                                        add_contracts=_add_decision["contracts"],
-                                        reasoning=_add_decision["reasoning"],
-                                        score=sig["score"],
-                                    )
-                                    if _add_ok:
-                                        dash["trades"].insert(
-                                            0,
-                                            {
-                                                "side": f"ADD {contract_info['right']} OPT",
-                                                "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
-                                                "price": str(contract_info["mid"]),
-                                                "time": datetime.now(_ET).strftime("%H:%M:%S"),
-                                            },
-                                        )
-                                        clog("TRADE", f"Added {_add_decision['contracts']} contracts to {sym} options position")
-                                        _executed_any_buy = True
-                                    else:
-                                        clog("WARN", f"Add-to-option order rejected for {sym} — check logs for IBKR reason")
-                                else:
-                                    clog("INFO", f"Opus said ADD for {sym} but no contract available now")
-                            except Exception as _add_err:
-                                clog("ERROR", f"Add-to-option failed for {sym}: {_add_err}")
-                        elif _add_decision.get("_opus_failed"):
-                            clog("WARN", f"Opus add-to-option call failed for {sym} — defaulting to HOLD ({_add_decision['reasoning']})")
-                        else:
-                            clog("INFO", f"Opus HOLD on {sym} add — {_add_decision['reasoning'][:100]}")
-                    else:
-                        clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
+                    if _add_decision["action"] == "ADD":
                         try:
-                            contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"], trade_type=buy.get("trade_type", "SWING"))
+                            contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"], trade_type=_pos_dict.get("trade_type", "SWING"))
                             if contract_info:
-                                opt_success = execute_buy_option(
-                                    ib,
-                                    contract_info,
-                                    pv,
-                                    reasoning=reason,
+                                _add_ok = execute_add_to_option(
+                                    ib=ib,
+                                    opt_key=_opt_key,
+                                    contract_info=contract_info,
+                                    add_contracts=_add_decision["contracts"],
+                                    reasoning=_add_decision["reasoning"],
                                     score=sig["score"],
-                                    trade_type=buy.get("trade_type", "INTRADAY"),
-                                    conviction=float(buy.get("conviction", 0.0)),
                                 )
-                                if opt_success:
+                                if _add_ok:
                                     dash["trades"].insert(
                                         0,
                                         {
-                                            "side": f"BUY {contract_info['right']} OPT",
+                                            "side": f"ADD {contract_info['right']} OPT",
                                             "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
                                             "price": str(contract_info["mid"]),
                                             "time": datetime.now(_ET).strftime("%H:%M:%S"),
                                         },
                                     )
-                                    clog("TRADE", f"Options trade executed for {sym} (independent of stock)")
-                                    _opt_type = "call" if contract_info["right"] == "C" else "put"
-                                    speak_natural(
-                                        "options",
-                                        fallback=f"I just bought a {_opt_type} on {sym}.",
-                                        symbol=sym,
-                                        option_type=_opt_type,
-                                        strike=f"{contract_info['strike']:.0f}",
-                                        score=sig["score"],
-                                    )
-                                    if not stock_success:
-                                        _write_last_decision(sym, buy, sig, decision, pv)
+                                    clog("TRADE", f"Added {_add_decision['contracts']} contracts to {sym} options position")
                                     _executed_any_buy = True
+                                else:
+                                    clog("WARN", f"Add-to-option order rejected for {sym} — check logs for IBKR reason")
                             else:
-                                clog("INFO", f"No suitable options contract for {sym}")
-                        except Exception as _opt_err:
-                            clog("ERROR", f"Options evaluation failed for {sym}: {_opt_err}")
+                                clog("INFO", f"Opus said ADD for {sym} but no contract available now")
+                        except Exception as _add_err:
+                            clog("ERROR", f"Add-to-option failed for {sym}: {_add_err}")
+                    elif _add_decision.get("_opus_failed"):
+                        clog("WARN", f"Opus add-to-option call failed for {sym} — defaulting to HOLD ({_add_decision['reasoning']})")
+                    else:
+                        clog("INFO", f"Opus HOLD on {sym} add — {_add_decision['reasoning'][:100]}")
+                else:
+                    clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
+                    try:
+                        contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"], trade_type=buy.get("trade_type", "SWING"))
+                        if contract_info:
+                            opt_success = execute_buy_option(
+                                ib,
+                                contract_info,
+                                pv,
+                                reasoning=reason,
+                                score=sig["score"],
+                                trade_type=buy.get("trade_type", "INTRADAY"),
+                                conviction=float(buy.get("conviction", 0.0)),
+                            )
+                            if opt_success:
+                                dash["trades"].insert(
+                                    0,
+                                    {
+                                        "side": f"BUY {contract_info['right']} OPT",
+                                        "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
+                                        "price": str(contract_info["mid"]),
+                                        "time": datetime.now(_ET).strftime("%H:%M:%S"),
+                                    },
+                                )
+                                clog("TRADE", f"Options trade executed for {sym}")
+                                _opt_type = "call" if contract_info["right"] == "C" else "put"
+                                speak_natural(
+                                    "options",
+                                    fallback=f"I just bought a {_opt_type} on {sym}.",
+                                    symbol=sym,
+                                    option_type=_opt_type,
+                                    strike=f"{contract_info['strike']:.0f}",
+                                    score=sig["score"],
+                                )
+                                _write_last_decision(sym, buy, sig, decision, pv)
+                                _executed_any_buy = True
+                        else:
+                            clog("INFO", f"No suitable options contract for {sym}")
+                    except Exception as _opt_err:
+                        clog("ERROR", f"Options evaluation failed for {sym}: {_opt_err}")
 
     # Record whether any agent-recommended buy actually executed this cycle.
     # None = no buys were recommended; True/False = recommended and executed/not.

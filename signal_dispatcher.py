@@ -51,6 +51,7 @@ def dispatch_signals(
     regime: dict,
     account_id: str = "",
     agent_outputs: dict | None = None,
+    execute: bool = True,
 ) -> list:
     """
     Classify then route each Signal to the order layer.
@@ -312,32 +313,35 @@ def dispatch_signals(
                         _entry_ctx = trade_ctx.to_dict()
                 except Exception:
                     pass
-                success = execute_buy(
-                    ib=ib,
-                    symbol=signal.symbol,
-                    price=signal.price,
-                    atr=signal.atr,
-                    score=round(signal.conviction_score * 5),
-                    portfolio_value=portfolio_value,
-                    regime=regime,
-                    reasoning=signal.rationale,
-                    signal_scores=signal.dimension_scores,
-                    agent_outputs=agent_outputs,
-                    open_time=datetime.now(UTC).isoformat(),
-                    candle_gate=signal.candle_gate,
-                    instrument=signal.instrument,
-                    advice_pt=advice.profit_target,
-                    advice_sl=advice.stop_loss,
-                    advice_size_mult=advice.size_multiplier,
-                    advice_instrument=advice.instrument,
-                    advice_id=advice.advice_id,
-                    trade_type=cls.trade_type,
-                    conviction=cls.conviction,
-                    pattern_id=pattern_id,
-                    market_read=market_read,
-                    agents_agreed=len(signal.source_agents or []),
-                    entry_context=_entry_ctx,
-                )
+                if execute:
+                    success = execute_buy(
+                        ib=ib,
+                        symbol=signal.symbol,
+                        price=signal.price,
+                        atr=signal.atr,
+                        score=round(signal.conviction_score * 5),
+                        portfolio_value=portfolio_value,
+                        regime=regime,
+                        reasoning=signal.rationale,
+                        signal_scores=signal.dimension_scores,
+                        agent_outputs=agent_outputs,
+                        open_time=datetime.now(UTC).isoformat(),
+                        candle_gate=signal.candle_gate,
+                        instrument=signal.instrument,
+                        advice_pt=advice.profit_target,
+                        advice_sl=advice.stop_loss,
+                        advice_size_mult=advice.size_multiplier,
+                        advice_instrument=advice.instrument,
+                        advice_id=advice.advice_id,
+                        trade_type=cls.trade_type,
+                        conviction=cls.conviction,
+                        pattern_id=pattern_id,
+                        market_read=market_read,
+                        agents_agreed=len(signal.source_agents or []),
+                        entry_context=_entry_ctx,
+                    )
+                else:
+                    success = False
             except Exception as exc:
                 log.error(f"dispatch execute_buy failed {signal.symbol}: {exc}")
                 success = False
@@ -365,32 +369,35 @@ def dispatch_signals(
                         _entry_ctx = trade_ctx.to_dict()
                 except Exception:
                     pass
-                success = execute_short(
-                    ib=ib,
-                    symbol=signal.symbol,
-                    price=signal.price,
-                    atr=signal.atr,
-                    score=round(signal.conviction_score * 5),
-                    portfolio_value=portfolio_value,
-                    regime=regime,
-                    reasoning=signal.rationale,
-                    signal_scores=signal.dimension_scores,
-                    agent_outputs=agent_outputs,
-                    open_time=datetime.now(UTC).isoformat(),
-                    candle_gate=signal.candle_gate,
-                    instrument=signal.instrument,
-                    advice_pt=advice.profit_target,
-                    advice_sl=advice.stop_loss,
-                    advice_size_mult=advice.size_multiplier,
-                    advice_instrument=advice.instrument,
-                    advice_id=advice.advice_id,
-                    trade_type=cls.trade_type,
-                    conviction=cls.conviction,
-                    pattern_id=pattern_id,
-                    market_read=market_read,
-                    agents_agreed=len(signal.source_agents or []),
-                    entry_context=_entry_ctx,
-                )
+                if execute:
+                    success = execute_short(
+                        ib=ib,
+                        symbol=signal.symbol,
+                        price=signal.price,
+                        atr=signal.atr,
+                        score=round(signal.conviction_score * 5),
+                        portfolio_value=portfolio_value,
+                        regime=regime,
+                        reasoning=signal.rationale,
+                        signal_scores=signal.dimension_scores,
+                        agent_outputs=agent_outputs,
+                        open_time=datetime.now(UTC).isoformat(),
+                        candle_gate=signal.candle_gate,
+                        instrument=signal.instrument,
+                        advice_pt=advice.profit_target,
+                        advice_sl=advice.stop_loss,
+                        advice_size_mult=advice.size_multiplier,
+                        advice_instrument=advice.instrument,
+                        advice_id=advice.advice_id,
+                        trade_type=cls.trade_type,
+                        conviction=cls.conviction,
+                        pattern_id=pattern_id,
+                        market_read=market_read,
+                        agents_agreed=len(signal.source_agents or []),
+                        entry_context=_entry_ctx,
+                    )
+                else:
+                    success = False
             except Exception as exc:
                 log.error(f"dispatch execute_short failed {signal.symbol}: {exc}")
                 success = False
