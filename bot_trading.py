@@ -2053,7 +2053,7 @@ def run_scan():
                 clog("INFO", f"No signal data for {sym} after 3 attempts — skipping")
                 continue
 
-        clog("INFO", f"Evaluating {sym} | Score={sig['score']} | {reason[:80]}")
+        clog("INFO", f"Evaluating {sym} | Score={sig['score']} | {reason}")
 
         buy_signal = next((s for s in signals if s.symbol == sym), None)
         if buy_signal is None:
