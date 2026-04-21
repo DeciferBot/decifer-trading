@@ -165,10 +165,12 @@ class TestIntradayGate(unittest.TestCase):
         self.assertIn("market closed", reason)
 
     def test_dead_window_adds_penalty(self):
+        from config import CONFIG
+        expected = CONFIG.get("entry_gate", {}).get("intraday_dead_window_penalty", 8)
         ctx = _intraday_ctx(in_dead_window=True)
         ok, reason, penalty = _validate_intraday("LONG", ctx)
         self.assertTrue(ok)
-        self.assertEqual(penalty, 8)
+        self.assertEqual(penalty, expected)
 
     def test_wide_spread_hard_rejected(self):
         ctx = _intraday_ctx(bid_ask_spread_pct=1.2)
@@ -403,18 +405,24 @@ class TestValidateEntry(unittest.TestCase):
         self.assertEqual(eff_score, 35)
 
     def test_dead_window_penalty_reduces_effective_score(self):
+        from config import CONFIG
+        penalty = CONFIG.get("entry_gate", {}).get("intraday_dead_window_penalty", 8)
+        min_score = CONFIG.get("min_score_to_trade", 14)
+        # Pick a score that is above min but below min+penalty → rejected after deduction
+        score = min_score + penalty - 2
         ctx = _intraday_ctx(in_dead_window=True)
-        allowed, trade_type, reason, eff_score = validate_entry("LONG", ctx, score=20)
-        # 20 - 8 penalty = 12, below default min_score=14 → rejected
+        allowed, trade_type, reason, eff_score = validate_entry("LONG", ctx, score=score)
         self.assertFalse(allowed)
         self.assertIn("effective score", reason)
 
     def test_dead_window_with_high_score_passes(self):
+        from config import CONFIG
+        penalty = CONFIG.get("entry_gate", {}).get("intraday_dead_window_penalty", 8)
         ctx = _intraday_ctx(in_dead_window=True)
         allowed, trade_type, reason, eff_score = validate_entry("LONG", ctx, score=30)
-        # 30 - 8 = 22 ≥ 14 → passes
+        # 30 - penalty ≥ 14 → passes
         self.assertTrue(allowed)
-        self.assertEqual(eff_score, 22)
+        self.assertEqual(eff_score, 30 - penalty)
 
     def test_reject_returns_false(self):
         ctx = _intraday_ctx(signal_age_minutes=30.0, catalyst_type="none",

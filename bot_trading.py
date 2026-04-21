@@ -327,9 +327,9 @@ def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict, port
 
 def _polarity(s: str) -> str:
     r = (s or "").upper()
-    if r in ("MOMENTUM_BULL", "RELIEF_RALLY") or "BULL" in r:
+    if r in ("MOMENTUM_BULL",) or "BULL" in r:
         return "BULL"
-    if r in ("TRENDING_BEAR", "DISTRIBUTION") or "BEAR" in r:
+    if r in ("TRENDING_BEAR", "DISTRIBUTION", "RELIEF_RALLY") or "BEAR" in r:
         return "BEAR"
     return ""
 

@@ -131,8 +131,11 @@ def _make_pos(
 class TestPolarity:
     def test_bull_regimes(self):
         assert bot_trading._polarity("MOMENTUM_BULL") == "BULL"
-        assert bot_trading._polarity("RELIEF_RALLY") == "BULL"
         assert bot_trading._polarity("BULL_TRENDING") == "BULL"
+
+    def test_relief_rally_is_bear(self):
+        # RELIEF_RALLY is a bear-market bounce — polarity is BEAR, matching portfolio_manager._regime_polarity
+        assert bot_trading._polarity("RELIEF_RALLY") == "BEAR"
 
     def test_bear_regimes(self):
         assert bot_trading._polarity("TRENDING_BEAR") == "BEAR"
@@ -171,9 +174,16 @@ class TestBuildPmExitReason:
 
     def test_noise_stop_when_same_polarity(self):
         pos = _make_pos(entry_regime="MOMENTUM_BULL")
-        regime = {"regime": "RELIEF_RALLY"}  # still BULL polarity
+        regime = {"regime": "TRENDING_UP"}  # both BULL polarity
         result = bot_trading._build_pm_exit_reason(pos, regime, "test_trigger", "some reason")
         assert "thesis:noise_stop" in result
+
+    def test_breached_when_bull_to_relief_rally(self):
+        # RELIEF_RALLY is BEAR polarity — a BULL→RELIEF_RALLY exit is a regime flip
+        pos = _make_pos(entry_regime="MOMENTUM_BULL")
+        regime = {"regime": "RELIEF_RALLY"}
+        result = bot_trading._build_pm_exit_reason(pos, regime, "test_trigger", "some reason")
+        assert "thesis:breached_regime_shift" in result
 
     def test_pm_trim_tag(self):
         pos = _make_pos()

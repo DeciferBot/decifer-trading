@@ -992,6 +992,12 @@ def fetch_multi_timeframe(
             gap_boost_mult=_gap_mult,
         )
 
+        # Long-only enforcement: inverse ETFs (SPXS, SQQQ, UVXY) provide bearish
+        # exposure when bought. Shorting them creates a double-negative with borrow
+        # costs and is architecturally inconsistent. Drop SHORT signals silently.
+        if confluence["direction"] == "SHORT" and symbol in CONFIG.get("long_only_symbols", set()):
+            return None
+
         return {
             "symbol": symbol,
             "price": sig_5m["price"],

@@ -809,7 +809,7 @@ def check_sector_concentration(
         if regime in ("PANIC", "EXTREME_STRESS"):
             limit = min(max_sector, 0.15)
         else:
-            limit = min(max_sector, 0.30)
+            limit = max_sector
 
         if current_sector_pct >= limit:
             return False, (
@@ -839,49 +839,50 @@ def check_correlation(new_symbol: str, open_positions: list) -> tuple[bool, str]
     so tight it kills all opportunity in a trending sector.
     """
     # (group_name, symbols, max_allowed)
+    _gmax = CONFIG.get("correlation_group_max", 4)
     _GROUPS: list[tuple[str, set, int]] = [
-        # Broad index ETFs — 1 max (SPY + QQQ is just leveraged beta)
+        # Broad index ETFs — 1 max (SPY + QQQ is just redundant beta)
         ("broad index ETF",     {"SPY", "QQQ", "IWM", "DIA"}, 1),
-        # Inverse ETFs — 2 max
-        ("inverse ETF",         {"SPXS", "SQQQ", "SDOW", "SH"}, 2),
+        # Inverse ETFs
+        ("inverse ETF",         {"SPXS", "SQQQ", "SDOW", "SH"}, _gmax),
         # Tech mega-cap & software
         ("tech",                {"AAPL", "MSFT", "NVDA", "AMD", "INTC", "ORCL",
-                                 "CRM", "SHOP", "SNOW", "PLTR", "NOW", "ADBE"}, 2),
+                                 "CRM", "SHOP", "SNOW", "PLTR", "NOW", "ADBE"}, _gmax),
         # Semiconductors (tighter — highly co-moving)
         ("semiconductors",      {"NVDA", "AMD", "MU", "INTC", "AMAT", "LRCX",
-                                 "KLAC", "QCOM", "AVGO", "MRVL", "ON"}, 2),
+                                 "KLAC", "QCOM", "AVGO", "MRVL", "ON"}, _gmax),
         # Communication / internet
         ("communication",       {"GOOGL", "META", "NFLX", "DIS", "SNAP", "PINS",
-                                 "TWTR", "T", "VZ"}, 2),
+                                 "TWTR", "T", "VZ"}, _gmax),
         # Consumer discretionary / e-commerce
         ("consumer disc",       {"AMZN", "TSLA", "NKE", "MCD", "SBUX", "TGT",
-                                 "HD", "LOW", "BKNG"}, 2),
+                                 "HD", "LOW", "BKNG"}, _gmax),
         # Consumer staples
         ("consumer staples",    {"WMT", "COST", "PG", "KO", "PEP", "PM",
-                                 "MDLZ", "CL"}, 2),
+                                 "MDLZ", "CL"}, _gmax),
         # Pharma / biotech
         ("pharma/biotech",      {"LLY", "ABBV", "MRNA", "PFE", "JNJ", "MRK",
-                                 "BIIB", "REGN", "VRTX", "GILD", "BMY", "AMGN"}, 2),
+                                 "BIIB", "REGN", "VRTX", "GILD", "BMY", "AMGN"}, _gmax),
         # Healthcare services / devices
         ("healthcare",          {"UNH", "MDT", "ABT", "CVS", "HUM", "ELV",
-                                 "ISRG", "TMO", "DHR"}, 2),
+                                 "ISRG", "TMO", "DHR"}, _gmax),
         # Energy
         ("energy",              {"XOM", "CVX", "OXY", "COP", "SLB", "MPC",
-                                 "PSX", "VLO", "EOG"}, 2),
+                                 "PSX", "VLO", "EOG"}, _gmax),
         # Financials / banks
         ("financials",          {"JPM", "BAC", "GS", "MS", "WFC", "C",
-                                 "V", "MA", "AXP", "SCHW"}, 2),
+                                 "V", "MA", "AXP", "SCHW"}, _gmax),
         # Industrials
         ("industrials",         {"CAT", "GE", "HON", "BA", "UPS", "FDX",
-                                 "RTX", "DE", "LMT"}, 2),
+                                 "RTX", "DE", "LMT"}, _gmax),
         # Materials / mining
-        ("materials",           {"FCX", "NEM", "LIN", "APD", "NUE", "CF"}, 2),
+        ("materials",           {"FCX", "NEM", "LIN", "APD", "NUE", "CF"}, _gmax),
         # Utilities
-        ("utilities",           {"NEE", "DUK", "SO", "AEP", "D", "EXC"}, 2),
+        ("utilities",           {"NEE", "DUK", "SO", "AEP", "D", "EXC"}, _gmax),
         # Real estate / REITs
-        ("REITs",               {"PLD", "AMT", "SPG", "EQIX", "O", "VICI"}, 2),
+        ("REITs",               {"PLD", "AMT", "SPG", "EQIX", "O", "VICI"}, _gmax),
         # Crypto proxies
-        ("crypto proxy",        {"IBIT", "BITO", "MSTR", "COIN", "MARA"}, 2),
+        ("crypto proxy",        {"IBIT", "BITO", "MSTR", "COIN", "MARA"}, _gmax),
     ]
 
     open_syms = {p["symbol"] for p in open_positions}
@@ -944,7 +945,10 @@ _SIGNIFICANT_REGIME_CHANGES = {
     ("TRENDING_DOWN", "TRENDING_UP"),
     ("TRENDING_DOWN", "CAPITULATION"),
     ("RANGE_BOUND", "CAPITULATION"),
+    ("RANGE_BOUND", "TRENDING_UP"),
+    ("RANGE_BOUND", "TRENDING_DOWN"),
     ("RELIEF_RALLY", "CAPITULATION"),
+    ("RELIEF_RALLY", "TRENDING_DOWN"),
 }
 
 
@@ -1035,6 +1039,7 @@ def check_thesis_validity(open_positions: list, current_regime: str) -> list:
     for pos in open_positions:
         entry_regime = pos.get("regime") or _session_opening_regime
         if not entry_regime:
+            log.debug(f"check_thesis_validity: {pos.get('symbol','?')} skipped — no entry_regime and session_opening_regime not set")
             continue
         if (entry_regime, current_regime) in _SIGNIFICANT_REGIME_CHANGES:
             reason = (

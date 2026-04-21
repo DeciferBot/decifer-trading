@@ -148,6 +148,7 @@ CONFIG = {
     "max_position_size": 0.30,  # Informational only — not enforced in sizing (see risk.py comment). Hard cap is 20% in orders_core.py. (live: re-evaluate enforcement)
     "max_daily_loss_pct": 0.05,  # 5% max daily loss before halting
     "correlation_threshold": 0.75,  # Block new trade if correlation > this
+    "correlation_group_max": 4,     # Max positions per sector group (live: 3)
     "max_positions": 100,  # Sanity ceiling only — NOT a portfolio construction tool.
     # Real position-count constraints are emergent from min_cash_reserve (10%),
     # max_single_position (6%), and max_sector_exposure (40%). Count caps are
@@ -156,13 +157,13 @@ CONFIG = {
     "daily_loss_limit": 0.10,  # 10% daily loss limit
     "max_drawdown_alert": 0.25,  # 25% drawdown alert
     "min_cash_reserve": 0.10,  # 10% cash floor — hard stop on new entries
-    "max_single_position": 0.06,  # Cross-instrument exposure guard only (stock+option stacking on same name).
+    "max_single_position": 0.15,  # Cross-instrument exposure guard (stock+option stacking on same name). (live: 0.10)
     # Not enforced as a sizing cap — Opus decides position size from account context.
-    "max_sector_exposure": 0.40,  # 40% sector cap
+    "max_sector_exposure": 0.50,  # 50% sector cap (live: 0.40)
     "consecutive_loss_pause": 999,  # Paper learning mode: effectively disabled (live: 5)
     "reentry_cooldown_minutes": 30,  # Block re-entry after close (lifecycle gate)
     "failed_thesis_cooldown_hours": 4,  # Extended cooldown when INTRADAY wrong_if was triggered
-    "score_persistence_scans": 2,  # Consecutive above-threshold scans required before entry
+    "score_persistence_scans": 0,  # Disabled — beta trader fires on scan-1 conviction (live: 2)
     "persistence_conviction_bypass": 36,  # Score >= this passes persistence gate immediately (scan-1 safe)
     # ── HELD-POSITION SCALE-UP TRIGGER ────────────────────────────
     # When a held position's score rises materially since entry (or since the
@@ -593,6 +594,10 @@ CONFIG = {
         "tech_short": "SQQQ",  # 3x inverse Nasdaq
         "vix_long": "UVXY",  # VIX spike play
     },
+    # Symbols that may only be traded LONG. A SHORT signal on any of these
+    # is silently dropped — the instrument itself provides the bearish
+    # exposure, so shorting it creates a double-negative with borrow costs.
+    "long_only_symbols": {"SPXS", "SQQQ", "UVXY"},
     # ── LOGGING ───────────────────────────────────────────────
     "log_file": "logs/decifer.log",
     "trade_log": "data/trades.json",
@@ -830,7 +835,7 @@ CONFIG = {
 
         # INTRADAY thresholds
         "intraday_max_signal_age_minutes":   15,    # signal older than this → reject
-        "intraday_min_rel_volume":           1.3,   # below this → score penalty
+        "intraday_min_rel_volume":           1.0,   # below this → score penalty (live: 1.3)
         "intraday_hard_fail_rel_volume":     0.8,   # below this → hard reject
         "intraday_max_spread_pct":           0.4,   # above this → score penalty
         "intraday_hard_fail_spread_pct":     0.8,   # above this → hard reject
@@ -838,7 +843,7 @@ CONFIG = {
         "intraday_hod_noman_high":          -1.0,   # HOD no-man's land upper bound (%)
         "intraday_long_min_vwap_dist":      -1.5,   # LONG: reject if >1.5% below VWAP
         "intraday_short_max_vwap_dist":      1.5,   # SHORT: reject if >1.5% above VWAP
-        "intraday_dead_window_penalty":      8,     # extra score pts required 11:00–14:30
+        "intraday_dead_window_penalty":      4,     # extra score pts required 11:00–14:30 (live: 8)
         "intraday_low_volume_penalty":       5,     # extra score pts if rel_vol < min
         "intraday_wide_spread_penalty":      4,     # extra score pts if spread elevated
 

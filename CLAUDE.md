@@ -165,15 +165,36 @@ WHAT IS NEXT:
 - **Tier 3** — Deep (multi-file refactor, new phase planning): require Amit approval of approach BEFORE any code
 
 ### Architecture Integrity (paramount)
-- Build from first principles, not patches. A patch that makes broken code "work" hides structural problems and accumulates debt.
-- If a request conflicts with the architecture or vision, flag it to Amit before proceeding — never work around it silently.
-- Functions > 30 lines are doing more than one thing. Modules > 200 lines have grown beyond scope. Stop and split.
-- Every module has one clearly defined responsibility. If you cannot state it in one sentence, it's doing too much.
+
+**PATCHES ARE COMPLETELY PROHIBITED. THIS IS A HARD RULE WITH NO EXCEPTIONS.**
+
+A patch is any change that suppresses a symptom without addressing its root cause. This includes: `try/except` blocks added to silence errors, default fallback values that mask missing data, conditional branches added to "handle" an edge case that shouldn't exist, and any fix that makes a test pass without understanding why it was failing.
+
+**The mandatory sequence before a single line of code is written:**
+1. **STOP.** Do not open any file with intent to edit.
+2. **DIAGNOSE.** Trace the failure to its actual origin — not the line that raised the error, but why that condition exists at all. Read every layer involved. Follow imports. Read callers. Read the data flow.
+3. **ARTICULATE.** State the root cause in one clear sentence. If you cannot do this, you do not understand it yet — keep digging.
+4. **RESEARCH.** Understand what the correct design looks like from first principles. What should this code do? Why did the original design fail to do it? What invariant was violated?
+5. **ONLY THEN: implement.** Fix at the root. If the root cause requires a rewrite, do the rewrite. If it requires a design decision, bring it to Amit before writing a single line.
+
+**Violations that will not be tolerated:**
+- Catching an exception to prevent a crash without removing the condition that causes it
+- Adding an `if x is None: return` guard without understanding why `x` is None
+- Hardcoding a value to make output correct without understanding why the computed value is wrong
+- Any change described as "temporary" or "for now"
+- Adjusting a test to make it pass rather than fixing the code it tests
+
+If a request conflicts with the architecture or vision, flag it to Amit before proceeding — never work around it silently.
+
+Functions > 30 lines are doing more than one thing. Modules > 200 lines have grown beyond scope. Stop and split.
+
+Every module has one clearly defined responsibility. If you cannot state it in one sentence, it's doing too much.
 
 ### Before Any Implementation
-1. Does this belong in the existing architecture, or does it require a design decision first?
-2. Am I patching something broken, or building something correct?
-3. Does this change sustain or erode the long-term vision?
+1. **What is the root cause — stated in one sentence?** If this cannot be answered, stop. Do not proceed.
+2. Does this belong in the existing architecture, or does it require a design decision first?
+3. Is this fix correct from first principles, or does it merely suppress a symptom?
+4. Does this change sustain or erode the long-term vision?
 
 ### Code Integrity
 - Never invent function names, method signatures, or API behaviours without reading the actual source first.
