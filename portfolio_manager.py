@@ -390,7 +390,11 @@ that sized the original entry. Your job is the verb and the reasoning tag, not t
         )
         raw = resp.content[0].text.strip()
         log.info(f"Portfolio review ({trigger}): {len(open_positions)} positions reviewed")
-        return forced_exits + _parse_actions(raw, open_positions)
+        log.debug(f"portfolio_manager raw response:\n{raw}")
+        parsed = _parse_actions(raw, open_positions)
+        if not any(r["reasoning"] != "not_in_output" for r in parsed):
+            log.warning(f"portfolio_manager: ALL positions defaulted to HOLD — raw response head: {raw[:400]!r}")
+        return forced_exits + parsed
 
     except Exception as exc:
         log.error(f"portfolio_manager: LLM call failed ({exc}) — returning all HOLD")
@@ -590,6 +594,10 @@ def _parse_actions(text: str, open_positions: list) -> list:
     Falls back to HOLD for any position not found in output.
     """
     import re
+
+    # Opus occasionally wraps headers in markdown bold: **SYMBOL: TGT**
+    # Strip all bold markers so the split and regexes work on plain text.
+    text = re.sub(r"\*+", "", text)
 
     results = {}
     blocks = re.split(r"\n(?=SYMBOL:)", text.strip())
