@@ -797,6 +797,10 @@ def reconcile_with_ibkr(ib: IB):
                             new_entry["advice_id"] = _saved.get("advice_id", "")
                             if _saved.get("score", 0) > 0:
                                 new_entry["score"] = _saved["score"]
+                            if _saved.get("sl"):
+                                new_entry["sl"] = _saved["sl"]
+                            if _saved.get("tp"):
+                                new_entry["tp"] = _saved["tp"]
                             new_entry["_metadata_restored"] = True
                         _safe_set_trade(key, new_entry)
                         try:
@@ -863,6 +867,12 @@ def reconcile_with_ibkr(ib: IB):
                             new_entry["advice_id"] = _saved.get("advice_id", "")
                             if _saved.get("score", 0) > 0:
                                 new_entry["score"] = _saved["score"]
+                            # Restore original SL/TP — fallback formulas above are last-resort
+                            # defaults only; saved values are from the actual order placement.
+                            if _saved.get("sl"):
+                                new_entry["sl"] = _saved["sl"]
+                            if _saved.get("tp"):
+                                new_entry["tp"] = _saved["tp"]
                             new_entry["_metadata_restored"] = True
                         _safe_set_trade(key, new_entry)
                         try:
@@ -978,8 +988,6 @@ def reconcile_with_ibkr(ib: IB):
         log.info(
             f"Reconciliation complete. Tracking {len(active_trades)} positions. (processed={reconciled_count}, failed={failed_count})"
         )
-        _orders_state._reconcile_in_progress = False
-        _save_positions_file()  # positions.json now reflects full IBKR-reconciled state
 
         # ── Step 6: orphan alerting ───────────────────────────────────────────
         # Any position that ended up with trade_type UNKNOWN after all lookup
@@ -1028,6 +1036,7 @@ def reconcile_with_ibkr(ib: IB):
         log.error(f"Reconciliation error: {e}")
     finally:
         _orders_state._reconcile_in_progress = False
+        _save_positions_file()  # always persist — runs even if reconcile errors partway through
 
 
 def _reattach_sl_order(

@@ -545,58 +545,64 @@ def check_external_closes(regime: dict):
                     news=_news_stop.get("claude_catalyst") or "none",
                 )
 
-                log_trade(
-                    trade=trade,
-                    agent_outputs={},
-                    regime=regime,
-                    action="CLOSE",
-                    outcome={
-                        "exit_price": round(exit_price, 2),
-                        "pnl": round(pnl, 2),
-                        "pnl_pct": round(
-                            pnl
-                            / (
-                                (trade.get("entry") or 1)
-                                * (trade.get("qty") or 1)
-                                * (100 if trade.get("instrument") == "option" else 1)
+                try:
+                    log_trade(
+                        trade=trade,
+                        agent_outputs={},
+                        regime=regime,
+                        action="CLOSE",
+                        outcome={
+                            "exit_price": round(exit_price, 2),
+                            "pnl": round(pnl, 2),
+                            "pnl_pct": round(
+                                pnl
+                                / (
+                                    (trade.get("entry") or 1)
+                                    * (trade.get("qty") or 1)
+                                    * (100 if trade.get("instrument") == "option" else 1)
+                                ),
+                                4,
                             ),
-                            4,
-                        ),
-                        "reason": exit_reason,
-                    },
-                )
+                            "reason": exit_reason,
+                        },
+                    )
 
-                dash["trades"].insert(
-                    0,
-                    {
-                        "side": "SELL",
-                        "symbol": sym,
-                        "price": str(round(exit_price, 2)),
-                        "time": datetime.now(_ET).strftime("%H:%M:%S"),
-                        "pnl": round(pnl, 2),
-                    },
-                )
+                    dash["trades"].insert(
+                        0,
+                        {
+                            "side": "SELL",
+                            "symbol": sym,
+                            "price": str(round(exit_price, 2)),
+                            "time": datetime.now(_ET).strftime("%H:%M:%S"),
+                            "pnl": round(pnl, 2),
+                        },
+                    )
 
-                from learning import get_performance_summary
-                from learning import load_trades as lt
+                    from learning import get_performance_summary
+                    from learning import load_trades as lt
 
-                dash["all_trades"] = lt()
-                dash["performance"] = get_performance_summary(lt())
+                    dash["all_trades"] = lt()
+                    dash["performance"] = get_performance_summary(lt())
 
-                del open_trades[sym]
-                bot_state._sl_fill_events.discard(sym)
-                dash["positions"] = get_open_positions()
+                    dash["positions"] = get_open_positions()
 
-                if pnl >= 0:
-                    from risk import record_win
+                    if pnl >= 0:
+                        from risk import record_win
 
-                    record_win()
-                else:
-                    from risk import record_loss
+                        record_win()
+                    else:
+                        from risk import record_loss
 
-                    record_loss(source="external" if exit_reason != "sl_hit" else "sl")
-                    global _session_stop_count
-                    _session_stop_count += 1
+                        record_loss(source="external" if exit_reason != "sl_hit" else "sl")
+                        global _session_stop_count
+                        _session_stop_count += 1
+
+                except Exception as _log_exc:
+                    clog("ERROR", f"External close log/dashboard error for {sym}: {_log_exc}")
+                finally:
+                    # Always remove from tracker — prevents infinite reprocessing on next cycle
+                    open_trades.pop(sym, None)
+                    bot_state._sl_fill_events.discard(sym)
 
     except Exception as e:
         clog("ERROR", f"External close check error: {e}")
@@ -618,36 +624,39 @@ def check_options_positions():
             return
         to_exit = check_options_exits(opts, ib)
         for opt_key in to_exit:
-            clog("TRADE", f"Closing options position: {opt_key}")
-            sold = execute_sell_option(ib, opt_key, reason="exit_condition")
-            if sold:
-                dash["positions"] = get_open_positions()
-            else:
-                from orders_options import (
-                    _MAX_OPTION_SELL_RETRIES,
-                    _OPTION_SELL_COOLDOWN,
-                    _option_sell_attempts,
-                    _pending_option_exits,
-                )
-
-                if opt_key in _pending_option_exits:
-                    clog("INFO", f"Options market closed — {opt_key} queued for next open")
+            try:
+                clog("TRADE", f"Closing options position: {opt_key}")
+                sold = execute_sell_option(ib, opt_key, reason="exit_condition")
+                if sold:
+                    dash["positions"] = get_open_positions()
                 else:
-                    _att = _option_sell_attempts.get(opt_key, {})
-                    _cnt = _att.get("count", 0)
-                    if _cnt >= _MAX_OPTION_SELL_RETRIES:
-                        _elapsed = (
-                            datetime.now(UTC) - _att.get("last_try", datetime.min.replace(tzinfo=UTC))
-                        ).total_seconds()
-                        _remaining = max(0, int(_OPTION_SELL_COOLDOWN - _elapsed))
-                        clog(
-                            "WARN", f"Option sell cooling down for {opt_key} — {_cnt} failures, {_remaining}s remaining"
-                        )
+                    from orders_options import (
+                        _MAX_OPTION_SELL_RETRIES,
+                        _OPTION_SELL_COOLDOWN,
+                        _option_sell_attempts,
+                        _pending_option_exits,
+                    )
+
+                    if opt_key in _pending_option_exits:
+                        clog("INFO", f"Options market closed — {opt_key} queued for next open")
                     else:
-                        clog(
-                            "WARN",
-                            f"Option sell failed for {opt_key} — will retry next cycle (attempt {_cnt}/{_MAX_OPTION_SELL_RETRIES})",
-                        )
+                        _att = _option_sell_attempts.get(opt_key, {})
+                        _cnt = _att.get("count", 0)
+                        if _cnt >= _MAX_OPTION_SELL_RETRIES:
+                            _elapsed = (
+                                datetime.now(UTC) - _att.get("last_try", datetime.min.replace(tzinfo=UTC))
+                            ).total_seconds()
+                            _remaining = max(0, int(_OPTION_SELL_COOLDOWN - _elapsed))
+                            clog(
+                                "WARN", f"Option sell cooling down for {opt_key} — {_cnt} failures, {_remaining}s remaining"
+                            )
+                        else:
+                            clog(
+                                "WARN",
+                                f"Option sell failed for {opt_key} — will retry next cycle (attempt {_cnt}/{_MAX_OPTION_SELL_RETRIES})",
+                            )
+            except Exception as _opt_exc:
+                clog("ERROR", f"Options exit error for {opt_key}: {_opt_exc}")
     except Exception as e:
         clog("ERROR", f"Options position check error: {e}")
 
@@ -869,10 +878,19 @@ def _maybe_generate_overnight_research():
 
         def _run():
             try:
-                from orders_portfolio import get_open_positions
                 from overnight_research import generate_overnight_notes
+            except Exception as exc:
+                clog("WARNING", f"Overnight research failed (import): {exc}")
+                return
 
+            try:
+                from orders_portfolio import get_open_positions
                 universe = [p["symbol"] for p in get_open_positions()]
+            except Exception as exc:
+                clog("WARNING", f"Overnight research: could not fetch positions (TWS down?), running without universe — {exc}")
+                universe = []
+
+            try:
                 generate_overnight_notes(universe=universe or None)
                 clog("INFO", "Overnight research notes generated → data/overnight_notes.md")
             except Exception as exc:
