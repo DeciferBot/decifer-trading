@@ -343,3 +343,117 @@ class TestFetchBarsEdgeCases:
         finally:
             sys.modules.update(saved)
             _reset_client()
+
+
+# ── Tests: get_relative_volume — session-aware baseline ───────────────────────
+
+
+def _make_minute_bars(n=30, vol_per_bar=50_000):
+    """Return a 1-minute OHLCV DataFrame in UTC."""
+    idx = pd.date_range(end=pd.Timestamp.now(tz="UTC"), periods=n, freq="min")
+    return pd.DataFrame(
+        {
+            "Open":   [100.0] * n,
+            "High":   [101.0] * n,
+            "Low":    [99.0]  * n,
+            "Close":  [100.5] * n,
+            "Volume": [vol_per_bar] * n,
+        },
+        index=idx,
+    )
+
+
+class TestGetRelativeVolumeSessionAware:
+    """Session-aware baseline tests — no network calls."""
+
+    def setup_method(self):
+        _reset_client()
+
+    def test_regular_session_uses_390min_formula(self):
+        """REGULAR session: result = today_vol / (avg_daily * elapsed/390)."""
+        import pytz
+        from datetime import date as _date
+        et = pytz.timezone("America/New_York")
+
+        # 60 intraday 1-min bars × 100 000 vol each = 6 000 000 today_vol
+        intraday_df = _make_minute_bars(n=60, vol_per_bar=100_000)
+        # 30 daily bars × 20 000 000 avg
+        daily_idx = pd.date_range(end=pd.Timestamp.now(tz="UTC"), periods=30, freq="D")
+        daily_df = pd.DataFrame({"Volume": [20_000_000] * 30}, index=daily_idx)
+
+        # Simulate 60 min elapsed into REGULAR session
+        fake_now_et = pd.Timestamp.now(tz=et).replace(hour=10, minute=30,
+                                                       second=0, microsecond=0)
+
+        with patch.object(alpaca_data, "_volume_session", return_value="REGULAR"), \
+             patch.object(alpaca_data, "fetch_bars",
+                          side_effect=lambda sym, period=None, interval=None:
+                          intraday_df if interval == "1m" else daily_df), \
+             patch("pandas.Timestamp.now", return_value=fake_now_et):
+            result = alpaca_data.get_relative_volume("AAPL")
+
+        # today_vol = 6 000 000, avg_daily_vol = 20 000 000 (exclude last row ≈ 20M)
+        # elapsed = 60 min, expected = 20M × (60/390) ≈ 3 076 923
+        # rel_vol ≈ 6M / 3.077M ≈ 1.95
+        assert result is not None
+        assert 1.8 < result < 2.2, f"Expected ~1.95, got {result}"
+
+    def test_after_hours_uses_session_matched_baseline(self):
+        """AFTER_HOURS: result uses AH baseline and 240-min window."""
+        import pytz
+        et = pytz.timezone("America/New_York")
+
+        # 120 bars × 10 000 vol = 1 200 000 today AH vol
+        ah_bars_today = _make_minute_bars(n=120, vol_per_bar=10_000)
+        baseline_vol = 2_000_000.0   # 20-day AH baseline
+        fake_now_et = pd.Timestamp.now(tz=et).replace(hour=18, minute=0,
+                                                       second=0, microsecond=0)
+        # elapsed = 120 min into 16:00 session; expected = 2M × (120/240) = 1M
+        # rel_vol = 1.2M / 1M = 1.20
+
+        with patch.object(alpaca_data, "_volume_session", return_value="AFTER_HOURS"), \
+             patch.object(alpaca_data, "_fetch_bars_range", return_value=ah_bars_today), \
+             patch.object(alpaca_data, "_get_extended_session_baseline",
+                          return_value=baseline_vol), \
+             patch("pandas.Timestamp.now", return_value=fake_now_et):
+            result = alpaca_data.get_relative_volume("TGT")
+
+        assert result is not None
+        assert 1.1 < result < 1.35, f"Expected ~1.20, got {result}"
+
+    def test_returns_none_when_baseline_unavailable(self):
+        """None baseline → get_relative_volume returns None (no division by zero)."""
+        import pytz
+        et = pytz.timezone("America/New_York")
+
+        ah_bars_today = _make_minute_bars(n=60, vol_per_bar=5_000)
+        fake_now_et = pd.Timestamp.now(tz=et).replace(hour=17, minute=0,
+                                                       second=0, microsecond=0)
+
+        with patch.object(alpaca_data, "_volume_session", return_value="AFTER_HOURS"), \
+             patch.object(alpaca_data, "_fetch_bars_range", return_value=ah_bars_today), \
+             patch.object(alpaca_data, "_get_extended_session_baseline",
+                          return_value=None), \
+             patch("pandas.Timestamp.now", return_value=fake_now_et):
+            result = alpaca_data.get_relative_volume("TGT")
+
+        assert result is None
+
+    def test_returns_none_before_5min_into_session(self):
+        """Elapsed < 5 min at session open → return None to avoid noise."""
+        import pytz
+        et = pytz.timezone("America/New_York")
+
+        # Only 3 bars into AH session (16:00 + 3 min)
+        ah_bars_today = _make_minute_bars(n=3, vol_per_bar=50_000)
+        fake_now_et = pd.Timestamp.now(tz=et).replace(hour=16, minute=3,
+                                                       second=0, microsecond=0)
+
+        with patch.object(alpaca_data, "_volume_session", return_value="AFTER_HOURS"), \
+             patch.object(alpaca_data, "_fetch_bars_range", return_value=ah_bars_today), \
+             patch.object(alpaca_data, "_get_extended_session_baseline",
+                          return_value=2_000_000.0), \
+             patch("pandas.Timestamp.now", return_value=fake_now_et):
+            result = alpaca_data.get_relative_volume("TGT")
+
+        assert result is None

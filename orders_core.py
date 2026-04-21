@@ -462,10 +462,14 @@ def execute_buy(
         # slices fill — not atomic, which is the accepted trade-off at this size.
         # FX is excluded: "qty" is currency units (e.g. 25,000 EUR), not shares,
         # and smart_execution uses Stock() which IBKR rejects for Forex contracts.
+        # Extended hours excluded: TWAP slice orders lack outsideRth=True so IBKR
+        # cancels every slice after 30 s, creating an indefinite cancel loop.
+        # The extended-hours standalone LMT path below handles large after-hours orders.
         _notional = qty * price
         _smart_min_shares = CONFIG.get("smart_execution_min_shares", 500)
         _smart_min_notional = CONFIG.get("smart_execution_min_notional", 10000.0)
-        if instrument != "fx" and qty >= _smart_min_shares and _notional >= _smart_min_notional:
+        _twap_in_ext_hours = is_equities_extended_hours() and not is_options_market_open()
+        if instrument != "fx" and qty >= _smart_min_shares and _notional >= _smart_min_notional and not _twap_in_ext_hours:
             try:
                 from ib_async import Stock as _SmartStock
 
@@ -582,6 +586,16 @@ def execute_buy(
                         f"execute_buy {symbol}: TWAP position recorded — "
                         f"{stats.filled_quantity} shares @ avg ${_fill_price:.2f}"
                     )
+                if stats.filled_quantity == 0:
+                    # TWAP completed but no fills — all slices cancelled by IBKR.
+                    # Apply re-entry cooldown and release RESERVED to prevent the
+                    # scanner from immediately re-entering on the next cycle.
+                    log.warning(
+                        f"execute_buy {symbol}: TWAP returned 0 fills — applying re-entry cooldown"
+                    )
+                    with _trades_lock:
+                        recently_closed[symbol] = datetime.now(UTC).isoformat()
+                    _safe_del_trade(symbol)
                 return stats.filled_quantity > 0
             except Exception as _se:
                 log.warning(f"execute_buy {symbol}: smart execution failed ({_se}), falling through to atomic bracket")
@@ -1864,6 +1878,13 @@ def execute_add_to_position(
         add_order.outsideRth = True
         trade = ib.placeOrder(contract, add_order)
         ib.sleep(0.4)
+
+        _add_status = trade.orderStatus.status
+        if _add_status in ("Cancelled", "Inactive", "ApiCancelled", "ValidationError"):
+            log.warning(
+                f"execute_add_to_position {symbol}: ADD order immediately rejected ({_add_status}) — not updating qty"
+            )
+            return False
 
         # Update position: blended avg entry and new total qty
         new_qty = existing_qty + add_qty

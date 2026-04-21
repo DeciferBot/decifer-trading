@@ -13,6 +13,7 @@ Covers:
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -428,6 +429,36 @@ class TestValidateEntry(unittest.TestCase):
         allowed, trade_type, reason, eff_score = validate_entry("LONG", ctx, score=40)
         self.assertTrue(allowed)
         self.assertEqual(trade_type, "POSITION")
+
+
+# ── Session-aware rel_vol threshold tests ─────────────────────────────────────
+
+class TestSessionAwareRelVolThresholds(unittest.TestCase):
+    """Verify that entry_gate selects the correct rel_vol thresholds per session."""
+
+    def test_after_hours_hard_fail_at_0_2x(self):
+        """AFTER_HOURS: rel_vol 0.2× < hard_fail 0.3× → rejected."""
+        ctx = _intraday_ctx(rel_volume=0.2)
+        with patch("risk.get_session", return_value="AFTER_HOURS"):
+            ok, reason, _ = _validate_intraday("LONG", ctx)
+        self.assertFalse(ok)
+        self.assertIn("hard floor", reason)
+
+    def test_after_hours_passes_at_0_4x(self):
+        """AFTER_HOURS: rel_vol 0.4× > hard_fail 0.3× → clears hard fail gate."""
+        ctx = _intraday_ctx(rel_volume=0.4)
+        with patch("risk.get_session", return_value="AFTER_HOURS"):
+            ok, reason, _ = _validate_intraday("LONG", ctx)
+        # Hard-fail gate should pass (0.4 > 0.3); other gates may still apply
+        self.assertNotIn("hard floor", reason)
+
+    def test_regular_session_thresholds_unchanged(self):
+        """REGULAR session: rel_vol 0.6× < hard_fail 0.8× → rejected at regular threshold."""
+        ctx = _intraday_ctx(rel_volume=0.6)
+        with patch("risk.get_session", return_value="PRIME_AM"):
+            ok, reason, _ = _validate_intraday("LONG", ctx)
+        self.assertFalse(ok)
+        self.assertIn("hard floor", reason)
 
 
 if __name__ == "__main__":

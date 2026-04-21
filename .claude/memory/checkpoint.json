@@ -1,21 +1,21 @@
 {
-  "timestamp": "2026-04-20T17:05:27.708Z",
+  "timestamp": "2026-04-21T03:48:16.997Z",
   "branch": "master",
-  "lastCommit": "4ef3f86 feat(catalyst): wire Alpaca OPRA + FMP into catalyst screener",
+  "lastCommit": "4d2049c fix(signals): high-conviction bypass for persistence gate on scan 1",
   "roadmapPhase": null,
   "lastFilesTouched": [
     "claude/memory/checkpoint.json",
     ".claude/memory/session-history.jsonl",
-    "bot_ibkr.py",
     "config.py",
     "data/audit_log.jsonl",
-    "data/daily_promoted.json",
     "data/metadata_ledger.json",
-    "data/overnight_notes.md",
-    "data/pending_option_exits.json",
-    "data/signals_log.jsonl"
+    "data/signals_log.jsonl",
+    "orders_core.py",
+    "data/decifer.db",
+    "data/decifer.db-shm",
+    "data/decifer.db-wal"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 284
+  "sessionCount": 289
 }

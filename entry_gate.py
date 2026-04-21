@@ -71,9 +71,24 @@ def _validate_intraday(direction: str, ctx: TradeContext) -> tuple[bool, str, in
     if ctx.earnings_days_away is not None and ctx.earnings_days_away <= 0:
         return False, "earnings same day — binary event, not a technical trade", 0
 
-    # No volume
-    min_rel_vol = _cfg("intraday_min_rel_volume", 1.3)
-    hard_fail_vol = _cfg("intraday_hard_fail_rel_volume", 0.8)
+    # No volume — thresholds are session-aware (AH baseline is already corrected,
+    # so a lower threshold is appropriate there vs regular session).
+    try:
+        from risk import get_session as _get_session
+        _vol_session = _get_session()
+    except Exception:
+        _vol_session = "PRIME_AM"  # safe default → use regular thresholds
+
+    if _vol_session == "AFTER_HOURS":
+        min_rel_vol   = _cfg("after_hours_min_rel_volume", 0.8)
+        hard_fail_vol = _cfg("after_hours_hard_fail_rel_volume", 0.3)
+    elif _vol_session in ("PRE_MARKET", "PRE_OPEN"):
+        min_rel_vol   = _cfg("pre_market_min_rel_volume", 0.7)
+        hard_fail_vol = _cfg("pre_market_hard_fail_rel_volume", 0.25)
+    else:
+        min_rel_vol   = _cfg("intraday_min_rel_volume", 1.3)
+        hard_fail_vol = _cfg("intraday_hard_fail_rel_volume", 0.8)
+
     if ctx.rel_volume is not None and ctx.rel_volume < hard_fail_vol:
         return False, f"rel_volume {ctx.rel_volume:.2f}× below hard floor {hard_fail_vol}×", 0
 

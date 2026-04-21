@@ -794,6 +794,13 @@ CONFIG = {
         "max_chase_pct": 0.01,  # Hard ceiling: never pay more than 1% above the original limit
         "orphan_timeout_mins": 5,  # Hard cancel watcherless PENDING orders after this many minutes
     },
+    # ── SMART EXECUTION (TWAP/VWAP) ──────────────────────────────────────────
+    # Thresholds set high — at retail order sizes (hundreds of shares) TWAP adds
+    # latency and failure modes with zero market-impact benefit. IBKR fills a
+    # 1,000-share AMZN order in milliseconds; no slicing needed.
+    "smart_execution_min_shares": 50_000,   # effectively disabled for retail
+    "smart_execution_min_notional": 5_000_000.0,
+
     # ── EXECUTION AGENT ───────────────────────────────────────────────────────
     # Decides HOW to execute a trade (order type, aggression, fill watcher params).
     # Now deterministic — same rules encoded in Python, not LLM.
@@ -834,6 +841,15 @@ CONFIG = {
         "intraday_dead_window_penalty":      8,     # extra score pts required 11:00–14:30
         "intraday_low_volume_penalty":       5,     # extra score pts if rel_vol < min
         "intraday_wide_spread_penalty":      4,     # extra score pts if spread elevated
+
+        # Extended-hours rel volume thresholds (AFTER_HOURS / PRE_MARKET sessions)
+        # Baselines are now session-matched, so 1.0× = average activity for that session.
+        # Thresholds are lower than regular session because the corrected baseline
+        # already accounts for structurally thin after-hours liquidity.
+        "after_hours_min_rel_volume":        0.8,   # below this → score penalty
+        "after_hours_hard_fail_rel_volume":  0.3,   # below this → hard reject
+        "pre_market_min_rel_volume":         0.7,   # below this → score penalty
+        "pre_market_hard_fail_rel_volume":   0.25,  # below this → hard reject
 
         # SWING thresholds
         "swing_min_earnings_days_away":      5,     # earnings closer than this → reject

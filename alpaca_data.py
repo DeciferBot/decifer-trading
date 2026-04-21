@@ -58,6 +58,136 @@ def _get_client():
     return _client
 
 
+# ── Session detection (inline — avoids circular import with risk.py) ─────────
+
+
+def _volume_session(now_et) -> str:
+    """Classify the current trading session for volume-baseline selection.
+
+    Returns one of: "CLOSED", "PRE_MARKET", "REGULAR", "AFTER_HOURS".
+    Intentionally minimal — only the boundaries that matter for volume math.
+    """
+    from datetime import time as _time
+    t = now_et.time()
+    if t < _time(4, 0):   return "CLOSED"
+    if t < _time(9, 30):  return "PRE_MARKET"   # 04:00–09:30 ET (330 min window)
+    if t < _time(16, 0):  return "REGULAR"       # 09:30–16:00 ET (390 min window)
+    if t < _time(20, 0):  return "AFTER_HOURS"   # 16:00–20:00 ET (240 min window)
+    return "CLOSED"
+
+
+# ── Explicit date-range bar fetcher (extended-hours baseline) ─────────────────
+
+
+def _fetch_bars_range(
+    symbol: str,
+    start_utc: datetime,
+    end_utc: datetime,
+    interval: str = "1m",
+) -> "pd.DataFrame | None":
+    """Fetch OHLCV bars for a specific UTC datetime range.
+
+    Unlike fetch_bars() (which uses period strings), this accepts explicit
+    start/end datetimes — needed to pull after-hours / pre-market windows
+    without pulling the full day.  Same SIP feed and split-adjustment as
+    fetch_bars().
+    """
+    client = _get_client()
+    if client is None:
+        return None
+    try:
+        from alpaca.data.requests import StockBarsRequest
+        from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+
+        tf_map = {
+            "1m": TimeFrame.Minute,
+            "5m": TimeFrame(5, TimeFrameUnit.Minute),
+            "1h": TimeFrame.Hour,
+            "1d": TimeFrame.Day,
+        }
+        tf = tf_map.get(interval)
+        if tf is None:
+            log.debug(f"_fetch_bars_range: unsupported interval '{interval}'")
+            return None
+
+        request = StockBarsRequest(
+            symbol_or_symbols=symbol,
+            timeframe=tf,
+            start=start_utc,
+            end=end_utc,
+            feed="sip",
+            adjustment="split",
+        )
+        bars = client.get_stock_bars(request)
+        df = bars.df
+        if df is None or df.empty:
+            return None
+
+        if isinstance(df.index, pd.MultiIndex):
+            df = df.xs(symbol, level=0)
+
+        rename = {"open": "Open", "high": "High", "low": "Low",
+                  "close": "Close", "volume": "Volume"}
+        df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
+
+        if not isinstance(df.index, pd.DatetimeIndex):
+            df.index = pd.to_datetime(df.index)
+
+        cols = [c for c in ("Open", "High", "Low", "Close", "Volume") if c in df.columns]
+        return df[cols]
+
+    except Exception as exc:
+        log.debug(f"_fetch_bars_range: {symbol} failed — {exc}")
+        return None
+
+
+def _get_extended_session_baseline(
+    symbol: str,
+    session: str,
+    lookback_days: int = 20,
+) -> "float | None":
+    """Compute the 20-day average volume for a specific extended-hours session.
+
+    Fetches 30 calendar days of 1-minute bars covering the target session window,
+    filters to session hours in ET, groups by date, and returns the mean daily
+    volume over the last `lookback_days` non-zero trading days.
+
+    This is one Alpaca call (wide datetime range), not one call per day.
+    """
+    import pytz
+
+    et = pytz.timezone("America/New_York")
+    now_utc = datetime.now(UTC)
+
+    if session == "PRE_MARKET":
+        session_start_h, session_end_h = 4, 9    # 04:00–09:30 ET
+    else:  # AFTER_HOURS
+        session_start_h, session_end_h = 16, 20  # 16:00–20:00 ET
+
+    range_start = (now_utc - timedelta(days=30)).replace(
+        hour=session_start_h, minute=0, second=0, microsecond=0
+    )
+    df = _fetch_bars_range(symbol, range_start, now_utc, interval="1m")
+    if df is None or df.empty:
+        return None
+
+    # Convert index to ET and filter to session hours only
+    df_et = df.copy()
+    df_et.index = df_et.index.tz_convert(et)
+    mask = (df_et.index.hour >= session_start_h) & (df_et.index.hour < session_end_h)
+    df_et = df_et[mask]
+    if df_et.empty:
+        return None
+
+    # Sum per calendar day, keep last N non-zero days
+    daily_vols = df_et["Volume"].groupby(df_et.index.date).sum()
+    daily_vols = daily_vols[daily_vols > 0].tail(lookback_days)
+    if daily_vols.empty:
+        return None
+
+    return float(daily_vols.mean())
+
+
 # ── Period → start date ───────────────────────────────────────────────────────
 
 
@@ -288,57 +418,94 @@ def get_intraday_vwap(symbol: str) -> float | None:
 
 def get_relative_volume(symbol: str) -> float | None:
     """
-    Compute today's relative volume vs 20-day average, adjusted for time of day.
+    Compute today's relative volume vs the 20-day session-matched baseline.
 
-    Method:
-      1. Sum today's 1-minute bar volumes to get volume so far
-      2. Compute 20-day average daily volume from daily bars
-      3. Estimate expected volume at this intraday time:
-           expected = 20d_avg_daily_vol * (elapsed_minutes / 390)
-      4. Return today_vol_so_far / expected
+    Session dispatch:
+      REGULAR    — existing formula: today_vol / (avg_daily_vol × elapsed/390)
+      AFTER_HOURS — today's AH vol / (20-day AH avg × elapsed/240)
+      PRE_MARKET  — today's PM vol / (20-day PM avg × elapsed/330)
+      CLOSED      — returns None
+
+    The extended-hours baseline is computed from the SAME session window in
+    prior days, so 1.0× means "typical after-hours activity for this symbol"
+    rather than "0.05× of a regular session day."
 
     Returns float (e.g. 1.5 means 1.5× expected), or None if unavailable.
     Used by TradeContext.build_context() to populate rel_volume.
     """
     try:
-        import pandas as pd
-        from datetime import date as _date
         import pytz
+        from datetime import date as _date
 
-        # Today's cumulative volume from 1m bars
-        intraday = fetch_bars(symbol, period="1d", interval="1m")
-        if intraday is None or intraday.empty:
+        et = pytz.timezone("America/New_York")
+        now_et = pd.Timestamp.now(tz=et)
+        session = _volume_session(now_et)
+
+        if session == "CLOSED":
             return None
 
-        intraday.index = pd.to_datetime(intraday.index, utc=True)
-        today_bars = intraday[intraday.index.date == _date.today()]
-        if today_bars.empty:
-            today_bars = intraday
-        today_vol = float(today_bars["Volume"].sum())
+        # ── Regular session — existing logic unchanged ─────────────────────────
+        if session == "REGULAR":
+            intraday = fetch_bars(symbol, period="1d", interval="1m")
+            if intraday is None or intraday.empty:
+                return None
+            intraday.index = pd.to_datetime(intraday.index, utc=True)
+            today_bars = intraday[intraday.index.date == _date.today()]
+            if today_bars.empty:
+                today_bars = intraday
+            today_vol = float(today_bars["Volume"].sum())
+            if today_vol == 0:
+                return None
+            daily = fetch_bars(symbol, period="30d", interval="1d")
+            if daily is None or len(daily) < 5:
+                return None
+            avg_daily_vol = float(daily["Volume"].iloc[:-1].mean())  # exclude today
+            if avg_daily_vol == 0:
+                return None
+            market_open = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
+            elapsed = max(1.0, (now_et - market_open).total_seconds() / 60.0)
+            elapsed = min(elapsed, 390.0)
+            expected_vol = avg_daily_vol * (elapsed / 390.0)
+            if expected_vol == 0:
+                return None
+            return round(today_vol / expected_vol, 2)
+
+        # ── Extended-hours path ────────────────────────────────────────────────
+        if session == "PRE_MARKET":
+            session_start_h, window_min = 4, 330    # 04:00–09:30 ET
+        else:  # AFTER_HOURS
+            session_start_h, window_min = 16, 240   # 16:00–20:00 ET
+
+        # Today's volume so far in this session
+        session_open_et = now_et.replace(
+            hour=session_start_h, minute=0, second=0, microsecond=0
+        )
+        session_start_utc = session_open_et.astimezone(UTC)
+        today_bars_df = _fetch_bars_range(
+            symbol, session_start_utc, datetime.now(UTC), interval="1m"
+        )
+        if today_bars_df is None or today_bars_df.empty:
+            return None
+        today_vol = float(today_bars_df["Volume"].sum())
         if today_vol == 0:
             return None
 
-        # 20-day average daily volume
-        daily = fetch_bars(symbol, period="30d", interval="1d")
-        if daily is None or len(daily) < 5:
-            return None
-        avg_daily_vol = float(daily["Volume"].iloc[:-1].mean())  # exclude today
-        if avg_daily_vol == 0:
+        # 20-day session-matched baseline
+        baseline = _get_extended_session_baseline(symbol, session)
+        if not baseline:
             return None
 
-        # Elapsed minutes since 09:30 ET
-        et = pytz.timezone("America/New_York")
-        now_et = pd.Timestamp.now(tz=et)
-        market_open = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
-        elapsed = max(1.0, (now_et - market_open).total_seconds() / 60.0)
-        elapsed = min(elapsed, 390.0)  # cap at full day (390 min)
+        # Elapsed minutes into session — require ≥5 min to avoid noise at open
+        elapsed = (now_et - session_open_et).total_seconds() / 60.0
+        if elapsed < 5:
+            return None
+        elapsed = min(elapsed, float(window_min))
 
-        expected_vol = avg_daily_vol * (elapsed / 390.0)
+        expected_vol = baseline * (elapsed / float(window_min))
         if expected_vol == 0:
             return None
+        return round(today_vol / expected_vol, 2)
 
-        rel_vol = round(today_vol / expected_vol, 2)
-        return rel_vol
     except Exception as exc:
         log.debug("get_relative_volume: %s failed — %s", symbol, exc)
         return None
