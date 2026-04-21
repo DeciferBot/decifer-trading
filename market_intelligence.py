@@ -509,31 +509,28 @@ Pick exactly one from: {vocab_str}
 Then write a brief market_read (2-4 sentences): what is the market environment \
 right now? What dynamics are active? What does the cross-asset picture tell you?
 
-Then, for each candidate, decide:
-1. trade_type — choose exactly one:
-   - INTRADAY: same-session technical play. Requires fresh signal (<15 min), \
-confirming volume (rel_vol ≥ 1.3×), clean VWAP position, and NOT in HOD no-man's \
-land (-1% to -4% from day high). Use for pure momentum setups with no fundamental \
-anchor. Has a mechanical TP bracket and 90-min max hold.
-   - SWING: catalyst-backed, days to a week. Requires at least one qualifying catalyst \
-(earnings beat + guidance raise, analyst upgrade + PT raise, sector rotation breakout, \
-high-conviction news, insider buying, or congressional buying). Analyst consensus must \
-not be SELL for longs. Avoid if earnings < 5 days away. Held until catalyst resolves.
-   - POSITION: fundamental thesis, weeks to months. Requires ALL of: revenue growth \
->15% YoY AND not decelerating, sector ETF in structural uptrend (above 50d MA, \
-outperforming SPY 3m), and technical breakout from base. No new POSITION entries \
-in BEAR_TRENDING or PANIC regimes.
-   - AVOID: does not qualify for any type above, or environment is hostile.
-2. conviction: 0.0–1.0. This is NOT your confidence — it is the count of \
-independent observations that support this trade divided by total possible support \
-points. Base it only on observable facts in the data above. Do not inflate.
+Then, for each candidate:
+1. trade_type — label the natural hold horizon. Default to INTRADAY when unclear.
+   - INTRADAY: purely technical, same-session character
+   - SWING: catalyst or momentum setup with a 2–10 day thesis
+   - POSITION: fundamental thesis, weeks or longer
+   - AVOID: genuine exception only — see rules below
 
-## Hard rules
-- AVOID if the macro calendar shows a high-impact event within 6 hours
-- AVOID if the market observation shows acute stress (multiple assets in sharp \
-coordinated move that contradicts the signal direction)
-- POSITION requires ALL three primary conditions (revenue growth + sector trend + \
-technical base) — if any is missing, fall through to SWING or INTRADAY
+2. conviction: 0.0–1.0. Count of independent supporting observations divided by \
+total possible support points. Base it only on observable facts. Do not inflate.
+
+3. reasoning: one sentence. Lead with the real-world reason — catalyst, price \
+structure, sector move. Write it like a trade journal entry. No indicator values.
+
+## Rules
+- The signal engine has already decided to trade this. Your job is to label how \
+to manage it and document why. Do not re-evaluate whether to trade.
+- AVOID is reserved for genuine exceptions only:
+  * Earnings announced today or pre-market tomorrow (binary event — signal invalid)
+  * PANIC regime AND signal directly contradicts a violent coordinated market move
+- Everything else gets INTRADAY, SWING, or POSITION. Never AVOID a trade because \
+volume is low, HOD position is unfavourable, analyst consensus conflicts, or \
+fundamentals are weak. Those are observations to note in reasoning, not grounds to block.
 - conviction above 0.8 requires at least 4 independent supporting observations
 - Every candidate must get a classification — no omissions
 

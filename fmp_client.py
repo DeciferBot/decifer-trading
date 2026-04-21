@@ -545,14 +545,14 @@ def get_eps_acceleration(symbol: str) -> dict | None:
 
     Returns None if insufficient data.
     """
-    raw = _get("historical-earning-calendar", {"symbol": symbol.upper(), "limit": 8})
+    raw = _get("earnings", {"symbol": symbol.upper(), "limit": 8})
     if not raw or not isinstance(raw, list) or len(raw) < 4:
         return None
 
     records = []
     for item in raw[:8]:
-        actual = _safe_float(item.get("eps") or item.get("actual"))
-        estimate = _safe_float(item.get("epsEstimated") or item.get("estimated"))
+        actual = _safe_float(item.get("epsActual"))
+        estimate = _safe_float(item.get("epsEstimated"))
         if actual is not None:
             records.append({
                 "date":     (item.get("date") or "")[:10],
