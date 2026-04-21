@@ -1245,7 +1245,7 @@ def cancel_orphan_stop_orders():
             # No position — this stop is orphaned
             try:
                 ib.cancelOrder(order)
-                clog("WARNING", f"cancel_orphan_stop_orders: cancelled stale {otype} for {sym} (no active position)")
+                clog("INFO", f"cancel_orphan_stop_orders: cancelled stale {otype} for {sym} (no active position)")
                 cancelled += 1
             except Exception as exc:
                 clog("ERROR", f"cancel_orphan_stop_orders: failed to cancel {otype} for {sym} — {exc}")
