@@ -303,31 +303,30 @@ def get_analyst_consensus(symbol: str) -> dict | None:
     if not item:
         return None
 
-    consensus_raw = (item.get("consensus") or item.get("recommendation") or "").upper()
-    # Normalise FMP's various strings to our canonical 5-value set
+    # grades-consensus returns: strongBuy, buy, hold, sell, strongSell counts
+    # + a "consensus" string like "Buy" or "Strong Buy" (title case)
+    consensus_raw = (item.get("consensus") or item.get("recommendation") or "").strip().upper()
     consensus_map = {
-        "STRONG BUY":  "STRONG_BUY",
-        "STRONGBUY":   "STRONG_BUY",
-        "STRONG_BUY":  "STRONG_BUY",
-        "BUY":         "BUY",
-        "HOLD":        "HOLD",
-        "NEUTRAL":     "HOLD",
-        "SELL":        "SELL",
+        "STRONG BUY":   "STRONG_BUY",
+        "STRONGBUY":    "STRONG_BUY",
+        "STRONG_BUY":   "STRONG_BUY",
+        "BUY":          "BUY",
+        "HOLD":         "HOLD",
+        "NEUTRAL":      "HOLD",
+        "SELL":         "SELL",
         "UNDERPERFORM": "SELL",
-        "STRONG SELL": "STRONG_SELL",
-        "STRONGSELL":  "STRONG_SELL",
-        "STRONG_SELL": "STRONG_SELL",
+        "STRONG SELL":  "STRONG_SELL",
+        "STRONGSELL":   "STRONG_SELL",
+        "STRONG_SELL":  "STRONG_SELL",
     }
     consensus = consensus_map.get(consensus_raw, "HOLD")
 
+    # Price target fields do not exist on grades-consensus — they live on
+    # price-target-consensus and are fetched by get_price_target().
     return {
-        "symbol":           symbol.upper(),
-        "consensus":        consensus,
-        "target_high":      _safe_float(item.get("priceTargetHigh") or item.get("targetHigh")),
-        "target_low":       _safe_float(item.get("priceTargetLow") or item.get("targetLow")),
-        "target_consensus": _safe_float(item.get("priceTargetAverage") or item.get("targetConsensus")),
-        "target_median":    _safe_float(item.get("priceTargetMedian") or item.get("targetMedian")),
-        "last_updated":     (item.get("lastUpdated") or item.get("date") or "")[:10],
+        "symbol":       symbol.upper(),
+        "consensus":    consensus,
+        "last_updated": (item.get("lastUpdated") or item.get("date") or "")[:10],
     }
 
 
@@ -336,52 +335,61 @@ def get_analyst_consensus(symbol: str) -> dict | None:
 
 def get_price_target(symbol: str, limit: int = 5) -> dict | None:
     """
-    Fetch the most recent analyst price targets for a symbol.
+    Fetch analyst consensus price target for a symbol.
+
+    Primary: price-target-consensus (targetConsensus, targetHigh, targetLow, targetMedian).
+    Fallback: price-target-summary (lastQuarterAvgPriceTarget).
 
     Returns dict with:
         symbol (str)
-        latest_pt (float|None)         — most recent individual price target
-        pt_consensus (float|None)      — consensus/average across all analysts
+        latest_pt (float|None)         — consensus price target
+        pt_consensus (float|None)      — same as latest_pt (consensus)
+        pt_high (float|None)           — highest analyst PT
+        pt_low (float|None)            — lowest analyst PT
+        pt_median (float|None)         — median analyst PT
         pt_upside_pct (float|None)     — None here; caller computes against live price
-        analyst_count (int)
-        last_firm (str)
+        analyst_count (int|None)
         last_date (str ISO)
 
     Returns None if unavailable.
     """
-    raw = _get("price-target", {"symbol": symbol.upper(), "limit": limit}, ttl=_TTL_ANALYST)
-    if not raw or not isinstance(raw, list) or not raw:
-        # Fallback: try price-target-summary
-        consensus_raw = _get("price-target-summary", {"symbol": symbol.upper()}, ttl=_TTL_ANALYST)
-        if consensus_raw:
-            item = consensus_raw if isinstance(consensus_raw, dict) else (consensus_raw[0] if consensus_raw else None)
-            if item:
-                return {
-                    "symbol":         symbol.upper(),
-                    "latest_pt":      _safe_float(item.get("priceTargetAverage") or item.get("targetConsensus")),
-                    "pt_consensus":   _safe_float(item.get("priceTargetAverage") or item.get("targetConsensus")),
-                    "pt_upside_pct":  None,
-                    "analyst_count":  int(item.get("numberOfAnalysts") or item.get("analysts") or 0),
-                    "last_firm":      "",
-                    "last_date":      (item.get("lastUpdated") or item.get("date") or "")[:10],
-                }
-        return None
+    # Primary: price-target-consensus
+    raw = _get("price-target-consensus", {"symbol": symbol.upper()}, ttl=_TTL_ANALYST)
+    item = raw if isinstance(raw, dict) else (raw[0] if isinstance(raw, list) and raw else None)
+    if item:
+        consensus = _safe_float(item.get("targetConsensus"))
+        if consensus:
+            return {
+                "symbol":        symbol.upper(),
+                "latest_pt":     consensus,
+                "pt_consensus":  consensus,
+                "pt_high":       _safe_float(item.get("targetHigh")),
+                "pt_low":        _safe_float(item.get("targetLow")),
+                "pt_median":     _safe_float(item.get("targetMedian")),
+                "pt_upside_pct": None,   # caller computes: (pt_consensus - price) / price * 100
+                "analyst_count": None,
+                "last_date":     (item.get("date") or "")[:10],
+            }
 
-    pts = [_safe_float(r.get("priceTarget") or r.get("adjPriceTarget")) for r in raw]
-    pts = [p for p in pts if p is not None and p > 0]
-    if not pts:
-        return None
+    # Fallback: price-target-summary (lastQuarterAvgPriceTarget)
+    summary_raw = _get("price-target-summary", {"symbol": symbol.upper()}, ttl=_TTL_ANALYST)
+    s = summary_raw if isinstance(summary_raw, dict) else (summary_raw[0] if isinstance(summary_raw, list) and summary_raw else None)
+    if s:
+        pt = _safe_float(s.get("lastQuarterAvgPriceTarget") or s.get("lastMonthAvgPriceTarget"))
+        if pt:
+            return {
+                "symbol":        symbol.upper(),
+                "latest_pt":     pt,
+                "pt_consensus":  pt,
+                "pt_high":       None,
+                "pt_low":        None,
+                "pt_median":     None,
+                "pt_upside_pct": None,
+                "analyst_count": int(s.get("lastQuarterCount") or 0) or None,
+                "last_date":     "",
+            }
 
-    latest = raw[0]
-    return {
-        "symbol":        symbol.upper(),
-        "latest_pt":     pts[0],
-        "pt_consensus":  round(sum(pts) / len(pts), 2),
-        "pt_upside_pct": None,   # caller computes: (pt_consensus - price) / price * 100
-        "analyst_count": len(pts),
-        "last_firm":     latest.get("analystCompany") or latest.get("analyst") or "",
-        "last_date":     (latest.get("publishedDate") or latest.get("date") or "")[:10],
-    }
+    return None
 
 
 # ── Short Interest ────────────────────────────────────────────────────────────
@@ -406,24 +414,39 @@ def get_short_interest(symbol: str) -> dict | None:
     Returns None if unavailable.
     """
     # FMP stable: short-selling/daily-volume (symbol-level short volume)
+    # Note: this endpoint returns null for most symbols on our FMP tier.
+    # Fallback: financial-scores (Piotroski + Altman Z) used as quality proxy.
     raw_sv = _get("short-selling/daily-volume", {"symbol": symbol.upper()}, ttl=_TTL_FUNDAMENTALS)
-    if not raw_sv or not isinstance(raw_sv, list) or not raw_sv:
-        return None
+    if raw_sv and isinstance(raw_sv, list) and raw_sv:
+        item = raw_sv[0]
+        short_vol = _safe_float(item.get("shortVolume"))
+        total_vol  = _safe_float(item.get("totalVolume"))
+        short_pct  = None
+        if short_vol is not None and total_vol and total_vol > 0:
+            short_pct = round(short_vol / total_vol * 100, 2)
+        return {
+            "symbol":          symbol.upper(),
+            "short_float_pct": short_pct,
+            "short_shares":    int(short_vol) if short_vol else None,
+            "settlement_date": (item.get("date") or "")[:10],
+            "source":          "short_volume_ratio",
+        }
 
-    item = raw_sv[0]
-    short_vol = _safe_float(item.get("shortVolume"))
-    total_vol  = _safe_float(item.get("totalVolume"))
-    short_pct  = None
-    if short_vol is not None and total_vol and total_vol > 0:
-        short_pct = round(short_vol / total_vol * 100, 2)
+    # Fallback: financial-scores — Piotroski (0-9) and Altman Z as quality signals
+    raw_fs = _get("financial-scores", {"symbol": symbol.upper()}, ttl=_TTL_FUNDAMENTALS)
+    fs = raw_fs if isinstance(raw_fs, dict) else (raw_fs[0] if isinstance(raw_fs, list) and raw_fs else None)
+    if fs:
+        return {
+            "symbol":          symbol.upper(),
+            "short_float_pct": None,
+            "short_shares":    None,
+            "settlement_date": "",
+            "source":          "financial_scores",
+            "piotroski_score": _safe_float(fs.get("piotroskiScore")),
+            "altman_z_score":  _safe_float(fs.get("altmanZScore")),
+        }
 
-    return {
-        "symbol":          symbol.upper(),
-        "short_float_pct": short_pct,
-        "short_shares":    int(short_vol) if short_vol else None,
-        "settlement_date": (item.get("date") or "")[:10],
-        "source":          "short_volume_ratio",
-    }
+    return None
 
 
 # ── Revenue Growth ────────────────────────────────────────────────────────────
@@ -880,17 +903,26 @@ def get_key_metrics_ttm(symbol: str) -> dict | None:
     if not item:
         return None
 
+    # Margin fields (gross, operating, net, P/E, D/E) live on ratios-ttm, not key-metrics-ttm.
+    # Fetch separately and merge.
+    ratios_raw = _get("ratios-ttm", {"symbol": symbol.upper()}, ttl=_TTL_FUNDAMENTALS)
+    ratios = ratios_raw if isinstance(ratios_raw, dict) else (ratios_raw[0] if isinstance(ratios_raw, list) and ratios_raw else {})
+
     return {
-        "symbol":              symbol.upper(),
-        "gross_margin":        _safe_pct(item.get("grossProfitMarginTTM") or item.get("grossProfitMargin")),
-        "operating_margin":    _safe_pct(item.get("operatingProfitMarginTTM") or item.get("operatingProfitMargin")),
-        "net_margin":          _safe_pct(item.get("netProfitMarginTTM") or item.get("netProfitMargin")),
-        "fcf_yield":           _safe_pct(item.get("fcfYieldTTM") or item.get("freeCashFlowYieldTTM")),
-        "pe_ratio":            _safe_float(item.get("peRatioTTM") or item.get("peRatio")),
-        "roe":                 _safe_pct(item.get("roeTTM") or item.get("returnOnEquityTTM")),
-        "debt_to_equity":      _safe_float(item.get("debtToEquityTTM") or item.get("debtToEquity")),
-        "ev_to_sales":         _safe_float(item.get("evToSalesTTM") or item.get("evToRevenueTTM") or item.get("enterpriseValueOverRevenueTTM")),
-        "net_debt_to_ebitda":  _safe_float(item.get("netDebtToEBITDATTM") or item.get("netDebtToEbitdaTTM")),
+        "symbol":             symbol.upper(),
+        "gross_margin":       _safe_pct(ratios.get("grossProfitMarginTTM")),
+        "operating_margin":   _safe_pct(ratios.get("operatingProfitMarginTTM")),
+        "net_margin":         _safe_pct(ratios.get("netProfitMarginTTM")),
+        "fcf_yield":          _safe_pct(item.get("freeCashFlowYieldTTM")),
+        "pe_ratio":           _safe_float(ratios.get("peRatioTTM")) or (
+                                  round(1 / item["earningsYieldTTM"], 2)
+                                  if item.get("earningsYieldTTM") and item["earningsYieldTTM"] != 0
+                                  else None
+                              ),
+        "roe":                _safe_pct(item.get("returnOnEquityTTM")),
+        "debt_to_equity":     _safe_float(ratios.get("debtToEquityRatioTTM")),
+        "ev_to_sales":        _safe_float(item.get("evToSalesTTM") or item.get("evToRevenueTTM") or item.get("enterpriseValueOverRevenueTTM")),
+        "net_debt_to_ebitda": _safe_float(item.get("netDebtToEBITDATTM") or item.get("netDebtToEbitdaTTM")),
     }
 
 
@@ -924,11 +956,11 @@ def get_analyst_estimates(symbol: str) -> dict | None:
     item = raw[0]
     return {
         "symbol":                symbol.upper(),
-        "next_eps_estimate":     _safe_float(item.get("estimatedEpsAvg") or item.get("epsEstimated")),
-        "next_revenue_estimate": _safe_float(item.get("estimatedRevenueAvg") or item.get("revenueEstimated")),
-        "eps_est_high":          _safe_float(item.get("estimatedEpsHigh")),
-        "eps_est_low":           _safe_float(item.get("estimatedEpsLow")),
-        "num_analysts":          int(item.get("numberAnalystEstimatedEps") or 0) or None,
+        "next_eps_estimate":     _safe_float(item.get("epsAvg") or item.get("estimatedEpsAvg") or item.get("epsEstimated")),
+        "next_revenue_estimate": _safe_float(item.get("revenueAvg") or item.get("estimatedRevenueAvg") or item.get("revenueEstimated")),
+        "eps_est_high":          _safe_float(item.get("epsHigh") or item.get("estimatedEpsHigh")),
+        "eps_est_low":           _safe_float(item.get("epsLow") or item.get("estimatedEpsLow")),
+        "num_analysts":          int(item.get("numAnalystsEps") or item.get("numberAnalystEstimatedEps") or 0) or None,
         "period_date":           (item.get("date") or "")[:10],
     }
 
@@ -962,7 +994,7 @@ def get_dcf_value(symbol: str) -> dict | None:
         return None
 
     dcf   = _safe_float(item.get("dcf") or item.get("dcfValue") or item.get("intrinsicValue"))
-    price = _safe_float(item.get("stockPrice") or item.get("price"))
+    price = _safe_float(item.get("stockPrice") or item.get("Stock Price") or item.get("price"))
     upside = None
     if dcf and price and price > 0:
         upside = round((dcf - price) / price * 100, 2)
