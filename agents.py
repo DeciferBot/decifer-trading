@@ -657,6 +657,7 @@ RULES:
 - RANGE_BOUND regime: raise your conviction bar — only HIGH conviction setups.
 - TRENDING_DOWN regime: you MUST evaluate SHORT setups. If any SELL or STRONG_SELL signals appear in the scored list, include at least one SHORT opportunity. Do not default to cash or LONGs only — name the short candidates explicitly with DIRECTION: SHORT.
 - RELIEF_RALLY regime: treat as a bear-market bounce — favour shorts on failed breakouts, be sceptical of longs.
+- TRENDING_UP regime: trade with the trend — LONGs are the primary opportunity. Shorts require a specific negative catalyst (earnings miss, sector breakdown, confirmed insider selling) — a bearish signal score alone is not sufficient. If the only bearish evidence is momentum or breakout signals, output CASH not SHORT.
 - You determine direction from first principles using all data provided. SELL/STRONG_SELL signals are SHORT candidates; BUY/STRONG_BUY are LONG candidates — but these are starting points, not instructions. If price structure contradicts the signal direction, trust your read and either flip or omit the symbol.
 - Vol=Xx ADV means today's volume vs the 20-day average. Vol>2x = unusual conviction. Vol<0.5x = low participation, treat setups with scepticism. VWAP=+/-X% = how far price is from today's VWAP. A short candidate already sitting far below VWAP in a RANGE_BOUND or CHOPPY regime is a mean-reversion long setup, not a short continuation — recognise this and act accordingly.
 - Keep each section tight. No padding."""

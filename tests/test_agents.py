@@ -420,3 +420,21 @@ class TestAgentTechnical:
         with patch.object(agents, "_call_claude") as mock_claude:
             agents.agent_technical(signals=[_AAPL_SIGNAL], regime=_REGIME_BULL)
         mock_claude.assert_not_called()
+
+
+class TestTradingAnalystSystemPrompt:
+    """The Trading Analyst system prompt must contain regime-specific rules."""
+
+    def test_trending_up_instruction_present(self):
+        """TRENDING_UP must appear in the Trading Analyst system prompt."""
+        assert "TRENDING_UP" in agents._TRADING_ANALYST_SYSTEM
+
+    def test_trending_up_requires_catalyst(self):
+        """TRENDING_UP rule must require a specific catalyst for shorts, not
+        just signal score."""
+        assert "catalyst" in agents._TRADING_ANALYST_SYSTEM
+
+    def test_trending_up_cash_not_short(self):
+        """TRENDING_UP rule must direct Opus to output CASH rather than SHORT
+        when only bearish momentum/breakout signals are present."""
+        assert "CASH" in agents._TRADING_ANALYST_SYSTEM

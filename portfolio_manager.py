@@ -221,6 +221,50 @@ def run_portfolio_review(
     if not open_positions:
         return forced_exits
 
+    # ── Force-exit INTRADAY positions with adverse move > threshold ───────────
+    # For intraday trades the thesis IS today's price action. If price moved
+    # threshold% against direction, the thesis is broken — Opus cannot override.
+    # Signals lag price; green dimensions while price is -3% means signals
+    # haven't caught up yet, not that the trade is still valid.
+    _adverse_threshold = CONFIG.get("intraday_adverse_exit_pct", 3.0)
+    _adverse_exits = []
+    _remaining_after_adverse = []
+    for p in open_positions:
+        if p.get("trade_type", "").upper() != "INTRADAY":
+            _remaining_after_adverse.append(p)
+            continue
+        entry_px = p.get("entry", 0)
+        cur_px = p.get("current", entry_px)
+        if entry_px <= 0:
+            _remaining_after_adverse.append(p)
+            continue
+        raw_pct = (cur_px - entry_px) / entry_px * 100
+        direction = p.get("direction", "LONG").upper()
+        # Adverse pct = how far price moved AGAINST the trade direction
+        adverse_pct = -raw_pct if direction == "LONG" else raw_pct
+        if adverse_pct >= _adverse_threshold:
+            sym = p.get("symbol", "")
+            log.warning(
+                "PM: INTRADAY %s forced EXIT — adverse move %.1f%% exceeds %.1f%% threshold",
+                sym,
+                adverse_pct,
+                _adverse_threshold,
+            )
+            _adverse_exits.append({
+                "symbol": sym,
+                "action": "EXIT",
+                "reasoning": (
+                    f"intraday_adverse_move: price moved {adverse_pct:.1f}% against "
+                    f"{direction} direction — thesis broken, signals lag price"
+                ),
+            })
+        else:
+            _remaining_after_adverse.append(p)
+    open_positions = _remaining_after_adverse
+    forced_exits.extend(_adverse_exits)
+    if not open_positions:
+        return forced_exits
+
     regime_name = regime.get("regime", "UNKNOWN")
     vix = regime.get("vix", 0)
 

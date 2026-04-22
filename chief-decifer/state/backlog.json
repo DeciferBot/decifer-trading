@@ -174,6 +174,14 @@
       "priority": "low",
       "depends_on": [],
       "notes": "87 flat .py files in root create navigation noise and weaken import graph boundaries. Primary value: cognitive clarity + circular-import risk reduction. Group into bot/, orders/, data/clients/, universe/, news/ packages. Tier 3 \u2014 requires full test run after. Do not attempt during active trading phases. Zero alpha value \u2014 pure housekeeping."
+    },
+    {
+      "id": "BACK-021",
+      "title": "RELIEF_RALLY regime \u2014 gate new long entries by trade_type",
+      "status": "backlog",
+      "priority": "medium",
+      "depends_on": [],
+      "notes": "Diagnosed 2026-04-22: 5 RELIEF_RALLY longs, 0% WR, -$5,584. Root cause: Opus is told to be sceptical of longs in RELIEF_RALLY (agents.py:659) but a soft instruction loses to high-conviction signals. Proposed gate: INTRADAY longs allowed (ride the bounce), SWING/POSITION longs blocked. RELIEF_RALLY defined as: SPY+QQQ below 200d MA, VIX falling intraday (scanner.py:499-501). Regime is fully available at execute_buy call time via regime dict param. Implementation: add to _validate_order_context() in orders_core.py once Check 2 design is finalised. Deferred: need to confirm what trade_type those 5 losing trades were before locking the rule."
     }
   ]
 }

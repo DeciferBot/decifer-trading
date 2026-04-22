@@ -598,6 +598,10 @@ CONFIG = {
     # is silently dropped — the instrument itself provides the bearish
     # exposure, so shorting it creates a double-negative with borrow costs.
     "long_only_symbols": {"SPXS", "SQQQ", "UVXY"},
+    # PM: INTRADAY positions that move this far against direction are thesis-broken.
+    # Price leads signals — a 3%+ adverse intraday move is not noise. Opus cannot
+    # override this; the forced EXIT fires before Opus sees the position.
+    "intraday_adverse_exit_pct": 3.0,
     # ── LOGGING ───────────────────────────────────────────────
     "log_file": "logs/decifer.log",
     "trade_log": "data/trades.json",

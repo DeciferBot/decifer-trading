@@ -1490,3 +1490,369 @@ class TestSilentFailureFixes:
             "audit log failed" in r.message and "MSFT" in r.message
             for r in caplog.records
         ), "Expected WARNING log about audit log failure"
+
+
+# ── _validate_order_context tests ─────────────────────────────────────────────
+
+
+class TestValidateOrderContext:
+    """
+    Tests for _validate_order_context() — the pre-flight guard that runs at the
+    top of execute_buy and execute_short before any IBKR interaction.
+    """
+
+    def setup_method(self):
+        import orders_core as oc
+        self.validate = oc._validate_order_context
+
+    # ── Check 1: Instrument-direction ─────────────────────────────────────────
+
+    def test_short_spxs_rejected(self):
+        """SHORT on SPXS must be rejected — long-only inverse ETF."""
+        with patch("orders_core.CONFIG", {**_cfg, "long_only_symbols": {"SPXS", "SQQQ", "UVXY"}}):
+            result = self.validate("SPXS", "SHORT", "SWING", 30)
+        assert result is not None
+        assert "long-only" in result.lower()
+
+    def test_short_sqqq_rejected(self):
+        """SHORT on SQQQ must be rejected."""
+        with patch("orders_core.CONFIG", {**_cfg, "long_only_symbols": {"SPXS", "SQQQ", "UVXY"}}):
+            result = self.validate("SQQQ", "SHORT", "SWING", 30)
+        assert result is not None
+
+    def test_short_uvxy_rejected(self):
+        """SHORT on UVXY must be rejected."""
+        with patch("orders_core.CONFIG", {**_cfg, "long_only_symbols": {"SPXS", "SQQQ", "UVXY"}}):
+            result = self.validate("UVXY", "SHORT", "SWING", 30)
+        assert result is not None
+
+    def test_long_spxs_allowed(self):
+        """LONG on SPXS is valid — this is the intended bearish instrument."""
+        with patch("orders_core.CONFIG", {**_cfg, "long_only_symbols": {"SPXS", "SQQQ", "UVXY"}}):
+            result = self.validate("SPXS", "LONG", "SWING", 30)
+        assert result is None
+
+    def test_normal_symbol_short_allowed(self):
+        """SHORT on a regular stock passes Check 1."""
+        with patch("orders_core.CONFIG", {**_cfg, "long_only_symbols": {"SPXS", "SQQQ", "UVXY"}}):
+            result = self.validate("AAPL", "SHORT", "SWING", 30)
+        assert result is None
+
+    # ── Check 3: Trade-type timing ─────────────────────────────────────────────
+
+    def test_intraday_after_cutoff_rejected(self):
+        """INTRADAY entry at 15:35 ET must be rejected — <30min to close."""
+        import datetime as _dt
+        import orders_core as oc
+
+        fake_now = MagicMock()
+        fake_now.time.return_value = _dt.time(15, 35)
+
+        with patch("orders_core.CONFIG", {**_cfg, "long_only_symbols": set()}), \
+             patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fake_now
+            result = oc._validate_order_context("AAPL", "LONG", "INTRADAY", 30)
+        assert result is not None
+        assert "close" in result.lower()
+
+    def test_intraday_before_cutoff_allowed(self):
+        """INTRADAY entry at 14:00 ET must not be blocked by timing check."""
+        import datetime as _dt
+        import orders_core as oc
+
+        fake_now = MagicMock()
+        fake_now.time.return_value = _dt.time(14, 0)
+
+        with patch("orders_core.CONFIG", {**_cfg, "long_only_symbols": set()}), \
+             patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fake_now
+            result = oc._validate_order_context("AAPL", "LONG", "INTRADAY", 30)
+        assert result is None
+
+    # ── Check 4: Score-direction alignment (warn only) ─────────────────────────
+
+    def test_short_positive_score_warns_not_rejects(self, caplog):
+        """SHORT with positive score logs a warning but does NOT reject."""
+        import logging
+        import orders_core as oc
+        with patch("orders_core.CONFIG", {**_cfg, "long_only_symbols": set()}), \
+             caplog.at_level(logging.WARNING, logger="decifer.orders"):
+            result = oc._validate_order_context("TSLA", "SHORT", "SWING", 25)
+        assert result is None  # not rejected
+        assert any("positive score" in r.message for r in caplog.records)
+
+    def test_long_negative_score_warns_not_rejects(self, caplog):
+        """LONG with negative score logs a warning but does NOT reject."""
+        import logging
+        import orders_core as oc
+        with patch("orders_core.CONFIG", {**_cfg, "long_only_symbols": set()}), \
+             caplog.at_level(logging.WARNING, logger="decifer.orders"):
+            result = oc._validate_order_context("TSLA", "LONG", "SWING", -5)
+        assert result is None
+        assert any("negative score" in r.message for r in caplog.records)
+
+    def test_valid_long_positive_score_no_warning(self, caplog):
+        """Normal LONG with positive score — no warning, no rejection."""
+        import logging
+        import orders_core as oc
+        with patch("orders_core.CONFIG", {**_cfg, "long_only_symbols": set()}), \
+             caplog.at_level(logging.WARNING, logger="decifer.orders"):
+            result = oc._validate_order_context("AAPL", "LONG", "SWING", 30)
+        assert result is None
+
+    # ── Check 5: Zero-conviction orphan guard ─────────────────────────────────
+
+    def test_zero_conviction_unknown_type_rejected(self):
+        """score=0 + trade_type=UNKNOWN → rejected as zero-conviction orphan."""
+        import orders_core as oc
+        with patch("orders_core.CONFIG", {**_cfg, "long_only_symbols": set()}):
+            result = oc._validate_order_context("MSFT", "SHORT", "UNKNOWN", 0)
+        assert result is not None
+        assert "orphan" in result.lower()
+
+    def test_zero_conviction_empty_type_rejected(self):
+        """score=0 + trade_type='' → also rejected as orphan."""
+        import orders_core as oc
+        with patch("orders_core.CONFIG", {**_cfg, "long_only_symbols": set()}):
+            result = oc._validate_order_context("MSFT", "SHORT", "", 0)
+        assert result is not None
+        assert "orphan" in result.lower()
+
+    def test_zero_score_known_type_not_rejected(self):
+        """score=0 with trade_type=SWING → not an orphan, passes Check 5."""
+        import orders_core as oc
+        with patch("orders_core.CONFIG", {**_cfg, "long_only_symbols": set()}):
+            result = oc._validate_order_context("MSFT", "SHORT", "SWING", 0)
+        # Check 5 must not fire — only UNKNOWN/empty type triggers orphan guard
+        assert result is None or "orphan" not in (result or "")
+
+    def test_nonzero_score_unknown_type_not_rejected(self):
+        """score=25 + trade_type=UNKNOWN → has conviction, not an orphan."""
+        import orders_core as oc
+        with patch("orders_core.CONFIG", {**_cfg, "long_only_symbols": set()}):
+            result = oc._validate_order_context("MSFT", "SHORT", "UNKNOWN", 25)
+        assert result is None or "orphan" not in (result or "")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TESTS: _validate_order_context wiring — integration
+#
+# These tests call execute_buy() / execute_short() directly to verify the
+# validator is actually wired into both call sites. Unit tests above cover
+# the logic; these tests catch a missing call site.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_LONG_ONLY_CFG = {
+    **_cfg,
+    "long_only_symbols": {"SPXS", "SQQQ", "UVXY"},
+    # Required by execute_buy / execute_short after the validator passes
+    "active_account": "DUP481326",
+    "accounts": {"paper": "DUP481326"},
+    # Risk / sizing thresholds — kept permissive so tests don't trip other guards
+    "max_positions": 100,
+    "risk_pct_per_trade": 0.01,
+    "min_reward_risk_ratio": 1.5,
+    "max_single_position": 1.0,
+    "max_sector_exposure": 1.0,
+    "max_portfolio_allocation": 1.0,
+    "smart_execution_min_shares": 999_999,
+    "smart_execution_min_notional": 999_999_999.0,
+}
+
+
+class TestValidateOrderContextWiring:
+    """
+    Integration tests: _validate_order_context is called inside execute_buy
+    and execute_short. A rejection must cause the function to return False
+    before touching IBKR.
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup(self, mock_ib):
+        orders.open_trades.clear()
+        orders.recently_closed.clear()
+        self.ib = mock_ib
+
+    # ── Check 1 wiring: long-only symbols ────────────────────────────────────
+
+    @patch("orders.CONFIG", _LONG_ONLY_CFG)
+    def test_execute_short_rejects_long_only_symbol(self):
+        """execute_short('SPXS') must return False — Check 1 wired."""
+        result = orders.execute_short(
+            ib=self.ib,
+            symbol="SPXS",
+            price=10.0,
+            atr=0.5,
+            score=30,
+            portfolio_value=100_000,
+            regime={"regime": "TRENDING_UP"},
+            trade_type="SWING",
+        )
+        assert result is False
+
+    @patch("orders.CONFIG", _LONG_ONLY_CFG)
+    def test_execute_short_rejects_sqqq(self):
+        """execute_short('SQQQ') must return False — Check 1 wired."""
+        result = orders.execute_short(
+            ib=self.ib,
+            symbol="SQQQ",
+            price=10.0,
+            atr=0.5,
+            score=30,
+            portfolio_value=100_000,
+            regime={"regime": "TRENDING_UP"},
+            trade_type="SWING",
+        )
+        assert result is False
+
+    @patch("orders.CONFIG", _LONG_ONLY_CFG)
+    def test_execute_short_rejects_uvxy(self):
+        """execute_short('UVXY') must return False — Check 1 wired."""
+        result = orders.execute_short(
+            ib=self.ib,
+            symbol="UVXY",
+            price=10.0,
+            atr=0.5,
+            score=30,
+            portfolio_value=100_000,
+            regime={"regime": "TRENDING_UP"},
+            trade_type="SWING",
+        )
+        assert result is False
+
+    @patch("orders.CONFIG", _LONG_ONLY_CFG)
+    @patch("orders.calculate_position_size", return_value=100)
+    @patch("orders.calculate_stops", return_value=(98.0, 105.0))
+    @patch("orders.check_correlation", return_value=(True, "OK"))
+    @patch("orders.check_combined_exposure", return_value=(True, "OK"))
+    @patch("orders.check_sector_concentration", return_value=(True, "OK"))
+    @patch("orders._get_alpaca_price", return_value=100.0)
+    @patch("orders.log_order", return_value=None)
+    def test_execute_buy_allows_long_only_symbol(self, *_mocks):
+        """execute_buy('SPXS') must NOT be blocked by Check 1 — LONGs are valid."""
+        result = orders.execute_buy(
+            ib=self.ib,
+            symbol="SPXS",
+            price=100.0,  # match mock IB price to avoid contamination check
+            atr=0.5,
+            score=30,
+            portfolio_value=100_000,
+            regime={"regime": "TRENDING_UP"},
+            trade_type="SWING",
+        )
+        # Check 1 must not block a LONG on a long-only symbol
+        assert result is True
+
+    # ── Check 3 wiring: INTRADAY near-close ──────────────────────────────────
+
+    @patch("orders.CONFIG", _LONG_ONLY_CFG)
+    def test_execute_buy_rejects_intraday_near_close(self):
+        """execute_buy with INTRADAY at 15:35 ET must return False — Check 3 wired."""
+        import datetime as _dt
+        fake_now = MagicMock()
+        fake_now.time.return_value = _dt.time(15, 35)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fake_now
+            result = orders.execute_buy(
+                ib=self.ib,
+                symbol="AAPL",
+                price=100.0,
+                atr=2.0,
+                score=30,
+                portfolio_value=100_000,
+                regime={"regime": "TRENDING_UP"},
+                trade_type="INTRADAY",
+            )
+        assert result is False
+
+    @patch("orders.CONFIG", _LONG_ONLY_CFG)
+    def test_execute_short_rejects_intraday_near_close(self):
+        """execute_short with INTRADAY at 15:35 ET must return False — Check 3 wired."""
+        import datetime as _dt
+        fake_now = MagicMock()
+        fake_now.time.return_value = _dt.time(15, 35)
+        with patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fake_now
+            result = orders.execute_short(
+                ib=self.ib,
+                symbol="AAPL",
+                price=100.0,
+                atr=2.0,
+                score=30,
+                portfolio_value=100_000,
+                regime={"regime": "TRENDING_UP"},
+                trade_type="INTRADAY",
+            )
+        assert result is False
+
+    @patch("orders.CONFIG", {**_LONG_ONLY_CFG, "long_only_symbols": set()})
+    def test_execute_buy_allows_intraday_before_cutoff(self):
+        """execute_buy INTRADAY at 14:00 ET: _validate_order_context called with
+        'INTRADAY' and must return None (not rejected by Check 3)."""
+        import datetime as _dt
+        import orders_core as oc
+        # Spy on _validate_order_context in orders_core — verify it is called
+        # AND returns None (no Check 3 rejection at 14:00)
+        real_validate = oc._validate_order_context
+        call_results = []
+
+        def spy(symbol, direction, trade_type, score):
+            result = real_validate(symbol, direction, trade_type, score)
+            call_results.append(result)
+            return result
+
+        fake_now = MagicMock()
+        fake_now.time.return_value = _dt.time(14, 0)
+        with patch.object(oc, "_validate_order_context", side_effect=spy), \
+             patch("datetime.datetime") as mock_dt:
+            mock_dt.now.return_value = fake_now
+            # execute_buy may fail downstream (no full IB mock) — that's fine;
+            # we only care that the validator was called and did NOT reject.
+            orders.execute_buy(
+                ib=self.ib,
+                symbol="AAPL",
+                price=100.0,
+                atr=2.0,
+                score=30,
+                portfolio_value=100_000,
+                regime={"regime": "TRENDING_UP"},
+                trade_type="INTRADAY",
+            )
+        # Validator was called and returned None — not rejected by Check 3
+        assert len(call_results) == 1
+        assert call_results[0] is None
+
+    # ── Check 4 wiring: score-direction warning (not a rejection) ────────────
+
+    def test_execute_short_positive_score_warns_not_rejects(self, caplog):
+        """execute_short with score=25: _validate_order_context called, returns
+        None (not rejected), and logs the Check 4 warning."""
+        import logging
+        import orders_core as oc
+        cfg = {**_LONG_ONLY_CFG, "long_only_symbols": set()}
+        real_validate = oc._validate_order_context
+        call_results = []
+
+        def spy(symbol, direction, trade_type, score):
+            result = real_validate(symbol, direction, trade_type, score)
+            call_results.append(result)
+            return result
+
+        with patch("orders.CONFIG", cfg), \
+             patch.object(oc, "_validate_order_context", side_effect=spy), \
+             caplog.at_level(logging.WARNING, logger="decifer.orders"):
+            orders.execute_short(
+                ib=self.ib,
+                symbol="AAPL",
+                price=100.0,
+                atr=2.0,
+                score=25,
+                portfolio_value=100_000,
+                regime={"regime": "TRENDING_UP"},
+                trade_type="SWING",
+            )
+        # Check 4 must not reject — validator returned None
+        assert len(call_results) == 1
+        assert call_results[0] is None
+        # Warning must have been logged
+        assert any("positive score" in r.message for r in caplog.records)
