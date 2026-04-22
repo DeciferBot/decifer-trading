@@ -14,10 +14,65 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 
 log = logging.getLogger("decifer.price_updater")
 
 _INTERVAL = 2  # seconds between price update passes
+
+# Options price cache: occ_sym → {"mid": float, "bid": float, "ask": float, "ts": float}
+# Avoids hammering the Alpaca REST API on every 2-second tick.
+_OPTION_PRICE_CACHE: dict = {}
+_OPTION_PRICE_TTL = 15  # seconds between Alpaca snapshot refreshes per contract
+
+
+def _get_option_mid(trade: dict) -> dict | None:
+    """
+    Fetch current option mid price via Alpaca snapshot REST API.
+    Uses a 15-second TTL cache to avoid API rate limits.
+
+    Returns {mid, bid, ask, source} or None if unavailable.
+    """
+    symbol = trade.get("symbol", "")
+    expiry_ibkr = trade.get("expiry_ibkr", "")
+    right = trade.get("right", "")
+    strike = trade.get("strike")
+
+    if not (symbol and expiry_ibkr and right and strike):
+        return None
+
+    try:
+        from alpaca_options import build_option_symbol, get_snapshot_greeks
+
+        occ_sym = build_option_symbol(symbol, expiry_ibkr, right, float(strike))
+    except Exception:
+        return None
+
+    cached = _OPTION_PRICE_CACHE.get(occ_sym)
+    if cached and (time.monotonic() - cached["ts"]) < _OPTION_PRICE_TTL:
+        return {
+            "mid": cached["mid"],
+            "bid": cached["bid"],
+            "ask": cached["ask"],
+            "source": "alpaca_snapshot",
+        }
+
+    snap = get_snapshot_greeks(occ_sym)
+    if snap and snap.get("mid") is not None and snap["mid"] > 0:
+        entry = {
+            "mid": round(snap["mid"], 4),
+            "bid": round(snap.get("bid", 0.0), 4),
+            "ask": round(snap.get("ask", 0.0), 4),
+            "ts": time.monotonic(),
+        }
+        _OPTION_PRICE_CACHE[occ_sym] = entry
+        return {
+            "mid": entry["mid"],
+            "bid": entry["bid"],
+            "ask": entry["ask"],
+            "source": "alpaca_snapshot",
+        }
+    return None
 
 
 def get_live_prices() -> dict:
@@ -25,21 +80,32 @@ def get_live_prices() -> dict:
     Return {symbol: {mid, bid, ask, spread_pct, source}} for all open
     positions plus SPY and QQQ anchors.
 
-    source = "stream"  — live from QUOTE_CACHE (real-time bid/ask)
-           = "bar"     — last 1-minute bar close from BAR_CACHE (~1-2 min lag)
-           = "stale"   — neither cache has data; price unknown
+    For stock/FX positions the key is the ticker symbol.
+    For options the key is the underlying symbol (matches data-symbol on position cards).
+
+    source = "stream"           — live from QUOTE_CACHE (real-time bid/ask)
+           = "bar"              — last 1-minute bar close from BAR_CACHE (~1-2 min lag)
+           = "alpaca_snapshot"  — Alpaca REST snapshot for option contracts
+           = "stale"            — no data available
     """
     from alpaca_stream import BAR_CACHE, QUOTE_CACHE
     from orders_state import _trades_lock, active_trades
 
     with _trades_lock:
-        # symbol field may differ from key for options (e.g. KOD_C_35.0_2026-04-17)
-        symbols = {v.get("symbol", k) for k, v in active_trades.items()}
+        snapshot = {k: dict(v) for k, v in active_trades.items()}
 
-    symbols.update({"SPY", "QQQ"})
+    # Stock/FX: look up QUOTE_CACHE by ticker symbol
+    stock_symbols: set[str] = set()
+    for v in snapshot.values():
+        if v.get("instrument") != "option":
+            stock_symbols.add(v.get("symbol", ""))
+
+    stock_symbols.update({"SPY", "QQQ"})
+    stock_symbols.discard("")
+
     result: dict = {}
 
-    for sym in symbols:
+    for sym in stock_symbols:
         quote = QUOTE_CACHE.get(sym)
         if quote and quote.get("bid", 0) > 0 and quote.get("ask", 0) > 0:
             mid = round((quote["bid"] + quote["ask"]) / 2, 4)
@@ -70,6 +136,23 @@ def get_live_prices() -> dict:
                     "source": "stale",
                 }
 
+    # Options: fetch premium via Alpaca snapshot, keyed by underlying symbol
+    for v in snapshot.values():
+        if v.get("instrument") != "option":
+            continue
+        underlying = v.get("symbol", "")
+        if not underlying:
+            continue
+        price = _get_option_mid(v)
+        if price:
+            result[underlying] = {
+                "mid": price["mid"],
+                "bid": price["bid"],
+                "ask": price["ask"],
+                "spread_pct": 0.0,
+                "source": price["source"],
+            }
+
     return result
 
 
@@ -81,6 +164,7 @@ class PriceUpdater:
     Thread-safe: all active_trades mutations use _trades_lock (RLock).
     Falls back to BAR_CACHE last-close when QUOTE_CACHE has no data for a symbol.
     If neither cache has data, leaves the existing "current" value unchanged.
+    Options positions are priced via Alpaca snapshot REST API (15s TTL cache).
     """
 
     def __init__(self) -> None:
@@ -126,26 +210,37 @@ class PriceUpdater:
     @staticmethod
     def _update_once(QUOTE_CACHE, BAR_CACHE, active_trades, _trades_lock, dash) -> None:
         """Single price propagation pass."""
-        # Snapshot keys without holding the lock during slow cache reads
+        # Snapshot without holding lock during slow cache/API reads
         with _trades_lock:
-            items = [(k, v.get("symbol", k)) for k, v in active_trades.items()]
+            items = [(k, dict(v)) for k, v in active_trades.items()]
 
-        for key, sym in items:
-            quote = QUOTE_CACHE.get(sym)
-            if quote and quote.get("bid", 0) > 0 and quote.get("ask", 0) > 0:
-                mid = round((quote["bid"] + quote["ask"]) / 2, 4)
-                with _trades_lock:
-                    if key in active_trades:
-                        active_trades[key]["current"] = mid
+        for key, trade in items:
+            if trade.get("instrument") == "option":
+                # Options are not in StockDataStream — fetch premium via Alpaca REST snapshot
+                price = _get_option_mid(trade)
+                if price and price["mid"] > 0:
+                    with _trades_lock:
+                        if key in active_trades:
+                            active_trades[key]["current"] = price["mid"]
+                            active_trades[key]["current_premium"] = price["mid"]
+                # If snapshot unavailable, leave "current" unchanged
             else:
-                df = BAR_CACHE.get_5m(sym)
-                if df is not None and not df.empty:
-                    close = float(df.iloc[-1]["Close"])
-                    if close > 0:
-                        with _trades_lock:
-                            if key in active_trades:
-                                active_trades[key]["current"] = round(close, 4)
-                # If neither cache has data, leave "current" unchanged
+                sym = trade.get("symbol", key)
+                quote = QUOTE_CACHE.get(sym)
+                if quote and quote.get("bid", 0) > 0 and quote.get("ask", 0) > 0:
+                    mid = round((quote["bid"] + quote["ask"]) / 2, 4)
+                    with _trades_lock:
+                        if key in active_trades:
+                            active_trades[key]["current"] = mid
+                else:
+                    df = BAR_CACHE.get_5m(sym)
+                    if df is not None and not df.empty:
+                        close = float(df.iloc[-1]["Close"])
+                        if close > 0:
+                            with _trades_lock:
+                                if key in active_trades:
+                                    active_trades[key]["current"] = round(close, 4)
+                    # If neither cache has data, leave "current" unchanged
 
         # Update SPY price in the regime display
         spy = QUOTE_CACHE.get("SPY")
