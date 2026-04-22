@@ -1781,6 +1781,19 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             # FX: IBKR is authoritative (Alpaca/TV don't carry forex)
             validated_price = ibkr_price if ibkr_price > 0 else entry
             src_desc = f"IBKR_FX=${ibkr_price:.4f}" if ibkr_price > 0 else "IBKR_FX fallback to entry"
+        elif info.get("instrument") == "option":
+            # Options: _validate_position_price cross-checks against Alpaca's underlying stock price,
+            # which always diverges >50% from the option premium — causing false validation failures.
+            # Use IBKR option price directly; fall back to current_premium cached by price_updater.
+            if ibkr_price > 0:
+                validated_price = ibkr_price
+                src_desc = f"IBKR_OPT=${ibkr_price:.4f}"
+            elif info.get("current_premium", 0) > 0:
+                validated_price = info["current_premium"]
+                src_desc = f"cached_premium=${info['current_premium']:.4f}"
+            else:
+                validated_price = 0
+                src_desc = "no_option_price_available"
         else:
             validated_price, src_desc = _validate_position_price(symbol, ibkr_price, entry)
         if validated_price > 0:
@@ -1861,10 +1874,13 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             trade_id=info.get("trade_id"),
         )
 
+        _is_opt_close = info.get("instrument") == "option"
+        _close_mult = 100 if _is_opt_close else 1
+        _close_px = (info.get("current_premium") or info["current"]) if _is_opt_close else info["current"]
         if direction == "SHORT":
-            pnl = (info["entry"] - info["current"]) * sell_qty  # SHORT profits when price drops
+            pnl = (info["entry"] - _close_px) * sell_qty * _close_mult
         else:
-            pnl = (info["current"] - info["entry"]) * sell_qty
+            pnl = (_close_px - info["entry"]) * sell_qty * _close_mult
         if pnl >= 0:
             record_win()
         else:
@@ -1883,7 +1899,10 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                 from trade_log import close_trade as _tl_close
                 _tl_close(
                     _close_trade_id, symbol,
-                    exit_price=float(info.get("current") or info.get("entry", 0.0)),
+                    exit_price=float(
+                        (info.get("current_premium") or info.get("current")) if _is_opt_close
+                        else (info.get("current") or info.get("entry", 0.0))
+                    ),
                     pnl=pnl,
                     exit_reason=reason,
                     direction=info.get("direction", "LONG"),

@@ -1276,6 +1276,61 @@ class DashHandler(BaseHTTPRequestHandler):
                     self.send_header("Content-Type", "application/json")
                     self.end_headers()
                     self.wfile.write(json.dumps({"ok": False, "error": str(e)}).encode())
+        elif self.path == "/api/purge-ghost":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length)) if length else {}
+            symbol = body.get("symbol", "").upper().strip()
+            if not symbol:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": False, "error": "No symbol"}).encode())
+            else:
+                from orders_portfolio import active_trades, _trades_lock, _save_positions_file
+                removed = []
+                with _trades_lock:
+                    keys = [k for k, v in active_trades.items() if v.get("symbol") == symbol or k == symbol]
+                    for k in keys:
+                        del active_trades[k]
+                        removed.append(k)
+                if removed:
+                    _save_positions_file()
+                    dash["positions"] = get_open_positions()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": True, "removed": removed}).encode())
+                clog("INFO", f"Ghost purge {symbol}: removed keys {removed}")
+        elif self.path == "/api/update-sl":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length)) if length else {}
+            symbol = body.get("symbol", "").upper().strip()
+            new_sl = body.get("sl")
+            new_tp = body.get("tp")
+            if not symbol or new_sl is None:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": False, "error": "symbol and sl required"}).encode())
+            else:
+                from orders_portfolio import active_trades, _trades_lock, _safe_update_trade, _save_positions_file
+                updates = {"sl": round(float(new_sl), 4)}
+                if new_tp is not None:
+                    updates["tp"] = round(float(new_tp), 4)
+                matched = []
+                with _trades_lock:
+                    keys = [k for k, v in active_trades.items() if v.get("symbol") == symbol or k == symbol]
+                for k in keys:
+                    _safe_update_trade(k, updates)
+                    matched.append(k)
+                if matched:
+                    _save_positions_file()
+                    dash["positions"] = get_open_positions()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"ok": True, "updated": matched, "sl": updates["sl"]}).encode())
+                clog("INFO", f"SL updated {symbol}: sl={updates['sl']} tp={updates.get('tp')} keys={matched}")
         elif self.path == "/api/pause":
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length)) if length else {}
