@@ -1,0 +1,18 @@
+{
+  "train_date": "2026-04-16T00:03:19.543992",
+  "num_trades": 159,
+  "feature_importance": {
+    "score": 0.03216126844035455,
+    "vix": 0.09813168610339336,
+    "holding_minutes": 0.4820348163466497,
+    "time_of_day": 0.2307977466982903,
+    "day_of_week": 0.11404987957836706,
+    "is_after_hours": 0.021711718042548477,
+    "agents_agreed": 0.0,
+    "regime_TRENDING_UP": 0.021112884790396625,
+    "regime_TRENDING_DOWN": 0.0,
+    "regime_RANGE_BOUND": 0.0,
+    "regime_CAPITULATION": 0.0,
+    "regime_RELIEF_RALLY": 0.0
+  }
+}

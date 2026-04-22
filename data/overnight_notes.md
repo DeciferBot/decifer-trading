@@ -1,99 +1,107 @@
-OVERNIGHT RESEARCH NOTES — 2026-04-20
-Generated: 2026-04-20 07:18 ET
+OVERNIGHT RESEARCH NOTES — 2026-04-22
+Generated: 2026-04-22 06:19 ET
 
 PRE-MARKET / AFTER-HOURS TONE:
-  SPY   $706.57  +0.70%  (gap-up)
-  QQQ   $645.65  +0.81%  (gap-up)
-  IWM   $273.17  +1.19%  (gap-up)
+  SPY   $707.83  -0.13%  (flat)
+  QQQ   $648.81  +0.31%  (gap-up)
+  IWM   $276.83  -0.19%  (gap-down)
   ---  sector ETFs  ---
-  XLF   $52.12  +0.17%  (gap-up)
-  XLK   $153.55  +1.01%  (gap-up)
-  XLE   $55.75  -1.47%  (gap-down)
-  XLV   $148.46  +1.26%  (gap-up)
-  XLI   $172.26  +1.13%  (gap-up)
-  XLU   $46.00  -0.76%  (gap-down)
-  XLB   $51.75  +0.00%  (flat)
-  XLRE  $44.17  +0.82%  (gap-up)
+  XLF   $52.44  -0.36%  (gap-down)
+  XLK   $156.23  +1.08%  (gap-up)
+  XLE   $55.90  +1.51%  (gap-up)
+  XLV   $146.00  -0.96%  (gap-down)
+  XLI   $172.20  -0.98%  (gap-down)
+  XLU   $45.19  -1.22%  (gap-down)
+  XLB   $52.02  -0.40%  (gap-down)
+  XLRE  $43.78  -1.93%  (gap-down)
 
 PRE-MARKET MOVERS (>1.5% gap vs yesterday's close):
-  ASTS   $   72.45  -20.33%  (gap-down)
-  MRVL   $  149.79  +12.31%  (gap-up)
-  ONTO   $  293.97  +10.04%  (gap-up)
-  NFLX   $   97.37  -9.67%  (gap-down)
-  MSTR   $  162.70  +9.24%  (gap-up)
-  NBIS   $  152.72  -7.63%  (gap-down)
-  PII    $   56.87  +7.26%  (gap-up)
-  SOXL   $   94.23  +6.63%  (gap-up)
-  CAR    $  476.12  +6.04%  (gap-up)
-  CVNA   $  382.22  +5.52%  (gap-up)
-  CRWV   $  114.56  -4.18%  (gap-down)
-  STX    $  551.00  +3.61%  (gap-up)
-  ORCL   $  173.01  -2.99%  (gap-down)
-  WDC    $  371.97  +2.84%  (gap-up)
-  BE     $  204.10  -2.84%  (gap-down)
+  CAR    $  770.01  +26.48%  (gap-up)
+  CRDO   $  187.09  +7.20%  (gap-up)
+  STX    $  577.84  +7.06%  (gap-up)
+  UNH    $  345.93  +6.94%  (gap-up)
+  SOXL   $  101.60  +5.90%  (gap-up)
+  WDC    $  394.80  +5.53%  (gap-up)
+  AMD    $  289.74  +5.38%  (gap-up)
+  LITE   $  852.99  -4.71%  (gap-down)
+  MRVL   $  154.78  +4.69%  (gap-up)
+  GE     $  289.50  -4.64%  (gap-down)
+  ORCL   $  185.45  +4.43%  (gap-up)
+  USO    $  126.43  +4.21%  (gap-up)
+  BE     $  227.11  +4.05%  (gap-up)
+  IREN   $   46.83  -3.88%  (gap-down)
+  COIN   $  203.77  -3.71%  (gap-down)
 
 YESTERDAY'S PERFORMANCE:
-  Trades: 3 (2W/1L)  Win rate: 67%  P&L: $-424.95
-  Best:  AMD SHORT +$144.29  (take_profit / UNKNOWN)
-  Worst: AMD LONG $-578.76  (pm_exit | INTRADAY | regime:TRENDING_UP→TRENDING_UP | held:5200min | thesis:breached_stale_scalp | pre_market: thesis_stale: INTRADAY trade held 3 days far beyond 90min momentum window, conviction=0.00, score dropping to WEAK band, / TRENDING_UP)
+  Trades: 40 (20W/20L)  Win rate: 50%  P&L: $-988.07
+  Best:  ELV LONG +$4,096.24  (agent_sell / TRENDING_UP)
+  Worst: SPXS SHORT $-4,003.21  (cycle_check:architecturally invalid: SPXS is a long-only inverse ETF; SHORT position must be closed / RANGE_BOUND)
   By regime:
-    TRENDING_UP: 2 trades  50% WR  $-569.24
+    RELIEF_RALLY: 5 trades  0% WR  $-5,584.41
+    RANGE_BOUND: 3 trades  33% WR  $-3,060.10
+    UNKNOWN: 7 trades  43% WR  $+532.91
+    MOMENTUM_BULL: 2 trades  100% WR  $+2,401.70
+    TRENDING_UP: 23 trades  61% WR  $+4,721.83
+  By dimension (non-zero entry scores):
+    insider_buying   19 trades  58% WR  $+1,463
+    news              7 trades  71% WR  $+152
+    squeeze          14 trades  43% WR  $-1,536
+    trend            28 trades  54% WR  $-2,007
+    iv_skew          17 trades  47% WR  $-2,099
+    mtf              25 trades  56% WR  $-2,931
+    social           10 trades  60% WR  $-3,290
+    momentum         34 trades  50% WR  $-4,347
+    flow             34 trades  50% WR  $-4,347
+    overnight_drift  32 trades  47% WR  $-5,124
+    breakout          6 trades  17% WR  $-6,883
+  FLAG: High trade count — overtrading risk
 
 ECONOMIC CALENDAR — Next 5 Days:
-  Mon Apr 20: No high-impact events
-  Tue Apr 21: API Crude Oil Stock Change (Apr/17) [MEDIUM]
-  Tue Apr 21: Fed Waller Speech [MEDIUM]
-  Tue Apr 21: Pending Home Sales YoY (Mar) [MEDIUM]
-  Tue Apr 21: Pending Home Sales MoM (Mar) [MEDIUM]
-  Tue Apr 21: Business Inventories MoM (Feb) [MEDIUM]
-  Tue Apr 21: Retail Sales MoM (Mar) [HIGH]
-  Tue Apr 21: Retail Sales Ex Autos MoM (Mar) [MEDIUM]
   Wed Apr 22: EIA Crude Oil Stocks Change (Apr/17) [MEDIUM]
   Wed Apr 22: EIA Gasoline Stocks Change (Apr/17) [MEDIUM]
   Wed Apr 22: MBA 30-Year Mortgage Rate (Apr/17) [MEDIUM]
-  Thu Apr 23: S&P Global Composite PMI (Apr) [MEDIUM]
   Thu Apr 23: S&P Global Services PMI (Apr) [MEDIUM]
+  Thu Apr 23: S&P Global Composite PMI (Apr) [MEDIUM]
   Thu Apr 23: S&P Global Manufacturing PMI (Apr) [MEDIUM]
   Thu Apr 23: Chicago Fed National Activity Index (Mar) [MEDIUM]
   Thu Apr 23: Initial Jobless Claims (Apr/18) [MEDIUM]
-  Fri Apr 24: CFTC S&P 500 speculative net positions [MEDIUM]
-  Fri Apr 24: CFTC Gold Speculative net positions [MEDIUM]
   Fri Apr 24: CFTC Crude Oil speculative net positions [MEDIUM]
+  Fri Apr 24: CFTC Gold Speculative net positions [MEDIUM]
   Fri Apr 24: CFTC Nasdaq 100 speculative net positions [MEDIUM]
+  Fri Apr 24: CFTC S&P 500 speculative net positions [MEDIUM]
   Sat Apr 25: No high-impact events
+  Sun Apr 26: No high-impact events
+  Mon Apr 27: Dallas Fed Manufacturing Index (Apr) [MEDIUM]
 
-EARNINGS — Next 5 Days:  (Alpha Vantage — dates only)
-  Mon Apr 20: CCBG  
-  Tue Apr 21: UNH  
+Earnings calendar: unavailable (no data source connected)
 
 Analyst changes: none in last 24h for tracked universe
 
-MARKET NEWS — Last 16h (FMP, 40 articles):
-  ▼ [NVDA]   4h ago   Machine learning algorithm predicts Nvidia stock price on May 1, 2026
-  ▼ [MSFT]   5h ago   Why Wall Street Loves Microsoft Stock Despite It Falling 23%
-  ▼ [AAPL]   6h ago   Apple withholds data in India antitrust case, watchdog sets final hearing
-  ▼ [ABT]    6h ago   Market Crash: 2 Healthcare Stocks Worth Loading Up on at a Discount
-  ▲ [META]   8h ago   The Zacks Analyst Blog Broadcom, Meta, IGM, QQQ and AIQ
-  ▲ [GOOGL]  11h ago  If I Had $10,000 to Put Into AI Stocks Right Now, Here's Exactly How I'd Invest It
-  ▲ [AMD]    11h ago  If I Had $10,000 to Put Into AI Stocks Right Now, Here's Exactly How I'd Invest It
-  ▲ [MSFT]   14h ago  I've Been Buying Artificial Intelligence (AI) Stocks for 10 Years. Here's the 1 Lesson Thi
-  ▲ [GOOGL]  14h ago  I've Been Buying Artificial Intelligence (AI) Stocks for 10 Years. Here's the 1 Lesson Thi
-  ▲ [AMD]    15h ago  AMD: $600 Bullseye
-  ─ [ABT]    4h ago   Has the Abbott Laboratories Sell-Off Finally Created an Entry Point?
-  ─ [WMT]    4h ago   Wall Street Breakfast Podcast: Tariff Refund Rush Begins
+MARKET NEWS — Last 16h (FMP, 45 articles):
+  ▲ [CRM]    5h ago   Salesforce: AI Is A True Acceleration Driver, Not A Hollow Rebrand
+  ▼ [NVDA]   8h ago   Switch and SUSE Advance Digital Twin Innovation with NVIDIA
+  ▼ [AMZN]   12h ago  Hagens Berman: Woodinville Woman Sues Amazon After Camp Stove Explodes, Causing Catastroph
+  ▲ [AAPL]   13h ago  Vocalbeats.AI Brings AI Note-Taking to the Wrist with Apple Watch Experience for Owll
+  ▲ [GOOGL]  15h ago  Vodafone offers small businesses cybersecurity, AI capability with Google tie-up
+  ▼ [LLY]    15h ago  Eli Lilly (LLY) Declines More Than Market: Some Information for Investors
+  ▼ [NVDA]   15h ago  Why Nvidia (NVDA) Dipped More Than Broader Market Today
+  ▼ [NVDA]   16h ago  Is the Magnificent Seven Yesterday's News? Here's What History Says
+  ─ [WMT]    4h ago   Back to the Roots Scales Regenerative Movement Nationwide; Expanding Pioneering Soil Healt
+  ─ [AAPL]   4h ago   In the AI era, Apple's strengths may become its constraints
+  ─ [USO]    4h ago   Japex aims to quadruple oil and gas output in 10 years, eyes US expansion
+  ─ [USO]    5h ago   Oil Prices Rise. 2 Ships Hit in Hormuz as Trump Extends Iran Cease-Fire.
 
-Net bias: bullish  (6 bullish / 4 bearish / 30 neutral)
+Net bias: bearish  (3 bullish / 5 bearish / 37 neutral)
   AVOID (bearish catalyst):
-    NVDA   — Machine learning algorithm predicts Nvidia stock price on Ma
-    MSFT   — Why Wall Street Loves Microsoft Stock Despite It Falling 23%
-    AAPL   — Apple withholds data in India antitrust case
-    ABT    — Market Crash: 2 Healthcare Stocks Worth Loading Up on at a D
+    NVDA   — Switch and SUSE Advance Digital Twin Innovation with NVIDIA
+    AMZN   — Hagens Berman: Woodinville Woman Sues Amazon After Camp Stov
+    LLY    — Eli Lilly (LLY) Declines More Than Market: Some Information
   FAVOR (bullish catalyst):
-    META   — The Zacks Analyst Blog Broadcom
-    GOOGL  — If I Had $10
-    AMD    — If I Had $10
+    CRM    — Salesforce: AI Is A True Acceleration Driver
+    AAPL   — Vocalbeats.AI Brings AI Note-Taking to the Wrist with Apple
+    GOOGL  — Vodafone offers small businesses cybersecurity
 
 MACRO (daily):
-  10Y-2Y Spread: 0.55%  (as of 2026-04-17)  prior: 0.54
-  10Y Treasury: 4.32%  (as of 2026-04-16)  prior: 4.29
+  10Y-2Y Spread: 0.52%  (as of 2026-04-21)  prior: 0.54
+  10Y Treasury: 4.26%  (as of 2026-04-20)  prior: 4.26
   WTI Crude: 100.72$/bbl  (as of 2026-04-13)  prior: 98.34

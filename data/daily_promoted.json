@@ -1,5 +1,5 @@
 {
-  "promoted_at": "2026-04-20T12:15:04.488696+00:00",
+  "promoted_at": "2026-04-22T12:15:03.895664+00:00",
   "count": 50,
   "symbols": [
     {
@@ -12,445 +12,445 @@
       "reason": "gap=+131.6%"
     },
     {
-      "ticker": "WMS",
-      "score": 106.382,
-      "gap_pct": 0.0213,
+      "ticker": "VGT",
+      "score": 263.333,
+      "gap_pct": -0.8745,
+      "pm_vol_ratio": 0.5,
+      "catalyst_score": 0.0,
+      "price": 102.2,
+      "reason": "gap=-87.5%"
+    },
+    {
+      "ticker": "VUG",
+      "score": 250.708,
+      "gap_pct": -0.8326,
+      "pm_vol_ratio": 0.46,
+      "catalyst_score": 0.0,
+      "price": 82.29,
+      "reason": "gap=-83.3%"
+    },
+    {
+      "ticker": "MGK",
+      "score": 240.183,
+      "gap_pct": -0.7993,
+      "pm_vol_ratio": 0.19,
+      "catalyst_score": 0.0,
+      "price": 82.6625,
+      "reason": "gap=-79.9%"
+    },
+    {
+      "ticker": "VO",
+      "score": 225.15,
+      "gap_pct": -0.7502,
+      "pm_vol_ratio": 0.05,
+      "catalyst_score": 0.0,
+      "price": 76.65,
+      "reason": "gap=-75.0%"
+    },
+    {
+      "ticker": "TOL",
+      "score": 112.944,
+      "gap_pct": 0.0431,
       "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 153.37,
-      "reason": "gap=+2.1%+relvol=50.0x"
+      "price": 148.32,
+      "reason": "gap=+4.3%+relvol=50.0x"
+    },
+    {
+      "ticker": "PHM",
+      "score": 111.562,
+      "gap_pct": 0.0385,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 128.64,
+      "reason": "gap=+3.9%+relvol=50.0x"
+    },
+    {
+      "ticker": "CRS",
+      "score": 104.624,
+      "gap_pct": 0.0154,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 438.88,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "LCII",
+      "score": 103.832,
+      "gap_pct": 0.0128,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 121.17,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "TPG",
+      "score": 103.491,
+      "gap_pct": 0.0116,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 45.2,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "AMP",
+      "score": 103.22,
+      "gap_pct": 0.0107,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 461.08,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "EG",
+      "score": 103.012,
+      "gap_pct": 0.01,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 349.82,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "OC",
+      "score": 102.941,
+      "gap_pct": 0.0098,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 121.93,
+      "reason": "relvol=50.0x"
+    },
+    {
+      "ticker": "TRGP",
+      "score": 102.786,
+      "gap_pct": 0.0093,
+      "pm_vol_ratio": 50.0,
+      "catalyst_score": 0.0,
+      "price": 232.65,
+      "reason": "relvol=50.0x"
     },
     {
       "ticker": "ALGN",
-      "score": 106.243,
-      "gap_pct": 0.0208,
+      "score": 102.724,
+      "gap_pct": 0.0091,
       "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 190.07,
-      "reason": "gap=+2.1%+relvol=50.0x"
-    },
-    {
-      "ticker": "STE",
-      "score": 102.973,
-      "gap_pct": 0.0099,
-      "pm_vol_ratio": 50.0,
-      "catalyst_score": 0.0,
-      "price": 225.79,
+      "price": 195.2,
       "reason": "relvol=50.0x"
     },
     {
-      "ticker": "MDGL",
-      "score": 102.961,
-      "gap_pct": 0.0099,
+      "ticker": "FTV",
+      "score": 102.46,
+      "gap_pct": -0.0082,
       "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 532.02,
+      "price": 61.03,
       "reason": "relvol=50.0x"
     },
     {
-      "ticker": "URTH",
-      "score": 102.901,
-      "gap_pct": 0.0097,
+      "ticker": "MSI",
+      "score": 101.974,
+      "gap_pct": 0.0066,
       "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 195.79,
+      "price": 445.48,
       "reason": "relvol=50.0x"
     },
     {
       "ticker": "WAT",
-      "score": 101.881,
-      "gap_pct": 0.0063,
+      "score": 101.797,
+      "gap_pct": 0.006,
       "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 327.77,
+      "price": 335.23,
       "reason": "relvol=50.0x"
     },
     {
-      "ticker": "WCN",
-      "score": 101.35,
-      "gap_pct": 0.0045,
+      "ticker": "RPRX",
+      "score": 101.765,
+      "gap_pct": 0.0059,
       "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 159.63,
+      "price": 49.48,
       "reason": "relvol=50.0x"
     },
     {
-      "ticker": "GTLS",
-      "score": 70.628,
-      "gap_pct": 0.0005,
-      "pm_vol_ratio": 35.24,
+      "ticker": "HST",
+      "score": 101.691,
+      "gap_pct": 0.0056,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 208.3,
-      "reason": "relvol=35.2x"
+      "price": 21.12,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "HTHT",
-      "score": 47.519,
-      "gap_pct": 0.0082,
-      "pm_vol_ratio": 22.53,
+      "ticker": "ECL",
+      "score": 101.48,
+      "gap_pct": 0.0049,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 55.67,
-      "reason": "relvol=22.5x"
+      "price": 270.84,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "BBIO",
-      "score": 45.481,
-      "gap_pct": 0.027,
-      "pm_vol_ratio": 18.7,
+      "ticker": "MTD",
+      "score": 101.47,
+      "gap_pct": 0.0049,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 76.75,
-      "reason": "gap=+2.7%+relvol=18.7x"
+      "price": 1324.27,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "SPIB",
-      "score": 41.188,
-      "gap_pct": 0.0039,
-      "pm_vol_ratio": 20.01,
+      "ticker": "VRTX",
+      "score": 101.407,
+      "gap_pct": -0.0047,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 33.73,
-      "reason": "relvol=20.0x"
+      "price": 436.59,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "SNAL",
-      "score": 39.528,
-      "gap_pct": 0.1305,
-      "pm_vol_ratio": 0.19,
+      "ticker": "WEC",
+      "score": 101.381,
+      "gap_pct": 0.0046,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 0.7813,
-      "reason": "gap=+13.1%"
+      "price": 113.58,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "USIG",
-      "score": 38.246,
-      "gap_pct": 0.0047,
-      "pm_vol_ratio": 18.42,
+      "ticker": "AEIS",
+      "score": 101.34,
+      "gap_pct": 0.012,
+      "pm_vol_ratio": 48.87,
       "catalyst_score": 0.0,
-      "price": 51.65,
-      "reason": "relvol=18.4x"
+      "price": 385.0,
+      "reason": "relvol=48.9x"
     },
     {
-      "ticker": "BDX",
-      "score": 36.231,
-      "gap_pct": 0.0038,
-      "pm_vol_ratio": 17.54,
+      "ticker": "TKO",
+      "score": 101.137,
+      "gap_pct": -0.0038,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 158.54,
-      "reason": "relvol=17.5x"
+      "price": 183.1,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "NTAP",
-      "score": 34.82,
-      "gap_pct": 0.0012,
-      "pm_vol_ratio": 17.24,
+      "ticker": "SAIA",
+      "score": 101.069,
+      "gap_pct": 0.0036,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 104.53,
-      "reason": "relvol=17.2x"
+      "price": 441.81,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "UCO",
-      "score": 33.888,
-      "gap_pct": -0.1125,
-      "pm_vol_ratio": 0.07,
+      "ticker": "CMS",
+      "score": 101.012,
+      "gap_pct": 0.0034,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 39.75,
-      "reason": "gap=-11.2%"
+      "price": 75.58,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "UTHR",
-      "score": 33.203,
-      "gap_pct": -0.0028,
-      "pm_vol_ratio": 16.18,
+      "ticker": "APTV",
+      "score": 100.937,
+      "gap_pct": 0.0031,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 588.38,
-      "reason": "relvol=16.2x"
+      "price": 60.8,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "SCO",
-      "score": 32.331,
-      "gap_pct": 0.1075,
-      "pm_vol_ratio": 0.04,
+      "ticker": "AON",
+      "score": 100.886,
+      "gap_pct": 0.003,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 7.95,
-      "reason": "gap=+10.8%"
+      "price": 335.32,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "NFLX",
-      "score": 31.798,
-      "gap_pct": -0.1059,
-      "pm_vol_ratio": 0.01,
+      "ticker": "NSC",
+      "score": 100.878,
+      "gap_pct": 0.0029,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 97.3,
-      "reason": "gap=-10.6%"
+      "price": 302.22,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "AMP",
-      "score": 31.669,
-      "gap_pct": 0.0072,
-      "pm_vol_ratio": 14.75,
+      "ticker": "ITT",
+      "score": 100.865,
+      "gap_pct": 0.0029,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 456.2,
-      "reason": "relvol=14.8x"
+      "price": 219.31,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "IWV",
-      "score": 31.625,
-      "gap_pct": 0.0066,
-      "pm_vol_ratio": 14.82,
+      "ticker": "TROW",
+      "score": 100.795,
+      "gap_pct": 0.0027,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 404.36,
-      "reason": "relvol=14.8x"
+      "price": 99.14,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "DRIP",
-      "score": 29.511,
-      "gap_pct": 0.0983,
-      "pm_vol_ratio": 0.01,
+      "ticker": "AXSM",
+      "score": 100.795,
+      "gap_pct": -0.0026,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 5.09,
-      "reason": "gap=+9.8%"
+      "price": 182.97,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "IQMM",
-      "score": 28.719,
-      "gap_pct": 0.0005,
-      "pm_vol_ratio": 14.28,
+      "ticker": "MLM",
+      "score": 100.794,
+      "gap_pct": 0.0026,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 100.14,
-      "reason": "relvol=14.3x"
+      "price": 614.49,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "DOW",
-      "score": 27.288,
-      "gap_pct": -0.0909,
-      "pm_vol_ratio": 0.0,
+      "ticker": "DRI",
+      "score": 100.788,
+      "gap_pct": 0.0026,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 36.1,
-      "reason": "gap=-9.1%"
+      "price": 196.95,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "USO",
-      "score": 26.932,
-      "gap_pct": -0.0883,
-      "pm_vol_ratio": 0.22,
+      "ticker": "CSGP",
+      "score": 100.749,
+      "gap_pct": 0.0025,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 121.59,
-      "reason": "gap=-8.8%"
+      "price": 38.91,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "KORU",
-      "score": 26.896,
-      "gap_pct": 0.0835,
-      "pm_vol_ratio": 0.92,
+      "ticker": "XEL",
+      "score": 100.747,
+      "gap_pct": 0.0025,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 485.5491,
-      "reason": "gap=+8.3%"
+      "price": 79.08,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "APA",
-      "score": 25.99,
-      "gap_pct": -0.0865,
-      "pm_vol_ratio": 0.01,
+      "ticker": "ODFL",
+      "score": 100.739,
+      "gap_pct": 0.0025,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 36.54,
-      "reason": "gap=-8.6%"
+      "price": 224.42,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "CF",
-      "score": 25.944,
-      "gap_pct": -0.0859,
-      "pm_vol_ratio": 0.09,
+      "ticker": "IDXX",
+      "score": 100.725,
+      "gap_pct": 0.0024,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 114.8,
-      "reason": "gap=-8.6%"
+      "price": 569.01,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "BNO",
-      "score": 25.721,
-      "gap_pct": -0.0852,
-      "pm_vol_ratio": 0.09,
+      "ticker": "TECH",
+      "score": 100.693,
+      "gap_pct": 0.0023,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 47.29,
-      "reason": "gap=-8.5%"
+      "price": 59.67,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "JBLU",
-      "score": 25.593,
-      "gap_pct": 0.0853,
-      "pm_vol_ratio": 0.0,
+      "ticker": "TRV",
+      "score": 100.678,
+      "gap_pct": 0.0023,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 5.7,
-      "reason": "gap=+8.5%"
+      "price": 301.42,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "UAL",
-      "score": 24.981,
-      "gap_pct": 0.0826,
-      "pm_vol_ratio": 0.1,
+      "ticker": "LPLA",
+      "score": 100.659,
+      "gap_pct": -0.0022,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 99.25,
-      "reason": "gap=+8.3%"
+      "price": 325.805,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "CE",
-      "score": 24.555,
-      "gap_pct": -0.0487,
-      "pm_vol_ratio": 4.97,
+      "ticker": "CW",
+      "score": 100.633,
+      "gap_pct": 0.0021,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 63.4,
-      "reason": "gap=-4.9%+relvol=5.0x"
+      "price": 719.51,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "EQNR",
-      "score": 24.365,
-      "gap_pct": -0.081,
-      "pm_vol_ratio": 0.03,
+      "ticker": "CPAY",
+      "score": 100.631,
+      "gap_pct": 0.0021,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 36.51,
-      "reason": "gap=-8.1%"
+      "price": 329.93,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "AGQ",
-      "score": 23.762,
-      "gap_pct": 0.076,
-      "pm_vol_ratio": 0.48,
+      "ticker": "KNSL",
+      "score": 100.628,
+      "gap_pct": 0.0021,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 132.45,
-      "reason": "gap=+7.6%"
+      "price": 358.86,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "AA",
-      "score": 23.054,
-      "gap_pct": -0.0762,
-      "pm_vol_ratio": 0.1,
+      "ticker": "AME",
+      "score": 100.621,
+      "gap_pct": -0.0021,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 66.325,
-      "reason": "gap=-7.6%"
+      "price": 233.54,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "PH",
-      "score": 22.996,
-      "gap_pct": 0.0752,
-      "pm_vol_ratio": 0.21,
+      "ticker": "PKG",
+      "score": 100.619,
+      "gap_pct": 0.0021,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 988.8,
-      "reason": "gap=+7.5%"
+      "price": 210.53,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "MSTZ",
-      "score": 22.846,
-      "gap_pct": -0.0755,
-      "pm_vol_ratio": 0.1,
+      "ticker": "EXR",
+      "score": 100.592,
+      "gap_pct": -0.002,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 6.7,
-      "reason": "gap=-7.5%"
+      "price": 143.64,
+      "reason": "relvol=50.0x"
     },
     {
-      "ticker": "ZSL",
-      "score": 22.555,
-      "gap_pct": -0.0751,
-      "pm_vol_ratio": 0.02,
+      "ticker": "STT",
+      "score": 100.579,
+      "gap_pct": 0.0019,
+      "pm_vol_ratio": 50.0,
       "catalyst_score": 0.0,
-      "price": 19.58,
-      "reason": "gap=-7.5%"
-    },
-    {
-      "ticker": "MSTU",
-      "score": 22.024,
-      "gap_pct": 0.0712,
-      "pm_vol_ratio": 0.33,
-      "catalyst_score": 0.0,
-      "price": 6.9505,
-      "reason": "gap=+7.1%"
-    },
-    {
-      "ticker": "AAL",
-      "score": 21.651,
-      "gap_pct": 0.0721,
-      "pm_vol_ratio": 0.01,
-      "catalyst_score": 0.0,
-      "price": 12.37,
-      "reason": "gap=+7.2%"
-    },
-    {
-      "ticker": "USAR",
-      "score": 21.216,
-      "gap_pct": 0.0646,
-      "pm_vol_ratio": 0.92,
-      "catalyst_score": 0.0,
-      "price": 21.8626,
-      "reason": "gap=+6.5%"
-    },
-    {
-      "ticker": "LYB",
-      "score": 20.856,
-      "gap_pct": -0.0687,
-      "pm_vol_ratio": 0.13,
-      "catalyst_score": 0.0,
-      "price": 67.3442,
-      "reason": "gap=-6.9%"
-    },
-    {
-      "ticker": "GDXU",
-      "score": 20.544,
-      "gap_pct": 0.066,
-      "pm_vol_ratio": 0.36,
-      "catalyst_score": 0.0,
-      "price": 248.75,
-      "reason": "gap=+6.6%"
-    },
-    {
-      "ticker": "NCLH",
-      "score": 20.524,
-      "gap_pct": 0.0684,
-      "pm_vol_ratio": 0.0,
-      "catalyst_score": 0.0,
-      "price": 20.44,
-      "reason": "gap=+6.8%"
-    },
-    {
-      "ticker": "BKIE",
-      "score": 20.105,
-      "gap_pct": 0.0118,
-      "pm_vol_ratio": 8.29,
-      "catalyst_score": 0.0,
-      "price": 99.73,
-      "reason": "relvol=8.3x"
-    },
-    {
-      "ticker": "LUV",
-      "score": 20.033,
-      "gap_pct": 0.0667,
-      "pm_vol_ratio": 0.01,
-      "catalyst_score": 0.0,
-      "price": 41.81,
-      "reason": "gap=+6.7%"
-    },
-    {
-      "ticker": "DAL",
-      "score": 19.697,
-      "gap_pct": 0.0648,
-      "pm_vol_ratio": 0.13,
-      "catalyst_score": 0.0,
-      "price": 70.17,
-      "reason": "gap=+6.5%"
-    },
-    {
-      "ticker": "RCL",
-      "score": 19.241,
-      "gap_pct": 0.0641,
-      "pm_vol_ratio": 0.01,
-      "catalyst_score": 0.0,
-      "price": 279.5,
-      "reason": "gap=+6.4%"
-    },
-    {
-      "ticker": "CCL",
-      "score": 19.236,
-      "gap_pct": 0.0641,
-      "pm_vol_ratio": 0.01,
-      "catalyst_score": 0.0,
-      "price": 28.54,
-      "reason": "gap=+6.4%"
+      "price": 153.57,
+      "reason": "relvol=50.0x"
     }
   ]
 }
