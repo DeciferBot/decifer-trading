@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import atexit
 import json
 import logging
 import threading
@@ -406,6 +407,8 @@ class CatalystEngine:
             self._threads.append(t)
             log.info(f"CatalystEngine: {name} started (interval={interval}s)")
 
+        atexit.register(self.stop)
+
         log.info(
             f"⚡ CatalystEngine started | "
             f"{loaded} candidates pre-loaded | "
@@ -419,6 +422,8 @@ class CatalystEngine:
     def stop(self) -> None:
         self._running = False
         self.stats["status"] = "stopped"
+        for t in self._threads:
+            t.join(timeout=2)
         log.info("CatalystEngine stopped")
 
     # ── Public API ──────────────────────────────────────────────

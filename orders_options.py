@@ -88,6 +88,11 @@ def execute_buy_option(
     score: int = 0,
     trade_type: str = "SCALP",
     conviction: float = 0.0,
+    signal_scores: dict | None = None,
+    agent_outputs: dict | None = None,
+    regime: str = "UNKNOWN",
+    pattern_id: str = "",
+    advice_id: str = "",
 ) -> bool:
     """
     Buy an options contract (call or put).
@@ -160,20 +165,38 @@ def execute_buy_option(
         account = CONFIG["active_account"]
 
         # ── Write-ahead metadata commit ───────────────────────────────────────
+        _trade_id_opt = f"{opt_key}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
+        _opt_open_time = datetime.now(UTC).isoformat()
         try:
-            from trade_store import ledger_write as _wal_write_opt
-            _wal_write_opt(opt_key, {
-                "symbol": symbol, "instrument": "option", "direction": "LONG",
-                "trade_type": trade_type or "SCALP",
-                "right": contract_info["right"], "strike": contract_info["strike"],
-                "expiry_str": contract_info["expiry_str"],
-                "entry": contract_info.get("mid_price", 0.0),
-                "qty": n_contracts, "entry_score": score,
-                "conviction": conviction, "reasoning": reasoning,
-                "open_time": datetime.now(UTC).isoformat(),
-            })
+            from ic_calculator import get_current_weights as _get_icw_opt_wal
+            _icw_wal = _get_icw_opt_wal()
+        except Exception:
+            _icw_wal = None
+        try:
+            from trade_log import append_event as _tl_ae_opt
+            _tl_ae_opt("ORDER_INTENT", _trade_id_opt, symbol,
+                       instrument="option", direction="LONG",
+                       trade_type=trade_type or "SCALP",
+                       right=contract_info["right"],
+                       strike=contract_info["strike"],
+                       expiry_str=contract_info["expiry_str"],
+                       entry=contract_info.get("mid", 0.0),
+                       qty=n_contracts, sl=0.0, tp=0.0,
+                       score=score, conviction=conviction,
+                       entry_regime=regime,
+                       reasoning=reasoning or "",
+                       signal_scores=signal_scores or {},
+                       agent_outputs=agent_outputs or {},
+                       pattern_id=pattern_id or "",
+                       advice_id=advice_id or "",
+                       ic_weights_at_entry=_icw_wal,
+                       open_time=_opt_open_time,
+                       delta=contract_info.get("delta"),
+                       underlying_price=contract_info.get("underlying_price"),
+                       iv=contract_info.get("iv"),
+                       iv_rank=contract_info.get("iv_rank"))
         except Exception as _wal_err_opt:
-            log.warning(f"execute_buy_option {opt_key}: write-ahead metadata commit failed: {_wal_err_opt}")
+            log.warning("execute_buy_option %s: trade_log ORDER_INTENT failed: %s", opt_key, _wal_err_opt)
 
         # Options only trade during regular hours — outsideRth must be False
         entry_order = LimitOrder("BUY", n_contracts, limit_price, account=account, tif="DAY", outsideRth=False)
@@ -209,12 +232,6 @@ def execute_buy_option(
             }
         )
 
-        try:
-            from ic_calculator import get_current_weights as _get_icw_opt
-
-            _icw_at_entry_opt = _get_icw_opt()
-        except Exception:
-            _icw_at_entry_opt = None
         active_trades[opt_key] = {
             "symbol": symbol,
             "instrument": "option",
@@ -229,7 +246,7 @@ def execute_buy_option(
             "entry": mid_price,  # unified field for dashboard
             "current": mid_price,
             "qty": n_contracts,
-            "sl": round(mid_price * (1 - CONFIG.get("options_stop_loss", 0.50)), 4),
+            "sl": round(mid_price * (1 - CONFIG.get("options_stop_loss", 0.20)), 4),
             "tp": round(mid_price * (1 + CONFIG.get("options_profit_target", 0.75)), 4),
             "delta": contract_info.get("delta"),
             "theta": contract_info.get("theta"),
@@ -243,21 +260,16 @@ def execute_buy_option(
             "reasoning": reasoning,
             "status": "PENDING",
             "order_id": trade.order.orderId,
-            "ic_weights_at_entry": _icw_at_entry_opt,
+            "ic_weights_at_entry": _icw_wal,
             "trade_type": trade_type,
             "conviction": conviction,
-            "open_time": datetime.now(UTC).isoformat(),
+            "open_time": _opt_open_time,
+            "trade_id": _trade_id_opt,  # stored so execute_sell_option can write POSITION_CLOSED
         }
 
         from orders_state import _save_positions_file
 
         _save_positions_file()
-        try:
-            from trade_store import ledger_write as _ledger_write
-
-            _ledger_write(opt_key, active_trades.get(opt_key, {}))
-        except Exception as _lw_err:
-            log.error(f"execute_buy_option {symbol}: ledger_write failed: {_lw_err}")
 
         log.info(
             f"✅ BUY {contract_info['right']} {symbol} "
@@ -560,6 +572,24 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
             _safe_update_trade(opt_key, {"contracts": remaining_c, "qty": remaining_c, "status": "ACTIVE"})
             log.info(f"[TRIM] {opt_key}: sold {sell_contracts} contracts, {remaining_c} remaining")
         else:
+            _close_trade_id_opt = pos.get("trade_id") or f"{opt_key}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
+            try:
+                from trade_log import close_trade as _tl_close_opt
+                _tl_close_opt(
+                    _close_trade_id_opt, pos["symbol"],
+                    exit_price=round(current, 4),
+                    pnl=round(pnl, 2),
+                    exit_reason=reason,
+                    direction=pos.get("direction", "LONG"),
+                    instrument="option",
+                    right=pos.get("right", ""),
+                    strike=pos.get("strike", 0.0),
+                    expiry_str=pos.get("expiry_str", ""),
+                    qty=sell_contracts,
+                    trade_type=pos.get("trade_type", "SCALP"),
+                )
+            except Exception as _tl_err_opt:
+                log.warning("trade_log.close_trade failed for %s: %s", opt_key, _tl_err_opt)
             recently_closed[pos["symbol"]] = datetime.now(UTC).isoformat()
             del active_trades[opt_key]
         return True

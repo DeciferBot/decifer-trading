@@ -355,10 +355,10 @@ def _build_pm_exit_reason(pos: dict, regime: dict, pm_trigger: str, reason_pm: s
         thesis_class = "breached_stale_scalp"
     else:
         thesis_class = "noise_stop"
-    short_reason = (reason_pm or pm_trigger)[:120]
+    full_reason = reason_pm or pm_trigger
     return (
         f"{exit_tag} | {trade_type_ex} | regime:{entry_regime}→{exit_regime}"
-        f" | held:{held_mins}min | thesis:{thesis_class} | {pm_trigger}: {short_reason}"
+        f" | held:{held_mins}min | thesis:{thesis_class} | {pm_trigger}: {full_reason}"
     )
 
 
@@ -2142,6 +2142,20 @@ def run_scan():
             _block_reason = next((r.get("skip_reason", r.get("side", "")) for r in dispatch_results if r.get("side") in ("AVOIDED", "REJECTED")), "gate blocked")
             clog("INFO", f"Options skipped for {sym} — {_block_reason[:100]}")
 
+        # trade_type from intelligence classification (set even when execute=False).
+        # buy dict from agent_final_decision never carries trade_type, so we must
+        # read it from dispatch_results — otherwise options always get INTRADAY DTE.
+        _intel_trade_type = next(
+            (r["trade_type"] for r in dispatch_results if r.get("trade_type")),
+            None,
+        )
+        _intel_conviction = next(
+            (r["conviction"] for r in dispatch_results if r.get("conviction")),
+            0.0,
+        )
+        if _intel_trade_type:
+            clog("INFO", f"{sym} intelligence trade_type={_intel_trade_type} conviction={_intel_conviction:.2f}")
+
         if _opts_eligible and not _gate_blocked:
             _sig_dir = buy.get("direction", "LONG")  # use agent direction (matches scanner via hard gate)
             if _sig_dir not in ("LONG", "SHORT"):
@@ -2200,7 +2214,7 @@ def run_scan():
                 else:
                     clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
                     try:
-                        contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"], trade_type=buy.get("trade_type", "SWING"))
+                        contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"], trade_type=_intel_trade_type or "SWING")
                         if contract_info:
                             opt_success = execute_buy_option(
                                 ib,
@@ -2208,8 +2222,11 @@ def run_scan():
                                 pv,
                                 reasoning=reason,
                                 score=sig["score"],
-                                trade_type=buy.get("trade_type", "INTRADAY"),
-                                conviction=float(buy.get("conviction", 0.0)),
+                                trade_type=_intel_trade_type or "SWING",
+                                conviction=float(_intel_conviction),
+                                signal_scores=sig.get("score_breakdown", {}),
+                                agent_outputs=buy.get("agent_outputs", {}) if isinstance(buy, dict) else {},
+                                regime=regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else str(regime),
                             )
                             if opt_success:
                                 dash["trades"].insert(

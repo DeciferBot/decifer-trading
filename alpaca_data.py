@@ -527,6 +527,24 @@ def get_52wk_high(symbol: str) -> float | None:
         return None
 
 
+def get_stock_above_200d(symbol: str) -> bool | None:
+    """
+    Return True if the stock's latest close is above its 200-day SMA.
+    Used by TradeContext to flag long-term trend alignment for POSITION trades.
+    Returns None if insufficient data.
+    """
+    try:
+        df = fetch_bars(symbol, period="1y", interval="1d")
+        if df is None or df.empty or len(df) < 200:
+            return None
+        close = df["Close"]
+        sma200 = close.rolling(200).mean()
+        return bool(close.iloc[-1] > sma200.iloc[-1])
+    except Exception as exc:
+        log.debug("get_stock_above_200d: %s failed — %s", symbol, exc)
+        return None
+
+
 def fetch_snapshots(symbols: list[str]) -> dict[str, dict]:
     """
     Fetch live price + 1-day change for a batch of symbols via Alpaca snapshots.

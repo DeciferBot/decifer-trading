@@ -106,6 +106,7 @@ class TradeContext:
     # ── Price structure (Alpaca — session cache) ──────────────────────────────
     week52_high: Optional[float] = None             # 52-week high
     week52_high_distance_pct: Optional[float] = None  # (price - 52wk_high) / 52wk_high * 100
+    stock_above_200d: Optional[bool] = None         # closing price > 200-day SMA (long-term trend)
 
     # ── Analyst grade breakdown (FMP — 30min cache) ───────────────────────────
     analyst_buy_count: Optional[int] = None         # number of buy/strong-buy ratings
@@ -389,7 +390,14 @@ def build_context(
     except Exception as exc:
         log.debug("build_context: 52wk high failed for %s — %s", symbol, exc)
 
-    # ── 19. Data quality assessment ───────────────────────────────────────────
+    # ── 19. Alpaca: 200-day MA (long-term trend for POSITION trades) ─────────
+    try:
+        from alpaca_data import get_stock_above_200d
+        ctx.stock_above_200d = get_stock_above_200d(symbol)
+    except Exception as exc:
+        log.debug("build_context: 200d MA failed for %s — %s", symbol, exc)
+
+    # ── 20. Data quality assessment ───────────────────────────────────────────
     critical_fields = [
         ctx.signal_age_minutes,
         ctx.vwap_distance_pct,

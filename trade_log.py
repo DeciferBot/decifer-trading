@@ -140,11 +140,13 @@ def append_event(event: str, trade_id: str, symbol: str, **payload) -> None:
 # ── Convenience wrappers ──────────────────────────────────────────────────────
 
 
-def close_trade(trade_id: str, symbol: str, exit_price: float, pnl: float, exit_reason: str) -> None:
+def close_trade(trade_id: str, symbol: str, exit_price: float, pnl: float,
+                exit_reason: str, **extra) -> None:
     """Append POSITION_CLOSED.  After this, open_trades() will not return this trade."""
     append_event(
         "POSITION_CLOSED", trade_id, symbol,
         exit_price=exit_price, pnl=round(pnl, 2), exit_reason=exit_reason,
+        **extra,
     )
 
 

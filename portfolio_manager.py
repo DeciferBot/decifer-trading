@@ -567,6 +567,37 @@ def lightweight_cycle_check(
                     }
                 )
                 actioned_syms.add(sym)
+            elif sym not in actioned_syms:
+                swing_max_mins = CONFIG.get("swing_max_hold_days", 10) * 390
+                if mins_held > swing_max_mins:
+                    actions.append(
+                        {
+                            "symbol": sym,
+                            "action": "REVIEW",
+                            "reasoning": (
+                                f"SWING hold duration exceeded {CONFIG.get('swing_max_hold_days', 10)}d "
+                                f"({mins_held / 390:.1f} trading days held) — "
+                                "Opus review: promote to POSITION or exit"
+                            ),
+                        }
+                    )
+                    actioned_syms.add(sym)
+
+        elif trade_type == "POSITION":
+            entry_polarity = _regime_polarity(entry_regime)
+            current_polarity = _regime_polarity(current_regime)
+            if entry_polarity and current_polarity and entry_polarity != current_polarity:
+                actions.append(
+                    {
+                        "symbol": sym,
+                        "action": "REVIEW",
+                        "reasoning": (
+                            f"POSITION macro backdrop flipped: entry={entry_regime} → now={current_regime}; "
+                            "polar regime shift — hold-horizon thesis integrity check required"
+                        ),
+                    }
+                )
+                actioned_syms.add(sym)
 
         elif trade_type == "HOLD":
             entry_polarity = _regime_polarity(entry_regime)

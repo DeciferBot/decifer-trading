@@ -377,11 +377,20 @@ def reconcile_with_ibkr(ib: IB):
 
     try:
         # ── Step 1: restore our own position ledger ───────────────────────────
-        stored = _ts_restore()
-        if stored:
+        # Primary: replay DB event log — the authoritative source.
+        # Fallback: positions.json cache (for first run before any DB events exist).
+        from trade_log import open_trades as _tl_open_trades
+        db_trades = _tl_open_trades()
+        if db_trades:
             with _trades_lock:
-                active_trades.update(stored)
-            log.info(f"Restored {len(stored)} position(s) from trade_store.")
+                active_trades.update(db_trades)
+            log.info(f"Restored {len(db_trades)} open position(s) from trade_log DB.")
+        else:
+            stored = _ts_restore()
+            if stored:
+                with _trades_lock:
+                    active_trades.update(stored)
+                log.info(f"DB empty — restored {len(stored)} position(s) from positions.json (fallback).")
 
         # ── Step 2: fetch IBKR portfolio ──────────────────────────────────────
         # portfolio() returns PortfolioItem with marketPrice + unrealizedPNL.
@@ -627,7 +636,7 @@ def reconcile_with_ibkr(ib: IB):
                     mult = 100 if is_option else 1
                     if direction == "SHORT":
                         sl = round(
-                            ibkr_entry * (1.02 if not is_option else (1 + CONFIG.get("options_stop_loss", 0.50))), 4
+                            ibkr_entry * (1.02 if not is_option else (1 + CONFIG.get("options_stop_loss", 0.20))), 4
                         )
                         tp = round(
                             ibkr_entry * (0.94 if not is_option else (1 - CONFIG.get("options_profit_target", 1.00))), 4
@@ -988,6 +997,31 @@ def reconcile_with_ibkr(ib: IB):
         log.info(
             f"Reconciliation complete. Tracking {len(active_trades)} positions. (processed={reconciled_count}, failed={failed_count})"
         )
+
+        # ── One-time migration: close stale DB trades not in IBKR ────────────
+        # Runs after every reconcile but becomes a no-op once the DB is clean.
+        # The DB accumulated ORDER_INTENT events without matching POSITION_CLOSED
+        # events before this fix was deployed. This block retroactively closes them
+        # so open_trades() returns only genuinely open positions going forward.
+        try:
+            from trade_log import open_trades as _tl_mig_open, close_trade as _tl_mig_close
+            _db_open = _tl_mig_open()
+            _active_trade_ids = {v.get("trade_id", "") for v in active_trades.values()}
+            _stale_ids = [
+                tid for tid in _db_open
+                if tid not in ibkr_keys and tid not in _active_trade_ids
+            ]
+            if _stale_ids:
+                log.info("Migration: writing POSITION_CLOSED for %d stale DB trades", len(_stale_ids))
+                for _tid in _stale_ids:
+                    _t = _db_open[_tid]
+                    _tl_mig_close(
+                        _tid, _t.get("symbol", "?"),
+                        exit_price=0.0, pnl=0.0, exit_reason="migration_close",
+                    )
+                log.info("Migration complete — DB is now clean")
+        except Exception as _mig_err:
+            log.warning("DB migration step failed (non-fatal): %s", _mig_err)
 
         # ── Step 6: orphan alerting ───────────────────────────────────────────
         # Any position that ended up with trade_type UNKNOWN after all lookup

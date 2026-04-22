@@ -74,7 +74,12 @@ def _swing_ctx(**kwargs) -> TradeContext:
 
 
 def _position_ctx(**kwargs) -> TradeContext:
-    """Minimal valid POSITION context — all three primary conditions met."""
+    """
+    Minimal valid POSITION context — passes the two-path checklist.
+
+    Path B (growth): revenue_growth_yoy=25 > 20, not decelerating, eps_accelerating=True.
+    Supporting (2/4): sector above 50d + outperforming SPY (signal 1), analyst BUY (signal 2).
+    """
     defaults = dict(
         symbol="NVDA",
         direction="LONG",
@@ -84,6 +89,7 @@ def _position_ctx(**kwargs) -> TradeContext:
         revenue_growth_yoy=25.0,
         revenue_growth_qoq=6.0,
         revenue_decelerating=False,
+        eps_accelerating=True,
         sector_above_50d=True,
         sector_3m_vs_spy=9.0,
         sector_etf="XLK",
@@ -234,44 +240,79 @@ class TestPositionGate(unittest.TestCase):
 
     def test_valid_position_passes(self):
         ctx = _position_ctx()
-        ok, reason, _ = _validate_position("LONG", ctx)
+        ok, reason = _validate_position("LONG", ctx)
         self.assertTrue(ok)
 
-    def test_low_revenue_growth_passes(self):
-        # Revenue growth no longer a gate
-        ctx = _position_ctx(revenue_growth_yoy=8.0)
-        ok, _, _ = _validate_position("LONG", ctx)
+    def test_path_a_value_stock_passes(self):
+        # Path A: profitable company with valuation gap — revenue can be modest
+        ctx = _position_ctx(
+            revenue_growth_yoy=8.0,
+            fcf_yield=2.5,
+            dcf_upside_pct=20.0,
+            eps_accelerating=False,   # Path A doesn't require EPS acceleration
+        )
+        ok, reason = _validate_position("LONG", ctx)
+        self.assertTrue(ok)
+        self.assertIn("value/quality", reason)
+
+    def test_sector_below_50d_passes_with_200d(self):
+        # Sector below 50d is not a hard block — stock above 200d MA compensates
+        ctx = _position_ctx(sector_above_50d=False, sector_3m_vs_spy=2.0,
+                            stock_above_200d=True)
+        ok, reason = _validate_position("LONG", ctx)
         self.assertTrue(ok)
 
-    def test_sector_below_50d_passes(self):
-        # Sector condition no longer a gate
-        ctx = _position_ctx(sector_above_50d=False)
-        ok, _, _ = _validate_position("LONG", ctx)
-        self.assertTrue(ok)
-
-    def test_sell_consensus_passes(self):
-        # Analyst consensus no longer a gate
-        ctx = _position_ctx(analyst_consensus="STRONG_SELL")
-        ok, _, _ = _validate_position("LONG", ctx)
+    def test_sell_consensus_passes_with_other_signals(self):
+        # Analyst consensus is supporting evidence, not a hard gate.
+        # Without BUY consensus, need 2 other signals (sector + upgrade here).
+        ctx = _position_ctx(analyst_consensus="STRONG_SELL", recent_upgrade=True)
+        ok, reason = _validate_position("LONG", ctx)
         self.assertTrue(ok)
 
     def test_panic_regime_rejected(self):
         ctx = _position_ctx(regime="PANIC")
-        ok, reason, _ = _validate_position("LONG", ctx)
+        ok, reason = _validate_position("LONG", ctx)
         self.assertFalse(ok)
         self.assertIn("hostile regime", reason)
 
     def test_bear_trending_regime_rejected(self):
         ctx = _position_ctx(regime="BEAR_TRENDING")
-        ok, reason, _ = _validate_position("LONG", ctx)
+        ok, reason = _validate_position("LONG", ctx)
         self.assertFalse(ok)
         self.assertIn("hostile regime", reason)
 
     def test_earnings_too_close_rejected(self):
-        ctx = _position_ctx(earnings_days_away=20)
-        ok, reason, _ = _validate_position("LONG", ctx)
+        # Binary event gate: earnings within 5 days blocks POSITION
+        ctx = _position_ctx(earnings_days_away=3)
+        ok, reason = _validate_position("LONG", ctx)
         self.assertFalse(ok)
-        self.assertIn("30-day gate", reason)
+        self.assertIn("binary event", reason)
+
+    def test_neither_path_qualifies_downgrades(self):
+        # No FCF (Path A fails), low revenue growth (Path B fails) → downgrade to SWING
+        ctx = _position_ctx(
+            revenue_growth_yoy=5.0,
+            fcf_yield=None,
+            dcf_upside_pct=None,
+            eps_accelerating=False,
+        )
+        ok, reason = _validate_position("LONG", ctx)
+        self.assertFalse(ok)
+        self.assertIn("downgrade to SWING", reason)
+
+    def test_insufficient_supporting_signals_downgrades(self):
+        # Path B qualifies but only 1 supporting signal → downgrade
+        ctx = _position_ctx(
+            sector_above_50d=False,
+            sector_3m_vs_spy=0.0,
+            stock_above_200d=False,
+            analyst_consensus="HOLD",
+            recent_upgrade=False,
+            insider_net_sentiment="NEUTRAL",
+        )
+        ok, reason = _validate_position("LONG", ctx)
+        self.assertFalse(ok)
+        self.assertIn("downgrade to SWING", reason)
 
 
 # ── Hierarchy tests ───────────────────────────────────────────────────────────

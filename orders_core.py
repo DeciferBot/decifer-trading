@@ -51,6 +51,70 @@ from orders_state import (
 )
 
 
+def _validate_order_context(
+    symbol: str,
+    direction: str,
+    trade_type: str,
+    score: int,
+) -> str | None:
+    """
+    Pre-flight validation before any order reaches IBKR.
+    Returns a rejection reason string, or None if the order is valid.
+
+    Runs at the top of execute_buy and execute_short regardless of how
+    the order was generated — signal pipeline, PM ADD, re-sync, anything.
+    Three checks:
+      1. Instrument-direction: long-only inverse ETFs cannot be shorted.
+      3. Trade-type timing: INTRADAY entries blocked within 30 min of close.
+      4. Score-direction alignment: warning only, not a hard reject.
+    """
+    import zoneinfo
+    from datetime import datetime, time as dtime
+
+    # ── CHECK 1: Instrument-direction ─────────────────────────────────────────
+    # Inverse ETFs (SPXS, SQQQ, UVXY) provide bearish exposure when BOUGHT.
+    # Shorting them creates a double-negative — synthetically long the market
+    # with borrow costs. Architecturally invalid in this system.
+    long_only = CONFIG.get("long_only_symbols", set())
+    if direction == "SHORT" and symbol in long_only:
+        return (
+            f"long-only instrument: {symbol} cannot be shorted "
+            f"(buy {symbol} to express bearish view)"
+        )
+
+    # ── CHECK 3: Trade-type timing ─────────────────────────────────────────────
+    # INTRADAY entries within 30 min of market close cannot be managed before
+    # the session ends — no time to monitor or exit cleanly.
+    if trade_type == "INTRADAY":
+        _ET = zoneinfo.ZoneInfo("America/New_York")
+        now_et = datetime.now(_ET).time()
+        cutoff = dtime(15, 30)  # 30 min before 16:00 ET close
+        if now_et >= cutoff:
+            return (
+                f"INTRADAY entry at {now_et.strftime('%H:%M')} ET — "
+                f"<30 min to close, no time to manage"
+            )
+
+    # ── CHECK 4: Score-direction alignment (warn only) ─────────────────────────
+    # Score measures conviction magnitude, not direction. A positive score on
+    # a SHORT is not wrong per se — bearish dimensions can dominate even when
+    # the aggregate is positive. Log for visibility only.
+    if direction == "SHORT" and score > 0:
+        log.warning(
+            "_validate_order_context: SHORT %s with positive score %d — verify bearish conviction",
+            symbol,
+            score,
+        )
+    elif direction == "LONG" and score < 0:
+        log.warning(
+            "_validate_order_context: LONG %s with negative score %d — verify bullish conviction",
+            symbol,
+            score,
+        )
+
+    return None
+
+
 def _derive_setup_type(signal_scores: dict) -> str:
     """Return the dominant signal dimension name from score breakdown."""
     if not signal_scores:
@@ -94,7 +158,7 @@ def _build_entry_thesis(
 
     # Use Opus market_read if available; fall back to agent synthesis rationale
     setup_context = (market_read or rationale or "").strip()
-    setup_tag = f" | setup: {setup_context[:150]}" if len(setup_context) > 10 else ""
+    setup_tag = f" | setup: {setup_context}" if len(setup_context) > 10 else ""
 
     return (
         f"{tt} {direction} {symbol} | "
@@ -235,6 +299,12 @@ def execute_buy(
         ):
             log.warning(f"Skipping duplicate order for {symbol} — open order already exists")
             _safe_del_trade(symbol)  # release reservation
+            return False
+
+        rejection = _validate_order_context(symbol, "LONG", trade_type, score)
+        if rejection:
+            log.warning("execute_buy: REJECTED %s — %s", symbol, rejection)
+            _safe_del_trade(symbol)
             return False
 
     try:
@@ -386,6 +456,12 @@ def execute_buy(
                 (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
                 if isinstance(regime, dict) else "UNKNOWN"
             )
+            _wal_entry_thesis = _build_entry_thesis(
+                trade_type or "INTRADAY", symbol, "LONG", conviction, score,
+                _wal_regime, market_read=market_read, rationale=reasoning,
+            )
+            _wal_setup_type = _derive_setup_type(signal_scores or {})
+            _wal_open_time = open_time or datetime.now(UTC).isoformat()
             _wal_write(symbol, {
                 "symbol": symbol, "instrument": instrument, "direction": "LONG",
                 "trade_type": trade_type or "INTRADAY",
@@ -393,25 +469,34 @@ def execute_buy(
                 "entry_score": score, "conviction": conviction, "reasoning": reasoning,
                 "signal_scores": signal_scores or {}, "agent_outputs": agent_outputs or {},
                 "entry_regime": _wal_regime,
-                "entry_thesis": _build_entry_thesis(
-                    trade_type or "INTRADAY", symbol, "LONG", conviction, score,
-                    _wal_regime, market_read=market_read, rationale=reasoning,
-                ),
-                "setup_type": _derive_setup_type(signal_scores or {}),
+                "entry_thesis": _wal_entry_thesis,
+                "setup_type": _wal_setup_type,
                 "pattern_id": pattern_id, "atr": atr, "advice_id": advice_id,
                 "ic_weights_at_entry": _wal_icw, "tranche_mode": tranche_mode,
                 "t1_qty": t1_qty, "t2_qty": t2_qty,
-                "open_time": open_time or datetime.now(UTC).isoformat(),
+                "open_time": _wal_open_time,
             })
             try:
                 from trade_log import append_event as _tl_ae
                 _tl_ae("ORDER_INTENT", _trade_id, symbol,
-                       direction="LONG", trade_type=trade_type or "INTRADAY",
+                       instrument=instrument, direction="LONG",
+                       trade_type=trade_type or "INTRADAY",
                        entry=price, qty=qty, sl=sl, tp=tp,
                        score=score, conviction=conviction, entry_regime=_wal_regime,
-                       signal_scores=signal_scores or {})
-            except Exception:
-                pass
+                       reasoning=reasoning or "",
+                       signal_scores=signal_scores or {},
+                       agent_outputs=agent_outputs or {},
+                       entry_thesis=_wal_entry_thesis,
+                       setup_type=_wal_setup_type,
+                       pattern_id=pattern_id or "",
+                       atr=atr or 0.0,
+                       advice_id=advice_id or "",
+                       ic_weights_at_entry=_wal_icw,
+                       tranche_mode=tranche_mode,
+                       t1_qty=t1_qty, t2_qty=t2_qty,
+                       open_time=_wal_open_time)
+            except Exception as _tl_err:
+                log.warning("execute_buy %s: trade_log ORDER_INTENT failed: %s", symbol, _tl_err)
         except Exception as _wal_err:
             log.warning(f"execute_buy {symbol}: write-ahead metadata commit failed: {_wal_err}")
 
@@ -1174,6 +1259,12 @@ def execute_short(
             _safe_del_trade(symbol)
             return False
 
+        rejection = _validate_order_context(symbol, "SHORT", trade_type, score)
+        if rejection:
+            log.warning("execute_short: REJECTED %s — %s", symbol, rejection)
+            _safe_del_trade(symbol)
+            return False
+
     try:
         contract = get_contract(symbol, instrument)
         ib.qualifyContracts(contract)
@@ -1271,6 +1362,12 @@ def execute_short(
                 (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
                 if isinstance(regime, dict) else "UNKNOWN"
             )
+            _wal_entry_thesis_s = _build_entry_thesis(
+                trade_type or "INTRADAY", symbol, "SHORT", conviction, score,
+                _wal_regime_s, market_read=market_read, rationale=reasoning,
+            )
+            _wal_setup_type_s = _derive_setup_type(signal_scores or {})
+            _wal_open_time_s = open_time or datetime.now(UTC).isoformat()
             _wal_write_s(symbol, {
                 "symbol": symbol, "instrument": instrument, "direction": "SHORT",
                 "trade_type": trade_type or "INTRADAY",
@@ -1278,24 +1375,33 @@ def execute_short(
                 "entry_score": score, "conviction": conviction, "reasoning": reasoning,
                 "signal_scores": signal_scores or {}, "agent_outputs": agent_outputs or {},
                 "entry_regime": _wal_regime_s,
-                "entry_thesis": _build_entry_thesis(
-                    trade_type or "INTRADAY", symbol, "SHORT", conviction, score,
-                    _wal_regime_s, market_read=market_read, rationale=reasoning,
-                ),
-                "setup_type": _derive_setup_type(signal_scores or {}),
+                "entry_thesis": _wal_entry_thesis_s,
+                "setup_type": _wal_setup_type_s,
                 "pattern_id": pattern_id, "atr": atr, "advice_id": advice_id,
                 "ic_weights_at_entry": _wal_icw_s,
-                "open_time": open_time or datetime.now(UTC).isoformat(),
+                "open_time": _wal_open_time_s,
             })
             try:
                 from trade_log import append_event as _tl_ae
                 _tl_ae("ORDER_INTENT", _trade_id, symbol,
-                       direction="SHORT", trade_type=trade_type or "INTRADAY",
+                       instrument=instrument, direction="SHORT",
+                       trade_type=trade_type or "INTRADAY",
                        entry=price, qty=qty, sl=sl, tp=tp,
                        score=score, conviction=conviction, entry_regime=_wal_regime_s,
-                       signal_scores=signal_scores or {})
-            except Exception:
-                pass
+                       reasoning=reasoning or "",
+                       signal_scores=signal_scores or {},
+                       agent_outputs=agent_outputs or {},
+                       entry_thesis=_wal_entry_thesis_s,
+                       setup_type=_wal_setup_type_s,
+                       pattern_id=pattern_id or "",
+                       atr=atr or 0.0,
+                       advice_id=advice_id or "",
+                       ic_weights_at_entry=_wal_icw_s,
+                       tranche_mode=False,
+                       t1_qty=None, t2_qty=None,
+                       open_time=_wal_open_time_s)
+            except Exception as _tl_err_s:
+                log.warning("execute_short %s: trade_log ORDER_INTENT failed: %s", symbol, _tl_err_s)
         except Exception as _wal_err_s:
             log.warning(f"execute_short {symbol}: write-ahead metadata commit failed: {_wal_err_s}")
 
@@ -1779,13 +1885,22 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             log.info(f"[TRIM] {symbol}: sold {sell_qty}, {info['qty'] - sell_qty} remaining")
         else:
             now_ts = datetime.now(UTC).isoformat()
-            _close_trade_id = info.get("trade_id")
-            if _close_trade_id:
-                try:
-                    from trade_log import close_trade as _tl_close
-                    _tl_close(_close_trade_id, symbol, info.get("current", 0.0), pnl, reason)
-                except Exception:
-                    pass
+            _close_trade_id = info.get("trade_id") or f"{symbol}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
+            try:
+                from trade_log import close_trade as _tl_close
+                _tl_close(
+                    _close_trade_id, symbol,
+                    exit_price=float(info.get("current") or info.get("entry", 0.0)),
+                    pnl=pnl,
+                    exit_reason=reason,
+                    direction=info.get("direction", "LONG"),
+                    entry=float(info.get("entry", 0.0)),
+                    qty=info.get("qty", 0),
+                    trade_type=info.get("trade_type", "UNKNOWN"),
+                    instrument=info.get("instrument", "stock"),
+                )
+            except Exception as _tl_err:
+                log.warning("trade_log.close_trade failed for %s: %s", symbol, _tl_err)
             with _trades_lock:
                 recently_closed[symbol] = now_ts
                 active_trades.pop(_trade_key, None)

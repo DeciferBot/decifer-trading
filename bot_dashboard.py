@@ -1161,8 +1161,13 @@ class DashHandler(BaseHTTPRequestHandler):
         ib = bot_state.ib
         if self.path == "/api/reconnect":
             import bot_state as _bs
+            from bot_ibkr import _on_disconnected
 
-            _bs._manual_reconnect_evt.set()  # wake the retry loop in main()
+            _bs._manual_reconnect_evt.set()  # wake startup loop or skip backoff in running worker
+            # If the auto-reconnect worker has already exhausted attempts (or never ran),
+            # spawn a fresh one now so the button actually does something.
+            if not _bs.ib.isConnected() and not _bs._reconnecting:
+                _on_disconnected()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")

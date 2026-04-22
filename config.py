@@ -637,7 +637,7 @@ CONFIG = {
     #                                     (premium paid = max loss if goes to zero)
     # Exit rules
     "options_profit_target": 0.75,  # Take profit at 75% premium gain
-    "options_stop_loss": 0.50,  # Stop loss at 50% premium loss
+    "options_stop_loss": 0.20,  # Stop loss at 20% premium loss
     "options_exit_dte": 2,  # Hard exit at this many DTE (gamma risk)
     # ── NEWS SENTINEL (real-time news trigger) ───────────────
     # Runs independently of the scan loop. Polls news every N seconds
@@ -849,11 +849,15 @@ CONFIG = {
         "swing_max_short_float_pct":        30.0,   # short float above this → reject (no squeeze)
         "swing_sector_rotation_max_days":   10,     # sector ETF breakout must be < N days old
         "swing_min_catalyst_score":         30,     # catalyst_engine score floor for news catalyst
+        "swing_max_hold_days":             10,      # paper=10; live=7 — triggers Opus review (not exit)
 
-        # POSITION thresholds
-        "position_min_earnings_days_away":  30,     # earnings must be > 30 days away
-        "position_min_revenue_growth_yoy":  15.0,   # YoY revenue growth floor (%)
-        "position_min_sector_vs_spy":        5.0,   # sector ETF 3m outperformance vs SPY (%)
+        # POSITION thresholds — two-path checklist
+        "position_min_earnings_days_away":   5,     # binary event gate: earnings < 5d → SWING
+        "position_min_dcf_upside_pct":      15.0,   # Path A: DCF upside must exceed this (%)
+        "position_min_analyst_upside_pct":  10.0,   # Path A: analyst PT upside floor (%)
+        "position_min_revenue_growth_pct":  20.0,   # Path B: revenue growth YoY floor (%)
+        "position_min_gross_margin_pct":    30.0,   # Path B: gross margin floor (%)
+        "position_min_supporting_signals":   2,     # both paths: need ≥ N of 4 signals
     },
 }
 

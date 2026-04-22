@@ -236,6 +236,7 @@ def dispatch_signals(
                 direction=signal.direction,
                 ctx=trade_ctx,
                 score=raw_score,
+                opus_trade_type=cls.trade_type,
             )
 
             if not gate_ok:
@@ -248,16 +249,24 @@ def dispatch_signals(
                 results.append(result)
                 continue
 
-            # entry_gate may override trade_type only for special cases (e.g. market-closed
-            # → SWING for overnight entries). Never let entry_gate demote Opus's label:
-            # INTRADAY < SWING < POSITION — only override if gate_type ranks higher.
+            # entry_gate may override trade_type for special cases:
+            #   - market-closed → SWING for overnight entries (promotes)
+            #   - POSITION fundamentals failed → SWING (demotes — intentional)
+            # For non-POSITION cases, never let entry_gate demote Opus's label:
+            # INTRADAY < SWING < POSITION — only override if gate_type ranks higher
+            # (except when Opus said POSITION and entry_gate ran the checklist).
             _type_rank = {"INTRADAY": 0, "SWING": 1, "POSITION": 2}
-            if (
-                gate_type not in ("REJECT", cls.trade_type)
-                and _type_rank.get(gate_type, 0) > _type_rank.get(cls.trade_type, 0)
+            # Allow POSITION→SWING downgrade (fundamentals checklist failed).
+            # Allow any promotion (gate_type ranks higher than Opus label).
+            # Block any other demotion (entry_gate should not silently drop Opus labels).
+            _opus_rank = _type_rank.get(cls.trade_type, 0)
+            _gate_rank = _type_rank.get(gate_type, 0)
+            _position_downgrade = (cls.trade_type == "POSITION" and gate_type == "SWING")
+            if gate_type not in ("REJECT", cls.trade_type) and (
+                _gate_rank > _opus_rank or _position_downgrade
             ):
                 log.debug(
-                    "dispatch: %s trade_type promoted %s → %s by entry_gate",
+                    "dispatch: %s trade_type %s → %s by entry_gate",
                     signal.symbol, cls.trade_type, gate_type,
                 )
                 cls.trade_type = gate_type

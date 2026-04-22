@@ -190,13 +190,13 @@ class TestBuildPmExitReason:
         result = bot_trading._build_pm_exit_reason(pos, {}, "cycle_regime_shift", "trimming", exit_tag="pm_trim")
         assert result.startswith("pm_trim |")
 
-    def test_reason_pm_truncated_to_120_chars(self):
+    def test_reason_pm_not_truncated(self):
         pos = _make_pos()
         long_reason = "x" * 200
         result = bot_trading._build_pm_exit_reason(pos, {}, "trigger", long_reason)
-        # The embedded reason after "trigger: " must be ≤120 chars
+        # Full reason must be preserved — no truncation in DB write paths
         embedded = result.split("| trigger: ", 1)[-1]
-        assert len(embedded) <= 120
+        assert len(embedded) == 200
 
     def test_empty_pos_does_not_raise(self):
         result = bot_trading._build_pm_exit_reason({}, {}, "trigger", "reason")

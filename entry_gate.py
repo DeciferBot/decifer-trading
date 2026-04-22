@@ -101,32 +101,117 @@ def _validate_swing(direction: str, ctx: TradeContext) -> tuple[bool, str, int]:
 # ── POSITION gate ─────────────────────────────────────────────────────────────
 
 
-def _validate_position(direction: str, ctx: TradeContext) -> tuple[bool, str, int]:
+def _validate_position(direction: str, ctx: TradeContext) -> tuple[bool, str]:
     """
-    Validate POSITION entry — ALL three primary conditions required.
+    Validate POSITION entry using a two-path fundamental checklist.
 
-    Primary conditions:
-      1. Revenue growth > 15% YoY AND not decelerating
-      2. Sector ETF above 50-day MA AND 3m outperformance vs SPY > 5%
-      3. Technical: handled by signal engine (squeeze/breakout dimension)
+    Returns (qualifies_as_position, reason).
+    Failing downgrades to SWING — the trade still opens, just with a shorter
+    hold horizon. This is NOT a REJECT.
+
+    Hard gates (both paths):
+      1. No binary catalyst within 5 days (earnings)
+      2. Regime not hostile (BEAR_TRENDING, PANIC)
+
+    Path A — Quality / Value (profitable company):
+      FCF yield > 0 AND (DCF upside > threshold OR analyst upside > threshold)
+      AND revenue not shrinking AND not decelerating
+
+    Path B — Growth (pre-profitable / early stage):
+      Revenue growth > threshold AND not decelerating
+      AND gross margin > threshold AND EPS accelerating
+
+    Supporting evidence (need ≥ 2 of 4 — breadth of thesis):
+      1. Sector ETF above 50d MA AND outperforming SPY ≥ 5% over 3m
+         OR stock itself above 200d MA
+      2. Analyst consensus BUY or STRONG_BUY
+      3. Recent analyst upgrade (last 10 days)
+      4. Insider net buying
     """
-
-    # ── Hard disqualifiers ────────────────────────────────────────────────────
-
-    # Hostile regime: no new POSITION in BEAR or PANIC
-    if _regime_is_hostile(ctx.regime):
-        return False, f"regime {ctx.regime} — no POSITION entries in hostile regime", 0
-
-    # Earnings within 30 days (binary event risk at position time horizon)
-    min_days = _cfg("position_min_earnings_days_away", 30)
-    if ctx.earnings_days_away is not None and ctx.earnings_days_away < min_days:
-        return (
-            False,
-            f"earnings {ctx.earnings_days_away} days away — below {min_days}-day gate for POSITION",
-            0,
+    # ── Hard gate 1: binary catalyst risk ────────────────────────────────────
+    min_earn_days = _cfg("position_min_earnings_days_away", 5)
+    if ctx.earnings_days_away is not None and ctx.earnings_days_away < min_earn_days:
+        return False, (
+            f"earnings {ctx.earnings_days_away}d away — binary event within "
+            f"{min_earn_days}d, downgrade to SWING"
         )
 
-    return True, "POSITION approved", 0
+    # ── Hard gate 2: hostile regime ───────────────────────────────────────────
+    if _regime_is_hostile(ctx.regime):
+        return False, f"hostile regime {ctx.regime} — multi-week long contradicted, downgrade to SWING"
+
+    # ── Path A: quality / value (profitable) ─────────────────────────────────
+    min_dcf   = _cfg("position_min_dcf_upside_pct", 15)
+    min_pt    = _cfg("position_min_analyst_upside_pct", 10)
+    path_a = (
+        ctx.fcf_yield is not None
+        and ctx.fcf_yield > 0
+        and (
+            (ctx.dcf_upside_pct is not None and ctx.dcf_upside_pct > min_dcf)
+            or (ctx.analyst_upside_pct is not None and ctx.analyst_upside_pct > min_pt)
+        )
+        and (ctx.revenue_growth_yoy is None or ctx.revenue_growth_yoy > 0)
+        and not ctx.revenue_decelerating
+    )
+
+    # ── Path B: growth (pre-profitable) ──────────────────────────────────────
+    min_rev_growth  = _cfg("position_min_revenue_growth_pct", 20)
+    min_gross_margin = _cfg("position_min_gross_margin_pct", 30)
+    path_b = (
+        ctx.revenue_growth_yoy is not None
+        and ctx.revenue_growth_yoy > min_rev_growth
+        and not ctx.revenue_decelerating
+        and (ctx.gross_margin is None or ctx.gross_margin > min_gross_margin)
+        and ctx.eps_accelerating is True
+    )
+
+    if not path_a and not path_b:
+        return False, (
+            "neither quality/value nor growth path qualifies — "
+            f"fcf_yield={ctx.fcf_yield} dcf_upside={ctx.dcf_upside_pct} "
+            f"rev_growth={ctx.revenue_growth_yoy} rev_decel={ctx.revenue_decelerating} "
+            f"gross_margin={ctx.gross_margin} eps_accel={ctx.eps_accelerating} — "
+            "downgrade to SWING"
+        )
+
+    # ── Supporting evidence: need ≥ 2 of 4 ───────────────────────────────────
+    support = 0
+    support_detail = []
+
+    # 1. Sector momentum OR stock above 200d MA
+    sector_ok = bool(ctx.sector_above_50d and (ctx.sector_3m_vs_spy or 0) >= 5)
+    stock_trend_ok = bool(ctx.stock_above_200d)
+    if sector_ok or stock_trend_ok:
+        support += 1
+        support_detail.append("sector/200d trend")
+
+    # 2. Analyst consensus BUY or better
+    if ctx.analyst_consensus in ("BUY", "STRONG_BUY"):
+        support += 1
+        support_detail.append("analyst BUY")
+
+    # 3. Recent analyst upgrade
+    if ctx.recent_upgrade:
+        support += 1
+        support_detail.append("recent upgrade")
+
+    # 4. Insider net buying
+    if ctx.insider_net_sentiment == "BUYING":
+        support += 1
+        support_detail.append("insider buying")
+
+    min_support = _cfg("position_min_supporting_signals", 2)
+    if support < min_support:
+        return False, (
+            f"only {support}/{min_support} supporting signals "
+            f"({', '.join(support_detail) or 'none'}) — downgrade to SWING"
+        )
+
+    path_label = "value/quality" if path_a else "growth"
+    return True, (
+        f"POSITION validated: {path_label} path | "
+        f"{support}/4 signals ({', '.join(support_detail)})"
+    )
 
 
 # ── Trade type classifier ─────────────────────────────────────────────────────
@@ -172,6 +257,7 @@ def validate_entry(
     ctx: TradeContext,
     score: int,
     min_score: int | None = None,
+    opus_trade_type: str | None = None,
 ) -> tuple[bool, str, str, int]:
     """
     Full entry validation: classify trade type and check effective score.
@@ -179,6 +265,11 @@ def validate_entry(
     Returns (allowed, trade_type, reason, effective_score).
 
     allowed = False if trade_type == "REJECT" or effective_score < min_score.
+
+    opus_trade_type: the hold-horizon label from Opus (POSITION/SWING/INTRADAY).
+    When Opus says POSITION, the two-path fundamental checklist in _validate_position()
+    is run. If it fails, trade_type is downgraded to SWING — the trade still opens,
+    it just gets the shorter hold horizon.
     """
     if min_score is None:
         min_score = CONFIG.get("min_score_to_trade", 14)
@@ -187,6 +278,25 @@ def validate_entry(
 
     if trade_type == "REJECT":
         return False, "REJECT", reason, effective_score
+
+    # ── POSITION checklist: validate fundamentals when Opus said POSITION ─────
+    if opus_trade_type == "POSITION":
+        qualifies, pos_reason = _validate_position(direction, ctx)
+        if qualifies:
+            trade_type = "POSITION"
+            reason = pos_reason
+            log.info(
+                "entry_gate: %s %s POSITION approved | %s",
+                ctx.symbol, direction, pos_reason,
+            )
+        else:
+            # Downgrade to SWING — don't block the trade, just reduce hold horizon
+            trade_type = "SWING"
+            reason = pos_reason
+            log.info(
+                "entry_gate: %s %s POSITION→SWING | %s",
+                ctx.symbol, direction, pos_reason,
+            )
 
     if effective_score < min_score:
         full_reason = (

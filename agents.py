@@ -8,7 +8,7 @@
 #   Agent 1 — Technical Analyst     deterministic  (parallel with Trading Analyst)
 #   Agent 2 — Trading Analyst       LLM/Opus       (replaces Macro + Opportunity + Devil)
 #   Agent 3 — Risk Manager          deterministic
-#   Agent 4 — Final Decision Maker  deterministic
+#   Agent 4 — Trade Synthesiser     deterministic
 #
 # LLM calls per scan: 1 (Trading Analyst, Opus, uncapped tokens)
 # LLM calls per trade: 0 (Execution Agent is deterministic — execution_agent.py)
@@ -188,8 +188,8 @@ def run_all_agents(
         signals=ordered_qualified,
     )
 
-    # ── Agent 4: Final Decision Maker (deterministic) ────────────────────────
-    log.info("Agent 4: Final Decision Maker (deterministic)...")
+    # ── Agent 4: Trade Synthesiser (deterministic) ───────────────────────────
+    log.info("Agent 4: Trade Synthesiser (deterministic)...")
     final = agent_final_decision(
         tech,
         analyst,
@@ -217,7 +217,7 @@ def run_all_agents(
 
 
 # ══════════════════════════════════════════════════════════════
-# AGENT 4 — FINAL DECISION MAKER  (deterministic)
+# AGENT 4 — TRADE SYNTHESISER  (deterministic)
 # ══════════════════════════════════════════════════════════════
 
 

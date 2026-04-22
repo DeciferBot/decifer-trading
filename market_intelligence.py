@@ -511,11 +511,17 @@ entry context to decide. When in doubt, lean SWING over INTRADAY.
      pead, overnight_drift, analyst action, insider/congressional activity, \
      or a stock in a confirmed multi-day trend. 2–10 day hold. This is the \
      DEFAULT when a signal has any non-technical dimension contributing.
-   - POSITION: high conviction, hold weeks or longer. Use when: score ≥ 38 AND \
-     directional or MTF dim is elevated (confirmed multi-timeframe trend) AND \
-     the thesis isn't a single catalyst that resolves in days. A sustained \
-     trend with news/insider/sector support qualifies. This is not a \
-     fundamental purity test — it is a hold-horizon decision.
+   - POSITION: hold weeks or longer. Two paths qualify — use either one: \
+     PATH A (value/quality): company is profitable, FCF positive, stock is cheap \
+     vs DCF or analyst target, revenue not shrinking or decelerating. \
+     PATH B (growth): revenue growing >20% YoY AND not decelerating, gross margin \
+     solid, losses narrowing (EPS accelerating). \
+     Both paths require: directional or momentum dim elevated (confirmed trend), \
+     catalyst is open-ended not binary (sector rotation, product cycle, analyst \
+     re-rating = yes; earnings tomorrow = no), and ≥2 of: sector momentum, \
+     analyst BUY, recent upgrade, insider buying. \
+     The entry gate will validate these deterministically — your job is to label \
+     the hold horizon. When fundamentals support a multi-week hold, lean POSITION.
    - AVOID: genuine exception only — see rules below
 
 2. conviction: 0.0–1.0. Count of independent supporting observations divided by \
@@ -583,7 +589,9 @@ def _fallback_classify(
 
     # Classify by score band
     conviction = round(min(score / 50.0, 1.0), 2)
-    if score >= 40:
+    if score >= 42:
+        trade_type = "POSITION"
+    elif score >= 40:
         trade_type = "SWING"
     elif score >= 28 or score >= CONFIG.get("min_score_to_trade", 14):
         trade_type = "INTRADAY"
