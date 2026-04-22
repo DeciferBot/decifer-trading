@@ -95,6 +95,17 @@ def _validate_order_context(
                 f"<30 min to close, no time to manage"
             )
 
+    # ── CHECK 5: Zero-conviction orphan guard ─────────────────────────────────────
+    # score=0 with trade_type=UNKNOWN is the fingerprint of a re-synced orphan —
+    # a position that was never scored through the signal pipeline. A legitimate
+    # new entry always has score > 0 and a known trade_type from the intelligence
+    # layer. Both conditions together = confirmed orphan; either alone is not enough.
+    if score == 0 and trade_type.upper() in ("UNKNOWN", ""):
+        return (
+            f"zero-conviction orphan: score=0 and trade_type='{trade_type}' — "
+            f"position was not scored through the signal pipeline"
+        )
+
     # ── CHECK 4: Score-direction alignment (warn only) ─────────────────────────
     # Score measures conviction magnitude, not direction. A positive score on
     # a SHORT is not wrong per se — bearish dimensions can dominate even when
@@ -445,7 +456,6 @@ def execute_buy(
         # for why we entered — that is sacrosanct and lives here first.
         _trade_id = f"{symbol}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
         try:
-            from trade_store import ledger_write as _wal_write
             _wal_icw = None
             try:
                 from ic_calculator import get_current_weights as _wal_icw_fn
@@ -462,20 +472,6 @@ def execute_buy(
             )
             _wal_setup_type = _derive_setup_type(signal_scores or {})
             _wal_open_time = open_time or datetime.now(UTC).isoformat()
-            _wal_write(symbol, {
-                "symbol": symbol, "instrument": instrument, "direction": "LONG",
-                "trade_type": trade_type or "INTRADAY",
-                "entry": price, "qty": qty, "sl": sl, "tp": tp,
-                "entry_score": score, "conviction": conviction, "reasoning": reasoning,
-                "signal_scores": signal_scores or {}, "agent_outputs": agent_outputs or {},
-                "entry_regime": _wal_regime,
-                "entry_thesis": _wal_entry_thesis,
-                "setup_type": _wal_setup_type,
-                "pattern_id": pattern_id, "atr": atr, "advice_id": advice_id,
-                "ic_weights_at_entry": _wal_icw, "tranche_mode": tranche_mode,
-                "t1_qty": t1_qty, "t2_qty": t2_qty,
-                "open_time": _wal_open_time,
-            })
             try:
                 from trade_log import append_event as _tl_ae
                 _tl_ae("ORDER_INTENT", _trade_id, symbol,
@@ -652,11 +648,6 @@ def execute_buy(
                         }
                     _save_positions_file()
                     try:
-                        from trade_store import ledger_write as _ledger_write
-                        _ledger_write(symbol, active_trades.get(symbol, {}))
-                    except Exception as _lw_err:
-                        log.error(f"execute_buy {symbol}: ledger_write failed: {_lw_err}")
-                    try:
                         from learning import log_trade as _log_trade
 
                         _log_trade(
@@ -717,7 +708,7 @@ def execute_buy(
                 "sl": sl, "tp": tp, "score": score, "reasoning": reasoning,
                 "candle_gate": candle_gate or "UNKNOWN",
                 "timestamp": datetime.now(UTC).isoformat(),
-            })
+            }, trade_id=_trade_id)
 
             try:
                 _open_time = open_time or datetime.now(UTC).isoformat()
@@ -761,11 +752,6 @@ def execute_buy(
                         "trade_id": _trade_id,
                     }
                 _save_positions_file()
-                try:
-                    from trade_store import ledger_write as _ledger_write
-                    _ledger_write(symbol, active_trades.get(symbol, {}))
-                except Exception as _lw_err:
-                    log.error(f"execute_buy {symbol}: ledger_write failed: {_lw_err}")
                 from learning import log_trade
                 log_trade(trade=active_trades[symbol], agent_outputs=agent_outputs or {}, regime=regime, action="OPEN")
             except Exception as record_err:
@@ -858,7 +844,8 @@ def execute_buy(
                 "reasoning": reasoning,
                 "candle_gate": candle_gate or "UNKNOWN",
                 "timestamp": datetime.now(UTC).isoformat(),
-            }
+            },
+            trade_id=_trade_id,
         )
         log_order(
             {
@@ -873,7 +860,8 @@ def execute_buy(
                 "instrument": "stock",
                 "role": "stop_loss",
                 "timestamp": datetime.now(UTC).isoformat(),
-            }
+            },
+            trade_id=_trade_id,
         )
         if place_tp and tp_trade is not None:
             log_order(
@@ -889,7 +877,8 @@ def execute_buy(
                     "instrument": "stock",
                     "role": "take_profit",
                     "timestamp": datetime.now(UTC).isoformat(),
-                }
+                },
+                trade_id=_trade_id,
             )
 
         # ── VERIFY BRACKET — fallback if children got rejected ────
@@ -972,7 +961,8 @@ def execute_buy(
                         "role": "stop_loss_standalone",
                         "oca_group": oca_group,
                         "timestamp": datetime.now(UTC).isoformat(),
-                    }
+                    },
+                    trade_id=_trade_id,
                 )
             except Exception as e:
                 log.error(f"CRITICAL: Failed to place standalone SL for {symbol}: {e}")
@@ -1002,7 +992,8 @@ def execute_buy(
                             "role": "take_profit_standalone",
                             "oca_group": oca_group,
                             "timestamp": datetime.now(UTC).isoformat(),
-                        }
+                        },
+                        trade_id=_trade_id,
                     )
                     # Update t1_order_id to the standalone TP so update_tranche_status tracks it
                     if tranche_mode:
@@ -1080,11 +1071,6 @@ def execute_buy(
                     "trade_id": _trade_id,
                 }
             _save_positions_file()
-            try:
-                from trade_store import ledger_write as _ledger_write
-                _ledger_write(symbol, active_trades.get(symbol, {}))
-            except Exception as _lw_err:
-                log.error(f"execute_buy {symbol}: ledger_write failed: {_lw_err}")
             # Log OPEN record to trades.json for feedback loop
             from learning import log_trade
 
@@ -1351,7 +1337,6 @@ def execute_short(
         # ── Write-ahead metadata commit ───────────────────────────────────────
         _trade_id = f"{symbol}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
         try:
-            from trade_store import ledger_write as _wal_write_s
             _wal_icw_s = None
             try:
                 from ic_calculator import get_current_weights as _wal_icw_fn_s
@@ -1368,19 +1353,6 @@ def execute_short(
             )
             _wal_setup_type_s = _derive_setup_type(signal_scores or {})
             _wal_open_time_s = open_time or datetime.now(UTC).isoformat()
-            _wal_write_s(symbol, {
-                "symbol": symbol, "instrument": instrument, "direction": "SHORT",
-                "trade_type": trade_type or "INTRADAY",
-                "entry": price, "qty": qty, "sl": sl, "tp": tp,
-                "entry_score": score, "conviction": conviction, "reasoning": reasoning,
-                "signal_scores": signal_scores or {}, "agent_outputs": agent_outputs or {},
-                "entry_regime": _wal_regime_s,
-                "entry_thesis": _wal_entry_thesis_s,
-                "setup_type": _wal_setup_type_s,
-                "pattern_id": pattern_id, "atr": atr, "advice_id": advice_id,
-                "ic_weights_at_entry": _wal_icw_s,
-                "open_time": _wal_open_time_s,
-            })
             try:
                 from trade_log import append_event as _tl_ae
                 _tl_ae("ORDER_INTENT", _trade_id, symbol,
@@ -1431,7 +1403,7 @@ def execute_short(
                 "sl": sl, "tp": tp, "score": score, "reasoning": reasoning,
                 "candle_gate": candle_gate or "UNKNOWN",
                 "timestamp": datetime.now(UTC).isoformat(),
-            })
+            }, trade_id=_trade_id)
 
             try:
                 _open_time = open_time or datetime.now(UTC).isoformat()
@@ -1475,11 +1447,6 @@ def execute_short(
                         "trade_id": _trade_id,
                     }
                 _save_positions_file()
-                try:
-                    from trade_store import ledger_write as _ledger_write
-                    _ledger_write(symbol, active_trades.get(symbol, {}))
-                except Exception as _lw_err:
-                    log.error(f"execute_short {symbol}: ledger_write failed: {_lw_err}")
                 from learning import log_trade
                 log_trade(trade=active_trades[symbol], agent_outputs=agent_outputs or {}, regime=regime, action="OPEN")
             except Exception as record_err:
@@ -1567,7 +1534,8 @@ def execute_short(
                 "reasoning": reasoning,
                 "candle_gate": candle_gate or "UNKNOWN",
                 "timestamp": datetime.now(UTC).isoformat(),
-            }
+            },
+            trade_id=_trade_id,
         )
         log_order(
             {
@@ -1582,7 +1550,8 @@ def execute_short(
                 "instrument": "stock",
                 "role": "stop_loss",
                 "timestamp": datetime.now(UTC).isoformat(),
-            }
+            },
+            trade_id=_trade_id,
         )
         if place_tp and tp_trade is not None:
             log_order(
@@ -1598,7 +1567,8 @@ def execute_short(
                     "instrument": "stock",
                     "role": "take_profit",
                     "timestamp": datetime.now(UTC).isoformat(),
-                }
+                },
+                trade_id=_trade_id,
             )
 
         try:
@@ -1659,11 +1629,6 @@ def execute_short(
                     "trade_id": _trade_id,
                 }
             _save_positions_file()
-            try:
-                from trade_store import ledger_write as _ledger_write
-                _ledger_write(symbol, active_trades.get(symbol, {}))
-            except Exception as _lw_err:
-                log.error(f"execute_short {symbol}: ledger_write failed: {_lw_err}")
             from learning import log_trade
 
             log_trade(
@@ -1865,7 +1830,8 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                 "role": "close",
                 "reason": reason,
                 "timestamp": datetime.now(UTC).isoformat(),
-            }
+            },
+            trade_id=info.get("trade_id"),
         )
 
         if direction == "SHORT":
@@ -2026,7 +1992,8 @@ def execute_add_to_position(
                 "reason": reason,
                 "regime": regime.get("regime", ""),
                 "note": "portfolio_manager_add",
-            }
+            },
+            trade_id=info.get("trade_id"),
         )
         return True
 

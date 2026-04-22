@@ -96,9 +96,15 @@ def record_capital_adjustment(amount: float, note: str = ""):
 
 
 # ── Order logging (every order placed, regardless of fill status) ──────
-def log_order(order_record: dict):
+def log_order(order_record: dict, trade_id: str | None = None):
     """
-    Log an order to orders.json.
+    Log an order to orders.json and append the matching event to decifer.db.
+
+    trade_id: pass explicitly when in scope (execute_buy / execute_short / execute_sell).
+    When omitted, the function tries order_record.get("trade_id") first, then falls back
+    to a best-effort lookup from active_trades by symbol so fill_watcher and bot_ibkr
+    callers get DB coverage without any call-site changes.
+
     order_record should contain:
       symbol, side (BUY/SELL), order_type (LMT/MKT/STP), qty, price,
       order_id, status (SUBMITTED/FILLED/CANCELLED/REJECTED),
@@ -167,6 +173,36 @@ def log_order(order_record: dict):
         limit_price=order_record.get("price"),
         fill_price=order_record.get("fill_price"),
     )
+
+    # ── Mirror to decifer.db event log ───────────────────────────────────────
+    # Resolve trade_id: explicit param → order_record field → active_trades lookup
+    _db_trade_id = trade_id or order_record.get("trade_id")
+    if not _db_trade_id:
+        try:
+            from orders_state import active_trades, _trades_lock
+            _sym = order_record.get("symbol", "")
+            with _trades_lock:
+                _db_trade_id = active_trades.get(_sym, {}).get("trade_id")
+        except Exception:
+            pass
+    if _db_trade_id:
+        try:
+            _status = order_record.get("status", "")
+            _sym = order_record.get("symbol", "")
+            _oid = order_record.get("order_id") or 0
+            _qty = order_record.get("qty") or 0
+            if _status == "SUBMITTED":
+                from trade_log import submit_order as _tl_submit
+                _tl_submit(_db_trade_id, _sym, order_id=_oid, qty=_qty,
+                           limit_price=order_record.get("price") or 0.0,
+                           side=order_record.get("side", ""))
+            elif _status == "FILLED":
+                from trade_log import record_fill as _tl_fill
+                _tl_fill(_db_trade_id, _sym,
+                         fill_price=order_record.get("fill_price") or order_record.get("price") or 0.0,
+                         qty=_qty, order_id=_oid)
+        except Exception as _db_err:
+            log.warning("log_order: DB write failed for %s: %s", order_record.get("symbol"), _db_err)
 
 
 def update_order_status(order_id: int, status: str, fill_price: float | None = None, filled_qty: int | None = None):

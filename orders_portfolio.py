@@ -40,7 +40,6 @@ from orders_state import (
 )
 import orders_state as _orders_state
 from trade_store import ledger_lookup as _ledger_lookup
-from trade_store import ledger_write as _ledger_write
 from trade_store import restore as _ts_restore
 
 # ── flatten_all order-book wait constants ─────────────────────────────────────
@@ -742,10 +741,6 @@ def reconcile_with_ibkr(ib: IB):
                                 new_entry["score"] = _saved["score"]
                             new_entry["_metadata_restored"] = True
                         _safe_set_trade(key, new_entry)
-                        try:
-                            _ledger_write(key, new_entry, force=True)
-                        except Exception as _lw_e:
-                            log.warning(f"Reconcile {key}: ledger_write failed: {_lw_e}")
                     elif is_fx:
                         # FX position — tighter SL/TP (0.5%/1.5%) and 4-decimal precision
                         if direction == "SHORT":
@@ -812,10 +807,6 @@ def reconcile_with_ibkr(ib: IB):
                                 new_entry["tp"] = _saved["tp"]
                             new_entry["_metadata_restored"] = True
                         _safe_set_trade(key, new_entry)
-                        try:
-                            _ledger_write(key, new_entry, force=True)
-                        except Exception as _lw_e:
-                            log.warning(f"Reconcile {key}: ledger_write failed: {_lw_e}")
                     else:
                         # Stock position
                         if direction == "SHORT":
@@ -884,10 +875,6 @@ def reconcile_with_ibkr(ib: IB):
                                 new_entry["tp"] = _saved["tp"]
                             new_entry["_metadata_restored"] = True
                         _safe_set_trade(key, new_entry)
-                        try:
-                            _ledger_write(key, new_entry, force=True)
-                        except Exception as _lw_e:
-                            log.warning(f"Reconcile {key}: ledger_write failed: {_lw_e}")
 
                     if not is_option and not is_fx:
                         close_action = "BUY" if direction == "SHORT" else "SELL"
@@ -1027,7 +1014,7 @@ def reconcile_with_ibkr(ib: IB):
         # Any position that ended up with trade_type UNKNOWN after all lookup
         # tiers means the bot made this trade but lost the metadata on restart.
         # Write to data/orphaned_positions.json so the gap is visible and
-        # actionable (dashboard card, manual classify via ledger_write).
+        # actionable (dashboard card).
         try:
             import json as _json
             from pathlib import Path as _Path
@@ -1057,7 +1044,7 @@ def reconcile_with_ibkr(ib: IB):
             if _new_orphans:
                 log.warning(
                     "Reconcile: %d position(s) have UNKNOWN trade_type — metadata was lost on a prior restart. "
-                    "Keys: %s. See data/orphaned_positions.json. Use ledger_write() with force=True to recover.",
+                    "Keys: %s. See data/orphaned_positions.json.",
                     len(_new_orphans),
                     list(_new_orphans.keys()),
                 )
