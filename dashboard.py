@@ -2986,7 +2986,12 @@ function buildDailyPnL(equityData, tf) {
     if (!byDate[date]) byDate[date] = { open: d.value, close: d.value };
     byDate[date].close = d.value;
   });
-  let days = Object.entries(byDate).map(([date, v]) => ({ date, pnl: v.close - v.open }));
+  // True daily P&L = today's last reading - yesterday's last reading (not intraday close-open)
+  const sortedDates = Object.keys(byDate).sort();
+  let days = sortedDates.map((date, i) => {
+    const prevClose = i > 0 ? byDate[sortedDates[i - 1]].close : byDate[date].open;
+    return { date, pnl: byDate[date].close - prevClose };
+  });
 
   // If only 1 day of data, show HOURLY P&L bars instead of one giant bar
   if (days.length <= 1) {

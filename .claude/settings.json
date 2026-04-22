@@ -1,5 +1,9 @@
 {
   "model": "claude-sonnet-4-6",
+  "env": {
+    "PATH": "/Users/amitchopra/Documents/Claude/Projects/decifer trading/.venv/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+  },
+  "enableAllProjectMcpServers": true,
   "permissions": {
     "defaultMode": "acceptEdits",
     "allow": [

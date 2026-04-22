@@ -1,107 +1,90 @@
-OVERNIGHT RESEARCH NOTES — 2026-04-22
-Generated: 2026-04-22 06:19 ET
+OVERNIGHT RESEARCH NOTES — 2026-04-17
+Generated: 2026-04-17 01:05 ET
 
 PRE-MARKET / AFTER-HOURS TONE:
-  SPY   $707.83  -0.13%  (flat)
-  QQQ   $648.81  +0.31%  (gap-up)
-  IWM   $276.83  -0.19%  (gap-down)
+  SPY   $701.66  +0.25%  (gap-up)
+  QQQ   $640.24  +0.45%  (gap-up)
+  IWM   $269.95  +0.21%  (gap-up)
   ---  sector ETFs  ---
-  XLF   $52.44  -0.36%  (gap-down)
-  XLK   $156.23  +1.08%  (gap-up)
-  XLE   $55.90  +1.51%  (gap-up)
-  XLV   $146.00  -0.96%  (gap-down)
-  XLI   $172.20  -0.98%  (gap-down)
-  XLU   $45.19  -1.22%  (gap-down)
-  XLB   $52.02  -0.40%  (gap-down)
-  XLRE  $43.78  -1.93%  (gap-down)
+  XLF   $52.03  -0.27%  (gap-down)
+  XLK   $152.02  +1.14%  (gap-up)
+  XLE   $56.58  +1.47%  (gap-up)
+  XLV   $146.61  -0.79%  (gap-down)
+  XLI   $170.33  -0.50%  (gap-down)
+  XLU   $46.35  +0.72%  (gap-up)
+  XLB   $51.75  +0.72%  (gap-up)
+  XLRE  $43.81  +0.92%  (gap-up)
 
 PRE-MARKET MOVERS (>1.5% gap vs yesterday's close):
-  CAR    $  770.01  +26.48%  (gap-up)
-  CRDO   $  187.09  +7.20%  (gap-up)
-  STX    $  577.84  +7.06%  (gap-up)
-  UNH    $  345.93  +6.94%  (gap-up)
-  SOXL   $  101.60  +5.90%  (gap-up)
-  WDC    $  394.80  +5.53%  (gap-up)
-  AMD    $  289.74  +5.38%  (gap-up)
-  LITE   $  852.99  -4.71%  (gap-down)
-  MRVL   $  154.78  +4.69%  (gap-up)
-  GE     $  289.50  -4.64%  (gap-down)
-  ORCL   $  185.45  +4.43%  (gap-up)
-  USO    $  126.43  +4.21%  (gap-up)
-  BE     $  227.11  +4.05%  (gap-up)
-  IREN   $   46.83  -3.88%  (gap-down)
-  COIN   $  203.77  -3.71%  (gap-down)
+  CAR    $  445.15  +12.48%  (gap-up)
+  NFLX   $   97.44  -9.54%  (gap-down)
+  LITE   $  889.00  +7.89%  (gap-up)
+  AMD    $  277.35  +7.45%  (gap-up)
+  INTC   $   68.86  +6.04%  (gap-up)
+  CRDO   $  159.00  -5.55%  (gap-down)
+  ORCL   $  179.20  +5.53%  (gap-up)
+  ASTS   $   91.10  +4.82%  (gap-up)
+  ASML   $ 1412.15  -4.70%  (gap-down)
+  IREN   $   47.14  -3.44%  (gap-down)
+  MSTR   $  148.29  +3.31%  (gap-up)
+  CVNA   $  360.27  -2.91%  (gap-down)
+  SOXL   $   88.37  +2.80%  (gap-up)
+  TSM    $  364.74  -2.76%  (gap-down)
+  NOW    $   96.56  +2.52%  (gap-up)
 
 YESTERDAY'S PERFORMANCE:
-  Trades: 40 (20W/20L)  Win rate: 50%  P&L: $-988.07
-  Best:  ELV LONG +$4,096.24  (agent_sell / TRENDING_UP)
-  Worst: SPXS SHORT $-4,003.21  (cycle_check:architecturally invalid: SPXS is a long-only inverse ETF; SHORT position must be closed / RANGE_BOUND)
+  Trades: 4 (2W/2L)  Win rate: 50%  P&L: $-628.93
+  Best:  MSFT LONG +$15.40  (take_profit / UNKNOWN)
+  Worst: ONTO LONG $-481.02  (pm_exit | INTRADAY | regime:UNKNOWN→TRENDING_UP | held:0min | thesis:noise_stop | scalp_signal_lost: realized_loss_accumulating: Same underlying thesis as ONTO stock — weak score of 22, -6.5% on the option with time decay / TRENDING_UP)
   By regime:
-    RELIEF_RALLY: 5 trades  0% WR  $-5,584.41
-    RANGE_BOUND: 3 trades  33% WR  $-3,060.10
-    UNKNOWN: 7 trades  43% WR  $+532.91
-    MOMENTUM_BULL: 2 trades  100% WR  $+2,401.70
-    TRENDING_UP: 23 trades  61% WR  $+4,721.83
-  By dimension (non-zero entry scores):
-    insider_buying   19 trades  58% WR  $+1,463
-    news              7 trades  71% WR  $+152
-    squeeze          14 trades  43% WR  $-1,536
-    trend            28 trades  54% WR  $-2,007
-    iv_skew          17 trades  47% WR  $-2,099
-    mtf              25 trades  56% WR  $-2,931
-    social           10 trades  60% WR  $-3,290
-    momentum         34 trades  50% WR  $-4,347
-    flow             34 trades  50% WR  $-4,347
-    overnight_drift  32 trades  47% WR  $-5,124
-    breakout          6 trades  17% WR  $-6,883
-  FLAG: High trade count — overtrading risk
+    TRENDING_UP: 3 trades  33% WR  $-644.33
 
 ECONOMIC CALENDAR — Next 5 Days:
+  Fri Apr 17: CFTC Crude Oil speculative net positions [MEDIUM]
+  Fri Apr 17: CFTC S&P 500 speculative net positions [MEDIUM]
+  Fri Apr 17: CFTC Nasdaq 100 speculative net positions [MEDIUM]
+  Fri Apr 17: CFTC Gold Speculative net positions [MEDIUM]
+  Fri Apr 17: Fed Waller Speech [MEDIUM]
+  Fri Apr 17: Fed Barkin Speech [MEDIUM]
+  Sat Apr 18: No high-impact events
+  Sun Apr 19: No high-impact events
+  Mon Apr 20: No high-impact events
+  Tue Apr 21: API Crude Oil Stock Change (Apr/17) [MEDIUM]
+  Tue Apr 21: Business Inventories MoM (Feb) [MEDIUM]
+  Tue Apr 21: Pending Home Sales MoM (Mar) [MEDIUM]
+  Tue Apr 21: Pending Home Sales YoY (Mar) [MEDIUM]
+  Tue Apr 21: Retail Sales YoY (Mar) [HIGH]
+  Tue Apr 21: Retail Sales Ex Gas/Autos MoM (Mar) [HIGH]
+  Tue Apr 21: Retail Sales MoM (Mar) [HIGH]
+  Tue Apr 21: Retail Sales Ex Autos MoM (Mar) [HIGH]
   Wed Apr 22: EIA Crude Oil Stocks Change (Apr/17) [MEDIUM]
   Wed Apr 22: EIA Gasoline Stocks Change (Apr/17) [MEDIUM]
   Wed Apr 22: MBA 30-Year Mortgage Rate (Apr/17) [MEDIUM]
-  Thu Apr 23: S&P Global Services PMI (Apr) [MEDIUM]
-  Thu Apr 23: S&P Global Composite PMI (Apr) [MEDIUM]
-  Thu Apr 23: S&P Global Manufacturing PMI (Apr) [MEDIUM]
-  Thu Apr 23: Chicago Fed National Activity Index (Mar) [MEDIUM]
-  Thu Apr 23: Initial Jobless Claims (Apr/18) [MEDIUM]
-  Fri Apr 24: CFTC Crude Oil speculative net positions [MEDIUM]
-  Fri Apr 24: CFTC Gold Speculative net positions [MEDIUM]
-  Fri Apr 24: CFTC Nasdaq 100 speculative net positions [MEDIUM]
-  Fri Apr 24: CFTC S&P 500 speculative net positions [MEDIUM]
-  Sat Apr 25: No high-impact events
-  Sun Apr 26: No high-impact events
-  Mon Apr 27: Dallas Fed Manufacturing Index (Apr) [MEDIUM]
 
 Earnings calendar: unavailable (no data source connected)
 
-Analyst changes: none in last 24h for tracked universe
+Analyst changes: none in last 24h
 
-MARKET NEWS — Last 16h (FMP, 45 articles):
-  ▲ [CRM]    5h ago   Salesforce: AI Is A True Acceleration Driver, Not A Hollow Rebrand
-  ▼ [NVDA]   8h ago   Switch and SUSE Advance Digital Twin Innovation with NVIDIA
-  ▼ [AMZN]   12h ago  Hagens Berman: Woodinville Woman Sues Amazon After Camp Stove Explodes, Causing Catastroph
-  ▲ [AAPL]   13h ago  Vocalbeats.AI Brings AI Note-Taking to the Wrist with Apple Watch Experience for Owll
-  ▲ [GOOGL]  15h ago  Vodafone offers small businesses cybersecurity, AI capability with Google tie-up
-  ▼ [LLY]    15h ago  Eli Lilly (LLY) Declines More Than Market: Some Information for Investors
-  ▼ [NVDA]   15h ago  Why Nvidia (NVDA) Dipped More Than Broader Market Today
-  ▼ [NVDA]   16h ago  Is the Magnificent Seven Yesterday's News? Here's What History Says
-  ─ [WMT]    4h ago   Back to the Roots Scales Regenerative Movement Nationwide; Expanding Pioneering Soil Healt
-  ─ [AAPL]   4h ago   In the AI era, Apple's strengths may become its constraints
-  ─ [USO]    4h ago   Japex aims to quadruple oil and gas output in 10 years, eyes US expansion
-  ─ [USO]    5h ago   Oil Prices Rise. 2 Ships Hit in Hormuz as Trump Extends Iran Cease-Fire.
+MARKET NEWS — Last 16h (FMP, 60 articles):
+  ▲ [NFLX]   5h ago   Netflix Q1: Guidance Is Soft, The Business Isn't
+  ▲ [NVDA]   10h ago  Nvidia: I'm Finally Convinced (Rating Upgrade)
+  ▲ [NFLX]   10h ago  Netflix Beats Estimates but 9% Selloff Signals Investor Doubt on Outlook
+  ▲ [NFLX]   11h ago  Netflix (NFLX) Q1 Earnings and Revenues Surpass Estimates
+  ▲ [TSLA]   11h ago  Put the Tesla Pedal to the Metal With These ETFs
+  ▲ [AMD]    12h ago  Stock Market Today, April 16: Advanced Micro Devices Surges on AI Demand Momentum
+  ▲ [NFLX]   12h ago  Netflix Reports Strong Earnings and Co-Founder Reed Hastings' Departure. But Here's the Re
+  ▼ [ORCL]   12h ago  Silver Elephant Provides Early Warning Disclosure on Disposition of Oracle Commodity Holdi
+  ▼ [NFLX]   12h ago  Netflix Earnings Forecast Misses, Reed Hastings Steps Down
+  ▲ [NFLX]   13h ago  Netflix Beats Q1 Earnings, Shares Slide On Soft Guidance, Co-Founder Exit
+  ▼ [NFLX]   13h ago  Netflix chair Reed Hastings exits as earnings beat, stock drops
+  ▲ [NFLX]   13h ago  Netflix Q1 Revenue And Earnings Beat Street Expectations, But Shares Still Plunge
 
-Net bias: bearish  (3 bullish / 5 bearish / 37 neutral)
+Net bias: bullish  (9 bullish / 4 bearish / 47 neutral)
   AVOID (bearish catalyst):
-    NVDA   — Switch and SUSE Advance Digital Twin Innovation with NVIDIA
-    AMZN   — Hagens Berman: Woodinville Woman Sues Amazon After Camp Stov
-    LLY    — Eli Lilly (LLY) Declines More Than Market: Some Information
+    ORCL   — Silver Elephant Provides Early Warning Disclosure on Disposi
+    NFLX   — Netflix Earnings Forecast Misses
+    MU     — Micron: This Party Isn't Ending Anytime Soon
   FAVOR (bullish catalyst):
-    CRM    — Salesforce: AI Is A True Acceleration Driver
-    AAPL   — Vocalbeats.AI Brings AI Note-Taking to the Wrist with Apple
-    GOOGL  — Vodafone offers small businesses cybersecurity
-
-MACRO (daily):
-  10Y-2Y Spread: 0.52%  (as of 2026-04-21)  prior: 0.54
-  10Y Treasury: 4.26%  (as of 2026-04-20)  prior: 4.26
-  WTI Crude: 100.72$/bbl  (as of 2026-04-13)  prior: 98.34
+    NVDA   — Nvidia: I'm Finally Convinced (Rating Upgrade)
+    TSLA   — Put the Tesla Pedal to the Metal With These ETFs
+    AMD    — Stock Market Today

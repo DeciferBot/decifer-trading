@@ -240,16 +240,19 @@ Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
 
 ## New Machine Setup
 
-**If the environment looks unconfigured (missing packages, no `.env`, empty state dirs), run setup before doing anything else:**
-
+**Step 1 — Clone the repo:**
 ```bash
-cd "/path/to/decifer trading"
+git clone https://github.com/DeciferBot/decifer-trading.git "decifer trading"
+cd "decifer trading"
+```
+
+**Step 2 — Run the setup script (handles everything automatically):**
+```bash
 bash scripts/setup.sh
 ```
 
 The script handles everything automatically:
 - Installs Homebrew, `python@3.11`, `ta-lib`, `uv`, and other system deps
-- Clones or pulls the repo
 - Installs all Python packages from both `requirements.txt` and `Chief-Decifer-recovered/requirements.txt` via `uv` (no manual pip install needed)
 - Restores `.env` from iCloud Keychain or iCloud Drive backup
 - Installs NLTK data, launch daemons, etc.
@@ -258,10 +261,23 @@ The script handles everything automatically:
 1. Copy the template: `cp .env.example .env`
 2. Fill in all 9 keys: `ANTHROPIC_API_KEY`, `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`, `ALPACA_BASE_URL`, `FMP_API_KEY`, `ALPHA_VANTAGE_KEY`, `IBKR_ACTIVE_ACCOUNT`, `IBKR_PAPER_ACCOUNT`, `FRED_API_KEY`
 
+**Step 3 — Verify the environment:**
+```bash
+python3 -c "import anthropic, pandas, dash"
+```
+
 **Signs of an unconfigured environment to watch for:**
 - `ModuleNotFoundError` on import → run `bash scripts/setup.sh`
 - `ANTHROPIC_API_KEY` empty → `.env` not loaded; check root `.env` exists
 - Signal scripts writing to wrong paths → `config.py` auto-detects repo root via `__file__`, no `DECIFER_REPO_PATH` needed
+- `alpaca-py` missing → `python3.11 -m pip install alpaca-py` (setup.sh should handle this but may fail on non-interactive terminals requiring sudo)
+
+**⚠️ Chief Decifer requirements conflict warning:**
+Running `pip install -r Chief-Decifer-recovered/requirements.txt` will downgrade `dash` and `pandas` to older versions. Always restore with:
+```bash
+python3.11 -m pip install "dash>=4.1.0" "pandas>=3.0" "dash-bootstrap-components>=2.0"
+```
+after running Chief Decifer requirements.
 
 ---
 

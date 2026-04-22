@@ -25,7 +25,16 @@ try:
 except ImportError:
     HAS_DRAGGABLE = False
 
-from config import PORT, REFRESH_INTERVAL_MS, EDGAR_POLL_INTERVAL, CATALYST_SCREEN_INTERVAL, OPTIONS_ANOMALY_INTERVAL, SENTIMENT_SCORER_INTERVAL
+from config import (
+    PORT, REFRESH_INTERVAL_MS, EDGAR_POLL_INTERVAL, CATALYST_SCREEN_INTERVAL,
+    OPTIONS_ANOMALY_INTERVAL, SENTIMENT_SCORER_INTERVAL,
+    STATE_DIR, SESSIONS_DIR, RESEARCH_DIR, SPECS_DIR, INTERNAL_DIR, CATALYST_DIR,
+)
+
+# Ensure required state directories exist on every startup (they're gitignored).
+for _d in (SESSIONS_DIR, RESEARCH_DIR, SPECS_DIR, INTERNAL_DIR, CATALYST_DIR,
+           INTERNAL_DIR / "docs", STATE_DIR / "analysis"):
+    _d.mkdir(parents=True, exist_ok=True)
 
 # ── Version (always read from source — never cached at import time) ────────────
 def _get_version() -> str:
