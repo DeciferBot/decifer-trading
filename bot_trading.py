@@ -876,6 +876,18 @@ def _maybe_generate_overnight_research():
     if dtime(6, 0) <= t < dtime(9, 0) and not _overnight_research_done:
         _overnight_research_done = True
 
+        # RB-8: sentinel path — written by _run() on success, checked before
+        # notes injection at scan time so stale data is never silently injected.
+        import os as _os
+        _overnight_sentinel = _os.path.join(
+            _os.path.dirname(_os.path.abspath(__file__)), "data", "overnight_notes.done"
+        )
+        # Clear any previous cycle's sentinel so the sentinel reflects this run.
+        try:
+            _os.remove(_overnight_sentinel)
+        except OSError:
+            pass
+
         def _run():
             try:
                 from overnight_research import generate_overnight_notes
@@ -893,6 +905,15 @@ def _maybe_generate_overnight_research():
             try:
                 generate_overnight_notes(universe=universe or None)
                 clog("INFO", "Overnight research notes generated → data/overnight_notes.md")
+                # RB-8: write sentinel so the first scan knows notes are fresh.
+                # Without this, a slow FMP API call causes the 9:30 scan to silently
+                # inject yesterday's notes if the thread hasn't completed yet.
+                import os as _os2
+                try:
+                    with open(_overnight_sentinel, "w") as _sf:
+                        _sf.write(datetime.now(_ET).isoformat())
+                except Exception as _se:
+                    clog("WARNING", f"Overnight research: sentinel write failed: {_se}")
             except Exception as exc:
                 clog("WARNING", f"Overnight research failed: {exc}")
 
@@ -950,13 +971,21 @@ def _should_run_portfolio_review(
         if _review_age_mins < _review_cooldown:
             return False, ""
 
+    # RB-1: Collect ALL active triggers rather than returning on the first.
+    # Previously, a single early-return meant Opus received one trigger reason string
+    # and was blind to every other condition that also fired. If regime changed AND
+    # a news hit AND cascade all fired simultaneously, Opus saw only "regime_change".
+    # On the next cycle a different trigger was still active — Opus got called again
+    # with incomplete context each time. Accumulate all triggers and pass them all.
+    _active_triggers: list[str] = []
+
     # 2. Regime change — edge trigger: fires only when regime label changes
     current_regime = regime.get("regime", "")
     if _last_known_regime and current_regime and current_regime != _last_known_regime:
-        return True, "regime_change"
+        _active_triggers.append("regime_change")
 
     if not open_positions:
-        return False, ""
+        return bool(_active_triggers), "; ".join(_active_triggers)
 
     # 3. SCALP signal lost — direction flipped against entry OR momentum
     #    (the primary SCALP driver) collapsed from load-bearing at entry to zero.
@@ -971,6 +1000,7 @@ def _should_run_portfolio_review(
         s["symbol"]: float((s.get("score_breakdown") or {}).get("momentum", 0) or 0)
         for s in all_scored if s.get("symbol")
     }
+    _scalp_lost_syms = []
     for pos in open_positions:
         if pos.get("trade_type", "INTRADAY") not in ("SCALP", "INTRADAY"):
             continue
@@ -985,7 +1015,9 @@ def _should_run_portfolio_review(
         )
         mom_lost = entry_mom >= scalp_mom_entry_min and current_mom <= scalp_mom_current_max
         if dir_flipped or mom_lost:
-            return True, "scalp_signal_lost"
+            _scalp_lost_syms.append(sym)
+    if _scalp_lost_syms:
+        _active_triggers.append(f"scalp_signal_lost:{','.join(_scalp_lost_syms)}")
 
     # 3b. Held-score rise — edge trigger: fires when a held position's score has
     #     risen materially since entry AND reached a minimum conviction threshold.
@@ -997,6 +1029,7 @@ def _should_run_portfolio_review(
     rise_delta = CONFIG.get("add_trigger_score_delta", 15)
     rise_redfire = CONFIG.get("add_trigger_redfire_delta", 5)
     rise_min_score = CONFIG.get("add_trigger_min_score", 45)
+    _rise_syms = []
     for pos in open_positions:
         sym = pos.get("symbol", "")
         entry_sc = pos.get("entry_score", pos.get("score", 0)) or 0
@@ -1007,12 +1040,11 @@ def _should_run_portfolio_review(
             continue
         if (current_sc - entry_sc) < rise_delta:
             continue
-        # Score is elevated. Only fire if it's risen further than the last review
-        # already saw — prevents a position scoring 65 on every cycle from
-        # re-triggering PM endlessly after the first ADD decision.
         last_sc = _last_rise_scores.get(sym)
         if last_sc is None or (current_sc - last_sc) >= rise_redfire:
-            return True, "held_score_rise"
+            _rise_syms.append(sym)
+    if _rise_syms:
+        _active_triggers.append(f"held_score_rise:{','.join(_rise_syms)}")
 
     # 4. News hit — edge trigger: fires only when keyword_score has changed
     #    materially since the last review for that symbol.
@@ -1020,15 +1052,17 @@ def _should_run_portfolio_review(
     #    the PM on every scan cycle.
     news_thresh = pm_cfg.get("news_hit_threshold", 3)
     news_redfire_delta = pm_cfg.get("news_hit_redfire_delta", 2)
+    _news_hit_syms = []
     for pos in open_positions:
         sym = pos.get("symbol", "")
         kw = news_sentiment.get(sym, {}).get("keyword_score", 0)
         if abs(kw) < news_thresh:
             continue
-        # Score meets threshold. Only fire if score has changed since last review.
         last_kw = _last_news_scores.get(sym)
         if last_kw is None or abs(kw - last_kw) >= news_redfire_delta:
-            return True, "news_hit"
+            _news_hit_syms.append(sym)
+    if _news_hit_syms:
+        _active_triggers.append(f"news_hit:{','.join(_news_hit_syms)}")
 
     # 5. Earnings within 48 hours
     try:
@@ -1037,24 +1071,25 @@ def _should_run_portfolio_review(
         held_syms = [p["symbol"] for p in open_positions]
         lookahead = pm_cfg.get("earnings_lookahead_hours", 48)
         if _gew(held_syms, lookahead):
-            return True, "earnings_risk"
+            _active_triggers.append("earnings_risk")
     except Exception:
         pass
 
     # 6. Cascade: 2+ stops this session — fire once per session only
     cascade_thresh = pm_cfg.get("cascade_stop_count", 2)
     if _session_stop_count >= cascade_thresh and not _cascade_reviewed_this_session:
-        return True, "cascade"
+        _active_triggers.append("cascade")
 
     # 7. Daily drawdown threshold
     drawdown_thresh = pm_cfg.get("drawdown_trigger_pct", -0.015)
     if portfolio_value > 0 and (daily_pnl / portfolio_value) < drawdown_thresh:
-        return True, "drawdown"
+        _active_triggers.append("drawdown")
 
     # 8. Stale position — any open position held > N hours without an Opus review
     stale_hours = pm_cfg.get("stale_position_review_hours", 3)
     stale_secs = stale_hours * 3600
     now_utc = datetime.now(UTC)
+    _stale_syms = []
     for pos in open_positions:
         sym = pos.get("symbol", "")
         open_time_str = pos.get("open_time", "")
@@ -1070,9 +1105,11 @@ def _should_run_portfolio_review(
         last_reviewed = _last_pm_review_ts_by_symbol.get(sym)
         since_last = (now_utc - last_reviewed).total_seconds() if last_reviewed else secs_held
         if since_last >= stale_secs:
-            return True, "stale_position"
+            _stale_syms.append(sym)
+    if _stale_syms:
+        _active_triggers.append(f"stale_position:{','.join(_stale_syms)}")
 
-    return False, ""
+    return bool(_active_triggers), "; ".join(_active_triggers)
 
 
 # ── Scan helpers ──────────────────────────────────────────────────────────────
@@ -1398,15 +1435,10 @@ def run_scan():
 
     _print_score_table(scored)
 
-    update_position_prices(pipeline.scored)
-
-    if _check_kill():
-        return
-    _process_close_queue()
-
-    news = get_news_headlines()
-    fx = get_fx_snapshot()
-
+    # CP-1: Options scan runs before update_position_prices so both use the same
+    # live-price moment. Previously options scan ran ~30s after position marks were
+    # frozen from the pipeline snapshot, creating a divergent price universe between
+    # options analysis and PM ADD/TRIM notional calculations.
     options_signals = []
     if CONFIG.get("options_enabled") and get_session() not in ("PRE_MARKET", "AFTER_HOURS"):
         try:
@@ -1419,6 +1451,15 @@ def run_scan():
         except Exception as _opts_err:
             clog("ERROR", f"Options scanner error: {_opts_err}")
 
+    update_position_prices(pipeline.scored)
+
+    if _check_kill():
+        return
+    _process_close_queue()
+
+    news = get_news_headlines()
+    fx = get_fx_snapshot()
+
     if _check_kill():
         return
     _process_close_queue()
@@ -1430,6 +1471,7 @@ def run_scan():
     # ── Lightweight per-cycle position check (every scan, no LLM) ───────────
     global _pm_reviewed_regime
     _force_pm_review = False
+    _cc_review_reasons: list[str] = []  # CP-2: accumulate all REVIEW reasons for PM context
     if open_pos:
         cycle_actions = lightweight_cycle_check(open_pos, regime, pipeline.all_scored)
         for _ca in cycle_actions:
@@ -1488,6 +1530,7 @@ def run_scan():
                 else:
                     clog("ANALYSIS", f"Cycle check queued PM review: {_sym_ca} — {_rsn_ca}")
                     _force_pm_review = True
+                    _cc_review_reasons.append(f"{_sym_ca}: {_rsn_ca}")  # CP-2
 
     # ── Portfolio manager review (event-triggered) ────────────────────────────
     global \
@@ -1518,24 +1561,53 @@ def run_scan():
         )
         if _force_age_mins is None or _force_age_mins >= _force_cooldown_mins:
             should_review = True
-            pm_trigger = "cycle_regime_shift"
+            # CP-2: use the actual accumulated reasons so Opus sees full context,
+            # not just a generic label. Falls back to "cycle_regime_shift" if somehow empty.
+            pm_trigger = ("cycle_check: " + "; ".join(_cc_review_reasons)) if _cc_review_reasons else "cycle_regime_shift"
         else:
             clog(
                 "INFO",
                 f"Cycle check REVIEW suppressed: last PM review {_force_age_mins:.0f}m ago (cooldown {_force_cooldown_mins}m)",
             )
-    if should_review and open_pos:
+    # CP-5: Exclude PENDING (entry submitted but not yet filled) and EXITING
+    # (sell already in flight) from PM review. A position entered this cycle should
+    # not be eligible for an immediate EXIT recommendation before IBKR confirms the
+    # fill — it never gets a chance to breathe. EXITING positions are already being
+    # closed, so PM reviewing them is redundant and can produce conflicting orders.
+    _pm_review_statuses = {"ACTIVE", "PARTIAL_FILL"}
+    pm_open_pos = [p for p in open_pos if p.get("status", "ACTIVE") in _pm_review_statuses]
+
+    if should_review and pm_open_pos:
         clog("ANALYSIS", f"Portfolio review triggered: {pm_trigger}")
+        if len(pm_open_pos) < len(open_pos):
+            clog(
+                "INFO",
+                f"PM review: {len(pm_open_pos)}/{len(open_pos)} positions eligible "
+                f"({len(open_pos) - len(pm_open_pos)} PENDING/EXITING excluded)",
+            )
         try:
+            # BC-2: Refresh position prices from IBKR immediately before PM review.
+            # update_position_prices() above marks positions from the pipeline snapshot
+            # (~30s stale by the time PM runs). A fast-moving position can appear stable
+            # to PM when it isn't — ADD sizing, TRIM thresholds, and conviction-band
+            # crossings are all computed against the frozen marks. A second IBKR price
+            # pull here ensures PM sees live marks, not pipeline-era ones.
+            update_positions_from_ibkr(ib)
+            # Re-read pm_open_pos from the now-refreshed store so PM receives current prices.
+            pm_open_pos = [
+                p for p in get_open_positions()
+                if p.get("status", "ACTIVE") in _pm_review_statuses
+            ]
+
             # Approximate available cash from portfolio value minus open position notionals.
             # Avoids an extra IBKR call; accurate enough for Opus sizing decisions.
             _pos_notional = sum(
-                p.get("current", p.get("entry", 0)) * p.get("qty", 0) for p in open_pos
+                p.get("current", p.get("entry", 0)) * p.get("qty", 0) for p in pm_open_pos
             )
             _available_cash = max(0.0, pv - _pos_notional)
 
             pm_actions = run_portfolio_review(
-                open_positions=open_pos,
+                open_positions=pm_open_pos,
                 all_scored=pipeline.all_scored,
                 regime=regime,
                 news_sentiment=news_sentiment,
@@ -1860,7 +1932,8 @@ def run_scan():
             # Snapshot the news scores and collapse scores seen at this review so that
             # news_hit and score_collapse don't re-fire unless values change materially.
             _scored_map_snap = {s["symbol"]: s.get("score", 0) for s in (pipeline.all_scored or [])}
-            for _rp in open_pos:
+            # CP-5: iterate pm_open_pos (reviewed set) not open_pos (includes PENDING/EXITING)
+            for _rp in pm_open_pos:
                 _rsym = _rp["symbol"]
                 _kw = news_sentiment.get(_rsym, {}).get("keyword_score", 0)
                 _last_news_scores[_rsym] = _kw
@@ -1875,7 +1948,7 @@ def run_scan():
             # does not re-queue the same REVIEW on subsequent cycles for the same regime state.
             _reviewed_regime_label = regime.get("session_character") or regime.get("regime", "UNKNOWN")
             _now_reviewed = datetime.now(UTC)
-            for _rp in open_pos:
+            for _rp in pm_open_pos:
                 _pm_reviewed_regime[_rp["symbol"]] = _reviewed_regime_label
                 _last_pm_review_ts_by_symbol[_rp["symbol"]] = _now_reviewed
     else:
@@ -1883,6 +1956,19 @@ def run_scan():
 
     open_pos = get_open_positions()  # refresh after any PM exits
     dash["positions"] = open_pos
+
+    # CP-4: PM exits change daily P&L but strategy_mode was frozen before PM ran.
+    # Recompute pnl + strategy_mode so agents size new trades against the actual
+    # post-PM portfolio state (e.g. a large exit tipping NORMAL → DEFENSIVE).
+    pv, pnl = get_account_data()
+    _post_pm_mode = get_intraday_strategy_mode(pv, pnl, regime["regime"])
+    if _post_pm_mode["mode"] != strategy_mode["mode"]:
+        clog(
+            "RISK",
+            f"Strategy mode updated post-PM: {strategy_mode['mode']} → {_post_pm_mode['mode']} "
+            f"(PnL {_post_pm_mode['daily_pnl_pct']*100:+.1f}%)",
+        )
+    strategy_mode = _post_pm_mode
 
     positions_to_reconsider = check_thesis_validity(open_pos, regime["regime"])
     if positions_to_reconsider:
@@ -1892,6 +1978,19 @@ def run_scan():
         )
         for _p in positions_to_reconsider:
             clog("RISK", f"  Reconsider: {_p['symbol']} — {_p['reason']}")
+
+    # CP-3: Re-check regime immediately before agents — the scoring + PM pipeline
+    # can take 2-5 minutes; a VIX spike mid-scan would leave agents sizing trades
+    # with a stale (pre-spike) regime and wrong size_multiplier. If regime shifted,
+    # recompute strategy_mode so Agent 4 uses the correct sizing context.
+    _pre_agent_regime = get_market_regime(ib)
+    if _pre_agent_regime.get("regime") != regime.get("regime"):
+        clog(
+            "RISK",
+            f"Regime shifted mid-scan: {regime['regime']} → {_pre_agent_regime['regime']} — updating before agents",
+        )
+        regime = _pre_agent_regime
+        strategy_mode = get_intraday_strategy_mode(pv, pnl, regime["regime"])
 
     _agent_pos_notional = sum(
         p.get("current", p.get("entry", 0)) * p.get("qty", 0) for p in open_pos

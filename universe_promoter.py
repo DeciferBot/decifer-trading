@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 from datetime import UTC, datetime
 
 from alpaca_data import fetch_snapshots_batched
@@ -151,8 +152,22 @@ def run_promoter(top_n: int | None = None) -> list[dict]:
         "symbols": top,
     }
     os.makedirs(os.path.dirname(_PROMOTED_PATH), exist_ok=True)
-    with open(_PROMOTED_PATH, "w") as f:
-        json.dump(payload, f, indent=2)
+    # RB-2: Atomic write — every other persistent write in the codebase uses
+    # tempfile + os.replace(). A non-atomic write here produces a corrupt file
+    # on interrupted write; the loader returns [] silently, dropping Tier B symbols
+    # for up to 18 hours with no warning.
+    _dir = os.path.dirname(_PROMOTED_PATH)
+    _fd, _tmp = tempfile.mkstemp(dir=_dir, suffix=".tmp")
+    try:
+        with os.fdopen(_fd, "w") as f:
+            json.dump(payload, f, indent=2)
+        os.replace(_tmp, _PROMOTED_PATH)
+    except Exception:
+        try:
+            os.unlink(_tmp)
+        except OSError:
+            pass
+        raise
     log.info(
         f"run_promoter: wrote {_PROMOTED_PATH} — top score={top[0]['score']:.2f} "
         f"({top[0]['ticker']}: {top[0]['reason']})"

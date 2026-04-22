@@ -30,7 +30,8 @@ Three actors:
 - **Three-tier universe — Active ✅**: TV Screener ripped out. Universe is now: committed universe (top-1000 by dollar volume, weekly refresh) + dynamic adds (catalyst hits, held positions, favourites, sympathy plays, news-driven). Scanner pulls from committed universe; dynamic tiers bypass the gate.
 - **Catalyst screener — Active ✅**: `catalyst_engine.py` scores EDGAR filings, earnings surprises, and analyst actions in real-time. High-conviction catalyst hits get a flat score boost to clear `min_score_to_trade`. Wired into both the main signal engine and the Chief Decifer dashboard.
 - **Phase B / C / D — Not yet built**: Signal validation (Alphalens), HMM regime detection, walk-forward weight calibration. All blocked on trade data volume.
-- **Test suite**: 1704/1705 passing (2026-04-16). Tests are current with the codebase.
+- **Full architecture audit — Complete ✅** (2026-04-22): 27-issue audit across all cycle-position, behaviour-change, and robustness categories. 24 issues implemented across 2 sessions. All 5 CP fixes, all 9 BC fixes, and all 9 RB fixes shipped. See `docs/DECISIONS.md` for the full decision log.
+- **Test suite**: 1911 passing (2026-04-22). Tests are current with the codebase.
 - **Regime detector**: VIX-proxy + SPY EMA (locked). HMM explicitly deferred until ≥200 closed trades.
 
 ---

@@ -600,7 +600,20 @@ def batch_news_sentiment(symbols: list[str], directions: dict[str, str] | None =
     # ── Phase 3: Assemble final scores ─────────────────────────
     for sym in to_fetch:
         if sym not in rss_results:
-            results[sym] = _empty_sentiment(sym)
+            # BC-6: RSS fetch failed (network error, timeout, etc.).
+            # Zeroing Dimension 7 for every symbol in a failed batch biases scoring
+            # against all names that cycle. If a stale cache entry exists, serve it
+            # with a staleness flag rather than returning empty scores. Stale data
+            # preserves the signal's prior information; zero discards it entirely.
+            stale = _news_cache.get(sym)
+            if stale:
+                stale_data = dict(stale["data"])
+                stale_data["stale"] = True  # downstream can flag this in IC audit
+                results[sym] = stale_data
+                age_min = (now - stale["fetched_at"]).total_seconds() / 60
+                log.debug("BC-6: %s RSS failed — serving stale cache (%.0fm old)", sym, age_min)
+            else:
+                results[sym] = _empty_sentiment(sym)
             continue
 
         headlines, recency, kw = rss_results[sym]

@@ -156,12 +156,17 @@ def run_all_agents(
     )
 
     # ── Agents 1+2: Technical (deterministic) + Trading Analyst (Opus) in parallel ──
+    # BC-8: Agent 1 (Technical) evaluates ordered_qualified (all signals, fresh+held).
+    # Agent 2 (Trading Analyst/Opus) receives fresh_qualified only — held symbols are
+    # already visible in the OPEN POSITIONS block with full entry/P&L detail. Showing
+    # them again in the scored signals list causes Opus to double-represent them and
+    # cluster ADD recommendations on existing positions rather than evaluating new ones.
     log.info("Agents 1+2: Technical + Trading Analyst/Opus (parallel)...")
     with ThreadPoolExecutor(max_workers=2) as pool:
         tech_future = pool.submit(agent_technical, ordered_qualified, regime)
         analyst_future = pool.submit(
             agent_trading_analyst,
-            ordered_qualified,
+            fresh_qualified,  # BC-8: Opus sees fresh candidates only; held shown in OPEN POSITIONS block
             regime,
             news,
             fx_data,
@@ -205,6 +210,7 @@ def run_all_agents(
         positions_to_reconsider=positions_to_reconsider,
         portfolio_value=portfolio_value,
         daily_pnl=daily_pnl,
+        options_signals=options_signals,  # BC-1: pass validated contracts for instrument gate
     )
 
     final["_agent_outputs"] = {
@@ -236,6 +242,7 @@ def agent_final_decision(
     positions_to_reconsider: list | None = None,
     portfolio_value: float = 0.0,
     daily_pnl: float = 0.0,
+    options_signals: list | None = None,
 ) -> dict:
     """
     Deterministic final synthesis — vote counting + JSON assembly.
@@ -248,6 +255,11 @@ def agent_final_decision(
     _sm = strategy_mode or {}
     size_mult = _sm.get("size_multiplier", 1.0)
     _reconsider = positions_to_reconsider or []
+    # BC-1: build the set of symbols that have a validated options contract.
+    # Only symbols present in options_signals passed a get_contract() check upstream.
+    # Any symbol Opus labels as CALL/PUT that isn't in this set has no viable contract —
+    # downgrade to stock rather than letting a doomed order reach execution.
+    _option_valid_syms: set[str] = {o["symbol"] for o in (options_signals or [])}
 
     if regime.get("regime") == "CAPITULATION":
         return {
@@ -327,6 +339,16 @@ def agent_final_decision(
 
         reasoning = _extract_opportunity_reasoning(opportunity, sym) or f"{sym} selected by Trading Analyst"
         instrument = _extract_instrument(opportunity, sym)
+
+        # BC-1: Hard gate — Opus recommended an options instrument but no validated
+        # contract exists in options_signals. Force stock rather than let this reach
+        # orders_core where get_contract() will silently fail.
+        if instrument in ("call", "put") and sym not in _option_valid_syms:
+            log.info(
+                f"BC-1: {sym} instrument downgraded {instrument}→stock "
+                f"(no validated contract in options_signals)"
+            )
+            instrument = "stock"
 
         buys.append(
             {
@@ -451,7 +473,14 @@ def _extract_technical_conviction(tech_text: str, symbol: str) -> int:
 
 
 def _extract_risk_approval(risk_text: str, symbol: str) -> int:
-    """+1 APPROVE | -1 REJECT/BLOCK | 1 default when symbol not mentioned."""
+    """+1 APPROVE | -1 REJECT/BLOCK | 0 default when symbol not mentioned.
+
+    BC-4: Default changed from +1 to 0. Returning +1 when the Risk Manager text
+    simply doesn't mention a symbol silently bypasses the veto — a symbol that
+    was never evaluated by the Risk Manager would receive a free approval vote,
+    allowing Opus proposals to exceed the approved capital pool. A 0 (neutral,
+    not voted) is the correct interpretation of absence.
+    """
     if not risk_text:
         return 1
     upper = risk_text.upper()
@@ -465,7 +494,9 @@ def _extract_risk_approval(risk_text: str, symbol: str) -> int:
         if "REJECT" in window or "BLOCK" in window:
             return -1
         idx = upper.find(symbol, idx + len(symbol))
-    return 1
+    # BC-4: symbol not found in Risk Manager output → neutral (0), not approved (+1).
+    # The Risk Manager never evaluated this symbol; it cannot be treated as approved.
+    return 0
 
 
 def _extract_opportunity_reasoning(opportunity_text: str, symbol: str) -> str:
@@ -728,10 +759,21 @@ def agent_trading_analyst(
     overnight_block = ""
     try:
         from overnight_research import load_overnight_notes
+        import os as _os_ovn
 
-        notes = load_overnight_notes()
-        if notes:
-            overnight_block = f"\nOVERNIGHT RESEARCH NOTES:\n{notes}\n"
+        # RB-8: Only inject notes when the sentinel confirms this morning's research
+        # thread completed. Without this check, a slow FMP API call causes the first
+        # 9:30 scan to silently inject yesterday's notes — stale data passed to Opus
+        # as current market context.
+        _sentinel = _os_ovn.path.join(
+            _os_ovn.path.dirname(_os_ovn.path.abspath(__file__)), "data", "overnight_notes.done"
+        )
+        if _os_ovn.path.exists(_sentinel):
+            notes = load_overnight_notes()
+            if notes:
+                overnight_block = f"\nOVERNIGHT RESEARCH NOTES:\n{notes}\n"
+        else:
+            log.debug("Overnight research sentinel absent — skipping note injection (thread not yet complete or no run today)")
     except Exception:
         pass
 
@@ -788,8 +830,13 @@ def agent_trading_analyst(
                     "\nCATALYST CANDIDATES (M&A screener — high-conviction setups "
                     "with fundamental + options anomaly + EDGAR signals):\n"
                     + "\n".join(lines)
-                    + "\nNote: these tickers already received a score boost from the signal engine. "
-                    "Weight their setups accordingly — options anomaly + EDGAR hits are live signals.\n"
+                    + "\nIMPORTANT — AVOID DOUBLE-WEIGHTING: Each ticker's score in the "
+                    "SCORED SIGNALS list above already includes a catalyst boost applied by "
+                    "the signal engine. Do NOT treat the elevated score as organic technical "
+                    "strength AND also treat the catalyst flag as additional confirmation — "
+                    "that is double-counting the same signal. Evaluate these names on the "
+                    "underlying catalyst quality (options anomaly, EDGAR event, earnings "
+                    "surprise) independently of the inflated score.\n"
                 )
     except Exception:
         pass

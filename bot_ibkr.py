@@ -549,6 +549,10 @@ def connect_ibkr() -> bool:
             f"IBKR connected — port {CONFIG['ibkr_port']} | Account: {CONFIG.get('active_account', '')} | Market data: DELAYED (free)",
         )
         reconcile_with_ibkr(ib)
+        # RB-3: Cancel any orphaned SL/TP/target orders whose parent entry never
+        # filled (or was cancelled on a previous session). Must run after
+        # reconcile_with_ibkr() so active_symbols reflects the current FILLED state.
+        cancel_orphan_stop_orders()
         dash["status"] = "running"
         return True
     except Exception as e:
@@ -1215,9 +1219,14 @@ def sync_orders_from_ibkr():
 
 def cancel_orphan_stop_orders():
     """
-    Cancel any open stop/stop-limit orders in IBKR that have no corresponding
-    active position. Runs once at startup after sync_orders_from_ibkr().
-    Protects against stale exit orders left over from a crashed session.
+    Cancel any open exit orders (stops AND limit-sell targets) in IBKR that have
+    no corresponding active position. Runs once at startup after reconcile_with_ibkr().
+
+    RB-3: Original version only caught STP/STP LMT/TRAIL orders. OCO brackets also
+    include a LMT SELL target order. If the parent entry limit never filled (price
+    gapped away), both the stop AND the target sit live in IBKR indefinitely.
+    An unexpected fill on the orphaned target creates a synthetic short position.
+    Now also cancels LMT SELL orders for symbols with no active FILLED position.
     """
     from orders_portfolio import get_open_positions
 
@@ -1235,14 +1244,16 @@ def cancel_orphan_stop_orders():
                 sym = contract.symbol + getattr(contract, "currency", "")
             otype = (order.orderType or "").upper()
             action = (order.action or "").upper()
-            # Only target sell-side stop orders (STP, STP LMT, TRAIL) — these are exits
-            if otype not in ("STP", "STP LMT", "TRAIL", "TRAILLMT"):
+            # Target sell-side exit orders: stops, trailing stops, AND limit-sell targets.
+            # LMT SELL = take-profit leg of an OCO bracket. If the entry never filled,
+            # the LMT SELL is an orphan that can execute against a future short position.
+            if otype not in ("STP", "STP LMT", "TRAIL", "TRAILLMT", "LMT"):
                 continue
             if action not in ("SELL",):
                 continue
             if sym in active_symbols:
                 continue
-            # No position — this stop is orphaned
+            # No active position — this exit order is orphaned
             try:
                 ib.cancelOrder(order)
                 clog("INFO", f"cancel_orphan_stop_orders: cancelled stale {otype} for {sym} (no active position)")
@@ -1250,7 +1261,7 @@ def cancel_orphan_stop_orders():
             except Exception as exc:
                 clog("ERROR", f"cancel_orphan_stop_orders: failed to cancel {otype} for {sym} — {exc}")
         if cancelled == 0:
-            clog("INFO", "cancel_orphan_stop_orders: no orphan stop orders found")
+            clog("INFO", "cancel_orphan_stop_orders: no orphan exit orders found")
     except Exception as exc:
         clog("ERROR", f"cancel_orphan_stop_orders: {exc}")
 

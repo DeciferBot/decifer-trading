@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from bot_state import clog
 from config import CONFIG
+from learning import log_trade
 from orders_portfolio import close_position, get_open_positions, reconcile_with_ibkr
 from risk import _get_ibkr_cash
 
@@ -93,6 +94,33 @@ def auto_rebalance_cash(ib, portfolio_value: float, regime: dict) -> None:
                 ib.sleep(2)
                 cash_pct = _current_cash_pct()
                 clog("RISK", f"Auto-rebalance: cash now at {cash_pct * 100:.1f}%")
+                # BC-7: Auto-rebalance exits must reach the IC learning loop.
+                # close_position() calls log_order() (compliance) but NOT log_trade().
+                # Without this call, force-closed positions leave no exit record —
+                # the learning loop never calculates forward return and dimension IC
+                # is silently biased toward the normal execution path only.
+                _full_pos = next((p for p in positions if p.get("_trade_key", p.get("symbol")) == sym), None)
+                if _full_pos:
+                    _entry = _full_pos.get("entry", 0)
+                    _current = _full_pos.get("current", _entry)
+                    _qty = _full_pos.get("qty", 0)
+                    _pnl = (_current - _entry) * _qty if _entry > 0 and _qty != 0 else None
+                    _pnl_pct = ((_current - _entry) / _entry) if _entry > 0 else None
+                    try:
+                        log_trade(
+                            _full_pos,
+                            agent_outputs={},
+                            regime=regime,
+                            action="CLOSE",
+                            outcome={
+                                "exit_price": _current,
+                                "pnl": _pnl,
+                                "pnl_pct": _pnl_pct,
+                                "reason": "AUTO_REBALANCE_CASH",
+                            },
+                        )
+                    except Exception as _lt_e:
+                        clog("ERROR", f"Auto-rebalance: log_trade failed for {sym}: {_lt_e}")
             else:
                 clog(
                     "ERROR",

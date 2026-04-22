@@ -38,6 +38,12 @@ open_orders: dict = {}
 # symbol → ISO timestamp of close.
 # Blocks re-entry for reentry_cooldown_minutes after a position is closed.
 recently_closed: dict = {}
+# RB-4: Dedicated lock for recently_closed. The per-symbol lock in execute_buy()
+# closes the TOCTOU gap for a single symbol but does NOT protect recently_closed
+# from races between concurrent executions on different symbols, or between
+# execute_buy() and a PM exit handler that calls recently_closed.pop() at the
+# edge of the cooldown window. Use this lock for all reads and writes.
+_recently_closed_lock = threading.Lock()
 
 # ── Thesis-failure extended cooldown registry ─────────────────────────────────
 # symbol → ISO timestamp of close when the INTRADAY wrong_if condition fired.
@@ -254,7 +260,8 @@ def _load_positions_file() -> dict:
 
 def _is_recently_closed(symbol: str) -> bool:
     """Return True if symbol was closed within reentry_cooldown_minutes."""
-    ts_str = recently_closed.get(symbol)
+    with _recently_closed_lock:
+        ts_str = recently_closed.get(symbol)
     if not ts_str:
         return False
     cooldown = CONFIG.get("reentry_cooldown_minutes", 30)
@@ -296,13 +303,14 @@ def cleanup_recently_closed() -> int:
     cooldown_secs = CONFIG.get("reentry_cooldown_minutes", 30) * 60
     cutoff_secs = cooldown_secs * 2
     now = datetime.now(UTC)
-    expired = [
-        sym
-        for sym, ts_str in recently_closed.items()
-        if (now - datetime.fromisoformat(ts_str)).total_seconds() > cutoff_secs
-    ]
-    for sym in expired:
-        recently_closed.pop(sym, None)
+    with _recently_closed_lock:
+        expired = [
+            sym
+            for sym, ts_str in recently_closed.items()
+            if (now - datetime.fromisoformat(ts_str)).total_seconds() > cutoff_secs
+        ]
+        for sym in expired:
+            recently_closed.pop(sym, None)
     if expired:
         log.debug(f"recently_closed: evicted {len(expired)} stale entries {expired}")
     return len(expired)

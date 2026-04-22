@@ -509,6 +509,36 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
     _save_trades(trades)
     log.info(f"Trade logged: {action} {trade.get('symbol')} | P&L: {outcome.get('pnl') if outcome else 'open'}")
 
+    # ── BC-3: Execution IC stream ───────────────────────────────────────────────
+    # Signal IC (log_signal_scan) measures distribution of ALL scored signals before
+    # any filter. That tells us which signal dimensions predict price moves — but it
+    # cannot answer whether the agents add or subtract alpha vs the raw signal.
+    # Signals rejected by Risk Manager, direction-mismatched in Agent 4, or held by PM
+    # leave no trace in the audit. This second stream records what actually executed.
+    # The IC calculator can then compute: signal IC vs execution IC = agent alpha delta.
+    if action == "OPEN":
+        _exec_ic_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "execution_ic.jsonl")
+        _exec_ic_record = {
+            "timestamp": record["timestamp"],
+            "symbol": record["symbol"],
+            "direction": record.get("direction", "LONG"),
+            "instrument": trade.get("instrument", "stock"),
+            "score": record.get("score"),
+            "score_breakdown": record.get("score_breakdown", {}),
+            "agents_agreed": record.get("agents_agreed", 0),
+            "regime": record.get("regime"),
+            "entry_price": record.get("entry_price"),
+            # agent_votes — present when agent_outputs contains structured votes
+            "agent_technical": bool(agent_outputs.get("technical")),
+            "agent_risk": bool(agent_outputs.get("risk")),
+            "exit_reason": outcome.get("reason") if outcome else None,
+        }
+        try:
+            with open(_exec_ic_path, "a") as _f:
+                _f.write(json.dumps(_exec_ic_record) + "\n")
+        except Exception as _e:
+            log.debug(f"execution_ic.jsonl write failed (non-critical): {_e}")
+
     # ── Close Opus learning loop — record outcome against the advisor decision ──
     if action == "CLOSE" and trade.get("advice_id") and outcome:
         try:
@@ -724,8 +754,18 @@ def run_weekly_review() -> str:
     if not recent:
         return "No trades in the last 7 days."
 
-    perf = get_performance_summary(recent)
+    # RB-9: Filter to trades with a complete outcome before computing metrics.
+    # Trades closed < 1 trading day ago may not have forward_return calculated yet
+    # (the IC calculator runs on a delay). Including them in win-rate and avg-win/loss
+    # analysis biases the weekly summary toward incomplete data.
+    # Trades pending IC analysis are counted separately for transparency.
     closed = [t for t in recent if t.get("exit_price") is not None]
+    complete = [t for t in closed if t.get("forward_return") is not None]
+    pending_ic_count = len(closed) - len(complete)
+    # Use complete trades for performance metrics; fall back to all closed if no
+    # forward returns have been computed yet (early-stage system with few closed trades).
+    _for_metrics = complete if complete else closed
+    perf = get_performance_summary(_for_metrics)
 
     trade_details = "\n".join(
         [
@@ -738,11 +778,16 @@ def run_weekly_review() -> str:
 
     client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
 
+    _pending_note = (
+        f"\nNote: {pending_ic_count} additional closed trade(s) are excluded — IC forward return not yet calculated.\n"
+        if pending_ic_count > 0 else ""
+    )
+
     prompt = f"""You are the Weekly Review Agent for Decifer, an autonomous trading system.
 Analyse the past week's trading performance and provide actionable insights.
 
-PERFORMANCE SUMMARY:
-Total trades: {perf["total_trades"]}
+PERFORMANCE SUMMARY (based on {len(_for_metrics)} trades with complete IC data):
+{_pending_note}Total trades: {perf["total_trades"]}
 Win rate: {perf["win_rate"]}%
 Average win: ${perf["avg_win"]}
 Average loss: ${perf["avg_loss"]}

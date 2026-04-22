@@ -39,6 +39,7 @@ from orders_guards import (
 from orders_state import (
     _get_symbol_lock,
     _is_recently_closed,
+    _recently_closed_lock,
     _safe_del_trade,
     _safe_update_trade,
     _save_positions_file,
@@ -669,7 +670,7 @@ def execute_buy(
                     log.warning(
                         f"execute_buy {symbol}: TWAP returned 0 fills — applying re-entry cooldown"
                     )
-                    with _trades_lock:
+                    with _recently_closed_lock:  # RB-4
                         recently_closed[symbol] = datetime.now(UTC).isoformat()
                     _safe_del_trade(symbol)
                 return stats.filled_quantity > 0
@@ -696,7 +697,7 @@ def execute_buy(
             order_status = trade.orderStatus.status
             if order_status in ("Cancelled", "Inactive", "ApiCancelled", "ValidationError"):
                 log.error(f"execute_buy {symbol}: extended-hours entry rejected ({order_status}) — cooldown applied")
-                with _trades_lock:
+                with _recently_closed_lock:  # RB-4
                     recently_closed[symbol] = datetime.now(UTC).isoformat()
                 _safe_del_trade(symbol)
                 return False
@@ -782,6 +783,19 @@ def execute_buy(
         # Parent transmit=False prevents it from filling before children are attached.
         # The final child has transmit=True which transmits the entire group together.
         # This prevents the "parent already filled" rejection that kills child orders.
+
+        # RB-5: IBKR does not support the same OCO bracket structure for options
+        # as for equities. Submitting bracket children for an options entry causes
+        # the children to fail silently — the entry fills, but no SL/TP is live.
+        # For options: submit a standalone entry (transmit=True immediately) and
+        # rely on the Portfolio Manager for exit management.
+        _bracket_supported = instrument not in ("call", "put", "option")
+        if not _bracket_supported:
+            log.info(
+                f"execute_buy {symbol}: instrument={instrument} — bracket OCO skipped, "
+                f"standalone entry only (IBKR options do not support bracket OCO)"
+            )
+
         limit_price = round(price * 1.002, 2)
 
         # Leg 1: Entry (parent) — order type chosen by execution agent
@@ -795,33 +809,42 @@ def execute_buy(
             entry_order = LimitOrder("BUY", qty, _effective_limit, account=account, tif="GTC", outsideRth=True)
         # Stamp signal source on the order — survives in IBKR execution history.
         entry_order.orderRef = f"DEC:{score}"[:20]
-        entry_order.transmit = False
+        # RB-5: options entries transmit immediately (standalone); equity brackets
+        # hold parent until all children are attached.
+        entry_order.transmit = not _bracket_supported
         trade = ib.placeOrder(contract, entry_order)
         ib.sleep(0.2)  # brief pause for IBKR to assign orderId
 
         parent_id = trade.order.orderId
 
-        # Leg 2: Stop loss — attached to parent, DO NOT transmit yet
-        # StopLimitOrder is used instead of StopOrder: IBKR paper trading rejects pure
-        # StopOrder bracket children with ValidationError on many small/mid-cap stocks.
-        # Limit price = 1% below stop gives a reasonable fill window while being accepted.
-        sl_limit = round(sl * 0.99, 2)
-        sl_order = StopLimitOrder("SELL", qty, sl, sl_limit, account=account, tif="GTC", outsideRth=True)
-        sl_order.parentId = parent_id
-        # Empty trade_type falls back to INTRADAY behaviour (legacy callers, tests)
-        place_tp = not trade_type or trade_type in ("SCALP", "INTRADAY")
-        sl_order.transmit = not place_tp  # INTRADAY: False (TP follows); SWING/POSITION: True (transmit entry+SL)
-        sl_trade = ib.placeOrder(contract, sl_order)
-        ib.sleep(0.1)
-        _sl_order_id = sl_trade.order.orderId  # captured for trailing stop modifications
-
+        # RB-5: Skip bracket legs for options — they don't support OCO structure.
+        # SL/TP for options positions are managed by Portfolio Manager.
+        _sl_order_id = None
         tp_trade = None
-        if place_tp:
-            # Leg 3: Take profit — SCALP only; transmit=True sends ALL 3 legs together
-            tp_order = LimitOrder("SELL", tp_qty, tp, account=account, tif="GTC", outsideRth=True)
-            tp_order.parentId = parent_id
-            tp_order.transmit = True
-            tp_trade = ib.placeOrder(contract, tp_order)
+        sl_trade = None
+        place_tp = False
+
+        if _bracket_supported:
+            # Leg 2: Stop loss — attached to parent, DO NOT transmit yet
+            # StopLimitOrder is used instead of StopOrder: IBKR paper trading rejects pure
+            # StopOrder bracket children with ValidationError on many small/mid-cap stocks.
+            # Limit price = 1% below stop gives a reasonable fill window while being accepted.
+            sl_limit = round(sl * 0.99, 2)
+            sl_order = StopLimitOrder("SELL", qty, sl, sl_limit, account=account, tif="GTC", outsideRth=True)
+            sl_order.parentId = parent_id
+            # Empty trade_type falls back to INTRADAY behaviour (legacy callers, tests)
+            place_tp = not trade_type or trade_type in ("SCALP", "INTRADAY")
+            sl_order.transmit = not place_tp  # INTRADAY: False (TP follows); SWING/POSITION: True (transmit entry+SL)
+            sl_trade = ib.placeOrder(contract, sl_order)
+            ib.sleep(0.1)
+            _sl_order_id = sl_trade.order.orderId  # captured for trailing stop modifications
+
+            if place_tp:
+                # Leg 3: Take profit — SCALP only; transmit=True sends ALL 3 legs together
+                tp_order = LimitOrder("SELL", tp_qty, tp, account=account, tif="GTC", outsideRth=True)
+                tp_order.parentId = parent_id
+                tp_order.transmit = True
+                tp_trade = ib.placeOrder(contract, tp_order)
 
         # Wait for IBKR to process the full bracket
         ib.sleep(1.5)
@@ -847,22 +870,23 @@ def execute_buy(
             },
             trade_id=_trade_id,
         )
-        log_order(
-            {
-                "order_id": sl_trade.order.orderId,
-                "parent_id": parent_id,
-                "symbol": symbol,
-                "side": "SELL",
-                "order_type": "STPLMT",
-                "qty": qty,
-                "price": sl,
-                "status": "SUBMITTED",
-                "instrument": "stock",
-                "role": "stop_loss",
-                "timestamp": datetime.now(UTC).isoformat(),
-            },
-            trade_id=_trade_id,
-        )
+        if sl_trade is not None:  # RB-5: options skip bracket — sl_trade is None
+            log_order(
+                {
+                    "order_id": sl_trade.order.orderId,
+                    "parent_id": parent_id,
+                    "symbol": symbol,
+                    "side": "SELL",
+                    "order_type": "STPLMT",
+                    "qty": qty,
+                    "price": sl,
+                    "status": "SUBMITTED",
+                    "instrument": "stock",
+                    "role": "stop_loss",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                },
+                trade_id=_trade_id,
+            )
         if place_tp and tp_trade is not None:
             log_order(
                 {
@@ -886,26 +910,29 @@ def execute_buy(
         # Even with atomic submission, edge cases (connectivity blips, race conditions)
         # can cause child orders to go Inactive. If that happens, cancel the broken
         # children and place standalone SL/TP orders (no parentId).
+        # RB-5: bracket verification is skipped for options (no bracket was placed).
         order_status = trade.orderStatus.status
         if order_status in ("Cancelled", "Inactive", "ApiCancelled", "ValidationError"):
             log.error(f"Entry order immediately rejected by IBKR for {symbol}: {order_status} — not tracking")
-            # Cancel bracket children — IBKR paper can keep them even when entry is rejected
-            _cancel_ibkr_order_by_id(ib, sl_trade.order.orderId)
+            # Cancel bracket children if any (options entries have no children)
+            if sl_trade is not None:
+                _cancel_ibkr_order_by_id(ib, sl_trade.order.orderId)
             if tp_trade is not None:
                 _cancel_ibkr_order_by_id(ib, tp_trade.order.orderId)
             # Add to recently_closed so the reentry cooldown blocks the next scan
             # from immediately resubmitting — without this, the loop retries every
             # scan cycle indefinitely.
-            with _trades_lock:
+            with _recently_closed_lock:  # RB-4
                 recently_closed[symbol] = datetime.now(UTC).isoformat()
             _safe_del_trade(symbol)
             return False
 
-        sl_status = sl_trade.orderStatus.status
+        # RB-5: child order status checks only apply when bracket was placed
+        sl_status = sl_trade.orderStatus.status if sl_trade is not None else "N/A"
         _child_reject = ("Inactive", "Cancelled", "ApiCancelled", "ValidationError")
         tp_status = tp_trade.orderStatus.status if tp_trade is not None else "N/A"
 
-        if sl_status in _child_reject or (tp_trade is not None and tp_status in _child_reject):
+        if _bracket_supported and (sl_status in _child_reject or (tp_trade is not None and tp_status in _child_reject)):
             log.warning(
                 f"Bracket child rejected for {symbol} (SL={sl_status}, TP={tp_status}) "
                 f"— placing standalone SL/TP orders as fallback"
@@ -1391,7 +1418,7 @@ def execute_short(
             order_status = trade.orderStatus.status
             if order_status in ("Cancelled", "Inactive", "ApiCancelled", "ValidationError"):
                 log.error(f"execute_short {symbol}: extended-hours entry rejected ({order_status}) — cooldown applied")
-                with _trades_lock:
+                with _recently_closed_lock:  # RB-4
                     recently_closed[symbol] = datetime.now(UTC).isoformat()
                 _safe_del_trade(symbol)
                 return False
@@ -1512,7 +1539,7 @@ def execute_short(
             if tp_trade is not None:
                 _cancel_ibkr_order_by_id(ib, tp_trade.order.orderId)
             # Cooldown guard — prevents retry loop on next scan cycle
-            with _trades_lock:
+            with _recently_closed_lock:  # RB-4
                 recently_closed[symbol] = datetime.now(UTC).isoformat()
             _safe_del_trade(symbol)
             return False
@@ -1868,7 +1895,8 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             except Exception as _tl_err:
                 log.warning("trade_log.close_trade failed for %s: %s", symbol, _tl_err)
             with _trades_lock:
-                recently_closed[symbol] = now_ts
+                with _recently_closed_lock:  # RB-4: nest inside _trades_lock (consistent acquisition order — never reversed)
+                    recently_closed[symbol] = now_ts
                 active_trades.pop(_trade_key, None)
             # If the INTRADAY wrong_if condition fired, register the extended cooldown.
             # Reason strings from the PM contain "stale" or "thesis_broken" in these cases.

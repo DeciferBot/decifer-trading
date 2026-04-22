@@ -8,6 +8,7 @@
 
 import json
 import os
+import threading
 from datetime import UTC, datetime
 
 from ic.constants import (
@@ -22,6 +23,13 @@ from ic.constants import (
 from ic.core import compute_rolling_ic, normalize_ic_weights
 from ic.data import _load_signal_records
 
+# RB-7: Protect ic_weights.json against concurrent reads during a write.
+# update_ic_weights() runs on the weekly review background thread while
+# _get_edge_gate_adj() reads from the main scan loop. The write is already
+# atomic (os.replace), so the risk window is tiny — but a thread-local lock
+# eliminates it entirely at zero cost.
+_ic_weights_lock = threading.Lock()
+
 
 def get_current_weights() -> dict:
     """
@@ -35,8 +43,9 @@ def get_current_weights() -> dict:
     if not os.path.exists(IC_WEIGHTS_FILE):
         return dict(EQUAL_WEIGHTS)
     try:
-        with open(IC_WEIGHTS_FILE) as f:
-            data = json.load(f)
+        with _ic_weights_lock:  # RB-7: serialise against concurrent update_ic_weights write
+            with open(IC_WEIGHTS_FILE) as f:
+                data = json.load(f)
         weights = data.get("weights", {})
         if not all(d in weights for d in DIMENSIONS):
             return dict(EQUAL_WEIGHTS)
@@ -90,7 +99,7 @@ def update_ic_weights(
 
     os.makedirs(os.path.dirname(IC_WEIGHTS_FILE), exist_ok=True)
 
-    # Atomic write for the current weights file
+    # Atomic write for the current weights file, serialised with the read lock.
     import tempfile
 
     dir_ = os.path.dirname(IC_WEIGHTS_FILE)
@@ -98,7 +107,8 @@ def update_ic_weights(
     try:
         with os.fdopen(fd, "w") as f:
             json.dump(record, f, indent=2)
-        os.replace(tmp, IC_WEIGHTS_FILE)
+        with _ic_weights_lock:  # RB-7: hold lock only for the rename, not the full write
+            os.replace(tmp, IC_WEIGHTS_FILE)
     except Exception:
         try:
             os.unlink(tmp)

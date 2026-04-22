@@ -10,7 +10,10 @@
 # ║   Inventor: AMIT CHOPRA                                      ║
 # ╚══════════════════════════════════════════════════════════════╝
 
+import json
 import logging
+import os
+import tempfile
 from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -25,9 +28,62 @@ log = logging.getLogger("decifer.pipeline")
 # ── Score persistence tracking ─────────────────────────────────────────────────
 # Tracks whether each symbol was above the score threshold in recent scan cycles.
 # Populated every scan regardless of threshold outcome so the history is accurate.
-# Resets naturally when the bot restarts (in-memory only — no persistence needed).
+# RB-6: Persisted to disk (data/threshold_history.json) so bot restarts don't
+# reset all histories — marginal signals that were building toward the persistence
+# gate don't lose their progress across a restart.
 _THRESHOLD_HISTORY: dict = {}  # symbol → deque[bool]
 _THRESHOLD_HISTORY_MAXLEN = 4   # keep last 4 scans (enough for persistence_scans=3)
+_THRESHOLD_HISTORY_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "data", "threshold_history.json"
+)
+_THRESHOLD_HISTORY_MAX_STALENESS_MIN = 30  # discard entries older than this on load
+
+
+def _load_threshold_history() -> None:
+    """Load _THRESHOLD_HISTORY from disk, discarding stale entries (> max_staleness)."""
+    global _THRESHOLD_HISTORY
+    if not os.path.exists(_THRESHOLD_HISTORY_PATH):
+        return
+    try:
+        with open(_THRESHOLD_HISTORY_PATH) as f:
+            raw = json.load(f)
+        saved_at_str = raw.get("saved_at")
+        if not saved_at_str:
+            return
+        saved_at = datetime.fromisoformat(saved_at_str)
+        age_min = (datetime.now(UTC) - saved_at).total_seconds() / 60
+        if age_min > _THRESHOLD_HISTORY_MAX_STALENESS_MIN:
+            log.debug("threshold_history.json is %.0fm old (> %dm) — discarding on load",
+                      age_min, _THRESHOLD_HISTORY_MAX_STALENESS_MIN)
+            return
+        for sym, bits in raw.get("history", {}).items():
+            d = deque(maxlen=_THRESHOLD_HISTORY_MAXLEN)
+            d.extend(bits[-_THRESHOLD_HISTORY_MAXLEN:])
+            _THRESHOLD_HISTORY[sym] = d
+        log.debug("Loaded threshold history for %d symbols (%.0fm old)", len(_THRESHOLD_HISTORY), age_min)
+    except Exception as e:
+        log.debug("Failed to load threshold_history.json (non-critical): %s", e)
+
+
+def _save_threshold_history() -> None:
+    """Persist _THRESHOLD_HISTORY to disk atomically."""
+    try:
+        payload = {
+            "saved_at": datetime.now(UTC).isoformat(),
+            "history": {sym: list(hist) for sym, hist in _THRESHOLD_HISTORY.items()},
+        }
+        os.makedirs(os.path.dirname(_THRESHOLD_HISTORY_PATH), exist_ok=True)
+        _dir = os.path.dirname(_THRESHOLD_HISTORY_PATH)
+        _fd, _tmp = tempfile.mkstemp(dir=_dir, suffix=".tmp")
+        with os.fdopen(_fd, "w") as f:
+            json.dump(payload, f)
+        os.replace(_tmp, _THRESHOLD_HISTORY_PATH)
+    except Exception as e:
+        log.debug("Failed to save threshold_history.json (non-critical): %s", e)
+
+
+# Load persisted history on module import (runs once at bot startup).
+_load_threshold_history()
 
 # Symbols that must always be in the scan universe. Authoritative — computed
 # from scanner's CORE_SYMBOLS + CORE_EQUITIES so the two lists can never drift.
@@ -324,6 +380,8 @@ def _apply_persistence_gate(scored: list, all_scored: list, persistence_scans: i
             "Persistence gate: %d/%d signals passed (need %d consecutive scans above threshold)",
             len(passed), len(scored), persistence_scans,
         )
+    # RB-6: Persist history after each gate update so restarts don't zero it.
+    _save_threshold_history()
     return passed
 
 

@@ -6,6 +6,48 @@
 
 ---
 
+## 2026-04-22 — Full Architecture Audit: 27 Issues, 24 Fixes (CP + BC + RB)
+
+A full architecture trace and three-round deep audit identified 27 confirmed issues across three categories. All 24 implementable fixes were shipped across two sessions. The full issue list and fix rationale is in `docs/PROCESS_ARCHITECTURE.md`. Key decisions logged below.
+
+### Cycle Position (5 fixes — CP-1 through CP-5)
+
+- **CP-1**: Options scan now runs before `update_position_prices()` so both use the same live-price moment. Previously ~30s stale divergence between options analysis and PM sizing.
+- **CP-2**: Cycle-check REVIEW flags now accumulate into `_cc_review_reasons` and are passed as the PM trigger string. Previously hardcoded to `"cycle_regime_shift"`.
+- **CP-3**: Regime re-fetched immediately before `run_all_agents()`. A VIX spike mid-scan no longer causes Agent 4 to size trades at the pre-spike multiplier.
+- **CP-4**: Strategy mode recomputed after PM exits complete. PM exits that tip daily P&L past a mode boundary are now reflected before agents run.
+- **CP-5**: PENDING and EXITING positions excluded from PM review eligibility. A position entered this cycle cannot receive an EXIT recommendation before IBKR confirms the fill.
+
+### Behaviour Change (9 fixes — BC-1 through BC-8, excluding BC-9 which was verified correct)
+
+- **BC-1**: Agent 4 now validates options instrument against the `options_signals` list before building an order. Opus-proposed options for symbols with no viable contract are downgraded to stock rather than failing silently in `orders_core`.
+- **BC-4**: `_extract_risk_approval()` default changed from `+1` to `0` when a symbol is absent from Risk Manager output. A symbol the Risk Manager never evaluated cannot be treated as approved — doing so silently bypassed the veto ceiling.
+- **BC-5**: Catalyst Opus prompt note now explicitly warns against double-counting: the score boost is already applied upstream, so Opus must not treat the elevated score as organic signal AND the catalyst flag as additional confirmation.
+- **BC-8**: `agent_trading_analyst` (Opus) now receives `fresh_qualified` only. Held positions are already visible in the OPEN POSITIONS block — showing them again in the scored list caused ADD clustering on existing positions.
+- **BC-6**: News fetch failure now falls back to stale cache (with `stale: True` flag) rather than zeroing Dimension 7 for the entire batch. One bad network call can no longer flatten all news scores for a cycle.
+- **BC-7**: `auto_rebalance_cash()` now calls `log_trade()` after a successful close. Force-closed positions are now in the IC training set; without this, forward return was never calculated and dimension IC was biased toward the normal execution path.
+- **BC-2**: `update_positions_from_ibkr(ib)` called immediately before `run_portfolio_review()`. PM now evaluates live IBKR prices, not the pipeline snapshot frozen ~30s earlier.
+- **BC-3**: New execution IC stream: every `log_trade(action="OPEN")` writes to `data/execution_ic.jsonl`. The IC calculator can now compute signal IC vs execution IC to measure agent alpha contribution.
+- **BC-9**: Sympathy scanner sequencing verified correct — `get_sympathy_candidates()` is synchronous and completes before `_fetch_news()`. No code change required.
+
+### Robustness (9 fixes — RB-1 through RB-9)
+
+- **RB-1**: `_should_run_portfolio_review()` converted from early-return-on-first-trigger to accumulator. All active triggers are returned as a joined string — Opus receives full context instead of one arbitrarily selected trigger.
+- **RB-2**: `universe_promoter.py` write to `daily_promoted.json` converted to `tempfile.mkstemp + os.replace()`. Non-atomic writes could corrupt the file and silently drop Tier B for 18 hours.
+- **RB-3**: `cancel_orphan_stop_orders()` extended to also cancel LMT SELL (take-profit) orders for symbols with no active position. Previously only caught STP/TRAIL — OCO target legs were left live. Now called from `connect_ibkr()` on every startup.
+- **RB-4**: `_recently_closed_lock = threading.Lock()` added to `orders_state.py`. All reads (`_is_recently_closed`, `cleanup_recently_closed`) and all writes in `orders_core.py` now hold this lock. Prevents races between concurrent executions at the cooldown boundary.
+- **RB-5**: Options entries now set `transmit=True` immediately (standalone). SL/TP bracket legs are skipped — IBKR does not support OCO bracket structure for options. Options positions exit via PM only.
+- **RB-6**: `_THRESHOLD_HISTORY` persisted to `data/threshold_history.json`. Loaded on module import (entries older than 30 min discarded). Saved atomically after every `_apply_persistence_gate()` call. Bot restarts no longer zero marginal signals' persistence history.
+- **RB-7**: `_ic_weights_lock = threading.Lock()` added to `ic/storage.py`. `get_current_weights()` holds it during JSON read; `update_ic_weights()` holds it only during `os.replace()`. Eliminates same-process race between weekly review write thread and main scan loop.
+- **RB-8**: Overnight research thread writes `data/overnight_notes.done` sentinel on success. `agent_trading_analyst` checks for sentinel before injecting notes — absent sentinel means thread incomplete; stale notes are skipped rather than silently injected.
+- **RB-9**: `run_weekly_review()` now separates closed trades into complete (forward_return computed) and pending-IC. Performance metrics run on complete trades only (falls back to all if none complete). Pending count surfaced to Opus in the prompt.
+
+### Deferred / Non-Issues
+- **#22** (Config threshold cached at agent entry): CONFIG doesn't mutate mid-scan — functionally a no-op. Not implemented.
+- **#26** (log_trade exit captures current scores): Requires call-site verification to confirm the bug; deferred to avoid speculative change.
+
+---
+
 ## 2026-04-15 — PM ADD: Data-Driven, Not Rule-Driven; Code Sizes, Opus Decides
 
 **Decision**: The Portfolio Manager's ADD verb is now fully data-driven — Opus decides **whether** to ADD based on a rich position block (entry thesis, per-dimension entry→current deltas with IC-weight annotations on load-bearing dims, setup type, pattern, regime, news, earnings). The **size** is computed in code via `calculate_position_size()` — the same function that sized the original entry — using the current signal score (not the entry score) and the current ATR. Opus no longer emits `ADD_NOTIONAL`.
