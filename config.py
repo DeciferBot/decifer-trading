@@ -164,7 +164,7 @@ CONFIG = {
         "NEW_ENTRIES_ENABLED": True,
         "FORCE_MANAGE_ONLY": False,
         "USE_LEGACY_PIPELINE": True,   # legacy agents.py path remains authoritative until Phase 6
-        "USE_APEX_V3_SHADOW": False,   # Phase 6: run apex path in log-only mode
+        "USE_APEX_V3_SHADOW": True,    # Phase 8 Step 1: apex shadow observation ON
         "PM_LEGACY_OPUS_REVIEW_ENABLED": True,   # authoritative; Phase 6 cutover flips to False
         "SENTINEL_LEGACY_PIPELINE_ENABLED": True,  # authoritative; Phase 6 cutover flips to False
         "TRADE_ADVISOR_ENABLED": True,             # legacy trade_advisor.advise_trade; Phase 7 flips to False

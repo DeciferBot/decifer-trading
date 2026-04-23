@@ -1,21 +1,21 @@
 {
-  "timestamp": "2026-04-23T14:42:20.931Z",
+  "timestamp": "2026-04-23T17:45:56.645Z",
   "branch": "master",
-  "lastCommit": "0bd203d chore(sync): commit all cross-machine state for new machine setup",
+  "lastCommit": "6561c2c fix(alpaca_data): retry on transient ConnectionResetError in fetch_bars",
   "roadmapPhase": null,
   "lastFilesTouched": [
     "claude/memory/checkpoint.json",
     ".claude/memory/session-history.jsonl",
     "chief-decifer/state/internal/catalyst/edgar_events.json",
-    "chief-decifer/state/internal/catalyst/sec_tickers.json",
+    "config.py",
     "data/audit_log.jsonl",
-    "data/daily_promoted.json",
     "data/decifer.db",
     "data/equity_history.json",
     "data/execution_ic.jsonl",
-    "data/overnight_notes.json"
+    "data/signals_log.jsonl",
+    "data/trades.json"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 328
+  "sessionCount": 336
 }
