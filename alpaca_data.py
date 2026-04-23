@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from datetime import UTC, datetime, timedelta
 
 import pandas as pd
@@ -24,6 +25,16 @@ import pandas as pd
 from config import CONFIG
 
 log = logging.getLogger("decifer.alpaca_data")
+
+# Transient TCP errors that warrant a retry; includes requests.ConnectionError
+# when alpaca-py (which depends on requests) is present.
+try:
+    import requests.exceptions as _req_exc
+    _TRANSIENT_ERRORS = (OSError, _req_exc.ConnectionError)
+except ImportError:
+    _TRANSIENT_ERRORS = (OSError,)
+
+_MAX_FETCH_RETRIES = 3
 
 
 # ── Lazy client singleton ─────────────────────────────────────────────────────
@@ -118,7 +129,15 @@ def _fetch_bars_range(
             feed="sip",
             adjustment="split",
         )
-        bars = client.get_stock_bars(request)
+        for _attempt in range(_MAX_FETCH_RETRIES):
+            try:
+                bars = client.get_stock_bars(request)
+                break
+            except _TRANSIENT_ERRORS:
+                if _attempt == _MAX_FETCH_RETRIES - 1:
+                    raise
+                time.sleep(0.5 * (2 ** _attempt))
+
         df = bars.df
         if df is None or df.empty:
             return None
@@ -253,7 +272,15 @@ def fetch_bars(symbol: str, period: str = "60d", interval: str = "1d") -> pd.Dat
             feed="sip",
             adjustment="split",
         )
-        bars = client.get_stock_bars(request)
+        for _attempt in range(_MAX_FETCH_RETRIES):
+            try:
+                bars = client.get_stock_bars(request)
+                break
+            except _TRANSIENT_ERRORS:
+                if _attempt == _MAX_FETCH_RETRIES - 1:
+                    raise
+                time.sleep(0.5 * (2 ** _attempt))
+
         df = bars.df
 
         if df is None or df.empty:
