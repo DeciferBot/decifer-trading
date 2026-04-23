@@ -778,3 +778,220 @@ def get_current_market_read() -> str:
 def get_current_session_character() -> str:
     """Return the most recent session_character produced by Opus."""
     return _last_session_character
+
+
+# ══════════════════════════════════════════════════════════════
+# Phase 3 — APEX SYNTHESIZER (additive; shadow-safe)
+# ══════════════════════════════════════════════════════════════
+# apex_call() produces an ApexDecision dict. It performs no order
+# dispatch — it is a pure function of (apex_input, session_context).
+# Shadow vs. live gating is the caller's responsibility (Phase 6).
+# Legacy classify_signals() above remains authoritative until
+# USE_LEGACY_PIPELINE is flipped in Phase 6.
+
+_APEX_SYSTEM_PROMPT = """You are the Apex Synthesizer for Decifer, an autonomous paper-trading system.
+
+You receive pre-filtered, pre-validated candidates. Every candidate has passed
+all deterministic gates (risk, earnings, cooldown, options-eligibility, regime,
+long-only-ETF, time-of-day). Your job is judgment only.
+
+You are FORBIDDEN from deciding: position size, stop loss, take profit, or
+instrument-contract details (strike/expiry). Those are computed deterministically
+from your conviction output by the Risk & Execution vault.
+
+Two tracks in one response:
+
+TRACK A — NEW ENTRIES (per candidate you accept):
+  trade_type:  INTRADAY | SWING | POSITION | AVOID
+               Must be chosen from the candidate's allowed_trade_types list.
+               default_trade_type is a deterministic suggestion, not binding.
+  direction:   LONG | SHORT (or null if trade_type=AVOID)
+  direction_flipped: true if your direction disagrees with the candidate's
+               signal direction; requires non-empty rationale.
+  conviction:  "MEDIUM" (standard) or "HIGH" (strongly evidenced)
+               This is the sole lever on position size. Use HIGH sparingly.
+  instrument:  "stock" by default. "call"/"put" only when:
+                 - options_eligible = true, AND
+                 - trade_type in (SWING, POSITION), AND
+                 - setup is directionally clean (high DAR, no divergence_flags)
+  rationale:   One sentence. Required even for AVOID.
+  counter_argument / key_risk: one short sentence each (null for AVOID)
+
+TRACK B — OPEN POSITIONS (flagged for review):
+  action:         HOLD | TRIM | EXIT (no ADD in v1)
+  trim_pct:       25 | 50 | 75 (required when action=TRIM)
+  reasoning_tag:  snake_case label
+  reasoning:      one sentence
+
+NEWS_FINBERT_SENTIMENT FIELD NOTE:
+  The news_finbert_sentiment on each candidate is currently ADVISORY ONLY.
+  Do not weight it heavily; use raw news_headlines as primary news signal.
+
+SESSION CHARACTER VOCABULARY (pick one):
+  MOMENTUM_BULL | RELIEF_RALLY | FEAR_ELEVATED | DISTRIBUTION | TRENDING_BEAR
+
+OUTPUT: valid JSON matching exactly this schema (no prose outside JSON):
+{
+  "scan_ts": "<echo of input scan_ts>",
+  "session_character": "<one of vocab>",
+  "macro_bias": "BULLISH | BEARISH | NEUTRAL",
+  "market_read": "<2-4 sentences, logged only>",
+  "new_entries": [ ... ],
+  "portfolio_actions": [ ... ]
+}
+
+Both arrays may be empty. Never output ADD.
+"""
+
+
+def _format_candidate_line(c: dict) -> str:
+    """One-line per-candidate summary for the user prompt."""
+    sb = c.get("score_breakdown") or {}
+    dims = ", ".join(
+        f"{k}={sb.get(k)}"
+        for k in ("trend", "momentum", "breakout", "pead", "catalyst")
+        if sb.get(k) is not None
+    )
+    tc = c.get("trade_context") or {}
+    flags = ",".join(c.get("divergence_flags") or []) or "-"
+    headlines = " | ".join((c.get("news_headlines") or [])[:3]) or "-"
+    return (
+        f"{c.get('symbol')}: score={c.get('score')} dir={c.get('direction')} "
+        f"DAR={c.get('dar')} [{dims}] atr5={c.get('atr_5m')} atrD={c.get('atr_daily')} "
+        f"volR={c.get('vol_ratio')} tape={c.get('daily_tape_score')} "
+        f"rs={c.get('stock_rs_vs_spy')} cat={c.get('catalyst_score')} "
+        f"earn_d={tc.get('earnings_days_away')} flags={flags} "
+        f"default_tt={c.get('default_trade_type')} "
+        f"allowed={c.get('allowed_trade_types')} opt_ok={c.get('options_eligible')} "
+        f"news=[{headlines}] finbert={c.get('news_finbert_sentiment')}(advisory)"
+    )
+
+
+def _format_review_line(p: dict) -> str:
+    return (
+        f"{p.get('symbol')}: tt={p.get('trade_type')} dir={p.get('direction')} "
+        f"pnl={p.get('pnl_pct'):+.2%} days={p.get('days_held')} "
+        f"flag={p.get('flagged_reason')} "
+        f"band {p.get('entry_conviction_band')}→{p.get('current_conviction_band')} "
+        f"earn_d={p.get('earnings_days_away')}"
+    )
+
+
+def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> str:
+    trig = apex_input.get("trigger_type", "SCAN_CYCLE")
+    tctx = apex_input.get("trigger_context") or {}
+    mctx = apex_input.get("market_context") or {}
+    regime = mctx.get("regime") or {}
+    pstate = apex_input.get("portfolio_state") or {}
+    candidates = (apex_input.get("track_a") or {}).get("candidates") or []
+    review = apex_input.get("track_b") or []
+
+    parts: list[str] = [f"[TRIGGER] {trig}"]
+    if tctx:
+        parts.append(f"  context: {json.dumps(tctx, default=str)}")
+
+    parts.append("\n[MARKET CONTEXT]")
+    parts.append(f"  regime={regime.get('regime')} vix={regime.get('vix')}")
+    parts.append(f"  tape={mctx.get('tape')}")
+    if sctx:
+        parts.append(f"  market_read (cached): {sctx.market_read[:400]}")
+        if sctx.overnight_text:
+            parts.append(f"  overnight: {sctx.overnight_text[:400]}")
+
+    parts.append("\n[PORTFOLIO STATE]")
+    parts.append(
+        f"  pv=${pstate.get('portfolio_value', 0):,.0f} "
+        f"pnl=${pstate.get('daily_pnl', 0):+,.0f} "
+        f"positions={pstate.get('position_count', 0)} "
+        f"slots_left={pstate.get('position_slots_remaining', 0)} "
+        f"net_exp={pstate.get('net_exposure_pct', 0):+.2%}"
+    )
+
+    parts.append(f"\n[TRACK A — NEW CANDIDATES] ({len(candidates)})")
+    for c in candidates:
+        parts.append("  " + _format_candidate_line(c))
+
+    parts.append(f"\n[TRACK B — OPEN POSITIONS] ({len(review)})")
+    for p in review:
+        parts.append("  " + _format_review_line(p))
+
+    parts.append(f"\n[SCAN_TS] {apex_input.get('scan_ts', '')}")
+    parts.append("\nReturn the JSON object only. No commentary outside JSON.")
+    return "\n".join(parts)
+
+
+def _fallback_decision(apex_input: dict, reason: str = "") -> dict:
+    """Empty, schema-valid ApexDecision. Used when the Apex call or parse fails."""
+    review = apex_input.get("track_b") or []
+    return {
+        "scan_ts": apex_input.get("scan_ts", ""),
+        "session_character": _last_session_character,
+        "macro_bias": "NEUTRAL",
+        "market_read": f"[fallback] {reason}" if reason else "[fallback]",
+        "new_entries": [],
+        "portfolio_actions": [
+            {
+                "symbol": p.get("symbol"),
+                "action": "HOLD",
+                "trim_pct": None,
+                "reasoning_tag": "fallback_hold",
+                "reasoning": "Apex unavailable — default to HOLD",
+            }
+            for p in review if p.get("symbol")
+        ],
+    }
+
+
+def apex_call(
+    apex_input: dict,
+    session_context: SessionContext | None = None,
+) -> dict:
+    """
+    Single-call Apex Synthesizer. Returns a schema-valid ApexDecision dict.
+
+    Pure function: never submits orders, never persists state.
+    Caller (Phase 6) is responsible for shadow-vs-live gating via
+    safety_overlay.should_run_apex_shadow() / should_use_legacy_pipeline().
+
+    Failure modes (all return _fallback_decision, never raise):
+      - llm_client.call_apex() exception
+      - JSON parse failure
+      - schema validation failure
+    """
+    from llm_client import call_apex as _call_apex
+    from schemas import validate_apex_decision_schema
+
+    sctx = session_context
+    if sctx is None:
+        try:
+            sctx = _build_session_context(full_news=False)
+        except Exception as e:
+            log.warning("apex_call: session context build failed — %s", e)
+            sctx = None
+
+    try:
+        system_prompt = _APEX_SYSTEM_PROMPT
+        user_prompt = _build_apex_user_prompt(apex_input, sctx)
+        raw = _call_apex(system_prompt, user_prompt, max_tokens=2048)
+    except Exception as e:
+        log.error("apex_call: LLM call failed — %s", e)
+        return _fallback_decision(apex_input, reason=f"llm_error:{type(e).__name__}")
+
+    try:
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start < 0 or end <= start:
+            raise ValueError("no JSON object in response")
+        decision = json.loads(raw[start : end + 1])
+    except Exception as e:
+        log.error("apex_call: JSON parse failed — %s | raw head: %s", e, raw[:200])
+        return _fallback_decision(apex_input, reason=f"parse_error:{e}")
+
+    try:
+        validate_apex_decision_schema(decision)
+    except ValueError as e:
+        log.error("apex_call: schema validation failed — %s", e)
+        return _fallback_decision(apex_input, reason=f"schema_error:{e}")
+
+    decision.setdefault("scan_ts", apex_input.get("scan_ts", ""))
+    return decision
