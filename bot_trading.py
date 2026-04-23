@@ -2232,6 +2232,83 @@ def run_scan():
         dash["scanning"] = False
         return
 
+    # ── Phase 8A.2 — Scan-cycle Track A cutover branch ─────────────────────
+    # When USE_LEGACY_PIPELINE is False, bypass the legacy buy loop below and
+    # route Track A through apex_orchestrator._run_apex_pipeline(execute=True).
+    # PM Track B and Sentinel NI cutover branches already exist; this is the
+    # last missing cutover. Legacy code is preserved (not deleted) — flipping
+    # the flag back to True restores the legacy path with zero code changes.
+    try:
+        import safety_overlay as _so_track_a_cut
+        _scan_cutover = not _so_track_a_cut.should_use_legacy_pipeline()
+    except Exception:
+        _scan_cutover = False
+    if _scan_cutover:
+        try:
+            import apex_orchestrator as _aorch_track_a
+            from guardrails import filter_candidates as _fc_track_a
+            from guardrails import screen_open_positions as _screen_track_a
+            from guardrails import flag_positions_for_review as _flag_track_a
+
+            _cut_candidates = _fc_track_a(
+                list(pipeline.all_scored or []),
+                {p.get("symbol") for p in open_pos if p.get("symbol")},
+                regime=regime,
+            )
+            try:
+                _cut_review = _flag_track_a(open_pos, regime)
+            except Exception:
+                _cut_review = []
+            try:
+                _cut_forced = _screen_track_a(open_pos) or []
+            except Exception:
+                _cut_forced = []
+            _cut_portfolio_state = {
+                "portfolio_value": pv,
+                "daily_pnl": pnl,
+                "position_count": len(open_pos),
+                "position_slots_remaining": max(
+                    0, int(CONFIG.get("max_positions", 0) or 0) - len(open_pos)
+                ),
+                "open_positions": open_pos,
+            }
+            _cut_apex_input = _aorch_track_a.build_scan_cycle_apex_input(
+                candidates=_cut_candidates,
+                review_positions=_cut_review,
+                portfolio_state=_cut_portfolio_state,
+                regime=regime,
+            )
+            _cut_by_sym = {
+                c.get("symbol"): c for c in _cut_candidates if c.get("symbol")
+            }
+            _cut_active = {
+                p.get("symbol"): p for p in open_pos if p.get("symbol")
+            }
+            _cut_result = _aorch_track_a._run_apex_pipeline(
+                _cut_apex_input,
+                _cut_by_sym,
+                execute=True,
+                active_trades=_cut_active,
+                ib=ib,
+                portfolio_value=pv,
+                regime=regime,
+                forced_exits=_cut_forced,
+            )
+            _cut_report = _cut_result.get("dispatch_report") or {}
+            clog(
+                "INFO",
+                "APEX_LIVE SCAN_CYCLE: "
+                f"{len(_cut_report.get('new_entries') or [])} entries, "
+                f"{len(_cut_report.get('portfolio_actions') or [])} actions, "
+                f"{len(_cut_report.get('forced_exits') or [])} forced, "
+                f"{len(_cut_report.get('errors') or [])} errors",
+            )
+        except Exception as _cut_err:
+            log.error("APEX_LIVE SCAN_CYCLE cutover failed — %s", _cut_err)
+        dash["scanning"] = False
+        clog("SCAN", f"Scan #{bot_state.scan_count} complete (apex cutover)")
+        return
+
     _all_buys = decision.get("buys", [])
     _executed_any_buy = False
 
