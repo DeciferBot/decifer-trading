@@ -54,6 +54,13 @@ MODE_PARAMS = {
     "RECOVERY": {"score_threshold_adj": 10, "size_multiplier": 0.5},
 }
 
+# Apex conviction enum → position-size external_mult.
+# Sole location in codebase where this mapping lives (signal_dispatcher reads from here).
+CONVICTION_MULT: dict[str, float] = {
+    "MEDIUM": 0.65,
+    "HIGH":   1.00,
+}
+
 # ── VIX-rank Kelly state ────────────────────────────────────────
 _vix_rank_cache: float | None = None
 _vix_rank_cache_ts: datetime | None = None

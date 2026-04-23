@@ -23,6 +23,8 @@ enrichment fields are not validated here.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 
 def _check(record: dict, required: list[tuple[str, type | tuple]], context: str) -> None:
     """
@@ -128,3 +130,100 @@ def validate_signal(record: dict) -> None:
     Raises ValueError if any IC-required field is missing or wrong type.
     """
     _check(record, _SIGNAL_REQUIRED, "signal record")
+
+
+# ── Apex decision validation ───────────────────────────────────────────────────
+# These functions are called in two stages:
+#   1. validate_apex_decision_schema()  — structural only; called inside apex_call()
+#   2. validate_apex_decision_semantic() — payload-aware; called by filter_semantic_violations()
+#
+# Keep both stages separate: market_intelligence.py has no access to the candidates payload.
+
+_VALID_TRADE_TYPES = {"INTRADAY", "SWING", "POSITION", "AVOID"}
+_VALID_DIRECTIONS  = {"LONG", "SHORT"}
+_VALID_CONVICTIONS = {"MEDIUM", "HIGH"}
+_VALID_INSTRUMENTS = {"stock", "call", "put"}
+_VALID_ACTIONS     = {"HOLD", "TRIM", "EXIT"}
+_VALID_TRIM_PCTS   = {25, 50, 75}
+
+
+def validate_apex_decision_schema(decision: dict[str, Any]) -> None:
+    """
+    Structural validation of an ApexDecision dict.
+    Raises ValueError with a specific message on any violation.
+    Does NOT require payload/candidate context.
+    """
+    for entry in decision.get("new_entries", []):
+        sym = entry.get("symbol", "<unknown>")
+        tt = entry.get("trade_type")
+        if tt not in _VALID_TRADE_TYPES:
+            raise ValueError(f"new_entry {sym}: invalid trade_type {tt!r}")
+
+        if tt == "AVOID":
+            for nullable_field in ("direction", "conviction", "instrument",
+                                   "direction_flipped", "counter_argument", "key_risk"):
+                if entry.get(nullable_field) is not None:
+                    raise ValueError(
+                        f"new_entry {sym}: AVOID entry must have {nullable_field}=null"
+                    )
+            if not entry.get("rationale"):
+                raise ValueError(f"new_entry {sym}: AVOID entry requires non-empty rationale")
+        else:
+            direction = entry.get("direction")
+            if direction not in _VALID_DIRECTIONS:
+                raise ValueError(f"new_entry {sym}: invalid direction {direction!r}")
+            conviction = entry.get("conviction")
+            if conviction not in _VALID_CONVICTIONS:
+                raise ValueError(f"new_entry {sym}: invalid conviction {conviction!r}")
+            instrument = entry.get("instrument")
+            if instrument not in _VALID_INSTRUMENTS:
+                raise ValueError(f"new_entry {sym}: invalid instrument {instrument!r}")
+            if entry.get("direction_flipped") and not entry.get("rationale"):
+                raise ValueError(
+                    f"new_entry {sym}: direction_flipped=true requires non-empty rationale"
+                )
+
+    for action in decision.get("portfolio_actions", []):
+        sym = action.get("symbol", "<unknown>")
+        act = action.get("action")
+        if act == "ADD":
+            raise ValueError(
+                f"portfolio_action {sym}: ADD is not valid in v1 — Track B is HOLD/TRIM/EXIT only"
+            )
+        if act not in _VALID_ACTIONS:
+            raise ValueError(f"portfolio_action {sym}: invalid action {act!r}")
+        if act == "TRIM":
+            pct = action.get("trim_pct")
+            if pct not in _VALID_TRIM_PCTS:
+                raise ValueError(
+                    f"portfolio_action {sym}: TRIM requires trim_pct in {{25, 50, 75}}, got {pct!r}"
+                )
+
+
+def validate_apex_decision_semantic(
+    decision: dict[str, Any],
+    payloads_by_symbol: dict[str, dict],
+) -> None:
+    """
+    Payload-aware semantic validation of an ApexDecision.
+    Raises ValueError for the first violation found.
+    Requires candidates_by_symbol (ScannerPayload dicts with allowed_trade_types/options_eligible).
+    """
+    for entry in decision.get("new_entries", []):
+        sym = entry.get("symbol", "<unknown>")
+        if entry.get("trade_type") == "AVOID":
+            continue
+        payload = payloads_by_symbol.get(sym)
+        if payload is None:
+            continue  # symbol not in candidates — schema pass, semantic skip
+        allowed = payload.get("allowed_trade_types", [])
+        if allowed and entry.get("trade_type") not in allowed:
+            raise ValueError(
+                f"new_entry {sym}: trade_type {entry.get('trade_type')!r} "
+                f"not in allowed_trade_types {allowed}"
+            )
+        if entry.get("instrument") in ("call", "put") and not payload.get("options_eligible", False):
+            raise ValueError(
+                f"new_entry {sym}: instrument {entry.get('instrument')!r} chosen "
+                f"but options_eligible=False for this symbol"
+            )
