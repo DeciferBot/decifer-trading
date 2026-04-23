@@ -168,7 +168,11 @@ RULES:
 # ══════════════════════════════════════════════════════════════
 
 
-def run_portfolio_review(
+def run_portfolio_review(  # DEPRECATED — Phase 4/6
+    # DEPRECATED: Phase 4 marks this for removal. The single-Apex Track B
+    # (market_intelligence.apex_call with track_b populated) replaces it.
+    # Body is preserved until Phase 6 flips USE_LEGACY_PIPELINE — removing it
+    # now would change live behavior. Do not extend; do not add features.
     open_positions: list,
     all_scored: list,
     regime: dict,
@@ -716,6 +720,11 @@ def lightweight_cycle_check(
 
 def _parse_actions(text: str, open_positions: list) -> list:
     """
+    DEPRECATED — Phase 4/6. Replaced by schemas.validate_apex_decision_schema,
+    which validates structured JSON output from apex_call() instead of regex-
+    parsing Opus prose. Body is preserved until Phase 6 removes the legacy PM
+    Opus call path. Do not extend.
+
     Parse SYMBOL/ACTION/REASON blocks from Portfolio Manager output.
     Falls back to HOLD for any position not found in output.
     """
@@ -772,3 +781,108 @@ def _parse_actions(text: str, open_positions: list) -> list:
             output.append({"symbol": sym, "action": "HOLD", "reasoning": "not_in_output"})
 
     return output
+
+
+# ══════════════════════════════════════════════════════════════
+# Phase 4 — TrackBPositionInput builder (Apex Track B)
+# ══════════════════════════════════════════════════════════════
+# prepare_review_payload() is the single source of truth for the
+# per-position payload the Apex sees on Track B. It replaces the
+# prose-construction logic inside run_portfolio_review() without
+# touching it. guardrails._build_review_payload already imports
+# this function via a try/except guard — wiring is automatic.
+
+
+def prepare_review_payload(position: dict, regime: dict) -> dict:
+    """Build a TrackBPositionInput dict for one open position.
+
+    Robust to missing / empty position["signal_scores"] — all live DB rows
+    currently hold {}. When absent, dimension_deltas is emitted with the
+    per-dimension entry/delta/ic_weight fields set to None. This is graceful
+    degradation; the Apex prompt displays the band shift and flagged_reason
+    regardless.
+
+    Legacy float conviction compatibility: position["conviction"] may be a
+    float (0.62) from pre-migration rows or the MEDIUM|HIGH enum from newer
+    rows. We do not surface the raw value — _conviction_band() is applied to
+    entry_score / current_score for entry_conviction_band and
+    current_conviction_band, which reads band from score and is type-tolerant.
+    """
+    from datetime import UTC as _UTC
+    from datetime import datetime as _dt
+
+    sym = position.get("symbol")
+    entry = position.get("entry") or 0.0
+    current = position.get("current") or entry
+    qty = position.get("qty") or 0
+    direction = (position.get("direction") or "LONG").upper()
+
+    notional = (current or 0.0) * (qty or 0)
+    if entry > 0:
+        pnl_pct = (current - entry) / entry if direction == "LONG" else (entry - current) / entry
+    else:
+        pnl_pct = 0.0
+
+    try:
+        open_dt = _dt.fromisoformat(position.get("open_time", "")).replace(tzinfo=_UTC)
+        days_held = (_dt.now(_UTC) - open_dt).total_seconds() / (3600 * 24)
+    except Exception:
+        days_held = 0.0
+
+    entry_score = position.get("entry_score")
+    current_score = position.get("current_score") or position.get("score")
+
+    # Dimension deltas — graceful when signal_scores is {} or missing.
+    signal_scores = position.get("signal_scores") or {}
+    current_breakdown = position.get("current_score_breakdown") or {}
+    try:
+        from ic_calculator import get_current_weights
+        ic_weights = get_current_weights() or {}
+    except Exception:
+        ic_weights = {}
+
+    all_dims = sorted(set(signal_scores.keys()) | set(current_breakdown.keys()))
+    dimension_deltas: dict[str, dict] = {}
+    for dim in all_dims:
+        try:
+            e_val = float(signal_scores[dim]) if dim in signal_scores else None
+        except (TypeError, ValueError):
+            e_val = None
+        try:
+            c_val = float(current_breakdown[dim]) if dim in current_breakdown else None
+        except (TypeError, ValueError):
+            c_val = None
+        delta = (c_val - e_val) if (e_val is not None and c_val is not None) else None
+        dimension_deltas[dim] = {
+            "entry": e_val,
+            "current": c_val,
+            "delta": delta,
+            "ic_weight": ic_weights.get(dim),
+        }
+
+    tc = position.get("trade_context") or {}
+    return {
+        "symbol": sym,
+        "trade_type": position.get("trade_type"),
+        "direction": direction,
+        "qty": qty,
+        "entry_price": entry,
+        "current_price": current,
+        "notional": notional,
+        "pnl_pct": pnl_pct,
+        "days_held": days_held,
+        "entry_regime": position.get("regime") or position.get("entry_regime"),
+        "current_regime": (regime or {}).get("regime"),
+        "entry_score": entry_score,
+        "current_score": current_score,
+        "entry_thesis": (position.get("entry_thesis") or "").strip() or None,
+        "entry_conviction_band": _conviction_band(entry_score),
+        "current_conviction_band": _conviction_band(current_score),
+        "dimension_deltas": dimension_deltas,
+        "flagged_reason": position.get("flagged_reason"),
+        "news_headlines": position.get("news_headlines") or [],
+        "news_finbert_sentiment": position.get("news_finbert_sentiment"),
+        "earnings_days_away": tc.get("earnings_days_away"),
+        "stop_price": position.get("stop_loss"),
+        "take_profit_price": position.get("take_profit"),
+    }
