@@ -109,9 +109,9 @@ CONFIG = {
     "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", "YOUR_API_KEY_HERE"),
     "claude_model": "claude-sonnet-4-6",  # Sonnet — number crunching, structured data
     "claude_max_tokens": 800,  # Default token cap
-    # Alpha agents use Opus — regime/sentiment judgment and nuanced trade decisions.
-    "claude_model_alpha": "claude-opus-4-6",  # Opus for alpha-generating agents
-    "claude_max_tokens_alpha": 8192,  # Raised from 4096 — dimension evolution blocks per position made 4096 too tight at 13+ positions
+    # Alpha agents use Sonnet — structured synthesis of pre-scored signals; Opus was overkill.
+    "claude_model_alpha": "claude-sonnet-4-6",  # was claude-opus-4-6
+    "claude_max_tokens_alpha": 4096,  # was 8192; sonnet rarely needs more for this structured output
     # Haiku — text generation for voice alerts, trade cards, speech.
     "claude_model_haiku": "claude-haiku-4-5-20251001",
     # ── INTELLIGENCE LAYER ────────────────────────────────────
@@ -481,6 +481,12 @@ CONFIG = {
     "vix_choppy_max": 20,  # VIX above this + below 200d MA = TRENDING_DOWN
     "vix_panic_min": 35,  # VIX above = panic — no trades
     "vix_spike_pct": 0.20,  # 20% VIX spike in 1 hour = exit all
+    # ── DAILY TAPE GATES ──────────────────────────────────────
+    # Hard block: both SPY+QQQ below this % vs prior close → no new longs
+    "tape_bearish_hard_block_pct": -2.0,
+    # Soft raise: both below this % → require extra score points for longs
+    "tape_bearish_score_penalty_pct": -1.2,
+    "tape_bearish_score_penalty": 3,
     # ── ATR VOLATILITY-TARGETING POSITION SIZE CAP ────────────
     # Limits qty so that a 1-ATR adverse move costs at most atr_vol_target_pct
     # of portfolio. Applied after Kelly sizing — more conservative wins.
