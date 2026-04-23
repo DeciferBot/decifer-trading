@@ -2558,5 +2558,59 @@ def run_scan():
 
         bot_state.last_sunday_review = datetime.now(_ET).date()
 
+    # ── Phase 6: Apex SCAN_CYCLE shadow pipeline (log-only) ──────────────
+    # Runs after the legacy pipeline has finished. Builds the same inputs the
+    # Phase 6 cutover will use, invokes market_intelligence.apex_call() via
+    # apex_orchestrator._run_apex_pipeline() (execute=False), and appends the
+    # decision + would-be dispatch summary to data/apex_shadow_log.jsonl.
+    # Guarded by safety_overlay.should_run_apex_shadow() (default False).
+    # Never raises; never touches live orders.
+    try:
+        import safety_overlay as _so_scan_shadow
+        if _so_scan_shadow.should_run_apex_shadow():
+            import apex_orchestrator as _aorch
+            from guardrails import filter_candidates, flag_positions_for_review
+
+            _shadow_candidates = filter_candidates(
+                list(pipeline.all_scored or []),
+                {p.get("symbol") for p in open_pos if p.get("symbol")},
+                regime=regime,
+            )
+            try:
+                _shadow_review = flag_positions_for_review(open_pos, regime)
+            except Exception:
+                _shadow_review = []
+
+            _shadow_portfolio_state = {
+                "portfolio_value": pv,
+                "daily_pnl": pnl,
+                "position_count": len(open_pos),
+                "position_slots_remaining": max(
+                    0, int(CONFIG.get("max_positions", 0) or 0) - len(open_pos)
+                ),
+                "open_positions": open_pos,
+            }
+            _shadow_input = _aorch.build_scan_cycle_apex_input(
+                candidates=_shadow_candidates,
+                review_positions=_shadow_review,
+                portfolio_state=_shadow_portfolio_state,
+                regime=regime,
+            )
+            _shadow_by_sym = {
+                c.get("symbol"): c for c in _shadow_candidates if c.get("symbol")
+            }
+            _shadow_result = _aorch._run_apex_pipeline(
+                _shadow_input, _shadow_by_sym, execute=False
+            )
+            _aorch.log_shadow_result("SCAN_CYCLE", _shadow_result)
+            clog(
+                "INFO",
+                f"APEX_SHADOW SCAN_CYCLE: {len(_shadow_result.get('would_dispatch') or [])} "
+                f"would-dispatch / {len(_shadow_result.get('rejected') or [])} rejected "
+                "(log-only, no orders submitted)",
+            )
+    except Exception as _shadow_err:
+        log.warning("APEX_SHADOW SCAN_CYCLE error (non-fatal): %s", _shadow_err)
+
     dash["scanning"] = False
     clog("SCAN", f"Scan #{bot_state.scan_count} complete")
