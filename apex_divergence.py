@@ -153,6 +153,19 @@ def mirror_apex_decision(
     fallback = bool(decision.get("_fallback")) or "apex_call_error" in note
     schema_reject = "schema" in note or "validate" in note
 
+    # Phase 7C.3: Apex latency + token metadata (attached by
+    # market_intelligence.apex_call into decision["_meta"]). Surfaced at the
+    # mirror's top level so the roll-up can read it without digging.
+    _meta = decision.get("_meta") if isinstance(decision, dict) else None
+    _meta = _meta or {}
+    # The _meta.error marker is a stronger fallback signal than the note heuristic.
+    if _meta.get("error"):
+        err = _meta.get("error", "")
+        if "schema" in err:
+            schema_reject = True
+        else:
+            fallback = True
+
     return {
         "side": "apex",
         "cycle_id": cycle_id,
@@ -165,6 +178,13 @@ def mirror_apex_decision(
         "schema_reject": schema_reject,
         "note": note,
         "payloads_digest": _digest_payloads(candidates_by_symbol or {}),
+        "apex_latency_ms": _meta.get("latency_ms"),
+        "apex_attempts": _meta.get("attempts"),
+        "apex_input_tokens": _meta.get("input_tokens"),
+        "apex_output_tokens": _meta.get("output_tokens"),
+        "apex_cache_read_tokens": _meta.get("cache_read_tokens"),
+        "apex_cache_creation_tokens": _meta.get("cache_creation_tokens"),
+        "apex_model": _meta.get("model"),
     }
 
 

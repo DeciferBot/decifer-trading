@@ -958,7 +958,7 @@ def apex_call(
       - JSON parse failure
       - schema validation failure
     """
-    from llm_client import call_apex as _call_apex
+    from llm_client import call_apex_with_meta as _call_apex_meta
     from schemas import validate_apex_decision_schema
 
     sctx = session_context
@@ -969,13 +969,16 @@ def apex_call(
             log.warning("apex_call: session context build failed — %s", e)
             sctx = None
 
+    _meta: dict = {}
     try:
         system_prompt = _APEX_SYSTEM_PROMPT
         user_prompt = _build_apex_user_prompt(apex_input, sctx)
-        raw = _call_apex(system_prompt, user_prompt, max_tokens=2048)
+        raw, _meta = _call_apex_meta(system_prompt, user_prompt, max_tokens=2048)
     except Exception as e:
         log.error("apex_call: LLM call failed — %s", e)
-        return _fallback_decision(apex_input, reason=f"llm_error:{type(e).__name__}")
+        fb = _fallback_decision(apex_input, reason=f"llm_error:{type(e).__name__}")
+        fb["_meta"] = {"latency_ms": None, "error": f"llm_error:{type(e).__name__}"}
+        return fb
 
     try:
         start = raw.find("{")
@@ -985,13 +988,21 @@ def apex_call(
         decision = json.loads(raw[start : end + 1])
     except Exception as e:
         log.error("apex_call: JSON parse failed — %s | raw head: %s", e, raw[:200])
-        return _fallback_decision(apex_input, reason=f"parse_error:{e}")
+        fb = _fallback_decision(apex_input, reason=f"parse_error:{e}")
+        fb["_meta"] = {**_meta, "error": "parse_error"}
+        return fb
 
     try:
         validate_apex_decision_schema(decision)
     except ValueError as e:
         log.error("apex_call: schema validation failed — %s", e)
-        return _fallback_decision(apex_input, reason=f"schema_error:{e}")
+        fb = _fallback_decision(apex_input, reason=f"schema_error:{e}")
+        fb["_meta"] = {**_meta, "error": "schema_error"}
+        return fb
 
     decision.setdefault("scan_ts", apex_input.get("scan_ts", ""))
+    # Phase 7C.3: attach Apex-call metadata (latency, tokens, model).
+    # _meta is the underscore-prefixed instrumentation channel — consumers
+    # (shadow recorder, divergence log) read it; schema validation ignores it.
+    decision["_meta"] = _meta
     return decision

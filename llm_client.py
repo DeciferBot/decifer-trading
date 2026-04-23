@@ -27,16 +27,34 @@ def _get_client() -> anthropic.Anthropic:
     return _client
 
 
-def call_apex(
+def call_apex_with_meta(
     system_prompt: str,
     user_prompt: str,
     max_tokens: int = 2048,
-) -> str:
-    """Opus call for the Apex Synthesizer. System prompt is prompt-cached."""
+) -> tuple[str, dict]:
+    """
+    Opus call for the Apex Synthesizer. Returns (text, meta).
+
+    meta is a dict containing:
+        latency_ms        — wall-clock time spent in the API call (last attempt
+                            only if retries occurred; attempts counted separately)
+        attempts          — how many attempts were made (1 on success, up to 3)
+        input_tokens      — from resp.usage if available, else None
+        output_tokens     — from resp.usage if available, else None
+        cache_read_tokens — prompt-cache hit tokens if available, else None
+        cache_creation_tokens — prompt-cache miss tokens if available, else None
+        model             — the model id actually called
+
+    Phase 7C.3: added to support shadow-record latency fields without breaking
+    existing call_apex callers (which still get the text-only return).
+    """
     client = _get_client()
     model = CONFIG.get("claude_model_alpha", "claude-opus-4-6")
     last_err: Exception | None = None
+    attempts = 0
     for attempt in range(3):
+        attempts += 1
+        t0 = time.perf_counter()
         try:
             resp = client.messages.create(
                 model=model,
@@ -50,7 +68,19 @@ def call_apex(
                 ],
                 messages=[{"role": "user", "content": user_prompt}],
             )
-            return resp.content[0].text.strip()
+            latency_ms = int((time.perf_counter() - t0) * 1000)
+            text = resp.content[0].text.strip()
+            usage = getattr(resp, "usage", None)
+            meta = {
+                "latency_ms": latency_ms,
+                "attempts": attempts,
+                "input_tokens": getattr(usage, "input_tokens", None),
+                "output_tokens": getattr(usage, "output_tokens", None),
+                "cache_read_tokens": getattr(usage, "cache_read_input_tokens", None),
+                "cache_creation_tokens": getattr(usage, "cache_creation_input_tokens", None),
+                "model": model,
+            }
+            return text, meta
         except anthropic.APIStatusError as e:
             last_err = e
             if e.status_code in (529, 503, 502):
@@ -65,6 +95,20 @@ def call_apex(
             log.warning("Apex connection error — retry in %ss: %s", wait, e)
             time.sleep(wait)
     raise RuntimeError(f"Apex call failed after 3 attempts: {last_err}") from last_err
+
+
+def call_apex(
+    system_prompt: str,
+    user_prompt: str,
+    max_tokens: int = 2048,
+) -> str:
+    """Opus call for the Apex Synthesizer. System prompt is prompt-cached.
+
+    Thin wrapper around call_apex_with_meta that discards the meta dict for
+    backwards compatibility with callers that don't need latency/token data.
+    """
+    text, _meta = call_apex_with_meta(system_prompt, user_prompt, max_tokens)
+    return text
 
 
 def call_sonnet(

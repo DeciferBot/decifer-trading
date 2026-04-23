@@ -80,14 +80,20 @@ def log_shadow_result(
     """Append one JSON line capturing the Apex shadow outcome."""
     try:
         os.makedirs(os.path.dirname(_SHADOW_LOG_PATH), exist_ok=True)
+        # Phase 7C.3: surface apex _meta (latency, tokens, model) at the top
+        # level of the shadow record so the roll-up doesn't have to dig into
+        # the decision dict.
+        _decision = result.get("decision") or {}
+        _apex_meta = _decision.get("_meta") if isinstance(_decision, dict) else None
         entry = {
             "ts": datetime.now(UTC).isoformat(),
             "trigger_type": trigger_type,
             "trigger_context": trigger_context,
-            "decision": result.get("decision"),
+            "decision": _decision,
             "would_dispatch": result.get("would_dispatch") or [],
             "rejected": result.get("rejected") or [],
             "note": result.get("note", ""),
+            "apex_meta": _apex_meta or {},
         }
         with open(_SHADOW_LOG_PATH, "a") as fh:
             fh.write(json.dumps(entry, default=str) + "\n")
