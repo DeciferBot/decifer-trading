@@ -13,7 +13,30 @@ from market_intelligence import classify_signals
 from orders_core import execute_buy, execute_short
 from pattern_library import record_entry
 from signal_types import Signal
-from trade_advisor import advise_trade
+from trade_advisor import _formula_advice, advise_trade
+
+
+def _advise_trade_gated(**kwargs):
+    """
+    Phase 6D: route advise_trade through the TRADE_ADVISOR_ENABLED flag.
+
+    Default True preserves live behavior. Phase 7 flips False and the
+    deterministic ATR-formula fallback becomes authoritative — no LLM
+    sizing/stop overrides; conviction mapping + calculate_stops own the path.
+    """
+    try:
+        from safety_overlay import trade_advisor_enabled
+        enabled = trade_advisor_enabled()
+    except Exception:
+        enabled = True
+    if enabled:
+        return advise_trade(**kwargs)
+    return _formula_advice(
+        symbol=kwargs.get("symbol", ""),
+        direction=kwargs.get("direction", "LONG"),
+        entry_price=kwargs.get("entry_price", 0.0),
+        atr_5m=kwargs.get("atr_5m", 0.0),
+    )
 
 log = logging.getLogger("decifer.dispatcher")
 
@@ -304,7 +327,7 @@ def dispatch_signals(
         # ── Trade advisor (PT / SL / size / instrument) ───────
         if signal.direction == "LONG" and "LONG" in allowed_dirs:
             try:
-                advice = advise_trade(
+                advice = _advise_trade_gated(
                     symbol=signal.symbol,
                     direction="LONG",
                     entry_price=signal.price,
@@ -360,7 +383,7 @@ def dispatch_signals(
 
         elif signal.direction == "SHORT" and "SHORT" in allowed_dirs:
             try:
-                advice = advise_trade(
+                advice = _advise_trade_gated(
                     symbol=signal.symbol,
                     direction="SHORT",
                     entry_price=signal.price,
@@ -422,3 +445,252 @@ def dispatch_signals(
         results.append(result)
 
     return results
+
+
+# ══════════════════════════════════════════════════════════════
+# PHASE 6D — APEX DECISION DISPATCHER  (cutover bridge — off by default)
+# ══════════════════════════════════════════════════════════════
+# These two functions consume an ApexDecision (produced by
+# market_intelligence.apex_call + guardrails.filter_semantic_violations) and
+# translate it into calls to the existing orders_core execution primitives.
+#
+# They are NOT invoked by any live code path in Phase 6D. The Phase 7 cutover
+# flips USE_LEGACY_PIPELINE / PM_LEGACY_OPUS_REVIEW_ENABLED / SENTINEL_LEGACY_
+# PIPELINE_ENABLED to False, which activates the cutover else-branches that
+# call these functions. Default execute=False keeps them shadow-safe until
+# that moment.
+#
+# Unlike dispatch_signals() above (which consumes legacy Signal objects and
+# calls classify_signals internally), dispatch() consumes an already-validated
+# ApexDecision and does no additional LLM work. It is a pure translator.
+
+
+def dispatch_forced_exit(
+    symbol: str,
+    reason: str,
+    ib=None,
+    *,
+    execute: bool = False,
+) -> dict:
+    """
+    Close a position via execute_sell() with a deterministic reason tag.
+
+    Used for guardrails-detected forced exits (eod_flat, scalp_timeout,
+    architecture_violation, unknown_trade_type). No LLM involvement.
+
+    execute=False (default) is a dry run — returns the shape of the action
+    without calling execute_sell. Phase 6D keeps execute=False at every call
+    site; Phase 7 flips it True for live forced exits.
+    """
+    action = {
+        "symbol": symbol,
+        "action": "FORCED_EXIT",
+        "reason": reason,
+        "executed": False,
+    }
+    if not execute:
+        log.info(f"dispatch_forced_exit (dry): {symbol} — {reason}")
+        return action
+
+    try:
+        from orders_core import execute_sell
+        ok = execute_sell(ib, symbol, reason=reason)
+        action["executed"] = bool(ok)
+    except Exception as exc:
+        log.error(f"dispatch_forced_exit: execute_sell failed for {symbol} — {exc}")
+        action["error"] = str(exc)
+    return action
+
+
+def _select_atr(entry: dict, payload: dict) -> float:
+    """SWING/POSITION use daily ATR; INTRADAY/AVOID use 5m ATR (per master plan §L3)."""
+    tt = (entry.get("trade_type") or "").upper()
+    if tt in ("SWING", "POSITION"):
+        return float(payload.get("atr_daily") or payload.get("atr_5m") or 0.0)
+    return float(payload.get("atr_5m") or payload.get("atr") or 0.0)
+
+
+def _conviction_external_mult(conviction: str | None) -> float:
+    """Map Apex conviction enum (MEDIUM/HIGH) → external_mult for position sizing."""
+    from risk import CONVICTION_MULT
+    if not conviction:
+        return 0.65  # conservative default; should not occur for non-AVOID entries
+    return CONVICTION_MULT.get(conviction.upper(), 0.65)
+
+
+def dispatch(
+    decision: dict,
+    candidates_by_symbol: dict[str, dict],
+    active_trades: dict,
+    *,
+    ib=None,
+    portfolio_value: float = 0.0,
+    regime: dict | None = None,
+    execute: bool = False,
+) -> dict:
+    """
+    Translate an ApexDecision into order-layer calls.
+
+    decision             — ApexDecision dict (schema-validated upstream)
+    candidates_by_symbol — {symbol: ScannerPayload} for every Track A candidate
+    active_trades        — current open positions dict
+    execute              — False (default) returns a dry-run report; True
+                           actually submits orders via execute_buy /
+                           execute_short / execute_sell. Phase 6D callers set
+                           execute=False; Phase 7 flips to True.
+
+    Returns a report dict:
+        {
+          "new_entries":       [ {symbol, direction, trade_type, conviction,
+                                  instrument, qty, sl, tp, executed}, ... ],
+          "portfolio_actions": [ {symbol, action, trim_pct, executed}, ... ],
+          "forced_exits":      [ {symbol, reason, executed}, ... ],
+          "errors":            [str, ...],
+        }
+
+    CONVICTION_MULT and ATR selection are applied here (not at the Apex) so
+    the LLM's only sizing lever is the MEDIUM/HIGH conviction enum.
+    """
+    regime = regime or {}
+    report: dict = {
+        "new_entries": [],
+        "portfolio_actions": [],
+        "forced_exits": [],
+        "errors": [],
+    }
+
+    # ── Track A: new entries ──────────────────────────────────────────────
+    for entry in (decision.get("new_entries") or []):
+        sym = entry.get("symbol")
+        trade_type = (entry.get("trade_type") or "").upper()
+
+        if trade_type == "AVOID" or not sym:
+            continue
+
+        payload = candidates_by_symbol.get(sym) or {}
+        if not payload:
+            report["errors"].append(f"{sym}: no payload for Track A entry")
+            continue
+
+        price = float(payload.get("price") or 0.0)
+        score = int(payload.get("score") or 0)
+        atr = _select_atr(entry, payload)
+        ext_mult = _conviction_external_mult(entry.get("conviction"))
+        direction = (entry.get("direction") or "").upper()
+
+        qty = 0
+        sl = tp = 0.0
+        if price > 0 and portfolio_value > 0:
+            try:
+                from position_sizing import calculate_stops
+                from risk import calculate_position_size
+                qty = calculate_position_size(
+                    portfolio_value, price, score, regime, atr=atr, external_mult=ext_mult
+                )
+                sl, tp = calculate_stops(price, atr, "LONG" if direction == "LONG" else "SHORT")
+            except Exception as exc:
+                report["errors"].append(f"{sym}: sizing failed — {exc}")
+
+        rec = {
+            "symbol": sym,
+            "direction": direction,
+            "trade_type": trade_type,
+            "conviction": entry.get("conviction"),
+            "instrument": entry.get("instrument"),
+            "price": price,
+            "atr": atr,
+            "external_mult": ext_mult,
+            "qty": qty,
+            "sl": sl,
+            "tp": tp,
+            "executed": False,
+        }
+
+        if not execute:
+            report["new_entries"].append(rec)
+            continue
+
+        try:
+            signal_scores = payload.get("score_breakdown") or {}
+            rationale = entry.get("rationale", "")
+            if direction == "LONG":
+                ok = execute_buy(
+                    ib=ib,
+                    symbol=sym,
+                    price=price,
+                    atr=atr,
+                    score=score,
+                    portfolio_value=portfolio_value,
+                    regime=regime,
+                    reasoning=rationale,
+                    signal_scores=signal_scores,
+                    open_time=datetime.now(UTC).isoformat(),
+                    trade_type=trade_type,
+                    conviction=ext_mult,
+                )
+            elif direction == "SHORT":
+                ok = execute_short(
+                    ib=ib,
+                    symbol=sym,
+                    price=price,
+                    atr=atr,
+                    score=score,
+                    portfolio_value=portfolio_value,
+                    regime=regime,
+                    reasoning=rationale,
+                    signal_scores=signal_scores,
+                    open_time=datetime.now(UTC).isoformat(),
+                    trade_type=trade_type,
+                    conviction=ext_mult,
+                )
+            else:
+                ok = False
+                report["errors"].append(f"{sym}: unknown direction {direction!r}")
+            rec["executed"] = bool(ok)
+        except Exception as exc:
+            report["errors"].append(f"{sym}: execute failed — {exc}")
+        report["new_entries"].append(rec)
+
+    # ── Track B: portfolio actions (HOLD / TRIM / EXIT) ───────────────────
+    for act in (decision.get("portfolio_actions") or []):
+        sym = act.get("symbol")
+        action_type = (act.get("action") or "").upper()
+        rec = {
+            "symbol": sym,
+            "action": action_type,
+            "trim_pct": act.get("trim_pct"),
+            "reasoning_tag": act.get("reasoning_tag"),
+            "executed": False,
+        }
+        if action_type == "HOLD" or not sym:
+            report["portfolio_actions"].append(rec)
+            continue
+
+        if not execute:
+            report["portfolio_actions"].append(rec)
+            continue
+
+        try:
+            from orders_core import execute_sell
+            pos = active_trades.get(sym) or {}
+            pos_qty = int(pos.get("qty") or 0)
+            if action_type == "EXIT":
+                ok = execute_sell(ib, sym, reason=act.get("reasoning_tag") or "apex_exit")
+                rec["executed"] = bool(ok)
+            elif action_type == "TRIM":
+                trim_pct = int(act.get("trim_pct") or 50)
+                trim_qty = max(1, int(pos_qty * trim_pct / 100))
+                ok = execute_sell(
+                    ib, sym,
+                    reason=act.get("reasoning_tag") or f"apex_trim_{trim_pct}",
+                    qty_override=trim_qty,
+                )
+                rec["executed"] = bool(ok)
+            else:
+                report["errors"].append(f"{sym}: unknown action {action_type!r}")
+        except Exception as exc:
+            report["errors"].append(f"{sym}: portfolio action failed — {exc}")
+        report["portfolio_actions"].append(rec)
+
+    return report
+

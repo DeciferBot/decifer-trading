@@ -396,11 +396,21 @@ class NewsSentinel:
 
                     trigger = deep_read_trigger(trigger)
 
-                    # Final gate: Claude must confirm materiality
-                    if trigger.get("claude_confidence", 0) < 4 and trigger["urgency"] != "CRITICAL":
+                    # Final gate: materiality confirmation.
+                    # Phase 6D: when FINBERT_MATERIALITY_GATE_ENABLED=True the gate
+                    # reads finbert_confidence instead of claude_confidence. Default
+                    # False preserves the legacy Claude-confidence gate.
+                    try:
+                        from safety_overlay import finbert_materiality_gate_enabled
+                        _use_finbert = finbert_materiality_gate_enabled()
+                    except Exception:
+                        _use_finbert = False
+                    _conf_key = "finbert_confidence" if _use_finbert else "claude_confidence"
+                    _conf_val = trigger.get(_conf_key, 0) or 0
+                    if _conf_val < 4 and trigger["urgency"] != "CRITICAL":
                         log.info(
-                            f"Sentinel: {trigger['symbol']} — Claude confidence too low "
-                            f"({trigger.get('claude_confidence', 0)}), skipping"
+                            f"Sentinel: {trigger['symbol']} — {_conf_key} too low "
+                            f"({_conf_val}), skipping"
                         )
                         continue
 

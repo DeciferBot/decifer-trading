@@ -167,6 +167,8 @@ CONFIG = {
         "USE_APEX_V3_SHADOW": False,   # Phase 6: run apex path in log-only mode
         "PM_LEGACY_OPUS_REVIEW_ENABLED": True,   # authoritative; Phase 6 cutover flips to False
         "SENTINEL_LEGACY_PIPELINE_ENABLED": True,  # authoritative; Phase 6 cutover flips to False
+        "TRADE_ADVISOR_ENABLED": True,             # legacy trade_advisor.advise_trade; Phase 7 flips to False
+        "FINBERT_MATERIALITY_GATE_ENABLED": False, # news_sentinel: use finbert_confidence instead of claude_confidence when True
         "daily_loss_halt_new_entries_pct": 0.03,
         "daily_loss_manage_only_pct": 0.05,
         "per_symbol_hard_loss_pct": None,  # None = disabled; e.g. 0.15 → exit at -15%

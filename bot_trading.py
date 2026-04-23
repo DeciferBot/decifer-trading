@@ -1645,8 +1645,77 @@ def run_scan():
                     available_cash=_available_cash,
                 )
             else:
-                clog("INFO", "PM legacy Opus review disabled by safety_overlay flag — skipping")
+                # Phase 6D cutover branch (OFF BY DEFAULT — legacy flag above
+                # is True). When the Phase 7 cutover flips PM_LEGACY_OPUS_
+                # REVIEW_ENABLED to False, this branch becomes live: build an
+                # Apex Track B ApexInput, call market_intelligence.apex_call,
+                # run the semantic filter, translate ApexDecision.portfolio_
+                # actions into TRIM/EXIT orders via signal_dispatcher.dispatch.
+                # Until cutover, dispatch runs with execute=False (dry-run)
+                # and pm_actions is derived from the dry-run report so the
+                # existing downstream TRIM/EXIT loop still iterates safely.
+                clog("INFO", "PM legacy Opus review disabled — invoking Apex Track B cutover branch")
                 pm_actions = []
+                try:
+                    import apex_orchestrator as _aorch_pm
+                    from signal_dispatcher import dispatch as _apex_dispatch
+
+                    _pm_review_payload = []
+                    try:
+                        from guardrails import flag_positions_for_review as _flag_pm
+                        _pm_review_payload = _flag_pm(pm_open_pos, regime)
+                    except Exception as _pm_flag_err:
+                        log.warning("PM cutover: flag_positions_for_review failed — %s", _pm_flag_err)
+
+                    _pm_apex_input = _aorch_pm.build_scan_cycle_apex_input(
+                        candidates=[],
+                        review_positions=_pm_review_payload,
+                        portfolio_state={
+                            "portfolio_value": pv,
+                            "daily_pnl": pnl,
+                            "position_count": len(pm_open_pos),
+                            "open_positions": pm_open_pos,
+                        },
+                        regime=regime,
+                    )
+                    _pm_shadow = _aorch_pm._run_apex_pipeline(
+                        _pm_apex_input, candidates_by_symbol={}, execute=False
+                    )
+                    _aorch_pm.log_shadow_result("TRACK_B_PM", _pm_shadow)
+
+                    # Cutover execute flag — only flipped True when the legacy
+                    # flag is False AND USE_LEGACY_PIPELINE is also False. This
+                    # guard ensures the cutover branch can be reached
+                    # structurally without dispatching live orders until both
+                    # authoritative flags are flipped.
+                    try:
+                        import safety_overlay as _so_cut
+                        _pm_cutover_execute = (not _so_cut.should_use_legacy_pipeline())
+                    except Exception:
+                        _pm_cutover_execute = False
+
+                    _pm_decision = _pm_shadow.get("decision") or {}
+                    _pm_report = _apex_dispatch(
+                        _pm_decision,
+                        candidates_by_symbol={},
+                        active_trades={p.get("symbol"): p for p in pm_open_pos if p.get("symbol")},
+                        ib=ib,
+                        portfolio_value=pv,
+                        regime=regime,
+                        execute=_pm_cutover_execute,
+                    )
+                    # Translate report → pm_actions shape expected by the
+                    # existing loop below (symbol/action/trim_pct/reasoning).
+                    for _pa in _pm_report.get("portfolio_actions") or []:
+                        pm_actions.append({
+                            "symbol": _pa.get("symbol"),
+                            "action": _pa.get("action"),
+                            "trim_pct": _pa.get("trim_pct") or 50,
+                            "reasoning": _pa.get("reasoning_tag") or "apex_track_b",
+                        })
+                except Exception as _pm_cutover_err:
+                    log.error("PM cutover branch failed — %s", _pm_cutover_err)
+                    pm_actions = []
             for action in pm_actions:
                 sym_pm = action.get("symbol", "")
                 act_pm = action.get("action", "HOLD")

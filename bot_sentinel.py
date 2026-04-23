@@ -111,18 +111,71 @@ def handle_news_trigger(trigger: dict):
                 regime=regime,
             )
         else:
-            clog("INFO", f"Sentinel {sym}: legacy pipeline disabled by safety_overlay — SKIP")
+            # Phase 6D cutover branch (OFF BY DEFAULT — legacy flag above is
+            # True). When Phase 7 flips SENTINEL_LEGACY_PIPELINE_ENABLED to
+            # False, this branch becomes live: build an Apex NEWS_INTERRUPT
+            # ApexInput, call market_intelligence.apex_call, dispatch via
+            # signal_dispatcher.dispatch. Until cutover, execute=False.
+            clog("INFO", f"Sentinel {sym}: legacy disabled — invoking Apex NEWS_INTERRUPT cutover branch")
             decision = {
                 "action": "SKIP",
                 "symbol": sym,
-                "qty": 0,
-                "sl": 0,
-                "tp": 0,
-                "instrument": "stock",
+                "qty": 0, "sl": 0, "tp": 0, "instrument": "stock",
                 "confidence": 0,
-                "reasoning": "sentinel legacy pipeline disabled",
+                "reasoning": "apex news-interrupt cutover dry-run",
                 "trigger_type": "news_sentinel",
             }
+            try:
+                import apex_orchestrator as _aorch_s
+                import safety_overlay as _so_s
+                from sentinel_agents import build_news_trigger_payload
+                from signal_dispatcher import dispatch as _apex_dispatch
+
+                _s_apex_input = build_news_trigger_payload(
+                    trigger=trigger,
+                    open_positions=open_pos,
+                    portfolio_value=pv,
+                    daily_pnl=pnl,
+                    regime=regime,
+                    scored_candidate=None,  # Phase 7 scores the triggered symbol on demand
+                )
+                _s_shadow = _aorch_s._run_apex_pipeline(
+                    _s_apex_input, candidates_by_symbol={}, execute=False
+                )
+                _aorch_s.log_shadow_result(
+                    "NEWS_INTERRUPT", _s_shadow,
+                    trigger_context=_s_apex_input.get("trigger_context"),
+                )
+                _s_execute = not _so_s.should_use_legacy_pipeline()
+                _s_report = _apex_dispatch(
+                    _s_shadow.get("decision") or {},
+                    candidates_by_symbol={},
+                    active_trades={p.get("symbol"): p for p in open_pos if p.get("symbol")},
+                    ib=ib,
+                    portfolio_value=pv,
+                    regime=regime,
+                    execute=_s_execute,
+                )
+                # Surface the first Track A entry as the decision so the
+                # existing downstream BUY/SELL/HOLD switch below still runs
+                # shape-compatibly. No orders fire unless _s_execute=True.
+                _entries = _s_report.get("new_entries") or []
+                if _entries:
+                    _e = _entries[0]
+                    decision.update({
+                        "action": "BUY" if (_e.get("direction") == "LONG") else (
+                            "SELL" if _e.get("direction") == "SHORT" else "SKIP"
+                        ),
+                        "symbol": _e.get("symbol") or sym,
+                        "qty": int(_e.get("qty") or 0),
+                        "sl": float(_e.get("sl") or 0),
+                        "tp": float(_e.get("tp") or 0),
+                        "instrument": _e.get("instrument") or "stock",
+                        "confidence": 7 if _e.get("conviction") == "HIGH" else 5,
+                        "reasoning": _e.get("rationale") or decision["reasoning"],
+                    })
+            except Exception as _s_cut_err:
+                log.error(f"Sentinel cutover branch failed for {sym}: {_s_cut_err}")
 
         dash["sentinel_triggers"].insert(
             0,

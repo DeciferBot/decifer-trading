@@ -39,6 +39,8 @@ _DEFAULTS: dict = {
     "USE_APEX_V3_SHADOW": False,
     "PM_LEGACY_OPUS_REVIEW_ENABLED": True,     # authoritative; Phase 6 cutover flips to False
     "SENTINEL_LEGACY_PIPELINE_ENABLED": True,  # authoritative; Phase 6 cutover flips to False
+    "TRADE_ADVISOR_ENABLED": True,             # legacy trade_advisor; Phase 7 flips to False
+    "FINBERT_MATERIALITY_GATE_ENABLED": False, # news_sentinel materiality gate source
     "daily_loss_halt_new_entries_pct": 0.03,   # -3% blocks new entries
     "daily_loss_manage_only_pct": 0.05,        # -5% switches to manage-only (aligns with daily_loss_limit)
     "per_symbol_hard_loss_pct": None,          # e.g. -0.15 → force exit on -15% per-position unreal.; None disables
@@ -207,6 +209,30 @@ def should_use_legacy_pipeline() -> bool:
 def should_run_apex_shadow() -> bool:
     """Shadow mode: run new path in parallel but do NOT submit its orders."""
     return bool(flag("USE_APEX_V3_SHADOW"))
+
+
+def trade_advisor_enabled() -> bool:
+    """
+    Gate for the legacy trade_advisor.advise_trade() call site inside
+    signal_dispatcher.dispatch_signals.
+
+    Default True. Phase 7 flips False and deletes trade_advisor.py. When
+    False, dispatch_signals uses a pass-through TradeAdvice (no LLM, no
+    size/stop overrides — the deterministic ATR formula owns sizing/stops).
+    """
+    return bool(flag("TRADE_ADVISOR_ENABLED"))
+
+
+def finbert_materiality_gate_enabled() -> bool:
+    """
+    news_sentinel materiality gate source.
+
+    Default False — preserves current live behavior (gate uses
+    claude_confidence from news.claude_sentiment). When True, the gate uses
+    finbert_confidence from news.batch_news_sentiment instead. Phase 7 flips
+    True after the Apex path is shadow-validated.
+    """
+    return bool(flag("FINBERT_MATERIALITY_GATE_ENABLED"))
 
 
 def sentinel_legacy_pipeline_enabled() -> bool:
