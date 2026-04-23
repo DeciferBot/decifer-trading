@@ -47,9 +47,44 @@ def test_build_scan_cycle_apex_input_handles_empty_inputs():
     assert apex_input["portfolio_state"] == {}
 
 
-def test_run_apex_pipeline_execute_true_is_blocked():
-    with pytest.raises(NotImplementedError):
-        apex_orchestrator._run_apex_pipeline({"trigger_type": "SCAN_CYCLE"}, {}, execute=True)
+def test_run_apex_pipeline_execute_true_implemented_and_dispatches(monkeypatch):
+    """Phase 8A.1 — execute=True now implemented. Replaces the Phase 6
+    NotImplementedError safety rail. With an empty decision, no execute_*
+    call fires, and the returned note flips to 'executed'."""
+    import signal_dispatcher
+
+    calls = {"dispatch": 0, "forced": 0}
+
+    def _stub_dispatch(decision, candidates_by_symbol, active_trades, **kw):
+        calls["dispatch"] += 1
+        assert kw.get("execute") is True
+        return {"new_entries": [], "portfolio_actions": [],
+                "forced_exits": [], "errors": []}
+
+    def _stub_forced(symbol, reason, **kw):
+        calls["forced"] += 1
+        return {"symbol": symbol, "reason": reason, "executed": True}
+
+    monkeypatch.setattr(signal_dispatcher, "dispatch", _stub_dispatch)
+    monkeypatch.setattr(signal_dispatcher, "dispatch_forced_exit", _stub_forced)
+
+    # apex_call returns empty decision via _fallback_decision on bad input —
+    # this test does not need a real LLM response.
+    import market_intelligence
+    monkeypatch.setattr(
+        market_intelligence, "apex_call",
+        lambda *_a, **_kw: {"new_entries": [], "portfolio_actions": []},
+    )
+
+    result = apex_orchestrator._run_apex_pipeline(
+        {"trigger_type": "SCAN_CYCLE"}, {}, execute=True,
+        active_trades={}, ib=None, portfolio_value=100_000.0,
+        regime={"regime": "TRENDING_UP"}, forced_exits=[("AAPL", "eod_flat")],
+    )
+    assert result["note"] == "executed"
+    assert "dispatch_report" in result
+    assert calls["dispatch"] == 1
+    assert calls["forced"] == 1
 
 
 def test_dispatch_mixed_decision_dry_run_shape_and_no_orders(monkeypatch):

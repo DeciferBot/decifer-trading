@@ -156,28 +156,36 @@ def _run_apex_pipeline(
     candidates_by_symbol: dict[str, dict] | None = None,
     *,
     execute: bool = False,
+    active_trades: dict | None = None,
+    ib: Any = None,
+    portfolio_value: float = 0.0,
+    regime: dict | None = None,
+    forced_exits: list | None = None,
 ) -> dict:
     """
-    Run the Apex path end-to-end in shadow mode (default).
+    Run the Apex path end-to-end.
 
-    Steps:
+    Shadow mode (execute=False, default):
       1. market_intelligence.apex_call(apex_input) — returns ApexDecision
          (apex_call already runs validate_apex_decision_schema internally
           and returns _fallback_decision on any failure; never raises).
       2. guardrails.filter_semantic_violations(decision, candidates_by_symbol)
          — removes per-entry violations.
       3. Build (would_dispatch, rejected) summary.
+      4. Return {"decision", "would_dispatch", "rejected", "note": "shadow"}.
 
-    When execute=True, Phase 7 will additionally call signal_dispatcher.dispatch.
-    For Phase 6, execute=True raises NotImplementedError to make accidental
-    live dispatch impossible.
+    Execute mode (execute=True, Phase 8A cutover):
+      After shadow steps 1–3, additionally call
+      signal_dispatcher.dispatch(decision, candidates_by_symbol, active_trades,
+      ib=ib, portfolio_value=portfolio_value, regime=regime, execute=True)
+      to submit live orders, then dispatch any forced_exits via
+      signal_dispatcher.dispatch_forced_exit. Returns the shadow shape plus
+      "dispatch_report" (the dispatch() return dict) and "note": "executed".
+
+    Caller responsibility: execute=True requires a live ib client and real
+    active_trades / portfolio_value. No caller in Phase 6/7 passes execute=True
+    — the scan-cycle cutover branch added in Phase 8A.2 is the first.
     """
-    if execute:
-        raise NotImplementedError(
-            "apex_orchestrator._run_apex_pipeline(execute=True) is Phase 7+. "
-            "Phase 6 is shadow-only."
-        )
-
     candidates_by_symbol = candidates_by_symbol or {}
     empty: dict[str, Any] = {
         "decision": None,
@@ -208,9 +216,63 @@ def _run_apex_pipeline(
 
     would, rejected = _summarise_dispatch(decision, candidates_by_symbol)
 
-    return {
+    result: dict[str, Any] = {
         "decision": decision,
         "would_dispatch": would,
         "rejected": rejected,
         "note": "shadow",
     }
+
+    if not execute:
+        return result
+
+    # ── Phase 8A execute path ──────────────────────────────────────────────
+    # Submit orders via signal_dispatcher.dispatch. Swallow dispatch errors
+    # so the caller (scan-cycle orchestrator) never sees a raise — a crash
+    # here would orphan the Apex decision without a legacy fallback.
+    dispatch_report: dict[str, Any] = {
+        "new_entries": [], "portfolio_actions": [], "forced_exits": [], "errors": [],
+    }
+    try:
+        from signal_dispatcher import dispatch as _sd_dispatch
+        dispatch_report = _sd_dispatch(
+            decision or {},
+            candidates_by_symbol=candidates_by_symbol,
+            active_trades=active_trades or {},
+            ib=ib,
+            portfolio_value=portfolio_value,
+            regime=regime or {},
+            execute=True,
+        )
+    except Exception as e:
+        log.error("apex_orchestrator: dispatch(execute=True) raised — %s", e)
+        dispatch_report["errors"].append(f"dispatch_error:{e}")
+
+    # Forced exits (from guardrails.screen_open_positions) are separate from
+    # the Apex decision — dispatch each via dispatch_forced_exit.
+    forced_report: list[dict] = []
+    if forced_exits:
+        try:
+            from signal_dispatcher import dispatch_forced_exit as _sd_forced
+            for entry in forced_exits:
+                sym, reason = (entry[0], entry[1]) if isinstance(entry, tuple) else (
+                    entry.get("symbol"), entry.get("reason"),
+                )
+                if not sym:
+                    continue
+                try:
+                    forced_report.append(_sd_forced(
+                        symbol=sym, reason=reason or "forced_exit",
+                        ib=ib, execute=True,
+                    ))
+                except Exception as e:
+                    log.error("apex_orchestrator: forced exit %s failed — %s", sym, e)
+                    dispatch_report["errors"].append(f"forced_exit_error:{sym}:{e}")
+        except Exception as e:
+            log.error("apex_orchestrator: dispatch_forced_exit import failed — %s", e)
+            dispatch_report["errors"].append(f"forced_exit_import:{e}")
+
+    dispatch_report["forced_exits"] = (dispatch_report.get("forced_exits") or []) + forced_report
+    result["dispatch_report"] = dispatch_report
+    result["note"] = "executed"
+    return result
