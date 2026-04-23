@@ -110,6 +110,65 @@ def handle_news_trigger(trigger: dict):
                 daily_pnl=pnl,
                 regime=regime,
             )
+
+            # ── Phase 7C.1B — NEWS_INTERRUPT shadow + divergence record ────
+            # When USE_APEX_V3_SHADOW is on, run the Apex path in parallel
+            # (execute=False, no orders) and write a comparable legacy/Apex
+            # divergence record. Read-only: no state mutation, no dispatch.
+            try:
+                import safety_overlay as _so_shadow_ni
+                if _so_shadow_ni.should_run_apex_shadow():
+                    import apex_divergence as _AD_ni
+                    import apex_orchestrator as _aorch_ni
+                    from sentinel_agents import build_news_trigger_payload as _bntp
+                    _ni_input = _bntp(
+                        trigger=trigger,
+                        open_positions=open_pos,
+                        portfolio_value=pv,
+                        daily_pnl=pnl,
+                        regime=regime,
+                        scored_candidate=None,
+                    )
+                    _ni_shadow = _aorch_ni._run_apex_pipeline(
+                        _ni_input, candidates_by_symbol={}, execute=False
+                    )
+                    _aorch_ni.log_shadow_result(
+                        "NEWS_INTERRUPT", _ni_shadow,
+                        trigger_context=_ni_input.get("trigger_context"),
+                    )
+                    # Legacy mirror built from the already-computed legacy
+                    # sentinel decision. No re-dispatch; read-only.
+                    _ni_legacy_entries = []
+                    _ni_act = (decision.get("action") or "SKIP").upper()
+                    if _ni_act in ("BUY", "SELL"):
+                        _ni_legacy_entries.append({
+                            "symbol": decision.get("symbol") or sym,
+                            "direction": "LONG" if _ni_act == "BUY" else "SHORT",
+                            "trade_type": decision.get("trade_type"),
+                            "instrument": decision.get("instrument", "stock"),
+                            "qty": decision.get("qty"),
+                            "stop_loss": decision.get("sl"),
+                            "take_profit": decision.get("tp"),
+                        })
+                    _ni_legacy_mirror = _AD_ni.mirror_legacy_decision(
+                        cycle_id=f"news-{sym}-{datetime.now(_ET).strftime('%H%M%S')}",
+                        trigger_type="NEWS_INTERRUPT",
+                        new_entries=_ni_legacy_entries,
+                    )
+                    _ni_apex_mirror = _AD_ni.mirror_apex_decision(
+                        cycle_id=_ni_legacy_mirror["cycle_id"],
+                        trigger_type="NEWS_INTERRUPT",
+                        pipeline_result=_ni_shadow,
+                        candidates_by_symbol={},
+                    )
+                    _ni_events = _AD_ni.classify(_ni_legacy_mirror, _ni_apex_mirror)
+                    _AD_ni.write_divergence_record(
+                        legacy_mirror=_ni_legacy_mirror,
+                        apex_mirror=_ni_apex_mirror,
+                        events=_ni_events,
+                    )
+            except Exception as _ni_shadow_err:
+                log.warning("apex_divergence NEWS_INTERRUPT write failed (non-fatal): %s", _ni_shadow_err)
         else:
             # Phase 6D cutover branch (OFF BY DEFAULT — legacy flag above is
             # True). When Phase 7 flips SENTINEL_LEGACY_PIPELINE_ENABLED to

@@ -2672,6 +2672,61 @@ def run_scan():
                 _shadow_input, _shadow_by_sym, execute=False
             )
             _aorch.log_shadow_result("SCAN_CYCLE", _shadow_result)
+
+            # ── Phase 7C.1B — divergence record (read-only instrumentation) ──
+            # Compare what the legacy path *already decided to do this cycle*
+            # (decision.get("buys") and pm_actions, both assembled before this
+            # block ran) against the Apex dry-run result. No execution happens
+            # here: both sides are serialized from in-scope state, classified,
+            # and written to data/apex_divergence_log.jsonl.
+            try:
+                import apex_divergence as _AD
+                from guardrails import screen_open_positions as _screen_fe
+
+                _cycle_id = f"scan-{bot_state.scan_count}"
+                _legacy_new_entries = []
+                for _b in (decision.get("buys") or []):
+                    if not isinstance(_b, dict):
+                        continue
+                    _sym = _b.get("symbol")
+                    _sig_b = next(
+                        (s for s in (pipeline.all_scored or []) if s.get("symbol") == _sym),
+                        None,
+                    ) or {}
+                    _legacy_new_entries.append({
+                        "symbol": _sym,
+                        "direction": _b.get("direction", "LONG"),
+                        "trade_type": _b.get("trade_type"),
+                        "instrument": _b.get("instrument"),
+                        "score": _sig_b.get("score"),
+                    })
+                try:
+                    _legacy_forced = _screen_fe(open_pos) or []
+                except Exception:
+                    _legacy_forced = []
+                _legacy_mirror = _AD.mirror_legacy_decision(
+                    cycle_id=_cycle_id,
+                    trigger_type="SCAN_CYCLE",
+                    new_entries=_legacy_new_entries,
+                    portfolio_actions=list(pm_actions or []),
+                    forced_exits=_legacy_forced,
+                    payloads_by_symbol=_shadow_by_sym,
+                )
+                _apex_mirror = _AD.mirror_apex_decision(
+                    cycle_id=_cycle_id,
+                    trigger_type="SCAN_CYCLE",
+                    pipeline_result=_shadow_result,
+                    candidates_by_symbol=_shadow_by_sym,
+                )
+                _events = _AD.classify(_legacy_mirror, _apex_mirror)
+                _AD.write_divergence_record(
+                    legacy_mirror=_legacy_mirror,
+                    apex_mirror=_apex_mirror,
+                    events=_events,
+                )
+            except Exception as _div_err:
+                log.warning("apex_divergence SCAN_CYCLE write failed (non-fatal): %s", _div_err)
+
             clog(
                 "INFO",
                 f"APEX_SHADOW SCAN_CYCLE: {len(_shadow_result.get('would_dispatch') or [])} "
