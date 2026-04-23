@@ -250,3 +250,5 @@
 {"ts": "2026-04-23T14:24:56.300526+00:00", "regime": "TRENDING_UP", "core": 15, "equities": 36, "promoted": 50, "other": 0, "favs": 0, "held": 4, "universe": 101, "scored": 83, "signals": 83}
 {"ts": "2026-04-23T14:35:08.191892+00:00", "regime": "TRENDING_UP", "core": 15, "equities": 36, "promoted": 50, "other": 0, "favs": 0, "held": 4, "universe": 101, "scored": 79, "signals": 79}
 {"ts": "2026-04-23T14:45:41.614276+00:00", "regime": "TRENDING_UP", "core": 15, "equities": 36, "promoted": 50, "other": 0, "favs": 0, "held": 0, "universe": 100, "scored": 82, "signals": 82}
+{"ts": "2026-04-23T14:55:51.400647+00:00", "regime": "TRENDING_UP", "core": 15, "equities": 36, "promoted": 50, "other": 0, "favs": 0, "held": 1, "universe": 100, "scored": 81, "signals": 81}
+{"ts": "2026-04-23T15:04:01.739809+00:00", "regime": "TRENDING_UP", "core": 15, "equities": 36, "promoted": 50, "other": 0, "favs": 0, "held": 1, "universe": 100, "scored": 0, "signals": 0}

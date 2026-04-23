@@ -72,14 +72,17 @@ body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradie
 .col-title{padding:7px 12px;font-size:9px;font-weight:700;letter-spacing:2px;color:var(--muted2);text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;display:flex;justify-content:space-between}
 .col-body{overflow-y:auto;flex:1}
 
-/* Regime */
+/* Tape */
 .regime-wrap{padding:10px}
 .regime-box{border-radius:5px;padding:10px;border:1px solid}
-.bull{border-color:var(--green);background:rgba(0,200,83,.07)}
-.bear{border-color:var(--red);background:rgba(255,23,68,.07)}
-.choppy{border-color:var(--yellow);background:rgba(255,214,0,.07)}
-.panic{border-color:var(--red);background:rgba(255,23,68,.2);animation:flash 1s infinite}
-.unknown{border-color:var(--muted);background:transparent}
+.tape-panic   {border-color:var(--red);background:rgba(255,23,68,.2);animation:flash 1s infinite}
+.tape-selloff {border-color:#ff1744;background:rgba(255,23,68,.13)}
+.tape-bear    {border-color:#ff6d00;background:rgba(255,109,0,.1)}
+.tape-riskoff {border-color:#ff9100;background:rgba(255,145,0,.08)}
+.tape-mixed   {border-color:var(--muted);background:transparent}
+.tape-bull    {border-color:var(--green);background:rgba(0,200,83,.07)}
+.tape-strong  {border-color:#00e676;background:rgba(0,230,118,.13)}
+.unknown      {border-color:var(--muted);background:transparent}
 @keyframes flash{0%,100%{opacity:1}50%{opacity:.5}}
 .rl{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;margin-bottom:3px}
 .rm{font-size:10px;color:var(--muted2)}
@@ -396,7 +399,7 @@ canvas{display:block;width:100% !important}
   </div>
   <div class="hdr-right">
     <div class="pill" id="bot-pill"><div class="dot pulse"></div><span id="bot-status">Connecting...</span></div>
-    <div class="pill po" id="regime-pill">REGIME: —</div>
+    <div class="pill po" id="regime-pill">TAPE: —</div>
     <span style="font-size:10px;color:var(--muted2)" id="upd-time">—</span>
   </div>
 </div>
@@ -456,8 +459,8 @@ canvas{display:block;width:100% !important}
       <div class="col-body">
         <div class="regime-wrap">
           <div class="regime-box unknown" id="regime-box">
-            <div class="rl" id="regime-label">DETECTING...</div>
-            <div class="rm" id="regime-meta">VIX: — | SPY: —</div>
+            <div class="rl" id="regime-label">READING TAPE...</div>
+            <div class="rm" id="regime-meta">SPY: — | QQQ: — | VIX: —</div>
           </div>
         </div>
         <div class="session-row">
@@ -2659,14 +2662,14 @@ function buildTradeExplanation(t) {
   // ── MARKET CONTEXT ──
   if (t.regime && t.regime !== 'UNKNOWN') {
     const regimeMap = {
-      'TRENDING_UP':   'trending up — broad participation',
-      'TRENDING_DOWN': 'trending down — broad selling',
-      'RELIEF_RALLY':  'relief rally — bear-market bounce',
-      'RANGE_BOUND':   'range bound — no clear direction',
-      'CAPITULATION':  'capitulation — extreme fear'
+      'TRENDING_UP':   'structural uptrend (SPY/QQQ above 200d MA)',
+      'TRENDING_DOWN': 'structural downtrend (SPY/QQQ below 200d MA)',
+      'RELIEF_RALLY':  'relief bounce within downtrend',
+      'RANGE_BOUND':   'no structural trend',
+      'CAPITULATION':  'capitulation — VIX spike, entries halted'
     };
     const regimeDesc = regimeMap[t.regime] || t.regime;
-    story += `Market regime: <strong>${regimeDesc}</strong>`;
+    story += `Entry structure: <strong>${regimeDesc}</strong>`;
     if (t.vix) story += ` | VIX: ${Number(t.vix).toFixed(0)}`;
     story += '. ';
   }
@@ -3109,25 +3112,53 @@ function renderGrowth(perf, equity) {
   }
 }
 
-// ── Regime UI ─────────────────────────────────────────────
+// ── Tape UI ────────────────────────────────────────────────
 function updateRegime(regime) {
   const box   = document.getElementById('regime-box');
   const label = document.getElementById('regime-label');
   const meta  = document.getElementById('regime-meta');
   const pill  = document.getElementById('regime-pill');
 
-  const classMap = {
-    'TRENDING_UP':'bull','TRENDING_DOWN':'bear',
-    'RELIEF_RALLY':'choppy','RANGE_BOUND':'choppy','CAPITULATION':'panic','UNKNOWN':'unknown'
-  };
-  box.className = 'regime-box ' + (classMap[regime.regime] || 'unknown');
-  label.textContent = regime.regime || 'UNKNOWN';
-  const routerStr = regime.regime_router && regime.regime_router !== 'disabled'
-    ? ` | ROUTER: ${regime.regime_router.replace('_', '-').toUpperCase()}` : '';
-  const vixRankStr  = regime.vix_rank   != null ? (regime.vix_rank * 100).toFixed(0) + '%' : '—';
-  const kellyStr    = regime.kelly_fraction != null ? regime.kelly_fraction.toFixed(2) : '—';
-  meta.textContent  = `VIX: ${regime.vix || '—'} | Rank: ${vixRankStr} | Kelly: ${kellyStr} | SPY: $${regime.spy_price || '—'}${routerStr}`;
-  pill.textContent  = 'REGIME: ' + (regime.regime || '—');
+  const spy = regime.spy_chg_1d || 0;
+  const qqq = regime.qqq_chg_1d || 0;
+  const iwm = regime.iwm_chg_1d || 0;
+  const r   = regime.regime || 'UNKNOWN';
+
+  let tapeLabel, tapeClass;
+  if (r === 'CAPITULATION') {
+    tapeLabel = 'CAPITULATION';  tapeClass = 'tape-panic';
+  } else if (spy < -2.0 && qqq < -2.0) {
+    tapeLabel = 'SELLOFF';       tapeClass = 'tape-selloff';
+  } else if (spy < -1.2 && qqq < -1.2) {
+    tapeLabel = 'BEARISH';       tapeClass = 'tape-bear';
+  } else if (qqq < -1.5 && qqq < spy - 0.5) {
+    tapeLabel = 'TECH SELLOFF';  tapeClass = 'tape-bear';
+  } else if (iwm < -1.5) {
+    tapeLabel = 'RISK-OFF';      tapeClass = 'tape-riskoff';
+  } else if (spy > 2.0 && qqq > 2.0) {
+    tapeLabel = 'STRONG RALLY';  tapeClass = 'tape-strong';
+  } else if (spy > 1.0 && qqq > 1.0) {
+    tapeLabel = 'BULLISH';       tapeClass = 'tape-bull';
+  } else if (!regime.spy_chg_1d && regime.spy_chg_1d !== 0) {
+    tapeLabel = 'READING...';    tapeClass = 'unknown';
+  } else {
+    tapeLabel = 'MIXED';         tapeClass = 'tape-mixed';
+  }
+
+  box.className = 'regime-box ' + tapeClass;
+  label.textContent = tapeLabel;
+
+  const kellyStr   = regime.kelly_fraction != null ? regime.kelly_fraction.toFixed(2) : '—';
+  const routerStr  = regime.regime_router && regime.regime_router !== 'disabled'
+    ? ` | ${regime.regime_router.replace('_', '-').toUpperCase()}` : '';
+  const tapeCtx    = regime.tape_context || '';
+  if (tapeCtx && tapeCtx !== 'tape data unavailable') {
+    meta.textContent = `${tapeCtx} | VIX: ${regime.vix || '—'} | Kelly: ${kellyStr}${routerStr}`;
+  } else {
+    const vixRankStr = regime.vix_rank != null ? (regime.vix_rank * 100).toFixed(0) + '%' : '—';
+    meta.textContent = `VIX: ${regime.vix || '—'} | Rank: ${vixRankStr} | Kelly: ${kellyStr} | SPY: $${regime.spy_price || '—'}${routerStr}`;
+  }
+  pill.textContent = 'TAPE: ' + tapeLabel;
 }
 
 // ── Main poll ──────────────────────────────────────────────

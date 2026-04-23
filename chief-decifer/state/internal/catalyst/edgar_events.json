@@ -5,10 +5,94 @@
     "cik": null,
     "ticker": null,
     "title": "424B2 - MORGAN STANLEY (0000895421) (Filer)",
+    "updated": "2026-04-23T11:00:03-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/895421/000183988226020968/0001839882-26-020968-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001839882-26-020968 <b>Size:</b> 382 KB\n",
+    "fetched_at": "2026-04-23T15:01:47.038104+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "497VPU - UNION SECURITY LIFE INSURANCE CO OF NEW YORK",
+    "cik": null,
+    "ticker": null,
+    "title": "497VPU - UNION SECURITY LIFE INSURANCE CO OF NEW YORK (0000914804) (Filer)",
+    "updated": "2026-04-23T10:58:55-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/914804/000091480426000017/0000914804-26-000017-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0000914804-26-000017 <b>Size:</b> 126 KB\n",
+    "fetched_at": "2026-04-23T15:01:47.038129+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "497VPU - SEPARATE ACCOUNT A OF UNION SECURITY LIFE INS CO OF NEW YORK",
+    "cik": null,
+    "ticker": null,
+    "title": "497VPU - SEPARATE ACCOUNT A OF UNION SECURITY LIFE INS CO OF NEW YORK (0000914805) (Filer)",
+    "updated": "2026-04-23T10:58:44-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/914805/000091480526000026/0000914805-26-000026-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0000914805-26-000026 <b>Size:</b> 126 KB\n",
+    "fetched_at": "2026-04-23T15:01:47.038200+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "497VPU - SEPARATE ACCOUNT A OF UNION SECURITY LIFE INS CO OF NEW YORK",
+    "cik": null,
+    "ticker": null,
+    "title": "497VPU - SEPARATE ACCOUNT A OF UNION SECURITY LIFE INS CO OF NEW YORK (0000914805) (Filer)",
+    "updated": "2026-04-23T10:58:34-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/914805/000091480526000025/0000914805-26-000025-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0000914805-26-000025 <b>Size:</b> 154 KB\n",
+    "fetched_at": "2026-04-23T15:01:47.038251+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "497VPU - UNION SECURITY LIFE INSURANCE CO OF NEW YORK",
+    "cik": null,
+    "ticker": null,
+    "title": "497VPU - UNION SECURITY LIFE INSURANCE CO OF NEW YORK (0000914804) (Filer)",
+    "updated": "2026-04-23T10:58:25-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/914804/000091480426000016/0000914804-26-000016-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0000914804-26-000016 <b>Size:</b> 153 KB\n",
+    "fetched_at": "2026-04-23T15:01:47.038277+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - MORGAN STANLEY",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - MORGAN STANLEY (0000895421) (Filer)",
+    "updated": "2026-04-23T10:57:11-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/895421/000183988226020965/0001839882-26-020965-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001839882-26-020965 <b>Size:</b> 377 KB\n",
+    "fetched_at": "2026-04-23T15:01:47.038322+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - MORGAN STANLEY",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - MORGAN STANLEY (0000895421) (Filer)",
+    "updated": "2026-04-23T10:54:34-04:00",
+    "link": "https://www.sec.gov/Archives/edgar/data/895421/000183988226020964/0001839882-26-020964-index.htm",
+    "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001839882-26-020964 <b>Size:</b> 380 KB\n",
+    "fetched_at": "2026-04-23T15:01:47.038364+00:00",
+    "on_watchlist": false
+  },
+  {
+    "form_type": "4",
+    "company_name": "424B2 - MORGAN STANLEY",
+    "cik": null,
+    "ticker": null,
+    "title": "424B2 - MORGAN STANLEY (0000895421) (Filer)",
     "updated": "2026-04-23T10:50:45-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/895421/000183988226020962/0001839882-26-020962-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001839882-26-020962 <b>Size:</b> 366 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885240+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038406+00:00",
     "on_watchlist": false
   },
   {
@@ -20,7 +104,7 @@
     "updated": "2026-04-23T10:49:47-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/912900/000139834426006935/0001398344-26-006935-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001398344-26-006935 <b>Size:</b> 108 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885260+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038426+00:00",
     "on_watchlist": false
   },
   {
@@ -32,7 +116,7 @@
     "updated": "2026-04-23T10:45:49-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/773757/000119312526172389/0001193125-26-172389-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001193125-26-172389 <b>Size:</b> 1 MB\n",
-    "fetched_at": "2026-04-23T14:51:29.885278+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038447+00:00",
     "on_watchlist": false
   },
   {
@@ -44,7 +128,7 @@
     "updated": "2026-04-23T10:45:35-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/1833494/000119312526172387/0001193125-26-172387-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001193125-26-172387 <b>Size:</b> 2 MB\n",
-    "fetched_at": "2026-04-23T14:51:29.885312+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038489+00:00",
     "on_watchlist": false
   },
   {
@@ -56,7 +140,7 @@
     "updated": "2026-04-23T10:44:48-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/19617/000191870426010556/0001918704-26-010556-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001918704-26-010556 <b>Size:</b> 597 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885347+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038533+00:00",
     "on_watchlist": false
   },
   {
@@ -68,7 +152,7 @@
     "updated": "2026-04-23T10:44:05-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/19617/000191870426010555/0001918704-26-010555-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001918704-26-010555 <b>Size:</b> 534 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885386+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038575+00:00",
     "on_watchlist": false
   },
   {
@@ -80,7 +164,7 @@
     "updated": "2026-04-23T10:43:50-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/912900/000139834426006933/0001398344-26-006933-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001398344-26-006933 <b>Size:</b> 110 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885403+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038596+00:00",
     "on_watchlist": false
   },
   {
@@ -92,7 +176,7 @@
     "updated": "2026-04-23T10:42:14-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/801337/000095010326006080/0000950103-26-006080-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0000950103-26-006080 <b>Size:</b> 42 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885502+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038639+00:00",
     "on_watchlist": false
   },
   {
@@ -104,7 +188,7 @@
     "updated": "2026-04-23T10:42:05-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/2079278/000152862126000396/0001528621-26-000396-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001528621-26-000396 <b>Size:</b> 528 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885521+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038661+00:00",
     "on_watchlist": false
   },
   {
@@ -116,7 +200,7 @@
     "updated": "2026-04-23T10:41:02-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/200245/000191870426010554/0001918704-26-010554-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001918704-26-010554 <b>Size:</b> 550 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885556+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038706+00:00",
     "on_watchlist": false
   },
   {
@@ -128,7 +212,7 @@
     "updated": "2026-04-23T10:39:34-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/912900/000139834426006931/0001398344-26-006931-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001398344-26-006931 <b>Size:</b> 105 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885573+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038727+00:00",
     "on_watchlist": false
   },
   {
@@ -140,7 +224,7 @@
     "updated": "2026-04-23T10:36:30-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/1114446/000183988226020959/0001839882-26-020959-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001839882-26-020959 <b>Size:</b> 618 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885590+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038749+00:00",
     "on_watchlist": false
   },
   {
@@ -152,7 +236,7 @@
     "updated": "2026-04-23T10:34:04-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/2034268/000119312526172342/0001193125-26-172342-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001193125-26-172342 <b>Size:</b> 41 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885623+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038800+00:00",
     "on_watchlist": false
   },
   {
@@ -164,7 +248,7 @@
     "updated": "2026-04-23T10:32:40-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/2110/000119312526172336/0001193125-26-172336-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001193125-26-172336 <b>Size:</b> 2 MB\n",
-    "fetched_at": "2026-04-23T14:51:29.885640+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038840+00:00",
     "on_watchlist": false
   },
   {
@@ -176,7 +260,7 @@
     "updated": "2026-04-23T10:31:58-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/1649227/000139834426006929/0001398344-26-006929-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001398344-26-006929 <b>Size:</b> 3 MB\n",
-    "fetched_at": "2026-04-23T14:51:29.885661+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038863+00:00",
     "on_watchlist": false
   },
   {
@@ -188,7 +272,7 @@
     "updated": "2026-04-23T10:28:54-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/900043/000090004326000040/0000900043-26-000040-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0000900043-26-000040 <b>Size:</b> 367 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885680+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038886+00:00",
     "on_watchlist": false
   },
   {
@@ -200,7 +284,7 @@
     "updated": "2026-04-23T10:28:43-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/1084147/000108414726000048/0001084147-26-000048-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001084147-26-000048 <b>Size:</b> 721 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885702+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038909+00:00",
     "on_watchlist": false
   },
   {
@@ -212,7 +296,7 @@
     "updated": "2026-04-23T10:28:41-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/81264/000119312526172315/0001193125-26-172315-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001193125-26-172315 <b>Size:</b> 1 MB\n",
-    "fetched_at": "2026-04-23T14:51:29.885719+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038930+00:00",
     "on_watchlist": false
   },
   {
@@ -224,7 +308,7 @@
     "updated": "2026-04-23T10:28:30-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/1084147/000108414726000047/0001084147-26-000047-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001084147-26-000047 <b>Size:</b> 537 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885736+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038954+00:00",
     "on_watchlist": false
   },
   {
@@ -236,7 +320,7 @@
     "updated": "2026-04-23T10:28:20-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/1084147/000108414726000046/0001084147-26-000046-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001084147-26-000046 <b>Size:</b> 507 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885752+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038976+00:00",
     "on_watchlist": false
   },
   {
@@ -248,7 +332,7 @@
     "updated": "2026-04-23T10:28:11-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/1084147/000108414726000045/0001084147-26-000045-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0001084147-26-000045 <b>Size:</b> 615 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885769+00:00",
+    "fetched_at": "2026-04-23T15:01:47.038998+00:00",
     "on_watchlist": false
   },
   {
@@ -260,7 +344,7 @@
     "updated": "2026-04-23T10:26:48-04:00",
     "link": "https://www.sec.gov/Archives/edgar/data/1494891/000209734526000006/0002097345-26-000006-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-23 <b>AccNo:</b> 0002097345-26-000006 <b>Size:</b> 4 KB\n",
-    "fetched_at": "2026-04-23T14:51:29.885819+00:00",
+    "fetched_at": "2026-04-23T15:01:47.039039+00:00",
     "on_watchlist": false
   },
   {
@@ -28113,318 +28197,6 @@
     "link": "https://www.sec.gov/Archives/edgar/data/1784700/000121390026044554/0001213900-26-044554-index.htm",
     "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0001213900-26-044554 <b>Size:</b> 866 KB\n",
     "fetched_at": "2026-04-16T19:15:53.462789+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - GREIF, INC",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - GREIF, INC (0000043920) (Issuer)",
-    "updated": "2026-04-16T15:01:20-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/43920/000004392026000092/0000043920-26-000092-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0000043920-26-000092 <b>Size:</b> 5 KB\n",
-    "fetched_at": "2026-04-16T19:15:53.462843+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - CORNING INC /NY",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - CORNING INC /NY (0000024741) (Issuer)",
-    "updated": "2026-04-16T15:00:43-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/24741/000002474126000189/0000024741-26-000189-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0000024741-26-000189 <b>Size:</b> 19 KB\n",
-    "fetched_at": "2026-04-16T19:15:53.462894+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - HOPE BANCORP INC",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - HOPE BANCORP INC (0001128361) (Issuer)",
-    "updated": "2026-04-16T15:00:12-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/1128361/000145265326000007/0001452653-26-000007-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0001452653-26-000007 <b>Size:</b> 7 KB\n",
-    "fetched_at": "2026-04-16T19:15:53.462940+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - HOPE BANCORP INC",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - HOPE BANCORP INC (0001128361) (Issuer)",
-    "updated": "2026-04-16T15:00:10-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/1128361/000177770326000004/0001777703-26-000004-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0001777703-26-000004 <b>Size:</b> 5 KB\n",
-    "fetched_at": "2026-04-16T19:15:53.462986+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - Harris Angelee",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - Harris Angelee (0001316204) (Reporting)",
-    "updated": "2026-04-16T15:00:09-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/1316204/000131620426000004/0001316204-26-000004-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0001316204-26-000004 <b>Size:</b> 5 KB\n",
-    "fetched_at": "2026-04-16T19:15:53.463008+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - HOPE BANCORP INC",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - HOPE BANCORP INC (0001128361) (Issuer)",
-    "updated": "2026-04-16T15:00:07-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/1128361/000209887326000006/0002098873-26-000006-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0002098873-26-000006 <b>Size:</b> 5 KB\n",
-    "fetched_at": "2026-04-16T19:05:46.802547+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - HOPE BANCORP INC",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - HOPE BANCORP INC (0001128361) (Issuer)",
-    "updated": "2026-04-16T15:00:06-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/1128361/000197480226000004/0001974802-26-000004-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0001974802-26-000004 <b>Size:</b> 5 KB\n",
-    "fetched_at": "2026-04-16T19:05:46.802728+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - HOPE BANCORP INC",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - HOPE BANCORP INC (0001128361) (Issuer)",
-    "updated": "2026-04-16T15:00:04-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/1128361/000152113726000005/0001521137-26-000005-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0001521137-26-000005 <b>Size:</b> 6 KB\n",
-    "fetched_at": "2026-04-16T19:05:46.802783+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - HOPE BANCORP INC",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - HOPE BANCORP INC (0001128361) (Issuer)",
-    "updated": "2026-04-16T15:00:03-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/1128361/000144518126000005/0001445181-26-000005-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0001445181-26-000005 <b>Size:</b> 8 KB\n",
-    "fetched_at": "2026-04-16T19:05:46.802834+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - Ryman Hospitality Properties, Inc.",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - Ryman Hospitality Properties, Inc. (0001040829) (Issuer)",
-    "updated": "2026-04-16T14:59:37-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/1040829/000119312526158743/0001193125-26-158743-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0001193125-26-158743 <b>Size:</b> 5 KB\n",
-    "fetched_at": "2026-04-16T19:05:46.802885+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - WESTINGHOUSE AIR BRAKE TECHNOLOGIES CORP",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - WESTINGHOUSE AIR BRAKE TECHNOLOGIES CORP (0000943452) (Issuer)",
-    "updated": "2026-04-16T14:59:27-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/943452/000162828026025450/0001628280-26-025450-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0001628280-26-025450 <b>Size:</b> 11 KB\n",
-    "fetched_at": "2026-04-16T19:05:46.802940+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "424B5 - BMW AUTO LEASING LLC",
-    "cik": null,
-    "ticker": null,
-    "title": "424B5 - BMW AUTO LEASING LLC (0001126530) (Filer)",
-    "updated": "2026-04-16T14:59:26-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/1126530/000092963826001524/0000929638-26-001524-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0000929638-26-001524 <b>Size:</b> 3 MB\n",
-    "fetched_at": "2026-04-16T19:05:46.803000+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "424B2 - CITIGROUP INC",
-    "cik": null,
-    "ticker": null,
-    "title": "424B2 - CITIGROUP INC (0000831001) (Filer)",
-    "updated": "2026-04-16T14:59:05-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/831001/000095010326005798/0000950103-26-005798-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0000950103-26-005798 <b>Size:</b> 226 KB\n",
-    "fetched_at": "2026-04-16T19:05:46.803030+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "424B2 - GOLDMAN SACHS GROUP INC",
-    "cik": null,
-    "ticker": null,
-    "title": "424B2 - GOLDMAN SACHS GROUP INC (0000886982) (Filer)",
-    "updated": "2026-04-16T14:58:52-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/886982/000119312526158741/0001193125-26-158741-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0001193125-26-158741 <b>Size:</b> 777 KB\n",
-    "fetched_at": "2026-04-16T19:05:46.803092+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "424B2 - Citigroup Global Markets Holdings Inc.",
-    "cik": null,
-    "ticker": null,
-    "title": "424B2 - Citigroup Global Markets Holdings Inc. (0000200245) (Filer)",
-    "updated": "2026-04-16T14:58:15-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/200245/000095010326005797/0000950103-26-005797-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0000950103-26-005797 <b>Size:</b> 194 KB\n",
-    "fetched_at": "2026-04-16T19:05:46.803160+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - Ryman Hospitality Properties, Inc.",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - Ryman Hospitality Properties, Inc. (0001040829) (Issuer)",
-    "updated": "2026-04-16T14:55:37-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/1040829/000119312526158730/0001193125-26-158730-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0001193125-26-158730 <b>Size:</b> 9 KB\n",
-    "fetched_at": "2026-04-16T19:05:46.803230+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - PPG INDUSTRIES INC",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - PPG INDUSTRIES INC (0000079879) (Issuer)",
-    "updated": "2026-04-16T14:55:13-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/79879/000007987926000136/0000079879-26-000136-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0000079879-26-000136 <b>Size:</b> 6 KB\n",
-    "fetched_at": "2026-04-16T19:05:46.803295+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - PPG INDUSTRIES INC",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - PPG INDUSTRIES INC (0000079879) (Issuer)",
-    "updated": "2026-04-16T14:54:42-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/79879/000007987926000135/0000079879-26-000135-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0000079879-26-000135 <b>Size:</b> 6 KB\n",
-    "fetched_at": "2026-04-16T19:05:46.803353+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "485BPOS - PRUDENTIAL VARIABLE APPRECIABLE ACCOUNT",
-    "cik": null,
-    "ticker": null,
-    "title": "485BPOS - PRUDENTIAL VARIABLE APPRECIABLE ACCOUNT (0000828972) (Filer)",
-    "updated": "2026-04-16T14:54:40-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/828972/000082897226000010/0000828972-26-000010-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0000828972-26-000010 <b>Size:</b> 1 MB\n",
-    "fetched_at": "2026-04-16T19:05:46.803422+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "424B2 - JPMORGAN CHASE & CO",
-    "cik": null,
-    "ticker": null,
-    "title": "424B2 - JPMORGAN CHASE & CO (0000019617) (Filer)",
-    "updated": "2026-04-16T14:54:19-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/19617/000191870426010105/0001918704-26-010105-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0001918704-26-010105 <b>Size:</b> 1 MB\n",
-    "fetched_at": "2026-04-16T19:05:46.803486+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - Garcia Dominic Jerome",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - Garcia Dominic Jerome (0001861097) (Reporting)",
-    "updated": "2026-04-16T14:54:16-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/1861097/000121390026044543/0001213900-26-044543-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0001213900-26-044543 <b>Size:</b> 4 KB\n",
-    "fetched_at": "2026-04-16T18:55:38.233880+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - PPG INDUSTRIES INC",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - PPG INDUSTRIES INC (0000079879) (Issuer)",
-    "updated": "2026-04-16T14:53:55-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/79879/000007987926000134/0000079879-26-000134-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0000079879-26-000134 <b>Size:</b> 6 KB\n",
-    "fetched_at": "2026-04-16T18:55:38.233927+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - PPG INDUSTRIES INC",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - PPG INDUSTRIES INC (0000079879) (Issuer)",
-    "updated": "2026-04-16T14:53:20-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/79879/000007987926000133/0000079879-26-000133-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0000079879-26-000133 <b>Size:</b> 6 KB\n",
-    "fetched_at": "2026-04-16T18:55:38.233974+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "424B2 - CITIGROUP INC",
-    "cik": null,
-    "ticker": null,
-    "title": "424B2 - CITIGROUP INC (0000831001) (Filer)",
-    "updated": "2026-04-16T14:52:52-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/831001/000095010326005796/0000950103-26-005796-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0000950103-26-005796 <b>Size:</b> 228 KB\n",
-    "fetched_at": "2026-04-16T18:55:38.233998+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - PPG INDUSTRIES INC",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - PPG INDUSTRIES INC (0000079879) (Issuer)",
-    "updated": "2026-04-16T14:52:21-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/79879/000007987926000132/0000079879-26-000132-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0000079879-26-000132 <b>Size:</b> 6 KB\n",
-    "fetched_at": "2026-04-16T18:55:38.234045+00:00",
-    "on_watchlist": false
-  },
-  {
-    "form_type": "4",
-    "company_name": "4 - PPG INDUSTRIES INC",
-    "cik": null,
-    "ticker": null,
-    "title": "4 - PPG INDUSTRIES INC (0000079879) (Issuer)",
-    "updated": "2026-04-16T14:51:49-04:00",
-    "link": "https://www.sec.gov/Archives/edgar/data/79879/000007987926000131/0000079879-26-000131-index.htm",
-    "summary": "\n <b>Filed:</b> 2026-04-16 <b>AccNo:</b> 0000079879-26-000131 <b>Size:</b> 6 KB\n",
-    "fetched_at": "2026-04-16T18:55:38.234093+00:00",
     "on_watchlist": false
   }
 ]
