@@ -2169,7 +2169,7 @@ def run_scan():
                 timestamp=datetime.now(UTC),
                 regime_context=regime_name,
                 price=sig["price"],
-                atr=sig["atr"],
+                atr=sig.get("atr_5m", sig.get("atr", 0.0)),
                 candle_gate=sig.get("candle_gate", "UNKNOWN"),
             )
         buy_signal.direction = buy.get("direction", "LONG")  # use agent-recommended direction

@@ -15,7 +15,7 @@ import logging
 import os
 import tempfile
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from learning import log_signal_scan
@@ -140,6 +140,8 @@ class SignalPipelineResult:
     news_sentiment: dict
     universe: list
     regime_name: str
+    sensor_payloads: list = field(default_factory=list)  # list[SensorPayload] — Decifer 3.0 Apex Agent inputs
+    status: str = "OK"  # "OK" | "MONITOR_ONLY"
 
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
@@ -402,7 +404,7 @@ def _scored_to_signals(scored: list, regime_name: str) -> list:
                 timestamp=now,
                 regime_context=regime_name,
                 price=s.get("price", 0.0),
-                atr=s.get("atr", 0.0),
+                atr=s.get("atr_5m", 0.0),
                 atr_daily=s.get("atr_daily", 0.0),
                 candle_gate=s.get("candle_gate", "UNKNOWN"),
                 instrument=s.get("instrument", "stock"),
@@ -507,8 +509,30 @@ def run_signal_pipeline(
     # 3. Social sentiment (gated on session)
     social_sentiment = _fetch_social(filtered, session)
 
-    # 4. Score universe on 10 dimensions (alpha-pipeline-v2)
+    # Gate 1: VIX panic — suppress scan above threshold, return MONITOR_ONLY sentinel.
+    # The full 10-dimension scoring is expensive (~5-10s). When VIX signals a panic
+    # regime no new entries should be considered anyway — skip the scan entirely.
     regime_name = regime.get("regime", "UNKNOWN")
+    from config import CONFIG as _cfg_gate
+
+    _vix = regime.get("vix", 0.0) or 0.0
+    _monitor_threshold = _cfg_gate.get("vix_monitor_only_threshold", 40)
+    if _vix > _monitor_threshold:
+        log.warning(
+            f"Gate 1 MONITOR_ONLY: VIX={_vix:.1f} > {_monitor_threshold} — scan suppressed this cycle"
+        )
+        return SignalPipelineResult(
+            signals=[],
+            scored=[],
+            all_scored=[],
+            news_sentiment={},
+            universe=filtered,
+            regime_name=regime_name,
+            sensor_payloads=[],
+            status="MONITOR_ONLY",
+        )
+
+    # 4. Score universe on 10 dimensions (alpha-pipeline-v2)
     log.info(f"Scoring universe on 10 dimensions [{regime_name}]...")
     scored, all_scored = score_universe(
         filtered,
@@ -517,6 +541,7 @@ def run_signal_pipeline(
         social_data=social_sentiment,
         regime_router=regime.get("regime_router", "unknown"),
         ib=ib,
+        regime_dict=regime,
     )
     log.info(f"score_universe: {len(scored)} above threshold, {len(all_scored)} total")
 
@@ -560,6 +585,18 @@ def run_signal_pipeline(
     # 8. Append to signals_log.jsonl for IC calculator
     _append_signals_log(signals, log_path=signals_log_path)
 
+    # 9. Build Sensor Payloads for top candidates (Decifer 3.0 Apex Agent input contract)
+    from config import CONFIG as _cfg_sp
+
+    _top_n = _cfg_sp.get("sensor_payload_top_n", 15)
+    try:
+        from sensor_payload import build_sensor_payload
+
+        sensor_payloads = [build_sensor_payload(s, regime_name) for s in scored[:_top_n]]
+    except Exception as _sp_e:
+        log.warning(f"sensor_payload build failed: {_sp_e}")
+        sensor_payloads = []
+
     return SignalPipelineResult(
         signals=signals,
         scored=scored,
@@ -567,4 +604,6 @@ def run_signal_pipeline(
         news_sentiment=news_sentiment,
         universe=filtered,
         regime_name=regime_name,
+        sensor_payloads=sensor_payloads,
+        status="OK",
     )

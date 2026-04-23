@@ -104,7 +104,7 @@ def _scored_dict(symbol="AAPL", score=35, direction="LONG") -> dict:
         "score": score,
         "direction": direction,
         "price": 180.0,
-        "atr": 3.5,
+        "atr_5m": 3.5,
         "score_breakdown": {
             "trend": 7,
             "momentum": 6,
@@ -158,7 +158,7 @@ class TestScoredToSignals(unittest.TestCase):
     def test_price_and_atr_copied(self):
         s = _scored_dict("TSLA")
         s["price"] = 250.0
-        s["atr"] = 8.0
+        s["atr_5m"] = 8.0
         signals = _scored_to_signals([s], "TRENDING_UP")
         self.assertAlmostEqual(signals[0].price, 250.0)
         self.assertAlmostEqual(signals[0].atr, 8.0)

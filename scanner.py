@@ -690,7 +690,7 @@ def get_market_regime(ib: IB) -> dict:
             "iwm_chg_1d": 0.0,
             "spy_slope_3d": 0.0,
             "qqq_slope_3d": 0.0,
-            "tape_context": "tape data unavailable",
+            "tape_context": {"prose": "tape data unavailable", "description": "unknown", "slope_description": "unknown", "spy_chg_1d": 0.0, "qqq_chg_1d": 0.0, "iwm_chg_1d": 0.0, "spy_slope_3d": 0.0, "qqq_slope_3d": 0.0},
         }
 
 
@@ -700,8 +700,8 @@ def _build_tape_context(
     iwm_chg: float,
     spy_slope_3d: float,
     qqq_slope_3d: float,
-) -> str:
-    """Synthesize a single prose sentence describing today's market tape."""
+) -> dict:
+    """Build a TapeContext dict describing today's market tape."""
     # Direction description
     if qqq_chg < -1.5 and spy_chg < -1.0:
         desc = "growth/tech-led selloff"
@@ -724,16 +724,25 @@ def _build_tape_context(
     # 3-day slope context (use average of SPY and QQQ slopes)
     avg_slope = (spy_slope_3d + qqq_slope_3d) / 2
     if avg_slope > 2.0:
-        slope_ctx = f"after {avg_slope:.1f}% 3-day run — potential pullback"
+        slope_desc = f"after {avg_slope:.1f}% 3-day run — potential pullback"
     elif avg_slope < -2.0:
-        slope_ctx = f"extending {avg_slope:.1f}% 3-day decline"
+        slope_desc = f"extending {avg_slope:.1f}% 3-day decline"
     else:
-        slope_ctx = "in a flat 3-day range"
+        slope_desc = "in a flat 3-day range"
 
-    return (
-        f"SPY {spy_chg:+.1f}%, QQQ {qqq_chg:+.1f}%, IWM {iwm_chg:+.1f}% today"
-        f" — {desc}, {slope_ctx}"
-    )
+    return {
+        "spy_chg_1d": round(spy_chg, 2),
+        "qqq_chg_1d": round(qqq_chg, 2),
+        "iwm_chg_1d": round(iwm_chg, 2),
+        "spy_slope_3d": round(spy_slope_3d, 2),
+        "qqq_slope_3d": round(qqq_slope_3d, 2),
+        "description": desc,
+        "slope_description": slope_desc,
+        "prose": (
+            f"SPY {spy_chg:+.1f}%, QQQ {qqq_chg:+.1f}%, IWM {iwm_chg:+.1f}% today"
+            f" — {desc}, {slope_desc}"
+        ),
+    }
 
 
 def _regime_size_mult(regime: str) -> float:

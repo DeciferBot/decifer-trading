@@ -614,13 +614,14 @@ _SCORE_WORKERS = min(8, max(2, (_mp.cpu_count() or 4)))
 def _fetch_one_thread(args):
     """Worker function for ThreadPoolExecutor. Thread-safe via IBKR client."""
     symbol, news_score, social_score, regime_router, ib = args
-    try:
-        return fetch_multi_timeframe(
-            symbol, news_score=news_score, social_score=social_score, regime_router=regime_router, ib=ib
-        )
-    except Exception as exc:
-        log.debug(f"_fetch_one_thread failed for {symbol}: {exc}")
-        return None
+    with _ALPACA_SEM:
+        try:
+            return fetch_multi_timeframe(
+                symbol, news_score=news_score, social_score=social_score, regime_router=regime_router, ib=ib
+            )
+        except Exception as exc:
+            log.debug(f"_fetch_one_thread failed for {symbol}: {exc}")
+            return None
 
 
 log = logging.getLogger("decifer.signals")
@@ -737,6 +738,9 @@ _IBKR_PACING_LOCK = _mp.Manager().Lock() if False else None  # replaced by threa
 import threading as _threading
 
 _IBKR_PACING_LOCK = _threading.Lock()
+# Limit concurrent Alpaca fetch_bars calls within the ThreadPoolExecutor.
+# Burst parallelism from 8 workers causes connection resets on Alpaca Algo Trader Plus.
+_ALPACA_SEM = _threading.BoundedSemaphore(10)
 
 
 def fetch_ibkr_historical(symbol: str, ib, bar_size: str = "5 mins", duration: str = "5 D") -> pd.DataFrame | None:
@@ -998,6 +1002,15 @@ def fetch_multi_timeframe(
         if confluence["direction"] == "SHORT" and symbol in CONFIG.get("long_only_symbols", set()):
             return None
 
+        # Compute stock 5-day return from 1d bars for relative-strength calculation
+        _stock_5d: float | None = None
+        try:
+            if df_1d is not None and len(df_1d) >= 6:
+                _close = df_1d["close"]
+                _stock_5d = round((float(_close.iloc[-1]) / float(_close.iloc[-6]) - 1) * 100, 2)
+        except Exception:
+            pass
+
         return {
             "symbol": symbol,
             "price": sig_5m["price"],
@@ -1009,7 +1022,7 @@ def fetch_multi_timeframe(
                 "1d": sig_1d,
                 "1w": sig_1w,
             },
-            "atr": sig_5m["atr"],
+            "atr_5m": sig_5m["atr"],
             "atr_daily": sig_1d["atr"] if sig_1d else 0.0,
             "vol_ratio": sig_5m["vol_ratio"],
             # MTF alignment gate results (for dashboard + logging)
@@ -1027,6 +1040,16 @@ def fetch_multi_timeframe(
             # dashboard) can see what was boosted and by how much.
             "premarket_gap_pct": confluence.get("premarket_gap_pct", round(_premarket_gap_pct, 4)),
             "gap_boost_mult": confluence.get("gap_boost_mult", _gap_mult),
+            # Apex enrichment fields (set by L1 or L1.5)
+            "catalyst_score": confluence.get("catalyst_score"),
+            "divergence_flags": _compute_divergence_flags(sig_5m, confluence),
+            "stock_5d_return": _stock_5d,
+            "news_finbert_sentiment": None,   # populated when FinBERT is wired
+            "news_finbert_confidence": None,
+            # L1.5 fields — set by guardrails.filter_candidates(), not here
+            "allowed_trade_types": [],
+            "default_trade_type": None,
+            "options_eligible": False,
         }
 
     except Exception as e:
@@ -1459,6 +1482,13 @@ def compute_indicators(df: pd.DataFrame, symbol: str, tf: str) -> dict | None:
             "overnight_mean": round(overnight_mean_return, 6),
             "overnight_sharpe": round(overnight_sharpe, 3),
             "overnight_n_days": overnight_n_days,
+            # 20-day annualized realized vol — populated for 1d only; None otherwise.
+            # Used by sensor_payload to compute iv_rv_spread (ATM IV minus realized vol).
+            "realized_vol_20d": (
+                round(float(close.pct_change().rolling(20).std().iloc[-1]) * (252 ** 0.5), 4)
+                if tf == "1d" and len(close) >= 21
+                else None
+            ),
             # Signal
             "signal": signal,
         }
@@ -2846,6 +2876,8 @@ def compute_confluence(
         # fired only where intended.
         "premarket_gap_pct": round(float(premarket_gap_pct or 0.0), 4),
         "gap_boost_mult": _gap_mult,
+        # Raw catalyst engine score (distinct from catalyst_boost_pts in score_breakdown)
+        "catalyst_score": _cat_score,
     }
 
 
@@ -2870,6 +2902,53 @@ def get_regime_threshold(regime: str) -> int:
     return base
 
 
+def _score_daily_tape(
+    spy_chg_1d: float,
+    qqq_chg_1d: float,
+    breadth_pct: float | None,
+    credit_stress: bool,
+) -> int:
+    """Encode macro tape as a single integer -10 to +10 for Apex context."""
+    import math
+    spy_contrib = max(-3.0, min(3.0, spy_chg_1d / 2.0 * 3))
+    qqq_contrib = max(-3.0, min(3.0, qqq_chg_1d / 2.0 * 3))
+    if breadth_pct is None:
+        breadth_contrib = 0
+    elif breadth_pct < 30:
+        breadth_contrib = -2
+    elif breadth_pct < 50:
+        breadth_contrib = -1
+    elif breadth_pct < 70:
+        breadth_contrib = 0
+    else:
+        breadth_contrib = 2
+    credit_contrib = -2 if credit_stress else 0
+    return int(max(-10.0, min(10.0, spy_contrib + qqq_contrib + breadth_contrib + credit_contrib)))
+
+
+def _compute_divergence_flags(sig_5m: dict, confluence: dict) -> list[str]:
+    """Return list of divergence warning flags based on indicator relationships."""
+    flags: list[str] = []
+    signal = confluence.get("signal", "HOLD")
+    vol_ratio = sig_5m.get("vol_ratio", 1.0)
+    obv_slope = sig_5m.get("obv_slope", 0)
+    mfi = sig_5m.get("mfi", 50)
+    donchian_breakout = sig_5m.get("donch_breakout", 0)
+    vwap_dist = sig_5m.get("vwap_dist", 0.0)
+    vwap_sd_pct = sig_5m.get("vwap_sd_pct", 1.0) or 1.0
+    score = confluence.get("score", 0)
+    regime_router = confluence.get("regime_router", "unknown")
+
+    if signal in ("BUY", "STRONG_BUY") and obv_slope < 0 and mfi < 40:
+        flags.append("DISTRIBUTION_TRAP")
+    if donchian_breakout != 0 and vol_ratio < 1.5:
+        flags.append("LOW_VOL_BREAKOUT")
+    if (score >= 45 and regime_router in ("unknown", "mean_reversion")
+            and abs(vwap_dist) >= 2.0 * vwap_sd_pct):
+        flags.append("OVEREXTENDED_IN_RANGE")
+    return flags
+
+
 def score_universe(
     symbols: list,
     regime: str = "UNKNOWN",
@@ -2877,6 +2956,8 @@ def score_universe(
     social_data: dict | None = None,
     regime_router: str | None = None,
     ib=None,
+    regime_dict: dict | None = None,
+    spy_5d_return: float | None = None,
 ) -> tuple:
     """
     Score all symbols in the universe.
@@ -2973,6 +3054,29 @@ def score_universe(
             f"— aborting scan cycle to prevent low-confidence orders"
         )
         return [], []
+
+    # Enrich payloads with regime-level fields (computed once, applied to all symbols)
+    _daily_tape: int | None = None
+    if regime_dict:
+        _daily_tape = _score_daily_tape(
+            spy_chg_1d=regime_dict.get("spy_chg_1d", 0.0),
+            qqq_chg_1d=regime_dict.get("qqq_chg_1d", 0.0),
+            breadth_pct=regime_dict.get("breadth_pct"),
+            credit_stress=bool(regime_dict.get("credit_stress", False)),
+        )
+        if spy_5d_return is None:
+            spy_5d_return = regime_dict.get("spy_5d_return")
+
+    for payload in all_results:
+        if _daily_tape is not None:
+            payload["daily_tape_score"] = _daily_tape
+        else:
+            payload.setdefault("daily_tape_score", None)
+        stock_5d = payload.get("stock_5d_return")
+        if stock_5d is not None and spy_5d_return is not None:
+            payload["stock_rs_vs_spy"] = round(stock_5d - spy_5d_return, 2)
+        else:
+            payload.setdefault("stock_rs_vs_spy", None)
 
     all_sorted = sorted(all_results, key=lambda x: x["score"], reverse=True)
     above_threshold = [r for r in all_sorted if r["score"] >= threshold]

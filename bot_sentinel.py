@@ -200,7 +200,7 @@ def _execute_trigger_buy(
                 ib=ib,
                 symbol=sym,
                 price=sig["price"],
-                atr=sig["atr"],
+                atr=sig.get("atr_5m", sig.get("atr", 0.0)),
                 candle_gate=sig.get("candle_gate", "UNKNOWN"),
                 score=max(sig.get("score", 0), 30),
                 portfolio_value=portfolio_value,

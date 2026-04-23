@@ -571,7 +571,7 @@ class Backtester:
 
                     # Calculate position size
                     price = signal["price"]
-                    atr = signal["atr"]
+                    atr = signal.get("atr_5m", signal.get("atr", 0.0))
                     portfolio_val = self.portfolio.gross_value(current_prices)
                     risk_amount = portfolio_val * CONFIG["risk_pct_per_trade"]
                     atr_stop = atr * self.atr_stop_mult

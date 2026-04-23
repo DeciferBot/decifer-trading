@@ -16,21 +16,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 
-import anthropic
 import requests
 
 from config import CONFIG
-
-# ── MODULE-LEVEL CLAUDE CLIENT (created once, reused) ──────
-_claude_client = None
-
-
-def _get_claude_client():
-    global _claude_client
-    if _claude_client is None:
-        _claude_client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
-    return _claude_client
-
 
 log = logging.getLogger("decifer.news")
 
@@ -339,55 +327,6 @@ def keyword_score(headlines: list[str]) -> dict:
     }
 
 
-def claude_sentiment(symbol: str, headlines: list[str], direction: str = "") -> dict:
-    """
-    Tier 2: Claude deep sentiment read for symbols that pass keyword threshold.
-    Returns {sentiment: BULLISH/BEARISH/NEUTRAL, confidence: 0-10, summary: str}.
-    """
-    if not headlines:
-        return {"sentiment": "NEUTRAL", "confidence": 0, "summary": "No news"}
-
-    headline_text = "\n".join([f"- {h}" for h in headlines[:8]])
-
-    try:
-        client = _get_claude_client()
-        resp = client.messages.create(
-            model=CONFIG["claude_model"],
-            max_tokens=150,
-            system=(
-                "You are a Wall Street news sentiment analyst. "
-                "Analyse headlines and output ONLY valid JSON. "
-                "No explanation, no markdown, just JSON."
-            ),
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"""Symbol: {symbol}
-Current signal direction: {direction}
-
-Recent headlines:
-{headline_text}
-
-Output JSON:
-{{"sentiment": "BULLISH" or "BEARISH" or "NEUTRAL", "confidence": 0-10, "catalyst": "one sentence max"}}""",
-                }
-            ],
-        )
-        raw = resp.content[0].text.strip()
-        raw = raw.replace("```json", "").replace("```", "").strip()
-
-        result = json.loads(raw)
-        return {
-            "sentiment": result.get("sentiment", "NEUTRAL"),
-            "confidence": min(10, max(0, int(result.get("confidence", 0)))),
-            "summary": result.get("catalyst", ""),
-        }
-
-    except Exception as e:
-        log.debug(f"Claude sentiment error for {symbol}: {e}")
-        return {"sentiment": "NEUTRAL", "confidence": 0, "summary": ""}
-
-
 def get_news_sentiment(symbol: str, direction: str = "", keyword_threshold: int = 2) -> dict:
     """
     Two-tier news sentiment for a single symbol.
@@ -416,43 +355,25 @@ def get_news_sentiment(symbol: str, direction: str = "", keyword_threshold: int 
     # Tier 1: Keyword scoring
     kw = keyword_score(headlines)
 
-    # Tier 2: Claude deep read (only if keywords are meaningful)
-    claude = {"sentiment": "NEUTRAL", "confidence": 0, "summary": ""}
-    if abs(kw["score"]) >= keyword_threshold and headlines:
-        claude = claude_sentiment(symbol, headlines, direction)
-
-    # ── Compute final news_score (0-10) ──────────────────────
+    # ── Compute final news_score (0-10) — keyword + recency only ──
     news_score = 0
 
     # Keyword contribution (0-5)
     if direction in ("LONG", ""):
         kw_contrib = max(0, min(5, kw["score"]))
     elif direction == "SHORT":
-        kw_contrib = max(0, min(5, -kw["score"]))  # Bearish news = positive for shorts
+        kw_contrib = max(0, min(5, -kw["score"]))
     else:
         kw_contrib = 0
     news_score += kw_contrib
 
-    # Claude contribution (0-5)
-    if claude["sentiment"] != "NEUTRAL":
-        sentiment_aligned = (
-            (direction == "LONG" and claude["sentiment"] == "BULLISH")
-            or (direction == "SHORT" and claude["sentiment"] == "BEARISH")
-            or direction == ""
-        )
-        if sentiment_aligned:
-            news_score += min(5, claude["confidence"] // 2)
-        else:
-            # News contradicts trade direction — penalise
-            news_score = max(0, news_score - min(3, claude["confidence"] // 3))
-
-    # Recency boost: fresh news (< 4 hours) gets bonus
+    # Recency boost
     if recency < 2:
-        news_score = min(10, news_score + 2)  # Breaking news
+        news_score = min(10, news_score + 2)
     elif recency < 4:
-        news_score = min(10, news_score + 1)  # Recent
+        news_score = min(10, news_score + 1)
 
-    # Decay: old news (> 24 hours) gets penalised
+    # Decay
     if recency > 24:
         news_score = max(0, news_score - 2)
     elif recency > 12:
@@ -465,9 +386,8 @@ def get_news_sentiment(symbol: str, direction: str = "", keyword_threshold: int 
         "recency_hours": round(recency, 1),
         "keyword_score": kw["score"],
         "keyword_hits": kw["keywords"],
-        "claude_sentiment": claude["sentiment"],
-        "claude_confidence": claude["confidence"],
-        "claude_catalyst": claude["summary"],
+        "news_finbert_sentiment": None,
+        "news_finbert_confidence": None,
         "news_score": min(10, max(0, news_score)),
     }
 
@@ -481,9 +401,12 @@ def _empty_sentiment(symbol: str) -> dict:
         "recency_hours": 999,
         "keyword_score": 0,
         "keyword_hits": [],
-        "claude_sentiment": "NEUTRAL",
-        "claude_confidence": 0,
-        "claude_catalyst": "",
+        "news_finbert_sentiment": None,
+        "news_finbert_confidence": None,
+        "av_sentiment_score": 0.0,
+        "av_sentiment_label": "",
+        "av_relevance": 0.0,
+        "av_topics": [],
         "news_score": 0,
     }
 
@@ -555,35 +478,7 @@ def batch_news_sentiment(symbols: list[str], directions: dict[str, str] | None =
             sym, _articles, headlines, recency, kw = future.result()
             rss_results[sym] = (headlines, recency, kw)
 
-    # ── Phase 2: Claude tier-2 for top scorers (max 5) ─────────
-    claude_candidates = []
-    for sym, (headlines, _recency, kw) in rss_results.items():
-        if abs(kw["score"]) >= 2 and headlines:
-            claude_candidates.append((sym, headlines, kw["score"]))
-
-    # Sort by keyword score strength, take top 5
-    claude_candidates.sort(key=lambda x: abs(x[2]), reverse=True)
-    claude_candidates = claude_candidates[:5]
-
-    claude_results = {}
-    if claude_candidates:
-
-        def claude_one(sym, headlines, direction):
-            try:
-                return sym, claude_sentiment(sym, headlines, direction)
-            except Exception as e:
-                log.debug(f"Claude sentiment error for {sym}: {e}")
-                return sym, {"sentiment": "NEUTRAL", "confidence": 0, "summary": ""}
-
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            futures = {
-                pool.submit(claude_one, sym, hls, directions.get(sym, "")): sym for sym, hls, _ in claude_candidates
-            }
-            for future in as_completed(futures):
-                sym, claude_res = future.result()
-                claude_results[sym] = claude_res
-
-    # ── Phase 2b: Alpha Vantage Tier 3 — structured NLP from professional sources ──
+    # ── Phase 2: Alpha Vantage Tier 2 — structured NLP from professional sources ──
     # One call covers the whole batch. Cached 4 hours (25 call/day free tier).
     # AV aggregates Reuters, Bloomberg, AP etc. — higher quality than Yahoo RSS keywords.
     av_results: dict[str, dict] = {}
@@ -618,10 +513,9 @@ def batch_news_sentiment(symbols: list[str], directions: dict[str, str] | None =
 
         headlines, recency, kw = rss_results[sym]
         direction = directions.get(sym, "")
-        claude = claude_results.get(sym, {"sentiment": "NEUTRAL", "confidence": 0, "summary": ""})
         av = av_results.get(sym.upper(), {})
 
-        # Compute news_score (same logic as get_news_sentiment)
+        # Compute news_score: keyword + recency + AV (no Claude)
         news_score = 0
         if direction in ("LONG", ""):
             kw_contrib = max(0, min(5, kw["score"]))
@@ -631,20 +525,7 @@ def batch_news_sentiment(symbols: list[str], directions: dict[str, str] | None =
             kw_contrib = 0
         news_score += kw_contrib
 
-        if claude["sentiment"] != "NEUTRAL":
-            sentiment_aligned = (
-                (direction == "LONG" and claude["sentiment"] == "BULLISH")
-                or (direction == "SHORT" and claude["sentiment"] == "BEARISH")
-                or direction == ""
-            )
-            if sentiment_aligned:
-                news_score += min(5, claude["confidence"] // 2)
-            else:
-                news_score = max(0, news_score - min(3, claude["confidence"] // 3))
-
-        # ── AV Tier 3 contribution (±3, direction-aware) ───────
-        # Only fires when AV has meaningful relevance (>= 0.15) for this ticker.
-        # sentiment_score is -1 to +1; scaled by relevance; max contribution ±3.
+        # ── AV Tier 2 contribution (±3, direction-aware) ───────
         av_sentiment_score = av.get("sentiment_score", 0.0)
         av_relevance = av.get("relevance", 0.0)
         av_contrib = 0.0
@@ -653,7 +534,7 @@ def batch_news_sentiment(symbols: list[str], directions: dict[str, str] | None =
             if direction in ("LONG", ""):
                 av_contrib = raw
             elif direction == "SHORT":
-                av_contrib = -raw  # bearish AV signal = positive for shorts
+                av_contrib = -raw
         news_score = max(0, min(10, news_score + av_contrib))
 
         if recency < 2:
@@ -672,9 +553,8 @@ def batch_news_sentiment(symbols: list[str], directions: dict[str, str] | None =
             "recency_hours": round(recency, 1),
             "keyword_score": kw["score"],
             "keyword_hits": kw["keywords"],
-            "claude_sentiment": claude["sentiment"],
-            "claude_confidence": claude["confidence"],
-            "claude_catalyst": claude.get("summary", ""),
+            "news_finbert_sentiment": None,
+            "news_finbert_confidence": None,
             "av_sentiment_score": round(av_sentiment_score, 4),
             "av_sentiment_label": av.get("sentiment_label", ""),
             "av_relevance": round(av_relevance, 4),

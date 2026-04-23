@@ -719,7 +719,8 @@ def agent_trading_analyst(
     spy_chg_1d = regime.get("spy_chg_1d", 0.0)
     qqq_chg_1d = regime.get("qqq_chg_1d", 0.0)
     iwm_chg_1d = regime.get("iwm_chg_1d", 0.0)
-    tape_context = regime.get("tape_context", f"REGIME: {regime_name}")
+    _tc = regime.get("tape_context", f"REGIME: {regime_name}")
+    tape_context = _tc.get("prose", str(_tc)) if isinstance(_tc, dict) else _tc
 
     sig_lines = []
     # Wide input window — let Opus pick from a meaningful candidate set. Token cost
