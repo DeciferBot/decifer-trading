@@ -2794,6 +2794,7 @@ def compute_confluence(
     # so it clears the min_score_to_trade threshold more easily.
     # Stored in score_breakdown["catalyst"] for IC logging.
     _catalyst_boost_pts = 0
+    _cat_score = None
     _ticker = sig_5m.get("symbol", "")
     if _ticker:
         _cat_lookup = _get_catalyst_lookup()

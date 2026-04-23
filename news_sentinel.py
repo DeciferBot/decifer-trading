@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime, timedelta
 
 from config import CONFIG
-from news import BEARISH_STRONG, BULLISH_STRONG, claude_sentiment, keyword_score
+from news import keyword_score
 from news_infrastructure import headline_hash, shared_cooldown, shared_dedup
 
 log = logging.getLogger("decifer.sentinel")
@@ -243,23 +243,49 @@ def assess_materiality(articles: list[dict]) -> list[dict]:
 # ═══════════════════════════════════════════════════════════════
 def deep_read_trigger(trigger: dict) -> dict:
     """
-    Run Claude sentiment analysis on a confirmed trigger.
-    Returns the trigger enriched with Claude's analysis.
+    Enrich a confirmed trigger with a materiality confidence score.
+
+    Phase 1f removed the Sonnet claude_sentiment() call from news.py. The
+    downstream materiality gate (see NewsSentinel loop) now accepts either
+    claude_confidence (default legacy key) or finbert_confidence (enabled via
+    safety_overlay.FINBERT_MATERIALITY_GATE_ENABLED). To preserve the trigger
+    field contract without re-introducing an LLM call, we derive both fields
+    deterministically from the tier-1 keyword_score: a clean, direction-aware
+    signal that keeps the sentinel loop functional until Phase 6 cutover wires
+    in the FinBERT batch output.
     """
     headlines = trigger["headlines"]
-    sym = trigger["symbol"]
+    direction = trigger["direction"]
 
-    claude_result = claude_sentiment(sym, headlines, trigger["direction"])
+    kw = keyword_score(headlines)
+    raw = kw.get("score", 0)
+    # Direction-aware: for SHORT a negative keyword score is bullish (for the thesis)
+    signed = raw if direction == "LONG" else (-raw if direction == "SHORT" else raw)
 
-    trigger["claude_sentiment"] = claude_result.get("sentiment", "NEUTRAL")
-    trigger["claude_confidence"] = claude_result.get("confidence", 0)
-    trigger["claude_catalyst"] = claude_result.get("summary", "")
+    # keyword_score() returns a signed integer roughly in [-10, +10].
+    # A magnitude >= 2 is the same minimum-hit threshold used in get_news_sentiment.
+    if signed >= 2:
+        sentiment = "BULLISH"
+    elif signed <= -2:
+        sentiment = "BEARISH"
+    else:
+        sentiment = "NEUTRAL"
+    # Map |signed| (0..10) → confidence 0..10 — identical range to prior Claude gate.
+    confidence = int(max(0, min(10, abs(signed))))
+    catalyst = headlines[0][:80] if headlines else ""
 
-    # ── Upgrade/downgrade urgency based on Claude confidence ──
-    if claude_result.get("confidence", 0) >= CLAUDE_CONFIDENCE_THRESHOLD:
+    trigger["claude_sentiment"] = sentiment
+    trigger["claude_confidence"] = confidence
+    trigger["claude_catalyst"] = catalyst
+    # Mirror into finbert_* keys so the flag-gated gate has a value to read.
+    trigger.setdefault("finbert_sentiment", sentiment)
+    trigger.setdefault("finbert_confidence", confidence)
+
+    # ── Upgrade/downgrade urgency based on confidence ──
+    if confidence >= CLAUDE_CONFIDENCE_THRESHOLD:
         if trigger["urgency"] == "MODERATE":
             trigger["urgency"] = "HIGH"
-    elif claude_result.get("confidence", 0) <= 3 and trigger["urgency"] != "CRITICAL":
+    elif confidence <= 3 and trigger["urgency"] != "CRITICAL":
         trigger["urgency"] = "LOW"
 
     return trigger
