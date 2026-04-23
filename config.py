@@ -156,6 +156,20 @@ CONFIG = {
     # present because multiple readers do direct CONFIG["max_positions"] access.
     "daily_loss_limit": 0.10,  # 10% daily loss limit
     "max_drawdown_alert": 0.25,  # 25% drawdown alert
+    # ── Interphase live-safety overlay (between Phase 1 and Phase 2 of Decifer 3.0) ──
+    # Flags consumed by safety_overlay.py. See safety_overlay._DEFAULTS for semantics.
+    # These are kept in config so ops can toggle without a code deploy.
+    "safety_overlay": {
+        "LIVE_TRADING_ENABLED": True,
+        "NEW_ENTRIES_ENABLED": True,
+        "FORCE_MANAGE_ONLY": False,
+        "USE_LEGACY_PIPELINE": True,   # legacy agents.py path remains authoritative until Phase 6
+        "USE_APEX_V3_SHADOW": False,   # Phase 6: run apex path in log-only mode
+        "daily_loss_halt_new_entries_pct": 0.03,
+        "daily_loss_manage_only_pct": 0.05,
+        "per_symbol_hard_loss_pct": None,  # None = disabled; e.g. 0.15 → exit at -15%
+        "reconcile_every_cycle": True,
+    },
     "min_cash_reserve": 0.10,  # 10% cash floor — hard stop on new entries
     "max_single_position": 0.15,  # Cross-instrument exposure guard (stock+option stacking on same name). (live: 0.10)
     # Not enforced as a sizing cap — Opus decides position size from account context.

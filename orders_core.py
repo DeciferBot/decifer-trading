@@ -215,6 +215,14 @@ def execute_buy(
     Take profit: Limit order (placed immediately)
     Returns True if order placed successfully.
     """
+    try:
+        import safety_overlay as _so
+        _ok, _reason = _so.can_submit_order("buy")
+        if not _ok:
+            log.warning(f"execute_buy {symbol}: blocked by safety overlay — {_reason}")
+            return False
+    except Exception:
+        pass
     # Rebind patchable names from the current sys.modules entry so that
     # @patch('orders.*') works even when this module object differs from
     # sys.modules['orders'] (can happen during pytest collection cycles).
@@ -1198,6 +1206,14 @@ def execute_short(
     Take profit: Limit order BELOW entry (buy to cover when price falls).
     Returns True if order placed successfully.
     """
+    try:
+        import safety_overlay as _so
+        _ok, _reason = _so.can_submit_order("short")
+        if not _ok:
+            log.warning(f"execute_short {symbol}: blocked by safety overlay — {_reason}")
+            return False
+    except Exception:
+        pass
     import sys as _sys
 
     _om = _sys.modules.get("orders", _sys.modules[__name__])
@@ -1714,6 +1730,14 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
     Close an existing position at market.
     Returns True if order placed.
     """
+    try:
+        import safety_overlay as _so
+        _ok, _reason = _so.can_submit_order("sell")
+        if not _ok:
+            log.warning(f"execute_sell {symbol}: blocked by safety overlay — {_reason}")
+            return False
+    except Exception:
+        pass
     # Rebind patchable names from the current sys.modules entry so that
     # @patch('orders.*') works even when this module object differs from
     # sys.modules['orders'] (can happen during pytest collection cycles).

@@ -1209,6 +1209,25 @@ def run_scan():
             dash["scanning"] = False
             return
 
+    # ── Interphase safety overlay: LLM-independent circuit breakers ──────────
+    # Runs before any trade decision. Does not replace risk.check_risk_conditions()
+    # or the drawdown brake above — it layers on top, so that even if the Apex/
+    # agents path breaks we still block new entries on deeper daily loss.
+    try:
+        import safety_overlay as _so
+        _breaker_ok, _breaker_reason, _breaker_mode = _so.run_circuit_breakers(pv, pnl)
+        if _breaker_mode == "manage_only":
+            clog("RISK", f"⚠️ SAFETY OVERLAY manage-only: {_breaker_reason}")
+            dash["safety_mode"] = "manage_only"
+        else:
+            dash["safety_mode"] = "ok"
+        # Preflight broker reconciliation — IBKR is ground truth for qty/fills.
+        _recon = _so.preflight_reconcile(ib)
+        if _recon.get("mismatches"):
+            clog("RISK", f"🔄 Preflight reconcile: {_recon['mismatches']} mismatch(es) repaired")
+    except Exception as _so_err:
+        log.error("safety_overlay hook failed: %s", _so_err)
+
     clog("INFO", f"Portfolio: ${pv:,.2f} | DayP&L: ${pnl:+,.2f} | Positions: {len(get_open_positions())}")
 
     update_positions_from_ibkr(ib)
