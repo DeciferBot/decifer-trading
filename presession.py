@@ -342,13 +342,29 @@ def presession_catalyst_pipeline() -> dict:
             sym = candidate.get("ticker", "?")
             try:
                 trigger = _build_trigger(candidate)
-                decision = run_sentinel_pipeline(
-                    trigger=trigger,
-                    open_positions=open_positions,
-                    portfolio_value=portfolio_value,
-                    daily_pnl=daily_pnl,
-                    regime=regime,
-                )
+                # Phase 5 completion: legacy sentinel pipeline gated.
+                try:
+                    import safety_overlay as _so_ps
+                    _ps_legacy_on = _so_ps.sentinel_legacy_pipeline_enabled()
+                except Exception:
+                    _ps_legacy_on = True
+                if _ps_legacy_on:
+                    decision = run_sentinel_pipeline(
+                        trigger=trigger,
+                        open_positions=open_positions,
+                        portfolio_value=portfolio_value,
+                        daily_pnl=daily_pnl,
+                        regime=regime,
+                    )
+                else:
+                    decision = {
+                        "action": "SKIP",
+                        "symbol": sym,
+                        "qty": 0,
+                        "confidence": 0,
+                        "reasoning": "sentinel legacy pipeline disabled",
+                        "trigger_type": "presession",
+                    }
                 action = decision.get("action", "SKIP")
                 if action and action.upper() not in ("SKIP", "NO_TRADE", "HOLD"):
                     approvals += 1

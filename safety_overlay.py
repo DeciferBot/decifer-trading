@@ -38,6 +38,7 @@ _DEFAULTS: dict = {
     "USE_LEGACY_PIPELINE": True,
     "USE_APEX_V3_SHADOW": False,
     "PM_LEGACY_OPUS_REVIEW_ENABLED": True,     # authoritative; Phase 6 cutover flips to False
+    "SENTINEL_LEGACY_PIPELINE_ENABLED": True,  # authoritative; Phase 6 cutover flips to False
     "daily_loss_halt_new_entries_pct": 0.03,   # -3% blocks new entries
     "daily_loss_manage_only_pct": 0.05,        # -5% switches to manage-only (aligns with daily_loss_limit)
     "per_symbol_hard_loss_pct": None,          # e.g. -0.15 → force exit on -15% per-position unreal.; None disables
@@ -206,6 +207,21 @@ def should_use_legacy_pipeline() -> bool:
 def should_run_apex_shadow() -> bool:
     """Shadow mode: run new path in parallel but do NOT submit its orders."""
     return bool(flag("USE_APEX_V3_SHADOW"))
+
+
+def sentinel_legacy_pipeline_enabled() -> bool:
+    """
+    Gate for the legacy 3-agent news sentinel pipeline
+    (sentinel_agents.run_sentinel_pipeline — agent_catalyst + agent_risk_gate
+    + agent_instant_decision).
+
+    Default True — authoritative until the Phase 6 cutover. When False, the
+    live call sites in bot_sentinel.handle_news_trigger and presession short-
+    circuit with a SKIP decision instead of issuing the Sonnet + Opus LLM
+    calls. Phase 6 replaces the False branch with an Apex NEWS_INTERRUPT
+    dispatch built from build_news_trigger_payload().
+    """
+    return bool(flag("SENTINEL_LEGACY_PIPELINE_ENABLED"))
 
 
 def pm_legacy_opus_review_enabled() -> bool:

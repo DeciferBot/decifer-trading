@@ -166,6 +166,7 @@ CONFIG = {
         "USE_LEGACY_PIPELINE": True,   # legacy agents.py path remains authoritative until Phase 6
         "USE_APEX_V3_SHADOW": False,   # Phase 6: run apex path in log-only mode
         "PM_LEGACY_OPUS_REVIEW_ENABLED": True,   # authoritative; Phase 6 cutover flips to False
+        "SENTINEL_LEGACY_PIPELINE_ENABLED": True,  # authoritative; Phase 6 cutover flips to False
         "daily_loss_halt_new_entries_pct": 0.03,
         "daily_loss_manage_only_pct": 0.05,
         "per_symbol_hard_loss_pct": None,  # None = disabled; e.g. 0.15 → exit at -15%

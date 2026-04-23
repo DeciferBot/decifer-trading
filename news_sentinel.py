@@ -439,7 +439,34 @@ class NewsSentinel:
                         f"catalyst: {trigger.get('claude_catalyst', trigger['headlines'][0][:60])}"
                     )
 
-                    # Fire the callback to bot.py
+                    # Phase 5: shadow-only Apex NEWS_INTERRUPT preparation.
+                    # Builds the ApexInput payload and logs it; does NOT
+                    # dispatch. Guarded by USE_APEX_V3_SHADOW so default live
+                    # behavior (legacy on_trigger → handle_news_trigger →
+                    # run_sentinel_pipeline) is unchanged.
+                    try:
+                        import safety_overlay as _so_shadow
+                        if _so_shadow.should_run_apex_shadow():
+                            from sentinel_agents import build_news_trigger_payload
+                            _shadow_payload = build_news_trigger_payload(
+                                trigger=trigger,
+                                open_positions=[],  # Phase 6 threads real state
+                                portfolio_value=0.0,
+                                daily_pnl=0.0,
+                                regime={},
+                                scored_candidate=None,
+                            )
+                            log.info(
+                                "APEX_SHADOW news_interrupt prepared: sym=%s urgency=%s "
+                                "candidates=%d (log-only, no dispatch)",
+                                _shadow_payload["trigger_context"]["symbol"],
+                                _shadow_payload["trigger_context"].get("urgency"),
+                                len(_shadow_payload["track_a"]["candidates"]),
+                            )
+                    except Exception as _shadow_err:
+                        log.debug("APEX_SHADOW prep error (non-fatal): %s", _shadow_err)
+
+                    # Fire the callback to bot.py (legacy live path — authoritative)
                     try:
                         self.on_trigger(trigger)
                     except Exception as e:

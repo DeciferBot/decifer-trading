@@ -92,13 +92,37 @@ def handle_news_trigger(trigger: dict):
 
         clog("SIGNAL", f"🚨 SENTINEL TRIGGER: {sym} | {trigger.get('direction')} | urgency={trigger.get('urgency')}")
 
-        decision = run_sentinel_pipeline(
-            trigger=trigger,
-            open_positions=open_pos,
-            portfolio_value=pv,
-            daily_pnl=pnl,
-            regime=regime,
-        )
+        # Phase 5 completion: the legacy 3-agent sentinel pipeline is gated
+        # behind a safety_overlay flag (default True — authoritative today).
+        # The Phase 6 cutover flips the flag and replaces the else branch with
+        # an Apex NEWS_INTERRUPT dispatch built from
+        # sentinel_agents.build_news_trigger_payload().
+        try:
+            import safety_overlay as _so_sent
+            _sent_legacy_on = _so_sent.sentinel_legacy_pipeline_enabled()
+        except Exception:
+            _sent_legacy_on = True  # fail-safe: preserve legacy live behavior
+        if _sent_legacy_on:
+            decision = run_sentinel_pipeline(
+                trigger=trigger,
+                open_positions=open_pos,
+                portfolio_value=pv,
+                daily_pnl=pnl,
+                regime=regime,
+            )
+        else:
+            clog("INFO", f"Sentinel {sym}: legacy pipeline disabled by safety_overlay — SKIP")
+            decision = {
+                "action": "SKIP",
+                "symbol": sym,
+                "qty": 0,
+                "sl": 0,
+                "tp": 0,
+                "instrument": "stock",
+                "confidence": 0,
+                "reasoning": "sentinel legacy pipeline disabled",
+                "trigger_type": "news_sentinel",
+            }
 
         dash["sentinel_triggers"].insert(
             0,
@@ -331,13 +355,33 @@ def handle_catalyst_trigger(trigger: dict):
             f"urgency={trigger.get('urgency')} | {trigger.get('claude_catalyst', '')[:60]}",
         )
 
-        decision = run_sentinel_pipeline(
-            trigger=trigger,
-            open_positions=open_pos,
-            portfolio_value=pv,
-            daily_pnl=pnl,
-            regime=regime,
-        )
+        # Phase 5 completion: catalyst trigger path is also gated.
+        try:
+            import safety_overlay as _so_cat
+            _cat_legacy_on = _so_cat.sentinel_legacy_pipeline_enabled()
+        except Exception:
+            _cat_legacy_on = True
+        if _cat_legacy_on:
+            decision = run_sentinel_pipeline(
+                trigger=trigger,
+                open_positions=open_pos,
+                portfolio_value=pv,
+                daily_pnl=pnl,
+                regime=regime,
+            )
+        else:
+            clog("INFO", f"Catalyst {sym}: legacy pipeline disabled by safety_overlay — SKIP")
+            decision = {
+                "action": "SKIP",
+                "symbol": sym,
+                "qty": 0,
+                "sl": 0,
+                "tp": 0,
+                "instrument": "stock",
+                "confidence": 0,
+                "reasoning": "sentinel legacy pipeline disabled",
+                "trigger_type": "catalyst",
+            }
 
         dash.setdefault("catalyst_triggers", []).insert(
             0,
