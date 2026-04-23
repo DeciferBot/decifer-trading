@@ -35,12 +35,12 @@ _DEFAULTS: dict = {
     "LIVE_TRADING_ENABLED": True,
     "NEW_ENTRIES_ENABLED": True,
     "FORCE_MANAGE_ONLY": False,
-    "USE_LEGACY_PIPELINE": True,
-    "USE_APEX_V3_SHADOW": False,
-    "PM_LEGACY_OPUS_REVIEW_ENABLED": True,     # authoritative; Phase 6 cutover flips to False
-    "SENTINEL_LEGACY_PIPELINE_ENABLED": True,  # authoritative; Phase 6 cutover flips to False
-    "TRADE_ADVISOR_ENABLED": True,             # legacy trade_advisor; Phase 7 flips to False
-    "FINBERT_MATERIALITY_GATE_ENABLED": False, # news_sentinel materiality gate source
+    "USE_LEGACY_PIPELINE": False,  # Phase 8 cutover: Apex owns execute paths
+    "USE_APEX_V3_SHADOW": True,    # shadow+divergence logging ON
+    "PM_LEGACY_OPUS_REVIEW_ENABLED": False,    # Phase 8 cutover: PM Track B through Apex
+    "SENTINEL_LEGACY_PIPELINE_ENABLED": False, # Phase 8 cutover: Sentinel NI through Apex
+    "TRADE_ADVISOR_ENABLED": False,            # Phase 8 cutover: deterministic sizing only
+    "FINBERT_MATERIALITY_GATE_ENABLED": True,  # Phase 8 cutover: FinBERT materiality gate ON
     "daily_loss_halt_new_entries_pct": 0.03,   # -3% blocks new entries
     "daily_loss_manage_only_pct": 0.05,        # -5% switches to manage-only (aligns with daily_loss_limit)
     "per_symbol_hard_loss_pct": None,          # e.g. -0.15 → force exit on -15% per-position unreal.; None disables

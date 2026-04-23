@@ -168,6 +168,7 @@ def test_scan_cycle_shadow_and_divergence_wiring_intact():
     assert "write_divergence_record" in text
 
 
-def test_legacy_pipeline_flag_default_is_true():
+def test_legacy_pipeline_flag_post_cutover_default_is_false():
+    """Phase 8 cutover complete: Apex owns all execute paths."""
     from safety_overlay import should_use_legacy_pipeline
-    assert should_use_legacy_pipeline() is True
+    assert should_use_legacy_pipeline() is False

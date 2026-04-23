@@ -135,11 +135,13 @@ def test_bot_sentinel_shadow_and_cutover_branches_still_wired():
     assert "run_sentinel_pipeline" in text
 
 
-def test_sentinel_legacy_flag_default_is_true():
+def test_sentinel_legacy_flag_post_cutover_default_is_false():
+    """Phase 8 cutover complete: Sentinel legacy pipeline off; Apex NI is live."""
     from safety_overlay import sentinel_legacy_pipeline_enabled
-    assert sentinel_legacy_pipeline_enabled() is True
+    assert sentinel_legacy_pipeline_enabled() is False
 
 
-def test_apex_shadow_flag_default_is_false():
+def test_apex_shadow_flag_default_is_true():
+    """Phase 8 Step 1: shadow logging stays on."""
     from safety_overlay import should_run_apex_shadow
-    assert should_run_apex_shadow() is False
+    assert should_run_apex_shadow() is True

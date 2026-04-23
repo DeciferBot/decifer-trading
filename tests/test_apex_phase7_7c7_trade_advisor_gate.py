@@ -16,9 +16,10 @@ import trade_advisor
 _REPO = Path(__file__).resolve().parent.parent
 
 
-def test_trade_advisor_flag_default_is_true():
+def test_trade_advisor_flag_post_cutover_default_is_false():
+    """Phase 8 cutover complete: legacy trade_advisor disabled; deterministic sizing only."""
     from safety_overlay import trade_advisor_enabled
-    assert trade_advisor_enabled() is True
+    assert trade_advisor_enabled() is False
 
 
 def test_gated_advisor_calls_advise_trade_when_enabled(monkeypatch):

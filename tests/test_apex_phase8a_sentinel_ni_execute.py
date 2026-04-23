@@ -29,6 +29,7 @@ def test_sentinel_cutover_dispatch_uses_execute_flag():
     assert "execute=_s_execute" in _SENT
 
 
-def test_sentinel_legacy_flag_default_still_true():
+def test_sentinel_legacy_flag_post_cutover_default_is_false():
+    """Phase 8 cutover complete."""
     from safety_overlay import sentinel_legacy_pipeline_enabled
-    assert sentinel_legacy_pipeline_enabled() is True
+    assert sentinel_legacy_pipeline_enabled() is False

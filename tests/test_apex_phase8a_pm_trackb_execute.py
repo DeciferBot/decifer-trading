@@ -39,6 +39,7 @@ def test_pm_cutover_fail_safe_is_execute_false():
     assert "_pm_cutover_execute = False" in region
 
 
-def test_pm_legacy_flag_default_still_true():
+def test_pm_legacy_flag_post_cutover_default_is_false():
+    """Phase 8 cutover complete."""
     from safety_overlay import pm_legacy_opus_review_enabled
-    assert pm_legacy_opus_review_enabled() is True
+    assert pm_legacy_opus_review_enabled() is False

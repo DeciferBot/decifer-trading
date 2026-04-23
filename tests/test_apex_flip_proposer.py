@@ -22,18 +22,44 @@ sys.path.insert(0, str(_SCRIPTS))
 import apex_flip_proposer as fp  # noqa: E402
 
 
+# ── Pre-cutover (legacy) flag state fixture ─────────────────────────────────
+# The proposer was designed to walk the system FROM this state TO the
+# post-cutover state. Phase 8 cutover is now complete (see config.py), so
+# live CONFIG no longer matches legacy defaults. Tests that exercise the
+# proposer's forward-walk semantics simulate the legacy starting state via
+# this fixture rather than depending on live CONFIG.
+
+_LEGACY_STATE: dict = {
+    "USE_APEX_V3_SHADOW": False,
+    "FINBERT_MATERIALITY_GATE_ENABLED": False,
+    "TRADE_ADVISOR_ENABLED": True,
+    "PM_LEGACY_OPUS_REVIEW_ENABLED": True,
+    "SENTINEL_LEGACY_PIPELINE_ENABLED": True,
+    "USE_LEGACY_PIPELINE": True,
+}
+
+
+@pytest.fixture
+def legacy_flag_state(monkeypatch):
+    """Stub fp.read_current_flag_state() to return the pre-cutover state."""
+    monkeypatch.setattr(
+        fp, "read_current_flag_state", lambda: dict(_LEGACY_STATE)
+    )
+    return dict(_LEGACY_STATE)
+
+
 # ── flag state reader ───────────────────────────────────────────────────────
 
 def test_read_current_flag_state_returns_all_six_flags():
     state = fp.read_current_flag_state()
     assert set(state.keys()) == set(fp._FLAG_ACCESSOR.keys())
-    # Defaults per 7C.9 invariants.
-    assert state["USE_APEX_V3_SHADOW"] is False
-    assert state["FINBERT_MATERIALITY_GATE_ENABLED"] is False
-    assert state["TRADE_ADVISOR_ENABLED"] is True
-    assert state["PM_LEGACY_OPUS_REVIEW_ENABLED"] is True
-    assert state["SENTINEL_LEGACY_PIPELINE_ENABLED"] is True
-    assert state["USE_LEGACY_PIPELINE"] is True
+    # Phase 8 cutover complete — live CONFIG now reflects post-cutover state.
+    assert state["USE_APEX_V3_SHADOW"] is True
+    assert state["FINBERT_MATERIALITY_GATE_ENABLED"] is True
+    assert state["TRADE_ADVISOR_ENABLED"] is False
+    assert state["PM_LEGACY_OPUS_REVIEW_ENABLED"] is False
+    assert state["SENTINEL_LEGACY_PIPELINE_ENABLED"] is False
+    assert state["USE_LEGACY_PIPELINE"] is False
 
 
 # ── argument parsing ────────────────────────────────────────────────────────
@@ -69,9 +95,9 @@ def test_out_of_order_warning_none_when_earlier_flags_flipped():
     assert fp.out_of_order_warning("FINBERT_MATERIALITY_GATE_ENABLED", True, current) is None
 
 
-def test_out_of_order_warning_fires_when_earlier_flag_not_yet_flipped():
-    # Defaults: USE_APEX_V3_SHADOW still False. Proposing to flip flag #3
-    # forward while flag #1 has not moved → warn.
+def test_out_of_order_warning_fires_when_earlier_flag_not_yet_flipped(legacy_flag_state):
+    # Simulated legacy state: USE_APEX_V3_SHADOW still False. Proposing to flip
+    # flag #3 forward while flag #1 has not moved → warn.
     current = fp.read_current_flag_state()
     msg = fp.out_of_order_warning("TRADE_ADVISOR_ENABLED", False, current)
     assert msg is not None and "out-of-order" in msg
@@ -175,9 +201,9 @@ def _blocking_gates() -> dict:
     return fp.evaluate_gates(r)
 
 
-def test_build_proposal_noop_when_already_at_target():
+def test_build_proposal_noop_when_already_at_target(legacy_flag_state):
     current = fp.read_current_flag_state()
-    # TRADE_ADVISOR_ENABLED defaults True; proposing True is noop.
+    # Legacy state: TRADE_ADVISOR_ENABLED=True; proposing True is noop.
     p = fp.build_proposal(
         "TRADE_ADVISOR_ENABLED", True,
         current_state=current, gates=_passing_gates(),
@@ -187,7 +213,7 @@ def test_build_proposal_noop_when_already_at_target():
     assert p["hard_blocks"] == []
 
 
-def test_build_proposal_allow_when_gates_pass_and_in_order():
+def test_build_proposal_allow_when_gates_pass_and_in_order(legacy_flag_state):
     current = fp.read_current_flag_state()
     p = fp.build_proposal(
         "USE_APEX_V3_SHADOW", True,
@@ -199,7 +225,7 @@ def test_build_proposal_allow_when_gates_pass_and_in_order():
     assert len(p["manual_steps"]) >= 1
 
 
-def test_build_proposal_blocked_when_gates_fail():
+def test_build_proposal_blocked_when_gates_fail(legacy_flag_state):
     current = fp.read_current_flag_state()
     p = fp.build_proposal(
         "USE_APEX_V3_SHADOW", True,
@@ -209,7 +235,7 @@ def test_build_proposal_blocked_when_gates_fail():
     assert p["hard_blocks"]
 
 
-def test_build_proposal_records_out_of_order_warning():
+def test_build_proposal_records_out_of_order_warning(legacy_flag_state):
     current = fp.read_current_flag_state()
     # Flip #3 forward while #1 still at False.
     p = fp.build_proposal(
@@ -223,8 +249,8 @@ def test_build_proposal_records_out_of_order_warning():
 
 # ── build_rollback ──────────────────────────────────────────────────────────
 
-def test_build_rollback_inverts_target_and_is_never_blocked():
-    # Simulate a prior proposal audit that targeted True.
+def test_build_rollback_inverts_target_and_is_never_blocked(legacy_flag_state):
+    # Simulate a prior proposal audit that targeted True, under legacy state.
     source = {
         "kind": "propose",
         "ts": "2026-04-24T00:00:00+00:00",
@@ -237,16 +263,16 @@ def test_build_rollback_inverts_target_and_is_never_blocked():
     assert rb["source_target_value"] is True
     assert rb["target_value"] is False
     assert rb["hard_blocks"] == []
-    # Default state has USE_APEX_V3_SHADOW=False; inverse=False ⇒ noop.
+    # Legacy state has USE_APEX_V3_SHADOW=False; inverse=False ⇒ noop.
     assert rb["decision"] == "noop"
 
 
-def test_build_rollback_allow_when_current_differs_from_inverse():
+def test_build_rollback_allow_when_current_differs_from_inverse(legacy_flag_state):
     # Prior proposal targeted False for TRADE_ADVISOR_ENABLED. Inverse=True.
     # Current state has TRADE_ADVISOR_ENABLED=True already → noop.
     # To force "allow" we simulate a source whose inverse DIFFERS from current.
     source = {"flag": "USE_APEX_V3_SHADOW", "target_value": False, "ts": "x"}
-    # Inverse target = True. Current state USE_APEX_V3_SHADOW=False → allow.
+    # Inverse target = True. Legacy state USE_APEX_V3_SHADOW=False → allow.
     rb = fp.build_rollback(source)
     assert rb["decision"] == "allow"
     assert rb["target_value"] is True
@@ -290,7 +316,7 @@ def test_render_status_shows_blocked_hard_gates():
     assert "insufficient shadow cycles" in text
 
 
-def test_render_proposal_formats_decision_and_manual_steps():
+def test_render_proposal_formats_decision_and_manual_steps(legacy_flag_state):
     current = fp.read_current_flag_state()
     p = fp.build_proposal(
         "USE_APEX_V3_SHADOW", True,
@@ -319,7 +345,7 @@ def test_cli_status_smoke(tmp_path, capsys, monkeypatch):
     assert "Apex Flip Proposer — status" in out
 
 
-def test_cli_propose_writes_audit_and_returns_blocked_on_empty_logs(tmp_path, capsys):
+def test_cli_propose_writes_audit_and_returns_blocked_on_empty_logs(tmp_path, capsys, legacy_flag_state):
     rc = fp.main([
         "propose", "USE_APEX_V3_SHADOW=true",
         "--shadow-log", str(tmp_path / "missing_shadow.jsonl"),

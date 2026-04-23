@@ -34,6 +34,7 @@ def test_materiality_gate_threshold_unchanged():
     assert '_conf_val < 4 and trigger["urgency"] != "CRITICAL"' in _NS
 
 
-def test_finbert_gate_flag_default_false():
+def test_finbert_gate_flag_post_cutover_default_true():
+    """Phase 8 cutover complete: FinBERT materiality gate is the authoritative source."""
     from safety_overlay import finbert_materiality_gate_enabled
-    assert finbert_materiality_gate_enabled() is False
+    assert finbert_materiality_gate_enabled() is True

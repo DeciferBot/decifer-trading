@@ -103,9 +103,10 @@ def test_pm_cutover_branch_still_wired_in_bot_trading():
     assert "run_portfolio_review" in text
 
 
-def test_pm_legacy_flag_default_is_true():
+def test_pm_legacy_flag_post_cutover_default_is_false():
+    """Phase 8 cutover complete: PM Opus review is off; Apex Track B is live."""
     from safety_overlay import pm_legacy_opus_review_enabled
-    assert pm_legacy_opus_review_enabled() is True
+    assert pm_legacy_opus_review_enabled() is False
 
 
 def test_trackb_report_row_keys_match_pm_loop_expectation():

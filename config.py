@@ -163,12 +163,12 @@ CONFIG = {
         "LIVE_TRADING_ENABLED": True,
         "NEW_ENTRIES_ENABLED": True,
         "FORCE_MANAGE_ONLY": False,
-        "USE_LEGACY_PIPELINE": True,   # legacy agents.py path remains authoritative until Phase 6
-        "USE_APEX_V3_SHADOW": True,    # Phase 8 Step 1: apex shadow observation ON
-        "PM_LEGACY_OPUS_REVIEW_ENABLED": True,   # authoritative; Phase 6 cutover flips to False
-        "SENTINEL_LEGACY_PIPELINE_ENABLED": True,  # authoritative; Phase 6 cutover flips to False
-        "TRADE_ADVISOR_ENABLED": True,             # legacy trade_advisor.advise_trade; Phase 7 flips to False
-        "FINBERT_MATERIALITY_GATE_ENABLED": False, # news_sentinel: use finbert_confidence instead of claude_confidence when True
+        "USE_LEGACY_PIPELINE": False,   # Phase 8 cutover: Apex owns all execute paths
+        "USE_APEX_V3_SHADOW": True,     # shadow+divergence logging stays ON
+        "PM_LEGACY_OPUS_REVIEW_ENABLED": False,   # Phase 8 cutover: PM Track B through Apex
+        "SENTINEL_LEGACY_PIPELINE_ENABLED": False,  # Phase 8 cutover: Sentinel NI through Apex
+        "TRADE_ADVISOR_ENABLED": False,             # Phase 8 cutover: deterministic sizing only
+        "FINBERT_MATERIALITY_GATE_ENABLED": True,   # Phase 8 cutover: FinBERT materiality gate ON
         "daily_loss_halt_new_entries_pct": 0.03,
         "daily_loss_manage_only_pct": 0.05,
         "per_symbol_hard_loss_pct": None,  # None = disabled; e.g. 0.15 → exit at -15%

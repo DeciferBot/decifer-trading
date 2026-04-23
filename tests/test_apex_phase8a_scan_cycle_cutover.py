@@ -59,9 +59,8 @@ def test_cutover_branch_uses_filter_candidates_and_screen_open_positions():
     assert "flag_positions_for_review as _flag_track_a" in block
 
 
-def test_legacy_pipeline_default_still_true():
-    """Safety net: this test should start failing the moment someone flips
-    USE_LEGACY_PIPELINE's default to False. That is the real cutover trigger
-    and must be a deliberate, reviewed change."""
+def test_legacy_pipeline_post_cutover_default_is_false():
+    """Phase 8 cutover complete: USE_LEGACY_PIPELINE is False by default.
+    Apex owns all execute paths. Legacy code remains for rollback."""
     from safety_overlay import should_use_legacy_pipeline
-    assert should_use_legacy_pipeline() is True
+    assert should_use_legacy_pipeline() is False

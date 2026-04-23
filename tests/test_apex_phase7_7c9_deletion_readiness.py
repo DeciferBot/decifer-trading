@@ -92,7 +92,9 @@ def test_signal_dispatcher_still_routes_advise_trade_under_gate():
     assert "_formula_advice" in text
 
 
-def test_all_phase7_flag_defaults_unchanged():
+def test_all_phase8_cutover_flag_defaults():
+    """Phase 8 cutover complete — all six flags at their post-cutover values.
+    Legacy pipeline off, Apex owns all execute paths."""
     from safety_overlay import (
         finbert_materiality_gate_enabled,
         pm_legacy_opus_review_enabled,
@@ -101,12 +103,12 @@ def test_all_phase7_flag_defaults_unchanged():
         should_use_legacy_pipeline,
         trade_advisor_enabled,
     )
-    assert should_use_legacy_pipeline() is True
-    assert should_run_apex_shadow() is False
-    assert pm_legacy_opus_review_enabled() is True
-    assert sentinel_legacy_pipeline_enabled() is True
-    assert trade_advisor_enabled() is True
-    assert finbert_materiality_gate_enabled() is False
+    assert should_use_legacy_pipeline() is False
+    assert should_run_apex_shadow() is True
+    assert pm_legacy_opus_review_enabled() is False
+    assert sentinel_legacy_pipeline_enabled() is False
+    assert trade_advisor_enabled() is False
+    assert finbert_materiality_gate_enabled() is True
 
 
 def test_apex_divergence_still_forbids_order_layer_imports():
