@@ -80,6 +80,45 @@ CREATE TABLE IF NOT EXISTS signal_scores (
 );
 CREATE INDEX IF NOT EXISTS idx_ss_symbol_ts ON signal_scores(symbol, ts);
 CREATE INDEX IF NOT EXISTS idx_ss_scan_id   ON signal_scores(scan_id);
+
+-- Active positions: DB-primary, positions.json is fallback only.
+-- Full position state is stored as a JSON blob in `data` so no schema migration
+-- is needed when new fields are added to positions.
+CREATE TABLE IF NOT EXISTS positions (
+    key        TEXT PRIMARY KEY,
+    symbol     TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    data       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pos_symbol ON positions(symbol);
+
+-- Closed trade records: replaces trades.json as the write-primary store.
+CREATE TABLE IF NOT EXISTS closed_trades (
+    seq        INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts         TEXT NOT NULL,
+    symbol     TEXT NOT NULL,
+    trade_type TEXT,
+    data       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ct_symbol ON closed_trades(symbol);
+CREATE INDEX IF NOT EXISTS idx_ct_ts     ON closed_trades(ts);
+
+-- Pending option exits queued while market is closed.
+CREATE TABLE IF NOT EXISTS pending_exits (
+    opt_key    TEXT PRIMARY KEY,
+    reason     TEXT NOT NULL,
+    queued_at  TEXT NOT NULL
+);
+
+-- Audit log: all order, IC, voice, and exception events.
+CREATE TABLE IF NOT EXISTS audit_events (
+    seq   INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts    TEXT NOT NULL,
+    event TEXT NOT NULL,
+    data  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ae_event ON audit_events(event);
+CREATE INDEX IF NOT EXISTS idx_ae_ts    ON audit_events(ts);
 """
 
 
@@ -214,6 +253,44 @@ def open_trades() -> dict[str, dict]:
     return {tid: state for tid, state in intents.items() if tid not in closed}
 
 
+def find_order_intent(symbol: str) -> dict:
+    """
+    Return the payload of the most recent ORDER_INTENT for symbol that has no
+    matching POSITION_CLOSED.  Used as Tier 3 in _find_saved() so that metadata
+    written to the DB before a crash can be recovered even when positions.json
+    and metadata_ledger.json are stale or empty.
+
+    Returns {} if nothing is found.
+    """
+    try:
+        c = _get_conn()
+        rows = c.execute(
+            "SELECT trade_id, event, payload FROM trade_events "
+            "WHERE symbol=? ORDER BY seq",
+            (symbol,),
+        ).fetchall()
+    except Exception as e:
+        log.error("trade_log.find_order_intent failed for %s: %s", symbol, e)
+        return {}
+
+    intent: dict | None = None
+    intent_trade_id: str | None = None
+    for trade_id, event, payload_str in rows:
+        if event == "ORDER_INTENT":
+            try:
+                intent = json.loads(payload_str)
+                intent_trade_id = trade_id
+            except Exception:
+                pass
+        elif event == "POSITION_CLOSED" and trade_id == intent_trade_id:
+            intent = None
+            intent_trade_id = None
+
+    if intent and intent.get("trade_type") and intent["trade_type"] != "UNKNOWN":
+        return intent
+    return {}
+
+
 def get_trade(trade_id: str) -> list[dict]:
     """Return all events for a trade in sequence order (for debugging / audit)."""
     try:
@@ -264,3 +341,179 @@ def append_signal(
             c.commit()
         except Exception as e:
             log.error("trade_log.append_signal failed (%s): %s", symbol, e)
+
+
+# ── Positions (DB-primary, positions.json is fallback only) ──────────────────
+
+
+def upsert_position(key: str, symbol: str, position: dict) -> None:
+    """Write or update an active position.  Called on every mutation."""
+    ts = datetime.now(UTC).isoformat()
+    data = json.dumps(position, default=str)
+    with _db_lock:
+        try:
+            c = _get_conn()
+            c.execute(
+                "INSERT INTO positions (key, symbol, updated_at, data) VALUES (?,?,?,?)"
+                " ON CONFLICT(key) DO UPDATE SET symbol=excluded.symbol,"
+                " updated_at=excluded.updated_at, data=excluded.data",
+                (key, symbol, ts, data),
+            )
+            c.commit()
+        except Exception as e:
+            log.error("trade_log.upsert_position failed (%s): %s", key, e)
+
+
+def delete_position(key: str) -> None:
+    """Remove a position from the DB when it is closed or cancelled."""
+    with _db_lock:
+        try:
+            c = _get_conn()
+            c.execute("DELETE FROM positions WHERE key=?", (key,))
+            c.commit()
+        except Exception as e:
+            log.error("trade_log.delete_position failed (%s): %s", key, e)
+
+
+def load_positions() -> dict[str, dict]:
+    """
+    Load all active positions from DB.  Returns a dict keyed by position key.
+    Returns {} on any error so the caller can fall back to positions.json.
+    """
+    try:
+        c = _get_conn()
+        rows = c.execute("SELECT key, data FROM positions").fetchall()
+        result = {}
+        for key, data_str in rows:
+            try:
+                result[key] = json.loads(data_str)
+            except Exception:
+                log.warning("trade_log.load_positions: bad JSON for key=%s — skipping", key)
+        return result
+    except Exception as e:
+        log.error("trade_log.load_positions failed: %s", e)
+        return {}
+
+
+def replace_all_positions(snapshot: dict[str, dict]) -> None:
+    """Atomically replace the entire positions table from a snapshot dict."""
+    ts = datetime.now(UTC).isoformat()
+    with _db_lock:
+        try:
+            c = _get_conn()
+            c.execute("DELETE FROM positions")
+            for key, pos in snapshot.items():
+                symbol = pos.get("symbol", key)
+                data = json.dumps(pos, default=str)
+                c.execute(
+                    "INSERT INTO positions (key, symbol, updated_at, data) VALUES (?,?,?,?)",
+                    (key, symbol, ts, data),
+                )
+            c.commit()
+        except Exception as e:
+            log.error("trade_log.replace_all_positions failed: %s", e)
+
+
+# ── Closed trades ─────────────────────────────────────────────────────────────
+
+
+def append_closed_trade(symbol: str, trade_type: str | None, record: dict) -> None:
+    """Append a closed trade record.  Replaces writes to trades.json."""
+    ts = datetime.now(UTC).isoformat()
+    data = json.dumps(record, default=str)
+    with _db_lock:
+        try:
+            c = _get_conn()
+            c.execute(
+                "INSERT INTO closed_trades (ts, symbol, trade_type, data) VALUES (?,?,?,?)",
+                (ts, symbol, trade_type or "UNKNOWN", data),
+            )
+            c.commit()
+        except Exception as e:
+            log.error("trade_log.append_closed_trade failed (%s): %s", symbol, e)
+
+
+def load_closed_trades(symbol: str | None = None, limit: int = 0) -> list[dict]:
+    """Load closed trades from DB, optionally filtered by symbol."""
+    try:
+        c = _get_conn()
+        if symbol:
+            rows = c.execute(
+                "SELECT data FROM closed_trades WHERE symbol=? ORDER BY seq DESC"
+                + (f" LIMIT {int(limit)}" if limit else ""),
+                (symbol,),
+            ).fetchall()
+        else:
+            rows = c.execute(
+                "SELECT data FROM closed_trades ORDER BY seq DESC"
+                + (f" LIMIT {int(limit)}" if limit else "")
+            ).fetchall()
+        result = []
+        for (data_str,) in rows:
+            try:
+                result.append(json.loads(data_str))
+            except Exception:
+                pass
+        return result
+    except Exception as e:
+        log.error("trade_log.load_closed_trades failed: %s", e)
+        return []
+
+
+# ── Pending option exits ──────────────────────────────────────────────────────
+
+
+def upsert_pending_exit(opt_key: str, reason: str) -> None:
+    """Queue a pending option exit."""
+    ts = datetime.now(UTC).isoformat()
+    with _db_lock:
+        try:
+            c = _get_conn()
+            c.execute(
+                "INSERT INTO pending_exits (opt_key, reason, queued_at) VALUES (?,?,?)"
+                " ON CONFLICT(opt_key) DO UPDATE SET reason=excluded.reason",
+                (opt_key, reason, ts),
+            )
+            c.commit()
+        except Exception as e:
+            log.error("trade_log.upsert_pending_exit failed (%s): %s", opt_key, e)
+
+
+def delete_pending_exit(opt_key: str) -> None:
+    with _db_lock:
+        try:
+            c = _get_conn()
+            c.execute("DELETE FROM pending_exits WHERE opt_key=?", (opt_key,))
+            c.commit()
+        except Exception as e:
+            log.error("trade_log.delete_pending_exit failed (%s): %s", opt_key, e)
+
+
+def load_pending_exits() -> dict[str, str]:
+    """Return {opt_key: reason} for all pending exits."""
+    try:
+        c = _get_conn()
+        rows = c.execute("SELECT opt_key, reason FROM pending_exits").fetchall()
+        return {k: r for k, r in rows}
+    except Exception as e:
+        log.error("trade_log.load_pending_exits failed: %s", e)
+        return {}
+
+
+# ── Audit events ──────────────────────────────────────────────────────────────
+
+
+def append_audit(event: str, **fields) -> None:
+    """Append an audit event.  Replaces writes to audit_log.jsonl."""
+    ts = datetime.now(UTC).isoformat()
+    data = json.dumps({"ts": ts, "event": event, **fields}, default=str)
+    with _db_lock:
+        try:
+            c = _get_conn()
+            c.execute(
+                "INSERT INTO audit_events (ts, event, data) VALUES (?,?,?)",
+                (ts, event, data),
+            )
+            c.commit()
+        except Exception as e:
+            log.error("trade_log.append_audit failed (%s): %s", event, e)

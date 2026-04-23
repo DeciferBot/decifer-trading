@@ -265,6 +265,57 @@ def run_portfolio_review(
     if not open_positions:
         return forced_exits
 
+    # ── Force-exit UNKNOWN / zero-conviction / SL-breached positions ─────────
+    # These must never reach Opus. An UNKNOWN position has no entry thesis — Opus
+    # cannot evaluate drift on a trade it has no data for, and will under-react
+    # (TRIM instead of EXIT). A breached stop is a mechanical trigger, not a
+    # judgment call.
+    _unknown_exits = []
+    _remaining_after_unknown = []
+    for p in open_positions:
+        sym = p.get("symbol", "")
+        tt = p.get("trade_type", "UNKNOWN")
+        conviction = p.get("conviction", 0.0)
+        direction = p.get("direction", "LONG").upper()
+        sl = p.get("sl")
+        current_price = p.get("current") or p.get("current_price")
+        entry_price = p.get("entry", 0)
+
+        is_unknown = (not tt) or tt == "UNKNOWN"
+        is_zero_conviction = conviction == 0.0
+
+        sl_breached = False
+        if sl and current_price:
+            if direction == "LONG" and current_price < sl:
+                sl_breached = True
+            elif direction == "SHORT" and current_price > sl:
+                sl_breached = True
+
+        if is_unknown or is_zero_conviction or sl_breached:
+            reason_parts = []
+            if is_unknown:
+                reason_parts.append(f"trade_type=UNKNOWN (metadata lost — cannot evaluate thesis)")
+            if is_zero_conviction:
+                reason_parts.append(f"conviction=0 (position not opened through signal pipeline)")
+            if sl_breached:
+                reason_parts.append(
+                    f"stop_loss breached (sl={sl}, current={current_price:.2f}, direction={direction})"
+                )
+            reason = "; ".join(reason_parts)
+            log.warning("PM: %s forced EXIT — %s", sym, reason)
+            _unknown_exits.append({
+                "symbol": sym,
+                "action": "EXIT",
+                "reasoning": f"hard_guard: {reason}",
+            })
+        else:
+            _remaining_after_unknown.append(p)
+
+    open_positions = _remaining_after_unknown
+    forced_exits.extend(_unknown_exits)
+    if not open_positions:
+        return forced_exits
+
     regime_name = regime.get("regime", "UNKNOWN")
     vix = regime.get("vix", 0)
 

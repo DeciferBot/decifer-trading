@@ -26,7 +26,8 @@ ORDERS_FILE: str = CONFIG.get("order_log", "/tmp/orders.json")
 POSITIONS_FILE: str = CONFIG.get("positions_file", "data/positions.json")
 
 # ── In-memory position tracker ────────────────────────────────────────────────
-# Source of truth = trade_store (data/positions.json).
+# Source of truth = SQLite DB (positions table).
+# positions.json is kept as a crash-fallback only.
 # IBKR reconciles live price/fill-status on top of this at startup.
 active_trades: dict = {}
 open_trades = active_trades  # backward-compat alias (both names point to same dict)
@@ -95,32 +96,35 @@ def _get_symbol_lock(symbol: str) -> threading.Lock:
 
 def _persist_positions() -> None:
     """
-    Write active_trades snapshot to data/positions.json.
+    Write active_trades snapshot to DB (primary) and positions.json (fallback).
     Called after every structural mutation (entry, exit, SL/TP update, status change).
     Price/pnl ticks are NOT persisted — IBKR re-provides them on reconciliation.
     Errors are logged but never raised so a disk problem never kills a live trade.
 
-    Lock discipline: snapshot is taken under the lock, but the actual I/O (persist)
-    runs OUTSIDE the lock so a slow disk write never blocks the order execution path.
+    Lock discipline: snapshot is taken under the lock, but the actual I/O runs
+    OUTSIDE the lock so a slow write never blocks the order execution path.
     """
     if _reconcile_in_progress:
-        log.debug("_persist_positions: suppressed — reconcile in progress, positions.json will be written at reconcile end")
+        log.debug("_persist_positions: suppressed — reconcile in progress, will be written at reconcile end")
         return
     try:
-        from trade_store import persist
-
         with _trades_lock:
-            snapshot = dict(active_trades)  # O(n) copy, fast — lock scope ends here
-        persist(snapshot)  # I/O outside lock
+            snapshot = {k: v for k, v in active_trades.items() if v.get("status") != "RESERVED"}
+        # DB primary
+        try:
+            from trade_log import replace_all_positions as _tl_rap
+            _tl_rap(snapshot)
+        except Exception as _db_err:
+            log.error("[orders_state][_persist_positions] DB write failed: %s", _db_err)
+        # File fallback
+        from trade_store import persist
+        persist(snapshot)
     except Exception as e:
         log.error(
-            "[orders_state][_persist_positions] trade_store persist failed — "
+            "[orders_state][_persist_positions] persist failed — "
             "positions.json may be stale. Check data/persist_failure.flag. Error: %s",
             e, exc_info=True,
         )
-        # Write a flag file so the failure is visible even after a bot restart.
-        # The flag file is cheap to write and survives process exit — a human or
-        # startup check can detect it and alert before stale positions cause harm.
         try:
             import os as _os
             from datetime import datetime as _dt
@@ -189,6 +193,12 @@ def _safe_set_trade(key: str, value: dict) -> None:
         else:
             active_trades[key] = value
     if value.get("status") != "RESERVED":
+        # Granular DB upsert for this position (faster than replacing all)
+        try:
+            from trade_log import upsert_position as _tl_up
+            _tl_up(key, value.get("symbol", key), value)
+        except Exception as _up_err:
+            log.error("_safe_set_trade: DB upsert failed for %s: %s", key, _up_err)
         _persist_positions()
 
 
@@ -211,6 +221,12 @@ def _safe_del_trade(key: str) -> None:
     """Thread-safe delete from active_trades dict. Always persists."""
     with _trades_lock:
         _pos = active_trades.pop(key, None)
+    # Remove from DB immediately
+    try:
+        from trade_log import delete_position as _tl_dp
+        _tl_dp(key)
+    except Exception as _dp_err:
+        log.error("_safe_del_trade: DB delete failed for %s: %s", key, _dp_err)
     _persist_positions()
     if _pos and _pos.get("trade_id") and _pos.get("status") != "RESERVED":
         try:
@@ -222,8 +238,8 @@ def _safe_del_trade(key: str) -> None:
 
 
 def _save_positions_file() -> None:
-    """Persist active_trades metadata to disk so it survives bot restarts.
-    Atomic write: snapshot under lock, then write outside lock."""
+    """Persist active_trades to DB (primary) and positions.json (fallback).
+    Atomic write: snapshot under lock, then I/O outside lock."""
     import json
     import os
     import tempfile
@@ -231,6 +247,13 @@ def _save_positions_file() -> None:
     try:
         with _trades_lock:
             snapshot = {k: v for k, v in active_trades.items() if v.get("status") != "RESERVED"}
+        # DB primary
+        try:
+            from trade_log import replace_all_positions as _tl_rap
+            _tl_rap(snapshot)
+        except Exception as _db_err:
+            log.error("_save_positions_file: DB write failed: %s", _db_err)
+        # File fallback
         dir_name = os.path.dirname(os.path.abspath(POSITIONS_FILE))
         os.makedirs(dir_name, exist_ok=True)
         with tempfile.NamedTemporaryFile("w", dir=dir_name, delete=False, suffix=".tmp") as f:
@@ -242,19 +265,32 @@ def _save_positions_file() -> None:
 
 
 def _load_positions_file() -> dict:
-    """Load persisted position metadata. Returns empty dict if file missing or corrupt."""
+    """Load persisted position metadata.
+    DB is primary source of truth; positions.json is the fallback."""
     import json
     import os
 
+    # DB primary
+    try:
+        from trade_log import load_positions as _tl_lp
+        db_positions = _tl_lp()
+        if db_positions:
+            log.info("_load_positions_file: loaded %d position(s) from DB (primary)", len(db_positions))
+            return db_positions
+    except Exception as _db_err:
+        log.warning("_load_positions_file: DB read failed, falling back to file: %s", _db_err)
+
+    # File fallback
     try:
         if not os.path.exists(POSITIONS_FILE):
             return {}
         with open(POSITIONS_FILE) as f:
             data = json.load(f)
         if isinstance(data, dict):
+            log.info("_load_positions_file: loaded %d position(s) from file (fallback)", len(data))
             return data
     except Exception as e:
-        log.warning(f"_load_positions_file failed: {e}")
+        log.warning(f"_load_positions_file file fallback failed: {e}")
     return {}
 
 

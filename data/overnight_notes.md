@@ -1,90 +1,103 @@
-OVERNIGHT RESEARCH NOTES — 2026-04-17
-Generated: 2026-04-17 01:05 ET
+OVERNIGHT RESEARCH NOTES — 2026-04-23
+Generated: 2026-04-23 06:17 ET
 
 PRE-MARKET / AFTER-HOURS TONE:
-  SPY   $701.66  +0.25%  (gap-up)
-  QQQ   $640.24  +0.45%  (gap-up)
-  IWM   $269.95  +0.21%  (gap-up)
+  SPY   $707.36  +0.47%  (gap-up)
+  QQQ   $651.46  +1.11%  (gap-up)
+  IWM   $274.60  +0.03%  (flat)
   ---  sector ETFs  ---
-  XLF   $52.03  -0.27%  (gap-down)
-  XLK   $152.02  +1.14%  (gap-up)
-  XLE   $56.58  +1.47%  (gap-up)
-  XLV   $146.61  -0.79%  (gap-down)
-  XLI   $170.33  -0.50%  (gap-down)
-  XLU   $46.35  +0.72%  (gap-up)
-  XLB   $51.75  +0.72%  (gap-up)
-  XLRE  $43.81  +0.92%  (gap-up)
+  XLF   $52.00  -0.57%  (gap-down)
+  XLK   $156.56  +1.21%  (gap-up)
+  XLE   $56.89  +1.83%  (gap-up)
+  XLV   $145.97  +0.03%  (flat)
+  XLI   $171.00  -0.26%  (gap-down)
+  XLU   $45.00  +0.11%  (flat)
+  XLB   $51.68  -0.17%  (gap-down)
+  XLRE  $43.45  -0.75%  (gap-down)
 
 PRE-MARKET MOVERS (>1.5% gap vs yesterday's close):
-  CAR    $  445.15  +12.48%  (gap-up)
-  NFLX   $   97.44  -9.54%  (gap-down)
-  LITE   $  889.00  +7.89%  (gap-up)
-  AMD    $  277.35  +7.45%  (gap-up)
-  INTC   $   68.86  +6.04%  (gap-up)
-  CRDO   $  159.00  -5.55%  (gap-down)
-  ORCL   $  179.20  +5.53%  (gap-up)
-  ASTS   $   91.10  +4.82%  (gap-up)
-  ASML   $ 1412.15  -4.70%  (gap-down)
-  IREN   $   47.14  -3.44%  (gap-down)
-  MSTR   $  148.29  +3.31%  (gap-up)
-  CVNA   $  360.27  -2.91%  (gap-down)
-  SOXL   $   88.37  +2.80%  (gap-up)
-  TSM    $  364.74  -2.76%  (gap-down)
-  NOW    $   96.56  +2.52%  (gap-up)
+  CAR    $  416.01  -41.73%  (gap-down)
+  GEV    $ 1130.00  +13.99%  (gap-up)
+  NOW    $   88.73  -11.40%  (gap-down)
+  SOXL   $  106.59  +8.67%  (gap-up)
+  MU     $  479.53  +6.71%  (gap-up)
+  MSTR   $  174.62  +6.50%  (gap-up)
+  SNDK   $  957.98  +6.03%  (gap-up)
+  AMD    $  299.37  +5.23%  (gap-up)
+  CRWV   $  120.54  +4.67%  (gap-up)
+  IREN   $   47.18  +4.45%  (gap-up)
+  MRVL   $  157.80  +4.29%  (gap-up)
+  AVGO   $  417.02  +3.69%  (gap-up)
+  EWY    $  152.04  +3.58%  (gap-up)
+  TSM    $  381.10  +3.54%  (gap-up)
+  LRCX   $  267.50  +3.53%  (gap-up)
 
 YESTERDAY'S PERFORMANCE:
-  Trades: 4 (2W/2L)  Win rate: 50%  P&L: $-628.93
-  Best:  MSFT LONG +$15.40  (take_profit / UNKNOWN)
-  Worst: ONTO LONG $-481.02  (pm_exit | INTRADAY | regime:UNKNOWN→TRENDING_UP | held:0min | thesis:noise_stop | scalp_signal_lost: realized_loss_accumulating: Same underlying thesis as ONTO stock — weak score of 22, -6.5% on the option with time decay / TRENDING_UP)
+  Trades: 47 (19W/28L)  Win rate: 40%  P&L: $-39,512.41
+  Best:  AMD LONG +$2,340.93  (take_profit / UNKNOWN)
+  Worst: GE LONG $-20,272.92  (sl_hit | SWING | regime:MOMENTUM_BULL→TRENDING_UP | held:1174min | thesis:noise_stop / TRENDING_UP)
   By regime:
-    TRENDING_UP: 3 trades  33% WR  $-644.33
+    TRENDING_UP: 8 trades  50% WR  $-22,886.01
+    MOMENTUM_BULL: 22 trades  36% WR  $-9,931.70
+    DISTRIBUTION: 5 trades  20% WR  $-5,848.15
+    RELIEF_RALLY: 5 trades  20% WR  $-2,417.57
+    UNKNOWN: 7 trades  71% WR  $+1,571.02
+  By dimension (non-zero entry scores):
+    breakout         10 trades  40% WR  $+3,465
+    reversion         5 trades  20% WR  $-5,848
+    squeeze          22 trades  36% WR  $-6,471
+    trend            37 trades  41% WR  $-13,600
+    news              6 trades  50% WR  $-16,618
+    iv_skew          21 trades  33% WR  $-21,323
+    overnight_drift  38 trades  39% WR  $-33,915
+    momentum         39 trades  38% WR  $-34,117
+    flow             39 trades  38% WR  $-34,117
+    mtf              29 trades  38% WR  $-35,600
+    insider_buying   18 trades  33% WR  $-39,330
+  FLAG: High trade count — overtrading risk
 
 ECONOMIC CALENDAR — Next 5 Days:
-  Fri Apr 17: CFTC Crude Oil speculative net positions [MEDIUM]
-  Fri Apr 17: CFTC S&P 500 speculative net positions [MEDIUM]
-  Fri Apr 17: CFTC Nasdaq 100 speculative net positions [MEDIUM]
-  Fri Apr 17: CFTC Gold Speculative net positions [MEDIUM]
-  Fri Apr 17: Fed Waller Speech [MEDIUM]
-  Fri Apr 17: Fed Barkin Speech [MEDIUM]
-  Sat Apr 18: No high-impact events
-  Sun Apr 19: No high-impact events
-  Mon Apr 20: No high-impact events
-  Tue Apr 21: API Crude Oil Stock Change (Apr/17) [MEDIUM]
-  Tue Apr 21: Business Inventories MoM (Feb) [MEDIUM]
-  Tue Apr 21: Pending Home Sales MoM (Mar) [MEDIUM]
-  Tue Apr 21: Pending Home Sales YoY (Mar) [MEDIUM]
-  Tue Apr 21: Retail Sales YoY (Mar) [HIGH]
-  Tue Apr 21: Retail Sales Ex Gas/Autos MoM (Mar) [HIGH]
-  Tue Apr 21: Retail Sales MoM (Mar) [HIGH]
-  Tue Apr 21: Retail Sales Ex Autos MoM (Mar) [HIGH]
-  Wed Apr 22: EIA Crude Oil Stocks Change (Apr/17) [MEDIUM]
-  Wed Apr 22: EIA Gasoline Stocks Change (Apr/17) [MEDIUM]
-  Wed Apr 22: MBA 30-Year Mortgage Rate (Apr/17) [MEDIUM]
+  Thu Apr 23: S&P Global Services PMI (Apr) [MEDIUM]
+  Thu Apr 23: S&P Global Manufacturing PMI (Apr) [MEDIUM]
+  Thu Apr 23: S&P Global Composite PMI (Apr) [MEDIUM]
+  Thu Apr 23: Chicago Fed National Activity Index (Mar) [MEDIUM]
+  Thu Apr 23: Initial Jobless Claims (Apr/18) [MEDIUM]
+  Fri Apr 24: CFTC Nasdaq 100 speculative net positions [MEDIUM]
+  Fri Apr 24: CFTC Gold Speculative net positions [MEDIUM]
+  Fri Apr 24: CFTC S&P 500 speculative net positions [MEDIUM]
+  Fri Apr 24: CFTC Crude Oil speculative net positions [MEDIUM]
+  Sat Apr 25: No high-impact events
+  Sun Apr 26: No high-impact events
+  Mon Apr 27: Dallas Fed Manufacturing Index (Apr) [MEDIUM]
+  Tue Apr 28: API Crude Oil Stock Change (Apr/24) [MEDIUM]
+  Tue Apr 28: CB Consumer Confidence (Apr) [HIGH]
+  Tue Apr 28: S&P/Case-Shiller Home Price YoY (Feb) [MEDIUM]
 
 Earnings calendar: unavailable (no data source connected)
 
-Analyst changes: none in last 24h
+Analyst changes: none in last 24h for tracked universe
 
-MARKET NEWS — Last 16h (FMP, 60 articles):
-  ▲ [NFLX]   5h ago   Netflix Q1: Guidance Is Soft, The Business Isn't
-  ▲ [NVDA]   10h ago  Nvidia: I'm Finally Convinced (Rating Upgrade)
-  ▲ [NFLX]   10h ago  Netflix Beats Estimates but 9% Selloff Signals Investor Doubt on Outlook
-  ▲ [NFLX]   11h ago  Netflix (NFLX) Q1 Earnings and Revenues Surpass Estimates
-  ▲ [TSLA]   11h ago  Put the Tesla Pedal to the Metal With These ETFs
-  ▲ [AMD]    12h ago  Stock Market Today, April 16: Advanced Micro Devices Surges on AI Demand Momentum
-  ▲ [NFLX]   12h ago  Netflix Reports Strong Earnings and Co-Founder Reed Hastings' Departure. But Here's the Re
-  ▼ [ORCL]   12h ago  Silver Elephant Provides Early Warning Disclosure on Disposition of Oracle Commodity Holdi
-  ▼ [NFLX]   12h ago  Netflix Earnings Forecast Misses, Reed Hastings Steps Down
-  ▲ [NFLX]   13h ago  Netflix Beats Q1 Earnings, Shares Slide On Soft Guidance, Co-Founder Exit
-  ▼ [NFLX]   13h ago  Netflix chair Reed Hastings exits as earnings beat, stock drops
-  ▲ [NFLX]   13h ago  Netflix Q1 Revenue And Earnings Beat Street Expectations, But Shares Still Plunge
+MARKET NEWS — Last 16h (FMP, 45 articles):
+  ▼ [AMZN]   5h ago   New Insights from MarginBusiness Reveal Why Amazon Europe Expansion Falls Short for U.S. B
+  ▼ [TSLA]   14h ago  Elon Musk pushed back the launch of the Tesla Roadster. Again.
+  ▼ [META]   14h ago  Meta Adds New Live Chat Feature to Threads for NBA Playoffs, Major Events
+  ▼ [TSLA]   14h ago  Tesla just increased its capex to $25B. Here's where the money is going.
+  ▲ [TSLA]   15h ago  Tesla Q1: Why I'm Constructive On The Narrative But The Stock Is Still A Sell
+  ▲ [AMZN]   15h ago  Amazon (AMZN) Beats Stock Market Upswing: What Investors Need to Know
+  ▲ [TSLA]   16h ago  Elon Musk admits millions of Tesla owners need upgrades for true ‘Full Self-Driving'
+  ▲ [TSLA]   16h ago  Tesla (TSLA) Surpasses Q1 Earnings and Revenue Estimates
+  ─ [TSLA]   4h ago   Tesla to create 1,000 new jobs in Germany, responding to Model Y demand
+  ─ [MSFT]   5h ago   Microsoft Needs Copilot to Get Back in the Air
+  ─ [GOOGL]  5h ago   Jim Cramer sets Google stock price target
+  ─ [SPY]    6h ago   Semiconductor stocks are crushing the S&P 500 in 2026
 
-Net bias: bullish  (9 bullish / 4 bearish / 47 neutral)
+Net bias: neutral  (4 bullish / 4 bearish / 37 neutral)
   AVOID (bearish catalyst):
-    ORCL   — Silver Elephant Provides Early Warning Disclosure on Disposi
-    NFLX   — Netflix Earnings Forecast Misses
-    MU     — Micron: This Party Isn't Ending Anytime Soon
-  FAVOR (bullish catalyst):
-    NVDA   — Nvidia: I'm Finally Convinced (Rating Upgrade)
-    TSLA   — Put the Tesla Pedal to the Metal With These ETFs
-    AMD    — Stock Market Today
+    AMZN   — New Insights from MarginBusiness Reveal Why Amazon Europe Ex
+    TSLA   — Elon Musk pushed back the launch of the Tesla Roadster. Agai
+    META   — Meta Adds New Live Chat Feature to Threads for NBA Playoffs
+
+MACRO (daily):
+  10Y-2Y Spread: 0.51%  (as of 2026-04-22)  prior: 0.52
+  10Y Treasury: 4.30%  (as of 2026-04-21)  prior: 4.26
+  WTI Crude: 91.06$/bbl  (as of 2026-04-20)  prior: 85.91

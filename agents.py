@@ -715,9 +715,11 @@ def agent_trading_analyst(
     vix_1h = regime.get("vix_1h_change", 0)
     spy = regime.get("spy_price", "?")
     qqq = regime.get("qqq_price", "?")
-    spy_above = regime.get("spy_above_200d", regime.get("spy_above_ema", False))
-    qqq_above = regime.get("qqq_above_200d", regime.get("qqq_above_ema", False))
     size_mult = regime.get("position_size_multiplier", 1.0)
+    spy_chg_1d = regime.get("spy_chg_1d", 0.0)
+    qqq_chg_1d = regime.get("qqq_chg_1d", 0.0)
+    iwm_chg_1d = regime.get("iwm_chg_1d", 0.0)
+    tape_context = regime.get("tape_context", f"REGIME: {regime_name}")
 
     sig_lines = []
     # Wide input window — let Opus pick from a meaningful candidate set. Token cost
@@ -880,8 +882,8 @@ def agent_trading_analyst(
             + "\n"
         )
 
-    prompt = f"""REGIME: {regime_name} | VIX={vix:.1f} ({vix_1h:+.1f}%/1h) | size_mult={size_mult:.1f}x
-SPY=${spy} ({"above" if spy_above else "below"} 200d MA) | QQQ=${qqq} ({"above" if qqq_above else "below"} 200d MA)
+    prompt = f"""MARKET: {tape_context} | VIX={vix:.1f} ({vix_1h:+.1f}%/1h) | size_mult={size_mult:.1f}x
+SPY=${spy} ({spy_chg_1d:+.1f}% today) | QQQ=${qqq} ({qqq_chg_1d:+.1f}% today) | IWM {iwm_chg_1d:+.1f}%
 {account_block}{overnight_block}{voice_block}{catalyst_block}{held_block}
 SCORED SIGNALS — fresh candidates first (NOT already held):
 {chr(10).join(sig_lines) or "  None above threshold"}

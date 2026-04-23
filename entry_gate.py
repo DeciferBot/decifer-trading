@@ -71,6 +71,18 @@ def _validate_intraday(direction: str, ctx: TradeContext) -> tuple[bool, str, in
     if ctx.earnings_days_away is not None and ctx.earnings_days_away <= 0:
         return False, "earnings same day — binary event, not a technical trade", 0
 
+    # ── Tape gate: long entries require tape not deeply bearish ───────────────
+    if direction == "long":
+        spy_chg = ctx.regime.get("spy_chg_1d", 0.0) if isinstance(ctx.regime, dict) else 0.0
+        qqq_chg = ctx.regime.get("qqq_chg_1d", 0.0) if isinstance(ctx.regime, dict) else 0.0
+        hard_block = CONFIG.get("tape_bearish_hard_block_pct", -2.0)
+        soft_threshold = CONFIG.get("tape_bearish_score_penalty_pct", -1.2)
+        penalty = CONFIG.get("tape_bearish_score_penalty", 3)
+        if spy_chg < hard_block and qqq_chg < hard_block:
+            return False, f"tape too bearish for longs (SPY {spy_chg:+.1f}%, QQQ {qqq_chg:+.1f}%)", 0
+        if spy_chg < soft_threshold and qqq_chg < soft_threshold:
+            score_penalty += penalty
+
     return True, "INTRADAY approved", score_penalty
 
 
@@ -94,6 +106,14 @@ def _validate_swing(direction: str, ctx: TradeContext) -> tuple[bool, str, int]:
             f"earnings {ctx.earnings_days_away} days away — below {min_days}-day gate",
             0,
         )
+
+    # ── Tape gate: hard block long swings on deeply bearish tape ─────────────
+    if direction == "long":
+        spy_chg = ctx.regime.get("spy_chg_1d", 0.0) if isinstance(ctx.regime, dict) else 0.0
+        qqq_chg = ctx.regime.get("qqq_chg_1d", 0.0) if isinstance(ctx.regime, dict) else 0.0
+        hard_block = CONFIG.get("tape_bearish_hard_block_pct", -2.0)
+        if spy_chg < hard_block and qqq_chg < hard_block:
+            return False, f"tape too bearish for long swing (SPY {spy_chg:+.1f}%, QQQ {qqq_chg:+.1f}%)", 0
 
     return True, "SWING approved", 0
 

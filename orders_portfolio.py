@@ -352,26 +352,53 @@ def reconcile_with_ibkr(ib: IB):
 
     def _find_saved(key: str, sym: str, instrument: str) -> dict:
         """
-        Three-tier metadata recovery:
-          1. positions.json (exact key, then symbol+instrument scan)
-          2. metadata_ledger.json (durable, crash-safe, never bulk-rewritten)
+        Four-tier metadata recovery (DB primary, files as fallback):
+          1. DB positions table (exact key, then symbol+instrument scan)
+          2. positions.json (exact key, then symbol+instrument scan)
+          3. metadata_ledger.json (durable, crash-safe, never bulk-rewritten)
+          4. trade_events DB ORDER_INTENT payload (deepest fallback)
         """
-        # Tier 1: positions.json exact key
+        # Tier 1: DB positions table (primary source of truth)
+        try:
+            from trade_log import load_positions as _tl_lp
+            db_positions = _tl_lp()
+            if key in db_positions:
+                return db_positions[key]
+            for v in db_positions.values():
+                if v.get("symbol") == sym and v.get("instrument") == instrument and v.get("trade_type") and v["trade_type"] != "UNKNOWN":
+                    return v
+        except Exception as _db_err:
+            log.warning("_find_saved %s: DB positions read failed: %s", key, _db_err)
+        # Tier 2: positions.json exact key
         if key in saved_positions:
             return saved_positions[key]
-        # Tier 1b: positions.json symbol+instrument scan
+        # Tier 2b: positions.json symbol+instrument scan
         for v in saved_positions.values():
             if (
                 v.get("symbol") == sym and v.get("instrument") == instrument and v.get("trade_type")
             ):  # must have real decision metadata
                 return v
-        # Tier 2: metadata ledger (survives crashes / positions.json corruption)
+        # Tier 3: metadata ledger (survives crashes / positions.json corruption)
         ledger_hit = _ledger_lookup(key, sym, instrument)
         if ledger_hit:
             log.info(
                 f"Reconcile {key}: metadata recovered from ledger (trade_type={ledger_hit.get('trade_type', '?')})"
             )
             return ledger_hit
+        # Tier 4: trade_events DB — ORDER_INTENT payload written before IBKR submission.
+        # This is the deepest fallback: survives crashes that clear both positions.json
+        # and metadata_ledger.json because the DB write happens first in execute_buy/short.
+        try:
+            from trade_log import find_order_intent as _tl_foi
+            db_hit = _tl_foi(sym)
+            if db_hit:
+                log.info(
+                    f"Reconcile {key}: metadata recovered from trade_events DB "
+                    f"(trade_type={db_hit.get('trade_type', '?')})"
+                )
+                return db_hit
+        except Exception as _foi_err:
+            log.warning("Reconcile %s: Tier 3 DB lookup failed: %s", key, _foi_err)
         return {}
 
     try:

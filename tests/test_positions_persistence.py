@@ -126,21 +126,25 @@ class TestSaveLoadPositionsFile:
         assert "TSLA" not in result
 
     def test_load_missing_file_returns_empty(self, tmp_path):
-        """_load_positions_file() returns {} when POSITIONS_FILE does not exist."""
+        """_load_positions_file() returns {} when neither DB nor file has data."""
         pos_file = str(tmp_path / "does_not_exist.json")
 
-        with patch.object(orders_state, "POSITIONS_FILE", pos_file):
+        with (
+            patch.object(orders_state, "POSITIONS_FILE", pos_file),
+            patch("trade_log.load_positions", return_value={}),
+        ):
             result = orders_state._load_positions_file()
 
         assert result == {}
 
     def test_load_corrupt_json_returns_empty_and_logs(self, tmp_path, caplog):
-        """Corrupt JSON in POSITIONS_FILE returns {} and logs a WARNING."""
+        """Corrupt JSON in POSITIONS_FILE returns {} and logs a WARNING when DB is empty."""
         pos_file = tmp_path / "positions.json"
         pos_file.write_text("{ this is not valid json !!!")
 
         with (
             patch.object(orders_state, "POSITIONS_FILE", str(pos_file)),
+            patch("trade_log.load_positions", return_value={}),
             caplog.at_level(logging.WARNING, logger="decifer.orders"),
         ):
             result = orders_state._load_positions_file()
@@ -149,11 +153,14 @@ class TestSaveLoadPositionsFile:
         assert any("_load_positions_file" in r.message for r in caplog.records)
 
     def test_load_non_dict_json_returns_empty(self, tmp_path):
-        """JSON that is valid but not a dict (e.g. a list) must return {}."""
+        """JSON that is valid but not a dict (e.g. a list) must return {} when DB is empty."""
         pos_file = tmp_path / "positions.json"
         pos_file.write_text(json.dumps([{"symbol": "AAPL"}]))
 
-        with patch.object(orders_state, "POSITIONS_FILE", str(pos_file)):
+        with (
+            patch.object(orders_state, "POSITIONS_FILE", str(pos_file)),
+            patch("trade_log.load_positions", return_value={}),
+        ):
             result = orders_state._load_positions_file()
 
         assert result == {}

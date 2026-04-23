@@ -49,32 +49,57 @@ _pending_option_exits: dict = {}  # opt_key → original reason string
 
 def _load_pending_exits() -> None:
     global _pending_option_exits
+    _log = __import__("logging").getLogger(__name__)
+    # DB primary
+    try:
+        from trade_log import load_pending_exits as _tl_lpe
+        db_exits = _tl_lpe()
+        if db_exits:
+            _pending_option_exits = db_exits
+            _log.info(
+                "orders_options: loaded %d pending exit(s) from DB: %s",
+                len(db_exits), ", ".join(db_exits.keys()),
+            )
+            return
+    except Exception as _db_err:
+        _log.warning("orders_options: DB pending exits load failed, trying file: %s", _db_err)
+    # File fallback
     try:
         if os.path.exists(_PENDING_EXITS_FILE):
             with open(_PENDING_EXITS_FILE) as f:
-                _pending_option_exits = json.load(f)
+                _pending_option_exits = __import__("json").load(f)
             if _pending_option_exits:
-                import logging as _logging
-
-                _logging.getLogger(__name__).info(
-                    f"orders_options: loaded {len(_pending_option_exits)} persisted pending exit(s): "
-                    + ", ".join(_pending_option_exits.keys())
+                _log.info(
+                    "orders_options: loaded %d pending exit(s) from file (fallback): %s",
+                    len(_pending_option_exits), ", ".join(_pending_option_exits.keys()),
                 )
     except Exception:
         _pending_option_exits = {}
 
 
 def _save_pending_exits() -> None:
+    _log = __import__("logging").getLogger(__name__)
+    # DB primary — individual upserts are handled at queue/dequeue time;
+    # this full-sync is the belt-and-suspenders pass.
+    try:
+        from trade_log import load_pending_exits as _tl_lpe, upsert_pending_exit as _tl_upe, delete_pending_exit as _tl_dpe
+        existing_keys = set(_tl_lpe().keys())
+        current_keys = set(_pending_option_exits.keys())
+        for k in current_keys - existing_keys:
+            _tl_upe(k, _pending_option_exits[k])
+        for k in existing_keys - current_keys:
+            _tl_dpe(k)
+    except Exception as _db_err:
+        _log.warning("orders_options: DB pending exits save failed: %s", _db_err)
+    # File fallback
     try:
         os.makedirs(os.path.dirname(_PENDING_EXITS_FILE), exist_ok=True)
         tmp = _PENDING_EXITS_FILE + ".tmp"
         with open(tmp, "w") as f:
-            json.dump(_pending_option_exits, f)
+            __import__("json").dump(_pending_option_exits, f)
         os.replace(tmp, _PENDING_EXITS_FILE)
     except Exception as _e:
-        import logging as _logging
-
-        _logging.getLogger(__name__).warning(f"orders_options: failed to persist pending exits: {_e}")
+        _log.warning(f"orders_options: failed to persist pending exits to file: {_e}")
 
 
 _load_pending_exits()

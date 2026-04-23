@@ -493,9 +493,11 @@ def execute_buy(
                        t1_qty=t1_qty, t2_qty=t2_qty,
                        open_time=_wal_open_time)
             except Exception as _tl_err:
-                log.warning("execute_buy %s: trade_log ORDER_INTENT failed: %s", symbol, _tl_err)
+                log.error("execute_buy %s: ORDER_INTENT DB write failed — trade aborted: %s", symbol, _tl_err)
+                return False
         except Exception as _wal_err:
-            log.warning(f"execute_buy {symbol}: write-ahead metadata commit failed: {_wal_err}")
+            log.error("execute_buy %s: metadata build failed — trade aborted: %s", symbol, _wal_err)
+            return False
 
         # ── Execution Agent — decide HOW to fill this trade ──────────────────
         from execution_agent import get_execution_plan
@@ -1400,9 +1402,11 @@ def execute_short(
                        t1_qty=None, t2_qty=None,
                        open_time=_wal_open_time_s)
             except Exception as _tl_err_s:
-                log.warning("execute_short %s: trade_log ORDER_INTENT failed: %s", symbol, _tl_err_s)
+                log.error("execute_short %s: ORDER_INTENT DB write failed — trade aborted: %s", symbol, _tl_err_s)
+                return False
         except Exception as _wal_err_s:
-            log.warning(f"execute_short {symbol}: write-ahead metadata commit failed: {_wal_err_s}")
+            log.error("execute_short %s: metadata build failed — trade aborted: %s", symbol, _wal_err_s)
+            return False
 
         # ── EXTENDED HOURS: standalone short entry, SL placed post-fill ──────
         _in_extended_hours = is_equities_extended_hours() and not is_options_market_open()
