@@ -37,6 +37,7 @@ _DEFAULTS: dict = {
     "FORCE_MANAGE_ONLY": False,
     "USE_LEGACY_PIPELINE": True,
     "USE_APEX_V3_SHADOW": False,
+    "PM_LEGACY_OPUS_REVIEW_ENABLED": True,     # authoritative; Phase 6 cutover flips to False
     "daily_loss_halt_new_entries_pct": 0.03,   # -3% blocks new entries
     "daily_loss_manage_only_pct": 0.05,        # -5% switches to manage-only (aligns with daily_loss_limit)
     "per_symbol_hard_loss_pct": None,          # e.g. -0.15 → force exit on -15% per-position unreal.; None disables
@@ -205,3 +206,16 @@ def should_use_legacy_pipeline() -> bool:
 def should_run_apex_shadow() -> bool:
     """Shadow mode: run new path in parallel but do NOT submit its orders."""
     return bool(flag("USE_APEX_V3_SHADOW"))
+
+
+def pm_legacy_opus_review_enabled() -> bool:
+    """
+    Gate for the legacy portfolio_manager.run_portfolio_review() Opus call.
+
+    Default True — the legacy PM review path is authoritative until the Phase 6
+    cutover. Flipping to False short-circuits the live call site in
+    bot_trading.py so no Opus review prompt is issued and no _parse_actions()
+    regex parse runs. The Phase 6 cutover replaces the False branch with an
+    Apex Track B dispatch.
+    """
+    return bool(flag("PM_LEGACY_OPUS_REVIEW_ENABLED"))

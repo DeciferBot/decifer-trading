@@ -1625,15 +1625,28 @@ def run_scan():
             )
             _available_cash = max(0.0, pv - _pos_notional)
 
-            pm_actions = run_portfolio_review(
-                open_positions=pm_open_pos,
-                all_scored=pipeline.all_scored,
-                regime=regime,
-                news_sentiment=news_sentiment,
-                portfolio_value=pv,
-                trigger=pm_trigger,
-                available_cash=_available_cash,
-            )
+            # Phase 4 completion: the legacy PM Opus review is gated behind a
+            # safety_overlay flag (default True — authoritative today). The
+            # Phase 6 cutover flips the flag to False and replaces the else
+            # branch with the Apex Track B dispatch.
+            try:
+                import safety_overlay as _so_pm
+                _pm_legacy_on = _so_pm.pm_legacy_opus_review_enabled()
+            except Exception:
+                _pm_legacy_on = True  # fail-safe: preserve legacy live behavior
+            if _pm_legacy_on:
+                pm_actions = run_portfolio_review(
+                    open_positions=pm_open_pos,
+                    all_scored=pipeline.all_scored,
+                    regime=regime,
+                    news_sentiment=news_sentiment,
+                    portfolio_value=pv,
+                    trigger=pm_trigger,
+                    available_cash=_available_cash,
+                )
+            else:
+                clog("INFO", "PM legacy Opus review disabled by safety_overlay flag — skipping")
+                pm_actions = []
             for action in pm_actions:
                 sym_pm = action.get("symbol", "")
                 act_pm = action.get("action", "HOLD")
