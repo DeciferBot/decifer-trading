@@ -1674,6 +1674,9 @@ def run_scan():
                             "portfolio_value": pv,
                             "daily_pnl": pnl,
                             "position_count": len(pm_open_pos),
+                            "position_slots_remaining": max(
+                                0, int(CONFIG.get("max_positions", 0) or 0) - len(pm_open_pos)
+                            ),
                             "open_positions": pm_open_pos,
                         },
                         regime=regime,
@@ -2250,11 +2253,20 @@ def run_scan():
             from guardrails import screen_open_positions as _screen_track_a
             from guardrails import flag_positions_for_review as _flag_track_a
 
-            _cut_candidates = _fc_track_a(
+            _cut_candidates_raw = _fc_track_a(
                 list(pipeline.all_scored or []),
                 {p.get("symbol") for p in open_pos if p.get("symbol")},
                 regime=regime,
             )
+            # Cap at top 30 by score — sending 80+ candidates bloats the Apex
+            # response past the token budget and causes JSON truncation.
+            _cut_candidates = sorted(
+                _cut_candidates_raw, key=lambda c: c.get("score", 0), reverse=True
+            )[:30]
+            if len(_cut_candidates_raw) > 30:
+                clog("INFO",
+                     f"APEX_LIVE: {len(_cut_candidates_raw)} candidates after guardrails "
+                     f"— capped to top 30 by score")
             try:
                 _cut_review = _flag_track_a(open_pos, regime)
             except Exception:
@@ -2303,6 +2315,10 @@ def run_scan():
                 f"{len(_cut_report.get('forced_exits') or [])} forced, "
                 f"{len(_cut_report.get('errors') or [])} errors",
             )
+            try:
+                _aorch_track_a.log_shadow_result("SCAN_CYCLE", _cut_result)
+            except Exception as _log_err:
+                log.warning("APEX_LIVE: shadow log failed — %s", _log_err)
         except Exception as _cut_err:
             log.error("APEX_LIVE SCAN_CYCLE cutover failed — %s", _cut_err)
         dash["scanning"] = False

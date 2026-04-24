@@ -908,6 +908,8 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
     )
 
     parts.append(f"\n[TRACK A — NEW CANDIDATES] ({len(candidates)})")
+    if not candidates:
+        parts.append("  (none this cycle — output new_entries: [])")
     for c in candidates:
         parts.append("  " + _format_candidate_line(c))
 
@@ -973,7 +975,7 @@ def apex_call(
     try:
         system_prompt = _APEX_SYSTEM_PROMPT
         user_prompt = _build_apex_user_prompt(apex_input, sctx)
-        raw, _meta = _call_apex_meta(system_prompt, user_prompt, max_tokens=2048)
+        raw, _meta = _call_apex_meta(system_prompt, user_prompt, max_tokens=4096)
     except Exception as e:
         log.error("apex_call: LLM call failed — %s", e)
         fb = _fallback_decision(apex_input, reason=f"llm_error:{type(e).__name__}")
