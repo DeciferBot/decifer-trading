@@ -190,13 +190,34 @@ def handle_news_trigger(trigger: dict):
                 from sentinel_agents import build_news_trigger_payload
                 from signal_dispatcher import dispatch as _apex_dispatch
 
+                # Pre-score the triggered symbol so Apex has a real candidate
+                # instead of an empty Track A.  score_universe([sym]) is a
+                # targeted single-symbol call — safe on the sentinel thread.
+                _s_scored_candidate = None
+                try:
+                    from signals import score_universe as _su_ni
+                    _regime_str = regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN"
+                    _ni_above, _ = _su_ni(
+                        [sym],
+                        regime=_regime_str,
+                        ib=ib,
+                        regime_dict=regime if isinstance(regime, dict) else None,
+                    )
+                    if _ni_above:
+                        _s_scored_candidate = _ni_above[0]
+                        clog("INFO", f"Sentinel {sym}: pre-scored for NEWS_INTERRUPT — score={_s_scored_candidate.get('score')}")
+                    else:
+                        clog("INFO", f"Sentinel {sym}: pre-score returned no candidate above threshold — passing empty")
+                except Exception as _ni_score_err:
+                    log.warning("Sentinel %s: pre-score failed (%s) — passing scored_candidate=None", sym, _ni_score_err)
+
                 _s_apex_input = build_news_trigger_payload(
                     trigger=trigger,
                     open_positions=open_pos,
                     portfolio_value=pv,
                     daily_pnl=pnl,
                     regime=regime,
-                    scored_candidate=None,  # Phase 7 scores the triggered symbol on demand
+                    scored_candidate=_s_scored_candidate,
                 )
                 _s_shadow = _aorch_s._run_apex_pipeline(
                     _s_apex_input, candidates_by_symbol={}, execute=False

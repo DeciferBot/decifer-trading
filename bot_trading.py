@@ -1667,55 +1667,66 @@ def run_scan():
                     except Exception as _pm_flag_err:
                         log.warning("PM cutover: flag_positions_for_review failed — %s", _pm_flag_err)
 
-                    _pm_apex_input = _aorch_pm.build_scan_cycle_apex_input(
-                        candidates=[],
-                        review_positions=_pm_review_payload,
-                        portfolio_state={
-                            "portfolio_value": pv,
-                            "daily_pnl": pnl,
-                            "position_count": len(pm_open_pos),
-                            "position_slots_remaining": max(
-                                0, int(CONFIG.get("max_positions", 0) or 0) - len(pm_open_pos)
-                            ),
-                            "open_positions": pm_open_pos,
-                        },
-                        regime=regime,
+                    # Pre-check: skip the Apex call when it is deterministically
+                    # a no-op — no available slots for new entries and no
+                    # positions flagged for TRIM/EXIT review. Saves one Sonnet
+                    # round-trip per idle PM interval (~17 min cadence).
+                    _pm_slots_avail = max(
+                        0, int(CONFIG.get("max_positions", 0) or 0) - len(pm_open_pos)
                     )
-                    _pm_shadow = _aorch_pm._run_apex_pipeline(
-                        _pm_apex_input, candidates_by_symbol={}, execute=False
-                    )
-                    _aorch_pm.log_shadow_result("TRACK_B_PM", _pm_shadow)
+                    _pm_no_op = _pm_slots_avail == 0 and not _pm_review_payload
+                    if _pm_no_op:
+                        log.debug(
+                            "TRACK_B_PM: skipping Apex call — slots=0, no flagged positions"
+                        )
+                    if not _pm_no_op:
+                        _pm_apex_input = _aorch_pm.build_scan_cycle_apex_input(
+                            candidates=[],
+                            review_positions=_pm_review_payload,
+                            portfolio_state={
+                                "portfolio_value": pv,
+                                "daily_pnl": pnl,
+                                "position_count": len(pm_open_pos),
+                                "position_slots_remaining": _pm_slots_avail,
+                                "open_positions": pm_open_pos,
+                            },
+                            regime=regime,
+                        )
+                        _pm_shadow = _aorch_pm._run_apex_pipeline(
+                            _pm_apex_input, candidates_by_symbol={}, execute=False
+                        )
+                        _aorch_pm.log_shadow_result("TRACK_B_PM", _pm_shadow)
 
-                    # Cutover execute flag — only flipped True when the legacy
-                    # flag is False AND USE_LEGACY_PIPELINE is also False. This
-                    # guard ensures the cutover branch can be reached
-                    # structurally without dispatching live orders until both
-                    # authoritative flags are flipped.
-                    try:
-                        import safety_overlay as _so_cut
-                        _pm_cutover_execute = (not _so_cut.should_use_legacy_pipeline())
-                    except Exception:
-                        _pm_cutover_execute = False
+                        # Cutover execute flag — only flipped True when the legacy
+                        # flag is False AND USE_LEGACY_PIPELINE is also False. This
+                        # guard ensures the cutover branch can be reached
+                        # structurally without dispatching live orders until both
+                        # authoritative flags are flipped.
+                        try:
+                            import safety_overlay as _so_cut
+                            _pm_cutover_execute = (not _so_cut.should_use_legacy_pipeline())
+                        except Exception:
+                            _pm_cutover_execute = False
 
-                    _pm_decision = _pm_shadow.get("decision") or {}
-                    _pm_report = _apex_dispatch(
-                        _pm_decision,
-                        candidates_by_symbol={},
-                        active_trades={p.get("symbol"): p for p in pm_open_pos if p.get("symbol")},
-                        ib=ib,
-                        portfolio_value=pv,
-                        regime=regime,
-                        execute=_pm_cutover_execute,
-                    )
-                    # Translate report → pm_actions shape expected by the
-                    # existing loop below (symbol/action/trim_pct/reasoning).
-                    for _pa in _pm_report.get("portfolio_actions") or []:
-                        pm_actions.append({
-                            "symbol": _pa.get("symbol"),
-                            "action": _pa.get("action"),
-                            "trim_pct": _pa.get("trim_pct") or 50,
-                            "reasoning": _pa.get("reasoning_tag") or "apex_track_b",
-                        })
+                        _pm_decision = _pm_shadow.get("decision") or {}
+                        _pm_report = _apex_dispatch(
+                            _pm_decision,
+                            candidates_by_symbol={},
+                            active_trades={p.get("symbol"): p for p in pm_open_pos if p.get("symbol")},
+                            ib=ib,
+                            portfolio_value=pv,
+                            regime=regime,
+                            execute=_pm_cutover_execute,
+                        )
+                        # Translate report → pm_actions shape expected by the
+                        # existing loop below (symbol/action/trim_pct/reasoning).
+                        for _pa in _pm_report.get("portfolio_actions") or []:
+                            pm_actions.append({
+                                "symbol": _pa.get("symbol"),
+                                "action": _pa.get("action"),
+                                "trim_pct": _pa.get("trim_pct") or 50,
+                                "reasoning": _pa.get("reasoning_tag") or "apex_track_b",
+                            })
                 except Exception as _pm_cutover_err:
                     log.error("PM cutover branch failed — %s", _pm_cutover_err)
                     pm_actions = []
@@ -2767,6 +2778,12 @@ def run_scan():
                 {p.get("symbol") for p in open_pos if p.get("symbol")},
                 regime=regime,
             )
+            # Cap at 30 — same limit as the live cutover path. Without this cap
+            # the full candidate list overflows the output token budget and
+            # triggers JSON truncation + _fallback_decision() on the shadow path.
+            _shadow_candidates = sorted(
+                _shadow_candidates, key=lambda c: c.get("score", 0), reverse=True
+            )[:30]
             try:
                 _shadow_review = flag_positions_for_review(open_pos, regime)
             except Exception:

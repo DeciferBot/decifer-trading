@@ -823,6 +823,14 @@ TRACK B — OPEN POSITIONS (flagged for review):
   reasoning_tag:  snake_case label
   reasoning:      one sentence
 
+DAR FIELD NOTE (Data Availability Ratio):
+  DAR=pre-mkt means intraday data has not yet opened — it is a data pipeline
+  artifact, NOT a signal quality indicator. A candidate showing DAR=pre-mkt
+  with a strong score (35+) and clean signal dimensions is fully valid and
+  MUST NOT be vetoed solely because DAR is unavailable. Options eligibility
+  still requires high DAR (per instrument rules below), but stock entries
+  must be evaluated on score and signal dimensions alone when DAR=pre-mkt.
+
 NEWS_FINBERT_SENTIMENT FIELD NOTE:
   The news_finbert_sentiment on each candidate is currently ADVISORY ONLY.
   Do not weight it heavily; use raw news_headlines as primary news signal.
@@ -855,9 +863,11 @@ def _format_candidate_line(c: dict) -> str:
     tc = c.get("trade_context") or {}
     flags = ",".join(c.get("divergence_flags") or []) or "-"
     headlines = " | ".join((c.get("news_headlines") or [])[:3]) or "-"
+    dar_val = c.get("dar")
+    dar_str = "pre-mkt" if dar_val is None else dar_val
     return (
         f"{c.get('symbol')}: score={c.get('score')} dir={c.get('direction')} "
-        f"DAR={c.get('dar')} [{dims}] atr5={c.get('atr_5m')} atrD={c.get('atr_daily')} "
+        f"DAR={dar_str} [{dims}] atr5={c.get('atr_5m')} atrD={c.get('atr_daily')} "
         f"volR={c.get('vol_ratio')} tape={c.get('daily_tape_score')} "
         f"rs={c.get('stock_rs_vs_spy')} cat={c.get('catalyst_score')} "
         f"earn_d={tc.get('earnings_days_away')} flags={flags} "
