@@ -3,7 +3,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title><> Decifer 2.0</title>
+<title><> Decifer 3.0</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@700;800;900&display=swap');
 :root{
@@ -393,7 +393,7 @@ canvas{display:block;width:100% !important}
 <div class="hdr">
   <div class="logo">
     <span class="logo-sym">&lt;&gt;</span>
-    <span class="logo-name">Decifer <span style="color:var(--orange);font-size:13px">2.0</span></span>
+    <span class="logo-name">Decifer <span style="color:var(--orange);font-size:13px">3.0</span></span>
     <span class="logo-sub">Autonomous AI Trading</span>
     <span style="font-size:10px;color:var(--orange);font-weight:700;margin-left:6px;opacity:0.85;">by AMIT CHOPRA</span>
   </div>
@@ -4609,7 +4609,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closePositio
 
 <!-- FOOTER -->
 <div style="text-align:center;padding:18px 0 12px;font-size:11px;color:var(--muted2);border-top:1px solid var(--border);margin-top:32px;">
-  <span style="color:var(--orange);font-weight:700;">DECIFER 2.0</span> &nbsp;|&nbsp; Invented &amp; built by <span style="color:#fff;font-weight:700;">AMIT CHOPRA</span>
+  <span style="color:var(--orange);font-weight:700;">DECIFER 3.0</span> &nbsp;|&nbsp; Invented &amp; built by <span style="color:#fff;font-weight:700;">AMIT CHOPRA</span>
 </div>
 
 <!-- VOICE ASSISTANT -->

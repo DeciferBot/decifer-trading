@@ -12,7 +12,7 @@ echo "  ██║  ██║██╔══╝  ██║     ██║██╔
 echo "  ██████╔╝███████╗╚██████╗██║██║     ███████╗██║  ██║"
 echo "  ╚═════╝ ╚══════╝ ╚═════╝╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝"
 echo ""
-echo "  <> Autonomous AI Trading System v2.0"
+echo "  <> Autonomous AI Trading System v3.0"
 echo ""
 
 # Find the project folder
