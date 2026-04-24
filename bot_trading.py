@@ -1676,8 +1676,9 @@ def run_scan():
                     )
                     _pm_no_op = _pm_slots_avail == 0 and not _pm_review_payload
                     if _pm_no_op:
-                        log.debug(
-                            "TRACK_B_PM: skipping Apex call — slots=0, no flagged positions"
+                        log.info(
+                            "TRACK_B_PM: skipped (slots=%d, flagged=%d) — no actionable work",
+                            _pm_slots_avail, len(_pm_review_payload),
                         )
                     if not _pm_no_op:
                         _pm_apex_input = _aorch_pm.build_scan_cycle_apex_input(

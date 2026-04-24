@@ -1017,4 +1017,10 @@ def apex_call(
     # _meta is the underscore-prefixed instrumentation channel — consumers
     # (shadow recorder, divergence log) read it; schema validation ignores it.
     decision["_meta"] = _meta
+    _out_toks = _meta.get("output_tokens", 0)
+    if _out_toks > 3500:
+        log.warning(
+            "apex_call: output_tokens=%d approaching 4096 budget — truncation risk on next cycle",
+            _out_toks,
+        )
     return decision

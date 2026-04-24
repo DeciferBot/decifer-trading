@@ -216,6 +216,18 @@ def _run_apex_pipeline(
 
     would, rejected = _summarise_dispatch(decision, candidates_by_symbol)
 
+    # Observability: when candidates were presented but Apex returned zero entries,
+    # log the count and market_read so Monday diagnosis is immediate.
+    _cand_count = len((apex_input.get("track_a") or {}).get("candidates") or [])
+    _entry_count = len(decision.get("new_entries") or [])
+    if _cand_count > 0 and _entry_count == 0:
+        _ttype = apex_input.get("trigger_type", "?")
+        _mread = (decision.get("market_read") or "")[:200]
+        log.info(
+            "apex: zero entries — trigger=%s candidates=%d market_read=%r",
+            _ttype, _cand_count, _mread,
+        )
+
     result: dict[str, Any] = {
         "decision": decision,
         "would_dispatch": would,
