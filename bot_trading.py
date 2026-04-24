@@ -2101,19 +2101,48 @@ def run_scan():
     )
     _agent_cash = max(0.0, pv - _agent_pos_notional)
 
-    decision = run_all_agents(
-        signals=scored,
-        regime=regime,
-        news=news,
-        fx_data=fx,
-        open_positions=open_pos,
-        portfolio_value=pv,
-        daily_pnl=pnl,
-        options_signals=options_signals,
-        strategy_mode=strategy_mode,
-        positions_to_reconsider=positions_to_reconsider,
-        available_cash=_agent_cash,
-    )
+    # ── Phase 8B — bypass run_all_agents() in Apex 3.0 mode ─────────────────
+    # Apex Track A owns new entries; Track B owns thesis-based TRIM/EXIT.
+    # The only surviving output from run_all_agents() in 3.0 mode is the
+    # deterministic regime-change sell list, which comes entirely from
+    # positions_to_reconsider — no LLM call is needed to produce it.
+    # Build it directly and skip the Sonnet call when USE_LEGACY_PIPELINE=False.
+    try:
+        import safety_overlay as _so_pre_agents
+        _scan_cutover_pre = not _so_pre_agents.should_use_legacy_pipeline()
+    except Exception:
+        _scan_cutover_pre = False
+
+    if _scan_cutover_pre:
+        _open_syms_pre = {p["symbol"] for p in open_pos if p.get("symbol")}
+        _apex_mode_sells = [
+            p["symbol"]
+            for p in positions_to_reconsider
+            if p.get("reason", "").upper() != "HOLD" and p["symbol"] in _open_syms_pre
+        ]
+        decision = {
+            "buys": [],
+            "sells": _apex_mode_sells,
+            "hold": [],
+            "agents_agreed": 0,
+            "_agent_outputs": {},
+            "summary": "Apex 3.0 — legacy agent pipeline bypassed",
+            "cash": False,
+        }
+    else:
+        decision = run_all_agents(
+            signals=scored,
+            regime=regime,
+            news=news,
+            fx_data=fx,
+            open_positions=open_pos,
+            portfolio_value=pv,
+            daily_pnl=pnl,
+            options_signals=options_signals,
+            strategy_mode=strategy_mode,
+            positions_to_reconsider=positions_to_reconsider,
+            available_cash=_agent_cash,
+        )
 
     dash["claude_analysis"] = decision.get("summary", decision.get("claude_reasoning", ""))
     dash["agent_outputs"] = decision.get("_agent_outputs", {})

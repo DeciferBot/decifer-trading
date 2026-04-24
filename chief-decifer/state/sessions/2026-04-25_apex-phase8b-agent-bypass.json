@@ -1,0 +1,59 @@
+{
+  "session_id": "2026-04-25_apex-phase8b-agent-bypass",
+  "date": "2026-04-25",
+  "approved_by": "Amit",
+  "topic": "Phase 8B — bypass run_all_agents() in Apex 3.0 mode (legacy-sell leak fix)",
+  "north_star_pillars": [1, 2],
+
+  "summary": "Diagnosed and fixed a migration leak introduced during the Phase 8 cutover: run_all_agents() was still firing unconditionally every scan cycle even in 3.0 mode, paying for a full Sonnet call (4096 tokens, ~1-3s latency) whose BUY output was discarded and whose SELL output was deterministic regime-change logic that never needed the LLM. Added a pre-check (_scan_cutover_pre) before the run_all_agents() call that, when USE_LEGACY_PIPELINE=False, builds the deterministic sell list directly from positions_to_reconsider and sets a minimal decision dict — skipping the Sonnet call entirely. Legacy mode (USE_LEGACY_PIPELINE=True) is fully preserved in the else branch. Rollback is unchanged: flipping USE_LEGACY_PIPELINE=True restores run_all_agents() with zero code changes.",
+
+  "motivation": "Architecture audit revealed run_all_agents() was an accidental migration bridge, not intentional design. The Phase 8 cutover comment at bot_trading.py:2235 focused only on the buy path. No comment explained why run_all_agents() should persist in Apex mode. The Trading Analyst Sonnet call produces BUY recommendations only — in 3.0 mode those are discarded by Apex Track A. The SELL list comes entirely from check_thesis_validity() which is pure deterministic regime-change logic. Eliminating the redundant Sonnet call removes 1 of 4 Sonnet calls per scan cycle.",
+
+  "changes": {
+    "bot_trading.py": {
+      "description": "Replaced unconditional run_all_agents() call at line 2104 with an if/else gated on _scan_cutover_pre (= not should_use_legacy_pipeline()). Apex branch: builds _apex_mode_sells from positions_to_reconsider directly, sets minimal decision dict with sells populated. Legacy branch: calls run_all_agents() exactly as before. Downstream code (dashboard setup, sell loop, divergence block) is unchanged and handles both decision shapes via dict.get() with defaults.",
+      "lines_changed": "2104-2145 (Phase 8B block)",
+      "rollback": "Set USE_LEGACY_PIPELINE=True — else branch executes, run_all_agents() called as before"
+    },
+    "tests/test_apex_phase8b_agent_bypass.py": {
+      "description": "10 new structural tests: phase8b block exists, cutover_pre flag reads correct function, run_all_agents inside else branch, apex branch builds sells from positions_to_reconsider, HOLD filter present, minimal decision has all required keys, legacy branch preserves run_all_agents with all args, dashboard fields populated after branch, divergence block reads decision.buys, sell loop reads decision.sells.",
+      "result": "10/10 pass"
+    }
+  },
+
+  "sonnet_calls_per_cycle": {
+    "before": {
+      "count": 4,
+      "calls": [
+        "run_all_agents() Trading Analyst — 4096 tokens — BUY output discarded, SELL output deterministic",
+        "Apex Track B apex_call — 4096 tokens — live TRIM/EXIT",
+        "Apex Track A apex_call — 4096 tokens — live new entries",
+        "Apex shadow apex_call — 4096 tokens — log only"
+      ]
+    },
+    "after": {
+      "count": 3,
+      "calls": [
+        "Apex Track B apex_call — 4096 tokens — live TRIM/EXIT",
+        "Apex Track A apex_call — 4096 tokens — live new entries",
+        "Apex shadow apex_call — 4096 tokens — log only"
+      ],
+      "eliminated": "run_all_agents() Trading Analyst — wasted Sonnet call, ~1-3s latency per scan"
+    }
+  },
+
+  "exit_authority_3_0": {
+    "new_entries": "Apex Track A (Sonnet)",
+    "thesis_trim_exit": "Apex Track B (Sonnet)",
+    "regime_change_exits": "deterministic — check_thesis_validity() → positions_to_reconsider → _apex_mode_sells",
+    "forced_exits": "guardrails deterministic — EOD flat, scalp timeout, architecture violations",
+    "dedup_guard": "orders_core.execute_sell():1770 — status=EXITING blocks duplicates"
+  },
+
+  "tests": {
+    "targeted": "10/10 pass (test_apex_phase8b_agent_bypass.py)",
+    "regression": "1466 passed, 1 skipped, 1 pre-existing failure (test_portfolio_optimizer::test_update_builds_valid_correlation_matrix — pre-dates this session, unrelated to scan-cycle control flow)"
+  },
+
+  "what_is_next": "Shadow log (USE_APEX_V3_SHADOW=True) still generates 1 additional Sonnet call per cycle for divergence instrumentation. With legacy fully bypassed, the divergence comparison at line 2781 now produces an empty legacy side. Shadow can be disabled (USE_APEX_V3_SHADOW=False) once Amit is satisfied that Apex 3.0 is stable — reduces to 2 live Sonnet calls per cycle."
+}
