@@ -46,7 +46,10 @@ import portfolio_optimizer as po
 def _make_returns(symbols, n_days=40, seed=42):
     """Build a deterministic returns DataFrame."""
     rng = np.random.default_rng(seed)
-    dates = pd.date_range(end=datetime.today(), periods=n_days, freq="B")
+    _end = pd.Timestamp.today().normalize()
+    if _end.dayofweek >= 5:
+        _end -= pd.offsets.BDay(1)
+    dates = pd.date_range(end=_end, periods=n_days, freq="B")
     data = rng.normal(0.001, 0.02, size=(n_days, len(symbols)))
     return pd.DataFrame(data, index=dates, columns=symbols)
 

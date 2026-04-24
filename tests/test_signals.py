@@ -144,7 +144,10 @@ def mixed_indicators():
 def bullish_ohlcv():
     """120-row clearly bullish price series."""
     np.random.seed(0)
-    dates = pd.date_range(end=pd.Timestamp.today(), periods=120, freq="B")
+    _end = pd.Timestamp.today().normalize()
+    if _end.dayofweek >= 5:
+        _end -= pd.offsets.BDay(1)
+    dates = pd.date_range(end=_end, periods=120, freq="B")
     close = 100.0 + np.linspace(0, 50, 120) + np.random.randn(120) * 0.3
     return pd.DataFrame(
         {
@@ -162,7 +165,10 @@ def bullish_ohlcv():
 def bearish_ohlcv():
     """120-row clearly bearish price series."""
     np.random.seed(1)
-    dates = pd.date_range(end=pd.Timestamp.today(), periods=120, freq="B")
+    _end = pd.Timestamp.today().normalize()
+    if _end.dayofweek >= 5:
+        _end -= pd.offsets.BDay(1)
+    dates = pd.date_range(end=_end, periods=120, freq="B")
     close = 150.0 - np.linspace(0, 50, 120) + np.random.randn(120) * 0.3
     close = np.maximum(close, 1.0)
     return pd.DataFrame(
@@ -372,7 +378,10 @@ class TestComputeIndicatorsEdgeCases:
     def test_all_zero_volume_no_exception(self, config):
         """Zero volume column must not cause divide-by-zero."""
         np.random.seed(5)
-        dates = pd.date_range(end=pd.Timestamp.today(), periods=60, freq="B")
+        _end = pd.Timestamp.today().normalize()
+        if _end.dayofweek >= 5:
+            _end -= pd.offsets.BDay(1)
+        dates = pd.date_range(end=_end, periods=60, freq="B")
         close = 100.0 + np.random.randn(60)
         df = pd.DataFrame(
             {
@@ -393,7 +402,10 @@ class TestComputeIndicatorsEdgeCases:
 
     def test_constant_price_no_exception(self, config):
         """Constant price (zero variance) must not crash indicator calculation."""
-        dates = pd.date_range(end=pd.Timestamp.today(), periods=60, freq="B")
+        _end = pd.Timestamp.today().normalize()
+        if _end.dayofweek >= 5:
+            _end -= pd.offsets.BDay(1)
+        dates = pd.date_range(end=_end, periods=60, freq="B")
         df = pd.DataFrame(
             {
                 "Open": [150.0] * 60,

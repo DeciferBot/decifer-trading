@@ -68,7 +68,10 @@ import signals as _signals_mod
 
 def _ohlcv(n=60) -> pd.DataFrame:
     """Return a minimal OHLCV DataFrame with canonical columns."""
-    idx = pd.date_range(end=pd.Timestamp.today(), periods=n, freq="B")
+    _end = pd.Timestamp.today().normalize()
+    if _end.dayofweek >= 5:
+        _end -= pd.offsets.BDay(1)
+    idx = pd.date_range(end=_end, periods=n, freq="B")
     close = 100.0 + np.cumsum(np.random.randn(n) * 0.5)
     return pd.DataFrame(
         {
