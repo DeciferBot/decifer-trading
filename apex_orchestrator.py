@@ -223,7 +223,7 @@ def _run_apex_pipeline(
     if _cand_count > 0 and _entry_count == 0:
         _ttype = apex_input.get("trigger_type", "?")
         _mread = (decision.get("market_read") or "")[:200]
-        log.info(
+        log.warning(
             "apex: zero entries — trigger=%s candidates=%d market_read=%r",
             _ttype, _cand_count, _mread,
         )

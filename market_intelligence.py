@@ -814,6 +814,11 @@ TRACK A — NEW ENTRIES (per candidate you accept):
                  - options_eligible = true, AND
                  - trade_type in (SWING, POSITION), AND
                  - setup is directionally clean (high DAR, no divergence_flags)
+               IMPORTANT: divergence_flags restrict instrument selection to "stock"
+               only — they do NOT veto the stock trade itself. A stock entry
+               with divergence_flags can and should proceed when score and signal
+               dimensions support it. Never AVOID a stock trade solely because
+               divergence_flags is non-empty.
   rationale:   One sentence. Required even for AVOID.
   counter_argument / key_risk: one short sentence each (null for AVOID)
 
@@ -837,6 +842,19 @@ NEWS_FINBERT_SENTIMENT FIELD NOTE:
 
 SESSION CHARACTER VOCABULARY (pick one):
   MOMENTUM_BULL | RELIEF_RALLY | FEAR_ELEVATED | DISTRIBUTION | TRENDING_BEAR
+  FEAR_ELEVATED is a regime descriptor, NOT an AVOID mandate. It describes
+  elevated hedging/put activity — it does not mean all entries should be
+  skipped. Evaluate each candidate on its own score and dimension evidence.
+
+ENTRY FLOOR RULE:
+  When ≥3 candidates have score ≥35 and no named systemic blocking condition
+  (earnings within 48h, regime=PANIC, an active halt, or a specific named
+  macro event), you MUST produce at least one new_entries item. If you choose
+  to AVOID every candidate despite multiple strong-score setups, your
+  market_read MUST name the specific blocking condition explicitly (e.g.
+  "VIX spike above 30", "FOMC decision in 2h", "TRENDING_BEAR confirmed").
+  Vague caution ("uncertain macro", "elevated fear") is not sufficient — name
+  the specific reason or produce an entry.
 
 OUTPUT: valid JSON matching exactly this schema (no prose outside JSON):
 {
@@ -878,9 +896,11 @@ def _format_candidate_line(c: dict) -> str:
 
 
 def _format_review_line(p: dict) -> str:
+    pnl = p.get("pnl_pct")
+    pnl_str = f"{pnl:+.2%}" if pnl is not None else "n/a"
     return (
         f"{p.get('symbol')}: tt={p.get('trade_type')} dir={p.get('direction')} "
-        f"pnl={p.get('pnl_pct'):+.2%} days={p.get('days_held')} "
+        f"pnl={pnl_str} days={p.get('days_held')} "
         f"flag={p.get('flagged_reason')} "
         f"band {p.get('entry_conviction_band')}→{p.get('current_conviction_band')} "
         f"earn_d={p.get('earnings_days_away')}"
@@ -934,6 +954,10 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
 
 def _fallback_decision(apex_input: dict, reason: str = "") -> dict:
     """Empty, schema-valid ApexDecision. Used when the Apex call or parse fails."""
+    log.error(
+        "apex_call: FALLBACK DECISION — %s (all new_entries suppressed, positions held)",
+        reason or "unknown",
+    )
     review = apex_input.get("track_b") or []
     return {
         "scan_ts": apex_input.get("scan_ts", ""),
