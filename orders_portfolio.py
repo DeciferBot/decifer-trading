@@ -363,7 +363,10 @@ def reconcile_with_ibkr(ib: IB):
             from trade_log import load_positions as _tl_lp
             db_positions = _tl_lp()
             if key in db_positions:
-                return db_positions[key]
+                hit = db_positions[key]
+                if hit.get("trade_type") and hit["trade_type"] != "UNKNOWN":
+                    return hit
+                # exact key found but UNKNOWN — fall through to scan and deeper tiers
             for v in db_positions.values():
                 if v.get("symbol") == sym and v.get("instrument") == instrument and v.get("trade_type") and v["trade_type"] != "UNKNOWN":
                     return v
@@ -371,12 +374,16 @@ def reconcile_with_ibkr(ib: IB):
             log.warning("_find_saved %s: DB positions read failed: %s", key, _db_err)
         # Tier 2: positions.json exact key
         if key in saved_positions:
-            return saved_positions[key]
+            hit = saved_positions[key]
+            if hit.get("trade_type") and hit["trade_type"] != "UNKNOWN":
+                return hit
+            # exact key found but UNKNOWN — fall through to scan and deeper tiers
         # Tier 2b: positions.json symbol+instrument scan
         for v in saved_positions.values():
             if (
-                v.get("symbol") == sym and v.get("instrument") == instrument and v.get("trade_type")
-            ):  # must have real decision metadata
+                v.get("symbol") == sym and v.get("instrument") == instrument
+                and v.get("trade_type") and v["trade_type"] != "UNKNOWN"
+            ):
                 return v
         # Tier 3: metadata ledger (survives crashes / positions.json corruption)
         ledger_hit = _ledger_lookup(key, sym, instrument)
