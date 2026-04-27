@@ -153,3 +153,24 @@ def test_apex_orchestrator_zero_entries_logs_at_warning(caplog):
     assert any("zero entries" in m for m in warning_msgs), (
         f"Expected WARNING-level 'zero entries' log, got: {warning_msgs}"
     )
+
+
+# ── 6: System prompt output schema does not contradict ENTRY FLOOR RULE ───────
+
+def test_system_prompt_no_blanket_both_arrays_may_be_empty():
+    from market_intelligence import _APEX_SYSTEM_PROMPT
+    # "Both arrays may be empty" directly contradicts the ENTRY FLOOR RULE.
+    # It was causing the model to produce new_entries=[] even when the floor
+    # should have forced at least one entry.
+    assert "Both arrays may be empty" not in _APEX_SYSTEM_PROMPT, (
+        "Output schema must not contain 'Both arrays may be empty' — it contradicts "
+        "the ENTRY FLOOR RULE and causes the model to default to new_entries=[]"
+    )
+
+
+def test_system_prompt_output_schema_floor_consistent():
+    from market_intelligence import _APEX_SYSTEM_PROMPT
+    # The output schema section must explicitly require new_entries when the floor applies.
+    assert "portfolio_actions may be empty" in _APEX_SYSTEM_PROMPT, (
+        "Output schema must state portfolio_actions may be empty (the permitted empty array)"
+    )
