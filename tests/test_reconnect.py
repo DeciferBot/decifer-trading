@@ -153,7 +153,7 @@ for _mod_name in [
     _stub.build_sentinel_universe = MagicMock(return_value=[])
     _stub.load_custom_themes = MagicMock(return_value={})
     _stub.get_all_themes = MagicMock(return_value={})
-    _stub.run_sentinel_pipeline = MagicMock()
+    _stub.build_news_trigger_payload = MagicMock(return_value={})
     sys.modules.setdefault(_mod_name, _stub)
 
 # ── Now import bot + submodules ───────────────────────────────────────────────

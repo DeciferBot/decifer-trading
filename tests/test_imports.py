@@ -49,7 +49,6 @@ HOT_PATH_MODULES = [
     "ic_calculator",
     # Supporting modules
     "scanner",
-    "agents",
     "risk",
     "learning",
     "config",

@@ -319,7 +319,7 @@ theme_stub.get_all_themes = lambda: {}
 
 # sentinel_agents
 sentinel_agents_stub = sys.modules["sentinel_agents"]
-sentinel_agents_stub.run_sentinel_pipeline = lambda *a, **kw: {}
+sentinel_agents_stub.build_news_trigger_payload = lambda *a, **kw: {}
 
 # ── Now import bot ────────────────────────────────────────────────────────────
 import pytest
