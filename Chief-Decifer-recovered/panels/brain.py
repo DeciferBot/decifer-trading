@@ -453,7 +453,7 @@ def _render_last_trade_card():
             html.Span(f"Trade taken {age}" if age else "",
                       style={"fontSize": "0.6rem", "color": "var(--cd-faint)"}),
             html.Span(
-                f"  \u00b7  {agents}/4 agents agreed" if agents else "  \u00b7  Apex Synthesizer",
+                "  \u00b7  Apex Synthesizer",
                 style={"fontSize": "0.6rem", "color": "var(--cd-faint)"},
             ),
         ], style={"marginTop": "14px"}),

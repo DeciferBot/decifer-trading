@@ -2158,27 +2158,8 @@ def run_scan():
 
     dash["claude_analysis"] = decision.get("summary", decision.get("claude_reasoning", ""))
     dash["agent_outputs"] = decision.get("_agent_outputs", {})
-    dash["last_agents_agreed"] = decision.get("agents_agreed", 0)
 
     now_str = datetime.now(_ET).strftime("%H:%M:%S")
-    agent_convo = []
-    agent_names = [
-        ("technical", "Technical Analyst", "Analyses price action, volume, and all indicator dimensions"),
-        ("trading_analyst", "Trading Analyst", "Macro context, opportunity synthesis, devil's advocate (Opus)"),
-        ("risk", "Risk Manager", "Sizes positions and flags portfolio-level risk"),
-    ]
-    outputs = decision.get("_agent_outputs", {})
-    _skip_reason = decision.get("summary", "")
-    for key, name, role_desc in agent_names:
-        raw = outputs.get(key, "") or (_skip_reason and f"Agent skipped — {_skip_reason}")
-        agent_convo.append(
-            {
-                "agent": name,
-                "role": role_desc,
-                "time": now_str,
-                "output": (raw or "No output this cycle.")[:800],
-            }
-        )
     _buys = decision.get("buys", [])
     _sells = decision.get("sells", [])
     _holds = decision.get("hold", [])
@@ -2194,19 +2175,16 @@ def run_scan():
     for _h in _holds:
         _sym = _h if isinstance(_h, str) else _h.get("symbol", str(_h))
         _action_lines.append(f"HOLD {_sym}")
-    _final_output = "\n".join(_action_lines) if _action_lines else "No trades this cycle."
-    agent_convo.append(
+    _decision_output = "\n".join(_action_lines) if _action_lines else "No trades this cycle."
+    dash["agent_conversation"] = [
         {
-            "agent": "Trade Synthesiser",
-            "role": "Counts agent votes and compiles executable trade instructions (deterministic)",
+            "agent": "Apex Synthesizer",
+            "role": "Single claude-sonnet-4-6 call — candidates, regime, portfolio, session context → ApexDecision",
             "time": now_str,
-            "output": _final_output,
+            "output": _decision_output,
         }
-    )
-    dash["agent_conversation"] = agent_convo
-
-    _max_votes = len(agent_names) + 1  # 3 agents + final decision
-    clog("ANALYSIS", f"Agents agreed: {decision.get('agents_agreed', 0)}/{_max_votes} | {decision.get('summary', '')}")
+    ]
+    clog("ANALYSIS", f"Apex Synthesizer: {decision.get('summary', '')}")
 
     if dash.get("killed"):
         clog("RISK", "🚨 Kill switch active — skipping all trade execution")

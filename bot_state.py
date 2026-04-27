@@ -63,7 +63,6 @@ dash = {
     "claude_analysis": "Waiting for first scan...",
     "agent_outputs": {},
     "agent_conversation": [],
-    "last_agents_agreed": None,
     "agents_required": CONFIG["agents_required_to_agree"],
     "performance": {},
     "equity_history": [],

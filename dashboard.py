@@ -472,9 +472,9 @@ canvas{display:block;width:100% !important}
       <button class="pause-btn" style="border-color:#00C853;color:#00C853;background:rgba(0,200,83,.08)" onclick="restartBot()">🔄 RESTART BOT</button>
       <button class="pause-btn" style="border-color:#FF6B00;color:#FF6B00;background:rgba(255,107,0,.08)" onclick="forceScan()">⚡ FORCE SCAN</button>
         <div style="padding:8px 10px;border-top:1px solid var(--border);margin-top:4px">
-          <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Agent Agreement</div>
-          <div style="font-size:11px;color:var(--muted2)">Required: <span style="color:var(--orange);font-weight:700" id="agents-req">3/4</span></div>
-          <div style="font-size:11px;color:var(--muted2);margin-top:3px">Last scan: <span style="color:var(--text)" id="last-agree">—</span></div>
+          <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Apex Synthesizer</div>
+          <div style="font-size:11px;color:var(--muted2)">Min score: <span style="color:var(--orange);font-weight:700" id="agents-req">—</span></div>
+          <div style="font-size:11px;color:var(--muted2);margin-top:3px">Engine: <span style="color:var(--green);font-weight:700" id="last-agree">Apex</span></div>
         </div>
         <div style="padding:8px 10px;border-top:1px solid var(--border)">
           <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">Daily Risk Budget</div>
@@ -2747,7 +2747,7 @@ function renderDecisionBar(convo, lastScan, executed, skipReasons) {
   const labelEl   = document.getElementById('decision-bar-label');
   if (!actionsEl) return;
 
-  const finalEntry = convo.find(m => m.agent === 'Trade Synthesiser') || convo[convo.length - 1];
+  const finalEntry = convo.find(m => m.agent === 'Apex Synthesizer') || convo[convo.length - 1];
   if (!finalEntry) return;
 
   const lines = (finalEntry.output || '').split('\n').map(l => l.trim()).filter(Boolean);
@@ -3247,18 +3247,14 @@ async function poll() {
     // Session
     document.getElementById('session-name').textContent = d.session || '—';
 
-    // Agents required — store globals for Last Decision card and color-code the vote
+    // Min score threshold display
     const _req = d.agents_required ?? null;
-    const _agreed = d.last_agents_agreed;
     window._agentsRequired   = _req;
-    window._lastAgentsAgreed = _agreed;
     window._lastScanTime     = d.last_scan || '';
-    const _total = 4;  // Fixed: 3 analysis agents + 1 Trade Synthesiser
-    document.getElementById('agents-req').textContent = _req != null ? _req + (_total ? '/' + _total : '') : '—';
+    document.getElementById('agents-req').textContent = _req != null ? _req : '—';
     const agreeEl = document.getElementById('last-agree');
-    agreeEl.textContent = _agreed != null ? _agreed + (_total ? '/' + _total : '') : '—';
-    if (_agreed != null && _req != null) agreeEl.style.color = _agreed >= _req ? 'var(--green)' : 'var(--red)';
-    else agreeEl.style.color = '';
+    agreeEl.textContent = 'Apex';
+    agreeEl.style.color = 'var(--green)';
 
     // Risk budget — limit from settings, not hardcoded
     if (d.portfolio_value) {
@@ -4243,8 +4239,7 @@ function renderTradeCard(ld) {
   const edge    = esc(ld.edge_why_now || '');
   const risk    = esc(ld.risk || '');
   const exp     = ld.expected_returns || {};
-  const _tot    = 4;  // Fixed: 3 analysis agents + 1 Trade Synthesiser
-  const agents  = ld.agents_agreed != null ? ld.agents_agreed + (_tot ? '/' + _tot : '') + ' agents agreed' : '';
+  const agents  = 'Apex Synthesizer';
   const ts      = ld.timestamp ? esc(ld.timestamp.replace('T', ' ').slice(0, 16)) : '';
 
   // Age label
@@ -4302,7 +4297,7 @@ function renderAgentConvoFull(convo, lastScan) {
   const ACTION_BG    = { BUY: 'rgba(0,200,83,.12)', SELL: 'rgba(255,82,82,.12)', HOLD: 'rgba(255,107,0,.12)' };
 
   el.innerHTML = convo.map((msg, i) => {
-    const isFinal = msg.agent === 'Trade Synthesiser';
+    const isFinal = msg.agent === 'Apex Synthesizer';
     const borderColor = isFinal ? 'var(--green)' : `hsl(${25 + i * 40}, 85%, 55%)`;
 
     let outputHtml;
