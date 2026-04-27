@@ -20,7 +20,6 @@ from datetime import UTC, datetime
 _ET = zoneinfo.ZoneInfo("America/New_York")
 
 import bot_state
-from agents import run_all_agents
 from bot_account import get_account_data, get_fx_snapshot, get_news_headlines, save_equity_history
 from bot_ibkr import connect_ibkr, sync_orders_from_ibkr
 from bot_state import clog, dash
@@ -53,7 +52,7 @@ from orders_portfolio import (
     update_position_prices,
     update_positions_from_ibkr,
 )
-from portfolio_manager import lightweight_cycle_check, run_portfolio_review
+from portfolio_manager import lightweight_cycle_check
 from risk import (
     calculate_position_size,
     check_risk_conditions,
@@ -699,8 +698,22 @@ def _eod_options_review(regime: dict):
     held overnight or closed before the bell.  No hard-coded rules — pure AI
     judgment based on each position's greeks, P&L, and the current regime.
     """
-    from agents import _call_claude
+    import anthropic as _anthropic
     from orders_portfolio import close_position, get_open_positions
+
+    def _call_claude(system_prompt: str, user_message: str) -> str:
+        try:
+            _cl = _anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
+            resp = _cl.messages.create(
+                model=CONFIG["claude_model"],
+                max_tokens=CONFIG["claude_max_tokens"],
+                system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
+                messages=[{"role": "user", "content": user_message}],
+            )
+            return resp.content[0].text.strip()
+        except Exception as _e:
+            log.error(f"Claude API error in EOD options review: {_e}")
+            return ""
 
     ib = bot_state.ib
     positions = get_open_positions()
@@ -1625,112 +1638,73 @@ def run_scan():
             )
             _available_cash = max(0.0, pv - _pos_notional)
 
-            # Phase 4 completion: the legacy PM Opus review is gated behind a
-            # safety_overlay flag (default True — authoritative today). The
-            # Phase 6 cutover flips the flag to False and replaces the else
-            # branch with the Apex Track B dispatch.
+            pm_actions = []
             try:
-                import safety_overlay as _so_pm
-                _pm_legacy_on = _so_pm.pm_legacy_opus_review_enabled()
-            except Exception:
-                _pm_legacy_on = True  # fail-safe: preserve legacy live behavior
-            if _pm_legacy_on:
-                pm_actions = run_portfolio_review(
-                    open_positions=pm_open_pos,
-                    all_scored=pipeline.all_scored,
-                    regime=regime,
-                    news_sentiment=news_sentiment,
-                    portfolio_value=pv,
-                    trigger=pm_trigger,
-                    available_cash=_available_cash,
-                )
-            else:
-                # Phase 6D cutover branch (OFF BY DEFAULT — legacy flag above
-                # is True). When the Phase 7 cutover flips PM_LEGACY_OPUS_
-                # REVIEW_ENABLED to False, this branch becomes live: build an
-                # Apex Track B ApexInput, call market_intelligence.apex_call,
-                # run the semantic filter, translate ApexDecision.portfolio_
-                # actions into TRIM/EXIT orders via signal_dispatcher.dispatch.
-                # Until cutover, dispatch runs with execute=False (dry-run)
-                # and pm_actions is derived from the dry-run report so the
-                # existing downstream TRIM/EXIT loop still iterates safely.
-                clog("INFO", "PM legacy Opus review disabled — invoking Apex Track B cutover branch")
-                pm_actions = []
+                import apex_orchestrator as _aorch_pm
+                from signal_dispatcher import dispatch as _apex_dispatch
+
+                _pm_review_payload = []
                 try:
-                    import apex_orchestrator as _aorch_pm
-                    from signal_dispatcher import dispatch as _apex_dispatch
+                    from guardrails import flag_positions_for_review as _flag_pm
+                    _pm_review_payload = _flag_pm(pm_open_pos, regime)
+                except Exception as _pm_flag_err:
+                    log.warning("PM cutover: flag_positions_for_review failed — %s", _pm_flag_err)
 
-                    _pm_review_payload = []
-                    try:
-                        from guardrails import flag_positions_for_review as _flag_pm
-                        _pm_review_payload = _flag_pm(pm_open_pos, regime)
-                    except Exception as _pm_flag_err:
-                        log.warning("PM cutover: flag_positions_for_review failed — %s", _pm_flag_err)
-
-                    # Pre-check: skip the Apex call when it is deterministically
-                    # a no-op — no available slots for new entries and no
-                    # positions flagged for TRIM/EXIT review. Saves one Sonnet
-                    # round-trip per idle PM interval (~17 min cadence).
-                    _pm_slots_avail = max(
-                        0, int(CONFIG.get("max_positions", 0) or 0) - len(pm_open_pos)
+                # Pre-check: skip the Apex call when it is deterministically
+                # a no-op — no available slots for new entries and no
+                # positions flagged for TRIM/EXIT review. Saves one Sonnet
+                # round-trip per idle PM interval (~17 min cadence).
+                _pm_slots_avail = max(
+                    0, int(CONFIG.get("max_positions", 0) or 0) - len(pm_open_pos)
+                )
+                _pm_no_op = _pm_slots_avail == 0 and not _pm_review_payload
+                if _pm_no_op:
+                    log.info(
+                        "TRACK_B_PM: skipped (slots=%d, flagged=%d) — no actionable work",
+                        _pm_slots_avail, len(_pm_review_payload),
                     )
-                    _pm_no_op = _pm_slots_avail == 0 and not _pm_review_payload
-                    if _pm_no_op:
-                        log.info(
-                            "TRACK_B_PM: skipped (slots=%d, flagged=%d) — no actionable work",
-                            _pm_slots_avail, len(_pm_review_payload),
-                        )
-                    if not _pm_no_op:
-                        _pm_apex_input = _aorch_pm.build_scan_cycle_apex_input(
-                            candidates=[],
-                            review_positions=_pm_review_payload,
-                            portfolio_state={
-                                "portfolio_value": pv,
-                                "daily_pnl": pnl,
-                                "position_count": len(pm_open_pos),
-                                "position_slots_remaining": _pm_slots_avail,
-                                "open_positions": pm_open_pos,
-                            },
-                            regime=regime,
-                        )
-                        _pm_shadow = _aorch_pm._run_apex_pipeline(
-                            _pm_apex_input, candidates_by_symbol={}, execute=False
-                        )
-                        _aorch_pm.log_shadow_result("TRACK_B_PM", _pm_shadow)
+                if not _pm_no_op:
+                    _pm_apex_input = _aorch_pm.build_scan_cycle_apex_input(
+                        candidates=[],
+                        review_positions=_pm_review_payload,
+                        portfolio_state={
+                            "portfolio_value": pv,
+                            "daily_pnl": pnl,
+                            "position_count": len(pm_open_pos),
+                            "position_slots_remaining": _pm_slots_avail,
+                            "open_positions": pm_open_pos,
+                        },
+                        regime=regime,
+                    )
+                    _pm_shadow = _aorch_pm._run_apex_pipeline(
+                        _pm_apex_input, candidates_by_symbol={}, execute=False
+                    )
+                    _aorch_pm.log_shadow_result("TRACK_B_PM", _pm_shadow)
 
-                        # Cutover execute flag — only flipped True when the legacy
-                        # flag is False AND USE_LEGACY_PIPELINE is also False. This
-                        # guard ensures the cutover branch can be reached
-                        # structurally without dispatching live orders until both
-                        # authoritative flags are flipped.
-                        try:
-                            import safety_overlay as _so_cut
-                            _pm_cutover_execute = (not _so_cut.should_use_legacy_pipeline())
-                        except Exception:
-                            _pm_cutover_execute = False
+                    _pm_cutover_execute = True
 
-                        _pm_decision = _pm_shadow.get("decision") or {}
-                        _pm_report = _apex_dispatch(
-                            _pm_decision,
-                            candidates_by_symbol={},
-                            active_trades={p.get("symbol"): p for p in pm_open_pos if p.get("symbol")},
-                            ib=ib,
-                            portfolio_value=pv,
-                            regime=regime,
-                            execute=_pm_cutover_execute,
-                        )
-                        # Translate report → pm_actions shape expected by the
-                        # existing loop below (symbol/action/trim_pct/reasoning).
-                        for _pa in _pm_report.get("portfolio_actions") or []:
-                            pm_actions.append({
-                                "symbol": _pa.get("symbol"),
-                                "action": _pa.get("action"),
-                                "trim_pct": _pa.get("trim_pct") or 50,
-                                "reasoning": _pa.get("reasoning_tag") or "apex_track_b",
-                            })
-                except Exception as _pm_cutover_err:
-                    log.error("PM cutover branch failed — %s", _pm_cutover_err)
-                    pm_actions = []
+                    _pm_decision = _pm_shadow.get("decision") or {}
+                    _pm_report = _apex_dispatch(
+                        _pm_decision,
+                        candidates_by_symbol={},
+                        active_trades={p.get("symbol"): p for p in pm_open_pos if p.get("symbol")},
+                        ib=ib,
+                        portfolio_value=pv,
+                        regime=regime,
+                        execute=_pm_cutover_execute,
+                    )
+                    # Translate report → pm_actions shape expected by the
+                    # existing loop below (symbol/action/trim_pct/reasoning).
+                    for _pa in _pm_report.get("portfolio_actions") or []:
+                        pm_actions.append({
+                            "symbol": _pa.get("symbol"),
+                            "action": _pa.get("action"),
+                            "trim_pct": _pa.get("trim_pct") or 50,
+                            "reasoning": _pa.get("reasoning_tag") or "apex_track_b",
+                        })
+            except Exception as _pm_cutover_err:
+                log.error("PM cutover branch failed — %s", _pm_cutover_err)
+                pm_actions = []
             for action in pm_actions:
                 sym_pm = action.get("symbol", "")
                 act_pm = action.get("action", "HOLD")
@@ -2113,48 +2087,20 @@ def run_scan():
     )
     _agent_cash = max(0.0, pv - _agent_pos_notional)
 
-    # ── Phase 8B — bypass run_all_agents() in Apex 3.0 mode ─────────────────
-    # Apex Track A owns new entries; Track B owns thesis-based TRIM/EXIT.
-    # The only surviving output from run_all_agents() in 3.0 mode is the
-    # deterministic regime-change sell list, which comes entirely from
-    # positions_to_reconsider — no LLM call is needed to produce it.
-    # Build it directly and skip the Sonnet call when USE_LEGACY_PIPELINE=False.
-    try:
-        import safety_overlay as _so_pre_agents
-        _scan_cutover_pre = not _so_pre_agents.should_use_legacy_pipeline()
-    except Exception:
-        _scan_cutover_pre = False
-
-    if _scan_cutover_pre:
-        _open_syms_pre = {p["symbol"] for p in open_pos if p.get("symbol")}
-        _apex_mode_sells = [
-            p["symbol"]
-            for p in positions_to_reconsider
-            if p.get("reason", "").upper() != "HOLD" and p["symbol"] in _open_syms_pre
-        ]
-        decision = {
-            "buys": [],
-            "sells": _apex_mode_sells,
-            "hold": [],
-            "agents_agreed": 0,
-            "_agent_outputs": {},
-            "summary": "Apex 3.0 — legacy agent pipeline bypassed",
-            "cash": False,
-        }
-    else:
-        decision = run_all_agents(
-            signals=scored,
-            regime=regime,
-            news=news,
-            fx_data=fx,
-            open_positions=open_pos,
-            portfolio_value=pv,
-            daily_pnl=pnl,
-            options_signals=options_signals,
-            strategy_mode=strategy_mode,
-            positions_to_reconsider=positions_to_reconsider,
-            available_cash=_agent_cash,
-        )
+    _open_syms_pre = {p["symbol"] for p in open_pos if p.get("symbol")}
+    _apex_mode_sells = [
+        p["symbol"]
+        for p in positions_to_reconsider
+        if p.get("reason", "").upper() != "HOLD" and p["symbol"] in _open_syms_pre
+    ]
+    decision = {
+        "buys": [],
+        "sells": _apex_mode_sells,
+        "hold": [],
+        "_agent_outputs": {},
+        "summary": "Apex 3.0 — regime-change sells only; Track A owns new entries",
+        "cash": False,
+    }
 
     dash["claude_analysis"] = decision.get("summary", decision.get("claude_reasoning", ""))
     dash["agent_outputs"] = decision.get("_agent_outputs", {})
@@ -2254,605 +2200,80 @@ def run_scan():
         dash["scanning"] = False
         return
 
-    # ── Phase 8A.2 — Scan-cycle Track A cutover branch ─────────────────────
-    # When USE_LEGACY_PIPELINE is False, bypass the legacy buy loop below and
-    # route Track A through apex_orchestrator._run_apex_pipeline(execute=True).
-    # PM Track B and Sentinel NI cutover branches already exist; this is the
-    # last missing cutover. Legacy code is preserved (not deleted) — flipping
-    # the flag back to True restores the legacy path with zero code changes.
     try:
-        import safety_overlay as _so_track_a_cut
-        _scan_cutover = not _so_track_a_cut.should_use_legacy_pipeline()
-    except Exception:
-        _scan_cutover = False
-    if _scan_cutover:
-        try:
-            import apex_orchestrator as _aorch_track_a
-            from guardrails import filter_candidates as _fc_track_a
-            from guardrails import screen_open_positions as _screen_track_a
-            from guardrails import flag_positions_for_review as _flag_track_a
+        import apex_orchestrator as _aorch_track_a
+        from guardrails import filter_candidates as _fc_track_a
+        from guardrails import screen_open_positions as _screen_track_a
+        from guardrails import flag_positions_for_review as _flag_track_a
 
-            _cut_candidates_raw = _fc_track_a(
-                [c for c in (pipeline.all_scored or []) if c.get("symbol")],
-                {p.get("symbol") for p in open_pos if p.get("symbol")},
-                regime=regime,
-            )
-            # Cap at top 30 by score — sending 80+ candidates bloats the Apex
-            # response past the token budget and causes JSON truncation.
-            _cut_candidates = sorted(
-                _cut_candidates_raw, key=lambda c: c.get("score", 0), reverse=True
-            )[:30]
-            if len(_cut_candidates_raw) > 30:
-                clog("INFO",
-                     f"APEX_LIVE: {len(_cut_candidates_raw)} candidates after guardrails "
-                     f"— capped to top 30 by score")
-            try:
-                _cut_review = _flag_track_a(open_pos, regime)
-            except Exception:
-                _cut_review = []
-            try:
-                _cut_forced = _screen_track_a(open_pos) or []
-            except Exception:
-                _cut_forced = []
-            _cut_portfolio_state = {
-                "portfolio_value": pv,
-                "daily_pnl": pnl,
-                "position_count": len(open_pos),
-                "position_slots_remaining": max(
-                    0, int(CONFIG.get("max_positions", 0) or 0) - len(open_pos)
-                ),
-                "open_positions": open_pos,
-            }
-            _cut_apex_input = _aorch_track_a.build_scan_cycle_apex_input(
-                candidates=_cut_candidates,
-                review_positions=_cut_review,
-                portfolio_state=_cut_portfolio_state,
-                regime=regime,
-            )
-            _cut_by_sym = {
-                c.get("symbol"): c for c in _cut_candidates if c.get("symbol")
-            }
-            _cut_active = {
-                p.get("symbol"): p for p in open_pos if p.get("symbol")
-            }
-            _cut_result = _aorch_track_a._run_apex_pipeline(
-                _cut_apex_input,
-                _cut_by_sym,
-                execute=True,
-                active_trades=_cut_active,
-                ib=ib,
-                portfolio_value=pv,
-                regime=regime,
-                forced_exits=_cut_forced,
-            )
-            _cut_report = _cut_result.get("dispatch_report") or {}
-            clog(
-                "INFO",
-                "APEX_LIVE SCAN_CYCLE: "
-                f"{len(_cut_report.get('new_entries') or [])} entries, "
-                f"{len(_cut_report.get('portfolio_actions') or [])} actions, "
-                f"{len(_cut_report.get('forced_exits') or [])} forced, "
-                f"{len(_cut_report.get('errors') or [])} errors",
-            )
-            try:
-                _aorch_track_a.log_shadow_result("SCAN_CYCLE", _cut_result)
-            except Exception as _log_err:
-                log.warning("APEX_LIVE: shadow log failed — %s", _log_err)
-        except Exception as _cut_err:
-            log.error("APEX_LIVE SCAN_CYCLE cutover failed — %s", _cut_err)
-        dash["scanning"] = False
-        clog("SCAN", f"Scan #{bot_state.scan_count} complete (apex cutover)")
-        return
-
-    _all_buys = decision.get("buys", [])
-    _executed_any_buy = False
-
-    for buy in _all_buys:
-        sym = buy.get("symbol") if isinstance(buy, dict) else buy
-        buy.get("qty") if isinstance(buy, dict) else None
-        reason = buy.get("reasoning", "") if isinstance(buy, dict) else ""
-
-        sig = next((s for s in scored if s["symbol"] == sym), None)
-
-        if not sig:
-            clog("INFO", f"{sym} not in scored list — fetching signal data for agent-recommended symbol")
-            for _attempt in range(3):
-                try:
-                    raw = fetch_multi_timeframe(sym)
-                    if raw:
-                        raw["score"] = max(raw.get("score", 0), 30)
-                        sig = raw
-                        break
-                    time.sleep(2)
-                except Exception:
-                    time.sleep(2)
-            if not sig:
-                clog("INFO", f"No signal data for {sym} after 3 attempts — skipping")
-                continue
-
-        clog("INFO", f"Evaluating {sym} | Score={sig['score']} | {reason}")
-
-        buy_signal = next((s for s in signals if s.symbol == sym), None)
-        if buy_signal is None:
-            buy_signal = Signal(
-                symbol=sym,
-                direction="LONG",
-                conviction_score=round(sig.get("score", 30) / 5.0, 3),
-                dimension_scores=sig.get("score_breakdown", {}),
-                timestamp=datetime.now(UTC),
-                regime_context=regime_name,
-                price=sig["price"],
-                atr=sig.get("atr_5m", sig.get("atr", 0.0)),
-                candle_gate=sig.get("candle_gate", "UNKNOWN"),
-            )
-        buy_signal.direction = buy.get("direction", "LONG")  # use agent-recommended direction
-        buy_signal.rationale = reason
-        buy_signal.source_agents = list(range(decision.get("agents_agreed", 0)))
-
-        from orders_contracts import is_options_market_open
-
-        # Score tier: score >= options_min_score → options only; below → stock only.
-        _opts_min = CONFIG.get("options_min_score", 35)
-        _opts_eligible = (
-            CONFIG.get("options_enabled")
-            and get_session() not in ("PRE_MARKET", "AFTER_HOURS")
-            and is_options_market_open()
-            and sig["score"] >= _opts_min
+        _cut_candidates_raw = _fc_track_a(
+            [c for c in (pipeline.all_scored or []) if c.get("symbol")],
+            {p.get("symbol") for p in open_pos if p.get("symbol")},
+            regime=regime,
         )
-
-        dispatch_results = _dispatch_signals(
-            [buy_signal],
+        # Cap at top 30 by score — sending 80+ candidates bloats the Apex
+        # response past the token budget and causes JSON truncation.
+        _cut_candidates = sorted(
+            _cut_candidates_raw, key=lambda c: c.get("score", 0), reverse=True
+        )[:30]
+        if len(_cut_candidates_raw) > 30:
+            clog("INFO",
+                 f"APEX_LIVE: {len(_cut_candidates_raw)} candidates after guardrails "
+                 f"— capped to top 30 by score")
+        try:
+            _cut_review = _flag_track_a(open_pos, regime)
+        except Exception:
+            _cut_review = []
+        try:
+            _cut_forced = _screen_track_a(open_pos) or []
+        except Exception:
+            _cut_forced = []
+        _cut_portfolio_state = {
+            "portfolio_value": pv,
+            "daily_pnl": pnl,
+            "position_count": len(open_pos),
+            "position_slots_remaining": max(
+                0, int(CONFIG.get("max_positions", 0) or 0) - len(open_pos)
+            ),
+            "open_positions": open_pos,
+        }
+        _cut_apex_input = _aorch_track_a.build_scan_cycle_apex_input(
+            candidates=_cut_candidates,
+            review_positions=_cut_review,
+            portfolio_state=_cut_portfolio_state,
+            regime=regime,
+        )
+        _cut_by_sym = {
+            c.get("symbol"): c for c in _cut_candidates if c.get("symbol")
+        }
+        _cut_active = {
+            p.get("symbol"): p for p in open_pos if p.get("symbol")
+        }
+        _cut_result = _aorch_track_a._run_apex_pipeline(
+            _cut_apex_input,
+            _cut_by_sym,
+            execute=True,
+            active_trades=_cut_active,
             ib=ib,
             portfolio_value=pv,
             regime=regime,
-            account_id=CONFIG.get("active_account", ""),
-            agent_outputs=decision.get("_agent_outputs", {}),
-            execute=not _opts_eligible,
+            forced_exits=_cut_forced,
         )
-        stock_success = any(r["success"] for r in dispatch_results)
-
-        # Surface skip reason for any signal that was blocked before execution
-        for _dr in dispatch_results:
-            _skip = _dr.get("skip_reason", "")
-            if not _dr["success"] and _skip:
-                _skip_entry = {
-                    "symbol": sym,
-                    "side": _dr.get("side", ""),
-                    "reason": _skip,
-                    "timestamp": datetime.now(_ET).isoformat(timespec="seconds"),
-                }
-                dash.setdefault("last_skip_reasons", []).insert(0, _skip_entry)
-                dash["last_skip_reasons"] = dash["last_skip_reasons"][:20]  # keep last 20
-                # Persist to skip_log.jsonl for post-session review
-                try:
-                    _skip_path = Path(__file__).parent / "data" / "skip_log.jsonl"
-                    with _skip_path.open("a") as _sf:
-                        _sf.write(json.dumps(_skip_entry) + "\n")
-                except Exception as _se:
-                    clog("WARN", f"Could not write skip_log.jsonl: {_se}")
-                clog("INFO", f"Trade skip logged — {sym}: {_skip[:120]}")
-
-        if stock_success:
-            trade_side = "SHORT" if buy.get("direction") == "SHORT" else "BUY"
-            clog("TRADE", f"{trade_side} {sym} | Score={sig['score']} | {reason[:80]}")
-            # Voice fires on fill confirmation in bot_ibkr._on_order_status_event,
-            # not here — so it announces when IBKR confirms the fill, not on submission.
-            dash["trades"].insert(
-                0,
-                {
-                    "side": trade_side,
-                    "symbol": sym,
-                    "price": str(sig["price"]),
-                    "time": datetime.now(_ET).strftime("%H:%M:%S"),
-                },
-            )
-            _write_last_decision(sym, buy, sig, decision, pv)
-            _executed_any_buy = True
-
-        _gate_blocked = any(r.get("side") in ("AVOIDED", "REJECTED") for r in dispatch_results)
-        if _gate_blocked and _opts_eligible:
-            _block_reason = next((r.get("skip_reason", r.get("side", "")) for r in dispatch_results if r.get("side") in ("AVOIDED", "REJECTED")), "gate blocked")
-            clog("INFO", f"Options skipped for {sym} — {_block_reason[:100]}")
-
-        # trade_type from intelligence classification (set even when execute=False).
-        # buy dict from agent_final_decision never carries trade_type, so we must
-        # read it from dispatch_results — otherwise options always get INTRADAY DTE.
-        _intel_trade_type = next(
-            (r["trade_type"] for r in dispatch_results if r.get("trade_type")),
-            None,
+        _cut_report = _cut_result.get("dispatch_report") or {}
+        clog(
+            "INFO",
+            "APEX_LIVE SCAN_CYCLE: "
+            f"{len(_cut_report.get('new_entries') or [])} entries, "
+            f"{len(_cut_report.get('portfolio_actions') or [])} actions, "
+            f"{len(_cut_report.get('forced_exits') or [])} forced, "
+            f"{len(_cut_report.get('errors') or [])} errors",
         )
-        _intel_conviction = next(
-            (r["conviction"] for r in dispatch_results if r.get("conviction")),
-            0.0,
-        )
-        if _intel_trade_type:
-            clog("INFO", f"{sym} intelligence trade_type={_intel_trade_type} conviction={_intel_conviction:.2f}")
-
-        if _opts_eligible and not _gate_blocked:
-            _sig_dir = buy.get("direction", "LONG")  # use agent direction (matches scanner via hard gate)
-            if _sig_dir not in ("LONG", "SHORT"):
-                clog(
-                    "INFO",
-                    f"Score {sig['score']} qualifies for options but direction={_sig_dir!r} — skipping (no clear conviction)",
-                )
-            else:
-                direction = _sig_dir
-                _open_pos = _get_open_option_position(sym)
-                if _open_pos:
-                    _opt_key, _pos_dict = _open_pos
-                    clog("INFO", f"Open option position for {sym} — asking Opus whether to add")
-                    _add_decision = ask_opus_add_to_option(
-                        symbol=sym,
-                        position=_pos_dict,
-                        signal_score=sig["score"],
-                        signal_breakdown=sig.get("score_breakdown", {}),
-                        direction=direction,
-                        regime=regime.get("regime", "UNKNOWN"),
-                    )
-                    if _add_decision["action"] == "ADD":
-                        try:
-                            contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"], trade_type=_pos_dict.get("trade_type", "SWING"))
-                            if contract_info:
-                                _add_ok = execute_add_to_option(
-                                    ib=ib,
-                                    opt_key=_opt_key,
-                                    contract_info=contract_info,
-                                    add_contracts=_add_decision["contracts"],
-                                    reasoning=_add_decision["reasoning"],
-                                    score=sig["score"],
-                                )
-                                if _add_ok:
-                                    dash["trades"].insert(
-                                        0,
-                                        {
-                                            "side": f"ADD {contract_info['right']} OPT",
-                                            "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
-                                            "price": str(contract_info["mid"]),
-                                            "time": datetime.now(_ET).strftime("%H:%M:%S"),
-                                        },
-                                    )
-                                    clog("TRADE", f"Added {_add_decision['contracts']} contracts to {sym} options position")
-                                    _executed_any_buy = True
-                                else:
-                                    clog("WARN", f"Add-to-option order rejected for {sym} — check logs for IBKR reason")
-                            else:
-                                clog("INFO", f"Opus said ADD for {sym} but no contract available now")
-                        except Exception as _add_err:
-                            clog("ERROR", f"Add-to-option failed for {sym}: {_add_err}")
-                    elif _add_decision.get("_opus_failed"):
-                        clog("WARN", f"Opus add-to-option call failed for {sym} — defaulting to HOLD ({_add_decision['reasoning']})")
-                    else:
-                        clog("INFO", f"Opus HOLD on {sym} add — {_add_decision['reasoning'][:100]}")
-                else:
-                    clog("TRADE", f"Score {sig['score']} qualifies for options — evaluating {sym} {direction}")
-                    try:
-                        contract_info = find_best_contract(sym, direction, pv, ib, regime, score=sig["score"], trade_type=_intel_trade_type or "SWING")
-                        if contract_info:
-                            opt_success = execute_buy_option(
-                                ib,
-                                contract_info,
-                                pv,
-                                reasoning=reason,
-                                score=sig["score"],
-                                trade_type=_intel_trade_type or "SWING",
-                                conviction=float(_intel_conviction),
-                                signal_scores=sig.get("score_breakdown", {}),
-                                agent_outputs=buy.get("agent_outputs", {}) if isinstance(buy, dict) else {},
-                                regime=regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else str(regime),
-                            )
-                            if opt_success:
-                                dash["trades"].insert(
-                                    0,
-                                    {
-                                        "side": f"BUY {contract_info['right']} OPT",
-                                        "symbol": f"{sym} ${contract_info['strike']:.0f} {contract_info['expiry_str']}",
-                                        "price": str(contract_info["mid"]),
-                                        "time": datetime.now(_ET).strftime("%H:%M:%S"),
-                                    },
-                                )
-                                clog("TRADE", f"Options trade executed for {sym}")
-                                _opt_type = "call" if contract_info["right"] == "C" else "put"
-                                speak_natural(
-                                    "options",
-                                    fallback=f"I just bought a {_opt_type} on {sym}.",
-                                    symbol=sym,
-                                    option_type=_opt_type,
-                                    strike=f"{contract_info['strike']:.0f}",
-                                    score=sig["score"],
-                                )
-                                _write_last_decision(sym, buy, sig, decision, pv)
-                                _executed_any_buy = True
-                        else:
-                            clog("INFO", f"No suitable options contract for {sym}")
-                    except Exception as _opt_err:
-                        clog("ERROR", f"Options evaluation failed for {sym}: {_opt_err}")
-
-    # Record whether any agent-recommended buy actually executed this cycle.
-    # None = no buys were recommended; True/False = recommended and executed/not.
-    dash["last_decision_executed"] = _executed_any_buy if _all_buys else None
-
-    # ── FX direct dispatch ────────────────────────────────────────────────────────
-    # FX signals bypass the equity intelligence gate — the fx_signals scorer is the
-    # complete decision; no agent classification needed.
-    if CONFIG.get("fx_enabled") and pipeline:
         try:
-            from fx_signals import FX_PAIRS
-
-            _fx_sigs = [s for s in pipeline.signals if s.symbol in FX_PAIRS]
-            _fx_min = CONFIG.get("fx_min_score", 20)
-            for _fxs in _fx_sigs:
-                _fxs_score = round(_fxs.conviction_score * 5)
-                if _fxs_score < _fx_min or _fxs.direction not in ("LONG", "SHORT"):
-                    continue
-                _fxs_reasoning = f"FX-direct {_fxs.symbol}: {_fxs.dimension_scores}"
-                if _fxs.direction == "LONG":
-                    _fx_ok = execute_buy(
-                        ib=ib,
-                        symbol=_fxs.symbol,
-                        price=_fxs.price,
-                        atr=_fxs.atr,
-                        score=_fxs_score,
-                        portfolio_value=pv,
-                        regime=regime,
-                        reasoning=_fxs_reasoning,
-                        signal_scores=_fxs.dimension_scores,
-                        open_time=datetime.now(UTC).isoformat(),
-                        instrument="fx",
-                    )
-                else:
-                    _fx_ok = execute_short(
-                        ib=ib,
-                        symbol=_fxs.symbol,
-                        price=_fxs.price,
-                        atr=_fxs.atr,
-                        score=_fxs_score,
-                        portfolio_value=pv,
-                        regime=regime,
-                        reasoning=_fxs_reasoning,
-                        signal_scores=_fxs.dimension_scores,
-                        open_time=datetime.now(UTC).isoformat(),
-                        instrument="fx",
-                    )
-                if _fx_ok:
-                    clog("TRADE", f"FX {_fxs.direction} {_fxs.symbol} | Score={_fxs_score}")
-                    dash["trades"].insert(
-                        0,
-                        {
-                            "side": _fxs.direction,
-                            "symbol": _fxs.symbol,
-                            "price": str(round(_fxs.price, 5)),
-                            "time": datetime.now(_ET).strftime("%H:%M:%S"),
-                        },
-                    )
-        except Exception as _fxe:
-            clog("ERROR", f"FX dispatch: {_fxe}")
-
-    dash["positions"] = get_open_positions()
-    _seen_dash = {}
-    _deduped = []
-    for _t in dash["trades"]:
-        _key = f"{_t.get('side', '')}-{_t.get('symbol', '')}-{_t.get('time', '')[:5]}"
-        if _key not in _seen_dash:
-            _seen_dash[_key] = True
-            _deduped.append(_t)
-    dash["trades"] = _deduped[:200]
-
-    sync_orders_from_ibkr()
-
-    all_trades = load_trades()
-    dash["all_trades"] = all_trades
-    dash["all_orders"] = load_orders()
-    _scan_start = dash.get("_scan_start")
-    if _scan_start:
-        dash["recent_orders"] = [o for o in dash["all_orders"] if (o.get("timestamp") or "") >= _scan_start]
-    else:
-        dash["recent_orders"] = dash["all_orders"]
-    dash["performance"] = get_performance_summary(all_trades)
-    dash["performance"]["total_pnl"] = round(dash.get("portfolio_value", 0) - get_effective_capital(), 2)
-
-    dash["equity_history"].append({"date": datetime.now(_ET).strftime("%Y-%m-%d %H:%M ET"), "value": pv})
-    if len(dash["equity_history"]) > 2000:
-        dash["equity_history"] = dash["equity_history"][-2000:]
-    save_equity_history(dash["equity_history"])
-
-    today = datetime.now(_ET).weekday()
-    if today == 6 and bot_state.last_sunday_review != datetime.now(_ET).date():
-        clog("ANALYSIS", "Running weekly performance review...")
-        review = run_weekly_review()
-        clog("ANALYSIS", f"Weekly review: {review[:200]}...")
-
-        try:
-            _tools = str(pathlib.Path(__file__).parent / "tools")
-            if _tools not in sys.path:
-                sys.path.insert(0, _tools)
-            from signal_correlation import load_signals, pca_dims, print_matrix
-
-            _df = load_signals(pathlib.Path(__file__).parent / "data" / "signals_log.jsonl")
-            if not _df.empty:
-                _high = print_matrix(_df, "ALL REGIMES", 0.75)
-                _n_eff, _ = pca_dims(_df)
-                if _high:
-                    log.warning(
-                        "Signal correlation: %d high-corr pair(s) (|r|>=0.75): %s",
-                        len(_high),
-                        [(d1, d2, f"{r:.2f}") for d1, d2, r in _high],
-                    )
-                clog("ANALYSIS", f"Signal dims: {_n_eff}/9 effective, {len(_high)} high-corr pair(s)")
-        except Exception as _corr_exc:
-            log.warning("Signal correlation check failed: %s", _corr_exc)
-
-        try:
-            from audit_candle_gate import run_audit as _run_gate_audit
-
-            _gate = _run_gate_audit()
-            if _gate["flagged_anomaly"] > 0:
-                log.error(
-                    "Candle gate audit: %d ANOMALY trade(s) — blocked signal reached order layer",
-                    _gate["flagged_anomaly"],
-                )
-            clog(
-                "ANALYSIS",
-                f"Candle gate: {_gate['valid']} valid, "
-                f"{_gate['flagged_anomaly']} anomalies, {_gate['flagged_unknown']} unknown",
-            )
-        except Exception as _gate_exc:
-            log.warning("Candle gate audit failed: %s", _gate_exc)
-
-        try:
-            import pathlib as _pl
-
-            from ic_calculator import compare_live_vs_historical_ic, update_ic_weights
-
-            _hist_log = str(_pl.Path(__file__).parent / "data" / "signals_log_historical.jsonl")
-            new_weights = update_ic_weights(historical_log_path=_hist_log)
-            clog("ANALYSIS", "IC weights updated: " + ", ".join(f"{k}={v:.3f}" for k, v in new_weights.items()))
-
-            # ── Live vs historical IC comparison milestone ─────────────────
-            _ic_report = compare_live_vs_historical_ic(historical_log_path=_hist_log)
-            _n = _ic_report["n_live_trades"]
-            _pct = _ic_report["progress_pct"]
-            if not _ic_report["ready"]:
-                clog(
-                    "ANALYSIS",
-                    f"Live IC progress: {_n}/50 scored closed trades ({_pct:.0f}%) — "
-                    "keeping force_equal_weights until milestone",
-                )
-            else:
-                _r = _ic_report.get("agreement_r") or 0.0
-                _label = _ic_report.get("agreement_label", "?")
-                _dims = ", ".join(
-                    f"{d}(L={v['live']:.3f}/H={v['hist']:.3f})"
-                    for d, v in _ic_report.get("dim_comparison", {}).items()
-                    if v.get("live") is not None
-                )
-                clog("ANALYSIS", f"Live IC milestone reached ({_n} trades): hist/live agreement r={_r:.3f} [{_label}]")
-                clog("ANALYSIS", f"Per-dim: {_dims}")
-                if _ic_report.get("recommend_disable"):
-                    clog("ANALYSIS", "IC profiles AGREE (r≥0.5) — consider disabling force_equal_weights in config.py")
-                else:
-                    clog(
-                        "ANALYSIS",
-                        "IC profiles DIVERGE (r<0.5) — keep force_equal_weights; investigate dim disagreements",
-                    )
-        except Exception as _ic_exc:
-            log.warning("IC weight update failed: %s", _ic_exc)
-
-        bot_state.last_sunday_review = datetime.now(_ET).date()
-
-    # ── Phase 6: Apex SCAN_CYCLE shadow pipeline (log-only) ──────────────
-    # Runs after the legacy pipeline has finished. Builds the same inputs the
-    # Phase 6 cutover will use, invokes market_intelligence.apex_call() via
-    # apex_orchestrator._run_apex_pipeline() (execute=False), and appends the
-    # decision + would-be dispatch summary to data/apex_shadow_log.jsonl.
-    # Guarded by safety_overlay.should_run_apex_shadow() (default False).
-    # Never raises; never touches live orders.
-    try:
-        import safety_overlay as _so_scan_shadow
-        if _so_scan_shadow.should_run_apex_shadow():
-            import apex_orchestrator as _aorch
-            from guardrails import filter_candidates, flag_positions_for_review
-
-            _shadow_candidates = filter_candidates(
-                list(pipeline.all_scored or []),
-                {p.get("symbol") for p in open_pos if p.get("symbol")},
-                regime=regime,
-            )
-            # Cap at 30 — same limit as the live cutover path. Without this cap
-            # the full candidate list overflows the output token budget and
-            # triggers JSON truncation + _fallback_decision() on the shadow path.
-            _shadow_candidates = sorted(
-                _shadow_candidates, key=lambda c: c.get("score", 0), reverse=True
-            )[:30]
-            try:
-                _shadow_review = flag_positions_for_review(open_pos, regime)
-            except Exception:
-                _shadow_review = []
-
-            _shadow_portfolio_state = {
-                "portfolio_value": pv,
-                "daily_pnl": pnl,
-                "position_count": len(open_pos),
-                "position_slots_remaining": max(
-                    0, int(CONFIG.get("max_positions", 0) or 0) - len(open_pos)
-                ),
-                "open_positions": open_pos,
-            }
-            _shadow_input = _aorch.build_scan_cycle_apex_input(
-                candidates=_shadow_candidates,
-                review_positions=_shadow_review,
-                portfolio_state=_shadow_portfolio_state,
-                regime=regime,
-            )
-            _shadow_by_sym = {
-                c.get("symbol"): c for c in _shadow_candidates if c.get("symbol")
-            }
-            _shadow_result = _aorch._run_apex_pipeline(
-                _shadow_input, _shadow_by_sym, execute=False
-            )
-            _aorch.log_shadow_result("SCAN_CYCLE", _shadow_result)
-
-            # ── Phase 7C.1B — divergence record (read-only instrumentation) ──
-            # Compare what the legacy path *already decided to do this cycle*
-            # (decision.get("buys") and pm_actions, both assembled before this
-            # block ran) against the Apex dry-run result. No execution happens
-            # here: both sides are serialized from in-scope state, classified,
-            # and written to data/apex_divergence_log.jsonl.
-            try:
-                import apex_divergence as _AD
-                from guardrails import screen_open_positions as _screen_fe
-
-                _cycle_id = f"scan-{bot_state.scan_count}"
-                _legacy_new_entries = []
-                for _b in (decision.get("buys") or []):
-                    if not isinstance(_b, dict):
-                        continue
-                    _sym = _b.get("symbol")
-                    _sig_b = next(
-                        (s for s in (pipeline.all_scored or []) if s.get("symbol") == _sym),
-                        None,
-                    ) or {}
-                    _legacy_new_entries.append({
-                        "symbol": _sym,
-                        "direction": _b.get("direction", "LONG"),
-                        "trade_type": _b.get("trade_type"),
-                        "instrument": _b.get("instrument"),
-                        "score": _sig_b.get("score"),
-                    })
-                try:
-                    _legacy_forced = _screen_fe(open_pos) or []
-                except Exception:
-                    _legacy_forced = []
-                _legacy_mirror = _AD.mirror_legacy_decision(
-                    cycle_id=_cycle_id,
-                    trigger_type="SCAN_CYCLE",
-                    new_entries=_legacy_new_entries,
-                    portfolio_actions=list(pm_actions or []),
-                    forced_exits=_legacy_forced,
-                    payloads_by_symbol=_shadow_by_sym,
-                )
-                _apex_mirror = _AD.mirror_apex_decision(
-                    cycle_id=_cycle_id,
-                    trigger_type="SCAN_CYCLE",
-                    pipeline_result=_shadow_result,
-                    candidates_by_symbol=_shadow_by_sym,
-                )
-                _events = _AD.classify(_legacy_mirror, _apex_mirror)
-                _AD.write_divergence_record(
-                    legacy_mirror=_legacy_mirror,
-                    apex_mirror=_apex_mirror,
-                    events=_events,
-                )
-            except Exception as _div_err:
-                log.warning("apex_divergence SCAN_CYCLE write failed (non-fatal): %s", _div_err)
-
-            clog(
-                "INFO",
-                f"APEX_SHADOW SCAN_CYCLE: {len(_shadow_result.get('would_dispatch') or [])} "
-                f"would-dispatch / {len(_shadow_result.get('rejected') or [])} rejected "
-                "(log-only, no orders submitted)",
-            )
-    except Exception as _shadow_err:
-        log.warning("APEX_SHADOW SCAN_CYCLE error (non-fatal): %s", _shadow_err)
-
+            _aorch_track_a.log_shadow_result("SCAN_CYCLE", _cut_result)
+        except Exception as _log_err:
+            log.warning("APEX_LIVE: shadow log failed — %s", _log_err)
+    except Exception as _cut_err:
+        log.error("APEX_LIVE SCAN_CYCLE failed — %s", _cut_err)
     dash["scanning"] = False
     clog("SCAN", f"Scan #{bot_state.scan_count} complete")
+

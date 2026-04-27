@@ -449,6 +449,7 @@ def reconcile_with_ibkr(ib: IB):
         # Skip the purge and let the next reconcile cycle handle it correctly.
         keys_to_remove = []
         closed_while_down = []  # collect (advice_id, exit_price, pnl) to close Opus loop after lock
+        trades_closed_while_down = []  # collect full trade dicts for CLOSE log_trade calls
         # Safety guard: if IBKR returned 0 items but we have ACTIVE positions with
         # real decision metadata, that is almost certainly an account-data timing
         # issue (TWS hasn't pushed updatePortfolio yet), not that everything closed.
@@ -500,6 +501,7 @@ def reconcile_with_ibkr(ib: IB):
                                 f"Position {key} in our store but not in IBKR — was closed while bot was down, removing"
                             )
                             keys_to_remove.append(key)
+                            trades_closed_while_down.append(dict(trade))
                             if trade.get("advice_id"):
                                 closed_while_down.append(
                                     {
@@ -511,6 +513,32 @@ def reconcile_with_ibkr(ib: IB):
 
         for key in keys_to_remove:
             _safe_del_trade(key)
+
+        # Write CLOSE log records for positions that vanished while the bot was down.
+        # Without this, trades.json shows them as permanently open (ghost entries).
+        for _t in trades_closed_while_down:
+            try:
+                from learning import log_trade as _log_trade
+                _exit_px = float(_t.get("current") or _t.get("entry", 0))
+                _entry_px = float(_t.get("entry", 0))
+                _qty = int(_t.get("qty", 1))
+                _is_short = _t.get("direction", "LONG") == "SHORT"
+                _pnl = round(((_entry_px - _exit_px) if _is_short else (_exit_px - _entry_px)) * _qty, 2)
+                _pnl_pct = round(_pnl / (_entry_px * _qty), 4) if _entry_px * _qty else 0
+                _log_trade(
+                    trade=_t,
+                    agent_outputs={},
+                    regime={},
+                    action="CLOSE",
+                    outcome={
+                        "exit_price": _exit_px,
+                        "pnl": _pnl,
+                        "pnl_pct": _pnl_pct,
+                        "reason": "closed_while_bot_down",
+                    },
+                )
+            except Exception as _cwd_err:
+                log.warning("Reconcile: failed to write CLOSE log for %s: %s", _t.get("symbol", "?"), _cwd_err)
 
         # (trade_advisor learning loop removed — deterministic sizing owns stops)
 
@@ -1009,9 +1037,14 @@ def reconcile_with_ibkr(ib: IB):
             from trade_log import open_trades as _tl_mig_open, close_trade as _tl_mig_close
             _db_open = _tl_mig_open()
             _active_trade_ids = {v.get("trade_id", "") for v in active_trades.values()}
+            # ibkr_keys contains symbol-based keys (e.g. "USO"), not trade_ids.
+            # Comparing trade_id directly against ibkr_keys is always True and incorrect.
+            # Use the symbol from the DB record to check if the position is live in IBKR.
+            _ibkr_symbols = {_ibkr_item_to_key(item) for item in portfolio_items if item.position != 0}
             _stale_ids = [
                 tid for tid in _db_open
-                if tid not in ibkr_keys and tid not in _active_trade_ids
+                if _db_open[tid].get("symbol", tid) not in _ibkr_symbols
+                and tid not in _active_trade_ids
             ]
             if _stale_ids:
                 log.info("Migration: writing POSITION_CLOSED for %d stale DB trades", len(_stale_ids))
