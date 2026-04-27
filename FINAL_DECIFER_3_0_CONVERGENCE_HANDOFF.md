@@ -116,32 +116,19 @@ Only two safety_overlay flags remain. Both are operational features, not migrati
 
 ---
 
-## 5. agents_agreed Field — Audit Decision
+## 5. agents_agreed Field — Removed ✓
 
-**Current state:** `agents_agreed` field still exists in:
-- `orders_core.py` function signatures (parameter, default=0)
-- `signal_dispatcher.py` — passes `len(signal.source_agents or [])` → always 0 for Apex trades
-- `learning.py` — copies field from trade records
-- `ml_engine.py` — used as training feature; always 0 for Apex trades (no match on `source_agents`)
-- `brain.py:372` — reads `agents_agreed` from last trade data but does NOT display it (display was fixed to "Apex Synthesizer" in Step 3)
+**Decision: REMOVED** (2026-04-27, commit `1e81246`)
 
-**Decision: DEFER**
-
-Reasons:
-1. The value is always 0 for all new Apex trades — harmless, not confusing to operators
-2. Removal touches 5 files and the ML feature vector — meaningful scope for a routine cleanup pass
-3. ML is gated at 50 closed trades and not actively training — no urgency
-4. `brain.py` already ignores it for display; `agents_agreed=0` in `trades.json` is invisible to operators
-
-**When to remove:** Immediately before the first ML retraining run. Remove from:
-- `orders_core.py` — drop parameter from `execute_buy()` and `execute_short()`
-- `signal_dispatcher.py` — remove `agents_agreed=` kwarg from both call sites
-- `learning.py` — drop from both `log_trade()` record shapes
-- `ml_engine.py` — remove from `_extract_agents_count`, feature list, and `SignalEnhancer`
-- `brain.py` — remove `agents = data.get("agents_agreed", 0)` (unused variable)
-- `signal_types.py` — remove `source_agents` field entirely
-
-**Amit must confirm** before touching `ml_engine.py` — it affects training feature quality.
+`agents_agreed` and `source_agents` removed end-to-end:
+- `signal_types.py` — `source_agents` field deleted from `Signal` dataclass and `to_dict()`
+- `signal_dispatcher.py` — `agents_agreed=` kwarg removed from both `execute_buy` / `execute_short` call sites
+- `orders_core.py` — `agents_agreed: int = 0` parameter dropped from both function signatures; removed from all 5 trade-dict write sites
+- `learning.py` — removed from both `log_trade()` record shapes
+- `ml_engine.py` — removed from `extract_features()`, deleted `_extract_agents_count()` method, removed from `feature_cols` list, removed from `SignalEnhancer.enhance_score`, removed from docstring
+- `brain.py` — removed unused `agents = data.get("agents_agreed", 0)` variable
+- `bot_trading.py` — removed from `last_decision.json` payload
+- Tests updated accordingly
 
 ---
 
@@ -168,7 +155,7 @@ These are comments/labels in non-runtime code. Safe to defer indefinitely.
 | IC Phase C (200 closed trades) | Not yet met | Full signal validation gate |
 | HMM regime detection | Deferred | Requires Phase C gate |
 | Walk-forward calibration | Deferred | Requires HMM + Alphalens |
-| `agents_agreed` field removal | Deferred | Before first ML retraining |
+| `agents_agreed` field removal | Done ✓ | Removed 2026-04-27 |
 
 ---
 
