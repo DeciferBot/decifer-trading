@@ -512,19 +512,7 @@ def reconcile_with_ibkr(ib: IB):
         for key in keys_to_remove:
             _safe_del_trade(key)
 
-        # Close Opus learning loop for positions that were filled/stopped while the bot was offline
-        for item in closed_while_down:
-            try:
-                from trade_advisor import record_outcome as _record_outcome
-
-                _record_outcome(
-                    advice_id=item["advice_id"],
-                    exit_price=item["exit_price"],
-                    pnl=item["pnl"],
-                    exit_reason="closed_while_bot_down",
-                )
-            except Exception as _e:
-                log.debug(f"advisor record_outcome (offline close) failed: {_e}")
+        # (trade_advisor learning loop removed — deterministic sizing owns stops)
 
         # ── Step 4: process IBKR portfolio items ──────────────────────────────
         reconciled_count = 0

@@ -39,7 +39,6 @@ _DEFAULTS: dict = {
     "USE_APEX_V3_SHADOW": True,    # shadow+divergence logging ON
     "PM_LEGACY_OPUS_REVIEW_ENABLED": False,    # Phase 8 cutover: PM Track B through Apex
     "SENTINEL_LEGACY_PIPELINE_ENABLED": False, # Phase 8 cutover: Sentinel NI through Apex
-    "TRADE_ADVISOR_ENABLED": False,            # Phase 8 cutover: deterministic sizing only
     "FINBERT_MATERIALITY_GATE_ENABLED": True,  # Phase 8 cutover: FinBERT materiality gate ON
     "daily_loss_halt_new_entries_pct": 0.03,   # -3% blocks new entries
     "daily_loss_manage_only_pct": 0.05,        # -5% switches to manage-only (aligns with daily_loss_limit)
@@ -210,17 +209,6 @@ def should_run_apex_shadow() -> bool:
     """Shadow mode: run new path in parallel but do NOT submit its orders."""
     return bool(flag("USE_APEX_V3_SHADOW"))
 
-
-def trade_advisor_enabled() -> bool:
-    """
-    Gate for the legacy trade_advisor.advise_trade() call site inside
-    signal_dispatcher.dispatch_signals.
-
-    Default True. Phase 7 flips False and deletes trade_advisor.py. When
-    False, dispatch_signals uses a pass-through TradeAdvice (no LLM, no
-    size/stop overrides — the deterministic ATR formula owns sizing/stops).
-    """
-    return bool(flag("TRADE_ADVISOR_ENABLED"))
 
 
 def finbert_materiality_gate_enabled() -> bool:

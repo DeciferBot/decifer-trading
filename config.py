@@ -167,7 +167,6 @@ CONFIG = {
         "USE_APEX_V3_SHADOW": True,     # shadow+divergence logging stays ON
         "PM_LEGACY_OPUS_REVIEW_ENABLED": False,   # Phase 8 cutover: PM Track B through Apex
         "SENTINEL_LEGACY_PIPELINE_ENABLED": False,  # Phase 8 cutover: Sentinel NI through Apex
-        "TRADE_ADVISOR_ENABLED": False,             # Phase 8 cutover: deterministic sizing only
         "FINBERT_MATERIALITY_GATE_ENABLED": True,   # Phase 8 cutover: FinBERT materiality gate ON
         "daily_loss_halt_new_entries_pct": 0.03,
         "daily_loss_manage_only_pct": 0.05,

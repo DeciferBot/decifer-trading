@@ -7,35 +7,34 @@
 # ╚══════════════════════════════════════════════════════════════╝
 
 import logging
+import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from market_intelligence import classify_signals
 from orders_core import execute_buy, execute_short
 from pattern_library import record_entry
+from position_sizing import calculate_stops
 from signal_types import Signal
-from trade_advisor import _formula_advice, advise_trade
 
 
-def _advise_trade_gated(**kwargs):
-    """
-    Phase 6D: route advise_trade through the TRADE_ADVISOR_ENABLED flag.
+@dataclass
+class _FormulaAdvice:
+    advice_id: str
+    instrument: str
+    size_multiplier: float
+    profit_target: float
+    stop_loss: float
 
-    Default True preserves live behavior. Phase 7 flips False and the
-    deterministic ATR-formula fallback becomes authoritative — no LLM
-    sizing/stop overrides; conviction mapping + calculate_stops own the path.
-    """
-    try:
-        from safety_overlay import trade_advisor_enabled
-        enabled = trade_advisor_enabled()
-    except Exception:
-        enabled = True
-    if enabled:
-        return advise_trade(**kwargs)
-    return _formula_advice(
-        symbol=kwargs.get("symbol", ""),
-        direction=kwargs.get("direction", "LONG"),
-        entry_price=kwargs.get("entry_price", 0.0),
-        atr_5m=kwargs.get("atr_5m", 0.0),
+
+def _formula_advice(symbol: str, direction: str, entry_price: float, atr_5m: float) -> _FormulaAdvice:
+    sl, tp = calculate_stops(entry_price, atr_5m, direction)
+    return _FormulaAdvice(
+        advice_id=str(uuid.uuid4())[:8],
+        instrument="COMMON",
+        size_multiplier=1.0,
+        profit_target=tp,
+        stop_loss=sl,
     )
 
 log = logging.getLogger("decifer.dispatcher")
@@ -327,18 +326,7 @@ def dispatch_signals(
         # ── Trade advisor (PT / SL / size / instrument) ───────
         if signal.direction == "LONG" and "LONG" in allowed_dirs:
             try:
-                advice = _advise_trade_gated(
-                    symbol=signal.symbol,
-                    direction="LONG",
-                    entry_price=signal.price,
-                    atr_5m=signal.atr,
-                    atr_daily=signal.atr_daily,
-                    conviction_score=signal.conviction_score,
-                    dimension_scores=signal.dimension_scores,
-                    rationale=signal.rationale,
-                    regime_context=signal.regime_context,
-                    trade_type=cls.trade_type,
-                )
+                advice = _formula_advice(signal.symbol, "LONG", signal.price, signal.atr)
                 _entry_ctx = None
                 try:
                     if trade_ctx is not None:
@@ -383,18 +371,7 @@ def dispatch_signals(
 
         elif signal.direction == "SHORT" and "SHORT" in allowed_dirs:
             try:
-                advice = _advise_trade_gated(
-                    symbol=signal.symbol,
-                    direction="SHORT",
-                    entry_price=signal.price,
-                    atr_5m=signal.atr,
-                    atr_daily=signal.atr_daily,
-                    conviction_score=signal.conviction_score,
-                    dimension_scores=signal.dimension_scores,
-                    rationale=signal.rationale,
-                    regime_context=signal.regime_context,
-                    trade_type=cls.trade_type,
-                )
+                advice = _formula_advice(signal.symbol, "SHORT", signal.price, signal.atr)
                 _entry_ctx = None
                 try:
                     if trade_ctx is not None:
@@ -582,7 +559,6 @@ def dispatch(
         sl = tp = 0.0
         if price > 0 and portfolio_value > 0:
             try:
-                from position_sizing import calculate_stops
                 from risk import calculate_position_size
                 qty = calculate_position_size(
                     portfolio_value, price, score, regime, atr=atr, external_mult=ext_mult

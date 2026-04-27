@@ -44,10 +44,9 @@ shadow observation window between each:
 
     1. USE_APEX_V3_SHADOW               : False → True   (observation on)
     2. FINBERT_MATERIALITY_GATE_ENABLED : False → True   (news gate cutover)
-    3. TRADE_ADVISOR_ENABLED            : True  → False  (deterministic stops)
-    4. PM_LEGACY_OPUS_REVIEW_ENABLED    : True  → False  (Apex Track B live)
-    5. SENTINEL_LEGACY_PIPELINE_ENABLED : True  → False  (Apex NEWS_INTERRUPT live)
-    6. USE_LEGACY_PIPELINE              : True  → False  (full cutover)
+    3. PM_LEGACY_OPUS_REVIEW_ENABLED    : True  → False  (Apex Track B live)
+    4. SENTINEL_LEGACY_PIPELINE_ENABLED : True  → False  (Apex NEWS_INTERRUPT live)
+    5. USE_LEGACY_PIPELINE              : True  → False  (full cutover)
 
 The proposer enforces this order: it will WARN when a flip is proposed out
 of order. It does not strictly block — the operator retains authority — but
@@ -101,7 +100,6 @@ _AUDIT_DIR_DEFAULT = "data/apex_flip_audit"
 FLIP_SEQUENCE: list[tuple[str, bool, bool]] = [
     ("USE_APEX_V3_SHADOW",               False, True),
     ("FINBERT_MATERIALITY_GATE_ENABLED", False, True),
-    ("TRADE_ADVISOR_ENABLED",            True,  False),
     ("PM_LEGACY_OPUS_REVIEW_ENABLED",    True,  False),
     ("SENTINEL_LEGACY_PIPELINE_ENABLED", True,  False),
     ("USE_LEGACY_PIPELINE",              True,  False),
@@ -110,7 +108,6 @@ FLIP_SEQUENCE: list[tuple[str, bool, bool]] = [
 _FLAG_ACCESSOR = {
     "USE_APEX_V3_SHADOW":               "should_run_apex_shadow",
     "FINBERT_MATERIALITY_GATE_ENABLED": "finbert_materiality_gate_enabled",
-    "TRADE_ADVISOR_ENABLED":            "trade_advisor_enabled",
     "PM_LEGACY_OPUS_REVIEW_ENABLED":    "pm_legacy_opus_review_enabled",
     "SENTINEL_LEGACY_PIPELINE_ENABLED": "sentinel_legacy_pipeline_enabled",
     "USE_LEGACY_PIPELINE":              "should_use_legacy_pipeline",

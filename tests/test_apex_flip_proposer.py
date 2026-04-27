@@ -32,7 +32,6 @@ import apex_flip_proposer as fp  # noqa: E402
 _LEGACY_STATE: dict = {
     "USE_APEX_V3_SHADOW": False,
     "FINBERT_MATERIALITY_GATE_ENABLED": False,
-    "TRADE_ADVISOR_ENABLED": True,
     "PM_LEGACY_OPUS_REVIEW_ENABLED": True,
     "SENTINEL_LEGACY_PIPELINE_ENABLED": True,
     "USE_LEGACY_PIPELINE": True,
@@ -50,13 +49,12 @@ def legacy_flag_state(monkeypatch):
 
 # ── flag state reader ───────────────────────────────────────────────────────
 
-def test_read_current_flag_state_returns_all_six_flags():
+def test_read_current_flag_state_returns_all_flags():
     state = fp.read_current_flag_state()
     assert set(state.keys()) == set(fp._FLAG_ACCESSOR.keys())
     # Phase 8 cutover complete — live CONFIG now reflects post-cutover state.
     assert state["USE_APEX_V3_SHADOW"] is True
     assert state["FINBERT_MATERIALITY_GATE_ENABLED"] is True
-    assert state["TRADE_ADVISOR_ENABLED"] is False
     assert state["PM_LEGACY_OPUS_REVIEW_ENABLED"] is False
     assert state["SENTINEL_LEGACY_PIPELINE_ENABLED"] is False
     assert state["USE_LEGACY_PIPELINE"] is False
@@ -99,7 +97,7 @@ def test_out_of_order_warning_fires_when_earlier_flag_not_yet_flipped(legacy_fla
     # Simulated legacy state: USE_APEX_V3_SHADOW still False. Proposing to flip
     # flag #3 forward while flag #1 has not moved → warn.
     current = fp.read_current_flag_state()
-    msg = fp.out_of_order_warning("TRADE_ADVISOR_ENABLED", False, current)
+    msg = fp.out_of_order_warning("PM_LEGACY_OPUS_REVIEW_ENABLED", False, current)
     assert msg is not None and "out-of-order" in msg
 
 
@@ -203,9 +201,9 @@ def _blocking_gates() -> dict:
 
 def test_build_proposal_noop_when_already_at_target(legacy_flag_state):
     current = fp.read_current_flag_state()
-    # Legacy state: TRADE_ADVISOR_ENABLED=True; proposing True is noop.
+    # Legacy state: PM_LEGACY_OPUS_REVIEW_ENABLED=True; proposing True is noop.
     p = fp.build_proposal(
-        "TRADE_ADVISOR_ENABLED", True,
+        "PM_LEGACY_OPUS_REVIEW_ENABLED", True,
         current_state=current, gates=_passing_gates(),
     )
     assert p["decision"] == "noop"
@@ -239,7 +237,7 @@ def test_build_proposal_records_out_of_order_warning(legacy_flag_state):
     current = fp.read_current_flag_state()
     # Flip #3 forward while #1 still at False.
     p = fp.build_proposal(
-        "TRADE_ADVISOR_ENABLED", False,
+        "PM_LEGACY_OPUS_REVIEW_ENABLED", False,
         current_state=current, gates=_passing_gates(),
     )
     assert any("out-of-order" in w for w in p["warnings"])
@@ -268,8 +266,6 @@ def test_build_rollback_inverts_target_and_is_never_blocked(legacy_flag_state):
 
 
 def test_build_rollback_allow_when_current_differs_from_inverse(legacy_flag_state):
-    # Prior proposal targeted False for TRADE_ADVISOR_ENABLED. Inverse=True.
-    # Current state has TRADE_ADVISOR_ENABLED=True already → noop.
     # To force "allow" we simulate a source whose inverse DIFFERS from current.
     source = {"flag": "USE_APEX_V3_SHADOW", "target_value": False, "ts": "x"}
     # Inverse target = True. Legacy state USE_APEX_V3_SHADOW=False → allow.
