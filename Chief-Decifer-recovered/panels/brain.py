@@ -369,7 +369,6 @@ def _render_last_trade_card():
     edge       = data.get("edge_why_now", "")
     risk       = data.get("risk", "")
     exp        = data.get("expected_returns", {})
-    agents     = data.get("agents_agreed", 0)
     ts         = data.get("timestamp", "")
 
     dir_color  = "#51cf66" if direction == "BUY" else "#ff6b6b"

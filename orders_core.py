@@ -205,7 +205,6 @@ def execute_buy(
     conviction: float = 0.0,
     pattern_id: str = "",
     market_read: str = "",
-    agents_agreed: int = 0,
     entry_context: dict | None = None,
 ) -> bool:
     """
@@ -651,7 +650,6 @@ def execute_buy(
                             "sl_order_id": None,
                             "tp_order_id": None,
                             "high_water_mark": _fill_price,
-                            "agents_agreed": agents_agreed,
                             "tranche_mode": False,
                             "execution_method": "twap",
                             "entry_context": entry_context,
@@ -756,7 +754,6 @@ def execute_buy(
                         "sl_order_id": None,   # placed post-fill by _on_order_status_event
                         "tp_order_id": None,
                         "high_water_mark": price,
-                        "agents_agreed": agents_agreed,
                         "tranche_mode": False,
                         "extended_hours_entry": True,
                         "entry_context": entry_context,
@@ -1096,7 +1093,6 @@ def execute_buy(
                     "sl_order_id": _sl_order_id,
                     "tp_order_id": tp_trade.order.orderId if tp_trade is not None else None,
                     "high_water_mark": price,
-                    "agents_agreed": agents_agreed,
                     # ── Tranche tracking ──────────────────────────────────
                     "tranche_mode": tranche_mode,
                     "t1_qty": t1_qty,
@@ -1196,7 +1192,6 @@ def execute_short(
     conviction: float = 0.0,
     pattern_id: str = "",
     market_read: str = "",
-    agents_agreed: int = 0,
     entry_context: dict | None = None,
 ) -> bool:
     """
@@ -1487,7 +1482,6 @@ def execute_short(
                         "sl_order_id": None,   # placed post-fill by _on_order_status_event
                         "tp_order_id": None,
                         "high_water_mark": price,
-                        "agents_agreed": agents_agreed,
                         "tranche_mode": False,
                         "extended_hours_entry": True,
                         "entry_context": entry_context,
@@ -1670,7 +1664,6 @@ def execute_short(
                     "sl_order_id": _sl_order_id,
                     "tp_order_id": tp_trade.order.orderId if tp_trade is not None else None,
                     "high_water_mark": price,
-                    "agents_agreed": agents_agreed,
                     "tranche_mode": False,
                     "entry_context": entry_context,
                     "trade_id": _trade_id,

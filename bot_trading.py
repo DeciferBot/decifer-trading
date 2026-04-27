@@ -300,7 +300,6 @@ def _write_last_decision(symbol: str, buy: dict, sig: dict, decision: dict, port
         "edge_why_now": edge,
         "risk": risk,
         "price_targets": price_targets,
-        "agents_agreed": decision.get("agents_agreed", 0),
         "timestamp": datetime.now(_ET).isoformat(timespec="seconds"),
     }
 

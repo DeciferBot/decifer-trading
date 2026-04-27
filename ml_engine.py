@@ -143,7 +143,6 @@ class TradeLabeler:
             "is_after_hours": entry_time.hour < 9 or entry_time.hour >= 16,
             "action": trade.get("action", "BUY"),
             "exit_reason": trade.get("exit_reason", ""),
-            "agents_agreed": self._extract_agents_count(trade),
         }
 
         return features
@@ -157,21 +156,6 @@ class TradeLabeler:
             return delta.total_seconds() / 60.0
         except Exception:
             return 0.0
-
-    def _extract_agents_count(self, trade: dict) -> int:
-        """Extract agents agreement count from trade record."""
-        # Prefer the directly stored field (written by log_trade since fix).
-        if trade.get("agents_agreed") and isinstance(trade["agents_agreed"], int):
-            return trade["agents_agreed"]
-        # Legacy fallback: parse from reasoning string.
-        # Supports: "Agents agreed N/6", "N agents aligned"
-        import re
-        reasoning = trade.get("reasoning") or ""
-        for pattern in (r"Agents agreed (\d+)/\d+", r"(\d+) agents aligned"):
-            match = re.search(pattern, reasoning, re.IGNORECASE)
-            if match:
-                return int(match.group(1))
-        return 0
 
     def create_dataset(self) -> pd.DataFrame | None:
         """Create labeled training dataset from all trades."""
@@ -241,7 +225,6 @@ class DeciferML:
             "time_of_day",
             "day_of_week",
             "is_after_hours",
-            "agents_agreed",
         ]
 
         # Add regime one-hot encoding
@@ -483,7 +466,6 @@ class SignalEnhancer:
           - vix: current VIX level
           - time_of_day: current hour (0-23)
           - holding_target: target holding period in minutes
-          - agents_agreed: how many agents agreed
 
         Returns:
           - enhanced_score: adjusted 0-50 score
@@ -511,7 +493,6 @@ class SignalEnhancer:
                 "time_of_day": symbol_data.get("time_of_day", 10),
                 "day_of_week": symbol_data.get("day_of_week", 0),
                 "is_after_hours": symbol_data.get("is_after_hours", False),
-                "agents_agreed": symbol_data.get("agents_agreed", 2),
                 "regime": symbol_data.get("regime", "UNKNOWN"),
             }
 

@@ -137,7 +137,6 @@ def _make_signal(symbol: str, direction: str = "LONG") -> Signal:
         },
         timestamp=datetime(2026, 3, 29, 10, 0, 0, tzinfo=UTC),
         regime_context="TRENDING_UP",
-        source_agents=[0, 1, 2, 3],
         rationale="Test rationale",
         price=100.0,
         atr=2.5,
@@ -166,7 +165,6 @@ class TestSignalDataclass(unittest.TestCase):
             "dimension_scores",
             "timestamp",
             "regime_context",
-            "source_agents",
             "rationale",
             "price",
             "atr",
@@ -194,7 +192,6 @@ class TestSignalDataclass(unittest.TestCase):
             regime_context="UNKNOWN",
         )
         self.assertEqual(s.rationale, "")
-        self.assertEqual(s.source_agents, [])
 
 
 class TestDispatchSignals(unittest.TestCase):

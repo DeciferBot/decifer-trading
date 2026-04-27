@@ -9,7 +9,7 @@
 
 import json
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
@@ -34,7 +34,6 @@ class Signal:
     dimension_scores: per-dimension breakdown {"trend": x, "momentum": y, ...} each 0–10
     timestamp       : UTC datetime when the signal was generated
     regime_context  : market regime label at time of signal ("TRENDING_UP" etc.)
-    source_agents   : list (unused in Apex 3.0 — always empty; retained for schema compat)
     rationale       : human-readable summary from the agent layer (optional)
     price           : last price at scoring time (needed by dispatcher for order sizing)
     atr             : Average True Range at scoring time (needed for stop calculation)
@@ -46,7 +45,6 @@ class Signal:
     dimension_scores: dict  # {"trend": 7, "momentum": 5, ...}
     timestamp: datetime
     regime_context: str
-    source_agents: list = field(default_factory=list)
     rationale: str = ""
     # Routing metadata — populated from raw scored dict, needed by execute_buy
     price: float = 0.0
@@ -64,7 +62,6 @@ class Signal:
             "dimension_scores": self.dimension_scores,
             "timestamp": self.timestamp.isoformat(),
             "regime_context": self.regime_context,
-            "source_agents": self.source_agents,
             "rationale": self.rationale,
             "price": self.price,
             "atr": self.atr,

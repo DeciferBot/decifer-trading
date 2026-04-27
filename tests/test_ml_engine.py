@@ -194,21 +194,6 @@ class TestTradeLabeler:
         assert "vix" in features
         assert "time_of_day" in features
         assert "day_of_week" in features
-        assert "agents_agreed" in features
-
-    def test_extract_features_agents_agreed_parsed(self):
-        """agents_agreed is extracted from reasoning string."""
-        lb = self._labeler([])
-        trade = _make_trade_record(reasoning="Agents agreed 4/6 — moderate")
-        features = lb.extract_features(trade)
-        assert features["agents_agreed"] == 4
-
-    def test_extract_features_agents_agreed_zero_if_no_match(self):
-        """agents_agreed defaults to 0 when pattern not found."""
-        lb = self._labeler([])
-        trade = _make_trade_record(reasoning="No pattern here")
-        features = lb.extract_features(trade)
-        assert features["agents_agreed"] == 0
 
     def test_extract_features_bad_entry_time_returns_none(self):
         """extract_features returns None when entry_time is missing/malformed."""
@@ -360,7 +345,6 @@ class TestDeciferML:
             "time_of_day": 10,
             "day_of_week": 0,
             "is_after_hours": False,
-            "agents_agreed": 5,
         }
         result = ml.predict(features)
         assert 0.0 <= result["win_prob"] <= 1.0

@@ -357,7 +357,6 @@ def dispatch_signals(
                         conviction=cls.conviction,
                         pattern_id=pattern_id,
                         market_read=market_read,
-                        agents_agreed=len(signal.source_agents or []),
                         entry_context=_entry_ctx,
                     )
                 else:
@@ -402,7 +401,6 @@ def dispatch_signals(
                         conviction=cls.conviction,
                         pattern_id=pattern_id,
                         market_read=market_read,
-                        agents_agreed=len(signal.source_agents or []),
                         entry_context=_entry_ctx,
                     )
                 else:

@@ -396,7 +396,6 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
         "reasoning": trade.get("reasoning"),
         "regime": regime.get("session_character") or regime.get("regime"),
         "vix": regime.get("vix"),
-        "agents_agreed": trade.get("agents_agreed", 0),
         "pnl": outcome.get("pnl") if outcome else None,
         "pnl_pct": outcome.get("pnl_pct") if outcome else None,
         "exit_reason": outcome.get("reason") if outcome else None,
@@ -538,7 +537,6 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
             "instrument": trade.get("instrument", "stock"),
             "score": record.get("score"),
             "score_breakdown": record.get("score_breakdown", {}),
-            "agents_agreed": record.get("agents_agreed", 0),
             "regime": record.get("regime"),
             "entry_price": record.get("entry_price"),
             # agent_votes — present when agent_outputs contains structured votes
