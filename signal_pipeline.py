@@ -121,7 +121,7 @@ class SignalPipelineResult:
     signals       : List[Signal] — typed Signal objects above the score threshold.
                     Consumed by signal_dispatcher for order routing.
     scored        : List[dict]  — raw scored dicts above the score threshold.
-                    Consumed by run_all_agents() (which expects raw dicts) and
+                    Consumed by apex_orchestrator (via guardrails) and
                     update_position_prices().
     all_scored    : List[dict]  — all scored symbols including below-threshold.
                     Consumed by log_signal_scan() for IC tracking (already called

@@ -15,7 +15,7 @@ Pre-session catalyst pipeline.
 Rationale:
   The CatalystEngine scores candidates in the background (fundamental +
   options anomaly + EDGAR + sentiment) but nothing currently hands the
-  top-ranked ones to the 4-agent pipeline before 09:30 ET. By the time
+  top-ranked ones to the Apex scan cycle before 09:30 ET. By the time
   intraday scans fire, overnight alpha has already been priced in.
 
 Flow:

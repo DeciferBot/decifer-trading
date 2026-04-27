@@ -34,7 +34,7 @@ class Signal:
     dimension_scores: per-dimension breakdown {"trend": x, "momentum": y, ...} each 0–10
     timestamp       : UTC datetime when the signal was generated
     regime_context  : market regime label at time of signal ("TRENDING_UP" etc.)
-    source_agents   : list of agent IDs that agreed on this signal (populated post-agents)
+    source_agents   : list (unused in Apex 3.0 — always empty; retained for schema compat)
     rationale       : human-readable summary from the agent layer (optional)
     price           : last price at scoring time (needed by dispatcher for order sizing)
     atr             : Average True Range at scoring time (needed for stop calculation)

@@ -29,11 +29,10 @@ Three actors:
 - **Three-tier universe — Active ✅**: TV Screener ripped out. Universe is now: committed universe (top-1000 by dollar volume, weekly refresh) + dynamic adds (catalyst hits, held positions, favourites, sympathy plays, news-driven).
 - **Catalyst screener — Active ✅**: `catalyst_engine.py` scores EDGAR filings, earnings surprises, and analyst actions in real-time. High-conviction catalyst hits get a flat score boost to clear `min_score_to_trade`.
 - **Full architecture audit — Complete ✅** (2026-04-22): 27-issue audit, 24 fixes shipped.
-- **Decifer 3.0 "Apex" — Live ✅** (cutover 2026-04-24): The 4-agent pipeline is replaced by the **Apex Single-Synthesizer** — one `apex_call()` via `claude-sonnet-4-6`. Three Sonnet calls per cycle: Track A (new entries), Track B PM (TRIM/EXIT/HOLD), Shadow (divergence log). Legacy code preserved behind `USE_LEGACY_PIPELINE` flag; rollback = flip flag + restart. `run_all_agents()` bypassed in Apex mode (Phase 8B fix, 2026-04-25).
-- **Weekend Robustness Pass 1 — Complete ✅** (2026-04-25): Entry floor rule added to system prompt (≥3 candidates score ≥35 → must produce ≥1 entry); `FEAR_ELEVATED` clarified as regime descriptor not AVOID mandate; `divergence_flags` clarified as instrument-selector not trade-vetor; fallback path logs ERROR; zero-entries observability raised to WARNING; `pnl_pct=None` crash in PM Track B fixed; brain.py "0/4 agents" label fixed to "Apex Synthesizer".
-- **Monday Preflight — Complete ✅** (2026-04-25): DAR=None rendered as `DAR=pre-mkt` with explicit model instruction (was being cited as conviction blocker); 30-candidate cap added to prevent token truncation; NEWS_INTERRUPT pre-scores the catalyst symbol before calling Apex so Track A has a real candidate; TRACK_B_PM no-op gate added (skip PM call when no slots and no flagged positions).
+- **Decifer 3.0 "Apex" — Live ✅** (cutover 2026-04-24): The 4-agent pipeline is replaced by the **Apex Single-Synthesizer** — one `apex_call()` via `claude-sonnet-4-6`. Three Sonnet calls per cycle: Track A (new entries), Track B PM (TRIM/EXIT/HOLD), Shadow (divergence log). Legacy code (`agents.py`, `sentinel_agents.py` pipeline, `run_portfolio_review()`, buy loop) was deleted at post-migration cleanup (2026-04-27). No rollback path — forward only.
+- **Post-migration cleanup — Complete ✅** (2026-04-27): `agents.py` deleted, legacy buy loop deleted, 3 migration flags collapsed, 5 Phase 8A test files renamed to permanent regression names. Test suite: **1931 passing**. Tag: `decifer-3.0-post-migration-cleanup`.
 - **Phase B / C / D — Not yet built**: Signal validation (Alphalens), HMM regime detection, walk-forward weight calibration. All blocked on trade data volume.
-- **Test suite**: ~2074 passing (2026-04-25). Tests are current with the codebase.
+- **Test suite**: 1931 passing (2026-04-27). Tests are current with the codebase.
 - **Regime detector**: VIX-proxy + SPY EMA (locked). HMM explicitly deferred until ≥200 closed trades.
 
 ---
@@ -87,8 +86,8 @@ OTM options (δ 0.30–0.40) have higher leverage per dollar of premium — but 
 2. **Gamma/theta ratio** — ATM options have maximum gamma per unit of theta. OTM options at short DTE decay catastrophically fast and require a large move AND correct timing; ATM only requires directional correctness.
 3. **Signal type** — Decifer's momentum/breakout signals fire when a stock is already moving. ATM captures that move immediately. OTM requires the move to exceed the strike before theta erodes the position.
 
-### News Sentinel: 3-Agent Pipeline, Not 4
-Speed matters for breaking news (15-30 second window). Full 4-agent pipeline takes 5-10 minutes. Sentinel uses Catalyst Analyst + Risk Gate + Instant Decision. Position sizing is 0.75× to compensate for lighter analysis. Hardcoded risk limits still apply.
+### News Sentinel: Single Apex Call, Not 3-Agent Pipeline
+Speed matters for breaking news. `handle_news_trigger()` calls `build_news_trigger_payload()` then routes through `apex_orchestrator._run_apex_pipeline(execute=True)`. The catalyst symbol is pre-scored so Apex has a real Track A candidate. Position sizing is 0.75× sentinel multiplier. Hardcoded risk limits still apply.
 
 ### Smart Execution: $10K / 500-Share Threshold
 TWAP/VWAP/Iceberg only for orders above $10K notional or 500 shares. Smaller orders use simple limit orders. Smart execution adds latency — for small orders the market impact is negligible.
