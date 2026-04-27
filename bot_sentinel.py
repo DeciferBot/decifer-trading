@@ -22,7 +22,7 @@ from orders_core import execute_buy, execute_sell
 from orders_portfolio import get_open_positions
 from position_sizing import calculate_stops
 from risk import calculate_position_size, check_risk_conditions, get_scan_interval, is_trading_day
-from sentinel_agents import run_sentinel_pipeline
+from sentinel_agents import build_news_trigger_payload
 from theme_tracker import build_sentinel_universe
 
 log = logging.getLogger("decifer.bot")
@@ -92,170 +92,77 @@ def handle_news_trigger(trigger: dict):
 
         clog("SIGNAL", f"🚨 SENTINEL TRIGGER: {sym} | {trigger.get('direction')} | urgency={trigger.get('urgency')}")
 
-        # Phase 5 completion: the legacy 3-agent sentinel pipeline is gated
-        # behind a safety_overlay flag (default True — authoritative today).
-        # The Phase 6 cutover flips the flag and replaces the else branch with
-        # an Apex NEWS_INTERRUPT dispatch built from
-        # sentinel_agents.build_news_trigger_payload().
+        decision = {
+            "action": "SKIP",
+            "symbol": sym,
+            "qty": 0, "sl": 0, "tp": 0, "instrument": "stock",
+            "confidence": 0,
+            "reasoning": "apex news-interrupt",
+            "trigger_type": "news_sentinel",
+        }
         try:
-            import safety_overlay as _so_sent
-            _sent_legacy_on = _so_sent.sentinel_legacy_pipeline_enabled()
-        except Exception:
-            _sent_legacy_on = True  # fail-safe: preserve legacy live behavior
-        if _sent_legacy_on:
-            decision = run_sentinel_pipeline(
+            import apex_orchestrator as _aorch_s
+            from signal_dispatcher import dispatch as _apex_dispatch
+
+            _s_scored_candidate = None
+            try:
+                from signals import score_universe as _su_ni
+                _regime_str = regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN"
+                _ni_above, _ = _su_ni(
+                    [sym],
+                    regime=_regime_str,
+                    ib=ib,
+                    regime_dict=regime if isinstance(regime, dict) else None,
+                )
+                if _ni_above:
+                    _s_scored_candidate = _ni_above[0]
+                    clog("INFO", f"Sentinel {sym}: pre-scored for NEWS_INTERRUPT — score={_s_scored_candidate.get('score')}")
+                else:
+                    clog("INFO", f"Sentinel {sym}: pre-score returned no candidate above threshold — passing empty")
+            except Exception as _ni_score_err:
+                log.warning("Sentinel %s: pre-score failed (%s) — passing scored_candidate=None", sym, _ni_score_err)
+
+            _s_apex_input = build_news_trigger_payload(
                 trigger=trigger,
                 open_positions=open_pos,
                 portfolio_value=pv,
                 daily_pnl=pnl,
                 regime=regime,
+                scored_candidate=_s_scored_candidate,
             )
-
-            # ── Phase 7C.1B — NEWS_INTERRUPT shadow + divergence record ────
-            # When USE_APEX_V3_SHADOW is on, run the Apex path in parallel
-            # (execute=False, no orders) and write a comparable legacy/Apex
-            # divergence record. Read-only: no state mutation, no dispatch.
-            try:
-                import safety_overlay as _so_shadow_ni
-                if _so_shadow_ni.should_run_apex_shadow():
-                    import apex_divergence as _AD_ni
-                    import apex_orchestrator as _aorch_ni
-                    from sentinel_agents import build_news_trigger_payload as _bntp
-                    _ni_input = _bntp(
-                        trigger=trigger,
-                        open_positions=open_pos,
-                        portfolio_value=pv,
-                        daily_pnl=pnl,
-                        regime=regime,
-                        scored_candidate=None,
-                    )
-                    _ni_shadow = _aorch_ni._run_apex_pipeline(
-                        _ni_input, candidates_by_symbol={}, execute=False
-                    )
-                    _aorch_ni.log_shadow_result(
-                        "NEWS_INTERRUPT", _ni_shadow,
-                        trigger_context=_ni_input.get("trigger_context"),
-                    )
-                    # Legacy mirror built from the already-computed legacy
-                    # sentinel decision. No re-dispatch; read-only.
-                    _ni_legacy_entries = []
-                    _ni_act = (decision.get("action") or "SKIP").upper()
-                    if _ni_act in ("BUY", "SELL"):
-                        _ni_legacy_entries.append({
-                            "symbol": decision.get("symbol") or sym,
-                            "direction": "LONG" if _ni_act == "BUY" else "SHORT",
-                            "trade_type": decision.get("trade_type"),
-                            "instrument": decision.get("instrument", "stock"),
-                            "qty": decision.get("qty"),
-                            "stop_loss": decision.get("sl"),
-                            "take_profit": decision.get("tp"),
-                        })
-                    _ni_legacy_mirror = _AD_ni.mirror_legacy_decision(
-                        cycle_id=f"news-{sym}-{datetime.now(_ET).strftime('%H%M%S')}",
-                        trigger_type="NEWS_INTERRUPT",
-                        new_entries=_ni_legacy_entries,
-                    )
-                    _ni_apex_mirror = _AD_ni.mirror_apex_decision(
-                        cycle_id=_ni_legacy_mirror["cycle_id"],
-                        trigger_type="NEWS_INTERRUPT",
-                        pipeline_result=_ni_shadow,
-                        candidates_by_symbol={},
-                    )
-                    _ni_events = _AD_ni.classify(_ni_legacy_mirror, _ni_apex_mirror)
-                    _AD_ni.write_divergence_record(
-                        legacy_mirror=_ni_legacy_mirror,
-                        apex_mirror=_ni_apex_mirror,
-                        events=_ni_events,
-                    )
-            except Exception as _ni_shadow_err:
-                log.warning("apex_divergence NEWS_INTERRUPT write failed (non-fatal): %s", _ni_shadow_err)
-        else:
-            # Phase 6D cutover branch (OFF BY DEFAULT — legacy flag above is
-            # True). When Phase 7 flips SENTINEL_LEGACY_PIPELINE_ENABLED to
-            # False, this branch becomes live: build an Apex NEWS_INTERRUPT
-            # ApexInput, call market_intelligence.apex_call, dispatch via
-            # signal_dispatcher.dispatch. Until cutover, execute=False.
-            clog("INFO", f"Sentinel {sym}: legacy disabled — invoking Apex NEWS_INTERRUPT cutover branch")
-            decision = {
-                "action": "SKIP",
-                "symbol": sym,
-                "qty": 0, "sl": 0, "tp": 0, "instrument": "stock",
-                "confidence": 0,
-                "reasoning": "apex news-interrupt cutover dry-run",
-                "trigger_type": "news_sentinel",
-            }
-            try:
-                import apex_orchestrator as _aorch_s
-                import safety_overlay as _so_s
-                from sentinel_agents import build_news_trigger_payload
-                from signal_dispatcher import dispatch as _apex_dispatch
-
-                # Pre-score the triggered symbol so Apex has a real candidate
-                # instead of an empty Track A.  score_universe([sym]) is a
-                # targeted single-symbol call — safe on the sentinel thread.
-                _s_scored_candidate = None
-                try:
-                    from signals import score_universe as _su_ni
-                    _regime_str = regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN"
-                    _ni_above, _ = _su_ni(
-                        [sym],
-                        regime=_regime_str,
-                        ib=ib,
-                        regime_dict=regime if isinstance(regime, dict) else None,
-                    )
-                    if _ni_above:
-                        _s_scored_candidate = _ni_above[0]
-                        clog("INFO", f"Sentinel {sym}: pre-scored for NEWS_INTERRUPT — score={_s_scored_candidate.get('score')}")
-                    else:
-                        clog("INFO", f"Sentinel {sym}: pre-score returned no candidate above threshold — passing empty")
-                except Exception as _ni_score_err:
-                    log.warning("Sentinel %s: pre-score failed (%s) — passing scored_candidate=None", sym, _ni_score_err)
-
-                _s_apex_input = build_news_trigger_payload(
-                    trigger=trigger,
-                    open_positions=open_pos,
-                    portfolio_value=pv,
-                    daily_pnl=pnl,
-                    regime=regime,
-                    scored_candidate=_s_scored_candidate,
-                )
-                _s_shadow = _aorch_s._run_apex_pipeline(
-                    _s_apex_input, candidates_by_symbol={}, execute=False
-                )
-                _aorch_s.log_shadow_result(
-                    "NEWS_INTERRUPT", _s_shadow,
-                    trigger_context=_s_apex_input.get("trigger_context"),
-                )
-                _s_execute = not _so_s.should_use_legacy_pipeline()
-                _s_report = _apex_dispatch(
-                    _s_shadow.get("decision") or {},
-                    candidates_by_symbol={},
-                    active_trades={p.get("symbol"): p for p in open_pos if p.get("symbol")},
-                    ib=ib,
-                    portfolio_value=pv,
-                    regime=regime,
-                    execute=_s_execute,
-                )
-                # Surface the first Track A entry as the decision so the
-                # existing downstream BUY/SELL/HOLD switch below still runs
-                # shape-compatibly. No orders fire unless _s_execute=True.
-                _entries = _s_report.get("new_entries") or []
-                if _entries:
-                    _e = _entries[0]
-                    decision.update({
-                        "action": "BUY" if (_e.get("direction") == "LONG") else (
-                            "SELL" if _e.get("direction") == "SHORT" else "SKIP"
-                        ),
-                        "symbol": _e.get("symbol") or sym,
-                        "qty": int(_e.get("qty") or 0),
-                        "sl": float(_e.get("sl") or 0),
-                        "tp": float(_e.get("tp") or 0),
-                        "instrument": _e.get("instrument") or "stock",
-                        "confidence": 7 if _e.get("conviction") == "HIGH" else 5,
-                        "reasoning": _e.get("rationale") or decision["reasoning"],
-                    })
-            except Exception as _s_cut_err:
-                log.error(f"Sentinel cutover branch failed for {sym}: {_s_cut_err}")
+            _s_shadow = _aorch_s._run_apex_pipeline(
+                _s_apex_input, candidates_by_symbol={}, execute=False
+            )
+            _aorch_s.log_shadow_result(
+                "NEWS_INTERRUPT", _s_shadow,
+                trigger_context=_s_apex_input.get("trigger_context"),
+            )
+            _s_report = _apex_dispatch(
+                _s_shadow.get("decision") or {},
+                candidates_by_symbol={},
+                active_trades={p.get("symbol"): p for p in open_pos if p.get("symbol")},
+                ib=ib,
+                portfolio_value=pv,
+                regime=regime,
+                execute=True,
+            )
+            _entries = _s_report.get("new_entries") or []
+            if _entries:
+                _e = _entries[0]
+                decision.update({
+                    "action": "BUY" if (_e.get("direction") == "LONG") else (
+                        "SELL" if _e.get("direction") == "SHORT" else "SKIP"
+                    ),
+                    "symbol": _e.get("symbol") or sym,
+                    "qty": int(_e.get("qty") or 0),
+                    "sl": float(_e.get("sl") or 0),
+                    "tp": float(_e.get("tp") or 0),
+                    "instrument": _e.get("instrument") or "stock",
+                    "confidence": 7 if _e.get("conviction") == "HIGH" else 5,
+                    "reasoning": _e.get("rationale") or decision["reasoning"],
+                })
+        except Exception as _s_cut_err:
+            log.error(f"Sentinel Apex NEWS_INTERRUPT failed for {sym}: {_s_cut_err}")
 
         dash["sentinel_triggers"].insert(
             0,
@@ -488,33 +395,17 @@ def handle_catalyst_trigger(trigger: dict):
             f"urgency={trigger.get('urgency')} | {trigger.get('claude_catalyst', '')[:60]}",
         )
 
-        # Phase 5 completion: catalyst trigger path is also gated.
-        try:
-            import safety_overlay as _so_cat
-            _cat_legacy_on = _so_cat.sentinel_legacy_pipeline_enabled()
-        except Exception:
-            _cat_legacy_on = True
-        if _cat_legacy_on:
-            decision = run_sentinel_pipeline(
-                trigger=trigger,
-                open_positions=open_pos,
-                portfolio_value=pv,
-                daily_pnl=pnl,
-                regime=regime,
-            )
-        else:
-            clog("INFO", f"Catalyst {sym}: legacy pipeline disabled by safety_overlay — SKIP")
-            decision = {
-                "action": "SKIP",
-                "symbol": sym,
-                "qty": 0,
-                "sl": 0,
-                "tp": 0,
-                "instrument": "stock",
-                "confidence": 0,
-                "reasoning": "sentinel legacy pipeline disabled",
-                "trigger_type": "catalyst",
-            }
+        decision = {
+            "action": "SKIP",
+            "symbol": sym,
+            "qty": 0,
+            "sl": 0,
+            "tp": 0,
+            "instrument": "stock",
+            "confidence": 0,
+            "reasoning": "catalyst routed via news-interrupt Apex path",
+            "trigger_type": "catalyst",
+        }
 
         dash.setdefault("catalyst_triggers", []).insert(
             0,

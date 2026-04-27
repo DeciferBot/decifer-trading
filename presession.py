@@ -328,43 +328,19 @@ def presession_catalyst_pipeline() -> dict:
         portfolio_value = float(CONFIG.get("starting_capital", 1_000_000))
         daily_pnl = 0.0  # pre-session; PnL hasn't started accruing yet
 
-        # Import sentinel lazily so a presession failure doesn't break imports
-        # elsewhere. anthropic client instantiation happens here.
-        try:
-            from sentinel_agents import run_sentinel_pipeline
-        except Exception as exc:
-            summary["reason"] = f"sentinel_import_failed:{exc}"
-            log.error("presession: sentinel import failed — %s", exc)
-            return summary
-
         approvals = 0
         for candidate in candidates:
             sym = candidate.get("ticker", "?")
             try:
                 trigger = _build_trigger(candidate)
-                # Phase 5 completion: legacy sentinel pipeline gated.
-                try:
-                    import safety_overlay as _so_ps
-                    _ps_legacy_on = _so_ps.sentinel_legacy_pipeline_enabled()
-                except Exception:
-                    _ps_legacy_on = True
-                if _ps_legacy_on:
-                    decision = run_sentinel_pipeline(
-                        trigger=trigger,
-                        open_positions=open_positions,
-                        portfolio_value=portfolio_value,
-                        daily_pnl=daily_pnl,
-                        regime=regime,
-                    )
-                else:
-                    decision = {
-                        "action": "SKIP",
-                        "symbol": sym,
-                        "qty": 0,
-                        "confidence": 0,
-                        "reasoning": "sentinel legacy pipeline disabled",
-                        "trigger_type": "presession",
-                    }
+                decision = {
+                    "action": "SKIP",
+                    "symbol": sym,
+                    "qty": 0,
+                    "confidence": 0,
+                    "reasoning": "presession scoring only — execution via NEWS_INTERRUPT Apex path",
+                    "trigger_type": "presession",
+                }
                 action = decision.get("action", "SKIP")
                 if action and action.upper() not in ("SKIP", "NO_TRADE", "HOLD"):
                     approvals += 1

@@ -64,6 +64,35 @@ for _decifer_mod in ("orders", "risk", "scanner", "signals", "news", "agents"):
 # Import the REAL orders module (conftest has already patched all heavy deps)
 import orders
 
+# ── Redirect trade_log DB to an isolated temp file for this test module ───────
+# execute_buy/execute_short call trade_log.append_event("ORDER_INTENT", ...) which
+# writes to the SQLite DB. Without redirection, these writes pollute data/decifer.db
+# and can trigger the startup migration to incorrectly close real live positions.
+import pathlib
+import tempfile
+import trade_log as _test_tl
+
+_test_db_tmp = pathlib.Path(tempfile.mktemp(suffix="_test_orders.db"))
+_test_tl_orig_path = _test_tl._DB_PATH
+_test_tl_orig_conn = _test_tl._conn
+_test_tl._DB_PATH = _test_db_tmp
+_test_tl._conn = None
+
+
+def teardown_module(module):
+    _test_tl._DB_PATH = _test_tl_orig_path
+    _test_tl._conn = _test_tl_orig_conn
+    try:
+        if _test_db_tmp.exists():
+            _test_db_tmp.unlink()
+        for _ext in (".db-shm", ".db-wal"):
+            _p = pathlib.Path(str(_test_db_tmp) + _ext)
+            if _p.exists():
+                _p.unlink()
+    except Exception:
+        pass
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIG FIXTURE
 # ─────────────────────────────────────────────────────────────────────────────

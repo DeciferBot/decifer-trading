@@ -13,7 +13,6 @@ Exposed surface:
     can_submit_order(action)         → (allowed, reason)
     run_circuit_breakers(pv, pnl)    → (ok, reason, mode)  mode ∈ {"ok","manage_only","halt"}
     preflight_reconcile(ib)          → syncs internal state to IBKR truth
-    should_use_legacy_pipeline()     → bool
     should_run_apex_shadow()         → bool
 
 No persistence, no network. Reads CONFIG, reads active_trades, calls existing
@@ -35,11 +34,8 @@ _DEFAULTS: dict = {
     "LIVE_TRADING_ENABLED": True,
     "NEW_ENTRIES_ENABLED": True,
     "FORCE_MANAGE_ONLY": False,
-    "USE_LEGACY_PIPELINE": False,  # Phase 8 cutover: Apex owns execute paths
-    "USE_APEX_V3_SHADOW": True,    # shadow+divergence logging ON
-    "PM_LEGACY_OPUS_REVIEW_ENABLED": False,    # Phase 8 cutover: PM Track B through Apex
-    "SENTINEL_LEGACY_PIPELINE_ENABLED": False, # Phase 8 cutover: Sentinel NI through Apex
-    "FINBERT_MATERIALITY_GATE_ENABLED": True,  # Phase 8 cutover: FinBERT materiality gate ON
+    "USE_APEX_V3_SHADOW": True,    # shadow+divergence logging (operational)
+    "FINBERT_MATERIALITY_GATE_ENABLED": True,
     "daily_loss_halt_new_entries_pct": 0.03,   # -3% blocks new entries
     "daily_loss_manage_only_pct": 0.05,        # -5% switches to manage-only (aligns with daily_loss_limit)
     "per_symbol_hard_loss_pct": None,          # e.g. -0.15 → force exit on -15% per-position unreal.; None disables
@@ -200,11 +196,6 @@ def preflight_reconcile(ib) -> dict:
 
 # ── Pipeline selection helpers (for future Phase 6 wiring) ───────────────────
 
-def should_use_legacy_pipeline() -> bool:
-    """Until Phase 6 flips this, legacy is the only live path."""
-    return bool(flag("USE_LEGACY_PIPELINE"))
-
-
 def should_run_apex_shadow() -> bool:
     """Shadow mode: run new path in parallel but do NOT submit its orders."""
     return bool(flag("USE_APEX_V3_SHADOW"))
@@ -223,29 +214,3 @@ def finbert_materiality_gate_enabled() -> bool:
     return bool(flag("FINBERT_MATERIALITY_GATE_ENABLED"))
 
 
-def sentinel_legacy_pipeline_enabled() -> bool:
-    """
-    Gate for the legacy 3-agent news sentinel pipeline
-    (sentinel_agents.run_sentinel_pipeline — agent_catalyst + agent_risk_gate
-    + agent_instant_decision).
-
-    Default True — authoritative until the Phase 6 cutover. When False, the
-    live call sites in bot_sentinel.handle_news_trigger and presession short-
-    circuit with a SKIP decision instead of issuing the Sonnet + Opus LLM
-    calls. Phase 6 replaces the False branch with an Apex NEWS_INTERRUPT
-    dispatch built from build_news_trigger_payload().
-    """
-    return bool(flag("SENTINEL_LEGACY_PIPELINE_ENABLED"))
-
-
-def pm_legacy_opus_review_enabled() -> bool:
-    """
-    Gate for the legacy portfolio_manager.run_portfolio_review() Opus call.
-
-    Default True — the legacy PM review path is authoritative until the Phase 6
-    cutover. Flipping to False short-circuits the live call site in
-    bot_trading.py so no Opus review prompt is issued and no _parse_actions()
-    regex parse runs. The Phase 6 cutover replaces the False branch with an
-    Apex Track B dispatch.
-    """
-    return bool(flag("PM_LEGACY_OPUS_REVIEW_ENABLED"))

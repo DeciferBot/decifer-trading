@@ -39,14 +39,13 @@ re-evaluated for rollbacks (rollback = safety action, never blocked).
 
 Flip order (canonical)
 ──────────────────────
-The Phase 7 master plan flips flags in this order, one at a time, with a
-shadow observation window between each:
+The Phase 7 master plan flipped flags in this order, one at a time, with a
+shadow observation window between each. All five flags are now at their
+post-cutover values. USE_APEX_V3_SHADOW and FINBERT_MATERIALITY_GATE_ENABLED
+remain as live operational flags; the other three were removed at cleanup.
 
-    1. USE_APEX_V3_SHADOW               : False → True   (observation on)
-    2. FINBERT_MATERIALITY_GATE_ENABLED : False → True   (news gate cutover)
-    3. PM_LEGACY_OPUS_REVIEW_ENABLED    : True  → False  (Apex Track B live)
-    4. SENTINEL_LEGACY_PIPELINE_ENABLED : True  → False  (Apex NEWS_INTERRUPT live)
-    5. USE_LEGACY_PIPELINE              : True  → False  (full cutover)
+    1. USE_APEX_V3_SHADOW               : False → True   (observation on) ✓
+    2. FINBERT_MATERIALITY_GATE_ENABLED : False → True   (news gate cutover) ✓
 
 The proposer enforces this order: it will WARN when a flip is proposed out
 of order. It does not strictly block — the operator retains authority — but
@@ -100,17 +99,11 @@ _AUDIT_DIR_DEFAULT = "data/apex_flip_audit"
 FLIP_SEQUENCE: list[tuple[str, bool, bool]] = [
     ("USE_APEX_V3_SHADOW",               False, True),
     ("FINBERT_MATERIALITY_GATE_ENABLED", False, True),
-    ("PM_LEGACY_OPUS_REVIEW_ENABLED",    True,  False),
-    ("SENTINEL_LEGACY_PIPELINE_ENABLED", True,  False),
-    ("USE_LEGACY_PIPELINE",              True,  False),
 ]
 
 _FLAG_ACCESSOR = {
     "USE_APEX_V3_SHADOW":               "should_run_apex_shadow",
     "FINBERT_MATERIALITY_GATE_ENABLED": "finbert_materiality_gate_enabled",
-    "PM_LEGACY_OPUS_REVIEW_ENABLED":    "pm_legacy_opus_review_enabled",
-    "SENTINEL_LEGACY_PIPELINE_ENABLED": "sentinel_legacy_pipeline_enabled",
-    "USE_LEGACY_PIPELINE":              "should_use_legacy_pipeline",
 }
 
 

@@ -1,0 +1,85 @@
+{
+  "session_id": "2026-04-24_decifer-3-0-cutover",
+  "date": "2026-04-24",
+  "approved_by": "Amit",
+  "topic": "Decifer 3.0 cutover — flip all six legacy flags off, bump version label everywhere",
+  "north_star_pillars": [1, 2, 3],
+
+  "summary": "Completed the Phase 8 cutover to the Single-Apex Synthesizer architecture. Amit explicitly overrode the Phase 7B ≥20-shadow-cycle gate and instructed: 'flip everything, make it work as intended, i override and give you permission to go.' Flipped six flags in config.py and safety_overlay.py defaults so the running bot, on restart, routes scan-cycle Track A, PM Track B, and Sentinel NEWS_INTERRUPT through the Apex execute path instead of the legacy 4-agent/Opus pipelines. Updated 11 test files to match the inverted defaults. All 2064 tests pass. Bot restarted and confirmed live on 3.0 flags. Separately, Amit noticed the runtime startup log and dashboard still said '2.0' — root cause was version.py never being bumped and three hardcoded '2.0' strings in dashboard.py. Bumped version.py to 3.0.0 codename 'Apex' and fixed the hardcoded labels.",
+
+  "motivation": "Phase 8 Step 1 (shadow-logging activation) was verified earlier tonight with a well-formed scan-1 record in data/apex_shadow_log.jsonl. Amit's directive tonight was to finish the project — have Decifer 3.0 running when he returns. The execute-path plumbing had already landed in Phase 8A commits (3b61141, 799f425, eb0cdcd); only the flag flips remained. Legacy code was preserved behind flags per earlier standing directive ('Do NOT delete any legacy code tonight') so rollback is one git revert away.",
+
+  "changes": {
+    "config.py": {
+      "description": "Six flag values flipped to post-cutover state: USE_LEGACY_PIPELINE=False, USE_APEX_V3_SHADOW=True, PM_LEGACY_OPUS_REVIEW_ENABLED=False, SENTINEL_LEGACY_PIPELINE_ENABLED=False, TRADE_ADVISOR_ENABLED=False, FINBERT_MATERIALITY_GATE_ENABLED=True.",
+      "impact": "Scan-cycle Track A routes through _run_apex_pipeline(execute=True). PM Track B dispatches TRIM/EXIT/HOLD directly from Apex. Sentinel NEWS_INTERRUPT builds an ApexInput and calls the Apex. Deterministic sizing (ATR × CONVICTION_MULT) replaces trade_advisor. News materiality gate reads finbert_confidence ≥ 4.",
+      "commit": "69df171"
+    },
+    "safety_overlay.py": {
+      "description": "_DEFAULTS updated to match config.py so the fallback layer and the primary config agree. No split-brain.",
+      "commit": "69df171"
+    },
+    "tests/ (11 files)": {
+      "description": "20 flag-default assertions inverted to new defaults. test_apex_flip_proposer.py given a legacy_flag_state monkeypatch fixture so its 9 forward-walk tests keep validating the proposer tool from a simulated legacy starting state. test_apex_phase7_7c9_deletion_readiness.py function renamed to test_all_phase8_cutover_flag_defaults.",
+      "commit": "69df171"
+    },
+    "version.py": {
+      "description": "Bumped 2.0.0 'Paper Alpha' → 3.0.0 'Apex'. bump-version.sh skipped because it auto-pushes and 26 local commits were queued.",
+      "commit": "da163ff"
+    },
+    "dashboard.py": {
+      "description": "Three hardcoded '2.0' labels flipped to '3.0': browser tab title (line 6), top-left logo badge (line 396), footer credit (line 4612). bot.py:83 only replaces 'Autonomous AI Trading' with '· v3.0.0' — these three were independent.",
+      "commit": "da163ff"
+    },
+    "Decifer.command": {
+      "description": "Startup banner 'v2.0' → 'v3.0'.",
+      "commit": "da163ff"
+    },
+    "DECIFER_3_0_CUTOVER_HANDOFF.md": {
+      "description": "Full handoff doc: flag before/after table, activation procedure (bot restart required), what to watch for on first post-restart scan, rollback instructions (single git revert of 69df171).",
+      "commit": "9859c06"
+    }
+  },
+
+  "what_did_not_change": [
+    "Legacy code paths (run_portfolio_review, run_sentinel_pipeline, trade_advisor.advise_trade, agents.py four-agent code) — preserved behind flags per earlier directive. Rollback is one commit.",
+    "Model — kept at claude_model_alpha=claude-sonnet-4-6 per Amit's one-word answer 'sonnet' during cutover decision.",
+    "Master-plan Phases 1/3/4/5/6 (deletion of market_intelligence legacy code, agents.py, trade_advisor.py, Opus call in portfolio_manager) — deferred as supervised refactor, to be done during market hours after cutover proves stable for ≥1 day.",
+    "Phase 7B hard-gate shadow verification — Amit explicitly overrode the ≥20-cycle requirement."
+  ],
+
+  "decisions_made": [
+    "OVERRIDE LOCKED: Amit accepted the risk of skipping Phase 7B gate. The DECIFER_3_0_CUTOVER_HANDOFF.md documents this in 'What Did NOT Happen Tonight'.",
+    "Legacy code preserved, not deleted. Flag-gated rollback chosen over immediate refactor. Deletion phases move to a supervised follow-up session.",
+    "Apex model = Sonnet, not Opus. Direct user answer.",
+    "No silent legacy fallback. If apex_call() errors, the cycle is a no-op — legacy is disabled, not a backstop."
+  ],
+
+  "verification_done": [
+    "pytest tests/ -q → 2064 passed, 0 failed, 1 skipped (182s).",
+    "Bot restarted by user; 'ok i restarted' confirmation received.",
+    "Six flags verified at new values in the running process."
+  ],
+
+  "verification_pending": [
+    "First post-restart scan — expect 'APEX_LIVE SCAN_CYCLE:' log line per cycle. Absence means the cutover guard didn't trigger.",
+    "First real BUY through the cutover — verify orders_core.execute_buy received sane qty/sl/tp from CONVICTION_MULT × ATR path; cross-check data/trades.json against data/apex_shadow_log.jsonl decision.",
+    "Watch for _fallback_decision() firing (empty entries + all HOLDs) in apex_shadow_log.jsonl apex_meta.attempts > 1 — should be rare.",
+    "Forced exits still fire outside Apex (EOD, 90-min INTRADAY timeout, long-only-in-SHORT, UNKNOWN trade_type) via dispatch_forced_exit(..., execute=True).",
+    "Bot must be restarted a second time so version 3.0.0 reflects in runtime log and dashboard — version.py + dashboard.py changes committed after the first restart."
+  ],
+
+  "commits": [
+    "69df171 refactor(apex): Phase 8 cutover — flip all five remaining flags to Apex",
+    "9859c06 docs(apex): Decifer 3.0 cutover handoff",
+    "da163ff chore(version): bump to 3.0.0 \"Apex\" and refresh dashboard labels"
+  ],
+
+  "rollback": "git revert --no-edit 69df171 && restart — restores all six flags to legacy defaults.",
+
+  "process_notes": [
+    "bump-version.sh auto-pushes (git push && git push origin --tags) at the end. With 26 local commits queued, this would have pushed everything uninvited. Manual edit of version.py is correct when you need commit-without-push control.",
+    "After running 'git add -A' accidentally swept runtime state (pyc, db, jsonl) into the stage earlier tonight. Recovered with git reset HEAD and explicit git add for only tracked source files. Do not use -A when the working tree has bot-state noise.",
+    "26 commits pushed to origin/master in one go at the end of session (phase 8 cutover chain + handoff doc + version bump)."
+  ]
+}

@@ -32,9 +32,6 @@ import apex_flip_proposer as fp  # noqa: E402
 _LEGACY_STATE: dict = {
     "USE_APEX_V3_SHADOW": False,
     "FINBERT_MATERIALITY_GATE_ENABLED": False,
-    "PM_LEGACY_OPUS_REVIEW_ENABLED": True,
-    "SENTINEL_LEGACY_PIPELINE_ENABLED": True,
-    "USE_LEGACY_PIPELINE": True,
 }
 
 
@@ -52,12 +49,9 @@ def legacy_flag_state(monkeypatch):
 def test_read_current_flag_state_returns_all_flags():
     state = fp.read_current_flag_state()
     assert set(state.keys()) == set(fp._FLAG_ACCESSOR.keys())
-    # Phase 8 cutover complete — live CONFIG now reflects post-cutover state.
+    # Both remaining operational flags are at their post-cutover values.
     assert state["USE_APEX_V3_SHADOW"] is True
     assert state["FINBERT_MATERIALITY_GATE_ENABLED"] is True
-    assert state["PM_LEGACY_OPUS_REVIEW_ENABLED"] is False
-    assert state["SENTINEL_LEGACY_PIPELINE_ENABLED"] is False
-    assert state["USE_LEGACY_PIPELINE"] is False
 
 
 # ── argument parsing ────────────────────────────────────────────────────────
@@ -80,7 +74,7 @@ def test_parse_flag_argument_rejects_bad_inputs():
 
 def test_expected_transition_known_and_unknown():
     assert fp.expected_transition("USE_APEX_V3_SHADOW") == (False, True)
-    assert fp.expected_transition("USE_LEGACY_PIPELINE") == (True, False)
+    assert fp.expected_transition("FINBERT_MATERIALITY_GATE_ENABLED") == (False, True)
     assert fp.expected_transition("NOT_A_FLAG") is None
 
 
@@ -95,9 +89,9 @@ def test_out_of_order_warning_none_when_earlier_flags_flipped():
 
 def test_out_of_order_warning_fires_when_earlier_flag_not_yet_flipped(legacy_flag_state):
     # Simulated legacy state: USE_APEX_V3_SHADOW still False. Proposing to flip
-    # flag #3 forward while flag #1 has not moved → warn.
+    # flag #2 forward while flag #1 has not moved → warn.
     current = fp.read_current_flag_state()
-    msg = fp.out_of_order_warning("PM_LEGACY_OPUS_REVIEW_ENABLED", False, current)
+    msg = fp.out_of_order_warning("FINBERT_MATERIALITY_GATE_ENABLED", True, current)
     assert msg is not None and "out-of-order" in msg
 
 
@@ -201,9 +195,9 @@ def _blocking_gates() -> dict:
 
 def test_build_proposal_noop_when_already_at_target(legacy_flag_state):
     current = fp.read_current_flag_state()
-    # Legacy state: PM_LEGACY_OPUS_REVIEW_ENABLED=True; proposing True is noop.
+    # Legacy state: USE_APEX_V3_SHADOW=False; proposing False is noop.
     p = fp.build_proposal(
-        "PM_LEGACY_OPUS_REVIEW_ENABLED", True,
+        "USE_APEX_V3_SHADOW", False,
         current_state=current, gates=_passing_gates(),
     )
     assert p["decision"] == "noop"
@@ -235,9 +229,9 @@ def test_build_proposal_blocked_when_gates_fail(legacy_flag_state):
 
 def test_build_proposal_records_out_of_order_warning(legacy_flag_state):
     current = fp.read_current_flag_state()
-    # Flip #3 forward while #1 still at False.
+    # Flip #2 (FINBERT) forward while #1 (USE_APEX_V3_SHADOW) still at False.
     p = fp.build_proposal(
-        "PM_LEGACY_OPUS_REVIEW_ENABLED", False,
+        "FINBERT_MATERIALITY_GATE_ENABLED", True,
         current_state=current, gates=_passing_gates(),
     )
     assert any("out-of-order" in w for w in p["warnings"])

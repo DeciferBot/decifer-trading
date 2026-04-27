@@ -95,7 +95,8 @@ def _generate_natural(event: str, fallback: str, **ctx) -> str:
     Falls back to `fallback` if Claude is unavailable.
     """
     try:
-        from agents import client
+        import anthropic as _anthropic
+        client = _anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
 
         _prompts = {
             "entry": (
@@ -279,7 +280,8 @@ def answer_voice_query(question: str, dash: dict) -> str:
             "Keep answers to 2-3 sentences max. No markdown, no bullet points, no preamble."
         )
 
-        from agents import client
+        import anthropic as _anthropic
+        client = _anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
         from config import CONFIG as _CONFIG
 
         _resp = client.messages.create(
@@ -361,7 +363,8 @@ def classify_voice_intent(text: str) -> dict:
     """
     try:
         import json as _json
-        from agents import client
+        import anthropic as _anthropic
+        client = _anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
         from config import CONFIG as _CONFIG
 
         system = (

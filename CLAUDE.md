@@ -5,7 +5,7 @@
 
 ## North Star
 
-Decifer is an autonomous paper-trading system that uses a 10-dimension signal engine and a 4-agent Claude AI pipeline to scan, score, and execute trades on IBKR (paper account DUP481326). The goal: generate high-quality training data across market regimes to eventually validate a live system.
+Decifer is an autonomous paper-trading system that uses a 10-dimension signal engine and the **Apex Single-Synthesizer** (one `claude-sonnet-4-6` call) to scan, score, and execute trades on IBKR (paper account DUP481326). The goal: generate high-quality training data across market regimes to eventually validate a live system.
 
 **We are not building a live trading system yet. Every paper trade is a data point.**
 
@@ -24,14 +24,16 @@ Three actors:
 
 ## Current State (update this when phases change)
 
-- **Phase A — Complete ✅** (shipped 2026-03-28): Direction-agnostic signals, short-candidate scanner, directional skew tracking, consensus threshold set to 3/4 agents, mean-reversion dimension (10th signal)
+- **Phase A — Complete ✅** (shipped 2026-03-28): Direction-agnostic signals, short-candidate scanner, directional skew tracking, mean-reversion dimension (10th signal)
 - **IC scoring — Active**: Information Coefficient tracking is running. Gate for Phase C = 200 closed trades.
-- **PM ADD verb — Activated ✅** (2026-04-15): Portfolio Manager now shows Opus the full decision surface (entry thesis, per-dimension entry→current deltas with IC-weight annotations, setup type, pattern, regime, news) and lets Opus decide ADD/TRIM/EXIT/HOLD. Code (`calculate_position_size()`) sizes ADDs — same function entries use. Opus no longer emits `ADD_NOTIONAL`. Hardcoded safety floors: `check_risk_conditions`, earnings-48h, single-position-cap clamp (downgrades to HOLD if no headroom).
-- **Three-tier universe — Active ✅**: TV Screener ripped out. Universe is now: committed universe (top-1000 by dollar volume, weekly refresh) + dynamic adds (catalyst hits, held positions, favourites, sympathy plays, news-driven). Scanner pulls from committed universe; dynamic tiers bypass the gate.
-- **Catalyst screener — Active ✅**: `catalyst_engine.py` scores EDGAR filings, earnings surprises, and analyst actions in real-time. High-conviction catalyst hits get a flat score boost to clear `min_score_to_trade`. Wired into both the main signal engine and the Chief Decifer dashboard.
+- **Three-tier universe — Active ✅**: TV Screener ripped out. Universe is now: committed universe (top-1000 by dollar volume, weekly refresh) + dynamic adds (catalyst hits, held positions, favourites, sympathy plays, news-driven).
+- **Catalyst screener — Active ✅**: `catalyst_engine.py` scores EDGAR filings, earnings surprises, and analyst actions in real-time. High-conviction catalyst hits get a flat score boost to clear `min_score_to_trade`.
+- **Full architecture audit — Complete ✅** (2026-04-22): 27-issue audit, 24 fixes shipped.
+- **Decifer 3.0 "Apex" — Live ✅** (cutover 2026-04-24): The 4-agent pipeline is replaced by the **Apex Single-Synthesizer** — one `apex_call()` via `claude-sonnet-4-6`. Three Sonnet calls per cycle: Track A (new entries), Track B PM (TRIM/EXIT/HOLD), Shadow (divergence log). Legacy code preserved behind `USE_LEGACY_PIPELINE` flag; rollback = flip flag + restart. `run_all_agents()` bypassed in Apex mode (Phase 8B fix, 2026-04-25).
+- **Weekend Robustness Pass 1 — Complete ✅** (2026-04-25): Entry floor rule added to system prompt (≥3 candidates score ≥35 → must produce ≥1 entry); `FEAR_ELEVATED` clarified as regime descriptor not AVOID mandate; `divergence_flags` clarified as instrument-selector not trade-vetor; fallback path logs ERROR; zero-entries observability raised to WARNING; `pnl_pct=None` crash in PM Track B fixed; brain.py "0/4 agents" label fixed to "Apex Synthesizer".
+- **Monday Preflight — Complete ✅** (2026-04-25): DAR=None rendered as `DAR=pre-mkt` with explicit model instruction (was being cited as conviction blocker); 30-candidate cap added to prevent token truncation; NEWS_INTERRUPT pre-scores the catalyst symbol before calling Apex so Track A has a real candidate; TRACK_B_PM no-op gate added (skip PM call when no slots and no flagged positions).
 - **Phase B / C / D — Not yet built**: Signal validation (Alphalens), HMM regime detection, walk-forward weight calibration. All blocked on trade data volume.
-- **Full architecture audit — Complete ✅** (2026-04-22): 27-issue audit across all cycle-position, behaviour-change, and robustness categories. 24 issues implemented across 2 sessions. All 5 CP fixes, all 9 BC fixes, and all 9 RB fixes shipped. See `docs/DECISIONS.md` for the full decision log.
-- **Test suite**: 1911 passing (2026-04-22). Tests are current with the codebase.
+- **Test suite**: ~2074 passing (2026-04-25). Tests are current with the codebase.
 - **Regime detector**: VIX-proxy + SPY EMA (locked). HMM explicitly deferred until ≥200 closed trades.
 
 ---
@@ -52,8 +54,20 @@ Hard classifier (BULL_TRENDING / BEAR_TRENDING / CHOPPY / PANIC) via VIX levels 
 ### Skew Tracking: Diagnostic Only, Never a Feedback Loop
 `get_directional_skew()` in `learning.py` tracks % long vs short. This is a dashboard metric and alert for Amit — it is NOT fed back into agent prompts. Feeding skew back ("you've been 80% long, correct") creates forced trades to balance a statistic. The market is structurally long-biased. Fighting that base rate is wrong.
 
-### 4-Agent Pipeline: Risk Manager Has Veto Power
-The pipeline is: Technical Analyst (deterministic) + Trading Analyst (Opus, 1 LLM call) + Risk Manager (deterministic, hardcoded veto) + Final Decision Maker (deterministic). Devil's Advocate was removed — the Trading Analyst sees all data simultaneously, eliminating the anchoring bias the DA was meant to counter. Paper threshold = 3/4 agents agree (aggressive for data generation). Live threshold = 4/4 (conservative).
+### Apex Single-Synthesizer: One Sonnet Call, Not 4-Agent Pipeline (Decifer 3.0)
+The 4-agent pipeline (Technical Analyst + Trading Analyst Opus + Risk Manager + Final Decision Maker) is replaced by `apex_call()` in `market_intelligence.py` — a single `claude-sonnet-4-6` call that receives all context (candidates, regime, portfolio state, overnight research, session character, IC weights) and returns a structured `ApexDecision` JSON with `new_entries[]` and `pm_actions[]`. Three calls per scan cycle:
+1. **Track A** — new entries (live execute)
+2. **Track B** — PM TRIM/EXIT/HOLD review (live execute)
+3. **Shadow** — divergence logging only (`USE_APEX_V3_SHADOW=True`)
+
+Forced exits (EOD flat, 90-min INTRADAY timeout, architecture violations) remain deterministic — they never go through Apex. Regime-change sells (`check_thesis_validity()`) are also deterministic — `_apex_mode_sells` builds directly from `positions_to_reconsider`, no LLM involved. Legacy code is flag-gated (`USE_LEGACY_PIPELINE`), not deleted. Rollback = flip flag + restart.
+
+**Entry floor rule (locked):** When ≥3 candidates score ≥35 with no named systemic blocking condition, Apex MUST produce at least one new entry. `FEAR_ELEVATED` is a regime descriptor, not an AVOID mandate. `divergence_flags` restrict instrument selection to stocks only — they do NOT veto the stock trade.
+
+**Model = Sonnet, not Opus.** Amit's explicit decision at cutover. Do not change without Amit approval.
+
+### News Sentinel: Single Apex Call, Not 3-Agent Pipeline
+Sentinel `NEWS_INTERRUPT` path now builds an `ApexInput` and calls `apex_call()` — same synthesizer as scan cycles, not the old 3-agent (Catalyst Analyst + Risk Gate + Instant Decision). The catalyst symbol is **pre-scored** before the Apex call so Track A always has a real candidate (not an empty list). Position sizing remains 0.75× sentinel multiplier. Hardcoded risk limits still apply.
 
 ### Paper Config: Aggressive for Data Generation
 Paper trading thresholds are deliberately loose (min_score 14, agents_required 3, max_positions 100 sanity ceiling). Cost of a bad paper trade = zero. Value = training data. Every parameter that differs from live config is preserved as an inline comment in `config.py`. When switching to live, revert ALL of them (live: min_score 28, agents_required 4).
