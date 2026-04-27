@@ -27,7 +27,7 @@ _cfg = {
     "trade_log": "/dev/null",
     "order_log": "/dev/null",
     "anthropic_api_key": "test-key",
-    "model": "claude-opus-4-20250514",
+    "model": "claude-sonnet-4-6",
     "max_tokens": 1000,
     "mongo_uri": "",
     "db_name": "test",

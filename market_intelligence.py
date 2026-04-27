@@ -10,11 +10,11 @@ Single responsibility: classify every incoming signal with a trade_type
 before any order is placed.
 
 Two-tier design — always produces a classification:
-  Tier 1 — Opus: reads cross-asset observations, pattern library, news,
+  Tier 1 — Sonnet: reads cross-asset observations, pattern library, news,
             macro calendar, and the scored signal candidates. Reasons
             freely — no regime labels imposed. Returns structured JSON
             classification per signal.
-  Tier 2 — Evidence fallback: if Opus fails or times out, derives
+  Tier 2 — Evidence fallback: if Sonnet fails or times out, derives
             trade_type mechanically from signal score and market context.
             Dumber but always fires.
 
@@ -46,7 +46,7 @@ from pattern_library import get_relevant_patterns, get_setup_performance, get_th
 log = logging.getLogger("decifer.intelligence")
 
 # ── Session character vocabulary ──────────────────────────────────────────────
-# Opus picks one of these to describe the market session.  Stored as entry_regime
+# Sonnet picks one of these to describe the market session.  Stored as entry_regime
 # on every new position — replaces the mechanical BULL_TRENDING/CHOPPY labels.
 SESSION_CHARACTER_VOCAB = {
     "MOMENTUM_BULL",  # strong uptrend, VIX low, broad participation
@@ -55,7 +55,7 @@ SESSION_CHARACTER_VOCAB = {
     "DISTRIBUTION",  # selling pressure, SPY declining or losing breadth
     "TRENDING_BEAR",  # sustained downtrend, shorts working
 }
-_DEFAULT_SESSION_CHARACTER = "FEAR_ELEVATED"  # conservative fallback if Opus omits
+_DEFAULT_SESSION_CHARACTER = "FEAR_ELEVATED"  # conservative fallback if Sonnet omits
 
 # ── Significance keywords — trigger full news refresh if seen in headlines ──
 _SIGNIFICANCE_KEYWORDS = {
@@ -109,7 +109,7 @@ class SignalClassification:
     symbol: str
     trade_type: str  # INTRADAY | SWING | POSITION | AVOID
     conviction: float  # 0.0–1.0, evidence-based — not LLM self-reported confidence
-    reasoning: str  # Opus rationale (logged only, never acted upon mechanically)
+    reasoning: str  # Sonnet rationale (logged only, never acted upon mechanically)
     source: str  # "opus" | "fallback"
 
 
@@ -118,7 +118,7 @@ class SessionContext:
     """Cached per intelligence_cache_minutes. Rebuilt on expiry."""
 
     timestamp: str
-    market_read: str  # Opus free-form market interpretation
+    market_read: str  # Sonnet free-form market interpretation
     observation: MarketObservation
     news_mode: str  # "full" | "headlines"
     news_text: str  # formatted for prompt inclusion
@@ -307,7 +307,7 @@ def _build_session_context(full_news: bool) -> SessionContext:
 
     return SessionContext(
         timestamp=datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
-        market_read="",  # filled after Opus call in classify_signals
+        market_read="",  # filled after Sonnet call in classify_signals
         observation=obs,
         news_mode="full" if full_news else "headlines",
         news_text=news_text,
@@ -352,7 +352,7 @@ def _build_regime_context_block(regime: dict) -> str:
 
 def _format_trade_context_block(trade_contexts: dict[str, dict]) -> str:
     """
-    Format per-symbol TradeContext as a compact text block for the Opus prompt.
+    Format per-symbol TradeContext as a compact text block for the Sonnet prompt.
     Only renders symbols that have a context dict.
     """
     if not trade_contexts:
@@ -417,7 +417,7 @@ def _format_trade_context_block(trade_contexts: dict[str, dict]) -> str:
             lines.append(f"  Sector {etf}: {above_str}{spy_str}")
 
         # Execution-quality metrics (rel_vol, HOD_dist, dead_window, signal_age) are
-        # intentionally excluded here — they are INTRADAY-only and caused Opus to
+        # intentionally excluded here — they are INTRADAY-only and caused Sonnet to
         # misuse them as AVOID justifications for SWING/POSITION candidates.
         # The entry gate enforces those checks deterministically after classification.
         spread = ctx.get("bid_ask_spread_pct")
@@ -447,7 +447,7 @@ def _build_classification_prompt(
     regime: dict | None = None,
     trade_contexts: dict[str, dict] | None = None,
 ) -> str:
-    """Build the full classification prompt for Opus."""
+    """Build the full classification prompt for Sonnet."""
 
     candidate_lines = []
     for c in candidates:
@@ -562,7 +562,7 @@ def _fallback_classify(
 ) -> SignalClassification:
     """
     Tier 2: mechanical classification from signal score and observation.
-    Used when Opus is unavailable. Always produces a valid result.
+    Used when Sonnet is unavailable. Always produces a valid result.
     """
     sym = candidate.get("symbol", "?")
     score = candidate.get("score", 0)
@@ -617,7 +617,7 @@ def _parse_response(
     obs: MarketObservation,
 ) -> tuple[str, str, list[SignalClassification]]:
     """
-    Parse Opus JSON response. Returns (session_character, market_read, classifications).
+    Parse Sonnet JSON response. Returns (session_character, market_read, classifications).
     Any missing or invalid classification falls back to evidence-based tier.
     """
     # Strip markdown code fences
@@ -670,7 +670,7 @@ def _parse_response(
                 trade_type=tt,
                 conviction=round(conviction, 3),
                 reasoning=str(r.get("reasoning", ""))[:300],
-                source="opus",
+                source="sonnet",
             )
         )
 
@@ -690,18 +690,18 @@ def classify_signals(
     Classify a batch of scored signal candidates.
 
     Rebuilds session context when cache expires. Always returns a
-    classification for every candidate — never blocks on Opus failure.
+    classification for every candidate — never blocks on Sonnet failure.
 
     Args:
         candidates: list of signal dicts from the scanner, each with
                     {symbol, direction, score, score_breakdown, ...}
         force_context_refresh: bypass context cache
-        regime: regime dict from get_market_regime() — passed as context to Opus
+        regime: regime dict from get_market_regime() — passed as context to Sonnet
 
     Returns:
         (session_character, market_read, classifications)
-        session_character: Opus-chosen label from SESSION_CHARACTER_VOCAB
-        market_read: Opus free-form interpretation of current environment
+        session_character: Sonnet-chosen label from SESSION_CHARACTER_VOCAB
+        market_read: Sonnet free-form interpretation of current environment
         classifications: one SignalClassification per candidate
     """
     global _session_ctx, _ctx_time, _session_open_done, _last_session_character
@@ -738,12 +738,12 @@ def classify_signals(
 
     obs = ctx.observation
 
-    # ── Tier 1: Opus classification ────────────────────────────
+    # ── Tier 1: Sonnet classification ────────────────────────────
     try:
         prompt = _build_classification_prompt(ctx, candidates, regime=regime, trade_contexts=trade_contexts)
         client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
         resp = client.messages.create(
-            model=CONFIG.get("intelligence_model", "claude-opus-4-6"),
+            model=CONFIG.get("intelligence_model", "claude-sonnet-4-6"),
             max_tokens=CONFIG.get("intelligence_max_tokens", 1024),
             messages=[{"role": "user", "content": prompt}],
         )
@@ -802,6 +802,7 @@ from your conviction output by the Risk & Execution vault.
 Two tracks in one response:
 
 TRACK A — NEW ENTRIES (per candidate you accept):
+  symbol:      REQUIRED. The ticker from the candidate line (e.g. "AMZN").
   trade_type:  INTRADAY | SWING | POSITION | AVOID
                Must be chosen from the candidate's allowed_trade_types list.
                default_trade_type is a deterministic suggestion, not binding.
@@ -862,11 +863,33 @@ OUTPUT: valid JSON matching exactly this schema (no prose outside JSON):
   "session_character": "<one of vocab>",
   "macro_bias": "BULLISH | BEARISH | NEUTRAL",
   "market_read": "<2-4 sentences, logged only>",
-  "new_entries": [ ... ],
-  "portfolio_actions": [ ... ]
+  "new_entries": [
+    {
+      "symbol": "AMZN",
+      "trade_type": "SWING",
+      "direction": "LONG",
+      "direction_flipped": false,
+      "conviction": "MEDIUM",
+      "instrument": "stock",
+      "rationale": "one sentence",
+      "counter_argument": "one sentence",
+      "key_risk": "one sentence"
+    }
+  ],
+  "portfolio_actions": [
+    {
+      "symbol": "NKE",
+      "action": "HOLD",
+      "reasoning_tag": "tag",
+      "reasoning": "one sentence"
+    }
+  ]
 }
 
-Both arrays may be empty. Never output ADD.
+portfolio_actions may be empty. new_entries must contain at least one non-AVOID entry
+when ≥3 candidates have score ≥35 and no named systemic blocker applies (see ENTRY FLOOR RULE).
+Never output ADD.
+CRITICAL: every new_entries item MUST include "symbol" (the ticker string). Entries without "symbol" are silently dropped by the execution layer.
 """
 
 

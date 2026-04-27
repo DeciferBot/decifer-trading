@@ -40,7 +40,7 @@ def _shadow_entry(
     rejected: int = 0,
     latency_ms: int | None = 1200,
     error: str | None = None,
-    model: str = "claude-opus-4-6",
+    model: str = "claude-sonnet-4-6",
 ) -> dict:
     meta: dict = {
         "latency_ms": latency_ms,

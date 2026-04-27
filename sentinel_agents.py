@@ -42,7 +42,7 @@ def _call_claude_opus(system_prompt: str, user_message: str, max_tokens: int = 5
     """Opus call — nuanced trade decision synthesis (Instant Decision)."""
     try:
         resp = client.messages.create(
-            model=CONFIG.get("claude_model_alpha", "claude-opus-4-6"),
+            model=CONFIG.get("claude_model_alpha", "claude-sonnet-4-6"),
             max_tokens=max_tokens,
             system=system_prompt,
             messages=[{"role": "user", "content": user_message}],

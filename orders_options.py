@@ -919,7 +919,7 @@ or
     try:
         client = anthropic.Anthropic(api_key=CONFIG["anthropic_api_key"])
         message = client.messages.create(
-            model=CONFIG.get("llm_advisor_model", "claude-opus-4-6"),
+            model=CONFIG.get("llm_advisor_model", "claude-sonnet-4-6"),
             max_tokens=256,
             messages=[{"role": "user", "content": prompt}],
         )

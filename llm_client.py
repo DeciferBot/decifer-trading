@@ -49,7 +49,7 @@ def call_apex_with_meta(
     existing call_apex callers (which still get the text-only return).
     """
     client = _get_client()
-    model = CONFIG.get("claude_model_alpha", "claude-opus-4-6")
+    model = CONFIG.get("claude_model_alpha", "claude-sonnet-4-6")
     last_err: Exception | None = None
     attempts = 0
     for attempt in range(3):

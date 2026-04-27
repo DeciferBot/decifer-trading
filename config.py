@@ -117,19 +117,19 @@ CONFIG = {
     # ── INTELLIGENCE LAYER ────────────────────────────────────
     # Classifies every signal with trade_type (SCALP/SWING/HOLD/AVOID) and
     # evidence-based conviction before dispatch. Always fires — Tier 2
-    # evidence fallback used when Opus is unavailable.
+    # evidence fallback used when Sonnet is unavailable.
     "use_intelligence_layer": True,
-    "intelligence_model": "claude-opus-4-6",
+    "intelligence_model": "claude-sonnet-4-6",
     "intelligence_max_tokens": 1024,
     "intelligence_cache_minutes": 30,  # session context cache window
-    "intelligence_pattern_lookback": 20,  # similar patterns shown to Opus per call
+    "intelligence_pattern_lookback": 20,  # similar patterns shown to Sonnet per call
     "intelligence_news_mode": "full_on_open_headlines_thereafter",
     # ── TRADE ADVISOR (execution layer) ──────────────────────
-    # Opus decides PT, SL, position size multiplier, and instrument
+    # Sonnet decides PT, SL, position size multiplier, and instrument
     # per signal. Separate from the intelligence layer.
     # Falls back to ATR formula if the API call fails.
     "use_llm_advisor": True,
-    "llm_advisor_model": "claude-opus-4-6",
+    "llm_advisor_model": "claude-sonnet-4-6",
     "llm_advisor_max_tokens": 512,
     "llm_advisor_history": 15,  # last N completed decisions passed to Opus as learning context
     # ── IBKR RECONNECT & HEARTBEAT ────────────────────────────

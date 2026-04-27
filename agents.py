@@ -46,7 +46,7 @@ def _call_claude_alpha(system_prompt: str, user_message: str) -> str:
     Used for Trading Analyst and Portfolio Manager only."""
     try:
         resp = client.messages.create(
-            model=CONFIG.get("claude_model_alpha", "claude-opus-4-6"),
+            model=CONFIG.get("claude_model_alpha", "claude-sonnet-4-6"),
             max_tokens=CONFIG.get("claude_max_tokens_alpha", 4096),
             system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_message}],

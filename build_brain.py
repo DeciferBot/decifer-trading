@@ -55,7 +55,7 @@ NORTH_STAR = ROOT / "chief-decifer/state/specs/feat-north-star.json"
 BACKLOG = ROOT / "chief-decifer/state/backlog.json"
 
 MODEL_ANNOTATE = "claude-sonnet-4-6"
-MODEL_SYNTHESIZE = "claude-opus-4-6"
+MODEL_SYNTHESIZE = "claude-sonnet-4-6"
 MAX_WORKERS = 5  # parallel Sonnet calls
 
 EXCLUDE_DIRS = {".claude", "__pycache__", "tests", ".git", "logs", "docs", "roadmap"}

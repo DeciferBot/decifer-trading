@@ -21,7 +21,7 @@ for mod in ["ib_async", "anthropic"]:
 config_mod = types.ModuleType("config")
 config_mod.CONFIG = {
     "anthropic_api_key": "test-key",
-    "claude_model": "claude-3-haiku-20240307",
+    "claude_model": "claude-haiku-4-5-20251001",
     "max_positions": 10,
     "risk_pct_per_trade": 0.02,
     "daily_loss_limit": 0.05,

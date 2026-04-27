@@ -18,7 +18,7 @@ Trigger sources (checked in bot_trading.py):
   6. cascade           — 2+ positions hit stops in the same session
   7. drawdown          — daily P&L < -1.5% of portfolio
 
-Uses Opus (claude_model_alpha) — same model as Trading Analyst.
+Uses Sonnet (claude_model_alpha) — same model as Trading Analyst.
 Mechanical stops still handle adverse price moves. This agent handles
 thesis drift: "does the original story still make sense?"
 """
@@ -203,7 +203,7 @@ def run_portfolio_review(  # DEPRECATED — Phase 4/6
     if not open_positions:
         return []
 
-    # Force-exit any SHORT position on a long_only_symbol before Opus sees it.
+    # Force-exit any SHORT position on a long_only_symbol before Sonnet sees it.
     long_only = CONFIG.get("long_only_symbols", set())
     forced_exits = []
     filtered_positions = []
@@ -227,7 +227,7 @@ def run_portfolio_review(  # DEPRECATED — Phase 4/6
 
     # ── Force-exit INTRADAY positions with adverse move > threshold ───────────
     # For intraday trades the thesis IS today's price action. If price moved
-    # threshold% against direction, the thesis is broken — Opus cannot override.
+    # threshold% against direction, the thesis is broken — Sonnet cannot override.
     # Signals lag price; green dimensions while price is -3% means signals
     # haven't caught up yet, not that the trade is still valid.
     _adverse_threshold = CONFIG.get("intraday_adverse_exit_pct", 3.0)
@@ -270,7 +270,7 @@ def run_portfolio_review(  # DEPRECATED — Phase 4/6
         return forced_exits
 
     # ── Force-exit UNKNOWN / zero-conviction / SL-breached positions ─────────
-    # These must never reach Opus. An UNKNOWN position has no entry thesis — Opus
+    # These must never reach Sonnet. An UNKNOWN position has no entry thesis — Opus
     # cannot evaluate drift on a trade it has no data for, and will under-react
     # (TRIM instead of EXIT). A breached stop is a mechanical trigger, not a
     # judgment call.
@@ -325,7 +325,7 @@ def run_portfolio_review(  # DEPRECATED — Phase 4/6
 
     # Build score lookup from all_scored. Each scored row carries a composite score
     # and a per-dimension score_breakdown (signals.py:2473). We keep both so the
-    # prompt can show Opus the composite delta AND the per-dimension evolution.
+    # prompt can show Sonnet the composite delta AND the per-dimension evolution.
     score_map = {s["symbol"]: s.get("score", 0) for s in (all_scored or [])}
     breakdown_map = {s["symbol"]: (s.get("score_breakdown") or {}) for s in (all_scored or [])}
 
@@ -377,7 +377,7 @@ def run_portfolio_review(  # DEPRECATED — Phase 4/6
         if current_score is not None:
             delta = current_score - entry_score
             score_line += f" → current={current_score} (delta={delta:+d})"
-            # Annotate conviction-band cross (entry vs current band). Helps Opus
+            # Annotate conviction-band cross (entry vs current band). Helps Sonnet
             # decide ADD vs HOLD: a cross from STANDARD→HIGH is a materially
             # stronger signal than a same-band rise from 46→58.
             entry_band = _conviction_band(entry_score)
@@ -401,7 +401,7 @@ def run_portfolio_review(  # DEPRECATED — Phase 4/6
 
         # Per-dimension score evolution (entry signal_scores → current score_breakdown),
         # with IC weights at entry annotating which dimensions were load-bearing. This
-        # is the decision surface for ADD/TRIM/EXIT — Opus can see WHERE conviction is
+        # is the decision surface for ADD/TRIM/EXIT — Sonnet can see WHERE conviction is
         # rising or collapsing, not just the composite delta.
         entry_dim = p.get("signal_scores") or {}
         current_dim = breakdown_map.get(sym) or {}
@@ -409,7 +409,7 @@ def run_portfolio_review(  # DEPRECATED — Phase 4/6
         dim_lines = []
         # overnight_drift is an entry-only signal — it scores the overnight positioning
         # window and is spent once the trade is open.  Showing its delta (always negative
-        # as the session progresses) misleads Opus into treating decay as thesis failure.
+        # as the session progresses) misleads Sonnet into treating decay as thesis failure.
         _ENTRY_ONLY_DIMS = {"overnight_drift"}
         if entry_dim or current_dim:
             all_dims = sorted(
@@ -476,7 +476,7 @@ that sized the original entry. Your job is the verb and the reasoning tag, not t
     try:
         client = _get_client()
         resp = client.messages.create(
-            model=CONFIG.get("claude_model_alpha", "claude-opus-4-6"),
+            model=CONFIG.get("claude_model_alpha", "claude-sonnet-4-6"),
             max_tokens=CONFIG.get("claude_max_tokens_alpha", 4096),
             system=[
                 {
@@ -539,7 +539,7 @@ def lightweight_cycle_check(
       SCALP — time_in_trade > scalp_max_hold_minutes AND pnl < scalp_min_pnl_pct
                → EXIT: momentum thesis did not fire; free the capital.
       SCALP — direction flipped against entry OR momentum collapsed (was load-bearing, now zero)
-               → REVIEW: thesis driver not playing out; Opus review required.
+               → REVIEW: thesis driver not playing out; Sonnet review required.
       SWING — regime changed since entry (entry_regime != current_regime)
                → REVIEW: queue for full Opus PM review this cycle.
       HOLD  — polar regime flip (BULL→BEAR or BEAR→BULL) since entry
@@ -647,7 +647,7 @@ def lightweight_cycle_check(
                             "reasoning": (
                                 f"SCALP {reason}: entry_dir={entry_dir} current_dir={current_dir} "
                                 f"entry_mom={entry_mom:.0f} current_mom={current_mom:.0f} — "
-                                "thesis driver not playing out; Opus review required"
+                                "thesis driver not playing out; Sonnet review required"
                             ),
                         }
                     )
@@ -661,7 +661,7 @@ def lightweight_cycle_check(
                         "action": "REVIEW",
                         "reasoning": (
                             f"SWING regime shifted: entry={entry_regime} → now={current_regime}; "
-                            "thesis context changed — full Opus review required"
+                            "thesis context changed — full Sonnet review required"
                         ),
                     }
                 )

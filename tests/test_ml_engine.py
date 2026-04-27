@@ -27,7 +27,7 @@ sys.modules.setdefault("ib_async", ib_mod)
 configmod = types.ModuleType("config")
 configmod.CONFIG = {
     "anthropic_api_key": "test-key",
-    "claude_model": "claude-3-5-sonnet-20241022",
+    "claude_model": "claude-sonnet-4-6",
     "starting_capital": 100_000,
     "trade_log": "/tmp/ml_test_trades.json",
     "order_log": "/tmp/ml_test_orders.json",
