@@ -2273,7 +2273,7 @@ def run_scan():
             from guardrails import flag_positions_for_review as _flag_track_a
 
             _cut_candidates_raw = _fc_track_a(
-                list(pipeline.all_scored or []),
+                [c for c in (pipeline.all_scored or []) if c.get("symbol")],
                 {p.get("symbol") for p in open_pos if p.get("symbol")},
                 regime=regime,
             )

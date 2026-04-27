@@ -154,7 +154,9 @@ def validate_apex_decision_schema(decision: dict[str, Any]) -> None:
     Does NOT require payload/candidate context.
     """
     for entry in decision.get("new_entries", []):
-        sym = entry.get("symbol", "<unknown>")
+        sym = entry.get("symbol")
+        if not isinstance(sym, str) or not sym:
+            raise ValueError(f"new_entry: missing or null symbol field (got {sym!r})")
         tt = entry.get("trade_type")
         if tt not in _VALID_TRADE_TYPES:
             raise ValueError(f"new_entry {sym}: invalid trade_type {tt!r}")
