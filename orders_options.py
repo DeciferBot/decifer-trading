@@ -743,7 +743,11 @@ def update_tranche_status(ib: IB) -> None:
             tp_t1 = trade["tp"]
             sl_price = trade["sl"]
 
-            t1_pnl = round((tp_t1 - entry) * t1_qty, 2)
+            direction = trade.get("direction", "LONG")
+            if direction == "SHORT":
+                t1_pnl = round((entry - tp_t1) * t1_qty, 2)
+            else:
+                t1_pnl = round((tp_t1 - entry) * t1_qty, 2)
             from learning import log_trade
 
             log_trade(
@@ -760,10 +764,11 @@ def update_tranche_status(ib: IB) -> None:
                 _cancel_ibkr_order_by_id(ib, old_sl_id)
                 ib.sleep(0.3)
 
-            # Place standalone T2 stop
+            # Place standalone T2 stop — BUY to cover for SHORT, SELL to exit for LONG
+            t2_side = "BUY" if direction == "SHORT" else "SELL"
             contract = get_contract(symbol)
             t2_stop = StopOrder(
-                "SELL",
+                t2_side,
                 t2_qty,
                 sl_price,
                 account=CONFIG["active_account"],

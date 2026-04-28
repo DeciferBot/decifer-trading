@@ -1180,6 +1180,7 @@ def execute_short(
     agent_outputs: dict | None = None,
     open_time: str | None = None,
     candle_gate: str | None = None,
+    tranche_mode: bool = True,
     instrument: str = "stock",
     # Trade advisor kwargs — override ATR formula when provided
     advice_pt: float = 0.0,
@@ -1364,6 +1365,23 @@ def execute_short(
             _safe_del_trade(symbol)
             return False
 
+        # ── Tranche sizing ────────────────────────────────────────
+        if tranche_mode and qty < 2:
+            log.warning(f"[TRANCHE] qty={qty} too small for dual-tranche — falling back to legacy for {symbol}")
+            tranche_mode = False
+
+        if trade_type and trade_type not in ("SCALP", "INTRADAY"):
+            tranche_mode = False
+
+        if tranche_mode:
+            t1_qty = qty // 2
+            t2_qty = qty - t1_qty
+            tp_qty = t1_qty
+        else:
+            tp_qty = qty if qty < 3 else max(1, qty // 3)
+            t1_qty = tp_qty
+            t2_qty = qty - tp_qty
+
         # ── Halt guard ────────────────────────────────────────────
         import bot_state as _bs
 
@@ -1409,8 +1427,8 @@ def execute_short(
                        atr=atr or 0.0,
                        advice_id=advice_id or "",
                        ic_weights_at_entry=_wal_icw_s,
-                       tranche_mode=False,
-                       t1_qty=None, t2_qty=None,
+                       tranche_mode=tranche_mode,
+                       t1_qty=t1_qty, t2_qty=t2_qty,
                        open_time=_wal_open_time_s)
             except Exception as _tl_err_s:
                 log.error("execute_short %s: ORDER_INTENT DB write failed — trade aborted: %s", symbol, _tl_err_s)
@@ -1537,8 +1555,8 @@ def execute_short(
 
         tp_trade = None
         if place_tp:
-            # Take profit: buy to cover when price falls to target — SCALP only
-            tp_order = LimitOrder("BUY", qty, tp, account=account, tif="GTC", outsideRth=True)
+            # Take profit: buy to cover T1 when price falls to target
+            tp_order = LimitOrder("BUY", tp_qty, tp, account=account, tif="GTC", outsideRth=True)
             tp_order.parentId = parent_id
             tp_order.transmit = True
             tp_trade = ib.placeOrder(contract, tp_order)
@@ -1664,19 +1682,38 @@ def execute_short(
                     "sl_order_id": _sl_order_id,
                     "tp_order_id": tp_trade.order.orderId if tp_trade is not None else None,
                     "high_water_mark": price,
-                    "tranche_mode": False,
+                    "tranche_mode": tranche_mode,
+                    "t1_qty": t1_qty,
+                    "t2_qty": t2_qty,
+                    "t1_status": "OPEN" if tranche_mode else "N/A",
+                    "t1_order_id": tp_trade.order.orderId if tranche_mode else None,
+                    "t2_sl_order_id": None,
                     "entry_context": entry_context,
                     "trade_id": _trade_id,
                 }
             _save_positions_file()
             from learning import log_trade
 
-            log_trade(
-                trade=active_trades[symbol],
-                agent_outputs=agent_outputs or {},
-                regime=regime,
-                action="OPEN",
-            )
+            if tranche_mode:
+                log_trade(
+                    trade={**active_trades[symbol], "qty": t1_qty, "tranche_id": 1, "parent_trade_id": parent_id},
+                    agent_outputs=agent_outputs or {},
+                    regime=regime,
+                    action="OPEN",
+                )
+                log_trade(
+                    trade={**active_trades[symbol], "qty": t2_qty, "tranche_id": 2, "parent_trade_id": parent_id},
+                    agent_outputs=agent_outputs or {},
+                    regime=regime,
+                    action="OPEN",
+                )
+            else:
+                log_trade(
+                    trade=active_trades[symbol],
+                    agent_outputs=agent_outputs or {},
+                    regime=regime,
+                    action="OPEN",
+                )
         except Exception as record_err:
             log.error(
                 f"GHOST POSITION RISK {symbol}: short order submitted (id={parent_id}) but "
@@ -1685,7 +1722,8 @@ def execute_short(
             raise
 
         _rr = (price - tp) / (sl - price) if (sl - price) > 0 else 0
-        log.info(f"✅ SHORT {symbol} qty={qty} @ ${price:.2f} | SL=${sl:.2f} TP=${tp:.2f} | R:R={_rr:.1f}")
+        _tranche_tag = f" [T1={t1_qty}/T2={t2_qty}]" if tranche_mode else ""
+        log.info(f"✅ SHORT {symbol} qty={qty} @ ${price:.2f} | SL=${sl:.2f} TP=${tp:.2f} | R:R={_rr:.1f}{_tranche_tag}")
 
         # ── Start fill watcher for this short entry ─────────────────────────
         if CONFIG.get("fill_watcher", {}).get("enabled", True):
