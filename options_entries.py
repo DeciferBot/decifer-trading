@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import logging
 
+from bot_state import clog
 from config import CONFIG
 from options import find_best_contract
 from orders_contracts import is_options_market_open
@@ -187,9 +188,9 @@ def execute_options_entries(
             )
 
     if any(skips.values()):
-        log.info(
-            "options_entries: skip summary — %s",
-            " ".join(f"{k}={v}" for k, v in skips.items() if v),
-        )
+        skip_str = " ".join(f"{k}={v}" for k, v in skips.items() if v)
+        log.info("options_entries: skip summary — %s", skip_str)
+        if not fired:
+            clog("ANALYSIS", f"Options entries: 0 fired — {skip_str}")
 
     return frozenset(fired)

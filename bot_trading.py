@@ -93,6 +93,7 @@ _last_pm_review_ts_by_symbol: dict = {}  # symbol → datetime when that positio
 _last_news_scores: dict = {}  # symbol → keyword_score at last news_hit review
 _last_collapse_scores: dict = {}  # symbol → current_score at last score_collapse review
 _last_rise_scores: dict = {}  # symbol → current_score at last held_score_rise review (edge dedup)
+_last_scalp_mom_scores: dict = {}  # symbol → momentum score at last scalp_signal_lost review (edge dedup)
 
 # ── Last-decision writer (for Chief Decifer trade card) ───────────────────────
 
@@ -1426,19 +1427,19 @@ def run_scan():
     # Tier C — options universe: always score liquid options names so stock and
     # options signals are evaluated together. These names may not make the daily
     # promoted list on defensive rotation days (e.g. DDOG, SMCI, COIN on value days).
+    _cov_opts = 0
     try:
         from options_scanner import OPTIONABLE_UNIVERSE as _OPT_UNIVERSE
         before = len(universe)
         universe = list(set(universe + _OPT_UNIVERSE))
-        n_opts = len(universe) - before
-        if n_opts:
-            clog("INFO", f"Options universe: {n_opts} symbol(s) pinned into scoring (not in Tier A/B today)")
+        _cov_opts = len(universe) - before
+        if _cov_opts:
+            clog("INFO", f"Options universe: {_cov_opts} symbol(s) pinned into scoring (not in Tier A/B today)")
     except Exception:
         pass
 
     _cov_favs = len(favs)
     _cov_held = len(held_syms)
-    _cov_opts = n_opts if "n_opts" in dir() else 0
 
     # Refresh Alpaca stream subscriptions to match the finalised universe.
     # update_symbols() is a no-op if the symbol list hasn't changed.
@@ -1486,7 +1487,7 @@ def run_scan():
     clog(
         "SCAN",
         f"Pipeline: core={_cov_core} equities={_cov_equities} promoted={_cov_promoted} "
-        f"other={_cov_other} favs={_cov_favs} held={_cov_held} → universe={len(universe)} "
+        f"other={_cov_other} favs={_cov_favs} held={_cov_held} opts={_cov_opts} → universe={len(universe)} "
         f"→ scored={len(scored)} → signals={len(signals)} [{regime_name}]",
     )
     # Coverage audit log — per-cycle layer breakdown for universe health monitoring.
@@ -1506,6 +1507,7 @@ def run_scan():
             "other": _cov_other,
             "favs": _cov_favs,
             "held": _cov_held,
+            "opts": _cov_opts,
             "universe": len(universe),
             "scored": len(scored),
             "signals": len(signals),
