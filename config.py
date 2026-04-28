@@ -171,7 +171,7 @@ CONFIG = {
         "reconcile_every_cycle": True,
     },
     "min_cash_reserve": 0.10,  # 10% cash floor — hard stop on new entries
-    "max_single_position": 0.15,  # Cross-instrument exposure guard (stock+option stacking on same name). (live: 0.10)
+    "max_single_position": 0.06,  # Cross-instrument exposure guard (stock+option stacking on same name). (live: tbd — was 0.15 paper / 0.10 live before 2026-04-28)
     # Not enforced as a sizing cap — Opus decides position size from account context.
     "max_sector_exposure": 0.50,  # 50% sector cap (live: 0.40)
     "consecutive_loss_pause": 999,  # Paper learning mode: effectively disabled (live: 5)
