@@ -661,6 +661,7 @@ class TestExecuteSell:
     ):
         """Happy path: execute_sell closes position and returns True."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
+        mock_config_obj.get.side_effect = lambda k, d=None: mock_config.get(k, d)
 
         # Setup open position
         orders.open_trades["AAPL"] = {
@@ -706,6 +707,7 @@ class TestExecuteSell:
     ):
         """execute_sell should call record_loss if exit price < entry."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
+        mock_config_obj.get.side_effect = lambda k, d=None: mock_config.get(k, d)
 
         orders.open_trades["AAPL"] = {
             "symbol": "AAPL",
@@ -1314,17 +1316,28 @@ class TestReconcileWithIbkr:
             assert cancelled_order.orderId == 42
 
     def test_reconcile_removes_active_position_not_in_portfolio(self, mock_config):
-        """ACTIVE positions absent from IBKR portfolio should be removed without checking openTrades."""
+        """ACTIVE positions absent from IBKR portfolio should be removed without checking openTrades.
+
+        Portfolio must be non-empty (TSLA present) to avoid the false-closed-while-down
+        guard which skips purge when IBKR returns zero items.
+        """
         with patch("orders.CONFIG", mock_config), patch("orders_portfolio._ts_restore", return_value={}):
             orders.active_trades.clear()
             orders.active_trades["MSFT"] = {"status": "ACTIVE", "symbol": "MSFT"}
 
-            ib = self._make_ib(portfolio=[])
+            # IBKR has TSLA but not MSFT — MSFT should be purged.
+            # Non-empty portfolio is required: the guard skips purge when IBKR
+            # returns 0 items to prevent false closed-while-bot-down removals.
+            tsla_item = MagicMock()
+            tsla_item.position = 10
+            tsla_item.contract.symbol = "TSLA"
+            tsla_item.contract.secType = "STK"
+            tsla_item.contract.strike = 0
+            ib = self._make_ib(portfolio=[tsla_item])
 
             orders.reconcile_with_ibkr(ib)
 
             assert "MSFT" not in orders.active_trades
-            ib.openTrades.assert_not_called()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

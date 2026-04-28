@@ -28,6 +28,7 @@ from datetime import UTC, datetime
 
 from ib_async import LimitOrder, MarketOrder
 
+from bot_ibkr import cancel_with_reason
 from config import CONFIG
 from learning import _append_audit_event, log_order
 
@@ -275,7 +276,7 @@ class FillWatcher:
         try:
             if self._ib.isConnected():
                 try:
-                    self._ib.cancelOrder(self._entry_trade.order)
+                    cancel_with_reason(self._ib, self._entry_trade.order, f"fill_watcher cancel: {reason}")
                     self._ib.sleep(0.5)
                 except Exception as exc:
                     log.warning(f"FillWatcher: cancelOrder for {self._symbol} raised: {exc}")
@@ -284,7 +285,7 @@ class FillWatcher:
                 try:
                     for t in self._ib.openTrades():
                         if getattr(t.order, "parentId", None) == self._order_id:
-                            self._ib.cancelOrder(t.order)
+                            cancel_with_reason(self._ib, t.order, f"fill_watcher bracket child cancel: {reason}")
                 except Exception as _bc_exc:
                     log.warning(
                         "FillWatcher._cancel_order: bracket child cancel failed for %s "
@@ -336,7 +337,7 @@ class FillWatcher:
             if self._ib.isConnected():
                 # Cancel the stale limit order
                 try:
-                    self._ib.cancelOrder(self._entry_trade.order)
+                    cancel_with_reason(self._ib, self._entry_trade.order, f"fallback to market order for {self._symbol}")
                     self._ib.sleep(0.5)
                 except Exception as exc:
                     log.warning(f"FillWatcher._fallback_to_market: cancelOrder for {self._symbol} raised: {exc}")
@@ -345,7 +346,7 @@ class FillWatcher:
                 try:
                     for t in self._ib.openTrades():
                         if getattr(t.order, "parentId", None) == self._order_id:
-                            self._ib.cancelOrder(t.order)
+                            cancel_with_reason(self._ib, t.order, f"fallback to market: bracket child cancel for {self._symbol}")
                 except Exception as _bc_exc:
                     log.warning(
                         "FillWatcher._fallback_to_market: bracket child cancel failed for %s "

@@ -14,6 +14,7 @@ from datetime import UTC, date, datetime
 
 from ib_async import IB, LimitOrder, MarketOrder, StopOrder
 
+from bot_ibkr import cancel_with_reason
 from config import CONFIG
 from learning import log_order
 from orders_contracts import (
@@ -273,7 +274,7 @@ def close_position(ib_unused, trade_key: str) -> str | None:
         for t in eib.trades():
             if t.contract.symbol == sym and t.orderStatus.status in ("Submitted", "PreSubmitted"):
                 try:
-                    eib.cancelOrder(t.order)
+                    cancel_with_reason(eib, t.order, f"cancel open order for {sym} on position close")
                     log.info(f"Close {trade_key}: Cancelled order {t.order.orderId}")
                 except Exception:
                     pass

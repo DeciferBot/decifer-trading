@@ -155,6 +155,10 @@ _account_ready: bool = True
 # Orders to these symbols are blocked until the halt clears.
 _halted_symbols: set = set()
 
+# Maps orderId → reason string for cancels Decifer initiates.
+# The IBKR error 202 handler in bot_ibkr.py pops entries as they arrive.
+_cancel_reasons: dict[int, str] = {}
+
 
 # ── Utility: coloured terminal log ───────────────────────────────────────────
 def clog(type_: str, msg: str):

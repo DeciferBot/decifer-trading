@@ -27,6 +27,12 @@ import bot_state
 from bot_state import _reconnect_lock, _subscription_registry, clog, dash
 from config import CONFIG
 
+
+def cancel_with_reason(ib, order, reason: str) -> None:
+    """Cancel an IBKR order and register a reason so the 202 callback logs it."""
+    bot_state._cancel_reasons[order.orderId] = reason
+    ib.cancelOrder(order)
+
 log = logging.getLogger("decifer.bot")
 
 # Ensure reconnect/heartbeat keys exist — they may be absent in minimal test configs
@@ -198,8 +204,14 @@ def _on_ibkr_error(req_id: int, error_code: int, error_string: str, contract) ->
         return
 
     if error_code == 202:
-        log.warning(f"IBKR error 202 (reqId={req_id}): {tag}order cancelled — {error_string}")
-        clog("INFO", f"IBKR: order cancelled {tag.strip()}: {error_string}")
+        reason = bot_state._cancel_reasons.pop(req_id, None)
+        sym_label = tag.strip() or "unknown"
+        if reason:
+            log.warning(f"IBKR error 202 (reqId={req_id}): {tag}order cancelled — {reason}")
+            clog("INFO", f"IBKR: order cancelled [{sym_label}] — {reason}")
+        else:
+            log.warning(f"IBKR error 202 (reqId={req_id}): {tag}order cancelled — unknown reason (TWS-initiated)")
+            clog("INFO", f"IBKR: order cancelled [{sym_label}] — unknown reason (TWS-initiated)")
         return
 
     if error_code == 154:
@@ -1118,7 +1130,13 @@ def backfill_trades_from_ibkr():
                             new_pnl > existing_pnl and not (existing_oid and not new_oid)
                         )
                         if should_replace:
-                            deduped[s_idx] = t
+                            # Preserve metadata from the existing record if the replacement lacks it.
+                            merged = dict(existing_rec)
+                            merged.update(t)
+                            for _mkey in ("trade_type", "conviction", "reasoning", "signal_scores", "entry_regime"):
+                                if not t.get(_mkey) and existing_rec.get(_mkey):
+                                    merged[_mkey] = existing_rec[_mkey]
+                            deduped[s_idx] = merged
                         is_dupe = True
                         break
                 except Exception:
@@ -1293,7 +1311,7 @@ def cancel_orphan_stop_orders():
                 continue
             # No active position — this exit order is orphaned
             try:
-                ib.cancelOrder(order)
+                cancel_with_reason(ib, order, f"orphan {otype} — no active {sym} position")
                 clog("INFO", f"cancel_orphan_stop_orders: cancelled stale {otype} for {sym} (no active position)")
                 cancelled += 1
             except Exception as exc:

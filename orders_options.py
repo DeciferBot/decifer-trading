@@ -17,6 +17,7 @@ from datetime import UTC, date, datetime
 
 from ib_async import IB, LimitOrder, Option, StopOrder
 
+from bot_ibkr import cancel_with_reason
 from config import CONFIG
 from learning import log_order
 from orders_contracts import (
@@ -521,7 +522,7 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
                 f"Keeping position in tracker (IBKR still holds it)."
             )
             try:
-                ib.cancelOrder(opt_sell_trade.order)
+                cancel_with_reason(ib, opt_sell_trade.order, f"option sell not filled after {attempts['count']} attempts (status={order_status})")
             except Exception:
                 pass
             _safe_update_trade(opt_key, {"status": "ACTIVE"})
@@ -538,7 +539,7 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
             attempts["last_try"] = datetime.now(UTC)
             _option_sell_attempts[opt_key] = attempts
             try:
-                ib.cancelOrder(opt_sell_trade.order)
+                cancel_with_reason(ib, opt_sell_trade.order, "option sell false fill (paper account zero avgFillPrice)")
             except Exception:
                 pass
             _safe_update_trade(opt_key, {"status": "ACTIVE"})

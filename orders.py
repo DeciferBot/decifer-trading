@@ -23,6 +23,7 @@ import threading
 
 from ib_async import IB, Forex, Future, LimitOrder, MarketOrder, Option, Stock, StopOrder
 
+from bot_ibkr import cancel_with_reason
 from config import CONFIG
 from learning import log_order
 from orders_contracts import (
@@ -104,7 +105,7 @@ def cancel_order_by_id(ib, order_id) -> bool:
     """
     for t in ib.openTrades():
         if t.order.orderId == order_id:
-            ib.cancelOrder(t.order)
+            cancel_with_reason(ib, t.order, "manual cancel by order ID (dashboard)")
             ib.sleep(1)
             return True
     return False

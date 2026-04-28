@@ -23,6 +23,8 @@ from typing import Any
 
 from ib_async import Contract, Order
 
+from bot_ibkr import cancel_with_reason
+
 logger = logging.getLogger(__name__)
 
 
@@ -345,7 +347,7 @@ class TWAPExecutor:
                         if elapsed > self.config.twap_slice_timeout_seconds:
                             logger.warning(f"Slice {slice_index} timeout after {elapsed:.1f}s, adjusting price")
                             # Cancel and retry with adjusted price
-                            self.ib.cancelOrder(trade.order)
+                            cancel_with_reason(self.ib, trade.order, f"TWAP slice {slice_index} timeout after {elapsed:.1f}s")
                             self.ib.sleep(0.5)
 
                             # Adjust price (more aggressive); re-round to avoid float drift
@@ -401,7 +403,7 @@ class TWAPExecutor:
                 try:
                     order = Order()
                     order.orderId = slice_obj.order_id
-                    self.ib.cancelOrder(order)
+                    cancel_with_reason(self.ib, order, f"cancel all slices (orderId={slice_obj.order_id})")
                 except Exception as e:
                     logger.error(f"Failed to cancel slice {slice_obj.order_id}: {e}")
 

@@ -56,8 +56,9 @@ def _get_emergency_ib() -> IB:
             return None
 
 
-def _cancel_ibkr_order_by_id(ib, order_id: int) -> None:
+def _cancel_ibkr_order_by_id(ib, order_id: int, reason: str = "cancel by id") -> None:
     """Cancel a live IBKR order by orderId only. Safe to call if order is already gone."""
+    import bot_state
     from ib_async import Order as _Order
 
     try:
@@ -66,10 +67,12 @@ def _cancel_ibkr_order_by_id(ib, order_id: int) -> None:
             return
         bare = _Order()
         bare.orderId = order_id
+        bot_state._cancel_reasons[order_id] = reason
         ib.cancelOrder(bare)
         ib.sleep(0.3)
         log.info(f"_cancel_ibkr_order_by_id: cancel sent for order #{order_id}")
     except Exception as exc:
+        bot_state._cancel_reasons.pop(order_id, None)
         log.error(f"_cancel_ibkr_order_by_id: failed for #{order_id}: {exc}")
 
 
