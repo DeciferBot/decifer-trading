@@ -96,7 +96,7 @@ def _get_symbol_lock(symbol: str) -> threading.Lock:
 
 def _persist_positions() -> None:
     """
-    Write active_trades snapshot to DB (primary) and positions.json (fallback).
+    Write active_trades snapshot to positions.json.
     Called after every structural mutation (entry, exit, SL/TP update, status change).
     Price/pnl ticks are NOT persisted — IBKR re-provides them on reconciliation.
     Errors are logged but never raised so a disk problem never kills a live trade.
@@ -107,32 +107,7 @@ def _persist_positions() -> None:
     if _reconcile_in_progress:
         log.debug("_persist_positions: suppressed — reconcile in progress, will be written at reconcile end")
         return
-    try:
-        with _trades_lock:
-            snapshot = {k: v for k, v in active_trades.items() if v.get("status") != "RESERVED"}
-        # DB primary
-        try:
-            from trade_log import replace_all_positions as _tl_rap
-            _tl_rap(snapshot)
-        except Exception as _db_err:
-            log.error("[orders_state][_persist_positions] DB write failed: %s", _db_err)
-        # File fallback
-        from trade_store import persist
-        persist(snapshot)
-    except Exception as e:
-        log.error(
-            "[orders_state][_persist_positions] persist failed — "
-            "positions.json may be stale. Check data/persist_failure.flag. Error: %s",
-            e, exc_info=True,
-        )
-        try:
-            import os as _os
-            from datetime import datetime as _dt
-            _flag = _os.path.join(_os.path.dirname(POSITIONS_FILE), "persist_failure.flag")
-            with open(_flag, "w") as _f:
-                _f.write(f"{_dt.now(UTC).isoformat()} persist failed: {e}\n")
-        except Exception as _fe:
-            log.error("[orders_state][_persist_positions] could not write flag file: %s", _fe)
+    _save_positions_file()
 
 
 # ── Decision metadata — these fields are written ONCE at trade entry ──────────
@@ -209,13 +184,13 @@ def _safe_set_trade(key: str, value: dict) -> None:
                 )
             active_trades[key] = value
     if value.get("status") != "RESERVED":
-        # Granular DB upsert for this position (faster than replacing all)
-        try:
-            from trade_log import upsert_position as _tl_up
-            _tl_up(key, value.get("symbol", key), value)
-        except Exception as _up_err:
-            log.error("_safe_set_trade: DB upsert failed for %s: %s", key, _up_err)
         _persist_positions()
+
+
+_STRUCTURAL_UPDATE_KEYS: frozenset = frozenset({
+    "sl", "tp", "sl_order_id", "tp_order_id", "status", "qty",
+    "t1_status", "t1_order_id", "t2_qty", "tranche_mode",
+})
 
 
 def _safe_update_trade(key: str, updates: dict) -> None:
@@ -224,37 +199,22 @@ def _safe_update_trade(key: str, updates: dict) -> None:
     Persists only when the update touches structural fields (sl, tp, order IDs,
     status, qty). Price/pnl ticks are excluded — too frequent, transient.
     """
-    from trade_store import STRUCTURAL_UPDATE_KEYS
-
     with _trades_lock:
         if key in active_trades:
             active_trades[key].update(updates)
-    if updates.keys() & STRUCTURAL_UPDATE_KEYS:
+    if updates.keys() & _STRUCTURAL_UPDATE_KEYS:
         _persist_positions()
 
 
 def _safe_del_trade(key: str) -> None:
     """Thread-safe delete from active_trades dict. Always persists."""
     with _trades_lock:
-        _pos = active_trades.pop(key, None)
-    # Remove from DB immediately
-    try:
-        from trade_log import delete_position as _tl_dp
-        _tl_dp(key)
-    except Exception as _dp_err:
-        log.error("_safe_del_trade: DB delete failed for %s: %s", key, _dp_err)
+        active_trades.pop(key, None)
     _persist_positions()
-    if _pos and _pos.get("trade_id") and _pos.get("status") != "RESERVED":
-        try:
-            from trade_log import append_event as _tl_ae
-            _tl_ae("POSITION_REMOVED", _pos["trade_id"], _pos.get("symbol", key),
-                   status=_pos.get("status", "UNKNOWN"), pnl=_pos.get("pnl", 0.0))
-        except Exception:
-            pass
 
 
 def _save_positions_file() -> None:
-    """Persist active_trades to DB (primary) and positions.json (fallback).
+    """Persist active_trades to positions.json.
     Atomic write: snapshot under lock, then I/O outside lock."""
     import json
     import os
@@ -263,13 +223,6 @@ def _save_positions_file() -> None:
     try:
         with _trades_lock:
             snapshot = {k: v for k, v in active_trades.items() if v.get("status") != "RESERVED"}
-        # DB primary
-        try:
-            from trade_log import replace_all_positions as _tl_rap
-            _tl_rap(snapshot)
-        except Exception as _db_err:
-            log.error("_save_positions_file: DB write failed: %s", _db_err)
-        # File fallback
         dir_name = os.path.dirname(os.path.abspath(POSITIONS_FILE))
         os.makedirs(dir_name, exist_ok=True)
         with tempfile.NamedTemporaryFile("w", dir=dir_name, delete=False, suffix=".tmp") as f:
@@ -277,36 +230,33 @@ def _save_positions_file() -> None:
             tmp_path = f.name
         os.replace(tmp_path, POSITIONS_FILE)
     except Exception as e:
-        log.warning(f"_save_positions_file failed: {e}")
+        log.error("[orders_state] persist failed — positions.json may be stale. Error: %s", e, exc_info=True)
+        try:
+            import os as _os
+            from datetime import datetime as _dt
+            _flag = _os.path.join(_os.path.dirname(_os.path.abspath(POSITIONS_FILE)), "persist_failure.flag")
+            _os.makedirs(_os.path.dirname(_flag), exist_ok=True)
+            with open(_flag, "w") as _f:
+                _f.write(f"{_dt.now(UTC).isoformat()} persist failed: {e}\n")
+        except Exception:
+            pass
 
 
 def _load_positions_file() -> dict:
-    """Load persisted position metadata.
-    DB is primary source of truth; positions.json is the fallback."""
+    """Load persisted position metadata from positions.json."""
     import json
     import os
 
-    # DB primary
-    try:
-        from trade_log import load_positions as _tl_lp
-        db_positions = _tl_lp()
-        if db_positions:
-            log.info("_load_positions_file: loaded %d position(s) from DB (primary)", len(db_positions))
-            return db_positions
-    except Exception as _db_err:
-        log.warning("_load_positions_file: DB read failed, falling back to file: %s", _db_err)
-
-    # File fallback
     try:
         if not os.path.exists(POSITIONS_FILE):
             return {}
         with open(POSITIONS_FILE) as f:
             data = json.load(f)
         if isinstance(data, dict):
-            log.info("_load_positions_file: loaded %d position(s) from file (fallback)", len(data))
+            log.info("_load_positions_file: loaded %d position(s) from positions.json", len(data))
             return data
     except Exception as e:
-        log.warning(f"_load_positions_file file fallback failed: {e}")
+        log.warning(f"_load_positions_file failed: {e}")
     return {}
 
 

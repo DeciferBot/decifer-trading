@@ -41,8 +41,6 @@ from orders_state import (
     recently_closed,
 )
 import orders_state as _orders_state
-from trade_store import ledger_lookup as _ledger_lookup
-from trade_store import restore as _ts_restore
 
 # ── flatten_all order-book wait constants ─────────────────────────────────────
 # After reqGlobalCancel, IBKR processes cancellations asynchronously.  We poll
@@ -354,78 +352,50 @@ def reconcile_with_ibkr(ib: IB):
 
     def _find_saved(key: str, sym: str, instrument: str) -> dict:
         """
-        Four-tier metadata recovery (DB primary, files as fallback):
-          1. DB positions table (exact key, then symbol+instrument scan)
-          2. positions.json (exact key, then symbol+instrument scan)
-          3. metadata_ledger.json (durable, crash-safe, never bulk-rewritten)
-          4. trade_events DB ORDER_INTENT payload (deepest fallback)
+        Metadata recovery via event_log (JSONL write-ahead log):
+          Primary: event_log.open_trades() — trade_id-keyed dict with ORDER_INTENT
+                   metadata merged in (trade_type, conviction, regime, signal_scores).
+          Fallback: positions.json cache (for the window between IBKR fill and
+                    the next event_log write — extremely rare).
         """
-        # Tier 1: DB positions table (primary source of truth)
+        # Primary: event_log open trades (intent metadata merged with fill data)
         try:
-            from trade_log import load_positions as _tl_lp
-            db_positions = _tl_lp()
-            if key in db_positions:
-                hit = db_positions[key]
-                if hit.get("trade_type") and hit["trade_type"] != "UNKNOWN":
-                    return hit
-                # exact key found but UNKNOWN — fall through to scan and deeper tiers
-            for v in db_positions.values():
-                if v.get("symbol") == sym and v.get("instrument") == instrument and v.get("trade_type") and v["trade_type"] != "UNKNOWN":
+            from event_log import open_trades as _el_open
+            el_trades = _el_open()
+            # Match by symbol (event_log keyed by trade_id, not symbol+instrument key)
+            for v in el_trades.values():
+                if v.get("symbol") == sym and v.get("trade_type") and v["trade_type"] != "UNKNOWN":
                     return v
-        except Exception as _db_err:
-            log.warning("_find_saved %s: DB positions read failed: %s", key, _db_err)
-        # Tier 2: positions.json exact key
+        except Exception as _el_err:
+            log.warning("_find_saved %s: event_log read failed: %s", key, _el_err)
+        # Fallback: positions.json exact key
         if key in saved_positions:
             hit = saved_positions[key]
             if hit.get("trade_type") and hit["trade_type"] != "UNKNOWN":
                 return hit
-            # exact key found but UNKNOWN — fall through to scan and deeper tiers
-        # Tier 2b: positions.json symbol+instrument scan
+        # Fallback: positions.json symbol+instrument scan
         for v in saved_positions.values():
             if (
                 v.get("symbol") == sym and v.get("instrument") == instrument
                 and v.get("trade_type") and v["trade_type"] != "UNKNOWN"
             ):
                 return v
-        # Tier 3: metadata ledger (survives crashes / positions.json corruption)
-        ledger_hit = _ledger_lookup(key, sym, instrument)
-        if ledger_hit:
-            log.info(
-                f"Reconcile {key}: metadata recovered from ledger (trade_type={ledger_hit.get('trade_type', '?')})"
-            )
-            return ledger_hit
-        # Tier 4: trade_events DB — ORDER_INTENT payload written before IBKR submission.
-        # This is the deepest fallback: survives crashes that clear both positions.json
-        # and metadata_ledger.json because the DB write happens first in execute_buy/short.
-        try:
-            from trade_log import find_order_intent as _tl_foi
-            db_hit = _tl_foi(sym)
-            if db_hit:
-                log.info(
-                    f"Reconcile {key}: metadata recovered from trade_events DB "
-                    f"(trade_type={db_hit.get('trade_type', '?')})"
-                )
-                return db_hit
-        except Exception as _foi_err:
-            log.warning("Reconcile %s: Tier 3 DB lookup failed: %s", key, _foi_err)
         return {}
 
     try:
         # ── Step 1: restore our own position ledger ───────────────────────────
-        # Primary: replay DB event log — the authoritative source.
-        # Fallback: positions.json cache (for first run before any DB events exist).
-        from trade_log import open_trades as _tl_open_trades
-        db_trades = _tl_open_trades()
-        if db_trades:
+        # Primary: replay event_log JSONL — the authoritative source.
+        # Fallback: positions.json cache (for first run before any event_log entries exist).
+        from event_log import open_trades as _el_open_trades
+        el_trades = _el_open_trades()
+        if el_trades:
             with _trades_lock:
-                active_trades.update(db_trades)
-            log.info(f"Restored {len(db_trades)} open position(s) from trade_log DB.")
-        else:
-            stored = _ts_restore()
-            if stored:
-                with _trades_lock:
-                    active_trades.update(stored)
-                log.info(f"DB empty — restored {len(stored)} position(s) from positions.json (fallback).")
+                active_trades.update(el_trades)
+            log.info(f"Restored {len(el_trades)} open position(s) from event_log.")
+        elif saved_positions:
+            with _trades_lock:
+                active_trades.update(saved_positions)
+            log.info(f"event_log empty — restored {len(saved_positions)} position(s) from positions.json (fallback).")
 
         # ── Step 2: fetch IBKR portfolio ──────────────────────────────────────
         # portfolio() returns PortfolioItem with marketPrice + unrealizedPNL.
@@ -1060,36 +1030,6 @@ def reconcile_with_ibkr(ib: IB):
             f"Reconciliation complete. Tracking {len(active_trades)} positions. (processed={reconciled_count}, failed={failed_count})"
         )
 
-        # ── One-time migration: close stale DB trades not in IBKR ────────────
-        # Runs after every reconcile but becomes a no-op once the DB is clean.
-        # The DB accumulated ORDER_INTENT events without matching POSITION_CLOSED
-        # events before this fix was deployed. This block retroactively closes them
-        # so open_trades() returns only genuinely open positions going forward.
-        try:
-            from trade_log import open_trades as _tl_mig_open, close_trade as _tl_mig_close
-            _db_open = _tl_mig_open()
-            _active_trade_ids = {v.get("trade_id", "") for v in active_trades.values()}
-            # ibkr_keys contains symbol-based keys (e.g. "USO"), not trade_ids.
-            # Comparing trade_id directly against ibkr_keys is always True and incorrect.
-            # Use the symbol from the DB record to check if the position is live in IBKR.
-            _ibkr_symbols = {_ibkr_item_to_key(item) for item in portfolio_items if item.position != 0}
-            _stale_ids = [
-                tid for tid in _db_open
-                if _db_open[tid].get("symbol", tid) not in _ibkr_symbols
-                and tid not in _active_trade_ids
-            ]
-            if _stale_ids:
-                log.info("Migration: writing POSITION_CLOSED for %d stale DB trades", len(_stale_ids))
-                for _tid in _stale_ids:
-                    _t = _db_open[_tid]
-                    _tl_mig_close(
-                        _tid, _t.get("symbol", "?"),
-                        exit_price=0.0, pnl=0.0, exit_reason="migration_close",
-                    )
-                log.info("Migration complete — DB is now clean")
-        except Exception as _mig_err:
-            log.warning("DB migration step failed (non-fatal): %s", _mig_err)
-
         # ── Step 6: orphan alerting ───────────────────────────────────────────
         # Any position that ended up with trade_type UNKNOWN after all lookup
         # tiers means the bot made this trade but lost the metadata on restart.
@@ -1474,23 +1414,26 @@ def update_positions_from_ibkr(ib: IB):
         # (trade_type, conviction, reasoning, signal_scores, entry_regime, …) is
         # preserved verbatim from the saved record.  Without this the whole training-
         # data corpus is corrupted every time the bot drops and re-adds a position.
-        from trade_store import restore as _restore_positions
-
         def _find_saved_metadata(sym: str, instrument: str) -> dict:
             """
-            Scan positions.json for the best metadata match for this symbol+instrument.
-            Returns the saved dict (possibly stale keys) or {} if nothing useful found.
+            Scan event_log open trades and positions.json for metadata match for this symbol+instrument.
+            Returns the saved dict or {} if nothing useful found.
             """
             try:
-                saved = _restore_positions()
-                # Exact key match first (already covered by `ibkr_key not in active_trades`
-                # but positions.json may have the entry under the old key).
-                for _saved_key, saved_val in saved.items():
+                from event_log import open_trades as _el_open2
+                for v in _el_open2().values():
+                    if v.get("symbol") == sym and v.get("trade_type") and v["trade_type"] != "UNKNOWN":
+                        return v
+            except Exception:
+                pass
+            try:
+                saved = _load_positions_file()
+                for saved_val in saved.values():
                     if (
                         saved_val.get("symbol") == sym
                         and saved_val.get("instrument") == instrument
                         and saved_val.get("trade_type")
-                    ):  # has real metadata
+                    ):
                         return saved_val
             except Exception:
                 pass

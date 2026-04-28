@@ -27,6 +27,7 @@ from datetime import datetime
 from bot_state import clog, dash
 
 WATCHED_MODULES: dict = {
+    "bot_ibkr": "bot_ibkr",  # safe to reload — no state; bot_state.ib holds the connection
     "signals": "signals",
     "scanner": "scanner",
     "agents": "agents",

@@ -64,33 +64,6 @@ for _decifer_mod in ("orders", "risk", "scanner", "signals", "news", "agents"):
 # Import the REAL orders module (conftest has already patched all heavy deps)
 import orders
 
-# ── Redirect trade_log DB to an isolated temp file for this test module ───────
-# execute_buy/execute_short call trade_log.append_event("ORDER_INTENT", ...) which
-# writes to the SQLite DB. Without redirection, these writes pollute data/decifer.db
-# and can trigger the startup migration to incorrectly close real live positions.
-import pathlib
-import tempfile
-import trade_log as _test_tl
-
-_test_db_tmp = pathlib.Path(tempfile.mktemp(suffix="_test_orders.db"))
-_test_tl_orig_path = _test_tl._DB_PATH
-_test_tl_orig_conn = _test_tl._conn
-_test_tl._DB_PATH = _test_db_tmp
-_test_tl._conn = None
-
-
-def teardown_module(module):
-    _test_tl._DB_PATH = _test_tl_orig_path
-    _test_tl._conn = _test_tl_orig_conn
-    try:
-        if _test_db_tmp.exists():
-            _test_db_tmp.unlink()
-        for _ext in (".db-shm", ".db-wal"):
-            _p = pathlib.Path(str(_test_db_tmp) + _ext)
-            if _p.exists():
-                _p.unlink()
-    except Exception:
-        pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1287,7 +1260,7 @@ class TestReconcileWithIbkr:
 
     def test_reconcile_preserves_pending_with_live_ibkr_order(self, mock_config):
         """PENDING entry should survive reconcile when the order is still live in IBKR."""
-        with patch("orders.CONFIG", mock_config), patch("orders_portfolio._ts_restore", return_value={}):
+        with patch("orders.CONFIG", mock_config), patch("event_log.open_trades", return_value={}), patch("orders_portfolio._load_positions_file", return_value={}):
             orders.active_trades.clear()
             orders.active_trades["AAPL"] = {"status": "PENDING", "order_id": 42, "symbol": "AAPL"}
 
@@ -1302,7 +1275,7 @@ class TestReconcileWithIbkr:
 
     def test_reconcile_cancels_pending_when_order_gone_from_ibkr(self, mock_config):
         """PENDING entry with no matching IBKR open order should be cancelled and removed."""
-        with patch("orders.CONFIG", mock_config), patch("orders_portfolio._ts_restore", return_value={}):
+        with patch("orders.CONFIG", mock_config), patch("event_log.open_trades", return_value={}), patch("orders_portfolio._load_positions_file", return_value={}):
             orders.active_trades.clear()
             orders.active_trades["AAPL"] = {"status": "PENDING", "order_id": 42, "symbol": "AAPL"}
 
@@ -1321,7 +1294,7 @@ class TestReconcileWithIbkr:
         Portfolio must be non-empty (TSLA present) to avoid the false-closed-while-down
         guard which skips purge when IBKR returns zero items.
         """
-        with patch("orders.CONFIG", mock_config), patch("orders_portfolio._ts_restore", return_value={}):
+        with patch("orders.CONFIG", mock_config), patch("event_log.open_trades", return_value={}), patch("orders_portfolio._load_positions_file", return_value={}):
             orders.active_trades.clear()
             orders.active_trades["MSFT"] = {"status": "ACTIVE", "symbol": "MSFT"}
 

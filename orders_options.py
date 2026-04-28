@@ -66,11 +66,6 @@ def _drop_expired_pending_exits(_log=None) -> None:
         return
     for k in expired:
         _pending_option_exits.pop(k, None)
-        try:
-            from trade_log import delete_pending_exit as _tl_dpe
-            _tl_dpe(k)
-        except Exception:
-            pass
         if _log:
             _log.warning("orders_options: dropped expired deferred exit %s — option already expired", k)
         else:
@@ -80,21 +75,6 @@ def _drop_expired_pending_exits(_log=None) -> None:
 def _load_pending_exits() -> None:
     global _pending_option_exits
     _log = __import__("logging").getLogger(__name__)
-    # DB primary
-    try:
-        from trade_log import load_pending_exits as _tl_lpe
-        db_exits = _tl_lpe()
-        if db_exits:
-            _pending_option_exits = db_exits
-            _drop_expired_pending_exits(_log)
-            _log.info(
-                "orders_options: loaded %d pending exit(s) from DB: %s",
-                len(_pending_option_exits), ", ".join(_pending_option_exits.keys()),
-            )
-            return
-    except Exception as _db_err:
-        _log.warning("orders_options: DB pending exits load failed, trying file: %s", _db_err)
-    # File fallback
     try:
         if os.path.exists(_PENDING_EXITS_FILE):
             with open(_PENDING_EXITS_FILE) as f:
@@ -102,7 +82,7 @@ def _load_pending_exits() -> None:
             if _pending_option_exits:
                 _drop_expired_pending_exits(_log)
                 _log.info(
-                    "orders_options: loaded %d pending exit(s) from file (fallback): %s",
+                    "orders_options: loaded %d pending exit(s) from file: %s",
                     len(_pending_option_exits), ", ".join(_pending_option_exits.keys()),
                 )
     except Exception:
@@ -111,19 +91,6 @@ def _load_pending_exits() -> None:
 
 def _save_pending_exits() -> None:
     _log = __import__("logging").getLogger(__name__)
-    # DB primary — individual upserts are handled at queue/dequeue time;
-    # this full-sync is the belt-and-suspenders pass.
-    try:
-        from trade_log import load_pending_exits as _tl_lpe, upsert_pending_exit as _tl_upe, delete_pending_exit as _tl_dpe
-        existing_keys = set(_tl_lpe().keys())
-        current_keys = set(_pending_option_exits.keys())
-        for k in current_keys - existing_keys:
-            _tl_upe(k, _pending_option_exits[k])
-        for k in existing_keys - current_keys:
-            _tl_dpe(k)
-    except Exception as _db_err:
-        _log.warning("orders_options: DB pending exits save failed: %s", _db_err)
-    # File fallback
     try:
         os.makedirs(os.path.dirname(_PENDING_EXITS_FILE), exist_ok=True)
         tmp = _PENDING_EXITS_FILE + ".tmp"
@@ -230,30 +197,23 @@ def execute_buy_option(
         except Exception:
             _icw_wal = None
         try:
-            from trade_log import append_event as _tl_ae_opt
-            _tl_ae_opt("ORDER_INTENT", _trade_id_opt, symbol,
-                       instrument="option", direction="LONG",
-                       trade_type=trade_type or "SCALP",
-                       right=contract_info["right"],
-                       strike=contract_info["strike"],
-                       expiry_str=contract_info["expiry_str"],
-                       entry=contract_info.get("mid", 0.0),
-                       qty=n_contracts, sl=0.0, tp=0.0,
-                       score=score, conviction=conviction,
-                       entry_regime=regime,
-                       reasoning=reasoning or "",
-                       signal_scores=signal_scores or {},
-                       agent_outputs=agent_outputs or {},
-                       pattern_id=pattern_id or "",
-                       advice_id=advice_id or "",
-                       ic_weights_at_entry=_icw_wal,
-                       open_time=_opt_open_time,
-                       delta=contract_info.get("delta"),
-                       underlying_price=contract_info.get("underlying_price"),
-                       iv=contract_info.get("iv"),
-                       iv_rank=contract_info.get("iv_rank"))
+            from event_log import append_intent as _el_intent_opt
+            _el_intent_opt(
+                _trade_id_opt, symbol,
+                direction="LONG",
+                trade_type=trade_type or "SCALP",
+                instrument="option",
+                intended_price=contract_info.get("mid", 0.0),
+                qty=n_contracts, sl=0.0, tp=0.0,
+                regime=regime or "UNKNOWN",
+                signal_scores=signal_scores or {},
+                conviction=conviction,
+                reasoning=reasoning or "",
+                score=float(score),
+                open_time=_opt_open_time,
+            )
         except Exception as _wal_err_opt:
-            log.warning("execute_buy_option %s: trade_log ORDER_INTENT failed: %s", opt_key, _wal_err_opt)
+            log.warning("execute_buy_option %s: ORDER_INTENT write failed: %s", opt_key, _wal_err_opt)
 
         # Options only trade during regular hours — outsideRth must be False
         entry_order = LimitOrder("BUY", n_contracts, limit_price, account=account, tif="DAY", outsideRth=False)
@@ -630,23 +590,34 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
             log.info(f"[TRIM] {opt_key}: sold {sell_contracts} contracts, {remaining_c} remaining")
         else:
             _close_trade_id_opt = pos.get("trade_id") or f"{opt_key}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
+            _now_ts_opt = datetime.now(UTC).isoformat()
             try:
-                from trade_log import close_trade as _tl_close_opt
-                _tl_close_opt(
-                    _close_trade_id_opt, pos["symbol"],
-                    exit_price=round(current, 4),
-                    pnl=round(pnl, 2),
-                    exit_reason=reason,
-                    direction=pos.get("direction", "LONG"),
-                    instrument="option",
-                    right=pos.get("right", ""),
-                    strike=pos.get("strike", 0.0),
-                    expiry_str=pos.get("expiry_str", ""),
-                    qty=sell_contracts,
-                    trade_type=pos.get("trade_type", "SCALP"),
-                )
-            except Exception as _tl_err_opt:
-                log.warning("trade_log.close_trade failed for %s: %s", opt_key, _tl_err_opt)
+                from event_log import append_close as _el_close_opt
+                _el_close_opt(_close_trade_id_opt, pos["symbol"],
+                              exit_price=round(current, 4), pnl=round(pnl, 2),
+                              exit_reason=reason, hold_minutes=0)
+            except Exception as _el_err_opt:
+                log.warning("event_log.append_close failed for %s: %s", opt_key, _el_err_opt)
+            try:
+                import training_store as _ts_opt
+                _ts_opt.append({
+                    "trade_id": _close_trade_id_opt, "symbol": pos["symbol"],
+                    "direction": pos.get("direction", "LONG"),
+                    "trade_type": pos.get("trade_type") or "SCALP",
+                    "instrument": "option",
+                    "fill_price": float(pos.get("entry", 0.0)),
+                    "intended_price": float(pos.get("intended_price") or pos.get("entry", 0.0)),
+                    "exit_price": round(current, 4), "pnl": round(pnl, 2),
+                    "hold_minutes": 0, "exit_reason": reason,
+                    "regime": pos.get("entry_regime", "UNKNOWN"),
+                    "signal_scores": pos.get("signal_scores") or {},
+                    "conviction": float(pos.get("conviction") or 0.0),
+                    "score": float(pos.get("score") or pos.get("entry_score") or 0.0),
+                    "ts_fill": pos.get("open_time") or _now_ts_opt,
+                    "ts_close": _now_ts_opt,
+                })
+            except Exception as _ts_err_opt:
+                log.warning("training_store.append failed for %s: %s", opt_key, _ts_err_opt)
             recently_closed[pos["symbol"]] = datetime.now(UTC).isoformat()
             del active_trades[opt_key]
         return True

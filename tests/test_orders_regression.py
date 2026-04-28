@@ -62,6 +62,7 @@ for _decifer_mod in ("orders", "risk", "scanner", "signals", "news", "agents"):
     sys.modules.pop(_decifer_mod, None)
 
 # Import the REAL orders module (conftest has already patched all heavy deps)
+import orders  # noqa: E402 — must follow stub setup above
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -173,6 +174,7 @@ class TestOrphanedStopLoss:
         ib.portfolio.return_value = portfolio_items
         ib.openTrades.return_value = open_trades_list
         ib.sleep.return_value = None
+        ib.placeOrder.return_value.order.orderId = sl_order_id
         # placeOrder returns a trade whose order has a known orderId
         new_sl_trade = MagicMock()
         new_sl_trade.order.orderId = sl_order_id
@@ -207,7 +209,8 @@ class TestOrphanedStopLoss:
         with (
             patch("orders.CONFIG", mock_config),
             patch("orders._validate_position_price", return_value=(102.0, "IBKR")),
-            patch("orders_portfolio._ts_restore", return_value={}),
+            patch("event_log.open_trades", return_value={}),
+            patch("orders_portfolio._load_positions_file", return_value={}),
         ):
             _om.reconcile_with_ibkr(ib)
 
@@ -234,7 +237,8 @@ class TestOrphanedStopLoss:
         with (
             patch("orders.CONFIG", mock_config),
             patch("orders._validate_position_price", return_value=(102.0, "IBKR")),
-            patch("orders_portfolio._ts_restore", return_value={}),
+            patch("event_log.open_trades", return_value={}),
+            patch("orders_portfolio._load_positions_file", return_value={}),
         ):
             _om.reconcile_with_ibkr(ib)
 

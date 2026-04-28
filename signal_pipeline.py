@@ -423,20 +423,6 @@ def _append_signals_log(signals: list, log_path: str) -> None:
                 f.write(s.to_json() + "\n")
     except Exception as e:
         log.warning(f"typed signals_log write failed: {e}")
-    try:
-        from trade_log import append_signal as _tl_append_signal
-        scan_id = signals[0].timestamp.strftime("%Y%m%d_%H%M%S")
-        for s in signals:
-            _tl_append_signal(
-                scan_id=scan_id,
-                symbol=s.symbol,
-                score=round(s.conviction_score * 5),
-                direction=s.direction,
-                regime=s.regime_context,
-                breakdown=s.dimension_scores,
-            )
-    except Exception as _tl_e:
-        log.debug("trade_log.append_signal failed: %s", _tl_e)
 
 
 # ── Public entry point ─────────────────────────────────────────────────────────

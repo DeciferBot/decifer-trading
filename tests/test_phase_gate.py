@@ -228,7 +228,9 @@ class TestGetStatus:
         assert status.current_phase == 1
         assert status.phase_description
 
-    def test_phase1_with_no_trades_not_complete(self):
+    def test_phase1_with_no_trades_not_complete(self, monkeypatch):
+        import training_store
+        monkeypatch.setattr(training_store, "count", lambda: 0)
         cfg = _base_config(current_phase=1, overrides={"trade_log": "/nonexistent/trades.json"})
         status = get_status(cfg)
         assert status.closed_trades == 0
@@ -264,28 +266,24 @@ class TestGetStatus:
         assert "live_account_trading" in status.frozen_features
         assert status.frozen_features["live_account_trading"] == 4
 
-    def test_trades_counted_from_file(self, tmp_path):
-        trades_file = tmp_path / "trades.json"
-        trades = [
-            {"id": 1, "status": "closed"},
-            {"id": 2, "status": "exited"},
-            {"id": 3, "status": "open"},  # not counted
-            {"id": 4, "status": "filled"},
-        ]
-        trades_file.write_text(json.dumps(trades))
-        cfg = _base_config(current_phase=1, overrides={"trade_log": str(trades_file)})
+    def test_trades_counted_from_training_store(self, monkeypatch):
+        import training_store
+        monkeypatch.setattr(training_store, "count", lambda: 3)
+        cfg = _base_config(current_phase=1)
         status = get_status(cfg)
-        assert status.closed_trades == 3  # closed + exited + filled
+        assert status.closed_trades == 3
 
-    def test_missing_trade_log_counts_zero(self):
-        cfg = _base_config(current_phase=1, overrides={"trade_log": "/nonexistent/path.json"})
+    def test_missing_trade_log_counts_zero(self, monkeypatch):
+        import training_store
+        monkeypatch.setattr(training_store, "count", lambda: 0)
+        cfg = _base_config(current_phase=1)
         status = get_status(cfg)
         assert status.closed_trades == 0
 
-    def test_malformed_trade_log_counts_zero(self, tmp_path):
-        bad_file = tmp_path / "trades.json"
-        bad_file.write_text("not valid json{{{")
-        cfg = _base_config(current_phase=1, overrides={"trade_log": str(bad_file)})
+    def test_malformed_trade_log_counts_zero(self, monkeypatch):
+        import training_store
+        monkeypatch.setattr(training_store, "count", lambda: 0)
+        cfg = _base_config(current_phase=1)
         status = get_status(cfg)
         assert status.closed_trades == 0
 
@@ -577,13 +575,15 @@ class TestPhase1CompleteRequiresICValidation:
     def test_phase1_complete_still_false_when_only_ic_passes_no_trades(self, monkeypatch):
         """IC passing alone is not enough — trade count must also be met."""
         import phase_gate as pg
+        import training_store
 
         monkeypatch.setattr(
             pg,
             "_load_ic_validation_result",
             lambda data_dir=None: {"ready_for_live": True, "failures": []},
         )
-        cfg = _base_config(current_phase=1, overrides={"trade_log": "/nonexistent/trades.json"})
+        monkeypatch.setattr(training_store, "count", lambda: 0)
+        cfg = _base_config(current_phase=1)
         status = get_status(cfg)
         assert status.criteria_met["ic_walkforward_validated"] is True
         assert status.criteria_met["min_closed_trades"] is False

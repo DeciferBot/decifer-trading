@@ -161,7 +161,7 @@ class TestPersistFailureFlagFile:
 
         try:
             with patch("orders_state.active_trades", {"AAPL": {"qty": 10}}):
-                with patch("trade_store.persist", side_effect=OSError("disk full")):
+                with patch("tempfile.NamedTemporaryFile", side_effect=OSError("disk full")):
                     with caplog.at_level(logging.ERROR, logger="decifer.orders"):
                         os_mod._persist_positions()
         finally:
@@ -188,8 +188,7 @@ class TestPersistFailureFlagFile:
 
         try:
             with patch("orders_state.active_trades", {"AAPL": {"qty": 10}}):
-                with patch("trade_store.persist"):  # succeeds, no side_effect
-                    os_mod._persist_positions()
+                os_mod._persist_positions()
         finally:
             os_mod.POSITIONS_FILE = original_positions_file
 

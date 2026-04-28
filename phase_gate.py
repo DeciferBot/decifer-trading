@@ -78,17 +78,12 @@ def _is_closed_trade(t: dict) -> bool:
 
 
 def _count_closed_trades(trades_path: str) -> int:
-    """Return the number of closed (exited) trades from trades.json."""
-    p = Path(trades_path)
-    if not p.exists():
-        return 0
+    """Return the number of closed trade records from training_store."""
     try:
-        data = json.loads(p.read_text())
-    except (json.JSONDecodeError, OSError):
+        import training_store
+        return training_store.count()
+    except Exception:
         return 0
-    if isinstance(data, list):
-        return sum(1 for t in data if _is_closed_trade(t))
-    return 0
 
 
 def _get_test_pass_rate() -> float | None:

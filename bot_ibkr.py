@@ -820,8 +820,9 @@ def backfill_trades_from_ibkr():
                     hold_mins = 0
 
                 try:
-                    from trade_store import ledger_lookup as _bf_ll
-                    _bf_meta = _bf_ll(sym, sym, "stock")
+                    import training_store as _ts_bf
+                    _recent = _ts_bf.load(symbol=sym, limit=1)
+                    _bf_meta = _recent[0] if _recent else {}
                 except Exception:
                     _bf_meta = {}
                 trade = {
@@ -923,8 +924,9 @@ def backfill_trades_from_ibkr():
                     hold_mins = 0
 
                 try:
-                    from trade_store import ledger_lookup as _bf_ll_s
-                    _bf_meta_s = _bf_ll_s(sym, sym, "stock")
+                    import training_store as _ts_bf_s
+                    _recent_s = _ts_bf_s.load(symbol=sym, limit=1)
+                    _bf_meta_s = _recent_s[0] if _recent_s else {}
                 except Exception:
                     _bf_meta_s = {}
                 trade = {
@@ -1053,8 +1055,9 @@ def backfill_trades_from_ibkr():
 
                 _opt_key_bf = f"{sell['underlying']}_{sell['right']}_{sell['strike']}_{sell['expiry']}"
                 try:
-                    from trade_store import ledger_lookup as _bf_ll_opt
-                    _bf_meta_opt = _bf_ll_opt(_opt_key_bf, sell["underlying"], "option")
+                    import training_store as _ts_bf_opt
+                    _recent_opt = _ts_bf_opt.load(symbol=sell["underlying"], limit=1)
+                    _bf_meta_opt = _recent_opt[0] if _recent_opt else {}
                 except Exception:
                     _bf_meta_opt = {}
                 trade = {

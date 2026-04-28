@@ -53,13 +53,6 @@ def _append_audit_event(event_type: str, **fields) -> None:
     tooling that reads it directly (Chief Decifer, external scripts).
     """
     record = {"ts": datetime.utcnow().isoformat() + "Z", "event": event_type, **fields}
-    # DB primary
-    try:
-        from trade_log import append_audit as _tl_aa
-        _tl_aa(event_type, **fields)
-    except Exception as _db_exc:
-        log.error(f"audit DB write failed: {_db_exc}")
-    # File fallback
     os.makedirs(os.path.dirname(os.path.abspath(AUDIT_LOG_FILE)), exist_ok=True)
     try:
         with open(AUDIT_LOG_FILE, "a") as fh:
@@ -213,16 +206,11 @@ def log_order(order_record: dict, trade_id: str | None = None):
             _sym = order_record.get("symbol", "")
             _oid = order_record.get("order_id") or 0
             _qty = order_record.get("qty") or 0
-            if _status == "SUBMITTED":
-                from trade_log import submit_order as _tl_submit
-                _tl_submit(_db_trade_id, _sym, order_id=_oid, qty=_qty,
-                           limit_price=order_record.get("price") or 0.0,
-                           side=order_record.get("side", ""))
-            elif _status == "FILLED":
-                from trade_log import record_fill as _tl_fill
-                _tl_fill(_db_trade_id, _sym,
+            if _status == "FILLED":
+                from event_log import append_fill as _el_fill
+                _el_fill(_db_trade_id, _sym,
                          fill_price=order_record.get("fill_price") or order_record.get("price") or 0.0,
-                         qty=_qty, order_id=_oid)
+                         fill_qty=_qty, order_id=_oid)
         except Exception as _db_err:
             log.warning("log_order: DB write failed for %s: %s", order_record.get("symbol"), _db_err)
 
@@ -528,12 +516,6 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
 
     trades.append(record)
     _save_trades(trades)
-    # DB write — closed_trades table is the primary store for analytics
-    try:
-        from trade_log import append_closed_trade as _tl_act
-        _tl_act(record.get("symbol", ""), record.get("trade_type"), record)
-    except Exception as _ct_err:
-        log.error("closed_trades DB write failed (%s): %s", record.get("symbol"), _ct_err)
     log.info(f"Trade logged: {action} {trade.get('symbol')} | P&L: {outcome.get('pnl') if outcome else 'open'}")
 
     # ── BC-3: Execution IC stream ───────────────────────────────────────────────
@@ -560,12 +542,6 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
             "exit_reason": outcome.get("reason") if outcome else None,
         }
         # DB primary
-        try:
-            from trade_log import append_audit as _tl_aa
-            _tl_aa("EXECUTION_IC", **_exec_ic_record)
-        except Exception as _db_e:
-            log.debug(f"execution_ic DB write failed (non-critical): {_db_e}")
-        # File fallback
         try:
             with open(_exec_ic_path, "a") as _f:
                 _f.write(json.dumps(_exec_ic_record) + "\n")
