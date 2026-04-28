@@ -2008,8 +2008,6 @@ def run_scan():
                                             )
                 else:
                     clog("INFO", f"Portfolio manager HOLD: {sym_pm} — {reason_pm}")
-                    from bot_voice import speak as _speak_hold
-                    _speak_hold(f"Holding {sym_pm}. {reason_pm or 'Thesis intact.'}")
             # Log all actions to audit log
             import json as _json
 
@@ -2122,11 +2120,10 @@ def run_scan():
         "sells": _apex_mode_sells,
         "hold": [],
         "_agent_outputs": {},
-        "summary": "Apex 3.0 — regime-change sells only; Track A owns new entries",
         "cash": False,
     }
 
-    dash["claude_analysis"] = decision.get("summary", decision.get("claude_reasoning", ""))
+    dash["claude_analysis"] = "Apex scan in progress…"
     dash["agent_outputs"] = decision.get("_agent_outputs", {})
 
     now_str = datetime.now(_ET).strftime("%H:%M:%S")
@@ -2298,6 +2295,11 @@ def run_scan():
             log.warning("APEX_LIVE: shadow log failed — %s", _log_err)
         _apex_decision = _cut_result.get("decision") or {}
         _apex_meta = _apex_decision.get("_meta") or {}
+        dash["claude_analysis"] = (
+            _apex_decision.get("market_read")
+            or _apex_decision.get("session_character")
+            or "Apex scan complete"
+        )
         dash["agent_conversation"] = [{
             "agent": "Apex Synthesizer",
             "role": "Single claude-sonnet-4-6 call — candidates, regime, portfolio, session context → ApexDecision",
