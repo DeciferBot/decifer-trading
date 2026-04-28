@@ -234,7 +234,7 @@ def lightweight_cycle_check(
     # Prefer session_character (Opus-generated) over mechanical label so that
     # the cycle check compares the same vocabulary as entry_regime.
     current_regime = regime.get("session_character") or regime.get("regime", "UNKNOWN")
-    scalp_max_mins = pm_cfg.get("scalp_max_hold_minutes", 90)
+    scalp_max_mins = pm_cfg.get("scalp_max_hold_minutes", 60)
     scalp_min_pnl = pm_cfg.get("scalp_min_pnl_pct", 0.003)  # 0.3%
     scalp_mom_entry_min = pm_cfg.get("scalp_momentum_entry_min", 4)
     scalp_mom_current_max = pm_cfg.get("scalp_momentum_current_max", 1)

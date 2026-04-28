@@ -67,6 +67,8 @@ def filter_candidates(
         sym = sig.get("symbol")
         if not sym:
             continue
+        if sym in open_symbols:
+            log.info("filter_candidates: %s dropped — already held (Track B)", sym); continue
         if _is_recently_closed(sym):
             log.info("filter_candidates: %s dropped — cooldown", sym); continue
         blocked, _r = is_failed_thesis_blocked(sym, sig.get("price", 0.0))
@@ -148,7 +150,7 @@ def screen_open_positions(
     """Return (symbol, reason) pairs for positions that must exit immediately.
     These bypass the Apex entirely."""
     now = now_utc or datetime.now(UTC)
-    scalp_max_mins = CONFIG.get("portfolio_manager", {}).get("scalp_max_hold_minutes", 90)
+    scalp_max_mins = CONFIG.get("portfolio_manager", {}).get("scalp_max_hold_minutes", 60)
     forced: list[tuple[str, str]] = []
 
     _items = open_positions.values() if isinstance(open_positions, dict) else open_positions

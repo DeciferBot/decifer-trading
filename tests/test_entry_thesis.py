@@ -16,7 +16,7 @@ def test_scalp_thesis_contains_time_and_pnl():
     assert "LONG" in t
     assert "AAPL" in t
     assert "wrong_if" in t
-    assert "90min" in t  # scalp_max_hold_minutes default
+    assert "60min" in t  # scalp_max_hold_minutes default
     assert "0.3%" in t  # scalp_min_pnl_pct default as %
     assert "BULL" in t
 

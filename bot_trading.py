@@ -351,7 +351,7 @@ def _build_pm_exit_reason(pos: dict, regime: dict, pm_trigger: str, reason_pm: s
     exit_pol = _polarity(exit_regime)
     if entry_pol and exit_pol and entry_pol != exit_pol:
         thesis_class = "breached_regime_shift"
-    elif trade_type_ex in ("SCALP", "INTRADAY") and held_mins > CONFIG.get("scalp_max_hold_minutes", 90):
+    elif trade_type_ex in ("SCALP", "INTRADAY") and held_mins > CONFIG.get("portfolio_manager", {}).get("scalp_max_hold_minutes", 60):
         thesis_class = "breached_stale_scalp"
     else:
         thesis_class = "noise_stop"
@@ -524,7 +524,7 @@ def check_external_closes(regime: dict):
                     thesis_class = "confirmed"
                 elif entry_pol and exit_pol and entry_pol != exit_pol:
                     thesis_class = "breached_regime_shift"
-                elif trade_type_ex in ("SCALP", "INTRADAY") and held_mins > CONFIG.get("scalp_max_hold_minutes", 90):
+                elif trade_type_ex in ("SCALP", "INTRADAY") and held_mins > CONFIG.get("portfolio_manager", {}).get("scalp_max_hold_minutes", 60):
                     thesis_class = "breached_stale_scalp"
                 else:
                     thesis_class = "noise_stop"
@@ -720,10 +720,37 @@ def _eod_options_review(regime: dict):
 
     ib = bot_state.ib
     positions = get_open_positions()
+
+    # ── Force-close all INTRADAY equity positions ──────────────────────────
+    # Equity INTRADAY trades have no overnight thesis. The 60-min timeout handles
+    # mid-session expiry, but any entry after 14:00 ET can survive past close —
+    # this is the hard backstop.
+    intraday_equities = [
+        p for p in positions
+        if p.get("trade_type") == "INTRADAY" and p.get("instrument", "stock") != "option"
+    ]
+    for p in intraday_equities:
+        key = p.get("_trade_key", p.get("symbol"))
+        sym = p.get("symbol", key)
+        clog("TRADE", f"EOD INTRADAY equity force-close: {key}")
+        try:
+            result = close_position(ib, key) or close_position(ib, sym)
+            if result:
+                try:
+                    from bot_voice import speak_natural as _speak_eod
+                    _speak_eod("exit_pm", fallback=f"Closing {sym} into the bell.", symbol=sym,
+                               reason="intraday equity flat EOD", news="none")
+                except Exception:
+                    pass
+            else:
+                clog("ERROR", f"EOD INTRADAY equity close failed: {key}")
+        except Exception as e:
+            clog("ERROR", f"EOD INTRADAY equity close error for {key}: {e}")
+
     opts = [p for p in positions if p.get("instrument") == "option"]
 
     if not opts:
-        clog("INFO", "EOD options review: no open options positions")
+        clog("INFO", f"EOD review: {len(intraday_equities)} INTRADAY equities closed, no options to review")
         return
 
     # INTRADAY positions are always closed at EOD — no AI judgment needed.

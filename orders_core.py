@@ -155,7 +155,7 @@ def _build_entry_thesis(
     thesis describes THIS specific setup, not just the trade_type category.
     """
     pm = CONFIG.get("portfolio_manager", {})
-    scalp_mins = pm.get("scalp_max_hold_minutes", 90)
+    scalp_mins = pm.get("scalp_max_hold_minutes", 60)
     scalp_pnl = pm.get("scalp_min_pnl_pct", 0.003) * 100
 
     tt = (trade_type or "INTRADAY").upper()

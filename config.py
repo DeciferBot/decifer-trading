@@ -849,6 +849,7 @@ CONFIG = {
         "drawdown_trigger_pct": -0.015,  # daily_pnl / portfolio_value → trigger
         "earnings_lookahead_hours": 48,  # flag earnings within this window
         "max_tokens": 600,
+        "scalp_max_hold_minutes": 60,   # INTRADAY/SCALP timeout; live: 60
     },
 
     # ── ENTRY GATE ────────────────────────────────────────────────────────────
