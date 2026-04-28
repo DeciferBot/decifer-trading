@@ -1824,11 +1824,15 @@ def run_scan():
                     if not _already_exiting:
                         _pm_order_placed = False
                         if _opt_keys_pm:
-                            for _ok in _opt_keys_pm:
-                                clog("TRADE", f"PM EXIT routing to option sell: {_ok}")
-                                _exit_reason_pm = _build_pm_exit_reason(pos_pm or {}, regime, pm_trigger, reason_pm)
-                                if execute_sell_option(ib, _ok, reason=_exit_reason_pm):
-                                    _pm_order_placed = True
+                            from orders_contracts import is_options_market_open as _opt_mkt_open
+                            if not _opt_mkt_open():
+                                clog("INFO", f"PM EXIT: options market closed — deferring option exit for {sym_pm} to next market-hours scan")
+                            else:
+                                for _ok in _opt_keys_pm:
+                                    clog("TRADE", f"PM EXIT routing to option sell: {_ok}")
+                                    _exit_reason_pm = _build_pm_exit_reason(pos_pm or {}, regime, pm_trigger, reason_pm)
+                                    if execute_sell_option(ib, _ok, reason=_exit_reason_pm):
+                                        _pm_order_placed = True
                         if sym_pm in _pm_trades:
                             _exit_reason_pm = _build_pm_exit_reason(pos_pm or {}, regime, pm_trigger, reason_pm)
                             if execute_sell(ib, sym_pm, reason=_exit_reason_pm):
@@ -1906,17 +1910,22 @@ def run_scan():
                         _trim_order_placed = False
                         _trim_pct_used = action.get("trim_pct", 50)
                         if _opt_keys_pm:
-                            for _ok in _opt_keys_pm:
-                                with _pm_lock:
-                                    _c = _pm_trades.get(_ok, {}).get("contracts", 0)
-                                _trim_c = max(1, round(_c * _trim_pct_used / 100))
-                                if execute_sell_option(
-                                    ib,
-                                    _ok,
-                                    reason=f"portfolio_manager_trim:{pm_trigger}",
-                                    contracts_override=_trim_c if _trim_c < _c else None,
-                                ):
-                                    _trim_order_placed = True
+                            from orders_contracts import is_options_market_open as _opt_mkt_open_trim
+                            if not _opt_mkt_open_trim():
+                                clog("INFO", f"PM TRIM: options market closed — skipping option trim for {sym_pm} until market open")
+                                _trimmed_today.discard(sym_pm)
+                            else:
+                                for _ok in _opt_keys_pm:
+                                    with _pm_lock:
+                                        _c = _pm_trades.get(_ok, {}).get("contracts", 0)
+                                    _trim_c = max(1, round(_c * _trim_pct_used / 100))
+                                    if execute_sell_option(
+                                        ib,
+                                        _ok,
+                                        reason=f"portfolio_manager_trim:{pm_trigger}",
+                                        contracts_override=_trim_c if _trim_c < _c else None,
+                                    ):
+                                        _trim_order_placed = True
                         if sym_pm in _pm_trades:
                             with _pm_lock:
                                 _q = _pm_trades.get(sym_pm, {}).get("qty", 0)

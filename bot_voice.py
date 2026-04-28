@@ -7,10 +7,13 @@ STT: handled by the browser (Web Speech API); only text arrives here.
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import queue
 import subprocess
 import threading
+from datetime import datetime, timezone
 
 log = logging.getLogger("decifer.voice")
 
@@ -79,14 +82,24 @@ def _clean(text: str) -> str:
     return text.strip()
 
 
-def speak(msg: str) -> None:
+def speak(msg: str, _log_event: str = "speak", _log_extra: dict | None = None) -> None:
     """Non-blocking TTS. Enqueues text for the single speech worker — never blocks the trading loop."""
     if not msg:
         return
     try:
-        _speech_queue.put_nowait(_clean(msg))
+        cleaned = _clean(msg)
+        _speech_queue.put_nowait(cleaned)
     except queue.Full:
         log.debug("Voice queue full — dropping alert: %.60s…", msg)
+        return
+    try:
+        entry: dict = {"ts": datetime.now(timezone.utc).isoformat(), "event": _log_event, "text": cleaned}
+        if _log_extra:
+            entry.update(_log_extra)
+        with open(_VOICE_LOG, "a") as _f:
+            _f.write(json.dumps(entry) + "\n")
+    except Exception:
+        pass
 
 
 def _generate_natural(event: str, fallback: str, **ctx) -> str:
@@ -179,6 +192,9 @@ def _generate_natural(event: str, fallback: str, **ctx) -> str:
         return fallback
 
 
+_VOICE_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "voice_log.jsonl")
+
+
 def speak_natural(event: str, fallback: str = "", **ctx) -> None:
     """
     Generate a friendly spoken alert via Claude Haiku, then speak it.
@@ -188,7 +204,8 @@ def speak_natural(event: str, fallback: str = "", **ctx) -> None:
     def _run():
         text = _generate_natural(event, fallback, **ctx) or fallback
         if text:
-            speak(text)
+            extra = {k: v for k, v in ctx.items() if v is not None} or None
+            speak(text, _log_event=event, _log_extra=extra)
 
     threading.Thread(target=_run, daemon=True).start()
 
@@ -292,13 +309,13 @@ def answer_voice_query(question: str, dash: dict) -> str:
         )
         answer = _resp.content[0].text.strip()
         answer = answer or "I couldn't retrieve that right now."
-        speak(answer)
+        speak(answer, _log_event="voice_query", _log_extra={"question": question})
         return answer
 
     except Exception as e:
         log.error("Voice query error: %s", e)
         err = "Error processing your question."
-        speak(err)
+        speak(err, _log_event="voice_query_error")
         return err
 
 
