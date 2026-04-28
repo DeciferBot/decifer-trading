@@ -631,8 +631,9 @@ class TestExecuteSell:
 
     @pytest.fixture(autouse=True)
     def mock_market_open(self):
-        """Simulate market open so execute_sell is not deferred by market-hours guard."""
-        with patch("orders_core.is_equities_extended_hours", return_value=True):
+        """Simulate regular market hours so execute_sell uses a market order (not GTC limit)."""
+        with patch("orders_core.is_equities_extended_hours", return_value=True), \
+             patch("orders_core.is_options_market_open", return_value=True):
             yield
 
     @pytest.fixture(autouse=True)

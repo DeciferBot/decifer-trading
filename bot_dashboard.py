@@ -692,6 +692,13 @@ class DashHandler(BaseHTTPRequestHandler):
             self.end_headers()
             # Include current settings so dashboard form can show live values
             state = dict(dash)
+            # Refresh trade list from disk so Today's Results stays current
+            # without requiring a bot restart
+            try:
+                from learning import load_trades as _lt
+                state["all_trades"] = _lt()
+            except Exception:
+                pass
             # Total P&L = NetLiquidation - effective capital (starting + deposits - withdrawals)
             from learning import get_effective_capital
 

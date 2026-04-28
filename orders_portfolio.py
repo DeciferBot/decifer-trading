@@ -29,6 +29,7 @@ from orders_contracts import (
 from orders_state import (
     _flatten_lock,
     _load_positions_file,
+    _recently_closed_lock,
     _safe_del_trade,
     _safe_set_trade,
     _safe_update_trade,
@@ -610,17 +611,34 @@ def reconcile_with_ibkr(ib: IB):
                     stored_direction = active_trades[key].get("direction", "LONG")
                     ibkr_qty = abs(int(item.position))
                     stored_qty = active_trades[key].get("qty", ibkr_qty)
-                    # Reconcile qty: partial fills mean IBKR holds fewer contracts
-                    # than we submitted. Trust IBKR as ground truth.
-                    if is_option and ibkr_qty != stored_qty:
+                    # Reconcile qty: partial fills or tranche closes mean IBKR holds
+                    # a different count than tracked. Trust IBKR as ground truth for
+                    # both options and stocks.
+                    if ibkr_qty != stored_qty:
                         log.warning(
                             f"Reconcile {key}: qty mismatch — tracked={stored_qty}, "
-                            f"IBKR={ibkr_qty} (partial fill). Correcting to {ibkr_qty}."
+                            f"IBKR={ibkr_qty}. Correcting to {ibkr_qty}."
                         )
                         stored_qty = ibkr_qty
                         with _trades_lock:
                             active_trades[key]["qty"] = ibkr_qty
-                            active_trades[key]["contracts"] = ibkr_qty
+                            if is_option:
+                                active_trades[key]["contracts"] = ibkr_qty
+                    # Detect phantom/corrupted entry prices: if the stored entry
+                    # deviates >50% from IBKR's averageCost the metadata is stale
+                    # (e.g. a test placeholder like $100 for a $269 stock).
+                    # Correct the entry so PnL calculations and SL/TP logic are valid.
+                    if not is_option and not is_fx and ibkr_entry > 0 and stored_entry > 0:
+                        _entry_deviation = abs(stored_entry - ibkr_entry) / ibkr_entry
+                        if _entry_deviation > 0.50:
+                            log.warning(
+                                f"Reconcile {key}: stored entry ${stored_entry:.2f} deviates "
+                                f"{_entry_deviation:.0%} from IBKR avgCost ${ibkr_entry:.2f} "
+                                f"— phantom/stale metadata detected, correcting entry"
+                            )
+                            stored_entry = ibkr_entry
+                            with _trades_lock:
+                                active_trades[key]["entry"] = ibkr_entry
                     mult = 100 if is_option else 1
                     if stored_direction == "SHORT":
                         pnl = round((stored_entry - validated_price) * stored_qty * mult, 2)
@@ -630,7 +648,11 @@ def reconcile_with_ibkr(ib: IB):
                         active_trades[key]["current"] = round(validated_price, 4)
                         active_trades[key]["pnl"] = pnl
                         active_trades[key]["realized_pnl"] = round(float(getattr(item, "realizedPNL", 0) or 0), 2)
-                        active_trades[key]["status"] = "ACTIVE"
+                        # Preserve EXITING status: a close order is already live in IBKR.
+                        # Overwriting to ACTIVE bypasses execute_sell's dedup guard, causing
+                        # a new exit order every scan cycle until price moves to fill them all.
+                        if active_trades[key].get("status") != "EXITING":
+                            active_trades[key]["status"] = "ACTIVE"
                         active_trades[key]["_price_sources"] = src_desc
                         if is_option:
                             active_trades[key]["current_premium"] = round(validated_price, 4)
@@ -1278,7 +1300,7 @@ def update_positions_from_ibkr(ib: IB):
                 for k in active_trades:
                     if k in price_map or k in _positions_keys:
                         continue
-                    if active_trades[k].get("status") == "PENDING":
+                    if active_trades[k].get("status") in ("PENDING", "EXITING"):
                         continue
                     # FX positions are unreliable in IBKR callbacks — they can
                     # temporarily vanish from both portfolio() and positions() due
@@ -1293,6 +1315,54 @@ def update_positions_from_ibkr(ib: IB):
                     del active_trades[k]
             if stale_keys:
                 _save_positions_file()
+
+        # ── Deferred CLOSE for EXITING positions no longer in IBKR ───────────
+        # When execute_sell placed an extended-hours limit order that hadn't filled
+        # within 2s, the position was kept as EXITING (with close_order_id) rather
+        # than immediately removing it and writing a premature CLOSE record.
+        # Here we detect those positions: if IBKR no longer holds them, the close
+        # order filled — write the CLOSE record now and finalize the position.
+        _exiting_keys = []
+        with _trades_lock:
+            for k, v in active_trades.items():
+                if v.get("status") == "EXITING" and v.get("close_order_id") and k not in price_map and k not in _positions_keys:
+                    _exiting_keys.append(k)
+        for k in _exiting_keys:
+            _t = active_trades.get(k, {})
+            if not _t:
+                continue
+            log.info(
+                f"EXITING position {k} (close order #{_t.get('close_order_id')}) "
+                f"gone from IBKR — writing deferred CLOSE record"
+            )
+            try:
+                from learning import log_trade as _log_trade_ex
+                _exit_px = float(_t.get("current") or _t.get("entry", 0))
+                _entry_px = float(_t.get("entry", 0))
+                _qty = int(_t.get("qty", 1))
+                _is_short = _t.get("direction", "LONG") == "SHORT"
+                _pnl = round((_entry_px - _exit_px if _is_short else _exit_px - _entry_px) * _qty, 2)
+                _pnl_pct = round(_pnl / (_entry_px * _qty), 4) if _entry_px * _qty else 0
+                _log_trade_ex(
+                    trade=_t,
+                    agent_outputs={},
+                    regime={},
+                    action="CLOSE",
+                    outcome={
+                        "exit_price": _exit_px,
+                        "pnl": _pnl,
+                        "pnl_pct": _pnl_pct,
+                        "reason": _t.get("pending_exit_reason", "ext_hours_limit_filled"),
+                    },
+                )
+            except Exception as _dfr_err:
+                log.warning("Deferred CLOSE log for %s failed: %s", k, _dfr_err)
+            with _trades_lock:
+                with _recently_closed_lock:
+                    recently_closed[_t.get("symbol", k)] = datetime.now(UTC).isoformat()
+                active_trades.pop(k, None)
+        if _exiting_keys:
+            _save_positions_file()
 
         # ── Orphaned PENDING detection ────────────────────────────────────────
         # A PENDING entry with no active FillWatcher and past orphan_timeout_mins

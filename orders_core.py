@@ -1838,6 +1838,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
         # Initialised here so thesis-failure gate at line ~1947 always has a value regardless
         # of which branch below executes (regular vs extended hours).
         _exit_price = validated_price if validated_price > 0 else info.get("current", info.get("entry", 0))
+        _is_ext_hours_limit = not is_options_market_open()
         if is_options_market_open():
             # Regular session — plain market order, fills at best available price
             close_order = MarketOrder(close_action, sell_qty, account=CONFIG["active_account"])
@@ -1957,6 +1958,30 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
         log.info(
             f"{'✅' if pnl >= 0 else '❌'} CLOSE {direction} {symbol} ({close_action}) | P&L ${pnl:+.2f} | Reason: {reason}"
         )
+
+        # Extended-hours limit orders (GTC) may not fill within the 2s sleep window.
+        # If the order is still pending, keep the position in active_trades as EXITING
+        # so reconcile treats it as a known closing position on restart (not EXTERNAL),
+        # and defer the CLOSE record until update_positions_from_ibkr confirms the fill.
+        if _is_ext_hours_limit and not _is_partial:
+            _order_filled = (
+                sell_trade.orderStatus.status == "Filled"
+                or (sell_trade.orderStatus.filled or 0) >= sell_qty
+            )
+            if not _order_filled:
+                log.info(
+                    f"execute_sell {symbol}: extended-hours limit order not yet filled "
+                    f"(id={sell_trade.order.orderId}, status={sell_trade.orderStatus.status}) "
+                    f"— keeping EXITING, CLOSE record deferred until fill confirmed"
+                )
+                _safe_update_trade(_trade_key, {
+                    "status": "EXITING",
+                    "close_order_id": sell_trade.order.orderId,
+                    "pending_exit_reason": reason,
+                })
+                _save_positions_file()
+                return True
+
         if _is_partial:
             _safe_update_trade(_trade_key, {"qty": info["qty"] - sell_qty, "status": "ACTIVE"})
             log.info(f"[TRIM] {symbol}: sold {sell_qty}, {info['qty'] - sell_qty} remaining")

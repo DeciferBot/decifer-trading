@@ -9385,3 +9385,447 @@
 {"ts": "2026-04-23T19:30:10.067894Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7028, "side": "SELL", "qty": 99, "order_type": "LMT", "limit_price": 1.9, "fill_price": null}
 {"ts": "2026-04-23T19:42:28.994094Z", "event": "sell_exception", "symbol": "FCX", "error": "This event loop is already running", "reason": "[SENTINEL] We currently hold FCX with a +$45.90/share unrealized gain; the Grasberg mine delay and slashed outlook represent a material, durable bearish catalyst warranting immediate full exit to lock in the $1,239 gain before institutional selling and analyst downgrades accelerate the decline.", "note": "execute_sell raised an exception \u2014 position may still be open in IBKR."}
 {"type": "portfolio_review", "trigger": "news_hit:AMD; drawdown", "actions": [{"symbol": "REGN", "action": "EXIT", "reasoning": "hard_guard: stop_loss breached (sl=29.6044, current=29.52, direction=LONG)"}, {"symbol": "AMD", "action": "HOLD", "reasoning": "thesis_intact: Regime unchanged, news is NEUTRAL (slightly positive keyword score), position is +5.6% after 1 day with no signal deterioration evident \u2014 no reason to act."}, {"symbol": "FCX", "action": "HOLD", "reasoning": "thesis_intact: Position is +44.8% on a same-day entry with regime unchanged and no adverse signals \u2014 substantial unrealized gain warrants monitoring but thesis is not broken and momentum appears intact."}, {"symbol": "GE", "action": "HOLD", "reasoning": "thesis_intact: -8.7% drawdown on a same-day option SWING entry with regime fully intact and no news or signal invalidation \u2014 intraday option noise on day zero does not constitute thesis failure."}, {"symbol": "HON", "action": "HOLD", "reasoning": "thesis_intact: -9.4% drawdown on a day-zero SWING entry with neutral news, regime unchanged, and no load-bearing dimension collapse evident \u2014 loss is within normal intraday option variance and does not invalidate the thesis."}, {"symbol": "IBIT", "action": "HOLD", "reasoning": "thesis_intact: Essentially flat (+0.9%) on a day-zero entry with regime unchanged \u2014 no signal has moved against the thesis and no action is warranted."}, {"symbol": "TGT", "action": "HOLD", "reasoning": "thesis_intact: -8.1% on a day-zero SWING entry with regime fully intact and no adverse news or signal flip \u2014 intraday drawdown alone on a freshly entered option position is not thesis invalidation."}], "ts": "2026-04-23T16:01:58.675538-04:00"}
+{"type": "portfolio_review", "trigger": "news_hit:FCX", "actions": [{"symbol": "AMD", "action": "EXIT", "reasoning": "hard_guard: trade_type=UNKNOWN (metadata lost \u2014 cannot evaluate thesis); conviction=0 (position not opened through signal pipeline)"}, {"symbol": "FCX", "action": "EXIT", "reasoning": "hard_guard: trade_type=UNKNOWN (metadata lost \u2014 cannot evaluate thesis); conviction=0 (position not opened through signal pipeline)"}, {"symbol": "GE", "action": "EXIT", "reasoning": "hard_guard: trade_type=UNKNOWN (metadata lost \u2014 cannot evaluate thesis); conviction=0 (position not opened through signal pipeline)"}, {"symbol": "HON", "action": "EXIT", "reasoning": "hard_guard: trade_type=UNKNOWN (metadata lost \u2014 cannot evaluate thesis); conviction=0 (position not opened through signal pipeline)"}, {"symbol": "IBIT", "action": "EXIT", "reasoning": "hard_guard: trade_type=UNKNOWN (metadata lost \u2014 cannot evaluate thesis); conviction=0 (position not opened through signal pipeline)"}, {"symbol": "REGN", "action": "EXIT", "reasoning": "hard_guard: trade_type=UNKNOWN (metadata lost \u2014 cannot evaluate thesis); conviction=0 (position not opened through signal pipeline)"}, {"symbol": "TGT", "action": "EXIT", "reasoning": "hard_guard: trade_type=UNKNOWN (metadata lost \u2014 cannot evaluate thesis); conviction=0 (position not opened through signal pipeline)"}], "ts": "2026-04-23T18:46:22.359596-04:00"}
+{"ts": "2026-04-23T22:48:08.646012Z", "event": "SUBMITTED", "symbol": "AMZN", "order_id": 6830, "side": "BUY", "qty": 804, "order_type": "LMT", "limit_price": 255.41, "fill_price": null}
+{"ts": "2026-04-23T22:48:08.941274Z", "event": "fill_watcher_started", "symbol": "AMZN", "order_id": 6830, "original_limit": 255.41, "price_boundary": 256.69, "side": "BUY"}
+{"ts": "2026-04-23T22:48:47.451299Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 6836, "side": "SELL", "qty": 4556, "order_type": "LMT", "limit_price": 44.91, "fill_price": null}
+{"ts": "2026-04-23T22:48:49.183806Z", "event": "fill_watcher_started", "symbol": "NKE", "order_id": 6836, "original_limit": 44.91, "price_boundary": 44.46, "side": "SELL"}
+{"ts": "2026-04-23T22:48:53.950032Z", "event": "fill_watcher_filled", "symbol": "AMZN", "order_id": 6830, "attempts": 0, "fill_limit": 255.41}
+{"ts": "2026-04-23T22:49:19.493773Z", "event": "fill_watcher_adjusted", "symbol": "NKE", "order_id": 6836, "new_limit": 44.82, "attempt": 1}
+{"ts": "2026-04-23T22:49:25.082751Z", "event": "SUBMITTED", "symbol": "AON", "order_id": 6840, "side": "SELL", "qty": 399, "order_type": "LMT", "limit_price": 326.1, "fill_price": null}
+{"ts": "2026-04-23T22:49:25.326608Z", "event": "fill_watcher_started", "symbol": "AON", "order_id": 6840, "original_limit": 326.1, "price_boundary": 322.84, "side": "SELL"}
+{"ts": "2026-04-23T22:49:39.812169Z", "event": "fill_watcher_adjusted", "symbol": "NKE", "order_id": 6836, "new_limit": 44.73, "attempt": 2}
+{"ts": "2026-04-23T22:49:55.664039Z", "event": "fill_watcher_adjusted", "symbol": "AON", "order_id": 6840, "new_limit": 325.45, "attempt": 1}
+{"ts": "2026-04-23T22:50:00.167103Z", "event": "fill_watcher_adjusted", "symbol": "NKE", "order_id": 6836, "new_limit": 44.64, "attempt": 3}
+{"ts": "2026-04-23T22:50:06.539491Z", "event": "fill_watcher_started", "symbol": "ABT", "order_id": 6844, "original_limit": 91.87, "price_boundary": 90.95, "side": "SELL"}
+{"ts": "2026-04-23T22:50:16.035898Z", "event": "fill_watcher_adjusted", "symbol": "AON", "order_id": 6840, "new_limit": 324.8, "attempt": 2}
+{"ts": "2026-04-23T22:50:20.236565Z", "event": "fill_watcher_max_attempts", "symbol": "NKE", "order_id": 6836, "attempts": 3, "final_limit": 44.64}
+{"ts": "2026-04-23T22:50:24.030668Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 6845, "side": "SELL", "qty": 4556, "order_type": "LMT", "limit_price": 44.64, "fill_price": null}
+{"ts": "2026-04-23T22:50:24.032666Z", "event": "fill_watcher_market_fallback", "symbol": "NKE", "order_id": 6836, "final_limit": 44.64, "new_order_id": 6845}
+{"ts": "2026-04-23T22:50:36.396420Z", "event": "fill_watcher_adjusted", "symbol": "AON", "order_id": 6840, "new_limit": 324.15, "attempt": 3}
+{"ts": "2026-04-23T22:50:36.859587Z", "event": "fill_watcher_adjusted", "symbol": "ABT", "order_id": 6844, "new_limit": 91.69, "attempt": 1}
+{"ts": "2026-04-23T22:50:50.699082Z", "event": "SUBMITTED", "symbol": "PNC", "order_id": 6849, "side": "SELL", "qty": 683, "order_type": "LMT", "limit_price": 224.64, "fill_price": null}
+{"ts": "2026-04-23T22:50:50.997686Z", "event": "fill_watcher_started", "symbol": "PNC", "order_id": 6849, "original_limit": 224.64, "price_boundary": 222.39, "side": "SELL"}
+{"ts": "2026-04-23T22:50:56.398936Z", "event": "fill_watcher_max_attempts", "symbol": "AON", "order_id": 6840, "attempts": 3, "final_limit": 324.15}
+{"ts": "2026-04-23T22:50:57.214288Z", "event": "fill_watcher_adjusted", "symbol": "ABT", "order_id": 6844, "new_limit": 91.51, "attempt": 2}
+{"ts": "2026-04-23T22:50:59.016557Z", "event": "fill_watcher_market_fallback", "symbol": "AON", "order_id": 6840, "final_limit": 324.15, "new_order_id": 6850}
+{"ts": "2026-04-23T22:51:17.521760Z", "event": "fill_watcher_adjusted", "symbol": "ABT", "order_id": 6844, "new_limit": 91.33, "attempt": 3}
+{"ts": "2026-04-23T22:51:21.308958Z", "event": "fill_watcher_adjusted", "symbol": "PNC", "order_id": 6849, "new_limit": 224.19, "attempt": 1}
+{"ts": "2026-04-23T22:51:37.530957Z", "event": "fill_watcher_max_attempts", "symbol": "ABT", "order_id": 6844, "attempts": 3, "final_limit": 91.33}
+{"ts": "2026-04-23T22:51:39.592180Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 6851, "side": "SELL", "qty": 1670, "order_type": "LMT", "limit_price": 91.33, "fill_price": null}
+{"ts": "2026-04-23T22:51:39.594493Z", "event": "fill_watcher_market_fallback", "symbol": "ABT", "order_id": 6844, "final_limit": 91.33, "new_order_id": 6851}
+{"ts": "2026-04-23T22:51:41.616549Z", "event": "fill_watcher_adjusted", "symbol": "PNC", "order_id": 6849, "new_limit": 223.74, "attempt": 2}
+{"ts": "2026-04-23T22:52:01.994399Z", "event": "fill_watcher_adjusted", "symbol": "PNC", "order_id": 6849, "new_limit": 223.29, "attempt": 3}
+{"ts": "2026-04-23T22:52:22.001050Z", "event": "fill_watcher_max_attempts", "symbol": "PNC", "order_id": 6849, "attempts": 3, "final_limit": 223.29}
+{"ts": "2026-04-23T22:52:24.108197Z", "event": "SUBMITTED", "symbol": "PNC", "order_id": 6860, "side": "SELL", "qty": 683, "order_type": "LMT", "limit_price": 222.62, "fill_price": null}
+{"ts": "2026-04-23T22:52:25.485511Z", "event": "fill_watcher_market_fallback", "symbol": "PNC", "order_id": 6849, "final_limit": 223.29, "new_order_id": 6860}
+{"ts": "2026-04-23T23:12:58.486915Z", "event": "fill_watcher_started", "symbol": "AME", "order_id": 6866, "original_limit": 235.52, "price_boundary": 237.88, "side": "BUY"}
+{"ts": "2026-04-23T23:13:28.890578Z", "event": "fill_watcher_adjusted", "symbol": "AME", "order_id": 6866, "new_limit": 235.99, "attempt": 1}
+{"ts": "2026-04-23T23:13:38.258374Z", "event": "SUBMITTED", "symbol": "EG", "order_id": 6870, "side": "BUY", "qty": 437, "order_type": "LMT", "limit_price": 351.51, "fill_price": null}
+{"ts": "2026-04-23T23:13:38.549772Z", "event": "fill_watcher_started", "symbol": "EG", "order_id": 6870, "original_limit": 351.51, "price_boundary": 355.03, "side": "BUY"}
+{"ts": "2026-04-23T23:13:49.199824Z", "event": "fill_watcher_adjusted", "symbol": "AME", "order_id": 6866, "new_limit": 236.46, "attempt": 2}
+{"ts": "2026-04-23T23:14:09.014221Z", "event": "fill_watcher_adjusted", "symbol": "EG", "order_id": 6870, "new_limit": 352.21, "attempt": 1}
+{"ts": "2026-04-23T23:14:09.511039Z", "event": "fill_watcher_adjusted", "symbol": "AME", "order_id": 6866, "new_limit": 236.93, "attempt": 3}
+{"ts": "2026-04-23T23:14:29.325746Z", "event": "fill_watcher_adjusted", "symbol": "EG", "order_id": 6870, "new_limit": 352.91, "attempt": 2}
+{"ts": "2026-04-23T23:14:29.515205Z", "event": "fill_watcher_max_attempts", "symbol": "AME", "order_id": 6866, "attempts": 3, "final_limit": 236.93}
+{"ts": "2026-04-23T23:14:31.572541Z", "event": "SUBMITTED", "symbol": "AME", "order_id": 6871, "side": "BUY", "qty": 653, "order_type": "LMT", "limit_price": 236.93, "fill_price": null}
+{"ts": "2026-04-23T23:14:31.574723Z", "event": "fill_watcher_market_fallback", "symbol": "AME", "order_id": 6866, "final_limit": 236.93, "new_order_id": 6871}
+{"ts": "2026-04-23T23:14:49.652864Z", "event": "fill_watcher_adjusted", "symbol": "EG", "order_id": 6870, "new_limit": 353.62, "attempt": 3}
+{"ts": "2026-04-23T23:15:09.656267Z", "event": "fill_watcher_max_attempts", "symbol": "EG", "order_id": 6870, "attempts": 3, "final_limit": 353.62}
+{"ts": "2026-04-23T23:15:12.193738Z", "event": "SUBMITTED", "symbol": "EG", "order_id": 6872, "side": "BUY", "qty": 437, "order_type": "LMT", "limit_price": 353.62, "fill_price": null}
+{"ts": "2026-04-23T23:15:12.195873Z", "event": "fill_watcher_market_fallback", "symbol": "EG", "order_id": 6870, "final_limit": 353.62, "new_order_id": 6872}
+{"type": "portfolio_review", "trigger": "cycle_check: AMZN: SWING regime shifted: entry=MOMENTUM_BULL \u2192 now=TRENDING_UP; thesis context changed \u2014 full Opus review required; NKE: SWING regime shifted: entry=TRENDING_BEAR \u2192 now=TRENDING_UP; thesis context changed \u2014 full Opus review required; ABT: SWING regime shifted: entry=MOMENTUM_BULL \u2192 now=TRENDING_UP; thesis context changed \u2014 full Opus review required", "actions": [{"symbol": "AMD", "action": "EXIT", "reasoning": "hard_guard: trade_type=UNKNOWN (metadata lost \u2014 cannot evaluate thesis); conviction=0 (position not opened through signal pipeline)"}, {"symbol": "FCX", "action": "EXIT", "reasoning": "hard_guard: trade_type=UNKNOWN (metadata lost \u2014 cannot evaluate thesis); conviction=0 (position not opened through signal pipeline)"}, {"symbol": "GE", "action": "EXIT", "reasoning": "hard_guard: trade_type=UNKNOWN (metadata lost \u2014 cannot evaluate thesis); conviction=0 (position not opened through signal pipeline)"}, {"symbol": "HON", "action": "EXIT", "reasoning": "hard_guard: trade_type=UNKNOWN (metadata lost \u2014 cannot evaluate thesis); conviction=0 (position not opened through signal pipeline)"}, {"symbol": "IBIT", "action": "EXIT", "reasoning": "hard_guard: trade_type=UNKNOWN (metadata lost \u2014 cannot evaluate thesis); conviction=0 (position not opened through signal pipeline)"}, {"symbol": "REGN", "action": "EXIT", "reasoning": "hard_guard: trade_type=UNKNOWN (metadata lost \u2014 cannot evaluate thesis); conviction=0 (position not opened through signal pipeline)"}, {"symbol": "TGT", "action": "EXIT", "reasoning": "hard_guard: trade_type=UNKNOWN (metadata lost \u2014 cannot evaluate thesis); conviction=0 (position not opened through signal pipeline)"}, {"symbol": "NKE", "action": "EXIT", "reasoning": "regime_flip_against_short: Entry thesis explicitly required TRENDING_BEAR regime but current regime is TRENDING_UP \u2014 the exact invalidation condition stated in the thesis (\"wrong_if: regime shifts against entry direction\") has been met on day zero."}, {"symbol": "ABT", "action": "EXIT", "reasoning": "regime_flip_against_short: Entry thesis was written under MOMENTUM_BULL regime with a SHORT bias, wrong_if condition is regime shifting against entry direction \u2014 current regime is TRENDING_UP and the thesis invalidation condition is satisfied on day zero; holding a short into a broad TRENDING_UP tape with no offsetting signal data available is unjustifiable."}], "ts": "2026-04-23T19:35:21.023326-04:00"}
+{"ts": "2026-04-23T23:37:50.029020Z", "event": "SUBMITTED", "symbol": "SJM", "order_id": 6884, "side": "BUY", "qty": 1757, "order_type": "LMT", "limit_price": 96.38, "fill_price": null}
+{"ts": "2026-04-23T23:37:50.779319Z", "event": "fill_watcher_started", "symbol": "SJM", "order_id": 6884, "original_limit": 96.38, "price_boundary": 97.34, "side": "BUY"}
+{"ts": "2026-04-23T23:38:21.118489Z", "event": "fill_watcher_adjusted", "symbol": "SJM", "order_id": 6884, "new_limit": 96.57, "attempt": 1}
+{"ts": "2026-04-23T23:38:41.448345Z", "event": "fill_watcher_adjusted", "symbol": "SJM", "order_id": 6884, "new_limit": 96.76, "attempt": 2}
+{"ts": "2026-04-23T23:39:01.758909Z", "event": "fill_watcher_adjusted", "symbol": "SJM", "order_id": 6884, "new_limit": 96.95, "attempt": 3}
+{"ts": "2026-04-23T23:39:14.017807Z", "event": "SUBMITTED", "symbol": "NI", "order_id": 6888, "side": "BUY", "qty": 3819, "order_type": "LMT", "limit_price": 48.39, "fill_price": null}
+{"ts": "2026-04-23T23:39:14.296908Z", "event": "fill_watcher_started", "symbol": "NI", "order_id": 6888, "original_limit": 48.39, "price_boundary": 48.87, "side": "BUY"}
+{"ts": "2026-04-23T23:39:21.764885Z", "event": "fill_watcher_max_attempts", "symbol": "SJM", "order_id": 6884, "attempts": 3, "final_limit": 96.95}
+{"ts": "2026-04-23T23:39:24.251180Z", "event": "SUBMITTED", "symbol": "SJM", "order_id": 6889, "side": "BUY", "qty": 1757, "order_type": "LMT", "limit_price": 96.95, "fill_price": null}
+{"ts": "2026-04-23T23:39:24.253039Z", "event": "fill_watcher_market_fallback", "symbol": "SJM", "order_id": 6884, "final_limit": 96.95, "new_order_id": 6889}
+{"ts": "2026-04-23T23:39:44.751323Z", "event": "fill_watcher_adjusted", "symbol": "NI", "order_id": 6888, "new_limit": 48.49, "attempt": 1}
+{"ts": "2026-04-23T23:40:05.100690Z", "event": "fill_watcher_adjusted", "symbol": "NI", "order_id": 6888, "new_limit": 48.59, "attempt": 2}
+{"ts": "2026-04-23T23:40:10.414631Z", "event": "SUBMITTED", "symbol": "HTHT", "order_id": 6893, "side": "SELL", "qty": 2059, "order_type": "LMT", "limit_price": 52.15, "fill_price": null}
+{"ts": "2026-04-23T23:40:10.673855Z", "event": "fill_watcher_started", "symbol": "HTHT", "order_id": 6893, "original_limit": 52.15, "price_boundary": 51.63, "side": "SELL"}
+{"ts": "2026-04-23T23:40:25.406613Z", "event": "fill_watcher_adjusted", "symbol": "NI", "order_id": 6888, "new_limit": 48.69, "attempt": 3}
+{"ts": "2026-04-23T23:40:41.022491Z", "event": "fill_watcher_adjusted", "symbol": "HTHT", "order_id": 6893, "new_limit": 52.05, "attempt": 1}
+{"ts": "2026-04-23T23:40:45.422497Z", "event": "fill_watcher_max_attempts", "symbol": "NI", "order_id": 6888, "attempts": 3, "final_limit": 48.69}
+{"ts": "2026-04-23T23:40:47.641022Z", "event": "fill_watcher_market_fallback", "symbol": "NI", "order_id": 6888, "final_limit": 48.69, "new_order_id": 6894}
+{"ts": "2026-04-23T23:41:01.389002Z", "event": "fill_watcher_adjusted", "symbol": "HTHT", "order_id": 6893, "new_limit": 51.95, "attempt": 2}
+{"ts": "2026-04-23T23:41:21.742294Z", "event": "fill_watcher_adjusted", "symbol": "HTHT", "order_id": 6893, "new_limit": 51.85, "attempt": 3}
+{"ts": "2026-04-23T23:41:28.585268Z", "event": "fill_watcher_started", "symbol": "CRS", "order_id": 6898, "original_limit": 424.17, "price_boundary": 428.41, "side": "BUY"}
+{"ts": "2026-04-23T23:41:41.753580Z", "event": "fill_watcher_max_attempts", "symbol": "HTHT", "order_id": 6893, "attempts": 3, "final_limit": 51.85}
+{"ts": "2026-04-23T23:41:44.165951Z", "event": "SUBMITTED", "symbol": "HTHT", "order_id": 6899, "side": "SELL", "qty": 2059, "order_type": "LMT", "limit_price": 51.85, "fill_price": null}
+{"ts": "2026-04-23T23:41:44.167358Z", "event": "fill_watcher_market_fallback", "symbol": "HTHT", "order_id": 6893, "final_limit": 51.85, "new_order_id": 6899}
+{"ts": "2026-04-23T23:41:58.962651Z", "event": "fill_watcher_adjusted", "symbol": "CRS", "order_id": 6898, "new_limit": 425.02, "attempt": 1}
+{"ts": "2026-04-23T23:42:19.328809Z", "event": "fill_watcher_adjusted", "symbol": "CRS", "order_id": 6898, "new_limit": 425.87, "attempt": 2}
+{"ts": "2026-04-23T23:42:39.694138Z", "event": "fill_watcher_adjusted", "symbol": "CRS", "order_id": 6898, "new_limit": 426.72, "attempt": 3}
+{"ts": "2026-04-23T23:42:59.703688Z", "event": "fill_watcher_max_attempts", "symbol": "CRS", "order_id": 6898, "attempts": 3, "final_limit": 426.72}
+{"ts": "2026-04-23T23:43:02.150442Z", "event": "SUBMITTED", "symbol": "CRS", "order_id": 6900, "side": "BUY", "qty": 435, "order_type": "LMT", "limit_price": 426.72, "fill_price": null}
+{"ts": "2026-04-23T23:43:02.152913Z", "event": "fill_watcher_market_fallback", "symbol": "CRS", "order_id": 6898, "final_limit": 426.72, "new_order_id": 6900}
+{"ts": "2026-04-24T04:50:40.661666Z", "event": "VALIDATIONERROR", "symbol": "AME", "order_id": 6906, "side": "SELL", "qty": 109, "order_type": "STP", "limit_price": 231.98, "fill_price": null}
+{"ts": "2026-04-24T04:50:41.164447Z", "event": "VALIDATIONERROR", "symbol": "AMZN", "order_id": 6908, "side": "SELL", "qty": 804, "order_type": "STP", "limit_price": 249.9, "fill_price": null}
+{"ts": "2026-04-24T04:50:42.146216Z", "event": "VALIDATIONERROR", "symbol": "NI", "order_id": 6910, "side": "SELL", "qty": 438, "order_type": "STP", "limit_price": 47.58, "fill_price": null}
+{"ts": "2026-04-24T04:50:42.357588Z", "event": "VALIDATIONERROR", "symbol": "NKE", "order_id": 6912, "side": "BUY", "qty": 3132, "order_type": "STP", "limit_price": 45.9, "fill_price": null}
+{"ts": "2026-04-24T04:50:43.242276Z", "event": "VALIDATIONERROR", "symbol": "SJM", "order_id": 6914, "side": "SELL", "qty": 1441, "order_type": "STP", "limit_price": 94.47, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-04-24T04:56:44.018498-04:00"}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-04-24T05:14:44.420320-04:00"}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-04-24T05:32:36.025348-04:00"}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-04-24T05:50:15.964673-04:00"}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-04-24T06:08:02.068296-04:00"}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-04-24T06:25:40.664302-04:00"}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-04-24T06:43:39.422836-04:00"}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-04-24T07:01:52.818620-04:00"}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-04-24T07:20:01.204312-04:00"}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-04-24T07:38:19.736911-04:00"}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-04-24T07:56:21.594947-04:00"}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-04-24T08:14:25.879322-04:00"}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-04-24T08:31:45.795202-04:00"}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [], "ts": "2026-04-24T08:50:49.869700-04:00"}
+{"type": "portfolio_review", "trigger": "news_hit:AMD,AME,AMZN,FCX,IBIT,NI,NKE; stale_position:HTHT,CRS,AMZN,NI,SJM,HTHT", "actions": [], "ts": "2026-04-24T09:12:04.181548-04:00"}
+{"type": "portfolio_review", "trigger": "held_score_rise:NKE; news_hit:AMD,AME,AMZN,FCX,IBIT,NI,NKE; stale_position:HTHT,CRS,AMZN,NI,SJM,HTHT", "actions": [], "ts": "2026-04-24T09:18:42.787759-04:00"}
+{"type": "portfolio_review", "trigger": "held_score_rise:NKE; news_hit:AMD,AME,AMZN,FCX,IBIT,NI,NKE; stale_position:HTHT,CRS,AMZN,NI,SJM,HTHT", "actions": [], "ts": "2026-04-24T09:25:22.864916-04:00"}
+{"type": "portfolio_review", "trigger": "held_score_rise:AMD,FCX,NKE; news_hit:AMD,AME,AMZN,FCX,IBIT,NI,NKE; stale_position:HTHT,CRS,AMZN,NI,SJM,HTHT", "actions": [], "ts": "2026-04-24T09:32:54.902044-04:00"}
+{"ts": "2026-04-24T13:40:21.605086Z", "event": "PENDING_CANCEL", "symbol": "FCX", "order_id": 6927, "side": "SELL", "qty": 27, "order_type": "LMT", "limit_price": 5.32, "fill_price": null}
+{"ts": "2026-04-24T13:40:36.548682Z", "event": "SUBMITTED", "symbol": "TGT", "order_id": 6930, "side": "SELL", "qty": 35, "order_type": "LMT", "limit_price": 2.67, "fill_price": null}
+{"ts": "2026-04-24T13:41:08.583672Z", "event": "SUBMITTED", "symbol": "GE", "order_id": 6939, "side": "SELL", "qty": 10, "order_type": "LMT", "limit_price": 11.9, "fill_price": null}
+{"ts": "2026-04-24T13:49:26.369693Z", "event": "SUBMITTED", "symbol": "TGT", "order_id": 6945, "side": "SELL", "qty": 35, "order_type": "LMT", "limit_price": 2.4, "fill_price": null}
+{"type": "portfolio_review", "trigger": "news_hit:AME,NI; stale_position:NI,SJM", "actions": [], "ts": "2026-04-24T10:05:54.403064-04:00"}
+{"type": "portfolio_review", "trigger": "news_hit:AME,NI; stale_position:NI,SJM", "actions": [], "ts": "2026-04-24T10:41:47.000952-04:00"}
+{"ts": "2026-04-24T14:43:53.466816Z", "event": "VALIDATIONERROR", "symbol": "CRS", "order_id": 6949, "side": "SELL", "qty": 435, "order_type": "STP", "limit_price": 419.44, "fill_price": null}
+{"ts": "2026-04-24T14:43:54.400387Z", "event": "VALIDATIONERROR", "symbol": "EG", "order_id": 6951, "side": "SELL", "qty": 437, "order_type": "STP", "limit_price": 345.6, "fill_price": null}
+{"ts": "2026-04-24T14:43:56.102672Z", "event": "VALIDATIONERROR", "symbol": "HTHT", "order_id": 6953, "side": "BUY", "qty": 2059, "order_type": "STP", "limit_price": 52.79, "fill_price": null}
+{"ts": "2026-04-24T14:43:56.974102Z", "event": "VALIDATIONERROR", "symbol": "NI", "order_id": 6955, "side": "SELL", "qty": 3600, "order_type": "STP", "limit_price": 47.76, "fill_price": null}
+{"ts": "2026-04-24T14:43:58.536605Z", "event": "VALIDATIONERROR", "symbol": "SJM", "order_id": 6957, "side": "SELL", "qty": 616, "order_type": "STP", "limit_price": 94.65, "fill_price": null}
+{"type": "portfolio_review", "trigger": "news_hit:CRS,HTHT; stale_position:HTHT,NI,SJM", "actions": [], "ts": "2026-04-24T10:55:00.461371-04:00"}
+{"type": "portfolio_review", "trigger": "news_hit:FCX", "actions": [], "ts": "2026-04-24T12:10:47.017080-04:00"}
+{"type": "portfolio_review", "trigger": "held_score_rise:NKE", "actions": [], "ts": "2026-04-24T13:52:53.278418-04:00"}
+{"type": "portfolio_review", "trigger": "news_hit:HON", "actions": [], "ts": "2026-04-24T14:32:38.261217-04:00"}
+{"ts": "2026-04-24T18:50:25.112409Z", "event": "SUBMITTED", "symbol": "GOOGL", "order_id": 6972, "side": "SELL", "qty": 443, "order_type": "LMT", "limit_price": 346.17, "fill_price": null}
+{"ts": "2026-04-24T18:50:25.215710Z", "event": "SUBMITTED", "symbol": "GOOGL", "order_id": 6970, "side": "BUY", "qty": 443, "order_type": "LMT", "limit_price": 344.53, "fill_price": null}
+{"ts": "2026-04-24T18:50:30.199636Z", "event": "fill_watcher_started", "symbol": "GOOGL", "order_id": 6970, "original_limit": 344.53, "price_boundary": 346.25, "side": "BUY"}
+{"ts": "2026-04-24T18:51:15.276562Z", "event": "fill_watcher_filled", "symbol": "GOOGL", "order_id": 6970, "attempts": 0, "fill_limit": 344.53}
+{"type": "portfolio_review", "trigger": "news_hit:HON,GOOGL", "actions": [], "ts": "2026-04-24T15:05:59.733479-04:00"}
+{"ts": "2026-04-24T19:34:44.896988Z", "event": "SUBMITTED", "symbol": "HON", "order_id": 38, "side": "SELL", "qty": 34, "order_type": "MKT", "limit_price": 5.82374475, "fill_price": null}
+{"ts": "2026-04-24T19:34:46.052033Z", "event": "SUBMITTED", "symbol": "REGN", "order_id": 40, "side": "SELL", "qty": 5, "order_type": "MKT", "limit_price": 37.9413948, "fill_price": null}
+{"type": "portfolio_review", "trigger": "held_score_rise:NKE", "actions": [], "ts": "2026-04-24T15:37:19.179539-04:00"}
+{"type": "portfolio_review", "trigger": "news_hit:GOOGL", "actions": [], "ts": "2026-04-24T16:57:13.153226-04:00"}
+{"type": "portfolio_review", "trigger": "scalp_signal_lost:GOOGL", "actions": [], "ts": "2026-04-24T17:36:03.554703-04:00"}
+{"ts": "2026-04-27T14:56:55.487339Z", "event": "VALIDATIONERROR", "symbol": "AME", "order_id": 6976, "side": "SELL", "qty": 544, "order_type": "STP", "limit_price": 232.32, "fill_price": null}
+{"type": "portfolio_review", "trigger": "news_hit:AME,NI,NKE; drawdown", "actions": [], "ts": "2026-04-27T11:03:06.975596-04:00"}
+{"type": "portfolio_review", "trigger": "news_hit:NI,NKE; drawdown", "actions": [], "ts": "2026-04-27T11:35:04.580460-04:00"}
+{"ts": "2026-04-27T15:36:05.520365Z", "event": "fill_watcher_started", "symbol": "AMZN", "order_id": 6983, "original_limit": 261.83, "price_boundary": 263.14, "side": "BUY"}
+{"ts": "2026-04-27T15:36:12.562370Z", "event": "fill_watcher_started", "symbol": "USO", "order_id": 6988, "original_limit": 136.07, "price_boundary": 136.75, "side": "BUY"}
+{"ts": "2026-04-27T15:36:20.866422Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 6994, "side": "SELL", "qty": 451, "order_type": "STP LMT", "limit_price": 320.1, "fill_price": null}
+{"ts": "2026-04-27T15:36:20.985264Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 6993, "side": "BUY", "qty": 451, "order_type": "LMT", "limit_price": 335.5, "fill_price": null}
+{"ts": "2026-04-27T15:36:23.866111Z", "event": "fill_watcher_started", "symbol": "AMD", "order_id": 6993, "original_limit": 335.5, "price_boundary": 337.18, "side": "BUY"}
+{"ts": "2026-04-27T15:36:30.086343Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 6999, "side": "BUY", "qty": 162, "order_type": "STP LMT", "limit_price": 931.78, "fill_price": null}
+{"ts": "2026-04-27T15:36:30.557699Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7000, "side": "BUY", "qty": 162, "order_type": "LMT", "limit_price": 922.72, "fill_price": null}
+{"ts": "2026-04-27T15:36:34.920652Z", "event": "fill_watcher_started", "symbol": "GS", "order_id": 6998, "original_limit": 927.13, "price_boundary": 917.86, "side": "SELL"}
+{"ts": "2026-04-27T15:36:50.646267Z", "event": "fill_watcher_filled", "symbol": "AMZN", "order_id": 6983, "attempts": 0, "fill_limit": 261.83}
+{"ts": "2026-04-27T15:36:57.691769Z", "event": "fill_watcher_filled", "symbol": "USO", "order_id": 6988, "attempts": 0, "fill_limit": 136.07}
+{"ts": "2026-04-27T15:37:05.058804Z", "event": "fill_watcher_filled", "symbol": "GS", "order_id": 6998, "attempts": 0, "fill_limit": 927.13}
+{"ts": "2026-04-27T15:37:08.960171Z", "event": "fill_watcher_filled", "symbol": "AMD", "order_id": 6993, "attempts": 0, "fill_limit": 335.5}
+{"ts": "2026-04-27T16:05:38.434531Z", "event": "SUBMITTED", "symbol": "NI", "order_id": 44, "side": "SELL", "qty": 3600, "order_type": "MKT", "limit_price": 48.45687105, "fill_price": null}
+{"type": "portfolio_review", "trigger": "scalp_signal_lost:GS; news_hit:AMZN,USO; earnings_risk; drawdown", "actions": [], "ts": "2026-04-27T12:06:29.583075-04:00"}
+{"ts": "2026-04-27T16:31:14.267022Z", "event": "VALIDATIONERROR", "symbol": "AMD", "order_id": 7004, "side": "SELL", "qty": 451, "order_type": "STP", "limit_price": 326.24, "fill_price": null}
+{"ts": "2026-04-27T16:31:15.136985Z", "event": "VALIDATIONERROR", "symbol": "AMZN", "order_id": 7006, "side": "SELL", "qty": 579, "order_type": "STP", "limit_price": 256.06, "fill_price": null}
+{"ts": "2026-04-27T16:31:16.052599Z", "event": "VALIDATIONERROR", "symbol": "GS", "order_id": 7008, "side": "BUY", "qty": 162, "order_type": "STP", "limit_price": 948.2, "fill_price": null}
+{"ts": "2026-04-27T16:31:17.500035Z", "event": "VALIDATIONERROR", "symbol": "USO", "order_id": 7010, "side": "SELL", "qty": 1114, "order_type": "STP", "limit_price": 133.0, "fill_price": null}
+{"type": "portfolio_review", "trigger": "held_score_rise:AMZN; news_hit:AMZN,NKE,USO; earnings_risk; drawdown; stale_position:AMD", "actions": [], "ts": "2026-04-27T12:37:41.621548-04:00"}
+{"ts": "2026-04-27T16:38:35.860596Z", "event": "SUBMITTED", "symbol": "GOOGL", "order_id": 7016, "side": "SELL", "qty": 429, "order_type": "STP LMT", "limit_price": 344.03, "fill_price": null}
+{"ts": "2026-04-27T16:38:37.081488Z", "event": "SUBMITTED", "symbol": "GOOGL", "order_id": 7015, "side": "BUY", "qty": 429, "order_type": "LMT", "limit_price": 352.78, "fill_price": null}
+{"ts": "2026-04-27T16:38:43.510631Z", "event": "fill_watcher_started", "symbol": "GOOGL", "order_id": 7015, "original_limit": 352.78, "price_boundary": 354.54, "side": "BUY"}
+{"ts": "2026-04-27T16:39:28.605808Z", "event": "fill_watcher_filled", "symbol": "GOOGL", "order_id": 7015, "attempts": 0, "fill_limit": 352.78}
+{"ts": "2026-04-27T16:51:12.642342Z", "event": "FILLED", "symbol": "NVDA", "order_id": 67890, "side": "BUY", "qty": 5, "order_type": "LMT", "limit_price": 850.0, "fill_price": 849.75}
+{"ts": "2026-04-27T16:51:12.667796Z", "event": "CANCELLED", "symbol": "TSLA", "order_id": 111, "side": "BUY", "qty": 3, "order_type": null, "limit_price": 200.0, "fill_price": null}
+{"ts": "2026-04-27T16:51:12.696186Z", "event": "SUBMITTED", "symbol": "AAPL", "order_id": 12345, "side": "BUY", "qty": 10, "order_type": "LMT", "limit_price": 182.5, "fill_price": null}
+{"ts": "2026-04-27T16:51:12.745262Z", "event": "SUBMITTED", "symbol": "META", "order_id": 555, "side": "BUY", "qty": 8, "order_type": null, "limit_price": 500.0, "fill_price": null}
+{"ts": "2026-04-27T16:51:14.531542Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-27T16:51:25.737860Z", "event": "fill_watcher_started", "symbol": "CHEAP", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-27T16:51:27.373857Z", "event": "fill_watcher_started", "symbol": "EXPENSIVE", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-27T16:51:28.880331Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-27T16:51:36.836243Z", "event": "fill_watcher_started", "symbol": "SPXS", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-27T17:06:29.990531Z", "event": "VALIDATIONERROR", "symbol": "GOOGL", "order_id": 7020, "side": "SELL", "qty": 429, "order_type": "STP", "limit_price": 344.86, "fill_price": null}
+{"type": "portfolio_review", "trigger": "held_score_rise:AMD,AMZN,GOOGL,USO; news_hit:AMZN,GOOGL,NKE,USO; earnings_risk; drawdown; stale_position:AMD", "actions": [], "ts": "2026-04-27T13:12:32.595133-04:00"}
+{"ts": "2026-04-27T17:24:09.413603Z", "event": "FILLED", "symbol": "NVDA", "order_id": 67890, "side": "BUY", "qty": 5, "order_type": "LMT", "limit_price": 850.0, "fill_price": 849.75}
+{"ts": "2026-04-27T17:24:09.439636Z", "event": "CANCELLED", "symbol": "TSLA", "order_id": 111, "side": "BUY", "qty": 3, "order_type": null, "limit_price": 200.0, "fill_price": null}
+{"ts": "2026-04-27T17:24:09.461080Z", "event": "SUBMITTED", "symbol": "AAPL", "order_id": 12345, "side": "BUY", "qty": 10, "order_type": "LMT", "limit_price": 182.5, "fill_price": null}
+{"ts": "2026-04-27T17:24:09.480839Z", "event": "SUBMITTED", "symbol": "META", "order_id": 555, "side": "BUY", "qty": 8, "order_type": null, "limit_price": 500.0, "fill_price": null}
+{"ts": "2026-04-27T17:24:10.951173Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-27T17:24:20.444907Z", "event": "fill_watcher_started", "symbol": "CHEAP", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-27T17:24:21.636420Z", "event": "fill_watcher_started", "symbol": "EXPENSIVE", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-27T17:24:22.671520Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-27T17:24:27.729440Z", "event": "fill_watcher_started", "symbol": "SPXS", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"type": "portfolio_review", "trigger": "held_score_rise:ABT,AMD,GOOGL,NKE,USO; news_hit:AMZN,GOOGL,NKE,USO; earnings_risk; stale_position:AMD", "actions": [], "ts": "2026-04-27T13:26:55.057269-04:00"}
+{"type": "portfolio_review", "trigger": "held_score_rise:AMD,GOOGL,USO; news_hit:GOOGL,NKE,USO; earnings_risk; stale_position:ABT,AMD,NKE", "actions": [], "ts": "2026-04-27T13:44:46.709535-04:00"}
+{"type": "portfolio_review", "trigger": "scalp_signal_lost:GS; news_hit:AMD,AMZN; earnings_risk", "actions": [], "ts": "2026-04-27T14:15:58.776390-04:00"}
+{"type": "portfolio_review", "trigger": "scalp_signal_lost:GS; news_hit:AMD; earnings_risk", "actions": [], "ts": "2026-04-27T14:49:27.352829-04:00"}
+{"type": "portfolio_review", "trigger": "scalp_signal_lost:GS; news_hit:NKE; earnings_risk; drawdown", "actions": [], "ts": "2026-04-27T15:22:37.259314-04:00"}
+{"type": "portfolio_review", "trigger": "scalp_signal_lost:GS; news_hit:AMD,AMZN; earnings_risk; drawdown", "actions": [], "ts": "2026-04-27T15:56:59.079130-04:00"}
+{"type": "portfolio_review", "trigger": "scalp_signal_lost:GS; news_hit:AMD; earnings_risk; drawdown", "actions": [], "ts": "2026-04-27T16:37:04.169888-04:00"}
+{"type": "portfolio_review", "trigger": "news_hit:AMZN,GOOGL; earnings_risk; drawdown", "actions": [], "ts": "2026-04-27T17:11:02.424193-04:00"}
+{"type": "portfolio_review", "trigger": "held_score_rise:AMZN; news_hit:AMZN,GOOGL; earnings_risk; drawdown", "actions": [], "ts": "2026-04-27T17:46:44.420644-04:00"}
+{"type": "portfolio_review", "trigger": "held_score_rise:AMD,AMZN; news_hit:GOOGL; earnings_risk; drawdown", "actions": [], "ts": "2026-04-27T18:20:48.001111-04:00"}
+{"type": "portfolio_review", "trigger": "news_hit:AMZN; earnings_risk; drawdown", "actions": [], "ts": "2026-04-27T18:54:46.496397-04:00"}
+{"type": "portfolio_review", "trigger": "held_score_rise:AMZN,GOOGL; news_hit:AMD; earnings_risk; drawdown", "actions": [], "ts": "2026-04-27T19:28:47.998299-04:00"}
+{"ts": "2026-04-28T08:27:04.155947Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7035, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T08:27:07.475852Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7038, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T08:27:10.884229Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7041, "side": "BUY", "qty": 162, "order_type": "LMT", "limit_price": 938.57, "fill_price": null}
+{"ts": "2026-04-28T08:27:16.099333Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7044, "side": "BUY", "qty": 3132, "order_type": "LMT", "limit_price": 45.23, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "regime_flip_short_invalidated"}, {"symbol": "AMD", "action": "EXIT", "trim_pct": 50, "reasoning": "intraday_overheld_score_collapse"}, {"symbol": "AMZN", "action": "HOLD", "trim_pct": 50, "reasoning": "early_stage_monitor"}, {"symbol": "GOOGL", "action": "HOLD", "trim_pct": 50, "reasoning": "early_stage_monitor"}, {"symbol": "GS", "action": "EXIT", "trim_pct": 50, "reasoning": "intraday_short_regime_conflict"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "regime_flip_short_invalidated"}, {"symbol": "USO", "action": "HOLD", "trim_pct": 50, "reasoning": "energy_sector_tailwind"}], "ts": "2026-04-28T04:27:18.448095-04:00"}
+{"ts": "2026-04-28T08:28:25.254545Z", "event": "SUBMITTED", "symbol": "BJ", "order_id": 7048, "side": "SELL", "qty": 1623, "order_type": "LMT", "limit_price": 92.7, "fill_price": null}
+{"ts": "2026-04-28T08:28:25.488446Z", "event": "fill_watcher_started", "symbol": "BJ", "order_id": 7048, "original_limit": 92.7, "price_boundary": 91.77, "side": "SELL"}
+{"ts": "2026-04-28T08:28:28.021434Z", "event": "SUBMITTED", "symbol": "AMZN", "order_id": 7051, "side": "SELL", "qty": 579, "order_type": "LMT", "limit_price": 260.6, "fill_price": null}
+{"ts": "2026-04-28T08:28:31.358885Z", "event": "SUBMITTED", "symbol": "GOOGL", "order_id": 7054, "side": "SELL", "qty": 429, "order_type": "LMT", "limit_price": 349.64, "fill_price": null}
+{"ts": "2026-04-28T08:28:55.946524Z", "event": "fill_watcher_adjusted", "symbol": "BJ", "order_id": 7048, "new_limit": 92.51, "attempt": 1}
+{"ts": "2026-04-28T08:29:16.270644Z", "event": "fill_watcher_adjusted", "symbol": "BJ", "order_id": 7048, "new_limit": 92.32, "attempt": 2}
+{"ts": "2026-04-28T08:29:36.624467Z", "event": "fill_watcher_adjusted", "symbol": "BJ", "order_id": 7048, "new_limit": 92.14, "attempt": 3}
+{"ts": "2026-04-28T08:29:56.642625Z", "event": "fill_watcher_max_attempts", "symbol": "BJ", "order_id": 7048, "attempts": 3, "final_limit": 92.14}
+{"ts": "2026-04-28T08:29:57.813441Z", "event": "SUBMITTED", "symbol": "BJ", "order_id": 7055, "side": "SELL", "qty": 1623, "order_type": "LMT", "limit_price": 91.86, "fill_price": null}
+{"ts": "2026-04-28T08:29:58.841816Z", "event": "fill_watcher_market_fallback", "symbol": "BJ", "order_id": 7048, "final_limit": 92.14, "new_order_id": 7055}
+{"ts": "2026-04-28T08:45:13.675351Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7058, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T08:45:17.050666Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7061, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T08:45:20.407425Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7064, "side": "BUY", "qty": 162, "order_type": "LMT", "limit_price": 939.69, "fill_price": null}
+{"ts": "2026-04-28T08:45:26.124688Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7067, "side": "BUY", "qty": 3132, "order_type": "LMT", "limit_price": 45.23, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "USO", "action": "HOLD", "trim_pct": 50, "reasoning": "score_collapse_but_profitable"}, {"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_losing_short"}, {"symbol": "AMD", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_losing_long"}, {"symbol": "GS", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_sector_headwind"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_no_conviction"}], "ts": "2026-04-28T04:45:27.863870-04:00"}
+{"ts": "2026-04-28T09:02:57.371600Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7070, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T09:03:00.673104Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7073, "side": "BUY", "qty": 162, "order_type": "LMT", "limit_price": 939.69, "fill_price": null}
+{"ts": "2026-04-28T09:03:04.251419Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7076, "side": "BUY", "qty": 3132, "order_type": "LMT", "limit_price": 45.23, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "USO", "action": "HOLD", "trim_pct": 50, "reasoning": "sector_strength_offset"}, {"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_no_thesis"}, {"symbol": "AMD", "action": "HOLD", "trim_pct": 50, "reasoning": "positive_pnl_buffer"}, {"symbol": "GS", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_sector_headwind"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_no_thesis"}], "ts": "2026-04-28T05:03:06.148551-04:00"}
+{"ts": "2026-04-28T09:03:44.143691Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7079, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T09:20:28.465103Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7082, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T09:20:31.771808Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7085, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T09:20:35.234969Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7088, "side": "BUY", "qty": 162, "order_type": "LMT", "limit_price": 939.69, "fill_price": null}
+{"ts": "2026-04-28T09:20:38.431459Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7091, "side": "BUY", "qty": 3132, "order_type": "LMT", "limit_price": 45.23, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "USO", "action": "HOLD", "trim_pct": 50, "reasoning": "energy_gap_up_support"}, {"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_short_against_trend"}, {"symbol": "AMD", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_no_momentum"}, {"symbol": "GS", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_financials_weak"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_no_confirmation"}], "ts": "2026-04-28T05:20:40.395679-04:00"}
+{"ts": "2026-04-28T09:21:46.594266Z", "event": "SUBMITTED", "symbol": "HIG", "order_id": 7095, "side": "SELL", "qty": 1123, "order_type": "LMT", "limit_price": 134.01, "fill_price": null}
+{"ts": "2026-04-28T09:21:46.854050Z", "event": "fill_watcher_started", "symbol": "HIG", "order_id": 7095, "original_limit": 134.01, "price_boundary": 132.67, "side": "SELL"}
+{"ts": "2026-04-28T09:22:17.175531Z", "event": "fill_watcher_adjusted", "symbol": "HIG", "order_id": 7095, "new_limit": 133.74, "attempt": 1}
+{"ts": "2026-04-28T09:22:37.531366Z", "event": "fill_watcher_adjusted", "symbol": "HIG", "order_id": 7095, "new_limit": 133.47, "attempt": 2}
+{"ts": "2026-04-28T09:22:57.880589Z", "event": "fill_watcher_adjusted", "symbol": "HIG", "order_id": 7095, "new_limit": 133.2, "attempt": 3}
+{"ts": "2026-04-28T09:23:17.890973Z", "event": "fill_watcher_max_attempts", "symbol": "HIG", "order_id": 7095, "attempts": 3, "final_limit": 133.2}
+{"ts": "2026-04-28T09:23:19.165247Z", "event": "SUBMITTED", "symbol": "HIG", "order_id": 7096, "side": "SELL", "qty": 1123, "order_type": "LMT", "limit_price": 132.8, "fill_price": null}
+{"ts": "2026-04-28T09:23:20.132462Z", "event": "fill_watcher_market_fallback", "symbol": "HIG", "order_id": 7095, "final_limit": 133.2, "new_order_id": 7096}
+{"ts": "2026-04-28T09:38:37.604416Z", "event": "SUBMITTED", "symbol": "USO", "order_id": 7101, "side": "SELL", "qty": 1114, "order_type": "LMT", "limit_price": 134.45, "fill_price": null}
+{"ts": "2026-04-28T09:38:41.149887Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7104, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T09:38:44.452155Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7107, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T09:38:47.739641Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7110, "side": "BUY", "qty": 162, "order_type": "LMT", "limit_price": 939.69, "fill_price": null}
+{"ts": "2026-04-28T09:38:53.239110Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7113, "side": "BUY", "qty": 2969, "order_type": "LMT", "limit_price": 45.23, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "USO", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "AMD", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "GS", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}], "ts": "2026-04-28T05:38:54.945792-04:00"}
+{"ts": "2026-04-28T09:56:15.179239Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7116, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T09:56:18.479319Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7119, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T09:56:22.048102Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7122, "side": "BUY", "qty": 162, "order_type": "LMT", "limit_price": 939.69, "fill_price": null}
+{"ts": "2026-04-28T09:56:25.616952Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7125, "side": "BUY", "qty": 2969, "order_type": "LMT", "limit_price": 45.23, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "AMD", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "GS", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}], "ts": "2026-04-28T05:56:27.462436-04:00"}
+{"ts": "2026-04-28T10:14:11.919914Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7128, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T10:14:15.189984Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7131, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T10:14:18.463561Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7134, "side": "BUY", "qty": 162, "order_type": "LMT", "limit_price": 939.69, "fill_price": null}
+{"ts": "2026-04-28T10:14:21.798445Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7137, "side": "BUY", "qty": 2583, "order_type": "LMT", "limit_price": 45.23, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "AMD", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "GS", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}], "ts": "2026-04-28T06:14:23.617259-04:00"}
+{"ts": "2026-04-28T10:31:51.635939Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7140, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T10:31:54.832868Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7143, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T10:31:58.119789Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7146, "side": "BUY", "qty": 162, "order_type": "LMT", "limit_price": 939.69, "fill_price": null}
+{"ts": "2026-04-28T10:32:01.452395Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7149, "side": "BUY", "qty": 2583, "order_type": "LMT", "limit_price": 45.23, "fill_price": null}
+{"ts": "2026-04-28T10:32:15.877567Z", "event": "SUBMITTED", "symbol": "BJ", "order_id": 7152, "side": "BUY", "qty": 210, "order_type": "LMT", "limit_price": 93.08, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "AMD", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "GS", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "BJ", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}], "ts": "2026-04-28T06:32:17.782641-04:00"}
+{"ts": "2026-04-28T10:49:38.758674Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7155, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T10:49:42.264939Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7158, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T10:49:45.739269Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7161, "side": "BUY", "qty": 162, "order_type": "LMT", "limit_price": 939.69, "fill_price": null}
+{"ts": "2026-04-28T10:49:49.133561Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7164, "side": "BUY", "qty": 303, "order_type": "LMT", "limit_price": 45.23, "fill_price": null}
+{"ts": "2026-04-28T10:50:03.659750Z", "event": "SUBMITTED", "symbol": "BJ", "order_id": 7167, "side": "BUY", "qty": 210, "order_type": "LMT", "limit_price": 93.08, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "AMD", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "GS", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "BJ", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}], "ts": "2026-04-28T06:50:05.508015-04:00"}
+{"ts": "2026-04-28T11:07:18.392692Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7170, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T11:07:21.677958Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7173, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T11:07:25.248772Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7176, "side": "BUY", "qty": 162, "order_type": "LMT", "limit_price": 939.69, "fill_price": null}
+{"ts": "2026-04-28T11:07:28.606267Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7179, "side": "SELL", "qty": 2533, "order_type": "LMT", "limit_price": 45.11, "fill_price": null}
+{"ts": "2026-04-28T11:07:43.168458Z", "event": "SUBMITTED", "symbol": "BJ", "order_id": 7182, "side": "BUY", "qty": 210, "order_type": "LMT", "limit_price": 93.08, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_short_against_regime"}, {"symbol": "AMD", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "GS", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_short_against_financials_strength"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "BJ", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}], "ts": "2026-04-28T07:07:45.011539-04:00"}
+{"ts": "2026-04-28T11:08:41.608418Z", "event": "SUBMITTED", "symbol": "HIG", "order_id": 7185, "side": "BUY", "qty": 1123, "order_type": "LMT", "limit_price": 136.98, "fill_price": null}
+{"ts": "2026-04-28T11:25:45.063057Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7188, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T11:25:48.641579Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7191, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T11:25:52.126902Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7194, "side": "BUY", "qty": 162, "order_type": "LMT", "limit_price": 939.69, "fill_price": null}
+{"ts": "2026-04-28T11:25:55.766240Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7197, "side": "SELL", "qty": 9975, "order_type": "LMT", "limit_price": 45.11, "fill_price": null}
+{"ts": "2026-04-28T11:26:10.263842Z", "event": "SUBMITTED", "symbol": "HIG", "order_id": 7200, "side": "BUY", "qty": 1123, "order_type": "LMT", "limit_price": 136.03, "fill_price": null}
+{"ts": "2026-04-28T11:26:24.780237Z", "event": "SUBMITTED", "symbol": "BJ", "order_id": 7203, "side": "BUY", "qty": 210, "order_type": "LMT", "limit_price": 93.08, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "AMD", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "GS", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "HIG", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "BJ", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}], "ts": "2026-04-28T07:26:26.625870-04:00"}
+{"ts": "2026-04-28T11:27:12.858092Z", "event": "SUBMITTED", "symbol": "USO", "order_id": 7207, "side": "BUY", "qty": 1062, "order_type": "LMT", "limit_price": 141.12, "fill_price": null}
+{"ts": "2026-04-28T11:27:13.183611Z", "event": "fill_watcher_started", "symbol": "USO", "order_id": 7207, "original_limit": 141.12, "price_boundary": 141.83, "side": "BUY"}
+{"ts": "2026-04-28T11:27:58.313009Z", "event": "fill_watcher_filled", "symbol": "USO", "order_id": 7207, "attempts": 0, "fill_limit": 141.12}
+{"ts": "2026-04-28T11:43:59.081140Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7210, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T11:44:02.551503Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7213, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T11:44:05.855185Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7216, "side": "SELL", "qty": 13705, "order_type": "LMT", "limit_price": 45.05, "fill_price": null}
+{"ts": "2026-04-28T11:44:20.553788Z", "event": "SUBMITTED", "symbol": "HIG", "order_id": 7219, "side": "BUY", "qty": 1123, "order_type": "LMT", "limit_price": 136.03, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_short_loss"}, {"symbol": "AMD", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_long_loss"}, {"symbol": "GS", "action": "HOLD", "trim_pct": 50, "reasoning": "score_collapse_near_flat"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_no_catalyst"}, {"symbol": "HIG", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_short_loss_financials_headwind"}, {"symbol": "BJ", "action": "HOLD", "trim_pct": 50, "reasoning": "score_collapse_flat_breakeven"}], "ts": "2026-04-28T07:44:22.354297-04:00"}
+{"ts": "2026-04-28T11:45:09.671466Z", "event": "SUBMITTED", "symbol": "AAPL", "order_id": 7223, "side": "BUY", "qty": 554, "order_type": "LMT", "limit_price": 269.54, "fill_price": null}
+{"ts": "2026-04-28T11:45:10.109971Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 7223, "original_limit": 269.54, "price_boundary": 270.89, "side": "BUY"}
+{"ts": "2026-04-28T11:45:12.587785Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7226, "side": "SELL", "qty": 138, "order_type": "LMT", "limit_price": 937.62, "fill_price": null}
+{"ts": "2026-04-28T11:45:27.767330Z", "event": "SUBMITTED", "symbol": "BJ", "order_id": 7231, "side": "BUY", "qty": 210, "order_type": "LMT", "limit_price": 93.08, "fill_price": null}
+{"ts": "2026-04-28T11:45:55.231433Z", "event": "fill_watcher_filled", "symbol": "AAPL", "order_id": 7223, "attempts": 0, "fill_limit": 269.54}
+{"ts": "2026-04-28T12:02:18.108373Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7234, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T12:02:21.621185Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7237, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T12:02:24.956825Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7240, "side": "SELL", "qty": 6228, "order_type": "LMT", "limit_price": 45.05, "fill_price": null}
+{"ts": "2026-04-28T12:02:40.646435Z", "event": "SUBMITTED", "symbol": "HIG", "order_id": 7243, "side": "BUY", "qty": 1123, "order_type": "LMT", "limit_price": 136.03, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "AMD", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "GS", "action": "HOLD", "trim_pct": 50, "reasoning": "sector_tailwind_monitor"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "HIG", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_against_sector"}, {"symbol": "BJ", "action": "HOLD", "trim_pct": 50, "reasoning": "flat_pnl_score_watch"}], "ts": "2026-04-28T08:02:42.530290-04:00"}
+{"ts": "2026-04-28T12:03:33.422076Z", "event": "SUBMITTED", "symbol": "UNH", "order_id": 7247, "side": "BUY", "qty": 417, "order_type": "LMT", "limit_price": 357.89, "fill_price": null}
+{"ts": "2026-04-28T12:03:34.015619Z", "event": "fill_watcher_started", "symbol": "UNH", "order_id": 7247, "original_limit": 357.89, "price_boundary": 359.68, "side": "BUY"}
+{"ts": "2026-04-28T12:03:35.771835Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7250, "side": "SELL", "qty": 138, "order_type": "LMT", "limit_price": 938.01, "fill_price": null}
+{"ts": "2026-04-28T12:03:51.184844Z", "event": "SUBMITTED", "symbol": "BJ", "order_id": 7255, "side": "BUY", "qty": 210, "order_type": "LMT", "limit_price": 93.08, "fill_price": null}
+{"ts": "2026-04-28T12:04:19.125054Z", "event": "fill_watcher_filled", "symbol": "UNH", "order_id": 7247, "attempts": 0, "fill_limit": 357.89}
+{"ts": "2026-04-28T12:24:11.387794Z", "event": "SUBMITTED", "symbol": "ABT", "order_id": 7258, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T12:24:16.995228Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7261, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T12:24:22.466855Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7264, "side": "SELL", "qty": 498, "order_type": "LMT", "limit_price": 937.12, "fill_price": null}
+{"ts": "2026-04-28T12:24:31.376711Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7267, "side": "BUY", "qty": 6228, "order_type": "LMT", "limit_price": 45.15, "fill_price": null}
+{"ts": "2026-04-28T12:24:53.629526Z", "event": "SUBMITTED", "symbol": "HIG", "order_id": 7270, "side": "BUY", "qty": 1123, "order_type": "LMT", "limit_price": 135.03, "fill_price": null}
+{"ts": "2026-04-28T12:25:09.972138Z", "event": "SUBMITTED", "symbol": "BJ", "order_id": 7273, "side": "BUY", "qty": 210, "order_type": "LMT", "limit_price": 93.08, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "AMD", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "GS", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "HIG", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "BJ", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}], "ts": "2026-04-28T08:25:11.456148-04:00"}
+{"ts": "2026-04-28T12:40:14.534318Z", "event": "VALIDATIONERROR", "symbol": "BJ", "order_id": 7277, "side": "BUY", "qty": 310, "order_type": "STP", "limit_price": 94.81, "fill_price": null}
+{"ts": "2026-04-28T12:40:15.257140Z", "event": "VALIDATIONERROR", "symbol": "GS", "order_id": 7279, "side": "SELL", "qty": 698, "order_type": "STP", "limit_price": 920.69, "fill_price": null}
+{"ts": "2026-04-28T12:40:15.888788Z", "event": "VALIDATIONERROR", "symbol": "HIG", "order_id": 7281, "side": "BUY", "qty": 1123, "order_type": "STP", "limit_price": 135.65, "fill_price": null}
+{"ts": "2026-04-28T12:40:16.776491Z", "event": "VALIDATIONERROR", "symbol": "UNH", "order_id": 7283, "side": "SELL", "qty": 417, "order_type": "STP", "limit_price": 350.56, "fill_price": null}
+{"ts": "2026-04-28T12:40:31.439321Z", "event": "CANCELLED", "symbol": "AAPL", "order_id": 200, "side": "SELL", "qty": 99, "order_type": "STP", "limit_price": 266.11, "fill_price": null}
+{"ts": "2026-04-28T12:41:45.110413Z", "event": "SUBMITTED", "symbol": "AAPL", "order_id": 42, "side": "BUY", "qty": 10, "order_type": "LMT", "limit_price": 150.0, "fill_price": null}
+{"ts": "2026-04-28T12:41:45.117192Z", "event": "SUBMITTED", "symbol": "AAPL", "order_id": 99, "side": "BUY", "qty": 10, "order_type": "LMT", "limit_price": 150.0, "fill_price": null}
+{"ts": "2026-04-28T12:41:45.120967Z", "event": "SUBMITTED", "symbol": "AAPL", "order_id": 0, "side": "BUY", "qty": 10, "order_type": "LMT", "limit_price": 150.0, "fill_price": null}
+{"ts": "2026-04-28T12:41:45.124443Z", "event": "SUBMITTED", "symbol": "AAPL", "order_id": 7, "side": "BUY", "qty": 10, "order_type": "LMT", "limit_price": 0, "fill_price": null}
+{"ts": "2026-04-28T12:41:45.128313Z", "event": "SUBMITTED", "symbol": "AAPL", "order_id": 8, "side": "BUY", "qty": 10, "order_type": "LMT", "limit_price": 0, "fill_price": null}
+{"ts": "2026-04-28T12:41:45.132535Z", "event": "SUBMITTED", "symbol": "AAPL", "order_id": 55, "side": "BUY", "qty": 10, "order_type": "LMT", "limit_price": 150.0, "fill_price": null}
+{"ts": "2026-04-28T12:41:45.141946Z", "event": "SUBMITTED", "symbol": "SYM1", "order_id": 1, "side": "BUY", "qty": 10, "order_type": "LMT", "limit_price": 150.0, "fill_price": null}
+{"ts": "2026-04-28T12:41:45.143852Z", "event": "SUBMITTED", "symbol": "SYM2", "order_id": 2, "side": "BUY", "qty": 10, "order_type": "LMT", "limit_price": 150.0, "fill_price": null}
+{"ts": "2026-04-28T12:41:45.146553Z", "event": "SUBMITTED", "symbol": "SYM3", "order_id": 3, "side": "BUY", "qty": 10, "order_type": "LMT", "limit_price": 150.0, "fill_price": null}
+{"ts": "2026-04-28T12:49:00.790051Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7287, "side": "SELL", "qty": 451, "order_type": "LMT", "limit_price": 333.96, "fill_price": null}
+{"ts": "2026-04-28T12:49:03.966484Z", "event": "VALIDATIONERROR", "symbol": "GS", "order_id": 7290, "side": "SELL", "qty": 698, "order_type": "LMT", "limit_price": 937.12, "fill_price": null}
+{"ts": "2026-04-28T12:49:09.389058Z", "event": "SUBMITTED", "symbol": "BJ", "order_id": 7293, "side": "BUY", "qty": 310, "order_type": "LMT", "limit_price": 93.08, "fill_price": null}
+{"ts": "2026-04-28T12:49:12.991936Z", "event": "SUBMITTED", "symbol": "HIG", "order_id": 7296, "side": "BUY", "qty": 1123, "order_type": "LMT", "limit_price": 136.98, "fill_price": null}
+{"ts": "2026-04-28T12:49:19.542449Z", "event": "SUBMITTED", "symbol": "USO", "order_id": 7299, "side": "SELL", "qty": 1062, "order_type": "LMT", "limit_price": 139.65, "fill_price": null}
+{"ts": "2026-04-28T12:49:23.256912Z", "event": "CANCELLED", "symbol": "ABT", "order_id": 7302, "side": "BUY", "qty": 682, "order_type": "LMT", "limit_price": 92.99, "fill_price": null}
+{"ts": "2026-04-28T12:49:26.812642Z", "event": "SUBMITTED", "symbol": "NKE", "order_id": 7305, "side": "BUY", "qty": 11344, "order_type": "LMT", "limit_price": 45.23, "fill_price": null}
+{"ts": "2026-04-28T12:49:32.328956Z", "event": "SUBMITTED", "symbol": "UNH", "order_id": 7308, "side": "SELL", "qty": 208, "order_type": "LMT", "limit_price": 356.24, "fill_price": null}
+{"ts": "2026-04-28T12:49:38.218866Z", "event": "SUBMITTED", "symbol": "UNH", "order_id": 7311, "side": "SELL", "qty": 104, "order_type": "LMT", "limit_price": 356.24, "fill_price": null}
+{"type": "portfolio_review", "trigger": "pre_market", "actions": [{"symbol": "AMD", "action": "EXIT", "trim_pct": 50, "reasoning": "intraday_overheld_score_collapse"}, {"symbol": "GS", "action": "EXIT", "trim_pct": 50, "reasoning": "intraday_overheld_score_collapse"}, {"symbol": "BJ", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "HIG", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_adverse_pnl"}, {"symbol": "USO", "action": "EXIT", "trim_pct": 50, "reasoning": "score_collapse_below_threshold"}, {"symbol": "ABT", "action": "EXIT", "trim_pct": 50, "reasoning": "regime_flip_short_losing"}, {"symbol": "NKE", "action": "EXIT", "trim_pct": 50, "reasoning": "regime_flip_short_stagnant"}, {"symbol": "UNH", "action": "TRIM", "trim_pct": 50, "reasoning": "regime_flip_reduced_conviction"}], "ts": "2026-04-28T08:49:40.614785-04:00"}
+{"ts": "2026-04-28T12:50:51.340946Z", "event": "SUBMITTED", "symbol": "CBRE", "order_id": 7315, "side": "SELL", "qty": 407, "order_type": "LMT", "limit_price": 145.93, "fill_price": null}
+{"ts": "2026-04-28T12:50:51.600366Z", "event": "fill_watcher_started", "symbol": "CBRE", "order_id": 7315, "original_limit": 145.93, "price_boundary": 144.47, "side": "SELL"}
+{"ts": "2026-04-28T12:51:19.310904Z", "event": "SUBMITTED", "symbol": "EPAM", "order_id": 7319, "side": "SELL", "qty": 511, "order_type": "LMT", "limit_price": 116.08, "fill_price": null}
+{"ts": "2026-04-28T12:51:19.611065Z", "event": "fill_watcher_started", "symbol": "EPAM", "order_id": 7319, "original_limit": 116.08, "price_boundary": 114.92, "side": "SELL"}
+{"ts": "2026-04-28T12:51:22.058773Z", "event": "fill_watcher_adjusted", "symbol": "CBRE", "order_id": 7315, "new_limit": 145.64, "attempt": 1}
+{"ts": "2026-04-28T12:51:42.377837Z", "event": "fill_watcher_adjusted", "symbol": "CBRE", "order_id": 7315, "new_limit": 145.35, "attempt": 2}
+{"ts": "2026-04-28T12:51:46.379496Z", "event": "SUBMITTED", "symbol": "MSI", "order_id": 7323, "side": "SELL", "qty": 137, "order_type": "LMT", "limit_price": 430.74, "fill_price": null}
+{"ts": "2026-04-28T12:51:46.619774Z", "event": "fill_watcher_started", "symbol": "MSI", "order_id": 7323, "original_limit": 430.74, "price_boundary": 426.43, "side": "SELL"}
+{"ts": "2026-04-28T12:51:49.724883Z", "event": "fill_watcher_filled", "symbol": "EPAM", "order_id": 7319, "attempts": 0, "fill_limit": 116.08}
+{"ts": "2026-04-28T12:52:02.732743Z", "event": "fill_watcher_adjusted", "symbol": "CBRE", "order_id": 7315, "new_limit": 145.06, "attempt": 3}
+{"ts": "2026-04-28T12:52:14.012725Z", "event": "SUBMITTED", "symbol": "NSC", "order_id": 7327, "side": "BUY", "qty": 186, "order_type": "LMT", "limit_price": 320.61, "fill_price": null}
+{"ts": "2026-04-28T12:52:14.439665Z", "event": "fill_watcher_started", "symbol": "NSC", "order_id": 7327, "original_limit": 320.61, "price_boundary": 323.82, "side": "BUY"}
+{"ts": "2026-04-28T12:52:17.078406Z", "event": "fill_watcher_adjusted", "symbol": "MSI", "order_id": 7323, "new_limit": 429.88, "attempt": 1}
+{"ts": "2026-04-28T12:52:18.587025Z", "event": "SUBMITTED", "symbol": "UNH", "order_id": 7330, "side": "SELL", "qty": 105, "order_type": "LMT", "limit_price": 355.85, "fill_price": null}
+{"ts": "2026-04-28T12:52:22.740187Z", "event": "fill_watcher_max_attempts", "symbol": "CBRE", "order_id": 7315, "attempts": 3, "final_limit": 145.06}
+{"ts": "2026-04-28T12:52:25.450801Z", "event": "SUBMITTED", "symbol": "CBRE", "order_id": 7339, "side": "SELL", "qty": 407, "order_type": "LMT", "limit_price": 145.06, "fill_price": null}
+{"ts": "2026-04-28T12:52:25.455487Z", "event": "fill_watcher_market_fallback", "symbol": "CBRE", "order_id": 7315, "final_limit": 145.06, "new_order_id": 7339}
+{"ts": "2026-04-28T12:52:37.473854Z", "event": "fill_watcher_adjusted", "symbol": "MSI", "order_id": 7323, "new_limit": 429.02, "attempt": 2}
+{"ts": "2026-04-28T12:52:44.760804Z", "event": "fill_watcher_adjusted", "symbol": "NSC", "order_id": 7327, "new_limit": 321.25, "attempt": 1}
+{"ts": "2026-04-28T12:52:57.796942Z", "event": "fill_watcher_adjusted", "symbol": "MSI", "order_id": 7323, "new_limit": 428.16, "attempt": 3}
+{"ts": "2026-04-28T12:53:05.079053Z", "event": "fill_watcher_adjusted", "symbol": "NSC", "order_id": 7327, "new_limit": 321.89, "attempt": 2}
+{"ts": "2026-04-28T12:53:17.821450Z", "event": "fill_watcher_max_attempts", "symbol": "MSI", "order_id": 7323, "attempts": 3, "final_limit": 428.16}
+{"ts": "2026-04-28T12:53:19.465651Z", "event": "SUBMITTED", "symbol": "MSI", "order_id": 7340, "side": "SELL", "qty": 137, "order_type": "LMT", "limit_price": 426.88, "fill_price": null}
+{"ts": "2026-04-28T12:53:21.058528Z", "event": "fill_watcher_market_fallback", "symbol": "MSI", "order_id": 7323, "final_limit": 428.16, "new_order_id": 7340}
+{"ts": "2026-04-28T12:53:25.388763Z", "event": "fill_watcher_adjusted", "symbol": "NSC", "order_id": 7327, "new_limit": 322.53, "attempt": 3}
+{"ts": "2026-04-28T12:53:45.393937Z", "event": "fill_watcher_max_attempts", "symbol": "NSC", "order_id": 7327, "attempts": 3, "final_limit": 322.53}
+{"ts": "2026-04-28T12:53:46.825758Z", "event": "SUBMITTED", "symbol": "NSC", "order_id": 7341, "side": "BUY", "qty": 186, "order_type": "LMT", "limit_price": 323.5, "fill_price": null}
+{"ts": "2026-04-28T12:53:47.634111Z", "event": "fill_watcher_market_fallback", "symbol": "NSC", "order_id": 7327, "final_limit": 322.53, "new_order_id": 7341}
+{"ts": "2026-04-28T13:13:01.314182Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T13:13:09.024225Z", "event": "fill_watcher_started", "symbol": "CHEAP", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T13:13:09.957145Z", "event": "fill_watcher_started", "symbol": "EXPENSIVE", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T13:13:10.942667Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T13:13:14.514979Z", "event": "fill_watcher_started", "symbol": "SPXS", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T13:15:16.011589Z", "event": "VALIDATIONERROR", "symbol": "AAPL", "order_id": 7345, "side": "SELL", "qty": 554, "order_type": "STP", "limit_price": 263.72, "fill_price": null}
+{"ts": "2026-04-28T13:15:17.669421Z", "event": "VALIDATIONERROR", "symbol": "CBRE", "order_id": 7347, "side": "BUY", "qty": 407, "order_type": "STP", "limit_price": 147.5, "fill_price": null}
+{"ts": "2026-04-28T13:15:18.443222Z", "event": "VALIDATIONERROR", "symbol": "EPAM", "order_id": 7349, "side": "BUY", "qty": 511, "order_type": "STP", "limit_price": 118.57, "fill_price": null}
+{"ts": "2026-04-28T13:15:19.503260Z", "event": "VALIDATIONERROR", "symbol": "NSC", "order_id": 7351, "side": "SELL", "qty": 50, "order_type": "STP", "limit_price": 316.07, "fill_price": null}
+{"ts": "2026-04-28T13:17:07.159927Z", "event": "SUBMITTED", "symbol": "HIG", "order_id": 48, "side": "BUY", "qty": 1123, "order_type": "MKT", "limit_price": 136.72999575, "fill_price": null}
+{"ts": "2026-04-28T13:19:15.853737Z", "event": "SUBMITTED", "symbol": "AAPL", "order_id": 58, "side": "SELL", "qty": 554, "order_type": "MKT", "limit_price": 271.019989, "fill_price": null}
+{"ts": "2026-04-28T13:20:17.788962Z", "event": "VALIDATIONERROR", "symbol": "AAPL", "order_id": 7355, "side": "SELL", "qty": 554, "order_type": "STP", "limit_price": 263.72, "fill_price": null}
+{"ts": "2026-04-28T13:20:18.555118Z", "event": "VALIDATIONERROR", "symbol": "ABT", "order_id": 7357, "side": "BUY", "qty": 682, "order_type": "STP", "limit_price": 93.89, "fill_price": null}
+{"ts": "2026-04-28T13:20:19.227019Z", "event": "VALIDATIONERROR", "symbol": "AMD", "order_id": 7359, "side": "SELL", "qty": 451, "order_type": "STP", "limit_price": 326.24, "fill_price": null}
+{"ts": "2026-04-28T13:20:19.927944Z", "event": "VALIDATIONERROR", "symbol": "BJ", "order_id": 7361, "side": "BUY", "qty": 517, "order_type": "STP", "limit_price": 94.42, "fill_price": null}
+{"ts": "2026-04-28T13:20:20.511010Z", "event": "VALIDATIONERROR", "symbol": "CBRE", "order_id": 7363, "side": "BUY", "qty": 407, "order_type": "STP", "limit_price": 147.5, "fill_price": null}
+{"ts": "2026-04-28T13:20:21.183762Z", "event": "VALIDATIONERROR", "symbol": "EPAM", "order_id": 7365, "side": "BUY", "qty": 511, "order_type": "STP", "limit_price": 118.57, "fill_price": null}
+{"ts": "2026-04-28T13:20:21.860608Z", "event": "VALIDATIONERROR", "symbol": "GS", "order_id": 7367, "side": "BUY", "qty": 458, "order_type": "STP", "limit_price": 958.47, "fill_price": null}
+{"ts": "2026-04-28T13:20:22.482296Z", "event": "VALIDATIONERROR", "symbol": "HIG", "order_id": 7369, "side": "BUY", "qty": 1123, "order_type": "STP", "limit_price": 135.65, "fill_price": null}
+{"ts": "2026-04-28T13:20:23.126820Z", "event": "VALIDATIONERROR", "symbol": "NSC", "order_id": 7371, "side": "SELL", "qty": 50, "order_type": "STP", "limit_price": 316.07, "fill_price": null}
+{"ts": "2026-04-28T13:24:19.613709Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T13:24:27.914565Z", "event": "fill_watcher_started", "symbol": "CHEAP", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T13:24:28.756527Z", "event": "fill_watcher_started", "symbol": "EXPENSIVE", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T13:24:29.518717Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T13:24:33.038678Z", "event": "fill_watcher_started", "symbol": "SPXS", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T13:46:21.804346Z", "event": "SUBMITTED", "symbol": "UNH", "order_id": 7387, "side": "SELL", "qty": 164, "order_type": "STP LMT", "limit_price": 355.99, "fill_price": null}
+{"ts": "2026-04-28T13:46:22.098232Z", "event": "SUBMITTED", "symbol": "UNH", "order_id": 7388, "side": "SELL", "qty": 164, "order_type": "LMT", "limit_price": 359.48, "fill_price": null}
+{"ts": "2026-04-28T13:46:22.707682Z", "event": "SUBMITTED", "symbol": "UNH", "order_id": 7386, "side": "BUY", "qty": 164, "order_type": "LMT", "limit_price": 357.78, "fill_price": null}
+{"ts": "2026-04-28T13:46:24.721918Z", "event": "fill_watcher_started", "symbol": "UNH", "order_id": 7386, "original_limit": 357.78, "price_boundary": 359.57, "side": "BUY"}
+{"ts": "2026-04-28T13:46:31.139326Z", "event": "SUBMITTED", "symbol": "NEM", "order_id": 7393, "side": "BUY", "qty": 524, "order_type": "STP LMT", "limit_price": 112.85, "fill_price": null}
+{"ts": "2026-04-28T13:46:31.283071Z", "event": "SUBMITTED", "symbol": "NEM", "order_id": 7394, "side": "BUY", "qty": 524, "order_type": "LMT", "limit_price": 110.93, "fill_price": null}
+{"ts": "2026-04-28T13:46:31.945170Z", "event": "SUBMITTED", "symbol": "NEM", "order_id": 7392, "side": "SELL", "qty": 524, "order_type": "LMT", "limit_price": 112.04, "fill_price": null}
+{"ts": "2026-04-28T13:46:36.463108Z", "event": "fill_watcher_started", "symbol": "NEM", "order_id": 7392, "original_limit": 112.04, "price_boundary": 110.92, "side": "SELL"}
+{"ts": "2026-04-28T13:46:43.192566Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7399, "side": "SELL", "qty": 62, "order_type": "STP LMT", "limit_price": 939.21, "fill_price": null}
+{"ts": "2026-04-28T13:46:43.444759Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7400, "side": "SELL", "qty": 62, "order_type": "LMT", "limit_price": 948.4, "fill_price": null}
+{"ts": "2026-04-28T13:46:43.935113Z", "event": "SUBMITTED", "symbol": "GS", "order_id": 7398, "side": "BUY", "qty": 62, "order_type": "LMT", "limit_price": 943.92, "fill_price": null}
+{"ts": "2026-04-28T13:46:48.695752Z", "event": "fill_watcher_started", "symbol": "GS", "order_id": 7398, "original_limit": 943.92, "price_boundary": 948.64, "side": "BUY"}
+{"ts": "2026-04-28T13:46:56.058097Z", "event": "SUBMITTED", "symbol": "HON", "order_id": 7405, "side": "BUY", "qty": 276, "order_type": "STP LMT", "limit_price": 213.82, "fill_price": null}
+{"ts": "2026-04-28T13:46:56.670597Z", "event": "SUBMITTED", "symbol": "HON", "order_id": 7406, "side": "BUY", "qty": 276, "order_type": "LMT", "limit_price": 211.74, "fill_price": null}
+{"ts": "2026-04-28T13:46:57.017636Z", "event": "SUBMITTED", "symbol": "HON", "order_id": 7404, "side": "SELL", "qty": 276, "order_type": "LMT", "limit_price": 212.75, "fill_price": null}
+{"ts": "2026-04-28T13:46:58.106694Z", "event": "fill_watcher_started", "symbol": "HON", "order_id": 7404, "original_limit": 212.75, "price_boundary": 210.62, "side": "SELL"}
+{"ts": "2026-04-28T13:47:06.592105Z", "event": "fill_watcher_filled", "symbol": "NEM", "order_id": 7392, "attempts": 0, "fill_limit": 112.04}
+{"ts": "2026-04-28T13:47:10.197762Z", "event": "fill_watcher_adjusted", "symbol": "UNH", "order_id": 7386, "new_limit": 358.14, "attempt": 1}
+{"ts": "2026-04-28T13:47:28.575998Z", "event": "fill_watcher_adjusted", "symbol": "HON", "order_id": 7404, "new_limit": 212.32, "attempt": 1}
+{"ts": "2026-04-28T13:47:33.811924Z", "event": "fill_watcher_filled", "symbol": "GS", "order_id": 7398, "attempts": 0, "fill_limit": 943.92}
+{"ts": "2026-04-28T13:47:35.532053Z", "event": "fill_watcher_adjusted", "symbol": "UNH", "order_id": 7386, "new_limit": 358.5, "attempt": 2}
+{"ts": "2026-04-28T13:47:48.981285Z", "event": "fill_watcher_adjusted", "symbol": "HON", "order_id": 7404, "new_limit": 211.9, "attempt": 2}
+{"ts": "2026-04-28T13:48:00.558428Z", "event": "fill_watcher_max_attempts", "symbol": "UNH", "order_id": 7386, "attempts": 2, "final_limit": 358.5}
+{"ts": "2026-04-28T13:48:05.054631Z", "event": "CANCELLED", "symbol": "UNH", "order_id": 7407, "side": "BUY", "qty": 164, "order_type": "MKT", "limit_price": 0, "fill_price": null}
+{"ts": "2026-04-28T13:48:07.271229Z", "event": "fill_watcher_market_fallback", "symbol": "UNH", "order_id": 7386, "final_limit": 358.5, "new_order_id": 7407}
+{"ts": "2026-04-28T13:48:09.012911Z", "event": "fill_watcher_filled", "symbol": "HON", "order_id": 7404, "attempts": 2, "fill_limit": 211.9}
+{"type": "portfolio_review", "trigger": "scalp_signal_lost:GS; news_hit:UNH,HON; drawdown", "actions": [], "ts": "2026-04-28T09:53:03.819986-04:00"}
+{"ts": "2026-04-28T13:54:04.425786Z", "event": "SUBMITTED", "symbol": "MRNA", "order_id": 7412, "side": "BUY", "qty": 1219, "order_type": "STP LMT", "limit_price": 50.87, "fill_price": null}
+{"ts": "2026-04-28T13:54:04.914868Z", "event": "SUBMITTED", "symbol": "MRNA", "order_id": 7411, "side": "SELL", "qty": 1219, "order_type": "LMT", "limit_price": 48.15, "fill_price": null}
+{"ts": "2026-04-28T13:54:07.285629Z", "event": "fill_watcher_started", "symbol": "MRNA", "order_id": 7411, "original_limit": 48.15, "price_boundary": 47.67, "side": "SELL"}
+{"ts": "2026-04-28T13:54:13.296553Z", "event": "SUBMITTED", "symbol": "ABBV", "order_id": 7417, "side": "BUY", "qty": 297, "order_type": "STP LMT", "limit_price": 202.18, "fill_price": null}
+{"ts": "2026-04-28T13:54:13.552377Z", "event": "SUBMITTED", "symbol": "ABBV", "order_id": 7416, "side": "SELL", "qty": 297, "order_type": "LMT", "limit_price": 197.11, "fill_price": null}
+{"ts": "2026-04-28T13:54:15.137887Z", "event": "fill_watcher_started", "symbol": "ABBV", "order_id": 7416, "original_limit": 197.11, "price_boundary": 195.14, "side": "SELL"}
+{"ts": "2026-04-28T13:54:20.891676Z", "event": "SUBMITTED", "symbol": "GOOGL", "order_id": 7422, "side": "SELL", "qty": 168, "order_type": "STP LMT", "limit_price": 347.75, "fill_price": null}
+{"ts": "2026-04-28T13:54:21.089851Z", "event": "SUBMITTED", "symbol": "GOOGL", "order_id": 7423, "side": "SELL", "qty": 168, "order_type": "LMT", "limit_price": 351.93, "fill_price": null}
+{"ts": "2026-04-28T13:54:21.358306Z", "event": "SUBMITTED", "symbol": "GOOGL", "order_id": 7421, "side": "BUY", "qty": 168, "order_type": "LMT", "limit_price": 349.73, "fill_price": null}
+{"ts": "2026-04-28T13:54:25.550459Z", "event": "fill_watcher_started", "symbol": "GOOGL", "order_id": 7421, "original_limit": 349.73, "price_boundary": 351.48, "side": "BUY"}
+{"ts": "2026-04-28T13:54:37.665747Z", "event": "fill_watcher_adjusted", "symbol": "MRNA", "order_id": 7411, "new_limit": 48.05, "attempt": 1}
+{"ts": "2026-04-28T13:54:45.292972Z", "event": "fill_watcher_filled", "symbol": "ABBV", "order_id": 7416, "attempts": 0, "fill_limit": 197.11}
+{"ts": "2026-04-28T13:54:57.997923Z", "event": "fill_watcher_adjusted", "symbol": "MRNA", "order_id": 7411, "new_limit": 47.95, "attempt": 2}
+{"ts": "2026-04-28T13:55:10.591903Z", "event": "fill_watcher_filled", "symbol": "GOOGL", "order_id": 7421, "attempts": 0, "fill_limit": 349.73}
+{"ts": "2026-04-28T13:55:18.325683Z", "event": "fill_watcher_adjusted", "symbol": "MRNA", "order_id": 7411, "new_limit": 47.85, "attempt": 3}
+{"ts": "2026-04-28T13:55:38.334781Z", "event": "fill_watcher_filled_late", "symbol": "MRNA", "order_id": 7411, "attempts": 3, "fill_limit": 47.85}
+{"ts": "2026-04-28T14:09:26.106910Z", "event": "SCORING_GAP", "consecutive_zero_scans": 3, "universe_size": 100, "regime": "TRENDING_UP"}
+{"ts": "2026-04-28T14:14:47.972459Z", "event": "SCORING_GAP", "consecutive_zero_scans": 4, "universe_size": 100, "regime": "TRENDING_UP"}
+{"ts": "2026-04-28T14:20:10.335347Z", "event": "VALIDATIONERROR", "symbol": "ABBV", "order_id": 7427, "side": "BUY", "qty": 297, "order_type": "STP", "limit_price": 202.08, "fill_price": null}
+{"ts": "2026-04-28T14:20:10.982579Z", "event": "VALIDATIONERROR", "symbol": "GOOGL", "order_id": 7429, "side": "SELL", "qty": 168, "order_type": "STP", "limit_price": 341.3, "fill_price": null}
+{"ts": "2026-04-28T14:20:11.590443Z", "event": "VALIDATIONERROR", "symbol": "GS", "order_id": 7431, "side": "SELL", "qty": 62, "order_type": "STP", "limit_price": 921.71, "fill_price": null}
+{"ts": "2026-04-28T14:20:12.211720Z", "event": "VALIDATIONERROR", "symbol": "MRNA", "order_id": 7433, "side": "BUY", "qty": 1219, "order_type": "STP", "limit_price": 48.84, "fill_price": null}
+{"ts": "2026-04-28T14:20:12.960392Z", "event": "VALIDATIONERROR", "symbol": "UNH", "order_id": 7435, "side": "SELL", "qty": 164, "order_type": "STP", "limit_price": 352.65, "fill_price": null}
+{"ts": "2026-04-28T14:20:24.906265Z", "event": "VALIDATIONERROR", "symbol": "UNH", "order_id": 7437, "side": "SELL", "qty": 82, "order_type": "STP", "limit_price": 355.99, "fill_price": null}
+{"ts": "2026-04-28T14:20:31.315365Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T14:20:40.318580Z", "event": "fill_watcher_started", "symbol": "CHEAP", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T14:20:42.067539Z", "event": "fill_watcher_started", "symbol": "EXPENSIVE", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T14:20:43.781521Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T14:20:51.058706Z", "event": "fill_watcher_started", "symbol": "SPXS", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T14:22:02.753255Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T14:22:12.812567Z", "event": "fill_watcher_started", "symbol": "CHEAP", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T14:22:13.900813Z", "event": "fill_watcher_started", "symbol": "EXPENSIVE", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T14:22:14.781392Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T14:22:18.373187Z", "event": "fill_watcher_started", "symbol": "SPXS", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T14:23:39.360341Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T14:23:47.254770Z", "event": "fill_watcher_started", "symbol": "CHEAP", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T14:23:48.095664Z", "event": "fill_watcher_started", "symbol": "EXPENSIVE", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T14:23:48.904035Z", "event": "fill_watcher_started", "symbol": "AAPL", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-04-28T14:23:52.573122Z", "event": "fill_watcher_started", "symbol": "SPXS", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"type": "portfolio_review", "trigger": "scalp_signal_lost:GS; news_hit:ABBV,UNH; drawdown", "actions": [], "ts": "2026-04-28T10:29:54.698960-04:00"}
+{"ts": "2026-04-28T14:30:53.425483Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7442, "side": "BUY", "qty": 182, "order_type": "STP LMT", "limit_price": 326.82, "fill_price": null}
+{"ts": "2026-04-28T14:30:53.773577Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7443, "side": "BUY", "qty": 182, "order_type": "LMT", "limit_price": 316.16, "fill_price": null}
+{"ts": "2026-04-28T14:30:53.867419Z", "event": "SUBMITTED", "symbol": "AMD", "order_id": 7441, "side": "SELL", "qty": 182, "order_type": "LMT", "limit_price": 322.89, "fill_price": null}
+{"ts": "2026-04-28T14:30:55.076004Z", "event": "fill_watcher_started", "symbol": "AMD", "order_id": 7441, "original_limit": 322.89, "price_boundary": 319.66, "side": "SELL"}

@@ -900,6 +900,27 @@ def fetch_multi_timeframe(
         if df_1d is None or len(df_1d) < 20:
             return None
 
+        # Staleness gate: if the last 5m bar is older than 120 minutes the data
+        # source returned cached/prior-session data. Scoring on stale price causes
+        # spurious entries (e.g. yesterday's close used as today's signal price).
+        try:
+            _last_ts = df_5m.index[-1]
+            if hasattr(_last_ts, "tz_convert"):
+                _last_ts = _last_ts.tz_convert("UTC").to_pydatetime()
+            elif hasattr(_last_ts, "to_pydatetime"):
+                _last_ts = _last_ts.to_pydatetime()
+                if _last_ts.tzinfo is None:
+                    _last_ts = _last_ts.replace(tzinfo=UTC)
+            _bar_age_mins = (datetime.now(UTC) - _last_ts).total_seconds() / 60
+            if _bar_age_mins > 120:
+                log.warning(
+                    "fetch_multi_timeframe: %s 5m last bar is %d min old (%s) — stale data, skipping",
+                    symbol, int(_bar_age_mins), _last_ts.strftime("%Y-%m-%d %H:%M UTC"),
+                )
+                return None
+        except Exception:
+            pass  # if we can't check staleness, proceed and let scoring decide
+
         sig_5m = compute_indicators(df_5m, symbol, "5m")
         sig_1d = compute_indicators(df_1d, symbol, "1d")
         sig_1w = compute_indicators(df_1w, symbol, "1w") if df_1w is not None and len(df_1w) >= 10 else None

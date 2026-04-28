@@ -669,6 +669,7 @@ class TestExecuteSellCompositeKey:
         with (
             patch("orders.CONFIG", mock_config),
             patch("orders_core.is_equities_extended_hours", return_value=True),
+            patch("orders_core.is_options_market_open", return_value=True),
             patch("orders._validate_position_price", return_value=(3.50, "IBKR")),
             patch("orders._get_ibkr_price", return_value=3.50),
             patch("orders.record_win"),

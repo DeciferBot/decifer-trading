@@ -2357,7 +2357,7 @@ function renderTodaysTrades(allTrades) {
   const todayTrades = allTrades
     .filter(t => {
       const ts = t.timestamp || t.exit_time || '';
-      return ts.slice(0, 10) === todayStr && t.exit_price != null;
+      return ts.slice(0, 10) === todayStr && t.exit_price != null && t.action === 'CLOSE';
     })
     .sort((a, b) => new Date(b.timestamp || b.exit_time || 0) - new Date(a.timestamp || a.exit_time || 0));
 
