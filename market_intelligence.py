@@ -392,9 +392,11 @@ def _format_trade_context_block(trade_contexts: dict[str, dict]) -> str:
         eps_accel   = ctx.get("eps_accelerating")
         beat_rate   = ctx.get("eps_beat_rate")
         gm          = ctx.get("gross_margin")
-        fcf         = ctx.get("fcf_yield")
-        dcf_up      = ctx.get("dcf_upside_pct")
-        rev_decel   = ctx.get("revenue_decelerating", False)
+        fcf           = ctx.get("fcf_yield")
+        dcf_up        = ctx.get("dcf_upside_pct")
+        rev_decel     = ctx.get("revenue_decelerating", False)
+        is_profitable = ctx.get("is_profitable")
+        pe            = ctx.get("pe_ratio")
         if rev_yoy is not None:
             accel_str  = " EPS↑" if eps_accel else ""
             beat_str   = f" beat={beat_rate:.0f}%" if beat_rate is not None else ""
@@ -406,6 +408,13 @@ def _format_trade_context_block(trade_contexts: dict[str, dict]) -> str:
                 f"  Fundamentals: rev_yoy={rev_yoy:+.1f}%{decel_flag}{accel_str}{beat_str}"
                 f"{gm_str}{fcf_str}{dcf_str}"
             )
+        profit_parts = []
+        if is_profitable is not None:
+            profit_parts.append(f"profitable={'yes' if is_profitable else 'no'}")
+        if pe is not None:
+            profit_parts.append(f"P/E={pe:.1f}")
+        if profit_parts:
+            lines.append(f"  Quality: {' | '.join(profit_parts)}")
 
         # Sector
         etf         = ctx.get("sector_etf")
@@ -947,9 +956,9 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
     parts.append(f"  regime={regime.get('regime')} vix={regime.get('vix')}")
     parts.append(f"  tape={mctx.get('tape')}")
     if sctx:
-        parts.append(f"  market_read (cached): {sctx.market_read[:400]}")
+        parts.append(f"  market_read (cached): {sctx.market_read}")
         if sctx.overnight_text:
-            parts.append(f"  overnight: {sctx.overnight_text[:400]}")
+            parts.append(f"  overnight: {sctx.overnight_text}")
 
     parts.append("\n[PORTFOLIO STATE]")
     parts.append(
