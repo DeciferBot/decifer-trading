@@ -617,6 +617,31 @@ def reconcile_with_ibkr(ib: IB):
                         "reason": "closed_while_bot_down",
                     },
                 )
+                # Also write POSITION_CLOSED to event_log so open_trades() does not
+                # re-surface this position as open on the next reconcile pass.
+                _tid = _t.get("trade_id", "")
+                if _tid:
+                    try:
+                        from event_log import append_close as _el_close
+                        _open_mins = 0
+                        _ot = _t.get("open_time") or _t.get("ts") or ""
+                        if _ot:
+                            try:
+                                from datetime import datetime, timezone
+                                _dt = datetime.fromisoformat(_ot.replace("Z", "+00:00"))
+                                _open_mins = int((datetime.now(timezone.utc) - _dt).total_seconds() / 60)
+                            except Exception:
+                                pass
+                        _el_close(
+                            trade_id=_tid,
+                            symbol=_t.get("symbol", "?"),
+                            exit_price=_exit_px,
+                            pnl=_pnl,
+                            exit_reason="closed_while_bot_down",
+                            hold_minutes=_open_mins,
+                        )
+                    except Exception as _el_err:
+                        log.warning("Reconcile: failed to write event_log POSITION_CLOSED for %s: %s", _t.get("symbol", "?"), _el_err)
             except Exception as _cwd_err:
                 log.warning("Reconcile: failed to write CLOSE log for %s: %s", _t.get("symbol", "?"), _cwd_err)
 

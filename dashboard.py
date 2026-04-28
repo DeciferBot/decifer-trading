@@ -2374,12 +2374,18 @@ function renderTodaysTrades(allTrades) {
   }
 
   const exitLabels = {
-    'stop_loss':     'SL',
-    'take_profit':   'TP',
-    'agent_sell':    'Exit',
-    'trailing_stop': 'Trail',
-    'manual':        'Manual',
-    'kill':          'Kill'
+    'stop_loss':             'SL',
+    'take_profit':           'TP',
+    'agent_sell':            'Exit',
+    'trailing_stop':         'Trail',
+    'manual':                'Manual',
+    'kill':                  'Kill',
+    'closed_while_bot_down': 'CWD',
+    'score_collapse_below_threshold': 'Score↓',
+    'pm_exit':               'PM Exit',
+    'pm_trim':               'PM Trim',
+    'profit_close':          'TP',
+    'loss_close':            'SL',
   };
 
   el.innerHTML = todayTrades.map(t => {
