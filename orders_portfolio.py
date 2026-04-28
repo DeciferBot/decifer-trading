@@ -326,6 +326,46 @@ def close_position(ib_unused, trade_key: str) -> str | None:
     return detail
 
 
+def _build_ibkr_execution_index(ib: IB) -> dict[str, list]:
+    """Return {symbol: [Fill, ...] newest-first} from today's IBKR executions.
+
+    One blocking reqExecutions() call per reconcile cycle. Returns {} on any
+    failure so callers degrade gracefully to estimated prices.
+    """
+    try:
+        fills = ib.reqExecutions()
+        if not isinstance(fills, list):
+            return {}
+        index: dict[str, list] = {}
+        for fill in fills:
+            sym = getattr(fill.contract, "symbol", None)
+            if sym:
+                index.setdefault(sym, []).append(fill)
+        for sym in index:
+            index[sym].sort(key=lambda f: getattr(f.execution, "time", ""), reverse=True)
+        return index
+    except Exception as _e:
+        log.debug("Reconcile: reqExecutions failed (non-fatal): %s", _e)
+        return {}
+
+
+def _resolve_cwd_exit_price(trade: dict, exec_index: dict) -> tuple[float, str]:
+    """Return (exit_price, source) for a position closed while the bot was down.
+
+    Tries the IBKR execution index first (real fill); falls back to the last
+    polled market price stored in the position dict.
+    IBKR execution sides: "SLD" = sold (LONG exit), "BOT" = bought (SHORT exit).
+    """
+    is_short = trade.get("direction", "LONG") == "SHORT"
+    exit_side = "BOT" if is_short else "SLD"
+    for fill in exec_index.get(trade.get("symbol", ""), []):
+        if getattr(fill.execution, "side", "") == exit_side:
+            avg = getattr(fill.execution, "avgPrice", None)
+            if avg:
+                return float(avg), "ibkr_fill"
+    return float(trade.get("current") or trade.get("entry", 0)), "estimated"
+
+
 def reconcile_with_ibkr(ib: IB):
     """
     On startup or reconnect: restore positions from our own store, then reconcile
@@ -459,6 +499,9 @@ def reconcile_with_ibkr(ib: IB):
                 "Positions will be re-checked on next reconcile cycle.",
                 _n_ibkr, _n_stored, _coverage * 100, _min_coverage * 100,
             )
+        # Build execution index before acquiring the lock — one network call,
+        # used to resolve actual fill prices for closed-while-down positions.
+        _exec_index = _build_ibkr_execution_index(ib) if not _block_cwd_sweep else {}
         with _trades_lock:
             for key in list(active_trades.keys()):
                 if key not in ibkr_keys:
@@ -486,16 +529,28 @@ def reconcile_with_ibkr(ib: IB):
                                 _cancel_ibkr_order_by_id(ib, order_id)
                             keys_to_remove.append(key)
                     elif not _block_cwd_sweep:
-                        log.warning(
-                            f"Position {key} in our store but not in IBKR — was closed while bot was down, removing"
-                        )
+                        _cwd_px, _cwd_src = _resolve_cwd_exit_price(trade, _exec_index)
+                        if _cwd_src == "estimated":
+                            log.warning(
+                                "Position %s closed while bot was down — no IBKR fill found, "
+                                "using estimated exit price %.4f (last polled market price)",
+                                key, _cwd_px,
+                            )
+                        else:
+                            log.info(
+                                "Position %s closed while bot was down — exit price %.4f from IBKR fill",
+                                key, _cwd_px,
+                            )
                         keys_to_remove.append(key)
-                        trades_closed_while_down.append(dict(trade))
+                        _trade_copy = dict(trade)
+                        _trade_copy["_cwd_exit_px"] = _cwd_px
+                        _trade_copy["_cwd_exit_src"] = _cwd_src
+                        trades_closed_while_down.append(_trade_copy)
                         if trade.get("advice_id"):
                             closed_while_down.append(
                                 {
                                     "advice_id": trade["advice_id"],
-                                    "exit_price": float(trade.get("current") or trade.get("entry", 0)),
+                                    "exit_price": _cwd_px,
                                     "pnl": float(trade.get("pnl", 0.0)),
                                 }
                             )
@@ -508,7 +563,8 @@ def reconcile_with_ibkr(ib: IB):
         for _t in trades_closed_while_down:
             try:
                 from learning import log_trade as _log_trade
-                _exit_px = float(_t.get("current") or _t.get("entry", 0))
+                _exit_px = _t.pop("_cwd_exit_px", float(_t.get("current") or _t.get("entry", 0)))
+                _exit_src = _t.pop("_cwd_exit_src", "estimated")
                 _entry_px = float(_t.get("entry", 0))
                 _qty = int(_t.get("qty", 1))
                 _is_short = _t.get("direction", "LONG") == "SHORT"
@@ -521,6 +577,7 @@ def reconcile_with_ibkr(ib: IB):
                     action="CLOSE",
                     outcome={
                         "exit_price": _exit_px,
+                        "exit_price_source": _exit_src,
                         "pnl": _pnl,
                         "pnl_pct": _pnl_pct,
                         "reason": "closed_while_bot_down",

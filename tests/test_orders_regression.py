@@ -174,6 +174,7 @@ class TestOrphanedStopLoss:
         ib.portfolio.return_value = portfolio_items
         ib.openTrades.return_value = open_trades_list
         ib.sleep.return_value = None
+        ib.reqExecutions.return_value = []
         ib.placeOrder.return_value.order.orderId = sl_order_id
         # placeOrder returns a trade whose order has a known orderId
         new_sl_trade = MagicMock()
@@ -690,3 +691,126 @@ class TestExecuteSellCompositeKey:
         # A True return proves the option was found via the composite key search.
         # False with "No open position" would mean the bug regressed.
         assert result is True, "execute_sell('GSAT') must find and close the option stored under composite key"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. Closed-while-down exit price sourcing (Problem 2 fix)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestClosedWhileDownExitPrice:
+    """
+    When a position is found in our store but absent from IBKR on reconcile,
+    the exit price written to the CLOSE log must use the real IBKR fill price
+    when a matching execution exists, and fall back to the last polled market
+    price otherwise.
+
+    Covers _resolve_cwd_exit_price and _build_ibkr_execution_index via the
+    full reconcile_with_ibkr path.
+    """
+
+    def _make_fill(self, symbol, side, avg_price):
+        fill = MagicMock()
+        fill.contract.symbol = symbol
+        fill.execution.side = side
+        fill.execution.avgPrice = avg_price
+        fill.execution.time = "20260428 10:30:00"
+        return fill
+
+    def _make_ib(self, portfolio_items, fills):
+        ib = MagicMock()
+        ib.isConnected.return_value = True
+        ib.portfolio.return_value = portfolio_items
+        ib.openTrades.return_value = []
+        ib.sleep.return_value = None
+        ib.reqExecutions.return_value = fills
+        return ib
+
+    def _make_portfolio_item(self, symbol, position=10, price=155.0):
+        item = MagicMock()
+        item.position = position
+        item.contract.symbol = symbol
+        item.contract.secType = "STK"
+        item.contract.strike = 0
+        item.marketPrice = price
+        item.averageCost = price
+        item.unrealizedPNL = 0.0
+        return item
+
+    def test_uses_ibkr_fill_when_execution_exists(self, mock_config):
+        """Exit price must be taken from IBKR execution when a SLD fill exists."""
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        _om.active_trades["NVDA"] = {
+            "symbol": "NVDA",
+            "status": "ACTIVE",
+            "direction": "LONG",
+            "entry": 800.0,
+            "current": 810.0,
+            "qty": 5,
+            "trade_type": "INTRADAY",
+        }
+
+        # IBKR portfolio has AAPL but NOT NVDA → NVDA was closed while down
+        aapl_item = self._make_portfolio_item("AAPL")
+        ibkr_fill = self._make_fill("NVDA", "SLD", 825.50)
+        ib = self._make_ib([aapl_item], [ibkr_fill])
+
+        logged_outcomes = []
+
+        def _capture_log_trade(trade, agent_outputs, regime, action, outcome):
+            if action == "CLOSE":
+                logged_outcomes.append(outcome)
+
+        with (
+            patch("orders.CONFIG", mock_config),
+            patch("event_log.open_trades", return_value={}),
+            patch("orders_portfolio._load_positions_file", return_value={}),
+            patch("learning.log_trade", side_effect=_capture_log_trade),
+        ):
+            _om.reconcile_with_ibkr(ib)
+
+        assert "NVDA" not in _om.active_trades
+        assert logged_outcomes, "CLOSE log_trade must be called for closed-while-down position"
+        assert logged_outcomes[0]["exit_price"] == 825.50, (
+            f"Expected IBKR fill price 825.50, got {logged_outcomes[0]['exit_price']}"
+        )
+        assert logged_outcomes[0]["exit_price_source"] == "ibkr_fill"
+
+    def test_falls_back_to_estimated_when_no_execution(self, mock_config):
+        """When reqExecutions returns nothing for the symbol, exit price is the stored 'current'."""
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        _om.active_trades["NVDA"] = {
+            "symbol": "NVDA",
+            "status": "ACTIVE",
+            "direction": "LONG",
+            "entry": 800.0,
+            "current": 810.0,
+            "qty": 5,
+            "trade_type": "INTRADAY",
+        }
+
+        aapl_item = self._make_portfolio_item("AAPL")
+        ib = self._make_ib([aapl_item], [])  # no fills
+
+        logged_outcomes = []
+
+        def _capture_log_trade(trade, agent_outputs, regime, action, outcome):
+            if action == "CLOSE":
+                logged_outcomes.append(outcome)
+
+        with (
+            patch("orders.CONFIG", mock_config),
+            patch("event_log.open_trades", return_value={}),
+            patch("orders_portfolio._load_positions_file", return_value={}),
+            patch("learning.log_trade", side_effect=_capture_log_trade),
+        ):
+            _om.reconcile_with_ibkr(ib)
+
+        assert "NVDA" not in _om.active_trades
+        assert logged_outcomes
+        assert logged_outcomes[0]["exit_price"] == 810.0, (
+            f"Expected fallback to current=810.0, got {logged_outcomes[0]['exit_price']}"
+        )
+        assert logged_outcomes[0]["exit_price_source"] == "estimated"

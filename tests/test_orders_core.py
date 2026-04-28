@@ -1256,6 +1256,7 @@ class TestReconcileWithIbkr:
         ib.openTrades.return_value = open_trades or []
         ib.cancelOrder.return_value = None
         ib.sleep.return_value = None
+        ib.reqExecutions.return_value = []
         return ib
 
     def test_reconcile_preserves_pending_with_live_ibkr_order(self, mock_config):
