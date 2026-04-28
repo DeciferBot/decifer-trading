@@ -344,7 +344,7 @@ def _prev_day_close_value() -> float | None:
 
 
 def get_account_data():
-    """Fetch portfolio value and compute daily P&L from equity history."""
+    """Fetch portfolio value and daily P&L from IBKR."""
     ib = bot_state.ib
     try:
         vals = ib.accountValues(CONFIG["active_account"])
@@ -355,6 +355,14 @@ def get_account_data():
                 break
         pnl = 0.0
         if pv > 0:
+            # Prefer IBKR's native daily P&L from the reqPnL subscription.
+            # dailyPnL == nan means IBKR hasn't pushed a value yet — fall back to equity history.
+            sub = bot_state._pnl_subscription
+            if sub is not None:
+                raw = getattr(sub, "dailyPnL", math.nan)
+                if not math.isnan(raw):
+                    return pv, round(raw, 2)
+            # Fallback: delta from yesterday's last equity snapshot
             prev_close = _prev_day_close_value()
             if prev_close is not None and prev_close > 0:
                 pnl = round(pv - prev_close, 2)
