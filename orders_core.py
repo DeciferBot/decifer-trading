@@ -1835,6 +1835,9 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
         # IBKR does not support MarketOrder during extended hours (pre-market / after-hours).
         # Outside 9:30 AM – 4:00 PM ET, use an aggressive LimitOrder so the close can fill
         # immediately instead of being queued for the next regular-session open.
+        # Initialised here so thesis-failure gate at line ~1947 always has a value regardless
+        # of which branch below executes (regular vs extended hours).
+        _exit_price = validated_price if validated_price > 0 else info.get("current", info.get("entry", 0))
         if is_options_market_open():
             # Regular session — plain market order, fills at best available price
             close_order = MarketOrder(close_action, sell_qty, account=CONFIG["active_account"])

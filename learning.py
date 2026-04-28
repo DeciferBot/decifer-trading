@@ -557,6 +557,30 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
         except Exception as _e:
             log.debug(f"execution_ic.jsonl write failed (non-critical): {_e}")
 
+    elif action == "CLOSE" and outcome:
+        # Record the exit so the IC calculator can pair entry vs outcome.
+        # Without this, every execution_ic entry has exit_reason=null and no pnl —
+        # making it impossible to compute Information Coefficient.
+        _exec_ic_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "execution_ic.jsonl")
+        _exec_ic_close = {
+            "action": "CLOSE",
+            "timestamp": record["timestamp"],
+            "symbol": record["symbol"],
+            "direction": record.get("direction", "LONG"),
+            "instrument": trade.get("instrument", "stock"),
+            "score": record.get("score"),
+            "exit_price": record.get("exit_price"),
+            "exit_reason": record.get("exit_reason"),
+            "pnl": record.get("pnl"),
+            "pnl_pct": record.get("pnl_pct"),
+            "hold_minutes": hold_minutes,
+        }
+        try:
+            with open(_exec_ic_path, "a") as _f:
+                _f.write(json.dumps(_exec_ic_close) + "\n")
+        except Exception as _e:
+            log.debug(f"execution_ic.jsonl close write failed (non-critical): {_e}")
+
     # (trade_advisor learning loop removed — deterministic sizing owns stops)
 
     # ── Close pattern library loop — record outcome against market observation ──
