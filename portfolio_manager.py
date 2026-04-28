@@ -139,6 +139,18 @@ DISAMBIGUATION — "pullback to support" vs "averaging down into a losing trade"
     the thesis invalidation condition is near, or regime has flipped. In that case TRIM or
     EXIT — never ADD.
 
+DRAWDOWN RULE — the trigger context may include "drawdown" (portfolio P&L < -1.5%).
+  Drawdown is a portfolio-level risk signal, NOT a per-position exit signal.
+  Use it to tighten scrutiny on weak or stale positions (low score, collapsed dimensions,
+  broken thesis). Do NOT use it to TRIM or EXIT a position that has:
+    • current score ≥ 50, AND
+    • core signal dimensions intact or strengthening, AND
+    • regime not flipped against entry direction.
+  A position that is working (strong score, intact thesis) during a portfolio drawdown is
+  your recovery asset — trimming it because the portfolio is down is the wrong direction.
+  If the trigger was "held_score_rise" for this symbol, the signal engine already confirmed
+  the position is strengthening: default to HOLD or ADD, not TRIM.
+
 OUTPUT FORMAT — produce exactly this for every position provided, no exceptions:
 
 SYMBOL: <ticker>
