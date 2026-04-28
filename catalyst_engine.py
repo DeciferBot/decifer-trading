@@ -518,13 +518,23 @@ class CatalystEngine:
         )
 
         time.sleep(120)
+        _options_empty_skips = 0
         while self._running:
             try:
                 tickers = self.store.all_tickers()
                 if not tickers:
-                    log.info("CatalystEngine [options]: no candidates yet — skipping")
+                    _options_empty_skips += 1
+                    if _options_empty_skips >= 3:
+                        log.warning(
+                            "CatalystEngine [options]: no candidates for %d consecutive cycles "
+                            "— fundamental screener may be failing silently",
+                            _options_empty_skips,
+                        )
+                    else:
+                        log.info("CatalystEngine [options]: no candidates yet — skipping")
                     time.sleep(interval)
                     continue
+                _options_empty_skips = 0
                 log.info(f"CatalystEngine [options]: scanning {len(tickers)} tickers ...")
                 results = run_anomaly_scan(tickers)
                 updated = merge_options(results)
@@ -549,13 +559,23 @@ class CatalystEngine:
         )
 
         time.sleep(180)
+        _sentiment_empty_skips = 0
         while self._running:
             try:
                 tickers = self.store.all_tickers()
                 if not tickers:
-                    log.info("CatalystEngine [sentiment]: no candidates yet — skipping")
+                    _sentiment_empty_skips += 1
+                    if _sentiment_empty_skips >= 3:
+                        log.warning(
+                            "CatalystEngine [sentiment]: no candidates for %d consecutive cycles "
+                            "— fundamental screener may be failing silently",
+                            _sentiment_empty_skips,
+                        )
+                    else:
+                        log.info("CatalystEngine [sentiment]: no candidates yet — skipping")
                     time.sleep(interval)
                     continue
+                _sentiment_empty_skips = 0
                 log.info(f"CatalystEngine [sentiment]: scoring {len(tickers)} tickers ...")
                 results = run_sentiment_scan(tickers)
                 updated = merge_sentiment(results)
