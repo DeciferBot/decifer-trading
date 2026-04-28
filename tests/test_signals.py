@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import os
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -229,7 +229,20 @@ def _call_indicators(df):
 # ---------------------------------------------------------------------------
 
 
+_EQUAL_WEIGHTS = {d: 1.0 / 15 for d in [
+    "trend", "momentum", "squeeze", "flow", "breakout", "mtf", "news",
+    "social", "reversion", "iv_skew", "pead", "short_squeeze",
+    "overnight_drift", "analyst_revision", "insider_buying",
+]}
+
+
 class TestComputeConfluence:
+    @pytest.fixture(autouse=True)
+    def _patch_ic_weights(self):
+        """Force equal IC weights so confluence tests are IC-config-independent."""
+        with patch("ic_calculator.get_current_weights", return_value=_EQUAL_WEIGHTS):
+            yield
+
     def test_all_bullish_gives_high_score(self, bullish_indicators, config):
         """All-bullish indicators should produce a score >= 0.55."""
         score = _call_confluence(bullish_indicators, config)

@@ -363,8 +363,8 @@ CONFIG = {
         # Fixes the cold-start trap: dimensions with IC=0 (no data) get zero weight →
         # never generate trades → never build IC → permanently stuck at 0.
         # Enable in paper mode. Disable once all dimensions have ≥20 trades of IC data.
-        "force_equal_weights": True,
-        "edge_gate_enabled": False,  # Paper learning mode: gate prevents data accumulation.
+        "force_equal_weights": False,  # IC weighting active (2026-04-28, n=60, 5 dims IC>0.05)
+        "edge_gate_enabled": True,   # Re-enabled: mean positive IC = 0.1728 (gate: >0.02)
         # Circular: low IC → gate raises bar → fewer trades → lower IC.
         # Re-enable when system has proven IC > 0.02 across dims.
         "edge_gate_warn_threshold": 0.02,  # mean IC below this → degraded, raise bar +5
