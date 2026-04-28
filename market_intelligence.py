@@ -364,18 +364,22 @@ def _format_trade_context_block(trade_contexts: dict[str, dict]) -> str:
             continue
         dq = ctx.get("data_quality", "unknown")
         direction = ctx.get("direction", "?")
-        lines.append(f"\n{sym} {direction}  [data_quality={dq}]")
+        catalyst_type = ctx.get("catalyst_type") or ""
+        cat_str = f"  catalyst={catalyst_type}" if catalyst_type and catalyst_type != "none" else ""
+        lines.append(f"\n{sym} {direction}  [data_quality={dq}]{cat_str}")
 
         # Analyst block
-        consensus   = ctx.get("analyst_consensus") or "n/a"
-        upside      = ctx.get("analyst_upside_pct")
-        buy_ct      = ctx.get("analyst_buy_count")
-        sell_ct     = ctx.get("analyst_sell_count")
-        earnings_d  = ctx.get("earnings_days_away")
-        upside_str  = f" | PT upside {upside:+.1f}%" if upside is not None else ""
-        grade_str   = f" | {buy_ct}↑/{sell_ct}↓" if buy_ct is not None else ""
-        earn_str    = f" | earnings {earnings_d}d" if earnings_d is not None else ""
-        lines.append(f"  Analyst: {consensus}{grade_str}{upside_str}{earn_str}")
+        consensus      = ctx.get("analyst_consensus") or "n/a"
+        upside         = ctx.get("analyst_upside_pct")
+        buy_ct         = ctx.get("analyst_buy_count")
+        sell_ct        = ctx.get("analyst_sell_count")
+        earnings_d     = ctx.get("earnings_days_away")
+        recent_upgrade = ctx.get("recent_upgrade", False)
+        upside_str     = f" | PT upside {upside:+.1f}%" if upside is not None else ""
+        grade_str      = f" | {buy_ct}↑/{sell_ct}↓" if buy_ct is not None else ""
+        earn_str       = f" | earnings {earnings_d}d" if earnings_d is not None else ""
+        upgrade_str    = " | upgraded↑" if recent_upgrade else ""
+        lines.append(f"  Analyst: {consensus}{grade_str}{upside_str}{earn_str}{upgrade_str}")
 
         # Smart money
         insider     = ctx.get("insider_net_sentiment")

@@ -95,6 +95,8 @@ class TradeContext:
 
     # ── Financial quality metrics (FMP TTM — 24h cache) ──────────────────────
     gross_margin: Optional[float] = None            # gross margin % e.g. 45.0
+    net_margin: Optional[float] = None             # net profit margin % (>0 = profitable)
+    is_profitable: Optional[bool] = None           # True if net_margin > 0
     fcf_yield: Optional[float] = None              # free cash flow yield %
     pe_ratio: Optional[float] = None               # trailing P/E ratio
     dcf_upside_pct: Optional[float] = None         # DCF fair value upside %
@@ -360,9 +362,11 @@ def build_context(
         from fmp_client import get_key_metrics_ttm, get_dcf_value
         metrics = get_key_metrics_ttm(symbol)
         if metrics:
-            ctx.gross_margin = metrics.get("gross_margin")
-            ctx.fcf_yield    = metrics.get("fcf_yield")
-            ctx.pe_ratio     = metrics.get("pe_ratio")
+            ctx.gross_margin  = metrics.get("gross_margin")
+            ctx.net_margin    = metrics.get("net_margin")
+            ctx.is_profitable = (ctx.net_margin > 0) if ctx.net_margin is not None else None
+            ctx.fcf_yield     = metrics.get("fcf_yield")
+            ctx.pe_ratio      = metrics.get("pe_ratio")
 
         dcf = get_dcf_value(symbol)
         if dcf:
