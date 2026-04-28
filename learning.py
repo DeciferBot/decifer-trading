@@ -623,6 +623,13 @@ def _save_trades(trades: list) -> None:
         # Fallback: direct write (e.g. target is /dev/null in test environments)
         with open(target, "w") as f:
             json.dump(trades, f, indent=2)
+    # Keep dash["all_trades"] in sync so the dashboard homepage reflects new trades
+    # immediately — without this, only the PM-review close path updated memory.
+    try:
+        import bot_state as _bs
+        _bs.dash["all_trades"] = trades
+    except Exception:
+        pass
 
 
 def load_trades() -> list:
