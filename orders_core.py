@@ -483,26 +483,32 @@ def execute_buy(
             _wal_setup_type = _derive_setup_type(signal_scores or {})
             _wal_open_time = open_time or datetime.now(UTC).isoformat()
             try:
-                from trade_log import append_event as _tl_ae
-                _tl_ae("ORDER_INTENT", _trade_id, symbol,
-                       instrument=instrument, direction="LONG",
-                       trade_type=trade_type or "INTRADAY",
-                       entry=price, qty=qty, sl=sl, tp=tp,
-                       score=score, conviction=conviction, entry_regime=_wal_regime,
-                       reasoning=reasoning or "",
-                       signal_scores=signal_scores or {},
-                       agent_outputs=agent_outputs or {},
-                       entry_thesis=_wal_entry_thesis,
-                       setup_type=_wal_setup_type,
-                       pattern_id=pattern_id or "",
-                       atr=atr or 0.0,
-                       advice_id=advice_id or "",
-                       ic_weights_at_entry=_wal_icw,
-                       tranche_mode=tranche_mode,
-                       t1_qty=t1_qty, t2_qty=t2_qty,
-                       open_time=_wal_open_time)
-            except Exception as _tl_err:
-                log.error("execute_buy %s: ORDER_INTENT DB write failed — trade aborted: %s", symbol, _tl_err)
+                from event_log import append_intent as _el_intent
+                _el_intent(
+                    _trade_id, symbol,
+                    direction="LONG",
+                    trade_type=trade_type or "INTRADAY",
+                    instrument=instrument,
+                    intended_price=price,
+                    qty=qty, sl=sl, tp=tp,
+                    regime=_wal_regime,
+                    signal_scores=signal_scores or {},
+                    conviction=conviction,
+                    reasoning=reasoning or "",
+                    score=score,
+                    open_time=_wal_open_time,
+                    agent_outputs=agent_outputs or {},
+                    entry_thesis=_wal_entry_thesis,
+                    setup_type=_wal_setup_type,
+                    pattern_id=pattern_id or "",
+                    atr=atr or 0.0,
+                    advice_id=advice_id or "",
+                    ic_weights_at_entry=_wal_icw,
+                    tranche_mode=tranche_mode,
+                    t1_qty=t1_qty, t2_qty=t2_qty,
+                )
+            except Exception as _el_err:
+                log.error("execute_buy %s: ORDER_INTENT write failed — trade aborted: %s", symbol, _el_err)
                 return False
         except Exception as _wal_err:
             log.error("execute_buy %s: metadata build failed — trade aborted: %s", symbol, _wal_err)
@@ -657,6 +663,14 @@ def execute_buy(
                             "entry_context": entry_context,
                             "trade_id": _trade_id,
                         }
+                    # IBKR confirmed the fill — write ORDER_FILLED to event log.
+                    try:
+                        from event_log import append_fill as _el_fill
+                        _el_fill(_trade_id, symbol,
+                                 fill_price=_fill_price,
+                                 fill_qty=int(stats.filled_quantity))
+                    except Exception as _elf_err:
+                        log.warning("execute_buy %s: ORDER_FILLED write failed (non-fatal): %s", symbol, _elf_err)
                     _save_positions_file()
                     try:
                         from learning import log_trade as _log_trade
@@ -1415,26 +1429,32 @@ def execute_short(
             _wal_setup_type_s = _derive_setup_type(signal_scores or {})
             _wal_open_time_s = open_time or datetime.now(UTC).isoformat()
             try:
-                from trade_log import append_event as _tl_ae
-                _tl_ae("ORDER_INTENT", _trade_id, symbol,
-                       instrument=instrument, direction="SHORT",
-                       trade_type=trade_type or "INTRADAY",
-                       entry=price, qty=qty, sl=sl, tp=tp,
-                       score=score, conviction=conviction, entry_regime=_wal_regime_s,
-                       reasoning=reasoning or "",
-                       signal_scores=signal_scores or {},
-                       agent_outputs=agent_outputs or {},
-                       entry_thesis=_wal_entry_thesis_s,
-                       setup_type=_wal_setup_type_s,
-                       pattern_id=pattern_id or "",
-                       atr=atr or 0.0,
-                       advice_id=advice_id or "",
-                       ic_weights_at_entry=_wal_icw_s,
-                       tranche_mode=tranche_mode,
-                       t1_qty=t1_qty, t2_qty=t2_qty,
-                       open_time=_wal_open_time_s)
-            except Exception as _tl_err_s:
-                log.error("execute_short %s: ORDER_INTENT DB write failed — trade aborted: %s", symbol, _tl_err_s)
+                from event_log import append_intent as _el_intent_s
+                _el_intent_s(
+                    _trade_id, symbol,
+                    direction="SHORT",
+                    trade_type=trade_type or "INTRADAY",
+                    instrument=instrument,
+                    intended_price=price,
+                    qty=qty, sl=sl, tp=tp,
+                    regime=_wal_regime_s,
+                    signal_scores=signal_scores or {},
+                    conviction=conviction,
+                    reasoning=reasoning or "",
+                    score=score,
+                    open_time=_wal_open_time_s,
+                    agent_outputs=agent_outputs or {},
+                    entry_thesis=_wal_entry_thesis_s,
+                    setup_type=_wal_setup_type_s,
+                    pattern_id=pattern_id or "",
+                    atr=atr or 0.0,
+                    advice_id=advice_id or "",
+                    ic_weights_at_entry=_wal_icw_s,
+                    tranche_mode=tranche_mode,
+                    t1_qty=t1_qty, t2_qty=t2_qty,
+                )
+            except Exception as _el_err_s:
+                log.error("execute_short %s: ORDER_INTENT write failed — trade aborted: %s", symbol, _el_err_s)
                 return False
         except Exception as _wal_err_s:
             log.error("execute_short %s: metadata build failed — trade aborted: %s", symbol, _wal_err_s)
@@ -1940,12 +1960,28 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                 None,
             )
             if _live_exit:
-                log.info(
-                    f"execute_sell {symbol}: GTC {close_action} already live in IBKR "
-                    f"(id={_live_exit.order.orderId}, status={_live_exit.orderStatus.status}) "
-                    f"— skipping duplicate placement"
-                )
-                return True
+                _live_lmt = getattr(_live_exit.order, "lmtPrice", 0) or 0
+                _price_drift = abs(_live_lmt - _limit) / _limit if _limit > 0 else 0
+                if _price_drift > 0.02 and _limit > 0:
+                    # Live GTC limit is >2% from current market — cancel and reprice
+                    # so the exit can actually fill (e.g. stock fell 5% since order placed).
+                    cancel_with_reason(
+                        ib, _live_exit.order,
+                        f"repricing stale GTC exit: old=${_live_lmt:.2f} new=${_limit:.2f} drift={_price_drift:.1%}"
+                    )
+                    ib.sleep(0.5)
+                    log.info(
+                        f"execute_sell {symbol}: cancelled stale GTC exit "
+                        f"(id={_live_exit.order.orderId}, limit=${_live_lmt:.2f}) — repricing to ${_limit:.2f}"
+                    )
+                    # fall through to place new order at current price
+                else:
+                    log.info(
+                        f"execute_sell {symbol}: GTC {close_action} already live in IBKR "
+                        f"(id={_live_exit.order.orderId}, status={_live_exit.orderStatus.status}) "
+                        f"— skipping duplicate placement"
+                    )
+                    return True
 
             close_order = _LimitOrder(close_action, sell_qty, _limit, account=CONFIG["active_account"])
             close_order.outsideRth = True
@@ -2110,24 +2146,61 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
         else:
             now_ts = datetime.now(UTC).isoformat()
             _close_trade_id = info.get("trade_id") or f"{symbol}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
+            _exit_price_val = float(
+                (info.get("current_premium") or info.get("current")) if _is_opt_close
+                else (info.get("current") or info.get("entry", 0.0))
+            )
+            # Compute hold_minutes from open_time to now.
+            _hold_mins = 0
             try:
-                from trade_log import close_trade as _tl_close
-                _tl_close(
-                    _close_trade_id, symbol,
-                    exit_price=float(
-                        (info.get("current_premium") or info.get("current")) if _is_opt_close
-                        else (info.get("current") or info.get("entry", 0.0))
-                    ),
-                    pnl=pnl,
-                    exit_reason=reason,
-                    direction=info.get("direction", "LONG"),
-                    entry=float(info.get("entry", 0.0)),
-                    qty=info.get("qty", 0),
-                    trade_type=info.get("trade_type", "UNKNOWN"),
-                    instrument=info.get("instrument", "stock"),
-                )
-            except Exception as _tl_err:
-                log.warning("trade_log.close_trade failed for %s: %s", symbol, _tl_err)
+                from datetime import datetime as _dt
+                _ot = info.get("open_time", "")
+                if _ot:
+                    _opened = _dt.fromisoformat(_ot.replace("Z", "+00:00"))
+                    _hold_mins = max(0, int((_dt.now(UTC) - _opened).total_seconds() / 60))
+            except Exception:
+                pass
+            # Write POSITION_CLOSED to event log (write-ahead log, crash-safe).
+            try:
+                from event_log import append_close as _el_close
+                _el_close(_close_trade_id, symbol,
+                          exit_price=_exit_price_val,
+                          pnl=pnl,
+                          exit_reason=reason,
+                          hold_minutes=_hold_mins)
+            except Exception as _elc_err:
+                log.warning("execute_sell %s: POSITION_CLOSED write failed (non-fatal): %s", symbol, _elc_err)
+            # Write confirmed closed trade to training store — only after exit confirmed.
+            # Record uses actual fill_price (entry), not intended_price, for ML accuracy.
+            try:
+                from training_store import append as _ts_append
+                _ts_append({
+                    "trade_id": _close_trade_id,
+                    "symbol": symbol,
+                    "direction": info.get("direction", "LONG"),
+                    "trade_type": info.get("trade_type") or "INTRADAY",
+                    "instrument": info.get("instrument", "stock"),
+                    "fill_price": float(info.get("entry", 0.0)),
+                    "intended_price": float(info.get("intended_price") or info.get("entry", 0.0)),
+                    "exit_price": _exit_price_val,
+                    "pnl": pnl,
+                    "hold_minutes": _hold_mins,
+                    "exit_reason": reason,
+                    "regime": info.get("entry_regime", "UNKNOWN"),
+                    "signal_scores": info.get("signal_scores") or {},
+                    "conviction": float(info.get("conviction") or 0.0),
+                    "score": float(info.get("score") or info.get("entry_score") or 0.0),
+                    "ts_fill": info.get("open_time") or now_ts,
+                    "ts_close": now_ts,
+                    "qty": info.get("qty", 0),
+                    "sl": float(info.get("sl") or 0.0),
+                    "tp": float(info.get("tp") or 0.0),
+                    "setup_type": info.get("setup_type", ""),
+                    "pattern_id": info.get("pattern_id", ""),
+                    "atr": float(info.get("atr") or 0.0),
+                })
+            except Exception as _tsa_err:
+                log.warning("execute_sell %s: training_store write failed (non-fatal): %s", symbol, _tsa_err)
             with _trades_lock:
                 with _recently_closed_lock:  # RB-4: nest inside _trades_lock (consistent acquisition order — never reversed)
                     recently_closed[symbol] = now_ts
@@ -2148,7 +2221,23 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
 
     except Exception as e:
         log.error(f"Sell failed {symbol}: {e}")
-        _safe_update_trade(_trade_key, {"status": "ACTIVE"})
+        # Only revert to ACTIVE if the order was never submitted. If placeOrder
+        # succeeded before the exception (e.g. from bracket cancel or ib.sleep),
+        # the order is live in IBKR — keeping EXITING prevents duplicate orders
+        # on the next cycle.
+        try:
+            _submitted = sell_trade is not None and sell_trade.order.orderId > 0
+        except NameError:
+            _submitted = False
+        except Exception:
+            _submitted = False
+        if not _submitted:
+            _safe_update_trade(_trade_key, {"status": "ACTIVE"})
+        else:
+            log.warning(
+                f"execute_sell {symbol}: exception after order submission "
+                f"— keeping EXITING status to prevent duplicate order"
+            )
         try:
             from learning import _append_audit_event
 
