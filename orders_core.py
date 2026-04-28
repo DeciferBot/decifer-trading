@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 
 from ib_async import IB, MarketOrder, StopLimitOrder
 
+from bot_ibkr import cancel_with_reason
 from config import CONFIG
 from orders_contracts import (
     _cancel_ibkr_order_by_id,
@@ -924,9 +925,9 @@ def execute_buy(
             log.error(f"Entry order immediately rejected by IBKR for {symbol}: {order_status} — not tracking")
             # Cancel bracket children if any (options entries have no children)
             if sl_trade is not None:
-                _cancel_ibkr_order_by_id(ib, sl_trade.order.orderId)
+                _cancel_ibkr_order_by_id(ib, sl_trade.order.orderId, f"bracket SL cancelled — entry rejected ({order_status})")
             if tp_trade is not None:
-                _cancel_ibkr_order_by_id(ib, tp_trade.order.orderId)
+                _cancel_ibkr_order_by_id(ib, tp_trade.order.orderId, f"bracket TP cancelled — entry rejected ({order_status})")
             # Add to recently_closed so the reentry cooldown blocks the next scan
             # from immediately resubmitting — without this, the loop retries every
             # scan cycle indefinitely.
@@ -950,9 +951,9 @@ def execute_buy(
             # standalone OCA SL while the original is still live would create two active
             # stop losses on the same position.
             try:
-                ib.cancelOrder(sl_trade.order)
+                cancel_with_reason(ib, sl_trade.order, "bracket SL cancel before OCA fallback")
                 if tp_status in ("Inactive", "Cancelled", "ApiCancelled"):
-                    ib.cancelOrder(tp_trade.order)
+                    cancel_with_reason(ib, tp_trade.order, "bracket TP cancel before OCA fallback")
                 ib.sleep(0.5)
             except Exception as e:
                 log.warning(
@@ -1569,9 +1570,9 @@ def execute_short(
         if order_status in ("Cancelled", "Inactive", "ApiCancelled", "ValidationError"):
             log.error(f"Short entry immediately rejected by IBKR for {symbol}: {order_status}")
             # Cancel bracket children — IBKR paper can keep them even when entry is rejected
-            _cancel_ibkr_order_by_id(ib, sl_trade.order.orderId)
+            _cancel_ibkr_order_by_id(ib, sl_trade.order.orderId, f"bracket SL cancelled — short entry rejected ({order_status})")
             if tp_trade is not None:
-                _cancel_ibkr_order_by_id(ib, tp_trade.order.orderId)
+                _cancel_ibkr_order_by_id(ib, tp_trade.order.orderId, f"bracket TP cancelled — short entry rejected ({order_status})")
             # Cooldown guard — prevents retry loop on next scan cycle
             with _recently_closed_lock:  # RB-4
                 recently_closed[symbol] = datetime.now(UTC).isoformat()
@@ -1877,7 +1878,15 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
         # immediately instead of being queued for the next regular-session open.
         # Initialised here so thesis-failure gate at line ~1947 always has a value regardless
         # of which branch below executes (regular vs extended hours).
-        _exit_price = validated_price if validated_price > 0 else info.get("current", info.get("entry", 0))
+        _price_staleness_s = CONFIG.get("price_staleness_seconds", 60)
+        _current_age = datetime.now(UTC).timestamp() - info.get("current_ts", 0)
+        _current_fresh = info.get("current", 0) if _current_age <= _price_staleness_s else 0
+        if _current_age > _price_staleness_s and info.get("current", 0) > 0:
+            log.warning(
+                "execute_sell %s: cached current price is %.0fs old (limit=%ds) — skipping stale fallback",
+                symbol, _current_age, _price_staleness_s,
+            )
+        _exit_price = validated_price if validated_price > 0 else (_current_fresh or info.get("entry", 0))
         _is_ext_hours_limit = not is_options_market_open()
         if is_options_market_open():
             # Regular session — plain market order, fills at best available price
@@ -1888,7 +1897,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             # Sell slightly below (SELL) / buy slightly above (BUY) to maximise fill
             # probability in thin after-hours markets; GTC so it stays live if not
             # filled immediately.
-            _exit_price = validated_price if validated_price > 0 else info.get("current", info.get("entry", 0))
+            _exit_price = validated_price if validated_price > 0 else (_current_fresh or info.get("entry", 0))
             # When IBKR returned no price (ibkr_price=0) the fallback above may land on a
             # stale cached value or the original entry price — producing a limit that can
             # never fill (e.g. BUY limit below market for a SHORT cover).  Use the
@@ -1962,7 +1971,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                         _oid in (_sl_id, _tp_id)
                         or (_entry_order_id and _parent == _entry_order_id)
                     ):
-                        ib.cancelOrder(_t.order)
+                        cancel_with_reason(ib, _t.order, f"trim pre-cancel bracket order #{_oid} for {symbol}")
                         log.info(
                             f"[TRIM-pre] {symbol}: cancelled bracket order #{_oid} "
                             f"(sl_id={_sl_id}, tp_id={_tp_id}) before partial sell"
@@ -1976,19 +1985,30 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
 
         # For full EXIT: cancel any orphaned bracket children that remain after close.
         # (For TRIM, brackets were already cancelled above; new ones are placed below.)
+        # Two cases to cover:
+        #   1. OCO bracket children — linked by parentId == entry_order_id
+        #   2. Standalone SL/TP placed as fallback after ValidationError — no parentId,
+        #      identified by sl_order_id / tp_order_id stored in the trade record
         if not _is_partial:
             _entry_order_id = info.get("order_id")
-            if _entry_order_id:
-                try:
-                    for _t in ib.openTrades():
-                        if getattr(_t.order, "parentId", None) == _entry_order_id:
-                            ib.cancelOrder(_t.order)
-                            log.info(
-                                f"Cancelled orphaned bracket child for {symbol} "
-                                f"(orderId={_t.order.orderId}, parentId={_entry_order_id})"
-                            )
-                except Exception as _e:
-                    log.warning(f"Bracket child cleanup for {symbol} failed: {_e}")
+            _sl_oid = info.get("sl_order_id")
+            _tp_oid = info.get("tp_order_id")
+            _known_exit_ids = {i for i in (_sl_oid, _tp_oid) if i}
+            try:
+                for _t in ib.openTrades():
+                    _oid = _t.order.orderId
+                    _parent = getattr(_t.order, "parentId", None)
+                    _is_bracket_child = _entry_order_id and _parent == _entry_order_id
+                    _is_known_standalone = _oid in _known_exit_ids
+                    if _is_bracket_child or _is_known_standalone:
+                        cancel_with_reason(ib, _t.order, f"orphaned exit order after {symbol} close (bracket_child={_is_bracket_child}, standalone={_is_known_standalone})")
+                        log.info(
+                            f"Cancelled orphaned exit order for {symbol} "
+                            f"(orderId={_oid}, parentId={_parent}, "
+                            f"bracket_child={_is_bracket_child}, standalone={_is_known_standalone})"
+                        )
+            except Exception as _e:
+                log.warning(f"Bracket child cleanup for {symbol} failed: {_e}")
 
         # Log the close order
         log_order(
