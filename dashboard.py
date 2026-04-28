@@ -3124,15 +3124,28 @@ function updateRegime(regime) {
   const iwm = regime.iwm_chg_1d || 0;
   const r   = regime.regime || 'UNKNOWN';
 
+  // Session character from Apex is the authoritative tape label.
+  // Price-threshold logic is a fallback for the pre-Apex window only.
+  const SC_MAP = {
+    'MOMENTUM_BULL': ['MOMENTUM BULL', 'tape-strong'],
+    'RELIEF_RALLY':  ['RELIEF RALLY',  'tape-riskoff'],
+    'FEAR_ELEVATED': ['FEAR ELEVATED', 'tape-riskoff'],
+    'DISTRIBUTION':  ['DISTRIBUTION',  'tape-bear'],
+    'TRENDING_BEAR': ['TRENDING BEAR', 'tape-selloff'],
+  };
   let tapeLabel, tapeClass;
   if (r === 'CAPITULATION') {
     tapeLabel = 'CAPITULATION';  tapeClass = 'tape-panic';
+  } else if (regime.session_character && SC_MAP[regime.session_character]) {
+    [tapeLabel, tapeClass] = SC_MAP[regime.session_character];
   } else if (spy < -2.0 && qqq < -2.0) {
     tapeLabel = 'SELLOFF';       tapeClass = 'tape-selloff';
   } else if (spy < -1.2 && qqq < -1.2) {
     tapeLabel = 'BEARISH';       tapeClass = 'tape-bear';
   } else if (qqq < -1.5 && qqq < spy - 0.5) {
     tapeLabel = 'TECH SELLOFF';  tapeClass = 'tape-bear';
+  } else if (spy < -0.5 || qqq < -0.5) {
+    tapeLabel = 'DISTRIBUTION';  tapeClass = 'tape-bear';
   } else if (iwm < -1.5) {
     tapeLabel = 'RISK-OFF';      tapeClass = 'tape-riskoff';
   } else if (spy > 2.0 && qqq > 2.0) {
@@ -3142,7 +3155,7 @@ function updateRegime(regime) {
   } else if (!regime.spy_chg_1d && regime.spy_chg_1d !== 0) {
     tapeLabel = 'READING...';    tapeClass = 'unknown';
   } else {
-    tapeLabel = 'MIXED';         tapeClass = 'tape-mixed';
+    tapeLabel = 'RANGE BOUND';   tapeClass = 'tape-mixed';
   }
 
   box.className = 'regime-box ' + tapeClass;

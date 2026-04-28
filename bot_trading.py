@@ -34,6 +34,7 @@ from learning import (
     run_weekly_review,
 )
 from options import check_options_exits, find_best_contract
+from options_entries import execute_options_entries
 from options_scanner import scan_options_universe
 from orders_core import execute_buy, execute_sell, execute_short
 from orders_options import (
@@ -1551,6 +1552,29 @@ def run_scan():
             from learning import _append_audit_event
             _append_audit_event("options_scan_error", error=str(_opts_err))
 
+    # Deterministic options entries — runs before Apex so has_open_order_for(sym)
+    # blocks Apex from also taking a stock position on the same symbol this cycle.
+    # Returns frozenset of symbols that fired; used below to build _apex_sym_block.
+    _opts_fired_syms: frozenset[str] = frozenset()
+    if options_signals and CONFIG.get("options_enabled"):
+        try:
+            _opts_fired_syms = execute_options_entries(
+                ib=ib,
+                options_signals=options_signals,
+                portfolio_value=pv,
+                regime=regime,
+            )
+            if _opts_fired_syms:
+                clog("TRADE", f"Deterministic options entries: {len(_opts_fired_syms)} placed {sorted(_opts_fired_syms)}")
+                from learning import _append_audit_event
+                _append_audit_event(
+                    "options_deterministic_entries",
+                    entries_fired=len(_opts_fired_syms),
+                    symbols=sorted(_opts_fired_syms),
+                )
+        except Exception as _oe_err:
+            clog("ERROR", f"options_entries error: {_oe_err}")
+
     update_position_prices(pipeline.scored)
 
     if _check_kill():
@@ -2259,6 +2283,29 @@ def run_scan():
             clog("INFO",
                  f"APEX_LIVE: {len(_cut_candidates_raw)} candidates after guardrails "
                  f"— capped to top 30 by score")
+
+        # Explicit same-symbol options exposure guard (policies 3 & 4).
+        # Block Apex from opening a stock position on any symbol where:
+        #   (a) a deterministic options entry fired THIS cycle, OR
+        #   (b) an open options position already exists in active_trades.
+        # has_open_order_for() catches (a) indirectly — this is the explicit enforcement.
+        from orders_state import active_trades as _at_blk, _trades_lock as _atl_blk
+        with _atl_blk:
+            _existing_opts_syms: frozenset[str] = frozenset(
+                v.get("symbol") for v in _at_blk.values()
+                if v.get("instrument") == "option"
+                and v.get("status") != "RESERVED"
+                and v.get("symbol")
+            )
+        _apex_sym_block = _opts_fired_syms | _existing_opts_syms
+        if _apex_sym_block:
+            _before_block = len(_cut_candidates)
+            _cut_candidates = [c for c in _cut_candidates if c.get("symbol") not in _apex_sym_block]
+            _blocked_count = _before_block - len(_cut_candidates)
+            if _blocked_count:
+                clog("INFO",
+                     f"APEX_LIVE: {_blocked_count} stock candidate(s) blocked by options exposure guard "
+                     f"({sorted(_apex_sym_block)})")
         try:
             _cut_review = _flag_track_a(open_pos, regime)
         except Exception:
@@ -2314,6 +2361,9 @@ def run_scan():
             log.warning("APEX_LIVE: shadow log failed — %s", _log_err)
         _apex_decision = _cut_result.get("decision") or {}
         _apex_meta = _apex_decision.get("_meta") or {}
+        _apex_sc = _apex_decision.get("session_character") or ""
+        if _apex_sc and isinstance(dash.get("regime"), dict):
+            dash["regime"]["session_character"] = _apex_sc
         dash["claude_analysis"] = (
             _apex_decision.get("market_read")
             or _apex_decision.get("session_character")
