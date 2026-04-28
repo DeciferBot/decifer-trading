@@ -12,7 +12,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from market_intelligence import classify_signals
+from options import find_best_contract
 from orders_core import execute_buy, execute_short
+from orders_options import execute_buy_option
 from pattern_library import record_entry
 from position_sizing import calculate_stops
 from signal_types import Signal
@@ -587,39 +589,72 @@ def dispatch(
         try:
             signal_scores = payload.get("score_breakdown") or {}
             rationale = entry.get("rationale", "")
-            if direction == "LONG":
-                ok = execute_buy(
-                    ib=ib,
+            instrument = entry.get("instrument") or "stock"
+            regime_name = regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else str(regime)
+
+            if instrument in ("call", "put"):
+                contract_info = find_best_contract(
                     symbol=sym,
-                    price=price,
-                    atr=atr,
-                    score=score,
+                    direction=direction,
                     portfolio_value=portfolio_value,
-                    regime=regime,
-                    reasoning=rationale,
-                    signal_scores=signal_scores,
-                    open_time=datetime.now(UTC).isoformat(),
-                    trade_type=trade_type,
-                    conviction=ext_mult,
-                )
-            elif direction == "SHORT":
-                ok = execute_short(
                     ib=ib,
-                    symbol=sym,
-                    price=price,
-                    atr=atr,
-                    score=score,
-                    portfolio_value=portfolio_value,
                     regime=regime,
-                    reasoning=rationale,
-                    signal_scores=signal_scores,
-                    open_time=datetime.now(UTC).isoformat(),
+                    score=score,
                     trade_type=trade_type,
-                    conviction=ext_mult,
                 )
-            else:
-                ok = False
-                report["errors"].append(f"{sym}: unknown direction {direction!r}")
+                if contract_info is None:
+                    log.warning(
+                        f"dispatch {sym}: options contract not found (instrument={instrument}) "
+                        f"— falling back to stock entry"
+                    )
+                    instrument = "stock"
+                else:
+                    ok = execute_buy_option(
+                        ib=ib,
+                        contract_info=contract_info,
+                        portfolio_value=portfolio_value,
+                        reasoning=rationale,
+                        score=score,
+                        trade_type=trade_type,
+                        conviction=ext_mult,
+                        signal_scores=signal_scores,
+                        regime=regime_name,
+                    )
+
+            if instrument == "stock":
+                if direction == "LONG":
+                    ok = execute_buy(
+                        ib=ib,
+                        symbol=sym,
+                        price=price,
+                        atr=atr,
+                        score=score,
+                        portfolio_value=portfolio_value,
+                        regime=regime,
+                        reasoning=rationale,
+                        signal_scores=signal_scores,
+                        open_time=datetime.now(UTC).isoformat(),
+                        trade_type=trade_type,
+                        conviction=ext_mult,
+                    )
+                elif direction == "SHORT":
+                    ok = execute_short(
+                        ib=ib,
+                        symbol=sym,
+                        price=price,
+                        atr=atr,
+                        score=score,
+                        portfolio_value=portfolio_value,
+                        regime=regime,
+                        reasoning=rationale,
+                        signal_scores=signal_scores,
+                        open_time=datetime.now(UTC).isoformat(),
+                        trade_type=trade_type,
+                        conviction=ext_mult,
+                    )
+                else:
+                    ok = False
+                    report["errors"].append(f"{sym}: unknown direction {direction!r}")
             rec["executed"] = bool(ok)
         except Exception as exc:
             report["errors"].append(f"{sym}: execute failed — {exc}")

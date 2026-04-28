@@ -68,6 +68,7 @@ risk_mod.record_win = MagicMock()
 risk_mod.record_loss = MagicMock()
 risk_mod.check_combined_exposure = MagicMock(return_value=(True, "ok"))
 risk_mod.check_sector_concentration = MagicMock(return_value=(True, "ok"))
+risk_mod.CONVICTION_MULT = {"MEDIUM": 0.65, "HIGH": 1.00}
 sys.modules.setdefault("risk", risk_mod)
 
 # learning (stub) — include all symbols consumed by signal_pipeline and signal_dispatcher
@@ -365,6 +366,120 @@ class TestDispatchSignals(unittest.TestCase):
         self.assertTrue(results[0]["success"])  # LONG → execute_buy
         self.assertFalse(results[1]["success"])  # NEUTRAL → skipped
         self.assertTrue(results[2]["success"])  # SHORT → execute_short
+
+
+class TestDispatchOptionsRouting(unittest.TestCase):
+    """
+    Verify that dispatch() routes instrument="call"/"put" entries to
+    execute_buy_option (via find_best_contract) and NOT to execute_buy.
+    """
+
+    _REGIME = {"regime": "TRENDING_UP", "vix": 15.0}
+    _FAKE_CONTRACT = {
+        "symbol": "AAPL", "right": "C", "strike": 180.0,
+        "expiry_str": "20260530", "expiry_ibkr": "20260530",
+        "dte": 21, "mid": 3.50, "bid": 3.40, "ask": 3.60,
+        "spread_pct": 0.06, "volume": 500, "open_interest": 2000,
+        "iv": 0.30, "iv_rank": 45, "delta": 0.50, "gamma": 0.05,
+        "theta": -0.08, "vega": 0.12, "model_price": 3.55,
+        "contracts": 1, "max_risk_dollars": 350.0,
+        "direction": "LONG",
+    }
+
+    def _decision(self, instrument: str, direction: str = "LONG") -> dict:
+        return {
+            "new_entries": [{
+                "symbol": "AAPL",
+                "direction": direction,
+                "trade_type": "SWING",
+                "instrument": instrument,
+                "conviction": "MEDIUM",
+                "rationale": "test",
+            }],
+            "portfolio_actions": [],
+        }
+
+    def test_call_instrument_routes_to_execute_buy_option(self):
+        with (
+            patch.object(signal_dispatcher, "find_best_contract", return_value=self._FAKE_CONTRACT) as mock_fbc,
+            patch.object(signal_dispatcher, "execute_buy_option", return_value=True) as mock_opt,
+            patch.object(signal_dispatcher, "execute_buy", return_value=True) as mock_buy,
+        ):
+            report = signal_dispatcher.dispatch(
+                self._decision("call"),
+                candidates_by_symbol={"AAPL": {"score": 40, "atr": 2.0, "price": 180.0}},
+                active_trades={},
+                ib=MagicMock(),
+                portfolio_value=100_000.0,
+                regime=self._REGIME,
+                execute=True,
+            )
+
+        mock_fbc.assert_called_once()
+        mock_opt.assert_called_once()
+        mock_buy.assert_not_called()
+        self.assertTrue(report["new_entries"][0]["executed"])
+
+    def test_put_instrument_routes_to_execute_buy_option(self):
+        with (
+            patch.object(signal_dispatcher, "find_best_contract", return_value=self._FAKE_CONTRACT) as mock_fbc,
+            patch.object(signal_dispatcher, "execute_buy_option", return_value=True) as mock_opt,
+            patch.object(signal_dispatcher, "execute_short", return_value=True) as mock_short,
+        ):
+            report = signal_dispatcher.dispatch(
+                self._decision("put", direction="SHORT"),
+                candidates_by_symbol={"AAPL": {"score": 40, "atr": 2.0, "price": 180.0}},
+                active_trades={},
+                ib=MagicMock(),
+                portfolio_value=100_000.0,
+                regime=self._REGIME,
+                execute=True,
+            )
+
+        mock_fbc.assert_called_once()
+        mock_opt.assert_called_once()
+        mock_short.assert_not_called()
+        self.assertTrue(report["new_entries"][0]["executed"])
+
+    def test_call_no_contract_falls_back_to_execute_buy(self):
+        with (
+            patch.object(signal_dispatcher, "find_best_contract", return_value=None),
+            patch.object(signal_dispatcher, "execute_buy_option", return_value=True) as mock_opt,
+            patch.object(signal_dispatcher, "execute_buy", return_value=True) as mock_buy,
+        ):
+            report = signal_dispatcher.dispatch(
+                self._decision("call"),
+                candidates_by_symbol={"AAPL": {"score": 40, "atr": 2.0, "price": 180.0}},
+                active_trades={},
+                ib=MagicMock(),
+                portfolio_value=100_000.0,
+                regime=self._REGIME,
+                execute=True,
+            )
+
+        mock_opt.assert_not_called()
+        mock_buy.assert_called_once()
+        self.assertTrue(report["new_entries"][0]["executed"])
+
+    def test_stock_instrument_bypasses_options_path(self):
+        with (
+            patch.object(signal_dispatcher, "find_best_contract", return_value=self._FAKE_CONTRACT) as mock_fbc,
+            patch.object(signal_dispatcher, "execute_buy_option", return_value=True) as mock_opt,
+            patch.object(signal_dispatcher, "execute_buy", return_value=True) as mock_buy,
+        ):
+            report = signal_dispatcher.dispatch(
+                self._decision("stock"),
+                candidates_by_symbol={"AAPL": {"score": 40, "atr": 2.0, "price": 180.0}},
+                active_trades={},
+                ib=MagicMock(),
+                portfolio_value=100_000.0,
+                regime=self._REGIME,
+                execute=True,
+            )
+
+        mock_fbc.assert_not_called()
+        mock_opt.assert_not_called()
+        mock_buy.assert_called_once()
 
 
 if __name__ == "__main__":
