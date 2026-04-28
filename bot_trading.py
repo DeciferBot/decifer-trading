@@ -75,6 +75,7 @@ log = logging.getLogger("decifer.bot")
 
 # ── EOD options review state ──────────────────────────────────────────────────
 _eod_options_review_done: bool = False
+_session_state_reset_date: "date | None" = None  # date on which the pre-market state reset last ran
 
 # ── Portfolio manager state ───────────────────────────────────────────────────
 _portfolio_review_done_today: bool = False
@@ -422,26 +423,29 @@ def check_external_closes(regime: dict):
                     import math as _math
 
                     fills = ib.fills()
+                    is_short = trade.get("direction", "LONG") == "SHORT"
+                    # LONG close = sell (SLD); SHORT close = buy (BOT)
+                    close_sides = ("BOT", "BUY") if is_short else ("SLD", "SELL")
                     if is_opt_pos:
-                        sell_fills = [
+                        close_fills = [
                             f
                             for f in fills
                             if f.contract.symbol == underlying
-                            and f.execution.side.upper() in ("SLD", "SELL")
+                            and f.execution.side.upper() in close_sides
                             and _is_option_contract(f.contract)
                         ]
                     else:
-                        sell_fills = [
+                        close_fills = [
                             f
                             for f in fills
                             if f.contract.symbol == underlying
-                            and f.execution.side.upper() in ("SLD", "SELL")
+                            and f.execution.side.upper() in close_sides
                             and not _is_option_contract(f.contract)
                         ]
-                    if sell_fills:
-                        sell_fills.sort(key=lambda f: f.execution.time or datetime.min)
-                        exit_price = float(sell_fills[-1].execution.price)
-                        _fill_order_id = getattr(sell_fills[-1].execution, "orderId", None)
+                    if close_fills:
+                        close_fills.sort(key=lambda f: f.execution.time or datetime.min)
+                        exit_price = float(close_fills[-1].execution.price)
+                        _fill_order_id = getattr(close_fills[-1].execution, "orderId", None)
                     else:
                         _fill_order_id = None
                 except Exception:
@@ -474,7 +478,6 @@ def check_external_closes(regime: dict):
 
                 import math as _math
 
-                is_short = trade.get("direction", "LONG") == "SHORT"
                 rpnl_lookup = underlying if is_opt_pos else sym
                 mult = 100 if is_opt_pos else 1
                 manual_pnl = (
@@ -823,7 +826,7 @@ def _eod_options_review(regime: dict):
 
 def _maybe_eod_options_review(regime: dict):
     """Fire _eod_options_review once per day between 3:30 PM and 3:55 PM ET."""
-    global _eod_options_review_done
+    global _eod_options_review_done, _session_state_reset_date
     import zoneinfo as _zi
 
     _ET = _zi.ZoneInfo("America/New_York")
@@ -831,8 +834,13 @@ def _maybe_eod_options_review(regime: dict):
 
     now_et = datetime.now(_ET)
     t = now_et.time()
-    # Reset each morning before the session opens
-    if t < dtime(9, 30):
+    today = now_et.date()
+    # Reset once per calendar day before the session opens — not on every cycle.
+    # Previously this block ran on every scan cycle while t < 9:30, which reset
+    # _portfolio_review_done_today and _last_pm_review_ts each cycle and caused
+    # the pre-market PM review to re-fire every ~18 minutes throughout pre-market.
+    if t < dtime(9, 30) and _session_state_reset_date != today:
+        _session_state_reset_date = today
         _eod_options_review_done = False
         global \
             _portfolio_review_done_today, \
@@ -1504,8 +1512,17 @@ def run_scan():
             extra = list(set(top_scored_syms + favs_for_opts))
             options_signals = scan_options_universe(extra_symbols=extra, regime=regime)
             clog("ANALYSIS", f"Options scan: {len(options_signals)} notable setups found")
+            from learning import _append_audit_event
+            _append_audit_event(
+                "options_scan",
+                symbols_scanned=len(extra),
+                signals_found=len(options_signals),
+                regime=regime.get("regime", "UNKNOWN"),
+            )
         except Exception as _opts_err:
             clog("ERROR", f"Options scanner error: {_opts_err}")
+            from learning import _append_audit_event
+            _append_audit_event("options_scan_error", error=str(_opts_err))
 
     update_position_prices(pipeline.scored)
 

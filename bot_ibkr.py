@@ -367,10 +367,17 @@ def _on_ibkr_fill(trade, fill) -> None:
         with _trades_lock:
             for sym, t in open_trades.items():
                 sl_oid = t.get("sl_order_id")
+                tp_oid = t.get("tp_order_id")
                 if sl_oid and int(sl_oid) == int(oid):
                     bot_state._sl_fill_events.add(sym)
                     log.info(
                         f"[SL-FILL] Stop-loss fill detected for {sym} (orderId={oid}) — flagged for immediate processing"
+                    )
+                    break
+                if tp_oid and int(tp_oid) == int(oid):
+                    bot_state._sl_fill_events.add(sym)
+                    log.info(
+                        f"[TP-FILL] Take-profit fill detected for {sym} (orderId={oid}) — flagged for immediate processing"
                     )
                     break
     except Exception as exc:
@@ -1341,6 +1348,10 @@ def _on_order_status_event(trade):
             sym = contract.symbol
 
             if order.action == "BUY":
+                # Snapshot pre-update status for voice idempotency guard (same pattern as SHORT path)
+                with _trades_lock:
+                    _t_pre = dict(active_trades.get(sym, {}))
+
                 # Long entry fill — update tracker and announce
                 total_qty = int(order.totalQuantity)
                 updates = {"entry": fill_price, "status": "FILLED"}
@@ -1380,10 +1391,11 @@ def _on_order_status_event(trade):
                                 clog("ERROR", f"Post-fill SL placement failed for {_sym}: {_e}")
                         threading.Thread(target=_place_long_sl, daemon=True, name=f"ext_sl_{sym}").start()
 
-                # Voice: fires on confirmed fill, not at submission
+                # Voice: fires only on first fill (pre-update status is PENDING/SUBMITTED).
+                # Guard matches the SHORT path — prevents double-speak if IBKR re-sends FILLED.
                 try:
                     from bot_voice import speak_natural as _speak_natural
-                    if _t.get("direction") == "LONG":
+                    if _t_pre.get("direction") == "LONG" and _t_pre.get("status") in ("PENDING", "SUBMITTED"):
                         _news = (dash.get("news_data") or {}).get(sym, {})
                         _speak_natural(
                             "entry",
