@@ -645,11 +645,11 @@ canvas{display:block;width:100% !important}
   </div>
   <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase">Opus Portfolio Review</div>
+      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase">Apex Portfolio Review</div>
       <div style="font-size:10px;color:var(--muted2)" id="pm-review-ts">—</div>
     </div>
     <div id="pm-decisions-list">
-      <div class="empty">Opus portfolio review decisions appear here after the next review cycle.</div>
+      <div class="empty">Apex portfolio review decisions appear here after the next scan cycle.</div>
     </div>
   </div>
 </div>
@@ -4288,48 +4288,78 @@ function renderAgentConversation(convo) {
 }
 
 function renderAgentConvoFull(convo, lastScan) {
-  // Full conversation in Agents view with indicator annotations
   const el = document.getElementById('agents-convo-full');
   document.getElementById('agents-scan-time').textContent = 'Last scan: ' + (lastScan || '—');
   if (!convo || !convo.length) return;
 
-  const ACTION_COLOR = { BUY: 'var(--green)', SELL: 'var(--red)', HOLD: 'var(--orange)' };
-  const ACTION_BG    = { BUY: 'rgba(0,200,83,.12)', SELL: 'rgba(255,82,82,.12)', HOLD: 'rgba(255,107,0,.12)' };
+  const msg = convo[0];
 
-  el.innerHTML = convo.map((msg, i) => {
-    const isFinal = msg.agent === 'Apex Synthesizer';
-    const borderColor = isFinal ? 'var(--green)' : `hsl(${25 + i * 40}, 85%, 55%)`;
+  const CHAR_COLOR = {
+    MOMENTUM_BULL: '#51cf66', RELIEF_RALLY: '#ffd43b',
+    FEAR_ELEVATED: '#ff922b', DISTRIBUTION: '#ff6b6b', TRENDING_BEAR: '#ff6b6b',
+  };
+  const BIAS_COLOR = { BULLISH: '#51cf66', BEARISH: '#ff6b6b', NEUTRAL: 'var(--muted2)' };
+  const DIR_COLOR  = { LONG: '#51cf66', SHORT: '#ff6b6b' };
+  const CONV_COLOR = { HIGH: 'var(--orange)', MEDIUM: '#4dabf7' };
+  const TYPE_COLOR = { INTRADAY: 'var(--muted2)', SWING: '#4dabf7', POSITION: 'var(--orange)' };
 
-    let outputHtml;
-    if (isFinal) {
-      const lines = (msg.output || '').split('\n').map(l => l.trim()).filter(Boolean);
-      if (!lines.length || lines[0] === 'No trades this cycle.') {
-        outputHtml = '<div style="color:var(--muted2);font-size:11px">No trades this cycle.</div>';
-      } else {
-        outputHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">' +
-          lines.map(line => {
-            const parts  = line.split(/\s+/);
-            const action = (parts[0] || '').toUpperCase();
-            const ticker = parts.slice(1).join(' ');
-            const color  = ACTION_COLOR[action] || 'var(--muted2)';
-            const bg     = ACTION_BG[action]    || 'rgba(80,80,80,.1)';
-            return `<div style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:3px;border:1px solid ${color};background:${bg}">
-              <span style="font-size:9px;font-weight:700;color:${color};letter-spacing:1px">${esc(action)}</span>
-              <span style="font-size:12px;font-weight:700;color:var(--text)">${esc(ticker)}</span>
-            </div>`;
-          }).join('') +
-        '</div>';
-      }
+  const charColor = CHAR_COLOR[msg.session_character] || '#4dabf7';
+  const biasColor = BIAS_COLOR[msg.macro_bias]        || 'var(--muted2)';
+  const latency   = msg.latency_ms ? (msg.latency_ms / 1000).toFixed(1) + 's' : '';
+  const tokens    = msg.output_tokens ? msg.output_tokens + ' tok' : '';
+
+  const marketReadHtml = msg.market_read && !msg.market_read.startsWith('[fallback]')
+    ? `<div style="font-size:10px;color:var(--muted2);line-height:1.65;margin-bottom:4px">${esc(msg.market_read)}</div>`
+    : '';
+
+  let entriesHtml = '';
+  if (Array.isArray(msg.new_entries)) {
+    const active = msg.new_entries.filter(e => e.trade_type !== 'AVOID');
+    if (active.length) {
+      entriesHtml =
+        '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">' +
+        '<div style="font-size:8px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase;margin-bottom:8px">New Entries</div>' +
+        '<div style="display:flex;flex-direction:column;gap:6px">' +
+        active.map(e => {
+          const dc = DIR_COLOR[e.direction]  || 'var(--muted2)';
+          const cc = CONV_COLOR[e.conviction] || 'var(--muted2)';
+          const tc = TYPE_COLOR[e.trade_type] || 'var(--muted2)';
+          return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:4px;background:${dc}11;border:1px solid ${dc}33">
+            <div style="display:flex;flex-direction:column;gap:3px;min-width:130px;flex-shrink:0">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:13px;font-weight:700;color:var(--text)">${esc(e.symbol||'')}</span>
+                <span style="font-size:9px;font-weight:700;letter-spacing:1px;color:${dc}">${esc(e.direction||'')}</span>
+              </div>
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
+                <span style="font-size:8px;color:${cc}">${esc(e.conviction||'')}</span>
+                <span style="font-size:8px;color:var(--muted2)">·</span>
+                <span style="font-size:8px;color:${tc}">${esc(e.trade_type||'')}</span>
+                <span style="font-size:8px;color:var(--muted2)">·</span>
+                <span style="font-size:8px;color:var(--muted2)">${esc(e.instrument||'')}</span>
+              </div>
+            </div>
+            ${e.rationale ? `<div style="font-size:10px;color:var(--muted2);line-height:1.5">${esc(e.rationale)}</div>` : ''}
+          </div>`;
+        }).join('') +
+        '</div></div>';
     } else {
-      outputHtml = `<div class="agent-output">${annotateIndicators(msg.output || '')}</div>`;
+      entriesHtml = '<div style="margin-top:10px;font-size:10px;color:var(--muted2)">No new entries this cycle.</div>';
     }
+  }
 
-    return `<div class="agent-convo-card" style="border-left-color:${borderColor}">
-      <div class="agent-name" style="color:${borderColor}">${isFinal ? '⚡' : 'Agent ' + (i+1) + ':'} ${esc(msg.agent)}</div>
-      <div class="agent-role">${esc(msg.role)}</div>
-      ${outputHtml}
+  el.innerHTML =
+    `<div style="background:var(--card);border:1px solid var(--border);border-left:3px solid ${charColor};border-radius:6px;padding:12px 14px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        ${msg.session_character ? `<span style="font-size:8px;font-weight:700;letter-spacing:1px;padding:2px 8px;border-radius:3px;background:${charColor}22;border:1px solid ${charColor};color:${charColor}">${esc(msg.session_character)}</span>` : ''}
+        ${msg.macro_bias ? `<span style="font-size:8px;font-weight:700;letter-spacing:1px;padding:2px 8px;border-radius:3px;background:${biasColor}22;border:1px solid ${biasColor};color:${biasColor}">MACRO: ${esc(msg.macro_bias)}</span>` : ''}
+        <span style="flex:1"></span>
+        ${latency ? `<span style="font-size:9px;color:var(--muted2)">${esc(latency)}</span>` : ''}
+        ${tokens  ? `<span style="font-size:9px;color:var(--muted2)">${esc(tokens)}</span>` : ''}
+        ${msg.time ? `<span style="font-size:9px;color:var(--muted2)">${esc(msg.time)}</span>` : ''}
+      </div>
+      ${marketReadHtml}
+      ${entriesHtml}
     </div>`;
-  }).join('');
 }
 
 function renderPmDecisions(pm) {
@@ -4338,7 +4368,7 @@ function renderPmDecisions(pm) {
   if (!el) return;
 
   if (!pm || !pm.actions || !pm.actions.length) {
-    el.innerHTML = '<div class="empty">Opus portfolio review decisions appear here after the next review cycle.</div>';
+    el.innerHTML = '<div class="empty">Apex portfolio review decisions appear here after the next scan cycle.</div>';
     if (tsEl) tsEl.textContent = '—';
     return;
   }
