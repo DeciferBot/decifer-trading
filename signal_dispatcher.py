@@ -358,7 +358,6 @@ def dispatch_signals(
                         advice_pt=advice.profit_target,
                         advice_sl=advice.stop_loss,
                         advice_size_mult=advice.size_multiplier,
-                        advice_instrument=advice.instrument,
                         advice_id=advice.advice_id,
                         trade_type=cls.trade_type,
                         conviction=cls.conviction,
@@ -402,7 +401,6 @@ def dispatch_signals(
                         advice_pt=advice.profit_target,
                         advice_sl=advice.stop_loss,
                         advice_size_mult=advice.size_multiplier,
-                        advice_instrument=advice.instrument,
                         advice_id=advice.advice_id,
                         trade_type=cls.trade_type,
                         conviction=cls.conviction,
@@ -548,6 +546,25 @@ def dispatch(
         if (act.get("action") or "").upper() in ("EXIT", "TRIM") and act.get("symbol")
     }
 
+    # Dedup Track B: if Apex returns multiple actions for the same symbol, keep
+    # the highest-priority one. EXIT > TRIM > ADD > HOLD prevents self-contradiction.
+    _ACTION_PRIORITY = {"EXIT": 4, "TRIM": 3, "ADD": 2, "HOLD": 1}
+    _deduped_b: dict[str, dict] = {}
+    for _a in (decision.get("portfolio_actions") or []):
+        _s = _a.get("symbol")
+        if not _s:
+            continue
+        _pri = _ACTION_PRIORITY.get((_a.get("action") or "").upper(), 0)
+        _cur_pri = _ACTION_PRIORITY.get((_deduped_b.get(_s, {}).get("action") or "").upper(), 0)
+        if _s not in _deduped_b or _pri > _cur_pri:
+            _deduped_b[_s] = _a
+    _pm_actions = list(_deduped_b.values())
+
+    # RELIEF_RALLY: cap new LONG size to 50% — deterministic enforcement of what
+    # the Apex prompt requests softly. Checked once here so it applies to all entries.
+    _sc = (decision.get("session_character") or regime.get("session_character") or "").upper()
+    _relief_rally = (_sc == "RELIEF_RALLY")
+
     # ── Track A: new entries ──────────────────────────────────────────────
     for entry in (decision.get("new_entries") or []):
         sym = entry.get("symbol")
@@ -571,6 +588,9 @@ def dispatch(
         atr = _select_atr(entry, payload)
         ext_mult = _conviction_external_mult(entry.get("conviction"))
         direction = (entry.get("direction") or "").upper()
+        if _relief_rally and direction == "LONG":
+            ext_mult = min(ext_mult, 0.5)
+            log.info("dispatch: %s LONG size capped to 0.5× — RELIEF_RALLY session character", sym)
 
         qty = 0
         sl = tp = 0.0
@@ -678,7 +698,7 @@ def dispatch(
         report["new_entries"].append(rec)
 
     # ── Track B: portfolio actions (HOLD / TRIM / EXIT / ADD) ────────────
-    for act in (decision.get("portfolio_actions") or []):
+    for act in _pm_actions:
         sym = act.get("symbol")
         action_type = (act.get("action") or "").upper()
         rec = {

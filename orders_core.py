@@ -199,7 +199,6 @@ def execute_buy(
     advice_pt: float = 0.0,
     advice_sl: float = 0.0,
     advice_size_mult: float = 1.0,
-    advice_instrument: str = "COMMON",
     advice_id: str = "",
     # Intelligence layer classification
     trade_type: str = "",
@@ -1202,7 +1201,6 @@ def execute_short(
     advice_pt: float = 0.0,
     advice_sl: float = 0.0,
     advice_size_mult: float = 1.0,
-    advice_instrument: str = "COMMON",
     advice_id: str = "",
     # Intelligence layer classification
     trade_type: str = "",

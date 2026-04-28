@@ -82,6 +82,9 @@ def filter_candidates(
         direction = (sig.get("direction") or "").upper()
         if direction == "SHORT" and sym in _LONG_ONLY:
             log.info("filter_candidates: %s dropped — long-only inverse ETF short", sym); continue
+        reg = ((regime or {}).get("regime") or "").upper()
+        if direction == "SHORT" and reg == "TRENDING_UP":
+            log.info("filter_candidates: %s dropped — SHORT blocked in TRENDING_UP structural regime", sym); continue
 
         allowed = compute_allowed_trade_types(sym, regime or {}, minutes_to_close)
         if not allowed or allowed == ["AVOID"]:
