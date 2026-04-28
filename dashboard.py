@@ -632,7 +632,14 @@ canvas{display:block;width:100% !important}
 <div class="view agents-view" id="view-agents">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
     <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted2);text-transform:uppercase">Agent Live Conversation</div>
-    <div style="font-size:10px;color:var(--muted2)" id="agents-scan-time">Last scan: —</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="display:flex;align-items:center;gap:4px" id="agents-nav" style="display:none">
+        <button onclick="apexConvoNav(-1)" style="font-size:10px;padding:2px 8px;border-radius:3px;border:1px solid var(--border);background:var(--card);color:var(--muted2);cursor:pointer">&#8592;</button>
+        <span id="agents-nav-counter" style="font-size:9px;color:var(--muted2);min-width:40px;text-align:center">—</span>
+        <button onclick="apexConvoNav(1)" style="font-size:10px;padding:2px 8px;border-radius:3px;border:1px solid var(--border);background:var(--card);color:var(--muted2);cursor:pointer">&#8594;</button>
+      </div>
+      <div style="font-size:10px;color:var(--muted2)" id="agents-scan-time">Last scan: —</div>
+    </div>
   </div>
   <div id="agents-convo-full">
     <div class="empty" style="padding:30px">Agent conversation appears here after the first scan completes.</div>
@@ -3350,6 +3357,16 @@ async function poll() {
     _decisionHistory = incoming;
     renderTradeCard(_decisionHistory[_decisionIdx] || null);
 
+    // Apex conversation history — update buffer and refresh nav, then render current entry
+    if (d.agent_conversation_history && d.agent_conversation_history.length) {
+      window._apexConvoHistory = d.agent_conversation_history;  // oldest → newest
+      _updateApexNavCounter();
+      // If user is viewing latest, show it; otherwise leave their selected entry
+      if (window._apexConvoIdx < 0) {
+        const hist = window._apexConvoHistory;
+        _renderApexConvoEntry(hist[hist.length - 1]);
+      }
+    }
     // Agent conversation (full agents view only — live panel replaced by trade card)
     if (d.agent_conversation && d.agent_conversation.length) {
       renderAgentConvoFull(d.agent_conversation, d.last_scan);
@@ -4300,12 +4317,36 @@ function renderAgentConversation(convo) {
   // Full agent debate is still visible in the Agents tab.
 }
 
-function renderAgentConvoFull(convo, lastScan) {
-  const el = document.getElementById('agents-convo-full');
-  document.getElementById('agents-scan-time').textContent = 'Last scan: ' + (lastScan || '—');
-  if (!convo || !convo.length) return;
+// ── Apex conversation history buffer ─────────────────────────────────────────
+window._apexConvoHistory = [];   // oldest → newest
+window._apexConvoIdx     = -1;   // -1 = showing latest
 
-  const msg = convo[0];
+function apexConvoNav(dir) {
+  const hist = window._apexConvoHistory;
+  if (!hist.length) return;
+  const last = hist.length - 1;
+  // _apexConvoIdx -1 means "latest" = last index
+  let cur = window._apexConvoIdx < 0 ? last : window._apexConvoIdx;
+  cur = Math.max(0, Math.min(last, cur - dir));   // ← goes back (older), → goes forward (newer)
+  window._apexConvoIdx = (cur === last) ? -1 : cur;
+  _renderApexConvoEntry(hist[cur]);
+  _updateApexNavCounter();
+}
+
+function _updateApexNavCounter() {
+  const hist  = window._apexConvoHistory;
+  const nav   = document.getElementById('agents-nav');
+  const ctr   = document.getElementById('agents-nav-counter');
+  if (!hist.length) { if (nav) nav.style.display = 'none'; return; }
+  if (nav) nav.style.display = 'flex';
+  const last  = hist.length - 1;
+  const cur   = window._apexConvoIdx < 0 ? last : window._apexConvoIdx;
+  ctr.textContent = (cur + 1) + ' / ' + hist.length;
+}
+
+function _renderApexConvoEntry(msg) {
+  const el = document.getElementById('agents-convo-full');
+  if (!el || !msg) return;
 
   const CHAR_COLOR = {
     MOMENTUM_BULL: '#51cf66', RELIEF_RALLY: '#ffd43b',
@@ -4373,6 +4414,15 @@ function renderAgentConvoFull(convo, lastScan) {
       ${marketReadHtml}
       ${entriesHtml}
     </div>`;
+}
+
+function renderAgentConvoFull(convo, lastScan) {
+  document.getElementById('agents-scan-time').textContent = 'Last scan: ' + (lastScan || '—');
+  if (!convo || !convo.length) return;
+  // Only update if user is viewing the latest (not navigating history)
+  if (window._apexConvoIdx < 0) {
+    _renderApexConvoEntry(convo[0]);
+  }
 }
 
 function renderPmDecisions(pm) {

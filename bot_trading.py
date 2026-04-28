@@ -1423,8 +1423,22 @@ def run_scan():
     # Merge held symbols with favourites for downstream protected-set consumers.
     pipeline_favs = list(set(favs + held_syms))
 
+    # Tier C — options universe: always score liquid options names so stock and
+    # options signals are evaluated together. These names may not make the daily
+    # promoted list on defensive rotation days (e.g. DDOG, SMCI, COIN on value days).
+    try:
+        from options_scanner import OPTIONABLE_UNIVERSE as _OPT_UNIVERSE
+        before = len(universe)
+        universe = list(set(universe + _OPT_UNIVERSE))
+        n_opts = len(universe) - before
+        if n_opts:
+            clog("INFO", f"Options universe: {n_opts} symbol(s) pinned into scoring (not in Tier A/B today)")
+    except Exception:
+        pass
+
     _cov_favs = len(favs)
     _cov_held = len(held_syms)
+    _cov_opts = n_opts if "n_opts" in dir() else 0
 
     # Refresh Alpaca stream subscriptions to match the finalised universe.
     # update_symbols() is a no-op if the symbol list hasn't changed.
@@ -1539,7 +1553,20 @@ def run_scan():
             favs_for_opts = dash.get("favourites", [])
             extra = list(set(top_scored_syms + favs_for_opts))
             options_signals = scan_options_universe(extra_symbols=extra, regime=regime)
-            clog("ANALYSIS", f"Options scan: {len(options_signals)} notable setups found")
+            _exec_eligible = [
+                s for s in options_signals
+                if s.get("signal") in {"CALL_BUYER", "PUT_BUYER"}
+                and s.get("options_score", 0) >= CONFIG.get("options_scan_entry_min_score", 18)
+            ]
+            _non_exec = len(options_signals) - len(_exec_eligible)
+            if _exec_eligible:
+                clog("ANALYSIS", f"Options scan: {len(options_signals)} setups — {len(_exec_eligible)} exec-eligible, {_non_exec} context-only (EARNINGS_PLAY/MIXED/low-score)")
+            else:
+                _signal_breakdown = {}
+                for s in options_signals:
+                    _signal_breakdown[s.get("signal", "?")] = _signal_breakdown.get(s.get("signal", "?"), 0) + 1
+                _breakdown_str = " ".join(f"{k}={v}" for k, v in sorted(_signal_breakdown.items()))
+                clog("ANALYSIS", f"Options scan: {len(options_signals)} setups, 0 exec-eligible — {_breakdown_str} (no unusual vol or directional confirmation)")
             from learning import _append_audit_event
             _append_audit_event(
                 "options_scan",
@@ -2378,7 +2405,7 @@ def run_scan():
             or _apex_decision.get("session_character")
             or "Apex scan complete"
         )
-        dash["agent_conversation"] = [{
+        _apex_convo_entry = {
             "agent": "Apex Synthesizer",
             "role": "Single claude-sonnet-4-6 call — candidates, regime, portfolio, session context → ApexDecision",
             "time": now_str,
@@ -2388,7 +2415,15 @@ def run_scan():
             "new_entries": _apex_decision.get("new_entries") or [],
             "latency_ms": _apex_meta.get("latency_ms"),
             "output_tokens": _apex_meta.get("output_tokens"),
-        }]
+        }
+        dash["agent_conversation"] = [_apex_convo_entry]
+        try:
+            import json as _json
+            _alog_path = pathlib.Path("data/apex_conversation_log.jsonl")
+            with _alog_path.open("a") as _alf:
+                _alf.write(_json.dumps(_apex_convo_entry) + "\n")
+        except Exception as _alog_err:
+            log.warning("apex_conversation_log write failed — %s", _alog_err)
         if _apex_decision.get("portfolio_actions"):
             dash["pm_decisions"] = {
                 "actions": [

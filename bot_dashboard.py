@@ -755,6 +755,19 @@ class DashHandler(BaseHTTPRequestHandler):
                     state["decision_history"] = []
             except Exception:
                 state["decision_history"] = []
+            # Apex conversation history — last 30 scan cycles for Agents tab browsing
+            try:
+                _alog_path = _os.path.join(
+                    _os.path.dirname(_os.path.abspath(__file__)), "data", "apex_conversation_log.jsonl"
+                )
+                if _os.path.exists(_alog_path):
+                    with open(_alog_path) as _alf:
+                        _alines = [l.strip() for l in _alf if l.strip()]
+                        state["agent_conversation_history"] = [json.loads(l) for l in _alines[-30:]]
+                else:
+                    state["agent_conversation_history"] = []
+            except Exception:
+                state["agent_conversation_history"] = []
             state["settings"] = {
                 "risk_pct_per_trade": CONFIG["risk_pct_per_trade"],
                 "daily_loss_limit": CONFIG["daily_loss_limit"],
