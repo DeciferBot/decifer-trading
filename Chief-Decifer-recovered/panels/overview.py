@@ -198,7 +198,6 @@ MODULE_CATEGORIES = {
     "Market Data & Infrastructure": {
         "color": "#74c0fc", "icon": "🗄️",
         "modules": {
-            "data_collector.py": ("Market Data", "Historical OHLCV via yfinance, options chains, fundamentals."),
             "ibkr_streaming.py": ("IBKR Streaming", "Real-time price streaming from Interactive Brokers."),
             "backtester.py": ("Backtester", "Tests strategies against historical data before risking capital."),
             "dashboard.py": ("Trading Dashboard", "Web dashboard for monitoring live trades and bot activity."),

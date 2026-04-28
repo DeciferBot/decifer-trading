@@ -31,7 +31,6 @@ FILE_TO_SUBSYSTEM = {
     "news_sentinel.py": "News & Sentiment",
     "social_sentiment.py": "News & Sentiment",
     "theme_tracker.py": "News & Sentiment",
-    "data_collector.py": "Market Data",
     "ibkr_streaming.py": "Market Data",
     "backtester.py": "Analytics & UI",
     "dashboard.py": "Analytics & UI",

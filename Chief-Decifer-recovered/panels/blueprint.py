@@ -38,7 +38,7 @@ SUBSYSTEMS = {
     "Market Data": {
         "color": "#74c0fc",
         "desc": "Historical data collection, real-time IBKR streaming",
-        "modules": ["data_collector.py", "ibkr_streaming.py"],
+        "modules": ["ibkr_streaming.py"],
     },
     "News & Sentiment": {
         "color": "#fcc419",

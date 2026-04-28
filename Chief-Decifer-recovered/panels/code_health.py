@@ -78,7 +78,6 @@ _MODULE_NAMES = {
     "social_sentiment.py": "Social Sentiment",
     "ibkr_streaming.py": "IBKR Streaming",
     "news_sentinel.py": "News Sentinel",
-    "data_collector.py": "Market Data",
     "agents.py": "AI Agent Council",
     "options.py": "Options Trading",
     "news.py": "News Feed",

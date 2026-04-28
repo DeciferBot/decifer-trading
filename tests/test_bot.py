@@ -179,9 +179,8 @@ config_mod.CONFIG = {
 sys.modules.setdefault("config", config_mod)
 
 # Stub all Decifer sub-modules so they don't try to import real deps
-# NOTE: ml_engine, data_collector are excluded — they have their own test stubs
-# and blanket-stubbing them here would prevent later test files from importing
-# the real modules.
+# NOTE: ml_engine is excluded — it has its own test stubs and blanket-stubbing
+# it here would prevent later test files from importing the real module.
 for _mod_name in [
     "scanner",
     "signals",

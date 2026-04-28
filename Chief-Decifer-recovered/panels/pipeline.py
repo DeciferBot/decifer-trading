@@ -63,7 +63,6 @@ FILE_TO_SUBSYSTEM = {
     "telegram_bot.py":      "News & Sentiment",
     "bot_sentinel.py":      "News & Sentiment",
     # AI & Learning
-    "data_collector.py":    "AI & Learning",
     # Analytics & UI
     "bot_dashboard.py":     "Analytics & UI",
     "wip_tracker.py":       "Analytics & UI",

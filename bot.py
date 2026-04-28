@@ -464,25 +464,6 @@ def main():
     except Exception:
         pass  # Optional — social_sentiment.py has keyword fallback
 
-    # ── Background data collection (historical training data) ──
-    def _background_data_collection():
-        try:
-            from data_collector import collect_all
-
-            clog("INFO", "Background data collection started (historical training data)")
-            result = collect_all(intraday=True, daily=True, add_ml_features=True)
-            clog(
-                "INFO",
-                f"Data collection complete: {result['total_rows']:,} rows, "
-                f"{result['daily_symbols']} daily + {result['intraday_symbols']} intraday symbols",
-            )
-        except ImportError:
-            clog("INFO", "data_collector.py not found — skipping historical data collection")
-        except Exception as e:
-            clog("ERROR", f"Background data collection error: {e}")
-
-    threading.Thread(target=_background_data_collection, daemon=True, name="DataCollector").start()
-
     # Connect to IBKR — retry loop so dashboard stays live when TWS is offline
     if not connect_ibkr():
         port = CONFIG["ibkr_port"]

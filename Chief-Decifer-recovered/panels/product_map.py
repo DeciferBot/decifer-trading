@@ -25,8 +25,8 @@ STAGES = [
     {
         "num": "1", "name": "Scan", "color": "#4dabf7",
         "icon": "🔍", "tagline": "Find candidates",
-        "modules": ["scanner.py", "options_scanner.py", "data_collector.py"],
-        "how": "3,000+ stocks screened via TradingView + yfinance in real-time",
+        "modules": ["scanner.py", "options_scanner.py"],
+        "how": "Top-1000 committed universe screened via Alpaca in real-time",
     },
     {
         "num": "2", "name": "Score", "color": "#51cf66",
