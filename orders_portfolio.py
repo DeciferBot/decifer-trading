@@ -429,68 +429,76 @@ def reconcile_with_ibkr(ib: IB):
         keys_to_remove = []
         closed_while_down = []  # collect (advice_id, exit_price, pnl) to close Opus loop after lock
         trades_closed_while_down = []  # collect full trade dicts for CLOSE log_trade calls
-        # Safety guard: if IBKR returned 0 items but we have ACTIVE positions with
-        # real decision metadata, that is almost certainly an account-data timing
-        # issue (TWS hasn't pushed updatePortfolio yet), not that everything closed.
-        # Purging real positions here would destroy metadata-rich state we cannot
-        # recover from IBKR. PENDING positions are excluded — an unfilled order
-        # truly not in IBKR must still be cancelled regardless.
-        # Positions restored from the DB event log don't yet have status="ACTIVE"
-        # (that is only set after Step 4 confirms them with IBKR).  Use any
-        # non-PENDING entry as the guard — if we have stored positions of any
-        # kind and IBKR returned nothing, that is almost certainly a timing gap.
         _stored_non_pending = [
             k for k, v in active_trades.items()
             if v.get("status") != "PENDING"
         ]
+        _n_stored = len(_stored_non_pending)
+        _n_ibkr = len(ibkr_keys)
+        # Coverage ratio: what fraction of stored non-pending positions did IBKR confirm?
+        # If IBKR confirms < min_ibkr_coverage_to_sweep of what we track, TWS callbacks
+        # are likely still arriving (partial delivery) — block the sweep to avoid
+        # fabricating phantom closes with stale estimated exit prices.
+        # PENDING cancellation is exempt: it cross-checks ib.openTrades() independently.
+        _min_coverage = CONFIG.get("min_ibkr_coverage_to_sweep", 0.5)
+        _coverage = _n_ibkr / _n_stored if _n_stored > 0 else 1.0
+        _block_cwd_sweep = False
         if not ibkr_keys and _stored_non_pending:
+            _block_cwd_sweep = True
             log.error(
                 "Reconcile: IBKR returned 0 portfolio positions but we have %d stored position(s) "
                 "— skipping closed-while-down purge (likely account data not ready). "
                 "Positions will be re-checked on next reconcile cycle.",
-                len(_stored_non_pending),
+                _n_stored,
             )
-        else:
-            with _trades_lock:
-                for key in list(active_trades.keys()):
-                    if key not in ibkr_keys:
-                        trade = active_trades[key]
-                        if trade.get("status") == "PENDING":
-                            order_id = trade.get("order_id")
-                            still_live = False
-                            if order_id:
-                                try:
-                                    for t in ib.openTrades():
-                                        if t.order.orderId == order_id:
-                                            still_live = True
-                                            break
-                                except Exception:
-                                    still_live = True  # err on side of keeping it
-                            if still_live:
-                                log.debug(f"Reconcile: PENDING {key} order #{order_id} still live in IBKR — keeping")
-                                continue
-                            else:
-                                log.warning(
-                                    f"Reconcile: PENDING {key} order #{order_id} not in IBKR open orders "
-                                    f"— cancelling and removing from tracker"
-                                )
-                                if order_id:
-                                    _cancel_ibkr_order_by_id(ib, order_id)
-                                keys_to_remove.append(key)
+        elif ibkr_keys and _n_stored > 1 and _coverage < _min_coverage:
+            _block_cwd_sweep = True
+            log.error(
+                "Reconcile: IBKR confirmed %d/%d stored position(s) (%.0f%% < %.0f%% threshold) — "
+                "partial TWS data delivery suspected, skipping closed-while-down purge. "
+                "Positions will be re-checked on next reconcile cycle.",
+                _n_ibkr, _n_stored, _coverage * 100, _min_coverage * 100,
+            )
+        with _trades_lock:
+            for key in list(active_trades.keys()):
+                if key not in ibkr_keys:
+                    trade = active_trades[key]
+                    if trade.get("status") == "PENDING":
+                        order_id = trade.get("order_id")
+                        still_live = False
+                        if order_id:
+                            try:
+                                for t in ib.openTrades():
+                                    if t.order.orderId == order_id:
+                                        still_live = True
+                                        break
+                            except Exception:
+                                still_live = True  # err on side of keeping it
+                        if still_live:
+                            log.debug(f"Reconcile: PENDING {key} order #{order_id} still live in IBKR — keeping")
+                            continue
                         else:
                             log.warning(
-                                f"Position {key} in our store but not in IBKR — was closed while bot was down, removing"
+                                f"Reconcile: PENDING {key} order #{order_id} not in IBKR open orders "
+                                f"— cancelling and removing from tracker"
                             )
+                            if order_id:
+                                _cancel_ibkr_order_by_id(ib, order_id)
                             keys_to_remove.append(key)
-                            trades_closed_while_down.append(dict(trade))
-                            if trade.get("advice_id"):
-                                closed_while_down.append(
-                                    {
-                                        "advice_id": trade["advice_id"],
-                                        "exit_price": float(trade.get("current") or trade.get("entry", 0)),
-                                        "pnl": float(trade.get("pnl", 0.0)),
-                                    }
-                                )
+                    elif not _block_cwd_sweep:
+                        log.warning(
+                            f"Position {key} in our store but not in IBKR — was closed while bot was down, removing"
+                        )
+                        keys_to_remove.append(key)
+                        trades_closed_while_down.append(dict(trade))
+                        if trade.get("advice_id"):
+                            closed_while_down.append(
+                                {
+                                    "advice_id": trade["advice_id"],
+                                    "exit_price": float(trade.get("current") or trade.get("entry", 0)),
+                                    "pnl": float(trade.get("pnl", 0.0)),
+                                }
+                            )
 
         for key in keys_to_remove:
             _safe_del_trade(key)
