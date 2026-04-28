@@ -53,6 +53,20 @@ from orders_state import (
 )
 
 
+def _resolve_regime(regime: dict | str | None) -> str:
+    """Extract a regime string from any regime representation."""
+    if isinstance(regime, dict):
+        return (
+            regime.get("session_character")
+            or regime.get("regime")
+            or regime.get("name")
+            or "UNKNOWN"
+        )
+    if isinstance(regime, str) and regime:
+        return regime
+    return "UNKNOWN"
+
+
 def _validate_order_context(
     symbol: str,
     direction: str,
@@ -606,11 +620,7 @@ def execute_buy(
                     # Record position — TWAP fills are confirmed fills; skip PENDING state.
                     _fill_price = float(stats.average_execution_price) if stats.average_execution_price else price
                     _open_time = open_time or datetime.now(UTC).isoformat()
-                    _entry_regime = (
-                        (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
-                        if isinstance(regime, dict)
-                        else "UNKNOWN"
-                    )
+                    _entry_regime = _resolve_regime(regime)
                     try:
                         from ic_calculator import get_current_weights as _get_icw
 
@@ -741,10 +751,7 @@ def execute_buy(
                     _icw_at_entry = _get_icw()
                 except Exception:
                     _icw_at_entry = None
-                _entry_regime = (
-                    (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
-                    if isinstance(regime, dict) else "UNKNOWN"
-                )
+                _entry_regime = _resolve_regime(regime)
                 with _trades_lock:
                     active_trades[symbol] = {
                         "symbol": symbol, "instrument": instrument,
@@ -1089,9 +1096,7 @@ def execute_buy(
                     "trade_type": trade_type or "INTRADAY",
                     "conviction": conviction,
                     "setup_type": _derive_setup_type(signal_scores or {}),
-                    "entry_regime": (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
-                    if isinstance(regime, dict)
-                    else "UNKNOWN",
+                    "entry_regime": _resolve_regime(regime),
                     "entry_thesis": _build_entry_thesis(
                         trade_type or "INTRADAY",
                         symbol,
@@ -1493,10 +1498,7 @@ def execute_short(
                     _icw_at_entry = _get_icw()
                 except Exception:
                     _icw_at_entry = None
-                _entry_regime = (
-                    (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
-                    if isinstance(regime, dict) else "UNKNOWN"
-                )
+                _entry_regime = _resolve_regime(regime)
                 with _trades_lock:
                     active_trades[symbol] = {
                         "symbol": symbol, "instrument": instrument,
@@ -1684,9 +1686,7 @@ def execute_short(
                     "trade_type": trade_type or "INTRADAY",
                     "conviction": conviction,
                     "setup_type": _derive_setup_type(signal_scores or {}),
-                    "entry_regime": (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
-                    if isinstance(regime, dict)
-                    else "UNKNOWN",
+                    "entry_regime": _resolve_regime(regime),
                     "entry_thesis": _build_entry_thesis(
                         trade_type or "INTRADAY",
                         symbol,
@@ -2184,7 +2184,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                     "pnl": pnl,
                     "hold_minutes": _hold_mins,
                     "exit_reason": reason,
-                    "regime": info.get("entry_regime", "UNKNOWN"),
+                    "regime": info.get("entry_regime") or _resolve_regime(info.get("regime")) or "UNKNOWN",
                     "signal_scores": info.get("signal_scores") or {},
                     "conviction": float(info.get("conviction") or 0.0),
                     "score": float(info.get("score") or info.get("entry_score") or 0.0),

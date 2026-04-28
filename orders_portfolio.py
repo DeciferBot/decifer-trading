@@ -1453,6 +1453,8 @@ def update_positions_from_ibkr(ib: IB):
                 # been for N contracts but only M actually filled.
                 _ibkr_item = price_map.get(_key)
                 _ibkr_filled_qty = abs(int(_ibkr_item.position)) if _ibkr_item is not None else None
+                # averageCost for options is per-share premium; divide by 100 for per-contract.
+                _opt_fill = round(float(_ibkr_item.averageCost) / 100, 4) if (_ibkr_item and _ibkr_item.averageCost) else None
                 with _trades_lock:
                     if _key in active_trades:
                         active_trades[_key]["status"] = "ACTIVE"
@@ -1466,8 +1468,23 @@ def update_positions_from_ibkr(ib: IB):
                                 )
                             active_trades[_key]["qty"] = _ibkr_filled_qty
                             active_trades[_key]["contracts"] = _ibkr_filled_qty
+                        if _opt_fill and not active_trades[_key].get("_fill_confirmed"):
+                            active_trades[_key]["entry"] = _opt_fill
+                            active_trades[_key]["entry_premium"] = _opt_fill
+                            active_trades[_key]["high_water_mark"] = _opt_fill
+                            active_trades[_key]["current"] = _opt_fill
+                _tid = active_trades.get(_key, {}).get("trade_id", "")
+                if _tid and _opt_fill and _ibkr_filled_qty and not active_trades.get(_key, {}).get("_fill_confirmed"):
+                    try:
+                        from event_log import append_fill as _el_fill
+                        _el_fill(_tid, _key.split("|")[0], fill_price=_opt_fill, fill_qty=_ibkr_filled_qty)
+                        with _trades_lock:
+                            if _key in active_trades:
+                                active_trades[_key]["_fill_confirmed"] = True
+                    except Exception as _elf_err:
+                        log.warning("Reconcile: ORDER_FILLED write failed for option %s: %s", _key, _elf_err)
                 _src = "portfolio" if _key in price_map else "positions"
-                log.info(f"PENDING option {_key} found in IBKR {_src} — marking ACTIVE (fill confirmed)")
+                log.info("PENDING option %s confirmed ACTIVE by IBKR %s — fill=%.4f", _key, _src, _opt_fill or 0)
                 continue
             elif _trade_instrument == "option":
                 # Not yet in portfolio — use longer timeout so DAY orders get
@@ -1478,11 +1495,30 @@ def update_positions_from_ibkr(ib: IB):
                 # Order has already filled and IBKR shows an active position — not orphaned.
                 # Checks both ib.portfolio() and ib.positions() because FX (CASH)
                 # positions may only appear in the latter.
+                _ibkr_item = price_map.get(_key)
+                _actual_fill = round(float(_ibkr_item.averageCost), 4) if (_ibkr_item and _ibkr_item.averageCost) else None
+                _actual_qty = abs(int(_ibkr_item.position)) if _ibkr_item else None
                 with _trades_lock:
                     if _key in active_trades:
                         active_trades[_key]["status"] = "ACTIVE"
+                        if _actual_fill and not active_trades[_key].get("_fill_confirmed"):
+                            active_trades[_key]["entry"] = _actual_fill
+                            active_trades[_key]["high_water_mark"] = _actual_fill
+                            active_trades[_key]["current"] = _actual_fill
+                        if _actual_qty:
+                            active_trades[_key]["qty"] = _actual_qty
+                _tid = active_trades.get(_key, {}).get("trade_id", "")
+                if _tid and _actual_fill and _actual_qty and not active_trades.get(_key, {}).get("_fill_confirmed"):
+                    try:
+                        from event_log import append_fill as _el_fill
+                        _el_fill(_tid, _key.split("|")[0], fill_price=_actual_fill, fill_qty=_actual_qty)
+                        with _trades_lock:
+                            if _key in active_trades:
+                                active_trades[_key]["_fill_confirmed"] = True
+                    except Exception as _elf_err:
+                        log.warning("Reconcile: ORDER_FILLED write failed for %s: %s", _key, _elf_err)
                 _src = "portfolio" if _key in price_map else "positions"
-                log.info(f"PENDING {_key} found in IBKR {_src} — marking ACTIVE (fill confirmed)")
+                log.info("PENDING %s confirmed ACTIVE by IBKR %s — fill=%.4f", _key, _src, _actual_fill or 0)
                 continue
             else:
                 with _fw_lock:
@@ -1553,6 +1589,17 @@ def update_positions_from_ibkr(ib: IB):
             except Exception:
                 pass
             try:
+                from event_log import pending_orders as _el_pending2
+                for intent in reversed(_el_pending2()):
+                    if (
+                        intent.get("symbol") == sym
+                        and intent.get("trade_type")
+                        and intent["trade_type"] != "UNKNOWN"
+                    ):
+                        return intent
+            except Exception:
+                pass
+            try:
                 saved = _load_positions_file()
                 for saved_val in saved.values():
                     if (
@@ -1561,6 +1608,13 @@ def update_positions_from_ibkr(ib: IB):
                         and saved_val.get("trade_type")
                     ):
                         return saved_val
+            except Exception:
+                pass
+            try:
+                from event_log import last_intent_for_symbol as _last_intent2
+                intent = _last_intent2(sym)
+                if intent.get("trade_type") and intent["trade_type"] != "UNKNOWN":
+                    return intent
             except Exception:
                 pass
             return {}

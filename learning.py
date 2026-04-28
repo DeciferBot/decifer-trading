@@ -25,6 +25,7 @@ SIGNALS_LOG_FILE = CONFIG.get("signals_log", "data/signals_log.jsonl")
 AUDIT_LOG_FILE = CONFIG.get("audit_log", "data/audit_log.jsonl")
 CAPITAL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "capital_base.json")
 _capital_lock = threading.Lock()
+_exec_ic_lock = threading.Lock()
 
 # Rotate signals_log.jsonl once it exceeds this size to prevent the file growing forever.
 # Archived files are named  data/signals_log_archive_YYYYMMDD_HHMMSS.jsonl  and kept
@@ -541,10 +542,12 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
             "agent_risk": bool(agent_outputs.get("risk")),
             "exit_reason": outcome.get("reason") if outcome else None,
         }
-        # DB primary
         try:
-            with open(_exec_ic_path, "a") as _f:
-                _f.write(json.dumps(_exec_ic_record) + "\n")
+            with _exec_ic_lock:
+                with open(_exec_ic_path, "a", encoding="utf-8") as _f:
+                    _f.write(json.dumps(_exec_ic_record) + "\n")
+                    _f.flush()
+                    os.fsync(_f.fileno())
         except Exception as _e:
             log.debug(f"execution_ic.jsonl write failed (non-critical): {_e}")
 
@@ -567,8 +570,11 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
             "hold_minutes": hold_minutes,
         }
         try:
-            with open(_exec_ic_path, "a") as _f:
-                _f.write(json.dumps(_exec_ic_close) + "\n")
+            with _exec_ic_lock:
+                with open(_exec_ic_path, "a", encoding="utf-8") as _f:
+                    _f.write(json.dumps(_exec_ic_close) + "\n")
+                    _f.flush()
+                    os.fsync(_f.fileno())
         except Exception as _e:
             log.debug(f"execution_ic.jsonl close write failed (non-critical): {_e}")
 
