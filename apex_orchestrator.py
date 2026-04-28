@@ -54,6 +54,7 @@ def build_scan_cycle_apex_input(
     portfolio_state: dict | None = None,
     regime: dict | None = None,
     overnight_research: str | None = None,
+    options_flow: list[dict] | None = None,
 ) -> dict:
     """Build a SCAN_CYCLE ApexInput dict from guardrails-filtered inputs."""
     return {
@@ -64,6 +65,7 @@ def build_scan_cycle_apex_input(
         "market_context": {
             "regime": regime or {},
             "overnight_research": overnight_research,
+            "options_flow": list(options_flow or []),
         },
         "portfolio_state": portfolio_state or {},
         "scan_ts": datetime.now(UTC).isoformat(),

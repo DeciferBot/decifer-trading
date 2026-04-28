@@ -2280,6 +2280,7 @@ def run_scan():
             review_positions=_cut_review,
             portfolio_state=_cut_portfolio_state,
             regime=regime,
+            options_flow=options_signals,
         )
         _cut_by_sym = {
             c.get("symbol"): c for c in _cut_candidates if c.get("symbol")

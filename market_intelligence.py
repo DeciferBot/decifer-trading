@@ -964,6 +964,22 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
         if sctx.overnight_text:
             parts.append(f"  overnight: {sctx.overnight_text}")
 
+    options_flow = mctx.get("options_flow") or []
+    if options_flow:
+        parts.append(f"\n[OPTIONS FLOW] ({len(options_flow)} signals — use as supporting evidence for instrument=call/put on eligible SWING/POSITION candidates)")
+        for o in options_flow:
+            unusual = []
+            if o.get("unusual_calls"):
+                unusual.append("unusual_calls")
+            if o.get("unusual_puts"):
+                unusual.append("unusual_puts")
+            unusual_str = " ".join(unusual) or "no_unusual"
+            parts.append(
+                f"  {o.get('symbol')}: {o.get('signal')} score={o.get('options_score')} "
+                f"C/P={o.get('cp_ratio', 0):.1f}x ivr={o.get('iv_rank', 0):.0f} "
+                f"dte={o.get('dte')} {unusual_str} — {o.get('reasoning', '')}"
+            )
+
     parts.append("\n[PORTFOLIO STATE]")
     parts.append(
         f"  pv=${pstate.get('portfolio_value', 0):,.0f} "
