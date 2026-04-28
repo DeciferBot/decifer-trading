@@ -51,6 +51,16 @@ ML_CONFIDENCE_WEIGHT = CONFIG.get("ml_confidence_weight", 0.3)
 REGIME_OPTIONS = ["TRENDING_UP", "TRENDING_DOWN", "RANGE_BOUND", "CAPITULATION", "RELIEF_RALLY"]
 BREAKEVEN_THRESHOLD = 0.001  # Within 0.1% of entry price = breakeven
 
+# All signal dimensions the engine has ever produced (union across all schema versions).
+# Records that predate a dimension get 0 for that dimension — the model learns to ignore
+# zero-padded dimensions naturally via feature importance.
+SIGNAL_DIMENSIONS = [
+    "trend", "momentum", "squeeze", "flow", "breakout",
+    "news", "social", "reversion", "overnight_drift",
+    "pead", "short_squeeze", "catalyst", "analyst_revision",
+    "iv_skew", "fx_macro", "fx_momentum", "insider_buying", "mtf",
+]
+
 
 def ensure_models_dir():
     """Create models directory if it doesn't exist."""
@@ -94,14 +104,18 @@ class TradeLabeler:
         Label trade outcome: WIN, LOSS, or BREAKEVEN.
         Uses actual P&L and holding period.
         """
-        pnl = trade.get("pnl", 0)
+        pnl = trade.get("pnl") or 0
 
-        # Breakeven threshold: within 0.1% of entry price
-        entry_price = trade.get("entry_price", 0)
-        if entry_price > 0:
-            pnl_pct = pnl / (entry_price * trade.get("shares", 1))
-            if abs(pnl_pct) < BREAKEVEN_THRESHOLD:
-                return "BREAKEVEN"
+        # Use pre-computed pnl_pct when available
+        pnl_pct = trade.get("pnl_pct")
+        if pnl_pct is None:
+            entry_price = trade.get("entry_price") or trade.get("fill_price") or 0
+            shares = trade.get("shares") or trade.get("qty") or 1
+            if entry_price > 0:
+                pnl_pct = pnl / (entry_price * shares)
+
+        if pnl_pct is not None and abs(pnl_pct) < BREAKEVEN_THRESHOLD:
+            return "BREAKEVEN"
 
         if pnl > 0:
             return "WIN"
@@ -113,13 +127,11 @@ class TradeLabeler:
     def extract_features(self, trade: dict) -> dict:
         """
         Extract features from trade at entry time.
-        Includes: score, regime, VIX, volume, momentum, sector, time info.
-        Only processes CLOSE records with a real pnl outcome.
+        Includes: score, regime, VIX, per-dimension signal scores, and time info.
+        Only processes closed records with a real pnl outcome.
         """
-        # Skip OPEN records — they have no pnl outcome to learn from.
-        if trade.get("action") not in ("CLOSE", "close") and trade.get("action") in ("OPEN", "open"):
+        if trade.get("action") in ("OPEN", "open"):
             return None
-        # Skip records with no pnl — nothing to label.
         if trade.get("pnl") is None:
             return None
         try:
@@ -132,18 +144,24 @@ class TradeLabeler:
             "score": trade.get("score", 0),
             "regime": trade.get("regime", "UNKNOWN"),
             "vix": trade.get("vix", 0.0),
-            "shares": trade.get("shares", 0),
-            "entry_price": trade.get("entry_price", 0.0),
+            "shares": trade.get("shares", trade.get("qty", 0)),
+            "entry_price": trade.get("entry_price", trade.get("fill_price", 0.0)),
             "exit_price": trade.get("exit_price", 0.0),
             "pnl": trade.get("pnl", 0),
-            "holding_minutes": self._calculate_holding_time(trade),
+            "pnl_pct": trade.get("pnl_pct", None),
+            "holding_minutes": trade.get("hold_minutes") or self._calculate_holding_time(trade),
             "time_of_day": entry_time.hour,
-            "day_of_week": entry_time.weekday(),  # 0=Monday, 6=Sunday
+            "day_of_week": entry_time.weekday(),
             "is_weekend": entry_time.weekday() >= 5,
             "is_after_hours": entry_time.hour < 9 or entry_time.hour >= 16,
             "action": trade.get("action", "BUY"),
             "exit_reason": trade.get("exit_reason", ""),
         }
+
+        # Per-dimension signal scores — 0 for any dimension absent in this record.
+        signal_scores = trade.get("signal_scores") or {}
+        for dim in SIGNAL_DIMENSIONS:
+            features[f"dim_{dim}"] = signal_scores.get(dim, 0)
 
         return features
 
@@ -227,12 +245,15 @@ class DeciferML:
             "is_after_hours",
         ]
 
+        # Per-dimension signal scores (0 where missing — pre-Apex records without breakdowns)
+        dim_cols = [f"dim_{d}" for d in SIGNAL_DIMENSIONS if f"dim_{d}" in self.df.columns]
+
         # Add regime one-hot encoding
         regime_dummies = pd.get_dummies(self.df["regime"], prefix="regime")
         regime_dummies = regime_dummies.reindex([f"regime_{r}" for r in REGIME_OPTIONS], fill_value=0, axis=1)
 
         # Combine features
-        X = self.df[feature_cols].copy()
+        X = self.df[feature_cols + dim_cols].copy()
         X = pd.concat([X, regime_dummies], axis=1)
 
         # Handle missing/infinite values
@@ -279,8 +300,13 @@ class DeciferML:
             return False
 
         try:
-            # Target: PnL as percentage of entry
-            y_returns = (self.df["pnl"] / (self.df["entry_price"] * self.df["shares"])).fillna(0)
+            # Use pre-computed pnl_pct when available; fall back to pnl/(price*shares)
+            if "pnl_pct" in self.df.columns and self.df["pnl_pct"].notna().sum() > len(self.df) * 0.5:
+                y_returns = self.df["pnl_pct"].fillna(0)
+            else:
+                denom = (self.df["entry_price"] * self.df["shares"]).replace(0, np.nan)
+                y_returns = (self.df["pnl"] / denom).fillna(0)
+            y_returns = y_returns.replace([np.inf, -np.inf], 0)
 
             self.model_reg = GradientBoostingRegressor(
                 n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42, subsample=0.8
