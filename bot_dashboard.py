@@ -684,6 +684,16 @@ class DashHandler(BaseHTTPRequestHandler):
             self.end_headers()
             _bot = sys.modules.get("bot")
             html = (_bot.DASHBOARD_HTML if _bot else "") or ""
+            try:
+                import importlib.util
+                from pathlib import Path
+                _vpath = Path(__file__).parent / "version.py"
+                _spec = importlib.util.spec_from_file_location("_ver", _vpath)
+                _mod = importlib.util.module_from_spec(_spec)
+                _spec.loader.exec_module(_mod)
+                html = html.replace("__DECIFER_VERSION__", _mod.__version__)
+            except Exception:
+                html = html.replace("__DECIFER_VERSION__", "?")
             self.wfile.write(html.encode())
         elif self.path == "/api/state":
             self.send_response(200)
