@@ -227,6 +227,26 @@ def _run_apex_pipeline(
             "apex: zero entries — trigger=%s candidates=%d market_read=%r",
             _ttype, _cand_count, _mread,
         )
+        # Floor rule (CLAUDE.md): ≥3 candidates ≥35 with Apex returning zero entries
+        # is a violation that must be visible as an ERROR, not a warning.
+        _all_cands = (apex_input.get("track_a") or {}).get("candidates") or []
+        _high_score_count = sum(1 for c in _all_cands if (c.get("score") or 0) >= 35)
+        if _high_score_count >= 3:
+            log.error(
+                "apex: FLOOR_RULE_VIOLATION — %d candidates scored ≥35 but Apex returned "
+                "zero entries (trigger=%s). market_read=%r",
+                _high_score_count, _ttype, _mread,
+            )
+            try:
+                from learning import _append_audit_event
+                _append_audit_event(
+                    "FLOOR_RULE_VIOLATION",
+                    high_score_candidates=_high_score_count,
+                    trigger_type=_ttype,
+                    market_read=_mread,
+                )
+            except Exception as _ae:
+                log.debug("apex: floor rule audit write failed — %s", _ae)
 
     result: dict[str, Any] = {
         "decision": decision,

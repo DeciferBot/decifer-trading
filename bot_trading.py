@@ -81,6 +81,7 @@ _portfolio_review_done_today: bool = False
 _last_known_regime: str = ""
 _session_stop_count: int = 0
 _cascade_reviewed_this_session: bool = False  # prevent cascade from re-firing every loop
+_consecutive_zero_scored: int = 0  # circuit breaker: escalates to ERROR after 3 consecutive zero-scored scans
 _trimmed_today: set = set()  # symbols already trimmed this session — TRIM fires once only
 _pm_reviewed_regime: dict = {}  # symbol → regime label when PM last reviewed it
 _last_pm_review_ts: datetime | None = None  # when the last PM review completed (any trigger)
@@ -1464,6 +1465,30 @@ def run_scan():
     except Exception as _cov_err:
         log.debug(f"Universe coverage log skipped: {_cov_err}")
 
+    # Scoring gap circuit breaker: if signal pipeline produces zero scored symbols
+    # for 3+ consecutive scans the scoring engine has silently failed — escalate.
+    global _consecutive_zero_scored
+    if len(scored) == 0:
+        _consecutive_zero_scored += 1
+        if _consecutive_zero_scored >= 3:
+            log.error(
+                "SCORING_GAP: scored=0 for %d consecutive scan(s) — signal pipeline "
+                "may be silently failing. universe=%d regime=%s",
+                _consecutive_zero_scored, len(universe), regime_name,
+            )
+            try:
+                from learning import _append_audit_event
+                _append_audit_event(
+                    "SCORING_GAP",
+                    consecutive_zero_scans=_consecutive_zero_scored,
+                    universe_size=len(universe),
+                    regime=regime_name,
+                )
+            except Exception:
+                pass
+    else:
+        _consecutive_zero_scored = 0
+
     _print_score_table(scored)
 
     # CP-1: Options scan runs before update_position_prices so both use the same
@@ -2271,6 +2296,34 @@ def run_scan():
             _aorch_track_a.log_shadow_result("SCAN_CYCLE", _cut_result)
         except Exception as _log_err:
             log.warning("APEX_LIVE: shadow log failed — %s", _log_err)
+        _apex_decision = _cut_result.get("decision") or {}
+        _apex_meta = _apex_decision.get("_meta") or {}
+        dash["agent_conversation"] = [{
+            "agent": "Apex Synthesizer",
+            "role": "Single claude-sonnet-4-6 call — candidates, regime, portfolio, session context → ApexDecision",
+            "time": now_str,
+            "session_character": _apex_decision.get("session_character") or "",
+            "macro_bias": _apex_decision.get("macro_bias") or "",
+            "market_read": _apex_decision.get("market_read") or "",
+            "new_entries": _apex_decision.get("new_entries") or [],
+            "latency_ms": _apex_meta.get("latency_ms"),
+            "output_tokens": _apex_meta.get("output_tokens"),
+        }]
+        if _apex_decision.get("portfolio_actions"):
+            dash["pm_decisions"] = {
+                "actions": [
+                    {
+                        "symbol": _pa.get("symbol"),
+                        "action": _pa.get("action"),
+                        "trim_pct": _pa.get("trim_pct"),
+                        "reasoning": _pa.get("reasoning"),
+                        "reasoning_tag": _pa.get("reasoning_tag"),
+                    }
+                    for _pa in _apex_decision["portfolio_actions"]
+                ],
+                "trigger": "apex_scan_cycle",
+                "ts": now_str,
+            }
     except Exception as _cut_err:
         log.error("APEX_LIVE SCAN_CYCLE failed — %s", _cut_err)
     dash["scanning"] = False
