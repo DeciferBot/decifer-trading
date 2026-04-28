@@ -1,0 +1,19 @@
+{
+  "date": "2026-04-28",
+  "what_changed": [
+    "ml_engine.py: Added SIGNAL_DIMENSIONS constant (18 dims). Updated extract_features() to include per-dimension dim_* features, fixed NoneType comparison bug in label_trade(), added pnl_pct support. Updated prepare_data() to include dim_* columns in feature matrix. Retrained models: 431 trades -> 29 features. ML engine is now live and learning from dimension-level signal data.",
+    "data/models/: Fresh classifier.pkl + regressor.pkl saved (v3.0.26).",
+    "alpha_validation.py: Already built \u2014 ran it, saved report to data/alpha_validation_report.json and chief-decifer research panel. Early findings: mtf (+0.39), short_squeeze (+0.36), news (+0.27) are strongest; trend shows -0.18 (noisy at n=60, watch not act)."
+  ],
+  "what_deleted": "Nothing deleted.",
+  "decisions": [
+    "HMM regime detection deferred \u2014 wait for more trade data and stronger per-regime IC signal before replacing VIX-proxy.",
+    "ML engine stays active at ml_enabled=True; CV ROC-AUC 0.483 is expected at current data volume, safe to run."
+  ],
+  "tests": "1980 passed, 1 skipped (up from 1955 last session).",
+  "what_next": [
+    "Let trades accumulate. Re-run alpha_validation.py periodically (already wired to Chief Decifer research panel).",
+    "HMM regime detection \u2014 start when IC per-regime picture is clearer (target: ~200 records with dimension scores, currently 63)."
+  ],
+  "written_at": "2026-04-28T19:34:52.494839+00:00"
+}

@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-04-28T18:43:45.894500+00:00",
+  "generated_at": "2026-04-28T19:24:28.661428+00:00",
   "live_ic_n": 60,
-  "live_ic_updated": "2026-04-14T15:47:35.563434+00:00",
+  "live_ic_updated": "2026-04-28T18:51:23.419128+00:00",
   "historical_n": 600000,
   "training_n": 63,
   "dimensions": {
@@ -251,6 +251,6 @@
       "trend"
     ],
     "total_analyzed": 18,
-    "equal_weights_active": true
+    "equal_weights_active": false
   }
 }
