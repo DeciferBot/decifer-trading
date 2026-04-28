@@ -1848,11 +1848,55 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             # probability in thin after-hours markets; GTC so it stays live if not
             # filled immediately.
             _exit_price = validated_price if validated_price > 0 else info.get("current", info.get("entry", 0))
+            # When IBKR returned no price (ibkr_price=0) the fallback above may land on a
+            # stale cached value or the original entry price — producing a limit that can
+            # never fill (e.g. BUY limit below market for a SHORT cover).  Use the
+            # Alpaca real-time quote as a better source before falling back to stale data.
+            if ibkr_price == 0:
+                try:
+                    from alpaca_stream import QUOTE_CACHE as _QC_exit
+                    _qt = _QC_exit.get(symbol)
+                    if _qt:
+                        _alpaca_mid = (_qt["ask"] + _qt["bid"]) / 2
+                        if _alpaca_mid > 0:
+                            log.info(
+                                f"execute_sell {symbol}: ibkr_price=0, using Alpaca mid "
+                                f"${_alpaca_mid:.2f} (bid={_qt['bid']:.2f} ask={_qt['ask']:.2f}) "
+                                f"for extended-hours limit"
+                            )
+                            _exit_price = _alpaca_mid
+                except ImportError:
+                    pass
             if close_action == "SELL":
                 _limit = round(_exit_price * 0.998, 2)  # slightly below — taker price on thin book
             else:
                 _limit = round(_exit_price * 1.002, 2)  # slightly above — taker price on thin book
             from ib_async import LimitOrder as _LimitOrder
+
+            # Guard: if a GTC exit order is already live in IBKR for this symbol,
+            # skip placement to avoid stacking duplicate orders across scan cycles.
+            # Exclude the known SL order (different order type and ID).
+            _sl_id = info.get("sl_order_id")
+            _live_exit = next(
+                (
+                    t for t in ib.openTrades()
+                    if getattr(t.contract, "symbol", "") == symbol
+                    and getattr(t.order, "action", "") == close_action
+                    and getattr(t.order, "tif", "") == "GTC"
+                    and getattr(t.order, "orderType", "") not in ("STP", "STP LMT", "TRAIL")
+                    and t.order.orderId != _sl_id
+                    and t.orderStatus.status not in ("Cancelled", "Filled", "Inactive")
+                ),
+                None,
+            )
+            if _live_exit:
+                log.info(
+                    f"execute_sell {symbol}: GTC {close_action} already live in IBKR "
+                    f"(id={_live_exit.order.orderId}, status={_live_exit.orderStatus.status}) "
+                    f"— skipping duplicate placement"
+                )
+                return True
+
             close_order = _LimitOrder(close_action, sell_qty, _limit, account=CONFIG["active_account"])
             close_order.outsideRth = True
             close_order.tif = "GTC"

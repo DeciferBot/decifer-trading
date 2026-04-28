@@ -191,6 +191,22 @@ def _safe_set_trade(key: str, value: dict) -> None:
                 )
             active_trades[key] = merged
         else:
+            # Diagnostic: catch the exact moment trade_type is being reset to UNKNOWN
+            # for a position that previously had real metadata.  This fires only when
+            # an UNKNOWN write races against a successful metadata restoration.
+            if (
+                existing is not None
+                and existing.get("trade_type") not in (None, "", "UNKNOWN")
+                and value.get("trade_type") in (None, "", "UNKNOWN")
+            ):
+                import traceback as _tb
+                log.warning(
+                    "_safe_set_trade(%s): trade_type being overwritten from '%s' → '%s' — stack:\n%s",
+                    key,
+                    existing.get("trade_type"),
+                    value.get("trade_type"),
+                    "".join(_tb.format_stack()),
+                )
             active_trades[key] = value
     if value.get("status") != "RESERVED":
         # Granular DB upsert for this position (faster than replacing all)

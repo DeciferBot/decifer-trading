@@ -1071,6 +1071,12 @@ def reconcile_with_ibkr(ib: IB):
         # Write to data/orphaned_positions.json so the gap is visible and
         # actionable (dashboard card).
         try:
+            # Diagnostic snapshot: log trade_type for all positions at this point so we
+            # can correlate with any "_safe_set_trade overwrite" warnings above.
+            with _trades_lock:
+                _tt_snapshot = {k: v.get("trade_type", "UNKNOWN") for k, v in active_trades.items()}
+            log.debug("Reconcile Step 6 trade_type snapshot: %s", _tt_snapshot)
+
             import json as _json
             from pathlib import Path as _Path
             _orphan_file = _Path(CONFIG.get("positions_file", "data/positions.json")).parent / "orphaned_positions.json"
