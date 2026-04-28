@@ -2811,12 +2811,14 @@ def compute_confluence(
 
     # ── CATALYST BOOST ───────────────────────────────────────
     # If this ticker is a high-conviction catalyst candidate
-    # (catalyst_score >= catalyst_signal_min_score), add a flat boost
-    # so it clears the min_score_to_trade threshold more easily.
-    # Stored in score_breakdown["catalyst"] for IC logging.
+    # (catalyst_score >= catalyst_signal_min_score), add a flat boost.
+    # raw_score is preserved before the boost so the pre-filter gate and
+    # IC tracking can distinguish underlying signal quality from catalyst lift.
+    # The pre-filter uses raw_score; Apex receives both for informed decisions.
     _catalyst_boost_pts = 0
     _cat_score = None
     _ticker = sig_5m.get("symbol", "")
+    raw_score = score  # snapshot before any catalyst boost
     if _ticker:
         _cat_lookup = _get_catalyst_lookup()
         _cat_score = _cat_lookup.get(_ticker)
@@ -2825,7 +2827,7 @@ def compute_confluence(
             score += _catalyst_boost_pts
             log.info(
                 f"CATALYST BOOST {_ticker}: +{_catalyst_boost_pts}pts "
-                f"(catalyst_score={_cat_score:.1f}) → composite={score}"
+                f"(catalyst_score={_cat_score:.1f}, raw={raw_score}) → composite={score}"
             )
 
     # ── CANDLESTICK CONFIRMATION GATE ───────────────────────
@@ -2843,6 +2845,7 @@ def compute_confluence(
         "signal": final_signal,
         "direction": direction,
         "score": score,
+        "raw_score": raw_score,
         "buy_count": buy_signals,
         "sell_count": sell_signals,
         "tf_count": total_tf,
@@ -3101,5 +3104,5 @@ def score_universe(
             payload.setdefault("stock_rs_vs_spy", None)
 
     all_sorted = sorted(all_results, key=lambda x: x["score"], reverse=True)
-    above_threshold = [r for r in all_sorted if r["score"] >= threshold]
+    above_threshold = [r for r in all_sorted if r.get("raw_score", r["score"]) >= threshold]
     return above_threshold, all_sorted

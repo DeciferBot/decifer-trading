@@ -32,6 +32,17 @@ _capital_lock = threading.Lock()
 _SIGNALS_LOG_ROTATE_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
+def _parse_ts(s: str) -> datetime:
+    """Parse an ISO timestamp string and always return a UTC-aware datetime.
+
+    Naive timestamps (no tzinfo) are assumed to be UTC, which is the
+    convention used throughout Decifer. Comparing naive vs aware datetimes
+    raises TypeError — this utility eliminates that class of bug.
+    """
+    dt = datetime.fromisoformat(s)
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+
+
 # ── Immutable audit log ────────────────────────────────────────────────
 
 
@@ -366,7 +377,7 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
     hold_minutes = None
     if action == "CLOSE" and trade.get("open_time"):
         try:
-            open_dt = datetime.fromisoformat(trade["open_time"])
+            open_dt = _parse_ts(trade["open_time"])
             close_dt = datetime.now(UTC)
             hold_minutes = int((close_dt - open_dt).total_seconds() / 60)
         except Exception as _e:
@@ -449,7 +460,7 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
     # For CLOSE records: any existing CLOSE for the same symbol on the same day is a dupe
     # (a position can only be closed once per trade)
     # For OPEN records: match on symbol + action within 5 minutes
-    ts_new = datetime.fromisoformat(record["timestamp"])
+    ts_new = _parse_ts(record["timestamp"])
     for existing in trades:
         if existing.get("symbol") != record.get("symbol"):
             continue
@@ -460,7 +471,7 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
             # Partial fills of the same sell order can arrive in rapid succession —
             # always keep whichever record has the largest qty (most complete fill).
             try:
-                ts_ex = datetime.fromisoformat(existing["timestamp"])
+                ts_ex = _parse_ts(existing["timestamp"])
                 if abs((ts_new - ts_ex).total_seconds()) < 86400:  # within 24 hours
                     # Pattern_id guard: different pattern_ids = different trade cycles, never dupes.
                     # A symbol can be traded, closed, and reopened within 24 hours — each has a
@@ -501,7 +512,7 @@ def log_trade(trade: dict, agent_outputs: dict, regime: dict, action: str, outco
         else:
             # OPEN: match within 30 minutes — covers slow/partial fills of the same order
             try:
-                ts_ex = datetime.fromisoformat(existing["timestamp"])
+                ts_ex = _parse_ts(existing["timestamp"])
                 if abs((ts_new - ts_ex).total_seconds()) < 1800:
                     # Tranche guard: T1 open and T2 open are distinct — never treat as dupes
                     if (

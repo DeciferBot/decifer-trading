@@ -223,6 +223,7 @@ class PriceUpdater:
                         if key in active_trades:
                             active_trades[key]["current"] = price["mid"]
                             active_trades[key]["current_premium"] = price["mid"]
+                            active_trades[key]["current_ts"] = time.time()
                 # If snapshot unavailable, leave "current" unchanged
             else:
                 sym = trade.get("symbol", key)
@@ -232,6 +233,7 @@ class PriceUpdater:
                     with _trades_lock:
                         if key in active_trades:
                             active_trades[key]["current"] = mid
+                            active_trades[key]["current_ts"] = time.time()
                 else:
                     df = BAR_CACHE.get_5m(sym)
                     if df is not None and not df.empty:
@@ -240,6 +242,7 @@ class PriceUpdater:
                             with _trades_lock:
                                 if key in active_trades:
                                     active_trades[key]["current"] = round(close, 4)
+                                    active_trades[key]["current_ts"] = time.time()
                     # If neither cache has data, leave "current" unchanged
 
         # Update SPY price in the regime display
