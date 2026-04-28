@@ -783,8 +783,20 @@ def backfill_trades_from_ibkr():
                 entry_time = matching_buy["time"]
 
                 pnl = sell["total_pnl"]
+                _price_pnl = round((sell["avg_price"] - entry_price) * sell["total_shares"], 2)
+                # IBKR realizedPNL uses its own FIFO cost basis, which can differ
+                # from entry_price when a position was built up at multiple prices.
+                # If the sign contradicts the actual price movement, the IBKR number
+                # is unreliable — use price-based P&L instead.
+                if pnl != 0.0 and _price_pnl != 0.0 and (pnl < 0) != (_price_pnl < 0):
+                    log.warning(
+                        "backfill: IBKR realizedPNL sign contradicts price move for %s "
+                        "(ibkr=%.2f, price_based=%.2f) — using price-based P&L",
+                        sym, pnl, _price_pnl,
+                    )
+                    pnl = _price_pnl
                 if pnl == 0.0:
-                    pnl = round((sell["avg_price"] - entry_price) * sell["total_shares"], 2)
+                    pnl = _price_pnl
                 if pnl == 0.0:
                     continue
 
@@ -878,8 +890,16 @@ def backfill_trades_from_ibkr():
                 entry_time = matching_short_entry["time"]
 
                 pnl = buy_cover["total_pnl"]
+                _price_pnl = round((entry_price - buy_cover["avg_price"]) * buy_cover["total_shares"], 2)
+                if pnl != 0.0 and _price_pnl != 0.0 and (pnl < 0) != (_price_pnl < 0):
+                    log.warning(
+                        "backfill: IBKR realizedPNL sign contradicts price move for SHORT %s "
+                        "(ibkr=%.2f, price_based=%.2f) — using price-based P&L",
+                        sym, pnl, _price_pnl,
+                    )
+                    pnl = _price_pnl
                 if pnl == 0.0:
-                    pnl = round((entry_price - buy_cover["avg_price"]) * buy_cover["total_shares"], 2)
+                    pnl = _price_pnl
                 if pnl == 0.0:
                     continue
 
@@ -999,8 +1019,16 @@ def backfill_trades_from_ibkr():
                 entry_time = matching_buy["time"]
 
                 pnl = sell["total_pnl"]
+                _price_pnl = round((sell["avg_price"] - entry_premium) * sell["total_contracts"] * 100, 2)
+                if pnl != 0.0 and _price_pnl != 0.0 and (pnl < 0) != (_price_pnl < 0):
+                    log.warning(
+                        "backfill: IBKR realizedPNL sign contradicts price move for option %s "
+                        "(ibkr=%.2f, price_based=%.2f) — using price-based P&L",
+                        sym, pnl, _price_pnl,
+                    )
+                    pnl = _price_pnl
                 if pnl == 0.0:
-                    pnl = round((sell["avg_price"] - entry_premium) * sell["total_contracts"] * 100, 2)
+                    pnl = _price_pnl
                 if pnl == 0.0:
                     continue
 

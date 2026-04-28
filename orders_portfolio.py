@@ -464,18 +464,20 @@ def reconcile_with_ibkr(ib: IB):
         # Purging real positions here would destroy metadata-rich state we cannot
         # recover from IBKR. PENDING positions are excluded — an unfilled order
         # truly not in IBKR must still be cancelled regardless.
-        _active_with_metadata = [
+        # Positions restored from the DB event log don't yet have status="ACTIVE"
+        # (that is only set after Step 4 confirms them with IBKR).  Use any
+        # non-PENDING entry as the guard — if we have stored positions of any
+        # kind and IBKR returned nothing, that is almost certainly a timing gap.
+        _stored_non_pending = [
             k for k, v in active_trades.items()
-            if v.get("status") == "ACTIVE"
-            and v.get("trade_type")
-            and v["trade_type"] != "UNKNOWN"
+            if v.get("status") != "PENDING"
         ]
-        if not ibkr_keys and _active_with_metadata:
+        if not ibkr_keys and _stored_non_pending:
             log.error(
-                "Reconcile: IBKR returned 0 portfolio positions but we have %d ACTIVE positions "
-                "with real metadata — skipping closed-while-down purge (likely account data not ready). "
+                "Reconcile: IBKR returned 0 portfolio positions but we have %d stored position(s) "
+                "— skipping closed-while-down purge (likely account data not ready). "
                 "Positions will be re-checked on next reconcile cycle.",
-                len(_active_with_metadata),
+                len(_stored_non_pending),
             )
         else:
             with _trades_lock:
