@@ -1275,6 +1275,37 @@ def warm_fundamentals_cache(symbols: list[str]) -> None:
             pass
 
 
+def get_index_bars(symbol: str, period: str = "5d", interval: str = "1h") -> "pd.DataFrame | None":
+    """Fetch intraday or daily bars for index symbols (e.g. ^VIX) from FMP stable API.
+
+    Returns a DataFrame with OHLCV columns (capitalised) sorted oldest-first,
+    or None if FMP is unavailable or the symbol isn't covered.
+    """
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    _interval_map = {"1h": "1hour", "1d": "1day", "5m": "5min", "15m": "15min", "30m": "30min"}
+    fmp_interval = _interval_map.get(interval)
+    if not fmp_interval:
+        return None
+
+    _period_days = {"1d": 2, "5d": 8, "1mo": 35, "3mo": 95, "6mo": 185, "1y": 370}
+    days_back = _period_days.get(period, 8)
+    from_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+
+    data = _get(f"historical-chart/{fmp_interval}/{symbol}", params={"from": from_date}, ttl=300)
+    if not data or not isinstance(data, list):
+        return None
+
+    df = pd.DataFrame(data)
+    if "close" not in df.columns:
+        return None
+    df = df.rename(columns={"close": "Close", "open": "Open", "high": "High", "low": "Low", "volume": "Volume"})
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.set_index("date").sort_index()
+    return df if len(df) > 0 else None
+
+
 def _safe_pct(val) -> float | None:
     """
     Convert FMP decimal fraction (0.35) to percentage (35.0).

@@ -28,20 +28,32 @@ log = logging.getLogger("decifer.scanner")
 def _regime_download(symbol: str, period: str = "5d", interval: str = "1h", auto_adjust: bool = True, **_ignored):
     """Download bars for regime detection.
 
-    Priority: Alpaca (paid, reliable) → yfinance (fallback only).
+    Priority: Alpaca (equities/ETFs) → FMP (^index symbols) → yfinance (last resort).
     Module-level so tests can patch scanner._regime_download.
     """
-    # Layer 1: Alpaca — primary source
-    try:
-        from alpaca_data import fetch_bars
+    # Layer 1: Alpaca — primary for equities and ETFs
+    if not symbol.startswith("^"):
+        try:
+            from alpaca_data import fetch_bars
 
-        df = fetch_bars(symbol, period=period, interval=interval)
-        if df is not None and len(df) > 0:
-            return df
-    except Exception as _e:
-        log.debug(f"_regime_download Alpaca {symbol} failed: {_e}")
+            df = fetch_bars(symbol, period=period, interval=interval)
+            if df is not None and len(df) > 0:
+                return df
+        except Exception as _e:
+            log.debug(f"_regime_download Alpaca {symbol} failed: {_e}")
 
-    # Layer 2: yfinance — fallback only
+    # Layer 2: FMP — for ^index symbols (^VIX, ^MMTH, etc.) that Alpaca doesn't carry
+    if symbol.startswith("^"):
+        try:
+            import fmp_client
+
+            df = fmp_client.get_index_bars(symbol, period=period, interval=interval)
+            if df is not None and len(df) > 0:
+                return df
+        except Exception as _e:
+            log.debug(f"_regime_download FMP {symbol} failed: {_e}")
+
+    # Layer 3: yfinance — last resort
     import time as _t
 
     import yfinance as _yf
@@ -518,11 +530,12 @@ def get_market_regime(ib: IB) -> dict:
         credit_spread = None
         if CONFIG.get("cross_asset_regime_enabled", True):
             try:
-                _dxy = _dl("DX-Y.NYB", period="5d", interval="1d", auto_adjust=True)
+                # UUP (Invesco DB USD Index ETF) tracks DXY — Alpaca handles ETFs reliably
+                _dxy = _dl("UUP", period="5d", interval="1d", auto_adjust=True)
                 if _dxy is not None and len(_dxy) >= 3:
                     _dxy_c = _dxy["Close"].squeeze().dropna()
-                    _dxy_3d = float(_dxy_c.iloc[-1]) - float(_dxy_c.iloc[-3])
-                    dxy_trend = "rising" if _dxy_3d > 0.2 else ("falling" if _dxy_3d < -0.2 else "flat")
+                    _dxy_pct = float(_dxy_c.iloc[-1]) / float(_dxy_c.iloc[-3]) - 1
+                    dxy_trend = "rising" if _dxy_pct > 0.002 else ("falling" if _dxy_pct < -0.002 else "flat")
             except Exception as _de:
                 log.debug("DXY fetch failed: %s", _de)
 
