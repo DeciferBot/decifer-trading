@@ -361,7 +361,6 @@ THEMES = {
             "OSCR",
             "TDOC",
             "DOCS",
-            "ACCD",
             "LLY",
             "NVO",  # GLP-1 majors
             "AMZN",  # Amazon pharmacy

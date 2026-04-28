@@ -832,7 +832,7 @@ TRACK A — NEW ENTRIES (per candidate you accept):
   direction:   LONG | SHORT (or null if trade_type=AVOID)
   direction_flipped: true if your direction disagrees with the candidate's
                signal direction; requires non-empty rationale.
-  conviction:  "MEDIUM" (standard) or "HIGH" (strongly evidenced)
+  conviction:  "MEDIUM" (standard) or "HIGH" (strongly evidenced) — null if trade_type=AVOID
                This is the sole lever on position size. Use HIGH sparingly.
   instrument:  "stock" by default. "call"/"put" only for SWING/POSITION candidates
                with options_eligible=true and no divergence_flags where you have
