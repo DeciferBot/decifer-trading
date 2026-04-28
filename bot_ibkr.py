@@ -1456,6 +1456,13 @@ def _on_order_status_event(trade):
                     clog("WARNING", f"Voice entry alert failed for {sym}: {_ve}")
 
             elif order.action == "SELL":
+                # Snapshot pre-update status for voice idempotency guard.
+                # Update status to SUBMITTED immediately so IBKR re-sends of the
+                # same Filled event (which arrive 80-150ms apart) don't double-speak.
+                with _trades_lock:
+                    _t_pre = dict(active_trades.get(sym, {}))
+                if _t_pre.get("direction") == "SHORT" and _t_pre.get("status") == "PENDING":
+                    _safe_update_trade(sym, {"status": "SUBMITTED"})
                 with _trades_lock:
                     _t = dict(active_trades.get(sym, {}))
 
@@ -1486,7 +1493,7 @@ def _on_order_status_event(trade):
                 # Voice for short entry fill
                 try:
                     from bot_voice import speak_natural as _speak_natural
-                    if _t.get("direction") == "SHORT" and _t.get("status") == "PENDING":
+                    if _t_pre.get("direction") == "SHORT" and _t_pre.get("status") == "PENDING":
                         _news = (dash.get("news_data") or {}).get(sym, {})
                         _speak_natural(
                             "entry",
