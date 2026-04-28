@@ -329,7 +329,7 @@ def lightweight_cycle_check(
                     actioned_syms.add(sym)
 
         elif trade_type == "SWING":
-            if entry_regime and current_regime and entry_regime != current_regime:
+            if entry_regime and entry_regime != "UNKNOWN" and current_regime and entry_regime != current_regime:
                 actions.append(
                     {
                         "symbol": sym,

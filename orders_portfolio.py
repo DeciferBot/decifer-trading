@@ -900,7 +900,7 @@ def reconcile_with_ibkr(ib: IB):
                             new_entry["open_time"] = _saved.get("open_time")
                             new_entry["atr"] = _saved.get("atr", 0)
                             new_entry["conviction"] = _saved.get("conviction", 0.0)
-                            new_entry["entry_regime"] = _saved.get("entry_regime", "UNKNOWN")
+                            new_entry["entry_regime"] = _saved.get("entry_regime") or _saved.get("regime") or "UNKNOWN"
                             new_entry["entry_thesis"] = _saved.get("entry_thesis", "")
                             new_entry["pattern_id"] = _saved.get("pattern_id", "")
                             new_entry["high_water_mark"] = _saved.get("high_water_mark", ibkr_entry)
@@ -957,7 +957,7 @@ def reconcile_with_ibkr(ib: IB):
                             new_entry["open_time"] = _saved.get("open_time")
                             new_entry["atr"] = _saved.get("atr", 0)
                             new_entry["conviction"] = _saved.get("conviction", 0.0)
-                            new_entry["entry_regime"] = _saved.get("entry_regime", "UNKNOWN")
+                            new_entry["entry_regime"] = _saved.get("entry_regime") or _saved.get("regime") or "UNKNOWN"
                             new_entry["entry_thesis"] = _saved.get("entry_thesis", "")
                             new_entry["pattern_id"] = _saved.get("pattern_id", "")
                             new_entry["tranche_mode"] = _saved.get("tranche_mode", False)
@@ -1023,7 +1023,7 @@ def reconcile_with_ibkr(ib: IB):
                             new_entry["open_time"] = _saved.get("open_time")
                             new_entry["atr"] = _saved.get("atr", 0)
                             new_entry["conviction"] = _saved.get("conviction", 0.0)
-                            new_entry["entry_regime"] = _saved.get("entry_regime", "UNKNOWN")
+                            new_entry["entry_regime"] = _saved.get("entry_regime") or _saved.get("regime") or "UNKNOWN"
                             new_entry["entry_thesis"] = _saved.get("entry_thesis", "")
                             new_entry["pattern_id"] = _saved.get("pattern_id", "")
                             new_entry["tranche_mode"] = _saved.get("tranche_mode", False)
@@ -1139,6 +1139,8 @@ def reconcile_with_ibkr(ib: IB):
                         ):
                             if _saved.get(_fld) is not None:
                                 new_entry[_fld] = _saved[_fld]
+                        if new_entry.get("entry_regime", "UNKNOWN") == "UNKNOWN" and _saved.get("regime"):
+                            new_entry["entry_regime"] = _saved["regime"]
                         if _saved.get("score", 0) > 0:
                             new_entry["score"] = _saved["score"]
                         new_entry["_metadata_restored"] = True
