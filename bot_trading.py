@@ -2141,34 +2141,8 @@ def run_scan():
     }
 
     dash["claude_analysis"] = "Apex scan in progress…"
-    dash["agent_outputs"] = decision.get("_agent_outputs", {})
 
     now_str = datetime.now(_ET).strftime("%H:%M:%S")
-    _buys = decision.get("buys", [])
-    _sells = decision.get("sells", [])
-    _holds = decision.get("hold", [])
-    _action_lines = []
-    for _b in _buys:
-        _sym = _b.get("symbol", "?") if isinstance(_b, dict) else _b
-        _reason = _b.get("reasoning", "No reason given") if isinstance(_b, dict) else "No reason given"
-        _dir_label = "SHORT" if isinstance(_b, dict) and _b.get("direction") == "SHORT" else "BUY"
-        _action_lines.append(f"{_dir_label} {_sym} — {_reason}")
-    for _s in _sells:
-        _sym = _s if isinstance(_s, str) else _s.get("symbol", str(_s))
-        _action_lines.append(f"SELL {_sym}")
-    for _h in _holds:
-        _sym = _h if isinstance(_h, str) else _h.get("symbol", str(_h))
-        _action_lines.append(f"HOLD {_sym}")
-    _decision_output = "\n".join(_action_lines) if _action_lines else "No trades this cycle."
-    dash["agent_conversation"] = [
-        {
-            "agent": "Apex Synthesizer",
-            "role": "Single claude-sonnet-4-6 call — candidates, regime, portfolio, session context → ApexDecision",
-            "time": now_str,
-            "output": _decision_output,
-        }
-    ]
-    clog("ANALYSIS", f"Apex Synthesizer: {decision.get('summary', '')}")
 
     if dash.get("killed"):
         clog("RISK", "🚨 Kill switch active — skipping all trade execution")
