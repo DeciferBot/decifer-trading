@@ -2361,10 +2361,11 @@ function renderTodaysTrades(allTrades) {
   }
 
   const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const closingActions = new Set(['CLOSE', 'SELL', 'BUY']);
   const todayTrades = allTrades
     .filter(t => {
       const ts = t.timestamp || t.exit_time || '';
-      return ts.slice(0, 10) === todayStr && t.exit_price != null && t.action === 'CLOSE';
+      return ts.slice(0, 10) === todayStr && t.exit_price != null && closingActions.has(t.action);
     })
     .sort((a, b) => new Date(b.timestamp || b.exit_time || 0) - new Date(a.timestamp || a.exit_time || 0));
 

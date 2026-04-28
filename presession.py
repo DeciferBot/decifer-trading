@@ -369,10 +369,9 @@ def presession_catalyst_pipeline() -> dict:
                 approvals,
             )
         else:
-            # Phase 3b: wire order execution here.
-            log.warning(
-                "presession: dry_run=False but execution path not implemented yet (Phase 3b). "
-                "No orders placed."
+            raise NotImplementedError(
+                "presession: dry_run=False execution path (Phase 3b) is not implemented. "
+                "Set presession_dry_run=True or implement Phase 3b before passing dry_run=False."
             )
 
         return summary

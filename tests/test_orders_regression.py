@@ -212,6 +212,7 @@ class TestOrphanedStopLoss:
             patch("orders._validate_position_price", return_value=(102.0, "IBKR")),
             patch("event_log.open_trades", return_value={}),
             patch("orders_portfolio._load_positions_file", return_value={}),
+            patch("orders_portfolio._save_positions_file"),
         ):
             _om.reconcile_with_ibkr(ib)
 
@@ -240,6 +241,7 @@ class TestOrphanedStopLoss:
             patch("orders._validate_position_price", return_value=(102.0, "IBKR")),
             patch("event_log.open_trades", return_value={}),
             patch("orders_portfolio._load_positions_file", return_value={}),
+            patch("orders_portfolio._save_positions_file"),
         ):
             _om.reconcile_with_ibkr(ib)
 
@@ -766,6 +768,8 @@ class TestClosedWhileDownExitPrice:
             patch("orders.CONFIG", mock_config),
             patch("event_log.open_trades", return_value={}),
             patch("orders_portfolio._load_positions_file", return_value={}),
+            patch("orders_portfolio._save_positions_file"),
+            patch("event_log.append_close"),
             patch("learning.log_trade", side_effect=_capture_log_trade),
         ):
             _om.reconcile_with_ibkr(ib)
@@ -804,6 +808,8 @@ class TestClosedWhileDownExitPrice:
             patch("orders.CONFIG", mock_config),
             patch("event_log.open_trades", return_value={}),
             patch("orders_portfolio._load_positions_file", return_value={}),
+            patch("orders_portfolio._save_positions_file"),
+            patch("event_log.append_close"),
             patch("learning.log_trade", side_effect=_capture_log_trade),
         ):
             _om.reconcile_with_ibkr(ib)
@@ -877,7 +883,9 @@ class TestTradeTypeRecovery:
             patch("orders.CONFIG", mock_config),
             patch("event_log.open_trades", return_value={}),
             patch("orders_portfolio._load_positions_file", return_value={}),
+            patch("orders_portfolio._save_positions_file"),
             patch("event_log.get_intent", return_value={"trade_type": "INTRADAY", "trade_id": "NVDA_20260428_test"}),
+            patch("event_log.append_close"),
             patch("learning.log_trade", side_effect=_capture_log_trade),
         ):
             _om.reconcile_with_ibkr(ib)
@@ -913,8 +921,10 @@ class TestTradeTypeRecovery:
             patch("orders.CONFIG", mock_config),
             patch("event_log.open_trades", return_value={}),
             patch("orders_portfolio._load_positions_file", return_value={}),
+            patch("orders_portfolio._save_positions_file"),
             patch("event_log.get_intent", return_value={}),
             patch("event_log.last_intent_for_symbol", return_value={"trade_type": "SWING", "symbol": "NVDA"}),
+            patch("event_log.append_close"),
             patch("learning.log_trade", side_effect=_capture_log_trade),
         ):
             _om.reconcile_with_ibkr(ib)

@@ -65,6 +65,14 @@ for _decifer_mod in ("orders", "risk", "scanner", "signals", "news", "agents"):
 import orders
 
 
+# Prevent execute_buy/execute_short from writing OPEN records to real data/trades.json.
+# learning.TRADE_LOG_FILE is set at import time from the real config, so patching
+# orders.CONFIG alone is not sufficient — we must intercept the call itself.
+@pytest.fixture(autouse=True)
+def _block_log_trade():
+    with patch("learning.log_trade"):
+        yield
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIG FIXTURE
