@@ -126,9 +126,12 @@ else
     echo "  ⚠ No iCloud backup found — data/historical/ will be rebuilt on first run (takes ~30 min)"
 fi
 
-# ── Step 7: Make scripts executable ──────────────────────────────────────────
-echo "[7/8] Setting up launchers and daemons..."
+# ── Step 7: Make scripts executable and install git hooks ─────────────────────
+echo "[7/8] Setting up launchers, daemons, and git hooks..."
 chmod +x Decifer.command Chief.command launch_decifer.command auto-push.sh scripts/*.sh 2>/dev/null || true
+chmod +x .githooks/pre-commit 2>/dev/null || true
+git config core.hooksPath .githooks
+echo "  ✓ Git hooks path set to .githooks"
 
 # Install auto-push daemon
 if [ ! -f ~/Library/LaunchAgents/com.decifer.auto-push.plist ]; then

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Auto-bump PATCH version on every commit.
+# Skips if version.py is already staged (manual MINOR/MAJOR bump via bump-version.sh).
+
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+VERSION_FILE="$REPO_ROOT/version.py"
+
+# If bump-version.sh already staged version.py, leave it alone.
+if git diff --cached --name-only | grep -q "^version\.py$"; then
+    exit 0
+fi
+
+# Parse current version and bump PATCH.
+current=$(python3 -c "
+with open('$VERSION_FILE') as f:
+    for line in f:
+        if line.startswith('__version__'):
+            print(line.split('\"')[1])
+            break
+")
+
+IFS='.' read -ra parts <<< "$current"
+new_patch=$(( ${parts[2]} + 1 ))
+new_version="${parts[0]}.${parts[1]}.${new_patch}"
+
+# Write back — macOS sed needs '' after -i.
+sed -i '' "s/__version__ = \"${current}\"/__version__ = \"${new_version}\"/" "$VERSION_FILE"
+git add "$VERSION_FILE"
+
+echo "  [version] auto-bumped PATCH: v${current} → v${new_version}"
