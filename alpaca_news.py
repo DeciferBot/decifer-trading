@@ -91,10 +91,16 @@ class AlpacaNewsStream:
             self._stream = NewsDataStream(api_key, secret_key)
 
             async def on_news(article) -> None:
-                try:
-                    self._process_article(article)
-                except Exception as exc:
-                    log.error(f"AlpacaNewsStream: processing error — {exc}")
+                # _process_article eventually calls execute_sell → ib.placeOrder/ib.sleep.
+                # Those ib_async calls fail with "event loop is already running" when invoked
+                # directly from this async callback (Alpaca's WebSocket loop is running here).
+                # Spawning a daemon thread gives execute_sell a clean non-async context.
+                threading.Thread(
+                    target=self._process_article,
+                    args=(article,),
+                    daemon=True,
+                    name="alpaca-news-process",
+                ).start()
 
             self._stream.subscribe_news(on_news, "*")
             self._stream.run()  # blocks until stop() is called
