@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from ib_async import IB, LimitOrder, Option, StopOrder
 
@@ -47,6 +47,35 @@ _PENDING_EXITS_FILE = os.path.join(os.path.dirname(__file__), "data", "pending_o
 _pending_option_exits: dict = {}  # opt_key → original reason string
 
 
+def _is_option_expired(opt_key: str) -> bool:
+    """Return True if the option's expiry date is in the past (ET)."""
+    try:
+        expiry_str = opt_key.rsplit("_", 1)[-1]
+        expiry_date = date.fromisoformat(expiry_str)
+        today_et = datetime.now(_ET).date()
+        return today_et > expiry_date
+    except Exception:
+        return False
+
+
+def _drop_expired_pending_exits(_log=None) -> None:
+    """Remove any deferred exits whose option has already expired. Cleans DB and file."""
+    expired = [k for k in list(_pending_option_exits) if _is_option_expired(k)]
+    if not expired:
+        return
+    for k in expired:
+        _pending_option_exits.pop(k, None)
+        try:
+            from trade_log import delete_pending_exit as _tl_dpe
+            _tl_dpe(k)
+        except Exception:
+            pass
+        if _log:
+            _log.warning("orders_options: dropped expired deferred exit %s — option already expired", k)
+        else:
+            log.warning(f"Dropped expired deferred exit {k} — option already expired")
+
+
 def _load_pending_exits() -> None:
     global _pending_option_exits
     _log = __import__("logging").getLogger(__name__)
@@ -56,9 +85,10 @@ def _load_pending_exits() -> None:
         db_exits = _tl_lpe()
         if db_exits:
             _pending_option_exits = db_exits
+            _drop_expired_pending_exits(_log)
             _log.info(
                 "orders_options: loaded %d pending exit(s) from DB: %s",
-                len(db_exits), ", ".join(db_exits.keys()),
+                len(_pending_option_exits), ", ".join(_pending_option_exits.keys()),
             )
             return
     except Exception as _db_err:
@@ -69,6 +99,7 @@ def _load_pending_exits() -> None:
             with open(_PENDING_EXITS_FILE) as f:
                 _pending_option_exits = __import__("json").load(f)
             if _pending_option_exits:
+                _drop_expired_pending_exits(_log)
                 _log.info(
                     "orders_options: loaded %d pending exit(s) from file (fallback): %s",
                     len(_pending_option_exits), ", ".join(_pending_option_exits.keys()),
@@ -637,6 +668,11 @@ def flush_pending_option_exits(ib: IB) -> None:
     if not _pending_option_exits or not is_options_market_open():
         return
     for opt_key, reason in list(_pending_option_exits.items()):
+        if _is_option_expired(opt_key):
+            log.warning(f"Deferred exit {opt_key} dropped — option has expired")
+            _pending_option_exits.pop(opt_key, None)
+            _save_pending_exits()
+            continue
         if opt_key not in active_trades:
             log.info(f"Deferred exit {opt_key} dropped — position no longer tracked")
             _pending_option_exits.pop(opt_key, None)
