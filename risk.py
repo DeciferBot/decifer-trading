@@ -236,9 +236,25 @@ def check_risk_conditions(
         ibkr_cash = _get_ibkr_cash(ib, CONFIG.get("active_account", ""))
         if ibkr_cash is not None:
             cash_pct = ibkr_cash / portfolio_value
+            log.debug(
+                "[cash_check] primary: AvailableFunds=$%s / NLV=$%s = %.1f%%",
+                f"{ibkr_cash:,.0f}", f"{portfolio_value:,.0f}", cash_pct * 100,
+            )
         else:
-            deployed = sum(p.get("current", p.get("entry", 0)) * p.get("qty", 0) for p in open_positions)
+            # Fallback: only count LONG positions as deployed capital.
+            # SHORT positions require margin (already netted in AvailableFunds) but do
+            # not consume cash — counting their notional inflates deployed and creates
+            # false cash-reserve rejections when the subscription hasn't fired yet.
+            deployed = sum(
+                p.get("current", p.get("entry", 0)) * p.get("qty", 0)
+                for p in open_positions
+                if p.get("direction", "LONG").upper() != "SHORT"
+            )
             cash_pct = (portfolio_value - deployed) / portfolio_value
+            log.debug(
+                "[cash_check] fallback (no AvailableFunds sub): deployed=$%s / NLV=$%s = %.1f%%",
+                f"{deployed:,.0f}", f"{portfolio_value:,.0f}", cash_pct * 100,
+            )
         if cash_pct < CONFIG["min_cash_reserve"]:
             return (
                 False,

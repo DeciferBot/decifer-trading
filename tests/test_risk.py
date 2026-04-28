@@ -267,6 +267,80 @@ class TestPDTRule:
 
 
 # ---------------------------------------------------------------------------
+# cash reserve fallback — short positions must not count as deployed capital
+# ---------------------------------------------------------------------------
+
+
+class TestCashReserveFallback:
+    """Fallback path (AvailableFunds subscription not yet fired) must exclude SHORT positions."""
+
+    _REGIME = {"regime": "NEUTRAL", "position_size_multiplier": 1.0}
+
+    _BASE_CONFIG = {
+        "daily_loss_limit": 0.06,
+        "min_cash_reserve": 0.10,
+        "pdt": {"enabled": False},
+        "active_account": "DUP999",
+        "accounts": {"paper": "DUP999"},
+    }
+
+    def _run(self, portfolio_value, positions):
+        """Call check_risk_conditions with no AvailableFunds subscription (fallback path)."""
+        from unittest.mock import patch
+        from datetime import datetime as _real_dt
+        import pytz
+
+        _market_time = _real_dt(2026, 4, 9, 10, 0, 0, tzinfo=pytz.timezone("America/New_York"))
+
+        class _FakeDatetime(_real_dt):
+            @classmethod
+            def now(cls, tz=None):
+                return _market_time if tz else _market_time.replace(tzinfo=None)
+
+        risk._drawdown_halt = False
+        risk._daily_loss_hit = False
+        risk._pause_until = None
+
+        _safe_config = dict(risk.CONFIG)
+        _safe_config.update(self._BASE_CONFIG)
+
+        with (
+            patch.object(risk, "_get_ibkr_cash", return_value=None),
+            patch.object(risk, "datetime", _FakeDatetime),
+            patch.object(risk, "CONFIG", _safe_config),
+        ):
+            return risk.check_risk_conditions(
+                portfolio_value=portfolio_value,
+                daily_pnl=0.0,
+                regime=self._REGIME,
+                open_positions=positions,
+                ib=None,
+            )
+
+    def test_short_positions_not_counted_as_deployed(self):
+        """
+        Portfolio $1M, $900K deployed in longs, $100K notional in shorts.
+        Without the fix, deployed = $1M, cash_pct = 0% → blocks.
+        With the fix, deployed = $900K, cash_pct = 10% → allows.
+        """
+        positions = [
+            {"direction": "LONG", "entry": 100.0, "qty": 9000},   # $900K deployed
+            {"direction": "SHORT", "entry": 90.0, "qty": 1111},   # $99,990 — must NOT count
+        ]
+        ok, reason = self._run(portfolio_value=1_000_000, positions=positions)
+        assert ok is True, f"Short positions incorrectly counted as deployed — {reason}"
+
+    def test_long_positions_still_counted(self):
+        """If longs alone push cash below 10%, the reserve gate still fires."""
+        positions = [
+            {"direction": "LONG", "entry": 100.0, "qty": 9500},   # $950K — leaves only 5% cash
+        ]
+        ok, reason = self._run(portfolio_value=1_000_000, positions=positions)
+        assert ok is False
+        assert "Cash reserve" in reason
+
+
+# ---------------------------------------------------------------------------
 # position_size()
 # ---------------------------------------------------------------------------
 
