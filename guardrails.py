@@ -142,7 +142,7 @@ def _default_trade_type(sig: dict) -> str:
 # ── 3. Forced exits (no Apex) ─────────────────────────────────────────────────
 
 def screen_open_positions(
-    open_positions: dict,
+    open_positions: dict | list,
     now_utc: datetime | None = None,
 ) -> list[tuple[str, str]]:
     """Return (symbol, reason) pairs for positions that must exit immediately.
@@ -151,8 +151,9 @@ def screen_open_positions(
     scalp_max_mins = CONFIG.get("portfolio_manager", {}).get("scalp_max_hold_minutes", 90)
     forced: list[tuple[str, str]] = []
 
-    for key, pos in open_positions.items():
-        sym = pos.get("symbol") or key
+    _items = open_positions.values() if isinstance(open_positions, dict) else open_positions
+    for pos in _items:
+        sym = pos.get("symbol") or ""
         tt = (pos.get("trade_type") or "").upper()
         direction = (pos.get("direction") or "LONG").upper()
 
@@ -190,7 +191,7 @@ def _is_eod_window(now: datetime) -> bool:
 # ── 4. Track B review flagger ─────────────────────────────────────────────────
 
 def flag_positions_for_review(
-    open_positions: dict,
+    open_positions: dict | list,
     regime: dict,
     forced_symbols: set[str] | None = None,
 ) -> list[dict]:
@@ -201,8 +202,9 @@ def flag_positions_for_review(
     current_regime = (regime.get("regime") or "").upper()
     flagged: list[dict] = []
 
-    for key, pos in open_positions.items():
-        sym = pos.get("symbol") or key
+    _items = open_positions.values() if isinstance(open_positions, dict) else open_positions
+    for pos in _items:
+        sym = pos.get("symbol") or ""
         if sym in forced_symbols:
             continue
         tt = (pos.get("trade_type") or "").upper()
