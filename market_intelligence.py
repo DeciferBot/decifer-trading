@@ -49,11 +49,11 @@ log = logging.getLogger("decifer.intelligence")
 # Sonnet picks one of these to describe the market session.  Stored as entry_regime
 # on every new position — replaces the mechanical BULL_TRENDING/CHOPPY labels.
 SESSION_CHARACTER_VOCAB = {
-    "MOMENTUM_BULL",  # strong uptrend, VIX low, broad participation
-    "RELIEF_RALLY",  # bouncing from recent selloff, VIX declining but still elevated
-    "FEAR_ELEVATED",  # VIX rising, cautious but not extreme
-    "DISTRIBUTION",  # selling pressure, SPY declining or losing breadth
-    "TRENDING_BEAR",  # sustained downtrend, shorts working
+    "MOMENTUM_BULL",   # SPY trending up, VIX <18 flat/falling, broad participation — full-size longs
+    "RELIEF_RALLY",    # SPY bouncing within structural downtrend, VIX declining but still elevated — size longs 50%, keep shorts
+    "FEAR_ELEVATED",   # VIX rising 18–28, direction indeterminate — catalyst-driven setups only, reduce size on speculative plays
+    "DISTRIBUTION",    # SPY -0.5% to -2%, orderly selling, VIX rising — shorts working, longs need stock-specific story
+    "TRENDING_BEAR",   # SPY down >2% or confirmed multi-day downtrend, VIX >25 — shorts strongly preferred, longs need exceptional conviction
 }
 _DEFAULT_SESSION_CHARACTER = "FEAR_ELEVATED"  # conservative fallback if Sonnet omits
 
@@ -321,6 +321,14 @@ def _build_session_context(full_news: bool) -> SessionContext:
 
 # ── Prompt builders ───────────────────────────────────────────────────────────
 
+_REGIME_DEFINITIONS: dict[str, str] = {
+    "TRENDING_UP":   "structural bull — VIX<20, SPY+QQQ above 200d MA, broad participation (>55%)",
+    "TRENDING_DOWN": "structural bear — SPY+QQQ below 200d MA, VIX>20, breadth deteriorating (<40%)",
+    "RELIEF_RALLY":  "bounce within structural downtrend — VIX falling intraday but both MAs broken",
+    "RANGE_BOUND":   "no clear structural direction — mixed MA signals or VIX in transition zone",
+    "CAPITULATION":  "panic — VIX>35 or 1h spike >20%; no new entries",
+}
+
 
 def _build_regime_context_block(regime: dict) -> str:
     """Format the raw regime dict as a readable context block for the prompt."""
@@ -338,9 +346,10 @@ def _build_regime_context_block(regime: dict) -> str:
 
     breadth_str = f"{breadth:.0f}%" if breadth is not None else "unavailable"
     credit_str = f"{credit_spread:.0f} bps" if credit_spread is not None else "unavailable"
+    regime_def = _REGIME_DEFINITIONS.get(label, "unknown label")
 
     return (
-        f"  System regime label: {label}  (informational — reason freely from the data below)\n"
+        f"  Regime: {label}  ({regime_def})\n"
         f"  VIX: {vix:.1f}  (1h change: {vix_1h:+.1%})\n"
         f"  SPY: ${spy_price:.2f}  above 200d MA: {spy_above}\n"
         f"  QQQ: ${qqq_price:.2f}  above 200d MA: {qqq_above}\n"
@@ -838,8 +847,9 @@ TRACK A — NEW ENTRIES (per candidate you accept):
   counter_argument / key_risk: one short sentence each (null for AVOID)
 
 TRACK B — OPEN POSITIONS (flagged for review):
-  action:         HOLD | TRIM | EXIT (no ADD in v1)
+  action:         HOLD | TRIM | EXIT | ADD
   trim_pct:       25 | 50 | 75 (required when action=TRIM)
+  add_pct:        25 | 50 | 100 (required when action=ADD — % of current position size to add)
   reasoning_tag:  snake_case label
   reasoning:      one sentence
 
@@ -855,11 +865,34 @@ NEWS_FINBERT_SENTIMENT FIELD NOTE:
   The news_finbert_sentiment on each candidate is currently ADVISORY ONLY.
   Do not weight it heavily; use raw news_headlines as primary news signal.
 
-SESSION CHARACTER VOCABULARY (pick one):
-  MOMENTUM_BULL | RELIEF_RALLY | FEAR_ELEVATED | DISTRIBUTION | TRENDING_BEAR
-  FEAR_ELEVATED is a regime descriptor, NOT an AVOID mandate. It describes
-  elevated hedging/put activity — it does not mean all entries should be
-  skipped. Evaluate each candidate on its own score and dimension evidence.
+TWO-LAYER MARKET CONTEXT:
+
+REGIME (structural backdrop — multi-day, computed mechanically from VIX + 200d MAs + breadth):
+  Describes where the market cycle stands. Use to calibrate directional bias over the hold period.
+  TRENDING_UP    — structural bull: VIX<20, SPY+QQQ above 200d MA, broad participation >55%
+  TRENDING_DOWN  — structural bear: SPY+QQQ below 200d MA, VIX>20, breadth <40%
+  RELIEF_RALLY   — bounce within structural downtrend: VIX falling intraday but both MAs broken
+  RANGE_BOUND    — no clear structural direction: mixed MA signals or VIX in transition zone
+  CAPITULATION   — panic: VIX>35 or 1h spike >20%; no new entries permitted
+
+SESSION CHARACTER (today's tape — your judgment, intraday):
+  How the market is trading RIGHT NOW. Independent of regime — they can and do diverge.
+  Pick exactly one:
+  MOMENTUM_BULL  — SPY trending up, VIX <18 flat/falling, broad participation. Full-size longs.
+  RELIEF_RALLY   — SPY bouncing within structural downtrend, VIX declining but still elevated.
+                   Size new longs at 50% normal. Keep existing shorts. Do not chase strength.
+  FEAR_ELEVATED  — VIX rising 18–28, market direction indeterminate. NOT an AVOID mandate.
+                   Prefer catalyst-driven setups over pure technicals. Reduce size on speculative plays.
+  DISTRIBUTION   — SPY -0.5% to -2%, orderly selling, VIX rising moderately. Shorts working.
+                   Longs require a strong stock-specific story to justify against tape headwind.
+  TRENDING_BEAR  — SPY down >2% or confirmed multi-day downtrend, VIX >25. Shorts strongly preferred.
+                   New longs need exceptional stock-specific conviction to justify entry.
+
+INTERACTION RULE — when regime and session_character diverge, the divergence is informative:
+  TRENDING_DOWN + RELIEF_RALLY  → bounce within downtrend; scale new longs to 50%, hold shorts
+  TRENDING_UP   + DISTRIBUTION  → unusual intraday breakdown; reduce new entries, check breadth
+  RANGE_BOUND   + FEAR_ELEVATED → most common indeterminate case; stock-specific catalysts are the only reliable edge
+  Any regime    + TRENDING_BEAR → tape is leading the structural signal; treat as TRENDING_DOWN for sizing
 
 ENTRY FLOOR RULE:
   When ≥3 candidates have score ≥35 and no named systemic blocking condition
@@ -902,7 +935,8 @@ OUTPUT: valid JSON matching exactly this schema (no prose outside JSON):
 
 portfolio_actions may be empty. new_entries must contain at least one non-AVOID entry
 when ≥3 candidates have score ≥35 and no named systemic blocker applies (see ENTRY FLOOR RULE).
-Never output ADD.
+ADD is for scaling into a winner already held — use it when the thesis is strengthening and the position
+has room to grow. add_pct is the fraction of the current held qty to add (25 = small scale, 100 = double).
 CRITICAL: every new_entries item MUST include "symbol" (the ticker string). Entries without "symbol" are silently dropped by the execution layer.
 """
 
