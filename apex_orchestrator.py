@@ -34,12 +34,15 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 from datetime import UTC, datetime
 from typing import Any
 
 from config import CONFIG
 
 log = logging.getLogger("decifer.apex_orchestrator")
+
+_shadow_log_lock = threading.Lock()
 
 _SHADOW_LOG_PATH = os.path.join(
     CONFIG.get("data_dir", "data"), "apex_shadow_log.jsonl"
@@ -97,7 +100,7 @@ def log_shadow_result(
             "note": result.get("note", ""),
             "apex_meta": _apex_meta or {},
         }
-        with open(_SHADOW_LOG_PATH, "a") as fh:
+        with _shadow_log_lock, open(_SHADOW_LOG_PATH, "a") as fh:
             fh.write(json.dumps(entry, default=str) + "\n")
     except Exception as e:
         log.warning("apex_orchestrator: shadow log write failed — %s", e)
@@ -203,10 +206,16 @@ def _run_apex_pipeline(
         empty["note"] = f"import_error:{e}"
         return empty
 
+    _pre_call_cands = (apex_input.get("track_a") or {}).get("candidates") or []
+    _floor_eligible = [c.get("symbol") for c in _pre_call_cands if (c.get("score") or 0) >= 35]
+    if len(_floor_eligible) >= 3:
+        log.info("apex: pre-call floor rule eligible (≥35): %s", _floor_eligible)
+
     try:
         decision = apex_call(apex_input)
     except Exception as e:
-        log.error("apex_orchestrator: apex_call raised — %s", e)
+        import traceback as _tb
+        log.error("apex_orchestrator: apex_call raised — %s\n%s", e, _tb.format_exc())
         empty["note"] = f"apex_call_error:{e}"
         return empty
 

@@ -206,6 +206,7 @@ def execute_buy(
     pattern_id: str = "",
     market_read: str = "",
     entry_context: dict | None = None,
+    qty_override: int | None = None,
 ) -> bool:
     """
     Place a buy order with full OCO bracket.
@@ -389,10 +390,10 @@ def execute_buy(
             return False
 
         # Now calculate sizing and stops with the IBKR-sourced price
-        qty = calculate_position_size(portfolio_value, price, score, regime, atr=atr)
+        qty = qty_override if qty_override is not None else calculate_position_size(portfolio_value, price, score, regime, atr=atr)
 
         # ── Advisor size multiplier ───────────────────────────────────
-        if advice_size_mult != 1.0 and 0.25 <= advice_size_mult <= 2.0:
+        if qty_override is None and advice_size_mult != 1.0 and 0.25 <= advice_size_mult <= 2.0:
             qty = max(1, int(qty * advice_size_mult))
             log.info(f"[advisor] {symbol} size_mult={advice_size_mult} → qty={qty}")
 
@@ -1194,6 +1195,7 @@ def execute_short(
     pattern_id: str = "",
     market_read: str = "",
     entry_context: dict | None = None,
+    qty_override: int | None = None,
 ) -> bool:
     """
     Place a short-sell order with OCO bracket (sell-to-open + buy-to-cover SL + TP).
@@ -1330,10 +1332,10 @@ def execute_short(
             _safe_del_trade(symbol)
             return False
 
-        qty = calculate_position_size(portfolio_value, price, score, regime, atr=atr)
+        qty = qty_override if qty_override is not None else calculate_position_size(portfolio_value, price, score, regime, atr=atr)
 
         # ── Advisor size multiplier ───────────────────────────────────
-        if advice_size_mult != 1.0 and 0.25 <= advice_size_mult <= 2.0:
+        if qty_override is None and advice_size_mult != 1.0 and 0.25 <= advice_size_mult <= 2.0:
             qty = max(1, int(qty * advice_size_mult))
             log.info(f"[advisor] {symbol} size_mult={advice_size_mult} → qty={qty}")
 
@@ -1944,24 +1946,49 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                 f"(MktOrder not supported outside regular session)"
             )
 
+        # For TRIM (partial sell): cancel existing bracket orders BEFORE placing the sell.
+        # IBKR rejects a partial SELL when the full-size SL/TP bracket is still live —
+        # it would result in a net short position. Cancel first, sell, then reissue a
+        # resized bracket on the remaining quantity.
+        if _is_partial:
+            _entry_order_id = info.get("order_id")
+            _sl_id = info.get("sl_order_id")
+            _tp_id = info.get("tp_order_id")
+            try:
+                for _t in list(ib.openTrades()):
+                    _oid = _t.order.orderId
+                    _parent = getattr(_t.order, "parentId", None)
+                    if (
+                        _oid in (_sl_id, _tp_id)
+                        or (_entry_order_id and _parent == _entry_order_id)
+                    ):
+                        ib.cancelOrder(_t.order)
+                        log.info(
+                            f"[TRIM-pre] {symbol}: cancelled bracket order #{_oid} "
+                            f"(sl_id={_sl_id}, tp_id={_tp_id}) before partial sell"
+                        )
+                ib.sleep(0.5)
+            except Exception as _bce:
+                log.warning(f"[TRIM-pre] {symbol}: bracket pre-cancel failed — {_bce}")
+
         sell_trade = ib.placeOrder(contract, close_order)
         ib.sleep(2)
 
-        # Cancel any orphaned bracket children (SL + TP legs) that remain open
-        # after the position is closed. IBKR OCA only fires when one child fills —
-        # it does not fire when the position is closed externally (e.g. manually).
-        _entry_order_id = info.get("order_id")
-        if _entry_order_id:
-            try:
-                for _t in ib.openTrades():
-                    if getattr(_t.order, "parentId", None) == _entry_order_id:
-                        ib.cancelOrder(_t.order)
-                        log.info(
-                            f"Cancelled orphaned bracket child for {symbol} "
-                            f"(orderId={_t.order.orderId}, parentId={_entry_order_id})"
-                        )
-            except Exception as _e:
-                log.warning(f"Bracket child cleanup for {symbol} failed: {_e}")
+        # For full EXIT: cancel any orphaned bracket children that remain after close.
+        # (For TRIM, brackets were already cancelled above; new ones are placed below.)
+        if not _is_partial:
+            _entry_order_id = info.get("order_id")
+            if _entry_order_id:
+                try:
+                    for _t in ib.openTrades():
+                        if getattr(_t.order, "parentId", None) == _entry_order_id:
+                            ib.cancelOrder(_t.order)
+                            log.info(
+                                f"Cancelled orphaned bracket child for {symbol} "
+                                f"(orderId={_t.order.orderId}, parentId={_entry_order_id})"
+                            )
+                except Exception as _e:
+                    log.warning(f"Bracket child cleanup for {symbol} failed: {_e}")
 
         # Log the close order
         log_order(
@@ -2021,8 +2048,45 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                 return True
 
         if _is_partial:
-            _safe_update_trade(_trade_key, {"qty": info["qty"] - sell_qty, "status": "ACTIVE"})
-            log.info(f"[TRIM] {symbol}: sold {sell_qty}, {info['qty'] - sell_qty} remaining")
+            remaining_qty = info["qty"] - sell_qty
+            _safe_update_trade(_trade_key, {"qty": remaining_qty, "status": "ACTIVE"})
+            log.info(f"[TRIM] {symbol}: sold {sell_qty}, {remaining_qty} remaining")
+
+            # Reissue OCA bracket (SL + TP) sized to remaining_qty at original levels.
+            _sl_price = info.get("sl", 0.0)
+            _tp_price = info.get("tp", 0.0)
+            _trim_account = CONFIG.get("active_account", "")
+            if _sl_price and _tp_price and remaining_qty > 0:
+                try:
+                    from ib_async import LimitOrder as _LimitOrder_trim
+                    _oca_group = f"decifer_{symbol}_{sell_trade.order.orderId}_trim"
+                    _sl_limit_trim = round(_sl_price * 0.99, 2) if direction == "LONG" else round(_sl_price * 1.01, 2)
+                    _bracket_action = "SELL" if direction == "LONG" else "BUY"
+                    new_sl = StopLimitOrder(
+                        _bracket_action, remaining_qty, _sl_price, _sl_limit_trim,
+                        account=_trim_account, tif="GTC", outsideRth=True,
+                    )
+                    new_sl.ocaGroup = _oca_group
+                    new_sl.ocaType = 1
+                    new_tp = _LimitOrder_trim(
+                        _bracket_action, remaining_qty, _tp_price,
+                        account=_trim_account, tif="GTC", outsideRth=True,
+                    )
+                    new_tp.ocaGroup = _oca_group
+                    new_tp.ocaType = 1
+                    sl_t = ib.placeOrder(contract, new_sl)
+                    tp_t = ib.placeOrder(contract, new_tp)
+                    ib.sleep(0.5)
+                    _safe_update_trade(_trade_key, {
+                        "sl_order_id": sl_t.order.orderId,
+                        "tp_order_id": tp_t.order.orderId,
+                    })
+                    log.info(
+                        f"[TRIM] {symbol}: new bracket placed — SL #{sl_t.order.orderId} @ ${_sl_price:.2f}, "
+                        f"TP #{tp_t.order.orderId} @ ${_tp_price:.2f}, qty={remaining_qty}, OCA={_oca_group}"
+                    )
+                except Exception as _be:
+                    log.error(f"[TRIM] {symbol}: failed to place post-trim bracket — {_be}")
         else:
             now_ts = datetime.now(UTC).isoformat()
             _close_trade_id = info.get("trade_id") or f"{symbol}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"

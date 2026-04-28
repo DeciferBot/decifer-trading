@@ -115,6 +115,7 @@ def dispatch_signals(
     # Built for all LONG/SHORT signals. Reused in per-signal entry gate below
     # so we don't fetch FMP/Alpaca data twice per signal.
     _context_map: dict[str, object] = {}  # symbol.upper() → TradeContext
+    _context_failed: set[str] = set()  # symbols excluded due to context build failure
     for _sig in signals:
         if _sig.direction not in ("LONG", "SHORT"):
             continue
@@ -164,18 +165,22 @@ def dispatch_signals(
                 earnings_days_away=_ed, regime=_sig.regime_context,
             )
         except Exception as _ce:
-            log.debug("dispatch: pre-build context failed for %s — %s", _sig.symbol, _ce)
+            log.warning("dispatch: pre-build context failed for %s — excluding from candidates: %s", _sig.symbol, _ce)
+            _context_failed.add(_sig.symbol.upper())
 
     # ── Intelligence classification (gate) ────────────────────
     # Convert signals to candidate dicts, classify the full batch in one call.
     # Pass serialised TradeContexts so Opus has full entry context per symbol.
-    candidates = [_signal_to_candidate(s) for s in signals]
+    candidates = [_signal_to_candidate(s) for s in signals if s.symbol.upper() not in _context_failed]
     _ctx_for_opus = {}
     for _sym, _tctx in _context_map.items():
         try:
             _ctx_for_opus[_sym] = _tctx.to_dict()
-        except Exception:
-            pass
+        except Exception as _te:
+            log.warning("dispatch: to_dict() failed for %s — Apex will have no context: %s", _sym, _te)
+    _cand_syms_missing_ctx = [c["symbol"].upper() for c in candidates if c["symbol"].upper() not in _ctx_for_opus]
+    if _cand_syms_missing_ctx:
+        log.warning("dispatch: %d candidate(s) have no Apex context: %s", len(_cand_syms_missing_ctx), _cand_syms_missing_ctx)
     session_character, market_read, classifications = classify_signals(
         candidates, regime=regime, trade_contexts=_ctx_for_opus
     )
@@ -536,12 +541,24 @@ def dispatch(
         "errors": [],
     }
 
+    # Symbols with an active Track B EXIT or TRIM this cycle — block Track A re-entry.
+    _exiting_syms: set[str] = {
+        act.get("symbol")
+        for act in (decision.get("portfolio_actions") or [])
+        if (act.get("action") or "").upper() in ("EXIT", "TRIM") and act.get("symbol")
+    }
+
     # ── Track A: new entries ──────────────────────────────────────────────
     for entry in (decision.get("new_entries") or []):
         sym = entry.get("symbol")
         trade_type = (entry.get("trade_type") or "").upper()
 
         if trade_type == "AVOID" or not sym:
+            continue
+
+        if sym in _exiting_syms:
+            log.warning("dispatch: %s Track A entry blocked — Track B EXIT/TRIM in same cycle", sym)
+            report["errors"].append(f"{sym}: Track A entry blocked — Track B EXIT/TRIM in same cycle")
             continue
 
         payload = candidates_by_symbol.get(sym) or {}
@@ -660,7 +677,7 @@ def dispatch(
             report["errors"].append(f"{sym}: execute failed — {exc}")
         report["new_entries"].append(rec)
 
-    # ── Track B: portfolio actions (HOLD / TRIM / EXIT) ───────────────────
+    # ── Track B: portfolio actions (HOLD / TRIM / EXIT / ADD) ────────────
     for act in (decision.get("portfolio_actions") or []):
         sym = act.get("symbol")
         action_type = (act.get("action") or "").upper()
@@ -668,6 +685,7 @@ def dispatch(
             "symbol": sym,
             "action": action_type,
             "trim_pct": act.get("trim_pct"),
+            "add_pct": act.get("add_pct"),
             "reasoning_tag": act.get("reasoning_tag"),
             "executed": False,
         }
@@ -680,13 +698,14 @@ def dispatch(
             continue
 
         try:
-            from orders_core import execute_sell
             pos = active_trades.get(sym) or {}
             pos_qty = int(pos.get("qty") or 0)
             if action_type == "EXIT":
+                from orders_core import execute_sell
                 ok = execute_sell(ib, sym, reason=act.get("reasoning_tag") or "apex_exit")
                 rec["executed"] = bool(ok)
             elif action_type == "TRIM":
+                from orders_core import execute_sell
                 trim_pct = int(act.get("trim_pct") or 50)
                 trim_qty = max(1, int(pos_qty * trim_pct / 100))
                 ok = execute_sell(
@@ -694,6 +713,35 @@ def dispatch(
                     reason=act.get("reasoning_tag") or f"apex_trim_{trim_pct}",
                     qty_override=trim_qty,
                 )
+                rec["executed"] = bool(ok)
+            elif action_type == "ADD":
+                add_pct = int(act.get("add_pct") or 25)
+                add_qty = max(1, int(pos_qty * add_pct / 100))
+                direction = (pos.get("direction") or "LONG").upper()
+                price = float(pos.get("entry") or 0.0)
+                atr = float(pos.get("atr") or 0.0)
+                score = int(pos.get("score") or 0)
+                rationale = act.get("reasoning_tag") or f"apex_add_{add_pct}"
+                if direction == "LONG":
+                    ok = execute_buy(
+                        ib=ib, symbol=sym, price=price, atr=atr, score=score,
+                        portfolio_value=portfolio_value, regime=regime or {},
+                        reasoning=rationale, signal_scores={},
+                        open_time=datetime.now(UTC).isoformat(),
+                        trade_type=pos.get("trade_type") or "INTRADAY",
+                        conviction=1.0,
+                        qty_override=add_qty,
+                    )
+                else:
+                    ok = execute_short(
+                        ib=ib, symbol=sym, price=price, atr=atr, score=score,
+                        portfolio_value=portfolio_value, regime=regime or {},
+                        reasoning=rationale, signal_scores={},
+                        open_time=datetime.now(UTC).isoformat(),
+                        trade_type=pos.get("trade_type") or "INTRADAY",
+                        conviction=1.0,
+                        qty_override=add_qty,
+                    )
                 rec["executed"] = bool(ok)
             else:
                 report["errors"].append(f"{sym}: unknown action {action_type!r}")

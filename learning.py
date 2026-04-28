@@ -68,6 +68,10 @@ def load_capital_base() -> dict:
                 return json.load(f)
         except Exception as exc:
             log.error(f"load_capital_base: failed to parse {CAPITAL_FILE} — {exc}. Returning defaults.")
+            _append_audit_event("CAPITAL_BASE_DEFAULTED", reason="parse_error", error=str(exc))
+    else:
+        log.error(f"load_capital_base: {CAPITAL_FILE} not found — using default starting capital. Position sizing may be wrong.")
+        _append_audit_event("CAPITAL_BASE_DEFAULTED", reason="file_missing")
     # Default: starting capital from config, no adjustments
     return {"starting_capital": CONFIG.get("starting_capital", 1_000_000), "adjustments": []}
 

@@ -834,15 +834,14 @@ TRACK A — NEW ENTRIES (per candidate you accept):
                signal direction; requires non-empty rationale.
   conviction:  "MEDIUM" (standard) or "HIGH" (strongly evidenced)
                This is the sole lever on position size. Use HIGH sparingly.
-  instrument:  "stock" by default. "call"/"put" only when:
-                 - options_eligible = true, AND
-                 - trade_type in (SWING, POSITION), AND
-                 - setup is directionally clean (high DAR, no divergence_flags)
-               IMPORTANT: divergence_flags restrict instrument selection to "stock"
-               only — they do NOT veto the stock trade itself. A stock entry
-               with divergence_flags can and should proceed when score and signal
-               dimensions support it. Never AVOID a stock trade solely because
-               divergence_flags is non-empty.
+  instrument:  "stock" by default. "call"/"put" only for SWING/POSITION candidates
+               with options_eligible=true and no divergence_flags where you have
+               strong independent conviction from the stock signal alone.
+               Note: CALL_BUYER/PUT_BUYER options entries are executed deterministically
+               by the scanner bridge before this call — do not duplicate them here.
+               IMPORTANT: divergence_flags restrict instrument to "stock" only — they
+               do NOT veto the stock trade itself. Never AVOID a stock trade solely
+               because divergence_flags is non-empty.
   rationale:   One sentence. Required even for AVOID.
   counter_argument / key_risk: one short sentence each (null for AVOID)
 
@@ -1001,7 +1000,7 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
 
     options_flow = mctx.get("options_flow") or []
     if options_flow:
-        parts.append(f"\n[OPTIONS FLOW] ({len(options_flow)} signals — use as supporting evidence for instrument=call/put on eligible SWING/POSITION candidates)")
+        parts.append(f"\n[OPTIONS FLOW] ({len(options_flow)} signals — market sentiment intelligence. CALL_BUYER/PUT_BUYER entries are executed deterministically by the scanner bridge; use EARNINGS_PLAY/MIXED_FLOW for directional bias context on your stock entries.)")
         for o in options_flow:
             unusual = []
             if o.get("unusual_calls"):

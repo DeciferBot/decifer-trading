@@ -112,7 +112,6 @@ def compute_allowed_trade_types(
             allowed.remove("INTRADAY")
         if minutes_to_close < 60 and "POSITION" in allowed:
             allowed.remove("POSITION")
-    allowed.append("AVOID")
     return allowed
 
 

@@ -143,8 +143,9 @@ _VALID_TRADE_TYPES = {"INTRADAY", "SWING", "POSITION", "AVOID"}
 _VALID_DIRECTIONS  = {"LONG", "SHORT"}
 _VALID_CONVICTIONS = {"MEDIUM", "HIGH"}
 _VALID_INSTRUMENTS = {"stock", "call", "put"}
-_VALID_ACTIONS     = {"HOLD", "TRIM", "EXIT"}
+_VALID_ACTIONS     = {"HOLD", "TRIM", "EXIT", "ADD"}
 _VALID_TRIM_PCTS   = {25, 50, 75}
+_VALID_ADD_PCTS    = {25, 50, 100}
 
 
 def validate_apex_decision_schema(decision: dict[str, Any]) -> None:
@@ -188,10 +189,6 @@ def validate_apex_decision_schema(decision: dict[str, Any]) -> None:
     for action in decision.get("portfolio_actions", []):
         sym = action.get("symbol", "<unknown>")
         act = action.get("action")
-        if act == "ADD":
-            raise ValueError(
-                f"portfolio_action {sym}: ADD is not valid in v1 — Track B is HOLD/TRIM/EXIT only"
-            )
         if act not in _VALID_ACTIONS:
             raise ValueError(f"portfolio_action {sym}: invalid action {act!r}")
         if act == "TRIM":
@@ -199,6 +196,12 @@ def validate_apex_decision_schema(decision: dict[str, Any]) -> None:
             if pct not in _VALID_TRIM_PCTS:
                 raise ValueError(
                     f"portfolio_action {sym}: TRIM requires trim_pct in {{25, 50, 75}}, got {pct!r}"
+                )
+        if act == "ADD":
+            pct = action.get("add_pct")
+            if pct not in _VALID_ADD_PCTS:
+                raise ValueError(
+                    f"portfolio_action {sym}: ADD requires add_pct in {{25, 50, 100}}, got {pct!r}"
                 )
 
 

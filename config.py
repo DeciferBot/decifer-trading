@@ -662,6 +662,9 @@ CONFIG = {
     "options_profit_target": 0.75,  # Take profit at 75% premium gain
     "options_stop_loss": 0.20,  # Stop loss at 20% premium loss
     "options_exit_dte": 2,  # Hard exit at this many DTE (gamma risk)
+    # ── Options scanner deterministic entry bridge ────────────
+    "options_scan_entry_min_score": 18,       # min options_score (0-30) for direct execution
+    "options_scan_max_entries_per_cycle": 2,  # cap on new options entries per scan cycle
     # ── NEWS SENTINEL (real-time news trigger) ───────────────
     # Runs independently of the scan loop. Polls news every N seconds
     # and fires a single Apex call when material news is detected.
