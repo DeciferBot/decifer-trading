@@ -60,7 +60,7 @@ def _swing_ctx(**kwargs) -> TradeContext:
         analyst_consensus="BUY",
         short_float_pct=12.0,
         catalyst_type="earnings_beat",
-        catalyst_score=45.0,
+        catalyst_score=5.0,   # 0–10 scale (catalyst_engine native)
         regime="TRENDING_UP",
         recent_upgrade=False,
         recent_downgrade=False,
@@ -192,16 +192,17 @@ class TestSwingGate(unittest.TestCase):
         ok, reason, _ = _validate_swing("LONG", ctx)
         self.assertTrue(ok)
 
-    def test_no_catalyst_still_passes(self):
-        # Catalyst no longer required — SWING is a label, not a gate
+    def test_low_catalyst_score_rejected(self):
+        # catalyst_score below swing_min_catalyst_score (3.0 on 0–10 scale) must be rejected
         ctx = _swing_ctx(
             catalyst_type="none",
-            catalyst_score=5.0,
+            catalyst_score=1.5,
             recent_upgrade=False,
             sector_days_since_breakout=15,
         )
         ok, reason, _ = _validate_swing("LONG", ctx)
-        self.assertTrue(ok)
+        self.assertFalse(ok)
+        self.assertIn("catalyst score", reason)
 
     def test_sell_consensus_long_passes(self):
         # Analyst consensus no longer a gate

@@ -107,6 +107,16 @@ def _validate_swing(direction: str, ctx: TradeContext) -> tuple[bool, str, int]:
             0,
         )
 
+    # Catalyst score floor
+    min_catalyst = _cfg("swing_min_catalyst_score", 30)
+    cat_score = ctx.catalyst_score or 0.0
+    if cat_score < min_catalyst:
+        return (
+            False,
+            f"catalyst score {cat_score:.0f} below SWING floor {min_catalyst}",
+            0,
+        )
+
     # ── Tape gate: hard block long swings on deeply bearish tape ─────────────
     if direction == "long":
         spy_chg = ctx.regime.get("spy_chg_1d", 0.0) if isinstance(ctx.regime, dict) else 0.0

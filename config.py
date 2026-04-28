@@ -109,7 +109,7 @@ CONFIG = {
     "anthropic_api_key": os.environ.get("ANTHROPIC_API_KEY", "YOUR_API_KEY_HERE"),
     "claude_model": "claude-sonnet-4-6",  # Sonnet — number crunching, structured data
     "claude_max_tokens": 800,  # Default token cap
-    # Alpha agents use Sonnet — structured synthesis of pre-scored signals; Opus was overkill.
+    # Apex Single-Synthesizer uses Sonnet — structured synthesis of pre-scored signals.
     "claude_model_alpha": "claude-sonnet-4-6",  # was claude-opus-4-6
     "claude_max_tokens_alpha": 4096,  # was 8192; sonnet rarely needs more for this structured output
     # Haiku — text generation for voice alerts, trade cards, speech.
@@ -131,7 +131,7 @@ CONFIG = {
     "use_llm_advisor": True,
     "llm_advisor_model": "claude-sonnet-4-6",
     "llm_advisor_max_tokens": 512,
-    "llm_advisor_history": 15,  # last N completed decisions passed to Opus as learning context
+    "llm_advisor_history": 15,  # last N completed decisions passed to Apex as learning context
     # ── IBKR RECONNECT & HEARTBEAT ────────────────────────────
     "reconnect_max_attempts": 10,  # Retry attempts before giving up
     "reconnect_max_wait_secs": 60,  # Cap on exponential backoff delay (secs)
@@ -172,7 +172,7 @@ CONFIG = {
     },
     "min_cash_reserve": 0.10,  # 10% cash floor — hard stop on new entries
     "max_single_position": 0.06,  # Cross-instrument exposure guard (stock+option stacking on same name). (live: tbd — was 0.15 paper / 0.10 live before 2026-04-28)
-    # Not enforced as a sizing cap — Opus decides position size from account context.
+    # Not enforced as a sizing cap — Apex decides position size from account context.
     "max_sector_exposure": 0.50,  # 50% sector cap (live: 0.40)
     "consecutive_loss_pause": 999,  # Paper learning mode: effectively disabled (live: 5)
     "reentry_cooldown_minutes": 30,  # Block re-entry after close (lifecycle gate)
@@ -181,16 +181,16 @@ CONFIG = {
     "persistence_conviction_bypass": 36,  # Score >= this passes persistence gate immediately (scan-1 safe)
     # ── HELD-POSITION SCALE-UP TRIGGER ────────────────────────────
     # When a held position's score rises materially since entry (or since the
-    # last PM review), re-run PM so Opus can consider an ADD.  Addresses the
+    # last PM review), re-run PM so Apex can consider an ADD.  Addresses the
     # 2026-04-14 "AMZN scored 65 while held, position size stayed frozen"
     # failure — PM never fired because no trigger covered upward score moves.
-    # Opus still owns the verb; this trigger just wakes PM up to look.
+    # Apex still owns the verb; this trigger just wakes PM up to look.
     "add_trigger_score_delta": 15,  # current_score − entry_score ≥ this fires PM review
     "add_trigger_redfire_delta": 5,  # Edge-trigger: only re-fire if score rises further by ≥ this since last review
     "add_trigger_min_score": 45,  # Don't fire for held weakling upticks (score must reach at least here)
     # ── PRE-SESSION CATALYST PIPELINE (08:00 ET) ─────────────────
     # Runs before market open: pulls top candidates from CatalystEngine,
-    # enriches with earnings + pre-market snapshot, runs 3-agent sentinel,
+    # enriches with earnings + pre-market snapshot, runs Apex sentinel,
     # logs decisions to data/presession_log.jsonl for IC analysis.
     # Phase 3a ships in DRY-RUN mode only — no orders placed. Phase 3b
     # will add MOO execution once 5 sessions of dry-run output validates
@@ -618,8 +618,8 @@ CONFIG = {
     # exposure, so shorting it creates a double-negative with borrow costs.
     "long_only_symbols": {"SPXS", "SQQQ", "UVXY"},
     # PM: INTRADAY positions that move this far against direction are thesis-broken.
-    # Price leads signals — a 3%+ adverse intraday move is not noise. Opus cannot
-    # override this; the forced EXIT fires before Opus sees the position.
+    # Price leads signals — a 3%+ adverse intraday move is not noise. Apex cannot
+    # override this; the forced EXIT fires deterministically before Apex sees the position.
     "intraday_adverse_exit_pct": 3.0,
     # ── LOGGING ───────────────────────────────────────────────
     "log_file": "logs/decifer.log",
@@ -664,7 +664,7 @@ CONFIG = {
     "options_exit_dte": 2,  # Hard exit at this many DTE (gamma risk)
     # ── NEWS SENTINEL (real-time news trigger) ───────────────
     # Runs independently of the scan loop. Polls news every N seconds
-    # and fires a 3-agent mini pipeline when material news is detected.
+    # and fires a single Apex call when material news is detected.
     "sentinel_enabled": True,  # Master switch for News Sentinel
     "sentinel_poll_seconds": 45,  # Seconds between news polls (30-60 recommended)
     "sentinel_cooldown_minutes": 10,  # Don't re-trigger same symbol within N minutes
@@ -856,6 +856,14 @@ CONFIG = {
     # entry_gate.py reads these via _cfg() — change here, no code changes needed.
     "entry_gate": {
 
+        # ── SCORE BAND THRESHOLDS (read by market_intelligence.py) ──────────
+        # score >= min_score_swing_position → POSITION (SWING shares this floor;
+        #   classification between the two comes from the entry_gate checklist)
+        # score >= min_score_intraday       → INTRADAY
+        # else                              → AVOID
+        "min_score_swing_position": 40,   # live: 40
+        "min_score_intraday":       28,   # live: 28
+
         # INTRADAY thresholds
         "intraday_max_signal_age_minutes":   15,    # signal older than this → reject
         "intraday_max_spread_pct":           0.4,   # above this → score penalty
@@ -871,8 +879,8 @@ CONFIG = {
         "swing_min_earnings_days_away":      5,     # earnings closer than this → reject
         "swing_max_short_float_pct":        30.0,   # short float above this → reject (no squeeze)
         "swing_sector_rotation_max_days":   10,     # sector ETF breakout must be < N days old
-        "swing_min_catalyst_score":         30,     # catalyst_engine score floor for news catalyst
-        "swing_max_hold_days":             10,      # paper=10; live=7 — triggers Opus review (not exit)
+        "swing_min_catalyst_score":          3.0,    # catalyst_engine score floor (0–10 scale)
+        "swing_max_hold_days":             10,      # paper=10; live=7 — triggers Apex PM review (not exit)
 
         # POSITION thresholds — two-path checklist
         "position_min_earnings_days_away":   5,     # binary event gate: earnings < 5d → SWING

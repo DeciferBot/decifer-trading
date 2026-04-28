@@ -600,13 +600,14 @@ def _fallback_classify(
             source="fallback",
         )
 
-    # Classify by score band
+    # Classify by score band — thresholds live in CONFIG["entry_gate"]
+    _eg = CONFIG.get("entry_gate", {})
+    _swing_pos_floor = _eg.get("min_score_swing_position", 40)
+    _intraday_floor  = _eg.get("min_score_intraday", 28)
     conviction = round(min(score / 50.0, 1.0), 2)
-    if score >= 42:
+    if score >= _swing_pos_floor:
         trade_type = "POSITION"
-    elif score >= 40:
-        trade_type = "SWING"
-    elif score >= 28 or score >= CONFIG.get("min_score_to_trade", 14):
+    elif score >= _intraday_floor:
         trade_type = "INTRADAY"
     else:
         trade_type = "AVOID"
