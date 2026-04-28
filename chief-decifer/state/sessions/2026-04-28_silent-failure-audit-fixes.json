@@ -1,0 +1,65 @@
+{
+  "date": "2026-04-28",
+  "title": "Silent Failure Audit — Decifer 3.0 First Full Day",
+  "what_changed": [
+    {
+      "file": "orders_core.py",
+      "change": "Fixed _exit_price UnboundLocalError — variable was only assigned in the extended-hours else branch but read unconditionally at the thesis-failure gate (line ~1947). Now initialized before the market-hours branch so it is always bound."
+    },
+    {
+      "file": "learning.py",
+      "change": "Added CLOSE records to execution_ic stream. Only OPEN records were written before, making exit_reason/pnl null on all 8,132 IC entries. IC calculator now receives paired entry+outcome data from this session forward."
+    },
+    {
+      "file": "apex_orchestrator.py",
+      "change": "Floor rule enforcement: when >=3 candidates score >=35 and Apex returns zero entries, now fires log.error() + FLOOR_RULE_VIOLATION audit event. Previously was a silent log.warning() — rule was prompt-only with no algorithmic enforcement."
+    },
+    {
+      "file": "bot_trading.py",
+      "change": "Scoring gap circuit breaker: 3+ consecutive scans with scored=0 fires log.error() + SCORING_GAP audit event. The April 27 2-hour silent gap (11 consecutive zero-scored scans) would have been caught immediately."
+    },
+    {
+      "file": "catalyst_engine.py",
+      "change": "Sentiment and options runners escalate to log.warning() after 3+ consecutive empty-store skips. One skip is normal startup timing (fundamental screener takes >180s); three or more means the fundamental screener is failing silently."
+    },
+    {
+      "file": "alpaca_news.py",
+      "change": "Fixed 'event loop is already running' crash in execute_sell. _process_article was called synchronously inside the async on_news WebSocket callback (Alpaca's event loop), causing ib.placeOrder/ib.sleep to fail — silently caught, positions left open in IBKR untracked. Now spawned in a daemon thread to give execute_sell a clean non-async context."
+    }
+  ],
+  "what_was_deleted": "Nothing deleted.",
+  "decisions_made": [
+    "Issue #5 (metadata loss -> UNKNOWN forced exits) deferred — fading naturally as pre-migration positions close out. New positions always have metadata.",
+    "STP VALIDATIONERROR (80+ events) confirmed as IBKR warning 2109 per memory note — stops are working, orders transition to SUBMITTED within 400ms. No fix needed.",
+    "Issue #9 (Monday trades.json = 0): confirmed as pre-market timing. 12 trades logged for 2026-04-28 by 12:25 ET. Bot running normally."
+  ],
+  "silent_failures_audited": {
+    "total_categories": 9,
+    "critical_fixed": ["_exit_price UnboundLocalError", "sell_exception async boundary"],
+    "high_fixed": ["floor rule enforcement", "scoring gap circuit breaker"],
+    "medium_fixed": ["IC CLOSE records missing", "catalyst engine persistent skip"],
+    "deferred": ["metadata loss -> UNKNOWN exits (self-healing)"],
+    "non_issues": ["STP VALIDATIONERROR (IBKR warning 2109, not rejections)", "agents_agreed=0 (legacy field, expected)"],
+    "resolved_timing": ["Monday trades.json = 0 (was pre-market at audit time)"]
+  },
+  "tests": {
+    "passing": 1922,
+    "skipped": 1,
+    "known_flakes": [
+      "test_positions_persistence.py — reads live DB, fails when bot is running with open positions",
+      "test_reconnect.py::test_backoff_capped_sequence_values — passes in isolation, flaky in full suite"
+    ]
+  },
+  "what_is_next": [
+    "Phase C gate still blocked on 200 closed trades — IC data now being captured correctly from this session forward.",
+    "No open silent failures remaining from the Monday audit.",
+    "Issue #5 (UNKNOWN exits) to revisit if positions keep getting forced-exited after pre-migration positions clear."
+  ],
+  "commits": [
+    "0f35b31 fix(execution): resolve _exit_price UnboundLocalError and add IC CLOSE records",
+    "c150e89 fix(apex): enforce floor rule as ERROR + add scoring gap circuit breaker",
+    "8cff2e6 fix(catalyst): escalate persistent empty-store skips from INFO to WARNING",
+    "69452ab fix(news): run _process_article in a daemon thread to fix event-loop collision"
+  ],
+  "approved_by": "Amit"
+}
