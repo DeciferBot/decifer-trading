@@ -852,7 +852,9 @@ CONFIG = {
         "drawdown_trigger_pct": -0.015,  # daily_pnl / portfolio_value → trigger
         "earnings_lookahead_hours": 48,  # flag earnings within this window
         "max_tokens": 600,
-        "scalp_max_hold_minutes": 60,   # INTRADAY/SCALP timeout; live: 60
+        "scalp_max_hold_minutes": 60,       # INTRADAY/SCALP timeout; live: 60
+        "scalp_momentum_entry_min": 4,      # min momentum score at entry to qualify for mom_lost check
+        "scalp_momentum_current_max": 1,    # current momentum at or below this → mom_lost fires
     },
 
     # ── ENTRY GATE ────────────────────────────────────────────────────────────

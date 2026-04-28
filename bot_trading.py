@@ -881,6 +881,7 @@ def _maybe_eod_options_review(regime: dict):
             _last_news_scores, \
             _last_collapse_scores, \
             _last_rise_scores, \
+            _last_scalp_mom_scores, \
             _last_pm_review_ts_by_symbol
         _portfolio_review_done_today = False
         _session_stop_count = 0
@@ -891,6 +892,7 @@ def _maybe_eod_options_review(regime: dict):
         _last_news_scores = {}
         _last_collapse_scores = {}
         _last_rise_scores = {}
+        _last_scalp_mom_scores = {}
         _last_pm_review_ts_by_symbol = {}
     # Fire once in the pre-close window
     if dtime(15, 30) <= t < dtime(15, 55) and not _eod_options_review_done:
@@ -1001,7 +1003,7 @@ def _should_run_portfolio_review(
     the PM on every scan cycle.
     """
     global _portfolio_review_done_today, _last_known_regime, _last_pm_review_ts
-    global _last_news_scores, _last_collapse_scores, _last_rise_scores, _last_pm_review_ts_by_symbol
+    global _last_news_scores, _last_collapse_scores, _last_rise_scores, _last_scalp_mom_scores, _last_pm_review_ts_by_symbol
     pm_cfg = CONFIG.get("portfolio_manager", {})
     if not pm_cfg.get("enabled", True):
         return False, ""
@@ -1065,7 +1067,12 @@ def _should_run_portfolio_review(
         )
         mom_lost = entry_mom >= scalp_mom_entry_min and current_mom <= scalp_mom_current_max
         if dir_flipped or mom_lost:
-            _scalp_lost_syms.append(sym)
+            # Edge dedup: only re-fire if momentum has actually changed since the last
+            # review that was already triggered by this condition. Without this, a
+            # collapsed-momentum scalp re-triggers PM on every cooldown cycle indefinitely.
+            last_mom = _last_scalp_mom_scores.get(sym)
+            if last_mom is None or current_mom != last_mom or dir_flipped:
+                _scalp_lost_syms.append(sym)
     if _scalp_lost_syms:
         _active_triggers.append(f"scalp_signal_lost:{','.join(_scalp_lost_syms)}")
 
@@ -1695,6 +1702,7 @@ def run_scan():
         _last_news_scores, \
         _last_collapse_scores, \
         _last_rise_scores, \
+        _last_scalp_mom_scores, \
         _last_pm_review_ts_by_symbol
     should_review, pm_trigger = _should_run_portfolio_review(
         session=get_session(),
@@ -2150,6 +2158,10 @@ def run_scan():
             # Snapshot the news scores and collapse scores seen at this review so that
             # news_hit and score_collapse don't re-fire unless values change materially.
             _scored_map_snap = {s["symbol"]: s.get("score", 0) for s in (pipeline.all_scored or [])}
+            _mom_map_snap = {
+                s["symbol"]: float((s.get("score_breakdown") or {}).get("momentum", 0) or 0)
+                for s in (pipeline.all_scored or []) if s.get("symbol")
+            }
             # CP-5: iterate pm_open_pos (reviewed set) not open_pos (includes PENDING/EXITING)
             for _rp in pm_open_pos:
                 _rsym = _rp["symbol"]
@@ -2162,6 +2174,10 @@ def run_scan():
                     # Without this, a position scoring 65 on every cycle would
                     # re-fire PM every cycle; with it, only further rises fire.
                     _last_rise_scores[_rsym] = _cs
+                # Snapshot momentum for scalp_signal_lost edge dedup.
+                _cm = _mom_map_snap.get(_rsym)
+                if _cm is not None:
+                    _last_scalp_mom_scores[_rsym] = _cm
             # Record which regime each reviewed position was reviewed under so cycle_check
             # does not re-queue the same REVIEW on subsequent cycles for the same regime state.
             _reviewed_regime_label = regime.get("session_character") or regime.get("regime", "UNKNOWN")
