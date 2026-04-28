@@ -3151,7 +3151,7 @@ function updateRegime(regime) {
   const kellyStr   = regime.kelly_fraction != null ? regime.kelly_fraction.toFixed(2) : '—';
   const routerStr  = regime.regime_router && regime.regime_router !== 'disabled'
     ? ` | ${regime.regime_router.replace('_', '-').toUpperCase()}` : '';
-  const tapeCtx    = regime.tape_context || '';
+  const tapeCtx    = (regime.tape_context && regime.tape_context.prose) ? regime.tape_context.prose : (regime.tape_context || '');
   if (tapeCtx && tapeCtx !== 'tape data unavailable') {
     meta.textContent = `${tapeCtx} | VIX: ${regime.vix || '—'} | Kelly: ${kellyStr}${routerStr}`;
   } else {

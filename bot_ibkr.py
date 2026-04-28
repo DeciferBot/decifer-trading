@@ -765,7 +765,7 @@ def backfill_trades_from_ibkr():
 
                 matching_buy = None
                 for buy in sorted(buy_orders.get(sym, []), key=lambda b: b["time"], reverse=True):
-                    if buy["time"] <= sell["time"]:
+                    if buy["time"] <= sell["time"] and f"order-{buy['order_id']}" not in existing_ids:
                         matching_buy = buy
                         break
 
@@ -821,6 +821,9 @@ def backfill_trades_from_ibkr():
                 new_trades.append(trade)
                 existing_ids.add(order_key)
                 for eid in sell["exec_ids"]:
+                    existing_ids.add(eid)
+                existing_ids.add(f"order-{matching_buy['order_id']}")
+                for eid in matching_buy["exec_ids"]:
                     existing_ids.add(eid)
 
         # ── Process SHORT positions ───────────────────────────────────────────
