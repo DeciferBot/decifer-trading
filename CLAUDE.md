@@ -25,15 +25,17 @@ Three actors:
 ## Current State (update this when phases change)
 
 - **Phase A — Complete ✅** (shipped 2026-03-28): Direction-agnostic signals, short-candidate scanner, directional skew tracking, mean-reversion dimension (10th signal)
-- **IC scoring — Active**: Information Coefficient tracking is running. Gate for Phase C = 200 closed trades.
+- **IC scoring — Phase 2 Complete ✅** (2026-04-28): All three IC validation gates pass. Sample gate (60 valid records ≥ 50), IC gate (mean positive IC = 0.1728, 5 dims positive), Sharpe gate (walk-forward Sharpe 6.69 ≥ 0.8). Result persisted to `data/ic_validation_result.json`. Phase C gate (200 closed trades) also met — 358 trades. HMM and walk-forward weight calibration are now **unlocked**.
 - **Three-tier universe — Active ✅**: TV Screener ripped out. Universe is now: committed universe (top-1000 by dollar volume, weekly refresh) + dynamic adds (catalyst hits, held positions, favourites, sympathy plays, news-driven).
 - **Catalyst screener — Active ✅**: `catalyst_engine.py` scores EDGAR filings, earnings surprises, and analyst actions in real-time. High-conviction catalyst hits get a flat score boost to clear `min_score_to_trade`.
 - **Full architecture audit — Complete ✅** (2026-04-22): 27-issue audit, 24 fixes shipped.
 - **Decifer 3.0 "Apex" — Live ✅** (cutover 2026-04-24): The 4-agent pipeline is replaced by the **Apex Single-Synthesizer** — one `apex_call()` via `claude-sonnet-4-6`. Three Sonnet calls per cycle: Track A (new entries), Track B PM (TRIM/EXIT/HOLD), Shadow (divergence log). Legacy code (`agents.py`, `sentinel_agents.py` pipeline, `run_portfolio_review()`, buy loop) was deleted at post-migration cleanup (2026-04-27). No rollback path — forward only.
 - **Post-migration cleanup — Complete ✅** (2026-04-27): `agents.py` deleted, legacy buy loop deleted, 3 migration flags collapsed, 5 Phase 8A test files renamed to permanent regression names. Test suite: **1931 passing**. Tag: `decifer-3.0-post-migration-cleanup`.
-- **Phase B / C / D — Not yet built**: Signal validation (Alphalens), HMM regime detection, walk-forward weight calibration. All blocked on trade data volume.
-- **Test suite**: 1931 passing (2026-04-27). Tests are current with the codebase.
-- **Regime detector**: VIX-proxy + SPY EMA (locked). HMM explicitly deferred until ≥200 closed trades.
+- **JSONL persistence migration — Complete ✅** (2026-04-28): `trade_log.py` (SQLite WAL) and `trade_store.py` deleted. Replaced with `event_log.py` (ORDER_INTENT → ORDER_FILLED → POSITION_CLOSED write-ahead log) and `training_store.py` (ML training records). Eliminates UNKNOWN trade_type bug caused by SQLite WAL corruption. 349 closed trades migrated to `data/training_records.jsonl`. Phase C gate now reads from `training_store.count()`.
+- **Phase B — Unlocked**: HMM regime detection and walk-forward weight calibration gates are now met. Next: implement HMM as VIX-proxy replacement (see `roadmap/03-hmm-regime-detection.md`) and signal weight calibration (see `roadmap/06-weight-calibration.md`).
+- **Phase C / D — Pending Amit approval**: Alphalens full factor analysis and ML engine activation (ML gate = 50 trades, already met).
+- **Test suite**: 1955 passing (2026-04-28). Tests are current with the codebase.
+- **Regime detector**: VIX-proxy + SPY EMA (locked until HMM implementation approved).
 
 ---
 
@@ -107,12 +109,12 @@ TWAP/VWAP/Iceberg only for orders above $10K notional or 500 shares. Smaller ord
 
 ## What NOT to Build Without a Gate
 
-| Deferred Feature | Gate Condition |
-|-----------------|----------------|
-| HMM Regime Detection | ≥200 closed trades + IC Phase 2 review |
-| Walk-Forward Weight Calibration | HMM + Alphalens both complete |
-| Signal Validation (Alphalens) | ≥200 trades across regimes |
-| ML Engine activation | ≥50 closed trades (already gated in `ml_engine.py`) |
+| Deferred Feature | Gate Condition | Status |
+|-----------------|----------------|--------|
+| HMM Regime Detection | ≥200 closed trades + IC Phase 2 review | **GATE MET — awaiting Amit approval** |
+| Walk-Forward Weight Calibration | HMM + Alphalens both complete | Blocked on HMM |
+| Signal Validation (Alphalens) | ≥200 trades across regimes | **GATE MET — awaiting Amit approval** |
+| ML Engine activation | ≥50 closed trades (already gated in `ml_engine.py`) | **GATE MET — awaiting Amit approval** |
 
 ---
 

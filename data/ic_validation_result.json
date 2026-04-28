@@ -1,0 +1,13 @@
+{
+  "sample_gate_passed": true,
+  "ic_gate_passed": true,
+  "sharpe_gate_passed": true,
+  "n_valid_records": 60,
+  "mean_positive_ic": 0.172791,
+  "n_positive_dims": 5,
+  "walkforward_sharpe": 6.69,
+  "ic_quality": "NO_SIGNAL",
+  "failures": [],
+  "ready_for_live": true,
+  "checked_at": "2026-04-28T18:18:08.953202+00:00"
+}

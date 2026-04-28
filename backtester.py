@@ -411,6 +411,8 @@ class Backtester:
                     df = df[(df.index >= self.start_date) & (df.index <= self.end_date)]
                     if df.empty:
                         continue
+                    # Normalize all column names to lowercase for consistent access.
+                    df.columns = [c.lower() for c in df.columns]
                     self.data[symbol] = df.sort_index()
                     log.info(f"Loaded {symbol}: {len(df)} bars ({label})")
                     loaded = True
@@ -454,6 +456,11 @@ class Backtester:
         window = df.iloc[max(0, idx - 49) : idx + 1].copy()
         if len(window) < 30:
             return None
+
+        # compute_indicators expects yfinance-style title-case column names;
+        # features parquet uses lowercase — normalize before calling.
+        _col_map = {"open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"}
+        window = window.rename(columns={k: v for k, v in _col_map.items() if k in window.columns})
 
         # Compute indicators
         indicators = compute_indicators(window, symbol, "1d")

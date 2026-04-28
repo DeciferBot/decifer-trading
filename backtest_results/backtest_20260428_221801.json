@@ -1,0 +1,53 @@
+{
+  "report": {
+    "period": "2023-01-01 \u2192 2025-12-31",
+    "total_trades": 6,
+    "winning_trades": 4,
+    "losing_trades": 2,
+    "breakeven_trades": 0,
+    "win_rate": 0.667,
+    "avg_win_pnl": 371242.67,
+    "avg_loss_pnl": -51916.88,
+    "total_pnl": 1381136.92,
+    "gross_profit": 1484970.67,
+    "gross_loss": 103833.75,
+    "profit_factor": 14.3,
+    "sharpe_ratio": 6.69,
+    "max_drawdown": -38226.3,
+    "max_drawdown_pct": -0.04,
+    "avg_hold_minutes": 230280,
+    "regime_breakdown": {
+      "BULL_TRENDING": {
+        "trades": 6,
+        "pnl": 1381136.92
+      }
+    },
+    "monthly_pnl": {
+      "2023-02": -96438.94,
+      "2023-06": 1477575.87
+    }
+  },
+  "config": {
+    "symbols": [
+      "AAPL",
+      "AMD",
+      "AMZN",
+      "GOOGL",
+      "GS",
+      "HON",
+      "MDT",
+      "MSFT",
+      "NKE",
+      "NVDA",
+      "QQQ",
+      "SPY",
+      "TSLA",
+      "UNH"
+    ],
+    "start_date": "2023-01-01",
+    "end_date": "2025-12-31",
+    "min_score": 14,
+    "atr_stop_mult": 1.0,
+    "atr_trail_mult": 1.5
+  }
+}

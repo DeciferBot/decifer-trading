@@ -398,16 +398,30 @@ def reconcile_with_ibkr(ib: IB):
           Fallback: positions.json cache (for the window between IBKR fill and
                     the next event_log write — extremely rare).
         """
-        # Primary: event_log open trades (intent metadata merged with fill data)
+        # Primary: event_log confirmed fills (ORDER_FILLED with no POSITION_CLOSED)
         try:
             from event_log import open_trades as _el_open
             el_trades = _el_open()
-            # Match by symbol (event_log keyed by trade_id, not symbol+instrument key)
             for v in el_trades.values():
                 if v.get("symbol") == sym and v.get("trade_type") and v["trade_type"] != "UNKNOWN":
                     return v
         except Exception as _el_err:
             log.warning("_find_saved %s: event_log read failed: %s", key, _el_err)
+        # Secondary: event_log ORDER_INTENT records — positions submitted but not yet
+        # confirmed via ORDER_FILLED (GTC orders that filled while bot was offline never
+        # get append_fill called, so they only appear here, not in open_trades()).
+        # Most recent intent wins if a symbol was entered more than once.
+        try:
+            from event_log import pending_orders as _el_pending
+            for intent in reversed(_el_pending()):
+                if (
+                    intent.get("symbol") == sym
+                    and intent.get("trade_type")
+                    and intent["trade_type"] != "UNKNOWN"
+                ):
+                    return intent
+        except Exception as _pi_err:
+            log.warning("_find_saved %s: pending_orders read failed: %s", key, _pi_err)
         # Fallback: positions.json exact key
         if key in saved_positions:
             hit = saved_positions[key]
@@ -420,22 +434,29 @@ def reconcile_with_ibkr(ib: IB):
                 and v.get("trade_type") and v["trade_type"] != "UNKNOWN"
             ):
                 return v
+        # Last resort: scan all ORDER_INTENT records in event_log including those for
+        # fully-closed prior legs. Covers multi-leg re-entries where the latest leg's
+        # intent was recorded, filled, and closed before this reconcile ran.
+        try:
+            from event_log import last_intent_for_symbol as _last_intent
+            _intent = _last_intent(sym)
+            if _intent.get("trade_type") and _intent["trade_type"] != "UNKNOWN":
+                return _intent
+        except Exception as _li_err:
+            log.debug("_find_saved %s: last_intent_for_symbol failed: %s", key, _li_err)
         return {}
 
     try:
         # ── Step 1: restore our own position ledger ───────────────────────────
-        # Primary: replay event_log JSONL — the authoritative source.
-        # Fallback: positions.json cache (for first run before any event_log entries exist).
-        from event_log import open_trades as _el_open_trades
-        el_trades = _el_open_trades()
-        if el_trades:
-            with _trades_lock:
-                active_trades.update(el_trades)
-            log.info(f"Restored {len(el_trades)} open position(s) from event_log.")
-        elif saved_positions:
+        # Always load from positions.json (symbol-keyed, stable across restarts).
+        # event_log is used ONLY inside _find_saved() for metadata recovery.
+        # Never update active_trades directly from event_log.open_trades() —
+        # that function keys by trade_id strings, not symbol strings, and injecting
+        # trade_id keys into a symbol-keyed dict breaks all subsequent reconciliation.
+        if saved_positions:
             with _trades_lock:
                 active_trades.update(saved_positions)
-            log.info(f"event_log empty — restored {len(saved_positions)} position(s) from positions.json (fallback).")
+            log.info(f"Restored {len(saved_positions)} position(s) from positions.json.")
 
         # ── Step 2: fetch IBKR portfolio ──────────────────────────────────────
         # portfolio() returns PortfolioItem with marketPrice + unrealizedPNL.
@@ -545,6 +566,19 @@ def reconcile_with_ibkr(ib: IB):
                         _trade_copy = dict(trade)
                         _trade_copy["_cwd_exit_px"] = _cwd_px
                         _trade_copy["_cwd_exit_src"] = _cwd_src
+                        # Recover trade_type for positions that were stored as UNKNOWN —
+                        # look up the original ORDER_INTENT so CLOSE records carry correct metadata.
+                        if _trade_copy.get("trade_type") in (None, "", "UNKNOWN"):
+                            try:
+                                from event_log import get_intent as _get_intent, last_intent_for_symbol as _last_intent
+                                _tid = _trade_copy.get("trade_id", "")
+                                _recovered = _get_intent(_tid) if _tid else {}
+                                if not _recovered.get("trade_type"):
+                                    _recovered = _last_intent(_trade_copy.get("symbol", ""))
+                                if _recovered.get("trade_type") and _recovered["trade_type"] != "UNKNOWN":
+                                    _trade_copy["trade_type"] = _recovered["trade_type"]
+                            except Exception:
+                                pass
                         trades_closed_while_down.append(_trade_copy)
                         if trade.get("advice_id"):
                             closed_while_down.append(

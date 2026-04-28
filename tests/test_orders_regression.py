@@ -814,3 +814,113 @@ class TestClosedWhileDownExitPrice:
             f"Expected fallback to current=810.0, got {logged_outcomes[0]['exit_price']}"
         )
         assert logged_outcomes[0]["exit_price_source"] == "estimated"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. trade_type recovery for UNKNOWN positions (Problems 1 & 3 fix)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestTradeTypeRecovery:
+    """
+    When a position enters reconcile with trade_type=UNKNOWN (metadata lost on
+    a prior restart), the code must recover trade_type from the event_log
+    ORDER_INTENT before writing CLOSE records or adding external positions.
+
+    Covers:
+      - closed-while-down trade_type recovery via get_intent (trade_id present)
+      - closed-while-down trade_type recovery via last_intent_for_symbol (no trade_id)
+      - _find_saved last-resort tier uses last_intent_for_symbol when all else fails
+    """
+
+    def _make_ib_with_aapl(self):
+        ib = MagicMock()
+        ib.isConnected.return_value = True
+        ib.openTrades.return_value = []
+        ib.sleep.return_value = None
+        ib.reqExecutions.return_value = []
+        # IBKR has AAPL so NVDA (absent from portfolio) triggers cwd sweep
+        aapl_item = MagicMock()
+        aapl_item.position = 10
+        aapl_item.contract.symbol = "AAPL"
+        aapl_item.contract.secType = "STK"
+        aapl_item.contract.strike = 0
+        aapl_item.marketPrice = 155.0
+        aapl_item.averageCost = 150.0
+        aapl_item.unrealizedPNL = 50.0
+        ib.portfolio.return_value = [aapl_item]
+        return ib
+
+    def test_cwd_recovers_trade_type_via_get_intent(self, mock_config):
+        """When trade_id is present, closed-while-down must recover trade_type from get_intent."""
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        _om.active_trades["NVDA"] = {
+            "symbol": "NVDA",
+            "status": "ACTIVE",
+            "direction": "LONG",
+            "entry": 800.0,
+            "current": 810.0,
+            "qty": 5,
+            "trade_type": "UNKNOWN",
+            "trade_id": "NVDA_20260428_test",
+        }
+
+        ib = self._make_ib_with_aapl()
+        logged_trades = []
+
+        def _capture_log_trade(trade, agent_outputs, regime, action, outcome):
+            if action == "CLOSE":
+                logged_trades.append(dict(trade))
+
+        with (
+            patch("orders.CONFIG", mock_config),
+            patch("event_log.open_trades", return_value={}),
+            patch("orders_portfolio._load_positions_file", return_value={}),
+            patch("event_log.get_intent", return_value={"trade_type": "INTRADAY", "trade_id": "NVDA_20260428_test"}),
+            patch("learning.log_trade", side_effect=_capture_log_trade),
+        ):
+            _om.reconcile_with_ibkr(ib)
+
+        assert "NVDA" not in _om.active_trades
+        assert logged_trades, "CLOSE record must be written"
+        assert logged_trades[0]["trade_type"] == "INTRADAY", (
+            f"trade_type must be recovered from get_intent; got {logged_trades[0].get('trade_type')}"
+        )
+
+    def test_cwd_recovers_trade_type_via_last_intent_fallback(self, mock_config):
+        """When no trade_id, closed-while-down must fall back to last_intent_for_symbol."""
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        _om.active_trades["NVDA"] = {
+            "symbol": "NVDA",
+            "status": "ACTIVE",
+            "direction": "LONG",
+            "entry": 800.0,
+            "current": 810.0,
+            "qty": 5,
+            "trade_type": None,
+        }
+
+        ib = self._make_ib_with_aapl()
+        logged_trades = []
+
+        def _capture_log_trade(trade, agent_outputs, regime, action, outcome):
+            if action == "CLOSE":
+                logged_trades.append(dict(trade))
+
+        with (
+            patch("orders.CONFIG", mock_config),
+            patch("event_log.open_trades", return_value={}),
+            patch("orders_portfolio._load_positions_file", return_value={}),
+            patch("event_log.get_intent", return_value={}),
+            patch("event_log.last_intent_for_symbol", return_value={"trade_type": "SWING", "symbol": "NVDA"}),
+            patch("learning.log_trade", side_effect=_capture_log_trade),
+        ):
+            _om.reconcile_with_ibkr(ib)
+
+        assert "NVDA" not in _om.active_trades
+        assert logged_trades
+        assert logged_trades[0]["trade_type"] == "SWING", (
+            f"trade_type must be recovered via last_intent_for_symbol; got {logged_trades[0].get('trade_type')}"
+        )

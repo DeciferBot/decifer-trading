@@ -1,0 +1,39 @@
+{
+  "type": "alpha_validation",
+  "title": "Per-Dimension Alpha Validation",
+  "generated_at": "2026-04-28T00:00:00+00:00",
+  "summary": {
+    "keep": [
+      "mtf"
+    ],
+    "reduce_weight": [],
+    "remove": [],
+    "negative_ic": [
+      "trend"
+    ],
+    "total_analyzed": 2,
+    "equal_weights_active": true
+  },
+  "dimensions": {
+    "mtf": {
+      "ic": 0.385,
+      "tstat": null,
+      "pvalue": null,
+      "n": 60,
+      "ic_stability_std": null,
+      "quintile_spread": null,
+      "source": "live_ic_cache",
+      "verdict": "KEEP"
+    },
+    "trend": {
+      "ic": -0.185,
+      "tstat": null,
+      "pvalue": null,
+      "n": 60,
+      "ic_stability_std": null,
+      "quintile_spread": null,
+      "source": "live_ic_cache",
+      "verdict": "NEGATIVE_IC"
+    }
+  }
+}

@@ -248,3 +248,19 @@ def get_intent(trade_id: str) -> dict:
         if rec.get("trade_id") == trade_id and rec.get("event") == "ORDER_INTENT":
             return rec
     return {}
+
+
+def last_intent_for_symbol(symbol: str) -> dict:
+    """Return the most recent ORDER_INTENT for a symbol across all trade legs.
+
+    Searches every record in the log — including intents for trades that have
+    already been closed — so callers can recover trade_type metadata for positions
+    that pre-date the current session (e.g. multi-leg re-entries, external fills).
+    Returns {} if no matching intent exists.
+    """
+    best: dict = {}
+    for rec in _load_all():
+        if rec.get("event") == "ORDER_INTENT" and rec.get("symbol") == symbol:
+            if not best or rec.get("timestamp", "") > best.get("timestamp", ""):
+                best = rec
+    return best
