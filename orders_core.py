@@ -2078,20 +2078,21 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             f"{'✅' if pnl >= 0 else '❌'} CLOSE {direction} {symbol} ({close_action}) | P&L ${pnl:+.2f} | Reason: {reason}"
         )
 
-        # Extended-hours limit orders (GTC) may not fill within the 2s sleep window.
-        # If the order is still pending, keep the position in active_trades as EXITING
-        # so reconcile treats it as a known closing position on restart (not EXTERNAL),
-        # and defer the CLOSE record until update_positions_from_ibkr confirms the fill.
-        if _is_ext_hours_limit and not _is_partial:
+        # Any close order — market or limit, regular or extended hours — may not fill
+        # within the 2s sleep window.  The correct gate is whether the order actually
+        # filled, not what session type it was placed in.  If not yet filled, keep the
+        # position as EXITING so reconcile can write the CLOSE record once IBKR
+        # confirms the fill (via the deferred-close handler in orders_portfolio.py).
+        if not _is_partial:
             _order_filled = (
                 sell_trade.orderStatus.status == "Filled"
                 or (sell_trade.orderStatus.filled or 0) >= sell_qty
             )
             if not _order_filled:
                 log.info(
-                    f"execute_sell {symbol}: extended-hours limit order not yet filled "
+                    f"execute_sell {symbol}: close order not yet confirmed filled "
                     f"(id={sell_trade.order.orderId}, status={sell_trade.orderStatus.status}) "
-                    f"— keeping EXITING, CLOSE record deferred until fill confirmed"
+                    f"— keeping EXITING, CLOSE record deferred until fill confirmed by reconcile"
                 )
                 _safe_update_trade(_trade_key, {
                     "status": "EXITING",

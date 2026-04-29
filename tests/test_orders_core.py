@@ -190,12 +190,15 @@ def mock_ib():
 
     ib.qualifyContracts.side_effect = qualify_contracts
 
-    # Mock placeOrder — returns a mock Trade with order info
+    # Mock placeOrder — returns a mock Trade with order info.
+    # status="Filled" simulates a market order that fills within the 2s sleep window,
+    # which is the realistic happy-path scenario for regular-hours market orders.
     def place_order(contract, order):
         trade = MagicMock()
         raw_id = getattr(order, "orderId", None)
         trade.order.orderId = raw_id if isinstance(raw_id, int) else 12345
-        trade.orderStatus.status = "Submitted"
+        trade.orderStatus.status = "Filled"
+        trade.orderStatus.filled = 100
         return trade
 
     ib.placeOrder.side_effect = place_order

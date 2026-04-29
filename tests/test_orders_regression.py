@@ -672,6 +672,9 @@ class TestExecuteSellCompositeKey:
         _om.active_trades[self.OPT_KEY] = self._opt_pos()
 
         ib = MagicMock()
+        # Simulate market order filled within the 2s sleep window (normal happy path).
+        ib.placeOrder.return_value.orderStatus.status = "Filled"
+        ib.placeOrder.return_value.orderStatus.filled = 100
 
         with (
             patch("orders.CONFIG", mock_config),

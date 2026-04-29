@@ -1400,18 +1400,64 @@ def update_positions_from_ibkr(ib: IB):
             _t = active_trades.get(k, {})
             if not _t:
                 continue
+            _sym = _t.get("symbol", k.split("|")[0])
+            # Use actual IBKR fill price from the execution index built earlier in this
+            # reconcile cycle; falls back to cached current price if no matching fill found.
+            _exit_px, _exit_src = _resolve_cwd_exit_price(_t, _exec_index)
+            _entry_px = float(_t.get("entry", 0))
+            _qty = int(_t.get("qty", 1))
+            _is_short = _t.get("direction", "LONG") == "SHORT"
+            _pnl = round((_entry_px - _exit_px if _is_short else _exit_px - _entry_px) * _qty, 2)
+            _pnl_pct = round(_pnl / (_entry_px * _qty), 4) if _entry_px * _qty else 0
+            _exit_reason = _t.get("pending_exit_reason", "ext_hours_limit_filled")
+            _now_ts = datetime.now(UTC).isoformat()
+            _trade_id = _t.get("trade_id", k)
             log.info(
-                f"EXITING position {k} (close order #{_t.get('close_order_id')}) "
-                f"gone from IBKR — writing deferred CLOSE record"
+                "EXITING position %s (close order #%s) gone from IBKR — "
+                "writing deferred CLOSE (exit=%.4f src=%s pnl=%.2f)",
+                k, _t.get("close_order_id"), _exit_px, _exit_src, _pnl,
             )
+            # 1. WAL — POSITION_CLOSED
+            try:
+                from event_log import append_close as _el_close_dfr
+                _el_close_dfr(_trade_id, _sym,
+                              exit_price=_exit_px, pnl=_pnl,
+                              exit_reason=_exit_reason, hold_minutes=0)
+            except Exception as _e:
+                log.warning("Deferred CLOSE event_log write failed for %s: %s", k, _e)
+            # 2. ML training record
+            try:
+                from training_store import append as _ts_dfr
+                _ts_dfr({
+                    "trade_id": _trade_id,
+                    "symbol": _sym,
+                    "direction": _t.get("direction", "LONG"),
+                    "trade_type": _t.get("trade_type") or "INTRADAY",
+                    "instrument": _t.get("instrument", "stock"),
+                    "fill_price": float(_t.get("entry", 0.0)),
+                    "intended_price": float(_t.get("intended_price") or _t.get("entry", 0.0)),
+                    "exit_price": _exit_px,
+                    "pnl": _pnl,
+                    "hold_minutes": 0,
+                    "exit_reason": _exit_reason,
+                    "regime": _t.get("entry_regime") or _t.get("regime", "UNKNOWN"),
+                    "signal_scores": _t.get("signal_scores") or {},
+                    "conviction": float(_t.get("conviction") or 0.0),
+                    "score": float(_t.get("score") or _t.get("entry_score") or 0.0),
+                    "ts_fill": _t.get("open_time") or _now_ts,
+                    "ts_close": _now_ts,
+                    "qty": _qty,
+                    "sl": float(_t.get("sl") or 0.0),
+                    "tp": float(_t.get("tp") or 0.0),
+                    "setup_type": _t.get("setup_type", ""),
+                    "pattern_id": _t.get("pattern_id", ""),
+                    "atr": float(_t.get("atr") or 0.0),
+                })
+            except Exception as _e:
+                log.warning("Deferred CLOSE training_store write failed for %s: %s", k, _e)
+            # 3. IC / audit log
             try:
                 from learning import log_trade as _log_trade_ex
-                _exit_px = float(_t.get("current") or _t.get("entry", 0))
-                _entry_px = float(_t.get("entry", 0))
-                _qty = int(_t.get("qty", 1))
-                _is_short = _t.get("direction", "LONG") == "SHORT"
-                _pnl = round((_entry_px - _exit_px if _is_short else _exit_px - _entry_px) * _qty, 2)
-                _pnl_pct = round(_pnl / (_entry_px * _qty), 4) if _entry_px * _qty else 0
                 _log_trade_ex(
                     trade=_t,
                     agent_outputs={},
@@ -1421,14 +1467,14 @@ def update_positions_from_ibkr(ib: IB):
                         "exit_price": _exit_px,
                         "pnl": _pnl,
                         "pnl_pct": _pnl_pct,
-                        "reason": _t.get("pending_exit_reason", "ext_hours_limit_filled"),
+                        "reason": _exit_reason,
                     },
                 )
-            except Exception as _dfr_err:
-                log.warning("Deferred CLOSE log for %s failed: %s", k, _dfr_err)
+            except Exception as _e:
+                log.warning("Deferred CLOSE log_trade failed for %s: %s", k, _e)
             with _trades_lock:
                 with _recently_closed_lock:
-                    recently_closed[_t.get("symbol", k)] = datetime.now(UTC).isoformat()
+                    recently_closed[_sym] = _now_ts
                 active_trades.pop(k, None)
         if _exiting_keys:
             _save_positions_file()
