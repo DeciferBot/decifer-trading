@@ -1331,7 +1331,14 @@ def run_scan():
     else:
         _router_state = "disabled"
     regime["regime_router"] = _router_state
+    # Preserve session_character from the previous cycle so the dashboard
+    # shows the last known Apex label until the new cycle's Apex call returns.
+    # Without this, dash["regime"] = regime wipes session_character every cycle
+    # and the dashboard falls back to price-threshold logic for 1-3 minutes.
+    _prev_sc = dash.get("regime", {}).get("session_character", "")
     dash["regime"] = regime
+    if _prev_sc:
+        dash["regime"]["session_character"] = _prev_sc
     from risk import get_sizing_state
 
     dash["regime"].update(get_sizing_state())
@@ -2224,6 +2231,13 @@ def run_scan():
             f"Regime shifted mid-scan: {regime['regime']} → {_pre_agent_regime['regime']} — updating before agents",
         )
         regime = _pre_agent_regime
+        # Keep dash["regime"] coherent with the new regime dict so that
+        # session_character (written later by Apex) lands in the same object
+        # the dashboard is reading.
+        _mid_sc = dash.get("regime", {}).get("session_character", "")
+        dash["regime"] = regime
+        if _mid_sc:
+            dash["regime"]["session_character"] = _mid_sc
         strategy_mode = get_intraday_strategy_mode(pv, pnl, regime["regime"])
 
     _agent_pos_notional = sum(
