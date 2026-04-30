@@ -47,6 +47,13 @@ _MIN_SELL_RETRY_INTERVAL_S = 90  # min seconds between any two sell attempts (pr
 _PENDING_EXITS_FILE = os.path.join(os.path.dirname(__file__), "data", "pending_option_exits.json")
 _pending_option_exits: dict = {}  # opt_key → original reason string
 
+# Circuit-breaker: track how many times each opt_key has been attempted by flush.
+# Unlike _option_sell_attempts, this counter is NEVER reset on a successful paper fill,
+# so it catches the IBKR paper-account inconsistency loop where fills "succeed" but the
+# position re-appears on the next reconcile cycle.
+_flush_attempt_counts: dict = {}
+_MAX_FLUSH_ATTEMPTS = 5
+
 
 def _is_option_expired(opt_key: str) -> bool:
     """Return True if the option's expiry date is in the past (ET)."""
@@ -56,7 +63,7 @@ def _is_option_expired(opt_key: str) -> bool:
         today_et = datetime.now(_ET).date()
         return today_et > expiry_date
     except Exception:
-        return False
+        return True  # unparseable expiry → treat as expired, safer than retrying indefinitely
 
 
 def _drop_expired_pending_exits(_log=None) -> None:
@@ -649,6 +656,27 @@ def flush_pending_option_exits(ib: IB) -> None:
             log.info(f"Deferred exit {opt_key} dropped — position no longer tracked")
             _pending_option_exits.pop(opt_key, None)
             _save_pending_exits()
+            continue
+        _flush_attempt_counts[opt_key] = _flush_attempt_counts.get(opt_key, 0) + 1
+        if _flush_attempt_counts[opt_key] > _MAX_FLUSH_ATTEMPTS:
+            log.warning(
+                "Deferred exit %s attempted %d times with no clean resolution — dropping. "
+                "IBKR paper account may still hold this position.",
+                opt_key, _flush_attempt_counts[opt_key],
+            )
+            _pending_option_exits.pop(opt_key, None)
+            _save_pending_exits()
+            try:
+                from learning import _append_audit_event
+                _append_audit_event(
+                    "deferred_exit_stuck",
+                    opt_key=opt_key,
+                    symbol=opt_key.split("_")[0],
+                    flush_attempts=_flush_attempt_counts[opt_key],
+                    note="Dropped after exceeding max flush attempts — manual review may be needed.",
+                )
+            except Exception:
+                pass
             continue
         log.info(f"Flushing deferred option exit: {opt_key} (original reason: {reason})")
         _pending_option_exits.pop(opt_key, None)
