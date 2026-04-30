@@ -1953,10 +1953,25 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                             _exit_price = _alpaca_mid
                 except ImportError:
                     pass
-            if close_action == "SELL":
-                _limit = round(_exit_price * 0.998, 2)  # slightly below — taker price on thin book
+            # Price at the actual bid (SELL) or ask (BUY) for guaranteed fill.
+            # Pre-market spreads can be $10-20 wide; mid-based pricing puts the
+            # limit above the bid and the order never fills.  Bid/ask pricing
+            # guarantees fill as soon as a counterparty exists at that level.
+            _ibkr_bid, _ibkr_ask = _get_ibkr_bid_ask(ib, contract)
+            if close_action == "SELL" and _ibkr_bid > 0:
+                _limit = _ibkr_bid
+                log.info(
+                    "execute_sell %s: extended-hours SELL limit set at IBKR bid $%.2f", symbol, _limit
+                )
+            elif close_action == "BUY" and _ibkr_ask > 0:
+                _limit = _ibkr_ask
+                log.info(
+                    "execute_sell %s: extended-hours BUY limit set at IBKR ask $%.2f", symbol, _limit
+                )
+            elif close_action == "SELL":
+                _limit = round(_exit_price * 0.998, 2)
             else:
-                _limit = round(_exit_price * 1.002, 2)  # slightly above — taker price on thin book
+                _limit = round(_exit_price * 1.002, 2)
             from ib_async import LimitOrder as _LimitOrder
 
             # Guard: if a GTC exit order is already live in IBKR for this symbol,
@@ -2223,6 +2238,21 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                 with _recently_closed_lock:  # RB-4: nest inside _trades_lock (consistent acquisition order — never reversed)
                     recently_closed[symbol] = now_ts
                 active_trades.pop(_trade_key, None)
+                # Collect linked option legs before releasing lock so another thread can't mutate state.
+                # Only sweep when closing a stock/ETF — options and FX have no child legs.
+                _linked_opts: list[str] = []
+                if info.get("instrument") not in ("option", "fx"):
+                    _linked_opts = [
+                        k for k, v in active_trades.items()
+                        if v.get("symbol") == symbol and v.get("instrument") == "option"
+                    ]
+            # Close any linked option legs outside the lock (execute_sell_option acquires _trades_lock internally).
+            # execute_sell_option handles market-closed gracefully: queues to pending_option_exits, flushed at 9:30 ET.
+            if _linked_opts:
+                from orders_options import execute_sell_option as _sell_opt
+                for _opt_key in _linked_opts:
+                    log.info("execute_sell %s: closing linked option %s (parent exited)", symbol, _opt_key)
+                    _sell_opt(ib, _opt_key, reason=f"parent_closed:{reason}")
             # If the INTRADAY wrong_if condition fired, register the extended cooldown.
             # Reason strings from the PM contain "stale" or "thesis_broken" in these cases.
             _reason_lower = (reason or "").lower()

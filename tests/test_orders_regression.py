@@ -268,11 +268,11 @@ class TestDeferredOptionExits:
     the queue by re-calling execute_sell_option with reason="deferred:<orig>".
     """
 
-    OPT_KEY = "GSAT_C_35.0_2026-06-20"
+    OPT_KEY = "TEST_C_35.0_2026-06-20"
 
     def _opt_pos(self, direction="LONG"):
         return {
-            "symbol": "GSAT",
+            "symbol": "TEST",
             "instrument": "option",
             "right": "C",
             "strike": 35.0,
@@ -1051,6 +1051,47 @@ class TestResetStaleExits:
         assert _op.active_trades["EQIX"]["status"] == "EXITING"
         mock_cancel.assert_not_called()
 
+    def test_gtc_limit_cancelled_at_regular_session_open(self, mock_config):
+        """GTC LMT close order present when regular session opens → cancel + reset to ACTIVE for MKT."""
+        import orders_portfolio as _op
+        _op.active_trades["EQIX"] = {
+            "symbol": "EQIX", "status": "EXITING",
+            "close_order_id": 8752, "current": 1050.0, "direction": "LONG",
+        }
+        ibkr_trade = self._make_ibkr_trade(8752, "SELL", "LMT", 1054.29)
+        ibkr_trade.order.tif = "GTC"
+        ib = self._make_ib([ibkr_trade])
+        with (
+            patch("orders_portfolio.CONFIG", mock_config),
+            patch("orders_portfolio.is_options_market_open", return_value=True),
+            patch("orders_portfolio._cancel_ibkr_order_by_id") as mock_cancel,
+        ):
+            result = _op.reset_stale_exits(ib)
+        assert "EQIX" in result, "GTC limit at regular session open must be cancelled and reset"
+        assert _op.active_trades["EQIX"]["status"] == "ACTIVE"
+        assert _op.active_trades["EQIX"]["close_order_id"] is None
+        mock_cancel.assert_called_once_with(ib, 8752)
+
+    def test_gtc_limit_not_cancelled_in_extended_hours(self, mock_config):
+        """GTC LMT during pre-market/after-hours and within fill range — leave it alone."""
+        import orders_portfolio as _op
+        _op.active_trades["EQIX"] = {
+            "symbol": "EQIX", "status": "EXITING",
+            "close_order_id": 8752, "current": 1050.0, "direction": "LONG",
+        }
+        ibkr_trade = self._make_ibkr_trade(8752, "SELL", "LMT", 1047.90)
+        ibkr_trade.order.tif = "GTC"
+        ib = self._make_ib([ibkr_trade])
+        with (
+            patch("orders_portfolio.CONFIG", mock_config),
+            patch("orders_portfolio.is_options_market_open", return_value=False),
+            patch("orders_portfolio._cancel_ibkr_order_by_id") as mock_cancel,
+        ):
+            result = _op.reset_stale_exits(ib)
+        assert "EQIX" not in result, "Fillable GTC limit in extended hours must not be cancelled"
+        assert _op.active_trades["EQIX"]["status"] == "EXITING"
+        mock_cancel.assert_not_called()
+
     def test_non_exiting_position_ignored(self, mock_config):
         """ACTIVE positions are never touched by reset_stale_exits."""
         import orders_portfolio as _op
@@ -1118,3 +1159,115 @@ class TestAvoidEntrySanitization:
         entry = decision["new_entries"][0]
         assert entry["instrument"] == "stock"
         assert entry["direction"] == "LONG"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLASS 9: execute_sell closes linked option legs (unified close)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestExecuteSellClosesLinkedOptions:
+    """
+    When execute_sell(ib, "GSAT") closes a stock position that has a co-existing
+    option leg in active_trades, it must call execute_sell_option for that leg.
+
+    Before fix: option legs were silently abandoned — orphaned until next restart.
+    After fix:  execute_sell sweeps active_trades for instrument=option rows whose
+    symbol field matches the closed underlying and routes each through execute_sell_option.
+    """
+
+    STOCK_KEY = "GSAT"
+    OPT_KEY = "GSAT_C_35.0_2026-04-17"
+
+    def _stock_pos(self):
+        return {
+            "symbol": "GSAT",
+            "instrument": "stock",
+            "qty": 100,
+            "entry": 30.0,
+            "current": 32.0,
+            "direction": "LONG",
+            "status": "ACTIVE",
+        }
+
+    def _opt_pos(self):
+        return {
+            "symbol": "GSAT",
+            "instrument": "option",
+            "right": "C",
+            "strike": 35.0,
+            "expiry_ibkr": "20260417",
+            "expiry_str": "2026-04-17",
+            "qty": 2,
+            "contracts": 2,
+            "entry": 1.50,
+            "current": 2.00,
+            "direction": "LONG",
+            "status": "ACTIVE",
+        }
+
+    def test_linked_option_closed_when_stock_exits(self, mock_config):
+        """execute_sell('GSAT') must call execute_sell_option for the linked option."""
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        _om.recently_closed.clear()
+        _om.active_trades[self.STOCK_KEY] = self._stock_pos()
+        _om.active_trades[self.OPT_KEY] = self._opt_pos()
+
+        ib = MagicMock()
+        ib.placeOrder.return_value.orderStatus.status = "Filled"
+        ib.placeOrder.return_value.orderStatus.filled = 100
+
+        with (
+            patch("orders.CONFIG", mock_config),
+            patch("orders_core.is_equities_extended_hours", return_value=True),
+            patch("orders_core.is_options_market_open", return_value=True),
+            patch("orders._validate_position_price", return_value=(32.0, "IBKR")),
+            patch("orders._get_ibkr_price", return_value=32.0),
+            patch("orders.record_win"),
+            patch("orders.record_loss"),
+            patch("orders.log_order"),
+            patch("learning.log_order"),
+            patch("learning._save_orders"),
+            patch("learning._save_trades"),
+            patch("learning.log_trade"),
+            patch("fill_watcher.stop_watcher"),
+            patch("orders_options.execute_sell_option") as mock_sell_opt,
+        ):
+            result = _om.execute_sell(ib, self.STOCK_KEY, reason="apex_exit")
+
+        assert result is True, "Stock close must succeed"
+        mock_sell_opt.assert_called_once_with(
+            ib, self.OPT_KEY, reason="parent_closed:apex_exit"
+        )
+
+    def test_no_option_sweep_when_instrument_is_option(self, mock_config):
+        """Closing an option directly must not trigger a recursive option sweep."""
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        _om.recently_closed.clear()
+        _om.active_trades[self.OPT_KEY] = self._opt_pos()
+
+        ib = MagicMock()
+        ib.placeOrder.return_value.orderStatus.status = "Filled"
+        ib.placeOrder.return_value.orderStatus.filled = 2
+
+        with (
+            patch("orders.CONFIG", mock_config),
+            patch("orders_core.is_equities_extended_hours", return_value=True),
+            patch("orders_core.is_options_market_open", return_value=True),
+            patch("orders._validate_position_price", return_value=(2.00, "IBKR")),
+            patch("orders._get_ibkr_price", return_value=2.00),
+            patch("orders.record_win"),
+            patch("orders.record_loss"),
+            patch("orders.log_order"),
+            patch("learning.log_order"),
+            patch("learning._save_orders"),
+            patch("learning._save_trades"),
+            patch("learning.log_trade"),
+            patch("fill_watcher.stop_watcher"),
+            patch("orders_options.execute_sell_option") as mock_sell_opt,
+        ):
+            _om.execute_sell(ib, self.OPT_KEY, reason="manual")
+
+        mock_sell_opt.assert_not_called()
