@@ -842,6 +842,7 @@ TRACK A — NEW ENTRIES (per candidate you accept):
                IMPORTANT: divergence_flags restrict instrument to "stock" only — they
                do NOT veto the stock trade itself. Never AVOID a stock trade solely
                because divergence_flags is non-empty.
+               MUST be null (omit the field entirely) when trade_type=AVOID.
   rationale:   One sentence. Required even for AVOID.
   counter_argument / key_risk: one short sentence each (null for AVOID)
 

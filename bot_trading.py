@@ -2445,6 +2445,7 @@ def run_scan():
             "macro_bias": _apex_decision.get("macro_bias") or "",
             "market_read": _apex_decision.get("market_read") or "",
             "new_entries": _apex_decision.get("new_entries") or [],
+            "portfolio_actions": _apex_decision.get("portfolio_actions") or [],
             "latency_ms": _apex_meta.get("latency_ms"),
             "output_tokens": _apex_meta.get("output_tokens"),
         }
