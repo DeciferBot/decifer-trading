@@ -1510,5 +1510,22 @@ def _on_order_status_event(trade):
                 except Exception as _ve:
                     clog("WARNING", f"Voice short entry alert failed for {sym}: {_ve}")
 
+                # Long exit fill — if position is EXITING, write POSITION_CLOSED.
+                # Guard: execute_sell() may have already written it inline (in which case
+                # the key is gone from active_trades) or the deferred handler will run next
+                # reconcile cycle. Check status=EXITING to avoid double-writes.
+                if _t_pre.get("status") == "EXITING" and fill_price > 0:
+                    try:
+                        from orders_portfolio import _close_position_record
+                        _ep = float(_t_pre.get("entry", 0))
+                        _q = int(_t_pre.get("qty", 1))
+                        _short = _t_pre.get("direction") == "SHORT"
+                        _pnl = round((_ep - fill_price if _short else fill_price - _ep) * _q, 2)
+                        _reason = _t_pre.get("pending_exit_reason", "sell_filled")
+                        _close_position_record(sym, exit_price=fill_price, exit_reason=_reason, pnl=_pnl)
+                        clog("TRADE", f"✅ POSITION_CLOSED via callback: {sym} exit={fill_price:.4f} pnl={_pnl:.2f}")
+                    except Exception as _ce:
+                        clog("WARNING", f"Callback POSITION_CLOSED failed for {sym}: {_ce}")
+
     except Exception as e:
         clog("ERROR", f"Order status event error: {e}")

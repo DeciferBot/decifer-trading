@@ -203,6 +203,60 @@ def _flatten_all_inner(ib_fallback: IB = None):
     log.warning(f"🚨 FLATTEN ALL complete — {closed} orders placed, tracker cleared")
 
 
+def _close_position_record(
+    key: str,
+    exit_price: float,
+    exit_reason: str,
+    pnl: float = 0.0,
+    hold_minutes: int = 0,
+) -> None:
+    """Single exit point for all position closes.
+
+    Writes POSITION_CLOSED to event_log, writes training record, removes from
+    active_trades, and saves positions file — in that order. No caller may delete
+    directly from active_trades without going through here.
+    """
+    _t = active_trades.get(key, {})
+    if not _t:
+        return
+    _sym = _t.get("symbol", key.split("|")[0])
+    _tid = _t.get("trade_id", key)
+    try:
+        from event_log import append_close as _el
+        _el(_tid, _sym, exit_price=exit_price, pnl=pnl,
+            exit_reason=exit_reason, hold_minutes=hold_minutes)
+    except Exception as _e:
+        log.warning("_close_position_record: event_log write failed for %s: %s", key, _e)
+    try:
+        from training_store import append as _ts
+        _now_ts = datetime.now(UTC).isoformat()
+        _ts({
+            "trade_id": _tid,
+            "symbol": _sym,
+            "direction": _t.get("direction", "LONG"),
+            "trade_type": _t.get("trade_type", "INTRADAY"),
+            "instrument": _t.get("instrument", "stock"),
+            "fill_price": float(_t.get("entry", 0.0)),
+            "intended_price": float(_t.get("intended_price") or _t.get("entry") or 0.0),
+            "exit_price": exit_price,
+            "pnl": pnl,
+            "hold_minutes": hold_minutes,
+            "exit_reason": exit_reason,
+            "regime": _t.get("entry_regime") or _t.get("regime", "UNKNOWN"),
+            "signal_scores": _t.get("signal_scores") or {},
+            "conviction": float(_t.get("conviction") or 0),
+            "score": int(_t.get("score") or 0),
+            "entry_thesis": _t.get("entry_thesis", ""),
+            "ts_fill": _t.get("open_time") or _now_ts,
+            "ts_close": _now_ts,
+        })
+    except Exception as _e:
+        log.warning("_close_position_record: training_store write failed for %s: %s", key, _e)
+    with _trades_lock:
+        active_trades.pop(key, None)
+    _save_positions_file()
+
+
 def close_position(ib_unused, trade_key: str) -> str | None:
     """
     Close a single position by trade_key IMMEDIATELY via emergency IB connection.
@@ -328,13 +382,20 @@ def close_position(ib_unused, trade_key: str) -> str | None:
     log.warning(f"📤 INSTANT close: {detail}")
     from bot_state import clog as _clog; _clog("TRADE", f"📤 INSTANT close: {detail}")
 
-    # 4) Remove from bot tracker — try composite key first, then plain symbol
+    # 4) Mark EXITING — the deferred handler in update_positions_from_ibkr() will
+    #    confirm the fill from IBKR and write POSITION_CLOSED via _close_position_record().
+    #    Never delete directly here: that would silently drop the closed trade from
+    #    the event_log and dashboard.
     tracker_key = _ibkr_item_to_key(target)
-    if tracker_key in active_trades:
-        del active_trades[tracker_key]
-    elif trade_key in active_trades:
-        del active_trades[trade_key]
-    _save_positions_file()
+    _active_key = tracker_key if tracker_key in active_trades else (trade_key if trade_key in active_trades else None)
+    if _active_key:
+        with _trades_lock:
+            active_trades[_active_key]["status"] = "EXITING"
+            active_trades[_active_key]["close_order_id"] = close_trade.order.orderId
+            active_trades[_active_key]["pending_exit_reason"] = "manual_close"
+        _save_positions_file()
+    else:
+        log.warning("close_position %s: key not found in active_trades — position may already be gone", sym)
 
     return detail
 
@@ -1495,10 +1556,17 @@ def update_positions_from_ibkr(ib: IB):
                         continue
                     stale_keys.append(k)
                 for k in stale_keys:
-                    log.warning(f"Position {k} no longer in IBKR portfolio — removing from tracker")
-                    del active_trades[k]
-            if stale_keys:
-                _save_positions_file()
+                    _st = active_trades.get(k, {})
+                    _last_px = float(_st.get("current") or _st.get("entry") or 0)
+                    _entry_px = float(_st.get("entry") or _last_px)
+                    _qty = int(_st.get("qty") or 1)
+                    _is_short = _st.get("direction") == "SHORT"
+                    _pnl = round((_entry_px - _last_px if _is_short else _last_px - _entry_px) * _qty, 2)
+                    log.warning(
+                        "Position %s no longer in IBKR — recording stale close (pnl=%.2f)", k, _pnl
+                    )
+                    _close_position_record(k, exit_price=_last_px, exit_reason="stale_purge", pnl=_pnl)
+                # _close_position_record() already saves positions file per call; no separate save needed
 
         # ── Deferred CLOSE for EXITING positions no longer in IBKR ───────────
         # When execute_sell placed an extended-hours limit order that hadn't filled

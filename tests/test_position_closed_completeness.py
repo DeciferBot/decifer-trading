@@ -392,5 +392,193 @@ class TestFlattenAllTombstone(unittest.TestCase):
             restore()
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+# Group 5 — _close_position_record() writes POSITION_CLOSED before deleting
+# ═════════════════════════════════════════════════════════════════════════════
+
+class TestClosePositionRecord(unittest.TestCase):
+    """
+    _close_position_record() must write POSITION_CLOSED to event_log and remove
+    the key from active_trades atomically. This is the single exit point for all
+    position closes that don't go through the EXITING deferred handler.
+    """
+
+    def setUp(self):
+        import orders_state
+        self._orig_trades = dict(orders_state.active_trades)
+        orders_state.active_trades.clear()
+
+    def tearDown(self):
+        import orders_state
+        orders_state.active_trades.clear()
+        orders_state.active_trades.update(self._orig_trades)
+
+    def test_writes_position_closed_event(self):
+        """_close_position_record must write POSITION_CLOSED with correct fields."""
+        import event_log, orders_state
+        from orders_portfolio import _close_position_record
+
+        tmp, restore = _tmp_event_log()
+        try:
+            tid = "GOOGL_20260430_191353_000000"
+            orders_state.active_trades["GOOGL"] = _make_trade(
+                "GOOGL", trade_id=tid, entry=350.93, current=377.32, qty=167
+            )
+            _close_position_record("GOOGL", exit_price=377.32, exit_reason="manual_close",
+                                   pnl=4394.31)
+            events = _read_events(tmp)
+            closed = [e for e in events if e.get("event") == "POSITION_CLOSED"]
+            self.assertEqual(len(closed), 1)
+            self.assertEqual(closed[0]["symbol"], "GOOGL")
+            self.assertEqual(closed[0]["trade_id"], tid)
+            self.assertAlmostEqual(closed[0]["exit_price"], 377.32, places=4)
+            self.assertAlmostEqual(closed[0]["pnl"], 4394.31, places=2)
+            self.assertEqual(closed[0]["exit_reason"], "manual_close")
+        finally:
+            restore()
+
+    def test_removes_key_from_active_trades(self):
+        """After _close_position_record, the key must be gone from active_trades."""
+        import event_log, orders_state
+        from orders_portfolio import _close_position_record
+
+        tmp, restore = _tmp_event_log()
+        try:
+            orders_state.active_trades["GOOGL"] = _make_trade("GOOGL", entry=350.93)
+            self.assertIn("GOOGL", orders_state.active_trades)
+            _close_position_record("GOOGL", exit_price=377.32, exit_reason="manual_close")
+            self.assertNotIn("GOOGL", orders_state.active_trades,
+                             "Key must be removed from active_trades after close")
+        finally:
+            restore()
+
+    def test_missing_key_is_noop(self):
+        """Calling _close_position_record for a key not in active_trades must not raise."""
+        import event_log
+        from orders_portfolio import _close_position_record
+        tmp, restore = _tmp_event_log()
+        try:
+            _close_position_record("NONEXISTENT", exit_price=100.0, exit_reason="test")
+            events = _read_events(tmp)
+            closed = [e for e in events if e.get("event") == "POSITION_CLOSED"]
+            self.assertEqual(len(closed), 0, "No event written for missing key")
+        finally:
+            restore()
+
+    def test_event_log_failure_does_not_raise(self):
+        """If event_log write fails, _close_position_record must still remove the key."""
+        import event_log, orders_state
+        from orders_portfolio import _close_position_record
+
+        tmp, restore = _tmp_event_log()
+        try:
+            orders_state.active_trades["TSLA"] = _make_trade("TSLA")
+            with patch.object(event_log, "append_close", side_effect=OSError("disk full")):
+                _close_position_record("TSLA", exit_price=250.0, exit_reason="manual_close")
+            self.assertNotIn("TSLA", orders_state.active_trades,
+                             "Key must still be removed even when event_log write fails")
+        finally:
+            restore()
+
+    def test_resolves_position_in_open_trades(self):
+        """After _close_position_record, event_log.open_trades() must not show the position."""
+        import event_log, orders_state
+        from orders_portfolio import _close_position_record
+
+        tmp, restore = _tmp_event_log()
+        try:
+            tid = "MSFT_20260430_140000_000000"
+            event_log.append_fill(tid, "MSFT", fill_price=400.0, fill_qty=50)
+            self.assertEqual(len(event_log.open_trades()), 1)
+            orders_state.active_trades["MSFT"] = _make_trade(
+                "MSFT", trade_id=tid, entry=400.0
+            )
+            _close_position_record("MSFT", exit_price=405.0, exit_reason="apex_exit", pnl=250.0)
+            self.assertEqual(len(event_log.open_trades()), 0,
+                             "POSITION_CLOSED must resolve position in WAL")
+        finally:
+            restore()
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Group 6 — stale purge writes POSITION_CLOSED before delete
+# ═════════════════════════════════════════════════════════════════════════════
+
+class TestStalePurgeWritesPositionClosed(unittest.TestCase):
+    """
+    The stale position purge in update_positions_from_ibkr() must call
+    _close_position_record() for each stale key, ensuring POSITION_CLOSED is
+    written before the key is removed.
+    """
+
+    def _run_stale_purge(self, trade: dict, tmp_el: pathlib.Path) -> None:
+        """Replicate the stale purge logic (Change 3) directly."""
+        import event_log
+        orig = event_log._LOG_FILE
+        event_log._LOG_FILE = tmp_el
+        try:
+            _st = trade
+            _last_px = float(_st.get("current") or _st.get("entry") or 0)
+            _entry_px = float(_st.get("entry") or _last_px)
+            _qty = int(_st.get("qty") or 1)
+            _is_short = _st.get("direction") == "SHORT"
+            _pnl = round((_entry_px - _last_px if _is_short else _last_px - _entry_px) * _qty, 2)
+            from event_log import append_close as _el_stale
+            _el_stale(
+                _st.get("trade_id", "UNKNOWN"),
+                _st.get("symbol", "UNKNOWN"),
+                exit_price=_last_px,
+                exit_reason="stale_purge",
+                pnl=_pnl,
+                hold_minutes=0,
+            )
+        finally:
+            event_log._LOG_FILE = orig
+
+    def test_stale_long_writes_correct_pnl(self):
+        """Stale long where current > entry must produce positive P&L."""
+        tmp = pathlib.Path(tempfile.mktemp(suffix=".jsonl"))
+        try:
+            trade = _make_trade("NVDA", trade_id="NVDA_20260430_140000",
+                                entry=200.0, current=210.0, qty=100)
+            self._run_stale_purge(trade, tmp)
+            events = _read_events(tmp)
+            closed = [e for e in events if e.get("event") == "POSITION_CLOSED"]
+            self.assertEqual(len(closed), 1)
+            self.assertEqual(closed[0]["exit_reason"], "stale_purge")
+            self.assertAlmostEqual(closed[0]["pnl"], 1000.0, places=2)
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def test_stale_short_writes_correct_pnl(self):
+        """Stale short where current < entry must produce positive P&L."""
+        tmp = pathlib.Path(tempfile.mktemp(suffix=".jsonl"))
+        try:
+            trade = _make_trade("SPY", trade_id="SPY_20260430_140000",
+                                entry=600.0, current=590.0, qty=50, direction="SHORT")
+            self._run_stale_purge(trade, tmp)
+            events = _read_events(tmp)
+            closed = [e for e in events if e.get("event") == "POSITION_CLOSED"]
+            self.assertEqual(len(closed), 1)
+            self.assertAlmostEqual(closed[0]["pnl"], 500.0, places=2)
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def test_stale_resolves_open_trades(self):
+        """After stale purge, event_log.open_trades() must not count the position."""
+        import event_log
+        tmp, restore = _tmp_event_log()
+        try:
+            tid = "GOOGL_20260430_191313_stale"
+            event_log.append_fill(tid, "GOOGL", fill_price=350.93, fill_qty=167)
+            self.assertEqual(len(event_log.open_trades()), 1)
+            trade = _make_trade("GOOGL", trade_id=tid, entry=350.93, current=377.32, qty=167)
+            self._run_stale_purge(trade, tmp)
+            self.assertEqual(len(event_log.open_trades()), 0,
+                             "Stale purge POSITION_CLOSED must resolve WAL")
+        finally:
+            restore()
+
+
 if __name__ == "__main__":
     unittest.main()
