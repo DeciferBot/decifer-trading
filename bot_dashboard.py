@@ -676,6 +676,81 @@ def _enrich_images(articles: list) -> None:
                 a["image_url"] = _stock_logo(syms[0])
 
 
+# ── Real-time trade data helpers ──────────────────────────────────────────────
+_trades_cache: dict = {"data": [], "mtime": 0.0}
+_TRADE_EVENTS_LOG = CONFIG.get("trade_events_log", "data/trade_events.jsonl")
+_TRADES_JSON = CONFIG.get("trade_log", "data/trades.json")
+
+
+def _load_trades_cached() -> list:
+    """Load trades.json with mtime-based cache — avoids 1.3 MB disk read every 2 s."""
+    try:
+        mtime = os.path.getmtime(_TRADES_JSON)
+    except OSError:
+        return []
+    if mtime != _trades_cache["mtime"]:
+        from learning import load_trades as _lt
+        _trades_cache["data"] = _lt()
+        _trades_cache["mtime"] = mtime
+    return _trades_cache["data"]
+
+
+def _todays_closed_trades_from_events() -> list:
+    """Today's closed trades from trade_events.jsonl — written with fsync on close, zero lag.
+
+    Joins POSITION_CLOSED with its ORDER_INTENT for entry metadata.
+    Returns dicts compatible with renderTodaysTrades() (action='CLOSE', exit_price set).
+    """
+    today = _time.strftime("%Y-%m-%d", _time.gmtime())
+    if not os.path.exists(_TRADE_EVENTS_LOG):
+        return []
+    intents: dict = {}
+    fills: dict = {}
+    results = []
+    try:
+        with open(_TRADE_EVENTS_LOG, encoding="utf-8") as f:
+            lines = f.readlines()
+    except OSError:
+        return []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            rec = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        event = rec.get("event")
+        tid = rec.get("trade_id")
+        if not tid:
+            continue
+        if event == "ORDER_INTENT":
+            intents[tid] = rec
+        elif event == "ORDER_FILLED":
+            fills[tid] = rec
+        elif event == "POSITION_CLOSED" and rec.get("ts", "")[:10] == today:
+            intent = intents.get(tid, {})
+            fill = fills.get(tid, {})
+            entry_price = fill.get("fill_price") or intent.get("intended_price") or 0
+            results.append({
+                "timestamp": rec.get("ts", ""),
+                "exit_time": rec.get("ts", ""),
+                "symbol": rec.get("symbol") or intent.get("symbol", ""),
+                "direction": intent.get("direction", "LONG"),
+                "trade_type": intent.get("trade_type", "INTRADAY"),
+                "instrument": intent.get("instrument", "stock"),
+                "action": "CLOSE",
+                "entry_price": entry_price,
+                "exit_price": rec.get("exit_price"),
+                "pnl": rec.get("pnl"),
+                "exit_reason": rec.get("exit_reason"),
+                "hold_minutes": rec.get("hold_minutes", 0),
+                "score": intent.get("score", 0),
+                "qty": fill.get("fill_qty") or intent.get("qty") or 0,
+            })
+    return results
+
+
 class DashHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/":
@@ -702,11 +777,52 @@ class DashHandler(BaseHTTPRequestHandler):
             self.end_headers()
             # Include current settings so dashboard form can show live values
             state = dict(dash)
-            # Refresh trade list from disk so Today's Results stays current
-            # without requiring a bot restart
+            # Always use live active_trades — reconcile updates active_trades but
+            # not dash["positions"], so dash can lag until the next scan cycle.
             try:
-                from learning import load_trades as _lt
-                state["all_trades"] = _lt()
+                from orders_portfolio import get_open_positions as _gop
+                live_positions = _gop()
+                # Supplement with any ORDER_FILLED-without-POSITION_CLOSED entries not
+                # yet reconciled into active_trades (fills that arrived between scan cycles).
+                from event_log import open_trades as _open_trades
+                active_symbols = {p.get("symbol") for p in live_positions}
+                for tid, ev_pos in _open_trades().items():
+                    if ev_pos.get("symbol") in active_symbols:
+                        continue
+                    live_positions.append({
+                        "symbol": ev_pos.get("symbol", ""),
+                        "trade_id": tid,
+                        "direction": ev_pos.get("direction", "LONG"),
+                        "trade_type": ev_pos.get("trade_type", "INTRADAY"),
+                        "instrument": ev_pos.get("instrument", "stock"),
+                        "entry": ev_pos.get("entry") or ev_pos.get("fill_price") or ev_pos.get("intended_price") or 0,
+                        "qty": ev_pos.get("qty") or ev_pos.get("fill_qty") or 0,
+                        "status": "FILLED",
+                        "sl": ev_pos.get("sl"),
+                        "tp": ev_pos.get("tp"),
+                        "score": ev_pos.get("score", 0),
+                        "_pending_reconciliation": True,
+                    })
+                state["positions"] = live_positions
+            except Exception:
+                pass
+            # Today's trades come from trade_events.jsonl (fsync'd on close — zero lag).
+            # Historical trades come from trades.json via mtime-based cache.
+            try:
+                today = _time.strftime("%Y-%m-%d", _time.gmtime())
+                today_trades = _todays_closed_trades_from_events()
+                today_syms = {t["symbol"] for t in today_trades}
+                cached = _load_trades_cached()
+                hist = [t for t in cached if (t.get("timestamp") or t.get("exit_time") or "")[:10] != today]
+                # Keep today's file entries only for symbols absent from the events log
+                # (covers manual trades added directly to trades.json).
+                today_from_file = [
+                    t for t in cached
+                    if (t.get("timestamp") or t.get("exit_time") or "")[:10] == today
+                    and t.get("exit_price") is not None
+                    and t.get("symbol") not in today_syms
+                ]
+                state["all_trades"] = hist + today_from_file + today_trades
             except Exception:
                 pass
             # Total P&L = NetLiquidation - effective capital (starting + deposits - withdrawals)

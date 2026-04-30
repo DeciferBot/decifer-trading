@@ -2261,6 +2261,7 @@ function cancelOrder(orderId, idx) {
 let posSort = 'recency'; // 'recency' | 'size' | 'pnl'
 let lastPositions = [];
 let _lastPositionsFingerprint = '';
+let _lastTradesFingerprint = '';
 
 function sortPositions(mode) {
   posSort = mode;
@@ -2373,6 +2374,13 @@ function renderTodaysTrades(allTrades) {
     el.innerHTML = '<div class="empty">No closed trades today</div>';
     return;
   }
+
+  // Skip DOM rebuild when trade list hasn't changed — preserves scroll position.
+  const tradesFP = todayTrades.map(t =>
+    `${t.symbol}|${(t.pnl || 0).toFixed(2)}|${t.exit_reason || ''}|${t.timestamp || t.exit_time || ''}`
+  ).join(',');
+  if (tradesFP === _lastTradesFingerprint) return;
+  _lastTradesFingerprint = tradesFP;
 
   const exitLabels = {
     'stop_loss':             'SL',
@@ -3178,12 +3186,15 @@ function updateRegime(regime) {
   const kellyStr   = regime.kelly_fraction != null ? regime.kelly_fraction.toFixed(2) : '—';
   const routerStr  = regime.regime_router && regime.regime_router !== 'disabled'
     ? ` | ${regime.regime_router.replace('_', '-').toUpperCase()}` : '';
+  const vix1dStr   = regime.vix_change_1d != null && regime.vix_change_1d !== 0
+    ? (regime.vix_change_1d > 0 ? '+' : '') + regime.vix_change_1d.toFixed(1) + 'd' : '';
+  const vixStr     = `${regime.vix || '—'}${vix1dStr ? ' (' + vix1dStr + ')' : ''}`;
   const tapeCtx    = (regime.tape_context && regime.tape_context.prose) ? regime.tape_context.prose : (regime.tape_context || '');
   if (tapeCtx && tapeCtx !== 'tape data unavailable') {
-    meta.textContent = `${tapeCtx} | VIX: ${regime.vix || '—'} | Kelly: ${kellyStr}${routerStr}`;
+    meta.textContent = `${tapeCtx} | VIX: ${vixStr} | Kelly: ${kellyStr}${routerStr}`;
   } else {
     const vixRankStr = regime.vix_rank != null ? (regime.vix_rank * 100).toFixed(0) + '%' : '—';
-    meta.textContent = `VIX: ${regime.vix || '—'} | Rank: ${vixRankStr} | Kelly: ${kellyStr} | SPY: $${regime.spy_price || '—'}${routerStr}`;
+    meta.textContent = `VIX: ${vixStr} | Rank: ${vixRankStr} | Kelly: ${kellyStr} | SPY: $${regime.spy_price || '—'}${routerStr}`;
   }
   pill.textContent = 'TAPE: ' + tapeLabel;
 }
