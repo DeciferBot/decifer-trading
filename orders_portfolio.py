@@ -314,6 +314,7 @@ def close_position(ib_unused, trade_key: str) -> str | None:
 
     detail = f"{action} {qty} {sym} {'OPT' if is_option else ''} MKT (mkt=${mkt:.2f})"
     log.warning(f"📤 INSTANT close: {detail}")
+    from bot_state import clog as _clog; _clog("TRADE", f"📤 INSTANT close: {detail}")
 
     # 4) Remove from bot tracker — try composite key first, then plain symbol
     tracker_key = _ibkr_item_to_key(target)
@@ -391,27 +392,68 @@ def _force_exit_stale_intraday(ib: IB, key: str, sym: str, pos: dict) -> None:
 
 
 def reset_stale_exits(ib: IB) -> list[str]:
-    """Per-scan-cycle check: any EXITING position whose close order is no longer in IBKR
-    open orders (cancelled, expired, or never filed) is reset to ACTIVE so that
-    execute_sell can re-attempt on the same or next scan cycle."""
+    """Per-scan-cycle self-correction for stuck EXITING positions.
+
+    Two failure modes handled:
+      1. Order vanished — close_order_id not in IBKR open orders (cancelled/expired/never filed).
+      2. Order live but permanently unfillable — SELL limit >1% above market, or
+         BUY limit >1% below market.  The 1% threshold is far above the 0.2% taker
+         offset used by execute_sell, so it only fires when the limit is clearly wrong.
+
+    Both cases: cancel the order (if present), reset status to ACTIVE.
+    execute_sell re-attempts on the same or next scan cycle.
+    """
     try:
-        live_order_ids = {t.order.orderId for t in ib.openTrades()}
+        live_trades = {t.order.orderId: t for t in ib.openTrades()}
     except Exception as e:
         log.warning("reset_stale_exits: failed to fetch IBKR open orders — %s", e)
         return []
+
     reset: list[str] = []
     with _trades_lock:
-        for key, pos in active_trades.items():
+        for key, pos in list(active_trades.items()):
             if pos.get("status") != "EXITING":
                 continue
             close_oid = pos.get("close_order_id")
-            if not close_oid or close_oid not in live_order_ids:
+            sym = pos.get("symbol", key)
+
+            # ── Case 1: order is gone from IBKR ─────────────────────────────
+            if not close_oid or close_oid not in live_trades:
                 log.warning(
-                    "reset_stale_exits: %s close order #%s not in IBKR open orders — resetting to ACTIVE",
-                    pos.get("symbol", key), close_oid,
+                    "reset_stale_exits: %s close order #%s not in IBKR — resetting to ACTIVE",
+                    sym, close_oid,
                 )
                 _safe_update_trade(key, {"status": "ACTIVE", "close_order_id": None})
-                reset.append(pos.get("symbol", key))
+                reset.append(sym)
+                continue
+
+            # ── Case 2: order is live but limit is on the wrong side of market ─
+            ibkr_trade = live_trades[close_oid]
+            order = ibkr_trade.order
+            if order.orderType not in ("LMT", "LMT LMT"):
+                continue
+            current_price = pos.get("current", 0)
+            if current_price <= 0:
+                continue
+            lmt = order.lmtPrice
+            action = order.action  # "SELL" or "BUY"
+            unfillable = (
+                (action == "SELL" and lmt > current_price * 1.01)
+                or (action == "BUY" and lmt < current_price * 0.99)
+            )
+            if unfillable:
+                log.warning(
+                    "reset_stale_exits: %s close order #%s is unfillable "
+                    "(%s LMT $%.2f vs current $%.2f) — cancelling and resetting to ACTIVE",
+                    sym, close_oid, action, lmt, current_price,
+                )
+                try:
+                    _cancel_ibkr_order_by_id(ib, close_oid)
+                except Exception as _ce:
+                    log.error("reset_stale_exits: cancel #%s failed — %s", close_oid, _ce)
+                _safe_update_trade(key, {"status": "ACTIVE", "close_order_id": None})
+                reset.append(sym)
+
     return reset
 
 

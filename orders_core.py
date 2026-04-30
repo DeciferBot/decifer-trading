@@ -792,6 +792,7 @@ def execute_buy(
                 raise
 
             log.info(f"✅ BUY {symbol} qty={qty} @ ${price:.2f} [EXT-HRS] SL=${sl:.2f} placed post-fill")
+            from bot_state import clog as _clog; _clog("TRADE", f"✅ BUY {symbol} qty={qty} @ ${price:.2f} [EXT-HRS] SL=${sl:.2f}")
 
             if CONFIG.get("fill_watcher", {}).get("enabled", True):
                 from fill_watcher import FillWatcher, _active_watchers, _watchers_lock
@@ -1158,6 +1159,7 @@ def execute_buy(
         _rr = (tp - price) / (price - sl) if (price - sl) > 0 else 0
         _tranche_tag = f" [T1={t1_qty}/T2={t2_qty}]" if tranche_mode else ""
         log.info(f"✅ BUY {symbol} qty={qty}{_tranche_tag} @ ${price:.2f} | SL=${sl:.2f} TP=${tp:.2f} | R:R={_rr:.1f}")
+        from bot_state import clog as _clog; _clog("TRADE", f"✅ BUY {symbol} qty={qty}{_tranche_tag} @ ${price:.2f} | SL=${sl:.2f} TP=${tp:.2f} | R:R={_rr:.1f}")
 
         # ── Start fill watcher for this order ────────────────────────────────
         if CONFIG.get("fill_watcher", {}).get("enabled", True):
@@ -1184,6 +1186,7 @@ def execute_buy(
     except Exception as e:
         _safe_del_trade(symbol)  # clean up any reservation or partial entry if order failed
         log.error(f"Buy failed {symbol}: {e}")
+        from bot_state import clog as _clog; _clog("ERROR", f"Buy failed {symbol}: {e}")
         return False
 
 
@@ -1539,6 +1542,7 @@ def execute_short(
                 raise
 
             log.info(f"✅ SHORT {symbol} qty={qty} @ ${price:.2f} [EXT-HRS] SL=${sl:.2f} placed post-fill")
+            from bot_state import clog as _clog; _clog("TRADE", f"✅ SHORT {symbol} qty={qty} @ ${price:.2f} [EXT-HRS] SL=${sl:.2f}")
 
             if CONFIG.get("fill_watcher", {}).get("enabled", True):
                 from fill_watcher import FillWatcher, _active_watchers, _watchers_lock
@@ -1745,6 +1749,7 @@ def execute_short(
         _rr = (price - tp) / (sl - price) if (sl - price) > 0 else 0
         _tranche_tag = f" [T1={t1_qty}/T2={t2_qty}]" if tranche_mode else ""
         log.info(f"✅ SHORT {symbol} qty={qty} @ ${price:.2f} | SL=${sl:.2f} TP=${tp:.2f} | R:R={_rr:.1f}{_tranche_tag}")
+        from bot_state import clog as _clog; _clog("TRADE", f"✅ SHORT {symbol} qty={qty} @ ${price:.2f} | SL=${sl:.2f} TP=${tp:.2f} | R:R={_rr:.1f}{_tranche_tag}")
 
         # ── Start fill watcher for this short entry ─────────────────────────
         if CONFIG.get("fill_watcher", {}).get("enabled", True):
@@ -1915,7 +1920,20 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             # Sell slightly below (SELL) / buy slightly above (BUY) to maximise fill
             # probability in thin after-hours markets; GTC so it stays live if not
             # filled immediately.
-            _exit_price = validated_price if validated_price > 0 else (_current_fresh or info.get("entry", 0))
+            # Price priority for extended-hours limit:
+            # 1. ibkr_price — live IBKR tick, most reliable for order placement
+            # 2. validated_price — may be Alpaca-sourced; use only when IBKR is unavailable
+            # 3. current_fresh — recent cached price within staleness window
+            # 4. entry price — last resort
+            # Validated_price is intentionally NOT preferred here: _validate_position_price
+            # can return an Alpaca-sourced value that diverges from the real market (e.g.
+            # stale pre-market print), producing a limit that can never fill.
+            if ibkr_price > 0:
+                _exit_price = ibkr_price
+            elif validated_price > 0:
+                _exit_price = validated_price
+            else:
+                _exit_price = _current_fresh or info.get("entry", 0)
             # When IBKR returned no price (ibkr_price=0) the fallback above may land on a
             # stale cached value or the original entry price — producing a limit that can
             # never fill (e.g. BUY limit below market for a SHORT cover).  Use the
@@ -2106,6 +2124,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             remaining_qty = info["qty"] - sell_qty
             _safe_update_trade(_trade_key, {"qty": remaining_qty, "status": "ACTIVE"})
             log.info(f"[TRIM] {symbol}: sold {sell_qty}, {remaining_qty} remaining")
+            from bot_state import clog as _clog; _clog("TRADE", f"[TRIM] {symbol}: sold {sell_qty}, {remaining_qty} remaining")
 
             # Reissue OCA bracket (SL + TP) sized to remaining_qty at original levels.
             _sl_price = info.get("sl", 0.0)
@@ -2215,11 +2234,14 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                     f"Thesis-failure gate armed for {symbol}: "
                     f"{CONFIG.get('failed_thesis_cooldown_hours', 4)}h cooldown + 1% dislocation required"
                 )
+            _pnl_str = f"{'+'if pnl>=0 else ''}{pnl:.2f}" if pnl is not None else "?"
+            from bot_state import clog as _clog; _clog("TRADE", f"✅ SELL {symbol} @ ${_exit_price_val:.2f} | PnL=${_pnl_str} | reason={reason}")
             _save_positions_file()
         return True
 
     except Exception as e:
         log.error(f"Sell failed {symbol}: {e}")
+        from bot_state import clog as _clog; _clog("ERROR", f"Sell failed {symbol}: {e}")
         # Only revert to ACTIVE if the order was never submitted. If placeOrder
         # succeeded before the exception (e.g. from bracket cancel or ib.sleep),
         # the order is live in IBKR — keeping EXITING prevents duplicate orders
