@@ -2140,6 +2140,20 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             _safe_update_trade(_trade_key, {"qty": remaining_qty, "status": "ACTIVE"})
             log.info(f"[TRIM] {symbol}: sold {sell_qty}, {remaining_qty} remaining")
             from bot_state import clog as _clog; _clog("TRADE", f"[TRIM] {symbol}: sold {sell_qty}, {remaining_qty} remaining")
+            # Write POSITION_TRIMMED so crash-recovery replay tracks the correct remaining qty.
+            _trim_tid = info.get("trade_id", "")
+            _trim_px = float(getattr(sell_trade.orderStatus, "avgFillPrice", None) or
+                             info.get("current") or info.get("entry", 0.0))
+            if _trim_tid:
+                try:
+                    from event_log import append_trim as _el_trim
+                    _el_trim(_trim_tid, symbol,
+                             qty_sold=sell_qty,
+                             remaining_qty=remaining_qty,
+                             exit_price=_trim_px,
+                             exit_reason=reason)
+                except Exception as _elt_err:
+                    log.warning("execute_sell %s: POSITION_TRIMMED write failed (non-fatal): %s", symbol, _elt_err)
 
             # Reissue OCA bracket (SL + TP) sized to remaining_qty at original levels.
             _sl_price = info.get("sl", 0.0)

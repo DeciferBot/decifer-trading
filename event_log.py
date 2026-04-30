@@ -168,6 +168,55 @@ def append_close(
     })
 
 
+def append_trim(
+    trade_id: str,
+    symbol: str,
+    *,
+    qty_sold: int,
+    remaining_qty: int,
+    exit_price: float,
+    exit_reason: str = "trim",
+) -> None:
+    """Write POSITION_TRIMMED after a partial exit fills.
+
+    open_trades() replay uses this to track the correct remaining qty without
+    a full POSITION_CLOSED/re-open cycle that could lose metadata on failure.
+    """
+    _append({
+        "ts": datetime.now(UTC).isoformat(),
+        "event": "POSITION_TRIMMED",
+        "trade_id": trade_id,
+        "symbol": symbol,
+        "qty_sold": qty_sold,
+        "remaining_qty": remaining_qty,
+        "exit_price": exit_price,
+        "exit_reason": exit_reason,
+    })
+
+
+def append_qty_correction(
+    trade_id: str,
+    symbol: str,
+    *,
+    corrected_qty: int,
+    reason: str = "reconcile_ibkr",
+) -> None:
+    """Write POSITION_QTY_CORRECTED when reconcile detects IBKR qty != event log qty.
+
+    This makes the correction durable: after a restart, open_trades() replay
+    applies the correction so the bot starts with the right share count even if
+    positions.json is stale or empty.
+    """
+    _append({
+        "ts": datetime.now(UTC).isoformat(),
+        "event": "POSITION_QTY_CORRECTED",
+        "trade_id": trade_id,
+        "symbol": symbol,
+        "corrected_qty": corrected_qty,
+        "reason": reason,
+    })
+
+
 # ── Read API ──────────────────────────────────────────────────────────────────
 
 
@@ -187,6 +236,8 @@ def open_trades() -> dict[str, dict]:
     intents: dict[str, dict] = {}
     fills: dict[str, dict] = {}
     closed: set[str] = set()
+    trims: dict[str, int] = {}        # trade_id → latest remaining_qty after partial exit
+    corrections: dict[str, int] = {}  # trade_id → latest corrected_qty from reconcile
 
     for rec in _load_all():
         tid = rec.get("trade_id")
@@ -199,6 +250,10 @@ def open_trades() -> dict[str, dict]:
             fills[tid] = rec
         elif event == "POSITION_CLOSED":
             closed.add(tid)
+        elif event == "POSITION_TRIMMED":
+            trims[tid] = int(rec.get("remaining_qty", 0))
+        elif event == "POSITION_QTY_CORRECTED":
+            corrections[tid] = int(rec.get("corrected_qty", 0))
 
     result: dict[str, dict] = {}
     for tid, fill in fills.items():
@@ -208,7 +263,13 @@ def open_trades() -> dict[str, dict]:
         merged.update(fill)
         # Canonical entry price = confirmed fill, not intended price.
         merged["entry"] = fill["fill_price"]
-        merged["qty"] = fill["fill_qty"]
+        # Qty priority: explicit reconcile correction > latest trim > original fill.
+        if tid in corrections:
+            merged["qty"] = corrections[tid]
+        elif tid in trims:
+            merged["qty"] = trims[tid]
+        else:
+            merged["qty"] = fill["fill_qty"]
         result[tid] = merged
 
     return result

@@ -893,6 +893,15 @@ def reconcile_with_ibkr(ib: IB):
                             active_trades[key]["qty"] = ibkr_qty
                             if is_option:
                                 active_trades[key]["contracts"] = ibkr_qty
+                        # Write POSITION_QTY_CORRECTED so open_trades() replay returns
+                        # the right qty after a restart even if positions.json is stale.
+                        _qc_tid = active_trades.get(key, {}).get("trade_id", "")
+                        if _qc_tid:
+                            try:
+                                from event_log import append_qty_correction as _el_qc
+                                _el_qc(_qc_tid, sym, corrected_qty=ibkr_qty)
+                            except Exception as _qc_err:
+                                log.warning("Reconcile %s: POSITION_QTY_CORRECTED write failed: %s", key, _qc_err)
                     # Detect phantom/corrupted entry prices: if the stored entry
                     # deviates >50% from IBKR's averageCost the metadata is stale
                     # (e.g. a test placeholder like $100 for a $269 stock).
@@ -1199,6 +1208,31 @@ def reconcile_with_ibkr(ib: IB):
                                 new_entry["tp"] = _saved["tp"]
                             new_entry["_metadata_restored"] = True
                         _safe_set_trade(key, new_entry)
+                        # Write ORDER_FILLED to event log so crash recovery can reconstruct
+                        # this position without needing positions.json. Guard: skip if the
+                        # event log already has an open record for this symbol (handles the
+                        # case where the bot restarts multiple times before the position closes).
+                        _ext_tid = new_entry.get("trade_id", "")
+                        if not _ext_tid:
+                            _ext_tid = f"{sym}_EXT_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
+                            new_entry["trade_id"] = _ext_tid
+                            with _trades_lock:
+                                if key in active_trades:
+                                    active_trades[key]["trade_id"] = _ext_tid
+                        _el_already_open = False
+                        try:
+                            from event_log import open_trades as _el_check
+                            _el_already_open = any(
+                                v.get("symbol") == sym for v in _el_check().values()
+                            )
+                        except Exception:
+                            pass
+                        if not _el_already_open:
+                            try:
+                                from event_log import append_fill as _el_fill_ext
+                                _el_fill_ext(_ext_tid, sym, fill_price=ibkr_entry, fill_qty=qty)
+                            except Exception as _ef_err:
+                                log.warning("Reconcile: ORDER_FILLED write failed for external stock %s: %s", sym, _ef_err)
                         # Reattach any existing SL order for stop protection while we
                         # wait for the next scan cycle to force-exit via unknown_trade_type.
                         # Never place a NEW SL — only hook up an order that already exists.
