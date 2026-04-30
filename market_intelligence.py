@@ -653,7 +653,7 @@ def _parse_response(
     try:
         raw = json.loads(text)
     except Exception:
-        log.warning("intelligence: JSON parse failed — full fallback")
+        log.error("intelligence: JSON parse failed — session_character defaulting to FEAR_ELEVATED (parse failure, not a market signal)")
         return _DEFAULT_SESSION_CHARACTER, "", [_fallback_classify(c, obs) for c in candidates]
 
     raw_char = str(raw.get("session_character", "")).upper().strip()
@@ -788,7 +788,7 @@ def classify_signals(
         return session_character, market_read, classifications
 
     except Exception as exc:
-        log.warning(f"[intelligence] Opus failed ({exc}) — full evidence fallback")
+        log.error(f"[intelligence] classify_signals failed ({exc}) — session_character defaulting to FEAR_ELEVATED (failure fallback, not a market signal)")
         return _DEFAULT_SESSION_CHARACTER, "", [_fallback_classify(c, obs) for c in candidates]
 
 
@@ -842,6 +842,11 @@ TRACK A — NEW ENTRIES (per candidate you accept):
                IMPORTANT: divergence_flags restrict instrument to "stock" only — they
                do NOT veto the stock trade itself. Never AVOID a stock trade solely
                because divergence_flags is non-empty.
+               IMPORTANT: session_character (including FEAR_ELEVATED) does NOT restrict
+               instrument selection. "Reduce size on speculative plays" in FEAR_ELEVATED
+               applies to conviction level (use MEDIUM, not HIGH) — not to instrument type.
+               An options_eligible SWING/POSITION candidate with strong directional signal
+               warrants "call" or "put" regardless of session_character.
                MUST be null (omit the field entirely) when trade_type=AVOID.
   rationale:   One sentence. Required even for AVOID.
   counter_argument / key_risk: one short sentence each (null for AVOID)
