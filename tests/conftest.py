@@ -456,13 +456,10 @@ def _redirect_training_store(tmp_path, monkeypatch):
     Redirect training_store._STORE_FILE to a per-test temp path so execute_sell
     calls never write training records to the real data/training_records.jsonl.
     """
-    try:
-        import training_store
-        from pathlib import Path
+    import training_store
+    from pathlib import Path
 
-        monkeypatch.setattr(training_store, "_STORE_FILE", Path(tmp_path / "training.jsonl"))
-    except Exception:
-        pass
+    monkeypatch.setattr(training_store, "_STORE_FILE", Path(tmp_path / "training.jsonl"))
     yield
 
 

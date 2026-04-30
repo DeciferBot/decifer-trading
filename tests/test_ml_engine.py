@@ -54,6 +54,14 @@ from ml_engine import (
 # ────────────────────────────────────────────────────────────────────────────
 
 
+_DEFAULT_SIGNAL_SCORES = {
+    "trend": 8, "momentum": 6, "squeeze": 2, "flow": 7, "breakout": 3,
+    "news": 1, "social": 1, "reversion": 0, "overnight_drift": 4,
+    "pead": 0, "short_squeeze": 0, "catalyst": 0, "analyst_revision": 0,
+    "iv_skew": 2, "fx_macro": 0, "fx_momentum": 0, "insider_buying": 5, "mtf": 9,
+}
+
+
 def _make_trade_record(
     symbol="AAPL",
     pnl=150.0,
@@ -68,6 +76,7 @@ def _make_trade_record(
     reasoning="Agents agreed 5/6 — strong setup",
     action="BUY",
     exit_reason="TP",
+    signal_scores=None,
 ):
     return {
         "symbol": symbol,
@@ -83,6 +92,7 @@ def _make_trade_record(
         "reasoning": reasoning,
         "action": action,
         "exit_reason": exit_reason,
+        "signal_scores": signal_scores if signal_scores is not None else dict(_DEFAULT_SIGNAL_SCORES),
     }
 
 

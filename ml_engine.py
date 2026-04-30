@@ -48,7 +48,11 @@ TRADE_LOG_FILE = CONFIG.get("trade_log", "data/trades.json")
 MODELS_DIR = "data/models"
 MIN_TRADES_FOR_ML = CONFIG.get("ml_min_trades", 50)
 ML_CONFIDENCE_WEIGHT = CONFIG.get("ml_confidence_weight", 0.3)
-REGIME_OPTIONS = ["TRENDING_UP", "TRENDING_DOWN", "RANGE_BOUND", "CAPITULATION", "RELIEF_RALLY"]
+REGIME_OPTIONS = [
+    "TRENDING_UP", "TRENDING_DOWN", "RANGE_BOUND", "CAPITULATION", "RELIEF_RALLY",
+    "MOMENTUM_BULL", "FEAR_ELEVATED", "DISTRIBUTION", "EXTREME_STRESS", "TRENDING_BEAR",
+    "CHOPPY",
+]
 BREAKEVEN_THRESHOLD = 0.001  # Within 0.1% of entry price = breakeven
 
 # All signal dimensions the engine has ever produced (union across all schema versions).
@@ -183,6 +187,8 @@ class TradeLabeler:
 
         data_list = []
         for trade in self.trades:
+            if not trade.get("signal_scores"):
+                continue  # dimension features absent — only base features, not useful for ML
             features = self.extract_features(trade)
             if features is None:
                 continue
