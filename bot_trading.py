@@ -418,6 +418,12 @@ def check_external_closes(regime: dict):
                         del open_trades[sym]
                         continue
 
+                if trade.get("status") == "EXITING":
+                    # Close order already placed by execute_sell; deferred-close handler in
+                    # orders_portfolio.py will write POSITION_CLOSED once the fill confirms.
+                    # Skip here to prevent a duplicate event with wrong price.
+                    continue
+
                 exit_price = None
                 is_opt_pos = trade.get("instrument") == "option"
                 underlying = trade.get("symbol", sym)
@@ -603,6 +609,20 @@ def check_external_closes(regime: dict):
 
                 except Exception as _log_exc:
                     clog("ERROR", f"External close log/dashboard error for {sym}: {_log_exc}")
+
+                try:
+                    from event_log import append_close as _el_close_ext
+                    _close_tid = trade.get("trade_id") or f"{sym}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
+                    _el_close_ext(
+                        _close_tid, sym,
+                        exit_price=round(exit_price, 4),
+                        pnl=round(pnl, 2),
+                        exit_reason=exit_reason,
+                        hold_minutes=held_mins,
+                    )
+                except Exception as _el_ext_err:
+                    clog("WARN", f"check_external_closes: POSITION_CLOSED write failed for {sym}: {_el_ext_err}")
+
                 finally:
                     # Always remove from tracker — prevents infinite reprocessing on next cycle
                     open_trades.pop(sym, None)

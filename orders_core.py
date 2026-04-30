@@ -2179,9 +2179,12 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
         else:
             now_ts = datetime.now(UTC).isoformat()
             _close_trade_id = info.get("trade_id") or f"{symbol}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
+            _raw_fill = getattr(sell_trade.orderStatus, "avgFillPrice", None)
+            _actual_fill = float(_raw_fill) if isinstance(_raw_fill, (int, float)) and _raw_fill > 0 else 0.0
             _exit_price_val = float(
-                (info.get("current_premium") or info.get("current")) if _is_opt_close
-                else (info.get("current") or info.get("entry", 0.0))
+                _actual_fill if _actual_fill > 0 else
+                ((info.get("current_premium") or info.get("current") or info.get("entry", 0.0)) if _is_opt_close
+                 else (info.get("current") or info.get("entry", 0.0)))
             )
             # Compute hold_minutes from open_time to now.
             _hold_mins = 0

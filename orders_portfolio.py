@@ -185,6 +185,17 @@ def _flatten_all_inner(ib_fallback: IB = None):
                 log.warning(f"🚨 FLATTEN: Market {close_action} {abs(int(qty))} {sym} ({direction})")
             eib.placeOrder(contract, order)
             _safe_del_trade(key)
+            try:
+                from event_log import append_close as _el_flat
+                _flat_price = float(info.get("current") or info.get("entry") or 0.0)
+                _flat_tid = info.get("trade_id") or f"{sym}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
+                _el_flat(_flat_tid, sym,
+                         exit_price=_flat_price,
+                         pnl=0.0,
+                         exit_reason="flatten_all",
+                         hold_minutes=0)
+            except Exception:
+                pass  # emergency path — never let logging block execution
             closed += 1
         except Exception as e:
             log.error(f"🚨 FLATTEN failed for {sym}: {e}")
