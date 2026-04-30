@@ -937,3 +937,184 @@ class TestTradeTypeRecovery:
         assert logged_trades[0]["trade_type"] == "SWING", (
             f"trade_type must be recovered via last_intent_for_symbol; got {logged_trades[0].get('trade_type')}"
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CLASS 8: reset_stale_exits — self-correcting unfillable limits (commit cd33b70+)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestResetStaleExits:
+    """
+    reset_stale_exits must detect and self-correct two failure modes without
+    manual intervention:
+
+      Case 1 — Order vanished: close_order_id not found in ib.openTrades().
+               Reset to ACTIVE so execute_sell can retry.
+
+      Case 2 — Unfillable limit: SELL limit >1% above current price, or
+               BUY limit >1% below current price.  Cancel the IBKR order
+               and reset to ACTIVE.
+
+    Regression for the EQIX incident: stale pre-market force-exit placed a
+    SELL LMT at $1086.89 when EQIX was at $1045.  The bot was permanently
+    stuck in EXITING with a live-but-unfillable order.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _clear(self):
+        import orders_portfolio as _op
+        _op.active_trades.clear()
+        yield
+        _op.active_trades.clear()
+
+    def _make_ib(self, open_trades):
+        ib = MagicMock()
+        ib.openTrades.return_value = open_trades
+        return ib
+
+    def _make_ibkr_trade(self, order_id, action, order_type, lmt_price, status="Submitted"):
+        t = MagicMock()
+        t.order.orderId = order_id
+        t.order.action = action
+        t.order.orderType = order_type
+        t.order.lmtPrice = lmt_price
+        t.orderStatus.status = status
+        return t
+
+    def test_order_vanished_resets_to_active(self, mock_config):
+        """close_order_id not in ib.openTrades → reset to ACTIVE."""
+        import orders_portfolio as _op
+        _op.active_trades["EQIX"] = {
+            "symbol": "EQIX", "status": "EXITING",
+            "close_order_id": 8587, "current": 1050.0, "direction": "LONG",
+        }
+        ib = self._make_ib([])  # empty — order 8587 is gone
+        with patch("orders_portfolio.CONFIG", mock_config):
+            result = _op.reset_stale_exits(ib)
+        assert "EQIX" in result
+        assert _op.active_trades["EQIX"]["status"] == "ACTIVE"
+        assert _op.active_trades["EQIX"]["close_order_id"] is None
+
+    def test_unfillable_sell_limit_cancelled_and_reset(self, mock_config):
+        """SELL LMT $1086 on a $1050 stock → cancel + reset to ACTIVE."""
+        import orders_portfolio as _op
+        _op.active_trades["EQIX"] = {
+            "symbol": "EQIX", "status": "EXITING",
+            "close_order_id": 8587, "current": 1050.0, "direction": "LONG",
+        }
+        ibkr_trade = self._make_ibkr_trade(8587, "SELL", "LMT", 1086.89)
+        ib = self._make_ib([ibkr_trade])
+        with (
+            patch("orders_portfolio.CONFIG", mock_config),
+            patch("orders_portfolio._cancel_ibkr_order_by_id") as mock_cancel,
+        ):
+            result = _op.reset_stale_exits(ib)
+        assert "EQIX" in result, "Unfillable SELL limit must be detected and reset"
+        assert _op.active_trades["EQIX"]["status"] == "ACTIVE"
+        assert _op.active_trades["EQIX"]["close_order_id"] is None
+        mock_cancel.assert_called_once_with(ib, 8587)
+
+    def test_unfillable_buy_limit_cancelled_and_reset(self, mock_config):
+        """BUY LMT $900 on a $1050 SHORT cover → cancel + reset to ACTIVE."""
+        import orders_portfolio as _op
+        _op.active_trades["EQIX"] = {
+            "symbol": "EQIX", "status": "EXITING",
+            "close_order_id": 9001, "current": 1050.0, "direction": "SHORT",
+        }
+        ibkr_trade = self._make_ibkr_trade(9001, "BUY", "LMT", 900.0)
+        ib = self._make_ib([ibkr_trade])
+        with (
+            patch("orders_portfolio.CONFIG", mock_config),
+            patch("orders_portfolio._cancel_ibkr_order_by_id") as mock_cancel,
+        ):
+            result = _op.reset_stale_exits(ib)
+        assert "EQIX" in result
+        assert _op.active_trades["EQIX"]["status"] == "ACTIVE"
+        mock_cancel.assert_called_once_with(ib, 9001)
+
+    def test_fillable_limit_not_touched(self, mock_config):
+        """SELL LMT $1048 on a $1050 stock (0.2% below) — normal close order, leave it."""
+        import orders_portfolio as _op
+        _op.active_trades["EQIX"] = {
+            "symbol": "EQIX", "status": "EXITING",
+            "close_order_id": 8600, "current": 1050.0, "direction": "LONG",
+        }
+        ibkr_trade = self._make_ibkr_trade(8600, "SELL", "LMT", 1047.90)
+        ib = self._make_ib([ibkr_trade])
+        with (
+            patch("orders_portfolio.CONFIG", mock_config),
+            patch("orders_portfolio._cancel_ibkr_order_by_id") as mock_cancel,
+        ):
+            result = _op.reset_stale_exits(ib)
+        assert "EQIX" not in result, "Fillable limit must not be cancelled"
+        assert _op.active_trades["EQIX"]["status"] == "EXITING"
+        mock_cancel.assert_not_called()
+
+    def test_non_exiting_position_ignored(self, mock_config):
+        """ACTIVE positions are never touched by reset_stale_exits."""
+        import orders_portfolio as _op
+        _op.active_trades["NVDA"] = {
+            "symbol": "NVDA", "status": "ACTIVE",
+            "close_order_id": None, "current": 800.0, "direction": "LONG",
+        }
+        ib = self._make_ib([])
+        with patch("orders_portfolio.CONFIG", mock_config):
+            result = _op.reset_stale_exits(ib)
+        assert "NVDA" not in result
+        assert _op.active_trades["NVDA"]["status"] == "ACTIVE"
+
+
+class TestAvoidEntrySanitization:
+    """Regression: Apex returning banned fields on AVOID entries must not trigger schema_error."""
+
+    def test_avoid_entry_instrument_sanitized(self):
+        from market_intelligence import _sanitize_avoid_entries
+        from schemas import validate_apex_decision_schema
+
+        decision = {
+            "new_entries": [{
+                "symbol": "META",
+                "trade_type": "AVOID",
+                "instrument": "stock",
+                "direction": "LONG",
+                "conviction": "MEDIUM",
+                "direction_flipped": False,
+                "counter_argument": "strong momentum",
+                "key_risk": "earnings gap",
+                "rationale": "macro binary risk today",
+            }],
+            "portfolio_actions": [],
+            "market_read": "test",
+            "macro_bias": "NEUTRAL",
+            "session_character": "FEAR_ELEVATED",
+        }
+        _sanitize_avoid_entries(decision)
+        validate_apex_decision_schema(decision)  # must not raise
+        entry = decision["new_entries"][0]
+        assert entry.get("instrument") is None
+        assert entry.get("direction") is None
+        assert entry.get("conviction") is None
+        assert entry.get("direction_flipped") is None
+        assert entry.get("counter_argument") is None
+        assert entry.get("key_risk") is None
+        assert entry["rationale"] == "macro binary risk today"
+
+    def test_non_avoid_entries_untouched(self):
+        from market_intelligence import _sanitize_avoid_entries
+
+        decision = {
+            "new_entries": [{
+                "symbol": "AAPL",
+                "trade_type": "INTRADAY",
+                "direction": "LONG",
+                "conviction": "MEDIUM",
+                "instrument": "stock",
+                "rationale": "momentum breakout",
+            }],
+            "portfolio_actions": [],
+        }
+        _sanitize_avoid_entries(decision)
+        entry = decision["new_entries"][0]
+        assert entry["instrument"] == "stock"
+        assert entry["direction"] == "LONG"

@@ -1070,6 +1070,21 @@ def _fallback_decision(apex_input: dict, reason: str = "") -> dict:
     }
 
 
+# Fields that AVOID entries must not set (mirrors schemas.py _AVOID validation).
+_AVOID_NULL_FIELDS = ("direction", "conviction", "instrument",
+                      "direction_flipped", "counter_argument", "key_risk")
+
+
+def _sanitize_avoid_entries(decision: dict) -> None:
+    """Strip banned fields from AVOID entries — enforces the schema invariant at
+    code layer so a model hallucination (e.g. instrument='stock') never causes a
+    schema_error → fallback → FLOOR_RULE_VIOLATION cascade."""
+    for entry in decision.get("new_entries", []):
+        if entry.get("trade_type") == "AVOID":
+            for field in _AVOID_NULL_FIELDS:
+                entry.pop(field, None)
+
+
 def apex_call(
     apex_input: dict,
     session_context: SessionContext | None = None,
@@ -1119,6 +1134,8 @@ def apex_call(
         fb = _fallback_decision(apex_input, reason=f"parse_error:{e}")
         fb["_meta"] = {**_meta, "error": "parse_error"}
         return fb
+
+    _sanitize_avoid_entries(decision)
 
     try:
         validate_apex_decision_schema(decision)
