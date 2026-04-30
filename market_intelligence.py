@@ -1035,6 +1035,14 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
     for c in candidates:
         parts.append("  " + _format_candidate_line(c))
 
+    _tc_map = {
+        c["symbol"]: c["trade_context"]
+        for c in candidates
+        if c.get("symbol") and c.get("trade_context")
+    }
+    if _tc_map:
+        parts.append(_format_trade_context_block(_tc_map))
+
     parts.append(f"\n[TRACK B — OPEN POSITIONS] ({len(review)})")
     for p in review:
         parts.append("  " + _format_review_line(p))

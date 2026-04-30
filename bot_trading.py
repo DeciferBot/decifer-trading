@@ -2383,6 +2383,36 @@ def run_scan():
                  f"APEX_LIVE: {len(_cut_candidates_raw)} candidates after guardrails "
                  f"— capped to top 30 by score")
 
+        # Attach TradeContext (fundamentals) to each candidate so Apex can
+        # evaluate POSITION classification. Uses FMP cache warmed at scan start.
+        _sig_map = {s.symbol.upper(): s for s in (signals or [])}
+        for _c in _cut_candidates:
+            if _c.get("trade_context"):
+                continue
+            _csym = (_c.get("symbol") or "").upper()
+            _csig = _sig_map.get(_csym)
+            if not _csig:
+                continue
+            try:
+                from trade_context import build_context as _build_tc
+                from risk import get_earnings_days_away as _geda_tc
+                _ed_tc = None
+                try:
+                    _ed_tc = _geda_tc(_csym)
+                except Exception:
+                    pass
+                _tc = _build_tc(
+                    symbol=_csym,
+                    direction=_c.get("direction", "LONG"),
+                    signal=_csig,
+                    current_price=float(_c.get("price") or _csig.price or 0),
+                    earnings_days_away=_ed_tc,
+                    regime=(_c.get("regime") or {}).get("regime") if isinstance(_c.get("regime"), dict) else _c.get("regime"),
+                )
+                _c["trade_context"] = _tc.to_dict()
+            except Exception as _tc_err:
+                log.debug("APEX_LIVE: trade_context build failed for %s — %s", _csym, _tc_err)
+
         # Explicit same-symbol options exposure guard (policies 3 & 4).
         # Block Apex from opening a stock position on any symbol where:
         #   (a) a deterministic options entry fired THIS cycle, OR
