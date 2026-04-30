@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import bot_state
+import ibkr_reconciler
 import schemas
 from bot_account import get_account_details
 from bot_ibkr import sync_orders_from_ibkr
@@ -728,7 +729,7 @@ def _todays_closed_trades_from_events() -> list:
             intents[tid] = rec
         elif event == "ORDER_FILLED":
             fills[tid] = rec
-        elif event == "POSITION_CLOSED" and rec.get("ts", "")[:10] == today:
+        elif event == "POSITION_CLOSED" and rec.get("ts", "")[:10] == today and rec.get("exit_reason") != "manual_repair":
             intent = intents.get(tid, {})
             fill = fills.get(tid, {})
             entry_price = fill.get("fill_price") or intent.get("intended_price") or 0
@@ -784,19 +785,53 @@ class DashHandler(BaseHTTPRequestHandler):
                 live_positions = _gop()
                 # Supplement with any ORDER_FILLED-without-POSITION_CLOSED entries not
                 # yet reconciled into active_trades (fills that arrived between scan cycles).
+                import re as _re
+                from datetime import datetime as _fdt, timezone as _ftz
                 from event_log import open_trades as _open_trades
+
+                def _opt_underlying(sym: str) -> str:
+                    """Extract underlying ticker from an option contract symbol like AMZN_C_267.5_2026-05-15."""
+                    m = _re.match(r'^([A-Z]+)_[CP]_', sym or "")
+                    return m.group(1) if m else sym
+
+                _SCAN_TTL = CONFIG.get("scan_interval_seconds", 300)
                 active_symbols = {p.get("symbol") for p in live_positions}
+                # Also include underlyings so options keyed by underlying don't leak through
+                active_underlyings = {_opt_underlying(s) for s in active_symbols}
+
+                try:
+                    from price_updater import get_live_prices as _glp
+                    _live_px = _glp()
+                except Exception:
+                    _live_px = {}
+
                 for tid, ev_pos in _open_trades().items():
-                    if ev_pos.get("symbol") in active_symbols:
+                    ev_sym = ev_pos.get("symbol", "")
+                    # Skip if already tracked in active_trades (by symbol or underlying)
+                    if ev_sym in active_symbols or _opt_underlying(ev_sym) in active_underlyings:
                         continue
+                    # Skip fills older than one scan cycle — reconcile has run, position is gone
+                    fill_ts_str = ev_pos.get("ts") or ev_pos.get("fill_time") or ""
+                    if fill_ts_str:
+                        try:
+                            _fill_age = (_fdt.now(_ftz.utc) - _fdt.fromisoformat(fill_ts_str.replace("Z", "+00:00"))).total_seconds()
+                            if _fill_age > _SCAN_TTL:
+                                continue
+                        except Exception:
+                            pass
+                    # Populate current price from live price cache
+                    _underlying_sym = _opt_underlying(ev_sym)
+                    _px = _live_px.get(_underlying_sym) or _live_px.get(ev_sym) or {}
+                    _current = _px.get("mid") or 0
                     live_positions.append({
-                        "symbol": ev_pos.get("symbol", ""),
+                        "symbol": ev_sym,
                         "trade_id": tid,
                         "direction": ev_pos.get("direction", "LONG"),
                         "trade_type": ev_pos.get("trade_type", "INTRADAY"),
                         "instrument": ev_pos.get("instrument", "stock"),
                         "entry": ev_pos.get("entry") or ev_pos.get("fill_price") or ev_pos.get("intended_price") or 0,
                         "qty": ev_pos.get("qty") or ev_pos.get("fill_qty") or 0,
+                        "current": _current,
                         "status": "FILLED",
                         "sl": ev_pos.get("sl"),
                         "tp": ev_pos.get("tp"),
@@ -806,11 +841,12 @@ class DashHandler(BaseHTTPRequestHandler):
                 state["positions"] = live_positions
             except Exception:
                 pass
-            # Today's trades come from trade_events.jsonl (fsync'd on close — zero lag).
+            # Today's trades: IBKR fills as ground truth + event_log metadata.
+            # Falls back to event_log-only when IBKR is offline (ibkr_match='unmatched').
             # Historical trades come from trades.json via mtime-based cache.
             try:
                 today = _time.strftime("%Y-%m-%d", _time.gmtime())
-                today_trades = _todays_closed_trades_from_events()
+                today_trades = ibkr_reconciler.reconcile_closes(bot_state.ib, cutover_date=today)
                 today_syms = {t["symbol"] for t in today_trades}
                 cached = _load_trades_cached()
                 hist = [t for t in cached if (t.get("timestamp") or t.get("exit_time") or "")[:10] != today]
@@ -1605,7 +1641,22 @@ class DashHandler(BaseHTTPRequestHandler):
         pass  # Suppress default HTTP logs
 
 
+def _pnl_refresh_loop():
+    """Refresh daily P&L from IBKR's reqPnL subscription every 5 minutes."""
+    import math as _math
+    while True:
+        threading.Event().wait(300)
+        try:
+            from bot_account import get_account_data as _gad
+            _, pnl = _gad()
+            if pnl and not _math.isnan(pnl):
+                dash["daily_pnl"] = pnl
+        except Exception:
+            pass
+
+
 def start_dashboard():
     server = HTTPServer(("", CONFIG["dashboard_port"]), DashHandler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
+    threading.Thread(target=_pnl_refresh_loop, daemon=True, name="pnl-refresh").start()
     clog("INFO", f"Dashboard live → http://localhost:{CONFIG['dashboard_port']}")

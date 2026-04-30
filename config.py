@@ -625,6 +625,8 @@ CONFIG = {
     "log_file": "logs/decifer.log",
     "trade_log": "data/trades.json",
     "trade_log_db": "data/decifer.db",
+    "trade_events_log": "data/trade_events.jsonl",
+    "reconciled_trades_log": "data/reconciled_trades.jsonl",
     "order_log": "data/orders.json",
     "signals_log": "data/signals_log.jsonl",
     # ── OPTIONS TRADING ───────────────────────────────────────
@@ -892,7 +894,7 @@ CONFIG = {
         "position_min_earnings_days_away":   5,     # binary event gate: earnings < 5d → SWING
         "position_min_dcf_upside_pct":      15.0,   # Path A: DCF upside must exceed this (%)
         "position_min_analyst_upside_pct":  10.0,   # Path A: analyst PT upside floor (%)
-        "position_min_revenue_growth_pct":  20.0,   # Path B: revenue growth YoY floor (%)
+        "position_min_revenue_growth_pct":  10.0,   # Path B: revenue growth YoY floor (%) — paper: 10; live: 20
         "position_min_gross_margin_pct":    30.0,   # Path B: gross margin floor (%)
         "position_min_supporting_signals":   2,     # both paths: need ≥ N of 4 signals
     },
