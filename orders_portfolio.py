@@ -851,6 +851,8 @@ def reconcile_with_ibkr(ib: IB):
                                 ):
                                     if _mf in _saved:
                                         active_trades[key][_mf] = _saved[_mf]
+                                if active_trades[key].get("entry_regime", "UNKNOWN") == "UNKNOWN" and _saved.get("regime"):
+                                    active_trades[key]["entry_regime"] = _saved["regime"]
                                 if _saved.get("score", 0) > 0:
                                     active_trades[key]["score"] = _saved["score"]
                                 active_trades[key].pop("metadata_status", None)
@@ -894,25 +896,6 @@ def reconcile_with_ibkr(ib: IB):
                         )
                         pnl = round((validated_price - ibkr_entry) * qty * mult, 2)
 
-                    {
-                        "symbol": sym,
-                        "instrument": "option" if is_option else ("fx" if is_fx else "stock"),
-                        "entry": ibkr_entry,
-                        "current": round(validated_price, 4),
-                        "qty": qty,
-                        "sl": sl,
-                        "tp": tp,
-                        "direction": direction,
-                        "score": 0,
-                        "reasoning": "External position — not opened by this bot session",
-                        "trade_type": "UNKNOWN",
-                        "conviction": 0.0,
-                        "entry_regime": "UNKNOWN",
-                        "metadata_status": "MISSING",
-                        "pnl": pnl,
-                        "status": "ACTIVE",
-                        "_price_sources": src_desc,
-                    }
                     if is_option:
                         c = item.contract
                         raw_exp = str(c.lastTradeDateOrContractMonth)
@@ -1085,6 +1068,29 @@ def reconcile_with_ibkr(ib: IB):
                             "status": "ACTIVE",
                             "_price_sources": src_desc,
                         }
+                        _saved = _find_saved(key, sym, "stock")
+                        if _saved:
+                            log.info(
+                                f"Reconcile {key}: restoring stock metadata (trade_type={_saved.get('trade_type', '?')})"
+                            )
+                            for _mf in (
+                                "trade_type", "conviction", "reasoning", "signal_scores",
+                                "agent_outputs", "entry_score", "open_time", "atr",
+                                "entry_regime", "entry_thesis", "pattern_id", "setup_type",
+                                "ic_weights_at_entry", "advice_id", "high_water_mark",
+                                "tranche_mode", "t1_qty", "t2_qty", "t1_status", "t1_order_id",
+                            ):
+                                if _saved.get(_mf) is not None:
+                                    new_entry[_mf] = _saved[_mf]
+                            if new_entry.get("entry_regime", "UNKNOWN") == "UNKNOWN" and _saved.get("regime"):
+                                new_entry["entry_regime"] = _saved["regime"]
+                            if _saved.get("score", 0) > 0:
+                                new_entry["score"] = _saved["score"]
+                            if _saved.get("sl"):
+                                new_entry["sl"] = _saved["sl"]
+                            if _saved.get("tp"):
+                                new_entry["tp"] = _saved["tp"]
+                            new_entry["_metadata_restored"] = True
                         _safe_set_trade(key, new_entry)
                         # Reattach any existing SL order for stop protection while we
                         # wait for the next scan cycle to force-exit via unknown_trade_type.
