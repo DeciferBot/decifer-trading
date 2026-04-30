@@ -242,10 +242,10 @@ class DeciferML:
             return False
 
         # Select features for ML
+        # holding_minutes excluded: determined by outcome (leakage), not entry signal.
         feature_cols = [
             "score",
             "vix",
-            "holding_minutes",
             "time_of_day",
             "day_of_week",
             "is_after_hours",
