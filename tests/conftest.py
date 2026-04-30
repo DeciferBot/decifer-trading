@@ -432,6 +432,40 @@ def _redirect_hwm_state_file(tmp_path, monkeypatch):
     yield
 
 
+@pytest.fixture(autouse=True)
+def _redirect_event_log(tmp_path, monkeypatch):
+    """
+    Redirect event_log._LOG_FILE to a per-test temp path so execute_sell /
+    execute_sell_option calls never write POSITION_CLOSED records to the real
+    data/trade_events.jsonl.  Tests in test_event_log_and_training_store.py
+    override this with their own monkeypatch.setattr() which takes precedence.
+    """
+    try:
+        import event_log
+        from pathlib import Path
+
+        monkeypatch.setattr(event_log, "_LOG_FILE", Path(tmp_path / "events.jsonl"))
+    except Exception:
+        pass
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _redirect_training_store(tmp_path, monkeypatch):
+    """
+    Redirect training_store._STORE_FILE to a per-test temp path so execute_sell
+    calls never write training records to the real data/training_records.jsonl.
+    """
+    try:
+        import training_store
+        from pathlib import Path
+
+        monkeypatch.setattr(training_store, "_STORE_FILE", Path(tmp_path / "training.jsonl"))
+    except Exception:
+        pass
+    yield
+
+
 @pytest.fixture
 def config():
     """Return the Decifer CONFIG dict for signal tests."""
