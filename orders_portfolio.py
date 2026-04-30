@@ -390,6 +390,31 @@ def _force_exit_stale_intraday(ib: IB, key: str, sym: str, pos: dict) -> None:
         log.error("_force_exit_stale_intraday %s: execute_sell failed — %s", sym, _se)
 
 
+def reset_stale_exits(ib: IB) -> list[str]:
+    """Per-scan-cycle check: any EXITING position whose close order is no longer in IBKR
+    open orders (cancelled, expired, or never filed) is reset to ACTIVE so that
+    execute_sell can re-attempt on the same or next scan cycle."""
+    try:
+        live_order_ids = {t.order.orderId for t in ib.openTrades()}
+    except Exception as e:
+        log.warning("reset_stale_exits: failed to fetch IBKR open orders — %s", e)
+        return []
+    reset: list[str] = []
+    with _trades_lock:
+        for key, pos in active_trades.items():
+            if pos.get("status") != "EXITING":
+                continue
+            close_oid = pos.get("close_order_id")
+            if not close_oid or close_oid not in live_order_ids:
+                log.warning(
+                    "reset_stale_exits: %s close order #%s not in IBKR open orders — resetting to ACTIVE",
+                    pos.get("symbol", key), close_oid,
+                )
+                _safe_update_trade(key, {"status": "ACTIVE", "close_order_id": None})
+                reset.append(pos.get("symbol", key))
+    return reset
+
+
 def reconcile_with_ibkr(ib: IB):
     """
     On startup or reconnect: restore positions from our own store, then reconcile

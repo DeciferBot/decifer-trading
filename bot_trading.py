@@ -1737,6 +1737,17 @@ def run_scan():
                 "INFO",
                 f"Cycle check REVIEW suppressed: last PM review {_force_age_mins:.0f}m ago (cooldown {_force_cooldown_mins}m)",
             )
+    # Reset any EXITING positions whose close order has vanished from IBKR (cancelled,
+    # expired, or never filed). This unblocks execute_sell for the next PM/guardrails pass.
+    try:
+        from orders_portfolio import reset_stale_exits as _reset_stale_exits
+        _reset_syms = _reset_stale_exits(ib)
+        if _reset_syms:
+            clog("RISK", f"Stale EXITING positions reset to ACTIVE: {_reset_syms}")
+            open_pos = get_open_positions()
+    except Exception as _rse_err:
+        log.warning("reset_stale_exits failed — %s", _rse_err)
+
     # CP-5: Exclude PENDING (entry submitted but not yet filled) and EXITING
     # (sell already in flight) from PM review. A position entered this cycle should
     # not be eligible for an immediate EXIT recommendation before IBKR confirms the
