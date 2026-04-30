@@ -47,12 +47,14 @@ _MIN_SELL_RETRY_INTERVAL_S = 90  # min seconds between any two sell attempts (pr
 _PENDING_EXITS_FILE = os.path.join(os.path.dirname(__file__), "data", "pending_option_exits.json")
 _pending_option_exits: dict = {}  # opt_key → original reason string
 
-# Circuit-breaker: track how many times each opt_key has been attempted by flush.
-# Unlike _option_sell_attempts, this counter is NEVER reset on a successful paper fill,
-# so it catches the IBKR paper-account inconsistency loop where fills "succeed" but the
-# position re-appears on the next reconcile cycle.
-_flush_attempt_counts: dict = {}
-_MAX_FLUSH_ATTEMPTS = 5
+# Persistent blacklist: opt_keys condemned after repeated failed flush attempts.
+# Survives restarts. Checked at re-queue time (execute_sell_option) and at IBKR
+# reconcile time (orders_portfolio.reconcile_with_ibkr) so condemned positions
+# never re-enter active_trades or pending_option_exits across bot restarts.
+_BLACKLIST_FILE = os.path.join(os.path.dirname(__file__), "data", "option_exit_blacklist.json")
+_option_exit_blacklist: dict = {}  # opt_key → reason string
+_flush_attempt_counts: dict = {}   # opt_key → flush attempts this session (session-scoped counter)
+_MAX_FLUSH_ATTEMPTS = 3            # condemn after this many failed flush cycles in one session
 
 
 def _is_option_expired(opt_key: str) -> bool:
@@ -108,7 +110,41 @@ def _save_pending_exits() -> None:
         _log.warning(f"orders_options: failed to persist pending exits to file: {_e}")
 
 
+def _load_blacklist() -> None:
+    global _option_exit_blacklist
+    try:
+        if os.path.exists(_BLACKLIST_FILE):
+            with open(_BLACKLIST_FILE) as f:
+                _option_exit_blacklist = __import__("json").load(f)
+            if _option_exit_blacklist:
+                log.warning(
+                    "orders_options: %d opt_key(s) on exit blacklist: %s",
+                    len(_option_exit_blacklist), ", ".join(_option_exit_blacklist.keys()),
+                )
+    except Exception:
+        _option_exit_blacklist = {}
+
+
+def _save_blacklist() -> None:
+    try:
+        os.makedirs(os.path.dirname(_BLACKLIST_FILE), exist_ok=True)
+        tmp = _BLACKLIST_FILE + ".tmp"
+        with open(tmp, "w") as f:
+            __import__("json").dump(_option_exit_blacklist, f, indent=2)
+        os.replace(tmp, _BLACKLIST_FILE)
+    except Exception as _e:
+        log.warning("orders_options: failed to persist option exit blacklist: %s", _e)
+
+
+def blacklist_option_exit(opt_key: str, reason: str = "manual") -> None:
+    """Add opt_key to the persistent exit blacklist. Survives restarts."""
+    _option_exit_blacklist[opt_key] = reason
+    _save_blacklist()
+    log.warning("orders_options: %s added to option exit blacklist (%s)", opt_key, reason)
+
+
 _load_pending_exits()
+_load_blacklist()
 
 
 def execute_buy_option(
@@ -321,6 +357,9 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
     """
     # Options only trade during regular market hours (9:30–16:00 ET)
     if not is_options_market_open():
+        if opt_key in _option_exit_blacklist:
+            log.warning("execute_sell_option: %s is blacklisted — not re-queuing", opt_key)
+            return False
         now_et = datetime.now(_ET)
         log.warning(
             f"Options market closed ({now_et.strftime('%H:%M ET')}) — deferring exit for {opt_key} until next open"
@@ -657,13 +696,14 @@ def flush_pending_option_exits(ib: IB) -> None:
             _pending_option_exits.pop(opt_key, None)
             _save_pending_exits()
             continue
+        if opt_key in _option_exit_blacklist:
+            log.warning("Deferred exit %s is blacklisted — dropping without execute", opt_key)
+            _pending_option_exits.pop(opt_key, None)
+            _save_pending_exits()
+            continue
         _flush_attempt_counts[opt_key] = _flush_attempt_counts.get(opt_key, 0) + 1
         if _flush_attempt_counts[opt_key] > _MAX_FLUSH_ATTEMPTS:
-            log.warning(
-                "Deferred exit %s attempted %d times with no clean resolution — dropping. "
-                "IBKR paper account may still hold this position.",
-                opt_key, _flush_attempt_counts[opt_key],
-            )
+            blacklist_option_exit(opt_key, reason=f"flush_loop:{_flush_attempt_counts[opt_key]}_attempts")
             _pending_option_exits.pop(opt_key, None)
             _save_pending_exits()
             try:
@@ -673,7 +713,7 @@ def flush_pending_option_exits(ib: IB) -> None:
                     opt_key=opt_key,
                     symbol=opt_key.split("_")[0],
                     flush_attempts=_flush_attempt_counts[opt_key],
-                    note="Dropped after exceeding max flush attempts — manual review may be needed.",
+                    note="Blacklisted after exceeding max flush attempts — IBKR paper account may still hold this position.",
                 )
             except Exception:
                 pass

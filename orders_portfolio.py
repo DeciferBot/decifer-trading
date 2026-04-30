@@ -26,6 +26,7 @@ from orders_contracts import (
     _validate_position_price,
     get_contract,
     is_equities_extended_hours,
+    is_options_market_open,
 )
 from orders_state import (
     _flatten_lock,
@@ -394,13 +395,16 @@ def _force_exit_stale_intraday(ib: IB, key: str, sym: str, pos: dict) -> None:
 def reset_stale_exits(ib: IB) -> list[str]:
     """Per-scan-cycle self-correction for stuck EXITING positions.
 
-    Two failure modes handled:
+    Three failure modes handled:
       1. Order vanished — close_order_id not in IBKR open orders (cancelled/expired/never filed).
       2. Order live but permanently unfillable — SELL limit >1% above market, or
          BUY limit >1% below market.  The 1% threshold is far above the 0.2% taker
          offset used by execute_sell, so it only fires when the limit is clearly wrong.
+      3. Pre-market GTC limit stranded at regular session open — extended-hours limits
+         never become MKT orders on their own.  At regular session open, cancel the GTC
+         limit and reset to ACTIVE so execute_sell places a proper MKT order immediately.
 
-    Both cases: cancel the order (if present), reset status to ACTIVE.
+    All cases: cancel the order (if present), reset status to ACTIVE.
     execute_sell re-attempts on the same or next scan cycle.
     """
     try:
@@ -408,6 +412,8 @@ def reset_stale_exits(ib: IB) -> list[str]:
     except Exception as e:
         log.warning("reset_stale_exits: failed to fetch IBKR open orders — %s", e)
         return []
+
+    regular_session = is_options_market_open()  # True 9:30–16:00 ET
 
     reset: list[str] = []
     with _trades_lock:
@@ -427,12 +433,31 @@ def reset_stale_exits(ib: IB) -> list[str]:
                 reset.append(sym)
                 continue
 
-            # ── Case 2: order is live but limit is on the wrong side of market ─
             ibkr_trade = live_trades[close_oid]
             order = ibkr_trade.order
             if order.orderType not in ("LMT", "LMT LMT"):
                 continue
+
             current_price = pos.get("current", 0)
+
+            # ── Case 3: regular session open — GTC limit should be MKT ──────
+            # Extended-hours limits are never auto-converted to MKT on session
+            # open.  Cancel the stale GTC and reset so execute_sell fires MKT.
+            if regular_session and getattr(order, "tif", "").upper() in ("GTC", ""):
+                log.warning(
+                    "reset_stale_exits: %s close order #%s is a GTC LMT ($%.2f) "
+                    "but regular session is open — upgrading to MKT",
+                    sym, close_oid, order.lmtPrice,
+                )
+                try:
+                    _cancel_ibkr_order_by_id(ib, close_oid)
+                except Exception as _ce:
+                    log.error("reset_stale_exits: cancel #%s failed — %s", close_oid, _ce)
+                _safe_update_trade(key, {"status": "ACTIVE", "close_order_id": None})
+                reset.append(sym)
+                continue
+
+            # ── Case 2: order is live but limit is on the wrong side of market ─
             if current_price <= 0:
                 continue
             lmt = order.lmtPrice
@@ -967,6 +992,16 @@ def reconcile_with_ibkr(ib: IB):
                             if _saved.get("score", 0) > 0:
                                 new_entry["score"] = _saved["score"]
                             new_entry["_metadata_restored"] = True
+                        try:
+                            from orders_options import _option_exit_blacklist as _opt_blacklist
+                            if key in _opt_blacklist:
+                                log.warning(
+                                    "Reconcile: %s is on option exit blacklist — skipping re-add to active_trades",
+                                    key,
+                                )
+                                continue
+                        except Exception:
+                            pass
                         _safe_set_trade(key, new_entry)
                     elif is_fx:
                         # FX position — tighter SL/TP (0.5%/1.5%) and 4-decimal precision
