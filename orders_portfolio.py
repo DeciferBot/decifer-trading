@@ -366,6 +366,30 @@ def _resolve_cwd_exit_price(trade: dict, exec_index: dict) -> tuple[float, str]:
     return float(trade.get("current") or trade.get("entry", 0)), "estimated"
 
 
+def _open_date_before_today(open_time: str, today: date) -> bool:
+    try:
+        return datetime.fromisoformat(open_time.replace("Z", "+00:00")).date() < today
+    except Exception:
+        return False
+
+
+def _force_exit_stale_intraday(ib: IB, key: str, sym: str, pos: dict) -> None:
+    """Cancel any stale bracket/close orders then force-exit at market."""
+    for oid_field in ("close_order_id", "sl_order_id", "tp_order_id"):
+        oid = pos.get(oid_field)
+        if oid:
+            try:
+                _cancel_ibkr_order_by_id(ib, oid)
+            except Exception:
+                pass
+    _safe_update_trade(key, {"status": "ACTIVE"})
+    try:
+        from orders_core import execute_sell as _execute_sell
+        _execute_sell(ib, sym, reason="stale_intraday_force_exit")
+    except Exception as _se:
+        log.error("_force_exit_stale_intraday %s: execute_sell failed — %s", sym, _se)
+
+
 def reconcile_with_ibkr(ib: IB):
     """
     On startup or reconnect: restore positions from our own store, then reconcile
@@ -407,21 +431,6 @@ def reconcile_with_ibkr(ib: IB):
                     return v
         except Exception as _el_err:
             log.warning("_find_saved %s: event_log read failed: %s", key, _el_err)
-        # Secondary: event_log ORDER_INTENT records — positions submitted but not yet
-        # confirmed via ORDER_FILLED (GTC orders that filled while bot was offline never
-        # get append_fill called, so they only appear here, not in open_trades()).
-        # Most recent intent wins if a symbol was entered more than once.
-        try:
-            from event_log import pending_orders as _el_pending
-            for intent in reversed(_el_pending()):
-                if (
-                    intent.get("symbol") == sym
-                    and intent.get("trade_type")
-                    and intent["trade_type"] != "UNKNOWN"
-                ):
-                    return intent
-        except Exception as _pi_err:
-            log.warning("_find_saved %s: pending_orders read failed: %s", key, _pi_err)
         # Fallback: positions.json exact key
         if key in saved_positions:
             hit = saved_positions[key]
@@ -627,9 +636,8 @@ def reconcile_with_ibkr(ib: IB):
                         _ot = _t.get("open_time") or _t.get("ts") or ""
                         if _ot:
                             try:
-                                from datetime import datetime, timezone
                                 _dt = datetime.fromisoformat(_ot.replace("Z", "+00:00"))
-                                _open_mins = int((datetime.now(timezone.utc) - _dt).total_seconds() / 60)
+                                _open_mins = int((datetime.now(UTC) - _dt).total_seconds() / 60)
                             except Exception:
                                 pass
                         _el_close(
@@ -991,7 +999,6 @@ def reconcile_with_ibkr(ib: IB):
                             pnl = round((ibkr_entry - validated_price) * qty, 2)
                         else:
                             pnl = round((validated_price - ibkr_entry) * qty, 2)
-                        _saved = _find_saved(key, sym, "stock")
                         new_entry = {
                             "symbol": sym,
                             "instrument": "stock",
@@ -1005,47 +1012,16 @@ def reconcile_with_ibkr(ib: IB):
                             "conviction": 0.0,
                             "entry_regime": "UNKNOWN",
                             "metadata_status": "MISSING",
-                            "reasoning": "Reconciled from IBKR on startup — metadata not found",
+                            "reasoning": "Unknown position — not opened by this bot session. Will be force-exited.",
                             "direction": direction,
                             "pnl": pnl,
                             "status": "ACTIVE",
                             "_price_sources": src_desc,
                         }
-                        if _saved:
-                            log.info(
-                                f"Reconcile {key}: restoring metadata (trade_type={_saved.get('trade_type', '?')})"
-                            )
-                            new_entry["trade_type"] = _saved.get("trade_type", "SCALP")
-                            new_entry["reasoning"] = _saved.get("reasoning", new_entry["reasoning"])
-                            new_entry["signal_scores"] = _saved.get("signal_scores", {})
-                            new_entry["agent_outputs"] = _saved.get("agent_outputs", {})
-                            new_entry["entry_score"] = _saved.get("entry_score", 0)
-                            new_entry["open_time"] = _saved.get("open_time")
-                            new_entry["atr"] = _saved.get("atr", 0)
-                            new_entry["conviction"] = _saved.get("conviction", 0.0)
-                            new_entry["entry_regime"] = _saved.get("entry_regime") or _saved.get("regime") or "UNKNOWN"
-                            new_entry["entry_thesis"] = _saved.get("entry_thesis", "")
-                            new_entry["pattern_id"] = _saved.get("pattern_id", "")
-                            new_entry["tranche_mode"] = _saved.get("tranche_mode", False)
-                            new_entry["t1_qty"] = _saved.get("t1_qty")
-                            new_entry["t2_qty"] = _saved.get("t2_qty")
-                            new_entry["t1_status"] = _saved.get("t1_status")
-                            new_entry["t1_order_id"] = _saved.get("t1_order_id")
-                            new_entry["high_water_mark"] = _saved.get("high_water_mark", ibkr_entry)
-                            new_entry["ic_weights_at_entry"] = _saved.get("ic_weights_at_entry")
-                            new_entry["advice_id"] = _saved.get("advice_id", "")
-                            if _saved.get("score", 0) > 0:
-                                new_entry["score"] = _saved["score"]
-                            # Restore original SL/TP — fallback formulas above are last-resort
-                            # defaults only; saved values are from the actual order placement.
-                            if _saved.get("sl"):
-                                new_entry["sl"] = _saved["sl"]
-                            if _saved.get("tp"):
-                                new_entry["tp"] = _saved["tp"]
-                            new_entry["_metadata_restored"] = True
                         _safe_set_trade(key, new_entry)
-
-                    if not is_option and not is_fx:
+                        # Reattach any existing SL order for stop protection while we
+                        # wait for the next scan cycle to force-exit via unknown_trade_type.
+                        # Never place a NEW SL — only hook up an order that already exists.
                         close_action = "BUY" if direction == "SHORT" else "SELL"
                         _reattach_sl_order(ib, key, sym, qty, sl, close_action)
 
@@ -1155,6 +1131,26 @@ def reconcile_with_ibkr(ib: IB):
         log.info(
             f"Reconciliation complete. Tracking {len(active_trades)} positions. (processed={reconciled_count}, failed={failed_count})"
         )
+
+        # ── Step 5.5: force-exit stale INTRADAY/SCALP positions ──────────────
+        # IBKR is the source of truth. If a stock INTRADAY/SCALP position still
+        # exists here with an open_time from a prior trading day, EOD flat failed.
+        # Exit at market immediately — no Apex, no debate.
+        _today = date.today()
+        with _trades_lock:
+            _stale = [
+                (k, v.get("symbol", k), dict(v))
+                for k, v in active_trades.items()
+                if (v.get("trade_type") or "").upper() in ("INTRADAY", "SCALP")
+                and v.get("instrument", "stock") == "stock"
+                and _open_date_before_today(v.get("open_time", ""), _today)
+            ]
+        for _k, _sym, _pos in _stale:
+            log.warning(
+                "Reconcile: stale INTRADAY %s open since %s — forcing market exit",
+                _sym, (_pos.get("open_time") or "?")[:10],
+            )
+            _force_exit_stale_intraday(ib, _k, _sym, _pos)
 
         # ── Step 6: orphan alerting ───────────────────────────────────────────
         # Any position that ended up with trade_type UNKNOWN after all lookup
