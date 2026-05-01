@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from ib_async import IB, LimitOrder, MarketOrder, StopOrder
+from ib_async import IB, LimitOrder, MarketOrder
 
 from bot_ibkr import cancel_with_reason
 from config import CONFIG
@@ -936,6 +936,10 @@ def reconcile_with_ibkr(ib: IB):
                         active_trades[key]["_price_sources"] = src_desc
                         if is_option:
                             active_trades[key]["current_premium"] = round(validated_price, 4)
+                        # Store IBKR's live price as a reference so price_updater can
+                        # detect when Alpaca streaming quotes have drifted from IBKR.
+                        if ibkr_price > 0:
+                            active_trades[key]["ibkr_last"] = round(ibkr_price, 4)
                     log.debug(f"Reconcile {key}: price updated to ${validated_price:.4f} via {src_desc}")
 
                     # ── Metadata recovery for known positions with UNKNOWN trade_type ──
@@ -945,7 +949,22 @@ def reconcile_with_ibkr(ib: IB):
                     if not stored_tt or stored_tt == "UNKNOWN":
                         instrument_type = "option" if is_option else ("fx" if is_fx else "stock")
                         _saved = _find_saved(key, sym, instrument_type)
-                        if _saved and _saved.get("trade_type") and _saved["trade_type"] != "UNKNOWN":
+                        # Guard: only recover metadata when the saved intent's direction
+                        # matches the live IBKR direction.  A direction mismatch means the
+                        # UNKNOWN was set because this is an orphaned position from a flipped
+                        # trade (e.g. a long TP overshoot leaving a net short).  Recovering
+                        # trade_type in that case silently legitimises the orphan and prevents
+                        # guardrails from force-exiting it.
+                        _saved_dir = (_saved.get("direction") or "LONG").upper() if _saved else ""
+                        _live_dir  = (active_trades[key].get("direction") or "LONG").upper()
+                        _dir_ok    = (_saved_dir == _live_dir)
+                        if not _dir_ok and _saved:
+                            log.warning(
+                                f"Reconcile {key}: metadata recovery BLOCKED — saved direction "
+                                f"{_saved_dir!r} != live direction {_live_dir!r}. "
+                                f"Keeping trade_type=UNKNOWN so guardrails force-exits this orphan."
+                            )
+                        if _saved and _saved.get("trade_type") and _saved["trade_type"] != "UNKNOWN" and _dir_ok:
                             log.info(
                                 f"Reconcile {key}: late metadata recovery (trade_type={_saved.get('trade_type', '?')})"
                             )
@@ -967,15 +986,8 @@ def reconcile_with_ibkr(ib: IB):
                                 active_trades[key]["_metadata_restored"] = True
                             _save_positions_file()
 
-                    # Reattach SL bracket order ID if we didn't carry one.
-                    # FX skipped: _reattach_sl_order matches by contract.symbol
-                    # which is base currency ("EUR") not the pair ("EURUSD"),
-                    # so it never finds existing SL orders and would create duplicates.
-                    if not is_fx and not active_trades[key].get("sl_order_id"):
-                        close_action = "BUY" if stored_direction == "SHORT" else "SELL"
-                        _reattach_sl_order(
-                            ib, key, sym, stored_qty, active_trades[key].get("sl", 0), close_action, is_option=is_option
-                        )
+                    # sl_order_id reattachment is handled by bracket_health.audit_bracket_orders()
+                    # each scan cycle — no need to do it here at reconcile time.
 
                 else:
                     # ── Unknown position: genuinely external fill ─────────────
@@ -1255,11 +1267,8 @@ def reconcile_with_ibkr(ib: IB):
                                 _el_fill_ext(_ext_tid, sym, fill_price=ibkr_entry, fill_qty=qty)
                             except Exception as _ef_err:
                                 log.warning("Reconcile: ORDER_FILLED write failed for external stock %s: %s", sym, _ef_err)
-                        # Reattach any existing SL order for stop protection while we
-                        # wait for the next scan cycle to force-exit via unknown_trade_type.
-                        # Never place a NEW SL — only hook up an order that already exists.
-                        close_action = "BUY" if direction == "SHORT" else "SELL"
-                        _reattach_sl_order(ib, key, sym, qty, sl, close_action)
+                        # bracket_health.audit_bracket_orders() will reattach any existing
+                        # SL order on the next scan cycle.
 
                 reconciled_count += 1
 
@@ -1443,37 +1452,6 @@ def reconcile_with_ibkr(ib: IB):
         _orders_state._reconcile_in_progress = False
         _save_positions_file()  # always persist — runs even if reconcile errors partway through
 
-
-def _reattach_sl_order(
-    ib: IB, key: str, sym: str, qty: int, sl: float, close_action: str, is_option: bool = False
-) -> None:
-    """
-    Find an existing SL order in IBKR openTrades and reattach its ID, or submit
-    a new stop if none exists. Options are skipped (no stock-style bracket).
-    """
-    if is_option:
-        return
-    try:
-        sl_id = None
-        for open_trade in ib.openTrades():
-            if open_trade.contract.symbol != sym or open_trade.orderStatus.status not in ("Submitted", "PreSubmitted"):
-                continue
-            if open_trade.order.orderType in ("STP", "TRAIL") and open_trade.order.action.upper() == close_action:
-                sl_id = open_trade.order.orderId
-                break
-        if sl_id:
-            _safe_update_trade(key, {"sl_order_id": sl_id})
-            log.info(f"Reconcile {key}: reattached SL order {sl_id}")
-        elif sl > 0:
-            rc = get_contract(sym)
-            ib.qualifyContracts(rc)
-            new_sl = StopOrder(close_action, qty, sl, account=CONFIG["active_account"], tif="GTC", outsideRth=True)
-            sl_trade = ib.placeOrder(rc, new_sl)
-            ib.sleep(0.2)
-            _safe_update_trade(key, {"sl_order_id": sl_trade.order.orderId})
-            log.warning(f"Reconcile {key}: re-submitted orphaned SL @ ${sl:.2f} (id={sl_trade.order.orderId})")
-    except Exception as _e:
-        log.warning(f"Reconcile {key}: could not restore SL order: {_e}")
 
 
 def _validate_option_market_price(

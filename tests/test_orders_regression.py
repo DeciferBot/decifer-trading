@@ -194,11 +194,9 @@ class TestOrphanedStopLoss:
 
     def test_reconcile_reattaches_existing_sl_order(self, mock_config):
         """
-        Regression: when IBKR already has a live STP order for the recovered
-        position, reconcile must reattach its ID — NOT place a duplicate order.
-
-        Before fix: sl_order_id was never set after reconnect recovery.
-        After fix:  sl_order_id = existing IBKR stop order ID (9999).
+        Reconcile adds the position to active_trades but does NOT place a new SL order.
+        sl_order_id reattachment is handled by bracket_health.audit_bracket_orders()
+        on the next scan cycle — reconcile is no longer responsible for it.
         """
         _om = sys.modules["orders"]
         _om.active_trades.clear()
@@ -217,18 +215,13 @@ class TestOrphanedStopLoss:
             _om.reconcile_with_ibkr(ib)
 
         assert "TSLA" in _om.active_trades, "Position must be added by reconcile"
-        assert _om.active_trades["TSLA"].get("sl_order_id") == 9999, (
-            "sl_order_id must be reattached from existing IBKR stop order"
-        )
-        ib.placeOrder.assert_not_called()  # no duplicate SL placed
+        ib.placeOrder.assert_not_called()  # reconcile never places SL orders
 
-    def test_reconcile_resubmits_sl_when_none_found_in_ibkr(self, mock_config):
+    def test_reconcile_does_not_place_sl_when_none_found_in_ibkr(self, mock_config):
         """
-        Regression: when IBKR has the position but NO matching stop order,
-        reconcile must place a NEW GTC StopOrder as fallback protection.
-
-        Before fix: no SL was ever placed — position unprotected.
-        After fix:  new StopOrder placed, sl_order_id set to its orderId.
+        Reconcile adds the position to active_trades but does NOT place a new SL order
+        even when IBKR has no matching stop. Missing SL submission is handled by
+        bracket_health.audit_bracket_orders() on the next scan cycle.
         """
         _om = sys.modules["orders"]
         _om.active_trades.clear()
@@ -246,10 +239,7 @@ class TestOrphanedStopLoss:
             _om.reconcile_with_ibkr(ib)
 
         assert "TSLA" in _om.active_trades, "Position must be added by reconcile"
-        ib.placeOrder.assert_called_once()  # new SL placed exactly once
-        assert _om.active_trades["TSLA"].get("sl_order_id") == 8888, (
-            "sl_order_id must be set to newly placed stop order"
-        )
+        ib.placeOrder.assert_not_called()  # reconcile never places SL orders
 
 
 # ─────────────────────────────────────────────────────────────────────────────
