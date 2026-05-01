@@ -1217,11 +1217,30 @@ def reconcile_with_ibkr(ib: IB):
                         # case where the bot restarts multiple times before the position closes).
                         _ext_tid = new_entry.get("trade_id", "")
                         if not _ext_tid:
+                            # Try to recover the original trade_id from event_log before
+                            # generating a new EXT id — a new id breaks the ORDER_INTENT →
+                            # ORDER_FILLED → POSITION_CLOSED chain and corrupts ML records.
+                            try:
+                                from event_log import last_intent_for_symbol as _li
+                                _recovered = _li(sym)
+                                if _recovered.get("trade_id"):
+                                    _ext_tid = _recovered["trade_id"]
+                                    log.info(
+                                        "Reconcile: recovered trade_id %s for %s from event_log",
+                                        _ext_tid, sym,
+                                    )
+                            except Exception:
+                                pass
+                        if not _ext_tid:
                             _ext_tid = f"{sym}_EXT_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
-                            new_entry["trade_id"] = _ext_tid
-                            with _trades_lock:
-                                if key in active_trades:
-                                    active_trades[key]["trade_id"] = _ext_tid
+                            log.warning(
+                                "Reconcile: no trade_id found for %s — generating EXT id %s",
+                                sym, _ext_tid,
+                            )
+                        new_entry["trade_id"] = _ext_tid
+                        with _trades_lock:
+                            if key in active_trades:
+                                active_trades[key]["trade_id"] = _ext_tid
                         _el_already_open = False
                         try:
                             from event_log import open_trades as _el_check
@@ -1577,6 +1596,28 @@ def update_positions_from_ibkr(ib: IB):
                 f"to protect {_active_non_pending} tracked position(s) from false deletion"
             )
         else:
+            # Build execution index once so stale-position closes use real fill prices
+            # rather than the last cached `current` price.  Mirrors the pattern already
+            # used by the EXITING-deferred path below.
+            _stale_exec_index = _build_ibkr_execution_index(ib)
+
+            def _detect_stale_exit_reason(trade: dict, sym_fills: list) -> str:
+                """Return tp_hit / sl_hit / bracket_exit / stale_purge from IBKR fills."""
+                is_short = trade.get("direction", "LONG") == "SHORT"
+                exit_side = "BOT" if is_short else "SLD"
+                tp_oid = trade.get("tp_order_id")
+                sl_oid = trade.get("sl_order_id")
+                for fill in sym_fills:
+                    if getattr(fill.execution, "side", "") != exit_side:
+                        continue
+                    foid = getattr(fill.execution, "orderId", None)
+                    if tp_oid and foid and int(foid) == int(tp_oid):
+                        return "tp_hit"
+                    if sl_oid and foid and int(foid) == int(sl_oid):
+                        return "sl_hit"
+                    return "bracket_exit"
+                return "stale_purge"
+
             stale_keys = []
             with _trades_lock:
                 for k in active_trades:
@@ -1594,15 +1635,19 @@ def update_positions_from_ibkr(ib: IB):
                     stale_keys.append(k)
                 for k in stale_keys:
                     _st = active_trades.get(k, {})
-                    _last_px = float(_st.get("current") or _st.get("entry") or 0)
-                    _entry_px = float(_st.get("entry") or _last_px)
+                    _sym_k = _st.get("symbol", k.split("|")[0])
+                    _exit_px, _exit_src = _resolve_cwd_exit_price(_st, _stale_exec_index)
+                    _exit_reason = _detect_stale_exit_reason(_st, _stale_exec_index.get(_sym_k, []))
+                    _entry_px = float(_st.get("entry") or _exit_px)
                     _qty = int(_st.get("qty") or 1)
                     _is_short = _st.get("direction") == "SHORT"
-                    _pnl = round((_entry_px - _last_px if _is_short else _last_px - _entry_px) * _qty, 2)
+                    _pnl = round((_entry_px - _exit_px if _is_short else _exit_px - _entry_px) * _qty, 2)
                     log.warning(
-                        "Position %s no longer in IBKR — recording stale close (pnl=%.2f)", k, _pnl
+                        "Position %s no longer in IBKR — recording close "
+                        "(reason=%s exit=%.4f src=%s pnl=%.2f)",
+                        k, _exit_reason, _exit_px, _exit_src, _pnl,
                     )
-                    _close_position_record(k, exit_price=_last_px, exit_reason="stale_purge", pnl=_pnl)
+                    _close_position_record(k, exit_price=_exit_px, exit_reason=_exit_reason, pnl=_pnl)
                 # _close_position_record() already saves positions file per call; no separate save needed
 
         # ── Deferred CLOSE for EXITING positions no longer in IBKR ───────────
