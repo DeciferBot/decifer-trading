@@ -33,6 +33,9 @@ statsmodels>=0.14.0          # ADF test for mean-reversion gating in REVERSION d
 # ── NLP / Sentiment ──
 nltk>=3.8.0                  # VADER sentiment analysis (social_sentiment.py). After install run: python3 -c "import nltk; nltk.download('vader_lexicon')"
 
+# ── HTML Parsing ──
+lxml>=4.9.0                  # Required by pd.read_html() in signals/catalyst_screen.py (S&P 500 constituent fetch)
+
 # ── HTTP / Networking ──
 requests>=2.31.0             # HTTP requests for news feeds, Reddit API, ApeWisdom (news.py, news_sentinel.py, social_sentiment.py)
 

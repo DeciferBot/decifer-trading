@@ -97,7 +97,8 @@ def _wait_for_order_book_clear(eib: IB, timeout: float = _GLOBAL_CANCEL_WAIT_SEC
             remaining = eib.openOrders()
             if not remaining:
                 return 0
-        except Exception:
+        except Exception as _e:
+            log.warning(f"_wait_for_order_book_clear: openOrders() failed ({_e}), treating as clear")
             return 0  # If we can't query, proceed anyway
         eib.sleep(_GLOBAL_CANCEL_POLL_INTERVAL)
     try:
@@ -173,8 +174,8 @@ def _flatten_all_inner(ib_fallback: IB = None):
                 )
                 try:
                     eib.qualifyContracts(contract)
-                except Exception:
-                    pass
+                except Exception as _e:
+                    log.warning(f"FLATTEN: qualifyContracts failed for {sym} option ({_e}), proceeding with SMART")
                 mkt = info.get("current_premium") or info.get("entry_premium") or 0.01
                 lp = max(round(float(mkt) * 0.90, 2), 0.01)
                 order = LimitOrder(close_action, abs(int(qty)), lp, tif="GTC")
@@ -340,8 +341,8 @@ def close_position(ib_unused, trade_key: str) -> str | None:
                 try:
                     cancel_with_reason(eib, t.order, f"cancel open order for {sym} on position close")
                     log.info(f"Close {trade_key}: Cancelled order {t.order.orderId}")
-                except Exception:
-                    pass
+                except Exception as _e:
+                    log.warning(f"Close {trade_key}: Could not cancel order {t.order.orderId}: {_e}")
         eib.sleep(0.3)
     except Exception as e:
         log.warning(f"Close {trade_key}: Error cancelling related orders: {e}")
@@ -354,8 +355,8 @@ def close_position(ib_unused, trade_key: str) -> str | None:
         contract.exchange = "SMART"
     try:
         eib.qualifyContracts(contract)
-    except Exception:
-        pass  # Proceed with exchange='SMART' even if qualify fails
+    except Exception as _e:
+        log.warning(f"Close {trade_key}: qualifyContracts failed ({_e}), proceeding with SMART")
 
     order = MarketOrder(action, qty, account=CONFIG["active_account"], outsideRth=True)
     close_trade = eib.placeOrder(contract, order)
@@ -649,8 +650,8 @@ def reconcile_with_ibkr(ib: IB):
             for pos in ib.positions():
                 if pos.position != 0:
                     ibkr_keys.add(_ibkr_item_to_key(pos))
-        except Exception:
-            pass
+        except Exception as _e:
+            log.warning(f"Reconcile: ib.positions() failed ({_e}) — FX positions may be misidentified as closed")
 
         # ── Step 3: detect positions closed while bot was down ────────────────
         # In our store but not in IBKR → SL/TP was triggered or manually closed.
@@ -709,7 +710,8 @@ def reconcile_with_ibkr(ib: IB):
                                     if t.order.orderId == order_id:
                                         still_live = True
                                         break
-                            except Exception:
+                            except Exception as _e:
+                                log.warning(f"Reconcile: openTrades() check failed for PENDING {key} order #{order_id} ({_e}) — assuming still live")
                                 still_live = True  # err on side of keeping it
                         if still_live:
                             log.debug(f"Reconcile: PENDING {key} order #{order_id} still live in IBKR — keeping")
@@ -1023,7 +1025,8 @@ def reconcile_with_ibkr(ib: IB):
                         try:
                             _exp_d = datetime.strptime(expiry_str, "%Y-%m-%d").date()
                             _dte_calc = (_exp_d - date.today()).days
-                        except Exception:
+                        except Exception as _e:
+                            log.warning(f"DTE calc failed for {key} expiry '{expiry_str}': {_e} — defaulting to 0")
                             _dte_calc = 0
                         new_entry = {
                             "symbol": sym,

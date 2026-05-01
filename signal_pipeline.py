@@ -571,17 +571,8 @@ def run_signal_pipeline(
     # 8. Append to signals_log.jsonl for IC calculator
     _append_signals_log(signals, log_path=signals_log_path)
 
-    # 9. Build Sensor Payloads for top candidates (Decifer 3.0 Apex Agent input contract)
-    from config import CONFIG as _cfg_sp
-
-    _top_n = _cfg_sp.get("sensor_payload_top_n", 15)
-    try:
-        from sensor_payload import build_sensor_payload
-
-        sensor_payloads = [build_sensor_payload(s, regime_name) for s in scored[:_top_n]]
-    except Exception as _sp_e:
-        log.warning(f"sensor_payload build failed: {_sp_e}")
-        sensor_payloads = []
+    # 9. Sensor payloads — module not yet implemented; reserved for future enrichment.
+    sensor_payloads = []
 
     return SignalPipelineResult(
         signals=signals,

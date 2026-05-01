@@ -348,7 +348,8 @@ def _build_pm_exit_reason(pos: dict, regime: dict, pm_trigger: str, reason_pm: s
         held_mins = int(
             (datetime.now(UTC) - datetime.fromisoformat(pos["open_time"].replace("Z", "+00:00"))).total_seconds() / 60
         )
-    except Exception:
+    except Exception as _e:
+        log.warning(f"held_mins calc failed for {pos.get('symbol', '?')} (open_time={pos.get('open_time')}): {_e} — defaulting to 0; SCALP timeout will not fire")
         held_mins = 0
     entry_pol = _polarity(entry_regime)
     exit_pol = _polarity(exit_regime)
@@ -1150,8 +1151,8 @@ def _should_run_portfolio_review(
         lookahead = pm_cfg.get("earnings_lookahead_hours", 48)
         if _gew(held_syms, lookahead):
             _active_triggers.append("earnings_risk")
-    except Exception:
-        pass
+    except Exception as _e:
+        log.warning(f"earnings_calendar check failed: {_e} — earnings_risk trigger skipped; held positions may be exposed through earnings")
 
     # 6. Cascade: 2+ stops this session — fire once per session only
     cascade_thresh = pm_cfg.get("cascade_stop_count", 2)
@@ -1353,6 +1354,17 @@ def run_scan():
             _hmm_result = get_hmm_regime_spy()
             _hmm_regime = _hmm_result.get("regime", "unknown")
             regime["hmm_regime"] = _hmm_result
+            # Alert when HMM and VIX-proxy disagree on direction — high-confidence
+            # divergence means one detector is wrong; bot trades under VIX-proxy.
+            _vix_is_bull = regime.get("regime", "") in ("TRENDING_UP", "RANGE_BOUND")
+            _vix_is_bear = regime.get("regime", "") in ("TRENDING_DOWN", "CAPITULATION", "RELIEF_RALLY")
+            _hmm_conf = _hmm_result.get("confidence", 0)
+            if (_vix_is_bull and _hmm_regime == "bear") or (_vix_is_bear and _hmm_regime == "bull"):
+                clog(
+                    "WARN",
+                    f"REGIME CONFLICT: VIX-proxy={regime.get('regime')} vs HMM={_hmm_regime} "
+                    f"({_hmm_conf:.0%} confidence) — bot trading under VIX-proxy; review if divergence persists",
+                )
         from signals import _resolve_regime_router
 
         _router_state = _resolve_regime_router(_vix_regime, _hurst_regime, _hmm_regime)
