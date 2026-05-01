@@ -2050,6 +2050,30 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
         sell_trade = ib.placeOrder(contract, close_order)
         ib.sleep(2)
 
+        # Deferred-trim gate: if this is a partial sell and the fill isn't confirmed
+        # within the 2s window, keep qty unchanged and defer to reconcile.
+        # This prevents POSITION_TRIMMED from being written for unfilled limit orders
+        # and stops orphaned bracket children from accumulating on each trim attempt.
+        if _is_partial:
+            _trim_filled = (
+                sell_trade.orderStatus.status == "Filled"
+                or (sell_trade.orderStatus.filled or 0) >= sell_qty
+            )
+            if not _trim_filled:
+                log.info(
+                    f"execute_sell {symbol}: trim SELL not confirmed filled within 2s "
+                    f"(id={sell_trade.order.orderId}, status={sell_trade.orderStatus.status}) "
+                    f"— qty unchanged, status=TRIMMING, deferring to reconcile"
+                )
+                _safe_update_trade(_trade_key, {
+                    "status": "TRIMMING",
+                    "pending_trim_order_id": sell_trade.order.orderId,
+                    "pending_trim_qty": sell_qty,
+                    "pending_trim_reason": reason,
+                })
+                _save_positions_file()
+                return True
+
         # For full EXIT: cancel any orphaned bracket children that remain after close.
         # (For TRIM, brackets were already cancelled above; new ones are placed below.)
         # Two cases to cover:
@@ -2136,10 +2160,14 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                 return True
 
         if _is_partial:
-            remaining_qty = info["qty"] - sell_qty
+            # Use the confirmed fill qty from IBKR, not the order qty.
+            # A partial fill (e.g. 101 of 131 ordered) must decrement by the actual fill
+            # so active_trades stays in sync with IBKR.
+            _actual_filled = int(sell_trade.orderStatus.filled or 0) or sell_qty
+            remaining_qty = info["qty"] - _actual_filled
             _safe_update_trade(_trade_key, {"qty": remaining_qty, "status": "ACTIVE"})
-            log.info(f"[TRIM] {symbol}: sold {sell_qty}, {remaining_qty} remaining")
-            from bot_state import clog as _clog; _clog("TRADE", f"[TRIM] {symbol}: sold {sell_qty}, {remaining_qty} remaining")
+            log.info(f"[TRIM] {symbol}: ordered {sell_qty}, filled {_actual_filled}, {remaining_qty} remaining")
+            from bot_state import clog as _clog; _clog("TRADE", f"[TRIM] {symbol}: sold {_actual_filled} (ordered {sell_qty}), {remaining_qty} remaining")
             # Write POSITION_TRIMMED so crash-recovery replay tracks the correct remaining qty.
             _trim_tid = info.get("trade_id", "")
             _trim_px = float(getattr(sell_trade.orderStatus, "avgFillPrice", None) or
@@ -2148,7 +2176,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                 try:
                     from event_log import append_trim as _el_trim
                     _el_trim(_trim_tid, symbol,
-                             qty_sold=sell_qty,
+                             qty_sold=_actual_filled,
                              remaining_qty=remaining_qty,
                              exit_price=_trim_px,
                              exit_reason=reason)

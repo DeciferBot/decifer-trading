@@ -1271,3 +1271,120 @@ class TestExecuteSellClosesLinkedOptions:
             _om.execute_sell(ib, self.OPT_KEY, reason="manual")
 
         mock_sell_opt.assert_not_called()
+
+
+class TestDeferredTrimOnUnfilledLimitSell:
+    """Regression: trim SELL not confirmed within 2s must set TRIMMING status
+    without decrementing qty, writing POSITION_TRIMMED, or placing a new bracket.
+
+    Root cause of SNX order accumulation (2026-04-30): execute_sell wrote
+    POSITION_TRIMMED and placed a new SL/TP bracket even when the extended-hours
+    limit SELL never filled. Over nine trim attempts the system held a phantom
+    position of 1 share while IBKR held 263, and accumulated dozens of orphaned
+    Inactive bracket children.
+    """
+
+    TRADE_KEY = "SNX"
+
+    def _position(self):
+        return {
+            "symbol": "SNX",
+            "direction": "LONG",
+            "trade_type": "SWING",
+            "instrument": "stock",
+            "qty": 263,
+            "entry": 224.18,
+            "intended_price": 224.22,
+            "current": 284.00,
+            "sl": 218.05,
+            "tp": 238.08,
+            "status": "ACTIVE",
+            "trade_id": "SNX_20260429_172800_821400",
+            "order_id": 101,
+            "sl_order_id": 102,
+            "tp_order_id": 103,
+            "open_time": "2026-04-29T17:33:05+00:00",
+        }
+
+    def test_unconfirmed_trim_sets_trimming_status_not_decrement(self, mock_config):
+        """When a trim SELL limit order is not filled within 2s, qty must not
+        be decremented and status must be TRIMMING."""
+        import orders as _om
+        _om.active_trades.clear()
+        _om.recently_closed.clear()
+        _om.active_trades[self.TRADE_KEY] = self._position()
+
+        ib = MagicMock()
+        # Unfilled: status=Submitted, filled=0
+        ib.placeOrder.return_value.orderStatus.status = "Submitted"
+        ib.placeOrder.return_value.orderStatus.filled = 0
+        ib.placeOrder.return_value.orderStatus.avgFillPrice = None
+        ib.placeOrder.return_value.order.orderId = 999
+        ib.openTrades.return_value = []
+
+        with (
+            patch("orders.CONFIG", mock_config),
+            patch("orders_core.is_equities_extended_hours", return_value=True),
+            patch("orders_core.is_options_market_open", return_value=False),
+            patch("orders._validate_position_price", return_value=(284.00, "IBKR")),
+            patch("orders._get_ibkr_bid_ask", return_value=(284.00, 284.05)),
+            patch("orders.record_win"),
+            patch("orders.record_loss"),
+            patch("orders.log_order"),
+            patch("learning.log_order"),
+            patch("learning._save_orders"),
+            patch("learning._save_trades"),
+            patch("learning.log_trade"),
+            patch("fill_watcher.stop_watcher"),
+            patch("event_log.append_trim") as mock_trim_event,
+        ):
+            result = _om.execute_sell(ib, self.TRADE_KEY, reason="profit_harvesting", qty_override=131)
+
+        assert result is True
+        pos = _om.active_trades.get(self.TRADE_KEY, {})
+        assert pos.get("qty") == 263, "qty must not be decremented for an unconfirmed trim"
+        assert pos.get("status") == "TRIMMING", "status must be TRIMMING when fill unconfirmed"
+        assert pos.get("pending_trim_order_id") == 999
+        assert pos.get("pending_trim_qty") == 131
+        mock_trim_event.assert_not_called(), "POSITION_TRIMMED must not be written until fill confirmed"
+
+    def test_confirmed_trim_proceeds_normally(self, mock_config):
+        """When trim SELL is confirmed filled within 2s, normal trim path runs:
+        qty decremented, POSITION_TRIMMED written, new bracket placed."""
+        import orders as _om
+        _om.active_trades.clear()
+        _om.recently_closed.clear()
+        _om.active_trades[self.TRADE_KEY] = self._position()
+
+        ib = MagicMock()
+        # Filled immediately
+        ib.placeOrder.return_value.orderStatus.status = "Filled"
+        ib.placeOrder.return_value.orderStatus.filled = 131
+        ib.placeOrder.return_value.orderStatus.avgFillPrice = 284.42
+        ib.placeOrder.return_value.order.orderId = 888
+        ib.openTrades.return_value = []
+
+        with (
+            patch("orders.CONFIG", mock_config),
+            patch("orders_core.is_equities_extended_hours", return_value=True),
+            patch("orders_core.is_options_market_open", return_value=False),
+            patch("orders._validate_position_price", return_value=(284.00, "IBKR")),
+            patch("orders._get_ibkr_bid_ask", return_value=(284.42, 284.50)),
+            patch("orders.record_win"),
+            patch("orders.record_loss"),
+            patch("orders.log_order"),
+            patch("learning.log_order"),
+            patch("learning._save_orders"),
+            patch("learning._save_trades"),
+            patch("learning.log_trade"),
+            patch("fill_watcher.stop_watcher"),
+            patch("event_log.append_trim") as mock_trim_event,
+        ):
+            result = _om.execute_sell(ib, self.TRADE_KEY, reason="profit_harvesting", qty_override=131)
+
+        assert result is True
+        pos = _om.active_trades.get(self.TRADE_KEY, {})
+        assert pos.get("qty") == 132, "qty must be decremented when fill confirmed"
+        assert pos.get("status") == "ACTIVE", "status must return to ACTIVE after confirmed trim"
+        assert pos.get("pending_trim_order_id") is None
+        mock_trim_event.assert_called_once(), "POSITION_TRIMMED must be written on confirmed fill"

@@ -1696,6 +1696,124 @@ def update_positions_from_ibkr(ib: IB):
         if _exiting_keys:
             _save_positions_file()
 
+        # ── Deferred TRIM resolution ──────────────────────────────────────────
+        # execute_sell set status=TRIMMING when a partial SELL limit order hadn't
+        # filled within 2s. Here we detect whether it has since filled or was
+        # cancelled, and finalise accordingly without touching qty prematurely.
+        _trimming_keys = []
+        with _trades_lock:
+            for k, v in active_trades.items():
+                if v.get("status") == "TRIMMING" and v.get("pending_trim_order_id"):
+                    _trimming_keys.append(k)
+
+        if _trimming_keys:
+            _open_order_ids = {t.order.orderId for t in ib.openTrades()}
+            for k in _trimming_keys:
+                _t = active_trades.get(k, {})
+                if not _t:
+                    continue
+                _sym = _t.get("symbol", k.split("|")[0])
+                _trim_oid = _t.get("pending_trim_order_id")
+                _trim_qty = int(_t.get("pending_trim_qty") or 0)
+                _trim_reason = _t.get("pending_trim_reason", "deferred_trim")
+                _trim_tid = _t.get("trade_id", "")
+
+                if _trim_oid in _open_order_ids:
+                    # Still pending — nothing to do this cycle
+                    continue
+
+                # Order is gone from open trades. Check exec_index for a fill.
+                _trim_fill = next(
+                    (
+                        f for f in _exec_index.get(_sym, [])
+                        if getattr(f.execution, "orderId", None) == _trim_oid
+                    ),
+                    None,
+                )
+
+                if _trim_fill:
+                    # Fill confirmed — finalise the trim.
+                    # Use actual filled qty from IBKR execution, not the order qty stored
+                    # in pending_trim_qty.  A partial fill must decrement by what actually
+                    # traded so active_trades stays in sync with IBKR.
+                    _fill_px = float(getattr(_trim_fill.execution, "price", 0) or 0)
+                    _actual_filled = int(
+                        getattr(_trim_fill.execution, "cumQty", 0)
+                        or getattr(_trim_fill.execution, "shares", 0)
+                        or _trim_qty
+                    )
+                    _remaining = int(_t.get("qty", _trim_qty)) - _actual_filled
+                    _safe_update_trade(k, {
+                        "qty": max(0, _remaining),
+                        "status": "ACTIVE",
+                        "pending_trim_order_id": None,
+                        "pending_trim_qty": None,
+                        "pending_trim_reason": None,
+                    })
+                    if _trim_tid:
+                        try:
+                            from event_log import append_trim as _el_trim_dfr
+                            _el_trim_dfr(_trim_tid, _sym,
+                                         qty_sold=_actual_filled,
+                                         remaining_qty=max(0, _remaining),
+                                         exit_price=_fill_px,
+                                         exit_reason=_trim_reason)
+                        except Exception as _elt:
+                            log.warning("Deferred TRIM event_log write failed for %s: %s", k, _elt)
+                    # Place a resized OCA bracket for the remaining qty.
+                    _sl_p = float(_t.get("sl") or 0)
+                    _tp_p = float(_t.get("tp") or 0)
+                    _direction = _t.get("direction", "LONG")
+                    _account = CONFIG.get("active_account", "")
+                    if _sl_p and _tp_p and _remaining > 0:
+                        try:
+                            from ib_async import StopLimitOrder as _SLO, LimitOrder as _LO
+                            _oca = f"decifer_{_sym}_{_trim_oid}_deferred_trim"
+                            _sl_lmt = round(_sl_p * 0.99 if _direction == "LONG" else _sl_p * 1.01, 2)
+                            _ba = "SELL" if _direction == "LONG" else "BUY"
+                            _new_sl = _SLO(_ba, _remaining, _sl_p, _sl_lmt, account=_account, tif="GTC", outsideRth=True)
+                            _new_sl.ocaGroup = _oca
+                            _new_sl.ocaType = 1
+                            _new_tp = _LO(_ba, _remaining, _tp_p, account=_account, tif="GTC", outsideRth=True)
+                            _new_tp.ocaGroup = _oca
+                            _new_tp.ocaType = 1
+                            _ct = get_contract(_sym)
+                            _sl_t = ib.placeOrder(_ct, _new_sl)
+                            _tp_t = ib.placeOrder(_ct, _new_tp)
+                            ib.sleep(0.5)
+                            _safe_update_trade(k, {
+                                "sl_order_id": _sl_t.order.orderId,
+                                "tp_order_id": _tp_t.order.orderId,
+                            })
+                            log.info(
+                                "Deferred TRIM %s: confirmed fill px=%.4f sold=%d remaining=%d "
+                                "new bracket SL#%d @ %.2f TP#%d @ %.2f",
+                                _sym, _fill_px, _trim_qty, _remaining,
+                                _sl_t.order.orderId, _sl_p, _tp_t.order.orderId, _tp_p,
+                            )
+                        except Exception as _be:
+                            log.error("Deferred TRIM %s: bracket placement failed — %s", _sym, _be)
+                    else:
+                        log.info(
+                            "Deferred TRIM %s: fill confirmed px=%.4f sold=%d remaining=%d "
+                            "(no bracket — sl or tp missing)",
+                            _sym, _fill_px, _trim_qty, _remaining,
+                        )
+                else:
+                    # Gone from open orders but no fill found — cancelled.
+                    log.warning(
+                        "Deferred TRIM %s: order #%s not in open trades or fills — "
+                        "trim SELL cancelled, reverting to ACTIVE at unchanged qty",
+                        _sym, _trim_oid,
+                    )
+                    _safe_update_trade(k, {
+                        "status": "ACTIVE",
+                        "pending_trim_order_id": None,
+                        "pending_trim_qty": None,
+                        "pending_trim_reason": None,
+                    })
+            _save_positions_file()
+
         # ── Orphaned PENDING detection ────────────────────────────────────────
         # A PENDING entry with no active FillWatcher and past orphan_timeout_mins
         # is unmanaged (e.g. watcher aborted on disconnect). Cancel at IBKR and remove.
