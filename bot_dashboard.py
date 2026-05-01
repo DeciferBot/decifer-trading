@@ -678,22 +678,38 @@ def _enrich_images(articles: list) -> None:
 
 
 # ── Real-time trade data helpers ──────────────────────────────────────────────
-_trades_cache: dict = {"data": [], "mtime": 0.0}
 _TRADE_EVENTS_LOG = CONFIG.get("trade_events_log", "data/trade_events.jsonl")
-_TRADES_JSON = CONFIG.get("trade_log", "data/trades.json")
+
+import training_store as _training_store
+
+_TR_CACHE: list = []
+_TR_CACHE_MTIME: float = 0.0
 
 
-def _load_trades_cached() -> list:
-    """Load trades.json with mtime-based cache — avoids 1.3 MB disk read every 2 s."""
+def _load_training_records() -> list:
+    """Load training_records.jsonl with mtime-based cache.
+
+    Normalises field names to match the reconciler convention used by the
+    dashboard frontend: fill_price → entry_price, ts_close → timestamp.
+    """
+    global _TR_CACHE, _TR_CACHE_MTIME
     try:
-        mtime = os.path.getmtime(_TRADES_JSON)
-    except OSError:
-        return []
-    if mtime != _trades_cache["mtime"]:
-        from learning import load_trades as _lt
-        _trades_cache["data"] = _lt()
-        _trades_cache["mtime"] = mtime
-    return _trades_cache["data"]
+        path = _training_store._STORE_FILE
+        mtime = path.stat().st_mtime if path.exists() else 0.0
+        if mtime == _TR_CACHE_MTIME:
+            return _TR_CACHE
+        raw = _training_store.load()
+        normalised = []
+        for r in raw:
+            rec = dict(r)
+            rec.setdefault("entry_price", r.get("fill_price"))
+            rec.setdefault("timestamp", r.get("ts_close", ""))
+            normalised.append(rec)
+        _TR_CACHE = normalised
+        _TR_CACHE_MTIME = mtime
+    except Exception:
+        pass
+    return _TR_CACHE
 
 
 def _todays_closed_trades_from_events() -> list:
@@ -843,15 +859,13 @@ class DashHandler(BaseHTTPRequestHandler):
                 pass
             # Today's trades: IBKR fills as ground truth + event_log metadata.
             # Falls back to event_log-only when IBKR is offline (ibkr_match='unmatched').
-            # Historical trades (pre-today) come from trades.json via mtime-based cache.
-            # today_from_file is intentionally removed — the reconciler covers all today's
-            # closes including the offline fallback, so trades.json entries for today
-            # (including reconciliation_backfill records) must not bleed through.
+            # Historical trades (pre-today) come from training_records.jsonl — the
+            # authoritative append-only store that replaced trades.json (2026-04-28).
             try:
                 today = _time.strftime("%Y-%m-%d", _time.gmtime())
                 today_trades = ibkr_reconciler.reconcile_closes(bot_state.ib, cutover_date=today)
-                cached = _load_trades_cached()
-                hist = [t for t in cached if (t.get("timestamp") or t.get("exit_time") or "")[:10] != today]
+                cached = _load_training_records()
+                hist = [t for t in cached if (t.get("timestamp") or t.get("ts_close") or "")[:10] != today]
                 state["all_trades"] = hist + today_trades
             except Exception:
                 pass
