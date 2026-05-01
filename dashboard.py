@@ -2314,8 +2314,14 @@ function renderPositions(positions) {
     const col = p.pnl >= 0 ? 'var(--green)' : 'var(--red)';
     const isPending = p.status === 'PENDING';
     const cardOpacity = isPending ? 'opacity:0.55' : '';
-    // Option subtitle: show strike + expiry + right
-    const optSub = p.isOpt ? `<div style="font-size:9px;color:var(--cyan);margin-top:1px">${p.right === 'C' ? 'CALL' : 'PUT'} $${p.strike} exp ${p.expiry_str || p.expiry || ''}</div>` : '';
+    // Option subtitle: show strike + expiry + right.
+    // Fallback: parse missing fields from a contract symbol like AMZN_C_267.5_2026-05-15.
+    let _optRight = p.right, _optStrike = p.strike, _optExpiry = p.expiry_str || p.expiry || '';
+    if (p.isOpt && (!_optRight || _optStrike == null || !_optExpiry)) {
+      const _cm = (p.symbol || '').match(/^[A-Z]+_([CP])_([\d.]+)_(\d{4}-\d{2}-\d{2})/);
+      if (_cm) { _optRight = _optRight || _cm[1]; _optStrike = (_optStrike != null ? _optStrike : parseFloat(_cm[2])); _optExpiry = _optExpiry || _cm[3]; }
+    }
+    const optSub = p.isOpt ? `<div style="font-size:9px;color:var(--cyan);margin-top:1px">${_optRight === 'C' ? 'CALL' : 'PUT'} $${_optStrike != null ? _optStrike : '?'} exp ${_optExpiry}</div>` : '';
     // Pending badge
     const pendingBadge = isPending ? ' <span style="font-size:8px;color:var(--yellow);background:rgba(255,214,0,.12);border:1px solid var(--yellow);padding:1px 5px;border-radius:8px;font-weight:600;letter-spacing:0.5px">PENDING</span>' : '';
     // Tranche badge: shows T1 OPEN / T1 FILLED when dual-tranche mode is active
@@ -2331,7 +2337,11 @@ function renderPositions(positions) {
     const actionBtn = isPending && p.order_id
       ? `<button onclick="event.stopPropagation();cancelOrder(${p.order_id},${p._idx})" style="background:rgba(255,214,0,.12);border:1px solid var(--yellow);color:var(--yellow);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Cancel pending order">CANCEL</button>`
       : `<button onclick="event.stopPropagation();closePosition(${p._idx})" style="background:rgba(255,23,68,.12);border:1px solid var(--red);color:var(--red);font-size:9px;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-weight:600" title="Close this position">✕</button>`;
-    return `<div class="pos-card" data-symbol="${p.symbol||''}" data-entry="${p.entry||0}" data-qty="${p.qty||0}" data-direction="${p.dir||'LONG'}" onclick="showPositionDetail(${p._idx})" title="Click for details" style="${cardOpacity}">
+    // Trailing lock: SL has been ratcheted above entry (LONG) or below entry (SHORT)
+    const isTrailLock = p.dir === 'LONG' ? (p.sl > p.entry) : (p.sl < p.entry);
+    const slLabel = isTrailLock ? `TRAIL ${fmt$(p.sl)}` : `SL ${fmt$(p.sl)}`;
+    const slStyle = isTrailLock ? 'color:var(--cyan);font-weight:600' : '';
+    return `<div class="pos-card" data-symbol="${p.symbol||''}" data-entry="${p.entry||0}" data-qty="${p.qty||0}" data-direction="${p.dir||'LONG'}" data-isopt="${p.isOpt}" onclick="showPositionDetail(${p._idx})" title="Click for details" style="${cardOpacity}">
       <div class="pos-hdr">
         <span class="pos-sym">${p.symbol}${p.instrument === 'option' ? ' <span style="font-size:9px;color:var(--cyan);font-weight:600">OPT</span>' : p.instrument === 'fx' ? ' <span style="font-size:9px;color:var(--orange);font-weight:600">FX</span>' : ''}${pendingBadge}${trancheBadge}${typePill} <span style="font-size:10px;color:var(--muted2);font-weight:400">${p.dir} ×${Math.abs(p.qty)}</span></span>
         <span style="display:flex;align-items:center;gap:6px">
@@ -2342,12 +2352,12 @@ function renderPositions(positions) {
       ${optSub}
       ${isPending ? '' : `<div class="pos-bar-bg"><div class="pos-bar" style="width:${bw}%;background:${col}"></div></div>`}
       <div class="pos-meta">
-        ${isPending ? `<span style="color:var(--yellow)">Limit ${fmt$(p.entry)}</span>` : `<span style="color:var(--orange);font-weight:600">${fmt$(p.posValue)}</span>`}
-        ${isPending ? '' : `<span>${p.pct >= 0 ? '+' : ''}${p.pct.toFixed(2)}%</span>`}
+        ${isPending ? `<span style="color:var(--yellow)">Limit ${fmt$(p.entry)}</span>` : `<span class="pos-val" style="color:var(--orange);font-weight:600">${fmt$(p.posValue)}</span>`}
+        ${isPending ? '' : `<span class="pos-pct">${p.pct >= 0 ? '+' : ''}${p.pct.toFixed(2)}%</span>`}
         ${isPending ? '' : `<span>Entry ${fmt$(p.entry)}</span>`}
-        ${isPending ? '' : `<span title="${p._price_sources || 'unknown'}">Now ${fmt$(p.current)}</span>`}
+        ${isPending ? '' : `<span class="pos-now" title="${p._price_sources || 'unknown'}">Now ${fmt$(p.current)}</span>`}
       </div>
-      ${isPending ? '' : `<div class="pos-meta"><span>SL ${fmt$(p.sl)}</span><span>TP ${fmt$(p.tp)}</span></div>`}
+      ${isPending ? '' : `<div class="pos-meta"><span style="${slStyle}">${slLabel}</span><span>TP ${fmt$(p.tp)}</span></div>`}
     </div>`;
   }).join('');
 }
@@ -3464,7 +3474,9 @@ async function poll() {
 
       // ── Cash reserve ──────────────────────────────────────────
       const minCashPct = d.settings?.min_cash_reserve != null ? Math.round(d.settings.min_cash_reserve * 100) : null;
-      const cashPct    = Math.max(100 - deployed, 0);
+      const cashPct    = d.account_details
+        ? ((d.account_details.available_cash || d.account_details.total_cash || 0) / pv * 100)
+        : Math.max(100 - deployed, 0);
       document.getElementById('r-cash-bar').style.width      = Math.min(cashPct, 100) + '%';
       document.getElementById('r-cash-bar').style.background = minCashPct != null ? (cashPct < minCashPct ? 'var(--red)' : 'var(--green)') : 'var(--muted2)';
       document.getElementById('r-cash-pct').textContent      = cashPct.toFixed(1) + '% cash';
@@ -3600,26 +3612,49 @@ async function fetchPrices() {
 
 function applyLivePrices(prices) {
   document.querySelectorAll('.pos-card[data-symbol]').forEach(card => {
-    const sym = card.dataset.symbol;
-    const p   = prices[sym];
+    const rawSym = card.dataset.symbol;
+    // Options: data-symbol may be a contract name (AMZN_C_267.5_2026-05-15).
+    // Extract the underlying ticker so the prices dict lookup works.
+    const underlying = (rawSym.match(/^([A-Z]+)_[CP]_/) || [])[1] || rawSym;
+    const p = prices[underlying] || prices[rawSym];
     if (!p || p.source === 'stale' || p.mid <= 0) return;
 
     const entry = parseFloat(card.dataset.entry) || 0;
     const qty   = parseFloat(card.dataset.qty)   || 0;
     const dir   = card.dataset.direction || 'LONG';
+    const isOpt = card.dataset.isopt === 'true';
+    const mult  = isOpt ? 100 : 1;
     if (!entry || !qty) return;
 
-    const mid  = p.mid;
-    const pnl  = dir === 'SHORT' ? (entry - mid) * qty : (mid - entry) * qty;
+    const mid    = p.mid;
+    const absQty = Math.abs(qty);
+    const pnl    = dir === 'SHORT' ? (entry - mid) * absQty * mult : (mid - entry) * absQty * mult;
+    const pct    = entry > 0 ? (dir === 'SHORT' ? (entry - mid) / entry : (mid - entry) / entry) * 100 : 0;
+    const posVal = Math.abs(mid * absQty * mult);
+    const col    = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const bw     = Math.min(Math.abs(pct) * 10, 100);
 
-    // Update P&L display
+    // P&L amount
     const pnlEl = card.querySelector('.pos-pnl');
-    if (pnlEl) {
-      pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmt$(Math.abs(pnl));
-      pnlEl.style.color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
-    }
+    if (pnlEl) { pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmt$(Math.abs(pnl)); pnlEl.style.color = col; }
 
-    // Show live indicator dot next to symbol
+    // "Now $XX.XX" price
+    const nowEl = card.querySelector('.pos-now');
+    if (nowEl) nowEl.textContent = 'Now ' + fmt$(mid);
+
+    // P&L percentage
+    const pctEl = card.querySelector('.pos-pct');
+    if (pctEl) pctEl.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+
+    // Position value
+    const valEl = card.querySelector('.pos-val');
+    if (valEl) valEl.textContent = fmt$(posVal);
+
+    // Progress bar
+    const barEl = card.querySelector('.pos-bar');
+    if (barEl) { barEl.style.width = bw + '%'; barEl.style.background = col; }
+
+    // Live indicator dot
     let liveEl = card.querySelector('.live-dot');
     if (!liveEl) {
       liveEl = document.createElement('span');

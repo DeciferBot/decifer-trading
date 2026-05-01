@@ -910,8 +910,16 @@ def update_trailing_stops(ib: IB) -> None:
             )
             modified_stop.orderId = sl_order_id
             modified_stop.transmit = True
-            ib.placeOrder(contract, modified_stop)
-            ib.sleep(0.1)
+            mod_trade = ib.placeOrder(contract, modified_stop)
+            ib.sleep(0.4)
+
+            mod_status = mod_trade.orderStatus.status if mod_trade else ""
+            if mod_status not in ("Submitted", "PreSubmitted", "Filled"):
+                log.warning(
+                    f"[TRAIL] {symbol} stop modify rejected by IBKR "
+                    f"(status={mod_status!r}) — keeping sl={old_sl:.2f}"
+                )
+                continue
 
             with _trades_lock:
                 if symbol in active_trades:

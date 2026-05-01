@@ -47,6 +47,7 @@ from orders_options import (
     update_trailing_stops,
     update_tranche_status,
 )
+from bracket_health import audit_bracket_orders, sync_bracket_prices
 from orders_portfolio import (
     flatten_all,
     get_open_positions,
@@ -1313,8 +1314,10 @@ def run_scan():
     clog("INFO", f"Portfolio: ${pv:,.2f} | DayP&L: ${pnl:+,.2f} | Positions: {len(get_open_positions())}")
 
     update_positions_from_ibkr(ib)
+    sync_bracket_prices(ib)
     update_tranche_status(ib)
     update_trailing_stops(ib)
+    audit_bracket_orders(ib)
     flush_pending_option_exits(ib)
     dash["positions"] = get_open_positions()
 
