@@ -78,6 +78,7 @@ CONFIG = {
     "alpaca_news_enabled": True,  # AlpacaNewsStream (Benzinga push feed)
     # Order protection gates sourced from the live Alpaca stream
     "max_spread_pct": 0.003,  # 0.30% bid-ask spread cap (skip wider markets)
+    "max_display_spread_pct": 0.05,  # 5% spread cap for price display — wider quotes fall back to last bar close
     # ── IBKR HISTORICAL DATA PACING ───────────────────────────
     # IBKR enforces a soft limit of 60 reqHistoricalData requests per 10 minutes.
     # We stay under 55 to leave headroom. Throttle applied in fetch_ibkr_historical().

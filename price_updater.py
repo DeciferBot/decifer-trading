@@ -105,15 +105,28 @@ def get_live_prices() -> dict:
 
     result: dict = {}
 
+    # Wide-spread quotes (pre-market stubs, illiquid prints) produce bad mid prices.
+    # Gate: if spread > 5% of mid, treat the quote as unreliable and fall back to
+    # the last bar close.  5% is generous for display purposes — the order-entry
+    # gate (max_spread_pct = 0.3%) is far tighter and is applied separately.
+    _MAX_DISPLAY_SPREAD = CONFIG.get("max_display_spread_pct", 0.05)
+
     for sym in stock_symbols:
         quote = QUOTE_CACHE.get(sym)
+        _quote_usable = False
         if quote and quote.get("bid", 0) > 0 and quote.get("ask", 0) > 0:
-            mid = round((quote["bid"] + quote["ask"]) / 2, 4)
+            _bid, _ask = quote["bid"], quote["ask"]
+            _mid = (_bid + _ask) / 2
+            _spread_pct = (_ask - _bid) / _mid if _mid else 1.0
+            _quote_usable = _spread_pct <= _MAX_DISPLAY_SPREAD
+
+        if _quote_usable:
+            mid = round(_mid, 4)
             result[sym] = {
                 "mid": mid,
-                "bid": round(quote["bid"], 4),
-                "ask": round(quote["ask"], 4),
-                "spread_pct": round(quote.get("spread_pct") or 0, 6),
+                "bid": round(_bid, 4),
+                "ask": round(_ask, 4),
+                "spread_pct": round(_spread_pct, 6),
                 "source": "stream",
             }
         else:
