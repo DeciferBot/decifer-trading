@@ -16,6 +16,8 @@ import logging
 import threading
 import time
 
+from config import CONFIG
+
 log = logging.getLogger("decifer.price_updater")
 
 _INTERVAL = 2  # seconds between price update passes
