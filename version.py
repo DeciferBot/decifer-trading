@@ -6,5 +6,5 @@
 #   MINOR — new feature shipped (new signal dimension, new agent, new gate)
 #   PATCH — bug fix, parameter tweak, test fix
 
-__version__ = "3.0.54"
+__version__ = "3.0.55"
 __codename__ = "Apex"

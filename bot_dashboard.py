@@ -843,22 +843,16 @@ class DashHandler(BaseHTTPRequestHandler):
                 pass
             # Today's trades: IBKR fills as ground truth + event_log metadata.
             # Falls back to event_log-only when IBKR is offline (ibkr_match='unmatched').
-            # Historical trades come from trades.json via mtime-based cache.
+            # Historical trades (pre-today) come from trades.json via mtime-based cache.
+            # today_from_file is intentionally removed — the reconciler covers all today's
+            # closes including the offline fallback, so trades.json entries for today
+            # (including reconciliation_backfill records) must not bleed through.
             try:
                 today = _time.strftime("%Y-%m-%d", _time.gmtime())
                 today_trades = ibkr_reconciler.reconcile_closes(bot_state.ib, cutover_date=today)
-                today_syms = {t["symbol"] for t in today_trades}
                 cached = _load_trades_cached()
                 hist = [t for t in cached if (t.get("timestamp") or t.get("exit_time") or "")[:10] != today]
-                # Keep today's file entries only for symbols absent from the events log
-                # (covers manual trades added directly to trades.json).
-                today_from_file = [
-                    t for t in cached
-                    if (t.get("timestamp") or t.get("exit_time") or "")[:10] == today
-                    and t.get("exit_price") is not None
-                    and t.get("symbol") not in today_syms
-                ]
-                state["all_trades"] = hist + today_from_file + today_trades
+                state["all_trades"] = hist + today_trades
             except Exception:
                 pass
             # Total P&L = NetLiquidation - effective capital (starting + deposits - withdrawals)
