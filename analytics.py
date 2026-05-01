@@ -67,7 +67,7 @@ def _build_returns_series(closed: list[dict]) -> pd.Series:
         except Exception:
             continue
         rows.append({"date": dt, "pnl": float(t["pnl"]),
-                      "notional": abs(float(t.get("entry_price", 1)) * float(t.get("qty") or t.get("shares") or 1))})
+                      "notional": abs(float(t.get("entry_price") or 1) * float(t.get("qty") or t.get("shares") or 1))})
 
     if not rows:
         return pd.Series(dtype=float)
