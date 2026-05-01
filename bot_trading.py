@@ -1278,6 +1278,11 @@ def run_scan():
     dash["daily_pnl"] = pnl
 
     if pv > 0:
+        dash["equity_history"].append({"date": datetime.now(_ET).strftime("%Y-%m-%d %H:%M ET"), "value": pv})
+        if len(dash["equity_history"]) > 2000:
+            dash["equity_history"] = dash["equity_history"][-2000:]
+        save_equity_history(dash["equity_history"])
+
         newly_halted = update_equity_high_water_mark(pv)
         if newly_halted:
             clog("RISK", "⛔ DRAWDOWN BRAKE: drawdown limit exceeded — flattening all positions")
