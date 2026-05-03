@@ -937,6 +937,28 @@ CONFIG = {
         "position_research_min_intraday_score_floor":  6,      # min signal score to survive pipeline gates
         "position_research_strong_discovery_score":    6,      # discovery_score threshold for rescue
         "position_research_allow_archetype_rescue":    True,   # rescue if any archetype matched
+        # ── Tier D Shadow Apex Lane (Phase 1B) ───────────────────────────────
+        # Separate shadow-only Apex pass for Tier D dropped by the main top-30 cap.
+        # execute=False enforced at call site. No orders. No training records.
+        "tier_d_shadow_apex_enabled":           True,
+        "tier_d_shadow_apex_cap":               10,   # max Tier D sent to shadow Apex per cycle
+        "tier_d_shadow_min_discovery_score":    6,    # min discovery_score for shadow eligibility
+        "tier_d_shadow_require_archetype":      True, # require at least one matched archetype
+        "tier_d_shadow_allow_live_entries":     False,# hard lock — shadow only, never execute
+
+        # ── Tier D Paper Evaluation Mode ─────────────────────────────────────
+        # Controlled paper POSITION entries for Core Research Tier D candidates.
+        # Live is blocked unconditionally by tier_d_paper_gate.is_paper_mode().
+        # Shadow logging continues alongside paper entries.
+        "position_research_allow_paper_entries":                True,   # master switch for paper entries
+        "position_research_paper_core_only":                    True,   # core_research bucket only
+        "position_research_paper_exclude_tactical_momentum":    True,   # TM always shadow-only
+        "position_research_paper_starter_size_only":            True,   # no full/high-conviction sizing
+        "position_research_paper_min_discovery_score":          8,      # higher bar than shadow (6)
+        "position_research_paper_require_archetype":            True,   # primary_archetype must be set
+        "position_research_paper_max_entries_per_day":          3,      # daily paper entry cap
+        "position_research_paper_max_open_positions":           5,      # concurrent open cap
+        "position_research_paper_starter_size_fraction":        0.25,   # 25% of normal position size
     },
 }
 

@@ -420,16 +420,18 @@ def dispatch_signals(
 
             raw_score = round(signal.conviction_score * 5)
 
-            # For Tier D signals, retrieve the PRU FMP snapshot and backfill info
-            # so entry_gate shadow validation can detect ctx data-flow gaps and
-            # log missing_fresh_trade_context_after_rescue.
+            # For Tier D signals, retrieve the PRU FMP snapshot, backfill info,
+            # and PRU metadata (universe_bucket, primary_archetype, discovery_score)
+            # so entry_gate shadow validation and the paper gate have full context.
             _pru_snap: dict = {}
             _t4_backfill: dict = {}
+            _pru_meta_sym: dict = {}
             if getattr(signal, "scanner_tier", "") == "D":
                 try:
                     import scanner as _scanner_mod
                     _, _pru_meta = _scanner_mod.get_position_research_universe()
-                    _pru_snap = _pru_meta.get(signal.symbol, {}).get("pru_fmp_snapshot") or {}
+                    _pru_meta_sym = _pru_meta.get(signal.symbol, {})
+                    _pru_snap = _pru_meta_sym.get("pru_fmp_snapshot") or {}
                 except Exception as _pe:
                     log.debug("dispatch: pru_fmp_snapshot lookup failed for %s: %s", signal.symbol, _pe)
                 _t4_backfill = _tier_d_backfill.get(signal.symbol.upper(), {})
@@ -445,6 +447,12 @@ def dispatch_signals(
                 scanner_tier=getattr(signal, "scanner_tier", "") or None,
                 pru_fmp_snapshot=_pru_snap or None,
                 tier_d_backfill_info=_t4_backfill or None,
+                universe_bucket=_pru_meta_sym.get("universe_bucket") or None,
+                primary_archetype=_pru_meta_sym.get("primary_archetype") or None,
+                discovery_score=(
+                    _pru_meta_sym.get("adjusted_discovery_score")
+                    or _pru_meta_sym.get("discovery_score")
+                ) or None,
             )
 
             if not gate_ok:
@@ -486,6 +494,34 @@ def dispatch_signals(
                 "dispatch: entry_gate failed for %s — proceeding without gate: %s",
                 signal.symbol, _gate_exc,
             )
+
+        # ── Tier D paper entry metadata ────────────────────────────────────────
+        # Retrieve the gate result cached by tier_d_paper_gate.evaluate() during
+        # validate_entry. If the entry was allowed as a paper POSITION trade,
+        # build _td_paper_kwargs to pass tagging and size fraction to execute_buy.
+        _td_paper_kwargs: dict = {}
+        if getattr(signal, "scanner_tier", "") == "D" and gate_type == "POSITION":
+            try:
+                from tier_d_paper_gate import get_result as _td_get_result
+                _td_gate = _td_get_result(signal.symbol) or {}
+                if _td_gate.get("paper_entry_allowed"):
+                    _size_frac = CONFIG.get("entry_gate", {}).get(
+                        "position_research_paper_starter_size_fraction", 0.25
+                    )
+                    _td_paper_kwargs = {
+                        "tier_d_paper_entry":     True,
+                        "paper_evaluation_trade": True,
+                        "position_size_bucket":   "tier_d_paper_starter",
+                        "scanner_tier":           "D",
+                        "size_fraction_override": _size_frac,
+                    }
+                    log.info(
+                        "dispatch: %s Tier D paper entry approved — "
+                        "size_fraction=%.2f bucket=tier_d_paper_starter",
+                        signal.symbol, _size_frac,
+                    )
+            except Exception as _td_exc:
+                log.debug("dispatch: tier_d_paper_gate.get_result failed: %s", _td_exc)
 
         # ── Record entry in pattern library ───────────────────
         # Returns pattern_id stored on the position for learning loop.
@@ -543,6 +579,7 @@ def dispatch_signals(
                         pattern_id=pattern_id,
                         market_read=market_read,
                         entry_context=_entry_ctx,
+                        **_td_paper_kwargs,
                     )
                 else:
                     success = False

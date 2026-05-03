@@ -439,6 +439,9 @@ def validate_entry(
     scanner_tier: str | None = None,
     pru_fmp_snapshot: dict | None = None,
     tier_d_backfill_info: dict | None = None,
+    universe_bucket: str | None = None,
+    primary_archetype: str | None = None,
+    discovery_score: float | None = None,
 ) -> tuple[bool, str, str, int]:
     """
     Full entry validation: classify trade type and check effective score.
@@ -460,18 +463,31 @@ def validate_entry(
     if min_score is None:
         min_score = CONFIG.get("min_score_to_trade", 14)
 
-    # ── Tier D shadow mode: run full POSITION simulation, then block execution ─
-    # When shadow mode is active, Tier D candidates are fully evaluated in simulation
-    # (to answer "would this have passed?") but no live POSITION entry is created.
-    # This preserves safety while generating the dry-run data needed to validate the funnel.
-    if (
-        scanner_tier == "D"
-        and opus_trade_type == "POSITION"
-        and CONFIG.get("entry_gate", {}).get("position_research_shadow_mode",
-            CONFIG.get("position_research_shadow_mode", True))
-        and not CONFIG.get("entry_gate", {}).get("position_research_allow_live_position_entries",
-            CONFIG.get("position_research_allow_live_position_entries", False))
-    ):
+    # ── Tier D: paper gate → shadow mode fallback ────────────────────────────
+    # For Tier D POSITION signals there are two paths:
+    #
+    #   A) Paper entry allowed — tier_d_paper_gate clears all checks
+    #      → run real _validate_position(), write extended shadow log, return result.
+    #      This is the new paper evaluation mode. Shadow logging continues.
+    #
+    #   B) Paper entry blocked (any reason) AND shadow mode active
+    #      → run simulation only, write shadow log (with paper block reason), return blocked.
+    #      This is the original shadow-only behaviour, unchanged.
+    #
+    # Live-block guarantee: tier_d_paper_gate.evaluate() returns
+    # tier_d_live_disabled before touching any other condition when the active
+    # account is not the paper account.
+    if scanner_tier == "D" and opus_trade_type == "POSITION":
+        _shadow_mode = CONFIG.get("entry_gate", {}).get(
+            "position_research_shadow_mode",
+            CONFIG.get("position_research_shadow_mode", True),
+        )
+        _allow_live = CONFIG.get("entry_gate", {}).get(
+            "position_research_allow_live_position_entries",
+            CONFIG.get("position_research_allow_live_position_entries", False),
+        )
+
+        # Simulate position validation in all paths (generates would_have_passed).
         sim_pass, sim_type, sim_reason, sim_score = _simulate_position_validation(
             direction, ctx, score, instrument=instrument,
         )
@@ -489,10 +505,6 @@ def validate_entry(
             ctx_data_source = "no_ctx"
 
         # ── Detect data-flow gap and run PRU-supplemented simulation ─────────
-        # If ctx is missing fundamentals but PRU had them at build time, that is a
-        # data-flow gap (FMP data existed hours ago but wasn't available at dispatch).
-        # We run a second simulation with PRU values filled in — for observability
-        # only. The live gate always uses only the fresh TradeContext.
         data_flow_gap = False
         would_have_passed_with_pru_data = None
         pru_supplemented_fields: list[str] = []
@@ -522,19 +534,6 @@ def validate_entry(
                 )
                 would_have_passed_with_pru_data = supp_pass
 
-        log.info(
-            "entry_gate: %s %s [TIER_D] shadow_mode_blocked — "
-            "would_have_passed=%s ctx_data_source=%s data_flow_gap=%s "
-            "pru_supplemented=%s would_have_passed_with_pru=%s "
-            "simulated_type=%s simulated_score=%d simulated_reason=%s",
-            _sym, direction,
-            sim_pass, ctx_data_source, data_flow_gap,
-            pru_supplemented_fields, would_have_passed_with_pru_data,
-            sim_type, sim_score, sim_reason,
-        )
-        # missing_fresh_trade_context_after_rescue is True when ctx had no
-        # fundamentals even after the backfill pass in signal_dispatcher.
-        # It means the POSITION simulation result may be unreliable.
         _bf = tier_d_backfill_info or {}
         _missing_ctx_after_rescue = (
             ctx_data_source == "no_ctx"
@@ -542,32 +541,118 @@ def validate_entry(
             and not _bf.get("context_backfilled", False)
         )
 
-        _write_pr_shadow({
-            "ts": datetime.now(UTC).isoformat(),
-            "symbol": _sym,
-            "direction": direction,
-            "signal_score": score,
-            "ctx_data_source": ctx_data_source,
-            "ctx_populated_fields": _ctx_populated,
-            "tier_d_rescued_after_context_build": _bf.get("tier_d_rescued_after_context_build", False),
-            "context_backfilled": _bf.get("context_backfilled", False),
-            "context_backfill_source": _bf.get("context_backfill_source", "n/a"),
-            "missing_fresh_trade_context_after_rescue": _missing_ctx_after_rescue,
-            "data_flow_gap": data_flow_gap,
-            "pru_supplemented_fields": pru_supplemented_fields,
-            "would_have_passed": sim_pass,
-            "would_have_passed_with_pru_data": would_have_passed_with_pru_data,
-            "simulated_type": sim_type,
-            "simulated_score": sim_score,
-            "simulated_reason": sim_reason,
-        })
-        return (
-            False,
-            "POSITION_RESEARCH_ONLY",
-            f"shadow_mode_blocked (simulated: would_have_passed={sim_pass}, "
-            f"type={sim_type}, reason={sim_reason[:120]})",
-            0,
-        )
+        # ── Evaluate paper gate ───────────────────────────────────────────────
+        _paper_gate: dict = {}
+        try:
+            from tier_d_paper_gate import evaluate as _td_pg_eval, is_paper_mode as _is_paper
+            _paper_gate = _td_pg_eval(
+                symbol=_sym,
+                universe_bucket=universe_bucket,
+                primary_archetype=primary_archetype,
+                discovery_score=discovery_score,
+                instrument=instrument,
+            )
+        except Exception as _pg_exc:
+            log.debug("entry_gate: tier_d_paper_gate.evaluate failed: %s", _pg_exc)
+            _paper_gate = {
+                "paper_entry_allowed": False,
+                "paper_entry_block_reason": "gate_eval_error",
+            }
+
+        _paper_allowed = _paper_gate.get("paper_entry_allowed", False)
+
+        # ── Path A: paper entry allowed ───────────────────────────────────────
+        if _paper_allowed:
+            pos_ok, pos_type, pos_reason, pos_score = _validate_position(
+                direction, ctx, instrument,
+            )
+            log.info(
+                "entry_gate: %s %s [TIER_D] paper_entry_path — "
+                "pos_ok=%s pos_type=%s sim_pass=%s ctx_data_source=%s",
+                _sym, direction, pos_ok, pos_type, sim_pass, ctx_data_source,
+            )
+            _write_pr_shadow({
+                "ts": datetime.now(UTC).isoformat(),
+                "symbol": _sym,
+                "direction": direction,
+                "signal_score": score,
+                "ctx_data_source": ctx_data_source,
+                "ctx_populated_fields": _ctx_populated,
+                "tier_d_rescued_after_context_build": _bf.get("tier_d_rescued_after_context_build", False),
+                "context_backfilled": _bf.get("context_backfilled", False),
+                "context_backfill_source": _bf.get("context_backfill_source", "n/a"),
+                "missing_fresh_trade_context_after_rescue": _missing_ctx_after_rescue,
+                "data_flow_gap": data_flow_gap,
+                "pru_supplemented_fields": pru_supplemented_fields,
+                "would_have_passed": sim_pass,
+                "would_have_passed_with_pru_data": would_have_passed_with_pru_data,
+                "simulated_type": sim_type,
+                "simulated_score": sim_score,
+                "simulated_reason": sim_reason,
+                "paper_entry_allowed": True,
+                "paper_entry_taken": pos_ok,
+                "paper_entry_block_reason": (
+                    None if pos_ok else f"position_validation:{pos_reason}"
+                ),
+                "position_size_bucket": _paper_gate.get("position_size_bucket", ""),
+                "execution_mode": "paper",
+                "universe_bucket": universe_bucket,
+                "primary_archetype": primary_archetype,
+                "discovery_score": discovery_score,
+            })
+            return (pos_ok, pos_type, pos_reason, pos_score)
+
+        # ── Path B: shadow-only (original behaviour + extended log fields) ────
+        if _shadow_mode and not _allow_live:
+            log.info(
+                "entry_gate: %s %s [TIER_D] shadow_mode_blocked — "
+                "paper_block=%s would_have_passed=%s ctx_data_source=%s "
+                "data_flow_gap=%s pru_supplemented=%s would_have_passed_with_pru=%s "
+                "simulated_type=%s simulated_score=%d simulated_reason=%s",
+                _sym, direction,
+                _paper_gate.get("paper_entry_block_reason"),
+                sim_pass, ctx_data_source, data_flow_gap,
+                pru_supplemented_fields, would_have_passed_with_pru_data,
+                sim_type, sim_score, sim_reason,
+            )
+            try:
+                _exec_mode = "paper" if _is_paper() else "live"
+            except Exception:
+                _exec_mode = "unknown"
+            _write_pr_shadow({
+                "ts": datetime.now(UTC).isoformat(),
+                "symbol": _sym,
+                "direction": direction,
+                "signal_score": score,
+                "ctx_data_source": ctx_data_source,
+                "ctx_populated_fields": _ctx_populated,
+                "tier_d_rescued_after_context_build": _bf.get("tier_d_rescued_after_context_build", False),
+                "context_backfilled": _bf.get("context_backfilled", False),
+                "context_backfill_source": _bf.get("context_backfill_source", "n/a"),
+                "missing_fresh_trade_context_after_rescue": _missing_ctx_after_rescue,
+                "data_flow_gap": data_flow_gap,
+                "pru_supplemented_fields": pru_supplemented_fields,
+                "would_have_passed": sim_pass,
+                "would_have_passed_with_pru_data": would_have_passed_with_pru_data,
+                "simulated_type": sim_type,
+                "simulated_score": sim_score,
+                "simulated_reason": sim_reason,
+                "paper_entry_allowed": False,
+                "paper_entry_block_reason": _paper_gate.get("paper_entry_block_reason"),
+                "position_size_bucket": "",
+                "execution_mode": _exec_mode,
+                "universe_bucket": universe_bucket,
+                "primary_archetype": primary_archetype,
+                "discovery_score": discovery_score,
+            })
+            return (
+                False,
+                "POSITION_RESEARCH_ONLY",
+                f"shadow_mode_blocked (paper_block={_paper_gate.get('paper_entry_block_reason')} "
+                f"simulated: would_have_passed={sim_pass}, "
+                f"type={sim_type}, reason={sim_reason[:120]})",
+                0,
+            )
 
     # ── Change 5 — Block score=0 SWING/POSITION entries ──────────────────────
     # score=0 means no signal data was available. 18% of historical SWING trades

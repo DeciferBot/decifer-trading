@@ -142,14 +142,36 @@ def _load_event_log() -> tuple[dict, dict, dict]:
 
 
 def _fetch_ibkr_fills(ib) -> list:
+    """Return all known fills: reqExecutions (last 24h) + Flex Web Service (last 365 days).
+
+    reqExecutions is real-time but limited to 24 hours.  Flex covers historical
+    gaps so _find_fill() can match positions closed more than a day ago with real
+    timestamps and prices instead of falling back to event_log estimates.
+    """
+    fills: list = []
+
+    # Layer 1: reqExecutions — authoritative for the last 24 hours
     try:
-        if ib is None or not ib.isConnected():
-            return []
-        result = ib.reqExecutions()
-        return result if isinstance(result, list) else []
+        if ib is not None and ib.isConnected():
+            result = ib.reqExecutions()
+            if isinstance(result, list):
+                fills.extend(result)
     except Exception as exc:
         log.debug("reqExecutions failed (non-fatal): %s", exc)
-        return []
+
+    # Layer 2: Flex Web Service — up to 365 days, fills the historical gap
+    token = CONFIG.get("ibkr_flex_token", "")
+    query_id = CONFIG.get("ibkr_flex_trades_query_id", "")
+    if token and query_id:
+        try:
+            from bot_account import fetch_flex_trades
+            flex_fills = fetch_flex_trades(token, query_id)
+            fills.extend(flex_fills)
+            log.debug("Flex trades fetched: %d fills", len(flex_fills))
+        except Exception as exc:
+            log.debug("Flex trades fetch failed (non-fatal): %s", exc)
+
+    return fills
 
 
 def _load_commission_index() -> dict[int, dict]:

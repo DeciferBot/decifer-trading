@@ -228,6 +228,11 @@ def execute_buy(
     market_read: str = "",
     entry_context: dict | None = None,
     qty_override: int | None = None,
+    # Tier D paper evaluation mode
+    size_fraction_override: float = 1.0,
+    tier_d_paper_entry: bool = False,
+    paper_evaluation_trade: bool = False,
+    position_size_bucket: str = "",
 ) -> bool:
     """
     Place a buy order with full OCO bracket.
@@ -418,6 +423,11 @@ def execute_buy(
             qty = max(1, int(qty * advice_size_mult))
             log.info(f"[advisor] {symbol} size_mult={advice_size_mult} → qty={qty}")
 
+        # ── Tier D paper starter-size fraction ────────────────────────
+        if qty_override is None and size_fraction_override != 1.0 and 0.0 < size_fraction_override < 1.0:
+            qty = max(1, int(qty * size_fraction_override))
+            log.info(f"[tier_d_paper] {symbol} size_fraction={size_fraction_override} → qty={qty}")
+
         # ── HARD CAPS — last line of defense against contaminated data ──
         # Max order value = 20% of portfolio (stricter than max_single_position for safety).
         # 3x leveraged inverse ETFs use a 6.67% notional cap so that effective market
@@ -504,6 +514,14 @@ def execute_buy(
             _wal_open_time = open_time or datetime.now(UTC).isoformat()
             try:
                 from event_log import append_intent as _el_intent
+                _td_intent_extras: dict = {}
+                if tier_d_paper_entry:
+                    _td_intent_extras = {
+                        "tier_d_paper_entry":     True,
+                        "paper_evaluation_trade": True,
+                        "position_size_bucket":   position_size_bucket or "tier_d_paper_starter",
+                        "scanner_tier":           "D",
+                    }
                 _el_intent(
                     _trade_id, symbol,
                     direction="LONG",
@@ -526,6 +544,7 @@ def execute_buy(
                     ic_weights_at_entry=_wal_icw,
                     tranche_mode=tranche_mode,
                     t1_qty=t1_qty, t2_qty=t2_qty,
+                    **_td_intent_extras,
                 )
             except Exception as _el_err:
                 log.error("execute_buy %s: ORDER_INTENT write failed — trade aborted: %s", symbol, _el_err)

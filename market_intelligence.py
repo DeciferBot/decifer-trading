@@ -959,7 +959,7 @@ def _format_candidate_line(c: dict) -> str:
     headlines = " | ".join((c.get("news_headlines") or [])[:3]) or "-"
     dar_val = c.get("dar")
     dar_str = "pre-mkt" if dar_val is None else dar_val
-    return (
+    line = (
         f"{c.get('symbol')}: score={c.get('score')} dir={c.get('direction')} "
         f"DAR={dar_str} [{dims}] atr5={c.get('atr_5m')} atrD={c.get('atr_daily')} "
         f"volR={c.get('vol_ratio')} tape={c.get('daily_tape_score')} "
@@ -969,6 +969,10 @@ def _format_candidate_line(c: dict) -> str:
         f"allowed={c.get('allowed_trade_types')} opt_ok={c.get('options_eligible')} "
         f"news=[{headlines}] finbert={c.get('news_finbert_sentiment')}(advisory)"
     )
+    hint = c.get("_shadow_hint")
+    if hint:
+        line = f"{hint}\n  {line}"
+    return line
 
 
 def _format_review_line(p: dict) -> str:

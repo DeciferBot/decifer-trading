@@ -967,6 +967,116 @@ def main() -> None:
             print(f"  ✗ Phase 1B not yet complete: {', '.join(issues)}")
 
     # ------------------------------------------------------------------ #
+    # DETAIL SECTION 0e — Tier D Paper Entries
+    # ------------------------------------------------------------------ #
+    section("DETAIL SECTION 0e — Tier D Paper Entries (evaluation mode)")
+
+    # Load trade_events.jsonl for paper entry records
+    trade_events: list[dict] = _load_jsonl(TRADE_EVENTS)
+
+    td_paper_intents = [
+        r for r in trade_events
+        if r.get("event") == "ORDER_INTENT" and r.get("tier_d_paper_entry")
+    ]
+    td_paper_fills = [
+        r for r in trade_events
+        if r.get("event") == "ORDER_FILLED" and r.get("tier_d_paper_entry")
+    ]
+    td_paper_closes = [
+        r for r in trade_events
+        if r.get("event") == "POSITION_CLOSED" and r.get("tier_d_paper_entry")
+    ]
+
+    # Shadow log paper entry stats
+    shadow_paper_allowed = [r for r in shadow if r.get("paper_entry_allowed") is True]
+    shadow_paper_blocked = [r for r in shadow if r.get("paper_entry_allowed") is False
+                            and r.get("paper_entry_block_reason") is not None]
+    shadow_paper_taken   = [r for r in shadow_paper_allowed if r.get("paper_entry_taken") is True]
+
+    print(f"  Shadow log — paper_entry_allowed:       {len(shadow_paper_allowed)}")
+    print(f"  Shadow log — paper_entry_taken:         {len(shadow_paper_taken)}")
+    print(f"  Shadow log — paper_entry_blocked:       {len(shadow_paper_blocked)}")
+    print(f"  Trade events — ORDER_INTENT (paper):    {len(td_paper_intents)}")
+    print(f"  Trade events — ORDER_FILLED  (paper):   {len(td_paper_fills)}")
+    print(f"  Trade events — POSITION_CLOSED (paper): {len(td_paper_closes)}")
+    print()
+
+    # Block-reason breakdown
+    if shadow_paper_blocked:
+        reason_counts: dict[str, int] = {}
+        for r in shadow_paper_blocked:
+            reason = r.get("paper_entry_block_reason") or "unknown"
+            reason_counts[reason] = reason_counts.get(reason, 0) + 1
+        print(f"  Paper entry block reasons:")
+        for reason, cnt in sorted(reason_counts.items(), key=lambda x: -x[1]):
+            print(f"    {cnt:>4}  {reason}")
+        print()
+
+    # Core Research vs Tactical Momentum breakdown from shadow log
+    cr_allowed  = [r for r in shadow_paper_allowed if r.get("universe_bucket") == "core_research"]
+    tm_blocked  = [r for r in shadow_paper_blocked if r.get("paper_entry_block_reason") == "tactical_momentum_shadow_only"]
+    print(f"  Core Research paper entries (shadow):   {len(cr_allowed)}")
+    print(f"  Tactical Momentum blocked:              {len(tm_blocked)}")
+    print()
+
+    # Discovery score and archetype stats for taken entries
+    if shadow_paper_taken:
+        ds_vals = [r.get("discovery_score") for r in shadow_paper_taken if r.get("discovery_score") is not None]
+        if ds_vals:
+            avg_ds = sum(ds_vals) / len(ds_vals)
+            print(f"  Avg discovery_score (taken):            {avg_ds:.1f}")
+
+        archetype_cnt: dict[str, int] = {}
+        for r in shadow_paper_taken:
+            arch = r.get("primary_archetype") or "unknown"
+            archetype_cnt[arch] = archetype_cnt.get(arch, 0) + 1
+        if archetype_cnt:
+            print(f"  Archetype distribution (taken):")
+            for arch, cnt in sorted(archetype_cnt.items(), key=lambda x: -x[1]):
+                print(f"    {cnt:>4}  {arch}")
+        print()
+
+    # Open Tier D paper positions (intent without a matching close)
+    intent_syms = {r.get("trade_id"): r.get("symbol") for r in td_paper_intents}
+    closed_ids  = {r.get("trade_id") for r in td_paper_closes}
+    open_td_paper = {tid: sym for tid, sym in intent_syms.items() if tid not in closed_ids}
+    print(f"  Open Tier D paper positions:            {len(open_td_paper)}")
+    if open_td_paper:
+        for sym in sorted(set(open_td_paper.values())):
+            print(f"    {sym}")
+    print()
+
+    # P&L summary for closed Tier D paper positions
+    if td_paper_closes:
+        pnls = [r.get("pnl") for r in td_paper_closes if r.get("pnl") is not None]
+        if pnls:
+            total_pnl  = sum(pnls)
+            wins       = [p for p in pnls if p > 0]
+            losses     = [p for p in pnls if p <= 0]
+            win_rate   = len(wins) / len(pnls) * 100
+            print(f"  Closed Tier D paper P&L:                ${total_pnl:+,.2f}")
+            print(f"  Win rate:                               {win_rate:.0f}% ({len(wins)}W/{len(losses)}L)")
+            print()
+
+    # Safety: no live Tier D entries
+    live_td = [
+        r for r in trade_events
+        if r.get("tier_d_paper_entry") and r.get("execution_mode") == "live"
+    ]
+    print(f"  ── Safety: live Tier D entries ─────────────────────────────────")
+    if live_td:
+        print(f"  ✗ ALERT: {len(live_td)} live Tier D entries found in trade_events — INVESTIGATE")
+    else:
+        print(f"  ✓ No live Tier D entries in trade_events (tier_d_paper_entry+execution_mode=live = 0)")
+    print()
+
+    if not shadow_paper_allowed and not td_paper_intents:
+        print("  ⚠  No paper entry records yet. Waiting for scan cycles with qualifying")
+        print("     Core Research Tier D candidates that classify POSITION and pass")
+        print("     entry_gate._validate_position().")
+        print()
+
+    # ------------------------------------------------------------------ #
     # DETAIL SECTION 1 — Scan-Cycle Coverage
     # ------------------------------------------------------------------ #
     section("DETAIL SECTION 1 — Scan-Cycle Coverage")

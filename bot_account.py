@@ -170,6 +170,154 @@ def _fetch_flex_nav(token: str, query_id: str) -> list[dict] | None:
         return None
 
 
+# ── Flex fill shims (mimic ib_insync Fill interface) ─────────────────────────
+
+
+class _FlexContract:
+    """Minimal contract shim so _find_fill() in ibkr_reconciler can read .symbol."""
+    __slots__ = ("symbol",)
+
+    def __init__(self, symbol: str) -> None:
+        self.symbol = symbol
+
+
+class _FlexExecution:
+    """Minimal execution shim matching the ib_insync Execution attribute names."""
+    __slots__ = ("symbol", "side", "orderId", "time", "avgPrice", "execId")
+
+    def __init__(
+        self,
+        symbol: str,
+        side: str,
+        order_id: int,
+        time_str: str,
+        avg_price: float,
+        exec_id: str,
+    ) -> None:
+        self.symbol = symbol
+        self.side = side        # "BOT" or "SLD"
+        self.orderId = order_id
+        self.time = time_str    # IBKR format: "20260430 14:30:22"
+        self.avgPrice = avg_price
+        self.execId = exec_id
+
+
+class _FlexFill:
+    """Wraps a single Flex XML <Trade> row as a Fill-compatible object."""
+    __slots__ = ("contract", "execution")
+
+    def __init__(
+        self,
+        symbol: str,
+        side: str,
+        order_id: int,
+        time_str: str,
+        avg_price: float,
+        exec_id: str,
+    ) -> None:
+        self.contract = _FlexContract(symbol)
+        self.execution = _FlexExecution(symbol, side, order_id, time_str, avg_price, exec_id)
+
+
+def _parse_flex_datetime(raw: str) -> str:
+    """
+    Convert IBKR Flex dateTime string to the format _parse_ibkr_time() expects.
+
+    Flex format:  "20260430;143022"   (yyyyMMdd;HHmmss)
+    Target format: "20260430 14:30:22"
+    """
+    if not raw or len(raw) < 15:
+        return raw
+    date_part, _, time_part = raw.partition(";")
+    if not time_part or len(time_part) < 6:
+        return raw
+    return f"{date_part} {time_part[:2]}:{time_part[2:4]}:{time_part[4:6]}"
+
+
+def fetch_flex_trades(token: str, query_id: str) -> list[_FlexFill]:
+    """
+    Fetch up to 365 days of execution fill history via IBKR Flex Web Service.
+
+    Returns a list of _FlexFill objects whose .contract and .execution attributes
+    match the ib_insync Fill interface, so ibkr_reconciler._find_fill() works
+    unchanged on both real Fill objects and these shims.
+
+    Returns [] on any failure (non-fatal — reconciler falls back to event_log data).
+    """
+    log.info(f"[FlexTrades] Requesting fills for query {query_id}...")
+    try:
+        params = urllib.parse.urlencode({"t": token, "q": query_id, "v": "3"})
+        with urllib.request.urlopen(f"{_FLEX_SEND_URL}?{params}", timeout=30) as r:
+            root = ET.fromstring(r.read())
+        status = root.findtext("Status")
+        ref_code = root.findtext("ReferenceCode")
+        if status != "Success" or not ref_code:
+            log.warning(f"[FlexTrades] Request rejected: status={status}")
+            return []
+
+        log.info(f"[FlexTrades] Ref={ref_code}; polling...")
+        time.sleep(5)
+        xml_data = None
+        for attempt in range(8):
+            params2 = urllib.parse.urlencode({"t": token, "q": ref_code, "v": "3"})
+            with urllib.request.urlopen(f"{_FLEX_RECEIVE_URL}?{params2}", timeout=30) as r:
+                raw = r.read()
+            if b"<FlexQueryResponse" in raw:
+                xml_data = raw
+                break
+            try:
+                err = ET.fromstring(raw)
+                if err.findtext("ErrorCode") in ("1019", "1100"):
+                    log.info(f"[FlexTrades] Not ready yet ({attempt + 1}/8)...")
+                    time.sleep(5)
+                    continue
+            except Exception:
+                pass
+            log.warning(f"[FlexTrades] Unexpected response: {raw[:200]}")
+            return []
+
+        if xml_data is None:
+            log.warning("[FlexTrades] Timed out waiting for statement.")
+            return []
+
+        xml_root = ET.fromstring(xml_data)
+        fills: list[_FlexFill] = []
+
+        for node in xml_root.iter("Trade"):
+            symbol = node.get("symbol", "").strip()
+            if not symbol:
+                continue
+
+            raw_side = node.get("buySell", "").upper()
+            side = "BOT" if raw_side == "BUY" else "SLD" if raw_side == "SELL" else None
+            if side is None:
+                continue
+
+            raw_dt = node.get("dateTime", "")
+            time_str = _parse_flex_datetime(raw_dt)
+
+            try:
+                avg_price = float(node.get("tradePrice") or 0)
+            except (TypeError, ValueError):
+                avg_price = 0.0
+
+            try:
+                order_id = int(node.get("ibOrderID") or 0)
+            except (TypeError, ValueError):
+                order_id = 0
+
+            exec_id = node.get("ibExecID", "")
+
+            fills.append(_FlexFill(symbol, side, order_id, time_str, avg_price, exec_id))
+
+        log.info(f"[FlexTrades] {len(fills)} fills fetched via Flex.")
+        return fills
+
+    except Exception as exc:
+        log.warning(f"[FlexTrades] Error: {exc}")
+        return []
+
+
 # ── Trade-based reconstruction ────────────────────────────────────────────────
 
 
