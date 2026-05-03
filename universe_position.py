@@ -46,12 +46,42 @@ _WEAK = 1
 _MODERATE = 2
 _STRONG = 3
 
+# Cluster caps — (member tickers, max allowed in final universe)
+_CLUSTER_CAPS: dict[str, tuple[frozenset, int]] = {
+    "crypto_btc_proxy": (frozenset({
+        "MSTR", "MARA", "WULF", "CIFR", "IREN", "APLD", "HUT", "CLSK", "RIOT",
+        "COIN", "BTBT", "MIGI", "CORZ",
+    }), 2),
+    "quantum": (frozenset({
+        "IONQ", "QBTS", "RGTI", "QUBT", "IQM", "ARQQ",
+    }), 2),
+    "ai_infra": (frozenset({
+        "NVDA", "AMD", "SMCI", "DELL", "ALAB", "CRDO", "CLS", "AXTI",
+        "AAOI", "COHR", "ANET", "AVGO", "MRVL",
+    }), 4),
+    "nuclear_uranium": (frozenset({
+        "SMR", "OKLO", "UEC", "LEU", "NNE", "BWXT", "CCJ", "DNN",
+    }), 2),
+}
+
+# Duplicate share-class deduplication: key = ticker to drop, value = preferred ticker to keep
+_PREFERRED_SHARE_CLASS: dict[str, str] = {
+    "GOOG": "GOOGL",  # GOOGL has higher liquidity
+}
+
+# Archetypes that carry independent thesis weight (used in admission gate)
+_MEANINGFUL_ARCHETYPES = frozenset({
+    "Quality Compounder", "Growth Leader", "Re-rating Candidate", "Turnaround/Inflection",
+})
+
 # Schema fields required on every symbol entry
 _REQUIRED_SYMBOL_FIELDS = (
     "ticker", "discovery_score", "matched_position_archetypes",
     "discovery_signals", "discovery_signal_points", "missing_data_fields",
     "universe_source", "scanner_tier", "position_research_universe_member",
     "active_trading_universe_member", "priority_overlap", "universe_entry_reason",
+    "primary_archetype", "secondary_tags", "universe_bucket",
+    "risk_penalty_pts", "adjusted_discovery_score",
 )
 
 
@@ -151,24 +181,29 @@ def _compute_technical_signals(
     spy_1m_return: float | None,
     sector_1m_return: float | None,
     sector_etf_above_50ma: bool,
-) -> tuple[dict[str, int], list[str]]:
+) -> tuple[dict[str, int], list[str], dict[str, bool]]:
     """
     Compute technical discovery signals from 90d daily bars (~63 trading days).
-    Returns (signal_points_dict, missing_fields_list).
-    Missing bars or too-short history → 0 pts for affected signals, not rejection.
+    Returns (signal_points_dict, missing_fields_list, hygiene_flags).
+
+    hygiene_flags carries {"above_50d_ma": bool, "sector_etf_above_50ma": bool}.
+    These are tracked for secondary-tag assignment and archetype logic but do NOT
+    contribute score points — they pass in 96-97% of all names and are useless as
+    discriminators.
     """
     pts: dict[str, int] = {}
     missing: list[str] = []
+    above_50d_ma_flag = False
 
     if df is None or df.empty or len(df) < 5:
         missing.append("daily_bars")
-        return pts, missing
+        return pts, missing, {"above_50d_ma": False, "sector_etf_above_50ma": sector_etf_above_50ma}
 
     try:
         closes = df["Close"].tolist()
     except Exception:
         missing.append("daily_bars")
-        return pts, missing
+        return pts, missing, {"above_50d_ma": False, "sector_etf_above_50ma": sector_etf_above_50ma}
 
     n = len(closes)
     cur = closes[-1]
@@ -192,11 +227,10 @@ def _compute_technical_signals(
         if sym_1m > sector_1m_return:
             pts["outperforming_sector_1m"] = _MODERATE
 
-    # Above 50-day MA
+    # Above 50-day MA — tracked as hygiene flag, not a score point (fires 96% of the time)
     if n >= 50:
         ma50 = sum(closes[-50:]) / 50.0
-        if cur > ma50:
-            pts["above_50d_ma"] = _WEAK
+        above_50d_ma_flag = cur > ma50
     else:
         missing.append("50d_ma")
 
@@ -217,11 +251,9 @@ def _compute_technical_signals(
         if off_high > 20.0 and recovery > 5.0:
             pts["base_building_after_drawdown"] = _MODERATE
 
-    # Sector ETF above 50MA (computed once per build run, passed in)
-    if sector_etf_above_50ma:
-        pts["sector_etf_above_50ma"] = _WEAK
+    # sector_etf_above_50ma is tracked as hygiene flag only (fires 97% of the time)
 
-    return pts, missing
+    return pts, missing, {"above_50d_ma": above_50d_ma_flag, "sector_etf_above_50ma": sector_etf_above_50ma}
 
 
 # ── Fundamental signal scoring ─────────────────────────────────────────────────
@@ -332,54 +364,120 @@ def _compute_fundamental_signals(
     return pts, missing, raw_snapshot
 
 
-# ── Archetype matching ─────────────────────────────────────────────────────────
+# ── Archetype assignment ───────────────────────────────────────────────────────
 
 
-def _match_archetypes(
-    fundamental_pts: dict[str, int],
-    technical_pts: dict[str, int],
-) -> list[str]:
-    """Match POSITION archetypes based on fired signal keys. Multiple may match."""
-    all_pts = {**fundamental_pts, **technical_pts}
-
-    rev_strong = "revenue_yoy_gt_10pct" in all_pts
-    rev_moderate = "revenue_yoy_gt_5pct" in all_pts
-    rev_positive = "revenue_yoy_positive" in all_pts
+def _assign_primary_archetype(
+    fund_pts: dict[str, int],
+    tech_pts: dict[str, int],
+    above_50d_ma_flag: bool,
+) -> str:
+    """
+    Assign ONE primary archetype. Priority-ordered: first match wins.
+    Sector/RS Leader is now a secondary tag, not a primary archetype.
+    Returns "Speculative Theme" as fallback for names that don't fit any thesis.
+    """
+    rev_strong = "revenue_yoy_gt_10pct" in fund_pts
+    rev_moderate = "revenue_yoy_gt_5pct" in fund_pts
+    rev_positive = "revenue_yoy_positive" in fund_pts
     any_rev_pos = rev_strong or rev_moderate or rev_positive
-    margin_ok = "gross_margin_positive" in all_pts
-    outperform_spy = "outperforming_spy_1m" in all_pts
-    above_50ma = "above_50d_ma" in all_pts
-    rs_positive = outperform_spy or above_50ma
-    sector_above = "sector_etf_above_50ma" in all_pts
-    recent_upgrade = "recent_analyst_upgrade" in all_pts
-    upside_high = "analyst_upside_gt_15pct" in all_pts
-    upside_low = "analyst_upside_positive" in all_pts
-    consensus_ok = "consensus_not_negative" in all_pts
-    base_build = "base_building_after_drawdown" in all_pts
+    margin_ok = "gross_margin_positive" in fund_pts
+    outperform_spy = "outperforming_spy_1m" in tech_pts
+    rs_positive = outperform_spy or above_50d_ma_flag
+    recent_upgrade = "recent_analyst_upgrade" in fund_pts
+    upside_high = "analyst_upside_gt_15pct" in fund_pts
+    upside_low = "analyst_upside_positive" in fund_pts
+    consensus_ok = "consensus_not_negative" in fund_pts
+    base_build = "base_building_after_drawdown" in tech_pts
 
-    archetypes: list[str] = []
-
-    # Quality Compounder: strong revenue + positive margin + relative strength
     if rev_strong and margin_ok and rs_positive:
-        archetypes.append("Quality Compounder")
-
-    # Growth Leader: high revenue growth OR analyst upgrade with significant upside
-    if rev_strong or (any_rev_pos and rev_moderate) or (recent_upgrade and upside_high):
-        archetypes.append("Growth Leader")
-
-    # Re-rating Candidate: analyst upgrade OR positive consensus + upside
+        return "Quality Compounder"
+    if rev_strong or (rev_moderate and recent_upgrade and upside_high):
+        return "Growth Leader"
     if recent_upgrade or (upside_low and consensus_ok):
-        archetypes.append("Re-rating Candidate")
-
-    # Turnaround/Inflection: base-building recovery + any positive revenue signal
+        return "Re-rating Candidate"
     if base_build and any_rev_pos:
-        archetypes.append("Turnaround/Inflection")
+        return "Turnaround/Inflection"
+    return "Speculative Theme"
 
-    # Sector/RS Leader: outperforming SPY AND sector ETF healthy
-    if outperform_spy and sector_above:
-        archetypes.append("Sector/RS Leader")
 
-    return archetypes
+def _assign_secondary_tags(
+    fund_pts: dict[str, int],
+    tech_pts: dict[str, int],
+    hygiene_flags: dict[str, bool],
+) -> list[str]:
+    """
+    Assign zero or more secondary tags for context. These replace Sector/RS Leader
+    as a primary archetype and add informational surface area without inflating scores.
+    """
+    tags: list[str] = []
+    if "outperforming_spy_1m" in tech_pts and hygiene_flags.get("sector_etf_above_50ma"):
+        tags.append("Sector/RS Leader")
+    if hygiene_flags.get("above_50d_ma"):
+        tags.append("Above 50DMA")
+    if "base_building_after_drawdown" in tech_pts:
+        tags.append("Breakout")
+    if "recent_analyst_upgrade" in fund_pts:
+        tags.append("Analyst Momentum")
+    return tags
+
+
+def _check_thesis_quality_gate(
+    fund_pts: dict[str, int],
+    tech_pts: dict[str, int],
+    primary_archetype: str,
+) -> bool:
+    """
+    Returns True if the name has at least one independent thesis signal.
+    Names failing this gate are classified as Tactical Momentum — still tracked
+    in the universe but sorted after Core Research names and labelled accordingly.
+    """
+    if "revenue_yoy_gt_10pct" in fund_pts:
+        return True
+    if "analyst_upside_gt_15pct" in fund_pts:
+        return True
+    if "recent_analyst_upgrade" in fund_pts:
+        return True
+    # Breakout with confirmed RS — the only pure-momentum combo allowed into Core Research
+    if "base_building_after_drawdown" in tech_pts and "outperforming_spy_1m" in tech_pts:
+        return True
+    if primary_archetype == "Quality Compounder":
+        return True
+    return False
+
+
+def _compute_risk_penalties(pru_fmp_snapshot: dict) -> int:
+    """
+    Negative score adjustments for bad fundamentals.
+    Applied after admission gate — affects sort order, not whether a name enters at all.
+    Revenue and analyst upside penalties use the worst-bracket that applies (not cumulative).
+    The no-thesis penalty (-3) stacks on top of the revenue/upside brackets.
+    """
+    penalty = 0
+
+    rev = pru_fmp_snapshot.get("revenue_growth_yoy")
+    if rev is not None:
+        if rev < -25.0:
+            penalty -= 4
+        elif rev < -10.0:
+            penalty -= 2
+
+    upside = pru_fmp_snapshot.get("analyst_upside_pct")
+    if upside is not None:
+        if upside < -30.0:
+            penalty -= 5
+        elif upside < -20.0:
+            penalty -= 4
+        elif upside < -10.0:
+            penalty -= 2
+
+    # Combinatorial: no revenue strength AND no analyst support
+    has_rev_strength = rev is not None and rev > 0.0
+    has_analyst_support = upside is not None and upside > 5.0
+    if not has_rev_strength and not has_analyst_support:
+        penalty -= 3
+
+    return penalty
 
 
 # ── Per-symbol scoring ─────────────────────────────────────────────────────────
@@ -422,29 +520,49 @@ def _score_symbol(
     fund_pts, fund_missing, pru_fmp_snapshot = _compute_fundamental_signals(
         symbol, current_price, recent_upgrade_syms,
     )
-    tech_pts, tech_missing = _compute_technical_signals(
+    tech_pts, tech_missing, hygiene_flags = _compute_technical_signals(
         df, spy_1m_return, sector_1m_return, sector_above_50ma,
     )
 
     all_pts = {**fund_pts, **tech_pts}
     discovery_score = sum(all_pts.values())
     has_strong = any(v >= _STRONG for v in all_pts.values())
-    archetypes = _match_archetypes(fund_pts, tech_pts)
 
-    # Admission gate
+    # Assign primary archetype using earned thesis signals
+    primary_archetype = _assign_primary_archetype(
+        fund_pts, tech_pts, hygiene_flags["above_50d_ma"],
+    )
+
+    # Admission gate — Speculative Theme names need a minimum score or strong signal
     min_score = int(CONFIG.get("position_research_min_score", 2))
-    if discovery_score < min_score and not has_strong and not archetypes:
+    if discovery_score < min_score and not has_strong and primary_archetype not in _MEANINGFUL_ARCHETYPES:
         return None
+
+    # Risk penalties — affect sort order, not admission
+    risk_penalty_pts = _compute_risk_penalties(pru_fmp_snapshot)
+    adjusted_discovery_score = discovery_score + risk_penalty_pts
+
+    # Thesis quality gate — names failing go to Tactical Momentum bucket
+    thesis_pass = _check_thesis_quality_gate(fund_pts, tech_pts, primary_archetype)
+    if not thesis_pass:
+        primary_archetype = "Tactical Momentum"
+        universe_bucket = "tactical_momentum"
+    else:
+        universe_bucket = "core_research"
+
+    secondary_tags = _assign_secondary_tags(fund_pts, tech_pts, hygiene_flags)
+
+    # matched_position_archetypes kept as single-item list for signal_pipeline.py compat
+    matched_position_archetypes = [primary_archetype]
 
     # Build human-readable entry reason
     strong_signals = [k for k, v in all_pts.items() if v >= _STRONG]
     reason_parts: list[str] = []
     if strong_signals:
         reason_parts.append("strong: " + ",".join(strong_signals))
-    if archetypes:
-        reason_parts.append("archetypes: " + ",".join(archetypes))
-    if not reason_parts:
-        reason_parts.append(f"discovery_score={discovery_score}")
+    reason_parts.append(f"archetype: {primary_archetype}")
+    if universe_bucket == "tactical_momentum":
+        reason_parts.append("bucket: tactical_momentum")
     entry_reason = "; ".join(reason_parts)
 
     in_active = symbol in active_trading_syms
@@ -452,7 +570,12 @@ def _score_symbol(
     return {
         "ticker": symbol,
         "discovery_score": discovery_score,
-        "matched_position_archetypes": archetypes,
+        "adjusted_discovery_score": adjusted_discovery_score,
+        "risk_penalty_pts": risk_penalty_pts,
+        "primary_archetype": primary_archetype,
+        "secondary_tags": secondary_tags,
+        "universe_bucket": universe_bucket,
+        "matched_position_archetypes": matched_position_archetypes,
         "discovery_signals": list(all_pts.keys()),
         "discovery_signal_points": all_pts,
         "missing_data_fields": sorted(set(fund_missing + tech_missing)),
@@ -464,6 +587,66 @@ def _score_symbol(
         "priority_overlap": in_active,
         "universe_entry_reason": entry_reason,
     }
+
+
+# ── Cluster caps and duplicate deduplication ──────────────────────────────────
+
+
+def _apply_cluster_caps_and_dedup(candidates: list[dict]) -> list[dict]:
+    """
+    Walk the pre-sorted candidate list and enforce:
+    1. Duplicate share-class removal (e.g. GOOG dropped when GOOGL is present).
+    2. Per-cluster caps (e.g. at most 2 crypto/Bitcoin proxy names).
+
+    Assumes candidates are already sorted in desired output order (core_research first,
+    then by adjusted_discovery_score descending). The first N members of each cluster
+    that appear in order are kept; later ones are dropped.
+    Adds a 'cluster_label' field to kept cluster members for downstream reporting.
+    """
+    # Build set of preferred tickers that are actually present
+    tickers_present = {c["ticker"] for c in candidates}
+    preferred_present = {
+        preferred
+        for dropped, preferred in _PREFERRED_SHARE_CLASS.items()
+        if preferred in tickers_present
+    }
+
+    cluster_counts: dict[str, int] = {label: 0 for label in _CLUSTER_CAPS}
+    result: list[dict] = []
+
+    for candidate in candidates:
+        ticker = candidate["ticker"]
+
+        # Drop inferior share class when preferred counterpart is present
+        if ticker in _PREFERRED_SHARE_CLASS and _PREFERRED_SHARE_CLASS[ticker] in preferred_present:
+            log.debug("PRU dedup: removing %s (prefer %s)", ticker, _PREFERRED_SHARE_CLASS[ticker])
+            continue
+
+        # Check cluster membership and cap
+        cluster_label: str | None = None
+        capped = False
+        for label, (members, cap) in _CLUSTER_CAPS.items():
+            if ticker in members:
+                cluster_label = label
+                if cluster_counts[label] >= cap:
+                    capped = True
+                else:
+                    cluster_counts[label] += 1
+                break
+
+        if capped:
+            log.debug(
+                "PRU cluster cap: dropping %s (cluster=%s cap=%d)",
+                ticker, cluster_label, _CLUSTER_CAPS[cluster_label][1],
+            )
+            continue
+
+        c = dict(candidate)
+        if cluster_label:
+            c["cluster_label"] = cluster_label
+        result.append(c)
+
+    return result
 
 
 # ── Schema validation ──────────────────────────────────────────────────────────
@@ -580,19 +763,30 @@ def build_position_research_universe(
             else:
                 scored.append(entry)
 
-    scored.sort(key=lambda r: r["discovery_score"], reverse=True)
-    top = scored[:top_n]
+    # Sort: core_research before tactical_momentum; within each bucket by adjusted_discovery_score
+    scored.sort(
+        key=lambda r: (r["universe_bucket"] == "core_research", r["adjusted_discovery_score"]),
+        reverse=True,
+    )
 
+    # Over-sample before cluster caps to fill gaps left by dropped names
+    top_raw = scored[:top_n * 2]
+    top_capped = _apply_cluster_caps_and_dedup(top_raw)
+    top = top_capped[:top_n]
+
+    core_n = sum(1 for r in top if r["universe_bucket"] == "core_research")
+    tactical_n = len(top) - core_n
     log.info(
-        "PRU build: admitted=%d hard_blocked=%d insufficient=%d | top_n=%d",
-        len(scored), hard_blocked, insufficient, len(top),
+        "PRU build: admitted=%d hard_blocked=%d insufficient=%d | "
+        "top_n=%d core_research=%d tactical_momentum=%d",
+        len(scored), hard_blocked, insufficient, len(top), core_n, tactical_n,
     )
     if top:
         ex = top[0]
         log.info(
-            "PRU build: top scorer: %s score=%d archetypes=%s reason=%s",
-            ex["ticker"], ex["discovery_score"],
-            ex["matched_position_archetypes"], ex["universe_entry_reason"],
+            "PRU build: top scorer: %s score=%d adj=%d archetype=%s bucket=%s",
+            ex["ticker"], ex["discovery_score"], ex["adjusted_discovery_score"],
+            ex["primary_archetype"], ex["universe_bucket"],
         )
     return top
 

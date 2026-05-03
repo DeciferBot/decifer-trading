@@ -11,9 +11,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from universe_position import (
+    _CLUSTER_CAPS,
+    _MEANINGFUL_ARCHETYPES,
+    _apply_cluster_caps_and_dedup,
+    _assign_primary_archetype,
+    _assign_secondary_tags,
+    _check_thesis_quality_gate,
     _compute_fundamental_signals,
+    _compute_risk_penalties,
     _compute_technical_signals,
-    _match_archetypes,
     _score_symbol,
     _validate_schema,
     build_position_research_universe,
@@ -44,6 +50,11 @@ def _make_pru_payload(tickers: list[str], age_days: float = 0) -> dict:
             {
                 "ticker": t,
                 "discovery_score": 5,
+                "adjusted_discovery_score": 5,
+                "risk_penalty_pts": 0,
+                "primary_archetype": "Re-rating Candidate",
+                "secondary_tags": ["Analyst Momentum"],
+                "universe_bucket": "core_research",
                 "matched_position_archetypes": ["Re-rating Candidate"],
                 "discovery_signals": ["recent_analyst_upgrade"],
                 "discovery_signal_points": {"recent_analyst_upgrade": 2},
@@ -53,7 +64,7 @@ def _make_pru_payload(tickers: list[str], age_days: float = 0) -> dict:
                 "position_research_universe_member": True,
                 "active_trading_universe_member": False,
                 "priority_overlap": False,
-                "universe_entry_reason": "archetypes: Re-rating Candidate",
+                "universe_entry_reason": "archetype: Re-rating Candidate",
             }
             for t in tickers
         ],
@@ -68,30 +79,36 @@ def test_strong_technical_signal_admitted():
     # 22 closes: stock up 15%, SPY up 5%
     closes = [100.0] * 21 + [115.0]
     df = _make_df(closes)
-    pts, missing = _compute_technical_signals(df, spy_1m_return=5.0, sector_1m_return=None, sector_etf_above_50ma=False)
+    pts, missing, hygiene = _compute_technical_signals(df, spy_1m_return=5.0, sector_1m_return=None, sector_etf_above_50ma=False)
     assert "outperforming_spy_1m" in pts
     assert pts["outperforming_spy_1m"] == 3  # _STRONG
 
 
-def test_two_weak_signals_admitted():
-    """Two weak signals (revenue > 0% + above 50MA = 1+1 = 2) → admitted (meets 2-point threshold)."""
-    # Revenue positive → 1pt
+def test_two_weak_signals_no_longer_include_hygiene_points():
+    """
+    above_50d_ma no longer contributes score points (fires 96% of the time — useless discriminator).
+    It is tracked in hygiene_flags only. Two real scoring signals are still needed for admission
+    at the default min_score=2 threshold.
+    """
+    # Revenue positive → 1pt scoring signal
     with patch("fmp_client.get_revenue_growth", return_value={"revenue_growth_yoy": 3.0, "revenue_deceleration": False}), \
-         patch("fmp_client.get_key_metrics_ttm", return_value=None), \
+         patch("fmp_client.get_key_metrics_ttm", return_value={"gross_margin": 0.5, "debt_to_equity": 0.5}), \
          patch("fmp_client.get_price_target", return_value=None), \
          patch("fmp_client.get_analyst_grades", return_value=None):
         fund_pts, _, _ = _compute_fundamental_signals("TEST", 50.0, recent_upgrade_syms=set())
     assert "revenue_yoy_positive" in fund_pts
     assert fund_pts["revenue_yoy_positive"] == 1
 
-    # Stock above 50d MA → 1pt
-    closes = [90.0] * 49 + [100.0]  # 49 bars below 90 avg → current 100 > MA=90
-    df = _make_df([90.0] * 49 + [100.0])
-    tech_pts, _ = _compute_technical_signals(df, spy_1m_return=None, sector_1m_return=None, sector_etf_above_50ma=False)
-    assert "above_50d_ma" in tech_pts
+    # above_50d_ma now goes to hygiene_flags, not pts
+    closes = [90.0] * 49 + [100.0]
+    df = _make_df(closes)
+    tech_pts, _, hygiene = _compute_technical_signals(df, spy_1m_return=None, sector_1m_return=None, sector_etf_above_50ma=False)
+    assert "above_50d_ma" not in tech_pts          # no longer a score signal
+    assert hygiene["above_50d_ma"] is True          # still tracked as a hygiene flag
 
+    # total scoring points from these two signals = 1 (revenue) + 0 (50ma no longer scores)
     total = fund_pts.get("revenue_yoy_positive", 0) + tech_pts.get("above_50d_ma", 0)
-    assert total >= 2
+    assert total == 1  # below default min_score=2 without a strong signal or meaningful archetype
 
 
 def test_single_weak_signal_rejected():
@@ -120,16 +137,14 @@ def test_single_weak_signal_rejected():
 
 
 def test_archetype_rescue_with_low_score():
-    """Archetype match with only 1pt score → admitted even below 2-point threshold."""
-    # Simulate: recent_upgrade + analyst upside > 15% → Re-rating Candidate archetype
+    """Meaningful archetype with low score → admitted even below min_score threshold."""
     fund_pts = {"recent_analyst_upgrade": 2, "analyst_upside_gt_15pct": 3}
     tech_pts = {}
-    archetypes = _match_archetypes(fund_pts, tech_pts)
-    assert "Re-rating Candidate" in archetypes
-    # With just 1pt fund signal and archetype, admission should work
-    total = sum(fund_pts.values())
-    has_strong = any(v >= 3 for v in fund_pts.values())
-    assert has_strong or len(archetypes) > 0  # strong signal or archetype → admit
+    primary = _assign_primary_archetype(fund_pts, tech_pts, above_50d_ma_flag=False)
+    # analyst_upside_gt_15pct + consensus miss → falls to Re-rating Candidate
+    assert primary in _MEANINGFUL_ARCHETYPES
+    # thesis gate passes because analyst_upside_gt_15pct is present
+    assert _check_thesis_quality_gate(fund_pts, tech_pts, primary) is True
 
 
 def test_hard_block_unusable_price():
@@ -214,7 +229,12 @@ def test_atomic_write_and_schema_validation(tmp_path, monkeypatch):
             {
                 "ticker": "AAPL",
                 "discovery_score": 6,
-                "matched_position_archetypes": ["Sector/RS Leader"],
+                "adjusted_discovery_score": 6,
+                "risk_penalty_pts": 0,
+                "primary_archetype": "Speculative Theme",
+                "secondary_tags": ["Sector/RS Leader"],
+                "universe_bucket": "tactical_momentum",
+                "matched_position_archetypes": ["Tactical Momentum"],
                 "discovery_signals": ["outperforming_spy_1m"],
                 "discovery_signal_points": {"outperforming_spy_1m": 3},
                 "missing_data_fields": [],
@@ -223,7 +243,7 @@ def test_atomic_write_and_schema_validation(tmp_path, monkeypatch):
                 "position_research_universe_member": True,
                 "active_trading_universe_member": False,
                 "priority_overlap": False,
-                "universe_entry_reason": "strong: outperforming_spy_1m",
+                "universe_entry_reason": "strong: outperforming_spy_1m; archetype: Tactical Momentum",
             }
         ]
 
@@ -898,3 +918,685 @@ def test_apex_cap_no_drop_when_candidates_within_limit():
     assert rec["tier_d_with_archetypes_dropped"] is False
     assert rec["tier_d_strong_discovery_dropped"] is False
     assert rec["highest_dropped_tier_d_score"] is None
+
+
+# ── Tests 31-42: PRU quality improvements ─────────────────────────────────────
+
+
+def test_risk_penalty_severe_revenue_decline():
+    """Revenue growth worse than -25% → penalty -4."""
+    snap = {"revenue_growth_yoy": -78.0, "analyst_upside_pct": 30.0}
+    penalty = _compute_risk_penalties(snap)
+    assert penalty == -4
+
+
+def test_risk_penalty_moderate_revenue_decline():
+    """Revenue growth between -10% and -25% → penalty -2."""
+    snap = {"revenue_growth_yoy": -15.0, "analyst_upside_pct": 20.0}
+    penalty = _compute_risk_penalties(snap)
+    assert penalty == -2
+
+
+def test_risk_penalty_analyst_upside_very_negative():
+    """Analyst upside worse than -30% → penalty -5."""
+    snap = {"revenue_growth_yoy": 5.0, "analyst_upside_pct": -75.0}
+    penalty = _compute_risk_penalties(snap)
+    assert penalty == -5
+
+
+def test_risk_penalty_analyst_upside_moderate_negative():
+    """Analyst upside between -20% and -30% → penalty -4."""
+    snap = {"revenue_growth_yoy": 5.0, "analyst_upside_pct": -23.0}
+    penalty = _compute_risk_penalties(snap)
+    assert penalty == -4
+
+
+def test_risk_penalty_no_thesis_at_all():
+    """No revenue strength AND no analyst support → extra -3 combinatorial penalty."""
+    snap = {"revenue_growth_yoy": -2.0, "analyst_upside_pct": 3.0}
+    penalty = _compute_risk_penalties(snap)
+    # revenue < 0 → no bracket penalty; upside 3% < 5% → no bracket; but no-thesis penalty fires
+    assert penalty == -3
+
+
+def test_risk_penalty_clean_name_no_penalty():
+    """Strong revenue and positive analyst upside → no penalty."""
+    snap = {"revenue_growth_yoy": 35.0, "analyst_upside_pct": 44.0}
+    penalty = _compute_risk_penalties(snap)
+    assert penalty == 0
+
+
+def test_thesis_quality_gate_passes_with_revenue():
+    """`revenue_yoy_gt_10pct` alone is enough to pass the thesis quality gate."""
+    fund_pts = {"revenue_yoy_gt_10pct": 3, "gross_margin_positive": 1}
+    tech_pts = {}
+    assert _check_thesis_quality_gate(fund_pts, tech_pts, "Growth Leader") is True
+
+
+def test_thesis_quality_gate_fails_momentum_only():
+    """Name with only short-term momentum (outperforming_spy_1m) fails the thesis gate."""
+    fund_pts = {"gross_margin_positive": 1, "debt_not_dangerous": 1, "consensus_not_negative": 1}
+    tech_pts = {"outperforming_spy_1m": 3, "outperforming_sector_1m": 2, "higher_lows": 1}
+    primary = _assign_primary_archetype(fund_pts, tech_pts, above_50d_ma_flag=False)
+    # No revenue strength, no analyst upside — will be Re-rating Candidate (consensus_not_negative
+    # alone isn't enough for Re-rating; need upside_low or recent_upgrade)
+    # The exact archetype depends on signals; the gate check is what matters
+    gate = _check_thesis_quality_gate(fund_pts, tech_pts, primary)
+    assert gate is False
+
+
+def test_primary_archetype_is_single_string():
+    """primary_archetype is always a str, never a list."""
+    fund_pts = {"revenue_yoy_gt_10pct": 3, "gross_margin_positive": 1}
+    tech_pts = {"outperforming_spy_1m": 3}
+    primary = _assign_primary_archetype(fund_pts, tech_pts, above_50d_ma_flag=True)
+    assert isinstance(primary, str)
+    assert len(primary) > 0
+
+
+def test_secondary_tags_contain_sector_rs_leader():
+    """Sector/RS Leader is a secondary tag when outperforming_spy_1m + sector_etf_above_50ma."""
+    fund_pts = {}
+    tech_pts = {"outperforming_spy_1m": 3}
+    hygiene_flags = {"above_50d_ma": True, "sector_etf_above_50ma": True}
+    tags = _assign_secondary_tags(fund_pts, tech_pts, hygiene_flags)
+    assert "Sector/RS Leader" in tags
+    assert "Above 50DMA" in tags
+
+
+def test_cluster_cap_crypto_max_2():
+    """5 crypto/Bitcoin proxy names scored → only top 2 survive cluster cap."""
+    crypto_tickers = ["MSTR", "MARA", "WULF", "CIFR", "IREN"]
+    candidates = [
+        {
+            "ticker": t, "universe_bucket": "core_research",
+            "adjusted_discovery_score": 15 - i, "discovery_score": 15 - i,
+            "primary_archetype": "Speculative Theme",
+        }
+        for i, t in enumerate(crypto_tickers)
+    ]
+    result = _apply_cluster_caps_and_dedup(candidates)
+    surviving_crypto = [r["ticker"] for r in result if r["ticker"] in set(crypto_tickers)]
+    assert len(surviving_crypto) == 2
+    assert surviving_crypto == ["MSTR", "MARA"]  # highest adjusted_discovery_score first
+
+
+def test_cluster_cap_quantum_max_2():
+    """4 quantum names → only top 2 survive cluster cap."""
+    quantum_tickers = ["IONQ", "QBTS", "RGTI", "QUBT"]
+    candidates = [
+        {
+            "ticker": t, "universe_bucket": "core_research",
+            "adjusted_discovery_score": 17 - i, "discovery_score": 17 - i,
+            "primary_archetype": "Growth Leader",
+        }
+        for i, t in enumerate(quantum_tickers)
+    ]
+    result = _apply_cluster_caps_and_dedup(candidates)
+    surviving = [r["ticker"] for r in result if r["ticker"] in set(quantum_tickers)]
+    assert len(surviving) == 2
+    assert surviving == ["IONQ", "QBTS"]
+
+
+def test_dedup_goog_googl():
+    """GOOG is removed when GOOGL is present (GOOGL is the preferred share class)."""
+    candidates = [
+        {"ticker": "GOOGL", "universe_bucket": "core_research", "adjusted_discovery_score": 12, "discovery_score": 12, "primary_archetype": "Growth Leader"},
+        {"ticker": "GOOG",  "universe_bucket": "core_research", "adjusted_discovery_score": 12, "discovery_score": 12, "primary_archetype": "Growth Leader"},
+        {"ticker": "NVDA",  "universe_bucket": "core_research", "adjusted_discovery_score": 15, "discovery_score": 15, "primary_archetype": "Quality Compounder"},
+    ]
+    result = _apply_cluster_caps_and_dedup(candidates)
+    tickers = [r["ticker"] for r in result]
+    assert "GOOGL" in tickers
+    assert "GOOG" not in tickers
+    assert "NVDA" in tickers
+
+
+def test_matched_position_archetypes_backward_compat():
+    """matched_position_archetypes is always a single-item list for signal_pipeline compat."""
+    snap = _make_snap()
+    fund_pts = {"recent_analyst_upgrade": 2, "analyst_upside_gt_15pct": 3,
+                "gross_margin_positive": 1, "debt_not_dangerous": 1, "consensus_not_negative": 1}
+    closes = [100.0] * 21 + [115.0]
+    df = _make_df(closes)
+    with patch("fmp_client.get_revenue_growth", return_value={"revenue_growth_yoy": 5.0, "revenue_deceleration": False}), \
+         patch("fmp_client.get_key_metrics_ttm", return_value={"gross_margin": 0.5, "debt_to_equity": 0.5}), \
+         patch("fmp_client.get_price_target", return_value={"pt_consensus": 70.0}), \
+         patch("fmp_client.get_analyst_grades", return_value={"consensus_score": 4.0}), \
+         patch("fmp_client.get_company_sector", return_value=None):
+        result = _score_symbol(
+            "TEST", snap, df,
+            spy_1m_return=5.0,
+            sector_etf_returns={},
+            sector_etf_above_50ma_map={},
+            sector_etf_for_symbol=None,
+            recent_upgrade_syms={"TEST"},
+            active_trading_syms=set(),
+        )
+    assert result is not None
+    assert isinstance(result["matched_position_archetypes"], list)
+    assert len(result["matched_position_archetypes"]) == 1
+    assert result["matched_position_archetypes"][0] == result["primary_archetype"]
+
+
+def test_core_research_sorted_before_tactical_momentum():
+    """In final list, core_research names always precede tactical_momentum regardless of raw score."""
+    import pandas as pd
+
+    def _make_symbol(ticker, bucket, adj_score, base_score):
+        return {
+            "ticker": ticker, "universe_bucket": bucket,
+            "adjusted_discovery_score": adj_score, "discovery_score": base_score,
+            "primary_archetype": "Quality Compounder" if bucket == "core_research" else "Tactical Momentum",
+            "matched_position_archetypes": ["Quality Compounder" if bucket == "core_research" else "Tactical Momentum"],
+            "secondary_tags": [], "risk_penalty_pts": 0,
+            "discovery_signals": [], "discovery_signal_points": {},
+            "missing_data_fields": [], "pru_fmp_snapshot": {},
+            "universe_source": "position_research", "scanner_tier": "D",
+            "position_research_universe_member": True,
+            "active_trading_universe_member": False, "priority_overlap": False,
+            "universe_entry_reason": "test",
+        }
+
+    scored = [
+        _make_symbol("HIGH_TAC",  "tactical_momentum", 20, 20),  # high score but tactical
+        _make_symbol("LOW_CORE",  "core_research",      5,  5),  # low score but core
+        _make_symbol("MED_CORE",  "core_research",     12, 12),
+        _make_symbol("MED_TAC",   "tactical_momentum", 10, 10),
+    ]
+    scored.sort(
+        key=lambda r: (r["universe_bucket"] == "core_research", r["adjusted_discovery_score"]),
+        reverse=True,
+    )
+    buckets = [r["universe_bucket"] for r in scored]
+    # All core_research entries must come before any tactical_momentum entry
+    last_core = max((i for i, b in enumerate(buckets) if b == "core_research"), default=-1)
+    first_tac = min((i for i, b in enumerate(buckets) if b == "tactical_momentum"), default=len(buckets))
+    assert last_core < first_tac
+
+
+# ── Shadow comparator tests ────────────────────────────────────────────────────
+#
+# The shadow comparator runs alongside the hard top-30 cap (bot_trading.py) and
+# writes stage="apex_cap_shadow_compare" records. It is evidence-only: it never
+# changes _cut_candidates or enables live Tier D entries.
+#
+# We test it via _build_shadow_compare_record(), a pure mirror of the inline logic,
+# following the same isolation pattern used for _build_apex_cap_record() above.
+
+
+def _build_shadow_compare_record(
+    candidates_raw: list[dict],
+    cap_limit: int = 30,
+    td_reserve: int = 8,
+    non_td_reserve: int = 18,
+    flex: int = 4,
+) -> dict:
+    """
+    Mirrors the apex-cap shadow comparator from bot_trading.py.
+    Pure function — no I/O.
+    """
+    from datetime import UTC, datetime
+
+    cut_all_sorted = sorted(candidates_raw, key=lambda c: c.get("score", 0), reverse=True)
+    cut_candidates = cut_all_sorted[:cap_limit]
+
+    cur_sel_syms    = {c.get("symbol") for c in cut_candidates}
+    shad_all_td     = [c for c in cut_all_sorted if c.get("scanner_tier") == "D"]
+    shad_all_non_td = [c for c in cut_all_sorted if c.get("scanner_tier") != "D"]
+    shad_cur_td     = [c for c in cut_candidates if c.get("scanner_tier") == "D"]
+    shad_drop_cur   = [c for c in cut_all_sorted[cap_limit:] if c.get("scanner_tier") == "D"]
+
+    def _td_rank_score(c):
+        return (
+            (c.get("discovery_score") or 0) * 2
+            + min(c.get("score", 0), 20)
+            + 3 * len(c.get("matched_position_archetypes") or [])
+            + (5 if c.get("symbol") in cur_sel_syms else 0)
+        )
+
+    shad_td_ranked     = sorted(shad_all_td,     key=_td_rank_score,                    reverse=True)
+    shad_non_td_ranked = sorted(shad_all_non_td, key=lambda c: c.get("score", 0), reverse=True)
+
+    shad_td_sel     = shad_td_ranked[:td_reserve]
+    shad_non_td_sel = shad_non_td_ranked[:non_td_reserve]
+
+    shad_used_syms   = {c.get("symbol") for c in shad_td_sel} | {c.get("symbol") for c in shad_non_td_sel}
+    flex_budget      = cap_limit - len(shad_td_sel) - len(shad_non_td_sel)
+    shad_remainder   = sorted(
+        [c for c in cut_all_sorted if c.get("symbol") not in shad_used_syms],
+        key=lambda c: c.get("score", 0), reverse=True,
+    )
+    shad_flex_sel    = shad_remainder[:flex_budget]
+    shad_selected    = shad_td_sel + shad_non_td_sel + shad_flex_sel
+
+    shad_sel_td_syms     = {c.get("symbol") for c in shad_selected if c.get("scanner_tier") == "D"}
+    cur_sel_td_syms      = {c.get("symbol") for c in cut_candidates if c.get("scanner_tier") == "D"}
+    cur_sel_non_td_syms  = {c.get("symbol") for c in cut_candidates if c.get("scanner_tier") != "D"}
+    shad_sel_non_td_syms = {c.get("symbol") for c in shad_selected if c.get("scanner_tier") != "D"}
+
+    td_added_by_shad = sorted(shad_sel_td_syms - cur_sel_td_syms)
+    non_td_displaced = sorted(cur_sel_non_td_syms - shad_sel_non_td_syms)
+    shad_td_in_sel   = [c for c in shad_selected if c.get("scanner_tier") == "D"]
+    shad_dropped_td  = [c for c in shad_td_ranked if c.get("symbol") not in shad_sel_td_syms]
+
+    n_td_before   = len(shad_all_td)
+    n_cur_td_sel  = len(shad_cur_td)
+    n_cur_td_drop = len(shad_drop_cur)
+    if n_td_before == 0 or n_cur_td_drop == 0:
+        verdict = "current_cap_not_primary_bottleneck"
+    elif n_cur_td_drop > n_cur_td_sel:
+        verdict = "current_cap_kills_tier_d"
+    else:
+        verdict = "current_cap_partially_suppresses_tier_d"
+
+    return {
+        "ts":    datetime.now(UTC).isoformat(),
+        "stage": "apex_cap_shadow_compare",
+        "raw_candidates_before_cap":         len(cut_all_sorted),
+        "raw_tier_d_before_cap":             n_td_before,
+        "current_selected_total":            len(cut_candidates),
+        "current_selected_tier_d":           n_cur_td_sel,
+        "current_dropped_tier_d":            n_cur_td_drop,
+        "current_selected_tier_d_symbols":   sorted(cur_sel_td_syms),
+        "current_dropped_tier_d_top_20":     [c.get("symbol") for c in shad_drop_cur[:20]],
+        "shadow_td_reserve":                 td_reserve,
+        "shadow_non_td_reserve":             non_td_reserve,
+        "shadow_flex":                       flex,
+        "shadow_selected_total":             len(shad_selected),
+        "shadow_selected_tier_d":            len(shad_td_in_sel),
+        "shadow_dropped_tier_d":             len(shad_dropped_td),
+        "shadow_selected_tier_d_symbols":    sorted(shad_sel_td_syms),
+        "shadow_tier_d_added_vs_current":    td_added_by_shad,
+        "shadow_non_tier_d_displaced_vs_current": non_td_displaced,
+        "shadow_top_tier_d_added": [
+            {
+                "symbol":           c.get("symbol"),
+                "signal_score":     c.get("score"),
+                "discovery_score":  c.get("discovery_score"),
+                "archetypes":       c.get("matched_position_archetypes", []),
+                "tier_d_rank_score": _td_rank_score(c),
+            }
+            for c in shad_td_sel
+            if c.get("symbol") in td_added_by_shad
+        ],
+        "shadow_non_tier_d_displaced": [
+            {
+                "symbol": sym,
+                "score": next(
+                    (c.get("score") for c in cut_candidates if c.get("symbol") == sym), None
+                ),
+            }
+            for sym in non_td_displaced
+        ],
+        "shadow_token_budget_same_total": len(shad_selected) <= cap_limit,
+        "bottleneck_verdict": verdict,
+    }
+
+
+def test_shadow_compare_current_fields_match_hard_cap():
+    """Shadow comparator faithfully mirrors current cap selection in current_* fields.
+
+    60 regular (score 100-41) + 20 Tier D (score 20-1): Tier D all below cutline.
+    """
+    candidates = _make_candidates(60, [{"score": 20 - i} for i in range(20)])
+    hard_cap = _build_apex_cap_record(candidates, cap_limit=30)
+    shadow   = _build_shadow_compare_record(candidates, cap_limit=30)
+
+    assert shadow["current_selected_total"]  == hard_cap["selected_candidates_after_cap"]
+    assert shadow["current_selected_tier_d"] == hard_cap["selected_tier_d_after_cap"]
+    assert shadow["current_dropped_tier_d"]  == hard_cap["dropped_tier_d_by_cap"]
+    assert shadow["current_selected_tier_d"] == 0
+    assert shadow["current_dropped_tier_d"]  == 20
+
+
+def test_shadow_compare_total_never_exceeds_cap():
+    """shadow_selected_total <= 30 across small, at-cap, and large pools."""
+    tiny  = _make_candidates(5, [{"score": 10}, {"score": 8}])
+    at    = _make_candidates(28, [{"score": 5}, {"score": 3}])
+    large = _make_candidates(60, [{"score": 5 + i} for i in range(40)])
+
+    for pool in (tiny, at, large):
+        rec = _build_shadow_compare_record(pool, cap_limit=30)
+        assert rec["shadow_selected_total"] <= 30
+        assert rec["shadow_token_budget_same_total"] is True
+
+
+def test_shadow_compare_tier_d_reserve_rescues_dropped_candidates():
+    """Tier D reserve selects names the hard cap dropped.
+
+    40 regular (score 100-61) push all Tier D below the cutline.
+    Shadow must recover at least one Tier D via the 8-slot reserve.
+    """
+    tier_d_specs = [
+        {"score": 30, "discovery_score": 7, "archetypes": ["Growth Leader"]},
+        {"score": 25, "discovery_score": 5, "archetypes": []},
+        {"score": 20, "discovery_score": 8, "archetypes": ["Quality Compounder"]},
+    ]
+    candidates = _make_candidates(40, tier_d_specs)
+    shadow = _build_shadow_compare_record(candidates, cap_limit=30)
+
+    assert shadow["current_selected_tier_d"] == 0
+    assert shadow["current_dropped_tier_d"]  == 3
+    assert shadow["shadow_selected_tier_d"] >= 1
+    assert len(shadow["shadow_tier_d_added_vs_current"]) >= 1
+    assert shadow["shadow_selected_total"] <= 30
+
+
+def test_shadow_compare_unused_tier_d_slots_filled_by_non_tier_d():
+    """Unused Tier D reserve slots are filled by non-Tier-D candidates.
+
+    Only 2 Tier D in pool; reserve is 8. The 6 unused slots go to non-Tier-D,
+    keeping total == 30.
+    """
+    candidates = _make_candidates(50, [{"score": 15}, {"score": 10}])
+    shadow = _build_shadow_compare_record(candidates, cap_limit=30)
+
+    assert shadow["shadow_selected_tier_d"] == 2
+    assert shadow["shadow_selected_total"]  == 30
+
+
+def test_shadow_compare_unused_non_tier_d_slots_filled_by_tier_d():
+    """Unused non-Tier-D reserve slots are filled by Tier D candidates.
+
+    Only 5 non-Tier-D vs 18-slot reserve. The 13 unused non-Tier-D slots go
+    into the flex budget and are filled by Tier D. Shadow selects > 8 Tier D.
+    """
+    tier_d_specs = [{"score": 50 - i, "discovery_score": 5} for i in range(30)]
+    candidates = _make_candidates(5, tier_d_specs)  # 5 non-TD + 30 TD = 35 total
+    shadow = _build_shadow_compare_record(candidates, cap_limit=30)
+
+    assert shadow["shadow_selected_total"]  == 30
+    assert shadow["shadow_selected_tier_d"] > 8
+
+
+def test_shadow_compare_stage_is_shadow_not_live():
+    """stage is "apex_cap_shadow_compare" — never "apex_cap".
+
+    The record must be unambiguously tagged so it cannot be mistaken for
+    the live apex_cap record that drives Apex calls. No live-execution fields.
+    """
+    candidates = _make_candidates(40, [{"score": 10}])
+    shadow = _build_shadow_compare_record(candidates, cap_limit=30)
+
+    assert shadow["stage"] == "apex_cap_shadow_compare"
+    assert shadow["stage"] != "apex_cap"
+    assert "execute" not in shadow
+    assert "allow_live_entries" not in shadow
+
+
+def test_shadow_compare_bottleneck_verdict_valid():
+    """bottleneck_verdict is always one of the three defined strings."""
+    valid = {
+        "current_cap_kills_tier_d",
+        "current_cap_partially_suppresses_tier_d",
+        "current_cap_not_primary_bottleneck",
+    }
+
+    # No Tier D in pool → not_primary_bottleneck
+    rec_a = _build_shadow_compare_record(_make_candidates(40, []))
+    assert rec_a["bottleneck_verdict"] in valid
+    assert rec_a["bottleneck_verdict"] == "current_cap_not_primary_bottleneck"
+
+    # Tier D present but none dropped by hard cap → not_primary_bottleneck
+    rec_b = _build_shadow_compare_record(_make_candidates(5, [{"score": 90}, {"score": 85}]))
+    assert rec_b["bottleneck_verdict"] in valid
+    assert rec_b["bottleneck_verdict"] == "current_cap_not_primary_bottleneck"
+
+    # More Tier D dropped than selected → kills_tier_d
+    heavy = _make_candidates(40, [{"score": 5 + i} for i in range(10)])
+    rec_c = _build_shadow_compare_record(heavy)
+    assert rec_c["bottleneck_verdict"] in valid
+    assert rec_c["bottleneck_verdict"] == "current_cap_kills_tier_d"
+
+    # Some Tier D dropped, more Tier D selected → partially_suppresses
+    # 27 regular (score 100-74) + 5 Tier D (80, 70, 60, 5, 4) = 32 total > cap=30.
+    # After sort: TDD000/70/60 land in top-30 (3 selected); TDD003/TDD004 fall out (2 dropped).
+    # 2 dropped < 3 selected → partial suppression, not kills.
+    mixed = _make_candidates(27, [{"score": 80}, {"score": 70}, {"score": 60}, {"score": 5}, {"score": 4}])
+    rec_d = _build_shadow_compare_record(mixed)
+    assert rec_d["bottleneck_verdict"] in valid
+    assert rec_d["bottleneck_verdict"] == "current_cap_partially_suppresses_tier_d"
+
+
+# ── Tests 51-58: Tier D Shadow Apex Lane (Phase 1B) ───────────────────────────
+#
+# The shadow lane lives in tier_d_shadow.py (pure functions) and is wired
+# into bot_trading.py (IBKR deps — not imported in tests).
+# Tests import directly from tier_d_shadow and verify the invariants:
+#   - main cap list is unchanged (shadow operates only on _td_dropped)
+#   - selection/rank logic is correct
+#   - execute=False is enforced (force_shadow_only stamps entries)
+#   - feature flag disables cleanly
+
+
+def _make_dropped_td(specs: list[dict]) -> list[dict]:
+    """Build a list of Tier D candidates as if returned by the cap logic."""
+    result = []
+    for i, spec in enumerate(specs):
+        result.append({
+            "symbol":                    spec.get("symbol", f"TDD{i:03d}"),
+            "score":                     spec.get("score", 10),
+            "scanner_tier":              "D",
+            "discovery_score":           spec.get("discovery_score", 5),
+            "matched_position_archetypes": spec.get("archetypes", []),
+            "priority_overlap":          spec.get("priority_overlap", False),
+        })
+    return result
+
+
+def test_shadow_feature_flag_off_returns_empty():
+    """Test 51: feature flag off — select returns empty, shadow lane disabled."""
+    from tier_d_shadow import select_tier_d_shadow_candidates
+
+    dropped = _make_dropped_td([
+        {"discovery_score": 10, "archetypes": ["Quality Compounder"]},
+        {"discovery_score": 8,  "archetypes": ["Growth Leader"]},
+    ])
+    cfg = {"tier_d_shadow_apex_enabled": False}
+    selected, not_selected = select_tier_d_shadow_candidates(dropped, cfg)
+
+    assert selected == []
+    assert not_selected == []
+
+
+def test_shadow_dropped_td_are_selected():
+    """Test 52: eligible dropped Tier D candidates are included in shadow selection."""
+    from tier_d_shadow import select_tier_d_shadow_candidates
+
+    dropped = _make_dropped_td([
+        {"symbol": "MSFT", "score": 55, "discovery_score": 13, "archetypes": ["Sector/RS Leader"]},
+        {"symbol": "AMZN", "score": 54, "discovery_score": 13, "archetypes": ["Re-rating Candidate"]},
+    ])
+    cfg = {
+        "tier_d_shadow_apex_enabled":         True,
+        "tier_d_shadow_apex_cap":             10,
+        "tier_d_shadow_min_discovery_score":  6,
+        "tier_d_shadow_require_archetype":    True,
+    }
+    selected, not_selected = select_tier_d_shadow_candidates(dropped, cfg)
+
+    syms = {c["symbol"] for c in selected}
+    assert "MSFT" in syms
+    assert "AMZN" in syms
+    assert len(selected) == 2
+    assert not_selected == []
+
+
+def test_shadow_cap_never_exceeded():
+    """Test 53: shadow selection total never exceeds tier_d_shadow_apex_cap."""
+    from tier_d_shadow import select_tier_d_shadow_candidates
+
+    dropped = _make_dropped_td([
+        {"discovery_score": 10, "archetypes": ["Quality Compounder"]} for _ in range(20)
+    ])
+    cfg = {
+        "tier_d_shadow_apex_enabled":         True,
+        "tier_d_shadow_apex_cap":             7,
+        "tier_d_shadow_min_discovery_score":  6,
+        "tier_d_shadow_require_archetype":    True,
+    }
+    selected, not_selected = select_tier_d_shadow_candidates(dropped, cfg)
+
+    assert len(selected) <= 7
+    assert len(selected) + len(not_selected) == 20
+
+
+def test_shadow_rank_discovery_and_archetypes():
+    """Test 54: shadow rank prioritises discovery_score and archetype count."""
+    from tier_d_shadow import select_tier_d_shadow_candidates, _shadow_rank
+
+    high_ds = {"symbol": "HIGH", "score": 5, "discovery_score": 15,
+               "archetypes": ["Quality Compounder", "Growth Leader"], "priority_overlap": False}
+    low_ds  = {"symbol": "LOW",  "score": 5, "discovery_score": 7,
+               "archetypes": ["Sector/RS Leader"], "priority_overlap": False}
+
+    assert _shadow_rank(high_ds) > _shadow_rank(low_ds)
+
+    dropped = _make_dropped_td([])
+    dropped.append({**high_ds, "scanner_tier": "D", "matched_position_archetypes": high_ds["archetypes"]})
+    dropped.append({**low_ds,  "scanner_tier": "D", "matched_position_archetypes": low_ds["archetypes"]})
+
+    cfg = {
+        "tier_d_shadow_apex_enabled":        True,
+        "tier_d_shadow_apex_cap":            1,
+        "tier_d_shadow_min_discovery_score": 6,
+        "tier_d_shadow_require_archetype":   True,
+    }
+    selected, not_selected = select_tier_d_shadow_candidates(dropped, cfg)
+
+    assert len(selected) == 1
+    assert selected[0]["symbol"] == "HIGH"
+
+
+def test_shadow_min_discovery_score_filter():
+    """Test 55: candidates below min_discovery_score are excluded."""
+    from tier_d_shadow import select_tier_d_shadow_candidates
+
+    dropped = _make_dropped_td([
+        {"symbol": "PASS", "discovery_score": 8,  "archetypes": ["Quality Compounder"]},
+        {"symbol": "FAIL", "discovery_score": 4,  "archetypes": ["Quality Compounder"]},
+    ])
+    cfg = {
+        "tier_d_shadow_apex_enabled":        True,
+        "tier_d_shadow_apex_cap":            10,
+        "tier_d_shadow_min_discovery_score": 6,
+        "tier_d_shadow_require_archetype":   True,
+    }
+    selected, _ = select_tier_d_shadow_candidates(dropped, cfg)
+
+    syms = {c["symbol"] for c in selected}
+    assert "PASS" in syms
+    assert "FAIL" not in syms
+
+
+def test_shadow_require_archetype_filter():
+    """Test 56: require_archetype=True excludes candidates with no archetypes."""
+    from tier_d_shadow import select_tier_d_shadow_candidates
+
+    dropped = _make_dropped_td([
+        {"symbol": "WITH",    "discovery_score": 10, "archetypes": ["Growth Leader"]},
+        {"symbol": "WITHOUT", "discovery_score": 10, "archetypes": []},
+    ])
+    cfg = {
+        "tier_d_shadow_apex_enabled":        True,
+        "tier_d_shadow_apex_cap":            10,
+        "tier_d_shadow_min_discovery_score": 6,
+        "tier_d_shadow_require_archetype":   True,
+    }
+    selected, _ = select_tier_d_shadow_candidates(dropped, cfg)
+
+    syms = {c["symbol"] for c in selected}
+    assert "WITH" in syms
+    assert "WITHOUT" not in syms
+
+    # With require_archetype=False, both pass
+    cfg["tier_d_shadow_require_archetype"] = False
+    selected2, _ = select_tier_d_shadow_candidates(dropped, cfg)
+    syms2 = {c["symbol"] for c in selected2}
+    assert "WITH" in syms2
+    assert "WITHOUT" in syms2
+
+
+def test_shadow_force_shadow_only_blocks_execution():
+    """Test 57: force_shadow_only stamps every entry as non-executable."""
+    from tier_d_shadow import force_shadow_only
+
+    entries = [
+        {"symbol": "MSFT", "trade_type": "POSITION",  "conviction": "HIGH"},
+        {"symbol": "AMZN", "trade_type": "SWING",      "conviction": "MEDIUM"},
+        {"symbol": "CAT",  "trade_type": "AVOID"},
+    ]
+    blocked = force_shadow_only(entries)
+
+    for e in blocked:
+        assert e["trade_type"]        == "POSITION_RESEARCH_ONLY"
+        assert e["execution_allowed"] is False
+        assert e["block_reason"]      == "tier_d_shadow_apex_only"
+
+    # Even if Apex returned POSITION — it must be blocked
+    assert all(e["trade_type"] == "POSITION_RESEARCH_ONLY" for e in blocked)
+
+
+def test_shadow_funnel_record_schema():
+    """Test 58: funnel record has all required fields and orders_placed=0."""
+    from tier_d_shadow import (
+        build_tier_d_shadow_funnel_record,
+        force_shadow_only,
+        select_tier_d_shadow_candidates,
+    )
+
+    td_before  = _make_dropped_td([{"discovery_score": 12, "archetypes": ["Quality Compounder"]}] * 5)
+    td_after   = td_before[:3]
+    td_dropped = td_before[3:]
+
+    cfg = {
+        "tier_d_shadow_apex_enabled":        True,
+        "tier_d_shadow_apex_cap":            10,
+        "tier_d_shadow_min_discovery_score": 6,
+        "tier_d_shadow_require_archetype":   True,
+    }
+    selected, not_selected = select_tier_d_shadow_candidates(td_dropped, cfg)
+
+    # Simulate Apex returning entries (then forced non-executable)
+    apex_entries = [{"symbol": c["symbol"], "trade_type": "POSITION", "conviction": "HIGH"}
+                    for c in selected]
+    blocked = force_shadow_only(apex_entries)
+
+    rec = build_tier_d_shadow_funnel_record(
+        cut_all_sorted=td_before,
+        td_before=td_before,
+        td_after=td_after,
+        td_dropped=td_dropped,
+        selected=selected,
+        not_selected=not_selected,
+        apex_new_entries=blocked,
+        scan_type="test",
+    )
+
+    required = [
+        "ts", "stage", "scan_type",
+        "raw_candidates_before_main_cap",
+        "tier_d_before_main_cap",
+        "tier_d_selected_main_cap",
+        "tier_d_dropped_main_cap",
+        "tier_d_shadow_eligible",
+        "tier_d_shadow_selected",
+        "tier_d_shadow_not_selected",
+        "tier_d_shadow_symbols",
+        "tier_d_shadow_rank_scores",
+        "tier_d_shadow_apex_classifications",
+        "tier_d_shadow_would_have_passed_validation",
+        "tier_d_shadow_blocked_count",
+        "tier_d_shadow_orders_placed",
+        "tier_d_shadow_training_records_written",
+    ]
+    for field in required:
+        assert field in rec, f"Missing field: {field}"
+
+    assert rec["stage"]                               == "tier_d_shadow_apex"
+    assert rec["tier_d_shadow_orders_placed"]          == 0
+    assert rec["tier_d_shadow_training_records_written"] == 0
+    assert rec["tier_d_shadow_blocked_count"]          == len(blocked)
+    # All entries are POSITION_RESEARCH_ONLY after force_shadow_only
+    assert all(e["execution_allowed"] is False for e in blocked)
