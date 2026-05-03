@@ -146,6 +146,7 @@ class SignalPipelineResult:
     regime_name: str
     sensor_payloads: list = field(default_factory=list)  # list[SensorPayload] — Decifer 3.0 Apex Agent inputs
     status: str = "OK"  # "OK" | "MONITOR_ONLY"
+    tier_d_funnel: dict = field(default_factory=dict)  # per-cycle Tier D attrition counts (stages 1-6)
 
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
@@ -663,6 +664,12 @@ def run_signal_pipeline(
         n_tagged = sum(1 for s in all_scored if s.get("scanner_tier") == "D")
         log.info("Tier D: tagged %d/%d scored symbols with PRU metadata", n_tagged, len(all_scored))
 
+    # Funnel attrition counters — updated at each stage below
+    _td_pru_loaded   = len(_tier_d_syms)
+    _td_in_universe  = _td_pru_loaded  # all PRU symbols enter the universe; no drop here
+    _td_all_scored   = sum(1 for s in all_scored if s.get("scanner_tier") == "D")
+    _td_above_thresh = sum(1 for s in scored    if s.get("scanner_tier") == "D")
+
     # 4b. FX track — score major currency pairs (disabled by default)
     try:
         from config import CONFIG as _cfg
@@ -683,6 +690,7 @@ def run_signal_pipeline(
 
     # 5. Strategy-mode threshold adjustment
     scored = _apply_strategy_threshold(scored, strategy_mode, regime_name)
+    _td_passed_strategy = sum(1 for s in scored if s.get("scanner_tier") == "D")
 
     # 5b. Short quality gate — raise bar for SHORT signals when IC is unproven
     scored = _apply_short_quality_gate(scored, regime_name)
@@ -694,11 +702,20 @@ def run_signal_pipeline(
     from config import CONFIG as _cfg
     _persistence = _cfg.get("score_persistence_scans", 2)
     scored = _apply_persistence_gate(scored, all_scored, _persistence)
+    _td_passed_persistence = sum(1 for s in scored if s.get("scanner_tier") == "D")
 
     # 5d. Tier D post-gate rescue — candidates that were dropped by strategy threshold
     # or persistence gate may be rescued if they meet discovery_score or archetype criteria.
+    _td_pre_rescue_in_scored = {s.get("symbol") for s in scored if s.get("scanner_tier") == "D"}
+    _td_rescue_pool = sum(
+        1 for s in all_scored
+        if s.get("scanner_tier") == "D" and s.get("symbol") not in _td_pre_rescue_in_scored
+    )
     if _tier_d_meta:
         scored = _rescue_tier_d(scored, all_scored, _tier_d_meta)
+    _td_pipeline_output = sum(1 for s in scored if s.get("scanner_tier") == "D")
+    _td_rescued = _td_pipeline_output - len(_td_pre_rescue_in_scored)
+    _td_dropped_final = _td_rescue_pool - _td_rescued
 
     # 6. IC audit log — write all scored symbols for forward-return tracking
     log_signal_scan(all_scored, regime)
@@ -712,6 +729,53 @@ def run_signal_pipeline(
     # 9. Sensor payloads — module not yet implemented; reserved for future enrichment.
     sensor_payloads = []
 
+    # 10. Tier D funnel record — written here so dispatch can append stage 7-11 counts
+    #     using the same ts as a join key.
+    _td_funnel: dict = {
+        "ts":                      datetime.now(UTC).isoformat(),
+        "regime":                  regime_name,
+        "stage":                   "pipeline",
+        # Stage 1 — PRU file
+        "pru_loaded":              _td_pru_loaded,
+        # Stage 2 — dynamic universe
+        "in_universe":             _td_in_universe,
+        # Stage 3 — score_universe (all_scored = scored on any dimension)
+        "scored_all":              _td_all_scored,
+        # Stage 3b — above regime threshold (would pass without Tier D rescue)
+        "above_regime_threshold":  _td_above_thresh,
+        # Stage 4 — strategy threshold gate (Tier D uses floor=6, not regime threshold)
+        "passed_strategy_threshold": _td_passed_strategy,
+        # Stage 5 — persistence gate (Tier D bypasses; count = same as strategy threshold)
+        "passed_persistence":      _td_passed_persistence,
+        # Stage 6 — rescue: rescue pool size and outcome
+        "rescue_pool":             _td_rescue_pool,
+        "rescued":                 _td_rescued,
+        "dropped_final":           _td_dropped_final,
+        # Stage 6b — final pipeline output (reaches dispatch)
+        "pipeline_output":         _td_pipeline_output,
+        # Drop diagnosis helpers
+        "drop_at_strategy_threshold": _td_above_thresh - _td_passed_strategy,
+        "drop_at_all_scored":         _td_pru_loaded - _td_all_scored,
+    }
+    if _td_pru_loaded > 0:
+        try:
+            import json as _tj
+            _funnel_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "data", "tier_d_funnel.jsonl"
+            )
+            with open(_funnel_path, "a") as _ff:
+                _ff.write(_tj.dumps(_td_funnel) + "\n")
+        except Exception as _fe:
+            log.debug("Tier D funnel write failed (non-critical): %s", _fe)
+        log.info(
+            "Tier D funnel [pipeline]: pru=%d universe=%d scored_all=%d "
+            "above_thresh=%d strategy=%d persistence=%d rescue_pool=%d "
+            "rescued=%d dropped=%d output=%d",
+            _td_pru_loaded, _td_in_universe, _td_all_scored, _td_above_thresh,
+            _td_passed_strategy, _td_passed_persistence, _td_rescue_pool,
+            _td_rescued, _td_dropped_final, _td_pipeline_output,
+        )
+
     return SignalPipelineResult(
         signals=signals,
         scored=scored,
@@ -721,4 +785,5 @@ def run_signal_pipeline(
         regime_name=regime_name,
         sensor_payloads=sensor_payloads,
         status="OK",
+        tier_d_funnel=_td_funnel,
     )
