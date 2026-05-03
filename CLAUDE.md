@@ -3,6 +3,20 @@
 
 ---
 
+## ⛔ TERMINOLOGY — READ THIS FIRST, EVERY SESSION
+
+**"dashboard" ALWAYS means `bot_dashboard.py`. FULL STOP.**
+
+There are two dashboards in this system:
+- **Bot dashboard** — `bot_dashboard.py` — the operational dashboard. THIS is what "dashboard" means.
+- **Chief Decifer dashboard** — port 8181, read-only monitoring UI — NEVER referred to as just "dashboard".
+
+**If Amit says "the dashboard", "dashboard bug", "fix the dashboard", "dashboard panel" — he means `bot_dashboard.py`. Do NOT touch Chief Decifer. Do NOT ask for clarification. The answer is always `bot_dashboard.py` unless Amit explicitly says "Chief" or "Chief Decifer dashboard".**
+
+Violating this wastes time and edits the wrong system. There are no exceptions.
+
+---
+
 ## North Star
 
 Decifer is an autonomous paper-trading system that uses a 10-dimension signal engine and the **Apex Single-Synthesizer** (one `claude-sonnet-4-6` call) to scan, score, and execute trades on IBKR (paper account DUP481326). The goal: generate high-quality training data across market regimes to eventually validate a live system.
@@ -34,7 +48,8 @@ Three actors:
 - **JSONL persistence migration — Complete ✅** (2026-04-28): `trade_log.py` (SQLite WAL) and `trade_store.py` deleted. Replaced with `event_log.py` (ORDER_INTENT → ORDER_FILLED → POSITION_CLOSED write-ahead log) and `training_store.py` (ML training records). Eliminates UNKNOWN trade_type bug caused by SQLite WAL corruption. 349 closed trades migrated to `data/training_records.jsonl`. Phase C gate now reads from `training_store.count()`.
 - **Phase B — Unlocked**: HMM regime detection and walk-forward weight calibration gates are now met. Next: implement HMM as VIX-proxy replacement (see `roadmap/03-hmm-regime-detection.md`) and signal weight calibration (see `roadmap/06-weight-calibration.md`).
 - **Phase C / D — Pending Amit approval**: Alphalens full factor analysis and ML engine activation (ML gate = 50 trades, already met).
-- **Test suite**: 1955 passing (2026-04-28). Tests are current with the codebase.
+- **Position Research Universe Phase 1 — Active ✅** (2026-05-03): Tier D discovery path. `universe_position.py` builds a broad discovery net (discovery points + archetypes) from the committed Master Universe, bypassing the gap/premarket-volume promoter. Scanner exposes Tier D via `get_position_research_universe()`. Signal pipeline tags Tier D BEFORE gates and bypasses persistence. Apex receives `[POSITION_CANDIDATE]` prefix for Tier D names. Shadow mode active (`position_research_shadow_mode=True`): full POSITION simulation runs and is logged, but no live entries placed until `position_research_allow_live_position_entries=True`. 22 tests, all passing.
+- **Test suite**: 2021 passing (2026-05-03). Tests are current with the codebase. 2 pre-existing trailing stop failures unrelated to Phase 1.
 - **Regime detector**: VIX-proxy + SPY EMA (locked until HMM implementation approved).
 
 ---
