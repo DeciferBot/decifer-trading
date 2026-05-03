@@ -923,6 +923,20 @@ CONFIG = {
         "position_min_revenue_growth_pct":  10.0,   # Path B: revenue growth YoY floor (%) — paper: 10; live: 20
         "position_min_gross_margin_pct":    30.0,   # Path B: gross margin floor (%)
         "position_min_supporting_signals":   2,     # both paths: need ≥ N of 4 signals
+
+        # ── Position Research Universe (Tier D) ──────────────────────────────
+        # Broad discovery net — bypasses gap/premarket-volume promoter.
+        # Shadow mode: candidates are built, scored, and reach Apex but no live
+        # POSITION entry is placed until position_research_allow_live_position_entries=True.
+        "position_research_universe_enabled":          True,
+        "position_research_shadow_mode":               True,   # observe only — no live POSITION entries
+        "position_research_allow_live_position_entries": False, # hard lock at entry_gate
+        "position_research_universe_size":             150,    # top N by discovery_score
+        "position_research_min_score":                 2,      # min discovery points for PRU admission
+        "position_research_max_staleness_days":        8,      # stale file warning threshold
+        "position_research_min_intraday_score_floor":  6,      # min signal score to survive pipeline gates
+        "position_research_strong_discovery_score":    6,      # discovery_score threshold for rescue
+        "position_research_allow_archetype_rescue":    True,   # rescue if any archetype matched
     },
 }
 

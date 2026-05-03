@@ -92,6 +92,7 @@ _load_threshold_history()
 try:
     from scanner import CORE_EQUITIES as _SCANNER_CORE_EQUITIES
     from scanner import CORE_SYMBOLS as _SCANNER_CORE_SYMBOLS
+    from scanner import get_position_research_universe as _get_position_research_universe
 
     _PREFILTER_CORE = frozenset(_SCANNER_CORE_SYMBOLS) | frozenset(_SCANNER_CORE_EQUITIES)
 except Exception:  # pragma: no cover — scanner import failure is fatal elsewhere
@@ -105,6 +106,9 @@ except Exception:  # pragma: no cover — scanner import failure is fatal elsewh
             "GLD", "SLV", "USO", "COPX",
         ]
     )
+
+    def _get_position_research_universe():  # pragma: no cover
+        return frozenset(), {}
 
 
 # ── Result type ────────────────────────────────────────────────────────────────
@@ -234,6 +238,84 @@ def _get_edge_gate_adj() -> tuple:
         return 0, "no_data"
 
 
+def _tag_tier_d(all_scored: list, tier_d_meta: dict) -> None:
+    """
+    Tag Tier D metadata onto scored dicts IN PLACE before any gates run.
+    This must be called BEFORE _apply_strategy_threshold so the gate can
+    check scanner_tier == "D" and apply the lower floor.
+    """
+    if not tier_d_meta:
+        return
+    for s in all_scored:
+        sym = s.get("symbol", "")
+        if sym in tier_d_meta:
+            meta = tier_d_meta[sym]
+            s["scanner_tier"] = "D"
+            s["position_research_universe_member"] = True
+            s["discovery_score"] = meta.get("discovery_score", 0)
+            s["matched_position_archetypes"] = meta.get("matched_position_archetypes", [])
+            s["discovery_signals"] = meta.get("discovery_signals", [])
+            s["universe_entry_reason"] = meta.get("universe_entry_reason", "")
+            s["missing_data_fields"] = meta.get("missing_data_fields", [])
+
+
+def _rescue_tier_d(scored: list, all_scored: list, tier_d_meta: dict) -> list:
+    """
+    After all gates, rescue Tier D candidates that were dropped if they meet
+    any rescue condition:
+      1. signal score >= position_research_min_intraday_score_floor (config: 6), OR
+      2. discovery_score >= position_research_strong_discovery_score (config: 6), OR
+      3. matched_position_archetypes not empty AND position_research_allow_archetype_rescue=True
+
+    Logs each rescue with reason and each drop with exact failure reason.
+    Does not re-add candidates already in scored.
+    """
+    if not tier_d_meta:
+        return scored
+
+    from config import CONFIG as _cfg
+    floor = int(_cfg.get("position_research_min_intraday_score_floor", 6))
+    strong_discovery = int(_cfg.get("position_research_strong_discovery_score", 6))
+    archetype_rescue = bool(_cfg.get("position_research_allow_archetype_rescue", True))
+
+    in_scored = {s.get("symbol") for s in scored}
+    rescued: list[dict] = []
+
+    for s in all_scored:
+        sym = s.get("symbol", "")
+        if sym not in tier_d_meta or sym in in_scored:
+            continue  # not Tier D or already passed gates normally
+
+        meta = tier_d_meta[sym]
+        sig_score = s.get("score", 0)
+        disc_score = meta.get("discovery_score", 0)
+        archetypes = meta.get("matched_position_archetypes", [])
+
+        rescue_reasons = []
+        if sig_score >= floor:
+            rescue_reasons.append(f"signal_score={sig_score}>={floor}")
+        if disc_score >= strong_discovery:
+            rescue_reasons.append(f"discovery_score={disc_score}>={strong_discovery}")
+        if archetype_rescue and archetypes:
+            rescue_reasons.append(f"archetypes={archetypes}")
+
+        if rescue_reasons:
+            log.info(
+                "Tier D rescue: %s signal=%d discovery=%d archetypes=%s reason=%s",
+                sym, sig_score, disc_score, archetypes, "; ".join(rescue_reasons),
+            )
+            rescued.append(s)
+        else:
+            log.debug(
+                "Tier D drop: %s signal=%d (<%d) discovery=%d (<%d) archetypes=%s — all rescue conditions failed",
+                sym, sig_score, floor, disc_score, strong_discovery, archetypes,
+            )
+
+    if rescued:
+        log.info("Tier D: rescued %d candidates after pipeline gates", len(rescued))
+    return scored + rescued
+
+
 def _apply_strategy_threshold(scored: list, strategy_mode: dict, regime_name: str) -> list:
     """
     Filter the scored list by the effective score threshold.
@@ -244,13 +326,18 @@ def _apply_strategy_threshold(scored: list, strategy_mode: dict, regime_name: st
 
     Edge gate raises the bar when the signal engine's rolling IC health drops,
     protecting capital when signals are less predictive than usual.
+
+    Tier D candidates use a lower floor (position_research_min_intraday_score_floor)
+    instead of the regime threshold — they don't need SWING-style intraday momentum.
     """
+    from config import CONFIG as _cfg
     mode_adj = strategy_mode.get("score_threshold_adj", 0)
     edge_adj, edge_state = _get_edge_gate_adj()
     adj = mode_adj + edge_adj
 
     used_threshold = get_regime_threshold(regime_name)
     effective = used_threshold + adj
+    tier_d_floor = int(_cfg.get("position_research_min_intraday_score_floor", 6))
 
     parts = []
     if mode_adj:
@@ -258,23 +345,51 @@ def _apply_strategy_threshold(scored: list, strategy_mode: dict, regime_name: st
     if edge_adj:
         parts.append(f"edge_gate={edge_state}+{edge_adj}")
 
-    if adj > 0:
-        pre = len(scored)
-        filtered = [s for s in scored if s["score"] >= effective]
-        reason = " | ".join(parts)
-        log.info(
-            f"Scored: {pre} → {len(filtered)} after threshold filter (raised {used_threshold}→{effective} [{reason}])"
-        )
-        if edge_adj:
-            log.warning(
-                f"EDGE GATE [{edge_state.upper()}]: system IC health low — "
-                f"score bar raised +{edge_adj} (need {effective} to trade)"
+    # When adj > 0, re-filter non-Tier-D candidates by the raised threshold.
+    # When adj == 0, non-Tier-D candidates pass through unchanged — score_universe() already
+    # filtered by the base threshold; this function only raises the bar further.
+    # Tier D candidates always go through the floor check regardless of adj.
+    tier_d_present = any(s.get("scanner_tier") == "D" for s in scored)
+
+    if adj > 0 or tier_d_present:
+        filtered = []
+        for s in scored:
+            if s.get("scanner_tier") == "D":
+                if s["score"] >= tier_d_floor:
+                    filtered.append(s)
+                else:
+                    log.debug(
+                        "Tier D threshold filter: %s score=%d below floor=%d",
+                        s.get("symbol"), s.get("score"), tier_d_floor,
+                    )
+            else:
+                if adj > 0:
+                    if s["score"] >= effective:
+                        filtered.append(s)
+                else:
+                    filtered.append(s)  # adj==0: pass non-Tier-D through unchanged
+
+        if adj > 0:
+            reason = " | ".join(parts)
+            log.info(
+                f"Scored: {len(scored)} → {len(filtered)} after threshold filter "
+                f"(raised {used_threshold}→{effective} [{reason}]; tier_d_floor={tier_d_floor})"
+            )
+            if edge_adj:
+                log.warning(
+                    f"EDGE GATE [{edge_state.upper()}]: system IC health low — "
+                    f"score bar raised +{edge_adj} (need {effective} to trade)"
+                )
+        else:
+            log.info(
+                f"Scored: {len(scored)} → {len(filtered)} "
+                f"[{regime_name}] edge={edge_state} tier_d_floor={tier_d_floor}"
             )
         return filtered
 
+    # adj==0, no Tier D — fast path: return unchanged (score_universe already filtered)
     if edge_state not in ("healthy", "disabled", "no_data"):
         log.warning(f"EDGE GATE [{edge_state.upper()}]: system IC health low (adj={edge_adj})")
-
     log.info(f"Scored: {len(scored)} above threshold ({used_threshold}) [{regime_name}] edge={edge_state}")
     return scored
 
@@ -361,6 +476,12 @@ def _apply_persistence_gate(scored: list, all_scored: list, persistence_scans: i
     bypassed = []
     for s in scored:
         sym = s["symbol"]
+        # Tier D candidates bypass the persistence gate — they don't build intraday
+        # momentum history and should not be held back waiting for N consecutive scans.
+        if s.get("scanner_tier") == "D":
+            passed.append(s)
+            bypassed.append(sym)
+            continue
         if s.get("score", 0) >= bypass_score:
             passed.append(s)
             bypassed.append(sym)
@@ -531,6 +652,16 @@ def run_signal_pipeline(
     )
     log.info(f"score_universe: {len(scored)} above threshold, {len(all_scored)} total")
 
+    # 4c. Tier D tagging — attach Position Research Universe metadata to scored dicts
+    # MUST run before _apply_strategy_threshold so the gate can apply the lower Tier D floor.
+    _tier_d_syms, _tier_d_meta = _get_position_research_universe()
+    if _tier_d_meta:
+        _tag_tier_d(all_scored, _tier_d_meta)
+        # also tag the above-threshold subset
+        _tag_tier_d(scored, _tier_d_meta)
+        n_tagged = sum(1 for s in all_scored if s.get("scanner_tier") == "D")
+        log.info("Tier D: tagged %d/%d scored symbols with PRU metadata", n_tagged, len(all_scored))
+
     # 4b. FX track — score major currency pairs (disabled by default)
     try:
         from config import CONFIG as _cfg
@@ -558,9 +689,15 @@ def run_signal_pipeline(
     # 5c. Score persistence gate — require signal above threshold for N consecutive scans.
     # Prevents single-scan DAR spikes from triggering entries.
     # Catalyst/sentinel entries are routed through signal_dispatcher separately and bypass this.
+    # Tier D candidates bypass this gate (checked inside _apply_persistence_gate).
     from config import CONFIG as _cfg
     _persistence = _cfg.get("score_persistence_scans", 2)
     scored = _apply_persistence_gate(scored, all_scored, _persistence)
+
+    # 5d. Tier D post-gate rescue — candidates that were dropped by strategy threshold
+    # or persistence gate may be rescued if they meet discovery_score or archetype criteria.
+    if _tier_d_meta:
+        scored = _rescue_tier_d(scored, all_scored, _tier_d_meta)
 
     # 6. IC audit log — write all scored symbols for forward-return tracking
     log_signal_scan(all_scored, regime)

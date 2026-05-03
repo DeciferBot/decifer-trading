@@ -1033,7 +1033,15 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
     if not candidates:
         parts.append("  (none this cycle — output new_entries: [])")
     for c in candidates:
-        parts.append("  " + _format_candidate_line(c))
+        prefix = ""
+        if c.get("scanner_tier") == "D":
+            prefix = (
+                "[POSITION_CANDIDATE] Source: Position Research Universe. "
+                "Evaluate primarily on multi-week thesis quality, business improvement, "
+                "relative strength, sector support, and risk/reward. "
+                "Do not penalise solely for lack of gap, premarket volume, or intraday momentum.\n  "
+            )
+        parts.append("  " + prefix + _format_candidate_line(c))
 
     _tc_map = {
         c["symbol"]: c["trade_context"]

@@ -385,6 +385,28 @@ def classify_trade_type(
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
+def _simulate_position_validation(
+    direction: str,
+    ctx: "TradeContext",
+    score: int,
+    instrument: str | None = None,
+) -> tuple[bool, str, str, int]:
+    """
+    Run the POSITION validation logic in simulation only — no order placement,
+    no state mutation, no recursion into validate_entry.
+
+    Returns (would_have_passed, simulated_trade_type, simulated_reason, simulated_score).
+
+    Used by the shadow mode block in validate_entry to answer:
+    "Would this Tier D candidate have qualified for POSITION if shadow mode were off?"
+    """
+    qualifies, pos_reason = _validate_position(direction, ctx, instrument=instrument)
+    if qualifies:
+        return True, "POSITION", pos_reason, score
+    else:
+        return False, "SWING", pos_reason, score
+
+
 def validate_entry(
     direction: str,
     ctx: TradeContext,
@@ -394,6 +416,7 @@ def validate_entry(
     score_breakdown: dict | None = None,
     instrument: str | None = None,
     open_intraday_count: int = 0,
+    scanner_tier: str | None = None,
 ) -> tuple[bool, str, str, int]:
     """
     Full entry validation: classify trade type and check effective score.
@@ -410,9 +433,39 @@ def validate_entry(
     score_breakdown: per-dimension signal scores {flow, squeeze, momentum, ...}
     instrument: "stock"|"call"|"put"|"COMMON" — used for POSITION equity-only gate
     open_intraday_count: number of currently open INTRADAY positions (concurrency gate)
+    scanner_tier: "D" if candidate came from Position Research Universe (Tier D)
     """
     if min_score is None:
         min_score = CONFIG.get("min_score_to_trade", 14)
+
+    # ── Tier D shadow mode: run full POSITION simulation, then block execution ─
+    # When shadow mode is active, Tier D candidates are fully evaluated in simulation
+    # (to answer "would this have passed?") but no live POSITION entry is created.
+    # This preserves safety while generating the dry-run data needed to validate the funnel.
+    if (
+        scanner_tier == "D"
+        and opus_trade_type == "POSITION"
+        and CONFIG.get("entry_gate", {}).get("position_research_shadow_mode",
+            CONFIG.get("position_research_shadow_mode", True))
+        and not CONFIG.get("entry_gate", {}).get("position_research_allow_live_position_entries",
+            CONFIG.get("position_research_allow_live_position_entries", False))
+    ):
+        sim_pass, sim_type, sim_reason, sim_score = _simulate_position_validation(
+            direction, ctx, score, instrument=instrument,
+        )
+        log.info(
+            "entry_gate: %s %s [TIER_D] shadow_mode_blocked — "
+            "would_have_passed=%s simulated_type=%s simulated_score=%d simulated_reason=%s",
+            ctx.symbol if ctx else "?", direction,
+            sim_pass, sim_type, sim_score, sim_reason,
+        )
+        return (
+            False,
+            "POSITION_RESEARCH_ONLY",
+            f"shadow_mode_blocked (simulated: would_have_passed={sim_pass}, "
+            f"type={sim_type}, reason={sim_reason[:120]})",
+            0,
+        )
 
     # ── Change 5 — Block score=0 SWING/POSITION entries ──────────────────────
     # score=0 means no signal data was available. 18% of historical SWING trades
@@ -485,10 +538,30 @@ def validate_entry(
             # Downgrade to SWING — don't block the trade, just reduce hold horizon
             trade_type = "SWING"
             reason = pos_reason
-            log.info(
-                "entry_gate: %s %s POSITION→SWING | %s",
-                ctx.symbol, direction, pos_reason,
-            )
+            # Audit trail: distinguish missing-data downgrade from failed-criteria downgrade
+            if ctx is not None:
+                _no_fcf = ctx.fcf_yield is None
+                _no_rev = ctx.revenue_growth_yoy is None
+                _no_margin = getattr(ctx, "gross_margin", None) is None
+                if _no_fcf and _no_rev and _no_margin:
+                    log.info(
+                        "entry_gate: %s %s POSITION→SWING missing_fundamentals_no_entry "
+                        "(fcf_yield=None, revenue_growth_yoy=None, gross_margin=None) | %s",
+                        ctx.symbol, direction, pos_reason,
+                    )
+                elif _no_fcf or _no_rev or _no_margin:
+                    log.info(
+                        "entry_gate: %s %s POSITION→SWING missing_trade_context_position_cap "
+                        "(partial data: fcf=%s rev=%s margin=%s) | %s",
+                        ctx.symbol, direction,
+                        ctx.fcf_yield, ctx.revenue_growth_yoy,
+                        getattr(ctx, "gross_margin", None), pos_reason,
+                    )
+                else:
+                    log.info(
+                        "entry_gate: %s %s POSITION→SWING | %s",
+                        ctx.symbol, direction, pos_reason,
+                    )
 
     if effective_score < min_score:
         full_reason = (

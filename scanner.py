@@ -262,9 +262,43 @@ def get_sector_rotation_bias() -> dict:
         return {"available": False}
 
 
+# ── Position Research Universe (Tier D) cache ─────────────────────────────────
+# Populated on each get_dynamic_universe() call when the feature is enabled.
+# Exported so signal_pipeline.py can read metadata without re-loading the file.
+
+_POSITION_RESEARCH_SYMBOLS: frozenset = frozenset()
+_POSITION_RESEARCH_META: dict = {}  # ticker → full metadata dict
+
+
+def get_position_research_universe() -> tuple[frozenset, dict]:
+    """
+    Load Tier D tickers and metadata from position_research_universe.json.
+    Returns (symbol_frozenset, meta_by_ticker_dict).
+    Returns (frozenset(), {}) on missing/stale/malformed file — graceful degradation.
+    Called by get_dynamic_universe() and signal_pipeline._tag_tier_d().
+    """
+    global _POSITION_RESEARCH_SYMBOLS, _POSITION_RESEARCH_META
+    if not CONFIG.get("position_research_universe_enabled", True):
+        return frozenset(), {}
+    try:
+        from universe_position import load_position_research_universe
+        tickers, meta_list = load_position_research_universe()
+        if tickers:
+            _POSITION_RESEARCH_SYMBOLS = frozenset(tickers)
+            _POSITION_RESEARCH_META = {m["ticker"]: m for m in meta_list if isinstance(m, dict) and "ticker" in m}
+        else:
+            _POSITION_RESEARCH_SYMBOLS = frozenset()
+            _POSITION_RESEARCH_META = {}
+    except Exception as exc:
+        log.warning("Tier D: load failed — %s — continuing without Tier D", exc)
+        _POSITION_RESEARCH_SYMBOLS = frozenset()
+        _POSITION_RESEARCH_META = {}
+    return _POSITION_RESEARCH_SYMBOLS, _POSITION_RESEARCH_META
+
+
 def get_dynamic_universe(ib: IB, regime: dict | None = None) -> list[str]:
     """
-    Build the per-cycle scan universe from three tiers:
+    Build the per-cycle scan universe from four tiers:
 
       Tier A — inline floor (always scanned):
         CORE_SYMBOLS (15 macro/vol/inverse/crypto/commodity ETFs)
@@ -280,6 +314,12 @@ def get_dynamic_universe(ib: IB, regime: dict | None = None) -> list[str]:
         Other Tier C paths (catalyst candidates, held positions, favourites,
         sympathy, news hits) are unioned in by the caller (bot_trading
         union logic) — not this function.
+
+      Tier D — Position Research Universe (additive, shadow mode):
+        Fundamental-quality discovery names from the committed Master Universe.
+        Bypasses gap/premarket-volume promoter. Read from
+        data/position_research_universe.json (built weekly).
+        Controlled by position_research_universe_enabled config key.
 
     Circuit breaker: if VIX is in extreme panic territory, we do not restrict
     the universe here. Risk gating happens downstream (risk.check_risk_conditions,
@@ -327,6 +367,23 @@ def get_dynamic_universe(ib: IB, regime: dict | None = None) -> list[str]:
             n_sector,
         )
 
+    # Tier D — Position Research Universe (shadow mode, additive)
+    n_tier_d = 0
+    n_tier_d_new = 0
+    if CONFIG.get("position_research_universe_enabled", True):
+        tier_d_syms, _meta = get_position_research_universe()
+        if tier_d_syms:
+            n_tier_d = len(tier_d_syms)
+            before = len(symbols)
+            symbols.update(tier_d_syms)
+            n_tier_d_new = len(symbols) - before
+            log.info(
+                "Tier D: %d position research names loaded (%d new, %d already in A/B/C)",
+                n_tier_d, n_tier_d_new, n_tier_d - n_tier_d_new,
+            )
+        else:
+            log.debug("Tier D: no position research universe available this cycle")
+
     _vix = (regime or {}).get("vix", 0)
     _vix_1h = (regime or {}).get("vix_1h_change", 0)
     _is_extreme = _vix > CONFIG.get("vix_panic_min", 35) or _vix_1h > CONFIG.get("vix_spike_pct", 0.20)
@@ -338,7 +395,8 @@ def get_dynamic_universe(ib: IB, regime: dict | None = None) -> list[str]:
 
     log.info(
         f"Universe: {len(symbols)} symbols | core={n_core} equities={n_equities} "
-        f"promoted={n_promoted} sector+={n_sector} | vix={_vix:.1f} extreme={_is_extreme}"
+        f"promoted={n_promoted} sector+={n_sector} tier_d={n_tier_d} "
+        f"| vix={_vix:.1f} extreme={_is_extreme}"
     )
     return list(symbols)
 
@@ -431,6 +489,7 @@ def get_market_regime(ib: IB) -> dict:
                     "regime": "UNKNOWN",
                     "vix": 0,
                     "vix_1h_change": 0,
+                    "vix_change_1d": 0.0,
                     "spy_price": 0,
                     "spy_above_200d": False,
                     "qqq_price": 0,
@@ -441,6 +500,18 @@ def get_market_regime(ib: IB) -> dict:
 
         vix_prev = float(vix_close.iloc[-2]) if vix_close is not None and len(vix_close) > 1 else vix_now
         vix_1h_change = (vix_now - vix_prev) / vix_prev if vix_prev > 0 else 0
+
+        # Daily VIX change: yesterday's last 1h bar vs today's current level.
+        # Used by dashboard to verify session_character labelling.
+        vix_change_1d = 0.0
+        try:
+            if vix_close is not None and len(vix_close) >= 2:
+                _today = vix_close.index[-1].date()
+                _prev_day_bars = vix_close[[d.date() < _today for d in vix_close.index]]
+                if len(_prev_day_bars) > 0:
+                    vix_change_1d = round(vix_now - float(_prev_day_bars.iloc[-1]), 2)
+        except Exception:
+            pass
 
         # ── 200-DAY DAILY MA — more reliable trend signal than 20h EMA ──
         # The 20h EMA (~2.5 trading days) flipped on intraday noise, causing
@@ -653,6 +724,7 @@ def get_market_regime(ib: IB) -> dict:
             "regime": regime,
             "vix": round(vix_now, 2),
             "vix_1h_change": round(vix_1h_change, 4),
+            "vix_change_1d": vix_change_1d,
             "spy_price": round(spy_price_now, 2),
             "spy_above_200d": spy_above_200d,
             "spy_200d_ma": round(spy_200d_ma, 2) if spy_200d_ma else None,
@@ -686,6 +758,7 @@ def get_market_regime(ib: IB) -> dict:
             "regime": "UNKNOWN",
             "vix": 0,
             "vix_1h_change": 0,
+            "vix_change_1d": 0.0,
             "spy_price": 0,
             "spy_above_200d": False,
             "spy_200d_ma": None,
