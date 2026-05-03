@@ -7,7 +7,7 @@
 # ║   Sources:                                                   ║
 # ║     • Alpaca — pre-market / after-hours price gaps          ║
 # ║     • Alpaca News — last 16h headlines (Haiku interpretation)║
-# ║     • data/trades.json — yesterday's performance summary    ║
+# ║     • data/reconciled_trades.jsonl — yesterday's perf summary║
 # ║     • FMP — economic calendar + earnings with estimates     ║
 # ║     • FMP — analyst upgrades/downgrades (last 24h)          ║
 # ║     • FRED — macro snapshot (CPI, rates, spread, crude)     ║
@@ -31,10 +31,17 @@ log = logging.getLogger("decifer.overnight")
 
 _ET = zoneinfo.ZoneInfo("America/New_York")
 NOTES_PATH = "data/overnight_notes.md"
-TRADES_FILE = "data/trades.json"
+RECONCILED_FILE = "data/reconciled_trades.jsonl"
 UNIVERSE_PATH = "data/committed_universe.json"
 _TONE_SYMS = ["SPY", "QQQ", "IWM"]  # market breadth proxies
 _SECTOR_ETFS = ["XLF", "XLK", "XLE", "XLV", "XLI", "XLU", "XLB", "XLRE"]  # sector rotation
+
+
+def _load_reconciled_trades() -> list[dict]:
+    if not os.path.exists(RECONCILED_FILE):
+        return []
+    with open(RECONCILED_FILE) as f:
+        return [json.loads(line) for line in f if line.strip()]
 
 
 # ── Pre-market / after-hours tone ─────────────────────────────────────────────
@@ -139,15 +146,13 @@ def _get_universe_movers(extra_syms: list[str] | None = None) -> str:
 
 def _get_performance_summary() -> str:
     """
-    Read data/trades.json and summarise yesterday's closed trades.
+    Read data/reconciled_trades.jsonl and summarise yesterday's closed trades.
     Returns a formatted string block. Never raises.
     """
     try:
-        if not os.path.exists(TRADES_FILE):
+        all_trades = _load_reconciled_trades()
+        if not all_trades:
             return "Yesterday's performance: no trade data found"
-
-        with open(TRADES_FILE) as f:
-            all_trades = json.load(f)
 
         yesterday = (datetime.now(_ET) - timedelta(days=1)).strftime("%Y-%m-%d")
         # Also include today if this is being generated intraday after close
@@ -652,9 +657,8 @@ def _build_overnight_json(universe: list[str] | None, gen_time: str) -> dict:
     # ── Yesterday's performance ───────────────────────────────────
     try:
         perf: dict = {}
-        if os.path.exists(TRADES_FILE):
-            with open(TRADES_FILE) as f:
-                all_trades = json.load(f)
+        all_trades = _load_reconciled_trades()
+        if all_trades:
             yesterday = (datetime.now(_ET) - timedelta(days=1)).strftime("%Y-%m-%d")
             today_str = datetime.now(_ET).strftime("%Y-%m-%d")
             day_trades = []
