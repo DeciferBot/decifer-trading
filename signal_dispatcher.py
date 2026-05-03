@@ -159,6 +159,49 @@ def _backfill_tier_d_contexts(
                 "(context_backfill_source=failed missing_fresh_trade_context_after_rescue=True): %s",
                 sig.symbol, exc,
             )
+
+        # Last resort: PRU snapshot (disk-persisted, survives process restarts).
+        # Fires only when both the initial build and the fresh-FMP retry returned no
+        # fundamentals — covers the 4 fields _compute_fundamental_signals() captured.
+        if not info["context_backfilled"]:
+            try:
+                import scanner as _scanner_mod
+                _, _pru_meta = _scanner_mod.get_position_research_universe()
+                _snap = _pru_meta.get(sig.symbol, {}).get("pru_fmp_snapshot") or {}
+                if _snap:
+                    import dataclasses as _dc
+                    _PRU_MAP = {
+                        "revenue_growth_yoy":   "revenue_growth_yoy",
+                        "revenue_decelerating": "revenue_decelerating",
+                        "gross_margin":         "gross_margin",
+                        "analyst_upside_pct":   "analyst_upside_pct",
+                    }
+                    _base = context_map.get(sym_upper) or ctx
+                    _overrides = {
+                        ctx_attr: _snap[snap_key]
+                        for snap_key, ctx_attr in _PRU_MAP.items()
+                        if _snap.get(snap_key) is not None
+                        and getattr(_base, ctx_attr, None) is None
+                    }
+                    if _overrides:
+                        _patched = _dc.replace(_base, **_overrides)
+                        if any(getattr(_patched, f, None) is not None
+                               for f in _TIER_D_FUND_FIELDS):
+                            context_map[sym_upper] = _patched
+                            info["context_backfilled"] = True
+                            info["context_backfill_source"] = "pru_snapshot"
+                            info["missing_fresh_trade_context_after_rescue"] = False
+                            log.info(
+                                "dispatch: Tier D %s context backfilled from PRU snapshot "
+                                "(context_backfill_source=pru_snapshot fields=%s)",
+                                sig.symbol, list(_overrides.keys()),
+                            )
+            except Exception as _se:
+                log.debug(
+                    "dispatch: Tier D %s PRU snapshot fallback failed: %s",
+                    sig.symbol, _se,
+                )
+
         backfill_info[sym_upper] = info
 
     return backfill_info
@@ -559,6 +602,60 @@ def dispatch_signals(
             )
 
         results.append(result)
+
+    # ── Tier D dispatch-stage funnel record ───────────────────────────────────
+    # Appended to tier_d_funnel.jsonl so the evidence report can show stages 7-11.
+    # Join key: the most recent pipeline record by ts (written seconds earlier).
+    _td_dispatch_syms = [s for s in signals if getattr(s, "scanner_tier", "") == "D"]
+    if _td_dispatch_syms:
+        _td_cls_counts: dict[str, int] = {}
+        for _tds in _td_dispatch_syms:
+            _tdcls = class_map.get(_tds.symbol.upper())
+            _ttype = _tdcls.trade_type if _tdcls else "no_classification"
+            _td_cls_counts[_ttype] = _td_cls_counts.get(_ttype, 0) + 1
+        _td_shadow_blocked = sum(
+            1 for r in results
+            if r.get("skip_reason", "").startswith("shadow_mode_blocked")
+            and getattr(r.get("signal"), "scanner_tier", "") == "D"
+        )
+        _td_ctx_failed = sum(
+            1 for s in _td_dispatch_syms if s.symbol.upper() in _context_failed
+        )
+        _td_dispatch_record = {
+            "ts":                    datetime.now(UTC).isoformat(),
+            "stage":                 "dispatch",
+            # Stage 7 — entered dispatch
+            "entered_dispatch":      len(_td_dispatch_syms),
+            # Stage 7b — dropped by context-build failure
+            "dropped_context_fail":  _td_ctx_failed,
+            # Stage 8 — Apex classification breakdown
+            "apex_classification":   _td_cls_counts,
+            # Stage 9 — reached validate_entry (same as entered_dispatch - ctx_fail - AVOID)
+            "reached_validate_entry": len(_td_dispatch_syms) - _td_ctx_failed - _td_cls_counts.get("AVOID", 0),
+            # Stage 11 — shadow-blocked (only POSITION entries reach shadow gate)
+            "shadow_blocked":        _td_shadow_blocked,
+            # Stage 12 — executed as non-POSITION (SWING/INTRADAY passed through)
+            "executed_non_position": sum(
+                1 for r in results
+                if r.get("success") and getattr(r.get("signal"), "scanner_tier", "") == "D"
+            ),
+        }
+        try:
+            import json as _tdj
+            _funnel_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "data", "tier_d_funnel.jsonl"
+            )
+            with open(_funnel_path, "a") as _tdf:
+                _tdf.write(_tdj.dumps(_td_dispatch_record) + "\n")
+        except Exception as _tde:
+            log.debug("Tier D dispatch funnel write failed (non-critical): %s", _tde)
+        log.info(
+            "Tier D funnel [dispatch]: entered=%d ctx_fail=%d apex=%s "
+            "reached_gate=%d shadow_blocked=%d executed_non_position=%d",
+            len(_td_dispatch_syms), _td_ctx_failed, _td_cls_counts,
+            _td_dispatch_record["reached_validate_entry"],
+            _td_shadow_blocked, _td_dispatch_record["executed_non_position"],
+        )
 
     return results
 
