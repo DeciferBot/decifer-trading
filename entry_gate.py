@@ -18,7 +18,11 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import threading
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from config import CONFIG
@@ -27,6 +31,22 @@ if TYPE_CHECKING:
     from trade_context import TradeContext
 
 log = logging.getLogger("decifer.entry_gate")
+
+# ── Position Research shadow log ──────────────────────────────────────────────
+_PR_SHADOW_LOG = os.path.join(
+    CONFIG.get("data_dir", "data"), "position_research_shadow.jsonl"
+)
+_pr_shadow_lock = threading.Lock()
+
+
+def _write_pr_shadow(record: dict) -> None:
+    """Append one JSON line to position_research_shadow.jsonl (non-fatal)."""
+    try:
+        os.makedirs(os.path.dirname(_PR_SHADOW_LOG), exist_ok=True)
+        with _pr_shadow_lock, open(_PR_SHADOW_LOG, "a") as fh:
+            fh.write(json.dumps(record, default=str) + "\n")
+    except Exception as exc:
+        log.debug("entry_gate: shadow log write failed — %s", exc)
 
 # ── Gate config defaults (overridden by config.py entry_gate section) ─────────
 
@@ -453,12 +473,23 @@ def validate_entry(
         sim_pass, sim_type, sim_reason, sim_score = _simulate_position_validation(
             direction, ctx, score, instrument=instrument,
         )
+        _sym = (ctx.symbol if ctx else None) or "?"
         log.info(
             "entry_gate: %s %s [TIER_D] shadow_mode_blocked — "
             "would_have_passed=%s simulated_type=%s simulated_score=%d simulated_reason=%s",
-            ctx.symbol if ctx else "?", direction,
+            _sym, direction,
             sim_pass, sim_type, sim_score, sim_reason,
         )
+        _write_pr_shadow({
+            "ts": datetime.now(UTC).isoformat(),
+            "symbol": _sym,
+            "direction": direction,
+            "signal_score": score,
+            "would_have_passed": sim_pass,
+            "simulated_type": sim_type,
+            "simulated_score": sim_score,
+            "simulated_reason": sim_reason,
+        })
         return (
             False,
             "POSITION_RESEARCH_ONLY",

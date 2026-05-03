@@ -55,7 +55,7 @@ def _get_account_config(account_id: str) -> dict:
 
 def _signal_to_candidate(signal: Signal) -> dict:
     """Convert a Signal to the flat dict the intelligence layer expects."""
-    return {
+    cand = {
         "symbol": signal.symbol,
         "direction": signal.direction,
         "score": round(signal.conviction_score * 5),
@@ -63,6 +63,9 @@ def _signal_to_candidate(signal: Signal) -> dict:
         "rationale": signal.rationale or "",
         "regime_context": signal.regime_context or "",
     }
+    if getattr(signal, "scanner_tier", ""):
+        cand["scanner_tier"] = signal.scanner_tier
+    return cand
 
 
 # ── Main dispatch ─────────────────────────────────────────────────────────────
@@ -280,6 +283,7 @@ def dispatch_signals(
                 score_breakdown=signal.dimension_scores,
                 instrument=signal.instrument,
                 open_intraday_count=_open_intraday_count,
+                scanner_tier=getattr(signal, "scanner_tier", "") or None,
             )
 
             if not gate_ok:

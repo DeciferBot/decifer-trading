@@ -529,6 +529,7 @@ def _scored_to_signals(scored: list, regime_name: str) -> list:
                 atr_daily=s.get("atr_daily", 0.0),
                 candle_gate=s.get("candle_gate", "UNKNOWN"),
                 instrument=s.get("instrument", "stock"),
+                scanner_tier=s.get("scanner_tier", ""),
             )
         )
     return signals

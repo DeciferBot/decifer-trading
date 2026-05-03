@@ -60,7 +60,7 @@ _REQUIRED_SYMBOL_FIELDS = (
 
 def _fetch_etf_context(etfs: list[str]) -> tuple[dict[str, float | None], dict[str, bool]]:
     """
-    Fetch 60d daily bars for a list of ETFs.
+    Fetch 90d daily bars for a list of ETFs (~63 trading days, enough for 50d MA).
     Returns:
         returns_map:   {etf: 1-month return pct | None}
         above_50ma_map: {etf: True if current close > 50d MA}
@@ -70,7 +70,7 @@ def _fetch_etf_context(etfs: list[str]) -> tuple[dict[str, float | None], dict[s
 
     for etf in etfs:
         try:
-            df = fetch_bars(etf, period="60d", interval="1d")
+            df = fetch_bars(etf, period="90d", interval="1d")
             if df is None or df.empty or len(df) < 5:
                 returns_map[etf] = None
                 above_50ma_map[etf] = False
@@ -103,12 +103,12 @@ def _fetch_etf_context(etfs: list[str]) -> tuple[dict[str, float | None], dict[s
 
 
 def _fetch_symbol_bars_batch(symbols: list[str], workers: int = 20) -> dict[str, object]:
-    """Fetch 60d daily bars for symbols in parallel. Returns {symbol: DataFrame | None}."""
+    """Fetch 90d daily bars for symbols in parallel (~63 trading days, enough for 50d MA). Returns {symbol: DataFrame | None}."""
     results: dict[str, object] = {}
 
     def _one(sym: str):
         try:
-            return sym, fetch_bars(sym, period="60d", interval="1d")
+            return sym, fetch_bars(sym, period="90d", interval="1d")
         except Exception:
             return sym, None
 
@@ -153,7 +153,7 @@ def _compute_technical_signals(
     sector_etf_above_50ma: bool,
 ) -> tuple[dict[str, int], list[str]]:
     """
-    Compute technical discovery signals from 60d daily bars.
+    Compute technical discovery signals from 90d daily bars (~63 trading days).
     Returns (signal_points_dict, missing_fields_list).
     Missing bars or too-short history → 0 pts for affected signals, not rejection.
     """
@@ -510,10 +510,10 @@ def build_position_research_universe(
 
     # Phase 3: Sector mapping — pre-fetch sector ETF for each symbol
     log.info("PRU build: fetching sector mapping for %d symbols...", len(eligible))
-    sector_map = _fetch_sector_map(eligible, workers=20)
+    sector_map = _fetch_sector_map(eligible, workers=5)  # 5 concurrent avoids FMP rate-limit cascade
 
     # Phase 4: Symbol daily bars (parallel)
-    log.info("PRU build: fetching 60d daily bars for %d symbols...", len(eligible))
+    log.info("PRU build: fetching 90d daily bars for %d symbols...", len(eligible))
     symbol_bars = _fetch_symbol_bars_batch(eligible, workers=20)
 
     # Phase 5: Recent analyst upgrades — one call covers all symbols (10 days = 240h)
@@ -530,15 +530,20 @@ def build_position_research_universe(
     except Exception as e:
         log.warning("PRU build: get_analyst_changes failed: %s", e)
 
-    # Phase 6: Score each symbol
+    # Phase 6: Score each symbol — parallel via ThreadPoolExecutor.
+    # Each _score_symbol call makes ~4 sequential FMP HTTP requests (I/O bound).
+    # ThreadPoolExecutor overlaps those waits across symbols; GIL is not a concern.
+    # Workers=20 keeps us within FMP 750 calls/min: 20 × 4 = 80 concurrent calls max.
     scored: list[dict] = []
     hard_blocked = 0
     insufficient = 0
 
-    for sym in eligible:
+    _score_workers = min(20, len(eligible))
+
+    def _score_one(sym: str) -> tuple[str, dict | None]:
         snap = snaps.get(sym, {})
         df = symbol_bars.get(sym)
-        entry = _score_symbol(
+        return sym, _score_symbol(
             sym, snap, df,
             spy_1m_return,
             sector_etf_returns,
@@ -547,15 +552,21 @@ def build_position_research_universe(
             recent_upgrade_syms,
             active_trading_syms,
         )
-        if entry is None:
-            price = snap.get("price") or 0.0
-            vol = snap.get("prev_volume") or 0
-            if price <= 0 or vol < 50_000:
-                hard_blocked += 1
+
+    with ThreadPoolExecutor(max_workers=_score_workers, thread_name_prefix="pru_score") as ex:
+        futs = {ex.submit(_score_one, sym): sym for sym in eligible}
+        for fut in as_completed(futs):
+            sym, entry = fut.result()
+            if entry is None:
+                snap = snaps.get(sym, {})
+                price = snap.get("price") or 0.0
+                vol = snap.get("prev_volume") or 0
+                if price <= 0 or vol < 50_000:
+                    hard_blocked += 1
+                else:
+                    insufficient += 1
             else:
-                insufficient += 1
-        else:
-            scored.append(entry)
+                scored.append(entry)
 
     scored.sort(key=lambda r: r["discovery_score"], reverse=True)
     top = scored[:top_n]

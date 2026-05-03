@@ -52,6 +52,7 @@ class Signal:
     atr_daily: float = 0.0  # Daily ATR (session range — used by trade advisor for PT sizing)
     candle_gate: str = "UNKNOWN"
     instrument: str = "stock"  # "stock", "fx", "option" — routes get_contract()
+    scanner_tier: str = ""  # "D" for Position Research Universe; "" for Tier A/B/C
 
     def to_dict(self) -> dict:
         """Serialise to a JSON-safe dict (timestamp as ISO string)."""
