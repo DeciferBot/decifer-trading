@@ -254,6 +254,10 @@ def _tag_tier_d(all_scored: list, tier_d_meta: dict) -> None:
             s["scanner_tier"] = "D"
             s["position_research_universe_member"] = True
             s["discovery_score"] = meta.get("discovery_score", 0)
+            s["adjusted_discovery_score"] = meta.get("adjusted_discovery_score")
+            s["primary_archetype"] = meta.get("primary_archetype")
+            s["universe_bucket"] = meta.get("universe_bucket")
+            s["risk_penalty_pts"] = meta.get("risk_penalty_pts", 0)
             s["matched_position_archetypes"] = meta.get("matched_position_archetypes", [])
             s["discovery_signals"] = meta.get("discovery_signals", [])
             s["universe_entry_reason"] = meta.get("universe_entry_reason", "")
