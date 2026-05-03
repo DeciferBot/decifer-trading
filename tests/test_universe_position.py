@@ -554,3 +554,169 @@ def test_live_position_entries_blocked_when_allow_false():
     assert "shadow_mode_blocked" in reason
     # But simulation should show would_have_passed=True (good fundamentals)
     assert "would_have_passed=True" in reason
+
+
+# ── Test 23: Tier D context backfill ──────────────────────────────────────────
+
+
+def test_tier_d_context_backfill_succeeds_when_initial_ctx_has_no_fundamentals():
+    """
+    Tier D candidate rescued after context-map build.
+    Initial build_context() returns a ctx with no fundamental fields.
+    Backfill call to build_context() succeeds and populates the context_map.
+    After backfill, context is not default all-None.
+    """
+    from signal_dispatcher import _backfill_tier_d_contexts, _TIER_D_FUND_FIELDS
+
+    # Simulate a Tier D signal
+    tier_d_signal = MagicMock()
+    tier_d_signal.symbol = "IONQ"
+    tier_d_signal.direction = "LONG"
+    tier_d_signal.price = 45.0
+    tier_d_signal.regime_context = "BULL_TRENDING"
+    tier_d_signal.scanner_tier = "D"
+
+    # Initial ctx has no fundamental fields (all None)
+    empty_ctx = MagicMock()
+    for f in _TIER_D_FUND_FIELDS:
+        setattr(empty_ctx, f, None)
+
+    context_map = {"IONQ": empty_ctx}
+    context_failed = set()
+
+    # Backfill ctx with real fundamentals
+    good_ctx = MagicMock()
+    good_ctx.revenue_growth_yoy = 55.0
+    good_ctx.gross_margin = 40.0
+    good_ctx.fcf_yield = None
+    good_ctx.dcf_upside_pct = None
+    good_ctx.analyst_upside_pct = 44.0
+
+    with patch("signal_dispatcher._backfill_tier_d_contexts.__globals__"
+               if False else "trade_context.build_context", return_value=good_ctx):
+        backfill_info = _backfill_tier_d_contexts(
+            signals=[tier_d_signal],
+            context_map=context_map,
+            context_failed=context_failed,
+        )
+
+    info = backfill_info.get("IONQ", {})
+    assert info.get("tier_d_rescued_after_context_build") is True
+    assert info.get("context_backfilled") is True
+    assert info.get("context_backfill_source") == "fresh_fmp"
+    assert info.get("missing_fresh_trade_context_after_rescue") is False
+    # context_map must have been updated with the backfilled ctx
+    assert context_map["IONQ"] is good_ctx
+
+
+def test_tier_d_context_backfill_logs_missing_when_retry_also_fails():
+    """
+    Backfill attempt produces no fundamentals.
+    missing_fresh_trade_context_after_rescue must be True.
+    context_map is not updated (empty ctx kept).
+    """
+    from signal_dispatcher import _backfill_tier_d_contexts, _TIER_D_FUND_FIELDS
+
+    tier_d_signal = MagicMock()
+    tier_d_signal.symbol = "CRWV"
+    tier_d_signal.direction = "LONG"
+    tier_d_signal.price = 20.0
+    tier_d_signal.regime_context = "BULL_TRENDING"
+    tier_d_signal.scanner_tier = "D"
+
+    empty_ctx = MagicMock()
+    for f in _TIER_D_FUND_FIELDS:
+        setattr(empty_ctx, f, None)
+
+    still_empty_ctx = MagicMock()
+    for f in _TIER_D_FUND_FIELDS:
+        setattr(still_empty_ctx, f, None)
+
+    context_map = {"CRWV": empty_ctx}
+    context_failed = set()
+
+    with patch("trade_context.build_context", return_value=still_empty_ctx):
+        backfill_info = _backfill_tier_d_contexts(
+            signals=[tier_d_signal],
+            context_map=context_map,
+            context_failed=context_failed,
+        )
+
+    info = backfill_info.get("CRWV", {})
+    assert info.get("tier_d_rescued_after_context_build") is True
+    assert info.get("context_backfilled") is False
+    assert info.get("missing_fresh_trade_context_after_rescue") is True
+    # context_map must NOT have been updated (original empty ctx stays)
+    assert context_map["CRWV"] is empty_ctx
+
+
+def test_tier_d_shadow_log_includes_backfill_fields():
+    """
+    When backfill info is present, shadow log record contains all 4 required
+    backfill fields: tier_d_rescued_after_context_build, context_backfilled,
+    context_backfill_source, missing_fresh_trade_context_after_rescue.
+    """
+    import json, tempfile, os
+    from entry_gate import validate_entry
+    import entry_gate as _eg
+
+    ctx = MagicMock()
+    ctx.symbol = "LUNA"
+    ctx.earnings_days_away = 30
+    ctx.time_of_day_window = "INTRADAY"
+    ctx.regime = "BULL_TRENDING"
+    for f in ("fcf_yield", "dcf_upside_pct", "revenue_growth_yoy",
+              "gross_margin", "analyst_upside_pct"):
+        setattr(ctx, f, None)
+    ctx.revenue_decelerating = False
+    ctx.eps_accelerating = None
+    ctx.sector_above_50d = False
+    ctx.sector_3m_vs_spy = 0
+    ctx.stock_above_200d = False
+    ctx.analyst_consensus = "HOLD"
+    ctx.recent_upgrade = False
+    ctx.insider_net_sentiment = "NEUTRAL"
+
+    backfill_info = {
+        "tier_d_rescued_after_context_build": True,
+        "context_backfilled": False,
+        "context_backfill_source": "failed",
+        "missing_fresh_trade_context_after_rescue": True,
+    }
+
+    with tempfile.TemporaryDirectory() as tmp:
+        shadow_path = os.path.join(tmp, "shadow.jsonl")
+        with patch.object(_eg, "_PR_SHADOW_LOG", shadow_path), \
+             patch.dict("entry_gate.CONFIG", {
+                 "min_score_to_trade": 14,
+                 "position_research_shadow_mode": True,
+                 "position_research_allow_live_position_entries": False,
+                 "data_dir": tmp,
+                 "entry_gate": {
+                     "position_long_only": True,
+                     "position_equity_only": True,
+                     "position_min_earnings_days_away": 5,
+                     "position_min_dcf_upside_pct": 15.0,
+                     "position_min_analyst_upside_pct": 10.0,
+                     "position_min_revenue_growth_pct": 10.0,
+                     "position_min_gross_margin_pct": 30.0,
+                     "position_min_supporting_signals": 2,
+                     "score_zero_swing_position_blocks": True,
+                 },
+             }):
+            validate_entry(
+                direction="LONG",
+                ctx=ctx,
+                score=25,
+                opus_trade_type="POSITION",
+                scanner_tier="D",
+                tier_d_backfill_info=backfill_info,
+            )
+
+        records = [json.loads(l) for l in open(shadow_path)]
+        assert len(records) == 1
+        rec = records[0]
+        assert rec["tier_d_rescued_after_context_build"] is True
+        assert rec["context_backfilled"] is False
+        assert rec["context_backfill_source"] == "failed"
+        assert rec["missing_fresh_trade_context_after_rescue"] is True

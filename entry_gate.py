@@ -438,6 +438,7 @@ def validate_entry(
     open_intraday_count: int = 0,
     scanner_tier: str | None = None,
     pru_fmp_snapshot: dict | None = None,
+    tier_d_backfill_info: dict | None = None,
 ) -> tuple[bool, str, str, int]:
     """
     Full entry validation: classify trade type and check effective score.
@@ -531,6 +532,16 @@ def validate_entry(
             pru_supplemented_fields, would_have_passed_with_pru_data,
             sim_type, sim_score, sim_reason,
         )
+        # missing_fresh_trade_context_after_rescue is True when ctx had no
+        # fundamentals even after the backfill pass in signal_dispatcher.
+        # It means the POSITION simulation result may be unreliable.
+        _bf = tier_d_backfill_info or {}
+        _missing_ctx_after_rescue = (
+            ctx_data_source == "no_ctx"
+            and _bf.get("tier_d_rescued_after_context_build", False)
+            and not _bf.get("context_backfilled", False)
+        )
+
         _write_pr_shadow({
             "ts": datetime.now(UTC).isoformat(),
             "symbol": _sym,
@@ -538,6 +549,10 @@ def validate_entry(
             "signal_score": score,
             "ctx_data_source": ctx_data_source,
             "ctx_populated_fields": _ctx_populated,
+            "tier_d_rescued_after_context_build": _bf.get("tier_d_rescued_after_context_build", False),
+            "context_backfilled": _bf.get("context_backfilled", False),
+            "context_backfill_source": _bf.get("context_backfill_source", "n/a"),
+            "missing_fresh_trade_context_after_rescue": _missing_ctx_after_rescue,
             "data_flow_gap": data_flow_gap,
             "pru_supplemented_fields": pru_supplemented_fields,
             "would_have_passed": sim_pass,

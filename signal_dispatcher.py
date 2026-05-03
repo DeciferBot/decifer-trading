@@ -68,6 +68,102 @@ def _signal_to_candidate(signal: Signal) -> dict:
     return cand
 
 
+# ── Tier D context backfill ───────────────────────────────────────────────────
+# Fundamental fields used to assess TradeContext quality for Tier D candidates.
+_TIER_D_FUND_FIELDS = ("fcf_yield", "dcf_upside_pct", "revenue_growth_yoy",
+                       "gross_margin", "analyst_upside_pct")
+
+
+def _backfill_tier_d_contexts(
+    signals: list,
+    context_map: dict,
+    context_failed: set,
+) -> dict[str, dict]:
+    """
+    After the initial context-map build, scan Tier D candidates for missing or
+    no-fundamental TradeContext.  Attempt one fresh build_context() call per
+    affected symbol.
+
+    Returns a mapping  symbol.upper() → backfill_info  for every Tier D candidate
+    that needed attention:
+        {
+          "tier_d_rescued_after_context_build": True,
+          "context_backfilled": True | False,
+          "context_backfill_source": "fresh_fmp" | "failed",
+          "missing_fresh_trade_context_after_rescue": True | False,
+        }
+
+    Side-effect: updates context_map in place if backfill succeeds.
+    Safe: never raises; all errors are logged and included in the returned info.
+    """
+    from trade_context import build_context as _build_ctx
+
+    backfill_info: dict[str, dict] = {}
+
+    for sig in signals:
+        if getattr(sig, "scanner_tier", "") != "D":
+            continue
+        if sig.direction not in ("LONG", "SHORT"):
+            continue
+        sym_upper = sig.symbol.upper()
+        if sym_upper in context_failed:
+            continue  # already excluded from candidates
+
+        ctx = context_map.get(sym_upper)
+        has_fundamentals = (
+            ctx is not None
+            and any(getattr(ctx, f, None) is not None for f in _TIER_D_FUND_FIELDS)
+        )
+        if has_fundamentals:
+            continue  # context is adequately populated — no action needed
+
+        # Context is missing or has no fundamentals — flag and attempt backfill
+        info: dict = {
+            "tier_d_rescued_after_context_build": True,
+            "context_backfilled": False,
+            "context_backfill_source": "failed",
+            "missing_fresh_trade_context_after_rescue": True,
+        }
+        log.info(
+            "dispatch: Tier D %s ctx has no fundamentals (tier_d_rescued_after_context_build=True) "
+            "— attempting backfill",
+            sig.symbol,
+        )
+        try:
+            ctx_retry = _build_ctx(
+                symbol=sig.symbol, direction=sig.direction, signal=sig,
+                current_price=sig.price, regime=sig.regime_context,
+            )
+            has_fund_retry = any(
+                getattr(ctx_retry, f, None) is not None for f in _TIER_D_FUND_FIELDS
+            )
+            if has_fund_retry:
+                context_map[sym_upper] = ctx_retry
+                info["context_backfilled"] = True
+                info["context_backfill_source"] = "fresh_fmp"
+                info["missing_fresh_trade_context_after_rescue"] = False
+                log.info(
+                    "dispatch: Tier D %s context backfilled "
+                    "(context_backfilled=True context_backfill_source=fresh_fmp)",
+                    sig.symbol,
+                )
+            else:
+                log.warning(
+                    "dispatch: Tier D %s backfill produced no fundamentals "
+                    "(context_backfilled=False missing_fresh_trade_context_after_rescue=True)",
+                    sig.symbol,
+                )
+        except Exception as exc:
+            log.warning(
+                "dispatch: Tier D %s backfill failed "
+                "(context_backfill_source=failed missing_fresh_trade_context_after_rescue=True): %s",
+                sig.symbol, exc,
+            )
+        backfill_info[sym_upper] = info
+
+    return backfill_info
+
+
 # ── Main dispatch ─────────────────────────────────────────────────────────────
 
 
@@ -170,6 +266,11 @@ def dispatch_signals(
         except Exception as _ce:
             log.warning("dispatch: pre-build context failed for %s — excluding from candidates: %s", _sig.symbol, _ce)
             _context_failed.add(_sig.symbol.upper())
+
+    # ── Tier D context backfill ────────────────────────────────────────────────
+    # Detect Tier D candidates with missing or no-fundamental ctx; attempt retry.
+    # Mutates _context_map in place if backfill succeeds.
+    _tier_d_backfill = _backfill_tier_d_contexts(signals, _context_map, _context_failed)
 
     # ── Intelligence classification (gate) ────────────────────
     # Convert signals to candidate dicts, classify the full batch in one call.
@@ -276,9 +377,11 @@ def dispatch_signals(
 
             raw_score = round(signal.conviction_score * 5)
 
-            # For Tier D signals, retrieve the PRU FMP snapshot so entry_gate
-            # shadow validation can detect ctx data-flow gaps.
+            # For Tier D signals, retrieve the PRU FMP snapshot and backfill info
+            # so entry_gate shadow validation can detect ctx data-flow gaps and
+            # log missing_fresh_trade_context_after_rescue.
             _pru_snap: dict = {}
+            _t4_backfill: dict = {}
             if getattr(signal, "scanner_tier", "") == "D":
                 try:
                     import scanner as _scanner_mod
@@ -286,6 +389,7 @@ def dispatch_signals(
                     _pru_snap = _pru_meta.get(signal.symbol, {}).get("pru_fmp_snapshot") or {}
                 except Exception as _pe:
                     log.debug("dispatch: pru_fmp_snapshot lookup failed for %s: %s", signal.symbol, _pe)
+                _t4_backfill = _tier_d_backfill.get(signal.symbol.upper(), {})
 
             gate_ok, gate_type, gate_reason, effective_score = validate_entry(
                 direction=signal.direction,
@@ -297,6 +401,7 @@ def dispatch_signals(
                 open_intraday_count=_open_intraday_count,
                 scanner_tier=getattr(signal, "scanner_tier", "") or None,
                 pru_fmp_snapshot=_pru_snap or None,
+                tier_d_backfill_info=_t4_backfill or None,
             )
 
             if not gate_ok:
