@@ -52,7 +52,11 @@ def _regime_is_hostile(regime: str | None) -> bool:
 # ── INTRADAY gate ─────────────────────────────────────────────────────────────
 
 
-def _validate_intraday(direction: str, ctx: TradeContext) -> tuple[bool, str, int]:
+def _validate_intraday(
+    direction: str,
+    ctx: TradeContext,
+    score_breakdown: dict | None = None,
+) -> tuple[bool, str, int]:
     """
     Validate INTRADAY entry conditions.
 
@@ -60,6 +64,7 @@ def _validate_intraday(direction: str, ctx: TradeContext) -> tuple[bool, str, in
     score_penalty > 0 means this many extra points are required above base threshold.
     """
     score_penalty = 0
+    sig_threshold = _cfg("intraday_signal_threshold", 5)
 
     # ── Hard disqualifiers ────────────────────────────────────────────────────
 
@@ -71,8 +76,37 @@ def _validate_intraday(direction: str, ctx: TradeContext) -> tuple[bool, str, in
     if ctx.earnings_days_away is not None and ctx.earnings_days_away <= 0:
         return False, "earnings same day — binary event, not a technical trade", 0
 
+    # ── Change 2 — 2-of-3 signal gate ────────────────────────────────────────
+    # IC evidence: flow=+0.219, squeeze=+0.197, momentum=+0.082.
+    # Any 2 of the 3 must score ≥ threshold (default 5). 1-of-3 → REJECT.
+    bd = score_breakdown or {}
+    flow_score = float(bd.get("flow", 0) or 0)
+    squeeze_score = float(bd.get("squeeze", 0) or 0)
+    momentum_score = float(bd.get("momentum", 0) or 0)
+    signals_firing = sum([
+        flow_score >= sig_threshold,
+        squeeze_score >= sig_threshold,
+        momentum_score >= sig_threshold,
+    ])
+    if signals_firing < 2:
+        return False, (
+            f"INTRADAY 2-of-3 signal gate: only {signals_firing}/3 signals ≥{sig_threshold} "
+            f"(flow={flow_score:.0f} squeeze={squeeze_score:.0f} momentum={momentum_score:.0f}) "
+            "— need any 2 of (flow, squeeze, momentum); entry_gate:2of3_signal_gate"
+        ), 0
+
+    # ── Change 3 — INTRADAY SHORT: flow AND squeeze required ─────────────────
+    # Short side has structural long bias against it — require stronger confirmation.
+    if direction.lower() == "short":
+        if flow_score < sig_threshold or squeeze_score < sig_threshold:
+            return False, (
+                f"INTRADAY SHORT requires flow≥{sig_threshold} AND squeeze≥{sig_threshold}: "
+                f"flow={flow_score:.0f} squeeze={squeeze_score:.0f} "
+                "— entry_gate:short_flow_squeeze_gate"
+            ), 0
+
     # ── Tape gate: long entries require tape not deeply bearish ───────────────
-    if direction == "long":
+    if direction.lower() == "long":
         spy_chg = ctx.regime.get("spy_chg_1d", 0.0) if isinstance(ctx.regime, dict) else 0.0
         qqq_chg = ctx.regime.get("qqq_chg_1d", 0.0) if isinstance(ctx.regime, dict) else 0.0
         hard_block = CONFIG.get("tape_bearish_hard_block_pct", -2.0)
@@ -89,8 +123,15 @@ def _validate_intraday(direction: str, ctx: TradeContext) -> tuple[bool, str, in
 # ── SWING gate ────────────────────────────────────────────────────────────────
 
 
+_STRUCTURAL_CATALYST_TYPES = frozenset({
+    "earnings", "earnings_beat", "earnings_surprise", "pead",
+    "upgrade", "sector", "overnight_drift",
+})
+_SWING_SHORT_BEARISH_REGIMES = frozenset({"TRENDING_DOWN", "RELIEF_RALLY", "CAPITULATION"})
+
+
 def _validate_swing(direction: str, ctx: TradeContext) -> tuple[bool, str, int]:
-    """Validate SWING entry — requires at least one qualifying catalyst."""
+    """Validate SWING entry — requires at least one qualifying structural catalyst."""
 
     # ── Hard disqualifiers ────────────────────────────────────────────────────
 
@@ -108,17 +149,60 @@ def _validate_swing(direction: str, ctx: TradeContext) -> tuple[bool, str, int]:
         )
 
     # Catalyst score floor
-    min_catalyst = _cfg("swing_min_catalyst_score", 30)
+    min_catalyst = _cfg("swing_min_catalyst_score", 5.0)
     cat_score = ctx.catalyst_score or 0.0
     if cat_score < min_catalyst:
         return (
             False,
-            f"catalyst score {cat_score:.0f} below SWING floor {min_catalyst}",
+            f"catalyst score {cat_score:.1f} below SWING floor {min_catalyst:.1f} — entry_gate:catalyst_score_floor",
             0,
         )
 
+    # ── Change 6 — Block news-alone SWING entries ─────────────────────────────
+    # News IC = -0.253 (anti-predictive). Structural catalysts required.
+    # Allowed: earnings/PEAD, analyst upgrade, insider buying, congressional trade, sector.
+    # Currently SHADOW MODE (swing_news_alone_blocks=False): logs would-have-blocked
+    # but does not reject. Enable once ≥80% of SWING entries populate catalyst_type.
+    has_structural = (
+        (ctx.catalyst_type or "").lower() in _STRUCTURAL_CATALYST_TYPES
+        or ctx.recent_upgrade
+        or ctx.insider_net_sentiment == "BUYING"
+        or (ctx.congressional_sentiment or "").upper() == "BUYING"
+    )
+    if not has_structural:
+        if _cfg("swing_news_alone_blocks", True):
+            return False, (
+                f"news-alone SWING blocked: no structural catalyst found "
+                f"(catalyst_type={ctx.catalyst_type}, recent_upgrade={ctx.recent_upgrade}, "
+                f"insider={ctx.insider_net_sentiment}, congressional={ctx.congressional_sentiment}) "
+                "— news IC=-0.253 is anti-predictive; need earnings/upgrade/insider/congressional/sector — "
+                "entry_gate:news_alone_swing_block"
+            ), 0
+        elif _cfg("swing_news_alone_blocks_shadow", False):
+            log.info(
+                "entry_gate SHADOW: %s SWING would-have-blocked (news-alone, no structural catalyst) — "
+                "catalyst_type=%s recent_upgrade=%s insider=%s congressional=%s — "
+                "entry_gate:news_alone_swing_block_shadow",
+                ctx.symbol if ctx else "?",
+                ctx.catalyst_type, ctx.recent_upgrade,
+                ctx.insider_net_sentiment, ctx.congressional_sentiment,
+            )
+
+    # ── Change 7 — SWING SHORT: bearish structural regime only ────────────────
+    # Short book lost -$75,907. Only allow SWING SHORTs in genuinely bearish structure.
+    if direction.lower() == "short" and _cfg("swing_short_bearish_regimes_only", True):
+        structural_regime = (
+            ctx.regime.get("regime", "") if isinstance(ctx.regime, dict) else (ctx.regime or "")
+        ).upper()
+        if structural_regime not in _SWING_SHORT_BEARISH_REGIMES:
+            return False, (
+                f"SWING SHORT blocked in regime '{structural_regime}' "
+                f"(allowed: TRENDING_DOWN, RELIEF_RALLY, CAPITULATION) "
+                "— entry_gate:swing_short_bearish_regime_gate"
+            ), 0
+
     # ── Tape gate: hard block long swings on deeply bearish tape ─────────────
-    if direction == "long":
+    if direction.lower() == "long":
         spy_chg = ctx.regime.get("spy_chg_1d", 0.0) if isinstance(ctx.regime, dict) else 0.0
         qqq_chg = ctx.regime.get("qqq_chg_1d", 0.0) if isinstance(ctx.regime, dict) else 0.0
         hard_block = CONFIG.get("tape_bearish_hard_block_pct", -2.0)
@@ -131,7 +215,11 @@ def _validate_swing(direction: str, ctx: TradeContext) -> tuple[bool, str, int]:
 # ── POSITION gate ─────────────────────────────────────────────────────────────
 
 
-def _validate_position(direction: str, ctx: TradeContext) -> tuple[bool, str]:
+def _validate_position(
+    direction: str,
+    ctx: TradeContext,
+    instrument: str | None = None,
+) -> tuple[bool, str]:
     """
     Validate POSITION entry using a two-path fundamental checklist.
 
@@ -158,6 +246,21 @@ def _validate_position(direction: str, ctx: TradeContext) -> tuple[bool, str]:
       3. Recent analyst upgrade (last 10 days)
       4. Insider net buying
     """
+    # ── Change 8 — POSITION: LONG only, equity only ──────────────────────────
+    if _cfg("position_long_only", True) and (direction or "").lower() == "short":
+        return False, (
+            "POSITION blocked for SHORT direction (position_long_only=True) — "
+            "downgrade to SWING — entry_gate:position_long_only"
+        )
+
+    _instr = (instrument or "").lower()
+    if _cfg("position_equity_only", True) and _instr in ("call", "put", "option", "options"):
+        return False, (
+            f"POSITION blocked for instrument='{instrument}' (position_equity_only=True): "
+            "theta decay incompatible with multi-week hold — "
+            "downgrade to SWING — entry_gate:position_equity_only"
+        )
+
     # ── Hard gate 1: binary catalyst risk ────────────────────────────────────
     min_earn_days = _cfg("position_min_earnings_days_away", 5)
     if ctx.earnings_days_away is not None and ctx.earnings_days_away < min_earn_days:
@@ -192,7 +295,7 @@ def _validate_position(direction: str, ctx: TradeContext) -> tuple[bool, str]:
         and ctx.revenue_growth_yoy > min_rev_growth
         and not ctx.revenue_decelerating
         and (ctx.gross_margin is None or ctx.gross_margin > min_gross_margin)
-        and ctx.eps_accelerating is True
+        and ctx.eps_accelerating is not False
     )
 
     if not path_a and not path_b:
@@ -288,6 +391,9 @@ def validate_entry(
     score: int,
     min_score: int | None = None,
     opus_trade_type: str | None = None,
+    score_breakdown: dict | None = None,
+    instrument: str | None = None,
+    open_intraday_count: int = 0,
 ) -> tuple[bool, str, str, int]:
     """
     Full entry validation: classify trade type and check effective score.
@@ -300,18 +406,74 @@ def validate_entry(
     When Opus says POSITION, the two-path fundamental checklist in _validate_position()
     is run. If it fails, trade_type is downgraded to SWING — the trade still opens,
     it just gets the shorter hold horizon.
+
+    score_breakdown: per-dimension signal scores {flow, squeeze, momentum, ...}
+    instrument: "stock"|"call"|"put"|"COMMON" — used for POSITION equity-only gate
+    open_intraday_count: number of currently open INTRADAY positions (concurrency gate)
     """
     if min_score is None:
         min_score = CONFIG.get("min_score_to_trade", 14)
+
+    # ── Change 5 — Block score=0 SWING/POSITION entries ──────────────────────
+    # score=0 means no signal data was available. 18% of historical SWING trades
+    # entered at score=0. These have no signal basis and must not enter.
+    # Rollback: set score_zero_swing_position_blocks=False in config entry_gate section.
+    if score == 0 and opus_trade_type in ("SWING", "POSITION") and _cfg("score_zero_swing_position_blocks", True):
+        log.info(
+            "entry_gate: %s %s score=0 REJECTED for %s — no signal data available — "
+            "entry_gate:score_zero_swing_position",
+            ctx.symbol if ctx else "?", direction, opus_trade_type,
+        )
+        return False, "REJECT", (
+            f"score=0 — no signal data available for {opus_trade_type} entry "
+            "— entry_gate:score_zero_swing_position"
+        ), score
 
     trade_type, reason, effective_score = classify_trade_type(direction, ctx, score)
 
     if trade_type == "REJECT":
         return False, "REJECT", reason, effective_score
 
+    # ── Change 4 — INTRADAY max concurrent check ──────────────────────────────
+    if opus_trade_type == "INTRADAY":
+        max_concurrent = _cfg("intraday_max_concurrent", 2)
+        if open_intraday_count >= max_concurrent:
+            log.info(
+                "entry_gate: %s %s INTRADAY concurrent limit reached (%d/%d open) — "
+                "entry_gate:intraday_max_concurrent",
+                ctx.symbol if ctx else "?", direction, open_intraday_count, max_concurrent,
+            )
+            return False, "REJECT", (
+                f"INTRADAY max concurrent {max_concurrent} reached "
+                f"({open_intraday_count} open) — entry_gate:intraday_max_concurrent"
+            ), score
+
+    # ── INTRADAY checklist: signal gates for INTRADAY entries ────────────────
+    if opus_trade_type == "INTRADAY" and ctx is not None:
+        intra_ok, intra_reason, intra_penalty = _validate_intraday(
+            direction, ctx, score_breakdown=score_breakdown
+        )
+        if not intra_ok:
+            log.info(
+                "entry_gate: %s %s INTRADAY gate REJECTED | %s",
+                ctx.symbol, direction, intra_reason,
+            )
+            return False, "REJECT", intra_reason, effective_score
+        effective_score -= intra_penalty  # score_penalty reduces effective score
+
+    # ── SWING checklist: catalyst gates for SWING entries ────────────────────
+    if opus_trade_type == "SWING" and ctx is not None:
+        swing_ok, swing_reason, _ = _validate_swing(direction, ctx)
+        if not swing_ok:
+            log.info(
+                "entry_gate: %s %s SWING gate REJECTED | %s",
+                ctx.symbol, direction, swing_reason,
+            )
+            return False, "REJECT", swing_reason, effective_score
+
     # ── POSITION checklist: validate fundamentals when Opus said POSITION ─────
     if opus_trade_type == "POSITION":
-        qualifies, pos_reason = _validate_position(direction, ctx)
+        qualifies, pos_reason = _validate_position(direction, ctx, instrument=instrument)
         if qualifies:
             trade_type = "POSITION"
             reason = pos_reason

@@ -112,11 +112,23 @@ def test_hold_no_action_when_entry_regime_empty():
 # ── Regression: SCALP and SWING behaviour unchanged ──────────────────────────
 
 
-def test_scalp_still_exits_when_stale():
-    pos = _pos(trade_type="SCALP", entry_regime="BULL", mins_ago=100, entry=100.0, current=100.1)  # pnl < 0.3%
+def test_scalp_exits_when_stale_and_losing():
+    # Phase 4 Change 15: timeout force-exit only when pnl < 0% (losing trade).
+    # current=99.5 < entry=100.0 → pnl = -0.5% < 0% → force EXIT
+    pos = _pos(trade_type="SCALP", entry_regime="BULL", mins_ago=100, entry=100.0, current=99.5)
     actions = lightweight_cycle_check([pos], _regime("BULL"), [])
     assert len(actions) == 1
     assert actions[0]["action"] == "EXIT"
+
+
+def test_scalp_not_force_exited_when_profitable_at_timeout():
+    # Phase 4 Change 15: profitable SCALP at timeout goes to PM review, not forced exit.
+    # current=100.5 > entry=100.0 → pnl = +0.5% ≥ 0% → NOT force-exited by guardrails
+    pos = _pos(trade_type="SCALP", entry_regime="BULL", mins_ago=100, entry=100.0, current=100.5)
+    actions = lightweight_cycle_check([pos], _regime("BULL"), [])
+    # Must NOT be a forced EXIT action — may be REVIEW or empty
+    exit_actions = [a for a in actions if a["action"] == "EXIT"]
+    assert len(exit_actions) == 0
 
 
 def test_swing_still_reviews_on_regime_change():

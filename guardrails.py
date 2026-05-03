@@ -111,10 +111,11 @@ def compute_allowed_trade_types(
     if reg == "PANIC" and "SWING" in allowed:
         allowed.remove("SWING")
     if minutes_to_close is not None:
-        if minutes_to_close < 30 and "INTRADAY" in allowed:
+        # Phase 1 Change 4: 90-min no-entry window (was 30 min).
+        # INTRADAY positions entered <90min before close cannot be managed before EOD flat.
+        no_entry_mins = CONFIG.get("entry_gate", {}).get("intraday_no_entry_minutes_before_close", 90)
+        if minutes_to_close < no_entry_mins and "INTRADAY" in allowed:
             allowed.remove("INTRADAY")
-        if minutes_to_close < 60 and "POSITION" in allowed:
-            allowed.remove("POSITION")
     return allowed
 
 
@@ -168,7 +169,17 @@ def screen_open_positions(
 
         mins_held = _minutes_held(pos, now)
         if tt in ("INTRADAY", "SCALP") and mins_held > scalp_max_mins:
-            forced.append((sym, "scalp_timeout")); continue
+            # Phase 4 Change 15: only force-exit if pnl < 0% (losing trade).
+            # Profitable trades at timeout go to PM review instead of forced exit.
+            scalp_min_pnl = CONFIG.get("portfolio_manager", {}).get("scalp_min_pnl_pct", 0.0)
+            entry_px = pos.get("entry") or 0.0
+            current_px = pos.get("current") or entry_px
+            pos_pnl_pct = ((current_px - entry_px) / entry_px) if entry_px else 0.0
+            if (pos.get("direction") or "LONG").upper() == "SHORT":
+                pos_pnl_pct = -pos_pnl_pct
+            if pos_pnl_pct < scalp_min_pnl:
+                forced.append((sym, "scalp_timeout")); continue
+            # else: profitable at timeout — leave for PM review, not a forced exit
 
         if tt in ("INTRADAY", "SCALP") and _is_eod_window(now):
             forced.append((sym, "eod_flat")); continue

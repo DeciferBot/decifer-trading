@@ -96,6 +96,12 @@ CONFIG = {
     # Leave blank to skip (bot falls back to trade-based reconstruction).
     "ibkr_flex_token": os.environ.get("IBKR_FLEX_TOKEN", ""),
     "ibkr_flex_query_id": os.environ.get("IBKR_FLEX_QUERY_ID", ""),
+    # Trades Flex Query — Activity Flex Query ID 1495436 ("Decifer Trades")
+    # Fields: TradeDate, DateTime, Quantity, AssetClass, IBExecID, IBOrderID,
+    #         Buy/Sell, FifoPnlRealized, TradePrice, Symbol, IBCommission
+    # Period: Last 365 Calendar Days, Format: XML
+    # Used by ibkr_reconciler.py to fill historical gaps beyond reqExecutions 24h window.
+    "ibkr_flex_trades_query_id": os.environ.get("IBKR_FLEX_TRADES_QUERY_ID", ""),
     # ── FRED (Federal Reserve Economic Data) — free, unlimited ──
     # Economic release calendar + macro indicator snapshots (CPI, unemployment, etc.)
     # Sign up: https://fred.stlouisfed.org/docs/api/api_key.html (free, instant)
@@ -208,7 +214,11 @@ CONFIG = {
     # Tier B = committed ~1000-symbol list promoted daily to top-50, Tier C =
     # dynamic adds (catalyst, held, favs, sympathy, news). Replaces TV screener.
     "promoter_enabled": True,  # Master gate — disables 16:15/08:00 fires + Sunday refresh
-    "promoter_top_n": 50,  # How many symbols to promote into the daily scan universe
+    "promoter_top_n": 50,  # How many symbols to promote into the daily scan universe (always = momentum_slots + accumulation_slots)
+    "promoter_momentum_slots": 35,          # Phase 4 Change 13: Track A — momentum candidates
+    "promoter_accumulation_slots": 15,      # Phase 4 Change 13: Track B — accumulation/quality candidates
+    "promoter_accumulation_min_flow": 6,    # Phase 4: min flow signal score for Track B (sustained)
+    "promoter_accumulation_min_cycles": 3,  # Phase 4: flow must be ≥ min_flow for this many consecutive cycles
     "promoter_weight_gap": 3.0,  # Weight on |overnight gap %|
     "promoter_weight_pm_volume": 2.0,  # Weight on minute-bar relative volume (vs 30d avg)
     "promoter_weight_5d_return": 1.0,  # v2 — unused until 30d bar fetcher ships
@@ -491,7 +501,9 @@ CONFIG = {
     # stable than 20h EMA), VIX < 20 in an uptrend is a genuine bull regime.
     # Lowered vix_choppy_max 25→20: VIX > 20 while both SPY and QQQ are below
     # their 200d MA is a bear market, not merely choppy.
-    "vix_bull_max": 20,  # VIX below this + above 200d MA = TRENDING_UP
+    "vix_bull_max": 20,     # VIX below this + above 200d MA = TRENDING_UP (Phase 2 replaces with hysteresis)
+    "vix_bull_entry": 20,   # Phase 2: hysteresis entry threshold (same as old vix_bull_max — no backtest change)
+    "vix_bull_exit": 22,    # Phase 2: hysteresis exit threshold — must exceed 22 to leave TRENDING_UP
     "vix_choppy_max": 20,  # VIX above this + below 200d MA = TRENDING_DOWN
     "vix_panic_min": 35,  # VIX above = panic — no trades
     "vix_spike_pct": 0.20,  # 20% VIX spike in 1 hour = exit all
@@ -596,7 +608,7 @@ CONFIG = {
     # directly models the return distribution — genuinely orthogonal signal.
     "hmm_regime": {
         "enabled": True,
-        "lookback_days": 252,  # 1 year of daily returns
+        "lookback_days": 504,  # 2 years of daily returns — covers a full bull-bear cycle
         "cache_ttl_seconds": 3600,  # Re-fit at most once per hour
     },
     # ── REGIME DETECTOR LOCK ──────────────────────────────────
@@ -855,7 +867,8 @@ CONFIG = {
         "drawdown_trigger_pct": -0.015,  # daily_pnl / portfolio_value → trigger
         "earnings_lookahead_hours": 48,  # flag earnings within this window
         "max_tokens": 600,
-        "scalp_max_hold_minutes": 60,       # INTRADAY/SCALP timeout; live: 60
+        "scalp_max_hold_minutes": 90,       # INTRADAY/SCALP timeout raised 60→90 (Phase 4 Change 15); live: 60
+        "scalp_min_pnl_pct": 0.0,          # Phase 4: only force-exit losers at timeout (was 0.003 = 0.3%)
         "scalp_momentum_entry_min": 4,      # min momentum score at entry to qualify for mom_lost check
         "scalp_momentum_current_max": 1,    # current momentum at or below this → mom_lost fires
     },
@@ -871,7 +884,7 @@ CONFIG = {
         # score >= min_score_intraday       → INTRADAY
         # else                              → AVOID
         "min_score_swing_position": 40,   # live: 40
-        "min_score_intraday":       28,   # live: 28
+        "min_score_intraday":       40,   # Phase 1 Change 1: raised 28→40; score<40 has same win rate as chance; live: 28
 
         # INTRADAY thresholds
         "intraday_max_signal_age_minutes":   15,    # signal older than this → reject
@@ -888,7 +901,19 @@ CONFIG = {
         "swing_min_earnings_days_away":      5,     # earnings closer than this → reject
         "swing_max_short_float_pct":        30.0,   # short float above this → reject (no squeeze)
         "swing_sector_rotation_max_days":   10,     # sector ETF breakout must be < N days old
-        "swing_min_catalyst_score":          3.0,    # catalyst_engine score floor (0–10 scale)
+        "swing_min_catalyst_score":          5.0,    # Phase 1 Change 6: raised 3.0→5.0; live: 3.0
+        "score_zero_swing_position_blocks":  True,   # Phase 1 Change 5: block SWING/POSITION entries with score=0 (no signal data);
+                                                    # 18% of historical SWING trades entered at score=0; set False to disable
+        "swing_news_alone_blocks":           False,  # Phase 1 Change 6: SHADOW MODE — catalyst fields 0% populated in historical data;
+                                                    # set True only after Phase 5 Apex prompt ships and ≥80% of SWING entries
+                                                    # populate catalyst_type in trade_context (currently 0/97 = 0%)
+        "swing_news_alone_blocks_shadow":    True,   # Log would-have-blocked but do not reject (for field population monitoring)
+        "swing_short_bearish_regimes_only":  True,   # Phase 1 Change 7: SWING SHORT only in TRENDING_DOWN/RELIEF_RALLY/CAPITULATION
+        "position_long_only":                True,   # Phase 1 Change 8: POSITION = LONG direction only
+        "position_equity_only":              True,   # Phase 1 Change 8: POSITION = equities only (no options)
+        "intraday_no_entry_minutes_before_close": 90,  # Phase 1 Change 4: block INTRADAY last 90 min (was 30)
+        "intraday_max_concurrent":           2,      # Phase 1 Change 4: max 2 open INTRADAY at once
+        "intraday_signal_threshold":         5,      # Phase 1 Change 2/3: dimension score floor for 2-of-3 gate
         "swing_max_hold_days":             10,      # paper=10; live=7 — triggers Apex PM review (not exit)
 
         # POSITION thresholds — two-path checklist

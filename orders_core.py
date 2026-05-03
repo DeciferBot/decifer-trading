@@ -54,11 +54,18 @@ from orders_state import (
 
 
 def _resolve_regime(regime: dict | str | None) -> str:
-    """Extract a regime string from any regime representation."""
+    """Extract the structural regime label — never session_character.
+
+    session_character is Apex's free-text description of the current session
+    (e.g. "MOMENTUM_BULL"). It changes wording every cycle even when market
+    structure is identical, causing false regime-change comparisons.
+
+    Always use the structural label ("TRENDING_UP", "RANGE_BOUND", etc.) so
+    entry_regime stored on position records is stable and comparable across cycles.
+    """
     if isinstance(regime, dict):
         return (
-            regime.get("session_character")
-            or regime.get("regime")
+            regime.get("regime")
             or regime.get("name")
             or "UNKNOWN"
         )
@@ -486,7 +493,7 @@ def execute_buy(
             except Exception:
                 pass
             _wal_regime = (
-                (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
+                regime.get("regime", "UNKNOWN")
                 if isinstance(regime, dict) else "UNKNOWN"
             )
             _wal_entry_thesis = _build_entry_thesis(
@@ -1104,7 +1111,7 @@ def execute_buy(
                         "LONG",
                         conviction,
                         score,
-                        (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
+                        regime.get("regime", "UNKNOWN")
                         if isinstance(regime, dict)
                         else "UNKNOWN",
                         market_read=market_read,
@@ -1425,7 +1432,7 @@ def execute_short(
             except Exception:
                 pass
             _wal_regime_s = (
-                (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
+                regime.get("regime", "UNKNOWN")
                 if isinstance(regime, dict) else "UNKNOWN"
             )
             _wal_entry_thesis_s = _build_entry_thesis(
@@ -1697,7 +1704,7 @@ def execute_short(
                         "SHORT",
                         conviction,
                         score,
-                        (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
+                        regime.get("regime", "UNKNOWN")
                         if isinstance(regime, dict)
                         else "UNKNOWN",
                         market_read=market_read,

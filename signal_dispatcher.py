@@ -260,12 +260,26 @@ def dispatch_signals(
 
             trade_ctx = _context_map.get(signal.symbol.upper())
 
+            # Count currently open INTRADAY positions for the concurrency gate (Change 4)
+            _open_intraday_count = 0
+            try:
+                from orders_portfolio import get_open_positions as _gop
+                _open_intraday_count = sum(
+                    1 for _p in _gop()
+                    if (_p.get("trade_type") or "").upper() in ("INTRADAY", "SCALP")
+                )
+            except Exception as _oi_err:
+                log.debug("dispatch: open_intraday_count fetch failed: %s", _oi_err)
+
             raw_score = round(signal.conviction_score * 5)
             gate_ok, gate_type, gate_reason, effective_score = validate_entry(
                 direction=signal.direction,
                 ctx=trade_ctx,
                 score=raw_score,
                 opus_trade_type=cls.trade_type,
+                score_breakdown=signal.dimension_scores,
+                instrument=signal.instrument,
+                open_intraday_count=_open_intraday_count,
             )
 
             if not gate_ok:

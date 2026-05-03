@@ -202,11 +202,15 @@ class TestBuildPmExitReason:
         result = bot_trading._build_pm_exit_reason({}, {}, "trigger", "reason")
         assert "pm_exit" in result
 
-    def test_session_character_preferred_over_regime_key(self):
+    def test_structural_regime_used_not_session_character(self):
+        # Phase 1 Change 9: exit regime must use structural regime label ("regime" key),
+        # never session_character. session_character changes wording without market changing.
         pos = _make_pos(entry_regime="MOMENTUM_BULL")
-        regime = {"regime": "UNKNOWN", "session_character": "TRENDING_BEAR"}
+        regime = {"regime": "RANGE_BOUND", "session_character": "TRENDING_BEAR"}
         result = bot_trading._build_pm_exit_reason(pos, regime, "trig", "r")
-        assert "→TRENDING_BEAR" in result
+        # Structural label must appear; session_character must NOT override it
+        assert "→RANGE_BOUND" in result
+        assert "→TRENDING_BEAR" not in result
 
 
 # ─── tp_order_id exit-type classification ───────────────────────────────────

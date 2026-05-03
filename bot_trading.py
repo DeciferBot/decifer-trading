@@ -341,7 +341,7 @@ def _build_pm_exit_reason(pos: dict, regime: dict, pm_trigger: str, reason_pm: s
     """Build a structured, thesis-level exit reason for PM-initiated exits/trims."""
     entry_regime = pos.get("entry_regime", "UNKNOWN")
     exit_regime = (
-        (regime.get("session_character") or regime.get("regime", "UNKNOWN")) if isinstance(regime, dict) else "UNKNOWN"
+        regime.get("regime", "UNKNOWN") if isinstance(regime, dict) else "UNKNOWN"
     )
     trade_type_ex = pos.get("trade_type", "INTRADAY")
     try:
@@ -511,10 +511,8 @@ def check_external_closes(regime: dict):
                     exit_type = "manual"
                 # ── Build thesis-level reason (GAP-002) ────────────────────
                 entry_regime = trade.get("entry_regime", "UNKNOWN")
-                # Prefer session_character in regime dict (set by dispatcher) so the
-                # exit label uses the same vocabulary as the entry label.
                 exit_regime = (
-                    (regime.get("session_character") or regime.get("regime", "UNKNOWN"))
+                    regime.get("regime", "UNKNOWN")
                     if isinstance(regime, dict)
                     else "UNKNOWN"
                 )
@@ -1728,7 +1726,7 @@ def run_scan():
                             },
                         )
             elif _act_ca == "REVIEW":
-                _cur_regime_cc = regime.get("session_character") or regime.get("regime", "UNKNOWN")
+                _cur_regime_cc = regime.get("regime", "UNKNOWN")
                 if _pm_reviewed_regime.get(_sym_ca) == _cur_regime_cc:
                     clog(
                         "INFO",
@@ -2238,7 +2236,7 @@ def run_scan():
                     _last_scalp_mom_scores[_rsym] = _cm
             # Record which regime each reviewed position was reviewed under so cycle_check
             # does not re-queue the same REVIEW on subsequent cycles for the same regime state.
-            _reviewed_regime_label = regime.get("session_character") or regime.get("regime", "UNKNOWN")
+            _reviewed_regime_label = regime.get("regime", "UNKNOWN")
             _now_reviewed = datetime.now(UTC)
             for _rp in pm_open_pos:
                 _pm_reviewed_regime[_rp["symbol"]] = _reviewed_regime_label
