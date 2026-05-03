@@ -2393,13 +2393,81 @@ def run_scan():
         )
         # Cap at top 30 by score — sending 80+ candidates bloats the Apex
         # response past the token budget and causes JSON truncation.
-        _cut_candidates = sorted(
+        _CAP_LIMIT = 30
+        _cut_all_sorted = sorted(
             _cut_candidates_raw, key=lambda c: c.get("score", 0), reverse=True
-        )[:30]
-        if len(_cut_candidates_raw) > 30:
+        )
+        _cut_candidates = _cut_all_sorted[:_CAP_LIMIT]
+        if len(_cut_candidates_raw) > _CAP_LIMIT:
             clog("INFO",
                  f"APEX_LIVE: {len(_cut_candidates_raw)} candidates after guardrails "
-                 f"— capped to top 30 by score")
+                 f"— capped to top {_CAP_LIMIT} by score")
+
+        # ── Tier D apex-cap funnel record ─────────────────────────────────────
+        # Written unconditionally so the evidence report can see whether any
+        # Tier D candidates were present pre-cap, and whether the cap dropped them.
+        try:
+            _cap_dropped = _cut_all_sorted[_CAP_LIMIT:]
+            _td_before  = [c for c in _cut_all_sorted if c.get("scanner_tier") == "D"]
+            _td_after   = [c for c in _cut_candidates  if c.get("scanner_tier") == "D"]
+            _td_dropped = [c for c in _cap_dropped      if c.get("scanner_tier") == "D"]
+            _min_sel_score = min((c.get("score", 0) for c in _cut_candidates), default=None)
+            _max_td_score  = max((c.get("score", 0) for c in _td_before),      default=None)
+            _highest_td_dropped_score = max((c.get("score", 0) for c in _td_dropped), default=None)
+            _cap_record = {
+                "ts":                           datetime.now(UTC).isoformat(),
+                "stage":                        "apex_cap",
+                "raw_candidates_before_cap":    len(_cut_all_sorted),
+                "raw_tier_d_before_cap":        len(_td_before),
+                "raw_non_tier_d_before_cap":    len(_cut_all_sorted) - len(_td_before),
+                "cap_limit":                    _CAP_LIMIT,
+                "selected_candidates_after_cap": len(_cut_candidates),
+                "selected_tier_d_after_cap":    len(_td_after),
+                "selected_non_tier_d_after_cap": len(_cut_candidates) - len(_td_after),
+                "dropped_by_cap_total":         len(_cap_dropped),
+                "dropped_tier_d_by_cap":        len(_td_dropped),
+                "dropped_non_tier_d_by_cap":    len(_cap_dropped) - len(_td_dropped),
+                "selected_tier_d_symbols":      [c.get("symbol") for c in _td_after],
+                "dropped_tier_d_symbols_top_20": [c.get("symbol") for c in _td_dropped[:20]],
+                "top_10_selected_by_score": [
+                    {
+                        "symbol":       c.get("symbol"),
+                        "score":        c.get("score"),
+                        "scanner_tier": c.get("scanner_tier", ""),
+                    }
+                    for c in _cut_candidates[:10]
+                ],
+                "top_10_dropped_tier_d": [
+                    {
+                        "symbol":             c.get("symbol"),
+                        "score":              c.get("score"),
+                        "discovery_score":    c.get("discovery_score"),
+                        "matched_archetypes": c.get("matched_position_archetypes", []),
+                    }
+                    for c in _td_dropped[:10]
+                ],
+                "max_tier_d_score_before_cap":     _max_td_score,
+                "min_selected_score_after_cap":    _min_sel_score,
+                "highest_dropped_tier_d_score":    _highest_td_dropped_score,
+                "tier_d_with_archetypes_dropped":  any(
+                    c.get("matched_position_archetypes") for c in _td_dropped
+                ),
+                "tier_d_strong_discovery_dropped": any(
+                    (c.get("discovery_score") or 0) >= 6 for c in _td_dropped
+                ),
+            }
+            _funnel_path = Path(__file__).parent / "data" / "tier_d_funnel.jsonl"
+            with open(_funnel_path, "a") as _cap_f:
+                _cap_f.write(json.dumps(_cap_record) + "\n")
+            if _td_before:
+                clog("INFO",
+                     f"Tier D apex_cap: pre_cap={len(_td_before)} "
+                     f"selected={len(_td_after)} dropped={len(_td_dropped)} "
+                     f"max_td_score={_max_td_score} min_selected={_min_sel_score} "
+                     f"archetypes_dropped={_cap_record['tier_d_with_archetypes_dropped']} "
+                     f"strong_discovery_dropped={_cap_record['tier_d_strong_discovery_dropped']}")
+        except Exception as _cap_fe:
+            log.debug("Tier D apex_cap funnel write failed (non-critical): %s", _cap_fe)
 
         # Attach TradeContext (fundamentals) to each candidate so Apex can
         # evaluate POSITION classification. Uses FMP cache warmed at scan start.

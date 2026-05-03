@@ -96,11 +96,12 @@ def main() -> None:
 
     funnel_pipeline  = [r for r in funnel_raw if r.get("stage") == "pipeline"]
     funnel_dispatch  = [r for r in funnel_raw if r.get("stage") == "dispatch"]
+    funnel_apex_cap  = [r for r in funnel_raw if r.get("stage") == "apex_cap"]
 
     print(f"\nTier D Evidence Report  —  generated {datetime.now(timezone.utc).isoformat()[:19]}Z")
     print(f"PRU file:    {PRU_JSON}")
     print(f"PRU built:   {_ts_display(pru_built_at)}  ({pru_count} symbols)")
-    print(f"Funnel records:  {len(funnel_pipeline)} pipeline + {len(funnel_dispatch)} dispatch")
+    print(f"Funnel records:  {len(funnel_pipeline)} pipeline + {len(funnel_dispatch)} dispatch + {len(funnel_apex_cap)} apex_cap")
     print(f"Shadow records:  {len(shadow)}")
 
     if not funnel_pipeline and not shadow:
@@ -202,6 +203,98 @@ def main() -> None:
         if (p_drop_scored == 0 and (p_all_scored - p_above_thresh) == 0 and p_dropped == 0
                 and apex_totals.get("AVOID", 0) == 0):
             print(f"    ✓ No attrition anomalies detected")
+
+    # ------------------------------------------------------------------ #
+    # SECTION 0b — Apex Cap Analysis
+    # ------------------------------------------------------------------ #
+    section("SECTION 0b — Apex Cap Analysis (top-30 hard cap before Apex)")
+
+    if not funnel_apex_cap:
+        print("  ⚠  No apex_cap funnel records found.")
+        print(f"     Expected at: {FUNNEL_JSONL}  (stage=apex_cap)")
+        print("     This record is written by bot_trading.py after the guardrails filter.")
+        print("     Ensure the bot ran at least one full scan cycle after this code shipped.")
+    else:
+        ac_cycles   = len(funnel_apex_cap)
+        ac_pre_td   = sum(r.get("raw_tier_d_before_cap",        0) for r in funnel_apex_cap)
+        ac_sel_td   = sum(r.get("selected_tier_d_after_cap",    0) for r in funnel_apex_cap)
+        ac_drop_td  = sum(r.get("dropped_tier_d_by_cap",        0) for r in funnel_apex_cap)
+        ac_pre_all  = sum(r.get("raw_candidates_before_cap",    0) for r in funnel_apex_cap)
+        ac_sel_all  = sum(r.get("selected_candidates_after_cap",0) for r in funnel_apex_cap)
+        ac_drop_all = sum(r.get("dropped_by_cap_total",         0) for r in funnel_apex_cap)
+        ac_arch_drop  = sum(1 for r in funnel_apex_cap if r.get("tier_d_with_archetypes_dropped"))
+        ac_disc_drop  = sum(1 for r in funnel_apex_cap if r.get("tier_d_strong_discovery_dropped"))
+        # Cycles where Tier D was present pre-cap but entirely excluded post-cap
+        ac_fully_excluded = sum(
+            1 for r in funnel_apex_cap
+            if r.get("raw_tier_d_before_cap", 0) > 0
+            and r.get("selected_tier_d_after_cap", 0) == 0
+        )
+        # Bottleneck verdict: cap is main bottleneck if Tier D reaches pre-cap but
+        # is mostly excluded by the score-sort, and was visible in the pipeline output
+        ac_td_present_cycles = sum(1 for r in funnel_apex_cap if r.get("raw_tier_d_before_cap", 0) > 0)
+
+        print(f"  Apex cap records (scan cycles):                {ac_cycles}")
+        print(f"  Tier D present pre-cap (cycles):               {ac_td_present_cycles}/{ac_cycles}")
+        print()
+        print(f"  Aggregate totals across all cycles:")
+        print(f"    All candidates before cap:                   {ac_pre_all}")
+        print(f"    All candidates after cap:                    {ac_sel_all}")
+        print(f"    All dropped by cap:                          {ac_drop_all}")
+        print()
+        print(f"    Tier D before cap:                           {ac_pre_td}")
+        print(f"    Tier D selected after cap:                   {ac_sel_td}")
+        print(f"    Tier D dropped by cap:                       {ac_drop_td}")
+        print()
+        print(f"  Quality of dropped Tier D:")
+        print(f"    Cycles where Tier D with archetypes was dropped:       {ac_arch_drop}/{ac_td_present_cycles}")
+        print(f"    Cycles where Tier D with discovery_score>=6 was dropped: {ac_disc_drop}/{ac_td_present_cycles}")
+        print(f"    Cycles where Tier D was present but fully excluded:    {ac_fully_excluded}/{ac_td_present_cycles}")
+
+        # Bottleneck verdict
+        print()
+        if ac_td_present_cycles == 0:
+            print("  Verdict: Tier D reached pre-cap in 0 cycles.")
+            print("    → Cap is NOT the bottleneck. Check pipeline stages 1-6 instead.")
+        elif ac_drop_td > 0 and ac_drop_td >= ac_sel_td:
+            print("  Verdict: ⚠  CAP IS THE PRIMARY BOTTLENECK.")
+            print(f"    More Tier D candidates dropped ({ac_drop_td}) than selected ({ac_sel_td}).")
+            print("    → Report this to Amit before proceeding to Phase 2.")
+        elif ac_drop_td > 0:
+            print(f"  Verdict: Cap is a partial bottleneck ({ac_drop_td} Tier D dropped, {ac_sel_td} selected).")
+            print("    → Investigate whether dropped Tier D are high-quality (see examples below).")
+        else:
+            print(f"  Verdict: ✓ Cap is NOT dropping Tier D candidates.")
+            print(f"    All {ac_pre_td} Tier D that reached pre-cap survived the cap.")
+
+        # Show examples from the most recent apex_cap record with drops
+        _recent_with_drops = [r for r in reversed(funnel_apex_cap) if r.get("dropped_tier_d_by_cap", 0) > 0]
+        if _recent_with_drops:
+            r = _recent_with_drops[0]
+            print(f"\n  Most recent cycle with Tier D cap drops ({_ts_display(r.get('ts',''))}):")
+            print(f"    raw={r['raw_candidates_before_cap']} cap={r['cap_limit']} selected={r['selected_candidates_after_cap']}")
+            print(f"    Tier D before={r['raw_tier_d_before_cap']} after={r['selected_tier_d_after_cap']} dropped={r['dropped_tier_d_by_cap']}")
+            print(f"    max_tier_d_score_before_cap:  {r.get('max_tier_d_score_before_cap')}")
+            print(f"    min_selected_score_after_cap: {r.get('min_selected_score_after_cap')}")
+            print(f"    highest_dropped_tier_d_score: {r.get('highest_dropped_tier_d_score')}")
+            if r.get("top_10_selected_by_score"):
+                print(f"    top-5 selected (symbol/score/tier):")
+                for item in r["top_10_selected_by_score"][:5]:
+                    tier_tag = " [TIER D]" if item.get("scanner_tier") == "D" else ""
+                    print(f"      {item.get('symbol'):<8} score={item.get('score')}{tier_tag}")
+            if r.get("top_10_dropped_tier_d"):
+                print(f"    dropped Tier D (up to 5):")
+                for item in r["top_10_dropped_tier_d"][:5]:
+                    print(f"      {item.get('symbol'):<8} score={item.get('score')} "
+                          f"discovery={item.get('discovery_score')} "
+                          f"archetypes={item.get('matched_archetypes', [])}")
+
+        # Show all selected Tier D symbols from most recent cap record
+        _recent_cap = funnel_apex_cap[-1] if funnel_apex_cap else None
+        if _recent_cap and _recent_cap.get("selected_tier_d_symbols"):
+            print(f"\n  Most recent cycle — Tier D that survived cap: {_recent_cap['selected_tier_d_symbols']}")
+        if _recent_cap and _recent_cap.get("dropped_tier_d_symbols_top_20"):
+            print(f"  Most recent cycle — Tier D dropped by cap (up to 20): {_recent_cap['dropped_tier_d_symbols_top_20']}")
 
     # ------------------------------------------------------------------ #
     # SECTION 1 — Scan-cycle coverage
@@ -430,6 +523,13 @@ def main() -> None:
         ("Funnel attrition report available (≥1 pipeline + dispatch record)",
          pipeline_cycles >= 1 and len(funnel_dispatch) >= 1,
          f"pipeline={pipeline_cycles} dispatch={len(funnel_dispatch)}"),
+        ("Apex cap analysis available (≥1 apex_cap record)",
+         len(funnel_apex_cap) >= 1,
+         f"apex_cap records={len(funnel_apex_cap)}"),
+        ("Cap is not the primary bottleneck (or Tier D not reaching cap yet)",
+         len(funnel_apex_cap) == 0 or sum(r.get("raw_tier_d_before_cap", 0) for r in funnel_apex_cap) == 0
+         or sum(r.get("dropped_tier_d_by_cap", 0) for r in funnel_apex_cap) < sum(r.get("selected_tier_d_after_cap", 0) for r in funnel_apex_cap),
+         f"dropped={sum(r.get('dropped_tier_d_by_cap',0) for r in funnel_apex_cap)} selected={sum(r.get('selected_tier_d_after_cap',0) for r in funnel_apex_cap)}"),
     ]
 
     all_pass = True

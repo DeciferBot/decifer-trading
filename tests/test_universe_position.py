@@ -720,3 +720,181 @@ def test_tier_d_shadow_log_includes_backfill_fields():
         assert rec["context_backfilled"] is False
         assert rec["context_backfill_source"] == "failed"
         assert rec["missing_fresh_trade_context_after_rescue"] is True
+
+
+# ── Tests 26-30: Apex Cap Funnel Record ────────────────────────────────────────
+#
+# The cap instrumentation lives in bot_trading.py (which has IBKR deps and cannot
+# be imported in tests). We test the record-building logic in isolation by
+# replicating the identical computation used in bot_trading.py and verifying
+# the output schema matches what the evidence report expects.
+# This is the same pattern used for signal_dispatcher tests above.
+
+
+def _build_apex_cap_record(candidates_sorted: list[dict], cap_limit: int) -> dict:
+    """
+    Mirrors the apex-cap funnel record logic from bot_trading.py.
+    Pure function — no I/O. Used by tests 26-30.
+    """
+    from datetime import UTC, datetime
+    cap_dropped = candidates_sorted[cap_limit:]
+    selected    = candidates_sorted[:cap_limit]
+    td_before   = [c for c in candidates_sorted if c.get("scanner_tier") == "D"]
+    td_after    = [c for c in selected           if c.get("scanner_tier") == "D"]
+    td_dropped  = [c for c in cap_dropped        if c.get("scanner_tier") == "D"]
+    min_sel     = min((c.get("score", 0) for c in selected),   default=None)
+    max_td      = max((c.get("score", 0) for c in td_before),  default=None)
+    highest_td_drop = max((c.get("score", 0) for c in td_dropped), default=None)
+    return {
+        "ts":                           datetime.now(UTC).isoformat(),
+        "stage":                        "apex_cap",
+        "raw_candidates_before_cap":    len(candidates_sorted),
+        "raw_tier_d_before_cap":        len(td_before),
+        "raw_non_tier_d_before_cap":    len(candidates_sorted) - len(td_before),
+        "cap_limit":                    cap_limit,
+        "selected_candidates_after_cap": len(selected),
+        "selected_tier_d_after_cap":    len(td_after),
+        "selected_non_tier_d_after_cap": len(selected) - len(td_after),
+        "dropped_by_cap_total":         len(cap_dropped),
+        "dropped_tier_d_by_cap":        len(td_dropped),
+        "dropped_non_tier_d_by_cap":    len(cap_dropped) - len(td_dropped),
+        "selected_tier_d_symbols":      [c.get("symbol") for c in td_after],
+        "dropped_tier_d_symbols_top_20": [c.get("symbol") for c in td_dropped[:20]],
+        "top_10_selected_by_score": [
+            {"symbol": c.get("symbol"), "score": c.get("score"), "scanner_tier": c.get("scanner_tier", "")}
+            for c in selected[:10]
+        ],
+        "top_10_dropped_tier_d": [
+            {
+                "symbol":             c.get("symbol"),
+                "score":              c.get("score"),
+                "discovery_score":    c.get("discovery_score"),
+                "matched_archetypes": c.get("matched_position_archetypes", []),
+            }
+            for c in td_dropped[:10]
+        ],
+        "max_tier_d_score_before_cap":     max_td,
+        "min_selected_score_after_cap":    min_sel,
+        "highest_dropped_tier_d_score":    highest_td_drop,
+        "tier_d_with_archetypes_dropped":  any(c.get("matched_position_archetypes") for c in td_dropped),
+        "tier_d_strong_discovery_dropped": any((c.get("discovery_score") or 0) >= 6 for c in td_dropped),
+    }
+
+
+def _make_candidates(n_regular: int, tier_d_specs: list[dict]) -> list[dict]:
+    """
+    Build a pre-sorted candidate list:
+    - n_regular non-Tier-D candidates with scores 100, 99, 98, ...
+    - Tier D candidates inserted per tier_d_specs (each dict: score, discovery_score, archetypes)
+    Returned sorted by score descending (as bot_trading does before slicing).
+    """
+    candidates = []
+    for i in range(n_regular):
+        candidates.append({"symbol": f"REG{i:03d}", "score": 100 - i, "scanner_tier": ""})
+    for j, spec in enumerate(tier_d_specs):
+        candidates.append({
+            "symbol":                    f"TDD{j:03d}",
+            "score":                     spec.get("score", 5),
+            "scanner_tier":              "D",
+            "discovery_score":           spec.get("discovery_score", 3),
+            "matched_position_archetypes": spec.get("archetypes", []),
+        })
+    return sorted(candidates, key=lambda c: c.get("score", 0), reverse=True)
+
+
+def test_apex_cap_record_written_when_candidates_exceed_cap(tmp_path):
+    """Test 26: apex_cap record is written when raw candidates exceed cap limit."""
+    # 40 regular + 2 Tier D = 42 raw → exceeds cap=30, record must be written.
+    candidates = _make_candidates(40, [{"score": 8}, {"score": 6}])
+    assert len(candidates) == 42
+
+    rec = _build_apex_cap_record(candidates, cap_limit=30)
+
+    assert rec["stage"] == "apex_cap"
+    assert rec["raw_candidates_before_cap"] == 42
+    assert rec["cap_limit"] == 30
+    assert rec["selected_candidates_after_cap"] == 30
+    assert rec["dropped_by_cap_total"] == 12
+    # Verify required fields are all present
+    required = [
+        "raw_tier_d_before_cap", "raw_non_tier_d_before_cap",
+        "selected_tier_d_after_cap", "selected_non_tier_d_after_cap",
+        "dropped_tier_d_by_cap", "dropped_non_tier_d_by_cap",
+        "selected_tier_d_symbols", "dropped_tier_d_symbols_top_20",
+        "top_10_selected_by_score", "top_10_dropped_tier_d",
+        "max_tier_d_score_before_cap", "min_selected_score_after_cap",
+        "highest_dropped_tier_d_score",
+        "tier_d_with_archetypes_dropped", "tier_d_strong_discovery_dropped",
+    ]
+    for field in required:
+        assert field in rec, f"Missing field: {field}"
+
+
+def test_apex_cap_dropped_tier_d_counted_correctly():
+    """Test 27: Tier D dropped by cap is counted correctly.
+
+    40 regular candidates (score 100-61) fill the top-30 slots entirely.
+    2 Tier D at score=8 and score=6 fall below the cut (position 41-42 in sort).
+    dropped_tier_d_by_cap must be 2.
+    """
+    candidates = _make_candidates(40, [{"score": 8}, {"score": 6}])
+    rec = _build_apex_cap_record(candidates, cap_limit=30)
+
+    assert rec["raw_tier_d_before_cap"] == 2
+    assert rec["selected_tier_d_after_cap"] == 0
+    assert rec["dropped_tier_d_by_cap"] == 2
+    assert rec["dropped_by_cap_total"] == 12
+    assert len(rec["dropped_tier_d_symbols_top_20"]) == 2
+
+
+def test_apex_cap_selected_tier_d_counted_correctly():
+    """Test 28: selected_tier_d_after_cap is counted correctly.
+
+    10 regular candidates (score 100-91) then 2 Tier D (score 90, 89).
+    Total = 12, cap = 30 → no drop. Both Tier D survive.
+    """
+    candidates = _make_candidates(10, [{"score": 90}, {"score": 89}])
+    rec = _build_apex_cap_record(candidates, cap_limit=30)
+
+    assert rec["raw_candidates_before_cap"] == 12
+    assert rec["dropped_by_cap_total"] == 0
+    assert rec["dropped_tier_d_by_cap"] == 0
+    assert rec["selected_tier_d_after_cap"] == 2
+    assert len(rec["selected_tier_d_symbols"]) == 2
+
+
+def test_apex_cap_dropped_examples_include_discovery_and_archetypes():
+    """Test 29: top_10_dropped_tier_d entries include discovery_score and archetypes."""
+    tier_d_specs = [
+        {"score": 5, "discovery_score": 12, "archetypes": ["Quality Compounder", "Growth Leader"]},
+        {"score": 4, "discovery_score": 8,  "archetypes": ["Re-rating Candidate"]},
+    ]
+    # 35 regular → both Tier D drop (fall outside cap=30)
+    candidates = _make_candidates(35, tier_d_specs)
+    rec = _build_apex_cap_record(candidates, cap_limit=30)
+
+    assert rec["dropped_tier_d_by_cap"] == 2
+    dropped = rec["top_10_dropped_tier_d"]
+    assert len(dropped) == 2
+    # Higher-score dropped Tier D comes first
+    assert dropped[0]["score"] >= dropped[1]["score"]
+    assert dropped[0]["discovery_score"] == 12
+    assert "Quality Compounder" in dropped[0]["matched_archetypes"]
+    assert rec["tier_d_with_archetypes_dropped"] is True
+    assert rec["tier_d_strong_discovery_dropped"] is True  # discovery_score 12 >= 6
+
+
+def test_apex_cap_no_drop_when_candidates_within_limit():
+    """Test 30: if raw candidates <= cap, all drop counts are zero."""
+    # 5 regular + 3 Tier D = 8 total, cap = 30 → nothing dropped
+    candidates = _make_candidates(5, [{"score": 20}, {"score": 15}, {"score": 10}])
+    rec = _build_apex_cap_record(candidates, cap_limit=30)
+
+    assert rec["raw_candidates_before_cap"] == 8
+    assert rec["dropped_by_cap_total"] == 0
+    assert rec["dropped_tier_d_by_cap"] == 0
+    assert rec["dropped_non_tier_d_by_cap"] == 0
+    assert rec["selected_tier_d_after_cap"] == 3
+    assert rec["tier_d_with_archetypes_dropped"] is False
+    assert rec["tier_d_strong_discovery_dropped"] is False
+    assert rec["highest_dropped_tier_d_score"] is None
