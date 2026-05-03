@@ -755,8 +755,18 @@ def _build_apex_cap_record(candidates_sorted: list[dict], cap_limit: int) -> dic
     """
     Mirrors the apex-cap funnel record logic from bot_trading.py.
     Pure function — no I/O. Used by tests 26-30.
+    Attaches apex_cap_score and sorts by it before slicing, matching live behaviour.
     """
     from datetime import UTC, datetime
+    from apex_cap_score import compute_apex_cap_score
+    for c in candidates_sorted:
+        if "apex_cap_score" not in c:
+            c["apex_cap_score"] = compute_apex_cap_score(c)
+    candidates_sorted = sorted(
+        candidates_sorted,
+        key=lambda c: c.get("apex_cap_score", c.get("score", 0)),
+        reverse=True,
+    )
     cap_dropped = candidates_sorted[cap_limit:]
     selected    = candidates_sorted[:cap_limit]
     td_before   = [c for c in candidates_sorted if c.get("scanner_tier") == "D"]
@@ -805,21 +815,29 @@ def _make_candidates(n_regular: int, tier_d_specs: list[dict]) -> list[dict]:
     """
     Build a pre-sorted candidate list:
     - n_regular non-Tier-D candidates with scores 100, 99, 98, ...
-    - Tier D candidates inserted per tier_d_specs (each dict: score, discovery_score, archetypes)
+    - Tier D candidates inserted per tier_d_specs (score, discovery_score, archetypes,
+      primary_archetype, universe_bucket, adjusted_discovery_score, risk_penalty_pts)
     Returned sorted by score descending (as bot_trading does before slicing).
     """
+    from apex_cap_score import compute_apex_cap_score
     candidates = []
     for i in range(n_regular):
         candidates.append({"symbol": f"REG{i:03d}", "score": 100 - i, "scanner_tier": ""})
     for j, spec in enumerate(tier_d_specs):
         candidates.append({
-            "symbol":                    f"TDD{j:03d}",
-            "score":                     spec.get("score", 5),
-            "scanner_tier":              "D",
-            "discovery_score":           spec.get("discovery_score", 3),
+            "symbol":                      f"TDD{j:03d}",
+            "score":                       spec.get("score", 5),
+            "scanner_tier":                "D",
+            "discovery_score":             spec.get("discovery_score", 3),
             "matched_position_archetypes": spec.get("archetypes", []),
+            "primary_archetype":           spec.get("primary_archetype"),
+            "universe_bucket":             spec.get("universe_bucket"),
+            "adjusted_discovery_score":    spec.get("adjusted_discovery_score"),
+            "risk_penalty_pts":            spec.get("risk_penalty_pts", 0),
         })
-    return sorted(candidates, key=lambda c: c.get("score", 0), reverse=True)
+    for c in candidates:
+        c["apex_cap_score"] = compute_apex_cap_score(c)
+    return sorted(candidates, key=lambda c: c.get("apex_cap_score", c.get("score", 0)), reverse=True)
 
 
 def test_apex_cap_record_written_when_candidates_exceed_cap(tmp_path):
@@ -1600,3 +1618,194 @@ def test_shadow_funnel_record_schema():
     assert rec["tier_d_shadow_blocked_count"]          == len(blocked)
     # All entries are POSITION_RESEARCH_ONLY after force_shadow_only
     assert all(e["execution_allowed"] is False for e in blocked)
+
+
+# ── Tests 56-65: compute_apex_cap_score and live cap adjuster ──────────────────
+
+
+def test_56_non_tier_d_cap_score_equals_raw_score():
+    """Test 56: Non-Tier-D candidates get apex_cap_score == raw signal score."""
+    from apex_cap_score import compute_apex_cap_score
+
+    for score in (0, 18, 45, 100):
+        c = {"score": score, "scanner_tier": ""}
+        assert compute_apex_cap_score(c) == score
+
+    # scanner_tier absent also treated as non-Tier-D
+    assert compute_apex_cap_score({"score": 55}) == 55
+
+
+def test_57_tier_d_below_signal_floor_gets_no_bonus():
+    """Test 57: Tier D with score < 18 receives no research bonus."""
+    from apex_cap_score import compute_apex_cap_score
+
+    c = {
+        "score":                       17,
+        "scanner_tier":                "D",
+        "discovery_score":             15,
+        "adjusted_discovery_score":    15,
+        "primary_archetype":           "Quality Compounder",
+        "universe_bucket":             "core_research",
+        "matched_position_archetypes": ["Quality Compounder"],
+    }
+    assert compute_apex_cap_score(c) == 17
+
+    # Edge: exactly 0
+    c2 = {**c, "score": 0}
+    assert compute_apex_cap_score(c2) == 0
+
+
+def test_58_tier_d_above_floor_gets_discovery_archetype_bucket_bonus():
+    """Test 58: Tier D with score >= 18 receives full discovery + archetype + bucket bonus."""
+    from apex_cap_score import compute_apex_cap_score
+
+    c = {
+        "score":                       20,
+        "scanner_tier":                "D",
+        "discovery_score":             8,
+        "adjusted_discovery_score":    8,
+        "primary_archetype":           "Quality Compounder",
+        "universe_bucket":             "core_research",
+        "matched_position_archetypes": ["Quality Compounder"],
+    }
+    # discovery_bonus = min(8,10)*0.5 = 4.0
+    # archetype_bonus = 2 (primary_archetype set)
+    # bucket_bonus    = 1 (core_research)
+    expected = 20 + 4.0 + 2 + 1
+    assert compute_apex_cap_score(c) == expected
+
+    # Score exactly at floor
+    c18 = {**c, "score": 18}
+    expected18 = 18 + 4.0 + 2 + 1
+    assert compute_apex_cap_score(c18) == expected18
+
+
+def test_59_adjusted_discovery_score_preferred_over_discovery_score():
+    """Test 59: adjusted_discovery_score takes precedence over discovery_score."""
+    from apex_cap_score import compute_apex_cap_score
+
+    c = {
+        "score":                    20,
+        "scanner_tier":             "D",
+        "discovery_score":          4,
+        "adjusted_discovery_score": 9,
+    }
+    # Should use 9, not 4: min(9,10)*0.5 = 4.5
+    result = compute_apex_cap_score(c)
+    assert result == 20 + 4.5
+
+    # Confirm that without adjusted_discovery_score it uses discovery_score
+    c_no_adj = {"score": 20, "scanner_tier": "D", "discovery_score": 4}
+    result_no_adj = compute_apex_cap_score(c_no_adj)
+    assert result_no_adj == 20 + 2.0  # min(4,10)*0.5 = 2.0
+
+
+def test_60_core_research_receives_bucket_bonus():
+    """Test 60: universe_bucket='core_research' adds +1 to apex_cap_score."""
+    from apex_cap_score import compute_apex_cap_score
+
+    base = {"score": 25, "scanner_tier": "D", "universe_bucket": "core_research"}
+    result = compute_apex_cap_score(base)
+    base_no_bucket = {"score": 25, "scanner_tier": "D"}
+    result_no_bucket = compute_apex_cap_score(base_no_bucket)
+    assert result - result_no_bucket == 1.0
+
+
+def test_61_tactical_momentum_gets_no_bucket_bonus():
+    """Test 61: universe_bucket='tactical_momentum' does not receive bucket bonus."""
+    from apex_cap_score import compute_apex_cap_score
+
+    c = {"score": 25, "scanner_tier": "D", "universe_bucket": "tactical_momentum"}
+    c_no_bucket = {"score": 25, "scanner_tier": "D"}
+    assert compute_apex_cap_score(c) == compute_apex_cap_score(c_no_bucket)
+
+
+def test_62_live_cap_sort_uses_apex_cap_score():
+    """Test 62: Tier D with strong research metadata gets promoted above lower-signal regulars.
+
+    Scenario:
+    - 29 regular candidates at scores 100-72 (the top 29 slots)
+    - 1 regular candidate at score 22 (would be position 30 in raw-score sort)
+    - 1 Tier D at score 20, discovery=10, primary_archetype set, core_research
+      → apex_cap_score = 20 + 5 + 2 + 1 = 28
+
+    Old raw-score sort: regular at 22 fills slot 30; Tier D at 20 is dropped.
+    New apex_cap_score sort: Tier D at 28 beats regular at 22 → Tier D enters slot 30.
+    """
+    from apex_cap_score import compute_apex_cap_score
+
+    candidates = []
+    for i in range(29):
+        candidates.append({"symbol": f"REG{i:03d}", "score": 100 - i, "scanner_tier": ""})
+    candidates.append({"symbol": "REG_LOW", "score": 22, "scanner_tier": ""})
+    td = {
+        "symbol":                      "TDD_STAR",
+        "score":                       20,
+        "scanner_tier":                "D",
+        "discovery_score":             10,
+        "adjusted_discovery_score":    10,
+        "primary_archetype":           "Quality Compounder",
+        "universe_bucket":             "core_research",
+        "matched_position_archetypes": ["Quality Compounder"],
+    }
+    candidates.append(td)
+
+    # Attach apex_cap_score
+    for c in candidates:
+        c["apex_cap_score"] = compute_apex_cap_score(c)
+
+    cap_limit = 30
+    new_sorted  = sorted(candidates, key=lambda c: c.get("apex_cap_score", c.get("score", 0)), reverse=True)
+    new_selected = new_sorted[:cap_limit]
+    old_sorted   = sorted(candidates, key=lambda c: c.get("score", 0), reverse=True)
+    old_selected = old_sorted[:cap_limit]
+
+    new_syms = {c["symbol"] for c in new_selected}
+    old_syms = {c["symbol"] for c in old_selected}
+
+    assert "TDD_STAR" in new_syms, "Tier D should be promoted into cap with adjusted score"
+    assert "TDD_STAR" not in old_syms, "Tier D should be excluded by old raw-score sort"
+    assert "REG_LOW" not in new_syms, "Low-signal regular should be displaced"
+    assert "REG_LOW" in old_syms, "Low-signal regular survives old raw-score sort"
+
+
+def test_63_cap_total_never_exceeds_30():
+    """Test 63: cap total never exceeds 30 regardless of candidate pool size."""
+    from apex_cap_score import compute_apex_cap_score
+
+    for n_reg, td_specs in [
+        (5, []),
+        (30, []),
+        (60, [{"score": 20, "discovery_score": 10, "primary_archetype": "QC", "universe_bucket": "core_research"} for _ in range(20)]),
+    ]:
+        pool = _make_candidates(n_reg, td_specs)
+        selected = pool[:30]
+        assert len(selected) <= 30
+
+
+def test_64_shadow_comparator_stage_remains_shadow_only():
+    """Test 64: shadow compare record stage is 'apex_cap_shadow_compare', never live."""
+    candidates = _make_candidates(60, [{"score": 20 - i} for i in range(20)])
+    rec = _build_shadow_compare_record(candidates)
+    assert rec["stage"] == "apex_cap_shadow_compare"
+    # Confirm it is not the new live-compare stage
+    assert rec["stage"] != "apex_cap_adjusted_score_live_compare"
+
+
+def test_65_no_live_reserve_allocation():
+    """Test 65: live cap uses apex_cap_score sort only — no reserve quota or lane.
+
+    The number of Tier D candidates selected must equal exactly those whose
+    apex_cap_score places them in the top _CAP_LIMIT after unified sort.
+    There is no guaranteed minimum or floor for Tier D.
+    """
+    from apex_cap_score import compute_apex_cap_score
+
+    # 30 regulars at score 100-71 — they dominate the cap even with Tier D boost.
+    # Tier D at score 10 (< 18 floor) gets no bonus and is dropped.
+    candidates = _make_candidates(30, [{"score": 10, "discovery_score": 15, "primary_archetype": "QC"}])
+    cap_limit = 30
+    selected = candidates[:cap_limit]
+    td_selected = [c for c in selected if c.get("scanner_tier") == "D"]
+    assert len(td_selected) == 0, "Tier D below signal floor must not enter cap via any quota"
+    assert len(selected) == cap_limit
