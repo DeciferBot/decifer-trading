@@ -437,6 +437,7 @@ def validate_entry(
     instrument: str | None = None,
     open_intraday_count: int = 0,
     scanner_tier: str | None = None,
+    pru_fmp_snapshot: dict | None = None,
 ) -> tuple[bool, str, str, int]:
     """
     Full entry validation: classify trade type and check effective score.
@@ -474,18 +475,73 @@ def validate_entry(
             direction, ctx, score, instrument=instrument,
         )
         _sym = (ctx.symbol if ctx else None) or "?"
+
+        # ── Classify ctx data quality ─────────────────────────────────────────
+        _FUND_FIELDS = ("fcf_yield", "dcf_upside_pct", "revenue_growth_yoy",
+                        "gross_margin", "analyst_upside_pct")
+        _ctx_populated = [f for f in _FUND_FIELDS if getattr(ctx, f, None) is not None] if ctx else []
+        if len(_ctx_populated) >= 3:
+            ctx_data_source = "full_ctx"
+        elif len(_ctx_populated) >= 1:
+            ctx_data_source = "partial_ctx"
+        else:
+            ctx_data_source = "no_ctx"
+
+        # ── Detect data-flow gap and run PRU-supplemented simulation ─────────
+        # If ctx is missing fundamentals but PRU had them at build time, that is a
+        # data-flow gap (FMP data existed hours ago but wasn't available at dispatch).
+        # We run a second simulation with PRU values filled in — for observability
+        # only. The live gate always uses only the fresh TradeContext.
+        data_flow_gap = False
+        would_have_passed_with_pru_data = None
+        pru_supplemented_fields: list[str] = []
+        _PRU_TO_CTX = {
+            "revenue_growth_yoy": "revenue_growth_yoy",
+            "revenue_decelerating": "revenue_decelerating",
+            "gross_margin": "gross_margin",
+            "analyst_upside_pct": "analyst_upside_pct",
+        }
+        _snap = pru_fmp_snapshot or {}
+        if ctx_data_source in ("no_ctx", "partial_ctx") and _snap and ctx:
+            for pru_key, ctx_attr in _PRU_TO_CTX.items():
+                pru_val = _snap.get(pru_key)
+                ctx_val = getattr(ctx, ctx_attr, None)
+                if pru_val is not None and ctx_val is None:
+                    pru_supplemented_fields.append(ctx_attr)
+            if pru_supplemented_fields:
+                data_flow_gap = True
+                import dataclasses as _dc
+                _ctx_supp = _dc.replace(ctx, **{
+                    f: _snap[k]
+                    for k, f in _PRU_TO_CTX.items()
+                    if f in pru_supplemented_fields
+                })
+                supp_pass, _, _, _ = _simulate_position_validation(
+                    direction, _ctx_supp, score, instrument=instrument,
+                )
+                would_have_passed_with_pru_data = supp_pass
+
         log.info(
             "entry_gate: %s %s [TIER_D] shadow_mode_blocked — "
-            "would_have_passed=%s simulated_type=%s simulated_score=%d simulated_reason=%s",
+            "would_have_passed=%s ctx_data_source=%s data_flow_gap=%s "
+            "pru_supplemented=%s would_have_passed_with_pru=%s "
+            "simulated_type=%s simulated_score=%d simulated_reason=%s",
             _sym, direction,
-            sim_pass, sim_type, sim_score, sim_reason,
+            sim_pass, ctx_data_source, data_flow_gap,
+            pru_supplemented_fields, would_have_passed_with_pru_data,
+            sim_type, sim_score, sim_reason,
         )
         _write_pr_shadow({
             "ts": datetime.now(UTC).isoformat(),
             "symbol": _sym,
             "direction": direction,
             "signal_score": score,
+            "ctx_data_source": ctx_data_source,
+            "ctx_populated_fields": _ctx_populated,
+            "data_flow_gap": data_flow_gap,
+            "pru_supplemented_fields": pru_supplemented_fields,
             "would_have_passed": sim_pass,
+            "would_have_passed_with_pru_data": would_have_passed_with_pru_data,
             "simulated_type": sim_type,
             "simulated_score": sim_score,
             "simulated_reason": sim_reason,

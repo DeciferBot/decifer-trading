@@ -275,6 +275,18 @@ def dispatch_signals(
                 log.debug("dispatch: open_intraday_count fetch failed: %s", _oi_err)
 
             raw_score = round(signal.conviction_score * 5)
+
+            # For Tier D signals, retrieve the PRU FMP snapshot so entry_gate
+            # shadow validation can detect ctx data-flow gaps.
+            _pru_snap: dict = {}
+            if getattr(signal, "scanner_tier", "") == "D":
+                try:
+                    import scanner as _scanner_mod
+                    _, _pru_meta = _scanner_mod.get_position_research_universe()
+                    _pru_snap = _pru_meta.get(signal.symbol, {}).get("pru_fmp_snapshot") or {}
+                except Exception as _pe:
+                    log.debug("dispatch: pru_fmp_snapshot lookup failed for %s: %s", signal.symbol, _pe)
+
             gate_ok, gate_type, gate_reason, effective_score = validate_entry(
                 direction=signal.direction,
                 ctx=trade_ctx,
@@ -284,6 +296,7 @@ def dispatch_signals(
                 instrument=signal.instrument,
                 open_intraday_count=_open_intraday_count,
                 scanner_tier=getattr(signal, "scanner_tier", "") or None,
+                pru_fmp_snapshot=_pru_snap or None,
             )
 
             if not gate_ok:

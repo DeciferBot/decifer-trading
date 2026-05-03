@@ -231,10 +231,13 @@ def _compute_fundamental_signals(
     symbol: str,
     current_price: float,
     recent_upgrade_syms: set[str],
-) -> tuple[dict[str, int], list[str]]:
+) -> tuple[dict[str, int], list[str], dict]:
     """
     Compute fundamental discovery signals from FMP data.
-    Returns (signal_points_dict, missing_fields_list).
+    Returns (signal_points_dict, missing_fields_list, raw_fmp_snapshot).
+
+    raw_fmp_snapshot holds the raw values fetched so entry_gate shadow validation
+    can detect data-flow gaps (PRU had a value that TradeContext later shows as None).
     FMP failures = 0 pts + add to missing, never rejection.
     """
     import fmp_client
@@ -318,7 +321,15 @@ def _compute_fundamental_signals(
     if symbol in recent_upgrade_syms:
         pts["recent_analyst_upgrade"] = _MODERATE
 
-    return pts, missing
+    raw_snapshot = {
+        "revenue_growth_yoy": rev_yoy,
+        "revenue_decelerating": rev_decel,
+        "gross_margin": gross_margin,
+        "analyst_upside_pct": analyst_upside,
+        "consensus_score": consensus_score,
+        "debt_to_equity": dte,
+    }
+    return pts, missing, raw_snapshot
 
 
 # ── Archetype matching ─────────────────────────────────────────────────────────
@@ -408,7 +419,7 @@ def _score_symbol(
         sector_above_50ma = sector_etf_above_50ma_map.get(sector_etf_for_symbol, False)
 
     # Score signals
-    fund_pts, fund_missing = _compute_fundamental_signals(
+    fund_pts, fund_missing, pru_fmp_snapshot = _compute_fundamental_signals(
         symbol, current_price, recent_upgrade_syms,
     )
     tech_pts, tech_missing = _compute_technical_signals(
@@ -445,6 +456,7 @@ def _score_symbol(
         "discovery_signals": list(all_pts.keys()),
         "discovery_signal_points": all_pts,
         "missing_data_fields": sorted(set(fund_missing + tech_missing)),
+        "pru_fmp_snapshot": pru_fmp_snapshot,
         "universe_source": "position_research",
         "scanner_tier": "D",
         "position_research_universe_member": True,

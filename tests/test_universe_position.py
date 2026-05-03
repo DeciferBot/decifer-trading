@@ -80,7 +80,7 @@ def test_two_weak_signals_admitted():
          patch("fmp_client.get_key_metrics_ttm", return_value=None), \
          patch("fmp_client.get_price_target", return_value=None), \
          patch("fmp_client.get_analyst_grades", return_value=None):
-        fund_pts, _ = _compute_fundamental_signals("TEST", 50.0, recent_upgrade_syms=set())
+        fund_pts, _, _ = _compute_fundamental_signals("TEST", 50.0, recent_upgrade_syms=set())
     assert "revenue_yoy_positive" in fund_pts
     assert fund_pts["revenue_yoy_positive"] == 1
 
@@ -160,7 +160,7 @@ def test_missing_analyst_data_scores_zero_not_rejected():
          patch("fmp_client.get_key_metrics_ttm", return_value=None), \
          patch("fmp_client.get_price_target", return_value=None), \
          patch("fmp_client.get_analyst_grades", return_value=None):
-        pts, missing = _compute_fundamental_signals("TEST", 50.0, recent_upgrade_syms=set())
+        pts, missing, _ = _compute_fundamental_signals("TEST", 50.0, recent_upgrade_syms=set())
     # Revenue > 10% = 3pts (strong) should fire
     assert "revenue_yoy_gt_10pct" in pts
     assert pts["revenue_yoy_gt_10pct"] == 3
@@ -174,7 +174,7 @@ def test_missing_dcf_data_scores_zero_not_rejected():
          patch("fmp_client.get_key_metrics_ttm", return_value=None), \
          patch("fmp_client.get_price_target", return_value=None), \
          patch("fmp_client.get_analyst_grades", return_value=None):
-        pts, missing = _compute_fundamental_signals("TEST", 50.0, recent_upgrade_syms=set())
+        pts, missing, _ = _compute_fundamental_signals("TEST", 50.0, recent_upgrade_syms=set())
     assert "analyst_price_target" in missing
     # No crash; empty pts is fine (scored as 0)
     assert "analyst_upside_gt_15pct" not in pts
