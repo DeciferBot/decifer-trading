@@ -17,6 +17,8 @@
 from __future__ import annotations
 
 import logging
+import os
+from datetime import UTC, datetime
 
 from ib_async import IB
 
@@ -263,36 +265,79 @@ def get_sector_rotation_bias() -> dict:
 
 
 # ── Position Research Universe (Tier D) cache ─────────────────────────────────
-# Populated on each get_dynamic_universe() call when the feature is enabled.
-# Exported so signal_pipeline.py can read metadata without re-loading the file.
+# Populated on the first get_position_research_universe() call, then refreshed
+# only when the PRU file changes (mtime-based invalidation).
+# Exported so signal_pipeline.py and signal_dispatcher.py can read metadata.
 
 _POSITION_RESEARCH_SYMBOLS: frozenset = frozenset()
 _POSITION_RESEARCH_META: dict = {}  # ticker → full metadata dict
+_pru_file_mtime: float = -1.0       # os.path.getmtime() at last load; -1 = never loaded
+_pru_loaded_at: str = ""            # ISO timestamp of last cache load
+_pru_built_at: str = ""             # built_at from the PRU file
+_pru_symbol_count: int = 0          # symbol count at last load
 
 
 def get_position_research_universe() -> tuple[frozenset, dict]:
     """
     Load Tier D tickers and metadata from position_research_universe.json.
+
+    Uses mtime-based cache invalidation — re-reads the file only when it has
+    changed since the last load.  On a cache hit, returns cached values and
+    logs at DEBUG.  On a cache miss (first load or file changed), logs at INFO
+    with built_at / loaded_at / symbol count and whether it was a refresh.
+
     Returns (symbol_frozenset, meta_by_ticker_dict).
     Returns (frozenset(), {}) on missing/stale/malformed file — graceful degradation.
-    Called by get_dynamic_universe() and signal_pipeline._tag_tier_d().
+    Called by get_dynamic_universe() and signal_dispatcher.dispatch_signals().
     """
     global _POSITION_RESEARCH_SYMBOLS, _POSITION_RESEARCH_META
+    global _pru_file_mtime, _pru_loaded_at, _pru_built_at, _pru_symbol_count
+
     if not CONFIG.get("position_research_universe_enabled", True):
         return frozenset(), {}
+
+    from universe_position import _PRU_PATH, load_position_research_universe
+
+    # ── Mtime check: skip disk read if file unchanged ─────────────────────────
     try:
-        from universe_position import load_position_research_universe
-        tickers, meta_list = load_position_research_universe()
+        current_mtime = os.path.getmtime(_PRU_PATH)
+    except OSError:
+        current_mtime = 0.0
+
+    if current_mtime == _pru_file_mtime and _pru_file_mtime >= 0:
+        log.debug(
+            "Tier D: cache reused (built_at=%s loaded_at=%s symbols=%d)",
+            _pru_built_at, _pru_loaded_at, _pru_symbol_count,
+        )
+        return _POSITION_RESEARCH_SYMBOLS, _POSITION_RESEARCH_META
+
+    # ── Cache miss: file changed or first load ────────────────────────────────
+    was_refresh = _pru_file_mtime >= 0  # True if we previously had a valid cache
+    try:
+        tickers, meta_list, built_at_str = load_position_research_universe()
         if tickers:
             _POSITION_RESEARCH_SYMBOLS = frozenset(tickers)
-            _POSITION_RESEARCH_META = {m["ticker"]: m for m in meta_list if isinstance(m, dict) and "ticker" in m}
+            _POSITION_RESEARCH_META = {
+                m["ticker"]: m for m in meta_list if isinstance(m, dict) and "ticker" in m
+            }
         else:
             _POSITION_RESEARCH_SYMBOLS = frozenset()
             _POSITION_RESEARCH_META = {}
+        _pru_file_mtime = current_mtime
+        _pru_loaded_at = datetime.now(UTC).isoformat()
+        _pru_built_at = built_at_str
+        _pru_symbol_count = len(tickers)
+
+        action = "REFRESHED (file changed)" if was_refresh else "loaded"
+        log.info(
+            "Tier D: cache %s — built_at=%s loaded_at=%s symbols=%d",
+            action, _pru_built_at, _pru_loaded_at, _pru_symbol_count,
+        )
     except Exception as exc:
         log.warning("Tier D: load failed — %s — continuing without Tier D", exc)
         _POSITION_RESEARCH_SYMBOLS = frozenset()
         _POSITION_RESEARCH_META = {}
+
     return _POSITION_RESEARCH_SYMBOLS, _POSITION_RESEARCH_META
 
 

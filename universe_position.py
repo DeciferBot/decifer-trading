@@ -651,12 +651,12 @@ def refresh_position_research_universe() -> list[dict]:
 
 def load_position_research_universe(
     max_staleness_days: int | None = None,
-) -> tuple[list[str], list[dict]]:
+) -> tuple[list[str], list[dict], str]:
     """
     Load the Position Research Universe from disk.
 
-    Returns (ticker_list, full_metadata_list).
-    Returns ([], []) on missing, malformed, or stale file — graceful degradation,
+    Returns (ticker_list, full_metadata_list, built_at_str).
+    Returns ([], [], "") on missing, malformed, or stale file — graceful degradation,
     never crashes the bot, never uses stale data for live execution.
     """
     if max_staleness_days is None:
@@ -667,13 +667,13 @@ def load_position_research_universe(
             payload = json.load(f)
     except FileNotFoundError:
         log.debug("PRU: file not found at %s", _PRU_PATH)
-        return [], []
+        return [], [], ""
     except json.JSONDecodeError as e:
         log.warning("PRU: malformed JSON — %s — returning empty", e)
-        return [], []
+        return [], [], ""
     except Exception as e:
         log.warning("PRU: unexpected read error — %s — returning empty", e)
-        return [], []
+        return [], [], ""
 
     built_at_str = payload.get("built_at", "")
     try:
@@ -684,19 +684,18 @@ def load_position_research_universe(
                 "PRU: file is %.1fd old (>%dd) — returning empty (stale data not used)",
                 age_days, max_staleness_days,
             )
-            return [], []
+            return [], [], ""
     except Exception as e:
         log.warning("PRU: timestamp parse failed (%s) — returning empty", e)
-        return [], []
+        return [], [], ""
 
     symbols_list = payload.get("symbols", [])
     if not isinstance(symbols_list, list):
         log.warning("PRU: 'symbols' field is not a list — malformed file")
-        return [], []
+        return [], [], ""
 
     tickers = [r["ticker"] for r in symbols_list if isinstance(r, dict) and "ticker" in r]
-    log.info("PRU: loaded %d symbols (age=%.1fd)", len(tickers), age_days)
-    return tickers, symbols_list
+    return tickers, symbols_list, built_at_str
 
 
 if __name__ == "__main__":

@@ -247,7 +247,7 @@ def test_load_returns_empty_for_stale_file(tmp_path, monkeypatch):
     pru_path = tmp_path / "data" / "position_research_universe.json"
     pru_path.write_text(json.dumps(payload))
 
-    tickers, meta = load_position_research_universe(max_staleness_days=8)
+    tickers, meta, built_at = load_position_research_universe(max_staleness_days=8)
     assert tickers == []
     assert meta == []
 
@@ -259,7 +259,7 @@ def test_load_returns_empty_for_malformed_file(tmp_path, monkeypatch):
     pru_path = tmp_path / "data" / "position_research_universe.json"
     pru_path.write_text("{ this is not valid json !!!")
 
-    tickers, meta = load_position_research_universe()
+    tickers, meta, built_at = load_position_research_universe()
     assert tickers == []
     assert meta == []
 
