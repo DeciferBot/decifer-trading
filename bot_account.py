@@ -82,6 +82,8 @@ def save_equity_history(history: list):
 
 _FLEX_SEND_URL = "https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.SendRequest"
 _FLEX_RECEIVE_URL = "https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement"
+_flex_fail_until: float = 0.0
+_FLEX_BACKOFF_SECS = 900  # 15 min — back off after status=Fail to avoid hammering IBKR
 
 
 def _fetch_flex_nav(token: str, query_id: str) -> list[dict] | None:
@@ -244,6 +246,11 @@ def fetch_flex_trades(token: str, query_id: str) -> list[_FlexFill]:
 
     Returns [] on any failure (non-fatal — reconciler falls back to event_log data).
     """
+    global _flex_fail_until
+    if time.monotonic() < _flex_fail_until:
+        log.debug("[FlexTrades] Skipping — in backoff period")
+        return []
+
     log.info(f"[FlexTrades] Requesting fills for query {query_id}...")
     try:
         params = urllib.parse.urlencode({"t": token, "q": query_id, "v": "3"})
@@ -252,7 +259,10 @@ def fetch_flex_trades(token: str, query_id: str) -> list[_FlexFill]:
         status = root.findtext("Status")
         ref_code = root.findtext("ReferenceCode")
         if status != "Success" or not ref_code:
-            log.warning(f"[FlexTrades] Request rejected: status={status}")
+            err_code = root.findtext("ErrorCode") or "?"
+            err_msg = root.findtext("ErrorMessage") or ""
+            log.warning(f"[FlexTrades] Request rejected: status={status} code={err_code} msg={err_msg}")
+            _flex_fail_until = time.monotonic() + _FLEX_BACKOFF_SECS
             return []
 
         log.info(f"[FlexTrades] Ref={ref_code}; polling...")
