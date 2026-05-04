@@ -555,6 +555,53 @@ class TestOptionSellStateMachine:
         assert result is False, "SELL must be blocked while BUY is live in IBKR (PENDING)"
         ib.placeOrder.assert_not_called()
 
+    def test_execute_sell_routes_options_to_execute_sell_option(self, mock_config):
+        """
+        Regression: execute_sell("GOOGL") matched a SHORT options position via the
+        symbol-sweep, then placed a raw MarketOrder BUY-to-close. IBKR repeatedly
+        rejected it with "Cannot have open orders on both sides of the same US Option
+        contract" because execute_sell has no pre-cancel logic. The position stayed
+        in an EXITING→ACTIVE loop every scan cycle.
+
+        Root cause: the symbol-sweep in execute_sell() can match opt_key positions,
+        but the stock close path (MarketOrder, no retry, no pre-cancel) is wrong for
+        options. execute_sell_option() owns all that logic.
+
+        Fix: when the matched trade has instrument=="option", execute_sell() resets
+        status to ACTIVE and delegates to execute_sell_option(ib, opt_key, reason).
+        """
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+
+        OPT_KEY = "GOOGL_C_390_2026-05-16"
+        _om.active_trades[OPT_KEY] = {
+            "symbol": "GOOGL",
+            "instrument": "option",
+            "direction": "SHORT",
+            "status": "ACTIVE",
+            "contracts": 8,
+            "qty": 8,
+            "entry": 5.20,
+            "current": 8.10,
+            "expiry_ibkr": "20260516",
+            "strike": 390.0,
+            "right": "C",
+        }
+
+        ib = MagicMock()
+
+        from orders_core import execute_sell
+        with (
+            patch("orders_core.is_equities_extended_hours", return_value=True),
+            patch("orders_core.CONFIG", mock_config),
+            patch("orders_options.execute_sell_option", return_value=True) as mock_eso,
+        ):
+            result = execute_sell(ib, "GOOGL", reason="pm_exit")
+
+        # Routed to execute_sell_option — must not have placed a MarketOrder
+        mock_eso.assert_called_once_with(ib, OPT_KEY, reason="pm_exit")
+        ib.placeOrder.assert_not_called()
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CLASS 4: SHORT Option Exit Pricing  (commit 62078f6, lines 2329–2337)
@@ -728,29 +775,15 @@ class TestExecuteSellCompositeKey:
         _om.active_trades[self.OPT_KEY] = self._opt_pos()
 
         ib = MagicMock()
-        # Simulate market order filled within the 2s sleep window (normal happy path).
-        ib.placeOrder.return_value.orderStatus.status = "Filled"
-        ib.placeOrder.return_value.orderStatus.filled = 100
 
         with (
-            patch("orders.CONFIG", mock_config),
             patch("orders_core.is_equities_extended_hours", return_value=True),
-            patch("orders_core.is_options_market_open", return_value=True),
-            patch("orders._validate_position_price", return_value=(3.50, "IBKR")),
-            patch("orders._get_ibkr_price", return_value=3.50),
-            patch("orders.record_win"),
-            patch("orders.record_loss"),
-            patch("orders.log_order"),
-            patch("learning.log_order"),
-            patch("learning._save_orders"),
-            patch("learning._save_trades"),
-            patch("learning.log_trade"),
-            patch("fill_watcher.stop_watcher"),
+            patch("orders_options.execute_sell_option", return_value=True) as mock_eso,
         ):
             result = _om.execute_sell(ib, "GSAT", reason="signal")
 
-        # A True return proves the option was found via the composite key search.
-        # False with "No open position" would mean the bug regressed.
+        # Proves the symbol-sweep found the composite key and delegated to execute_sell_option.
+        mock_eso.assert_called_once_with(ib, self.OPT_KEY, reason="signal")
         assert result is True, "execute_sell('GSAT') must find and close the option stored under composite key"
 
 
@@ -1298,35 +1331,27 @@ class TestExecuteSellClosesLinkedOptions:
         )
 
     def test_no_option_sweep_when_instrument_is_option(self, mock_config):
-        """Closing an option directly must not trigger a recursive option sweep."""
+        """Closing an option directly routes to execute_sell_option (no recursive linked-option sweep).
+
+        Updated: execute_sell() now delegates options positions to execute_sell_option()
+        regardless of whether called with the composite key or the plain symbol. The
+        linked-option sweep (close_linked_option_legs) is still not triggered.
+        """
         _om = sys.modules["orders"]
         _om.active_trades.clear()
         _om.recently_closed.clear()
         _om.active_trades[self.OPT_KEY] = self._opt_pos()
 
         ib = MagicMock()
-        ib.placeOrder.return_value.orderStatus.status = "Filled"
-        ib.placeOrder.return_value.orderStatus.filled = 2
 
         with (
-            patch("orders.CONFIG", mock_config),
             patch("orders_core.is_equities_extended_hours", return_value=True),
-            patch("orders_core.is_options_market_open", return_value=True),
-            patch("orders._validate_position_price", return_value=(2.00, "IBKR")),
-            patch("orders._get_ibkr_price", return_value=2.00),
-            patch("orders.record_win"),
-            patch("orders.record_loss"),
-            patch("orders.log_order"),
-            patch("learning.log_order"),
-            patch("learning._save_orders"),
-            patch("learning._save_trades"),
-            patch("learning.log_trade"),
-            patch("fill_watcher.stop_watcher"),
-            patch("orders_options.execute_sell_option") as mock_sell_opt,
+            patch("orders_options.execute_sell_option", return_value=True) as mock_sell_opt,
         ):
-            _om.execute_sell(ib, self.OPT_KEY, reason="manual")
+            result = _om.execute_sell(ib, self.OPT_KEY, reason="manual")
 
-        mock_sell_opt.assert_not_called()
+        # execute_sell must route to execute_sell_option — not the stock MarketOrder path
+        mock_sell_opt.assert_called_once_with(ib, self.OPT_KEY, reason="manual")
 
 
 class TestDeferredTrimOnUnfilledLimitSell:

@@ -488,6 +488,24 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
 
         ib.cancelMktData(option_contract)
 
+        # Cancel all live IBKR orders on this exact contract (both directions) before
+        # placing the close. IBKR rejects "Cannot have open orders on both sides of
+        # the same US Option contract" if a stale entry order or bracket is still open.
+        try:
+            for _ot in ib.openTrades():
+                _c = _ot.contract
+                if (
+                    getattr(_c, "symbol", None) == pos["symbol"]
+                    and str(getattr(_c, "lastTradeDateOrContractMonth", "")) == pos.get("expiry_ibkr", "")
+                    and getattr(_c, "strike", None) == pos.get("strike")
+                    and getattr(_c, "right", None) == pos.get("right")
+                ):
+                    cancel_with_reason(ib, _ot.order, f"pre-cancel before close of {opt_key}")
+                    log.info("[pre-cancel] cleared open order #%d on %s before close", _ot.order.orderId, opt_key)
+            ib.sleep(0.5)
+        except Exception as _pre_e:
+            log.warning("execute_sell_option %s: pre-cancel sweep failed (non-fatal): %s", opt_key, _pre_e)
+
         sell_order = LimitOrder(_close_action, sell_contracts, limit_price, account=CONFIG["active_account"], tif="DAY")
         sell_order.outsideRth = False
         opt_sell_trade = ib.placeOrder(option_contract, sell_order)

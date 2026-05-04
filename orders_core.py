@@ -1866,6 +1866,14 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
         if info.get("status") == "EXITING":
             log.info(f"Exit already in flight for {symbol} ({_trade_key}) — skipping duplicate")
             return False
+        # Options positions must go through execute_sell_option — it owns the retry
+        # logic, bid-step-down, pending_exits queue, blacklist, and pre-cancel of
+        # opposing open orders. The stock MarketOrder path here has none of that and
+        # produces the "Cannot have open orders on both sides" IBKR rejection loop.
+        if info.get("instrument") == "option":
+            _safe_update_trade(_trade_key, {"status": "ACTIVE"})  # revert so execute_sell_option can set EXITING
+            from orders_options import execute_sell_option as _eso
+            return _eso(ib, _trade_key, reason=reason)
         _safe_update_trade(_trade_key, {"status": "EXITING"})
 
     _is_partial = qty_override is not None and qty_override < info["qty"]
