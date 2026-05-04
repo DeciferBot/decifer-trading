@@ -147,6 +147,12 @@ def _on_ibkr_error(req_id: int, error_code: int, error_string: str, contract) ->
     - 154   → order to a halted symbol — mark halted in bot_state
     """
     sym = getattr(contract, "symbol", None) if contract else None
+    if not sym and req_id is not None:
+        ib = bot_state.ib
+        if ib is not None:
+            trade = next((t for t in ib.trades() if t.order.orderId == req_id), None)
+            if trade:
+                sym = getattr(trade.contract, "symbol", None)
     tag = f"[{sym}] " if sym else ""
 
     if error_code in _INFORMATIONAL_CODES:
