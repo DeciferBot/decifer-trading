@@ -745,6 +745,32 @@ _IBKR_PACING_LOCK = _threading.Lock()
 # 30 concurrent at ~5s each = ~360 req/min — well within limit.
 _ALPACA_SEM = _threading.BoundedSemaphore(30)
 
+# ── 1d / 1wk bar cache ───────────────────────────────────────────────────────
+# Daily and weekly bars change once per day. Re-fetching them every scan cycle
+# (every few minutes) accounts for the majority of score_universe latency.
+# Cache per symbol with a 20-minute TTL — first scan fetches fresh, all
+# subsequent scans in the same session hit the cache instantly.
+_BAR_CACHE_1D: dict = {}   # symbol → (df, fetched_at_epoch)
+_BAR_CACHE_1W: dict = {}   # symbol → (df, fetched_at_epoch)
+_BAR_CACHE_TTL = 1200      # 20 minutes in seconds
+_BAR_CACHE_LOCK = _threading.Lock()
+
+
+def _get_cached_bars(cache: dict, symbol: str, fetch_fn) -> "pd.DataFrame | None":
+    """Return cached bars if fresh, otherwise call fetch_fn(), cache, and return."""
+    import time as _time
+    now = _time.monotonic()
+    with _BAR_CACHE_LOCK:
+        entry = cache.get(symbol)
+        if entry is not None:
+            df, fetched_at = entry
+            if now - fetched_at < _BAR_CACHE_TTL:
+                return df
+    df = fetch_fn()
+    with _BAR_CACHE_LOCK:
+        cache[symbol] = (df, now)
+    return df
+
 
 def fetch_ibkr_historical(symbol: str, ib, bar_size: str = "5 mins", duration: str = "5 D") -> pd.DataFrame | None:
     """
@@ -889,13 +915,19 @@ def fetch_multi_timeframe(
                 _flatten_columns(_safe_download(symbol, period="5d", interval="5m", progress=False, auto_adjust=True))
             )
 
-        # Daily (trend confirmation) — Alpaca primary via _safe_download
-        df_1d = normalize_bars(
-            _flatten_columns(_safe_download(symbol, period="60d", interval="1d", progress=False, auto_adjust=True))
+        # Daily (trend confirmation) — cached 20 min; only fetched fresh once per session.
+        df_1d = _get_cached_bars(
+            _BAR_CACHE_1D, symbol,
+            lambda: normalize_bars(
+                _flatten_columns(_safe_download(symbol, period="60d", interval="1d", progress=False, auto_adjust=True))
+            ),
         )
-        # Weekly (big picture) — Alpaca primary via _safe_download
-        df_1w = normalize_bars(
-            _flatten_columns(_safe_download(symbol, period="1y", interval="1wk", progress=False, auto_adjust=True))
+        # Weekly (big picture) — cached 20 min; weekly bars are stable intra-day.
+        df_1w = _get_cached_bars(
+            _BAR_CACHE_1W, symbol,
+            lambda: normalize_bars(
+                _flatten_columns(_safe_download(symbol, period="1y", interval="1wk", progress=False, auto_adjust=True))
+            ),
         )
 
         if df_5m is None or len(df_5m) < 30:
