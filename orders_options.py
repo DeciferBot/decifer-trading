@@ -15,7 +15,7 @@ import json
 import os
 from datetime import UTC, date, datetime
 
-from ib_async import IB, LimitOrder, Option, StopOrder
+from ib_async import IB, LimitOrder, Option, StopLimitOrder, StopOrder
 
 from bot_ibkr import cancel_with_reason
 from config import CONFIG
@@ -900,10 +900,12 @@ def update_trailing_stops(ib: IB) -> None:
 
             close_action = "BUY" if direction == "SHORT" else "SELL"
             contract = get_contract(symbol)
-            modified_stop = StopOrder(
+            sl_limit = round(new_sl * 0.99, 2) if direction == "LONG" else round(new_sl * 1.01, 2)
+            modified_stop = StopLimitOrder(
                 close_action,
                 qty,
                 new_sl,
+                sl_limit,
                 account=CONFIG["active_account"],
                 tif="GTC",
                 outsideRth=True,

@@ -19,6 +19,7 @@ _ib_mock.IB = MagicMock
 _ib_mock.Stock = MagicMock(return_value=MagicMock())
 _ib_mock.LimitOrder = MagicMock(return_value=MagicMock())
 _ib_mock.StopOrder = MagicMock(return_value=MagicMock())
+_ib_mock.StopLimitOrder = MagicMock(return_value=MagicMock())
 _ib_mock.MarketOrder = MagicMock(return_value=MagicMock())
 
 # ---------------------------------------------------------------------------
@@ -29,7 +30,9 @@ _ib_mock.MarketOrder = MagicMock(return_value=MagicMock())
 def _make_ib(connected=True):
     ib = MagicMock()
     ib.isConnected.return_value = connected
-    ib.placeOrder.return_value = MagicMock()
+    mod_trade = MagicMock()
+    mod_trade.orderStatus.status = "Submitted"
+    ib.placeOrder.return_value = mod_trade
     ib.sleep = MagicMock()
     return ib
 

@@ -314,6 +314,19 @@ def audit_bracket_orders(ib: IB) -> None:
                             )
                         else:
                             try:
+                                all_sell_count = sum(
+                                    1 for t in ib.openTrades()
+                                    if t.contract.symbol == symbol
+                                    and t.order.action.upper() == close_action
+                                    and t.orderStatus.status in ("Submitted", "PreSubmitted")
+                                )
+                                if all_sell_count >= 13:
+                                    log.warning(
+                                        "[BRACKET_AUDIT] %s skipping new sl — %d open %s orders already (IBKR limit 15)",
+                                        symbol, all_sell_count, close_action,
+                                    )
+                                    _mark_retry(symbol)
+                                    continue
                                 contract = get_contract(symbol, "stock")
                                 ib.qualifyContracts(contract)
                                 sl_limit = (
