@@ -2409,6 +2409,51 @@ def run_scan():
         # can compete fairly inside the unified cap.
         for _c in _cut_candidates_raw:
             _c["apex_cap_score"] = _compute_apex_cap_score(_c)
+        # ── Deduplicate by symbol before cap sort ────────────────────────────
+        # Multiple pipeline paths (held positions, PRU, committed universe,
+        # catalyst adds) can contribute the same symbol. Without dedup the same
+        # ticker appears 2-3× in the pool, inflating pre-cap counts, consuming
+        # multiple Apex slots, and allowing a symbol to appear in both the
+        # selected and dropped lists simultaneously. Dedup after apex_cap_score
+        # is attached so the best row wins on the full composite key.
+        _pre_dedupe_count = len(_cut_candidates_raw)
+        _deduped_by_sym: dict = {}
+        for _c in _cut_candidates_raw:
+            _sym = _c.get("symbol")
+            if not _sym:
+                continue
+            _existing = _deduped_by_sym.get(_sym)
+            if _existing is None:
+                _c.setdefault("source_count", 1)
+                _deduped_by_sym[_sym] = _c
+            else:
+                _existing["source_count"] = _existing.get("source_count", 1) + 1
+                _new_key = (
+                    _c.get("apex_cap_score", 0) or 0,
+                    _c.get("score", 0) or 0,
+                    _c.get("signal_score", 0) or 0,
+                )
+                _old_key = (
+                    _existing.get("apex_cap_score", 0) or 0,
+                    _existing.get("score", 0) or 0,
+                    _existing.get("signal_score", 0) or 0,
+                )
+                if _new_key > _old_key:
+                    _sc = _existing["source_count"]
+                    _deduped_by_sym[_sym] = _c
+                    _deduped_by_sym[_sym]["source_count"] = _sc
+        _cut_candidates_deduped = list(_deduped_by_sym.values())
+        _post_dedupe_count = len(_cut_candidates_deduped)
+        _duplicate_rows_removed = _pre_dedupe_count - _post_dedupe_count
+        _duplicate_symbol_count = sum(
+            1 for _c in _cut_candidates_deduped if (_c.get("source_count") or 1) > 1
+        )
+        if _duplicate_rows_removed:
+            clog("INFO",
+                 f"APEX_CAP_DEDUP: {_pre_dedupe_count} rows → {_post_dedupe_count} unique "
+                 f"(removed {_duplicate_rows_removed} duplicate rows, "
+                 f"{_duplicate_symbol_count} merged symbols)")
+
         # Cap at top 50 by apex_cap_score — sending 80+ candidates bloats the
         # Apex response past the token budget and causes JSON truncation.
         # Slots 31-50 are gated by apex_expanded_band_floor so only
@@ -2418,7 +2463,7 @@ def run_scan():
         _CORE_LIMIT = 30
         _EXPANDED_FLOOR = float(CONFIG.get("apex_expanded_band_floor", 20))
         _cut_all_sorted = sorted(
-            _cut_candidates_raw,
+            _cut_candidates_deduped,
             key=lambda c: c.get("apex_cap_score", c.get("score", 0)),
             reverse=True,
         )
@@ -2428,23 +2473,32 @@ def run_scan():
             if c.get("apex_cap_score", c.get("score", 0)) >= _EXPANDED_FLOOR
         ]
         _cut_candidates = _core + _expanded
-        if len(_cut_candidates_raw) > _CAP_LIMIT:
-            _old_sorted_log = sorted(_cut_candidates_raw, key=lambda c: c.get("score", 0), reverse=True)
+
+        # Symbol sets used throughout logging below
+        _selected_syms_set   = {c.get("symbol") for c in _cut_candidates}
+        _core_syms_set       = {c.get("symbol") for c in _core}
+        _expanded_syms_set   = {c.get("symbol") for c in _expanded}
+        _td_in_core_syms     = {c.get("symbol") for c in _core    if c.get("scanner_tier") == "D"}
+        _td_in_expanded_syms = {c.get("symbol") for c in _expanded if c.get("scanner_tier") == "D"}
+
+        if len(_cut_candidates_deduped) > _CAP_LIMIT:
+            _old_sorted_log   = sorted(_cut_candidates_deduped, key=lambda c: c.get("score", 0), reverse=True)
             _old_sel_syms_log = {c.get("symbol") for c in _old_sorted_log[:_CAP_LIMIT]}
-            _new_sel_syms_log = {c.get("symbol") for c in _cut_candidates}
             _td_before_log    = [c for c in _cut_all_sorted if c.get("scanner_tier") == "D"]
             _td_after_log     = [c for c in _cut_candidates  if c.get("scanner_tier") == "D"]
             _td_dropped_log   = [c for c in _cut_all_sorted[_CAP_LIMIT:] if c.get("scanner_tier") == "D"]
             _td_recovered_log = [c for c in _cut_candidates
                                  if c.get("scanner_tier") == "D" and c.get("symbol") not in _old_sel_syms_log]
             _non_td_displ_log = [c for c in _old_sorted_log[:_CAP_LIMIT]
-                                 if c.get("scanner_tier") != "D" and c.get("symbol") not in _new_sel_syms_log]
+                                 if c.get("scanner_tier") != "D" and c.get("symbol") not in _selected_syms_set]
             _raw_cutline_log  = min((c.get("score", 0) for c in _old_sorted_log[:_CAP_LIMIT]), default=None)
             _adj_cutline_log  = min((c.get("apex_cap_score", c.get("score", 0)) for c in _cut_candidates), default=None)
             clog("INFO",
-                 f"APEX_CAP: {len(_cut_candidates_raw)} candidates → capped to {_CAP_LIMIT} "
+                 f"APEX_CAP: {_post_dedupe_count} unique (was {_pre_dedupe_count} raw) "
+                 f"→ capped to {_CAP_LIMIT} "
                  f"raw_cutline={_raw_cutline_log} adj_cutline={_adj_cutline_log:.2f} "
                  f"tier_d_before={len(_td_before_log)} tier_d_selected={len(_td_after_log)} "
+                 f"(core={len(_td_in_core_syms)} expanded={len(_td_in_expanded_syms)}) "
                  f"tier_d_dropped={len(_td_dropped_log)} "
                  f"tier_d_recovered={len(_td_recovered_log)} non_td_displaced={len(_non_td_displ_log)}")
             for _rc in _td_recovered_log[:5]:
@@ -2459,10 +2513,35 @@ def run_scan():
                      f"  DISPLACED_NON_TD: {_dc.get('symbol')} score={_dc.get('score')} "
                      f"apex_cap_score={_dc.get('apex_cap_score', _dc.get('score', 0)):.2f}")
 
+        # ── Probe logging for key dropped Tier D symbols ──────────────────────
+        # Logs exact bonus breakdown so we can verify why each symbol was or was
+        # not recovered by the adjuster. Remove once investigation is resolved.
+        _PROBE_SYMS = {"DLR", "TSM", "WULF", "VRT", "CIFR", "APLD"}
+        for _pc in _cut_all_sorted:
+            if _pc.get("symbol") not in _PROBE_SYMS:
+                continue
+            _ps    = _pc.get("score", 0) or 0
+            _pad   = _pc.get("adjusted_discovery_score")
+            _prd   = _pc.get("discovery_score", 0) or 0
+            _parch = _pc.get("primary_archetype")
+            _pbkt  = _pc.get("universe_bucket")
+            _pacs  = _pc.get("apex_cap_score", 0) or 0
+            _ptier = _pc.get("scanner_tier", "")
+            _prank = _cut_all_sorted.index(_pc) + 1
+            _psel  = _pc.get("symbol") in _selected_syms_set
+            _pgrd  = " GUARDRAIL(score<18)" if (_ptier == "D" and _ps < 18) else ""
+            _pdisc = min((_pad if _pad is not None else _prd), 10) * 0.5 if (_ptier == "D" and _ps >= 18) else 0
+            _para  = 2 if (_ptier == "D" and _ps >= 18 and _parch) else 0
+            _pbns  = 1 if (_ptier == "D" and _ps >= 18 and _pbkt == "core_research") else 0
+            clog("INFO",
+                 f"PROBE {_pc.get('symbol')}: tier={_ptier} score={_ps} "
+                 f"discovery={_prd} adj_discovery={_pad} archetype={_parch} bucket={_pbkt} "
+                 f"disc_bonus={_pdisc} arch_bonus={_para} bkt_bonus={_pbns} "
+                 f"apex_cap_score={_pacs:.2f}{_pgrd} "
+                 f"rank={_prank}/{len(_cut_all_sorted)} selected={_psel} "
+                 f"source_count={_pc.get('source_count', 1)}")
+
         # ── Tier D apex-cap funnel record ─────────────────────────────────────
-        # Written unconditionally so the evidence report can see whether any
-        # Tier D candidates were present pre-cap, and whether the cap dropped them.
-        # _td_before/_td_after/_td_dropped used for apex_cap funnel logging below.
         _td_before:  list = []
         _td_after:   list = []
         _td_dropped: list = []
@@ -2474,6 +2553,11 @@ def run_scan():
             _min_sel_score = min((c.get("score", 0) for c in _cut_candidates), default=None)
             _max_td_score  = max((c.get("score", 0) for c in _td_before),      default=None)
             _highest_td_dropped_score = max((c.get("score", 0) for c in _td_dropped), default=None)
+            # Cutlines at ranks 30 and 50
+            _raw_sorted_cl  = sorted(_cut_candidates_deduped, key=lambda c: c.get("score", 0), reverse=True)
+            _raw_rank30_cl  = _raw_sorted_cl[_CORE_LIMIT - 1].get("score") if len(_raw_sorted_cl) >= _CORE_LIMIT else None
+            _adj_rank30_cl  = _cut_all_sorted[_CORE_LIMIT - 1].get("apex_cap_score") if len(_cut_all_sorted) >= _CORE_LIMIT else None
+            _adj_rank50_cl  = min((c.get("apex_cap_score", c.get("score", 0)) for c in _cut_candidates), default=None)
             _cap_record = {
                 "ts":                           datetime.now(UTC).isoformat(),
                 "stage":                        "apex_cap",
@@ -2481,6 +2565,8 @@ def run_scan():
                 "raw_tier_d_before_cap":        len(_td_before),
                 "raw_non_tier_d_before_cap":    len(_cut_all_sorted) - len(_td_before),
                 "cap_limit":                    _CAP_LIMIT,
+                "core_limit":                   _CORE_LIMIT,
+                "expanded_floor":               _EXPANDED_FLOOR,
                 "selected_candidates_after_cap": len(_cut_candidates),
                 "selected_tier_d_after_cap":    len(_td_after),
                 "selected_non_tier_d_after_cap": len(_cut_candidates) - len(_td_after),
@@ -2491,18 +2577,24 @@ def run_scan():
                 "dropped_tier_d_symbols_top_20": [c.get("symbol") for c in _td_dropped[:20]],
                 "top_10_selected_by_score": [
                     {
-                        "symbol":       c.get("symbol"),
-                        "score":        c.get("score"),
-                        "scanner_tier": c.get("scanner_tier", ""),
+                        "symbol":         c.get("symbol"),
+                        "score":          c.get("score"),
+                        "apex_cap_score": c.get("apex_cap_score"),
+                        "scanner_tier":   c.get("scanner_tier", ""),
+                        "band":           "core" if c.get("symbol") in _core_syms_set else "expanded",
                     }
                     for c in _cut_candidates[:10]
                 ],
                 "top_10_dropped_tier_d": [
                     {
-                        "symbol":             c.get("symbol"),
-                        "score":              c.get("score"),
-                        "discovery_score":    c.get("discovery_score"),
-                        "matched_archetypes": c.get("matched_position_archetypes", []),
+                        "symbol":                   c.get("symbol"),
+                        "score":                    c.get("score"),
+                        "apex_cap_score":           c.get("apex_cap_score"),
+                        "discovery_score":          c.get("discovery_score"),
+                        "adjusted_discovery_score": c.get("adjusted_discovery_score"),
+                        "primary_archetype":        c.get("primary_archetype"),
+                        "universe_bucket":          c.get("universe_bucket"),
+                        "matched_archetypes":       c.get("matched_position_archetypes", []),
                     }
                     for c in _td_dropped[:10]
                 ],
@@ -2515,6 +2607,21 @@ def run_scan():
                 "tier_d_strong_discovery_dropped": any(
                     (c.get("discovery_score") or 0) >= 6 for c in _td_dropped
                 ),
+                # Dedup stats
+                "pre_dedupe_count":       _pre_dedupe_count,
+                "post_dedupe_count":      _post_dedupe_count,
+                "duplicate_symbol_count": _duplicate_symbol_count,
+                "duplicate_rows_removed": _duplicate_rows_removed,
+                # Band breakdown
+                "tier_d_in_core":             len(_td_in_core_syms),
+                "tier_d_in_expanded":         len(_td_in_expanded_syms),
+                "tier_d_rejected":            len(_td_dropped),
+                "expanded_band_count":        len(_expanded),
+                "tier_d_expanded_band_count": len(_td_in_expanded_syms),
+                # Cutlines
+                "raw_rank_30_cutline":      _raw_rank30_cl,
+                "adjusted_rank_30_cutline": _adj_rank30_cl,
+                "adjusted_rank_50_cutline": _adj_rank50_cl,
             }
             _funnel_path = Path(__file__).parent / "data" / "tier_d_funnel.jsonl"
             with open(_funnel_path, "a") as _cap_f:
@@ -2522,30 +2629,85 @@ def run_scan():
             if _td_before:
                 clog("INFO",
                      f"Tier D apex_cap: pre_cap={len(_td_before)} "
-                     f"selected={len(_td_after)} dropped={len(_td_dropped)} "
+                     f"selected={len(_td_after)} (core={len(_td_in_core_syms)} expanded={len(_td_in_expanded_syms)}) "
+                     f"dropped={len(_td_dropped)} "
                      f"max_td_score={_max_td_score} min_selected={_min_sel_score} "
                      f"archetypes_dropped={_cap_record['tier_d_with_archetypes_dropped']} "
                      f"strong_discovery_dropped={_cap_record['tier_d_strong_discovery_dropped']}")
-            # Live compare: what old raw-score cap would have selected vs the new
-            # adjusted-score cap. Allows post-hoc audit of which Tier D names were
-            # recovered and which non-Tier-D names were displaced.
-            _old_sorted_cmp     = sorted(_cut_candidates_raw, key=lambda c: c.get("score", 0), reverse=True)
-            _old_sel_syms_cmp   = {c.get("symbol") for c in _old_sorted_cmp[:_CAP_LIMIT]}
-            _new_sel_syms_cmp   = {c.get("symbol") for c in _cut_candidates}
-            _td_recovered_cmp   = [c for c in _cut_candidates
-                                   if c.get("scanner_tier") == "D" and c.get("symbol") not in _old_sel_syms_cmp]
-            _non_td_displ_cmp   = [c for c in _old_sorted_cmp[:_CAP_LIMIT]
-                                   if c.get("scanner_tier") != "D" and c.get("symbol") not in _new_sel_syms_cmp]
+
+            # Per-candidate audit — one row per unique symbol with full score and
+            # band breakdown. Allows exact reconstruction of why each candidate
+            # was selected, placed in expanded band, or rejected.
+            _audit_rows = []
+            for _rank, _ac in enumerate(_cut_all_sorted, 1):
+                _asym = _ac.get("symbol")
+                _acs  = _ac.get("apex_cap_score", _ac.get("score", 0)) or 0
+                if _asym in _core_syms_set:
+                    _aband, _arej = "core", None
+                elif _asym in _expanded_syms_set:
+                    _aband, _arej = "expanded", None
+                elif _rank > _CORE_LIMIT and _acs < _EXPANDED_FLOOR:
+                    _aband, _arej = "rejected", "below_expanded_floor"
+                else:
+                    _aband, _arej = "rejected", "outside_cap"
+                _audit_rows.append({
+                    "symbol":                   _asym,
+                    "scanner_tier":             _ac.get("scanner_tier", ""),
+                    "origin":                   _ac.get("origin_path", ""),
+                    "pru":                      bool(_ac.get("position_research_universe_member")),
+                    "source_count":             _ac.get("source_count", 1),
+                    "raw_score":                _ac.get("score"),
+                    "signal_score":             _ac.get("signal_score"),
+                    "discovery_score":          _ac.get("discovery_score"),
+                    "adjusted_discovery_score": _ac.get("adjusted_discovery_score"),
+                    "primary_archetype":        _ac.get("primary_archetype"),
+                    "universe_bucket":          _ac.get("universe_bucket"),
+                    "apex_cap_score":           round(_acs, 4),
+                    "adjusted_rank":            _rank,
+                    "selected_for_apex":        _asym in _selected_syms_set,
+                    "selected_slot":            _rank if _asym in _selected_syms_set else None,
+                    "selected_band":            _aband,
+                    "rejection_reason":         _arej,
+                    "cap_limit":                _CAP_LIMIT,
+                    "core_limit":               _CORE_LIMIT,
+                    "expanded_floor":           _EXPANDED_FLOOR,
+                })
+            _audit_record = {
+                "ts":                 datetime.now(UTC).isoformat(),
+                "stage":              "apex_cap_candidate_audit",
+                "cap_limit":          _CAP_LIMIT,
+                "core_limit":         _CORE_LIMIT,
+                "expanded_floor":     _EXPANDED_FLOOR,
+                "pre_dedupe_count":   _pre_dedupe_count,
+                "post_dedupe_count":  _post_dedupe_count,
+                "candidates":         _audit_rows,
+            }
+            with open(_funnel_path, "a") as _af:
+                _af.write(json.dumps(_audit_record) + "\n")
+
+            # Live compare: adjusted-score cap vs what old raw-score cap selects
+            _old_sorted_cmp   = sorted(_cut_candidates_deduped, key=lambda c: c.get("score", 0), reverse=True)
+            _old_sel_syms_cmp = {c.get("symbol") for c in _old_sorted_cmp[:_CAP_LIMIT]}
+            _td_recovered_cmp = [c for c in _cut_candidates
+                                  if c.get("scanner_tier") == "D" and c.get("symbol") not in _old_sel_syms_cmp]
+            _non_td_displ_cmp = [c for c in _old_sorted_cmp[:_CAP_LIMIT]
+                                  if c.get("scanner_tier") != "D" and c.get("symbol") not in _selected_syms_set]
             _live_compare_record = {
                 "ts":                               datetime.now(UTC).isoformat(),
                 "stage":                            "apex_cap_adjusted_score_live_compare",
                 "cap_limit":                        _CAP_LIMIT,
+                "pre_dedupe_count":                 _pre_dedupe_count,
+                "post_dedupe_count":                _post_dedupe_count,
+                "duplicate_rows_removed":           _duplicate_rows_removed,
                 "raw_candidates_before_cap":        len(_cut_all_sorted),
                 "raw_score_cutline":                min((c.get("score", 0) for c in _old_sorted_cmp[:_CAP_LIMIT]), default=None),
-                "adjusted_apex_cap_score_cutline":  min((c.get("apex_cap_score", c.get("score", 0)) for c in _cut_candidates), default=None),
+                "adjusted_apex_cap_score_cutline":  _adj_rank50_cl,
                 "tier_d_before_cap":                len(_td_before),
                 "tier_d_selected_adjusted_cap":     len(_td_after),
                 "tier_d_dropped_adjusted_cap":      len(_td_dropped),
+                "tier_d_in_core":                   len(_td_in_core_syms),
+                "tier_d_in_expanded":               len(_td_in_expanded_syms),
+                "expanded_band_count":              len(_expanded),
                 "tier_d_recovered_count":           len(_td_recovered_cmp),
                 "non_tier_d_displaced_count":       len(_non_td_displ_cmp),
                 "tier_d_recovered_symbols":         [c.get("symbol") for c in _td_recovered_cmp],

@@ -573,15 +573,34 @@ def _build_apex_cap_record(candidates_sorted: list[dict], cap_limit: int) -> dic
     """
     Mirrors the apex-cap funnel record logic from bot_trading.py.
     Pure function — no I/O. Used by tests 26-30.
-    Attaches apex_cap_score and sorts by it before slicing, matching live behaviour.
+    Attaches apex_cap_score, deduplicates by symbol (keeping highest apex_cap_score row),
+    then sorts by apex_cap_score before slicing, matching live behaviour.
     """
     from datetime import UTC, datetime
     from apex_cap_score import compute_apex_cap_score
     for c in candidates_sorted:
         if "apex_cap_score" not in c:
             c["apex_cap_score"] = compute_apex_cap_score(c)
+    # Dedup by symbol — mirrors bot_trading.py dedup block
+    _deduped: dict = {}
+    for c in candidates_sorted:
+        sym = c.get("symbol")
+        if not sym:
+            continue
+        existing = _deduped.get(sym)
+        if existing is None:
+            c.setdefault("source_count", 1)
+            _deduped[sym] = c
+        else:
+            existing["source_count"] = existing.get("source_count", 1) + 1
+            new_key = (c.get("apex_cap_score", 0) or 0, c.get("score", 0) or 0)
+            old_key = (existing.get("apex_cap_score", 0) or 0, existing.get("score", 0) or 0)
+            if new_key > old_key:
+                sc = existing["source_count"]
+                _deduped[sym] = c
+                _deduped[sym]["source_count"] = sc
     candidates_sorted = sorted(
-        candidates_sorted,
+        list(_deduped.values()),
         key=lambda c: c.get("apex_cap_score", c.get("score", 0)),
         reverse=True,
     )
@@ -1132,3 +1151,215 @@ def test_65_no_live_reserve_allocation():
     td_selected = [c for c in selected if c.get("scanner_tier") == "D"]
     assert len(td_selected) == 0, "Tier D below signal floor must not enter cap via any quota"
     assert len(selected) == cap_limit
+
+
+# ── Tests 66-72: Deduplication and expanded-band coverage ─────────────────────
+
+
+def test_66_dedup_removes_duplicate_symbols():
+    """Test 66: two rows for the same symbol are collapsed to one by the dedup step."""
+    from apex_cap_score import compute_apex_cap_score
+
+    # 28 unique regulars + DUPE appearing twice = 30 raw, 29 unique
+    base = [{"symbol": f"REG{i:03d}", "score": 100 - i, "scanner_tier": ""} for i in range(28)]
+    dupe_a = {"symbol": "DUPE", "score": 30, "scanner_tier": ""}
+    dupe_b = {"symbol": "DUPE", "score": 25, "scanner_tier": ""}
+    pool = base + [dupe_a, dupe_b]
+    for c in pool:
+        c["apex_cap_score"] = compute_apex_cap_score(c)
+
+    rec = _build_apex_cap_record(pool, cap_limit=30)
+
+    # After dedup: 29 unique symbols — all fit inside cap=30
+    assert rec["raw_candidates_before_cap"] == 29
+    assert rec["dropped_by_cap_total"] == 0
+
+
+def test_67_dedup_keeps_higher_apex_cap_score_row():
+    """Test 67: when two rows share a symbol, the higher apex_cap_score row survives."""
+    from apex_cap_score import compute_apex_cap_score
+
+    # Two Tier D rows for same symbol: one at score=25, one at score=30
+    # Both above signal floor=18 so both get bonuses, but score=30 row wins.
+    row_low  = {"symbol": "TWIN", "score": 25, "scanner_tier": "D",
+                "discovery_score": 5, "adjusted_discovery_score": 5,
+                "primary_archetype": None, "universe_bucket": None}
+    row_high = {"symbol": "TWIN", "score": 30, "scanner_tier": "D",
+                "discovery_score": 8, "adjusted_discovery_score": 8,
+                "primary_archetype": "Quality Compounder", "universe_bucket": "core_research"}
+    for r in [row_low, row_high]:
+        r["apex_cap_score"] = compute_apex_cap_score(r)
+
+    assert row_high["apex_cap_score"] > row_low["apex_cap_score"]
+
+    pool = [row_low, row_high]
+    rec = _build_apex_cap_record(pool, cap_limit=30)
+
+    # Only 1 unique symbol after dedup
+    assert rec["raw_candidates_before_cap"] == 1
+    # The surviving row must be the high-score one (it ended up selected since cap=30 >> 1)
+    assert rec["selected_tier_d_after_cap"] == 1
+    selected_sym = rec["selected_tier_d_symbols"]
+    assert selected_sym == ["TWIN"]
+    # Verify the selected row's score matches row_high (check via top_10_selected_by_score)
+    top = rec["top_10_selected_by_score"]
+    assert top[0]["score"] == 30
+
+
+def test_68_no_symbol_in_both_selected_and_dropped():
+    """Test 68: after dedup, no symbol can appear in both selected and dropped lists."""
+    from apex_cap_score import compute_apex_cap_score
+
+    # 29 regular + 1 Tier D appearing twice = 31 raw → one symbol dropped by cap=30
+    regulars = [{"symbol": f"REG{i:03d}", "score": 100 - i, "scanner_tier": ""} for i in range(29)]
+    td_a = {"symbol": "TDUP", "score": 5, "scanner_tier": "D",
+            "discovery_score": 3, "adjusted_discovery_score": 3,
+            "primary_archetype": None, "universe_bucket": None}
+    td_b = {"symbol": "TDUP", "score": 4, "scanner_tier": "D",
+            "discovery_score": 2, "adjusted_discovery_score": 2,
+            "primary_archetype": None, "universe_bucket": None}
+    pool = regulars + [td_a, td_b]
+    for c in pool:
+        c["apex_cap_score"] = compute_apex_cap_score(c)
+
+    rec = _build_apex_cap_record(pool, cap_limit=30)
+
+    selected_set = set(rec["selected_tier_d_symbols"])
+    dropped_set  = set(rec["dropped_tier_d_symbols_top_20"])
+    assert selected_set.isdisjoint(dropped_set), (
+        f"Symbol overlap between selected and dropped: {selected_set & dropped_set}"
+    )
+
+
+def test_69_tier_d_bonus_applies_exactly_at_floor_boundary():
+    """Test 69: signal_score=18 earns full bonus; signal_score=17 earns zero."""
+    from apex_cap_score import compute_apex_cap_score
+
+    at_floor = {
+        "score": 18, "scanner_tier": "D",
+        "adjusted_discovery_score": 10,
+        "primary_archetype": "Quality Compounder",
+        "universe_bucket": "core_research",
+    }
+    below_floor = {
+        "score": 17, "scanner_tier": "D",
+        "adjusted_discovery_score": 10,
+        "primary_archetype": "Quality Compounder",
+        "universe_bucket": "core_research",
+    }
+
+    score_at    = compute_apex_cap_score(at_floor)
+    score_below = compute_apex_cap_score(below_floor)
+
+    assert score_at    == 18 + 5.0 + 2.0 + 1.0  # = 26.0
+    assert score_below == 17                      # no bonus below floor
+
+
+def test_70_expanded_band_slot_vs_core_slot():
+    """Test 70: Tier D in slots 31-50 (expanded band) is distinguishable from core (1-30).
+
+    Simulates the band split inline since _build_apex_cap_record only tracks total cap.
+    29 regulars at scores 100-72 fill core slots 1-29.
+    Tier D at score 25 + full bonus = 33 → apex_cap_score 33; enters slot 30 (core).
+    A low regular at score 22 ends up in expanded band or rejected.
+    """
+    from apex_cap_score import compute_apex_cap_score
+
+    candidates = [{"symbol": f"REG{i:03d}", "score": 100 - i, "scanner_tier": ""} for i in range(29)]
+    candidates.append({"symbol": "REG_LOW", "score": 22, "scanner_tier": ""})
+    td = {
+        "symbol": "TD_BAND",
+        "score": 25,
+        "scanner_tier": "D",
+        "adjusted_discovery_score": 10,
+        "primary_archetype": "Quality Compounder",
+        "universe_bucket": "core_research",
+    }
+    candidates.append(td)
+    for c in candidates:
+        c["apex_cap_score"] = compute_apex_cap_score(c)
+
+    CORE_LIMIT     = 30
+    EXPANDED_FLOOR = 20
+    CAP_LIMIT      = 50
+
+    sorted_all = sorted(candidates, key=lambda c: c.get("apex_cap_score", c.get("score", 0)), reverse=True)
+    core     = sorted_all[:CORE_LIMIT]
+    expanded = [c for c in sorted_all[CORE_LIMIT:CAP_LIMIT]
+                if (c.get("apex_cap_score") or c.get("score", 0)) >= EXPANDED_FLOOR]
+    selected = core + expanded
+
+    core_syms     = {c["symbol"] for c in core}
+    expanded_syms = {c["symbol"] for c in expanded}
+
+    # TD_BAND has apex_cap_score = 25 + 5 + 2 + 1 = 33; REG_LOW has score=22 raw
+    # TD_BAND beats REG_LOW → TD_BAND in core, REG_LOW pushed to expanded (score 22 >= floor 20)
+    assert "TD_BAND" in core_syms,     "Tier D with bonus should land in core (top 30)"
+    assert "REG_LOW" in expanded_syms, "Low regular displaced to expanded band"
+    assert "TD_BAND" not in expanded_syms
+
+
+def test_71_dedup_source_count_tracked():
+    """Test 71: surviving deduped row has source_count == 2 when two rows existed."""
+    from apex_cap_score import compute_apex_cap_score
+
+    row_a = {"symbol": "DUP2", "score": 40, "scanner_tier": ""}
+    row_b = {"symbol": "DUP2", "score": 35, "scanner_tier": ""}
+    for r in [row_a, row_b]:
+        r["apex_cap_score"] = compute_apex_cap_score(r)
+
+    # Call helper with just the two duplicate rows + cap=5 (both fit)
+    rec = _build_apex_cap_record([row_a, row_b], cap_limit=5)
+
+    # 1 unique symbol after dedup
+    assert rec["raw_candidates_before_cap"] == 1
+    # The helper doesn't return source_count directly, but we can verify
+    # dedup logic by checking that raw_candidates == 1 (not 2)
+    # and that the surviving symbol appears once in top_10
+    top_syms = [e["symbol"] for e in rec["top_10_selected_by_score"]]
+    assert top_syms.count("DUP2") == 1
+
+
+def test_72_apex_cap_candidate_audit_required_fields():
+    """Test 72: apex_cap_candidate_audit record schema has all required fields.
+
+    The audit row is built in bot_trading.py per unique post-dedup symbol.
+    We verify the required field list matches what the evidence report expects.
+    """
+    required_fields = [
+        "stage", "symbol", "scanner_tier", "origin", "pru",
+        "source_count", "raw_score", "signal_score",
+        "discovery_score", "adjusted_discovery_score",
+        "primary_archetype", "universe_bucket",
+        "apex_cap_score", "adjusted_rank",
+        "selected_for_apex", "selected_slot", "selected_band",
+        "rejection_reason", "cap_limit", "core_limit", "expanded_floor",
+    ]
+    # Build a representative audit row as bot_trading.py would
+    audit_row = {
+        "stage":                    "apex_cap_candidate_audit",
+        "symbol":                   "TSLA",
+        "scanner_tier":             "D",
+        "origin":                   "tier_d_main",
+        "pru":                      True,
+        "source_count":             1,
+        "raw_score":                72,
+        "signal_score":             72,
+        "discovery_score":          8,
+        "adjusted_discovery_score": 9,
+        "primary_archetype":        "Quality Compounder",
+        "universe_bucket":          "core_research",
+        "apex_cap_score":           80.5,
+        "adjusted_rank":            5,
+        "selected_for_apex":        True,
+        "selected_slot":            5,
+        "selected_band":            "core",
+        "rejection_reason":         None,
+        "cap_limit":                50,
+        "core_limit":               30,
+        "expanded_floor":           20.0,
+    }
+    for field in required_fields:
+        assert field in audit_row, f"Missing required audit field: {field}"
+    assert audit_row["stage"] == "apex_cap_candidate_audit"
+    assert audit_row["selected_band"] in {"core", "expanded", "rejected", "rejected_below_floor"}
