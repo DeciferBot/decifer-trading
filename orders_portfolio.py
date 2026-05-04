@@ -1523,738 +1523,641 @@ def _validate_option_market_price(
     return round(mkt_price, 4)
 
 
+def _build_ibkr_price_map(ib: IB) -> tuple[dict, set]:
+    """Return (price_map, positions_keys) from IBKR portfolio/positions calls."""
+    portfolio_items = ib.portfolio(CONFIG["active_account"])
+    price_map = {_ibkr_item_to_key(item): item for item in portfolio_items if item.position != 0}
+
+    positions_keys: set = set()
+    try:
+        for pos in ib.positions():
+            if pos.position != 0:
+                positions_keys.add(_ibkr_item_to_key(pos))
+    except Exception as _pos_err:
+        log.warning(f"ib.positions() fallback failed: {_pos_err}")
+
+    return price_map, positions_keys
+
+
+def _purge_closed_positions(ib: IB, price_map: dict, positions_keys: set) -> None:
+    """Close positions no longer in IBKR (closed externally via SL/TP/manual)."""
+    # Safety gate: empty IBKR response is more likely a data delivery failure than
+    # every position being simultaneously closed — skip purge to protect tracker.
+    _active_non_pending = sum(
+        1 for v in active_trades.values()
+        if v.get("status") not in ("PENDING", "RESERVED") and v.get("instrument") != "fx"
+    )
+    if _active_non_pending > 0 and not price_map and not positions_keys:
+        log.warning(
+            f"IBKR returned empty portfolio AND empty positions — skipping stale purge "
+            f"to protect {_active_non_pending} tracked position(s) from false deletion"
+        )
+        return
+
+    exec_index = _build_ibkr_execution_index(ib)
+
+    def _detect_exit_reason(trade: dict, sym_fills: list) -> str:
+        is_short = trade.get("direction", "LONG") == "SHORT"
+        exit_side = "BOT" if is_short else "SLD"
+        tp_oid = trade.get("tp_order_id")
+        sl_oid = trade.get("sl_order_id")
+        for fill in sym_fills:
+            if getattr(fill.execution, "side", "") != exit_side:
+                continue
+            foid = getattr(fill.execution, "orderId", None)
+            if tp_oid and foid and int(foid) == int(tp_oid):
+                return "tp_hit"
+            if sl_oid and foid and int(foid) == int(sl_oid):
+                return "sl_hit"
+            return "bracket_exit"
+        return "stale_purge"
+
+    stale_keys = []
+    with _trades_lock:
+        for k in active_trades:
+            if k in price_map or k in positions_keys:
+                continue
+            if active_trades[k].get("status") in ("PENDING", "EXITING"):
+                continue
+            # FX can temporarily vanish from IBKR callbacks — never auto-purge.
+            if active_trades[k].get("instrument") == "fx":
+                log.debug(f"Keeping FX position {k} — FX exempt from stale-position purge")
+                continue
+            stale_keys.append(k)
+        for k in stale_keys:
+            _st = active_trades.get(k, {})
+            _sym_k = _st.get("symbol", k.split("|")[0])
+            _exit_px, _exit_src = _resolve_cwd_exit_price(_st, exec_index)
+            _exit_reason = _detect_exit_reason(_st, exec_index.get(_sym_k, []))
+            _entry_px = float(_st.get("entry") or _exit_px)
+            _qty = int(_st.get("qty") or 1)
+            _is_short = _st.get("direction") == "SHORT"
+            _pnl = round((_entry_px - _exit_px if _is_short else _exit_px - _entry_px) * _qty, 2)
+            log.warning(
+                "Position %s no longer in IBKR — recording close "
+                "(reason=%s exit=%.4f src=%s pnl=%.2f)",
+                k, _exit_reason, _exit_px, _exit_src, _pnl,
+            )
+            _close_position_record(k, exit_price=_exit_px, exit_reason=_exit_reason, pnl=_pnl)
+
+
+def _resolve_exiting_positions(ib: IB, price_map: dict, positions_keys: set) -> None:
+    """Finalise EXITING positions whose close order has filled (gone from IBKR)."""
+    exiting_keys = []
+    with _trades_lock:
+        for k, v in active_trades.items():
+            if (v.get("status") == "EXITING"
+                    and v.get("close_order_id")
+                    and k not in price_map
+                    and k not in positions_keys):
+                exiting_keys.append(k)
+
+    if not exiting_keys:
+        return
+
+    exec_index = _build_ibkr_execution_index(ib)
+    now_ts = datetime.now(UTC).isoformat()
+
+    for k in exiting_keys:
+        _t = active_trades.get(k, {})
+        if not _t:
+            continue
+        _sym = _t.get("symbol", k.split("|")[0])
+        _exit_px, _exit_src = _resolve_cwd_exit_price(_t, exec_index)
+        _entry_px = float(_t.get("entry", 0))
+        _qty = int(_t.get("qty", 1))
+        _is_short = _t.get("direction", "LONG") == "SHORT"
+        _pnl = round((_entry_px - _exit_px if _is_short else _exit_px - _entry_px) * _qty, 2)
+        _pnl_pct = round(_pnl / (_entry_px * _qty), 4) if _entry_px * _qty else 0
+        _exit_reason = _t.get("pending_exit_reason", "ext_hours_limit_filled")
+        _trade_id = _t.get("trade_id", k)
+        log.info(
+            "EXITING position %s (close order #%s) gone from IBKR — "
+            "writing deferred CLOSE (exit=%.4f src=%s pnl=%.2f)",
+            k, _t.get("close_order_id"), _exit_px, _exit_src, _pnl,
+        )
+        try:
+            from event_log import append_close as _el_close_dfr
+            _el_close_dfr(_trade_id, _sym, exit_price=_exit_px, pnl=_pnl,
+                          exit_reason=_exit_reason, hold_minutes=0)
+        except Exception as _e:
+            log.warning("Deferred CLOSE event_log write failed for %s: %s", k, _e)
+        try:
+            from training_store import append as _ts_dfr
+            _ts_dfr({
+                "trade_id": _trade_id,
+                "symbol": _sym,
+                "direction": _t.get("direction", "LONG"),
+                "trade_type": _t.get("trade_type") or "INTRADAY",
+                "instrument": _t.get("instrument", "stock"),
+                "fill_price": float(_t.get("entry", 0.0)),
+                "intended_price": float(_t.get("intended_price") or _t.get("entry", 0.0)),
+                "exit_price": _exit_px,
+                "pnl": _pnl,
+                "hold_minutes": 0,
+                "exit_reason": _exit_reason,
+                "regime": _t.get("entry_regime") or _t.get("regime", "UNKNOWN"),
+                "signal_scores": _t.get("signal_scores") or {},
+                "conviction": float(_t.get("conviction") or 0.0),
+                "score": float(_t.get("score") or _t.get("entry_score") or 0.0),
+                "ts_fill": _t.get("open_time") or now_ts,
+                "ts_close": now_ts,
+                "qty": _qty,
+                "sl": float(_t.get("sl") or 0.0),
+                "tp": float(_t.get("tp") or 0.0),
+                "setup_type": _t.get("setup_type", ""),
+                "pattern_id": _t.get("pattern_id", ""),
+                "atr": float(_t.get("atr") or 0.0),
+            })
+        except Exception as _e:
+            log.warning("Deferred CLOSE training_store write failed for %s: %s", k, _e)
+        try:
+            from learning import log_trade as _log_trade_ex
+            _log_trade_ex(
+                trade=_t, agent_outputs={}, regime={}, action="CLOSE",
+                outcome={
+                    "exit_price": _exit_px, "pnl": _pnl,
+                    "pnl_pct": _pnl_pct, "reason": _exit_reason,
+                },
+            )
+        except Exception as _e:
+            log.warning("Deferred CLOSE log_trade failed for %s: %s", k, _e)
+        with _trades_lock:
+            with _recently_closed_lock:
+                recently_closed[_sym] = now_ts
+            active_trades.pop(k, None)
+
+    _save_positions_file()
+
+
+def _resolve_trimming_positions(ib: IB) -> None:
+    """Finalise TRIMMING positions: confirm fill or revert to ACTIVE if cancelled."""
+    trimming_keys = []
+    with _trades_lock:
+        for k, v in active_trades.items():
+            if v.get("status") == "TRIMMING" and v.get("pending_trim_order_id"):
+                trimming_keys.append(k)
+
+    if not trimming_keys:
+        return
+
+    open_order_ids = {t.order.orderId for t in ib.openTrades()}
+    exec_index = _build_ibkr_execution_index(ib)
+
+    for k in trimming_keys:
+        _t = active_trades.get(k, {})
+        if not _t:
+            continue
+        _sym = _t.get("symbol", k.split("|")[0])
+        _trim_oid = _t.get("pending_trim_order_id")
+        _trim_qty = int(_t.get("pending_trim_qty") or 0)
+        _trim_reason = _t.get("pending_trim_reason", "deferred_trim")
+        _trim_tid = _t.get("trade_id", "")
+
+        if _trim_oid in open_order_ids:
+            continue  # still pending — nothing to do this cycle
+
+        _trim_fill = next(
+            (f for f in exec_index.get(_sym, []) if getattr(f.execution, "orderId", None) == _trim_oid),
+            None,
+        )
+
+        if _trim_fill:
+            _fill_px = float(getattr(_trim_fill.execution, "price", 0) or 0)
+            _actual_filled = int(
+                getattr(_trim_fill.execution, "cumQty", 0)
+                or getattr(_trim_fill.execution, "shares", 0)
+                or _trim_qty
+            )
+            _remaining = int(_t.get("qty", _trim_qty)) - _actual_filled
+            _safe_update_trade(k, {
+                "qty": max(0, _remaining),
+                "status": "ACTIVE",
+                "pending_trim_order_id": None,
+                "pending_trim_qty": None,
+                "pending_trim_reason": None,
+            })
+            if _trim_tid:
+                try:
+                    from event_log import append_trim as _el_trim_dfr
+                    _el_trim_dfr(_trim_tid, _sym, qty_sold=_actual_filled,
+                                 remaining_qty=max(0, _remaining),
+                                 exit_price=_fill_px, exit_reason=_trim_reason)
+                except Exception as _elt:
+                    log.warning("Deferred TRIM event_log write failed for %s: %s", k, _elt)
+            _sl_p = float(_t.get("sl") or 0)
+            _tp_p = float(_t.get("tp") or 0)
+            _direction = _t.get("direction", "LONG")
+            _account = CONFIG.get("active_account", "")
+            if _sl_p and _tp_p and _remaining > 0:
+                try:
+                    from ib_async import StopLimitOrder as _SLO, LimitOrder as _LO
+                    _oca = f"decifer_{_sym}_{_trim_oid}_deferred_trim"
+                    _sl_lmt = round(_sl_p * 0.99 if _direction == "LONG" else _sl_p * 1.01, 2)
+                    _ba = "SELL" if _direction == "LONG" else "BUY"
+                    _new_sl = _SLO(_ba, _remaining, _sl_p, _sl_lmt, account=_account, tif="GTC", outsideRth=True)
+                    _new_sl.ocaGroup = _oca
+                    _new_sl.ocaType = 1
+                    _new_tp = _LO(_ba, _remaining, _tp_p, account=_account, tif="GTC", outsideRth=True)
+                    _new_tp.ocaGroup = _oca
+                    _new_tp.ocaType = 1
+                    _ct = get_contract(_sym)
+                    _sl_t = ib.placeOrder(_ct, _new_sl)
+                    _tp_t = ib.placeOrder(_ct, _new_tp)
+                    ib.sleep(0.5)
+                    _safe_update_trade(k, {
+                        "sl_order_id": _sl_t.order.orderId,
+                        "tp_order_id": _tp_t.order.orderId,
+                    })
+                    log.info(
+                        "Deferred TRIM %s: confirmed fill px=%.4f sold=%d remaining=%d "
+                        "new bracket SL#%d @ %.2f TP#%d @ %.2f",
+                        _sym, _fill_px, _trim_qty, _remaining,
+                        _sl_t.order.orderId, _sl_p, _tp_t.order.orderId, _tp_p,
+                    )
+                except Exception as _be:
+                    log.error("Deferred TRIM %s: bracket placement failed — %s", _sym, _be)
+            else:
+                log.info(
+                    "Deferred TRIM %s: fill confirmed px=%.4f sold=%d remaining=%d "
+                    "(no bracket — sl or tp missing)",
+                    _sym, _fill_px, _trim_qty, _remaining,
+                )
+        else:
+            log.warning(
+                "Deferred TRIM %s: order #%s not in open trades or fills — "
+                "trim SELL cancelled, reverting to ACTIVE at unchanged qty",
+                _sym, _trim_oid,
+            )
+            _safe_update_trade(k, {
+                "status": "ACTIVE",
+                "pending_trim_order_id": None,
+                "pending_trim_qty": None,
+                "pending_trim_reason": None,
+            })
+
+    _save_positions_file()
+
+
+def _resolve_orphaned_pending(ib: IB, price_map: dict, positions_keys: set) -> None:
+    """Cancel and remove PENDING positions with no FillWatcher that have timed out."""
+    from fill_watcher import _active_watchers
+    from fill_watcher import _watchers_lock as _fw_lock
+
+    _orphan_mins = CONFIG.get("fill_watcher", {}).get("orphan_timeout_mins", 5)
+
+    with _trades_lock:
+        pending_keys = [k for k in active_trades if active_trades[k].get("status") == "PENDING"]
+
+    for _key in pending_keys:
+        _trade_instrument = active_trades.get(_key, {}).get("instrument", "stock")
+        _effective_timeout = _orphan_mins
+
+        if _trade_instrument == "option" and (_key in price_map or _key in positions_keys):
+            _ibkr_item = price_map.get(_key)
+            _ibkr_filled_qty = abs(int(_ibkr_item.position)) if _ibkr_item is not None else None
+            _opt_fill = round(float(_ibkr_item.averageCost) / 100, 4) if (_ibkr_item and _ibkr_item.averageCost) else None
+            with _trades_lock:
+                if _key in active_trades:
+                    active_trades[_key]["status"] = "ACTIVE"
+                    if _ibkr_filled_qty is not None:
+                        _tracked_qty = active_trades[_key].get("qty", _ibkr_filled_qty)
+                        if _ibkr_filled_qty != _tracked_qty:
+                            log.warning(
+                                f"PENDING option {_key}: qty mismatch on fill confirmation — "
+                                f"tracked={_tracked_qty}, IBKR={_ibkr_filled_qty} (partial fill). "
+                                f"Correcting to {_ibkr_filled_qty}."
+                            )
+                        active_trades[_key]["qty"] = _ibkr_filled_qty
+                        active_trades[_key]["contracts"] = _ibkr_filled_qty
+                    if _opt_fill and not active_trades[_key].get("_fill_confirmed"):
+                        active_trades[_key]["entry"] = _opt_fill
+                        active_trades[_key]["entry_premium"] = _opt_fill
+                        active_trades[_key]["high_water_mark"] = _opt_fill
+                        active_trades[_key]["current"] = _opt_fill
+            _tid = active_trades.get(_key, {}).get("trade_id", "")
+            if _tid and _opt_fill and _ibkr_filled_qty and not active_trades.get(_key, {}).get("_fill_confirmed"):
+                try:
+                    from event_log import append_fill as _el_fill
+                    _el_fill(_tid, _key.split("|")[0], fill_price=_opt_fill, fill_qty=_ibkr_filled_qty)
+                    with _trades_lock:
+                        if _key in active_trades:
+                            active_trades[_key]["_fill_confirmed"] = True
+                except Exception as _elf_err:
+                    log.warning("Reconcile: ORDER_FILLED write failed for option %s: %s", _key, _elf_err)
+            _src = "portfolio" if _key in price_map else "positions"
+            log.info("PENDING option %s confirmed ACTIVE by IBKR %s — fill=%.4f", _key, _src, _opt_fill or 0)
+            continue
+        elif _trade_instrument == "option":
+            _effective_timeout = CONFIG.get("fill_watcher", {}).get("option_orphan_timeout_mins", 480)
+        elif _key in price_map or _key in positions_keys:
+            _ibkr_item = price_map.get(_key)
+            _actual_fill = round(float(_ibkr_item.averageCost), 4) if (_ibkr_item and _ibkr_item.averageCost) else None
+            _actual_qty = abs(int(_ibkr_item.position)) if _ibkr_item else None
+            with _trades_lock:
+                if _key in active_trades:
+                    active_trades[_key]["status"] = "ACTIVE"
+                    if _actual_fill and not active_trades[_key].get("_fill_confirmed"):
+                        active_trades[_key]["entry"] = _actual_fill
+                        active_trades[_key]["high_water_mark"] = _actual_fill
+                        active_trades[_key]["current"] = _actual_fill
+                    if _actual_qty:
+                        active_trades[_key]["qty"] = _actual_qty
+            _tid = active_trades.get(_key, {}).get("trade_id", "")
+            if _tid and _actual_fill and _actual_qty and not active_trades.get(_key, {}).get("_fill_confirmed"):
+                try:
+                    from event_log import append_fill as _el_fill
+                    _el_fill(_tid, _key.split("|")[0], fill_price=_actual_fill, fill_qty=_actual_qty)
+                    with _trades_lock:
+                        if _key in active_trades:
+                            active_trades[_key]["_fill_confirmed"] = True
+                except Exception as _elf_err:
+                    log.warning("Reconcile: ORDER_FILLED write failed for %s: %s", _key, _elf_err)
+            _src = "portfolio" if _key in price_map else "positions"
+            log.info("PENDING %s confirmed ACTIVE by IBKR %s — fill=%.4f", _key, _src, _actual_fill or 0)
+            continue
+        else:
+            with _fw_lock:
+                _has_watcher = _key in _active_watchers
+            if _has_watcher:
+                continue
+            _oid_check = active_trades.get(_key, {}).get("order_id")
+            if _oid_check:
+                _order_still_live = False
+                try:
+                    for _ot in ib.openTrades():
+                        if _ot.order.orderId == _oid_check:
+                            _order_still_live = True
+                            break
+                except Exception:
+                    _order_still_live = True  # fail-closed: assume live
+                if _order_still_live:
+                    continue
+
+        with _trades_lock:
+            _trade = active_trades.get(_key)
+        if _trade is None:
+            continue
+
+        _open_time_str = _trade.get("open_time")
+        try:
+            _open_dt = datetime.fromisoformat(_open_time_str)
+            _age_mins = (datetime.now(UTC) - _open_dt).total_seconds() / 60
+        except (ValueError, TypeError):
+            _age_mins = _effective_timeout + 1
+
+        if _age_mins < _effective_timeout:
+            continue
+
+        _oid = _trade.get("order_id")
+        log.warning(
+            f"Orphaned PENDING order {_key} order #{_oid} (age={_age_mins:.1f} min, no FillWatcher) — cancelling"
+        )
+        if _oid:
+            _cancel_ibkr_order_by_id(ib, _oid)
+        with _trades_lock:
+            recently_closed[_key] = datetime.now(UTC).isoformat()
+        _safe_del_trade(_key)
+
+
+def _readd_missing_positions(ib: IB, price_map: dict) -> None:
+    """Re-add positions that IBKR holds but the tracker is missing, recovering metadata."""
+
+    def _find_saved_metadata(sym: str, instrument: str) -> dict:
+        """Scan event_log and positions.json for metadata for this symbol+instrument."""
+        try:
+            from event_log import open_trades as _el_open2
+            for v in _el_open2().values():
+                if v.get("symbol") == sym and v.get("trade_type") and v["trade_type"] != "UNKNOWN":
+                    return v
+        except Exception:
+            pass
+        try:
+            from event_log import pending_orders as _el_pending2
+            for intent in reversed(_el_pending2()):
+                if (intent.get("symbol") == sym
+                        and intent.get("trade_type")
+                        and intent["trade_type"] != "UNKNOWN"):
+                    return intent
+        except Exception:
+            pass
+        try:
+            saved = _load_positions_file()
+            for saved_val in saved.values():
+                if (saved_val.get("symbol") == sym
+                        and saved_val.get("instrument") == instrument
+                        and saved_val.get("trade_type")):
+                    return saved_val
+        except Exception:
+            pass
+        try:
+            from event_log import last_intent_for_symbol as _last_intent2
+            intent = _last_intent2(sym)
+            if intent.get("trade_type") and intent["trade_type"] != "UNKNOWN":
+                return intent
+        except Exception:
+            pass
+        return {}
+
+    for ibkr_key, item in price_map.items():
+        if ibkr_key in active_trades:
+            continue
+        try:
+            is_opt = _is_option_contract(item.contract)
+            is_fx = getattr(item.contract, "secType", "") == "CASH"
+            sym = ibkr_key if is_fx else item.contract.symbol
+            direction = "SHORT" if item.position < 0 else "LONG"
+            qty = abs(int(item.position))
+            ibkr_mkt = float(item.marketPrice)
+            instrument = "option" if is_opt else ("fx" if is_fx else "stock")
+
+            saved_meta = _find_saved_metadata(sym, instrument)
+            metadata_restored = bool(saved_meta)
+
+            if is_opt:
+                entry = round(float(item.averageCost) / 100, 4)
+                c = item.contract
+                raw_exp = str(c.lastTradeDateOrContractMonth)
+                _right = "C" if c.right in ("C", "CALL") else "P"
+                _strike = float(c.strike)
+                _validated_mkt = _validate_option_market_price(
+                    ibkr_mkt, sym, _right, _strike, entry, context="re-sync"
+                )
+                validated = _validated_mkt if _validated_mkt > 0 else entry
+                expiry_str = (f"{raw_exp[:4]}-{raw_exp[4:6]}-{raw_exp[6:]}"
+                              if len(raw_exp) == 8 and raw_exp.isdigit() else raw_exp)
+                mult = 100
+                pnl = round((entry - validated if direction == "SHORT" else validated - entry) * qty * mult, 2)
+                try:
+                    _dte_calc2 = (datetime.strptime(expiry_str, "%Y-%m-%d").date() - date.today()).days
+                except Exception:
+                    _dte_calc2 = 0
+                ibkr_fields = {
+                    "symbol": sym, "instrument": "option", "right": _right,
+                    "strike": c.strike, "expiry_str": expiry_str, "expiry_ibkr": raw_exp,
+                    "dte": _dte_calc2, "contracts": qty, "entry_premium": entry,
+                    "current_premium": validated, "entry": entry, "current": validated,
+                    "qty": qty,
+                    "sl": round(entry * (1 - CONFIG.get("options_stop_loss", 0.50)), 4),
+                    "tp": round(entry * (1 + CONFIG.get("options_profit_target", 1.00)), 4),
+                    "direction": direction, "pnl": pnl, "status": "ACTIVE",
+                }
+                if metadata_restored:
+                    new_entry = {**saved_meta, **ibkr_fields}
+                    log.warning(
+                        f"Re-added missing option {ibkr_key} from IBKR — "
+                        f"metadata RESTORED from disk (trade_type={saved_meta.get('trade_type', '?')})"
+                    )
+                else:
+                    new_entry = {
+                        **ibkr_fields, "score": 0, "trade_type": "UNKNOWN",
+                        "conviction": 0.0, "entry_regime": "UNKNOWN",
+                        "metadata_status": "MISSING",
+                        "reasoning": "Re-synced from IBKR — original metadata not found",
+                    }
+                    log.warning(
+                        f"Re-added missing option {ibkr_key} from IBKR — "
+                        f"NO metadata found; trade_type/conviction unknown"
+                    )
+                _safe_set_trade(ibkr_key, new_entry)
+            else:
+                entry = round(float(item.averageCost), 4)
+                validated = ibkr_mkt if ibkr_mkt > 0 else entry
+                _prec = 4 if is_fx else 2
+                if direction == "SHORT":
+                    sl = round(entry * (1.005 if is_fx else 1.02), _prec)
+                    tp = round(entry * (0.985 if is_fx else 0.94), _prec)
+                    pnl = round((entry - validated) * qty, 2)
+                else:
+                    sl = round(entry * (0.995 if is_fx else 0.98), _prec)
+                    tp = round(entry * (1.015 if is_fx else 1.06), _prec)
+                    pnl = round((validated - entry) * qty, 2)
+                ibkr_fields = {
+                    "symbol": sym, "instrument": instrument,
+                    "entry": entry, "current": round(validated, 4),
+                    "qty": qty, "sl": sl, "tp": tp,
+                    "direction": direction, "pnl": pnl, "status": "ACTIVE",
+                }
+                _re_add_label = "fx" if is_fx else "stock"
+                if metadata_restored:
+                    new_entry = {**saved_meta, **ibkr_fields}
+                    log.warning(
+                        f"Re-added missing {_re_add_label} {ibkr_key} from IBKR — "
+                        f"metadata RESTORED from disk (trade_type={saved_meta.get('trade_type', '?')})"
+                    )
+                else:
+                    new_entry = {
+                        **ibkr_fields, "score": 0, "trade_type": "UNKNOWN",
+                        "conviction": 0.0, "entry_regime": "UNKNOWN",
+                        "metadata_status": "MISSING",
+                        "reasoning": "Re-synced from IBKR — original metadata not found",
+                    }
+                    log.warning(
+                        f"Re-added missing {_re_add_label} {ibkr_key} from IBKR — "
+                        f"NO metadata found; trade_type/conviction unknown"
+                    )
+                _safe_set_trade(ibkr_key, new_entry)
+        except Exception as readd_err:
+            log.error(f"Failed to re-add {ibkr_key}: {readd_err}")
+
+
+def _refresh_position_prices(ib: IB, price_map: dict) -> None:
+    """Update current price and P&L for all tracked positions using 3-way validation."""
+    with _trades_lock:
+        trades_snapshot = dict(active_trades)
+
+    for key, trade in trades_snapshot.items():
+        is_option = trade.get("instrument") == "option"
+        sym = trade.get("symbol", key)
+        entry = trade.get("entry", 0)
+
+        ibkr_price = 0
+        if key in price_map:
+            item = price_map[key]
+            mkt_price = float(item.marketPrice)
+            if mkt_price > 0:
+                if is_option:
+                    ibkr_price = _validate_option_market_price(
+                        mkt_price, sym, trade.get("right", ""),
+                        float(trade.get("strike", 0) or 0), entry, context=key,
+                    )
+                else:
+                    ibkr_price = mkt_price
+
+        if ibkr_price == 0 and trade.get("instrument") == "fx":
+            try:
+                _fx_contract = get_contract(sym, "fx")
+                ib.qualifyContracts(_fx_contract)
+                ibkr_price = _get_ibkr_price(ib, _fx_contract, fallback=0)
+            except Exception as _fx_err:
+                log.debug(f"FX price fetch for {sym}: {_fx_err}")
+
+        if is_option:
+            if ibkr_price > 0:
+                validated_price = ibkr_price
+                src_desc = f"IBKR_OPT=${ibkr_price:.2f}"
+            else:
+                stored = trade.get("current", 0)
+                if entry > 0 and stored > entry * 20:
+                    log.warning(
+                        f"Option {key}: stored current ${stored:.2f} looks like "
+                        f"underlying price (>{20}× entry ${entry:.4f}) — resetting to entry"
+                    )
+                    trade["current"] = entry
+                    trade["current_premium"] = entry
+                    trade["pnl"] = 0.0
+                else:
+                    log.warning(f"No IBKR price for option {key} — keeping previous ${stored:.2f}")
+                continue
+        elif trade.get("instrument") == "fx":
+            if ibkr_price > 0:
+                validated_price = ibkr_price
+                src_desc = f"IBKR_FX=${ibkr_price:.4f}"
+            else:
+                log.warning(f"No IBKR price for FX {key} — keeping previous ${trade.get('current', 0):.4f}")
+                continue
+        else:
+            validated_price, src_desc = _validate_position_price(sym, ibkr_price, entry)
+
+        if validated_price > 0:
+            trade["current"] = round(validated_price, 4)
+            if is_option:
+                trade["current_premium"] = round(validated_price, 4)
+            mult = 100 if is_option else 1
+            direction = trade.get("direction", "LONG")
+            if direction == "SHORT":
+                trade["pnl"] = round((entry - validated_price) * trade["qty"] * mult, 2)
+            else:
+                trade["pnl"] = round((validated_price - entry) * trade["qty"] * mult, 2)
+            trade["_price_sources"] = src_desc
+        else:
+            log.warning(
+                f"No validated price for {key}: {src_desc} — keeping previous ${trade.get('current', 0):.2f}"
+            )
+
+
 def update_positions_from_ibkr(ib: IB):
     """
-    Refresh current price and P&L for all tracked positions using 3-way price
-    validation (IBKR + Alpaca + TV). Called on every scan so dashboard always
-    shows live P&L even when no symbols score.
+    Refresh current price and P&L for all tracked positions. Called on every scan.
 
-    Uses composite keys to match IBKR portfolio items to the correct active_trades
-    entry (preventing stock/option collision). Stock prices are 3-way validated;
-    option premiums use IBKR only (Alpaca/TV don't have option pricing).
+    Delegates each responsibility to a focused helper so no cross-scope variable
+    collisions are possible:
+      1. _build_ibkr_price_map      — portfolio + positions from IBKR
+      2. _purge_closed_positions    — positions closed externally (SL/TP/manual)
+      3. _resolve_exiting_positions — deferred CLOSE for filled EXITING orders
+      4. _resolve_trimming_positions — deferred TRIM resolution
+      5. _resolve_orphaned_pending  — cancel timed-out PENDING with no FillWatcher
+      6. _readd_missing_positions   — re-add positions IBKR has that tracker lost
+      7. _refresh_position_prices   — IBKR market price → 3-way validation → P&L
     """
     try:
-        portfolio_items = ib.portfolio(CONFIG["active_account"])
-        # Build price map keyed by composite key (stock vs option safe)
-        price_map = {}
-        for item in portfolio_items:
-            if item.position != 0:
-                price_map[_ibkr_item_to_key(item)] = item
-
-        # FX (CASH) positions may not appear in ib.portfolio() if
-        # reqAccountUpdates hasn't delivered updatePortfolio callbacks yet.
-        # Build a fallback set from ib.positions() so FX entries are not
-        # incorrectly treated as stale or orphaned.
-        _positions_keys: set = set()
-        _positions_fallback_ok = False
-        try:
-            for pos in ib.positions():
-                if pos.position != 0:
-                    _positions_keys.add(_ibkr_item_to_key(pos))
-            _positions_fallback_ok = True
-        except Exception as _pos_err:
-            log.warning(f"ib.positions() fallback failed: {_pos_err}")
-
-        # Remove positions no longer in IBKR (closed externally via SL/TP/manual).
-        # FX positions are ONLY protected by _positions_keys (they rarely appear
-        # in ib.portfolio()).  If the fallback failed, never purge FX — we'd be
-        # deleting a live position just because the callback hasn't arrived.
-        #
-        # SAFETY GATE: if IBKR returned no data at all (price_map empty AND
-        # _positions_keys empty), it is far more likely that the API call
-        # returned stale/empty than that every position was simultaneously
-        # closed.  Skip the purge entirely to prevent wiping positions.json.
-        _active_non_pending = sum(
-            1 for v in active_trades.values()
-            if v.get("status") not in ("PENDING", "RESERVED") and v.get("instrument") != "fx"
-        )
-        if _active_non_pending > 0 and not price_map and not _positions_keys:
-            log.warning(
-                f"IBKR returned empty portfolio AND empty positions — skipping stale purge "
-                f"to protect {_active_non_pending} tracked position(s) from false deletion"
-            )
-        else:
-            # Build execution index once so stale-position closes use real fill prices
-            # rather than the last cached `current` price.  Mirrors the pattern already
-            # used by the EXITING-deferred path below.
-            _stale_exec_index = _build_ibkr_execution_index(ib)
-
-            def _detect_stale_exit_reason(trade: dict, sym_fills: list) -> str:
-                """Return tp_hit / sl_hit / bracket_exit / stale_purge from IBKR fills."""
-                is_short = trade.get("direction", "LONG") == "SHORT"
-                exit_side = "BOT" if is_short else "SLD"
-                tp_oid = trade.get("tp_order_id")
-                sl_oid = trade.get("sl_order_id")
-                for fill in sym_fills:
-                    if getattr(fill.execution, "side", "") != exit_side:
-                        continue
-                    foid = getattr(fill.execution, "orderId", None)
-                    if tp_oid and foid and int(foid) == int(tp_oid):
-                        return "tp_hit"
-                    if sl_oid and foid and int(foid) == int(sl_oid):
-                        return "sl_hit"
-                    return "bracket_exit"
-                return "stale_purge"
-
-            stale_keys = []
-            with _trades_lock:
-                for k in active_trades:
-                    if k in price_map or k in _positions_keys:
-                        continue
-                    if active_trades[k].get("status") in ("PENDING", "EXITING"):
-                        continue
-                    # FX positions are unreliable in IBKR callbacks — they can
-                    # temporarily vanish from both portfolio() and positions() due
-                    # to reqAccountUpdates timing.  Never auto-purge FX; require
-                    # manual close or an explicit close_position() call.
-                    if active_trades[k].get("instrument") == "fx":
-                        log.debug(f"Keeping FX position {k} — FX exempt from stale-position purge")
-                        continue
-                    stale_keys.append(k)
-                for k in stale_keys:
-                    _st = active_trades.get(k, {})
-                    _sym_k = _st.get("symbol", k.split("|")[0])
-                    _exit_px, _exit_src = _resolve_cwd_exit_price(_st, _stale_exec_index)
-                    _exit_reason = _detect_stale_exit_reason(_st, _stale_exec_index.get(_sym_k, []))
-                    _entry_px = float(_st.get("entry") or _exit_px)
-                    _qty = int(_st.get("qty") or 1)
-                    _is_short = _st.get("direction") == "SHORT"
-                    _pnl = round((_entry_px - _exit_px if _is_short else _exit_px - _entry_px) * _qty, 2)
-                    log.warning(
-                        "Position %s no longer in IBKR — recording close "
-                        "(reason=%s exit=%.4f src=%s pnl=%.2f)",
-                        k, _exit_reason, _exit_px, _exit_src, _pnl,
-                    )
-                    _close_position_record(k, exit_price=_exit_px, exit_reason=_exit_reason, pnl=_pnl)
-                # _close_position_record() already saves positions file per call; no separate save needed
-
-        # ── Deferred CLOSE for EXITING positions no longer in IBKR ───────────
-        # When execute_sell placed an extended-hours limit order that hadn't filled
-        # within 2s, the position was kept as EXITING (with close_order_id) rather
-        # than immediately removing it and writing a premature CLOSE record.
-        # Here we detect those positions: if IBKR no longer holds them, the close
-        # order filled — write the CLOSE record now and finalize the position.
-        _exiting_keys = []
-        with _trades_lock:
-            for k, v in active_trades.items():
-                if v.get("status") == "EXITING" and v.get("close_order_id") and k not in price_map and k not in _positions_keys:
-                    _exiting_keys.append(k)
-        for k in _exiting_keys:
-            _t = active_trades.get(k, {})
-            if not _t:
-                continue
-            _sym = _t.get("symbol", k.split("|")[0])
-            # Use actual IBKR fill price from the execution index built earlier in this
-            # reconcile cycle; falls back to cached current price if no matching fill found.
-            _exit_px, _exit_src = _resolve_cwd_exit_price(_t, _exec_index)
-            _entry_px = float(_t.get("entry", 0))
-            _qty = int(_t.get("qty", 1))
-            _is_short = _t.get("direction", "LONG") == "SHORT"
-            _pnl = round((_entry_px - _exit_px if _is_short else _exit_px - _entry_px) * _qty, 2)
-            _pnl_pct = round(_pnl / (_entry_px * _qty), 4) if _entry_px * _qty else 0
-            _exit_reason = _t.get("pending_exit_reason", "ext_hours_limit_filled")
-            _now_ts = datetime.now(UTC).isoformat()
-            _trade_id = _t.get("trade_id", k)
-            log.info(
-                "EXITING position %s (close order #%s) gone from IBKR — "
-                "writing deferred CLOSE (exit=%.4f src=%s pnl=%.2f)",
-                k, _t.get("close_order_id"), _exit_px, _exit_src, _pnl,
-            )
-            # 1. WAL — POSITION_CLOSED
-            try:
-                from event_log import append_close as _el_close_dfr
-                _el_close_dfr(_trade_id, _sym,
-                              exit_price=_exit_px, pnl=_pnl,
-                              exit_reason=_exit_reason, hold_minutes=0)
-            except Exception as _e:
-                log.warning("Deferred CLOSE event_log write failed for %s: %s", k, _e)
-            # 2. ML training record
-            try:
-                from training_store import append as _ts_dfr
-                _ts_dfr({
-                    "trade_id": _trade_id,
-                    "symbol": _sym,
-                    "direction": _t.get("direction", "LONG"),
-                    "trade_type": _t.get("trade_type") or "INTRADAY",
-                    "instrument": _t.get("instrument", "stock"),
-                    "fill_price": float(_t.get("entry", 0.0)),
-                    "intended_price": float(_t.get("intended_price") or _t.get("entry", 0.0)),
-                    "exit_price": _exit_px,
-                    "pnl": _pnl,
-                    "hold_minutes": 0,
-                    "exit_reason": _exit_reason,
-                    "regime": _t.get("entry_regime") or _t.get("regime", "UNKNOWN"),
-                    "signal_scores": _t.get("signal_scores") or {},
-                    "conviction": float(_t.get("conviction") or 0.0),
-                    "score": float(_t.get("score") or _t.get("entry_score") or 0.0),
-                    "ts_fill": _t.get("open_time") or _now_ts,
-                    "ts_close": _now_ts,
-                    "qty": _qty,
-                    "sl": float(_t.get("sl") or 0.0),
-                    "tp": float(_t.get("tp") or 0.0),
-                    "setup_type": _t.get("setup_type", ""),
-                    "pattern_id": _t.get("pattern_id", ""),
-                    "atr": float(_t.get("atr") or 0.0),
-                })
-            except Exception as _e:
-                log.warning("Deferred CLOSE training_store write failed for %s: %s", k, _e)
-            # 3. IC / audit log
-            try:
-                from learning import log_trade as _log_trade_ex
-                _log_trade_ex(
-                    trade=_t,
-                    agent_outputs={},
-                    regime={},
-                    action="CLOSE",
-                    outcome={
-                        "exit_price": _exit_px,
-                        "pnl": _pnl,
-                        "pnl_pct": _pnl_pct,
-                        "reason": _exit_reason,
-                    },
-                )
-            except Exception as _e:
-                log.warning("Deferred CLOSE log_trade failed for %s: %s", k, _e)
-            with _trades_lock:
-                with _recently_closed_lock:
-                    recently_closed[_sym] = _now_ts
-                active_trades.pop(k, None)
-        if _exiting_keys:
-            _save_positions_file()
-
-        # ── Deferred TRIM resolution ──────────────────────────────────────────
-        # execute_sell set status=TRIMMING when a partial SELL limit order hadn't
-        # filled within 2s. Here we detect whether it has since filled or was
-        # cancelled, and finalise accordingly without touching qty prematurely.
-        _trimming_keys = []
-        with _trades_lock:
-            for k, v in active_trades.items():
-                if v.get("status") == "TRIMMING" and v.get("pending_trim_order_id"):
-                    _trimming_keys.append(k)
-
-        if _trimming_keys:
-            _open_order_ids = {t.order.orderId for t in ib.openTrades()}
-            for k in _trimming_keys:
-                _t = active_trades.get(k, {})
-                if not _t:
-                    continue
-                _sym = _t.get("symbol", k.split("|")[0])
-                _trim_oid = _t.get("pending_trim_order_id")
-                _trim_qty = int(_t.get("pending_trim_qty") or 0)
-                _trim_reason = _t.get("pending_trim_reason", "deferred_trim")
-                _trim_tid = _t.get("trade_id", "")
-
-                if _trim_oid in _open_order_ids:
-                    # Still pending — nothing to do this cycle
-                    continue
-
-                # Order is gone from open trades. Check exec_index for a fill.
-                _trim_fill = next(
-                    (
-                        f for f in _exec_index.get(_sym, [])
-                        if getattr(f.execution, "orderId", None) == _trim_oid
-                    ),
-                    None,
-                )
-
-                if _trim_fill:
-                    # Fill confirmed — finalise the trim.
-                    # Use actual filled qty from IBKR execution, not the order qty stored
-                    # in pending_trim_qty.  A partial fill must decrement by what actually
-                    # traded so active_trades stays in sync with IBKR.
-                    _fill_px = float(getattr(_trim_fill.execution, "price", 0) or 0)
-                    _actual_filled = int(
-                        getattr(_trim_fill.execution, "cumQty", 0)
-                        or getattr(_trim_fill.execution, "shares", 0)
-                        or _trim_qty
-                    )
-                    _remaining = int(_t.get("qty", _trim_qty)) - _actual_filled
-                    _safe_update_trade(k, {
-                        "qty": max(0, _remaining),
-                        "status": "ACTIVE",
-                        "pending_trim_order_id": None,
-                        "pending_trim_qty": None,
-                        "pending_trim_reason": None,
-                    })
-                    if _trim_tid:
-                        try:
-                            from event_log import append_trim as _el_trim_dfr
-                            _el_trim_dfr(_trim_tid, _sym,
-                                         qty_sold=_actual_filled,
-                                         remaining_qty=max(0, _remaining),
-                                         exit_price=_fill_px,
-                                         exit_reason=_trim_reason)
-                        except Exception as _elt:
-                            log.warning("Deferred TRIM event_log write failed for %s: %s", k, _elt)
-                    # Place a resized OCA bracket for the remaining qty.
-                    _sl_p = float(_t.get("sl") or 0)
-                    _tp_p = float(_t.get("tp") or 0)
-                    _direction = _t.get("direction", "LONG")
-                    _account = CONFIG.get("active_account", "")
-                    if _sl_p and _tp_p and _remaining > 0:
-                        try:
-                            from ib_async import StopLimitOrder as _SLO, LimitOrder as _LO
-                            _oca = f"decifer_{_sym}_{_trim_oid}_deferred_trim"
-                            _sl_lmt = round(_sl_p * 0.99 if _direction == "LONG" else _sl_p * 1.01, 2)
-                            _ba = "SELL" if _direction == "LONG" else "BUY"
-                            _new_sl = _SLO(_ba, _remaining, _sl_p, _sl_lmt, account=_account, tif="GTC", outsideRth=True)
-                            _new_sl.ocaGroup = _oca
-                            _new_sl.ocaType = 1
-                            _new_tp = _LO(_ba, _remaining, _tp_p, account=_account, tif="GTC", outsideRth=True)
-                            _new_tp.ocaGroup = _oca
-                            _new_tp.ocaType = 1
-                            _ct = get_contract(_sym)
-                            _sl_t = ib.placeOrder(_ct, _new_sl)
-                            _tp_t = ib.placeOrder(_ct, _new_tp)
-                            ib.sleep(0.5)
-                            _safe_update_trade(k, {
-                                "sl_order_id": _sl_t.order.orderId,
-                                "tp_order_id": _tp_t.order.orderId,
-                            })
-                            log.info(
-                                "Deferred TRIM %s: confirmed fill px=%.4f sold=%d remaining=%d "
-                                "new bracket SL#%d @ %.2f TP#%d @ %.2f",
-                                _sym, _fill_px, _trim_qty, _remaining,
-                                _sl_t.order.orderId, _sl_p, _tp_t.order.orderId, _tp_p,
-                            )
-                        except Exception as _be:
-                            log.error("Deferred TRIM %s: bracket placement failed — %s", _sym, _be)
-                    else:
-                        log.info(
-                            "Deferred TRIM %s: fill confirmed px=%.4f sold=%d remaining=%d "
-                            "(no bracket — sl or tp missing)",
-                            _sym, _fill_px, _trim_qty, _remaining,
-                        )
-                else:
-                    # Gone from open orders but no fill found — cancelled.
-                    log.warning(
-                        "Deferred TRIM %s: order #%s not in open trades or fills — "
-                        "trim SELL cancelled, reverting to ACTIVE at unchanged qty",
-                        _sym, _trim_oid,
-                    )
-                    _safe_update_trade(k, {
-                        "status": "ACTIVE",
-                        "pending_trim_order_id": None,
-                        "pending_trim_qty": None,
-                        "pending_trim_reason": None,
-                    })
-            _save_positions_file()
-
-        # ── Orphaned PENDING detection ────────────────────────────────────────
-        # A PENDING entry with no active FillWatcher and past orphan_timeout_mins
-        # is unmanaged (e.g. watcher aborted on disconnect). Cancel at IBKR and remove.
-        from fill_watcher import _active_watchers
-        from fill_watcher import _watchers_lock as _fw_lock
-
-        _orphan_mins = CONFIG.get("fill_watcher", {}).get("orphan_timeout_mins", 5)
-
-        with _trades_lock:
-            _pending_keys = [k for k in active_trades if active_trades[k].get("status") == "PENDING"]
-
-        for _key in _pending_keys:
-            _trade_instrument = active_trades.get(_key, {}).get("instrument", "stock")
-
-            if _trade_instrument == "option" and (_key in price_map or _key in _positions_keys):
-                # Option order filled — IBKR shows an active position.
-                # Sync qty from IBKR to catch partial fills: submitted order may have
-                # been for N contracts but only M actually filled.
-                _ibkr_item = price_map.get(_key)
-                _ibkr_filled_qty = abs(int(_ibkr_item.position)) if _ibkr_item is not None else None
-                # averageCost for options is per-share premium; divide by 100 for per-contract.
-                _opt_fill = round(float(_ibkr_item.averageCost) / 100, 4) if (_ibkr_item and _ibkr_item.averageCost) else None
-                with _trades_lock:
-                    if _key in active_trades:
-                        active_trades[_key]["status"] = "ACTIVE"
-                        if _ibkr_filled_qty is not None:
-                            _tracked_qty = active_trades[_key].get("qty", _ibkr_filled_qty)
-                            if _ibkr_filled_qty != _tracked_qty:
-                                log.warning(
-                                    f"PENDING option {_key}: qty mismatch on fill confirmation — "
-                                    f"tracked={_tracked_qty}, IBKR={_ibkr_filled_qty} (partial fill). "
-                                    f"Correcting to {_ibkr_filled_qty}."
-                                )
-                            active_trades[_key]["qty"] = _ibkr_filled_qty
-                            active_trades[_key]["contracts"] = _ibkr_filled_qty
-                        if _opt_fill and not active_trades[_key].get("_fill_confirmed"):
-                            active_trades[_key]["entry"] = _opt_fill
-                            active_trades[_key]["entry_premium"] = _opt_fill
-                            active_trades[_key]["high_water_mark"] = _opt_fill
-                            active_trades[_key]["current"] = _opt_fill
-                _tid = active_trades.get(_key, {}).get("trade_id", "")
-                if _tid and _opt_fill and _ibkr_filled_qty and not active_trades.get(_key, {}).get("_fill_confirmed"):
-                    try:
-                        from event_log import append_fill as _el_fill
-                        _el_fill(_tid, _key.split("|")[0], fill_price=_opt_fill, fill_qty=_ibkr_filled_qty)
-                        with _trades_lock:
-                            if _key in active_trades:
-                                active_trades[_key]["_fill_confirmed"] = True
-                    except Exception as _elf_err:
-                        log.warning("Reconcile: ORDER_FILLED write failed for option %s: %s", _key, _elf_err)
-                _src = "portfolio" if _key in price_map else "positions"
-                log.info("PENDING option %s confirmed ACTIVE by IBKR %s — fill=%.4f", _key, _src, _opt_fill or 0)
-                continue
-            elif _trade_instrument == "option":
-                # Not yet in portfolio — use longer timeout so DAY orders get
-                # cleaned up if the bot misses the IBKR cancellation callback.
-                # Default 480 min (8 h) covers a full extended-hours session.
-                _effective_timeout = CONFIG.get("fill_watcher", {}).get("option_orphan_timeout_mins", 480)
-            elif _key in price_map or _key in _positions_keys:
-                # Order has already filled and IBKR shows an active position — not orphaned.
-                # Checks both ib.portfolio() and ib.positions() because FX (CASH)
-                # positions may only appear in the latter.
-                _ibkr_item = price_map.get(_key)
-                _actual_fill = round(float(_ibkr_item.averageCost), 4) if (_ibkr_item and _ibkr_item.averageCost) else None
-                _actual_qty = abs(int(_ibkr_item.position)) if _ibkr_item else None
-                with _trades_lock:
-                    if _key in active_trades:
-                        active_trades[_key]["status"] = "ACTIVE"
-                        if _actual_fill and not active_trades[_key].get("_fill_confirmed"):
-                            active_trades[_key]["entry"] = _actual_fill
-                            active_trades[_key]["high_water_mark"] = _actual_fill
-                            active_trades[_key]["current"] = _actual_fill
-                        if _actual_qty:
-                            active_trades[_key]["qty"] = _actual_qty
-                _tid = active_trades.get(_key, {}).get("trade_id", "")
-                if _tid and _actual_fill and _actual_qty and not active_trades.get(_key, {}).get("_fill_confirmed"):
-                    try:
-                        from event_log import append_fill as _el_fill
-                        _el_fill(_tid, _key.split("|")[0], fill_price=_actual_fill, fill_qty=_actual_qty)
-                        with _trades_lock:
-                            if _key in active_trades:
-                                active_trades[_key]["_fill_confirmed"] = True
-                    except Exception as _elf_err:
-                        log.warning("Reconcile: ORDER_FILLED write failed for %s: %s", _key, _elf_err)
-                _src = "portfolio" if _key in price_map else "positions"
-                log.info("PENDING %s confirmed ACTIVE by IBKR %s — fill=%.4f", _key, _src, _actual_fill or 0)
-                continue
-            else:
-                with _fw_lock:
-                    _has_watcher = _key in _active_watchers
-                if _has_watcher:
-                    continue
-                # No watcher — check if the entry order is still live at IBKR.
-                # This prevents premature purging of watcherless orders (e.g. shorts,
-                # FX entries) whose entry is still pending in the IBKR order book.
-                _oid_check = active_trades.get(_key, {}).get("order_id")
-                if _oid_check:
-                    _order_still_live = False
-                    try:
-                        for _ot in ib.openTrades():
-                            if _ot.order.orderId == _oid_check:
-                                _order_still_live = True
-                                break
-                    except Exception:
-                        _order_still_live = True  # fail-closed: assume live
-                    if _order_still_live:
-                        continue
-                _effective_timeout = _orphan_mins
-
-            with _trades_lock:
-                _trade = active_trades.get(_key)
-            if _trade is None:
-                continue
-
-            _open_time_str = _trade.get("open_time")
-            try:
-                _open_dt = datetime.fromisoformat(_open_time_str)
-                _age_mins = (datetime.now(UTC) - _open_dt).total_seconds() / 60
-            except (ValueError, TypeError):
-                _age_mins = _effective_timeout + 1  # treat unparseable timestamp as timed-out
-
-            if _age_mins < _effective_timeout:
-                continue
-
-            _oid = _trade.get("order_id")
-            log.warning(
-                f"Orphaned PENDING order {_key} order #{_oid} (age={_age_mins:.1f} min, no FillWatcher) — cancelling"
-            )
-            if _oid:
-                _cancel_ibkr_order_by_id(ib, _oid)
-            with _trades_lock:
-                recently_closed[_key] = datetime.now(UTC).isoformat()
-            _safe_del_trade(_key)
-
-        # Re-add positions that IBKR has but tracker is missing.
-        # Metadata rescue: before writing a bare-minimum stub, try to salvage the
-        # original decision record from positions.json.  Key-format mismatches
-        # (e.g. a stock key "NBIS" vs option key "NBIS_C_157.5_2026-04-24") are the
-        # most common cause — the position IS on disk, just under the wrong key.
-        # IBKR_RECONCILE_FIELDS are the only fields we overwrite; everything else
-        # (trade_type, conviction, reasoning, signal_scores, entry_regime, …) is
-        # preserved verbatim from the saved record.  Without this the whole training-
-        # data corpus is corrupted every time the bot drops and re-adds a position.
-        def _find_saved_metadata(sym: str, instrument: str) -> dict:
-            """
-            Scan event_log open trades and positions.json for metadata match for this symbol+instrument.
-            Returns the saved dict or {} if nothing useful found.
-            """
-            try:
-                from event_log import open_trades as _el_open2
-                for v in _el_open2().values():
-                    if v.get("symbol") == sym and v.get("trade_type") and v["trade_type"] != "UNKNOWN":
-                        return v
-            except Exception:
-                pass
-            try:
-                from event_log import pending_orders as _el_pending2
-                for intent in reversed(_el_pending2()):
-                    if (
-                        intent.get("symbol") == sym
-                        and intent.get("trade_type")
-                        and intent["trade_type"] != "UNKNOWN"
-                    ):
-                        return intent
-            except Exception:
-                pass
-            try:
-                saved = _load_positions_file()
-                for saved_val in saved.values():
-                    if (
-                        saved_val.get("symbol") == sym
-                        and saved_val.get("instrument") == instrument
-                        and saved_val.get("trade_type")
-                    ):
-                        return saved_val
-            except Exception:
-                pass
-            try:
-                from event_log import last_intent_for_symbol as _last_intent2
-                intent = _last_intent2(sym)
-                if intent.get("trade_type") and intent["trade_type"] != "UNKNOWN":
-                    return intent
-            except Exception:
-                pass
-            return {}
-
-        for ibkr_key, item in price_map.items():
-            if ibkr_key not in active_trades:
-                try:
-                    is_opt = _is_option_contract(item.contract)
-                    is_fx = getattr(item.contract, "secType", "") == "CASH"
-                    # FX: use reconstructed pair symbol (e.g. "EURUSD"), not base ("EUR")
-                    sym = ibkr_key if is_fx else item.contract.symbol
-                    direction = "SHORT" if item.position < 0 else "LONG"
-                    qty = abs(int(item.position))
-                    ibkr_mkt = float(item.marketPrice)
-                    instrument = "option" if is_opt else ("fx" if is_fx else "stock")
-
-                    # Attempt to recover the original trade metadata from disk.
-                    saved_meta = _find_saved_metadata(sym, instrument)
-                    metadata_restored = bool(saved_meta)
-
-                    if is_opt:
-                        entry = round(float(item.averageCost) / 100, 4)
-                        c = item.contract
-                        raw_exp = str(c.lastTradeDateOrContractMonth)
-                        _right = "C" if c.right in ("C", "CALL") else "P"
-                        _strike = float(c.strike)
-                        _validated_mkt = _validate_option_market_price(
-                            ibkr_mkt, sym, _right, _strike, entry, context="re-sync"
-                        )
-                        validated = _validated_mkt if _validated_mkt > 0 else entry
-                        if len(raw_exp) == 8 and raw_exp.isdigit():
-                            expiry_str = f"{raw_exp[:4]}-{raw_exp[4:6]}-{raw_exp[6:]}"
-                        else:
-                            expiry_str = raw_exp
-                        right = _right
-                        mult = 100
-                        if direction == "SHORT":
-                            pnl = round((entry - validated) * qty * mult, 2)
-                        else:
-                            pnl = round((validated - entry) * qty * mult, 2)
-
-                        # Build the authoritative IBKR structural fields.
-                        try:
-                            _exp_d2 = datetime.strptime(expiry_str, "%Y-%m-%d").date()
-                            _dte_calc2 = (_exp_d2 - date.today()).days
-                        except Exception:
-                            _dte_calc2 = 0
-                        ibkr_fields = {
-                            "symbol": sym,
-                            "instrument": "option",
-                            "right": right,
-                            "strike": c.strike,
-                            "expiry_str": expiry_str,
-                            "expiry_ibkr": raw_exp,
-                            "dte": _dte_calc2,
-                            "contracts": qty,
-                            "entry_premium": entry,
-                            "current_premium": validated,
-                            "entry": entry,
-                            "current": validated,
-                            "qty": qty,
-                            "sl": round(entry * (1 - CONFIG.get("options_stop_loss", 0.50)), 4),
-                            "tp": round(entry * (1 + CONFIG.get("options_profit_target", 1.00)), 4),
-                            "direction": direction,
-                            "pnl": pnl,
-                            "status": "ACTIVE",
-                        }
-
-                        if metadata_restored:
-                            # Merge: start from saved record, overlay IBKR structural fields.
-                            new_entry = {**saved_meta, **ibkr_fields}
-                            log.warning(
-                                f"Re-added missing option {ibkr_key} from IBKR — "
-                                f"metadata RESTORED from disk (trade_type={saved_meta.get('trade_type', '?')})"
-                            )
-                        else:
-                            # Genuine orphan: no saved record at all.
-                            new_entry = {
-                                **ibkr_fields,
-                                "score": 0,
-                                "trade_type": "UNKNOWN",
-                                "conviction": 0.0,
-                                "entry_regime": "UNKNOWN",
-                                "metadata_status": "MISSING",
-                                "reasoning": "Re-synced from IBKR — original metadata not found",
-                            }
-                            log.warning(
-                                f"Re-added missing option {ibkr_key} from IBKR — "
-                                f"NO metadata found; trade_type/conviction unknown"
-                            )
-                        _safe_set_trade(ibkr_key, new_entry)
-
-                    else:
-                        entry = round(float(item.averageCost), 4)
-                        validated = ibkr_mkt if ibkr_mkt > 0 else entry
-                        _prec = 4 if is_fx else 2
-                        if direction == "SHORT":
-                            sl = round(entry * (1.005 if is_fx else 1.02), _prec)
-                            tp = round(entry * (0.985 if is_fx else 0.94), _prec)
-                            pnl = round((entry - validated) * qty, 2)
-                        else:
-                            sl = round(entry * (0.995 if is_fx else 0.98), _prec)
-                            tp = round(entry * (1.015 if is_fx else 1.06), _prec)
-                            pnl = round((validated - entry) * qty, 2)
-
-                        ibkr_fields = {
-                            "symbol": sym,
-                            "instrument": instrument,
-                            "entry": entry,
-                            "current": round(validated, 4),
-                            "qty": qty,
-                            "sl": sl,
-                            "tp": tp,
-                            "direction": direction,
-                            "pnl": pnl,
-                            "status": "ACTIVE",
-                        }
-
-                        _re_add_label = "fx" if is_fx else "stock"
-                        if metadata_restored:
-                            new_entry = {**saved_meta, **ibkr_fields}
-                            log.warning(
-                                f"Re-added missing {_re_add_label} {ibkr_key} from IBKR — "
-                                f"metadata RESTORED from disk (trade_type={saved_meta.get('trade_type', '?')})"
-                            )
-                        else:
-                            new_entry = {
-                                **ibkr_fields,
-                                "score": 0,
-                                "trade_type": "UNKNOWN",
-                                "conviction": 0.0,
-                                "entry_regime": "UNKNOWN",
-                                "metadata_status": "MISSING",
-                                "reasoning": "Re-synced from IBKR — original metadata not found",
-                            }
-                            log.warning(
-                                f"Re-added missing {_re_add_label} {ibkr_key} from IBKR — "
-                                f"NO metadata found; trade_type/conviction unknown"
-                            )
-                        _safe_set_trade(ibkr_key, new_entry)
-
-                except Exception as readd_err:
-                    log.error(f"Failed to re-add {ibkr_key}: {readd_err}")
-
-        with _trades_lock:
-            trades_snapshot = dict(active_trades)
-        for key, trade in trades_snapshot.items():
-            is_option = trade.get("instrument") == "option"
-            sym = trade.get("symbol", key)
-            entry = trade.get("entry", 0)
-
-            ibkr_price = 0
-            if key in price_map:
-                item = price_map[key]
-                mkt_price = float(item.marketPrice)
-                if mkt_price > 0:
-                    if is_option:
-                        # Validate via structural bounds (call < underlying, put < strike).
-                        # Falls back to 20× heuristic if underlying unavailable.
-                        # Returns 0 → "No IBKR price" branch keeps previous price.
-                        ibkr_price = _validate_option_market_price(
-                            mkt_price,
-                            sym,
-                            trade.get("right", ""),
-                            float(trade.get("strike", 0) or 0),
-                            entry,
-                            context=key,
-                        )
-                    else:
-                        ibkr_price = mkt_price
-
-            # FX positions may be absent from ib.portfolio() — fetch live
-            # price directly via reqTickers so the dashboard stays current.
-            if ibkr_price == 0 and trade.get("instrument") == "fx":
-                try:
-                    _fx_contract = get_contract(sym, "fx")
-                    ib.qualifyContracts(_fx_contract)
-                    ibkr_price = _get_ibkr_price(ib, _fx_contract, fallback=0)
-                except Exception as _fx_err:
-                    log.debug(f"FX price fetch for {sym}: {_fx_err}")
-
-            # Options: trust IBKR premium (Alpaca/TV return stock price, not premium)
-            if is_option:
-                if ibkr_price > 0:
-                    validated_price = ibkr_price
-                    src_desc = f"IBKR_OPT=${ibkr_price:.2f}"
-                else:
-                    # Validation rejected the IBKR price (e.g. IBKR returned the
-                    # underlying stock price instead of the option premium — a known
-                    # paper-account quirk).  If the stored `current` is also suspect
-                    # (looks like an underlying price: > 20× entry), reset it to entry
-                    # so it stops poisoning the notional calculation and P&L display.
-                    stored = trade.get("current", 0)
-                    if entry > 0 and stored > entry * 20:
-                        log.warning(
-                            f"Option {key}: stored current ${stored:.2f} looks like "
-                            f"underlying price (>{20}× entry ${entry:.4f}) — resetting to entry"
-                        )
-                        trade["current"] = entry
-                        trade["current_premium"] = entry
-                        trade["pnl"] = 0.0
-                    else:
-                        log.warning(f"No IBKR price for option {key} — keeping previous ${stored:.2f}")
-                    continue
-            # FX: IBKR is the only reliable source (Alpaca/TV don't carry forex)
-            elif trade.get("instrument") == "fx":
-                if ibkr_price > 0:
-                    validated_price = ibkr_price
-                    src_desc = f"IBKR_FX=${ibkr_price:.4f}"
-                else:
-                    log.warning(f"No IBKR price for FX {key} — keeping previous ${trade.get('current', 0):.4f}")
-                    continue
-            else:
-                validated_price, src_desc = _validate_position_price(sym, ibkr_price, entry)
-
-            if validated_price > 0:
-                trade["current"] = round(validated_price, 4)
-                if is_option:
-                    trade["current_premium"] = round(validated_price, 4)
-                # Recalculate P&L from validated price
-                # Options: per-share premium × qty × 100 (contract multiplier)
-                mult = 100 if is_option else 1
-                direction = trade.get("direction", "LONG")
-                if direction == "SHORT":
-                    trade["pnl"] = round((entry - validated_price) * trade["qty"] * mult, 2)
-                else:
-                    trade["pnl"] = round((validated_price - entry) * trade["qty"] * mult, 2)
-                trade["_price_sources"] = src_desc
-            else:
-                log.warning(
-                    f"No validated price for {key}: {src_desc} — keeping previous ${trade.get('current', 0):.2f}"
-                )
-
+        price_map, positions_keys = _build_ibkr_price_map(ib)
+        _purge_closed_positions(ib, price_map, positions_keys)
+        _resolve_exiting_positions(ib, price_map, positions_keys)
+        _resolve_trimming_positions(ib)
+        _resolve_orphaned_pending(ib, price_map, positions_keys)
+        _readd_missing_positions(ib, price_map)
+        _refresh_position_prices(ib, price_map)
     except Exception as e:
         log.warning(f"Position price update error: {e}")
 
