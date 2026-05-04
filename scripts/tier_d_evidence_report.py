@@ -270,6 +270,19 @@ def main() -> None:
     funnel_pipeline = [r for r in funnel_raw if r.get("stage") == "pipeline"]
     funnel_dispatch = [r for r in funnel_raw if r.get("stage") == "dispatch"]
     funnel_apex_cap = [r for r in funnel_raw if r.get("stage") == "apex_cap"]
+    funnel_shadow_compare = [r for r in funnel_raw if r.get("stage") == "apex_cap_shadow_compare"]
+    funnel_shadow_apex    = [r for r in funnel_raw if r.get("stage") == "tier_d_shadow_apex"]
+
+    # Phase 2 shadow-log data — not yet collected; safe empty defaults until Phase 2 ships
+    shadow:   list[dict] = []
+    enriched: list[dict] = []
+    legacy:   list[dict] = []
+
+    # Phase 1 config state — no enforcement keys exist in config.py; hardcoded Phase 1 safe defaults
+    # WARNING: shadow_on / allow_live are documentation-only — no code gate enforces these values
+    shadow_on  = True   # Phase 1: shadow observation only (NOT code-enforced)
+    allow_live = False  # Phase 1: live Tier D entries not approved (NOT code-enforced)
+    live_off   = not allow_live
 
     print(f"\nTier D Evidence Report  —  generated {datetime.now(timezone.utc).isoformat()[:19]}Z")
     print(f"PRU file:    {PRU_JSON}")
@@ -491,7 +504,7 @@ def main() -> None:
     tier_d_orders = [
         e for e in trade_events
         if e.get("scanner_tier") == "D"
-        and e.get("event_type") in ("ORDER_INTENT", "ORDER_FILLED")
+        and e.get("event") in ("ORDER_INTENT", "ORDER_FILLED")
     ]
     tier_d_training = [
         r for r in training
@@ -920,6 +933,94 @@ def main() -> None:
         print()
 
     # ------------------------------------------------------------------ #
+    # DETAIL SECTION 0f — Trade Origin Audit
+    # ------------------------------------------------------------------ #
+    section("DETAIL SECTION 0f — Trade Origin Audit (PRU-symbol trade classification)")
+
+    _pru_order_intents = [
+        r for r in trade_events
+        if r.get("event") == "ORDER_INTENT" and r.get("symbol") in pru_meta
+    ]
+    _unexpected_executions: list[dict] = []
+    _unknown_origin: list[dict] = []
+    _origin_counts: dict[str, int] = {
+        "tier_d_paper_entry": 0,
+        "tier_d_unexpected_execution": 0,
+        "normal_trade_pru_overlap": 0,
+        "unknown_origin_needs_investigation": 0,
+    }
+
+    def _classify_origin(r: dict) -> str:
+        if r.get("tier_d_paper_entry") is True:
+            return "tier_d_paper_entry"
+        st = r.get("scanner_tier")
+        if st == "D":
+            return "tier_d_unexpected_execution"
+        if st is not None:
+            return "normal_trade_pru_overlap"
+        return "unknown_origin_needs_investigation"
+
+    print(f"  PRU-symbol ORDER_INTENT records found:  {len(_pru_order_intents)}")
+    print()
+
+    if not _pru_order_intents:
+        print("  No ORDER_INTENT records for PRU symbols found in trade_events.jsonl.")
+        print("  Either no PRU symbols have traded yet, or origin tagging was not yet in place.")
+        print("  (Expected before origin tagging ships in signal_dispatcher.py.)")
+    else:
+        print(f"  {'Timestamp':<20}  {'Symbol':<8}  {'TT':<9}  {'ScnTier':<8}  "
+              f"{'PaperEntry':<11}  {'OriginPath':<12}  Classification")
+        print(f"  {'-'*20}  {'-'*8}  {'-'*9}  {'-'*8}  {'-'*11}  {'-'*12}  --------------")
+        for r in sorted(_pru_order_intents, key=lambda x: x.get("ts", "")):
+            cls = _classify_origin(r)
+            _origin_counts[cls] += 1
+            if cls == "tier_d_unexpected_execution":
+                _unexpected_executions.append(r)
+            elif cls == "unknown_origin_needs_investigation":
+                _unknown_origin.append(r)
+            ts_s = (r.get("ts") or "?")[:19]
+            sym  = r.get("symbol", "?")
+            tt   = r.get("trade_type", "?")
+            st   = r.get("scanner_tier") or "MISSING"
+            pe   = str(r.get("tier_d_paper_entry", "MISSING"))
+            op   = r.get("origin_path") or "MISSING"
+            print(f"  {ts_s:<20}  {sym:<8}  {tt:<9}  {st:<8}  {pe:<11}  {op:<12}  {cls}")
+        print()
+
+    print(f"  Classification summary:")
+    for cls, cnt in _origin_counts.items():
+        if cnt == 0:
+            icon = "✓"
+        elif cls in ("tier_d_paper_entry", "normal_trade_pru_overlap"):
+            icon = "✓"
+        else:
+            icon = "⚠"
+        print(f"    [{icon}] {cls}: {cnt}")
+    print()
+
+    # ALAB and LUNR specific traces
+    _alab_intents = [r for r in _pru_order_intents if r.get("symbol") == "ALAB"]
+    _lunr_intents = [r for r in _pru_order_intents if r.get("symbol") == "LUNR"]
+    print(f"  ── ALAB trace ───────────────────────────────────────────────────")
+    print(f"  In PRU: {'Yes' if 'ALAB' in pru_meta else 'No'}")
+    print(f"  ORDER_INTENT records: {len(_alab_intents)}")
+    if _alab_intents:
+        for r in _alab_intents:
+            print(f"    {(r.get('ts') or '?')[:19]}  trade_type={r.get('trade_type')}  "
+                  f"scanner_tier={r.get('scanner_tier', 'MISSING')}  "
+                  f"tier_d_paper_entry={r.get('tier_d_paper_entry', 'MISSING')}  "
+                  f"origin_path={r.get('origin_path', 'MISSING')}")
+            print(f"    classification: {_classify_origin(r)}")
+    else:
+        print("    No ORDER_INTENT records for ALAB in trade_events.jsonl.")
+    print()
+    print(f"  ── LUNR trace ───────────────────────────────────────────────────")
+    print(f"  In PRU: {'Yes' if 'LUNR' in pru_meta else 'No'}")
+    print(f"  ORDER_INTENT records: {len(_lunr_intents)}")
+    if not _lunr_intents:
+        print("    No ORDER_INTENT records for LUNR — never executed.")
+
+    # ------------------------------------------------------------------ #
     # DETAIL SECTION 1 — Scan-Cycle Coverage
     # ------------------------------------------------------------------ #
     section("DETAIL SECTION 1 — Scan-Cycle Coverage")
@@ -1073,6 +1174,42 @@ def main() -> None:
         print(f"    ctx_data_source:    {r.get('ctx_data_source', '?')}")
         print(f"    would_have_passed:  {r.get('would_have_passed')}")
         print(f"    simulated_reason:   {(r.get('simulated_reason') or '?')[:100]}")
+
+    # ─────────────────────────────────────────────────────────────────── #
+    # TIER D SAFETY ASSERTIONS
+    # ─────────────────────────────────────────────────────────────────── #
+    section("TIER D SAFETY ASSERTIONS")
+
+    print(f"  Tier D shadow mode (documented):   {shadow_on}"
+          f"  [⚠  NOT code-enforced — no config gate exists]")
+    print(f"  Tier D live entries allowed:        {allow_live}"
+          f"  [⚠  NO enforcement key in config — relies on operational discipline]")
+    print(f"  Tier D paper entries in events:     {_origin_counts['tier_d_paper_entry']}")
+    print(f"  Tier D unexpected executions:       {_origin_counts['tier_d_unexpected_execution']}")
+    print(f"  PRU-overlap normal trades:          {_origin_counts['normal_trade_pru_overlap']}")
+    print(f"  Unknown-origin PRU-symbol trades:   {_origin_counts['unknown_origin_needs_investigation']}")
+    print()
+    print("  Phase 1 enforcement gap: CONFIRMED")
+    print("    bot_trading.py calls _run_apex_pipeline(execute=True) with no Tier D gate.")
+    print("    Any Tier D candidate that survives the 30-slot cap and gets Apex approval")
+    print("    will execute live. No phase_gate check, no shadow_mode code gate.")
+    print()
+    if _origin_counts["tier_d_unexpected_execution"] > 0:
+        print(f"  ✗ SAFETY VIOLATION — {_origin_counts['tier_d_unexpected_execution']} "
+              f"Tier D unexpected execution(s) found. Phase 2 gate: FAILED")
+        for r in _unexpected_executions[:5]:
+            print(f"    {(r.get('ts') or '?')[:19]}  {r.get('symbol')}  "
+                  f"scanner_tier={r.get('scanner_tier')}  trade_type={r.get('trade_type')}")
+    elif _origin_counts["unknown_origin_needs_investigation"] > 0:
+        print(f"  ⚠  UNRESOLVED — {_origin_counts['unknown_origin_needs_investigation']} "
+              f"PRU-symbol trade(s) cannot be classified.")
+        print("    Origin tagging was not in place when these trades executed.")
+        print("    Cannot confirm whether these were normal-path or Tier D execution.")
+        for r in _unknown_origin[:5]:
+            print(f"    {(r.get('ts') or '?')[:19]}  {r.get('symbol')}  "
+                  f"trade_type={r.get('trade_type')}")
+    else:
+        print("  ✓ No Tier D unexpected executions found.")
 
     # ------------------------------------------------------------------ #
     # DETAIL SECTION 7 — Phase 2 Readiness Gate

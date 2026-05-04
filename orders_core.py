@@ -233,6 +233,7 @@ def execute_buy(
     tier_d_paper_entry: bool = False,
     paper_evaluation_trade: bool = False,
     position_size_bucket: str = "",
+    **intent_extras: object,
 ) -> bool:
     """
     Place a buy order with full OCO bracket.
@@ -514,14 +515,14 @@ def execute_buy(
             _wal_open_time = open_time or datetime.now(UTC).isoformat()
             try:
                 from event_log import append_intent as _el_intent
-                _td_intent_extras: dict = {}
+                _td_intent_extras: dict = dict(intent_extras)
                 if tier_d_paper_entry:
-                    _td_intent_extras = {
+                    _td_intent_extras.update({
                         "tier_d_paper_entry":     True,
                         "paper_evaluation_trade": True,
                         "position_size_bucket":   position_size_bucket or "tier_d_paper_starter",
                         "scanner_tier":           "D",
-                    }
+                    })
                 _el_intent(
                     _trade_id, symbol,
                     direction="LONG",
@@ -1243,6 +1244,7 @@ def execute_short(
     market_read: str = "",
     entry_context: dict | None = None,
     qty_override: int | None = None,
+    **intent_extras: object,
 ) -> bool:
     """
     Place a short-sell order with OCO bracket (sell-to-open + buy-to-cover SL + TP).
@@ -1484,6 +1486,7 @@ def execute_short(
                     ic_weights_at_entry=_wal_icw_s,
                     tranche_mode=tranche_mode,
                     t1_qty=t1_qty, t2_qty=t2_qty,
+                    **intent_extras,
                 )
             except Exception as _el_err_s:
                 log.error("execute_short %s: ORDER_INTENT write failed — trade aborted: %s", symbol, _el_err_s)
