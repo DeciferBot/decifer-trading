@@ -1833,6 +1833,7 @@ def _resolve_orphaned_pending(ib: IB, price_map: dict, positions_keys: set) -> N
                     if _opt_fill and not active_trades[_key].get("_fill_confirmed"):
                         active_trades[_key]["entry"] = _opt_fill
                         active_trades[_key]["entry_premium"] = _opt_fill
+                        active_trades[_key]["current_premium"] = _opt_fill
                         active_trades[_key]["high_water_mark"] = _opt_fill
                         active_trades[_key]["current"] = _opt_fill
             _tid = active_trades.get(_key, {}).get("trade_id", "")

@@ -646,6 +646,13 @@ def check_options_exits(open_options: dict, ib=None) -> list[str]:
             except Exception:
                 pass
 
+        if curr_premium is None and entry_premium > 0:
+            log.warning(
+                f"Options SL check {sym}: no live price from Alpaca or IBKR — "
+                f"using stale current_premium={pos.get('current_premium')}; stop loss may lag"
+            )
+            curr_premium = pos.get("current_premium")
+
         if curr_premium and entry_premium > 0:
             pnl_pct = (curr_premium - entry_premium) / entry_premium
             if pnl_pct >= profit_target:
