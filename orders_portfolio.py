@@ -938,8 +938,8 @@ def reconcile_with_ibkr(ib: IB):
                             active_trades[key]["current_premium"] = round(validated_price, 4)
                         # Store IBKR's live price as a reference so price_updater can
                         # detect when Alpaca streaming quotes have drifted from IBKR.
-                        if ibkr_price > 0:
-                            active_trades[key]["ibkr_last"] = round(ibkr_price, 4)
+                        if ibkr_price_for_validation > 0:
+                            active_trades[key]["ibkr_last"] = round(ibkr_price_for_validation, 4)
                     log.debug(f"Reconcile {key}: price updated to ${validated_price:.4f} via {src_desc}")
 
                     # ── Metadata recovery for known positions with UNKNOWN trade_type ──
