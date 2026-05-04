@@ -706,38 +706,12 @@ def run_signal_pipeline(
     except Exception as _sy_e:
         log.debug("Sympathy scanner skipped: %s", _sy_e)
 
-    # 2. News sentiment (always)
-    log.info("Fetching news sentiment (Yahoo RSS + keyword scoring)...")
-    news_sentiment = _fetch_news(filtered)
-
-    # 3. Social sentiment (gated on session)
-    social_sentiment = _fetch_social(filtered, session)
-
-    # Gate 1: VIX panic — suppress scan above threshold, return MONITOR_ONLY sentinel.
-    # The full 10-dimension scoring is expensive (~5-10s). When VIX signals a panic
-    # regime no new entries should be considered anyway — skip the scan entirely.
+    # Resolve regime_name early — needed by the scoring cap and VIX gate below.
     regime_name = regime.get("regime", "UNKNOWN")
-    from config import CONFIG as _cfg_gate
 
-    _vix = regime.get("vix", 0.0) or 0.0
-    _monitor_threshold = _cfg_gate.get("vix_monitor_only_threshold", 40)
-    if _vix > _monitor_threshold:
-        log.warning(
-            f"Gate 1 MONITOR_ONLY: VIX={_vix:.1f} > {_monitor_threshold} — scan suppressed this cycle"
-        )
-        return SignalPipelineResult(
-            signals=[],
-            scored=[],
-            all_scored=[],
-            news_sentiment={},
-            universe=filtered,
-            regime_name=regime_name,
-            sensor_payloads=[],
-            status="MONITOR_ONLY",
-        )
-
-    # 3b. Staged Tier D pre-scoring cap — rank PRU discovery names by cheap fields
-    #     and cap before the expensive Alpaca bar fetch in score_universe().
+    # 1c. Staged Tier D pre-scoring cap — rank PRU discovery names by cheap metadata
+    #     fields and trim to MAX_TIER_D_TO_SCORE BEFORE the expensive news fetch and
+    #     bar fetch in score_universe().  News is fetched only for the capped universe.
     filtered, _scoring_cap_counters = _apply_tier_d_scoring_cap(filtered, regime_name)
     try:
         import json as _scj
@@ -758,6 +732,35 @@ def run_signal_pipeline(
             )
     except Exception as _sce:
         log.debug("Tier D scoring_cap funnel write failed (non-critical): %s", _sce)
+
+    # 2. News sentiment (always) — runs on capped universe (~140 symbols, not 232)
+    log.info("Fetching news sentiment (Yahoo RSS + keyword scoring)...")
+    news_sentiment = _fetch_news(filtered)
+
+    # 3. Social sentiment (gated on session)
+    social_sentiment = _fetch_social(filtered, session)
+
+    # Gate 1: VIX panic — suppress scan above threshold, return MONITOR_ONLY sentinel.
+    # The full 10-dimension scoring is expensive (~5-10s). When VIX signals a panic
+    # regime no new entries should be considered anyway — skip the scan entirely.
+    from config import CONFIG as _cfg_gate
+
+    _vix = regime.get("vix", 0.0) or 0.0
+    _monitor_threshold = _cfg_gate.get("vix_monitor_only_threshold", 40)
+    if _vix > _monitor_threshold:
+        log.warning(
+            f"Gate 1 MONITOR_ONLY: VIX={_vix:.1f} > {_monitor_threshold} — scan suppressed this cycle"
+        )
+        return SignalPipelineResult(
+            signals=[],
+            scored=[],
+            all_scored=[],
+            news_sentiment={},
+            universe=filtered,
+            regime_name=regime_name,
+            sensor_payloads=[],
+            status="MONITOR_ONLY",
+        )
 
     # 4. Score universe on 10 dimensions (alpha-pipeline-v2)
     log.info(f"Scoring universe on 10 dimensions [{regime_name}]...")
