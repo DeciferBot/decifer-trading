@@ -608,7 +608,7 @@ def _resolve_regime_router(vix_regime: str, hurst_regime: str = "unknown", hmm_r
 #   - yfinance cross-symbol data contamination risk
 #   - multiprocessing fork issues on some platforms
 # 5m bar fetches go to IBKR; 1d/1w stay on yfinance (no thread-safety issue at daily freq).
-_SCORE_WORKERS = min(8, max(2, (_mp.cpu_count() or 4)))
+_SCORE_WORKERS = min(16, max(4, (_mp.cpu_count() or 4) * 2))
 
 
 def _fetch_one_thread(args):
@@ -739,8 +739,9 @@ import threading as _threading
 
 _IBKR_PACING_LOCK = _threading.Lock()
 # Limit concurrent Alpaca fetch_bars calls within the ThreadPoolExecutor.
-# Burst parallelism from 8 workers causes connection resets on Alpaca Algo Trader Plus.
-_ALPACA_SEM = _threading.BoundedSemaphore(10)
+# Original 8 workers caused connection resets; semaphore is the hard ceiling for
+# Alpaca concurrency regardless of worker count.  14 is safe on Algo Trader Plus.
+_ALPACA_SEM = _threading.BoundedSemaphore(14)
 
 
 def fetch_ibkr_historical(symbol: str, ib, bar_size: str = "5 mins", duration: str = "5 D") -> pd.DataFrame | None:
