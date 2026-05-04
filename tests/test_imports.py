@@ -13,6 +13,7 @@ lint pass (or refactor) removed something a hot path depends on at runtime.
 
 import sys
 import types
+from pathlib import Path
 
 import pytest
 
@@ -315,3 +316,87 @@ def test_orders_contracts_rebind_resolves():
                 f"orders_contracts rebind would crash: {exc}. "
                 "Ensure orders_contracts.py imports _get_alpaca_price."
             )
+
+
+# ---------------------------------------------------------------------------
+# 7.  Python 3.9 compatibility — `from __future__ import annotations` guard
+#
+#     Absorbed from test_import_health.py (2026-05-04).
+#     The bot.py refactor introduced X|Y union syntax in module-level
+#     annotations. On Python 3.9 those raise TypeError at import time unless
+#     guarded by `from __future__ import annotations`.
+# ---------------------------------------------------------------------------
+
+import ast as _ast
+
+_PROJECT_ROOT_HEALTH = Path(__file__).parent.parent
+
+CORE_MODULE_FILES = [
+    "alpha_decay.py",
+    "bot_account.py",
+    "bot_dashboard.py",
+    "bot_ibkr.py",
+    "bot_sentinel.py",
+    "bot_state.py",
+    "bot_trading.py",
+    "config.py",
+    "execution_agent.py",
+    "ic_validator.py",
+    "learning.py",
+    "options.py",
+    "options_scanner.py",
+    "orders.py",
+    "phase_gate.py",
+    "risk.py",
+    "scanner.py",
+    "signals/__init__.py",
+    "telegram_bot.py",
+    "wip_tracker.py",
+]
+
+
+def _has_future_annotations(source: str) -> bool:
+    try:
+        tree = _ast.parse(source)
+    except SyntaxError:
+        return False
+    for node in _ast.walk(tree):
+        if isinstance(node, _ast.ImportFrom) and node.module == "__future__":
+            for alias in node.names:
+                if alias.name == "annotations":
+                    return True
+    return False
+
+
+def test_signals_resolves_to_package() -> None:
+    """
+    Regression guard: `import signals` must resolve to signals/__init__.py,
+    not any signals.py at the repo root. Python silently prefers a package
+    over a same-named module — if signals.py reappears at the root, edits to
+    it are dead code.
+    """
+    import importlib
+    sys.modules.pop("signals", None)
+    import signals  # noqa: PLC0415
+
+    expected_suffix = str(Path("signals") / "__init__.py")
+    actual = signals.__file__ or ""
+    assert actual.endswith(expected_suffix), (
+        f"`import signals` resolved to {actual!r}. "
+        f"Expected it to end with {expected_suffix!r}. "
+        "A signals.py at the repo root is shadowing the package — delete it."
+    )
+
+
+@pytest.mark.parametrize("filename", CORE_MODULE_FILES)
+def test_future_annotations_present(filename: str) -> None:
+    """Each core module must declare `from __future__ import annotations`."""
+    path = _PROJECT_ROOT_HEALTH / filename
+    if not path.exists():
+        pytest.skip(f"{filename} not found at {path}")
+
+    source = path.read_text(encoding="utf-8")
+    assert _has_future_annotations(source), (
+        f"{filename} is missing `from __future__ import annotations`. "
+        "Add it as the first non-comment import to guard Python 3.9 compatibility."
+    )

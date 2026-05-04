@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
+import pytest
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
@@ -33,6 +34,7 @@ from signals import (
     compute_hurst_dfa,
     get_hurst_regime_spy,
     get_market_regime_vix,
+    get_regime_threshold,
 )
 
 # NOTE: other test files (test_signals.py, test_signal_dispatch.py) replace
@@ -626,3 +628,153 @@ class TestResolveRegimeRouter:
             assert all(v == 1.0 for v in mults.values())
         finally:
             _c.CONFIG["regime_routing_enabled"] = orig
+
+
+# ── Regime architecture guards (absorbed from test_regime_architecture.py) ───
+# Guards the locked decision: VIX-proxy is the sole regime detector until
+# the IC Phase 2 gate is met (see DECISIONS.md Action #9).
+
+import importlib.util as _importlib_util
+
+_PROJECT_ROOT_ARCH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _load_real_config() -> dict:
+    """Load config.py directly from disk, bypassing any sys.modules stub."""
+    spec = _importlib_util.spec_from_file_location(
+        "_real_config_arch", os.path.join(_PROJECT_ROOT_ARCH, "config.py")
+    )
+    mod = _importlib_util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    return mod.CONFIG  # type: ignore[attr-defined]
+
+
+_REAL_CONFIG = _load_real_config()
+
+try:
+    from sklearn.ensemble import RandomForestClassifier as _RFC  # noqa: F401
+    _SKLEARN_AVAILABLE = True
+except ImportError:
+    _SKLEARN_AVAILABLE = False
+
+from ml_engine import RegimeClassifier
+
+
+def test_regime_detector_config_is_vix_proxy():
+    """config['regime_detector'] must be 'vix_proxy' — changing it is gate-guarded."""
+    assert _REAL_CONFIG["regime_detector"] == "vix_proxy", (
+        "Regime detector was changed away from 'vix_proxy'. "
+        "Requires IC Phase 2 gate review (closed_trades >= 200). See DECISIONS.md Action #9."
+    )
+
+
+def test_canonical_regime_states_declared_in_config():
+    """config['regime_states'] must declare the full canonical state set."""
+    states = _REAL_CONFIG["regime_states"]
+    assert isinstance(states, (tuple, list, frozenset))
+    required = {"TRENDING_UP", "TRENDING_DOWN", "RELIEF_RALLY", "RANGE_BOUND", "CAPITULATION", "UNKNOWN"}
+    assert required.issubset(set(states)), f"Missing canonical regime states: {required - set(states)}"
+
+
+@pytest.mark.skipif(not _SKLEARN_AVAILABLE, reason="scikit-learn not installed")
+def test_ml_regime_classifier_is_production_locked():
+    """RegimeClassifier.PRODUCTION_LOCKED must be True — not wired into live pipeline."""
+    assert RegimeClassifier.PRODUCTION_LOCKED is True, (
+        "RegimeClassifier.PRODUCTION_LOCKED was set to False. "
+        "Do not connect to production without gate review. See DECISIONS.md Action #9."
+    )
+
+
+@pytest.mark.skipif(not _SKLEARN_AVAILABLE, reason="scikit-learn not installed")
+def test_ml_regime_classifier_predict_raises_runtime_error():
+    """predict_regime() must raise RuntimeError while PRODUCTION_LOCKED is True."""
+    clf = RegimeClassifier()
+    with pytest.raises(RuntimeError, match="production"):
+        clf.predict_regime({"returns": 0.01, "volatility": 0.5, "volume_ma_ratio": 1.0})
+
+
+def test_regime_threshold_covers_all_canonical_states(monkeypatch):
+    """get_regime_threshold() must return a valid threshold for every canonical regime state."""
+    import config as _config_mod
+    from signals import get_regime_threshold
+
+    _required = {
+        "min_score_to_trade": 18,
+        "regime_threshold_bear_offset": -3,
+        "regime_threshold_choppy_offset": -6,
+        "regime_threshold_panic": 99,
+        "regime_threshold_bear_min": 15,
+        "regime_threshold_choppy_min": 12,
+    }
+    for k, v in _required.items():
+        monkeypatch.setitem(_config_mod.CONFIG, k, v)
+    for state in _REAL_CONFIG["regime_states"]:
+        threshold = get_regime_threshold(state)
+        assert isinstance(threshold, (int, float)), (
+            f"get_regime_threshold('{state}') returned non-numeric: {threshold!r}"
+        )
+        assert threshold >= 0, f"get_regime_threshold('{state}') returned negative: {threshold}"
+
+
+# ── Regime threshold tests (absorbed from test_regime_thresholds.py) ─────────
+
+
+class TestRegimeThresholdFlat:
+    """All non-circuit-breaker regimes return base threshold — no regime-specific offsets."""
+
+    def test_trending_up_uses_base(self, monkeypatch):
+        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 20)
+        assert get_regime_threshold("TRENDING_UP") == 20
+
+    def test_trending_down_uses_base(self, monkeypatch):
+        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 20)
+        assert get_regime_threshold("TRENDING_DOWN") == 20
+
+    def test_range_bound_uses_base(self, monkeypatch):
+        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 20)
+        assert get_regime_threshold("RANGE_BOUND") == 20
+
+    def test_unknown_uses_base(self, monkeypatch):
+        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 20)
+        assert get_regime_threshold("UNKNOWN") == 20
+
+    def test_unrecognised_regime_falls_back_to_base(self, monkeypatch):
+        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 22)
+        assert get_regime_threshold("SIDEWAYS_MOON") == 22
+
+    def test_all_non_circuit_breaker_regimes_equal(self, monkeypatch):
+        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 18)
+        base = 18
+        for regime in (
+            "TRENDING_UP", "TRENDING_DOWN", "RANGE_BOUND", "RELIEF_RALLY",
+            "UNKNOWN", "MOMENTUM_BULL", "FEAR_ELEVATED", "DISTRIBUTION", "TRENDING_BEAR",
+        ):
+            assert get_regime_threshold(regime) == base, (
+                f"Expected {base} for {regime}, got {get_regime_threshold(regime)}"
+            )
+
+
+class TestCircuitBreakerThreshold:
+    """PANIC and EXTREME_STRESS block all mechanically-scored signals."""
+
+    def test_capitulation_blocks_all(self, monkeypatch):
+        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_panic", 99)
+        assert get_regime_threshold("CAPITULATION") == 99
+
+    def test_extreme_stress_blocks_all(self, monkeypatch):
+        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_panic", 99)
+        assert get_regime_threshold("EXTREME_STRESS") == 99
+
+    def test_capitulation_threshold_configurable(self, monkeypatch):
+        monkeypatch.setitem(_config_mod.CONFIG, "regime_threshold_panic", 50)
+        assert get_regime_threshold("CAPITULATION") == 50
+
+    def test_base_changes_scale_all_non_circuit_breaker(self, monkeypatch):
+        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 14)
+        assert get_regime_threshold("TRENDING_UP") == 14
+        assert get_regime_threshold("RANGE_BOUND") == 14
+        assert get_regime_threshold("FEAR_ELEVATED") == 14
+
+        monkeypatch.setitem(_config_mod.CONFIG, "min_score_to_trade", 28)
+        assert get_regime_threshold("TRENDING_UP") == 28
+        assert get_regime_threshold("RANGE_BOUND") == 28
