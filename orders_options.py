@@ -380,6 +380,12 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
     if pos.get("status") == "EXITING":
         log.info(f"Exit already in flight for {opt_key} — skipping duplicate")
         return False
+    if pos.get("status") == "RESERVED":
+        log.warning(
+            f"execute_sell_option: {opt_key} BUY in flight (RESERVED) — "
+            "cannot sell until BUY fills; PM EXIT deferred to next cycle"
+        )
+        return False
 
     _is_partial = contracts_override is not None and contracts_override < pos["contracts"]
     sell_contracts = contracts_override if _is_partial else pos["contracts"]

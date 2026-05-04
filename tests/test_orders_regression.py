@@ -489,6 +489,39 @@ class TestOptionSellStateMachine:
         assert result is False
         ib.placeOrder.assert_not_called()
 
+    def test_sell_blocked_when_buy_in_flight_reserved(self, mock_config):
+        """
+        Regression: IBKR rejects with "Cannot have open orders on both sides of
+        the same US Option contract" when a BUY and SELL are simultaneously open.
+
+        Root cause: execute_options_entries() fires a BUY (setting status=RESERVED)
+        earlier in the scan cycle; the PM EXIT loop then finds the RESERVED slot in
+        active_trades and calls execute_sell_option — submitting a SELL before the
+        BUY fills.
+
+        Fix: execute_sell_option must return False immediately when status is RESERVED.
+        """
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        _om._option_sell_attempts.clear()
+
+        pos = self._opt_pos()
+        pos["status"] = "RESERVED"  # BUY submitted but not yet filled
+        _om.active_trades[self.OPT_KEY] = pos
+
+        ib = MagicMock()
+
+        with (
+            patch("orders_options.is_options_market_open", return_value=True),
+            patch("orders_options.CONFIG") as mock_cfg,
+        ):
+            mock_cfg.__getitem__.side_effect = lambda k: mock_config[k]
+            mock_cfg.get = lambda k, d=None: mock_config.get(k, d)
+            result = _om.execute_sell_option(ib, self.OPT_KEY, reason="pm_exit")
+
+        assert result is False, "SELL must be blocked while BUY is in flight (RESERVED)"
+        ib.placeOrder.assert_not_called()
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CLASS 4: SHORT Option Exit Pricing  (commit 62078f6, lines 2329–2337)
