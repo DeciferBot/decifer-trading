@@ -1136,7 +1136,7 @@ def apex_call(
     try:
         system_prompt = _APEX_SYSTEM_PROMPT
         user_prompt = _build_apex_user_prompt(apex_input, sctx)
-        raw, _meta = _call_apex_meta(system_prompt, user_prompt, max_tokens=4096)
+        raw, _meta = _call_apex_meta(system_prompt, user_prompt, max_tokens=int(CONFIG.get("apex_max_tokens", 6144)))
     except Exception as e:
         log.error("apex_call: LLM call failed — %s", e)
         fb = _fallback_decision(apex_input, reason=f"llm_error:{type(e).__name__}")
@@ -1171,9 +1171,11 @@ def apex_call(
     # (shadow recorder, divergence log) read it; schema validation ignores it.
     decision["_meta"] = _meta
     _out_toks = _meta.get("output_tokens", 0)
-    if _out_toks > 3500:
+    _apex_budget = int(CONFIG.get("apex_max_tokens", 8192))
+    if _out_toks > _apex_budget * 0.85:
         log.warning(
-            "apex_call: output_tokens=%d approaching 4096 budget — truncation risk on next cycle",
+            "apex_call: output_tokens=%d approaching %d budget — truncation risk on next cycle",
             _out_toks,
+            _apex_budget,
         )
     return decision

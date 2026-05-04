@@ -868,6 +868,19 @@ def dispatch(
                         regime=regime_name,
                     )
 
+            # Build origin extras from candidate payload for ORDER_INTENT tagging
+            _origin_extras = {
+                k: v for k, v in {
+                    "scanner_tier":                      payload.get("scanner_tier"),
+                    "universe_bucket":                   payload.get("universe_bucket"),
+                    "universe_source":                   payload.get("universe_source"),
+                    "primary_archetype":                 payload.get("primary_archetype"),
+                    "discovery_score":                   payload.get("discovery_score"),
+                    "position_research_universe_member": payload.get("scanner_tier") == "D",
+                    "origin_path":                       "tier_d_main" if payload.get("scanner_tier") == "D" else "normal",
+                }.items() if v is not None
+            }
+
             if instrument == "stock":
                 if direction == "LONG":
                     ok = execute_buy(
@@ -883,6 +896,7 @@ def dispatch(
                         open_time=datetime.now(UTC).isoformat(),
                         trade_type=trade_type,
                         conviction=ext_mult,
+                        **_origin_extras,
                     )
                 elif direction == "SHORT":
                     ok = execute_short(
@@ -898,6 +912,7 @@ def dispatch(
                         open_time=datetime.now(UTC).isoformat(),
                         trade_type=trade_type,
                         conviction=ext_mult,
+                        **_origin_extras,
                     )
                 else:
                     ok = False

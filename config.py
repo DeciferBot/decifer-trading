@@ -128,6 +128,7 @@ CONFIG = {
     "use_intelligence_layer": True,
     "intelligence_model": "claude-sonnet-4-6",
     "intelligence_max_tokens": 1024,
+    "apex_max_tokens": 8192,  # Apex Single-Synthesizer output budget (raised from 4096 to handle 50-candidate shortlist)
     "intelligence_cache_minutes": 30,  # session context cache window
     "intelligence_pattern_lookback": 20,  # similar patterns shown to Sonnet per call
     "intelligence_news_mode": "full_on_open_headlines_thereafter",
@@ -298,6 +299,7 @@ CONFIG = {
     # ── SCORING THRESHOLD ─────────────────────────────────────
     # NOTE: Lowered for paper trading to capture more setups for ML training (live values in comments)
     "min_score_to_trade": 14,  # Out of 50 — lower = more trades for training (live: 28)
+    "apex_expanded_band_floor": 20,  # Slots 31-50 only pass if apex_cap_score >= this; top 30 are unconditional
     "high_conviction_score": 36,  # Options only: score >= this → full options_max_risk_pct budget; below → 0.75x. Equity sizing uses signal_strength_kelly linear map instead.
     # ── DIMENSION FLAGS ───────────────────────────────────────────
     # Enable / disable individual signal dimensions without code changes.

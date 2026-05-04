@@ -2398,15 +2398,25 @@ def run_scan():
         # can compete fairly inside the unified cap.
         for _c in _cut_candidates_raw:
             _c["apex_cap_score"] = _compute_apex_cap_score(_c)
-        # Cap at top 30 by apex_cap_score — sending 80+ candidates bloats the
+        # Cap at top 50 by apex_cap_score — sending 80+ candidates bloats the
         # Apex response past the token budget and causes JSON truncation.
-        _CAP_LIMIT = 30
+        # Slots 31-50 are gated by apex_expanded_band_floor so only
+        # higher-conviction candidates fill the expanded band; top 30 are
+        # unconditional.
+        _CAP_LIMIT = 50
+        _CORE_LIMIT = 30
+        _EXPANDED_FLOOR = float(CONFIG.get("apex_expanded_band_floor", 20))
         _cut_all_sorted = sorted(
             _cut_candidates_raw,
             key=lambda c: c.get("apex_cap_score", c.get("score", 0)),
             reverse=True,
         )
-        _cut_candidates = _cut_all_sorted[:_CAP_LIMIT]
+        _core = _cut_all_sorted[:_CORE_LIMIT]
+        _expanded = [
+            c for c in _cut_all_sorted[_CORE_LIMIT:_CAP_LIMIT]
+            if c.get("apex_cap_score", c.get("score", 0)) >= _EXPANDED_FLOOR
+        ]
+        _cut_candidates = _core + _expanded
         if len(_cut_candidates_raw) > _CAP_LIMIT:
             _old_sorted_log = sorted(_cut_candidates_raw, key=lambda c: c.get("score", 0), reverse=True)
             _old_sel_syms_log = {c.get("symbol") for c in _old_sorted_log[:_CAP_LIMIT]}

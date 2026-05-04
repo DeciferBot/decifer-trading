@@ -2,12 +2,12 @@
 Apex cap score adjuster.
 
 compute_apex_cap_score() replaces the raw signal score as the sort key for
-the Apex top-30 cap. Non-Tier-D candidates are unchanged. Tier D candidates
+the Apex top-50 cap. Non-Tier-D candidates are unchanged. Tier D candidates
 with a real signal (score >= 18) receive a bounded bonus drawn from their
 position-research metadata so they can compete fairly inside the unified cap.
 
 No quota, reserve, or separate lane is created — this is purely a sort-key
-adjustment. The cap limit remains 30.
+adjustment. The cap limit is 50.
 """
 
 
