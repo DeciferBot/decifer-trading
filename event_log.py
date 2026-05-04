@@ -81,6 +81,19 @@ def _load_all() -> list[dict]:
     return records
 
 
+# ── Utility ───────────────────────────────────────────────────────────────────
+
+
+def get_ts(record: dict) -> str:
+    """Return the timestamp string from a trade-event record.
+
+    Searches ts → timestamp → created_at in that order.  Returns "" if none
+    present.  Callers should use this instead of record.get("timestamp") to
+    avoid silent misses caused by the canonical field being "ts".
+    """
+    return record.get("ts") or record.get("timestamp") or record.get("created_at") or ""
+
+
 # ── Write API ─────────────────────────────────────────────────────────────────
 
 

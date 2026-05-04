@@ -61,6 +61,7 @@ class TestEventLogAppend:
         event_log.append_intent(**_intent())
         assert (tmp_path / "events.jsonl").exists()
 
+    @pytest.mark.smoke
     def test_each_write_is_one_line(self, tmp_path, monkeypatch):
         import event_log
         monkeypatch.setattr(event_log, "_LOG_FILE", tmp_path / "events.jsonl")
@@ -174,6 +175,7 @@ class TestEventLogOpenTrades:
 
 
 class TestEventLogCrashSafety:
+    @pytest.mark.smoke
     def test_partial_last_line_is_skipped(self, tmp_path, monkeypatch):
         """A partial last line (crash artefact) must not corrupt earlier records."""
         import event_log
@@ -334,3 +336,29 @@ class TestTrainingStoreCount:
         with open(tmp_path / "training.jsonl", "a") as f:
             f.write('{"partial":')
         assert training_store.count() == 2
+
+
+# ── get_ts() robust timestamp helper ─────────────────────────────────────────
+
+class TestGetTs:
+    def test_reads_ts_field(self):
+        import event_log
+        assert event_log.get_ts({"ts": "2026-05-04T17:20:00+00:00"}) == "2026-05-04T17:20:00+00:00"
+
+    def test_falls_back_to_timestamp(self):
+        import event_log
+        assert event_log.get_ts({"timestamp": "2026-05-04T17:20:00+00:00"}) == "2026-05-04T17:20:00+00:00"
+
+    def test_falls_back_to_created_at(self):
+        import event_log
+        assert event_log.get_ts({"created_at": "2026-05-04T17:20:00+00:00"}) == "2026-05-04T17:20:00+00:00"
+
+    def test_ts_wins_over_timestamp(self):
+        import event_log
+        r = {"ts": "A", "timestamp": "B"}
+        assert event_log.get_ts(r) == "A"
+
+    def test_returns_empty_string_when_absent(self):
+        import event_log
+        assert event_log.get_ts({}) == ""
+        assert event_log.get_ts({"event": "ORDER_INTENT"}) == ""

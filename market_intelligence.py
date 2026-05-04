@@ -969,6 +969,31 @@ def _format_candidate_line(c: dict) -> str:
         f"allowed={c.get('allowed_trade_types')} opt_ok={c.get('options_eligible')} "
         f"news=[{headlines}] finbert={c.get('news_finbert_sentiment')}(advisory)"
     )
+    # Append Tier D research metadata when present so Apex can weigh PRU quality.
+    # Triggered by scanner_tier=="D" OR any non-null PRU field (covers candidates
+    # whose scanner_tier tag was dropped by a pipeline path but whose PRU metadata
+    # survived — e.g. normal_trade_pru_overlap candidates).
+    _is_tier_d = c.get("scanner_tier") == "D"
+    _has_pru_meta = any(
+        c.get(f) is not None
+        for f in ("adjusted_discovery_score", "primary_archetype", "universe_bucket")
+    )
+    if _is_tier_d or _has_pru_meta:
+        _acs = c.get("apex_cap_score")
+        _acs_str = f"{_acs:.1f}" if _acs is not None else "?"
+        _adj = c.get("adjusted_discovery_score")
+        _adj_str = f"{_adj:.0f}" if _adj is not None else "?"
+        line += (
+            f" pos_meta=[tier={c.get('scanner_tier') or '?'}"
+            f" origin={c.get('origin_path') or c.get('origin') or '?'}"
+            f" pru={bool(c.get('position_research_universe_member'))}"
+            f" adj_disc={_adj_str}"
+            f" arch={c.get('primary_archetype') or '?'}"
+            f" bucket={c.get('universe_bucket') or '?'}"
+            f" apex_score={_acs_str}"
+            f" band={c.get('selected_band') or '?'}"
+            f" slot={c.get('selected_slot') or '?'}]"
+        )
     hint = c.get("_shadow_hint")
     if hint:
         line = f"{hint}\n  {line}"

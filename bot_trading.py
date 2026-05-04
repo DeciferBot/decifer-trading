@@ -2478,6 +2478,20 @@ def run_scan():
         _selected_syms_set   = {c.get("symbol") for c in _cut_candidates}
         _core_syms_set       = {c.get("symbol") for c in _core}
         _expanded_syms_set   = {c.get("symbol") for c in _expanded}
+
+        # Attach band/slot to each candidate dict so _format_candidate_line()
+        # can surface them in the Apex prompt without a separate lookup.
+        for _rank_i, _rc in enumerate(_cut_all_sorted, start=1):
+            _rsym = _rc.get("symbol")
+            if _rsym in _core_syms_set:
+                _rc["selected_band"] = "core"
+                _rc["selected_slot"] = _rank_i
+            elif _rsym in _expanded_syms_set:
+                _rc["selected_band"] = "expanded"
+                _rc["selected_slot"] = _rank_i
+            else:
+                _rc["selected_band"] = "rejected"
+                _rc["selected_slot"] = None
         _td_in_core_syms     = {c.get("symbol") for c in _core    if c.get("scanner_tier") == "D"}
         _td_in_expanded_syms = {c.get("symbol") for c in _expanded if c.get("scanner_tier") == "D"}
 
