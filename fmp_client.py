@@ -1308,6 +1308,14 @@ def get_index_bars(symbol: str, period: str = "5d", interval: str = "1h") -> "pd
     return df if len(df) > 0 else None
 
 
+def get_sp500_tickers() -> list[str]:
+    """Return current S&P 500 constituent tickers from FMP. Empty list on failure."""
+    data = _get("sp500-constituent", {}, ttl=_TTL_FUNDAMENTALS)
+    if not isinstance(data, list):
+        return []
+    return [item["symbol"] for item in data if item.get("symbol")]
+
+
 def _safe_pct(val) -> float | None:
     """
     Convert FMP decimal fraction (0.35) to percentage (35.0).

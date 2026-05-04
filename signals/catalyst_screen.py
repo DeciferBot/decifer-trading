@@ -53,16 +53,24 @@ def _thresholds() -> dict:
 
 def _load_sp500_tickers() -> list[str]:
     """
-    Fetch S&P 500 tickers from Wikipedia.  Falls back to an empty list on error.
-    Requires pandas (already a project dependency).
+    Fetch S&P 500 tickers. FMP primary (authenticated, reliable); Wikipedia fallback.
     """
+    # Primary: FMP constituent endpoint — no scraping, no rate limits
+    try:
+        import fmp_client as fmp
+        if fmp.is_available():
+            tickers = fmp.get_sp500_tickers()
+            if tickers:
+                return tickers
+    except Exception as exc:
+        print(f"  [catalyst_screen] WARNING: FMP S&P 500 fetch failed: {exc}")
+
+    # Fallback: Wikipedia scrape
     try:
         import io
         import urllib.request
         import pandas as pd
         url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        # Wikipedia requires a browser-like User-Agent; pandas read_html uses a
-        # default that gets 403'd.  Fetch with urllib and pass the HTML string.
         req = urllib.request.Request(
             url,
             headers={"User-Agent": "Mozilla/5.0 (compatible; DeciferBot/1.0)"},
