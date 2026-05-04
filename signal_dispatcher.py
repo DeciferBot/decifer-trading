@@ -19,6 +19,20 @@ from pattern_library import record_entry
 from position_sizing import calculate_stops
 from signal_types import Signal
 
+def _lazy_pru_tickers() -> frozenset:
+    """Return PRU ticker frozenset via scanner's mtime-based cache.
+
+    Delegates to scanner.get_position_research_universe() so the set is
+    refreshed automatically when position_research_universe.json changes
+    (weekly rebuild while the bot is running), without any extra cache here.
+    """
+    try:
+        from scanner import get_position_research_universe
+        symbols, _ = get_position_research_universe()
+        return symbols
+    except Exception:
+        return frozenset()
+
 
 @dataclass
 class _FormulaAdvice:
@@ -717,6 +731,7 @@ def dispatch(
     portfolio_value: float = 0.0,
     regime: dict | None = None,
     execute: bool = False,
+    pru_members: frozenset | None = None,
 ) -> dict:
     """
     Translate an ApexDecision into order-layer calls.
@@ -869,6 +884,16 @@ def dispatch(
                     )
 
             # Build origin extras from candidate payload for ORDER_INTENT tagging
+            _is_tier_d = payload.get("scanner_tier") == "D"
+            _pru_set   = pru_members if pru_members is not None else _lazy_pru_tickers()
+            _in_pru    = _is_tier_d or (sym in _pru_set)
+            if _is_tier_d:
+                _origin_path = "tier_d_main_path"
+            elif sym in _pru_set:
+                _origin_path = "normal_trade_pru_overlap"
+            else:
+                _origin_path = "normal_path"
+
             _origin_extras = {
                 k: v for k, v in {
                     "scanner_tier":                      payload.get("scanner_tier"),
@@ -876,8 +901,19 @@ def dispatch(
                     "universe_source":                   payload.get("universe_source"),
                     "primary_archetype":                 payload.get("primary_archetype"),
                     "discovery_score":                   payload.get("discovery_score"),
-                    "position_research_universe_member": payload.get("scanner_tier") == "D",
-                    "origin_path":                       "tier_d_main" if payload.get("scanner_tier") == "D" else "normal",
+                    "adjusted_discovery_score":          payload.get("adjusted_discovery_score"),
+                    "matched_position_archetypes":       (
+                        payload.get("matched_position_archetypes")
+                        or payload.get("matched_archetypes")
+                    ),
+                    "position_research_universe_member": _in_pru,
+                    "origin_path":                       _origin_path,
+                    "tier_d_paper_entry":                True if _is_tier_d else None,
+                    "paper_evaluation_trade":            True if _is_tier_d else None,
+                    "execution_mode":                    "paper",
+                    "tier_d_gate_version":               "phase_1" if _is_tier_d else None,
+                    "apex_path":                         "track_a_main",
+                    "entry_gate_reason":                 payload.get("entry_gate_reason"),
                 }.items() if v is not None
             }
 

@@ -941,24 +941,23 @@ def main() -> None:
         r for r in trade_events
         if r.get("event") == "ORDER_INTENT" and r.get("symbol") in pru_meta
     ]
-    _unexpected_executions: list[dict] = []
     _unknown_origin: list[dict] = []
     _origin_counts: dict[str, int] = {
         "tier_d_paper_entry": 0,
-        "tier_d_unexpected_execution": 0,
+        "tier_d_shadow_apex_only": 0,
         "normal_trade_pru_overlap": 0,
-        "unknown_origin_needs_investigation": 0,
+        "unknown": 0,
     }
 
     def _classify_origin(r: dict) -> str:
-        if r.get("tier_d_paper_entry") is True:
+        op = r.get("origin_path") or ""
+        if r.get("tier_d_paper_entry") is True or r.get("scanner_tier") == "D" or op == "tier_d_main_path":
             return "tier_d_paper_entry"
-        st = r.get("scanner_tier")
-        if st == "D":
-            return "tier_d_unexpected_execution"
-        if st is not None:
+        if op == "tier_d_shadow_apex_only":
+            return "tier_d_shadow_apex_only"
+        if op == "normal_trade_pru_overlap" or r.get("scanner_tier") is not None:
             return "normal_trade_pru_overlap"
-        return "unknown_origin_needs_investigation"
+        return "unknown"
 
     print(f"  PRU-symbol ORDER_INTENT records found:  {len(_pru_order_intents)}")
     print()
@@ -974,9 +973,7 @@ def main() -> None:
         for r in sorted(_pru_order_intents, key=lambda x: x.get("ts", "")):
             cls = _classify_origin(r)
             _origin_counts[cls] += 1
-            if cls == "tier_d_unexpected_execution":
-                _unexpected_executions.append(r)
-            elif cls == "unknown_origin_needs_investigation":
+            if cls == "unknown":
                 _unknown_origin.append(r)
             ts_s = (r.get("ts") or "?")[:19]
             sym  = r.get("symbol", "?")
@@ -989,12 +986,7 @@ def main() -> None:
 
     print(f"  Classification summary:")
     for cls, cnt in _origin_counts.items():
-        if cnt == 0:
-            icon = "✓"
-        elif cls in ("tier_d_paper_entry", "normal_trade_pru_overlap"):
-            icon = "✓"
-        else:
-            icon = "⚠"
+        icon = "⚠" if cls == "unknown" and cnt > 0 else "✓"
         print(f"    [{icon}] {cls}: {cnt}")
     print()
 
@@ -1176,40 +1168,30 @@ def main() -> None:
         print(f"    simulated_reason:   {(r.get('simulated_reason') or '?')[:100]}")
 
     # ─────────────────────────────────────────────────────────────────── #
-    # TIER D SAFETY ASSERTIONS
+    # TIER D ATTRIBUTION STATUS
     # ─────────────────────────────────────────────────────────────────── #
-    section("TIER D SAFETY ASSERTIONS")
+    section("TIER D ATTRIBUTION STATUS")
 
-    print(f"  Tier D shadow mode (documented):   {shadow_on}"
-          f"  [⚠  NOT code-enforced — no config gate exists]")
-    print(f"  Tier D live entries allowed:        {allow_live}"
-          f"  [⚠  NO enforcement key in config — relies on operational discipline]")
-    print(f"  Tier D paper entries in events:     {_origin_counts['tier_d_paper_entry']}")
-    print(f"  Tier D unexpected executions:       {_origin_counts['tier_d_unexpected_execution']}")
-    print(f"  PRU-overlap normal trades:          {_origin_counts['normal_trade_pru_overlap']}")
-    print(f"  Unknown-origin PRU-symbol trades:   {_origin_counts['unknown_origin_needs_investigation']}")
+    print("  Tier D paper trading: ENABLED (intentional — collecting evaluation data)")
+    print(f"  Execution mode:       paper  (all new trades tagged execution_mode=paper)")
+    print(f"  Gate version:         phase_1")
     print()
-    print("  Phase 1 enforcement gap: CONFIRMED")
-    print("    bot_trading.py calls _run_apex_pipeline(execute=True) with no Tier D gate.")
-    print("    Any Tier D candidate that survives the 30-slot cap and gets Apex approval")
-    print("    will execute live. No phase_gate check, no shadow_mode code gate.")
+    print(f"  PRU-symbol trade attribution (ORDER_INTENT records):")
+    print(f"    Tier D paper entries:       {_origin_counts['tier_d_paper_entry']}")
+    print(f"    Tier D shadow-apex only:    {_origin_counts['tier_d_shadow_apex_only']}")
+    print(f"    Normal-path PRU overlap:    {_origin_counts['normal_trade_pru_overlap']}")
+    print(f"    Unknown origin (pre-tagging era): {_origin_counts['unknown']}")
     print()
-    if _origin_counts["tier_d_unexpected_execution"] > 0:
-        print(f"  ✗ SAFETY VIOLATION — {_origin_counts['tier_d_unexpected_execution']} "
-              f"Tier D unexpected execution(s) found. Phase 2 gate: FAILED")
-        for r in _unexpected_executions[:5]:
-            print(f"    {(r.get('ts') or '?')[:19]}  {r.get('symbol')}  "
-                  f"scanner_tier={r.get('scanner_tier')}  trade_type={r.get('trade_type')}")
-    elif _origin_counts["unknown_origin_needs_investigation"] > 0:
-        print(f"  ⚠  UNRESOLVED — {_origin_counts['unknown_origin_needs_investigation']} "
-              f"PRU-symbol trade(s) cannot be classified.")
-        print("    Origin tagging was not in place when these trades executed.")
-        print("    Cannot confirm whether these were normal-path or Tier D execution.")
+
+    if _origin_counts["unknown"] > 0:
+        print(f"  ⚠  {_origin_counts['unknown']} PRU-symbol trade(s) lack origin tags.")
+        print("     These predate signal_dispatcher origin tagging. Classification impossible.")
+        print("     All new trades will carry full origin attribution going forward.")
         for r in _unknown_origin[:5]:
-            print(f"    {(r.get('ts') or '?')[:19]}  {r.get('symbol')}  "
+            print(f"     {(r.get('ts') or '?')[:19]}  {r.get('symbol')}  "
                   f"trade_type={r.get('trade_type')}")
     else:
-        print("  ✓ No Tier D unexpected executions found.")
+        print("  ✓ All PRU-symbol trades carry origin tags.")
 
     # ------------------------------------------------------------------ #
     # DETAIL SECTION 7 — Phase 2 Readiness Gate

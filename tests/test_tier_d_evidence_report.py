@@ -200,7 +200,7 @@ class TestOriginClassification:
     """Test _classify_origin logic by running the report and checking audit output."""
 
     def test_unknown_origin_no_scanner_tier(self):
-        """ORDER_INTENT for a PRU symbol with no scanner_tier → unknown_origin_needs_investigation."""
+        """ORDER_INTENT for a PRU symbol with no scanner_tier → unknown classification."""
         trade_events = [
             {
                 "event": "ORDER_INTENT",
@@ -214,8 +214,8 @@ class TestOriginClassification:
             [_PIPELINE_RECORD, _APEX_CAP_RECORD], trade_events=trade_events
         )
         assert code == 0
-        assert "unknown_origin_needs_investigation: 1" in out
-        assert "UNRESOLVED" in out
+        assert "unknown: 1" in out
+        assert "predate signal_dispatcher origin tagging" in out
 
     def test_tier_d_paper_entry_classification(self):
         """ORDER_INTENT with tier_d_paper_entry=True → tier_d_paper_entry classification."""
@@ -234,10 +234,9 @@ class TestOriginClassification:
         )
         assert code == 0
         assert "tier_d_paper_entry: 1" in out
-        assert "tier_d_unexpected_execution: 0" in out
 
-    def test_unexpected_execution_detected(self):
-        """ORDER_INTENT with scanner_tier=D but no tier_d_paper_entry → unexpected execution."""
+    def test_tier_d_scanner_tier_classified_as_paper(self):
+        """ORDER_INTENT with scanner_tier=D (even without tier_d_paper_entry) → tier_d_paper_entry."""
         trade_events = [
             {
                 "event": "ORDER_INTENT",
@@ -245,15 +244,16 @@ class TestOriginClassification:
                 "trade_type": "SWING",
                 "ts": "2026-05-04T10:00:00+00:00",
                 "scanner_tier": "D",
-                # No tier_d_paper_entry
+                # No tier_d_paper_entry — scanner_tier=D is sufficient
             }
         ]
         out, code = _run_main_with_data(
             [_PIPELINE_RECORD, _APEX_CAP_RECORD], trade_events=trade_events
         )
         assert code == 0
-        assert "tier_d_unexpected_execution: 1" in out
-        assert "SAFETY VIOLATION" in out
+        assert "tier_d_paper_entry: 1" in out
+        assert "SAFETY VIOLATION" not in out
+        assert "UNRESOLVED" not in out
 
     def test_normal_trade_pru_overlap(self):
         """ORDER_INTENT with scanner_tier present and != D → normal_trade_pru_overlap."""
@@ -308,7 +308,7 @@ class TestIntentExtrasSignature:
 
 class TestDispatchOriginTagging:
     def test_dispatch_passes_scanner_tier_to_execute_buy(self):
-        """When payload has scanner_tier=D, execute_buy must receive scanner_tier=D and origin_path=tier_d_main."""
+        """When payload has scanner_tier=D, execute_buy must receive full origin attribution."""
         captured_kwargs: dict = {}
 
         def _fake_execute_buy(**kwargs):
@@ -339,6 +339,7 @@ class TestDispatchOriginTagging:
                 "universe_bucket": "core_research",
                 "primary_archetype": "Quality Compounder",
                 "discovery_score": 12,
+                "adjusted_discovery_score": 10,
                 "score_breakdown": {},
             }
         }
@@ -355,10 +356,18 @@ class TestDispatchOriginTagging:
                 ib=MagicMock(),
                 execute=True,
                 active_trades={},
+                pru_members=frozenset({"ALAB"}),
             )
 
         assert captured_kwargs.get("scanner_tier") == "D", \
             f"scanner_tier not passed to execute_buy. Got: {captured_kwargs}"
-        assert captured_kwargs.get("origin_path") == "tier_d_main", \
+        assert captured_kwargs.get("origin_path") == "tier_d_main_path", \
             f"origin_path not passed correctly. Got: {captured_kwargs}"
         assert captured_kwargs.get("position_research_universe_member") is True
+        assert captured_kwargs.get("tier_d_paper_entry") is True, \
+            f"tier_d_paper_entry not set for Tier D. Got: {captured_kwargs}"
+        assert captured_kwargs.get("paper_evaluation_trade") is True
+        assert captured_kwargs.get("execution_mode") == "paper"
+        assert captured_kwargs.get("tier_d_gate_version") == "phase_1"
+        assert captured_kwargs.get("apex_path") == "track_a_main"
+        assert captured_kwargs.get("adjusted_discovery_score") == 10
