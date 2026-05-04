@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import random
 import time as _time
 from datetime import UTC, date, datetime, timedelta
 
@@ -37,6 +38,7 @@ _TTL_NEWS         = 15 * 60       # 15 min — breaking news window
 _TTL_INSIDER      = 2 * 3600      # 2h — Form 4 filings
 _TTL_CONGRESS     = 6 * 3600      # 6h — congressional disclosures
 _TTL_FUNDAMENTALS = 24 * 3600     # 24h — quarterly data
+_MAX_429_RETRIES  = 3             # max retries on HTTP 429 (rate limit)
 
 # ── In-memory cache (key → (data, fetched_at)) ───────────────────────────────
 _cache: dict[str, tuple[object, float]] = {}
@@ -81,8 +83,26 @@ def _get(endpoint: str, params: dict, version: str = "", ttl: float | None = Non
         return data
     except requests.exceptions.HTTPError as exc:
         status = exc.response.status_code
+        if status == 429:
+            for attempt in range(_MAX_429_RETRIES):
+                wait = (0.5 * (2 ** attempt)) * (0.8 + 0.4 * random.random())
+                _time.sleep(wait)
+                try:
+                    resp = requests.get(url, params={**params, "apikey": key}, timeout=10)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    if isinstance(data, dict) and "Error Message" in data:
+                        log.warning("fmp_client: API error — %s", data["Error Message"])
+                        return None
+                    _cache[cache_key] = (data, _time.time())
+                    return data
+                except requests.exceptions.HTTPError as retry_exc:
+                    if retry_exc.response.status_code != 429:
+                        break
+            log.warning("fmp_client: HTTP 429 for %s (retries exhausted)", endpoint)
+            return None
         # 403/404 on legacy endpoints expected after Aug 2025 — demote to debug
-        if status in (403, 404):
+        elif status in (403, 404):
             log.debug("fmp_client: HTTP %s for %s (legacy endpoint)", status, endpoint)
         else:
             log.warning("fmp_client: HTTP %s for %s", status, endpoint)
@@ -1270,7 +1290,7 @@ def warm_fundamentals_cache(symbols: list[str]) -> None:
             except Exception:
                 pass
 
-    with ThreadPoolExecutor(max_workers=20) as _pool:
+    with ThreadPoolExecutor(max_workers=5) as _pool:
         _futs = {_pool.submit(_warm_one, sym) for sym in symbols}
         _done, _pending = _fut_wait(_futs, timeout=45.0)
         for _f in _pending:

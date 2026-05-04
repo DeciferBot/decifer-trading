@@ -304,7 +304,7 @@ def lightweight_cycle_check(
                 )
                 actioned_syms.add(sym)
             else:
-                # Thesis check: direction flipped OR momentum collapsed → Opus review
+                # Thesis check: direction flipped OR momentum collapsed → Apex review
                 entry_dir = pos.get("direction", "LONG")
                 current_dir = direction_map.get(sym, "NEUTRAL")
                 entry_mom = float((pos.get("signal_scores") or {}).get("momentum", 0) or 0)
@@ -330,13 +330,16 @@ def lightweight_cycle_check(
                     actioned_syms.add(sym)
 
         elif trade_type == "SWING":
-            if entry_regime and entry_regime != "UNKNOWN" and current_regime and entry_regime != current_regime:
+            entry_polarity_sw = _regime_polarity(entry_regime)
+            current_polarity_sw = _regime_polarity(current_regime)
+            if entry_polarity_sw and current_polarity_sw and entry_polarity_sw != current_polarity_sw:
                 actions.append(
                     {
                         "symbol": sym,
                         "action": "REVIEW",
                         "reasoning": (
-                            f"SWING regime shifted: entry={entry_regime} → now={current_regime}; "
+                            f"SWING regime polarity flipped: entry={entry_regime}({entry_polarity_sw}) → "
+                            f"now={current_regime}({current_polarity_sw}); "
                             "thesis context changed — full Sonnet review required"
                         ),
                     }
@@ -352,7 +355,7 @@ def lightweight_cycle_check(
                             "reasoning": (
                                 f"SWING hold duration exceeded {CONFIG.get('swing_max_hold_days', 10)}d "
                                 f"({mins_held / 390:.1f} trading days held) — "
-                                "Opus review: promote to POSITION or exit"
+                                "Apex review: promote to POSITION or exit"
                             ),
                         }
                     )

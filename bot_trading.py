@@ -1771,14 +1771,14 @@ def run_scan():
     )
     if not should_review and _force_pm_review:
         # Respect the same cooldown as event-triggered reviews so that a
-        # persistent regime-shift condition doesn't fire Opus every cycle.
+        # persistent regime-shift condition doesn't fire Apex every cycle.
         _force_cooldown_mins = CONFIG.get("portfolio_manager", {}).get("trim_cooldown_minutes", 30)
         _force_age_mins = (
             (datetime.now(_ET) - _last_pm_review_ts).total_seconds() / 60 if _last_pm_review_ts is not None else None
         )
         if _force_age_mins is None or _force_age_mins >= _force_cooldown_mins:
             should_review = True
-            # CP-2: use the actual accumulated reasons so Opus sees full context,
+            # CP-2: use the actual accumulated reasons so Apex sees full context,
             # not just a generic label. Falls back to "cycle_regime_shift" if somehow empty.
             pm_trigger = ("cycle_check: " + "; ".join(_cc_review_reasons)) if _cc_review_reasons else "cycle_regime_shift"
         else:
