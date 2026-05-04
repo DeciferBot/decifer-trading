@@ -1657,7 +1657,7 @@ def _pnl_refresh_loop():
         try:
             from bot_account import get_account_data as _gad
             _, pnl = _gad()
-            if pnl and not _math.isnan(pnl):
+            if pnl is not None and not _math.isnan(pnl):
                 dash["daily_pnl"] = pnl
         except Exception:
             pass

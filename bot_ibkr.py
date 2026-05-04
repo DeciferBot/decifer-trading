@@ -73,7 +73,7 @@ def _restore_subscriptions() -> None:
         try:
             if sub_type == "pnl":
                 account = params.get("account", CONFIG.get("active_account", ""))
-                ib.reqPnL(account)
+                bot_state._pnl_subscription = ib.reqPnL(account)
                 log.info(f"  ✔ Re-subscribed PnL for account {account}")
             elif sub_type == "account":
                 account = params.get("account", CONFIG.get("active_account", ""))
@@ -582,9 +582,8 @@ def connect_ibkr() -> bool:
 def subscribe_pnl():
     ib = bot_state.ib
     try:
-        if bot_state._pnl_subscription is None:
-            bot_state._pnl_subscription = ib.reqPnL(CONFIG["active_account"])
-            clog("INFO", "P&L subscription active")
+        bot_state._pnl_subscription = ib.reqPnL(CONFIG["active_account"])
+        clog("INFO", "P&L subscription active")
     except Exception as e:
         clog("ERROR", f"P&L subscription failed: {e}")
 
