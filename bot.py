@@ -408,7 +408,6 @@ def main():
     from bot_ibkr import (
         _on_order_status_event,
         backfill_trades_from_ibkr,
-        cancel_orphan_stop_orders,
         subscribe_pnl,
         sync_orders_from_ibkr,
     )
@@ -518,7 +517,7 @@ def main():
     bot_state.ib.sleep(2)  # Ensure commissionReports are linked to fills before backfill
     backfill_trades_from_ibkr()
     sync_orders_from_ibkr()
-    cancel_orphan_stop_orders()  # Cancel stale exit orders with no corresponding active position
+    # Orphan cleanup handled by Pass 2 in audit_bracket_orders (runs each scan cycle).
 
     # Hot reload hashes intentionally not initialised — check_and_reload() is not called in the main loop
 

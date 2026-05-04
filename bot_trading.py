@@ -498,10 +498,21 @@ def check_external_closes(regime: dict):
 
                 sl_order_id = trade.get("sl_order_id")
                 tp_order_id = trade.get("tp_order_id")
-                # ── Determine mechanical exit type ─────────────────────────
-                if sl_order_id and _fill_order_id and int(_fill_order_id) == int(sl_order_id):
+                _trade_id_ex = trade.get("trade_id", "")
+                # ── Determine mechanical exit type — orderRef first, orderId fallback ──
+                _fill_ref = ""
+                try:
+                    for _ft in ib.fills():
+                        if _ft.execution.orderId == _fill_order_id:
+                            _fill_ref = getattr(_ft.execution, "orderRef", "") or ""
+                            break
+                except Exception:
+                    pass
+                _sl_ref_match = _trade_id_ex and _fill_ref == f"SL:{_trade_id_ex}"[:20]
+                _tp_ref_match = _trade_id_ex and _fill_ref == f"TP:{_trade_id_ex}"[:20]
+                if _sl_ref_match or (sl_order_id and _fill_order_id and int(_fill_order_id) == int(sl_order_id)):
                     exit_type = "sl_hit"
-                elif tp_order_id and _fill_order_id and int(_fill_order_id) == int(tp_order_id):
+                elif _tp_ref_match or (tp_order_id and _fill_order_id and int(_fill_order_id) == int(tp_order_id)):
                     exit_type = "tp_hit"
                 elif pnl > 0 and trade.get("tp"):
                     tp = trade.get("tp")

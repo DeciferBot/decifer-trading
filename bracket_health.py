@@ -41,6 +41,7 @@ from orders_state import (
 
 _RETRY_COOLDOWN_S: int = 300  # 5 minutes between new-order submissions per symbol
 _retry_ts: dict[str, float] = {}
+_sl_place_ts: dict[str, float] = {}  # last time Pass 1 placed a new SL (grace period guard)
 
 
 def _in_cooldown(symbol: str) -> bool:
@@ -68,7 +69,7 @@ def _build_ibkr_bracket_map(ib: IB) -> dict[str, dict[str, list[Trade]]]:
             sec_type = (trade.contract.secType or "").upper()
             if sec_type not in ("STK", ""):
                 continue
-            if trade.orderStatus.status not in ("Submitted", "PreSubmitted"):
+            if trade.orderStatus.status not in ("Submitted", "PreSubmitted", "PendingSubmit", "ApiPending"):
                 continue
             sym = trade.contract.symbol
             otype = (trade.order.orderType or "").upper().replace(" ", "")
@@ -85,15 +86,27 @@ def _build_ibkr_bracket_map(ib: IB) -> dict[str, dict[str, list[Trade]]]:
     return result
 
 
-def _pick_best_sl(candidates: list[Trade], stored_sl: float) -> Trade:
-    """Keep SL closest to stored price; if no stored price, keep highest orderId."""
+def _pick_best_sl(candidates: list[Trade], stored_sl: float, trade_id: str = "") -> Trade:
+    """Keep SL whose orderRef matches trade_id; fall back to price proximity."""
+    if trade_id:
+        ref = f"SL:{trade_id}"[:20]
+        match = next((t for t in candidates if (t.order.orderRef or "") == ref), None)
+        if match:
+            return match
+        log.warning("[BRACKET_AUDIT] no orderRef match for SL:%s — using price proximity fallback", trade_id)
     if stored_sl > 0:
         return min(candidates, key=lambda t: abs(float(t.order.auxPrice or 0) - stored_sl))
     return max(candidates, key=lambda t: t.order.orderId)
 
 
-def _pick_best_tp(candidates: list[Trade], stored_tp: float) -> Trade:
-    """Keep TP closest to stored price; if no stored price, keep highest orderId."""
+def _pick_best_tp(candidates: list[Trade], stored_tp: float, trade_id: str = "") -> Trade:
+    """Keep TP whose orderRef matches trade_id; fall back to price proximity."""
+    if trade_id:
+        ref = f"TP:{trade_id}"[:20]
+        match = next((t for t in candidates if (t.order.orderRef or "") == ref), None)
+        if match:
+            return match
+        log.warning("[BRACKET_AUDIT] no orderRef match for TP:%s — using price proximity fallback", trade_id)
     if stored_tp > 0:
         return min(candidates, key=lambda t: abs(float(t.order.lmtPrice or 0) - stored_tp))
     return max(candidates, key=lambda t: t.order.orderId)
@@ -224,6 +237,7 @@ def audit_bracket_orders(ib: IB) -> None:
             tp = pos.get("tp") or 0
             sl_oid = pos.get("sl_order_id")
             tp_oid = pos.get("tp_order_id")
+            trade_id = pos.get("trade_id", "")
 
             if not current or not entry or not qty:
                 continue
@@ -294,7 +308,12 @@ def audit_bracket_orders(ib: IB) -> None:
 
             # ── Pass 1: SL bracket ────────────────────────────────────────────
             if sl_count == 0:
-                if not _in_cooldown(symbol):
+                # Grace period: if sl_order_id was recently set, the order may be
+                # in PendingSubmit/ApiPending and not yet visible — wait 30s before creating a new one
+                _recently_placed = sl_oid and (time.monotonic() - _sl_place_ts.get(symbol, 0) < 30)
+                if _recently_placed:
+                    log.debug("[BRACKET_AUDIT] %s sl_count=0 but within 30s grace period — skipping", symbol)
+                elif not _in_cooldown(symbol):
                     if not atr:
                         log.warning("[BRACKET_AUDIT] %s sl missing but no ATR — skipping", symbol)
                     else:
@@ -314,19 +333,6 @@ def audit_bracket_orders(ib: IB) -> None:
                             )
                         else:
                             try:
-                                all_sell_count = sum(
-                                    1 for t in ib.openTrades()
-                                    if t.contract.symbol == symbol
-                                    and t.order.action.upper() == close_action
-                                    and t.orderStatus.status in ("Submitted", "PreSubmitted")
-                                )
-                                if all_sell_count >= 13:
-                                    log.warning(
-                                        "[BRACKET_AUDIT] %s skipping new sl — %d open %s orders already (IBKR limit 15)",
-                                        symbol, all_sell_count, close_action,
-                                    )
-                                    _mark_retry(symbol)
-                                    continue
                                 contract = get_contract(symbol, "stock")
                                 ib.qualifyContracts(contract)
                                 sl_limit = (
@@ -338,18 +344,20 @@ def audit_bracket_orders(ib: IB) -> None:
                                     close_action, qty, new_sl, sl_limit,
                                     account=account, tif="GTC", outsideRth=True,
                                 )
+                                sl_order.orderRef = f"SL:{trade_id}"[:20]
                                 sl_trade = ib.placeOrder(contract, sl_order)
                                 ib.sleep(0.4)
                                 sl_status = sl_trade.orderStatus.status if sl_trade else ""
-                                if sl_status in ("Submitted", "PreSubmitted"):
+                                if sl_status in ("Submitted", "PreSubmitted", "PendingSubmit", "ApiPending"):
                                     with _trades_lock:
                                         if key in active_trades:
                                             active_trades[key]["sl"] = new_sl
                                             active_trades[key]["sl_order_id"] = sl_trade.order.orderId
+                                    _sl_place_ts[symbol] = time.monotonic()
                                     changed = True
                                     log.info(
-                                        "[BRACKET_AUDIT] %s sl submitted: %.2f (order #%d)",
-                                        symbol, new_sl, sl_trade.order.orderId,
+                                        "[BRACKET_AUDIT] %s sl submitted: %.2f (order #%d ref=%s)",
+                                        symbol, new_sl, sl_trade.order.orderId, sl_order.orderRef,
                                     )
                                 else:
                                     log.warning(
@@ -367,8 +375,8 @@ def audit_bracket_orders(ib: IB) -> None:
                     changed = True
                     log.info("[BRACKET_AUDIT] %s sl_order_id reattached: #%d (no resubmit needed)", symbol, found_id)
 
-            else:  # sl_count > 1 — cancel duplicates immediately
-                best_sl = _pick_best_sl(sl_candidates, sl)
+            else:  # sl_count > 1 — cancel duplicates immediately, keep by orderRef
+                best_sl = _pick_best_sl(sl_candidates, sl, trade_id)
                 for t in sl_candidates:
                     if t.order.orderId != best_sl.order.orderId:
                         try:
@@ -408,22 +416,36 @@ def audit_bracket_orders(ib: IB) -> None:
                             try:
                                 contract = get_contract(symbol, "stock")
                                 ib.qualifyContracts(contract)
+                                # Build OCA group so IBKR auto-cancels TP when SL fills
+                                _oca = f"decifer_{symbol}_{trade_id}_audit" if trade_id else ""
+                                # Get current audit SL order to determine if OCA linking is possible
+                                _sl_live = next(
+                                    (t for t in sl_candidates if t.order.orderId == sl_oid), None
+                                ) if sl_oid and sl_candidates else None
                                 tp_order = LimitOrder(
                                     close_action, qty, new_tp,
                                     account=account, tif="GTC", outsideRth=True,
                                 )
+                                tp_order.orderRef = f"TP:{trade_id}"[:20]
+                                if _oca and _sl_live:
+                                    tp_order.ocaGroup = _oca
+                                    tp_order.ocaType = 1
+                                    _sl_live.order.ocaGroup = _oca
+                                    _sl_live.order.ocaType = 1
+                                    ib.placeOrder(contract, _sl_live.order)  # modify to add OCA
+                                    ib.sleep(0.1)
                                 tp_trade = ib.placeOrder(contract, tp_order)
                                 ib.sleep(0.4)
                                 tp_status = tp_trade.orderStatus.status if tp_trade else ""
-                                if tp_status in ("Submitted", "PreSubmitted"):
+                                if tp_status in ("Submitted", "PreSubmitted", "PendingSubmit", "ApiPending"):
                                     with _trades_lock:
                                         if key in active_trades:
                                             active_trades[key]["tp"] = new_tp
                                             active_trades[key]["tp_order_id"] = tp_trade.order.orderId
                                     changed = True
                                     log.info(
-                                        "[BRACKET_AUDIT] %s tp submitted: %.2f (order #%d)",
-                                        symbol, new_tp, tp_trade.order.orderId,
+                                        "[BRACKET_AUDIT] %s tp submitted: %.2f (order #%d ref=%s)",
+                                        symbol, new_tp, tp_trade.order.orderId, tp_order.orderRef,
                                     )
                                 else:
                                     log.warning(
@@ -467,3 +489,67 @@ def audit_bracket_orders(ib: IB) -> None:
             _save_positions_file()
         except Exception as _e:
             log.warning("[BRACKET_AUDIT] positions save failed: %s", _e)
+
+    # ── Pass 2: IBKR → position orphan sweep ─────────────────────────────────
+    # Cancel any stop/limit exit order that has no corresponding ACTIVE/TRIMMING position.
+    # Covers both LONG SLs (SELL stop) and SHORT SLs (BUY stop), and orphaned TPs.
+    # Runs every scan cycle — catches survivors of fire-and-forget cancels within one cycle.
+    try:
+        with _trades_lock:
+            desired_long: set[str] = {
+                p.get("symbol", k)
+                for k, p in active_trades.items()
+                if p.get("status") in ("ACTIVE", "TRIMMING") and p.get("direction") == "LONG"
+            }
+            desired_short: set[str] = {
+                p.get("symbol", k)
+                for k, p in active_trades.items()
+                if p.get("status") in ("ACTIVE", "TRIMMING") and p.get("direction") == "SHORT"
+            }
+            # Build trade_id → symbol map for orderRef-based lookup
+            ref_to_symbol: dict[str, str] = {
+                p.get("trade_id", ""): p.get("symbol", k)
+                for k, p in active_trades.items()
+                if p.get("trade_id") and p.get("status") in ("ACTIVE", "TRIMMING")
+            }
+
+        for _t in ibkr_map.values():
+            for _trade in _t.get("sl_orders", []) + _t.get("tp_orders", []):
+                _sym = _trade.contract.symbol
+                _action = (_trade.order.action or "").upper()
+                _otype = (_trade.order.orderType or "").upper().replace(" ", "")
+                _ref = _trade.order.orderRef or ""
+                _is_sl = _otype in ("STP", "STPLMT", "TRAIL", "TRAILLMT")
+                _is_tp = _otype == "LMT"
+
+                orphan = False
+                if _is_sl and _ref.startswith("SL:"):
+                    if _action == "SELL" and _sym not in desired_long:
+                        orphan = True
+                    elif _action == "BUY" and _sym not in desired_short:
+                        orphan = True
+                elif _is_tp and _ref.startswith("TP:"):
+                    if _action == "SELL" and _sym not in desired_long:
+                        orphan = True
+                    elif _action == "BUY" and _sym not in desired_short:
+                        orphan = True
+                elif (_is_sl or _is_tp) and not _ref:
+                    # Pre-migration order: no orderRef — use symbol+direction matching
+                    if _is_sl:
+                        if _action == "SELL" and _sym not in desired_long:
+                            orphan = True
+                        elif _action == "BUY" and _sym not in desired_short:
+                            orphan = True
+
+                if orphan:
+                    try:
+                        ib.cancelOrder(_trade.order)
+                        log.warning(
+                            "[BRACKET_AUDIT] Pass2 orphan %s %s #%d (ref=%r) cancelled — no active position",
+                            _sym, _otype, _trade.order.orderId, _ref,
+                        )
+                    except Exception as _oe:
+                        log.warning("[BRACKET_AUDIT] Pass2 orphan cancel failed for %s #%d: %s",
+                                    _sym, _trade.order.orderId, _oe)
+    except Exception as _p2e:
+        log.error("[BRACKET_AUDIT] Pass 2 sweep failed: %s", _p2e)

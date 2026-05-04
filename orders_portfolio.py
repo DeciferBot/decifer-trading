@@ -1755,12 +1755,15 @@ def _resolve_trimming_positions(ib: IB) -> None:
                     _oca = f"decifer_{_sym}_{_trim_oid}_deferred_trim"
                     _sl_lmt = round(_sl_p * 0.99 if _direction == "LONG" else _sl_p * 1.01, 2)
                     _ba = "SELL" if _direction == "LONG" else "BUY"
+                    _deferred_trade_id = _t.get("trade_id", "")
                     _new_sl = _SLO(_ba, _remaining, _sl_p, _sl_lmt, account=_account, tif="GTC", outsideRth=True)
                     _new_sl.ocaGroup = _oca
                     _new_sl.ocaType = 1
+                    _new_sl.orderRef = f"SL:{_deferred_trade_id}"[:20]
                     _new_tp = _LO(_ba, _remaining, _tp_p, account=_account, tif="GTC", outsideRth=True)
                     _new_tp.ocaGroup = _oca
                     _new_tp.ocaType = 1
+                    _new_tp.orderRef = f"TP:{_deferred_trade_id}"[:20]
                     _ct = get_contract(_sym)
                     _sl_t = ib.placeOrder(_ct, _new_sl)
                     _tp_t = ib.placeOrder(_ct, _new_tp)

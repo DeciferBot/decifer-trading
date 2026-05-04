@@ -276,19 +276,20 @@ class TestUpdateTrancheStatus:
         ib.sleep = MagicMock()
 
         captured_stop_args = []
+        # T2 tranche now uses StopLimitOrder (not StopOrder) — Fix 1 (RC-0b)
         mock_stop = MagicMock(side_effect=lambda *a, **kw: captured_stop_args.append(a) or MagicMock(transmit=False))
 
         with (
             patch("orders_options.get_contract", return_value=MagicMock()),
             patch("orders_options._cancel_ibkr_order_by_id"),
             patch("orders_options.CONFIG", {"active_account": "DU_TEST"}),
-            patch.object(orders_options, "StopOrder", mock_stop),
+            patch.object(orders_options, "StopLimitOrder", mock_stop),
             patch("learning.log_trade"),
         ):
             orders.update_tranche_status(ib)
 
         assert ib.placeOrder.called
-        assert len(captured_stop_args) == 1, "StopOrder should be called once for T2"
+        assert len(captured_stop_args) == 1, "StopLimitOrder should be called once for T2"
         _action, _qty, _price = captured_stop_args[0][:3]
         assert _action == "SELL"
         assert _qty == 50  # t2_qty

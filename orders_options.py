@@ -807,15 +807,19 @@ def update_tranche_status(ib: IB) -> None:
             # Place standalone T2 stop — BUY to cover for SHORT, SELL to exit for LONG
             t2_side = "BUY" if direction == "SHORT" else "SELL"
             contract = get_contract(symbol)
-            t2_stop = StopOrder(
+            t2_sl_limit = round(sl_price * 0.99, 2) if direction == "LONG" else round(sl_price * 1.01, 2)
+            t2_stop = StopLimitOrder(
                 t2_side,
                 t2_qty,
                 sl_price,
+                t2_sl_limit,
                 account=CONFIG["active_account"],
                 tif="GTC",
                 outsideRth=True,
             )
             t2_stop.transmit = True
+            trade_id = active_trades.get(symbol, {}).get("trade_id", "")
+            t2_stop.orderRef = f"SL:{trade_id}"[:20]
             t2_stop_trade = ib.placeOrder(contract, t2_stop)
             ib.sleep(0.5)
             new_id = t2_stop_trade.order.orderId

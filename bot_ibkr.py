@@ -296,6 +296,14 @@ def _reconnect_worker() -> None:
                 ib.reqCompletedOrders(False)
             except Exception as _rco_exc:
                 log.warning(f"reqCompletedOrders after reconnect failed: {_rco_exc}")
+            # Reconcile position state against IBKR after reconnect —
+            # orphaned SLs from the disconnect are cleaned by Pass 2 on the next scan cycle.
+            try:
+                ib.sleep(2)  # let IBKR push open-order events before reading state
+                from orders_portfolio import reconcile_with_ibkr as _reconcile
+                _reconcile(ib)
+            except Exception as _rec_exc:
+                log.warning(f"reconcile_with_ibkr after reconnect failed: {_rec_exc}")
             break
         except Exception as exc:
             log.error(f"Reconnect attempt {attempt} failed: {exc}")
@@ -568,10 +576,7 @@ def connect_ibkr() -> bool:
             f"IBKR connected — port {CONFIG['ibkr_port']} | Account: {CONFIG.get('active_account', '')} | Market data: DELAYED (free)",
         )
         reconcile_with_ibkr(ib)
-        # RB-3: Cancel any orphaned SL/TP/target orders whose parent entry never
-        # filled (or was cancelled on a previous session). Must run after
-        # reconcile_with_ibkr() so active_symbols reflects the current FILLED state.
-        cancel_orphan_stop_orders()
+        # Orphan cleanup now handled by Pass 2 in audit_bracket_orders (runs each scan cycle).
         dash["status"] = "running"
         return True
     except Exception as e:
@@ -1275,54 +1280,6 @@ def sync_orders_from_ibkr():
         clog("ERROR", f"Order sync error: {e}")
 
 
-def cancel_orphan_stop_orders():
-    """
-    Cancel any open exit orders (stops AND limit-sell targets) in IBKR that have
-    no corresponding active position. Runs once at startup after reconcile_with_ibkr().
-
-    RB-3: Original version only caught STP/STP LMT/TRAIL orders. OCO brackets also
-    include a LMT SELL target order. If the parent entry limit never filled (price
-    gapped away), both the stop AND the target sit live in IBKR indefinitely.
-    An unexpected fill on the orphaned target creates a synthetic short position.
-    Now also cancels LMT SELL orders for symbols with no active FILLED position.
-    """
-    from orders_portfolio import get_open_positions
-
-    ib = bot_state.ib
-    try:
-        active_symbols = {p["symbol"] for p in get_open_positions()}
-        cancelled = 0
-        for t in ib.openTrades():
-            order = t.order
-            contract = t.contract
-            sym = contract.symbol
-            # FX: IBKR reports base currency ("EUR") but active_trades
-            # uses the 6-char pair ("EURUSD"). Reconstruct the pair.
-            if getattr(contract, "secType", "") == "CASH":
-                sym = contract.symbol + getattr(contract, "currency", "")
-            otype = (order.orderType or "").upper()
-            action = (order.action or "").upper()
-            # Target sell-side exit orders: stops, trailing stops, AND limit-sell targets.
-            # LMT SELL = take-profit leg of an OCO bracket. If the entry never filled,
-            # the LMT SELL is an orphan that can execute against a future short position.
-            if otype not in ("STP", "STP LMT", "TRAIL", "TRAILLMT", "LMT"):
-                continue
-            if action not in ("SELL",):
-                continue
-            if sym in active_symbols:
-                continue
-            # No active position — this exit order is orphaned
-            try:
-                cancel_with_reason(ib, order, f"orphan {otype} — no active {sym} position")
-                clog("INFO", f"cancel_orphan_stop_orders: cancelled stale {otype} for {sym} (no active position)")
-                cancelled += 1
-            except Exception as exc:
-                clog("ERROR", f"cancel_orphan_stop_orders: failed to cancel {otype} for {sym} — {exc}")
-        if cancelled == 0:
-            clog("INFO", "cancel_orphan_stop_orders: no orphan exit orders found")
-    except Exception as exc:
-        clog("ERROR", f"cancel_orphan_stop_orders: {exc}")
-
 
 def _on_order_status_event(trade):
     """
@@ -1425,12 +1382,15 @@ def _on_order_status_event(trade):
                                 import bot_state as _bs
                                 from ib_async import StopLimitOrder as _SLO
                                 from orders_contracts import get_contract as _gc
+                                from orders_state import active_trades as _at
                                 _ib = _bs.ib
                                 _c = _gc(_sym)
                                 _ib.qualifyContracts(_c)
                                 _sl_lmt = round(_sl * 0.99, 2)
+                                _tid = _at.get(_sym, {}).get("trade_id", "")
                                 _sl_ord = _SLO("SELL", _qty, _sl, _sl_lmt,
                                                account=CONFIG["active_account"], tif="GTC", outsideRth=True)
+                                _sl_ord.orderRef = f"SL:{_tid}"[:20]
                                 _sl_trade = _ib.placeOrder(_c, _sl_ord)
                                 _ib.sleep(0.3)
                                 _safe_update_trade(_sym, {"sl_order_id": _sl_trade.order.orderId})
@@ -1478,12 +1438,15 @@ def _on_order_status_event(trade):
                                 import bot_state as _bs
                                 from ib_async import StopLimitOrder as _SLO
                                 from orders_contracts import get_contract as _gc
+                                from orders_state import active_trades as _at
                                 _ib = _bs.ib
                                 _c = _gc(_sym)
                                 _ib.qualifyContracts(_c)
                                 _sl_lmt = round(_sl * 1.01, 2)
+                                _tid = _at.get(_sym, {}).get("trade_id", "")
                                 _sl_ord = _SLO("BUY", _qty, _sl, _sl_lmt,
                                                account=CONFIG["active_account"], tif="GTC", outsideRth=True)
+                                _sl_ord.orderRef = f"SL:{_tid}"[:20]
                                 _sl_trade = _ib.placeOrder(_c, _sl_ord)
                                 _ib.sleep(0.3)
                                 _safe_update_trade(_sym, {"sl_order_id": _sl_trade.order.orderId})

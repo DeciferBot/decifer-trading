@@ -632,19 +632,8 @@ def execute_buy(
                     f"avg ${stats.average_execution_price:.2f}, "
                     f"slippage {stats.slippage_bps:.1f}bps"
                 )
-                # Place SL as standalone order covering the filled quantity
                 if stats.filled_quantity > 0:
-                    _sl_order = StopLimitOrder(
-                        "SELL",
-                        stats.filled_quantity,
-                        sl,
-                        round(sl * 0.99, 2),
-                        account=account,
-                        tif="GTC",
-                        outsideRth=True,
-                    )
-                    ib.placeOrder(_smart_contract, _sl_order)
-                    # Record position — TWAP fills are confirmed fills; skip PENDING state.
+                    # Record position first — trade_id must exist before we tag the SL orderRef
                     _fill_price = float(stats.average_execution_price) if stats.average_execution_price else price
                     _open_time = open_time or datetime.now(UTC).isoformat()
                     _entry_regime = _resolve_regime(regime)
@@ -691,7 +680,7 @@ def execute_buy(
                                 rationale=reasoning,
                             ),
                             "pattern_id": pattern_id,
-                            "sl_order_id": None,
+                            "sl_order_id": None,  # set below after placeOrder
                             "tp_order_id": None,
                             "high_water_mark": _fill_price,
                             "tranche_mode": False,
@@ -699,6 +688,21 @@ def execute_buy(
                             "entry_context": entry_context,
                             "trade_id": _trade_id,
                         }
+                    # Place SL now that trade_id is stored — orderRef can reference it
+                    _sl_order = StopLimitOrder(
+                        "SELL",
+                        stats.filled_quantity,
+                        sl,
+                        round(sl * 0.99, 2),
+                        account=account,
+                        tif="GTC",
+                        outsideRth=True,
+                    )
+                    _sl_order.orderRef = f"SL:{_trade_id}"[:20]
+                    _twap_sl_trade = ib.placeOrder(_smart_contract, _sl_order)
+                    with _trades_lock:
+                        if symbol in active_trades:
+                            active_trades[symbol]["sl_order_id"] = _twap_sl_trade.order.orderId
                     # IBKR confirmed the fill — write ORDER_FILLED to event log.
                     try:
                         from event_log import append_fill as _el_fill
@@ -889,6 +893,7 @@ def execute_buy(
             sl_limit = round(sl * 0.99, 2)
             sl_order = StopLimitOrder("SELL", qty, sl, sl_limit, account=account, tif="GTC", outsideRth=True)
             sl_order.parentId = parent_id
+            sl_order.orderRef = f"SL:{_trade_id}"[:20]
             # Empty trade_type falls back to INTRADAY behaviour (legacy callers, tests)
             place_tp = not trade_type or trade_type in ("SCALP", "INTRADAY")
             sl_order.transmit = not place_tp  # INTRADAY: False (TP follows); SWING/POSITION: True (transmit entry+SL)
@@ -900,6 +905,7 @@ def execute_buy(
                 # Leg 3: Take profit — SCALP only; transmit=True sends ALL 3 legs together
                 tp_order = LimitOrder("SELL", tp_qty, tp, account=account, tif="GTC", outsideRth=True)
                 tp_order.parentId = parent_id
+                tp_order.orderRef = f"TP:{_trade_id}"[:20]
                 tp_order.transmit = True
                 tp_trade = ib.placeOrder(contract, tp_order)
 
@@ -1019,6 +1025,7 @@ def execute_buy(
                 standalone_sl = StopLimitOrder("SELL", qty, sl, _sl_limit2, account=account, tif="GTC", outsideRth=True)
                 standalone_sl.ocaGroup = oca_group
                 standalone_sl.ocaType = 1  # Cancel remaining on fill
+                standalone_sl.orderRef = f"SL:{_trade_id}"[:20]
                 standalone_sl.transmit = True
                 sl_trade2 = ib.placeOrder(contract, standalone_sl)
                 ib.sleep(0.3)
@@ -1056,6 +1063,7 @@ def execute_buy(
                     standalone_tp = LimitOrder("SELL", tp_qty, tp, account=account, tif="GTC", outsideRth=True)
                     standalone_tp.ocaGroup = oca_group
                     standalone_tp.ocaType = 1  # Cancel remaining on fill
+                    standalone_tp.orderRef = f"TP:{_trade_id}"[:20]
                     standalone_tp.transmit = True
                     tp_trade2 = ib.placeOrder(contract, standalone_tp)
                     ib.sleep(0.3)
@@ -1604,6 +1612,7 @@ def execute_short(
         sl_limit = round(sl * 1.01, 2)
         sl_order = StopLimitOrder("BUY", qty, sl, sl_limit, account=account, tif="GTC", outsideRth=True)
         sl_order.parentId = parent_id
+        sl_order.orderRef = f"SL:{_trade_id}"[:20]
         sl_order.transmit = not place_tp  # SCALP: False (TP follows); SWING/HOLD: True (transmit entry+SL)
         sl_trade = ib.placeOrder(contract, sl_order)
         ib.sleep(0.1)
@@ -1614,6 +1623,7 @@ def execute_short(
             # Take profit: buy to cover T1 when price falls to target
             tp_order = LimitOrder("BUY", tp_qty, tp, account=account, tif="GTC", outsideRth=True)
             tp_order.parentId = parent_id
+            tp_order.orderRef = f"TP:{_trade_id}"[:20]
             tp_order.transmit = True
             tp_trade = ib.placeOrder(contract, tp_order)
 
@@ -2110,25 +2120,25 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
         #   2. Standalone SL/TP placed as fallback after ValidationError — no parentId,
         #      identified by sl_order_id / tp_order_id stored in the trade record
         if not _is_partial:
-            _entry_order_id = info.get("order_id")
-            _sl_oid = info.get("sl_order_id")
-            _tp_oid = info.get("tp_order_id")
-            _known_exit_ids = {i for i in (_sl_oid, _tp_oid) if i}
+            # Symbol-sweep: cancel ALL stop/limit exit orders for this symbol in the close
+            # direction — catches unknown SLs (TWAP path), bracket children, and any extras
+            # that identification-based cleanup would miss.
             try:
                 for _t in ib.openTrades():
-                    _oid = _t.order.orderId
-                    _parent = getattr(_t.order, "parentId", None)
-                    _is_bracket_child = _entry_order_id and _parent == _entry_order_id
-                    _is_known_standalone = _oid in _known_exit_ids
-                    if _is_bracket_child or _is_known_standalone:
-                        cancel_with_reason(ib, _t.order, f"orphaned exit order after {symbol} close (bracket_child={_is_bracket_child}, standalone={_is_known_standalone})")
+                    if _t.contract.symbol != symbol:
+                        continue
+                    _otype = (_t.order.orderType or "").upper().replace(" ", "")
+                    _action = (_t.order.action or "").upper()
+                    _is_sl = _otype in ("STP", "STPLMT", "TRAIL", "TRAILLMT") and _action == close_action
+                    _is_tp = _otype == "LMT" and _action == close_action
+                    if _is_sl or _is_tp:
+                        cancel_with_reason(ib, _t.order, f"sweep cancel on {symbol} full close")
                         log.info(
-                            f"Cancelled orphaned exit order for {symbol} "
-                            f"(orderId={_oid}, parentId={_parent}, "
-                            f"bracket_child={_is_bracket_child}, standalone={_is_known_standalone})"
+                            "[execute_sell] sweep cancelled %s %s #%d on %s close",
+                            symbol, _otype, _t.order.orderId, close_action,
                         )
             except Exception as _e:
-                log.warning(f"Bracket child cleanup for {symbol} failed: {_e}")
+                log.warning("[execute_sell] symbol-sweep cleanup for %s failed: %s", symbol, _e)
 
         # Log the close order
         log_order(
@@ -2221,6 +2231,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                     from ib_async import LimitOrder as _LimitOrder_trim
                     _oca_group = f"decifer_{symbol}_{sell_trade.order.orderId}_trim"
                     _sl_limit_trim = round(_sl_price * 0.99, 2) if direction == "LONG" else round(_sl_price * 1.01, 2)
+                    _trim_trade_id = info.get("trade_id", "")
                     _bracket_action = "SELL" if direction == "LONG" else "BUY"
                     new_sl = StopLimitOrder(
                         _bracket_action, remaining_qty, _sl_price, _sl_limit_trim,
@@ -2228,12 +2239,14 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                     )
                     new_sl.ocaGroup = _oca_group
                     new_sl.ocaType = 1
+                    new_sl.orderRef = f"SL:{_trim_trade_id}"[:20]
                     new_tp = _LimitOrder_trim(
                         _bracket_action, remaining_qty, _tp_price,
                         account=_trim_account, tif="GTC", outsideRth=True,
                     )
                     new_tp.ocaGroup = _oca_group
                     new_tp.ocaType = 1
+                    new_tp.orderRef = f"TP:{_trim_trade_id}"[:20]
                     sl_t = ib.placeOrder(contract, new_sl)
                     tp_t = ib.placeOrder(contract, new_tp)
                     ib.sleep(0.5)
