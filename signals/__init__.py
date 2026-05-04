@@ -608,10 +608,11 @@ def _resolve_regime_router(vix_regime: str, hurst_regime: str = "unknown", hmm_r
 #   - yfinance cross-symbol data contamination risk
 #   - multiprocessing fork issues on some platforms
 # 5m bar fetches go to IBKR; 1d/1w stay on yfinance (no thread-safety issue at daily freq).
-# fetch_bars is pure I/O (HTTP wait on Alpaca REST) — thread count should be sized
-# for I/O concurrency, not CPU count.  Alpaca Algo Trader Plus allows 10,000 data
-# requests/minute; 30 workers at ~5s each = ~360 req/min, well within that limit.
-_SCORE_WORKERS = 30
+# urllib3 keeps 10 persistent connections to data.alpaca.markets; workers beyond 10
+# discard pooled connections and open fresh TCP sockets (~100ms overhead each).
+# 16 workers: 6 above the pool ceiling — acceptable, and 1d/1wk bars are now
+# cached so only 5m REST calls hit Alpaca after the first scan cycle.
+_SCORE_WORKERS = 16
 
 
 def _fetch_one_thread(args):
@@ -743,7 +744,7 @@ import threading as _threading
 _IBKR_PACING_LOCK = _threading.Lock()
 # Alpaca Algo Trader Plus market data limit: 10,000 req/min.
 # 30 concurrent at ~5s each = ~360 req/min — well within limit.
-_ALPACA_SEM = _threading.BoundedSemaphore(30)
+_ALPACA_SEM = _threading.BoundedSemaphore(16)
 
 # ── 1d / 1wk bar cache ───────────────────────────────────────────────────────
 # Daily and weekly bars change once per day. Re-fetching them every scan cycle
