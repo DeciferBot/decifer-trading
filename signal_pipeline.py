@@ -513,6 +513,97 @@ def _apply_persistence_gate(scored: list, all_scored: list, persistence_scans: i
     return passed
 
 
+def _apply_tier_d_scoring_cap(
+    filtered: list[str],
+    regime_name: str,
+) -> tuple[list[str], dict]:
+    """
+    Stage Tier D names before score_universe() to prevent PRU bloat.
+
+    Splits ``filtered`` into non-Tier-D (never trimmed) and Tier D names
+    (ranked by cheap PRU metadata fields, then capped).  Applies a global
+    symbols-to-score ceiling of ``max_symbols_to_score`` by trimming from
+    the bottom of the ranked Tier D list only.
+
+    Returns ``(new_filtered, counters)`` where ``counters`` is logged as
+    stage="scoring_cap" in tier_d_funnel.jsonl.
+    """
+    from config import CONFIG as _cap_cfg
+    max_tier_d   = _cap_cfg.get("tier_d_pre_scoring_max", 60)
+    min_tier_d   = _cap_cfg.get("tier_d_pre_scoring_min", 40)
+    global_cap   = _cap_cfg.get("max_symbols_to_score",  140)
+
+    pru_syms, pru_meta = _get_position_research_universe()
+    pru_sym_set = frozenset(pru_syms)
+
+    non_tier_d: list[str] = []
+    tier_d_pool: list[str] = []
+    for sym in filtered:
+        if sym in pru_sym_set:
+            tier_d_pool.append(sym)
+        else:
+            non_tier_d.append(sym)
+
+    tier_d_pool_count = len(tier_d_pool)
+
+    if tier_d_pool_count == 0:
+        counters = {
+            "total_normal_symbols":            len(non_tier_d),
+            "tier_d_discovery_pool_count":     0,
+            "tier_d_selected_for_scoring":     0,
+            "total_symbols_before_global_cap": len(non_tier_d),
+            "total_symbols_after_global_cap":  len(non_tier_d),
+            "tier_d_removed_before_scoring":   0,
+            "symbols_removed_by_global_cap":   0,
+        }
+        return filtered, counters
+
+    def _rank(sym: str) -> float:
+        m = pru_meta.get(sym, {})
+        return (
+            (m.get("adjusted_discovery_score") or 0) * 2
+            + min((m.get("discovery_score") or 0), 20)
+            + len(m.get("matched_position_archetypes") or []) * 3
+            + int(bool(m.get("priority_overlap"))) * 5
+        )
+
+    tier_d_pool.sort(key=_rank, reverse=True)
+
+    # Select between min_tier_d and max_tier_d names.
+    n_select = max(min(max_tier_d, tier_d_pool_count), min(min_tier_d, tier_d_pool_count))
+    tier_d_selected = tier_d_pool[:n_select]
+
+    total_before_cap = len(non_tier_d) + len(tier_d_selected)
+    symbols_removed_by_cap = 0
+
+    if total_before_cap > global_cap:
+        available_for_tier_d = max(0, global_cap - len(non_tier_d))
+        tier_d_selected = tier_d_selected[:available_for_tier_d]
+        symbols_removed_by_cap = total_before_cap - (len(non_tier_d) + len(tier_d_selected))
+
+    new_filtered = non_tier_d + tier_d_selected
+    tier_d_removed = tier_d_pool_count - len(tier_d_selected)
+
+    log.info(
+        "Tier D scoring cap [%s]: pool=%d selected=%d removed=%d | "
+        "normal=%d total_before=%d total_after=%d cap_trimmed=%d",
+        regime_name,
+        tier_d_pool_count, len(tier_d_selected), tier_d_removed,
+        len(non_tier_d), total_before_cap, len(new_filtered), symbols_removed_by_cap,
+    )
+
+    counters = {
+        "total_normal_symbols":            len(non_tier_d),
+        "tier_d_discovery_pool_count":     tier_d_pool_count,
+        "tier_d_selected_for_scoring":     len(tier_d_selected),
+        "total_symbols_before_global_cap": total_before_cap,
+        "total_symbols_after_global_cap":  len(new_filtered),
+        "tier_d_removed_before_scoring":   tier_d_removed,
+        "symbols_removed_by_global_cap":   symbols_removed_by_cap,
+    }
+    return new_filtered, counters
+
+
 def _scored_to_signals(scored: list, regime_name: str) -> list:
     """Convert score_universe() raw dicts → typed Signal objects."""
     now = datetime.now(UTC)
@@ -645,6 +736,29 @@ def run_signal_pipeline(
             status="MONITOR_ONLY",
         )
 
+    # 3b. Staged Tier D pre-scoring cap — rank PRU discovery names by cheap fields
+    #     and cap before the expensive Alpaca bar fetch in score_universe().
+    filtered, _scoring_cap_counters = _apply_tier_d_scoring_cap(filtered, regime_name)
+    try:
+        import json as _scj
+        _funnel_path_sc = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "data", "tier_d_funnel.jsonl"
+        )
+        with open(_funnel_path_sc, "a") as _scf:
+            _scf.write(
+                _scj.dumps(
+                    {
+                        "ts":     datetime.now(UTC).isoformat(),
+                        "regime": regime_name,
+                        "stage":  "scoring_cap",
+                        **_scoring_cap_counters,
+                    }
+                )
+                + "\n"
+            )
+    except Exception as _sce:
+        log.debug("Tier D scoring_cap funnel write failed (non-critical): %s", _sce)
+
     # 4. Score universe on 10 dimensions (alpha-pipeline-v2)
     log.info(f"Scoring universe on 10 dimensions [{regime_name}]...")
     scored, all_scored = score_universe(
@@ -758,8 +872,13 @@ def run_signal_pipeline(
         # Stage 6b — final pipeline output (reaches dispatch)
         "pipeline_output":         _td_pipeline_output,
         # Drop diagnosis helpers
-        "drop_at_strategy_threshold": _td_above_thresh - _td_passed_strategy,
-        "drop_at_all_scored":         _td_pru_loaded - _td_all_scored,
+        "drop_at_strategy_threshold":     _td_above_thresh - _td_passed_strategy,
+        "drop_at_all_scored":             _td_pru_loaded - _td_all_scored,
+        # Scoring-cap context — how many Tier D entered scoring after the pre-scoring cap
+        "tier_d_selected_for_scoring":    _scoring_cap_counters.get("tier_d_selected_for_scoring", _td_pru_loaded),
+        "tier_d_removed_before_scoring":  _scoring_cap_counters.get("tier_d_removed_before_scoring", 0),
+        # After score adjuster (apex_cap_score.py bonus) — same as pipeline_output at this stage
+        "tier_d_count_after_score_adjuster": _td_pipeline_output,
     }
     if _td_pru_loaded > 0:
         try:

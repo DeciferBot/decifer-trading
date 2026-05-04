@@ -275,6 +275,10 @@ _pru_file_mtime: float = -1.0       # os.path.getmtime() at last load; -1 = neve
 _pru_loaded_at: str = ""            # ISO timestamp of last cache load
 _pru_built_at: str = ""             # built_at from the PRU file
 _pru_symbol_count: int = 0          # symbol count at last load
+# Last-valid snapshot — retained so a transient read error mid-rebuild does not
+# evict the entire Tier D universe for the affected scan cycle.
+_last_valid_pru_syms: frozenset = frozenset()
+_last_valid_pru_meta: dict = {}
 
 
 def get_position_research_universe() -> tuple[frozenset, dict]:
@@ -292,6 +296,7 @@ def get_position_research_universe() -> tuple[frozenset, dict]:
     """
     global _POSITION_RESEARCH_SYMBOLS, _POSITION_RESEARCH_META
     global _pru_file_mtime, _pru_loaded_at, _pru_built_at, _pru_symbol_count
+    global _last_valid_pru_syms, _last_valid_pru_meta
 
     if not CONFIG.get("position_research_universe_enabled", True):
         return frozenset(), {}
@@ -327,6 +332,10 @@ def get_position_research_universe() -> tuple[frozenset, dict]:
         _pru_loaded_at = datetime.now(UTC).isoformat()
         _pru_built_at = built_at_str
         _pru_symbol_count = len(tickers)
+        # Persist last-known-good so a transient error on the next cycle falls back safely.
+        if _POSITION_RESEARCH_SYMBOLS:
+            _last_valid_pru_syms = _POSITION_RESEARCH_SYMBOLS
+            _last_valid_pru_meta = _POSITION_RESEARCH_META
 
         action = "REFRESHED (file changed)" if was_refresh else "loaded"
         log.info(
@@ -334,9 +343,19 @@ def get_position_research_universe() -> tuple[frozenset, dict]:
             action, _pru_built_at, _pru_loaded_at, _pru_symbol_count,
         )
     except Exception as exc:
-        log.warning("Tier D: load failed — %s — continuing without Tier D", exc)
-        _POSITION_RESEARCH_SYMBOLS = frozenset()
-        _POSITION_RESEARCH_META = {}
+        if _last_valid_pru_syms:
+            log.warning(
+                "Tier D: load failed (%s) — retaining last valid PRU (%d syms)",
+                exc, len(_last_valid_pru_syms),
+            )
+            _POSITION_RESEARCH_SYMBOLS = _last_valid_pru_syms
+            _POSITION_RESEARCH_META = _last_valid_pru_meta
+        else:
+            log.warning(
+                "Tier D: load failed (%s) — no prior valid PRU, continuing without Tier D", exc
+            )
+            _POSITION_RESEARCH_SYMBOLS = frozenset()
+            _POSITION_RESEARCH_META = {}
 
     return _POSITION_RESEARCH_SYMBOLS, _POSITION_RESEARCH_META
 

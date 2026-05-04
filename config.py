@@ -937,6 +937,10 @@ CONFIG = {
         "position_research_min_intraday_score_floor":  6,      # min signal score to survive pipeline gates
         "position_research_strong_discovery_score":    6,      # discovery_score threshold for rescue
         "position_research_allow_archetype_rescue":    True,   # rescue if any archetype matched
+        # Staged pre-scoring cap — controls Tier D volume entering score_universe()
+        "tier_d_pre_scoring_max":  60,   # max Tier D names allowed into score_universe()
+        "tier_d_pre_scoring_min":  40,   # floor: always send at least this many when available
+        "max_symbols_to_score":   140,   # global cap on total symbols entering score_universe()
     },
 }
 

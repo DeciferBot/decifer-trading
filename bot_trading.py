@@ -2622,6 +2622,8 @@ def run_scan():
                 "raw_rank_30_cutline":      _raw_rank30_cl,
                 "adjusted_rank_30_cutline": _adj_rank30_cl,
                 "adjusted_rank_50_cutline": _adj_rank50_cl,
+                # Cross-stage diagnostic: Tier D symbols that survived all caps and reach Apex
+                "tier_d_count_sent_to_apex": len(_td_after),
             }
             _funnel_path = Path(__file__).parent / "data" / "tier_d_funnel.jsonl"
             with open(_funnel_path, "a") as _cap_f:
