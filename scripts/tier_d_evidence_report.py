@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
 """
 tier_d_evidence_report.py
-Phase 1 Position Research Universe — real scan-cycle evidence report.
+Position Research Universe — real scan-cycle evidence report.
 
 Run after several scan cycles have completed:
     python3 scripts/tier_d_evidence_report.py
 
 Reads:
-  data/tier_d_funnel.jsonl          — per-cycle attrition counts (stages 1-11)
-  data/position_research_shadow.jsonl — shadow validation outcomes (stage 11)
-  data/position_research_universe.json — PRU metadata
-
-Phase 2 gate: collect evidence from multiple scan cycles, then review
-with Amit. Do NOT enable live Tier D POSITION entries until this report
-shows all ✓ in Section 8.
+  data/tier_d_funnel.jsonl              — per-cycle attrition counts (stages 1-9)
+  data/position_research_universe.json  — PRU metadata
 """
 import json
 import os
@@ -24,7 +19,6 @@ from datetime import datetime, timezone
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 FUNNEL_JSONL = os.path.join(REPO, "data", "tier_d_funnel.jsonl")
-SHADOW_JSONL = os.path.join(REPO, "data", "position_research_shadow.jsonl")
 PRU_JSON     = os.path.join(REPO, "data", "position_research_universe.json")
 TRAINING     = os.path.join(REPO, "data", "training_records.jsonl")
 TRADE_EVENTS = os.path.join(REPO, "data", "trade_events.jsonl")
@@ -261,23 +255,8 @@ def _apply_caps_dedup_report(
     return kept, cluster_removed, dedup_removed
 
 
-def _read_config_flags() -> tuple[bool | None, bool | None]:
-    """Return (shadow_mode, allow_live) by importing CONFIG the same way the bot does."""
-    try:
-        sys.path.insert(0, REPO)
-        from config import CONFIG
-        eg = CONFIG.get("entry_gate", {})
-        shadow_mode = eg.get("position_research_shadow_mode", True)
-        allow_live  = eg.get("position_research_allow_live_position_entries", False)
-        return shadow_mode, allow_live
-    except Exception as exc:
-        print(f"  ⚠  Could not import CONFIG: {exc}")
-        return None, None
-
-
 def main() -> None:
     funnel_raw   = _load_jsonl(FUNNEL_JSONL)
-    shadow       = _load_jsonl(SHADOW_JSONL)
     pru_data     = _load_pru()
     training     = _load_jsonl(TRAINING)
     trade_events = _load_jsonl(TRADE_EVENTS)
@@ -288,29 +267,23 @@ def main() -> None:
     for sym_entry in pru_data.get("symbols", []):
         pru_meta[sym_entry["ticker"]] = sym_entry
 
-    funnel_pipeline       = [r for r in funnel_raw if r.get("stage") == "pipeline"]
-    funnel_dispatch       = [r for r in funnel_raw if r.get("stage") == "dispatch"]
-    funnel_apex_cap       = [r for r in funnel_raw if r.get("stage") == "apex_cap"]
-    funnel_shadow_compare = [r for r in funnel_raw if r.get("stage") == "apex_cap_shadow_compare"]
-    funnel_shadow_apex    = [r for r in funnel_raw if r.get("stage") == "tier_d_shadow_apex"]
+    funnel_pipeline = [r for r in funnel_raw if r.get("stage") == "pipeline"]
+    funnel_dispatch = [r for r in funnel_raw if r.get("stage") == "dispatch"]
+    funnel_apex_cap = [r for r in funnel_raw if r.get("stage") == "apex_cap"]
 
     print(f"\nTier D Evidence Report  —  generated {datetime.now(timezone.utc).isoformat()[:19]}Z")
     print(f"PRU file:    {PRU_JSON}")
     print(f"PRU built:   {_ts_display(pru_built_at)}  ({pru_count} symbols)")
     print(f"Funnel records:  {len(funnel_pipeline)} pipeline + {len(funnel_dispatch)} dispatch + "
-          f"{len(funnel_apex_cap)} apex_cap + {len(funnel_shadow_compare)} shadow_compare")
-    print(f"Shadow records:  {len(shadow)}")
+          f"{len(funnel_apex_cap)} apex_cap")
 
-    if not funnel_pipeline and not shadow:
+    if not funnel_pipeline:
         print("\n⚠  No data yet. Run several scan cycles first, then re-run this report.")
         sys.exit(0)
 
     # Classify PRU symbols (handles both old and new PRU formats)
     classified = _classify_pru_symbols(pru_meta)
     kept, cluster_removed, dedup_removed = _apply_caps_dedup_report(classified)
-
-    enriched = [r for r in shadow if "ctx_data_source" in r]
-    legacy   = [r for r in shadow if "ctx_data_source" not in r]
 
     # ── Helper: look up bucket for a ticker ───────────────────────────────
     def _bucket(ticker: str) -> str:
@@ -511,122 +484,9 @@ def main() -> None:
                   f"unknown={by_bucket_drop.get('unknown', 0)}")
 
     # ================================================================== #
-    # SECTION 3 — SHADOW APEX (by bucket)
+    # SECTION 3 — EXECUTION (Tier D entries placed)
     # ================================================================== #
-    section("SECTION 3 — Shadow Apex (by bucket)")
-
-    # ── 3a: Main pipeline shadow log (the primary evidence source) ─────
-
-    enriched_with_bucket = []
-    for r in enriched:
-        sym = r.get("symbol", "")
-        b   = _bucket(sym)
-        enriched_with_bucket.append({**r, "_bucket": b})
-
-    cr_shadow = [r for r in enriched_with_bucket if r["_bucket"] == "core_research"]
-    tm_shadow = [r for r in enriched_with_bucket if r["_bucket"] == "tactical_momentum"]
-    unk_shadow = [r for r in enriched_with_bucket if r["_bucket"] == "unknown"]
-
-    print(f"  Main pipeline shadow log (position_research_shadow.jsonl):")
-    print(f"  Total enriched records:      {len(enriched)}")
-    print()
-    print(f"  {'':35}  {'Core Research':>14}  {'Tactical Momentum':>18}  {'Unknown':>8}")
-    print(f"  {'':35}  {'─'*14}  {'─'*18}  {'─'*8}")
-    print(f"  {'Sent to shadow validation':35}  {len(cr_shadow):>14}  {len(tm_shadow):>18}  {len(unk_shadow):>8}")
-
-    # Apex classification breakdown (simulated_type) by bucket
-    for bucket_label, bucket_records, header in [
-        ("Core Research",    cr_shadow, ""),
-        ("Tactical Momentum",tm_shadow, ""),
-    ]:
-        if not bucket_records:
-            continue
-        sim_types = Counter(r.get("simulated_type", "?") for r in bucket_records)
-        print(f"\n  Apex classification — {bucket_label} ({len(bucket_records)} records):")
-        for stype, cnt in sim_types.most_common():
-            print(f"    {stype:<30} {cnt:>4}")
-
-    # would_have_passed by bucket
-    print()
-    print(f"  would_have_passed validation:")
-    print(f"  {'':35}  {'Core Research':>14}  {'Tactical Momentum':>18}")
-    print(f"  {'':35}  {'─'*14}  {'─'*18}")
-    cr_pass  = sum(1 for r in cr_shadow if r.get("would_have_passed") is True)
-    cr_fail  = sum(1 for r in cr_shadow if r.get("would_have_passed") is False)
-    tm_pass  = sum(1 for r in tm_shadow if r.get("would_have_passed") is True)
-    tm_fail  = sum(1 for r in tm_shadow if r.get("would_have_passed") is False)
-    print(f"  {'would_have_passed=True':35}  {cr_pass:>14}  {tm_pass:>18}")
-    print(f"  {'would_have_passed=False':35}  {cr_fail:>14}  {tm_fail:>18}")
-
-    if cr_pass + cr_fail > 0:
-        cr_pct = 100 * cr_pass / (cr_pass + cr_fail)
-        print(f"\n  Core Research pass rate:        {cr_pct:.0f}%  ({cr_pass}/{cr_pass+cr_fail})")
-    if tm_pass + tm_fail > 0:
-        tm_pct = 100 * tm_pass / (tm_pass + tm_fail)
-        print(f"  Tactical Momentum pass rate:    {tm_pct:.0f}%  ({tm_pass}/{tm_pass+tm_fail})")
-
-    # Reject reasons by bucket
-    for bucket_label, fail_records in [
-        ("Core Research",     [r for r in cr_shadow if r.get("would_have_passed") is False]),
-        ("Tactical Momentum", [r for r in tm_shadow if r.get("would_have_passed") is False]),
-    ]:
-        if not fail_records:
-            continue
-        reasons = Counter(
-            (r.get("simulated_reason") or "?")[:80]
-            for r in fail_records
-        )
-        print(f"\n  Reject reasons — {bucket_label} ({len(fail_records)} failing records):")
-        for reason, cnt in reasons.most_common(6):
-            print(f"    [{cnt}]  {reason}")
-
-    # Verdict: are Core Research names being evaluated?
-    print()
-    if len(cr_shadow) == 0 and len(tm_shadow) == 0:
-        print("  ⚠  No shadow records yet — insufficient data.")
-    elif len(cr_shadow) == 0:
-        print("  ⚠  Zero Core Research names in shadow log. Only Tactical Momentum evaluated.")
-        print("     Check pipeline and apex_cap sections — Core Research may be blocked before shadow.")
-    elif len(cr_shadow) >= len(tm_shadow):
-        print(f"  ✓  Core Research ({len(cr_shadow)}) is the dominant bucket in shadow validation.")
-    else:
-        print(f"  ℹ  Tactical Momentum ({len(tm_shadow)}) outnumbers Core Research ({len(cr_shadow)}) in shadow log.")
-        print(f"     This may be expected if TM names score higher on raw signal dimensions.")
-
-    # ── 3b: Phase 1B shadow Apex lane (if any records exist) ──────────
-    if funnel_shadow_apex:
-        print(f"\n  Phase 1B Shadow Apex lane ({len(funnel_shadow_apex)} cycles):")
-        sa_syms_all: list[str] = []
-        for r in funnel_shadow_apex:
-            sa_syms_all.extend(r.get("tier_d_shadow_symbols") or [])
-
-        sa_cr = [s for s in sa_syms_all if _bucket(s) == "core_research"]
-        sa_tm = [s for s in sa_syms_all if _bucket(s) == "tactical_momentum"]
-        print(f"    Core Research sent to shadow Apex:       {len(set(sa_cr))} distinct")
-        print(f"    Tactical Momentum sent to shadow Apex:   {len(set(sa_tm))} distinct")
-
-        sa_class_totals: dict[str, int] = {}
-        for r in funnel_shadow_apex:
-            for k, v in (r.get("tier_d_shadow_apex_classifications") or {}).items():
-                sa_class_totals[k] = sa_class_totals.get(k, 0) + v
-        if sa_class_totals:
-            print(f"    Aggregate classifications:")
-            for cls, cnt in sorted(sa_class_totals.items(), key=lambda x: -x[1]):
-                print(f"      {cls:<30} {cnt}")
-    else:
-        print(f"\n  Phase 1B Shadow Apex lane: no records yet (stage=tier_d_shadow_apex)")
-        print(f"  Written when Tier D is dropped by the main top-30 cap.")
-
-    # ================================================================== #
-    # SECTION 4 — SAFETY
-    # ================================================================== #
-    section("SECTION 4 — Safety")
-
-    shadow_on, allow_live = _read_config_flags()
-    live_off = (allow_live is False)
-
-    print(f"  shadow_mode=True:                    {'✓ confirmed' if shadow_on is True else '⚠  RUNTIME VALUE IS ' + str(shadow_on)}")
-    print(f"  allow_live_position_entries=False:   {'✓ confirmed' if live_off else '⚠  RUNTIME VALUE IS ' + str(allow_live)}")
+    section("SECTION 3 — Execution")
 
     tier_d_orders = [
         e for e in trade_events
@@ -635,43 +495,26 @@ def main() -> None:
     ]
     tier_d_training = [
         r for r in training
-        if r.get("scanner_tier") == "D" or r.get("trade_type") == "POSITION_RESEARCH_ONLY"
+        if r.get("scanner_tier") == "D"
     ]
 
-    orders_ok   = len(tier_d_orders) == 0
-    training_ok = len(tier_d_training) == 0
+    print(f"  Tier D ORDER_INTENT / ORDER_FILLED records:  {len(tier_d_orders)}")
+    print(f"  Tier D training records written:             {len(tier_d_training)}")
 
-    print(f"  orders placed (Tier D):              {'✓ 0' if orders_ok else '⚠  ' + str(len(tier_d_orders)) + ' — INVESTIGATE'}")
-    print(f"  training_records pollution:          {'✓ 0' if training_ok else '⚠  ' + str(len(tier_d_training)) + ' — INVESTIGATE'}")
-    print(f"  Tier D live entries:                 {'✓ DISABLED' if live_off else '⚠  ENABLED — STOP'}")
+    # Dispatch execution summary
+    if funnel_dispatch:
+        total_executed = sum(r.get("executed", 0) for r in funnel_dispatch)
+        print(f"  Tier D entries executed (dispatch funnel):   {total_executed}")
 
-    print()
-    all_safe = shadow_on is True and live_off and orders_ok and training_ok
-    if all_safe:
-        print("  ✓ All safety checks pass. Observation only — no live impact.")
-    else:
-        print("  ✗ Safety check FAILED. Investigate before continuing.")
-
-    print()
-    print("  ─── Do not proceed to Phase 2 ───")
-    print("  ─── Do not enable live Tier D entries ───")
-    print("  ─── Do not change the main Apex cap yet ───")
-    print()
-    print("  Observation question: are real Core Research names now being")
-    print("  evaluated, and are Tactical Momentum names correctly separated?")
-    print()
-    cr_evaluated = len(set(r["symbol"] for r in cr_shadow)) if cr_shadow else 0
-    tm_evaluated = len(set(r["symbol"] for r in tm_shadow)) if tm_shadow else 0
-    print(f"  Core Research distinct symbols evaluated:      {cr_evaluated}")
-    print(f"  Tactical Momentum distinct symbols evaluated:  {tm_evaluated}")
-    if cr_evaluated > 0 and tm_evaluated > 0:
-        print(f"  Answer: ✓ Both buckets are being evaluated. Separation is visible in shadow log.")
-    elif cr_evaluated > 0:
-        print(f"  Answer: ✓ Core Research being evaluated. No TM names reached shadow yet.")
-    elif tm_evaluated > 0:
-        print(f"  Answer: ⚠  Only Tactical Momentum evaluated. No CR names reached shadow.")
-    else:
-        print(f"  Answer: ⚠  No Tier D names in shadow log yet. Need more scan cycles.")
+    if tier_d_orders:
+        print()
+        print("  Recent Tier D order events:")
+        for e in tier_d_orders[-10:]:
+            sym = e.get("symbol", "?")
+            evt = e.get("event_type", "?")
+            ts  = (e.get("ts") or "?")[:19]
+            tt  = e.get("trade_type", "?")
+            print(f"    {ts}  {sym:<8}  {evt:<14}  {tt}")
 
     # ================================================================== #
     # ─── DETAIL SECTIONS ─────────────────────────────────────────────── #

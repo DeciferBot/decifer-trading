@@ -2441,8 +2441,7 @@ def run_scan():
         # ── Tier D apex-cap funnel record ─────────────────────────────────────
         # Written unconditionally so the evidence report can see whether any
         # Tier D candidates were present pre-cap, and whether the cap dropped them.
-        # _td_before/_td_after/_td_dropped initialised here so the shadow lane
-        # below can access them after this inner try exits.
+        # _td_before/_td_after/_td_dropped used for apex_cap funnel logging below.
         _td_before:  list = []
         _td_after:   list = []
         _td_dropped: list = []
@@ -2558,122 +2557,6 @@ def run_scan():
                 _lcf.write(json.dumps(_live_compare_record) + "\n")
         except Exception as _cap_fe:
             log.debug("Tier D apex_cap funnel write failed (non-critical): %s", _cap_fe)
-
-        # ── Tier D apex-cap shadow comparator ─────────────────────────────────
-        # Evidence-only. Compares the hard top-30 score cap against a tier-aware
-        # shortlist that reserves slots for Tier D names. Does NOT change
-        # _cut_candidates or the Apex payload. Never enables live Tier D entries.
-        try:
-            _SHADOW_TD_RESERVE     = 8
-            _SHADOW_NON_TD_RESERVE = 18
-            _SHADOW_FLEX           = 4   # 8 + 18 + 4 == _CAP_LIMIT
-
-            # Re-derive tier D pools (defensive — avoids dependency on first block)
-            _shad_cur_td     = [c for c in _cut_candidates  if c.get("scanner_tier") == "D"]
-            _shad_all_td     = [c for c in _cut_all_sorted  if c.get("scanner_tier") == "D"]
-            _shad_all_non_td = [c for c in _cut_all_sorted  if c.get("scanner_tier") != "D"]
-            _shad_drop_cur   = [c for c in _cut_all_sorted[_CAP_LIMIT:]
-                                if c.get("scanner_tier") == "D"]
-
-            _shad_cur_sel_syms = {c.get("symbol") for c in _cut_candidates}
-
-            def _td_rank_score(c):
-                return (
-                    (c.get("discovery_score") or 0) * 2
-                    + min(c.get("score", 0), 20)
-                    + 3 * len(c.get("matched_position_archetypes") or [])
-                    + (5 if c.get("symbol") in _shad_cur_sel_syms else 0)
-                )
-
-            _shad_td_ranked     = sorted(_shad_all_td,     key=_td_rank_score,                    reverse=True)
-            _shad_non_td_ranked = sorted(_shad_all_non_td, key=lambda c: c.get("score", 0), reverse=True)
-
-            _shad_td_sel     = _shad_td_ranked[:_SHADOW_TD_RESERVE]
-            _shad_non_td_sel = _shad_non_td_ranked[:_SHADOW_NON_TD_RESERVE]
-
-            _shad_used_syms   = {c.get("symbol") for c in _shad_td_sel} | {c.get("symbol") for c in _shad_non_td_sel}
-            _shad_flex_budget = _CAP_LIMIT - len(_shad_td_sel) - len(_shad_non_td_sel)
-            _shad_remainder   = sorted(
-                [c for c in _cut_all_sorted if c.get("symbol") not in _shad_used_syms],
-                key=lambda c: c.get("score", 0), reverse=True,
-            )
-            _shad_flex_sel  = _shad_remainder[:_shad_flex_budget]
-            _shad_selected  = _shad_td_sel + _shad_non_td_sel + _shad_flex_sel
-
-            _shad_sel_td_syms    = {c.get("symbol") for c in _shad_selected if c.get("scanner_tier") == "D"}
-            _cur_sel_td_syms     = {c.get("symbol") for c in _cut_candidates if c.get("scanner_tier") == "D"}
-            _cur_sel_non_td_syms = {c.get("symbol") for c in _cut_candidates if c.get("scanner_tier") != "D"}
-            _shad_sel_non_td_syms = {c.get("symbol") for c in _shad_selected if c.get("scanner_tier") != "D"}
-
-            _td_added_by_shad = sorted(_shad_sel_td_syms - _cur_sel_td_syms)
-            _non_td_displaced = sorted(_cur_sel_non_td_syms - _shad_sel_non_td_syms)
-            _shad_td_in_sel   = [c for c in _shad_selected if c.get("scanner_tier") == "D"]
-            _shad_dropped_td  = [c for c in _shad_td_ranked if c.get("symbol") not in _shad_sel_td_syms]
-
-            _n_td_before   = len(_shad_all_td)
-            _n_cur_td_sel  = len(_shad_cur_td)
-            _n_cur_td_drop = len(_shad_drop_cur)
-            if _n_td_before == 0 or _n_cur_td_drop == 0:
-                _shad_verdict = "current_cap_not_primary_bottleneck"
-            elif _n_cur_td_drop > _n_cur_td_sel:
-                _shad_verdict = "current_cap_kills_tier_d"
-            else:
-                _shad_verdict = "current_cap_partially_suppresses_tier_d"
-
-            _shad_record = {
-                "ts":    datetime.now(UTC).isoformat(),
-                "stage": "apex_cap_shadow_compare",
-                # Current hard-cap state
-                "raw_candidates_before_cap":         len(_cut_all_sorted),
-                "raw_tier_d_before_cap":             _n_td_before,
-                "current_selected_total":            len(_cut_candidates),
-                "current_selected_tier_d":           _n_cur_td_sel,
-                "current_dropped_tier_d":            _n_cur_td_drop,
-                "current_selected_tier_d_symbols":   sorted(_cur_sel_td_syms),
-                "current_dropped_tier_d_top_20":     [c.get("symbol") for c in _shad_drop_cur[:20]],
-                # Shadow tier-aware result
-                "shadow_td_reserve":                 _SHADOW_TD_RESERVE,
-                "shadow_non_td_reserve":             _SHADOW_NON_TD_RESERVE,
-                "shadow_flex":                       _SHADOW_FLEX,
-                "shadow_selected_total":             len(_shad_selected),
-                "shadow_selected_tier_d":            len(_shad_td_in_sel),
-                "shadow_dropped_tier_d":             len(_shad_dropped_td),
-                "shadow_selected_tier_d_symbols":    sorted(_shad_sel_td_syms),
-                "shadow_tier_d_added_vs_current":    _td_added_by_shad,
-                "shadow_non_tier_d_displaced_vs_current": _non_td_displaced,
-                "shadow_top_tier_d_added": [
-                    {
-                        "symbol":           c.get("symbol"),
-                        "signal_score":     c.get("score"),
-                        "discovery_score":  c.get("discovery_score"),
-                        "archetypes":       c.get("matched_position_archetypes", []),
-                        "tier_d_rank_score": _td_rank_score(c),
-                    }
-                    for c in _shad_td_sel
-                    if c.get("symbol") in _td_added_by_shad
-                ],
-                "shadow_non_tier_d_displaced": [
-                    {
-                        "symbol": sym,
-                        "score": next(
-                            (c.get("score") for c in _cut_candidates if c.get("symbol") == sym),
-                            None,
-                        ),
-                    }
-                    for sym in _non_td_displaced
-                ],
-                "shadow_token_budget_same_total": len(_shad_selected) <= _CAP_LIMIT,
-                "bottleneck_verdict": _shad_verdict,
-            }
-            _shad_funnel_path = Path(__file__).parent / "data" / "tier_d_funnel.jsonl"
-            with open(_shad_funnel_path, "a") as _shad_f:
-                _shad_f.write(json.dumps(_shad_record) + "\n")
-            if _n_td_before:
-                clog("INFO",
-                     f"Tier D shadow_compare: td_added={len(_td_added_by_shad)} "
-                     f"displaced={len(_non_td_displaced)} verdict={_shad_verdict}")
-        except Exception as _shad_e:
-            log.debug("Tier D shadow_compare write failed (non-critical): %s", _shad_e)
 
         # Attach TradeContext (fundamentals) to each candidate so Apex can
         # evaluate POSITION classification. Uses FMP cache warmed at scan start.
@@ -2825,62 +2708,6 @@ def run_scan():
                 "trigger": "apex_scan_cycle",
                 "ts": now_str,
             }
-
-        # ── Tier D Shadow Apex Lane (Phase 1B) ────────────────────────────────
-        # Separate shadow-only Apex pass for Tier D candidates dropped by the
-        # main top-30 cap. execute=False — no orders, no training records.
-        # Runs unconditionally (even when main cap didn't drop Tier D) so the
-        # evidence report always has a record to aggregate.
-        try:
-            from tier_d_shadow import (
-                select_tier_d_shadow_candidates,
-                force_shadow_only,
-                build_tier_d_shadow_funnel_record,
-            )
-            _shad_cfg = CONFIG.get("entry_gate", {})
-            _shad_enabled = _shad_cfg.get("tier_d_shadow_apex_enabled", False)
-            if _shad_enabled and _td_dropped:
-                _shad_selected, _shad_not_selected = select_tier_d_shadow_candidates(
-                    _td_dropped, _shad_cfg
-                )
-                if _shad_selected:
-                    import apex_orchestrator as _aorch_shad
-                    _shad_apex_input = _aorch_shad.build_scan_cycle_apex_input(
-                        candidates=_shad_selected,
-                        review_positions=[],
-                        portfolio_state=_cut_portfolio_state,
-                        regime=regime,
-                    )
-                    _shad_by_sym = {
-                        c.get("symbol"): c for c in _shad_selected if c.get("symbol")
-                    }
-                    _shad_result = _aorch_shad._run_apex_pipeline(
-                        _shad_apex_input,
-                        _shad_by_sym,
-                        execute=False,  # NEVER execute — shadow only
-                    )
-                    _shad_entries = force_shadow_only(
-                        list((_shad_result.get("decision") or {}).get("new_entries") or [])
-                    )
-                    _shad_record = build_tier_d_shadow_funnel_record(
-                        cut_all_sorted=_cut_all_sorted,
-                        td_before=_td_before,
-                        td_after=_td_after,
-                        td_dropped=_td_dropped,
-                        selected=_shad_selected,
-                        not_selected=_shad_not_selected,
-                        apex_new_entries=_shad_entries,
-                        scan_type="live",
-                    )
-                    _shad_funnel = pathlib.Path(__file__).parent / "data" / "tier_d_funnel.jsonl"
-                    with open(_shad_funnel, "a") as _shad_fh:
-                        _shad_fh.write(json.dumps(_shad_record) + "\n")
-                    clog("INFO",
-                         f"Tier D shadow Apex: eligible={_shad_record['tier_d_shadow_eligible']} "
-                         f"selected={_shad_record['tier_d_shadow_selected']} "
-                         f"classifications={_shad_record['tier_d_shadow_apex_classifications']}")
-        except Exception as _shad_err:
-            log.warning("Tier D shadow Apex lane failed (non-critical): %s", _shad_err)
 
     except Exception as _cut_err:
         log.error("APEX_LIVE SCAN_CYCLE failed — %s", _cut_err)
