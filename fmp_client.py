@@ -1260,19 +1260,21 @@ def warm_fundamentals_cache(symbols: list[str]) -> None:
     """
     if not is_available():
         return
-    for sym in symbols:
-        try:
-            get_revenue_growth(sym)
-        except Exception:
-            pass
-        try:
-            get_eps_acceleration(sym)
-        except Exception:
-            pass
-        try:
-            get_key_metrics_ttm(sym)
-        except Exception:
-            pass
+
+    from concurrent.futures import ThreadPoolExecutor, wait as _fut_wait
+
+    def _warm_one(sym: str) -> None:
+        for fn in (get_revenue_growth, get_eps_acceleration, get_key_metrics_ttm):
+            try:
+                fn(sym)
+            except Exception:
+                pass
+
+    with ThreadPoolExecutor(max_workers=20) as _pool:
+        _futs = {_pool.submit(_warm_one, sym) for sym in symbols}
+        _done, _pending = _fut_wait(_futs, timeout=45.0)
+        for _f in _pending:
+            _f.cancel()
 
 
 def get_index_bars(symbol: str, period: str = "5d", interval: str = "1h") -> "pd.DataFrame | None":
