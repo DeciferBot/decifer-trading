@@ -380,10 +380,11 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
     if pos.get("status") == "EXITING":
         log.info(f"Exit already in flight for {opt_key} — skipping duplicate")
         return False
-    if pos.get("status") == "RESERVED":
+    if pos.get("status") in ("RESERVED", "PENDING"):
         log.warning(
-            f"execute_sell_option: {opt_key} BUY in flight (RESERVED) — "
-            "cannot sell until BUY fills; PM EXIT deferred to next cycle"
+            f"execute_sell_option: {opt_key} BUY order not yet filled "
+            f"(status={pos.get('status')}) — cannot sell while BUY is live in IBKR; "
+            "deferred to next cycle"
         )
         return False
 

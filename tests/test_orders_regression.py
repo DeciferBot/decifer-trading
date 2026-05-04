@@ -522,6 +522,39 @@ class TestOptionSellStateMachine:
         assert result is False, "SELL must be blocked while BUY is in flight (RESERVED)"
         ib.placeOrder.assert_not_called()
 
+    def test_sell_blocked_when_buy_in_flight_pending(self, mock_config):
+        """
+        Regression: IBKR rejects with "Cannot have open orders on both sides of
+        the same US Option contract" when a SELL is submitted while a BUY for the
+        same contract is live in IBKR (status=PENDING — placed but not yet filled).
+
+        Root cause: the RESERVED guard did not cover PENDING; a cross-cycle scenario
+        where check_options_exits() fires after placeOrder() but before fill
+        confirmation passes the guard and submits a SELL into an open BUY.
+
+        Fix: execute_sell_option must return False when status is PENDING.
+        """
+        _om = sys.modules["orders"]
+        _om.active_trades.clear()
+        _om._option_sell_attempts.clear()
+
+        pos = self._opt_pos()
+        pos["status"] = "PENDING"  # BUY placed in IBKR, not yet filled
+        _om.active_trades[self.OPT_KEY] = pos
+
+        ib = MagicMock()
+
+        with (
+            patch("orders_options.is_options_market_open", return_value=True),
+            patch("orders_options.CONFIG") as mock_cfg,
+        ):
+            mock_cfg.__getitem__.side_effect = lambda k: mock_config[k]
+            mock_cfg.get = lambda k, d=None: mock_config.get(k, d)
+            result = _om.execute_sell_option(ib, self.OPT_KEY, reason="pm_exit")
+
+        assert result is False, "SELL must be blocked while BUY is live in IBKR (PENDING)"
+        ib.placeOrder.assert_not_called()
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CLASS 4: SHORT Option Exit Pricing  (commit 62078f6, lines 2329–2337)
