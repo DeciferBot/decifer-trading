@@ -240,7 +240,7 @@ def _detect_review_reason(pos: dict, tt: str, current_regime: str) -> str | None
         direction = (pos.get("direction") or "LONG").upper()
         entry_px = pos.get("entry") or 0.0
         current_px = pos.get("current") or entry_px
-        tp = pos.get("take_profit") or 0.0
+        tp = pos.get("tp") or pos.get("take_profit") or 0.0
         if tp:
             if direction == "LONG" and current_px >= tp:
                 return "tp_exceeded"

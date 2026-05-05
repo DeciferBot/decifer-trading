@@ -600,11 +600,21 @@ def check_options_exits(open_options: dict, ib=None) -> list[str]:
                 pos.get("strike", 0),
             )
             _snap = get_snapshot_greeks(_occ)
-            if _snap and _snap.get("mid") and _snap["mid"] > 0:
-                curr_premium = float(_snap["mid"])
-                pos["current_premium"] = curr_premium
-                alpaca_live_ok = True
-                log.debug(f"Options price (Alpaca OPRA): {sym} premium=${curr_premium:.4f}")
+            if _snap:
+                # Prefer mid (bid+ask)/2; fall back to ask when bid=0 (common
+                # on paper accounts for OTM options that have no bids).
+                _alpaca_mid = _snap.get("mid")
+                _alpaca_ask = float(_snap.get("ask") or 0)
+                _alpaca_price = (
+                    float(_alpaca_mid) if (_alpaca_mid and _alpaca_mid > 0)
+                    else (_alpaca_ask if _alpaca_ask > 0 else None)
+                )
+                if _alpaca_price:
+                    curr_premium = _alpaca_price
+                    pos["current_premium"] = curr_premium
+                    pos["current"] = curr_premium  # keep Track B PM TP check in sync
+                    alpaca_live_ok = True
+                    log.debug(f"Options price (Alpaca OPRA): {sym} premium=${curr_premium:.4f}")
         except Exception:
             pass
 
@@ -643,6 +653,7 @@ def check_options_exits(open_options: dict, ib=None) -> list[str]:
                 if mid and mid > 0:
                     curr_premium = float(mid)
                     pos["current_premium"] = curr_premium
+                    pos["current"] = curr_premium  # keep Track B PM TP check in sync
             except Exception:
                 pass
 
