@@ -720,6 +720,8 @@ class CatalystEngine:
                 log.debug(f"CatalystEngine news fetch ({sym}): {exc}")
                 return []
 
+        if not self._running:
+            return []
         results: list[dict] = []
         with ThreadPoolExecutor(max_workers=8) as pool:
             futures = {pool.submit(_check_symbol, sym): sym for sym in symbols}
