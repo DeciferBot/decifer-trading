@@ -143,6 +143,14 @@ _pending_voice_commands: deque = deque()
 # DayTradesRemaining, ExcessLiquidity, Cushion, HighestSeverity, etc.
 account_values: dict = {}
 
+# wall-clock timestamp (time.time()) of the last write to account_values.
+# None until the first IBKR accountValueEvent tick arrives.
+account_values_updated_at: float | None = None
+
+# Provenance tag — always "IBKR". Present so callers can assert the source
+# is never Alpaca or a fallback computation.
+account_values_source: str = "IBKR"
+
 # Populated by _on_position() on connect and after every reconnect.
 # Keyed by symbol; value is the ib_async Position object.
 ibkr_positions: dict = {}

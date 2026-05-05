@@ -190,11 +190,25 @@ def execute_buy_option(
         mid_price = contract_info["mid"]
         est_option_value = n_contracts * mid_price * 100  # total premium outlay
 
-        exp_ok, exp_reason = check_combined_exposure(
+        exp_ok, exp_reason, exp_code = check_combined_exposure(
             symbol, est_option_value, list(active_trades.values()), portfolio_value, instrument="option"
         )
         if not exp_ok:
             log.warning(f"Combined exposure block for {symbol} options: {exp_reason}")
+            # Propagate into orders_core._block_reason so signal_dispatcher sees it in
+            # blocker_flags. Lazy sys.modules lookup avoids the circular import
+            # (orders_core imports orders_options, not the other way around).
+            import sys as _sys
+            _oc = _sys.modules.get("orders_core") or _sys.modules.get("orders")
+            if _oc is not None:
+                _oc._block_reason[symbol] = exp_code or "exposure_block"
+                _oc._exposure_block_details[symbol] = {
+                    "exp_reason": exp_reason,
+                    "exp_code": exp_code,
+                    "proposed_trade_notional": est_option_value,
+                    "portfolio_value": portfolio_value,
+                    "instrument": "option",
+                }
             return False
 
         # ── FIX #2: Sector concentration check ────────────────────────

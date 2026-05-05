@@ -465,6 +465,7 @@ def _on_account_value(account_value) -> None:
             numeric = val
 
         bot_state.account_values[tag] = numeric
+        bot_state.account_values_updated_at = time.time()
 
         if tag == "NetLiquidation":
             dash["portfolio_value"] = numeric

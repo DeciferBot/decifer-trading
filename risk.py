@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time as _time_mod
 from datetime import UTC, datetime, time
 
 import pandas_market_calendars as mcal
@@ -712,19 +713,78 @@ def get_underlying_exposure(symbol: str, open_positions: list) -> dict:
     }
 
 
+# ── Margin account snapshot logging ──────────────────────────────────────────
+
+_MARGIN_SNAPSHOT_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "data", "margin_account_snapshots.jsonl"
+)
+_margin_snapshot_last_logged: float = 0.0
+_MARGIN_SNAPSHOT_INTERVAL_S: float = 60.0  # emit at most once per minute
+
+
+def build_margin_snapshot() -> dict:
+    """Build a margin account state dict for audit records and tests."""
+    from bot_state import account_values as _av
+    from bot_state import account_values_updated_at as _ts
+    now = _time_mod.time()
+    age = round(now - _ts, 1) if _ts is not None else None
+    margin_cfg = CONFIG.get("margin_exposure", {})
+    return {
+        "ts": datetime.now(UTC).isoformat(),
+        "account_values_updated_at": _ts,
+        "account_values_age_seconds": age,
+        "NetLiquidation": _av.get("NetLiquidation"),
+        "ExcessLiquidity": _av.get("ExcessLiquidity"),
+        "AvailableFunds": _av.get("AvailableFunds"),
+        "BuyingPower": _av.get("BuyingPower"),
+        "FullInitMarginReq": _av.get("FullInitMarginReq"),
+        "FullMaintMarginReq": _av.get("FullMaintMarginReq"),
+        "margin_exposure_enabled": margin_cfg.get("enabled", False),
+        "margin_gross_cap": margin_cfg.get("margin_gross_cap", 1.5),
+        "excess_liquidity_buffer": margin_cfg.get("excess_liquidity_buffer", 0.10),
+        "available_funds_buffer": margin_cfg.get("available_funds_buffer", 0.05),
+    }
+
+
+def log_margin_account_snapshot() -> dict:
+    """Write a rate-limited margin snapshot to the audit JSONL and return it."""
+    global _margin_snapshot_last_logged
+    now = _time_mod.time()
+    if now - _margin_snapshot_last_logged < _MARGIN_SNAPSHOT_INTERVAL_S:
+        return {}
+    _margin_snapshot_last_logged = now
+    snap = build_margin_snapshot()
+    log.info(
+        "margin_snapshot: NLV=%s EL=%s AF=%s age_s=%s",
+        snap["NetLiquidation"], snap["ExcessLiquidity"],
+        snap["AvailableFunds"], snap["account_values_age_seconds"],
+    )
+    try:
+        os.makedirs(os.path.dirname(_MARGIN_SNAPSHOT_FILE), exist_ok=True)
+        with open(_MARGIN_SNAPSHOT_FILE, "a") as fh:
+            fh.write(json.dumps(snap) + "\n")
+    except Exception as exc:
+        log.warning("log_margin_account_snapshot: write failed — %s", exc)
+    return snap
+
+
 def check_combined_exposure(
     symbol: str, new_exposure_value: float, open_positions: list, portfolio_value: float, instrument: str = "stock"
-) -> tuple[bool, str]:
+) -> tuple[bool, str, str]:
     """
     FIX #1 + #3: Check whether adding a new position would create
     excessive combined exposure to the same underlying.
-    Returns (ok_to_trade, reason).
+    Returns (ok_to_trade, reason, block_code).
+    block_code is "" on success, else one of:
+      cross_instrument_block | equity_gross_cap_block | margin_gross_cap_block |
+      excess_liquidity_buffer_block | available_funds_buffer_block
     """
     if portfolio_value <= 0:
-        return True, "OK"
+        return True, "OK", ""
 
     max_single = CONFIG.get("max_single_position", 0.10)
-    max_alloc = CONFIG.get("max_portfolio_allocation", 1.0)
+    margin_cfg = CONFIG.get("margin_exposure", {})
+    margin_enabled = margin_cfg.get("enabled", False)
 
     existing = get_underlying_exposure(symbol, open_positions)
 
@@ -745,7 +805,7 @@ def check_combined_exposure(
                 f"({'stock+option' if has_stock and has_option else 'stock' if has_stock else 'option'}). "
                 f"Adding ${new_exposure_value:,.0f} would be {combined_pct:.1%} of portfolio "
                 f"(limit: {max_single:.0%})"
-            )
+            ), "cross_instrument_block"
 
     total_deployed = 0.0
     for pos in open_positions:
@@ -761,14 +821,74 @@ def check_combined_exposure(
     new_total = total_deployed + new_exposure_value
     alloc_pct = new_total / portfolio_value
 
-    if alloc_pct > max_alloc:
-        return False, (
-            f"Portfolio allocation limit: ${total_deployed:,.0f} deployed + "
-            f"${new_exposure_value:,.0f} new = {alloc_pct:.1%} "
-            f"(limit: {max_alloc:.0%})"
-        )
+    if margin_enabled:
+        # Margin mode snapshot (rate-limited — logs current account state for audit).
+        log_margin_account_snapshot()
 
-    return True, "OK"
+        # C. Freshness gate — refuse to use stale or absent account data.
+        from bot_state import account_values_updated_at as _ts
+        max_age = margin_cfg.get("max_account_values_age_seconds", 300)
+        if _ts is None:
+            return False, (
+                "Account values not yet received from IBKR — margin mode requires live account state"
+            ), "account_values_missing_block"
+        age_s = _time_mod.time() - _ts
+        if age_s > max_age:
+            return False, (
+                f"Account values stale: last update {age_s:.0f}s ago (limit: {max_age}s)"
+            ), "account_values_stale_block"
+
+        # Gross cap check (relaxed in margin mode).
+        gross_cap = margin_cfg.get("margin_gross_cap", 1.5)
+        if alloc_pct > gross_cap:
+            return False, (
+                f"Margin gross cap: ${total_deployed:,.0f} deployed + "
+                f"${new_exposure_value:,.0f} new = {alloc_pct:.1%} "
+                f"(limit: {gross_cap:.0%})"
+            ), "margin_gross_cap_block"
+
+        # D. Liquidity buffer checks — distinguish absent key from low value.
+        from bot_state import account_values as _av
+        net_liq = float(_av.get("NetLiquidation") or portfolio_value)
+
+        el_buffer = margin_cfg.get("excess_liquidity_buffer", 0.10)
+        el_min = net_liq * el_buffer
+        if "ExcessLiquidity" not in _av:
+            return False, (
+                "ExcessLiquidity not in account_values — IBKR has not yet sent this field"
+            ), "excess_liquidity_missing_block"
+        excess_liq = float(_av["ExcessLiquidity"])
+        if excess_liq < el_min:
+            return False, (
+                f"Excess liquidity buffer: ExcessLiquidity=${excess_liq:,.0f} < "
+                f"required {el_buffer:.0%} of NetLiquidation=${net_liq:,.0f} "
+                f"(min=${el_min:,.0f})"
+            ), "excess_liquidity_buffer_block"
+
+        af_buffer = margin_cfg.get("available_funds_buffer", 0.05)
+        af_min = net_liq * af_buffer
+        if "AvailableFunds" not in _av:
+            return False, (
+                "AvailableFunds not in account_values — IBKR has not yet sent this field"
+            ), "available_funds_missing_block"
+        avail_funds = float(_av["AvailableFunds"])
+        if avail_funds < af_min:
+            return False, (
+                f"Available funds buffer: AvailableFunds=${avail_funds:,.0f} < "
+                f"required {af_buffer:.0%} of NetLiquidation=${net_liq:,.0f} "
+                f"(min=${af_min:,.0f})"
+            ), "available_funds_buffer_block"
+    else:
+        # Equity mode: simple gross deployment cap.
+        equity_cap = margin_cfg.get("equity_gross_cap", CONFIG.get("max_portfolio_allocation", 1.0))
+        if alloc_pct > equity_cap:
+            return False, (
+                f"Portfolio allocation limit: ${total_deployed:,.0f} deployed + "
+                f"${new_exposure_value:,.0f} new = {alloc_pct:.1%} "
+                f"(limit: {equity_cap:.0%})"
+            ), "equity_gross_cap_block"
+
+    return True, "OK", ""
 
 
 # ══════════════════════════════════════════════════════════════════

@@ -122,6 +122,10 @@ def compute_allowed_trade_types(
 def _default_trade_type(sig: dict) -> str:
     """Deterministic suggestion shown to Apex. Uses entry_gate.classify_trade_type()
     when a TradeContext is attached; falls back to INTRADAY."""
+    # Tier D PRU Quality Compounders are multi-week fundamental candidates; POSITION
+    # is the correct anchor. Apex can still select INTRADAY or SWING via allowed list.
+    if sig.get("scanner_tier") == "D" and sig.get("primary_archetype") == "Quality Compounder":
+        return "POSITION"
     try:
         from entry_gate import classify_trade_type
         from trade_context import TradeContext  # noqa: F401

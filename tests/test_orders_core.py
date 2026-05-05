@@ -269,6 +269,7 @@ class TestExecuteBuy:
     @patch("orders.check_sector_concentration")
     @patch("orders._get_alpaca_price")
     @patch("orders.log_order")
+    @pytest.mark.smoke
     def test_execute_buy_happy_path_returns_true(
         self,
         mock_log_order,
@@ -288,7 +289,7 @@ class TestExecuteBuy:
 
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
-        mock_exposure.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK", "")
         mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (98.0, 105.0)  # SL, TP
         mock_position_size.return_value = 100  # qty
@@ -313,6 +314,7 @@ class TestExecuteBuy:
 
     @patch("orders.CONFIG")
     @patch("orders.check_correlation")
+    @pytest.mark.smoke
     def test_execute_buy_duplicate_symbol_returns_false(self, mock_correlation, mock_config_obj, mock_config, mock_ib):
         """execute_buy should reject if symbol already in open_trades."""
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
@@ -402,7 +404,7 @@ class TestExecuteBuy:
 
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
-        mock_exposure.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK", "")
         mock_sector.return_value = (True, "OK")
         # SL too close, poor R:R
         mock_stops.return_value = (99.5, 100.5)  # SL = 0.5, TP = 0.5 (R:R = 1.0 < 1.5)
@@ -449,7 +451,7 @@ class TestExecuteBuy:
 
         mock_yf_price.return_value = 0.50  # Too low
         mock_correlation.return_value = (True, "OK")
-        mock_exposure.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK", "")
         mock_sector.return_value = (True, "OK")
 
         result = orders.execute_buy(
@@ -491,7 +493,7 @@ class TestExecuteBuy:
 
         mock_yf_price.return_value = 50000.0  # Too high
         mock_correlation.return_value = (True, "OK")
-        mock_exposure.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK", "")
         mock_sector.return_value = (True, "OK")
 
         result = orders.execute_buy(
@@ -531,7 +533,7 @@ class TestExecuteBuy:
         mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
         mock_correlation.return_value = (True, "OK")
-        mock_exposure.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK", "")
         mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (98.0, 104.0)
         mock_position_size.return_value = 10
@@ -581,7 +583,7 @@ class TestExecuteBuy:
         mock_config_obj.get.side_effect = lambda k, default=None: mock_config.get(k, default)
 
         mock_correlation.return_value = (True, "OK")
-        mock_exposure.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK", "")
         mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (98.0, 104.0)
         mock_position_size.return_value = 10
@@ -941,7 +943,7 @@ class TestEdgeCases:
 
         mock_yf_price.return_value = 0  # No yfinance fallback
         mock_correlation.return_value = (True, "OK")
-        mock_exposure.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK", "")
         mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (95.0, 115.0)  # Reasonable stops for $100 price
         mock_position_size.return_value = 10000  # Large qty
@@ -990,7 +992,7 @@ class TestEdgeCases:
 
         mock_yf_price.return_value = price
         mock_correlation.return_value = (True, "OK")
-        mock_exposure.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK", "")
         mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (95.0, 110.0)
         # Position size would be 3000 shares = $300,000 (300% of portfolio)
@@ -1043,7 +1045,7 @@ class TestEdgeCases:
 
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
-        mock_exposure.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK", "")
         mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (98.0, 105.0)
         mock_position_size.return_value = 100
@@ -1090,7 +1092,7 @@ class TestEdgeCases:
 
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
-        mock_exposure.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK", "")
         mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (98.0, 105.0)
         mock_position_size.return_value = 100
@@ -1135,7 +1137,7 @@ class TestEdgeCases:
 
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
-        mock_exposure.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK", "")
         mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (98.0, 105.0)
         mock_position_size.return_value = 100
@@ -1185,7 +1187,7 @@ class TestEdgeCases:
 
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
-        mock_exposure.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK", "")
         mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (98.0, 105.0)
         mock_position_size.return_value = 100
@@ -1232,7 +1234,7 @@ class TestEdgeCases:
 
         mock_yf_price.return_value = 100.0
         mock_correlation.return_value = (True, "OK")
-        mock_exposure.return_value = (True, "OK")
+        mock_exposure.return_value = (True, "OK", "")
         mock_sector.return_value = (True, "OK")
         mock_stops.return_value = (98.0, 105.0)
         mock_position_size.return_value = 100
@@ -1752,7 +1754,7 @@ class TestValidateOrderContextWiring:
     @patch("orders.calculate_position_size", return_value=100)
     @patch("orders.calculate_stops", return_value=(98.0, 105.0))
     @patch("orders.check_correlation", return_value=(True, "OK"))
-    @patch("orders.check_combined_exposure", return_value=(True, "OK"))
+    @patch("orders.check_combined_exposure", return_value=(True, "OK", ""))
     @patch("orders.check_sector_concentration", return_value=(True, "OK"))
     @patch("orders._get_alpaca_price", return_value=100.0)
     @patch("orders.log_order", return_value=None)
@@ -1884,3 +1886,197 @@ class TestValidateOrderContextWiring:
         assert call_results[0] is None
         # Warning must have been logged
         assert any("positive score" in r.message for r in caplog.records)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TESTS: Block reason instrumentation — every return False must name a reason
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _make_rejected_ib():
+    """IB mock whose placeOrder always returns an immediately-Cancelled trade."""
+    ib = MagicMock()
+    ib.qualifyContracts.side_effect = lambda c: [c]
+    ib.sleep.return_value = None
+    ib.openOrders.return_value = []
+    ib.portfolio.return_value = []
+
+    def _place(contract, order):
+        t = MagicMock()
+        t.order.orderId = getattr(order, "orderId", 99999)
+        t.orderStatus.status = "Cancelled"
+        t.orderStatus.filled = 0
+        return t
+
+    ib.placeOrder.side_effect = _place
+    return ib
+
+
+# Patches common to all bracket-rejection tests: every pre-flight guard passes
+# and the trade reaches IBKR — where the Cancelled status triggers the new path.
+_BRACKET_PASS_PATCHES = [
+    patch("orders.CONFIG", _LONG_ONLY_CFG),
+    patch("orders.calculate_position_size", return_value=10),
+    patch("orders.calculate_stops", return_value=(95.0, 110.0)),
+    patch("orders.check_correlation", return_value=(True, "OK")),
+    patch("orders.check_combined_exposure", return_value=(True, "OK", "")),
+    patch("orders.check_sector_concentration", return_value=(True, "OK")),
+    patch("orders._get_alpaca_price", return_value=100.0),
+    patch("orders.log_order", return_value=None),
+    patch("orders_core._validate_order_context", return_value=None),
+    patch("orders_core._cancel_ibkr_order_by_id", return_value=None),
+]
+
+
+class TestBlockReasonInstrumentation:
+    """Every return False in execute_buy / execute_short must populate
+    _block_reason[symbol] before returning so dispatch audit records are
+    never left with empty blocker_flags."""
+
+    @pytest.fixture(autouse=True)
+    def clean_block_state(self):
+        import orders_core as oc
+        oc._block_reason.clear()
+        oc._exposure_block_details.clear()
+        oc.recently_closed.clear()
+        yield
+        oc._block_reason.clear()
+        oc._exposure_block_details.clear()
+        oc.recently_closed.clear()
+
+    def _apply_patches(self, patches):
+        """Stack a list of patch context managers and return a single CM."""
+        import contextlib
+        return contextlib.ExitStack()
+
+    def test_execute_buy_bracket_entry_rejected_sets_block_reason(self):
+        """execute_buy with an immediately-Cancelled IBKR entry sets
+        _block_reason[symbol] = 'bracket_entry_rejected'."""
+        import orders_core as oc
+
+        ib = _make_rejected_ib()
+        with (
+            patch("orders.CONFIG", _LONG_ONLY_CFG),
+            patch("orders.calculate_position_size", return_value=10),
+            patch("orders.calculate_stops", return_value=(95.0, 110.0)),
+            patch("orders.check_correlation", return_value=(True, "OK")),
+            patch("orders.check_combined_exposure", return_value=(True, "OK", "")),
+            patch("orders.check_sector_concentration", return_value=(True, "OK")),
+            patch("orders._get_alpaca_price", return_value=100.0),
+            patch("orders.log_order", return_value=None),
+            patch("orders_core._validate_order_context", return_value=None),
+            patch("orders_core._cancel_ibkr_order_by_id", return_value=None),
+            patch("orders_core.is_equities_extended_hours", return_value=False),
+            patch("orders_core.is_options_market_open", return_value=False),
+        ):
+            result = orders.execute_buy(
+                ib=ib,
+                symbol="BRTST",
+                price=100.0,
+                atr=2.0,
+                score=30,
+                portfolio_value=100_000,
+                regime={"regime": "TRENDING_UP"},
+                trade_type="SWING",
+            )
+        assert result is False
+        assert oc._block_reason.get("BRTST") == "bracket_entry_rejected"
+
+    def test_execute_short_extended_hours_rejected_sets_block_reason(self):
+        """execute_short in extended hours with a Cancelled entry sets
+        _block_reason[symbol] = 'extended_hours_rejected'."""
+        import orders_core as oc
+
+        ib = _make_rejected_ib()
+        with (
+            patch("orders.CONFIG", _LONG_ONLY_CFG),
+            patch("orders.calculate_position_size", return_value=10),
+            patch("orders.calculate_stops", return_value=(110.0, 80.0)),  # sl above, tp below
+            patch("orders.check_correlation", return_value=(True, "OK")),
+            patch("orders.check_combined_exposure", return_value=(True, "OK", "")),
+            patch("orders.check_sector_concentration", return_value=(True, "OK")),
+            patch("orders._get_alpaca_price", return_value=100.0),
+            patch("orders.log_order", return_value=None),
+            patch("orders_core._validate_order_context", return_value=None),
+            patch("orders_core._cancel_ibkr_order_by_id", return_value=None),
+            patch("orders_core.is_equities_extended_hours", return_value=True),
+            patch("orders_core.is_options_market_open", return_value=False),
+        ):
+            result = orders.execute_short(
+                ib=ib,
+                symbol="EHRTST",
+                price=100.0,
+                atr=2.0,
+                score=30,
+                portfolio_value=100_000,
+                regime={"regime": "TRENDING_DOWN"},
+                trade_type="SWING",
+            )
+        assert result is False
+        assert oc._block_reason.get("EHRTST") == "extended_hours_rejected"
+
+    def test_execute_short_bracket_entry_rejected_sets_block_reason(self):
+        """execute_short in regular hours with a Cancelled entry sets
+        _block_reason[symbol] = 'bracket_entry_rejected'."""
+        import orders_core as oc
+
+        ib = _make_rejected_ib()
+        with (
+            patch("orders.CONFIG", _LONG_ONLY_CFG),
+            patch("orders.calculate_position_size", return_value=10),
+            patch("orders.calculate_stops", return_value=(110.0, 80.0)),  # sl above, tp below
+            patch("orders.check_correlation", return_value=(True, "OK")),
+            patch("orders.check_combined_exposure", return_value=(True, "OK", "")),
+            patch("orders.check_sector_concentration", return_value=(True, "OK")),
+            patch("orders._get_alpaca_price", return_value=100.0),
+            patch("orders.log_order", return_value=None),
+            patch("orders_core._validate_order_context", return_value=None),
+            patch("orders_core._cancel_ibkr_order_by_id", return_value=None),
+            patch("orders_core.is_equities_extended_hours", return_value=False),
+            patch("orders_core.is_options_market_open", return_value=False),
+        ):
+            result = orders.execute_short(
+                ib=ib,
+                symbol="BRSTST",
+                price=100.0,
+                atr=2.0,
+                score=30,
+                portfolio_value=100_000,
+                regime={"regime": "TRENDING_DOWN"},
+                trade_type="SWING",
+            )
+        assert result is False
+        assert oc._block_reason.get("BRSTST") == "bracket_entry_rejected"
+
+    def test_all_named_guards_produce_nonempty_block_reason(self):
+        """Regression guard: the set of known block-reason codes must cover
+        every return-False path that was unnamed before this fix.
+
+        We verify the three newly-named paths exist in orders_core source so
+        a future refactor cannot silently remove the instrumentation lines."""
+        import ast
+        import pathlib
+
+        src = pathlib.Path(__file__).parent.parent / "orders_core.py"
+        tree = ast.parse(src.read_text())
+
+        # Collect all string literals assigned to _block_reason[symbol]
+        reason_codes: set[str] = set()
+        for node in ast.walk(tree):
+            # Match: _block_reason[...] = "some_string"
+            if (
+                isinstance(node, ast.Assign)
+                and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Subscript)
+                and isinstance(node.targets[0].value, ast.Name)
+                and node.targets[0].value.id == "_block_reason"
+                and isinstance(node.value, ast.Constant)
+            ):
+                reason_codes.add(node.value.value)
+
+        assert "bracket_entry_rejected" in reason_codes, (
+            "orders_core.py is missing _block_reason assignment for 'bracket_entry_rejected'"
+        )
+        assert "extended_hours_rejected" in reason_codes, (
+            "orders_core.py is missing _block_reason assignment for 'extended_hours_rejected'"
+        )

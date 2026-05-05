@@ -53,6 +53,16 @@ from orders_state import (
 )
 
 
+# Written by execute_buy/execute_short at each return-False guard; popped by
+# signal_dispatcher immediately after the call to name the exact block reason.
+# Thread-safe per symbol: execute_buy holds sym_lock for the same symbol, and
+# CPython dict writes are GIL-protected for different keys.
+_block_reason: dict[str, str] = {}
+# Structured exposure details written alongside _block_reason when exposure_block fires.
+# Popped by signal_dispatcher immediately after execute_buy/execute_short returns False.
+_exposure_block_details: dict[str, dict] = {}
+
+
 def _resolve_regime(regime: dict | str | None) -> str:
     """Extract the structural regime label — never session_character.
 
@@ -247,6 +257,7 @@ def execute_buy(
         _ok, _reason = _so.can_submit_order("buy")
         if not _ok:
             log.warning(f"execute_buy {symbol}: blocked by safety overlay — {_reason}")
+            _block_reason[symbol] = "safety_overlay_block"
             return False
     except Exception:
         pass
@@ -274,11 +285,13 @@ def execute_buy(
 
         if HALT_CACHE.is_halted(symbol):
             log.warning(f"execute_buy {symbol}: trading halted (Alpaca status feed) — aborting")
+            _block_reason[symbol] = "market_session_block"
             return False
         spread = QUOTE_CACHE.get_spread_pct(symbol)
         max_spread = CONFIG.get("max_spread_pct", 0.003)
         if spread is not None and spread > max_spread:
             log.warning(f"execute_buy {symbol}: spread {spread:.4%} > max {max_spread:.4%} — aborting")
+            _block_reason[symbol] = "spread_block"
             return False
     except ImportError:
         pass  # alpaca_stream not wired — checks skipped
@@ -291,24 +304,30 @@ def execute_buy(
             if symbol in active_trades:
                 if active_trades[symbol].get("status") == "EXITING":
                     log.info(f"Skipping {symbol} — exit in flight")
+                    _block_reason[symbol] = "already_held_exiting"
                     return False
                 log.warning(f"Already in {symbol} — skipping buy")
+                _block_reason[symbol] = "already_held"
                 return False
             if _is_recently_closed(symbol):
                 cooldown = CONFIG.get("reentry_cooldown_minutes", 30)
                 log.info(f"Skipping {symbol} — re-entry cooldown ({cooldown} min after recent close)")
+                _block_reason[symbol] = "cooldown_block"
                 return False
             _ftc_blocked, _ftc_reason = is_failed_thesis_blocked(symbol, price or 0.0)
             if _ftc_blocked:
                 log.info(f"Skipping {symbol} — thesis-failure gate: {_ftc_reason}")
+                _block_reason[symbol] = "thesis_failure_block"
                 return False
             if len(active_trades) >= CONFIG["max_positions"]:
                 log.warning(f"Max positions ({CONFIG['max_positions']}) reached — skipping {symbol}")
+                _block_reason[symbol] = "max_positions_reached"
                 return False
             # Correlation check
             ok, reason = check_correlation(symbol, list(active_trades.values()))
             if not ok:
                 log.warning(f"Correlation block for {symbol}: {reason}")
+                _block_reason[symbol] = "correlation_block"
                 return False
 
             # ── FIX #1+3: Cross-instrument + combined exposure check ──
@@ -318,11 +337,22 @@ def execute_buy(
             # a safe conservative estimate. The previous formula (risk_pct * 50)
             # produced 1.5× portfolio, which permanently broke this check.
             est_value = portfolio_value * CONFIG.get("max_single_position", 0.10)
-            exp_ok, exp_reason = check_combined_exposure(
+            exp_ok, exp_reason, exp_code = check_combined_exposure(
                 symbol, est_value, list(active_trades.values()), portfolio_value, instrument="stock"
             )
             if not exp_ok:
                 log.warning(f"Combined exposure block for {symbol}: {exp_reason}")
+                _block_reason[symbol] = exp_code or "exposure_block"
+                _exposure_block_details[symbol] = {
+                    "exp_reason":             exp_reason,
+                    "exp_code":               exp_code,
+                    "proposed_trade_notional": est_value,
+                    "portfolio_value":         portfolio_value,
+                    "open_position_count":     len(active_trades),
+                    "max_positions":           CONFIG.get("max_positions", 100),
+                    "max_alloc_pct":           CONFIG.get("max_portfolio_allocation", 1.0),
+                    "max_single_pct":          CONFIG.get("max_single_position", 0.10),
+                }
                 return False
 
             # ── FIX #2: Sector concentration check ────────────────────
@@ -331,6 +361,7 @@ def execute_buy(
             )
             if not sec_ok:
                 log.warning(f"Sector block for {symbol}: {sec_reason}")
+                _block_reason[symbol] = "sector_concentration_block"
                 return False
 
             # ── Reserve slot — closes TOCTOU gap between check and submission ──
@@ -346,12 +377,14 @@ def execute_buy(
         ):
             log.warning(f"Skipping duplicate order for {symbol} — open order already exists")
             _safe_del_trade(symbol)  # release reservation
+            _block_reason[symbol] = "open_order_exists"
             return False
 
         rejection = _validate_order_context(symbol, "LONG", trade_type, score)
         if rejection:
             log.warning("execute_buy: REJECTED %s — %s", symbol, rejection)
             _safe_del_trade(symbol)
+            _block_reason[symbol] = "risk_guard_block"
             return False
 
     try:
@@ -375,6 +408,7 @@ def execute_buy(
 
         if not prices:
             log.error(f"No price data available for {symbol} from any source — aborting")
+            _block_reason[symbol] = "no_price_data"
             return False
 
         # CONTAMINATION CHECK: if any two sources diverge by >50%, abort
@@ -387,6 +421,7 @@ def execute_buy(
                         f"PRICE CONTAMINATION {symbol}: sources={prices} "
                         f"({div:.0%} max divergence) — aborting trade to protect capital"
                     )
+                    _block_reason[symbol] = "price_contamination_block"
                     return False
 
         # Use the HIGHEST price from sources that agree within 10%.
@@ -411,9 +446,11 @@ def execute_buy(
         _price_floor, _price_ceil = (0.0001, 99999) if instrument == "fx" else (1.0, 10000)
         if price < _price_floor:
             log.error(f"Price too low for {symbol}: ${price:.4f} — likely data contamination, aborting")
+            _block_reason[symbol] = "price_sanity_block"
             return False
         if price > _price_ceil:
             log.error(f"Price too high for {symbol}: ${price:.2f} — likely data contamination, aborting")
+            _block_reason[symbol] = "price_sanity_block"
             return False
 
         # Now calculate sizing and stops with the IBKR-sourced price
@@ -464,6 +501,7 @@ def execute_buy(
         risk = price - sl
         if not tranche_mode and (risk <= 0 or (reward / risk) < CONFIG["min_reward_risk_ratio"]):
             log.warning(f"Poor R:R on {symbol}: reward={reward:.2f} risk={risk:.2f} — skipping")
+            _block_reason[symbol] = "risk_reward_block"
             return False
 
         account = CONFIG["active_account"]
@@ -549,9 +587,11 @@ def execute_buy(
                 )
             except Exception as _el_err:
                 log.error("execute_buy %s: ORDER_INTENT write failed — trade aborted: %s", symbol, _el_err)
+                _block_reason[symbol] = "order_intent_write_failed"
                 return False
         except Exception as _wal_err:
             log.error("execute_buy %s: metadata build failed — trade aborted: %s", symbol, _wal_err)
+            _block_reason[symbol] = "order_intent_write_failed"
             return False
 
         # ── Execution Agent — decide HOW to fill this trade ──────────────────
@@ -593,6 +633,7 @@ def execute_buy(
         if symbol in _bs._halted_symbols:
             log.warning(f"Skipping {symbol} — symbol is halted (IBKR error 154)")
             _safe_del_trade(symbol)
+            _block_reason[symbol] = "market_session_block"
             return False
 
         # ── SMART EXECUTION GATE ──────────────────────────────────
@@ -764,6 +805,7 @@ def execute_buy(
                 with _recently_closed_lock:  # RB-4
                     recently_closed[symbol] = datetime.now(UTC).isoformat()
                 _safe_del_trade(symbol)
+                _block_reason[symbol] = "market_session_block"
                 return False
 
             log_order({
@@ -988,6 +1030,7 @@ def execute_buy(
             with _recently_closed_lock:  # RB-4
                 recently_closed[symbol] = datetime.now(UTC).isoformat()
             _safe_del_trade(symbol)
+            _block_reason[symbol] = "bracket_entry_rejected"
             return False
 
         # RB-5: child order status checks only apply when bracket was placed
@@ -1222,6 +1265,7 @@ def execute_buy(
         _safe_del_trade(symbol)  # clean up any reservation or partial entry if order failed
         log.error(f"Buy failed {symbol}: {e}")
         from bot_state import clog as _clog; _clog("ERROR", f"Buy failed {symbol}: {e}")
+        _block_reason[symbol] = "unknown_execute_false"
         return False
 
 
@@ -1266,6 +1310,7 @@ def execute_short(
         _ok, _reason = _so.can_submit_order("short")
         if not _ok:
             log.warning(f"execute_short {symbol}: blocked by safety overlay — {_reason}")
+            _block_reason[symbol] = "safety_overlay_block"
             return False
     except Exception:
         pass
@@ -1290,11 +1335,13 @@ def execute_short(
 
         if HALT_CACHE.is_halted(symbol):
             log.warning(f"execute_short {symbol}: trading halted (Alpaca status feed) — aborting")
+            _block_reason[symbol] = "market_session_block"
             return False
         spread = QUOTE_CACHE.get_spread_pct(symbol)
         max_spread = CONFIG.get("max_spread_pct", 0.003)
         if spread is not None and spread > max_spread:
             log.warning(f"execute_short {symbol}: spread {spread:.4%} > max {max_spread:.4%} — aborting")
+            _block_reason[symbol] = "spread_block"
             return False
     except ImportError:
         pass  # alpaca_stream not wired — checks skipped
@@ -1305,36 +1352,54 @@ def execute_short(
             if symbol in active_trades:
                 if active_trades[symbol].get("status") == "EXITING":
                     log.info(f"Skipping {symbol} — exit in flight")
+                    _block_reason[symbol] = "already_held_exiting"
                     return False
                 log.warning(f"Already in {symbol} — skipping short")
+                _block_reason[symbol] = "already_held"
                 return False
             if _is_recently_closed(symbol):
                 cooldown = CONFIG.get("reentry_cooldown_minutes", 30)
                 log.info(f"Skipping {symbol} — re-entry cooldown ({cooldown} min after recent close)")
+                _block_reason[symbol] = "cooldown_block"
                 return False
             _ftc_blocked, _ftc_reason = is_failed_thesis_blocked(symbol, price or 0.0)
             if _ftc_blocked:
                 log.info(f"Skipping {symbol} — thesis-failure gate: {_ftc_reason}")
+                _block_reason[symbol] = "thesis_failure_block"
                 return False
             if len(active_trades) >= CONFIG["max_positions"]:
                 log.warning(f"Max positions ({CONFIG['max_positions']}) reached — skipping {symbol}")
+                _block_reason[symbol] = "max_positions_reached"
                 return False
             ok, reason = check_correlation(symbol, list(active_trades.values()))
             if not ok:
                 log.warning(f"Correlation block for {symbol}: {reason}")
+                _block_reason[symbol] = "correlation_block"
                 return False
             est_value = portfolio_value * CONFIG.get("max_single_position", 0.10)
-            exp_ok, exp_reason = check_combined_exposure(
+            exp_ok, exp_reason, exp_code = check_combined_exposure(
                 symbol, est_value, list(active_trades.values()), portfolio_value, instrument="stock"
             )
             if not exp_ok:
                 log.warning(f"Combined exposure block for {symbol}: {exp_reason}")
+                _block_reason[symbol] = exp_code or "exposure_block"
+                _exposure_block_details[symbol] = {
+                    "exp_reason":              exp_reason,
+                    "exp_code":                exp_code,
+                    "proposed_trade_notional": est_value,
+                    "portfolio_value":         portfolio_value,
+                    "open_position_count":     len(active_trades),
+                    "max_positions":           CONFIG.get("max_positions", 100),
+                    "max_alloc_pct":           CONFIG.get("max_portfolio_allocation", 1.0),
+                    "max_single_pct":          CONFIG.get("max_single_position", 0.10),
+                }
                 return False
             sec_ok, sec_reason = check_sector_concentration(
                 symbol, list(active_trades.values()), portfolio_value, regime.get("regime", "NORMAL")
             )
             if not sec_ok:
                 log.warning(f"Sector block for {symbol}: {sec_reason}")
+                _block_reason[symbol] = "sector_concentration_block"
                 return False
             active_trades[symbol] = {"status": "RESERVED", "symbol": symbol}
 
@@ -1343,12 +1408,14 @@ def execute_short(
         ):
             log.warning(f"Skipping duplicate short order for {symbol} — open order already exists")
             _safe_del_trade(symbol)
+            _block_reason[symbol] = "open_order_exists"
             return False
 
         rejection = _validate_order_context(symbol, "SHORT", trade_type, score)
         if rejection:
             log.warning("execute_short: REJECTED %s — %s", symbol, rejection)
             _safe_del_trade(symbol)
+            _block_reason[symbol] = "risk_guard_block"
             return False
 
     try:
@@ -1368,6 +1435,7 @@ def execute_short(
         if not prices:
             log.error(f"No price data for {symbol} — aborting short")
             _safe_del_trade(symbol)
+            _block_reason[symbol] = "no_price_data"
             return False
 
         price_vals = list(prices.values())
@@ -1377,6 +1445,7 @@ def execute_short(
                 if div > 0.50:
                     log.error(f"PRICE CONTAMINATION {symbol}: {prices} — aborting short")
                     _safe_del_trade(symbol)
+                    _block_reason[symbol] = "price_contamination_block"
                     return False
 
         # For shorts, use the LOWEST confirmed price (best short entry)
@@ -1387,6 +1456,7 @@ def execute_short(
         if price < _price_floor or price > _price_ceil:
             log.error(f"Price out of range for short {symbol}: ${price:.4f} — aborting")
             _safe_del_trade(symbol)
+            _block_reason[symbol] = "price_sanity_block"
             return False
 
         qty = qty_override if qty_override is not None else calculate_position_size(portfolio_value, price, score, regime, atr=atr)
@@ -1422,6 +1492,7 @@ def execute_short(
         if risk <= 0 or (reward / risk) < CONFIG["min_reward_risk_ratio"]:
             log.warning(f"Poor R:R on short {symbol}: reward={reward:.2f} risk={risk:.2f} — skipping")
             _safe_del_trade(symbol)
+            _block_reason[symbol] = "risk_reward_block"
             return False
 
         # ── Tranche sizing ────────────────────────────────────────
@@ -1498,9 +1569,11 @@ def execute_short(
                 )
             except Exception as _el_err_s:
                 log.error("execute_short %s: ORDER_INTENT write failed — trade aborted: %s", symbol, _el_err_s)
+                _block_reason[symbol] = "order_intent_write_failed"
                 return False
         except Exception as _wal_err_s:
             log.error("execute_short %s: metadata build failed — trade aborted: %s", symbol, _wal_err_s)
+            _block_reason[symbol] = "order_intent_write_failed"
             return False
 
         # ── EXTENDED HOURS: standalone short entry, SL placed post-fill ──────
@@ -1520,6 +1593,7 @@ def execute_short(
                 with _recently_closed_lock:  # RB-4
                     recently_closed[symbol] = datetime.now(UTC).isoformat()
                 _safe_del_trade(symbol)
+                _block_reason[symbol] = "extended_hours_rejected"
                 return False
 
             log_order({
@@ -1640,6 +1714,7 @@ def execute_short(
             with _recently_closed_lock:  # RB-4
                 recently_closed[symbol] = datetime.now(UTC).isoformat()
             _safe_del_trade(symbol)
+            _block_reason[symbol] = "bracket_entry_rejected"
             return False
 
         log_order(
@@ -1818,6 +1893,7 @@ def execute_short(
     except Exception as e:
         _safe_del_trade(symbol)
         log.error(f"Short failed {symbol}: {e}")
+        _block_reason[symbol] = "unknown_execute_false"
         return False
 
 

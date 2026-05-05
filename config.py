@@ -257,6 +257,20 @@ CONFIG = {
     "strategy_recovery_streak": 20,  # Paper: raised from 6 — don't tighten on paper losses
     "thesis_invalidation_regime_change": True,  # Re-evaluate open positions on significant regime shift
     "max_portfolio_allocation": 1.0,  # 1.0 = full account, 0.2 = 20% of account
+    # ── MARGIN-AWARE EXPOSURE (policy change, not a bug fix) ──────
+    # enabled=False → equity mode: gross deployment / NetLiquidation capped at equity_gross_cap.
+    # enabled=True  → margin mode: gross cap relaxed to margin_gross_cap; two liquidity buffer
+    #                 guards (ExcessLiquidity and AvailableFunds vs NetLiquidation) replace the
+    #                 simple alloc_pct check so IBKR margin health is the binding constraint.
+    # Live config note: tighten equity_gross_cap to 0.80 and buffer floors to 0.15 / 0.10.
+    "margin_exposure": {
+        "enabled": True,                         # ACTIVATED 2026-05-05 — conservative margin entry
+        "equity_gross_cap": 1.0,                 # equity mode gross cap (mirrors max_portfolio_allocation)
+        "margin_gross_cap": 1.10,                # margin mode gross cap (110% of NetLiquidation)
+        "excess_liquidity_buffer": 0.01,         # block if ExcessLiquidity < 1% of NetLiquidation
+        "available_funds_buffer": 0.01,          # block if AvailableFunds < 1% of NetLiquidation
+        "max_account_values_age_seconds": 300,   # block if account_values older than 5 min in margin mode
+    },
     "starting_capital": 1_000_000,  # Starting portfolio value for P&L tracking — update to match real account before going live
     # ── PDT RULE (Pattern Day Trader) ─────────────────────────
     # Applies when portfolio_value < pdt_threshold AND live account.
@@ -942,6 +956,18 @@ CONFIG = {
         "tier_d_pre_scoring_min":  40,   # floor: always send at least this many when available
         "max_symbols_to_score":   140,   # global cap on total symbols entering score_universe()
     },
+
+    # ── INTELLIGENCE-FIRST MIGRATION FLAGS ────────────────────────────────────
+    # All flags default false. Production-changing flags must remain false until
+    # shadow comparison, backtest gate, and advisory mode are all proven.
+    # See docs/intelligence_first_audit.md for wiring points.
+    # See docs/intelligence_first_retirement_register.md for retirement plan.
+    "intelligence_first_shadow_enabled":          False,  # master switch for all shadow output (safe to enable)
+    "intelligence_first_transmission_enabled":    False,  # run macro transmission matrix (safe to enable)
+    "intelligence_first_candidate_feed_enabled":  False,  # run economic candidate feed (safe to enable)
+    "intelligence_first_universe_builder_enabled": False, # run shadow universe builder (safe to enable)
+    "intelligence_first_advisory_enabled":        False,  # advisory logging alongside live bot — Sprint 6 only
+    "enable_active_opportunity_universe_handoff": False,  # PRODUCTION WIRING — never enable during migration
 }
 
 
