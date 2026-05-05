@@ -858,6 +858,16 @@ TRACK B — OPEN POSITIONS (flagged for review):
   reasoning_tag:  snake_case label
   reasoning:      one sentence
 
+TRACK B — FLAG MEANINGS:
+  tp_exceeded:    Position has traded through its take-profit target. Default action is EXIT.
+                  You may HOLD only if current conviction score >= 60 AND regime strongly
+                  supports continuation. Explicitly state why you are overriding TP.
+  earnings_approach: Earnings within 48h — evaluate if thesis should be held through print.
+  regime_flip:    Entry regime no longer matches current regime — re-evaluate hold thesis.
+  swing_timeout:  Position held beyond max swing hold duration.
+  thesis_driver_failure: Intraday position in loss territory — thesis likely invalidated.
+  score_collapse: Current signal score has fallen below entry threshold.
+
 DAR FIELD NOTE (Data Availability Ratio):
   DAR=pre-mkt means intraday data has not yet opened — it is a data pipeline
   artifact, NOT a signal quality indicator. A candidate showing DAR=pre-mkt

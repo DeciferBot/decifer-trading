@@ -41,7 +41,7 @@ else:
     _config_mod.CONFIG = _cfg
 
 
-from guardrails import _default_trade_type  # noqa: E402
+from guardrails import _default_trade_type, _detect_review_reason  # noqa: E402
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -175,3 +175,43 @@ class TestAllowedTradeTypesUnchanged:
         assert "SWING" in allowed, "SWING must remain in allowed_trade_types"
         assert "POSITION" in allowed, "POSITION must remain in allowed_trade_types"
         assert candidate.get("default_trade_type") == "POSITION"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# _detect_review_reason — TP enforcement
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestDetectReviewReasonTP:
+    def _pos(self, current, take_profit, direction="LONG", tt="SWING"):
+        return {
+            "symbol": "QCOM",
+            "trade_type": tt,
+            "direction": direction,
+            "entry": 7.40,
+            "current": current,
+            "take_profit": take_profit,
+        }
+
+    def test_long_above_tp_returns_tp_exceeded(self):
+        pos = self._pos(current=15.70, take_profit=12.16)
+        assert _detect_review_reason(pos, "SWING", "TRENDING_UP") == "tp_exceeded"
+
+    def test_long_below_tp_does_not_fire_tp_exceeded(self):
+        pos = self._pos(current=10.00, take_profit=12.16)
+        assert _detect_review_reason(pos, "SWING", "TRENDING_UP") != "tp_exceeded"
+
+    def test_long_at_tp_returns_tp_exceeded(self):
+        pos = self._pos(current=12.16, take_profit=12.16)
+        assert _detect_review_reason(pos, "SWING", "TRENDING_UP") == "tp_exceeded"
+
+    def test_short_below_tp_returns_tp_exceeded(self):
+        pos = self._pos(current=8.00, take_profit=10.00, direction="SHORT")
+        assert _detect_review_reason(pos, "SWING", "TRENDING_DOWN") == "tp_exceeded"
+
+    def test_short_above_tp_does_not_fire_tp_exceeded(self):
+        pos = self._pos(current=12.00, take_profit=10.00, direction="SHORT")
+        assert _detect_review_reason(pos, "SWING", "TRENDING_DOWN") != "tp_exceeded"
+
+    def test_no_tp_set_does_not_fire(self):
+        pos = self._pos(current=15.70, take_profit=0)
+        assert _detect_review_reason(pos, "SWING", "TRENDING_UP") != "tp_exceeded"

@@ -237,6 +237,16 @@ def flag_positions_for_review(
 def _detect_review_reason(pos: dict, tt: str, current_regime: str) -> str | None:
     """Return flagged_reason string if position needs Apex review, else None."""
     try:
+        direction = (pos.get("direction") or "LONG").upper()
+        entry_px = pos.get("entry") or 0.0
+        current_px = pos.get("current") or entry_px
+        tp = pos.get("take_profit") or 0.0
+        if tp:
+            if direction == "LONG" and current_px >= tp:
+                return "tp_exceeded"
+            if direction == "SHORT" and current_px <= tp:
+                return "tp_exceeded"
+
         entry_regime = (pos.get("regime") or pos.get("entry_regime") or "").upper()
         pnl_pct = _pnl_pct(pos)
         mins_held = _minutes_held(pos, datetime.now(UTC))
