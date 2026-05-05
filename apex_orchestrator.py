@@ -48,6 +48,58 @@ _SHADOW_LOG_PATH = os.path.join(
     CONFIG.get("data_dir", "data"), "apex_shadow_log.jsonl"
 )
 
+_AUDIT_LOG_PATH = os.path.join(
+    CONFIG.get("data_dir", "data"), "apex_decision_audit.jsonl"
+)
+_PROMPT_SNAPSHOT_PATH = os.path.join(
+    CONFIG.get("data_dir", "data"), "apex_prompt_snapshot.jsonl"
+)
+_RESPONSE_SNAPSHOT_PATH = os.path.join(
+    CONFIG.get("data_dir", "data"), "apex_response_snapshot.jsonl"
+)
+_audit_log_lock = threading.Lock()
+_snapshot_lock  = threading.Lock()
+
+
+def _write_apex_audit(record: dict) -> None:
+    """Append one JSON line to apex_decision_audit.jsonl. Non-critical — never raises."""
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(_AUDIT_LOG_PATH)), exist_ok=True)
+        with _audit_log_lock, open(_AUDIT_LOG_PATH, "a") as _fh:
+            _fh.write(json.dumps(record, default=str) + "\n")
+    except Exception as _e:
+        log.debug("apex_orchestrator: audit log write failed — %s", _e)
+
+
+def _write_prompt_snapshot(cycle_id: str, user_prompt: str) -> None:
+    """Write one full Apex user-prompt per cycle to apex_prompt_snapshot.jsonl."""
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(_PROMPT_SNAPSHOT_PATH)), exist_ok=True)
+        record = {
+            "ts": datetime.now(UTC).isoformat(),
+            "cycle_id": cycle_id,
+            "user_prompt": user_prompt,
+        }
+        with _snapshot_lock, open(_PROMPT_SNAPSHOT_PATH, "a") as _fh:
+            _fh.write(json.dumps(record, default=str) + "\n")
+    except Exception as _e:
+        log.debug("apex_orchestrator: prompt snapshot write failed — %s", _e)
+
+
+def _write_response_snapshot(cycle_id: str, raw_response: str) -> None:
+    """Write the raw Apex LLM response (pre-parse) per cycle to apex_response_snapshot.jsonl."""
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(_RESPONSE_SNAPSHOT_PATH)), exist_ok=True)
+        record = {
+            "ts": datetime.now(UTC).isoformat(),
+            "cycle_id": cycle_id,
+            "raw_response": raw_response,
+        }
+        with _snapshot_lock, open(_RESPONSE_SNAPSHOT_PATH, "a") as _fh:
+            _fh.write(json.dumps(record, default=str) + "\n")
+    except Exception as _e:
+        log.debug("apex_orchestrator: response snapshot write failed — %s", _e)
+
 
 # ── Input builders ───────────────────────────────────────────────────────────
 
@@ -227,6 +279,196 @@ def _run_apex_pipeline(
 
     would, rejected = _summarise_dispatch(decision, candidates_by_symbol)
 
+    # ── Prompt and response snapshots ────────────────────────────────────
+    _apex_meta_for_snap = decision.get("_meta") or {}
+    _snap_cycle_id = apex_input.get("scan_ts") or decision.get("scan_ts") or ""
+    _snap_user_prompt = _apex_meta_for_snap.get("user_prompt")
+    _snap_raw_response = _apex_meta_for_snap.get("raw_response")
+    if _snap_user_prompt:
+        _write_prompt_snapshot(_snap_cycle_id, _snap_user_prompt)
+    if _snap_raw_response:
+        _write_response_snapshot(_snap_cycle_id, _snap_raw_response)
+
+    # ── Apex decision audit — per-candidate records ───────────────────────
+    try:
+        _audit_cycle_id = apex_input.get("scan_ts") or decision.get("scan_ts")
+        _audit_now_ts   = datetime.now(UTC).isoformat()
+        _non_avoid = [
+            e for e in (decision.get("new_entries") or [])
+            if (e.get("trade_type") or "").upper() != "AVOID" and e.get("symbol")
+        ]
+        _avoid_syms = {
+            e.get("symbol")
+            for e in (decision.get("new_entries") or [])
+            if (e.get("trade_type") or "").upper() == "AVOID" and e.get("symbol")
+        }
+        _selected_map: dict[str, dict] = {}
+        for _rank, _entry in enumerate(_non_avoid, start=1):
+            _s = _entry.get("symbol")
+            if _s:
+                _selected_map[_s] = {"rank": _rank, "rationale": _entry.get("rationale")}
+
+        # Build per-symbol formatted prompt lines for apex_prompt_line field.
+        try:
+            from market_intelligence import _format_candidate_line as _fmt_cand_line
+            _prompt_line_map: dict[str, str] = {
+                c["symbol"]: _fmt_cand_line(c)
+                for c in (apex_input.get("track_a") or {}).get("candidates") or []
+                if c.get("symbol")
+            }
+        except Exception as _pline_exc:
+            log.debug("apex_orchestrator: prompt_line_map build failed — %s", _pline_exc)
+            _prompt_line_map = {}
+
+        for _cand in (apex_input.get("track_a") or {}).get("candidates") or []:
+            _s = _cand.get("symbol")
+            if not _s:
+                continue
+            if _s in _selected_map:
+                _apex_dec, _apex_rank, _apex_rsn = (
+                    "selected", _selected_map[_s]["rank"], _selected_map[_s]["rationale"]
+                )
+            elif _s in _avoid_syms:
+                _apex_dec, _apex_rank, _apex_rsn = (
+                    "avoid", None,
+                    next((e.get("rationale") for e in (decision.get("new_entries") or [])
+                          if e.get("symbol") == _s), None)
+                )
+            else:
+                _apex_dec, _apex_rank, _apex_rsn = "not_selected_or_not_returned", None, None
+
+            _cand_tier = _cand.get("scanner_tier")
+            _cand_origin = (
+                _cand.get("origin_path")
+                or (_cand.get("origin"))
+                or ("tier_d_main_path" if _cand_tier == "D" else "normal_path")
+            )
+            _write_apex_audit({
+                "ts":                        _audit_now_ts,
+                "record_type":               "apex_candidate",
+                "cycle_id":                  _audit_cycle_id,
+                "symbol":                    _s,
+                "scanner_tier":              _cand_tier,
+                "origin_path":               _cand_origin,
+                "pru":                       _cand.get("position_research_universe_member"),
+                "selected_band":             _cand.get("selected_band"),
+                "selected_slot":             _cand.get("selected_slot"),
+                "raw_score":                 _cand.get("score"),
+                "adjusted_discovery_score":  _cand.get("adjusted_discovery_score"),
+                "primary_archetype":         _cand.get("primary_archetype"),
+                "universe_bucket":           _cand.get("universe_bucket"),
+                "apex_cap_score":            _cand.get("apex_cap_score"),
+                "apex_prompt_line":          _prompt_line_map.get(_s),
+                "apex_decision":             _apex_dec,
+                "apex_rank_if_available":    _apex_rank,
+                "apex_reason_if_available":  _apex_rsn,
+            })
+    except Exception as _audit_exc:
+        log.warning("apex_orchestrator: apex_candidate audit failed — %s", _audit_exc)
+
+    # ── Apex decision audit — high_score_skip records ─────────────────────
+    # Written for every not-selected candidate whose effective_score exceeds
+    # at least one selected candidate's effective score.
+    try:
+        _REASON_CATEGORY_KEYWORDS: dict[str, list[str]] = {
+            "portfolio_fit":     ["portfolio", "correlation", "overlap", "already hold", "diversif", "concentration"],
+            "catalyst_quality":  ["catalyst", "news", "event", "headline", "earnings", "fundamental"],
+            "weak_tape":         ["tape", "momentum", "dar", "pre-market", "pre-mkt", "intraday"],
+            "volatility_risk":   ["volatil", "atr", "risk", "beta", "gap risk"],
+            "sector_overlap":    ["sector", "semiconductor", "tech", "same sector"],
+            "execution_quality": ["liquidity", "spread", "execution", "fill", "thin"],
+        }
+
+        def _classify_reason(reason_text: str) -> str:
+            if not reason_text:
+                return "no_reason_provided"
+            _r = reason_text.lower()
+            for _cat, _keywords in _REASON_CATEGORY_KEYWORDS.items():
+                if any(_kw in _r for _kw in _keywords):
+                    return _cat
+            return "other"
+
+        # Build lookup: skipped_symbol → Apex-provided explanation entry
+        _apex_skip_map: dict[str, dict] = {}
+        for _exp in (decision.get("higher_score_skips") or []):
+            _ss = _exp.get("skipped_symbol")
+            if _ss and _ss not in _apex_skip_map:
+                _apex_skip_map[_ss] = _exp
+
+        _sel_effective: dict[str, int] = {}
+        for _cand in (apex_input.get("track_a") or {}).get("candidates") or []:
+            _s = _cand.get("symbol")
+            if not _s or _s not in _selected_map:
+                continue
+            _v = _cand.get("apex_cap_score")
+            _sel_effective[_s] = int(round(_v)) if _v is not None else (_cand.get("score") or 0)
+
+        for _cand in (apex_input.get("track_a") or {}).get("candidates") or []:
+            _s = _cand.get("symbol")
+            if not _s or _s in _selected_map:
+                continue
+            _v = _cand.get("apex_cap_score")
+            _cand_eff = int(round(_v)) if _v is not None else (_cand.get("score") or 0)
+            _lower = {sym: eff for sym, eff in _sel_effective.items() if eff < _cand_eff}
+            if not _lower:
+                continue
+
+            _apex_exp = _apex_skip_map.get(_s)
+            _apex_skip_reason = (_apex_exp.get("reason") if _apex_exp else None)
+            _apex_mentioned = bool(_apex_exp) or any(
+                _s in (info.get("rationale") or "")
+                for info in _selected_map.values()
+            )
+            _lower_sym = max(_lower, key=_lower.get)  # highest-eff among the lower-selected group
+            _lower_eff = _lower[_lower_sym]
+            _score_gap = _cand_eff - _lower_eff
+
+            # Prefer Apex-supplied selected_lower_symbol when available
+            _sel_lower_sym = (_apex_exp.get("selected_lower_symbol") if _apex_exp else None) or _lower_sym
+            _sel_lower_eff = (_apex_exp.get("selected_effective_score") if _apex_exp else None) or _lower_eff
+
+            _cand_tier = _cand.get("scanner_tier")
+            _cand_origin = (
+                _cand.get("origin_path")
+                or (_cand.get("origin"))
+                or ("tier_d_main_path" if _cand_tier == "D" else "normal_path")
+            )
+            _write_apex_audit({
+                "ts":                           _audit_now_ts,
+                "record_type":                  "high_score_skip",
+                "cycle_id":                     _audit_cycle_id,
+                "symbol":                       _s,
+                "effective_score":              _cand_eff,
+                "raw_score":                    _cand.get("score"),
+                "scanner_tier":                 _cand_tier,
+                "origin_path":                  _cand_origin,
+                "selected_band":                _cand.get("selected_band"),
+                "selected_slot":                _cand.get("selected_slot"),
+                "higher_than_selected_symbols": list(_lower.keys()),
+                "highest_lower_selected_score": max(_lower.values()),
+                "apex_mentioned":               _apex_mentioned,
+                "apex_reason_if_any":           next(
+                    (e.get("rationale") for e in (decision.get("new_entries") or [])
+                     if e.get("symbol") == _s), None
+                ),
+                "apex_skip_reason":             _apex_skip_reason,
+                "selected_lower_symbol":        _sel_lower_sym,
+                "selected_lower_score":         _sel_lower_eff,
+                "score_gap":                    _score_gap,
+                "reason_category":              _classify_reason(_apex_skip_reason) if _apex_skip_reason else "no_reason_provided",
+                "suspected_reason":             (
+                    "apex_acknowledged_skip" if _apex_mentioned else "qualitative_preference"
+                ),
+                "existing_position":            _s in (active_trades or {}),
+                "exposure_conflict":            None,
+                "correlation_conflict":         None,
+                "sector_conflict":              None,
+                "option_ok":                    _cand.get("options_eligible"),
+                "liquidity_ok":                 None,
+            })
+    except Exception as _hss_exc:
+        log.warning("apex_orchestrator: high_score_skip audit failed — %s", _hss_exc)
+
     # Observability: when candidates were presented but Apex returned zero entries,
     # log the count and market_read so Monday diagnosis is immediate.
     _cand_count = len((apex_input.get("track_a") or {}).get("candidates") or [])
@@ -287,6 +529,46 @@ def _run_apex_pipeline(
             regime=regime or {},
             execute=True,
         )
+        # ── Apex decision audit — aggregate record ────────────────────────
+        try:
+            _agg_cands    = (apex_input.get("track_a") or {}).get("candidates") or []
+            _agg_entries  = [
+                e for e in (decision.get("new_entries") or [])
+                if (e.get("trade_type") or "").upper() != "AVOID" and e.get("symbol")
+            ]
+            _agg_td_cands = [c for c in _agg_cands if c.get("scanner_tier") == "D"]
+            _agg_dr       = dispatch_report.get("new_entries") or []
+            _agg_executed = [r for r in _agg_dr if r.get("executed")]
+            _agg_blocked  = [r for r in _agg_dr if not r.get("executed")]
+
+            def _is_td(sym: str) -> bool:
+                return (candidates_by_symbol.get(sym) or {}).get("scanner_tier") == "D"
+
+            _write_apex_audit({
+                "ts":                              datetime.now(UTC).isoformat(),
+                "record_type":                     "aggregate",
+                "cycle_id":                        apex_input.get("scan_ts") or decision.get("scan_ts"),
+                "total_candidates_sent_to_apex":   len(_agg_cands),
+                "tier_d_candidates_sent_to_apex":  len(_agg_td_cands),
+                "normal_candidates_sent_to_apex":  len(_agg_cands) - len(_agg_td_cands),
+                "tier_d_recovered_sent_to_apex":   sum(
+                    1 for c in _agg_td_cands
+                    if c.get("selected_band") is not None
+                    and (c.get("apex_cap_score") or 0) > (c.get("score") or 0)
+                ),
+                "apex_new_entries_count":          len(_agg_entries),
+                "apex_new_entries_symbols":        [e.get("symbol") for e in _agg_entries],
+                "tier_d_new_entries_count":        sum(1 for e in _agg_entries if _is_td(e.get("symbol", ""))),
+                "normal_new_entries_count":        sum(1 for e in _agg_entries if not _is_td(e.get("symbol", ""))),
+                "order_intent_count":              len(_agg_executed),
+                "tier_d_order_intent_count":       sum(1 for r in _agg_executed if _is_td(r.get("symbol", ""))),
+                "normal_order_intent_count":       sum(1 for r in _agg_executed if not _is_td(r.get("symbol", ""))),
+                "blocked_count":                   len(_agg_blocked),
+                "tier_d_blocked_count":            sum(1 for r in _agg_blocked if _is_td(r.get("symbol", ""))),
+                "normal_blocked_count":            sum(1 for r in _agg_blocked if not _is_td(r.get("symbol", ""))),
+            })
+        except Exception as _agg_exc:
+            log.warning("apex_orchestrator: aggregate audit failed — %s", _agg_exc)
     except Exception as e:
         log.error("apex_orchestrator: dispatch(execute=True) raised — %s", e)
         dispatch_report["errors"].append(f"dispatch_error:{e}")

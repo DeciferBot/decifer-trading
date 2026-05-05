@@ -887,7 +887,13 @@ SESSION CHARACTER (today's tape — your judgment, intraday):
   RELIEF_RALLY   — SPY bouncing within structural downtrend, VIX declining but still elevated.
                    Size new longs at 50% normal. Keep existing shorts. Do not chase strength.
   FEAR_ELEVATED  — VIX rising 18–28, market direction indeterminate. NOT an AVOID mandate.
-                   Prefer catalyst-driven setups over pure technicals. Reduce size on speculative plays.
+                   INTRADAY/SWING candidates: prefer catalyst-driven setups over pure technicals.
+                   POSITION candidates (pru=True, band=core): multi-week thesis quality, business
+                   improvement, and relative strength are valid entry reasons — a same-day catalyst
+                   is NOT required. Do NOT AVOID a POSITION candidate solely because catalyst=0,
+                   pead=0, news=[], gap is absent, or intraday momentum is weak; these are expected
+                   for PRU entries whose edge is fundamental, not intraday.
+                   For all types: reduce size on speculative plays (MEDIUM conviction, not HIGH).
   DISTRIBUTION   — SPY -0.5% to -2%, orderly selling, VIX rising moderately. Shorts working.
                    Longs require a strong stock-specific story to justify against tape headwind.
   TRENDING_BEAR  — SPY down >2% or confirmed multi-day downtrend, VIX >25. Shorts strongly preferred.
@@ -896,7 +902,9 @@ SESSION CHARACTER (today's tape — your judgment, intraday):
 INTERACTION RULE — when regime and session_character diverge, the divergence is informative:
   TRENDING_DOWN + RELIEF_RALLY  → bounce within downtrend; scale new longs to 50%, hold shorts
   TRENDING_UP   + DISTRIBUTION  → unusual intraday breakdown; reduce new entries, check breadth
-  RANGE_BOUND   + FEAR_ELEVATED → most common indeterminate case; stock-specific catalysts are the only reliable edge
+  RANGE_BOUND   + FEAR_ELEVATED → most common indeterminate case; stock-specific catalysts are the
+                                   most reliable edge for INTRADAY/SWING; POSITION candidates with
+                                   high effective_score remain valid on thesis quality alone
   Any regime    + TRENDING_BEAR → tape is leading the structural signal; treat as TRENDING_DOWN for sizing
 
 ENTRY FLOOR RULE:
@@ -908,6 +916,22 @@ ENTRY FLOOR RULE:
   "VIX spike above 30", "FOMC decision in 2h", "TRENDING_BEAR confirmed").
   Vague caution ("uncertain macro", "elevated fear") is not sufficient — name
   the specific reason or produce an entry.
+
+SCORE SEMANTICS:
+  effective_score is the primary comparable score for all Track A candidates.
+  raw_score is the underlying signal score before any research adjustment.
+  For POSITION candidates (pru=True), effective_score already incorporates a
+  validated research-quality adjustment — it is NOT artificial inflation.
+  Always compare effective_score against effective_score. Never compare one
+  candidate's raw_score against another candidate's effective_score.
+
+TIER D METADATA (pos_meta fields — present on POSITION candidates):
+  adj_disc = adjusted discovery score from the Position Research Universe pipeline
+  arch     = research archetype (e.g. "Quality Compounder", "Turnaround", "Secular Growth")
+  bucket   = research universe bucket (e.g. "core_research", "watchlist")
+  boost    = research-quality points added to raw_score to produce effective_score;
+             positive boost = the PRU pipeline validated this name on fundamental criteria
+  pru=True = sourced from Position Research Universe; multi-week hold evaluation applies
 
 OUTPUT: valid JSON matching exactly this schema (no prose outside JSON):
 {
@@ -935,7 +959,8 @@ OUTPUT: valid JSON matching exactly this schema (no prose outside JSON):
       "reasoning_tag": "tag",
       "reasoning": "one sentence"
     }
-  ]
+  ],
+  "higher_score_skips": []
 }
 
 portfolio_actions may be empty. new_entries must contain at least one non-AVOID entry
@@ -943,11 +968,47 @@ when ≥3 candidates have score ≥35 and no named systemic blocker applies (see
 ADD is for scaling into a winner already held — use it when the thesis is strengthening and the position
 has room to grow. add_pct is the fraction of the current held qty to add (25 = small scale, 100 = double).
 CRITICAL: every new_entries item MUST include "symbol" (the ticker string). Entries without "symbol" are silently dropped by the execution layer.
+
+HIGH_SCORE_SKIP EXPLANATION (observability only — does NOT force selection by score):
+  When you select a candidate but do NOT select a different candidate whose effective_score
+  is ≥8 points higher than any candidate you did select, add one entry per such skipped symbol
+  in higher_score_skips. You may still select lower-score candidates — this field is for
+  audit transparency only and does not constrain your selection.
+
+  "higher_score_skips": [
+    {
+      "skipped_symbol": "RKLB",
+      "skipped_effective_score": 86,
+      "selected_lower_symbol": "IWM",
+      "selected_effective_score": 73,
+      "reason": "one sentence explaining the qualitative or portfolio-fit reason for the skip"
+    }
+  ]
+
+  ALWAYS include the higher_score_skips field. Use an empty list [] when no skip meets
+  the ≥8 point threshold. Do NOT omit the field.
+  Reason categories that are valid: portfolio_fit, catalyst_quality, weak_tape,
+  volatility_risk, sector_overlap, execution_quality, other.
 """
 
 
 def _format_candidate_line(c: dict) -> str:
-    """One-line per-candidate summary for the user prompt."""
+    """One-line per-candidate summary for the user prompt.
+
+    effective_score = apex_cap_score when present (Tier D adjusted), else raw score.
+    This is the primary score Apex should use for comparison across all candidates.
+    """
+    raw_score = c.get("score") or 0
+    acs = c.get("apex_cap_score")
+    effective_score = int(round(acs)) if acs is not None else raw_score
+    tier = c.get("scanner_tier") or "normal"
+    _tier_d = c.get("scanner_tier") == "D"
+    origin = c.get("origin_path") or c.get("origin") or (
+        "tier_d_main_path" if _tier_d else "normal_path"
+    )
+    band = c.get("selected_band") or "-"
+    slot = c.get("selected_slot") or "-"
+
     sb = c.get("score_breakdown") or {}
     dims = ", ".join(
         f"{k}={sb.get(k)}"
@@ -960,7 +1021,9 @@ def _format_candidate_line(c: dict) -> str:
     dar_val = c.get("dar")
     dar_str = "pre-mkt" if dar_val is None else dar_val
     line = (
-        f"{c.get('symbol')}: score={c.get('score')} dir={c.get('direction')} "
+        f"{c.get('symbol')}: effective_score={effective_score} raw_score={raw_score} "
+        f"tier={tier} origin={origin} band={band} slot={slot} "
+        f"dir={c.get('direction')} "
         f"DAR={dar_str} [{dims}] atr5={c.get('atr_5m')} atrD={c.get('atr_daily')} "
         f"volR={c.get('vol_ratio')} tape={c.get('daily_tape_score')} "
         f"rs={c.get('stock_rs_vs_spy')} cat={c.get('catalyst_score')} "
@@ -979,20 +1042,16 @@ def _format_candidate_line(c: dict) -> str:
         for f in ("adjusted_discovery_score", "primary_archetype", "universe_bucket")
     )
     if _is_tier_d or _has_pru_meta:
-        _acs = c.get("apex_cap_score")
-        _acs_str = f"{_acs:.1f}" if _acs is not None else "?"
         _adj = c.get("adjusted_discovery_score")
         _adj_str = f"{_adj:.0f}" if _adj is not None else "?"
+        boost = int(round(acs - raw_score)) if acs is not None else 0
+        boost_str = f"+{boost}" if boost >= 0 else str(boost)
         line += (
-            f" pos_meta=[tier={c.get('scanner_tier') or '?'}"
-            f" origin={c.get('origin_path') or c.get('origin') or '?'}"
-            f" pru={bool(c.get('position_research_universe_member'))}"
-            f" adj_disc={_adj_str}"
+            f" pos_meta=[adj_disc={_adj_str}"
             f" arch={c.get('primary_archetype') or '?'}"
             f" bucket={c.get('universe_bucket') or '?'}"
-            f" apex_score={_acs_str}"
-            f" band={c.get('selected_band') or '?'}"
-            f" slot={c.get('selected_slot') or '?'}]"
+            f" boost={boost_str}"
+            f" pru={bool(c.get('position_research_universe_member'))}]"
         )
     hint = c.get("_shadow_hint")
     if hint:
@@ -1019,6 +1078,13 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
     regime = mctx.get("regime") or {}
     pstate = apex_input.get("portfolio_state") or {}
     candidates = (apex_input.get("track_a") or {}).get("candidates") or []
+    # Sort by effective_score descending so Apex sees highest-conviction entries first.
+    # effective_score = apex_cap_score when present (Tier D adjusted), else raw score.
+    candidates = sorted(
+        candidates,
+        key=lambda c: c.get("apex_cap_score") or c.get("score") or 0,
+        reverse=True,
+    )
     review = apex_input.get("track_b") or []
 
     parts: list[str] = [f"[TRIGGER] {trig}"]
@@ -1058,6 +1124,31 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
         f"net_exp={pstate.get('net_exposure_pct', 0):+.2%}"
     )
 
+    # ── Portfolio capacity context (instrumentation — limits unchanged) ──
+    _pv = pstate.get("portfolio_value") or 0.0
+    _pos_count = pstate.get("position_count") or 0
+    _max_pos = int(CONFIG.get("max_positions", 100) or 100)
+    _max_alloc = float(CONFIG.get("max_portfolio_allocation", 1.0) or 1.0)
+    _max_single = float(CONFIG.get("max_single_position", 0.10) or 0.10)
+    _gross_long = pstate.get("gross_long_notional") or 0.0
+    _gross_short = pstate.get("gross_short_notional") or 0.0
+    _total_deployed = _gross_long + _gross_short
+    _alloc_pct = (_total_deployed / _pv) if _pv > 0 else 0.0
+    _slots_left = max(0, _max_pos - _pos_count)
+    _likely_blocked = _alloc_pct >= (_max_alloc * 0.95)
+    parts.append("\n[PORTFOLIO CAPACITY]")
+    parts.append(
+        f"  open_positions={_pos_count}/{_max_pos} "
+        f"slots_left={_slots_left} "
+        f"total_deployed=${_total_deployed:,.0f} "
+        f"alloc={_alloc_pct:.1%}/{_max_alloc:.0%} "
+        f"max_single={_max_single:.0%}"
+    )
+    parts.append(
+        f"  new_entries_likely_blocked={'YES — near allocation limit' if _likely_blocked else 'no'}"
+        + (" (prefer entries that close correlated or offsetting positions)" if _likely_blocked else "")
+    )
+
     parts.append(f"\n[TRACK A — NEW CANDIDATES] ({len(candidates)})")
     if not candidates:
         parts.append("  (none this cycle — output new_entries: [])")
@@ -1066,9 +1157,11 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
         if c.get("scanner_tier") == "D":
             prefix = (
                 "[POSITION_CANDIDATE] Source: Position Research Universe. "
+                "This is a positive research-quality tag. "
                 "Evaluate primarily on multi-week thesis quality, business improvement, "
                 "relative strength, sector support, and risk/reward. "
-                "Do not penalise solely for lack of gap, premarket volume, or intraday momentum.\n  "
+                "Lack of immediate catalyst, gap, or intraday momentum should not override "
+                "a high effective_score unless tape, execution quality, portfolio fit, or risk is poor.\n  "
             )
         parts.append("  " + prefix + _format_candidate_line(c))
 
@@ -1162,6 +1255,9 @@ def apex_call(
         system_prompt = _APEX_SYSTEM_PROMPT
         user_prompt = _build_apex_user_prompt(apex_input, sctx)
         raw, _meta = _call_apex_meta(system_prompt, user_prompt, max_tokens=int(CONFIG.get("apex_max_tokens", 6144)))
+        # Store prompt and raw response in _meta so the orchestrator can persist them.
+        _meta["user_prompt"] = user_prompt
+        _meta["raw_response"] = raw
     except Exception as e:
         log.error("apex_call: LLM call failed — %s", e)
         fb = _fallback_decision(apex_input, reason=f"llm_error:{type(e).__name__}")
@@ -1189,6 +1285,13 @@ def apex_call(
         fb = _fallback_decision(apex_input, reason=f"schema_error:{e}")
         fb["_meta"] = {**_meta, "error": "schema_error"}
         return fb
+
+    # higher_score_skips is required in the schema but the model may omit it.
+    # Tolerate absence by defaulting to [] and flagging for audit.
+    if "higher_score_skips" not in decision:
+        log.debug("apex_call: higher_score_skips absent — defaulting to []")
+        decision["higher_score_skips"] = []
+        _meta["schema_missing_higher_score_skips"] = True
 
     decision.setdefault("scan_ts", apex_input.get("scan_ts", ""))
     # Phase 7C.3: attach Apex-call metadata (latency, tokens, model).
