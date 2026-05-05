@@ -12,7 +12,7 @@ echo "  ██║  ██║██╔══╝  ██║     ██║██╔
 echo "  ██████╔╝███████╗╚██████╗██║██║     ███████╗██║  ██║"
 echo "  ╚═════╝ ╚══════╝ ╚═════╝╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝"
 echo ""
-echo "  <> Autonomous AI Trading System v3.0"
+echo "  <> Autonomous AI Trading System v2.0"
 echo ""
 
 # Find the project folder
@@ -74,5 +74,18 @@ echo ""
 # Activate venv (Python 3.11)
 source venv/bin/activate
 
-# Run the bot (stays in foreground so you see output)
-python bot.py
+# Run the bot with auto-restart on crash
+RESTART_DELAY=10
+while true; do
+    python bot.py
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -eq 0 ]; then
+        echo "  ✓ Bot exited cleanly — not restarting."
+        break
+    fi
+    echo ""
+    echo "  ⚠ Bot crashed (exit $EXIT_CODE) — restarting in ${RESTART_DELAY}s..."
+    echo "  Press Ctrl+C to abort restart."
+    sleep $RESTART_DELAY
+    echo "  🔄 Restarting..."
+done
