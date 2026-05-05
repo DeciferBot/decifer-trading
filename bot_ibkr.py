@@ -285,41 +285,44 @@ def _reconnect_worker() -> None:
     client_id = CONFIG.get("ibkr_client_id", 1)
 
     wait = base_wait
-    for attempt in range(1, max_attempts + 1):
-        log.warning(f"IBKR reconnect attempt {attempt}/{max_attempts} (waiting {wait}s before connect)…")
-        dash["status"] = f"reconnecting ({attempt}/{max_attempts})"
-        time.sleep(wait)
+    try:
+        for attempt in range(1, max_attempts + 1):
+            log.warning(f"IBKR reconnect attempt {attempt}/{max_attempts} (waiting {wait}s before connect)…")
+            dash["status"] = f"reconnecting ({attempt}/{max_attempts})"
+            # Interruptible sleep — dashboard Reconnect button sets this event to skip backoff
+            bot_state._manual_reconnect_evt.wait(timeout=wait)
+            bot_state._manual_reconnect_evt.clear()
 
-        try:
-            ib = bot_state.ib  # read at call time for test-patch support
-            ib.connect(host, port, clientId=client_id, readonly=False)
-            log.info(f"✔ IBKR reconnected on attempt {attempt}.")
-            dash["status"] = "connected"
-            dash["ibkr_disconnected"] = False
-            _restore_subscriptions()
-            # Re-fetch today's completed orders that arrived while we were disconnected.
             try:
-                ib.reqCompletedOrders(False)
-            except Exception as _rco_exc:
-                log.warning(f"reqCompletedOrders after reconnect failed: {_rco_exc}")
-            # Reconcile position state against IBKR after reconnect —
-            # orphaned SLs from the disconnect are cleaned by Pass 2 on the next scan cycle.
-            try:
-                ib.sleep(2)  # let IBKR push open-order events before reading state
-                from orders_portfolio import reconcile_with_ibkr as _reconcile
-                _reconcile(ib)
-            except Exception as _rec_exc:
-                log.warning(f"reconcile_with_ibkr after reconnect failed: {_rec_exc}")
-            break
-        except Exception as exc:
-            log.error(f"Reconnect attempt {attempt} failed: {exc}")
-            wait = min(wait * 2, max_wait)
-    else:
-        # All attempts exhausted
-        _send_reconnect_exhausted_alert(max_attempts)
-
-    with _reconnect_lock:
-        bot_state._reconnecting = False
+                ib = bot_state.ib  # read at call time for test-patch support
+                ib.connect(host, port, clientId=client_id, readonly=False)
+                log.info(f"✔ IBKR reconnected on attempt {attempt}.")
+                dash["status"] = "running"
+                dash["ibkr_disconnected"] = False
+                _restore_subscriptions()
+                # Re-fetch today's completed orders that arrived while we were disconnected.
+                try:
+                    ib.reqCompletedOrders(False)
+                except Exception as _rco_exc:
+                    log.warning(f"reqCompletedOrders after reconnect failed: {_rco_exc}")
+                # Reconcile position state against IBKR after reconnect —
+                # orphaned SLs from the disconnect are cleaned by Pass 2 on the next scan cycle.
+                try:
+                    ib.sleep(2)  # let IBKR push open-order events before reading state
+                    from orders_portfolio import reconcile_with_ibkr as _reconcile
+                    _reconcile(ib)
+                except Exception as _rec_exc:
+                    log.warning(f"reconcile_with_ibkr after reconnect failed: {_rec_exc}")
+                break
+            except Exception as exc:
+                log.error(f"Reconnect attempt {attempt} failed: {exc}")
+                wait = min(wait * 2, max_wait)
+        else:
+            # All attempts exhausted
+            _send_reconnect_exhausted_alert(max_attempts)
+    finally:
+        with _reconnect_lock:
+            bot_state._reconnecting = False
 
 
 def _on_disconnected() -> None:
