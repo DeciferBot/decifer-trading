@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# Usage: ./scripts/bump-version.sh 1.4.0 "IC Weighted Scoring"
+# Force a specific version and codename.
+# Only needed when you want to override the automatic bump or change the codename.
+# Normal versioning is fully automatic via .githooks/commit-msg:
+#   feat  → MINOR   fix/refactor/chore/etc → PATCH   feat!/BREAKING CHANGE → MAJOR
+#
+# Usage: ./scripts/bump-version.sh 4.0.0 "New Codename"
 set -e
 
 if [ -z "$1" ] || [ -z "$2" ]; then

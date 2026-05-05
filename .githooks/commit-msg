@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# Auto-bump version from conventional commit type.
+#
+#   feat(...)         → MINOR bump, PATCH resets to 0
+#   fix / refactor /
+#   chore / test /
+#   docs / perf /
+#   style / ci        → PATCH bump
+#   feat! / fix! /
+#   BREAKING CHANGE   → MAJOR bump, MINOR and PATCH reset to 0
+#
+# Skips entirely if version.py is already staged
+# (manual MAJOR/MINOR bump via scripts/bump-version.sh).
+
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+VERSION_FILE="$REPO_ROOT/version.py"
+MSG_FILE="$1"
+
+# Let manual bump-version.sh commits through unchanged.
+if git diff --cached --name-only | grep -q "^version\.py$"; then
+    exit 0
+fi
+
+MSG=$(cat "$MSG_FILE")
+
+current=$(python3 -c "
+with open('$VERSION_FILE') as f:
+    for line in f:
+        if line.startswith('__version__'):
+            print(line.split('\"')[1])
+            break
+")
+
+IFS='.' read -ra parts <<< "$current"
+major="${parts[0]}"
+minor="${parts[1]}"
+patch="${parts[2]}"
+
+# Breaking change: any type with ! suffix, or BREAKING CHANGE in body.
+if echo "$MSG" | grep -qE "^[a-z]+(\([^)]*\))?!:" || echo "$MSG" | grep -q "BREAKING CHANGE"; then
+    new_version="$((major + 1)).0.0"
+    bump_type="MAJOR"
+# New feature.
+elif echo "$MSG" | grep -qE "^feat(\([^)]*\))?:"; then
+    new_version="${major}.$((minor + 1)).0"
+    bump_type="MINOR"
+# Everything else is a patch.
+else
+    new_version="${major}.${minor}.$((patch + 1))"
+    bump_type="PATCH"
+fi
+
+sed -i '' "s/__version__ = \"${current}\"/__version__ = \"${new_version}\"/" "$VERSION_FILE"
+git add "$VERSION_FILE"
+
+echo "  [version] ${bump_type}: v${current} → v${new_version}"

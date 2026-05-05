@@ -1,10 +1,12 @@
 # Decifer Trading — semantic version
-# Bump with: ./scripts/bump-version.sh <MAJOR.MINOR.PATCH> "<Codename>"
 #
-# Convention:
-#   MAJOR — architectural overhaul (new signal engine, new execution model)
-#   MINOR — new feature shipped (new signal dimension, new agent, new gate)
-#   PATCH — bug fix, parameter tweak, test fix
+# Convention (enforced automatically by .githooks/commit-msg):
+#   MAJOR — breaking architectural overhaul  (feat! / BREAKING CHANGE)
+#   MINOR — new feature shipped              (feat)
+#   PATCH — bug fix, tweak, refactor, test   (everything else)
+#
+# To force a specific version or change the codename:
+#   ./scripts/bump-version.sh <MAJOR.MINOR.PATCH> "<Codename>"
 
-__version__ = "3.0.121"
+__version__ = "3.7.0"
 __codename__ = "Apex"
