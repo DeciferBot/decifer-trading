@@ -684,7 +684,7 @@ def get_company_profile(symbol: str) -> dict | None:
         "symbol":     symbol.upper(),
         "sector_etf": GICS_ETF_MAP.get(sector),
         "sector":     sector,
-        "market_cap": _safe_float(item.get("mktCap")),
+        "market_cap": _safe_float(item.get("marketCap") or item.get("mktCap")),
         "employees":  int(item["fullTimeEmployees"]) if item.get("fullTimeEmployees") else None,
         "description": (item.get("description") or "")[:300],
         "exchange":   item.get("exchangeShortName") or item.get("exchange") or "",

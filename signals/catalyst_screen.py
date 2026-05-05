@@ -113,32 +113,32 @@ def _fetch_info(ticker: str) -> dict | None:
         import fmp_client as fmp
         if fmp.is_available():
             profile = fmp.get_company_profile(ticker)
-            if not profile or not profile.get("market_cap"):
-                return None
-            metrics = fmp.get_key_metrics_ttm(ticker)
-            growth  = fmp.get_revenue_growth(ticker)
+            if profile and profile.get("market_cap"):
+                metrics = fmp.get_key_metrics_ttm(ticker)
+                growth  = fmp.get_revenue_growth(ticker)
 
-            ev_revenue     = metrics.get("ev_to_sales") if metrics else None
-            net_debt_ebitda = metrics.get("net_debt_to_ebitda") if metrics else None
-            # Negative net-debt/EBITDA = net cash positive (debt < cash)
-            net_cash_positive = (net_debt_ebitda < 0) if net_debt_ebitda is not None else None
+                ev_revenue      = metrics.get("ev_to_sales") if metrics else None
+                net_debt_ebitda = metrics.get("net_debt_to_ebitda") if metrics else None
+                # Negative net-debt/EBITDA = net cash positive (debt < cash)
+                net_cash_positive = (net_debt_ebitda < 0) if net_debt_ebitda is not None else None
 
-            rev_growth_pct = growth.get("revenue_growth_yoy") if growth else None
-            # get_revenue_growth returns %, convert to decimal for threshold comparison
-            rev_growth = rev_growth_pct / 100.0 if rev_growth_pct is not None else None
+                rev_growth_pct = growth.get("revenue_growth_yoy") if growth else None
+                # get_revenue_growth returns %, convert to decimal for threshold comparison
+                rev_growth = rev_growth_pct / 100.0 if rev_growth_pct is not None else None
 
-            return {
-                "_source":      "fmp",
-                "sector":       profile.get("sector", ""),
-                "shortName":    ticker,
-                "marketCap":    profile.get("market_cap"),
-                "enterpriseToRevenue": ev_revenue,
-                "revenueGrowth":       rev_growth,
-                "_net_cash_positive":  net_cash_positive,
-                # sentinel values so _score_ticker net-cash branch works for both sources
-                "totalCash": 1.0 if net_cash_positive else 0.0,
-                "totalDebt": 0.0 if net_cash_positive else 1.0,
-            }
+                return {
+                    "_source":      "fmp",
+                    "sector":       profile.get("sector", ""),
+                    "shortName":    ticker,
+                    "marketCap":    profile.get("market_cap"),
+                    "enterpriseToRevenue": ev_revenue,
+                    "revenueGrowth":       rev_growth,
+                    "_net_cash_positive":  net_cash_positive,
+                    # sentinel values so _score_ticker net-cash branch works for both sources
+                    "totalCash": 1.0 if net_cash_positive else 0.0,
+                    "totalDebt": 0.0 if net_cash_positive else 1.0,
+                }
+            # profile missing or no market_cap — fall through to yfinance
     except Exception:
         pass
 
