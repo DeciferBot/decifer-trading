@@ -244,17 +244,22 @@ class PriceUpdater:
                 sym = trade.get("symbol", key)
                 quote = QUOTE_CACHE.get(sym)
                 if quote and quote.get("bid", 0) > 0 and quote.get("ask", 0) > 0:
+                    quote_age = time.time() - quote.get("ts", 0)
+                    if quote_age > 30:
+                        log.warning(
+                            "PriceUpdater: stale Alpaca quote for %s (age=%.0fs) — stream may have dropped",
+                            sym, quote_age,
+                        )
+                        continue
                     mid = round((quote["bid"] + quote["ask"]) / 2, 4)
-                    # If the reconciler has stored a recent IBKR price, check that
-                    # Alpaca's streaming quote hasn't drifted >1% from it.  When it
-                    # has, IBKR is authoritative — skip the Alpaca write so the
-                    # reconciler's validated price is preserved until the next cycle.
+                    # If IBKR has a recent validated price, guard against large drift
+                    # which would indicate the stream dropped and reconnected mid-move.
                     ibkr_ref = trade.get("ibkr_last", 0)
                     if ibkr_ref > 0:
                         _drift = abs(mid - ibkr_ref) / ibkr_ref
                         if _drift > 0.01:
                             log.warning(
-                                "PriceUpdater: skipping stale Alpaca quote for %s "
+                                "PriceUpdater: skipping Alpaca quote for %s "
                                 "(Alpaca=$%.2f, IBKR_last=$%.2f, drift=%.1f%%)",
                                 sym, mid, ibkr_ref, _drift * 100,
                             )

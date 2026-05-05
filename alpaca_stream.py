@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 
 import pandas as pd
 
@@ -150,6 +151,7 @@ class _QuoteCache:
                 "bid": bid,
                 "ask": ask,
                 "spread_pct": spread_pct,
+                "ts": time.time(),
             }
 
     def get_spread_pct(self, symbol: str) -> float | None:
