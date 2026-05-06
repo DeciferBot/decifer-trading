@@ -437,4 +437,109 @@ class TestModuleSingletons:
 
     def test_max_1m_bars_is_positive_int(self):
         assert isinstance(_MAX_1M_BARS, int)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AlpacaBarStream reconnect logic
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestAlpacaBarStreamReconnect:
+    """
+    Verify that _run() retries after a stream exception and exits cleanly
+    on intentional stop().  No real network connections or threads are used —
+    FakeStream.run() ends the loop by clearing _running, so _run() returns
+    synchronously in the test thread.
+    """
+
+    @staticmethod
+    def _make_fake_alpaca(monkeypatch, stream_ref: list, fail_times: int):
+        """
+        Patch sys.modules so _run()'s `from alpaca...` imports resolve to fakes.
+        FakeStream.run() raises RuntimeError for the first `fail_times` calls,
+        then clears stream_ref[0]._running so the while-loop exits cleanly.
+        `stream_ref` is a one-element list; fill in [0] after creating the stream.
+        Returns a list that accumulates one entry per run() call.
+        """
+        import types
+
+        run_calls: list = []
+
+        class FakeStream:
+            def __init__(self, *a, **kw):
+                pass
+
+            def subscribe_bars(self, *a, **kw):
+                pass
+
+            def subscribe_daily_bars(self, *a, **kw):
+                pass
+
+            def subscribe_quotes(self, *a, **kw):
+                pass
+
+            def subscribe_trading_statuses(self, *a, **kw):
+                pass
+
+            def run(self_inner):
+                run_calls.append(1)
+                if len(run_calls) <= fail_times:
+                    raise RuntimeError(f"fake error #{len(run_calls)}")
+                # Simulate a clean run completing — clear _running so the
+                # while-loop exits without retrying.
+                if stream_ref[0] is not None:
+                    stream_ref[0]._running = False
+
+        fake_live = types.ModuleType("alpaca.data.live")
+        fake_live.StockDataStream = FakeStream
+        fake_enums = types.ModuleType("alpaca.data.enums")
+
+        class _Feed:
+            SIP = "sip"
+
+        fake_enums.DataFeed = _Feed
+        monkeypatch.setitem(sys.modules, "alpaca.data.live", fake_live)
+        monkeypatch.setitem(sys.modules, "alpaca.data.enums", fake_enums)
+        monkeypatch.setattr("alpaca_stream.time.sleep", lambda _: None)
+        return run_calls
+
+    def test_reconnects_after_transient_error(self, monkeypatch):
+        """Stream that fails once should retry and run successfully."""
+        import unittest.mock as mock
+
+        import config as cfg_mod
+        from alpaca_stream import AlpacaBarStream
+
+        stream_ref: list = [None]
+        run_calls = self._make_fake_alpaca(monkeypatch, stream_ref, fail_times=1)
+
+        stream_obj = AlpacaBarStream()
+        stream_ref[0] = stream_obj
+        stream_obj._running = True
+
+        with mock.patch.object(cfg_mod, "CONFIG", {"alpaca_api_key": "k", "alpaca_secret_key": "s"}):
+            stream_obj._run(["SPY"])
+
+        assert len(run_calls) == 2, f"Expected 2 run() calls (1 fail + 1 success), got {len(run_calls)}"
+        assert not stream_obj._running
+
+    def test_stops_cleanly_on_intentional_stop(self, monkeypatch):
+        """A clean run that ends normally should not trigger a retry."""
+        import unittest.mock as mock
+
+        import config as cfg_mod
+        from alpaca_stream import AlpacaBarStream
+
+        stream_ref: list = [None]
+        run_calls = self._make_fake_alpaca(monkeypatch, stream_ref, fail_times=0)
+
+        stream_obj = AlpacaBarStream()
+        stream_ref[0] = stream_obj
+        stream_obj._running = True
+
+        with mock.patch.object(cfg_mod, "CONFIG", {"alpaca_api_key": "k", "alpaca_secret_key": "s"}):
+            stream_obj._run(["SPY"])
+
+        assert len(run_calls) == 1, "Should not retry after clean exit"
+        assert not stream_obj._running
         assert _MAX_1M_BARS > 0

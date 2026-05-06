@@ -343,61 +343,80 @@ class AlpacaBarStream:
         try:
             from alpaca.data.enums import DataFeed
             from alpaca.data.live import StockDataStream
-
-            self._stream = StockDataStream(api_key, secret_key, feed=DataFeed.SIP)
-
-            # ── Handler: 1-minute bars → BAR_CACHE ───────────────
-            async def on_bar(bar) -> None:
-                BAR_CACHE.update(
-                    bar.symbol,
-                    {
-                        "timestamp": bar.timestamp,
-                        "open": bar.open,
-                        "high": bar.high,
-                        "low": bar.low,
-                        "close": bar.close,
-                        "volume": bar.volume,
-                        "vwap": getattr(bar, "vwap", None),
-                    },
-                )
-                log.debug(f"AlpacaBarStream: {bar.symbol} 1m close={bar.close:.2f}")
-
-            # ── Handler: intraday daily bars → DAILY_BAR_CACHE ───
-            async def on_daily_bar(bar) -> None:
-                DAILY_BAR_CACHE.update(
-                    bar.symbol,
-                    {
-                        "open": bar.open,
-                        "high": bar.high,
-                        "low": bar.low,
-                        "close": bar.close,
-                        "volume": bar.volume,
-                        "timestamp": bar.timestamp,
-                    },
-                )
-
-            # ── Handler: quotes → QUOTE_CACHE ────────────────────
-            async def on_quote(quote) -> None:
-                bid = getattr(quote, "bid_price", 0) or 0
-                ask = getattr(quote, "ask_price", 0) or 0
-                QUOTE_CACHE.update(quote.symbol, bid, ask)
-
-            # ── Handler: trading statuses → HALT_CACHE ────────────
-            async def on_status(status) -> None:
-                code = getattr(status, "status_code", "T") or "T"
-                HALT_CACHE.update(status.symbol, code)
-
-            # Subscribe all four channels on the single SIP connection
-            self._stream.subscribe_bars(on_bar, *symbols)
-            self._stream.subscribe_daily_bars(on_daily_bar, *symbols)
-            self._stream.subscribe_quotes(on_quote, *symbols)
-            self._stream.subscribe_trading_statuses(on_status, *symbols)
-
-            self._stream.run()  # blocks until stop() is called
-
         except ImportError:
             log.error("AlpacaBarStream: alpaca-py not installed — run: pip3 install alpaca-py")
             self._running = False
-        except Exception as exc:
-            log.error(f"AlpacaBarStream: stream failed — {exc}")
-            self._running = False
+            return
+
+        # ── Handlers defined once — reused across reconnects ─────
+        async def on_bar(bar) -> None:
+            BAR_CACHE.update(
+                bar.symbol,
+                {
+                    "timestamp": bar.timestamp,
+                    "open": bar.open,
+                    "high": bar.high,
+                    "low": bar.low,
+                    "close": bar.close,
+                    "volume": bar.volume,
+                    "vwap": getattr(bar, "vwap", None),
+                },
+            )
+            log.debug(f"AlpacaBarStream: {bar.symbol} 1m close={bar.close:.2f}")
+
+        async def on_daily_bar(bar) -> None:
+            DAILY_BAR_CACHE.update(
+                bar.symbol,
+                {
+                    "open": bar.open,
+                    "high": bar.high,
+                    "low": bar.low,
+                    "close": bar.close,
+                    "volume": bar.volume,
+                    "timestamp": bar.timestamp,
+                },
+            )
+
+        async def on_quote(quote) -> None:
+            bid = getattr(quote, "bid_price", 0) or 0
+            ask = getattr(quote, "ask_price", 0) or 0
+            QUOTE_CACHE.update(quote.symbol, bid, ask)
+
+        async def on_status(status) -> None:
+            code = getattr(status, "status_code", "T") or "T"
+            HALT_CACHE.update(status.symbol, code)
+
+        # ── Reconnect loop with exponential backoff ───────────────
+        _BASE_WAIT = 5
+        _MAX_WAIT = 300
+        _MAX_TRIES = 10
+        attempt = 0
+
+        while self._running and attempt < _MAX_TRIES:
+            stream_start = time.time()
+            try:
+                self._stream = StockDataStream(api_key, secret_key, feed=DataFeed.SIP)
+                self._stream.subscribe_bars(on_bar, *symbols)
+                self._stream.subscribe_daily_bars(on_daily_bar, *symbols)
+                self._stream.subscribe_quotes(on_quote, *symbols)
+                self._stream.subscribe_trading_statuses(on_status, *symbols)
+                self._stream.run()  # blocks until stop() is called or error
+            except Exception as exc:
+                if not self._running:
+                    break  # intentional stop() call — exit cleanly
+                alive_secs = time.time() - stream_start
+                if alive_secs > 60:
+                    attempt = 0  # stream ran healthily — reset failure counter
+                attempt += 1
+                wait = min(_BASE_WAIT * (2 ** attempt), _MAX_WAIT)
+                log.warning(
+                    "AlpacaBarStream: stream error (attempt %d/%d), retrying in %.0fs: %s",
+                    attempt, _MAX_TRIES, wait, exc,
+                )
+                time.sleep(wait)
+
+        if self._running:
+            log.critical(
+                "AlpacaBarStream: max reconnect attempts (%d) reached — stream permanently dead", _MAX_TRIES
+            )
+        self._running = False
