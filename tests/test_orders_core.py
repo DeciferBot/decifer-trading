@@ -711,25 +711,8 @@ class TestExecuteSell:
         assert result is True
         mock_record_loss.assert_called_once()
 
-    @patch("orders.CONFIG")
-    @patch("orders._validate_position_price")
-    @patch("orders._get_ibkr_price")
-    @patch("orders.log_order")
-    @patch("orders.record_loss")
-    def test_execute_sell_options_composite_key(
-        self,
-        mock_record_loss,
-        mock_log_order,
-        mock_ibkr_price,
-        mock_validate_price,
-        mock_config_obj,
-        mock_config,
-        mock_ib,
-    ):
-        """execute_sell("GSAT") must find options position stored under composite key."""
-        mock_config_obj.__getitem__.side_effect = lambda k: mock_config[k]
-        mock_config_obj.get = lambda k, d=None: mock_config.get(k, d)
-
+    def test_execute_sell_options_composite_key(self, mock_config, mock_ib):
+        """execute_sell("GSAT") routes to execute_sell_option using composite key."""
         option_key = "GSAT_C_35.0_2026-04-17"
         orders.open_trades[option_key] = {
             "symbol": "GSAT",
@@ -738,19 +721,20 @@ class TestExecuteSell:
             "strike": 35.0,
             "expiry_ibkr": "20260417",
             "qty": 10,
+            "contracts": 10,
             "entry": 2.0,
+            "entry_premium": 2.0,
             "current": 2.0,
             "direction": "LONG",
         }
 
-        mock_ibkr_price.return_value = 1.5
-        mock_validate_price.return_value = (1.5, "IBKR=$1.50")
-
-        result = orders.execute_sell(ib=mock_ib, symbol="GSAT", reason="pm:exit")
+        with patch("orders_options.execute_sell_option", return_value=True) as mock_eso:
+            result = orders.execute_sell(ib=mock_ib, symbol="GSAT", reason="pm:exit")
 
         assert result is True
-        assert option_key not in orders.open_trades
-        mock_record_loss.assert_called_once()
+        mock_eso.assert_called_once()
+        # Verify the composite key was correctly resolved from the plain symbol
+        assert mock_eso.call_args[0][1] == option_key
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1834,6 +1818,7 @@ class TestValidateOrderContextWiring:
         fake_now = MagicMock()
         fake_now.time.return_value = _dt.time(14, 0)
         with patch.object(oc, "_validate_order_context", side_effect=spy), \
+             patch("orders.check_combined_exposure", return_value=(True, "OK", "")), \
              patch("datetime.datetime") as mock_dt:
             mock_dt.now.return_value = fake_now
             # execute_buy may fail downstream (no full IB mock) — that's fine;
@@ -1870,6 +1855,7 @@ class TestValidateOrderContextWiring:
 
         with patch("orders.CONFIG", cfg), \
              patch.object(oc, "_validate_order_context", side_effect=spy), \
+             patch("orders.check_combined_exposure", return_value=(True, "OK", "")), \
              caplog.at_level(logging.WARNING, logger="decifer.orders"):
             orders.execute_short(
                 ib=self.ib,

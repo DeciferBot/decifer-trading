@@ -369,8 +369,14 @@ class TestReconnectWorkerBackoff(unittest.TestCase):
         mock_ib = MagicMock()
         mock_ib.connect = MagicMock(side_effect=OSError("refused"))
         sleep_calls = []
+
+        def fake_wait(timeout=None):
+            if timeout is not None:
+                sleep_calls.append(timeout)
+            return False  # event not set — proceed with connect attempt
+
         with patch.object(bot, "ib", mock_ib), patch.object(bot_ibkr, "_send_reconnect_exhausted_alert"):
-            with patch("time.sleep", side_effect=lambda s: sleep_calls.append(s)):
+            with patch.object(bot_state._manual_reconnect_evt, "wait", side_effect=fake_wait):
                 bot_ibkr._reconnect_worker()
         return sleep_calls
 
@@ -420,18 +426,21 @@ class TestReconnectWorkerBackoff(unittest.TestCase):
         self.assertEqual(mock_ib.connect.call_count, 2)
 
     def test_sleep_called_before_each_connect(self):
-        """sleep is called once before each connect attempt."""
+        """wait is called once before each connect attempt."""
         bot.CONFIG["reconnect_max_attempts"] = 3
         mock_ib = MagicMock()
         mock_ib.connect = MagicMock(side_effect=OSError("refused"))
         sleep_calls = []
+
+        def fake_wait(timeout=None):
+            if timeout is not None:
+                sleep_calls.append(timeout)
+            return False
+
         with patch.object(bot, "ib", mock_ib), patch.object(bot_ibkr, "_send_reconnect_exhausted_alert"):
-            with patch("time.sleep", side_effect=lambda s: sleep_calls.append(s)):
+            with patch.object(bot_state._manual_reconnect_evt, "wait", side_effect=fake_wait):
                 bot_ibkr._reconnect_worker()
-        # One sleep per attempt — filter out heartbeat tick (60 s) which a concurrent
-        # daemon thread may inject when time.sleep is globally patched.
-        backoff_sleeps = [s for s in sleep_calls if s != 60]
-        self.assertEqual(len(backoff_sleeps), 3)
+        self.assertEqual(len(sleep_calls), 3)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -497,9 +506,10 @@ class TestReconnectWorkerState(unittest.TestCase):
         bot.dash["status"] = "reconnecting"
         mock_ib = MagicMock()
         mock_ib.connect = MagicMock()
-        with patch.object(bot, "ib", mock_ib), patch.object(bot_ibkr, "_restore_subscriptions"), patch("time.sleep"):
-            bot_ibkr._reconnect_worker()
-        self.assertEqual(bot.dash["status"], "connected")
+        with patch.object(bot, "ib", mock_ib), patch.object(bot_ibkr, "_restore_subscriptions"):
+            with patch.object(bot_state._manual_reconnect_evt, "wait", return_value=False):
+                bot_ibkr._reconnect_worker()
+        self.assertEqual(bot.dash["status"], "running")
 
     def test_dashboard_status_shows_attempt_number(self):
         """Dashboard status is updated on each attempt before connecting."""
@@ -507,13 +517,12 @@ class TestReconnectWorkerState(unittest.TestCase):
         mock_ib = MagicMock()
         mock_ib.connect = MagicMock()
 
-        original_sleep = time.sleep
-
-        def capture_status(s):
+        def capture_status(timeout=None):
             statuses.append(bot.dash.get("status", ""))
+            return False
 
         with patch.object(bot, "ib", mock_ib), patch.object(bot_ibkr, "_restore_subscriptions"):
-            with patch("time.sleep", side_effect=capture_status):
+            with patch.object(bot_state._manual_reconnect_evt, "wait", side_effect=capture_status):
                 bot_ibkr._reconnect_worker()
 
         self.assertTrue(len(statuses) >= 1)
@@ -866,8 +875,14 @@ def test_backoff_parametrized(base, max_w, attempts, expected):
     mock_ib = MagicMock()
     mock_ib.connect = MagicMock(side_effect=OSError("refused"))
     sleep_calls = []
+
+    def fake_wait(timeout=None):
+        if timeout is not None:
+            sleep_calls.append(timeout)
+        return False
+
     with patch.object(bot, "ib", mock_ib), patch.object(bot_ibkr, "_send_reconnect_exhausted_alert"):
-        with patch("time.sleep", side_effect=lambda s: sleep_calls.append(s)):
+        with patch.object(bot_state._manual_reconnect_evt, "wait", side_effect=fake_wait):
             bot_ibkr._reconnect_worker()
     assert sleep_calls == expected, f"Expected {expected}, got {sleep_calls}"
 

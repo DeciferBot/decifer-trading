@@ -1054,12 +1054,14 @@ def _format_candidate_line(c: dict) -> str:
     if _is_tier_d or _has_pru_meta:
         _adj = c.get("adjusted_discovery_score")
         _adj_str = f"{_adj:.0f}" if _adj is not None else "?"
+        apex_score_str = f"{acs}" if acs is not None else "?"
         boost = int(round(acs - raw_score)) if acs is not None else 0
         boost_str = f"+{boost}" if boost >= 0 else str(boost)
         line += (
             f" pos_meta=[adj_disc={_adj_str}"
             f" arch={c.get('primary_archetype') or '?'}"
             f" bucket={c.get('universe_bucket') or '?'}"
+            f" apex_score={apex_score_str}"
             f" boost={boost_str}"
             f" pru={bool(c.get('position_research_universe_member'))}]"
         )

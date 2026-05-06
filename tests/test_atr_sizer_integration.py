@@ -157,7 +157,7 @@ def _run_execute_buy(
         "orders.has_open_order_for": MagicMock(return_value=False),
         "orders._check_ibkr_open_order": MagicMock(return_value=False),
         "orders.check_correlation": MagicMock(return_value=(True, "ok")),
-        "orders.check_combined_exposure": MagicMock(return_value=(True, "ok")),
+        "orders.check_combined_exposure": MagicMock(return_value=(True, "ok", "")),
         "orders.check_sector_concentration": MagicMock(return_value=(True, "ok")),
         "execution_agent.get_execution_plan": MagicMock(return_value=_default_plan()),
         # Force market-hours path — tests must not depend on wall-clock time
@@ -402,7 +402,7 @@ def _build_fw_patches(plan, fw_mock) -> dict:
         "orders.has_open_order_for": MagicMock(return_value=False),
         "orders._check_ibkr_open_order": MagicMock(return_value=False),
         "orders.check_correlation": MagicMock(return_value=(True, "ok")),
-        "orders.check_combined_exposure": MagicMock(return_value=(True, "ok")),
+        "orders.check_combined_exposure": MagicMock(return_value=(True, "ok", "")),
         "orders.check_sector_concentration": MagicMock(return_value=(True, "ok")),
         "orders.LimitOrder": MagicMock(return_value=MagicMock()),
         "orders.StopOrder": MagicMock(return_value=MagicMock()),
