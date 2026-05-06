@@ -335,6 +335,6 @@ def last_intent_for_symbol(symbol: str) -> dict:
     best: dict = {}
     for rec in _load_all():
         if rec.get("event") == "ORDER_INTENT" and rec.get("symbol") == symbol:
-            if not best or rec.get("timestamp", "") > best.get("timestamp", ""):
+            if not best or get_ts(rec) > get_ts(best):
                 best = rec
     return best

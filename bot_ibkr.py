@@ -1409,6 +1409,21 @@ def _on_order_status_event(trade):
                                 clog("ERROR", f"Post-fill SL placement failed for {_sym}: {_e}")
                         threading.Thread(target=_place_long_sl, daemon=True, name=f"ext_sl_{sym}").start()
 
+                # ORDER_FILLED: write on first fill only (status was PENDING/SUBMITTED before this event).
+                # _on_order_status_event fires before _resolve_orphaned_pending, so without this
+                # the status is already FILLED by the time the reconcile pass runs — ORDER_FILLED
+                # would never be written and event_log.open_trades() would always return empty.
+                _el_tid = _t_pre.get("trade_id") or _t.get("trade_id", "")
+                if _el_tid and _t_pre.get("direction") == "LONG" and _t_pre.get("status") in ("PENDING", "SUBMITTED"):
+                    _el_qty = filled_qty or int(order.totalQuantity)
+                    try:
+                        from event_log import append_fill as _el_fill_cb
+                        _el_fill_cb(_el_tid, sym, fill_price=fill_price, fill_qty=_el_qty,
+                                    order_id=int(order.orderId or 0))
+                        _safe_update_trade(sym, {"_fill_confirmed": True})
+                    except Exception as _elf_e:
+                        clog("WARNING", f"ORDER_FILLED write failed for {sym}: {_elf_e}")
+
                 # Voice: fires only on first fill (pre-update status is PENDING/SUBMITTED).
                 # Guard matches the SHORT path — prevents double-speak if IBKR re-sends FILLED.
                 try:
@@ -1464,6 +1479,18 @@ def _on_order_status_event(trade):
                             except Exception as _e:
                                 clog("ERROR", f"Post-fill short SL placement failed for {_sym}: {_e}")
                         threading.Thread(target=_place_short_sl, daemon=True, name=f"ext_sl_{sym}").start()
+
+                # ORDER_FILLED for short entry: same first-fill guard as long path.
+                _el_tid_s = _t_pre.get("trade_id") or _t.get("trade_id", "")
+                if _el_tid_s and _t_pre.get("direction") == "SHORT" and _t_pre.get("status") == "PENDING":
+                    _el_qty_s = filled_qty or int(order.totalQuantity)
+                    try:
+                        from event_log import append_fill as _el_fill_cb_s
+                        _el_fill_cb_s(_el_tid_s, sym, fill_price=fill_price, fill_qty=_el_qty_s,
+                                      order_id=int(order.orderId or 0))
+                        _safe_update_trade(sym, {"_fill_confirmed": True})
+                    except Exception as _elf_es:
+                        clog("WARNING", f"ORDER_FILLED write failed for short {sym}: {_elf_es}")
 
                 # Voice for short entry fill
                 try:

@@ -198,6 +198,7 @@ def _safe_set_trade(key: str, value: dict) -> None:
 _STRUCTURAL_UPDATE_KEYS: frozenset = frozenset({
     "sl", "tp", "sl_order_id", "tp_order_id", "status", "qty",
     "t1_status", "t1_order_id", "t2_qty", "tranche_mode",
+    "_fill_confirmed",  # must persist immediately so restarts don't re-write ORDER_FILLED
 })
 
 

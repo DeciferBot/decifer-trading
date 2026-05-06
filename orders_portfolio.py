@@ -1941,9 +1941,7 @@ def _resolve_orphaned_pending(ib: IB, price_map: dict, positions_keys: set) -> N
                 try:
                     from event_log import append_fill as _el_fill
                     _el_fill(_tid, _key.split("|")[0], fill_price=_opt_fill, fill_qty=_ibkr_filled_qty)
-                    with _trades_lock:
-                        if _key in active_trades:
-                            active_trades[_key]["_fill_confirmed"] = True
+                    _safe_update_trade(_key, {"_fill_confirmed": True})
                 except Exception as _elf_err:
                     log.warning("Reconcile: ORDER_FILLED write failed for option %s: %s", _key, _elf_err)
             _src = "portfolio" if _key in price_map else "positions"
@@ -1969,9 +1967,7 @@ def _resolve_orphaned_pending(ib: IB, price_map: dict, positions_keys: set) -> N
                 try:
                     from event_log import append_fill as _el_fill
                     _el_fill(_tid, _key.split("|")[0], fill_price=_actual_fill, fill_qty=_actual_qty)
-                    with _trades_lock:
-                        if _key in active_trades:
-                            active_trades[_key]["_fill_confirmed"] = True
+                    _safe_update_trade(_key, {"_fill_confirmed": True})
                 except Exception as _elf_err:
                     log.warning("Reconcile: ORDER_FILLED write failed for %s: %s", _key, _elf_err)
             _src = "portfolio" if _key in price_map else "positions"
