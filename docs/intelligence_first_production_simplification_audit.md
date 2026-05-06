@@ -249,8 +249,103 @@ A production-ready, cloud-hostable trading system with clean service boundaries,
 
 ---
 
+## Sprint 6B File Classifications
+
+### advisory_logger.py
+
+| Field | Value |
+|-------|-------|
+| Classification | `advisory_only` |
+| Service layer | Advisory / Observability |
+| Runtime needed in production | Yes, only if advisory logging remains part of operations |
+| Temporary or permanent | TBD — retain until real-session advisory log review confirms value |
+| Production purpose | Read advisory_report.json; append one observer-only record per scan to advisory_runtime_log.jsonl |
+| Must not affect execution | Yes — no candidate mutation, no Apex input, no risk/order/execution change |
+| Must not be imported by | scanner.py, market_intelligence.py, orders_core.py, guardrails.py |
+| Retirement condition | Remove if advisory logs prove low value, or if production observability is consolidated in an external service (Datadog, CloudWatch, etc.) |
+| Rollback | Set `intelligence_first_advisory_enabled = False` in config.py; module is never loaded when flag is off |
+
+### data/intelligence/advisory_runtime_log.jsonl
+
+| Field | Value |
+|-------|-------|
+| Classification | `advisory_only` |
+| Service layer | Observability output |
+| Runtime needed in production | Yes, if advisory mode is active |
+| Temporary or permanent | Permanent while advisory hook is active; retention policy TBD |
+| Cloud runtime impact | Low — JSONL append; but log rotation and size management required before cloud deployment |
+| Retention policy | Not yet defined. Before cloud deployment: establish max size, rotation, or forwarding to log aggregator |
+| Must not be read by execution path | Yes — never read by bot_trading.py, market_intelligence.py, orders_core.py, or any live decision module |
+
+### tests/test_intelligence_sprint6b.py
+
+| Field | Value |
+|-------|-------|
+| Classification | `advisory_only` (test) |
+| Service layer | Test / CI |
+| Runtime needed in production | No |
+| Must remain in CI | Yes — while advisory hook exists in bot_trading.py, these tests are the primary safety net for the hook |
+| Retirement condition | Remove only if advisory hook is removed from bot_trading.py |
+
+### bot_trading.py — advisory hook (13-line addition in run_scan())
+
+| Field | Value |
+|-------|-------|
+| Classification | `advisory_only` hook inside a `production_runtime` file |
+| Service layer | Live bot observability |
+| Runtime needed in production | Yes, only if advisory mode is retained |
+| Production risk | Low when `intelligence_first_advisory_enabled = False` (default) |
+| Live-bot file touched | Yes — `bot_trading.py` is a production runtime file |
+| Full suite waiver | Explicitly waived by Amit; confirmed clean in background run (30 failed / 2855 passed — Sprint 3 baseline) |
+| Removal condition | Remove hook if advisory mode is retired or replaced by external observability service |
+| Rollback | `intelligence_first_advisory_enabled = False` disables hook with zero code change; or remove the 13-line try/except block |
+| Required before future handoff | Full suite must be run before any production handoff or live decision-path change involving bot_trading.py |
+
+---
+
+## Anti-Bloat Confirmation — Sprint 6B
+
+| Check | Status |
+|-------|--------|
+| New files added | 3 (advisory_logger.py, advisory_runtime_log.jsonl, test_intelligence_sprint6b.py) |
+| All net-new (no duplicates of existing) | Yes |
+| Existing files made obsolete | None |
+| Duplicate logic introduced | None |
+| Production handoff triggered | No — `enable_active_opportunity_universe_handoff = False` |
+| active_opportunity_universe.json consumed by bot | No |
+| Advisory log creates execution pressure | No — advisory_only=true, executable=false, order_instruction=null |
+| Apex input enriched | No |
+| Candidate source replaced | No |
+| Order/risk/execution changed | No |
+| live_output_changed | False |
+
+---
+
+## Real-Session Advisory Observation Phase
+
+**Status: Ready to begin (pending Amit enabling flag for observation sessions)**
+
+**Objective:** Collect real advisory_runtime_log.jsonl data across multiple sessions with `intelligence_first_advisory_enabled = True` and `enable_active_opportunity_universe_handoff = False`.
+
+**Metrics to collect per session:**
+- advisory_include / watch / defer / unresolved counts per scan
+- Route disagreements: how many current candidates have a different shadow route?
+- Unsupported current candidates: how many have no intelligence backing?
+- Missing shadow candidates: how many shadow candidates is the current pipeline missing?
+- Tier D preservation/loss across scans
+- Structural quota overflow per scan
+- Attention cap pressure per scan
+- Hook latency: does advisory logging add observable latency to run_scan()?
+- Hook error rate: does advisory_report.json ever go missing or stale mid-session?
+- Execution pressure check: does advisory status ever influence a trade? (Expected: never)
+
+**Gate for next phase:** No production handoff decision until advisory log review is complete across a minimum of several real sessions reviewed by Amit.
+
+---
+
 ## Update Log
 
 | Date | Action | Notes |
 |------|--------|-------|
 | 2026-05-06 | Created | Initial audit covering Sprints Day2–6B. All intelligence-first modules classified. No files recommended for immediate removal — production handoff gate not yet met. |
+| 2026-05-06 | Sprint 6B patch | Added explicit Sprint 6B file classifications (advisory_logger.py, advisory_runtime_log.jsonl, test_intelligence_sprint6b.py, bot_trading.py hook). Anti-bloat confirmation added. Real-session observation plan documented. |
