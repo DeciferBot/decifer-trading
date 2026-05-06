@@ -1916,4 +1916,158 @@ def validate_all(base_dir: str = "data/intelligence") -> dict[str, ValidationRes
             hist_results_path
         )
 
+    # Sprint 6A — advisory report (optional, only if present)
+    advisory_path = os.path.join(base_dir, "advisory_report.json")
+    if os.path.exists(advisory_path):
+        results["advisory_report"] = validate_advisory_report(advisory_path)
+
     return results
+
+
+# ---------------------------------------------------------------------------
+# Sprint 6A — advisory_report.json validator
+# ---------------------------------------------------------------------------
+_ADVISORY_REQUIRED_TOP_KEYS = [
+    "schema_version", "generated_at", "valid_for_session", "mode",
+    "data_source_mode", "source_files", "advisory_summary", "candidate_advisory",
+    "route_disagreements", "unsupported_current_candidates", "missing_shadow_candidates",
+    "tier_d_advisory", "structural_quota_advisory", "risk_theme_advisory",
+    "manual_and_held_advisory", "warnings",
+    "no_live_api_called", "broker_called", "env_inspected", "raw_news_used",
+    "llm_used", "broad_intraday_scan_used", "production_modules_imported",
+    "live_output_changed",
+]
+
+_ADVISORY_SUMMARY_REQUIRED_KEYS = [
+    "current_candidates_count", "shadow_candidates_count", "overlap_count",
+    "advisory_include_count", "advisory_watch_count", "advisory_defer_count",
+    "advisory_exclude_count", "advisory_unresolved_count", "route_disagreement_count",
+    "unsupported_current_count", "missing_shadow_count", "non_executable_all",
+    "live_output_changed",
+]
+
+_VALID_ADVISORY_STATUSES = {
+    "advisory_include", "advisory_watch", "advisory_defer",
+    "advisory_exclude", "advisory_unresolved",
+}
+
+_ADVISORY_CANDIDATE_REQUIRED_KEYS = [
+    "symbol", "in_current", "in_shadow", "current_sources", "shadow_sources",
+    "advisory_status", "advisory_reason", "executable", "order_instruction",
+]
+
+_ADVISORY_SECTION_KEYS = [
+    "route_disagreements", "unsupported_current_candidates", "missing_shadow_candidates",
+    "tier_d_advisory", "structural_quota_advisory", "risk_theme_advisory",
+    "manual_and_held_advisory",
+]
+
+
+def validate_advisory_report(path: str) -> "ValidationResult":
+    """Validate data/intelligence/advisory_report.json."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("advisory_report: not a dict")
+        return result
+
+    # Required top-level keys
+    for key in _ADVISORY_REQUIRED_TOP_KEYS:
+        if key not in data:
+            result.fail(f"advisory_report: missing required key '{key}'")
+
+    # Safety flags
+    if data.get("no_live_api_called") is not True:
+        result.fail("advisory_report: no_live_api_called must be true")
+    if data.get("broker_called") is not False:
+        result.fail("advisory_report: broker_called must be false")
+    if data.get("env_inspected") is not False:
+        result.fail("advisory_report: env_inspected must be false")
+    if data.get("raw_news_used") is not False:
+        result.fail("advisory_report: raw_news_used must be false")
+    if data.get("llm_used") is not False:
+        result.fail("advisory_report: llm_used must be false")
+    if data.get("broad_intraday_scan_used") is not False:
+        result.fail("advisory_report: broad_intraday_scan_used must be false")
+    if data.get("production_modules_imported") is not False:
+        result.fail("advisory_report: production_modules_imported must be false")
+    if data.get("live_output_changed") is not False:
+        result.fail("advisory_report: live_output_changed must be false")
+
+    # Mode checks
+    if data.get("mode") != "offline_advisory_report":
+        result.fail(f"advisory_report: mode must be 'offline_advisory_report', got '{data.get('mode')}'")
+
+    # advisory_summary checks
+    adv_sum = data.get("advisory_summary")
+    if not isinstance(adv_sum, dict):
+        result.fail("advisory_report: advisory_summary must be a dict")
+    else:
+        for key in _ADVISORY_SUMMARY_REQUIRED_KEYS:
+            if key not in adv_sum:
+                result.fail(f"advisory_report.advisory_summary: missing key '{key}'")
+        if adv_sum.get("non_executable_all") is not True:
+            result.fail("advisory_report.advisory_summary: non_executable_all must be true")
+        if adv_sum.get("live_output_changed") is not False:
+            result.fail("advisory_report.advisory_summary: live_output_changed must be false")
+
+    # candidate_advisory checks
+    ca = data.get("candidate_advisory")
+    if not isinstance(ca, list):
+        result.fail("advisory_report: candidate_advisory must be a list")
+    else:
+        for i, rec in enumerate(ca):
+            if not isinstance(rec, dict):
+                result.fail(f"advisory_report.candidate_advisory[{i}]: not a dict")
+                continue
+            for key in _ADVISORY_CANDIDATE_REQUIRED_KEYS:
+                if key not in rec:
+                    result.fail(f"advisory_report.candidate_advisory[{i}]: missing key '{key}'")
+            status = rec.get("advisory_status")
+            if status not in _VALID_ADVISORY_STATUSES:
+                result.fail(f"advisory_report.candidate_advisory[{i}] symbol={rec.get('symbol')}: "
+                            f"invalid advisory_status '{status}'")
+            if rec.get("executable") is not False:
+                result.fail(f"advisory_report.candidate_advisory[{i}] symbol={rec.get('symbol')}: "
+                            f"executable must be false")
+            if rec.get("order_instruction") is not None:
+                result.fail(f"advisory_report.candidate_advisory[{i}] symbol={rec.get('symbol')}: "
+                            f"order_instruction must be null")
+
+    # Required section keys exist
+    for section in _ADVISORY_SECTION_KEYS:
+        if section not in data:
+            result.fail(f"advisory_report: missing required section '{section}'")
+
+    # route_disagreements check
+    rd = data.get("route_disagreements")
+    if isinstance(rd, dict):
+        for dis in (rd.get("disagreements") or []):
+            if isinstance(dis, dict) and dis.get("executable") is not False:
+                result.fail(f"advisory_report.route_disagreements: disagreement for "
+                            f"'{dis.get('symbol')}' has executable != false")
+    else:
+        result.warn("advisory_report: route_disagreements is not a dict")
+
+    # structural_quota_advisory
+    sqa = data.get("structural_quota_advisory")
+    if isinstance(sqa, dict):
+        if sqa.get("production_change_required") is not False:
+            result.fail("advisory_report.structural_quota_advisory: production_change_required must be false")
+    else:
+        result.warn("advisory_report: structural_quota_advisory is not a dict")
+
+    # risk_theme_advisory
+    rta = data.get("risk_theme_advisory")
+    if isinstance(rta, dict):
+        if rta.get("executable_headwind_candidates") is not False:
+            result.fail("advisory_report.risk_theme_advisory: executable_headwind_candidates must be false")
+        if rta.get("short_or_hedge_instruction_generated") is not False:
+            result.fail("advisory_report.risk_theme_advisory: short_or_hedge_instruction_generated must be false")
+    else:
+        result.warn("advisory_report: risk_theme_advisory is not a dict")
+
+    return result

@@ -1,0 +1,3465 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2026-05-06T05:56:15.204094+00:00",
+  "valid_for_session": "offline_static_bootstrap",
+  "mode": "offline_advisory_report",
+  "data_source_mode": "local_shadow_outputs_only",
+  "source_files": [
+    "/Users/amitchopra/Desktop/decifer trading/data/universe_builder/current_pipeline_snapshot.json",
+    "/Users/amitchopra/Desktop/decifer trading/data/universe_builder/active_opportunity_universe_shadow.json",
+    "/Users/amitchopra/Desktop/decifer trading/data/universe_builder/current_vs_shadow_comparison.json",
+    "/Users/amitchopra/Desktop/decifer trading/data/universe_builder/universe_builder_report.json",
+    "/Users/amitchopra/Desktop/decifer trading/data/intelligence/economic_candidate_feed.json",
+    "/Users/amitchopra/Desktop/decifer trading/data/intelligence/current_economic_context.json",
+    "/Users/amitchopra/Desktop/decifer trading/data/intelligence/theme_activation.json",
+    "/Users/amitchopra/Desktop/decifer trading/data/intelligence/thesis_store.json",
+    "/Users/amitchopra/Desktop/decifer trading/data/intelligence/backtest/intelligence_backtest_summary.json",
+    "/Users/amitchopra/Desktop/decifer trading/data/intelligence/backtest/historical_replay_results.json",
+    "/Users/amitchopra/Desktop/decifer trading/data/intelligence/source_adapter_snapshot.json"
+  ],
+  "advisory_summary": {
+    "current_candidates_count": 235,
+    "shadow_candidates_count": 50,
+    "overlap_count": 27,
+    "advisory_include_count": 13,
+    "advisory_watch_count": 37,
+    "advisory_defer_count": 50,
+    "advisory_exclude_count": 0,
+    "advisory_unresolved_count": 0,
+    "route_disagreement_count": 17,
+    "unsupported_current_count": 50,
+    "missing_shadow_count": 23,
+    "note_tracked_symbols": "candidate_advisory covers symbols with explicit tracking data; full current pool is larger",
+    "non_executable_all": true,
+    "live_output_changed": false
+  },
+  "candidate_advisory": [
+    {
+      "symbol": "ASTS",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [
+        "favourites_manual_conviction",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": "position",
+      "shadow_route": "manual_conviction",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "manual_conviction_protected",
+      "reason_to_care": "manual_conviction",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "favourites_manual_conviction",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "manual_conviction",
+      "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "GLD",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "shadow_sources": [
+        "favourites_manual_conviction",
+        "committed_universe_read_only"
+      ],
+      "current_route": "intraday_swing",
+      "shadow_route": "manual_conviction",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "manual_conviction_protected",
+      "reason_to_care": "manual_conviction",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "favourites_manual_conviction",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "manual_conviction",
+      "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "IBIT",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "shadow_sources": [
+        "favourites_manual_conviction",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": "intraday_swing",
+      "shadow_route": "manual_conviction",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "manual_conviction_protected",
+      "reason_to_care": "manual_conviction",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "favourites_manual_conviction",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "manual_conviction",
+      "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "USO",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "shadow_sources": [
+        "favourites_manual_conviction",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": "intraday_swing",
+      "shadow_route": "manual_conviction",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "manual_conviction_protected",
+      "reason_to_care": "manual_conviction",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "favourites_manual_conviction",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "manual_conviction",
+      "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "SPY",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "shadow_sources": [
+        "favourites_manual_conviction",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": "intraday_swing",
+      "shadow_route": "manual_conviction",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "manual_conviction_protected",
+      "reason_to_care": "manual_conviction",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "favourites_manual_conviction",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "manual_conviction",
+      "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "QQQ",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "shadow_sources": [
+        "favourites_manual_conviction",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": "intraday_swing",
+      "shadow_route": "manual_conviction",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "manual_conviction_protected",
+      "reason_to_care": "manual_conviction",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "favourites_manual_conviction",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "manual_conviction",
+      "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "NVDA",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_d_structural",
+        "tier_a_always_on",
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "favourites_manual_conviction",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": "position",
+      "shadow_route": "manual_conviction",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "manual_conviction_protected",
+      "reason_to_care": "manual_conviction",
+      "theme_ids": [
+        "semiconductors"
+      ],
+      "driver_ids": [
+        "ai_capex_growth",
+        "ai_infrastructure_demand"
+      ],
+      "source_labels": [
+        "favourites_manual_conviction",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "activated",
+      "quota_group": "manual_conviction",
+      "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "TSLA",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "shadow_sources": [
+        "favourites_manual_conviction",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": "intraday_swing",
+      "shadow_route": "manual_conviction",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "manual_conviction_protected",
+      "reason_to_care": "manual_conviction",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "favourites_manual_conviction",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "manual_conviction",
+      "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "AAPL",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_a_always_on",
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "favourites_manual_conviction",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": "intraday_swing",
+      "shadow_route": "manual_conviction",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "manual_conviction_protected",
+      "reason_to_care": "manual_conviction",
+      "theme_ids": [
+        "quality_cash_flow"
+      ],
+      "driver_ids": [
+        "credit_stress_rising",
+        "risk_off_rotation",
+        "liquidity_tightening"
+      ],
+      "source_labels": [
+        "favourites_manual_conviction",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "crowded",
+      "quota_group": "manual_conviction",
+      "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "HIMS",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [
+        "favourites_manual_conviction",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "manual_conviction",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "manual_conviction_protected",
+      "reason_to_care": "manual_conviction",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "favourites_manual_conviction",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "manual_conviction",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "NBIS",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [
+        "favourites_manual_conviction",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": "position",
+      "shadow_route": "manual_conviction",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "manual_conviction_protected",
+      "reason_to_care": "manual_conviction",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "favourites_manual_conviction",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "manual_conviction",
+      "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "MU",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [
+        "favourites_manual_conviction",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": "position",
+      "shadow_route": "manual_conviction",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "manual_conviction_protected",
+      "reason_to_care": "manual_conviction",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "favourites_manual_conviction",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "manual_conviction",
+      "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "ONDS",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [
+        "favourites_manual_conviction",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "manual_conviction",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "manual_conviction_protected",
+      "reason_to_care": "manual_conviction",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "favourites_manual_conviction",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "manual_conviction",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "VRT",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "position",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_structural_candidate_not_in_current_pipeline_route=position",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "data_centre_power"
+      ],
+      "driver_ids": [
+        "ai_capex_growth",
+        "power_demand_growth"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "activated",
+      "quota_group": "structural_position",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "ETN",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "position",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_structural_candidate_not_in_current_pipeline_route=position",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "data_centre_power"
+      ],
+      "driver_ids": [
+        "ai_capex_growth",
+        "power_demand_growth"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "activated",
+      "quota_group": "structural_position",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "PWR",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "position",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_structural_candidate_not_in_current_pipeline_route=position",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "data_centre_power"
+      ],
+      "driver_ids": [
+        "ai_capex_growth",
+        "power_demand_growth"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "activated",
+      "quota_group": "structural_position",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "CEG",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "swing",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_structural_candidate_not_in_current_pipeline_route=swing",
+      "reason_to_care": "structural_or_catalyst_watch",
+      "theme_ids": [
+        "data_centre_power"
+      ],
+      "driver_ids": [
+        "ai_capex_growth",
+        "power_demand_growth"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "activated",
+      "quota_group": "structural_position",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "XLU",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "watchlist",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_candidate_not_in_current_pipeline_route=watchlist",
+      "reason_to_care": "proxy",
+      "theme_ids": [
+        "data_centre_power"
+      ],
+      "driver_ids": [
+        "ai_capex_growth",
+        "power_demand_growth"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "activated",
+      "quota_group": "etf_proxy",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "TSM",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "position",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_structural_candidate_not_in_current_pipeline_route=position",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "semiconductors"
+      ],
+      "driver_ids": [
+        "ai_capex_growth",
+        "ai_infrastructure_demand"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "activated",
+      "quota_group": "structural_position",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "AVGO",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "position",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_structural_candidate_not_in_current_pipeline_route=position",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "semiconductors"
+      ],
+      "driver_ids": [
+        "ai_capex_growth",
+        "ai_infrastructure_demand"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "activated",
+      "quota_group": "structural_position",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "AMD",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_d_structural",
+        "tier_a_always_on",
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": "position",
+      "shadow_route": "position",
+      "advisory_status": "advisory_include",
+      "advisory_reason": "supported_by_intelligence_shadow_route=position",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "semiconductors"
+      ],
+      "driver_ids": [
+        "ai_capex_growth",
+        "ai_infrastructure_demand"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "activated",
+      "quota_group": "structural_position",
+      "exclusion_reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "ASML",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "position",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_structural_candidate_not_in_current_pipeline_route=position",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "semiconductors"
+      ],
+      "driver_ids": [
+        "ai_capex_growth",
+        "ai_infrastructure_demand"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "activated",
+      "quota_group": "structural_position",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "SMH",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "watchlist",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_candidate_not_in_current_pipeline_route=watchlist",
+      "reason_to_care": "proxy",
+      "theme_ids": [
+        "semiconductors"
+      ],
+      "driver_ids": [
+        "ai_capex_growth",
+        "ai_infrastructure_demand"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "activated",
+      "quota_group": "etf_proxy",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "JPM",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_a_always_on",
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "current_route": "intraday_swing",
+      "shadow_route": "swing",
+      "advisory_status": "advisory_include",
+      "advisory_reason": "supported_by_intelligence_shadow_route=swing",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "banks"
+      ],
+      "driver_ids": [
+        "net_interest_margin_expansion",
+        "yields_rising"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "structural_position",
+      "exclusion_reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BAC",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "swing",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_structural_candidate_not_in_current_pipeline_route=swing",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "banks"
+      ],
+      "driver_ids": [
+        "net_interest_margin_expansion",
+        "yields_rising"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "structural_position",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "WFC",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "swing",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_structural_candidate_not_in_current_pipeline_route=swing",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "banks"
+      ],
+      "driver_ids": [
+        "net_interest_margin_expansion",
+        "yields_rising"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "structural_position",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "GS",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_a_always_on",
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "current_route": "intraday_swing",
+      "shadow_route": "swing",
+      "advisory_status": "advisory_include",
+      "advisory_reason": "supported_by_intelligence_shadow_route=swing",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "banks"
+      ],
+      "driver_ids": [
+        "net_interest_margin_expansion",
+        "yields_rising"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "structural_position",
+      "exclusion_reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "XLF",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "watchlist",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_candidate_not_in_current_pipeline_route=watchlist",
+      "reason_to_care": "proxy",
+      "theme_ids": [
+        "banks"
+      ],
+      "driver_ids": [
+        "net_interest_margin_expansion",
+        "yields_rising"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "etf_proxy",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "XOM",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_a_always_on",
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "current_route": "intraday_swing",
+      "shadow_route": "swing",
+      "advisory_status": "advisory_include",
+      "advisory_reason": "supported_by_intelligence_shadow_route=swing",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "energy"
+      ],
+      "driver_ids": [
+        "oil_supply_shock",
+        "geopolitical_supply_risk"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "structural_position",
+      "exclusion_reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "CVX",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_a_always_on",
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "current_route": "intraday_swing",
+      "shadow_route": "swing",
+      "advisory_status": "advisory_include",
+      "advisory_reason": "supported_by_intelligence_shadow_route=swing",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "energy"
+      ],
+      "driver_ids": [
+        "oil_supply_shock",
+        "geopolitical_supply_risk"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "structural_position",
+      "exclusion_reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "OXY",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_a_always_on",
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "current_route": "intraday_swing",
+      "shadow_route": "swing",
+      "advisory_status": "advisory_include",
+      "advisory_reason": "supported_by_intelligence_shadow_route=swing",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "energy"
+      ],
+      "driver_ids": [
+        "oil_supply_shock",
+        "geopolitical_supply_risk"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "structural_position",
+      "exclusion_reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "SLB",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "swing",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_structural_candidate_not_in_current_pipeline_route=swing",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "energy"
+      ],
+      "driver_ids": [
+        "oil_supply_shock",
+        "geopolitical_supply_risk"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "structural_position",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "XLE",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "watchlist",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_candidate_not_in_current_pipeline_route=watchlist",
+      "reason_to_care": "proxy",
+      "theme_ids": [
+        "energy"
+      ],
+      "driver_ids": [
+        "oil_supply_shock",
+        "geopolitical_supply_risk"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "etf_proxy",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "LMT",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "position",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_structural_candidate_not_in_current_pipeline_route=position",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "defence"
+      ],
+      "driver_ids": [
+        "geopolitical_risk_rising",
+        "defence_spending_expectations"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "structural_position",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "NOC",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "position",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_structural_candidate_not_in_current_pipeline_route=position",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "defence"
+      ],
+      "driver_ids": [
+        "geopolitical_risk_rising",
+        "defence_spending_expectations"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "structural_position",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "RTX",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "position",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_structural_candidate_not_in_current_pipeline_route=position",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "defence"
+      ],
+      "driver_ids": [
+        "geopolitical_risk_rising",
+        "defence_spending_expectations"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "structural_position",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "GD",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "position",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_structural_candidate_not_in_current_pipeline_route=position",
+      "reason_to_care": "structural",
+      "theme_ids": [
+        "defence"
+      ],
+      "driver_ids": [
+        "geopolitical_risk_rising",
+        "defence_spending_expectations"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "structural_position",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "ITA",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "watchlist",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_candidate_not_in_current_pipeline_route=watchlist",
+      "reason_to_care": "proxy",
+      "theme_ids": [
+        "defence"
+      ],
+      "driver_ids": [
+        "geopolitical_risk_rising",
+        "defence_spending_expectations"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "watchlist",
+      "quota_group": "etf_proxy",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "QUAL",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "watchlist",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_candidate_not_in_current_pipeline_route=watchlist",
+      "reason_to_care": "proxy",
+      "theme_ids": [
+        "quality_cash_flow"
+      ],
+      "driver_ids": [
+        "credit_stress_rising",
+        "risk_off_rotation",
+        "liquidity_tightening"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "crowded",
+      "quota_group": "etf_proxy",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "IWM",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "tier_a_always_on",
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": "intraday_swing",
+      "shadow_route": "watchlist",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "headwind_pressure_candidate_watchlist_only",
+      "reason_to_care": "headwind_pressure_watchlist",
+      "theme_ids": [
+        "small_caps"
+      ],
+      "driver_ids": [
+        "credit_stress_rising",
+        "refinancing_risk_rising",
+        "liquidity_tightening"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "weakening",
+      "quota_group": "attention",
+      "exclusion_reason": "Duplicate \u2014 already claimed by economic_intelligence_attention",
+      "route_disagreement": true,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "XLP",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "watchlist",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_candidate_not_in_current_pipeline_route=watchlist",
+      "reason_to_care": "proxy",
+      "theme_ids": [
+        "defensive_quality"
+      ],
+      "driver_ids": [
+        "defensive_rotation",
+        "volatility_rising",
+        "risk_appetite_falling",
+        "breadth_deterioration"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "crowded",
+      "quota_group": "etf_proxy",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "XLV",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "watchlist",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_candidate_not_in_current_pipeline_route=watchlist",
+      "reason_to_care": "proxy",
+      "theme_ids": [
+        "defensive_quality"
+      ],
+      "driver_ids": [
+        "defensive_rotation",
+        "volatility_rising",
+        "risk_appetite_falling",
+        "breadth_deterioration"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": "new",
+      "theme_state": "crowded",
+      "quota_group": "etf_proxy",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "SPLV",
+      "in_current": false,
+      "in_shadow": true,
+      "current_sources": [
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [
+        "intelligence_first_static_rule",
+        "economic_intelligence"
+      ],
+      "current_route": null,
+      "shadow_route": "watchlist",
+      "advisory_status": "advisory_watch",
+      "advisory_reason": "shadow_candidate_not_in_current_pipeline_route=watchlist",
+      "reason_to_care": "proxy",
+      "theme_ids": [
+        "defensive_quality"
+      ],
+      "driver_ids": [
+        "defensive_rotation",
+        "volatility_rising",
+        "risk_appetite_falling",
+        "breadth_deterioration"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence"
+      ],
+      "thesis_status": "new",
+      "theme_state": "crowded",
+      "quota_group": "etf_proxy",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "TCGL",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "intraday_swing",
+      "advisory_status": "advisory_include",
+      "advisory_reason": "in_both_current_and_shadow_rtc=attention_shadow_only",
+      "reason_to_care": "attention_shadow_only",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "attention",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "EXPE",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "intraday_swing",
+      "advisory_status": "advisory_include",
+      "advisory_reason": "in_both_current_and_shadow_rtc=attention_shadow_only",
+      "reason_to_care": "attention_shadow_only",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "attention",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "CHD",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "intraday_swing",
+      "advisory_status": "advisory_include",
+      "advisory_reason": "in_both_current_and_shadow_rtc=attention_shadow_only",
+      "reason_to_care": "attention_shadow_only",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "attention",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "CBRE",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "intraday_swing",
+      "advisory_status": "advisory_include",
+      "advisory_reason": "in_both_current_and_shadow_rtc=attention_shadow_only",
+      "reason_to_care": "attention_shadow_only",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "attention",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "EPAM",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "intraday_swing",
+      "advisory_status": "advisory_include",
+      "advisory_reason": "in_both_current_and_shadow_rtc=attention_shadow_only",
+      "reason_to_care": "attention_shadow_only",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "attention",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "PLD",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "intraday_swing",
+      "advisory_status": "advisory_include",
+      "advisory_reason": "in_both_current_and_shadow_rtc=attention_shadow_only",
+      "reason_to_care": "attention_shadow_only",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "attention",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "ACI",
+      "in_current": true,
+      "in_shadow": true,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "current_route": null,
+      "shadow_route": "intraday_swing",
+      "advisory_status": "advisory_include",
+      "advisory_reason": "in_both_current_and_shadow_rtc=attention_shadow_only",
+      "reason_to_care": "attention_shadow_only",
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": "attention",
+      "exclusion_reason": null,
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "A",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "ABBV",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural",
+        "tier_a_always_on"
+      ],
+      "shadow_sources": [],
+      "current_route": "intraday_swing",
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "ABT",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "shadow_sources": [],
+      "current_route": "intraday_swing",
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "ACGL",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "ADP",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "ADSK",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "AEM",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "AFRM",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "AGCO",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "ALNY",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "AMZN",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "shadow_sources": [],
+      "current_route": "intraday_swing",
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "AON",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "APH",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "APLD",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "APO",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "APP",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "ARGX",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "ASND",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "AVTR",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "AXON",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "AXP",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "AYI",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "B",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BA",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BABA",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BALL",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BAP",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BBY",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BG",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BIDU",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BIIB",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "shadow_sources": [],
+      "current_route": "intraday_swing",
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BITO",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "shadow_sources": [],
+      "current_route": "intraday_swing",
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BJ",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BK",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BLK",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BMNR",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BR",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BULL",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BURL",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "BX",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "CARR",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "CAT",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "shadow_sources": [],
+      "current_route": "intraday_swing",
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "CCI",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "CDE",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "CG",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "CHTR",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "CMS",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "shadow_sources": [],
+      "current_route": null,
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "COP",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "shadow_sources": [],
+      "current_route": "intraday_swing",
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "COPX",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "shadow_sources": [],
+      "current_route": "intraday_swing",
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_total_universe_cap",
+      "reason_to_care": null,
+      "theme_ids": [],
+      "driver_ids": [],
+      "source_labels": [],
+      "thesis_status": null,
+      "theme_state": null,
+      "quota_group": null,
+      "exclusion_reason": "Total universe cap reached (50)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    },
+    {
+      "symbol": "COST",
+      "in_current": true,
+      "in_shadow": false,
+      "current_sources": [
+        "tier_a_always_on",
+        "economic_candidate_feed"
+      ],
+      "shadow_sources": [],
+      "current_route": "intraday_swing",
+      "shadow_route": null,
+      "advisory_status": "advisory_defer",
+      "advisory_reason": "excluded_from_shadow_by_quota: Structural quota full (20)",
+      "reason_to_care": null,
+      "theme_ids": [
+        "quality_cash_flow",
+        "defensive_quality"
+      ],
+      "driver_ids": [
+        "breadth_deterioration",
+        "risk_off_rotation",
+        "credit_stress_rising",
+        "volatility_rising",
+        "liquidity_tightening",
+        "defensive_rotation",
+        "risk_appetite_falling"
+      ],
+      "source_labels": [],
+      "thesis_status": "new",
+      "theme_state": "crowded",
+      "quota_group": null,
+      "exclusion_reason": "Structural quota full (20)",
+      "route_disagreement": false,
+      "executable": false,
+      "order_instruction": null
+    }
+  ],
+  "route_disagreements": {
+    "total_route_disagreements": 17,
+    "disagreements": [
+      {
+        "symbol": "ASTS",
+        "current_route": "position",
+        "shadow_route": "manual_conviction",
+        "current_source": "tier_d_structural",
+        "shadow_source": [
+          "favourites_manual_conviction",
+          "legacy_theme_tracker_read_only",
+          "committed_universe_read_only"
+        ],
+        "reason": "ASTS current=position shadow=manual_conviction (reason_to_care=manual_conviction)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "GLD",
+        "current_route": "intraday_swing",
+        "shadow_route": "manual_conviction",
+        "current_source": "tier_a_always_on",
+        "shadow_source": [
+          "favourites_manual_conviction",
+          "committed_universe_read_only"
+        ],
+        "reason": "GLD current=intraday_swing shadow=manual_conviction (reason_to_care=manual_conviction)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "IBIT",
+        "current_route": "intraday_swing",
+        "shadow_route": "manual_conviction",
+        "current_source": "tier_a_always_on",
+        "shadow_source": [
+          "favourites_manual_conviction",
+          "legacy_theme_tracker_read_only",
+          "committed_universe_read_only"
+        ],
+        "reason": "IBIT current=intraday_swing shadow=manual_conviction (reason_to_care=manual_conviction)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "USO",
+        "current_route": "intraday_swing",
+        "shadow_route": "manual_conviction",
+        "current_source": "tier_a_always_on",
+        "shadow_source": [
+          "favourites_manual_conviction",
+          "overnight_research_read_only",
+          "committed_universe_read_only"
+        ],
+        "reason": "USO current=intraday_swing shadow=manual_conviction (reason_to_care=manual_conviction)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "SPY",
+        "current_route": "intraday_swing",
+        "shadow_route": "manual_conviction",
+        "current_source": "tier_a_always_on",
+        "shadow_source": [
+          "favourites_manual_conviction",
+          "overnight_research_read_only",
+          "committed_universe_read_only"
+        ],
+        "reason": "SPY current=intraday_swing shadow=manual_conviction (reason_to_care=manual_conviction)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "QQQ",
+        "current_route": "intraday_swing",
+        "shadow_route": "manual_conviction",
+        "current_source": "tier_a_always_on",
+        "shadow_source": [
+          "favourites_manual_conviction",
+          "overnight_research_read_only",
+          "committed_universe_read_only"
+        ],
+        "reason": "QQQ current=intraday_swing shadow=manual_conviction (reason_to_care=manual_conviction)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "NVDA",
+        "current_route": "position",
+        "shadow_route": "manual_conviction",
+        "current_source": "tier_d_structural",
+        "shadow_source": [
+          "favourites_manual_conviction",
+          "legacy_theme_tracker_read_only",
+          "committed_universe_read_only"
+        ],
+        "reason": "NVDA current=position shadow=manual_conviction (reason_to_care=manual_conviction)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "TSLA",
+        "current_route": "intraday_swing",
+        "shadow_route": "manual_conviction",
+        "current_source": "tier_a_always_on",
+        "shadow_source": [
+          "favourites_manual_conviction",
+          "legacy_theme_tracker_read_only",
+          "committed_universe_read_only"
+        ],
+        "reason": "TSLA current=intraday_swing shadow=manual_conviction (reason_to_care=manual_conviction)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "AAPL",
+        "current_route": "intraday_swing",
+        "shadow_route": "manual_conviction",
+        "current_source": "tier_a_always_on",
+        "shadow_source": [
+          "favourites_manual_conviction",
+          "legacy_theme_tracker_read_only",
+          "committed_universe_read_only"
+        ],
+        "reason": "AAPL current=intraday_swing shadow=manual_conviction (reason_to_care=manual_conviction)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "NBIS",
+        "current_route": "position",
+        "shadow_route": "manual_conviction",
+        "current_source": "tier_d_structural",
+        "shadow_source": [
+          "favourites_manual_conviction",
+          "overnight_research_read_only",
+          "committed_universe_read_only"
+        ],
+        "reason": "NBIS current=position shadow=manual_conviction (reason_to_care=manual_conviction)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "MU",
+        "current_route": "position",
+        "shadow_route": "manual_conviction",
+        "current_source": "tier_d_structural",
+        "shadow_source": [
+          "favourites_manual_conviction",
+          "legacy_theme_tracker_read_only",
+          "committed_universe_read_only"
+        ],
+        "reason": "MU current=position shadow=manual_conviction (reason_to_care=manual_conviction)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "JPM",
+        "current_route": "intraday_swing",
+        "shadow_route": "swing",
+        "current_source": "tier_a_always_on",
+        "shadow_source": [
+          "intelligence_first_static_rule",
+          "economic_intelligence",
+          "committed_universe_read_only"
+        ],
+        "reason": "JPM current=intraday_swing shadow=swing (reason_to_care=structural)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "GS",
+        "current_route": "intraday_swing",
+        "shadow_route": "swing",
+        "current_source": "tier_a_always_on",
+        "shadow_source": [
+          "intelligence_first_static_rule",
+          "economic_intelligence",
+          "committed_universe_read_only"
+        ],
+        "reason": "GS current=intraday_swing shadow=swing (reason_to_care=structural)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "XOM",
+        "current_route": "intraday_swing",
+        "shadow_route": "swing",
+        "current_source": "tier_a_always_on",
+        "shadow_source": [
+          "intelligence_first_static_rule",
+          "economic_intelligence",
+          "committed_universe_read_only"
+        ],
+        "reason": "XOM current=intraday_swing shadow=swing (reason_to_care=structural)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "CVX",
+        "current_route": "intraday_swing",
+        "shadow_route": "swing",
+        "current_source": "tier_a_always_on",
+        "shadow_source": [
+          "intelligence_first_static_rule",
+          "economic_intelligence",
+          "committed_universe_read_only"
+        ],
+        "reason": "CVX current=intraday_swing shadow=swing (reason_to_care=structural)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "OXY",
+        "current_route": "intraday_swing",
+        "shadow_route": "swing",
+        "current_source": "tier_a_always_on",
+        "shadow_source": [
+          "intelligence_first_static_rule",
+          "economic_intelligence",
+          "committed_universe_read_only"
+        ],
+        "reason": "OXY current=intraday_swing shadow=swing (reason_to_care=structural)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      },
+      {
+        "symbol": "IWM",
+        "current_route": "intraday_swing",
+        "shadow_route": "watchlist",
+        "current_source": "tier_a_always_on",
+        "shadow_source": [
+          "intelligence_first_static_rule",
+          "economic_intelligence",
+          "overnight_research_read_only",
+          "committed_universe_read_only"
+        ],
+        "reason": "IWM Tier A always-on but shadow re-classifies as watchlist (reason_to_care=headwind_pressure_watchlist)",
+        "advisory_status": "advisory_watch",
+        "executable": false
+      }
+    ],
+    "disagreement_by_source": {
+      "tier_d_structural": 4,
+      "tier_a_always_on": 13
+    },
+    "disagreement_by_route_pair": {
+      "position\u2192manual_conviction": 4,
+      "intraday_swing\u2192manual_conviction": 7,
+      "intraday_swing\u2192swing": 5,
+      "intraday_swing\u2192watchlist": 1
+    },
+    "warnings": []
+  },
+  "unsupported_current_candidates": {
+    "total": 0,
+    "symbols": [],
+    "deferred_by_quota_or_cap": 50,
+    "by_source": {},
+    "by_reason": {},
+    "warnings": []
+  },
+  "missing_shadow_candidates": {
+    "total": 23,
+    "symbols": [
+      "VRT",
+      "ETN",
+      "PWR",
+      "CEG",
+      "XLU",
+      "TSM",
+      "AVGO",
+      "ASML",
+      "SMH",
+      "BAC",
+      "WFC",
+      "XLF",
+      "SLB",
+      "XLE",
+      "LMT",
+      "NOC",
+      "RTX",
+      "GD",
+      "ITA",
+      "QUAL",
+      "XLP",
+      "XLV",
+      "SPLV"
+    ],
+    "by_theme": {
+      "data_centre_power": 5,
+      "semiconductors": 4,
+      "banks": 3,
+      "energy": 2,
+      "defence": 5,
+      "quality_cash_flow": 1,
+      "defensive_quality": 3
+    },
+    "by_route": {
+      "position": 10,
+      "swing": 4,
+      "watchlist": 9
+    },
+    "by_reason_to_care": {
+      "structural": 13,
+      "structural_or_catalyst_watch": 1,
+      "proxy": 9
+    },
+    "advisory_status_distribution": {
+      "advisory_watch": 23
+    }
+  },
+  "tier_d_advisory": {
+    "tier_d_total_current": 150,
+    "tier_d_in_shadow": 5,
+    "tier_d_excluded": 30,
+    "tier_d_preservation_rate": 0.0333,
+    "tier_d_top_preserved": [
+      "AMD",
+      "ASTS",
+      "MU",
+      "NBIS",
+      "NVDA"
+    ],
+    "tier_d_top_excluded": [
+      "ABBV",
+      "ADP",
+      "ADSK",
+      "AEM",
+      "AFRM",
+      "ALNY",
+      "AON",
+      "APH",
+      "APLD",
+      "APO",
+      "APP",
+      "ARGX",
+      "ASND",
+      "AVTR",
+      "AXON",
+      "AXP",
+      "AYI",
+      "B",
+      "BA",
+      "BABA"
+    ],
+    "tier_d_excluded_due_structural_quota": 145,
+    "tier_d_preserved_through_manual_or_other_source": [],
+    "tier_d_quality_rank_available": true,
+    "advisory_findings": [
+      "Tier D preservation rate is very low (3.3%) \u2014 structural quota is the primary blocker",
+      "145/150 Tier D candidates excluded due to structural quota cap (20) \u2014 shadow model prioritises economic intelligence candidates in structural slots",
+      "5 Tier D symbols preserved: AMD, ASTS, MU, NBIS, NVDA \u2014 all appear via manual/economic sources independently"
+    ]
+  },
+  "structural_quota_advisory": {
+    "structural_demand_count": 180,
+    "structural_capacity": 20,
+    "structural_accepted": 20,
+    "structural_overflow_count": 160,
+    "structural_quota_binding": true,
+    "overflow_by_theme": {},
+    "overflow_by_source": {},
+    "overflow_by_route": {},
+    "recommendation": "keep_current_shadow_cap_until_more_evidence",
+    "production_change_required": false
+  },
+  "risk_theme_advisory": {
+    "headwind_candidates": [
+      "IWM"
+    ],
+    "pressure_candidates": [
+      "IWM"
+    ],
+    "weakening_themes": [
+      "small_caps"
+    ],
+    "crowded_themes": [
+      "quality_cash_flow",
+      "defensive_quality"
+    ],
+    "risk_off_themes": [
+      "quality_cash_flow",
+      "defensive_quality",
+      "small_caps"
+    ],
+    "executable_headwind_candidates": false,
+    "short_or_hedge_instruction_generated": false,
+    "findings": [
+      "Crowded themes (quality_cash_flow, defensive_quality) \u2014 structural quota binding + excluded candidates; watchlist-only advisory",
+      "Weakening themes (small_caps) \u2014 headwind direction; pressure candidate advisory_watch only",
+      "1 headwind candidates present \u2014 all advisory_watch, none executable",
+      "No short or hedge execution instructions generated \u2014 headwind monitoring only"
+    ]
+  },
+  "manual_and_held_advisory": {
+    "manual_candidates_total": 13,
+    "manual_candidates_in_shadow": 13,
+    "manual_candidates_missing": [],
+    "manual_protection_preserved": true,
+    "held_candidates_total": "not_available_in_day5_shadow_mode",
+    "held_candidates_in_shadow": 0,
+    "held_candidates_missing": [],
+    "held_protection_preserved": true,
+    "warnings": [
+      "Held candidates missing from shadow: not_available_in_day5_shadow_mode"
+    ]
+  },
+  "warnings": [
+    "Structural quota is binding (demand=180, cap=20) \u2014 160 structural candidates excluded; advisory_defer status assigned",
+    "23 shadow candidates not present in current pipeline \u2014 review gap with intelligence layer"
+  ],
+  "no_live_api_called": true,
+  "broker_called": false,
+  "env_inspected": false,
+  "raw_news_used": false,
+  "llm_used": false,
+  "broad_intraday_scan_used": false,
+  "production_modules_imported": false,
+  "live_output_changed": false
+}
