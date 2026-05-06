@@ -15,7 +15,7 @@ import json
 import os
 from datetime import UTC, date, datetime
 
-from ib_async import IB, LimitOrder, Option, StopLimitOrder, StopOrder
+from ib_async import IB, LimitOrder, MarketOrder, Option, StopLimitOrder, StopOrder
 
 from bot_ibkr import cancel_with_reason
 from config import CONFIG
@@ -470,35 +470,56 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
 
         _bid_ok = bid is not None and not _m.isnan(bid) and bid > 0
         _ask_ok = ask is not None and not _m.isnan(ask) and ask > 0
+        _last_ok = last is not None and not _m.isnan(last) and last > 0
         _retry_count = attempts["count"]
         # Only step price if the last attempt had ZERO fills (market rejected the price).
         # Partial fills mean the market IS trading at the current level — don't step further.
         _step = 0 if attempts.get("had_partial") else _retry_count
+        _use_market_order = False
         if _is_short:
             # BUY-to-close: offer at ask, step 5% ABOVE ask each retry to chase fills
             _premium = round(1.0 + (_step * 0.05), 2)
             if _ask_ok:
                 limit_price = round(ask * _premium, 2)
-            elif last and not _m.isnan(last) and last > 0:
+            elif _last_ok:
                 limit_price = round(last * 1.03 * _premium, 2)
             else:
-                limit_price = round(pos.get("current_premium", 0.10) * 1.10, 2)
+                # No market data at all (e.g. IBKR 10091 no options quote subscription).
+                # A stale limit price from current_premium will always miss the market.
+                # Market order guarantees exit — the lack of a quote subscription does
+                # NOT block order placement, only streaming quotes.
+                _use_market_order = True
+                limit_price = round(pos.get("current_premium", 0.10) * 1.10, 2)  # for logging only
+                log.warning(
+                    "execute_sell_option %s: no bid/ask/last from IBKR — using MKT order for guaranteed exit",
+                    opt_key,
+                )
         else:
             # SELL-to-close: price at bid and step down aggressively
             _discount = round(1.0 - (_step * 0.05), 2)
             if _bid_ok:
                 limit_price = round(bid * _discount, 2)
-            elif last and not _m.isnan(last) and last > 0:
+            elif _last_ok:
                 limit_price = round(last * 0.97 * _discount, 2)
             else:
-                limit_price = round(pos.get("current_premium", 0.01) * 0.95, 2)
+                # No market data at all (e.g. IBKR 10091 no options quote subscription).
+                # A stale limit price from current_premium will always miss the market.
+                # Market order guarantees exit — the lack of a quote subscription does
+                # NOT block order placement, only streaming quotes.
+                _use_market_order = True
+                limit_price = round(pos.get("current_premium", 0.01) * 0.95, 2)  # for logging only
+                log.warning(
+                    "execute_sell_option %s: no bid/ask/last from IBKR — using MKT order for guaranteed exit",
+                    opt_key,
+                )
 
-            # On final attempt, if bid is near-zero accept $0.01 for near-worthless options
-            if _retry_count >= _MAX_OPTION_SELL_RETRIES - 1 and _bid_ok and bid <= 0.02:
-                limit_price = 0.01
-            # Floor at $0.05 — IBKR minimum tick for US equity options (below $3)
-            if not (_bid_ok and bid < 0.05):
-                limit_price = max(limit_price, 0.05)
+            if not _use_market_order:
+                # On final attempt, if bid is near-zero accept $0.01 for near-worthless options
+                if _retry_count >= _MAX_OPTION_SELL_RETRIES - 1 and _bid_ok and bid <= 0.02:
+                    limit_price = 0.01
+                # Floor at $0.05 — IBKR minimum tick for US equity options (below $3)
+                if not (_bid_ok and bid < 0.05):
+                    limit_price = max(limit_price, 0.05)
 
         ib.cancelMktData(option_contract)
 
@@ -520,17 +541,25 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
         except Exception as _pre_e:
             log.warning("execute_sell_option %s: pre-cancel sweep failed (non-fatal): %s", opt_key, _pre_e)
 
-        sell_order = LimitOrder(_close_action, sell_contracts, limit_price, account=CONFIG["active_account"], tif="DAY")
-        sell_order.outsideRth = False
-        opt_sell_trade = ib.placeOrder(option_contract, sell_order)
+        if _use_market_order:
+            sell_order = MarketOrder(_close_action, sell_contracts, account=CONFIG["active_account"], tif="DAY")
+            sell_order.outsideRth = False
+            opt_sell_trade = ib.placeOrder(option_contract, sell_order)
+            log.info(
+                f"Option MKT {_close_action} placed: {opt_key} x{sell_contracts} "
+                f"(no market data — MKT for guaranteed exit, ref_price=${limit_price:.2f})"
+            )
+        else:
+            sell_order = LimitOrder(_close_action, sell_contracts, limit_price, account=CONFIG["active_account"], tif="DAY")
+            sell_order.outsideRth = False
+            opt_sell_trade = ib.placeOrder(option_contract, sell_order)
+            log.info(
+                f"Option LMT {_close_action} placed: {opt_key} x{sell_contracts} @ ${limit_price:.2f} "
+                f"(bid={bid}, ask={ask}, direction={pos.get('direction', 'LONG')})"
+            )
 
-        log.info(
-            f"Option LMT {_close_action} placed: {opt_key} x{sell_contracts} @ ${limit_price:.2f} "
-            f"(bid={bid}, ask={ask}, direction={pos.get('direction', 'LONG')})"
-        )
-
-        # Wait for fill confirmation
-        max_wait = 15 if attempts["count"] == 0 else 25
+        # Wait for fill confirmation — MKT orders need longer for paper account processing
+        max_wait = 30 if _use_market_order else (15 if attempts["count"] == 0 else 25)
         for _ in range(max_wait * 2):
             ib.sleep(0.5)
             status = opt_sell_trade.orderStatus.status
