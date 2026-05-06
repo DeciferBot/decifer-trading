@@ -237,6 +237,28 @@ Every module has one clearly defined responsibility. If you cannot state it in o
 - Never run `git reset --hard`, `git push --force`, or `git clean -f` without explicit Amit instruction.
 - Pre-existing errors in touched files must be fixed in the same session, not silently worked around.
 
+### ⛔ METADATA IMMUTABILITY — HARD RULE, NO EXCEPTIONS
+
+**Trade metadata written at entry time is permanent. No process is ever allowed to delete or overwrite it.**
+
+Metadata = `trade_type`, `conviction`, `reasoning`, `signal_scores`, `agent_outputs`, `entry_regime`, `entry_thesis`, `entry_score`, `ic_weights_at_entry`, `pattern_id`, `setup_type`, `advice_id`, `open_time`, `atr`, `high_water_mark`, `metadata_status`.
+
+This rule exists because paper trading data IS the product. Every trade is a training record. Losing metadata is equivalent to losing the trade entirely — it cannot be reconstructed.
+
+**Every code path that creates or updates a position must obey these invariants:**
+
+1. **Write-ahead is mandatory**: `ORDER_INTENT` must be written to `event_log` BEFORE submitting any order to IBKR. If the intent write fails, the order must NOT be submitted. No exceptions for any entry path: `execute_buy`, `execute_short`, `execute_buy_option`, reconcile EXT paths, options EXT paths.
+
+2. **No process may stamp `metadata_status: "MISSING"` on a position that already has real metadata** (`trade_type` set and not `"UNKNOWN"`). The `_safe_set_trade` immutability guard in `orders_state.py` enforces this. `DECISION_METADATA_FIELDS` is the authoritative list — adding a new decision field to a position requires also adding it to that frozenset.
+
+3. **Reconcile may not overwrite decision metadata**: `reconcile_with_ibkr` and `update_positions_from_ibkr` may only update price, pnl, status, and order IDs. They must use `_safe_set_trade` or `_safe_update_trade`, never direct dict assignment.
+
+4. **EXT and orphan paths must anchor metadata**: Any position created by the reconcile EXT path (position found in IBKR but not in local state) must write both `ORDER_INTENT` and `ORDER_FILLED` to `event_log` immediately. An unanchored position in `active_trades` is a bug.
+
+5. **No manual intervention in paper mode**: The bot must self-recover from stuck positions, stale EXITING states, and orphaned metadata. If the bot cannot self-recover, that is a code bug — fix the code, do not intervene manually.
+
+**Violations are never acceptable regardless of urgency. If a change would cause any of the above to be violated, stop and escalate to Amit before writing a single line.**
+
 ### Data Contracts (paths are sacred — do not change)
 Chief has **one** state directory — `chief-decifer/state/`. No fallback. No split-brain.
 The session-start hook reads from this path; Chief's panels read from this path; Cowork writes here.
