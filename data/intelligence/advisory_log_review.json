@@ -1,0 +1,83 @@
+{
+  "schema_version": "6C.1",
+  "generated_at": "2026-05-06T06:32:26.313677+00:00",
+  "mode": "evidence_review_only",
+  "source_file": "/Users/amitchopra/Desktop/decifer trading/data/intelligence/advisory_runtime_log.jsonl",
+  "review_summary": {
+    "records_read": 1,
+    "sessions_detected": 1,
+    "session_keys": [
+      "2026-05-06"
+    ],
+    "advisory_report_available_rate": 1.0,
+    "advisory_report_fresh_rate": 1.0,
+    "advisory_only_all_records": true,
+    "non_executable_all_records": true,
+    "production_decision_changed_count": 0,
+    "apex_input_changed_count": 0,
+    "regime_distribution": {
+      "BULL_TRENDING": 1
+    }
+  },
+  "candidate_overlap_analysis": {
+    "total_candidate_evaluations": 4,
+    "mean_candidates_per_record": 4.0,
+    "advisory_status_totals": {
+      "advisory_unresolved": 1,
+      "advisory_watch": 3
+    },
+    "symbols_most_frequent": [
+      {
+        "symbol": "NVDA",
+        "count": 1
+      },
+      {
+        "symbol": "AAPL",
+        "count": 1
+      },
+      {
+        "symbol": "MSFT",
+        "count": 1
+      },
+      {
+        "symbol": "TSLA",
+        "count": 1
+      }
+    ]
+  },
+  "safety_analysis": {
+    "all_invariants_hold": true,
+    "advisory_only_all_records": true,
+    "non_executable_all_records": true,
+    "production_decision_changed_count": 0,
+    "apex_input_changed_count": 0,
+    "flag_violation_counts": {},
+    "violations": []
+  },
+  "decision_gate": "insufficient_live_observation",
+  "gate_reasons": [
+    "Insufficient observation: 1 records (need 10) and 1 sessions (need 3)"
+  ],
+  "warnings": [],
+  "minimum_threshold": {
+    "min_records": 10,
+    "min_sessions": 3,
+    "records_met": false,
+    "sessions_met": false
+  },
+  "advisory_only": true,
+  "executable": false,
+  "order_instruction": null,
+  "production_decision_changed": false,
+  "apex_input_changed": false,
+  "scanner_output_changed": false,
+  "order_logic_changed": false,
+  "risk_logic_changed": false,
+  "broker_called": false,
+  "llm_called": false,
+  "live_api_called": false,
+  "env_inspected": false,
+  "raw_news_used": false,
+  "broad_intraday_scan_used": false,
+  "live_output_changed": false
+}

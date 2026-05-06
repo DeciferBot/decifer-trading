@@ -1921,6 +1921,11 @@ def validate_all(base_dir: str = "data/intelligence") -> dict[str, ValidationRes
     if os.path.exists(advisory_path):
         results["advisory_report"] = validate_advisory_report(advisory_path)
 
+    # Sprint 6C — advisory log review (optional, only if present)
+    review_path = os.path.join(base_dir, "advisory_log_review.json")
+    if os.path.exists(review_path):
+        results["advisory_log_review"] = validate_advisory_log_review(review_path)
+
     return results
 
 
@@ -2069,5 +2074,155 @@ def validate_advisory_report(path: str) -> "ValidationResult":
             result.fail("advisory_report.risk_theme_advisory: short_or_hedge_instruction_generated must be false")
     else:
         result.warn("advisory_report: risk_theme_advisory is not a dict")
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Sprint 6C — advisory_log_review.json validator
+# ---------------------------------------------------------------------------
+_ADVISORY_LOG_REVIEW_REQUIRED_TOP_KEYS = [
+    "schema_version", "generated_at", "mode", "source_file",
+    "review_summary", "candidate_overlap_analysis", "safety_analysis",
+    "decision_gate", "gate_reasons", "warnings", "minimum_threshold",
+    "advisory_only", "executable", "order_instruction",
+    "production_decision_changed", "apex_input_changed",
+    "live_output_changed",
+]
+
+_ADVISORY_LOG_REVIEW_SUMMARY_REQUIRED_KEYS = [
+    "records_read", "sessions_detected",
+    "advisory_report_available_rate", "advisory_report_fresh_rate",
+    "advisory_only_all_records", "non_executable_all_records",
+    "production_decision_changed_count", "apex_input_changed_count",
+]
+
+_VALID_DECISION_GATE_VALUES = {
+    "insufficient_live_observation",
+    "advisory_safe_continue_logging",
+    "advisory_ready_for_handoff_design",
+    "advisory_needs_fix",
+}
+
+_ADVISORY_LOG_REVIEW_MUST_BE_FALSE = [
+    "executable", "production_decision_changed", "apex_input_changed",
+    "live_output_changed",
+]
+
+
+def validate_advisory_log_review(path: str) -> "ValidationResult":
+    """Validate data/intelligence/advisory_log_review.json (Sprint 6C)."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("advisory_log_review: not a dict")
+        return result
+
+    # Required top-level keys
+    for key in _ADVISORY_LOG_REVIEW_REQUIRED_TOP_KEYS:
+        if key not in data:
+            result.fail(f"advisory_log_review: missing required key '{key}'")
+
+    # mode must be evidence_review_only
+    if data.get("mode") != "evidence_review_only":
+        result.fail(
+            f"advisory_log_review: mode must be 'evidence_review_only', "
+            f"got {data.get('mode')!r}"
+        )
+
+    # decision_gate must be a valid value
+    gate = data.get("decision_gate")
+    if gate not in _VALID_DECISION_GATE_VALUES:
+        result.fail(
+            f"advisory_log_review: invalid decision_gate '{gate}'; "
+            f"must be one of {sorted(_VALID_DECISION_GATE_VALUES)}"
+        )
+
+    # gate_reasons must be a non-empty list
+    gate_reasons = data.get("gate_reasons")
+    if not isinstance(gate_reasons, list):
+        result.fail("advisory_log_review: gate_reasons must be a list")
+    elif len(gate_reasons) == 0:
+        result.warn("advisory_log_review: gate_reasons is empty")
+
+    # advisory_only must be True
+    if data.get("advisory_only") is not True:
+        result.fail("advisory_log_review: advisory_only must be true")
+
+    # Must-be-false safety flags
+    for flag in _ADVISORY_LOG_REVIEW_MUST_BE_FALSE:
+        if data.get(flag) is not False:
+            result.fail(
+                f"advisory_log_review: {flag} must be false, "
+                f"got {data.get(flag)!r}"
+            )
+
+    # review_summary section
+    rs = data.get("review_summary")
+    if not isinstance(rs, dict):
+        result.fail("advisory_log_review: review_summary must be a dict")
+    else:
+        for key in _ADVISORY_LOG_REVIEW_SUMMARY_REQUIRED_KEYS:
+            if key not in rs:
+                result.fail(f"advisory_log_review.review_summary: missing key '{key}'")
+        records_read = rs.get("records_read", 0)
+        if not isinstance(records_read, int):
+            result.fail("advisory_log_review.review_summary: records_read must be int")
+        if not isinstance(rs.get("sessions_detected"), int):
+            result.fail("advisory_log_review.review_summary: sessions_detected must be int")
+        if rs.get("advisory_only_all_records") is not True and records_read > 0:
+            result.fail(
+                "advisory_log_review.review_summary: advisory_only_all_records must be true "
+                "when records exist"
+            )
+        if rs.get("non_executable_all_records") is not True and records_read > 0:
+            result.fail(
+                "advisory_log_review.review_summary: non_executable_all_records must be true "
+                "when records exist"
+            )
+        if rs.get("production_decision_changed_count", -1) != 0:
+            result.fail(
+                "advisory_log_review.review_summary: production_decision_changed_count must be 0"
+            )
+        if rs.get("apex_input_changed_count", -1) != 0:
+            result.fail(
+                "advisory_log_review.review_summary: apex_input_changed_count must be 0"
+            )
+
+    # safety_analysis section
+    sa = data.get("safety_analysis")
+    if not isinstance(sa, dict):
+        result.fail("advisory_log_review: safety_analysis must be a dict")
+    else:
+        if sa.get("all_invariants_hold") is not True:
+            # Not a fail — it means there are genuine violations that the reviewer caught;
+            # that is valid output. But decision_gate should be advisory_needs_fix.
+            if gate != "advisory_needs_fix":
+                result.fail(
+                    "advisory_log_review: safety_analysis.all_invariants_hold is false "
+                    "but decision_gate is not 'advisory_needs_fix'"
+                )
+        if not isinstance(sa.get("violations"), list):
+            result.fail("advisory_log_review.safety_analysis: violations must be a list")
+
+    # minimum_threshold section
+    mt = data.get("minimum_threshold")
+    if not isinstance(mt, dict):
+        result.fail("advisory_log_review: minimum_threshold must be a dict")
+    else:
+        for key in ("min_records", "min_sessions", "records_met", "sessions_met"):
+            if key not in mt:
+                result.fail(f"advisory_log_review.minimum_threshold: missing key '{key}'")
+
+    # Zero-record tolerance: if records_read == 0, accept with warning
+    rs_dict = data.get("review_summary") or {}
+    if rs_dict.get("records_read", 0) == 0:
+        result.warn(
+            "advisory_log_review: no records observed yet — "
+            "advisory_runtime_log.jsonl is empty or missing"
+        )
 
     return result
