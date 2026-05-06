@@ -202,20 +202,23 @@ A production-ready, cloud-hostable trading system with clean service boundaries,
 
 | Gate | Status |
 |------|--------|
-| `enable_active_opportunity_universe_handoff` | **False** (locked) |
+| `enable_active_opportunity_universe_handoff` | **False** (locked — never enabled during this phase) |
 | Shadow universe file stable | Yes |
 | Comparison proves structural survival | Yes — 20/20 structural slots filled |
-| Advisory layer logging accumulation needed | **Pending** — need real session log review |
-| Full suite baseline clean | Pending Amit approval to run |
+| Advisory layer logging accumulation | **Active — Real-Session Observation Phase begun** |
+| Advisory reviewer gate | `insufficient_live_observation` (1 demo record; need ≥10 records or ≥3 sessions) |
+| `intelligence_first_advisory_enabled` | **True** (enabled for real-session observation) |
+| Full suite baseline | Partially fixed (v3.7.9 — test_orders_core, test_reconnect, test_atr_sizer, test_tranche_exits patch applied) |
 | Production simplification audit | **This document** |
 
-**Handoff will require:**
-1. Several real-session advisory_runtime_log.jsonl review
-2. `active_opportunity_universe_shadow.json` → renamed to `active_opportunity_universe.json`
-3. `enable_active_opportunity_universe_handoff = True`
-4. `current_pipeline_snapshot.json` retired (migration_tooling — no longer needed)
-5. Apex input change to read from production universe file
-6. Full suite clean run with all pre-existing failures documented
+**Handoff will require (not started):**
+1. `advisory_log_reviewer.py` returns `advisory_ready_for_handoff_design`
+2. Amit approves reviewer output
+3. `active_opportunity_universe_shadow.json` → renamed to `active_opportunity_universe.json`
+4. `enable_active_opportunity_universe_handoff = True`
+5. `current_pipeline_snapshot.json` retired (migration_tooling — no longer needed)
+6. Apex input change to read from production universe file
+7. Full suite clean run with all pre-existing failures documented
 
 ---
 
@@ -366,7 +369,7 @@ A production-ready, cloud-hostable trading system with clean service boundaries,
 
 ## Real-Session Advisory Observation Phase
 
-**Status: Ready to begin (pending Amit enabling flag for observation sessions)**
+**Status: ACTIVE — `intelligence_first_advisory_enabled = True` as of v3.7.10**
 
 **Objective:** Collect real advisory_runtime_log.jsonl data across multiple sessions with `intelligence_first_advisory_enabled = True` and `enable_active_opportunity_universe_handoff = False`.
 
@@ -382,7 +385,23 @@ A production-ready, cloud-hostable trading system with clean service boundaries,
 - Hook error rate: does advisory_report.json ever go missing or stale mid-session?
 - Execution pressure check: does advisory status ever influence a trade? (Expected: never)
 
-**Gate for next phase:** No production handoff decision until advisory log review is complete across a minimum of several real sessions reviewed by Amit.
+**Gate for next phase:** No production handoff decision until `advisory_log_reviewer.py` returns `advisory_ready_for_handoff_design` AND Amit explicitly approves after reviewing the full real-session report.
+
+**Advisory file classifications for cutover:**
+
+| File | Keep After Cutover? | Reason |
+|------|--------------------|----|
+| `advisory_logger.py` | TBD — if advisory logging retained | Depends on whether advisory observability continues in production |
+| `advisory_log_reviewer.py` | No — offline review tool | Not production runtime; run on demand |
+| `advisory_runtime_log.jsonl` | Yes — with retention/rotation policy | Runtime observability output; cloud deployment requires log rotation |
+| `advisory_log_review.json` | No — regenerated on demand | Offline evidence gate output; not execution input |
+| `advisory_report.json` | TBD — keep only if diagnostic value remains | Offline advisory report; not on execution path |
+
+**Modules that must never be imported by advisory layer:**
+`scanner.py`, `bot_trading.py`, `market_intelligence.py`, `orders_core.py`, `guardrails.py`, `catalyst_engine.py`, `overnight_research.py`, `agents.py`, `sentinel_agents.py`, `learning.py`, `bot_ibkr.py`
+
+**Backtest-only modules excluded from production runtime:**
+`backtest_intelligence.py` — contains local regime/theme copies; has no production output path; must not be imported in live runtime.
 
 ---
 
@@ -393,3 +412,4 @@ A production-ready, cloud-hostable trading system with clean service boundaries,
 | 2026-05-06 | Created | Initial audit covering Sprints Day2–6B. All intelligence-first modules classified. No files recommended for immediate removal — production handoff gate not yet met. |
 | 2026-05-06 | Sprint 6B patch | Added explicit Sprint 6B file classifications (advisory_logger.py, advisory_runtime_log.jsonl, test_intelligence_sprint6b.py, bot_trading.py hook). Anti-bloat confirmation added. Real-session observation plan documented. |
 | 2026-05-06 | Sprint 6C | Added advisory_log_reviewer.py (advisory_only, offline), advisory_log_review.json (advisory_only), test_intelligence_sprint6c.py (advisory_only test, 34 tests). Validator extended with validate_advisory_log_review(). No production modules touched. |
+| 2026-05-06 | Real-Session Observation Phase | intelligence_first_advisory_enabled set True (v3.7.10). enable_active_opportunity_universe_handoff remains False. Pre-existing test failures partially fixed (v3.7.9). No candidate/Apex/scoring/risk/order/execution changes. Advisory file cutover classifications added. Advisory modules-must-not-import list formalised. |
