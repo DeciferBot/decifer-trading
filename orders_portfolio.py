@@ -899,6 +899,22 @@ def reconcile_with_ibkr(ib: IB):
                     # signal_scores, agent_outputs, pattern_id, etc.
                     stored_entry = active_trades[key].get("entry", ibkr_entry)
                     stored_direction = active_trades[key].get("direction", "LONG")
+                    # RC-3: IBKR is the source of truth for position sign.
+                    # If stored direction contradicts item.position sign, correct it
+                    # immediately before any exit logic runs — a wrong direction causes
+                    # execute_sell to submit the wrong side (BUY instead of SELL or
+                    # vice versa), which is what cascaded into the MS $2M incident.
+                    _ibkr_direction = "SHORT" if item.position < 0 else "LONG"
+                    if stored_direction != _ibkr_direction:
+                        log.critical(
+                            "Reconcile %s: direction mismatch — stored=%s but IBKR "
+                            "position=%.0f (%s). Correcting to IBKR direction to prevent "
+                            "wrong-side exit orders.",
+                            key, stored_direction, item.position, _ibkr_direction,
+                        )
+                        stored_direction = _ibkr_direction
+                        with _trades_lock:
+                            active_trades[key]["direction"] = _ibkr_direction
                     ibkr_qty = abs(int(item.position))
                     stored_qty = active_trades[key].get("qty", ibkr_qty)
                     # Reconcile qty: partial fills or tranche closes mean IBKR holds

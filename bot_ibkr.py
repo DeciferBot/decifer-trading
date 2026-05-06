@@ -1509,6 +1509,25 @@ def _on_order_status_event(trade):
                 except Exception as _ve:
                     clog("WARNING", f"Voice short entry alert failed for {sym}: {_ve}")
 
+                # RC-5: SHORT exit fill — BUY order fills when covering a SHORT position.
+                # The SELL fill handler below (lines ~1516+) only fires for SELL fills,
+                # so a SHORT exit (BUY to cover) had NO POSITION_CLOSED callback path.
+                # Without this, a SHORT position stuck in EXITING state could never
+                # self-heal between scan cycles — the deferred handler also doesn't fire
+                # because covering a short leaves IBKR at 0 (or inverts to LONG if
+                # multiple stale GTC BUY orders fill), never triggering "k not in price_map".
+                if _t_pre.get("status") == "EXITING" and _t_pre.get("direction") == "SHORT" and fill_price > 0:
+                    try:
+                        from orders_portfolio import _close_position_record
+                        _ep_s = float(_t_pre.get("entry", 0))
+                        _q_s = int(_t_pre.get("qty", 1))
+                        _pnl_s = round((_ep_s - fill_price) * _q_s, 2)  # SHORT pnl = (entry - exit) * qty
+                        _reason_s = _t_pre.get("pending_exit_reason", "buy_to_cover_filled")
+                        _close_position_record(sym, exit_price=fill_price, exit_reason=_reason_s, pnl=_pnl_s)
+                        clog("TRADE", f"✅ POSITION_CLOSED via callback (short cover): {sym} exit={fill_price:.4f} pnl={_pnl_s:.2f}")
+                    except Exception as _ce_s:
+                        clog("WARNING", f"Callback POSITION_CLOSED (short cover) failed for {sym}: {_ce_s}")
+
                 # Long exit fill — if position is EXITING, write POSITION_CLOSED.
                 # Guard: execute_sell() may have already written it inline (in which case
                 # the key is gone from active_trades) or the deferred handler will run next

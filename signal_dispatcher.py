@@ -696,51 +696,57 @@ def dispatch_forced_exit(
         log.info(f"dispatch_forced_exit (dry): {symbol} — {reason}")
         return action
 
-    # Forced exits must fire even when status=EXITING.
-    # execute_sell's EXITING guard prevents duplicate orders — correct for normal
-    # PM exits, but wrong here: guardrails force-exits are authoritative overrides
-    # that must close the position regardless of prior close-order state.
-    # If a prior close order exists, cancel it first, then reset to ACTIVE so
-    # execute_sell can place a fresh market order.
-    try:
-        from orders_state import active_trades as _at, _trades_lock as _atl
-        from orders_portfolio import _cancel_ibkr_order_by_id as _cancel_oid
-        with _atl:
-            _matches = [k for k, v in _at.items() if v.get("symbol") == symbol]
-        for _key in _matches:
+    # RC-1: per-symbol lock prevents two threads from executing a forced exit
+    # concurrently for the same symbol. Without this, two calls can both reset
+    # EXITING → ACTIVE and both call execute_sell, submitting two SELL orders
+    # that both fill — inverting the position into a net short (the MS incident).
+    from orders_state import _get_symbol_lock as _gsl
+    with _gsl(symbol):
+        # Forced exits must fire even when status=EXITING.
+        # execute_sell's EXITING guard prevents duplicate orders — correct for normal
+        # PM exits, but wrong here: guardrails force-exits are authoritative overrides
+        # that must close the position regardless of prior close-order state.
+        # If a prior close order exists, cancel it first, then reset to ACTIVE so
+        # execute_sell can place a fresh market order.
+        try:
+            from orders_state import active_trades as _at, _trades_lock as _atl
+            from orders_portfolio import _cancel_ibkr_order_by_id as _cancel_oid
             with _atl:
-                _pos = _at.get(_key, {})
-            if _pos.get("status") == "EXITING":
-                _close_oid = _pos.get("close_order_id")
-                if _close_oid and ib is not None:
-                    try:
-                        _cancel_oid(ib, _close_oid)
-                        log.info(
-                            "dispatch_forced_exit %s: cancelled stale close order #%s before re-exit",
-                            symbol, _close_oid,
-                        )
-                    except Exception as _ce:
-                        log.warning(
-                            "dispatch_forced_exit %s: cancel order #%s failed (non-fatal) — %s",
-                            symbol, _close_oid, _ce,
-                        )
-                from orders_state import _safe_update_trade as _sut
-                _sut(_key, {"status": "ACTIVE", "close_order_id": None})
-                log.info(
-                    "dispatch_forced_exit %s: reset EXITING → ACTIVE (reason=%s)",
-                    symbol, reason,
-                )
-    except Exception as _reset_err:
-        log.warning("dispatch_forced_exit %s: EXITING reset failed — %s", symbol, _reset_err)
+                _matches = [k for k, v in _at.items() if v.get("symbol") == symbol]
+            for _key in _matches:
+                with _atl:
+                    _pos = _at.get(_key, {})
+                if _pos.get("status") == "EXITING":
+                    _close_oid = _pos.get("close_order_id")
+                    if _close_oid and ib is not None:
+                        try:
+                            _cancel_oid(ib, _close_oid)
+                            log.info(
+                                "dispatch_forced_exit %s: cancelled stale close order #%s before re-exit",
+                                symbol, _close_oid,
+                            )
+                        except Exception as _ce:
+                            log.warning(
+                                "dispatch_forced_exit %s: cancel order #%s failed (non-fatal) — %s",
+                                symbol, _close_oid, _ce,
+                            )
+                    from orders_state import _safe_update_trade as _sut
+                    _sut(_key, {"status": "ACTIVE", "close_order_id": None})
+                    log.info(
+                        "dispatch_forced_exit %s: reset EXITING → ACTIVE (reason=%s)",
+                        symbol, reason,
+                    )
+        except Exception as _reset_err:
+            log.warning("dispatch_forced_exit %s: EXITING reset failed — %s", symbol, _reset_err)
 
-    try:
-        from orders_core import execute_sell
-        ok = execute_sell(ib, symbol, reason=reason)
-        action["executed"] = bool(ok)
-    except Exception as exc:
-        log.error(f"dispatch_forced_exit: execute_sell failed for {symbol} — {exc}")
-        action["error"] = str(exc)
-    return action
+        try:
+            from orders_core import execute_sell
+            ok = execute_sell(ib, symbol, reason=reason)
+            action["executed"] = bool(ok)
+        except Exception as exc:
+            log.error(f"dispatch_forced_exit: execute_sell failed for {symbol} — {exc}")
+            action["error"] = str(exc)
+        return action
 
 
 def _select_atr(entry: dict, payload: dict) -> float:

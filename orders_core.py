@@ -1955,6 +1955,36 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
     _is_partial = qty_override is not None and qty_override < info["qty"]
     sell_qty = qty_override if _is_partial else info["qty"]
 
+    # RC-4: Cross-check sell_qty against IBKR actual position size before submitting.
+    # local active_trades["qty"] can lag or be wrong when positions are reconstructed
+    # via EXT paths with stale data. For full exits only (not partial closes), query
+    # IBKR's portfolio and use the IBKR qty if it differs. This prevents submitting
+    # a SELL 321 when IBKR actually holds 5376 shares (a partial close that leaves a
+    # large residual position). Failure to query IBKR is non-fatal — local qty is used.
+    if not _is_partial and ib is not None and info.get("instrument") != "fx":
+        try:
+            _ibkr_portfolio = ib.portfolio(CONFIG["active_account"])
+            _ibkr_item = next(
+                (p for p in _ibkr_portfolio if getattr(p.contract, "symbol", "") == symbol),
+                None,
+            )
+            if _ibkr_item is not None:
+                _ibkr_actual_qty = abs(int(_ibkr_item.position))
+                if _ibkr_actual_qty > 0 and _ibkr_actual_qty != sell_qty:
+                    _deviation = abs(_ibkr_actual_qty - sell_qty) / max(sell_qty, 1)
+                    _log_fn = log.critical if _deviation > 0.10 else log.warning
+                    _log_fn(
+                        "execute_sell %s: RC-4 qty mismatch — local=%d ibkr=%d (deviation=%.0f%%). "
+                        "Using IBKR qty to prevent wrong-size exit.",
+                        symbol, sell_qty, _ibkr_actual_qty, _deviation * 100,
+                    )
+                    sell_qty = _ibkr_actual_qty
+        except Exception as _rc4_err:
+            log.warning(
+                "execute_sell %s: RC-4 IBKR qty cross-check failed (non-fatal, using local qty) — %s",
+                symbol, _rc4_err,
+            )
+
     # Hours guard: equities/options require extended-hours window; FX is 24/5.
     if info.get("instrument") != "fx" and not is_equities_extended_hours():
         import zoneinfo as _zi
@@ -2097,45 +2127,64 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
                 _limit = round(_exit_price * 1.002, 2)
             from ib_async import LimitOrder as _LimitOrder
 
-            # Guard: if a GTC exit order is already live in IBKR for this symbol,
-            # skip placement to avoid stacking duplicate orders across scan cycles.
-            # Exclude the known SL order (different order type and ID).
+            # RC-2: Cancel ALL stale GTC exit orders for this symbol before placing a
+            # new one. The prior guard used next() which found only ONE order — when
+            # a position was destroyed/recreated across EXT cycles, GTC orders from
+            # prior cycles were never cancelled (they had different order IDs not tracked
+            # in close_order_id). They accumulated as orphaned GTC orders in IBKR and
+            # all fired at market open, creating a massive unintended position
+            # (MS $2M incident: 9 × 639-share BUY orders accumulated and all filled).
+            # Bracket orders (STP/TRAIL/SL/TP) are excluded — never cancel those here.
             _sl_id = info.get("sl_order_id")
-            _live_exit = next(
-                (
-                    t for t in ib.openTrades()
-                    if getattr(t.contract, "symbol", "") == symbol
-                    and getattr(t.order, "action", "") == close_action
-                    and getattr(t.order, "tif", "") == "GTC"
-                    and getattr(t.order, "orderType", "") not in ("STP", "STP LMT", "TRAIL")
-                    and t.order.orderId != _sl_id
-                    and t.orderStatus.status not in ("Cancelled", "Filled", "Inactive")
-                ),
-                None,
-            )
-            if _live_exit:
-                _live_lmt = getattr(_live_exit.order, "lmtPrice", 0) or 0
-                _price_drift = abs(_live_lmt - _limit) / _limit if _limit > 0 else 0
-                if _price_drift > 0.02 and _limit > 0:
-                    # Live GTC limit is >2% from current market — cancel and reprice
-                    # so the exit can actually fill (e.g. stock fell 5% since order placed).
+            _tp_id = info.get("tp_order_id")
+            _exclude_ids = {_id for _id in (_sl_id, _tp_id) if _id}
+            _live_exits = [
+                t for t in ib.openTrades()
+                if getattr(t.contract, "symbol", "") == symbol
+                and getattr(t.order, "action", "") == close_action
+                and getattr(t.order, "tif", "") == "GTC"
+                and getattr(t.order, "orderType", "") not in ("STP", "STP LMT", "TRAIL")
+                and t.order.orderId not in _exclude_ids
+                and t.orderStatus.status not in ("Cancelled", "Filled", "Inactive")
+            ]
+            if _live_exits:
+                if len(_live_exits) == 1:
+                    # Single GTC exit — check price drift. If within tolerance, no need
+                    # to resubmit; existing order is good.
+                    _live_lmt = getattr(_live_exits[0].order, "lmtPrice", 0) or 0
+                    _price_drift = abs(_live_lmt - _limit) / _limit if _limit > 0 else 0
+                    if _price_drift <= 0.02:
+                        log.info(
+                            "execute_sell %s: GTC %s already live in IBKR "
+                            "(id=%s, status=%s, limit=$%.2f, drift=%.1f%%) "
+                            "— skipping duplicate placement",
+                            symbol, close_action,
+                            _live_exits[0].order.orderId, _live_exits[0].orderStatus.status,
+                            _live_lmt, _price_drift * 100,
+                        )
+                        return True
+                # Cancel ALL live exit orders: either multiple (accumulated stale
+                # orders from prior EXT cycles) or single at a stale price.
+                for _stale in _live_exits:
+                    _stale_lmt = getattr(_stale.order, "lmtPrice", 0) or 0
                     cancel_with_reason(
-                        ib, _live_exit.order,
-                        f"repricing stale GTC exit: old=${_live_lmt:.2f} new=${_limit:.2f} drift={_price_drift:.1%}"
+                        ib, _stale.order,
+                        f"RC-2 cancel before resubmit ({len(_live_exits)} live GTC exit(s)): "
+                        f"old=${_stale_lmt:.2f} new=${_limit:.2f}",
                     )
-                    ib.sleep(0.5)
                     log.info(
-                        f"execute_sell {symbol}: cancelled stale GTC exit "
-                        f"(id={_live_exit.order.orderId}, limit=${_live_lmt:.2f}) — repricing to ${_limit:.2f}"
+                        "execute_sell %s: cancelled stale GTC exit (id=%s, limit=$%.2f)",
+                        symbol, _stale.order.orderId, _stale_lmt,
                     )
-                    # fall through to place new order at current price
-                else:
-                    log.info(
-                        f"execute_sell {symbol}: GTC {close_action} already live in IBKR "
-                        f"(id={_live_exit.order.orderId}, status={_live_exit.orderStatus.status}) "
-                        f"— skipping duplicate placement"
+                if len(_live_exits) > 1:
+                    log.critical(
+                        "execute_sell %s: RC-2 — cancelled %d accumulated GTC %s orders. "
+                        "Root cause: prior dispatch cycles left orphaned GTC orders in IBKR. "
+                        "RC-1 symbol lock should prevent future accumulation.",
+                        symbol, len(_live_exits), close_action,
                     )
-                    return True
+                ib.sleep(0.5)
+                # fall through to place a single fresh order
 
             close_order = _LimitOrder(close_action, sell_qty, _limit, account=CONFIG["active_account"])
             close_order.outsideRth = True
