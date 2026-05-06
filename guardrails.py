@@ -237,6 +237,11 @@ def flag_positions_for_review(
 def _detect_review_reason(pos: dict, tt: str, current_regime: str) -> str | None:
     """Return flagged_reason string if position needs Apex review, else None."""
     try:
+        # UNKNOWN trade_type positions are unconditional forced exits handled by
+        # screen_open_positions. They must never enter the PM review path — Apex
+        # would TRIM instead of flat-close, leaving a partial orphan open.
+        if tt in ("UNKNOWN", ""):
+            return None
         direction = (pos.get("direction") or "LONG").upper()
         entry_px = pos.get("entry") or 0.0
         current_px = pos.get("current") or entry_px
