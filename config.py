@@ -154,7 +154,7 @@ CONFIG = {
     # Primary path uses atr × atr_stop_multiplier instead.
     "risk_per_trade": 0.01,  # 1% per trade — used by legacy position_size()
     "max_position_size": 0.30,  # Informational only — not enforced in sizing (see risk.py comment). Hard cap is 20% in orders_core.py. (live: re-evaluate enforcement)
-    "max_daily_loss_pct": 0.05,  # 5% max daily loss before halting
+    "max_daily_loss_pct": 0.15,  # 15% max daily loss before halting
     "correlation_threshold": 0.75,  # Block new trade if correlation > this
     "correlation_group_max": 4,     # Max positions per sector group (live: 3)
     "max_positions": 100,  # Sanity ceiling only — NOT a portfolio construction tool.
@@ -162,7 +162,7 @@ CONFIG = {
     # max_single_position (6%), and max_sector_exposure (40%). Count caps are
     # weak proxies for risk; percent caps express risk directly. Keep this key
     # present because multiple readers do direct CONFIG["max_positions"] access.
-    "daily_loss_limit": 0.10,  # 10% daily loss limit
+    "daily_loss_limit": 0.15,  # 15% daily loss hard halt
     "max_drawdown_alert": 0.25,  # 25% drawdown alert
     # ── Interphase live-safety overlay (between Phase 1 and Phase 2 of Decifer 3.0) ──
     # Flags consumed by safety_overlay.py. See safety_overlay._DEFAULTS for semantics.
@@ -173,8 +173,9 @@ CONFIG = {
         "FORCE_MANAGE_ONLY": False,
         "USE_APEX_V3_SHADOW": True,     # shadow+divergence logging (operational, not migration)
         "FINBERT_MATERIALITY_GATE_ENABLED": True,
-        "daily_loss_halt_new_entries_pct": 0.03,
-        "daily_loss_manage_only_pct": 0.05,
+        "daily_loss_halt_new_entries_pct": 0.075,   # -7.5% blocks new entries
+        "daily_loss_manage_only_pct": 0.10,         # -10% PM-only (TRIM/EXIT/HOLD)
+        "daily_loss_halt_pct": 0.15,                # -15% full halt, scan aborts
         "per_symbol_hard_loss_pct": None,  # None = disabled; e.g. 0.15 → exit at -15%
         "reconcile_every_cycle": True,
     },

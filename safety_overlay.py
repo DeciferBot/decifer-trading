@@ -27,6 +27,10 @@ from config import CONFIG
 
 log = logging.getLogger("decifer.safety_overlay")
 
+# Runtime mode set by run_circuit_breakers each scan cycle.
+# "ok" | "block" | "manage_only" | "halt"
+_runtime_mode: str = "ok"
+
 
 # ── Config access with safe defaults ─────────────────────────────────────────
 
@@ -36,8 +40,9 @@ _DEFAULTS: dict = {
     "FORCE_MANAGE_ONLY": False,
     "USE_APEX_V3_SHADOW": True,    # shadow+divergence logging (operational)
     "FINBERT_MATERIALITY_GATE_ENABLED": True,
-    "daily_loss_halt_new_entries_pct": 0.03,   # -3% blocks new entries
-    "daily_loss_manage_only_pct": 0.05,        # -5% switches to manage-only (aligns with daily_loss_limit)
+    "daily_loss_halt_new_entries_pct": 0.075,   # -7.5% blocks new entries
+    "daily_loss_manage_only_pct": 0.10,        # -10% switches to manage-only (PM actions only)
+    "daily_loss_halt_pct": 0.15,               # -15% full halt — no new entries, no PM, scan stops
     "per_symbol_hard_loss_pct": None,          # e.g. -0.15 → force exit on -15% per-position unreal.; None disables
     "reconcile_every_cycle": True,             # run preflight reconcile at top of each scan
 }
@@ -76,6 +81,8 @@ def can_submit_order(action: str) -> tuple[bool, str]:
             return False, "NEW_ENTRIES_ENABLED=False — new entries blocked"
         if flag("FORCE_MANAGE_ONLY"):
             return False, "FORCE_MANAGE_ONLY=True — manage-only mode, no new entries"
+        if _runtime_mode in ("block", "manage_only", "halt"):
+            return False, f"circuit breaker {_runtime_mode} — new entries blocked"
         return True, "entry allowed"
 
     return False, f"unknown action: {action}"
@@ -89,30 +96,43 @@ def run_circuit_breakers(portfolio_value: float, daily_pnl: float) -> tuple[bool
 
     Returns (ok, reason, mode):
         ok=True,  mode="ok"           — normal operation
-        ok=True,  mode="manage_only"  — deeper drawdown: forcibly disable new entries
-        ok=False, mode="halt"         — (reserved for future hard-halt conditions)
+        ok=True,  mode="block"        — -7.5%: new entries blocked, PM and exits allowed
+        ok=True,  mode="manage_only"  — -10%: PM actions only (TRIM/EXIT/HOLD), no new entries
+        ok=False, mode="halt"         — -15%: full stop, scan cycle aborts
 
-    The caller is responsible for applying mode="manage_only" (e.g. treating it
-    as FORCE_MANAGE_ONLY for this cycle).
+    The caller is responsible for applying the mode.
     """
+    global _runtime_mode
+
     if portfolio_value <= 0:
+        _runtime_mode = "ok"
         return True, "portfolio_value not available — no breaker applied", "ok"
 
     pnl_pct = daily_pnl / portfolio_value
 
-    halt_pct = flag("daily_loss_manage_only_pct")
+    hard_halt_pct = flag("daily_loss_halt_pct")
+    manage_only_pct = flag("daily_loss_manage_only_pct")
     block_pct = flag("daily_loss_halt_new_entries_pct")
 
-    if halt_pct is not None and pnl_pct <= -abs(halt_pct):
+    if hard_halt_pct is not None and pnl_pct <= -abs(hard_halt_pct):
+        _runtime_mode = "halt"
+        return False, (
+            f"daily PnL {pnl_pct:+.2%} ≤ -{abs(hard_halt_pct):.0%} — full halt"
+        ), "halt"
+
+    if manage_only_pct is not None and pnl_pct <= -abs(manage_only_pct):
+        _runtime_mode = "manage_only"
         return True, (
-            f"daily PnL {pnl_pct:+.2%} ≤ -{abs(halt_pct):.0%} — manage-only mode"
+            f"daily PnL {pnl_pct:+.2%} ≤ -{abs(manage_only_pct):.0%} — manage-only (PM only)"
         ), "manage_only"
 
     if block_pct is not None and pnl_pct <= -abs(block_pct):
+        _runtime_mode = "block"
         return True, (
             f"daily PnL {pnl_pct:+.2%} ≤ -{abs(block_pct):.0%} — new entries blocked"
-        ), "manage_only"
+        ), "block"
 
+    _runtime_mode = "ok"
     return True, "circuit breakers clear", "ok"
 
 

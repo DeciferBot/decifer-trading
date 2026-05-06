@@ -1309,9 +1309,16 @@ def run_scan():
     try:
         import safety_overlay as _so
         _breaker_ok, _breaker_reason, _breaker_mode = _so.run_circuit_breakers(pv, pnl)
-        if _breaker_mode == "manage_only":
-            clog("RISK", f"⚠️ SAFETY OVERLAY manage-only: {_breaker_reason}")
+        if _breaker_mode == "halt":
+            clog("RISK", f"⛔ SAFETY OVERLAY full halt: {_breaker_reason}")
+            dash["safety_mode"] = "halt"
+            return
+        elif _breaker_mode == "manage_only":
+            clog("RISK", f"⚠️ SAFETY OVERLAY manage-only (PM only): {_breaker_reason}")
             dash["safety_mode"] = "manage_only"
+        elif _breaker_mode == "block":
+            clog("RISK", f"⚠️ SAFETY OVERLAY entries blocked: {_breaker_reason}")
+            dash["safety_mode"] = "block"
         else:
             dash["safety_mode"] = "ok"
         # Preflight broker reconciliation — IBKR is ground truth for qty/fills.
