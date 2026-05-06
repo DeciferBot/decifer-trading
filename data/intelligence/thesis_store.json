@@ -1,0 +1,454 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-05T20:35:06Z",
+  "valid_for_session": "2026-05-05",
+  "mode": "shadow_thesis_store",
+  "data_source_mode": "local_shadow_outputs_only",
+  "source_files": [
+    "data/intelligence/theme_activation.json",
+    "data/intelligence/current_economic_context.json",
+    "data/intelligence/economic_candidate_feed.json",
+    "data/universe_builder/active_opportunity_universe_shadow.json"
+  ],
+  "unavailable_sources": [],
+  "warnings": [
+    "Sprint 4B: thesis store built from local shadow files only using deterministic template \u2014 no LLM. Thesis store cannot create symbols, trades, or executable candidates. Not a trade signal."
+  ],
+  "thesis_summary": {
+    "total_theses": 8,
+    "new": 8,
+    "active": 0,
+    "strengthened": 0,
+    "weakened": 0,
+    "crowded": 0,
+    "invalidated": 0,
+    "unchanged": 0,
+    "watchlist": 0,
+    "low_confidence_count": 0,
+    "evidence_limited_count": 0,
+    "no_live_api_called": true,
+    "live_output_changed": false
+  },
+  "theses": [
+    {
+      "theme_id": "data_centre_power",
+      "current_thesis": "Theme data_centre_power is activated because drivers ai_capex_growth fired rules ai_capex_growth_to_data_centre_power. Candidate exposure is 5 symbols, with 5 currently in the shadow universe. Key risks are valuation; crowding; capex_delay. Confirmation still required: sector_etf_relative_strength; price_and_volume_confirmation; management_commentary_support.",
+      "previous_thesis": null,
+      "status": "new",
+      "previous_status": null,
+      "status_change": "created",
+      "changed_by": [],
+      "evidence": [
+        "driver_ai_capex_growth_active_via_rule_ai_capex_growth_to_data_centre_power",
+        "5_candidates_in_economic_feed",
+        "5_candidates_in_shadow_universe"
+      ],
+      "confidence": 0.45,
+      "horizon": "multi_week_to_multi_quarter",
+      "affected_symbols": [
+        "VRT",
+        "ETN",
+        "PWR",
+        "CEG",
+        "XLU"
+      ],
+      "candidate_route_hints": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "invalidation": [
+        "hyperscaler capex cuts",
+        "management commentary weakens AI infrastructure thesis",
+        "sector relative strength breaks down",
+        "credit conditions materially tighten",
+        "theme becomes crowded without price confirmation"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation",
+        "management_commentary_support"
+      ],
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "capex_delay",
+        "credit_stress",
+        "power_demand_disappointment"
+      ],
+      "last_updated": "2026-05-05T20:35:06Z",
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "semiconductors",
+      "current_thesis": "Theme semiconductors is activated because drivers ai_capex_growth fired rules ai_capex_growth_to_semiconductors. Candidate exposure is 6 symbols, with 6 currently in the shadow universe. Key risks are valuation; crowding; export_controls. Confirmation still required: semiconductor_relative_strength; ai_infrastructure_theme_confirmation; price_and_volume_confirmation.",
+      "previous_thesis": null,
+      "status": "new",
+      "previous_status": null,
+      "status_change": "created",
+      "changed_by": [],
+      "evidence": [
+        "driver_ai_capex_growth_active_via_rule_ai_capex_growth_to_semiconductors",
+        "6_candidates_in_economic_feed",
+        "6_candidates_in_shadow_universe"
+      ],
+      "confidence": 0.45,
+      "horizon": "multi_week_to_multi_quarter",
+      "affected_symbols": [
+        "NVDA",
+        "TSM",
+        "AVGO",
+        "AMD",
+        "ASML",
+        "SMH"
+      ],
+      "candidate_route_hints": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "invalidation": [
+        "hyperscaler capex guidance cut",
+        "export regulatory shock targeting key names",
+        "semiconductor sector ETF relative strength breaks down",
+        "valuation crowding extreme with no earnings acceleration",
+        "credit stress severe enough to defer capital spending"
+      ],
+      "confirmation_required": [
+        "semiconductor_relative_strength",
+        "ai_infrastructure_theme_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "export_controls",
+        "capex_delay",
+        "semiconductor_cycle"
+      ],
+      "last_updated": "2026-05-05T20:35:06Z",
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "banks",
+      "current_thesis": "Theme banks is watchlist because drivers yields_rising fired rules rates_rising_to_banks_conditional. Candidate exposure is 5 symbols, with 5 currently in the shadow universe. Key risks are credit_stress; deposit_pressure; curve_inversion. Confirmation still required: credit_stress_contained; yield_curve_not_severely_inverted; financial_sector_relative_strength.",
+      "previous_thesis": null,
+      "status": "new",
+      "previous_status": null,
+      "status_change": "created",
+      "changed_by": [],
+      "evidence": [
+        "driver_yields_rising_watch_via_rule_rates_rising_to_banks_conditional",
+        "5_candidates_in_economic_feed",
+        "5_candidates_in_shadow_universe"
+      ],
+      "confidence": 0.28,
+      "horizon": "multi_week",
+      "affected_symbols": [
+        "JPM",
+        "BAC",
+        "WFC",
+        "GS",
+        "XLF"
+      ],
+      "candidate_route_hints": [
+        "swing",
+        "watchlist"
+      ],
+      "invalidation": [
+        "credit stress indicators rising sharply",
+        "yield curve inverts severely",
+        "recession risk materialises \u2014 loan book deterioration",
+        "deposit stress or bank-specific solvency concerns",
+        "financial sector fails to confirm yield move"
+      ],
+      "confirmation_required": [
+        "credit_stress_contained",
+        "yield_curve_not_severely_inverted",
+        "financial_sector_relative_strength",
+        "price_and_volume_confirmation"
+      ],
+      "risk_flags": [
+        "credit_stress",
+        "deposit_pressure",
+        "curve_inversion",
+        "recession_risk",
+        "regulatory_risk"
+      ],
+      "last_updated": "2026-05-05T20:35:06Z",
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "energy",
+      "current_thesis": "Theme energy is watchlist because drivers oil_supply_shock fired rules oil_supply_shock_to_energy. Candidate exposure is 5 symbols, with 5 currently in the shadow universe. Key risks are oil_demand_destruction; geopolitical_reversal; commodity_volatility. Confirmation still required: oil_energy_relative_strength; xle_or_energy_sector_confirmation; price_and_volume_confirmation.",
+      "previous_thesis": null,
+      "status": "new",
+      "previous_status": null,
+      "status_change": "created",
+      "changed_by": [],
+      "evidence": [
+        "driver_oil_supply_shock_watch_via_rule_oil_supply_shock_to_energy",
+        "5_candidates_in_economic_feed",
+        "5_candidates_in_shadow_universe"
+      ],
+      "confidence": 0.28,
+      "horizon": "short_to_multi_week",
+      "affected_symbols": [
+        "XOM",
+        "CVX",
+        "OXY",
+        "SLB",
+        "XLE"
+      ],
+      "candidate_route_hints": [
+        "swing",
+        "intraday_swing",
+        "watchlist"
+      ],
+      "invalidation": [
+        "oil rise driven by demand destruction signal rather than supply disruption",
+        "broad risk-off overwhelms energy sector bid",
+        "credit stress severe enough to overwhelm commodity tailwind",
+        "energy sector relative strength fails to confirm oil move",
+        "geopolitical supply risk rapidly de-escalates"
+      ],
+      "confirmation_required": [
+        "oil_energy_relative_strength",
+        "xle_or_energy_sector_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "risk_flags": [
+        "oil_demand_destruction",
+        "geopolitical_reversal",
+        "commodity_volatility",
+        "broad_risk_off"
+      ],
+      "last_updated": "2026-05-05T20:35:06Z",
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "defence",
+      "current_thesis": "Theme defence is watchlist because drivers geopolitical_risk_rising fired rules geopolitical_risk_to_defence. Candidate exposure is 5 symbols, with 5 currently in the shadow universe. Key risks are de_escalation; budget_risk; valuation. Confirmation still required: defence_sector_relative_strength; geopolitical_risk_remains_active; price_and_volume_confirmation.",
+      "previous_thesis": null,
+      "status": "new",
+      "previous_status": null,
+      "status_change": "created",
+      "changed_by": [],
+      "evidence": [
+        "driver_geopolitical_risk_rising_watch_via_rule_geopolitical_risk_to_defence",
+        "5_candidates_in_economic_feed",
+        "5_candidates_in_shadow_universe"
+      ],
+      "confidence": 0.28,
+      "horizon": "multi_week_to_multi_quarter",
+      "affected_symbols": [
+        "LMT",
+        "NOC",
+        "RTX",
+        "GD",
+        "ITA"
+      ],
+      "candidate_route_hints": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "invalidation": [
+        "geopolitical risk event de-escalates sharply",
+        "defence sector fails to confirm geopolitical bid",
+        "broad market liquidation overwhelms defence theme",
+        "budget sequestration or procurement freeze",
+        "theme becomes crowded with valuation extended"
+      ],
+      "confirmation_required": [
+        "defence_sector_relative_strength",
+        "geopolitical_risk_remains_active",
+        "price_and_volume_confirmation"
+      ],
+      "risk_flags": [
+        "de_escalation",
+        "budget_risk",
+        "valuation",
+        "procurement_delay"
+      ],
+      "last_updated": "2026-05-05T20:35:06Z",
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "quality_cash_flow",
+      "current_thesis": "Theme quality_cash_flow is crowded because drivers credit_stress_rising, risk_off_rotation fired rules credit_stress_to_quality_cash_flow, risk_off_rotation_to_defensive_quality. Candidate exposure is 5 symbols, with 2 currently in the shadow universe. Key risks are valuation; crowding; broad_market_liquidation. Confirmation still required: quality_relative_strength; defensive_sector_confirmation; price_and_volume_confirmation_by_trading_bot.",
+      "previous_thesis": null,
+      "status": "new",
+      "previous_status": null,
+      "status_change": "created",
+      "changed_by": [],
+      "evidence": [
+        "driver_credit_stress_rising_watch_via_rule_credit_stress_to_quality_cash_flow",
+        "driver_risk_off_rotation_watch_via_rule_risk_off_rotation_to_defensive_quality",
+        "5_candidates_in_economic_feed",
+        "2_candidates_in_shadow_universe"
+      ],
+      "confidence": 0.3,
+      "horizon": "multi_week_to_multi_quarter",
+      "affected_symbols": [
+        "MSFT",
+        "AAPL",
+        "COST",
+        "BRK.B",
+        "QUAL"
+      ],
+      "candidate_route_hints": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "invalidation": [
+        "credit stress fades and high beta leadership resumes",
+        "quality relative strength breaks down",
+        "valuation risk becomes extreme",
+        "broad risk-on confirmed"
+      ],
+      "confirmation_required": [
+        "quality_relative_strength",
+        "defensive_sector_confirmation",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "broad_market_liquidation",
+        "earnings_disappointment"
+      ],
+      "last_updated": "2026-05-05T20:35:06Z",
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "defensive_quality",
+      "current_thesis": "Theme defensive_quality is crowded because drivers risk_off_rotation fired rules risk_off_rotation_to_defensive_quality. Candidate exposure is 8 symbols, with 3 currently in the shadow universe. Key risks are defensive_crowding; false_risk_off_signal; rate_sensitivity. Confirmation still required: defensive_sector_relative_strength; low_vol_or_quality_factor_relative_strength; SPY_QQQ_weakness_or_breadth_deterioration.",
+      "previous_thesis": null,
+      "status": "new",
+      "previous_status": null,
+      "status_change": "created",
+      "changed_by": [],
+      "evidence": [
+        "driver_risk_off_rotation_watch_via_rule_risk_off_rotation_to_defensive_quality",
+        "8_candidates_in_economic_feed",
+        "3_candidates_in_shadow_universe"
+      ],
+      "confidence": 0.3,
+      "horizon": "days_to_weeks",
+      "affected_symbols": [
+        "COST",
+        "JNJ",
+        "PG",
+        "KO",
+        "PEP",
+        "XLP",
+        "XLV",
+        "SPLV"
+      ],
+      "candidate_route_hints": [
+        "swing",
+        "watchlist"
+      ],
+      "invalidation": [
+        "broad risk-on recovery confirmed",
+        "defensives fail to outperform in risk-off",
+        "risk-off move exhausted and mean-reversion begins",
+        "rate shock causes defensive de-rating"
+      ],
+      "confirmation_required": [
+        "defensive_sector_relative_strength",
+        "low_vol_or_quality_factor_relative_strength",
+        "SPY_QQQ_weakness_or_breadth_deterioration"
+      ],
+      "risk_flags": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "last_updated": "2026-05-05T20:35:06Z",
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "small_caps",
+      "current_thesis": "Theme small_caps is weakening because drivers credit_stress_rising fired rules credit_stress_to_small_caps_headwind. Candidate exposure is 1 symbols, with 1 currently in the shadow universe. Key risks are credit_stress_easing; risk_on_rotation; liquidity_support_intervention. Confirmation still required: IWM_relative_weakness; credit_proxy_weakness; breadth_deterioration.",
+      "previous_thesis": null,
+      "status": "new",
+      "previous_status": null,
+      "status_change": "created",
+      "changed_by": [],
+      "evidence": [
+        "driver_credit_stress_rising_watch_via_rule_credit_stress_to_small_caps_headwind",
+        "1_candidates_in_economic_feed",
+        "1_candidates_in_shadow_universe",
+        "pressure_candidate_present_in_feed"
+      ],
+      "confidence": 0.22,
+      "horizon": "multi_week",
+      "affected_symbols": [
+        "IWM"
+      ],
+      "candidate_route_hints": [
+        "watchlist"
+      ],
+      "invalidation": [
+        "credit stress fades and small-cap relative strength recovers",
+        "liquidity support measures announced",
+        "risk-on rotation leads small-caps higher"
+      ],
+      "confirmation_required": [
+        "IWM_relative_weakness",
+        "credit_proxy_weakness",
+        "breadth_deterioration"
+      ],
+      "risk_flags": [
+        "credit_stress_easing",
+        "risk_on_rotation",
+        "liquidity_support_intervention"
+      ],
+      "last_updated": "2026-05-05T20:35:06Z",
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    }
+  ],
+  "no_live_api_called": true,
+  "broker_called": false,
+  "env_inspected": false,
+  "raw_news_used": false,
+  "llm_used": false,
+  "broad_intraday_scan_used": false,
+  "live_output_changed": false
+}

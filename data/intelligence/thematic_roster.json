@@ -1,0 +1,152 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-05",
+  "source_label": "intelligence_first_static_rule",
+  "rosters": [
+    {
+      "theme_id": "data_centre_power",
+      "core_symbols": [
+        "VRT",
+        "ETN",
+        "PWR",
+        "CEG"
+      ],
+      "etf_proxies": [
+        "XLU"
+      ],
+      "route_bias": "position_or_swing",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 5,
+      "notes": "Direct beneficiaries of AI data-centre power demand: Vertiv (cooling and power infrastructure), Eaton (power management systems), Quanta Services (grid and electrical engineering), Constellation Energy (nuclear power supply). XLU included as sector ETF proxy only.",
+      "last_reviewed": "2026-05-05",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "semiconductors",
+      "core_symbols": [
+        "NVDA",
+        "TSM",
+        "AVGO",
+        "AMD",
+        "ASML"
+      ],
+      "etf_proxies": [
+        "SMH"
+      ],
+      "route_bias": "position_or_swing",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 6,
+      "notes": "AI semiconductor infrastructure: NVDA (GPU accelerators, AI infrastructure leadership), TSM (advanced foundry, N3/N2 capacity), AVGO (networking ASICs, AI cluster interconnects), AMD (GPU competition, CPU/EPYC), ASML (EUV lithography equipment, bottleneck for all advanced nodes). SMH as sector ETF proxy.",
+      "last_reviewed": "2026-05-05",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "banks",
+      "core_symbols": [
+        "JPM",
+        "BAC",
+        "WFC",
+        "GS"
+      ],
+      "etf_proxies": [
+        "XLF"
+      ],
+      "route_bias": "swing_only",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 5,
+      "notes": "Net-interest-margin beneficiaries when rates rising and credit contained: JPMorgan (largest US bank, NIM leverage), Bank of America (most rate-sensitive of mega banks, high deposit beta), Wells Fargo (pure-play NIM expansion story), Goldman Sachs (capital markets + NIM). XLF as diversified financial sector proxy. Route bias swing_only: conditional tailwind only, not structural position candidates.",
+      "last_reviewed": "2026-05-05",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "energy",
+      "core_symbols": [
+        "XOM",
+        "CVX",
+        "OXY",
+        "SLB"
+      ],
+      "etf_proxies": [
+        "XLE"
+      ],
+      "route_bias": "swing_or_intraday",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 5,
+      "notes": "Oil supply shock beneficiaries: ExxonMobil (integrated oil, largest US energy co), Chevron (integrated oil, Permian exposure), Occidental Petroleum (pure-play E&P, high oil beta), SLB (oilfield services, rig count / capex spend beneficiary). XLE as energy sector ETF proxy. Route bias swing_or_intraday: supply shocks are often short-duration events.",
+      "last_reviewed": "2026-05-05",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "defence",
+      "core_symbols": [
+        "LMT",
+        "NOC",
+        "RTX",
+        "GD"
+      ],
+      "etf_proxies": [
+        "ITA"
+      ],
+      "route_bias": "position_or_swing",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 5,
+      "notes": "Geopolitical risk prime contractors: Lockheed Martin (F-35, missile systems, largest US defence prime), Northrop Grumman (stealth bombers, space systems, ICBM modernisation), RTX (missiles, engines, radar \u2014 formerly Raytheon/United Technologies), General Dynamics (combat vehicles, submarines, Gulfstream). ITA as aerospace/defence ETF proxy.",
+      "last_reviewed": "2026-05-05",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "quality_cash_flow",
+      "core_symbols": [
+        "MSFT",
+        "AAPL",
+        "COST",
+        "BRK.B"
+      ],
+      "etf_proxies": [
+        "QUAL"
+      ],
+      "route_bias": "position_or_swing",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 5,
+      "notes": "High-quality compounders with strong free cash flow, minimal debt dependency, and resilient earnings: Microsoft (software monopoly, cloud, high FCF), Apple (brand loyalty, services, large cash), Costco (resilient consumer demand, minimal leverage), Berkshire (diversified quality with large cash). QUAL ETF (iShares MSCI USA Quality Factor) as sector proxy.",
+      "last_reviewed": "2026-05-05",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "defensive_quality",
+      "core_symbols": [
+        "COST",
+        "JNJ",
+        "PG",
+        "KO",
+        "PEP"
+      ],
+      "etf_proxies": [
+        "XLP",
+        "XLV",
+        "SPLV"
+      ],
+      "route_bias": "swing_only",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 8,
+      "notes": "Defensive quality names with low volatility and resilient demand: Costco (essential retail), J&J (healthcare, stable cash flows), P&G (consumer staples, pricing power), Coca-Cola, PepsiCo. ETF proxies: XLP (Consumer Staples), XLV (Healthcare), SPLV (S&P 500 Low Volatility).",
+      "last_reviewed": "2026-05-05",
+      "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "small_caps",
+      "core_symbols": [],
+      "etf_proxies": [
+        "IWM"
+      ],
+      "route_bias": "watchlist_only",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 1,
+      "headwind_roster": true,
+      "notes": "IWM (iShares Russell 2000 ETF) as small-cap proxy. Used for headwind monitoring only under credit stress \u2014 watchlist-only, non-executable. No core symbols \u2014 individual small-cap selection requires additional intelligence layer not yet built.",
+      "last_reviewed": "2026-05-05",
+      "source_label": "intelligence_first_static_rule"
+    }
+  ],
+  "last_updated": "2026-05-05"
+}

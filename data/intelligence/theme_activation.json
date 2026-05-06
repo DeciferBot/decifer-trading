@@ -1,0 +1,492 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-05T20:35:06Z",
+  "valid_for_session": "2026-05-05",
+  "mode": "shadow_theme_activation",
+  "data_source_mode": "local_shadow_outputs_only",
+  "source_files": [
+    "data/intelligence/transmission_rules.json",
+    "data/intelligence/theme_taxonomy.json",
+    "data/intelligence/thematic_roster.json",
+    "data/intelligence/economic_candidate_feed.json",
+    "data/intelligence/daily_economic_state.json",
+    "data/intelligence/current_economic_context.json",
+    "data/universe_builder/active_opportunity_universe_shadow.json"
+  ],
+  "unavailable_sources": [],
+  "warnings": [
+    "Sprint 4B: theme activation inferred from local shadow files only. No live market data. Confidence scores are conservative estimates. Theme activation cannot create symbols or executable candidates."
+  ],
+  "activation_summary": {
+    "total_themes": 8,
+    "activated": 2,
+    "strengthening": 0,
+    "watchlist": 3,
+    "weakening": 1,
+    "crowded": 2,
+    "invalidated": 0,
+    "dormant": 0,
+    "low_confidence_count": 0,
+    "evidence_limited_count": 0,
+    "no_live_api_called": true,
+    "live_output_changed": false
+  },
+  "themes": [
+    {
+      "theme_id": "data_centre_power",
+      "state": "activated",
+      "previous_state": null,
+      "activated_by": [
+        "ai_capex_growth_to_data_centre_power"
+      ],
+      "weakened_by": [],
+      "invalidated_by": [],
+      "active_drivers": [
+        "ai_capex_growth"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_growth_to_data_centre_power"
+      ],
+      "direction": "tailwind",
+      "confidence": 0.45,
+      "horizon": "multi_week_to_multi_quarter",
+      "reason": "Theme data_centre_power direction=tailwind, state=activated, driver_state=active_shadow_inferred, candidates=5",
+      "confirmation_requirements": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation",
+        "management_commentary_support"
+      ],
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "capex_delay",
+        "credit_stress",
+        "power_demand_disappointment"
+      ],
+      "invalidation_rules": [
+        "hyperscaler capex cuts",
+        "management commentary weakens AI infrastructure thesis",
+        "sector relative strength breaks down",
+        "credit conditions materially tighten",
+        "theme becomes crowded without price confirmation"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "route_bias": "position_or_swing",
+      "candidate_count": 5,
+      "candidates_in_shadow_count": 5,
+      "candidates_excluded_count": 0,
+      "quota_pressure": {
+        "structural_quota_binding": true,
+        "overflow": 160
+      },
+      "evidence": [
+        "driver_ai_capex_growth_active_via_rule_ai_capex_growth_to_data_centre_power",
+        "5_candidates_in_economic_feed",
+        "5_candidates_in_shadow_universe"
+      ],
+      "evidence_limited": false,
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "semiconductors",
+      "state": "activated",
+      "previous_state": null,
+      "activated_by": [
+        "ai_capex_growth_to_semiconductors"
+      ],
+      "weakened_by": [],
+      "invalidated_by": [],
+      "active_drivers": [
+        "ai_capex_growth"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_growth_to_semiconductors"
+      ],
+      "direction": "tailwind",
+      "confidence": 0.45,
+      "horizon": "multi_week_to_multi_quarter",
+      "reason": "Theme semiconductors direction=tailwind, state=activated, driver_state=active_shadow_inferred, candidates=6",
+      "confirmation_requirements": [
+        "semiconductor_relative_strength",
+        "ai_infrastructure_theme_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "export_controls",
+        "capex_delay",
+        "semiconductor_cycle"
+      ],
+      "invalidation_rules": [
+        "hyperscaler capex guidance cut",
+        "export regulatory shock targeting key names",
+        "semiconductor sector ETF relative strength breaks down",
+        "valuation crowding extreme with no earnings acceleration",
+        "credit stress severe enough to defer capital spending"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "route_bias": "position_or_swing",
+      "candidate_count": 6,
+      "candidates_in_shadow_count": 6,
+      "candidates_excluded_count": 0,
+      "quota_pressure": {
+        "structural_quota_binding": true,
+        "overflow": 160
+      },
+      "evidence": [
+        "driver_ai_capex_growth_active_via_rule_ai_capex_growth_to_semiconductors",
+        "6_candidates_in_economic_feed",
+        "6_candidates_in_shadow_universe"
+      ],
+      "evidence_limited": false,
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "banks",
+      "state": "watchlist",
+      "previous_state": null,
+      "activated_by": [],
+      "weakened_by": [],
+      "invalidated_by": [],
+      "active_drivers": [
+        "yields_rising"
+      ],
+      "transmission_rules_fired": [
+        "rates_rising_to_banks_conditional"
+      ],
+      "direction": "tailwind",
+      "confidence": 0.28,
+      "horizon": "multi_week",
+      "reason": "Theme banks direction=tailwind, state=watchlist, driver_state=watch_shadow_inferred, candidates=5",
+      "confirmation_requirements": [
+        "credit_stress_contained",
+        "yield_curve_not_severely_inverted",
+        "financial_sector_relative_strength",
+        "price_and_volume_confirmation"
+      ],
+      "risk_flags": [
+        "credit_stress",
+        "deposit_pressure",
+        "curve_inversion",
+        "recession_risk",
+        "regulatory_risk"
+      ],
+      "invalidation_rules": [
+        "credit stress indicators rising sharply",
+        "yield curve inverts severely",
+        "recession risk materialises \u2014 loan book deterioration",
+        "deposit stress or bank-specific solvency concerns",
+        "financial sector fails to confirm yield move"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "route_bias": "swing_only",
+      "candidate_count": 5,
+      "candidates_in_shadow_count": 5,
+      "candidates_excluded_count": 0,
+      "quota_pressure": {
+        "structural_quota_binding": true,
+        "overflow": 160
+      },
+      "evidence": [
+        "driver_yields_rising_watch_via_rule_rates_rising_to_banks_conditional",
+        "5_candidates_in_economic_feed",
+        "5_candidates_in_shadow_universe"
+      ],
+      "evidence_limited": false,
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "energy",
+      "state": "watchlist",
+      "previous_state": null,
+      "activated_by": [],
+      "weakened_by": [],
+      "invalidated_by": [],
+      "active_drivers": [
+        "oil_supply_shock"
+      ],
+      "transmission_rules_fired": [
+        "oil_supply_shock_to_energy"
+      ],
+      "direction": "tailwind",
+      "confidence": 0.28,
+      "horizon": "short_to_multi_week",
+      "reason": "Theme energy direction=tailwind, state=watchlist, driver_state=watch_shadow_inferred, candidates=5",
+      "confirmation_requirements": [
+        "oil_energy_relative_strength",
+        "xle_or_energy_sector_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "risk_flags": [
+        "oil_demand_destruction",
+        "geopolitical_reversal",
+        "commodity_volatility",
+        "broad_risk_off"
+      ],
+      "invalidation_rules": [
+        "oil rise driven by demand destruction signal rather than supply disruption",
+        "broad risk-off overwhelms energy sector bid",
+        "credit stress severe enough to overwhelm commodity tailwind",
+        "energy sector relative strength fails to confirm oil move",
+        "geopolitical supply risk rapidly de-escalates"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "route_bias": "swing_or_intraday",
+      "candidate_count": 5,
+      "candidates_in_shadow_count": 5,
+      "candidates_excluded_count": 0,
+      "quota_pressure": {
+        "structural_quota_binding": true,
+        "overflow": 160
+      },
+      "evidence": [
+        "driver_oil_supply_shock_watch_via_rule_oil_supply_shock_to_energy",
+        "5_candidates_in_economic_feed",
+        "5_candidates_in_shadow_universe"
+      ],
+      "evidence_limited": false,
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "defence",
+      "state": "watchlist",
+      "previous_state": null,
+      "activated_by": [],
+      "weakened_by": [],
+      "invalidated_by": [],
+      "active_drivers": [
+        "geopolitical_risk_rising"
+      ],
+      "transmission_rules_fired": [
+        "geopolitical_risk_to_defence"
+      ],
+      "direction": "tailwind",
+      "confidence": 0.28,
+      "horizon": "multi_week_to_multi_quarter",
+      "reason": "Theme defence direction=tailwind, state=watchlist, driver_state=watch_shadow_inferred, candidates=5",
+      "confirmation_requirements": [
+        "defence_sector_relative_strength",
+        "geopolitical_risk_remains_active",
+        "price_and_volume_confirmation"
+      ],
+      "risk_flags": [
+        "de_escalation",
+        "budget_risk",
+        "valuation",
+        "procurement_delay"
+      ],
+      "invalidation_rules": [
+        "geopolitical risk event de-escalates sharply",
+        "defence sector fails to confirm geopolitical bid",
+        "broad market liquidation overwhelms defence theme",
+        "budget sequestration or procurement freeze",
+        "theme becomes crowded with valuation extended"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "route_bias": "position_or_swing",
+      "candidate_count": 5,
+      "candidates_in_shadow_count": 5,
+      "candidates_excluded_count": 0,
+      "quota_pressure": {
+        "structural_quota_binding": true,
+        "overflow": 160
+      },
+      "evidence": [
+        "driver_geopolitical_risk_rising_watch_via_rule_geopolitical_risk_to_defence",
+        "5_candidates_in_economic_feed",
+        "5_candidates_in_shadow_universe"
+      ],
+      "evidence_limited": false,
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "quality_cash_flow",
+      "state": "crowded",
+      "previous_state": null,
+      "activated_by": [],
+      "weakened_by": [],
+      "invalidated_by": [],
+      "active_drivers": [
+        "credit_stress_rising",
+        "risk_off_rotation"
+      ],
+      "transmission_rules_fired": [
+        "credit_stress_to_quality_cash_flow",
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "direction": "tailwind",
+      "confidence": 0.3,
+      "horizon": "multi_week_to_multi_quarter",
+      "reason": "Theme quality_cash_flow direction=tailwind, state=crowded, driver_state=watch_shadow_inferred, candidates=5",
+      "confirmation_requirements": [
+        "quality_relative_strength",
+        "defensive_sector_confirmation",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "broad_market_liquidation",
+        "earnings_disappointment"
+      ],
+      "invalidation_rules": [
+        "credit stress fades and high beta leadership resumes",
+        "quality relative strength breaks down",
+        "valuation risk becomes extreme",
+        "broad risk-on confirmed"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "route_bias": "position_or_swing",
+      "candidate_count": 5,
+      "candidates_in_shadow_count": 2,
+      "candidates_excluded_count": 3,
+      "quota_pressure": {
+        "structural_quota_binding": true,
+        "overflow": 160
+      },
+      "evidence": [
+        "driver_credit_stress_rising_watch_via_rule_credit_stress_to_quality_cash_flow",
+        "driver_risk_off_rotation_watch_via_rule_risk_off_rotation_to_defensive_quality",
+        "5_candidates_in_economic_feed",
+        "2_candidates_in_shadow_universe"
+      ],
+      "evidence_limited": false,
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "defensive_quality",
+      "state": "crowded",
+      "previous_state": null,
+      "activated_by": [],
+      "weakened_by": [],
+      "invalidated_by": [],
+      "active_drivers": [
+        "risk_off_rotation"
+      ],
+      "transmission_rules_fired": [
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "direction": "tailwind",
+      "confidence": 0.3,
+      "horizon": "days_to_weeks",
+      "reason": "Theme defensive_quality direction=tailwind, state=crowded, driver_state=watch_shadow_inferred, candidates=8",
+      "confirmation_requirements": [
+        "defensive_sector_relative_strength",
+        "low_vol_or_quality_factor_relative_strength",
+        "SPY_QQQ_weakness_or_breadth_deterioration"
+      ],
+      "risk_flags": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "invalidation_rules": [
+        "broad risk-on recovery confirmed",
+        "defensives fail to outperform in risk-off",
+        "risk-off move exhausted and mean-reversion begins",
+        "rate shock causes defensive de-rating"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "route_bias": "swing_only",
+      "candidate_count": 8,
+      "candidates_in_shadow_count": 3,
+      "candidates_excluded_count": 5,
+      "quota_pressure": {
+        "structural_quota_binding": true,
+        "overflow": 160
+      },
+      "evidence": [
+        "driver_risk_off_rotation_watch_via_rule_risk_off_rotation_to_defensive_quality",
+        "8_candidates_in_economic_feed",
+        "3_candidates_in_shadow_universe"
+      ],
+      "evidence_limited": false,
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "small_caps",
+      "state": "weakening",
+      "previous_state": null,
+      "activated_by": [],
+      "weakened_by": [
+        "credit_stress_to_small_caps_headwind"
+      ],
+      "invalidated_by": [],
+      "active_drivers": [
+        "credit_stress_rising"
+      ],
+      "transmission_rules_fired": [
+        "credit_stress_to_small_caps_headwind"
+      ],
+      "direction": "headwind",
+      "confidence": 0.22,
+      "horizon": "multi_week",
+      "reason": "Theme small_caps direction=headwind, state=weakening, driver_state=watch_shadow_inferred, candidates=1",
+      "confirmation_requirements": [
+        "IWM_relative_weakness",
+        "credit_proxy_weakness",
+        "breadth_deterioration"
+      ],
+      "risk_flags": [
+        "credit_stress_easing",
+        "risk_on_rotation",
+        "liquidity_support_intervention"
+      ],
+      "invalidation_rules": [
+        "credit stress fades and small-cap relative strength recovers",
+        "liquidity support measures announced",
+        "risk-on rotation leads small-caps higher"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "route_bias": "watchlist_only",
+      "candidate_count": 1,
+      "candidates_in_shadow_count": 1,
+      "candidates_excluded_count": 0,
+      "quota_pressure": {
+        "structural_quota_binding": true,
+        "overflow": 160
+      },
+      "evidence": [
+        "driver_credit_stress_rising_watch_via_rule_credit_stress_to_small_caps_headwind",
+        "1_candidates_in_economic_feed",
+        "1_candidates_in_shadow_universe",
+        "pressure_candidate_present_in_feed"
+      ],
+      "evidence_limited": false,
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    }
+  ],
+  "no_live_api_called": true,
+  "broker_called": false,
+  "env_inspected": false,
+  "raw_news_used": false,
+  "llm_used": false,
+  "broad_intraday_scan_used": false,
+  "live_output_changed": false
+}

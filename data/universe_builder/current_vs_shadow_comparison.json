@@ -1,0 +1,1372 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-05T20:35:13Z",
+  "mode": "shadow_comparison_only",
+  "source_files": [
+    "data/universe_builder/current_pipeline_snapshot.json",
+    "data/universe_builder/active_opportunity_universe_shadow.json",
+    "data/daily_promoted.json",
+    "data/position_research_universe.json",
+    "data/favourites.json"
+  ],
+  "current_summary": {
+    "current_pre_filter_source_pool_count": 235,
+    "current_tier_a_count": 51,
+    "current_tier_b_count": 50,
+    "current_tier_c_count": "not_available_in_day5_shadow_mode",
+    "current_tier_d_count": 150,
+    "current_favourites_count": 13,
+    "current_held_count": "not_available_in_day5_shadow_mode",
+    "current_guardrails_passed_count": "not_available_in_day5_shadow_mode",
+    "current_apex_pre_cap_count": "not_available_in_day5_shadow_mode",
+    "current_apex_final_cap_count": "not_available_in_day5_shadow_mode",
+    "unavailable_stages": [
+      "current_tier_c",
+      "current_held",
+      "current_guardrails_passed",
+      "current_apex_pre_cap",
+      "current_apex_final_cap"
+    ]
+  },
+  "shadow_summary": {
+    "shadow_total_count": 50,
+    "shadow_position_count": 11,
+    "shadow_swing_count": 9,
+    "shadow_watchlist_count": 10,
+    "shadow_attention_count": 8,
+    "shadow_structural_count": 20,
+    "shadow_economic_intelligence_count": 30,
+    "shadow_tier_d_count": 0,
+    "shadow_manual_count": 13,
+    "shadow_held_count": 0,
+    "shadow_etf_proxy_count": 9
+  },
+  "overlap_summary": {
+    "overlap_count": 27,
+    "overlap_symbols": [
+      "AAPL",
+      "ACI",
+      "AMD",
+      "ASTS",
+      "CBRE",
+      "CHD",
+      "CVX",
+      "EPAM",
+      "EXPE",
+      "GLD",
+      "GS",
+      "HIMS",
+      "IBIT",
+      "IWM",
+      "JPM",
+      "MU",
+      "NBIS",
+      "NVDA",
+      "ONDS",
+      "OXY",
+      "PLD",
+      "QQQ",
+      "SPY",
+      "TCGL",
+      "TSLA",
+      "USO",
+      "XOM"
+    ],
+    "in_current_not_shadow_count": 208,
+    "in_current_not_shadow_symbols": [
+      "A",
+      "ABBV",
+      "ABT",
+      "ACGL",
+      "ADP",
+      "ADSK",
+      "AEM",
+      "AFRM",
+      "AGCO",
+      "ALNY",
+      "AMZN",
+      "AON",
+      "APH",
+      "APLD",
+      "APO",
+      "APP",
+      "ARGX",
+      "ASND",
+      "AVTR",
+      "AXON",
+      "AXP",
+      "AYI",
+      "B",
+      "BA",
+      "BABA",
+      "BALL",
+      "BAP",
+      "BBY",
+      "BG",
+      "BIDU",
+      "BIIB",
+      "BITO",
+      "BJ",
+      "BK",
+      "BLK",
+      "BMNR",
+      "BR",
+      "BULL",
+      "BURL",
+      "BX",
+      "CARR",
+      "CAT",
+      "CCI",
+      "CDE",
+      "CG",
+      "CHTR",
+      "CMS",
+      "COP",
+      "COPX",
+      "COST"
+    ],
+    "in_shadow_not_current_count": 23,
+    "in_shadow_not_current_symbols": [
+      "ASML",
+      "AVGO",
+      "BAC",
+      "CEG",
+      "ETN",
+      "GD",
+      "ITA",
+      "LMT",
+      "NOC",
+      "PWR",
+      "QUAL",
+      "RTX",
+      "SLB",
+      "SMH",
+      "SPLV",
+      "TSM",
+      "VRT",
+      "WFC",
+      "XLE",
+      "XLF",
+      "XLP",
+      "XLU",
+      "XLV"
+    ]
+  },
+  "tier_d_analysis": {
+    "tier_d_total_current": 150,
+    "tier_d_in_shadow_count": 5,
+    "tier_d_in_shadow_symbols": [
+      "AMD",
+      "ASTS",
+      "MU",
+      "NBIS",
+      "NVDA"
+    ],
+    "tier_d_excluded_count": 145,
+    "tier_d_excluded_symbols": [
+      "ABBV",
+      "ADP",
+      "ADSK",
+      "AEM",
+      "AFRM",
+      "ALNY",
+      "AON",
+      "APH",
+      "APLD",
+      "APO",
+      "APP",
+      "ARGX",
+      "ASND",
+      "AVTR",
+      "AXON",
+      "AXP",
+      "AYI",
+      "B",
+      "BA",
+      "BABA",
+      "BAP",
+      "BBY",
+      "BIDU",
+      "BLK",
+      "BMNR",
+      "BR",
+      "BULL",
+      "BX",
+      "CARR",
+      "CCI"
+    ],
+    "tier_d_exclusion_reasons": {
+      "Structural quota full (20)": 145,
+      "Duplicate \u2014 already claimed by manual_conviction_favourites": 4,
+      "Duplicate \u2014 already claimed by economic_intelligence_structural": 1
+    },
+    "tier_d_preservation_rate": 0.0333,
+    "tier_d_quality_rank_available": true,
+    "tier_d_quality_rank_field": "discovery_score",
+    "tier_d_structural_quota_used": 20,
+    "tier_d_structural_quota_full": true,
+    "top_tier_d_preserved": [
+      "NVDA",
+      "AMD",
+      "NBIS",
+      "MU",
+      "ASTS"
+    ],
+    "top_tier_d_excluded": [
+      "TE",
+      "IONQ",
+      "APP",
+      "CRDO",
+      "RKLB",
+      "SNAP",
+      "BMNR",
+      "AFRM",
+      "DASH",
+      "BABA"
+    ],
+    "note": "Top Tier D excluded because structural quota (20) was filled by 4 economic intelligence candidates first. Sprint 2 quota_allocator.py will partition by route, increasing effective structural capacity."
+  },
+  "structural_candidate_analysis": {
+    "structural_candidates_current_count": 150,
+    "structural_candidates_shadow_count": 20,
+    "structural_candidates_preserved_count": 6,
+    "structural_candidates_preserved_symbols": [
+      "AMD",
+      "CVX",
+      "GS",
+      "JPM",
+      "OXY",
+      "XOM"
+    ],
+    "structural_candidates_lost_count": 14,
+    "structural_candidates_lost_symbols": [
+      "ASML",
+      "AVGO",
+      "BAC",
+      "CEG",
+      "ETN",
+      "GD",
+      "LMT",
+      "NOC",
+      "PWR",
+      "RTX",
+      "SLB",
+      "TSM",
+      "VRT",
+      "WFC"
+    ],
+    "structural_candidate_survival_rate": 0.3,
+    "structural_quota_used": 20,
+    "structural_quota_max": 20,
+    "structural_quota_binding": true,
+    "structural_candidates_displaced_by_attention": false
+  },
+  "attention_analysis": {
+    "attention_candidates_shadow_count": 8,
+    "attention_cap": 15,
+    "attention_cap_respected": true,
+    "attention_excluded_count": 0,
+    "attention_excluded_symbols": [],
+    "attention_exclusion_reasons": [],
+    "attention_candidates_consumed_structural_quota": false
+  },
+  "manual_and_held_analysis": {
+    "manual_candidates_current_count": 13,
+    "manual_candidates_shadow_count": 13,
+    "manual_candidates_protected": true,
+    "manual_candidates_lost": [],
+    "held_candidates_current_count": "not_available_in_day5_shadow_mode",
+    "held_candidates_shadow_count": 0,
+    "held_candidates_protected": true,
+    "held_candidates_lost": "not_available_in_day5_shadow_mode",
+    "held_unavailable_reason": "No live IBKR connection in Day 5 static bootstrap"
+  },
+  "economic_intelligence_analysis": {
+    "economic_candidates_total": 30,
+    "economic_candidates_in_shadow": 30,
+    "economic_candidates_excluded": 0,
+    "economic_symbols_in_shadow": [
+      "AMD",
+      "ASML",
+      "AVGO",
+      "BAC",
+      "CEG",
+      "CVX",
+      "ETN",
+      "GD",
+      "GS",
+      "ITA",
+      "IWM",
+      "JPM",
+      "LMT",
+      "NOC",
+      "OXY",
+      "PWR",
+      "QUAL",
+      "RTX",
+      "SLB",
+      "SMH",
+      "SPLV",
+      "TSM",
+      "VRT",
+      "WFC",
+      "XLE",
+      "XLF",
+      "XLP",
+      "XLU",
+      "XLV",
+      "XOM"
+    ],
+    "economic_symbols_excluded": [],
+    "economic_reason_to_care_present": true,
+    "economic_candidates_executable": false,
+    "llm_symbol_discovery_used": false,
+    "raw_news_used": false,
+    "broad_intraday_scan_used": false
+  },
+  "exclusion_analysis": {
+    "total_exclusions": 254,
+    "exclusions_by_reason": {
+      "Structural quota full (20)": 153,
+      "Total universe cap reached (50)": 79,
+      "Duplicate \u2014 already claimed by manual_conviction_favourites": 14,
+      "Duplicate \u2014 already claimed by economic_intelligence_structural": 7,
+      "Duplicate \u2014 already claimed by economic_intelligence_attention": 1
+    },
+    "exclusions_by_source": {
+      "tier_d_position_research": 150,
+      "tier_a_core_floor": 51,
+      "tier_b_daily_promoted": 43,
+      "intelligence_first_static_rule": 10,
+      "economic_intelligence": 10
+    },
+    "exclusions_by_quota_group": {},
+    "duplicate_exclusions": 22,
+    "quota_full_exclusions": 153,
+    "malformed_candidate_exclusions": 0
+  },
+  "quota_pressure_analysis": {
+    "structural_position": {
+      "demand_total": 180,
+      "capacity": 20,
+      "accepted": 20,
+      "overflow": 160,
+      "binding": true,
+      "demand_by_theme": {
+        "data_centre_power": 4,
+        "semiconductors": 5,
+        "banks": 4,
+        "energy": 4,
+        "defence": 4,
+        "quality_cash_flow": 4,
+        "defensive_quality": 5,
+        "": 150
+      },
+      "demand_by_source": {
+        "economic_intelligence_structural": 30,
+        "tier_d_structural": 150
+      }
+    },
+    "etf_proxy": {
+      "demand_total": 9,
+      "capacity": 10,
+      "accepted": 9,
+      "overflow": 0,
+      "binding": false
+    },
+    "attention": {
+      "demand_total": 102,
+      "capacity": 15,
+      "accepted": 8,
+      "overflow": 94,
+      "binding": false
+    },
+    "catalyst_swing": {
+      "demand_total": 0,
+      "capacity": 30,
+      "accepted": 0,
+      "overflow": 0,
+      "binding": false
+    }
+  },
+  "source_collision_analysis": {
+    "total_collisions": 36,
+    "collisions_where_symbol_still_in_shadow": 18,
+    "collisions_where_symbol_lost": 18,
+    "collisions_protected_by_manual_or_held": 11,
+    "source_path_excluded_but_symbol_preserved": 18,
+    "collision_detail": [
+      {
+        "symbol": "AAPL",
+        "collision_count": 3,
+        "attempted_by": [
+          "manual_conviction_favourites",
+          "economic_intelligence_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "manual_conviction_favourites",
+        "excluded_source_paths": [
+          "economic_intelligence_structural",
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": true,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "intelligence_first_static_rule",
+              "economic_intelligence"
+            ],
+            "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+          },
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+          }
+        ]
+      },
+      {
+        "symbol": "ABBV",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_d_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_a_core_floor",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "AMD",
+        "collision_count": 3,
+        "attempted_by": [
+          "economic_intelligence_structural",
+          "tier_d_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "economic_intelligence_structural",
+        "excluded_source_paths": [
+          "tier_a_core_floor",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_d_position_research"
+            ],
+            "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
+          },
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
+          }
+        ]
+      },
+      {
+        "symbol": "AON",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_d_structural",
+          "tier_b_attention"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_b_attention",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "ASTS",
+        "collision_count": 2,
+        "attempted_by": [
+          "manual_conviction_favourites",
+          "tier_d_structural"
+        ],
+        "winning_source": "manual_conviction_favourites",
+        "excluded_source_paths": [
+          "tier_d_structural"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": true,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_d_position_research"
+            ],
+            "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+          }
+        ]
+      },
+      {
+        "symbol": "BIIB",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_b_attention",
+          "tier_a_core_floor"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_a_core_floor",
+          "tier_b_attention"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "COST",
+        "collision_count": 3,
+        "attempted_by": [
+          "economic_intelligence_structural",
+          "economic_intelligence_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "economic_intelligence_structural",
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "CRM",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_d_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_a_core_floor",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "CTVA",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_d_structural",
+          "tier_b_attention"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_b_attention",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "CVX",
+        "collision_count": 2,
+        "attempted_by": [
+          "economic_intelligence_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "economic_intelligence_structural",
+        "excluded_source_paths": [
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
+          }
+        ]
+      },
+      {
+        "symbol": "FCX",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_d_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_a_core_floor",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "GLD",
+        "collision_count": 2,
+        "attempted_by": [
+          "manual_conviction_favourites",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "manual_conviction_favourites",
+        "excluded_source_paths": [
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": true,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+          }
+        ]
+      },
+      {
+        "symbol": "GS",
+        "collision_count": 2,
+        "attempted_by": [
+          "economic_intelligence_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "economic_intelligence_structural",
+        "excluded_source_paths": [
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
+          }
+        ]
+      },
+      {
+        "symbol": "HON",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_d_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_a_core_floor",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "HST",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_d_structural",
+          "tier_b_attention"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_b_attention",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "IBIT",
+        "collision_count": 2,
+        "attempted_by": [
+          "manual_conviction_favourites",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "manual_conviction_favourites",
+        "excluded_source_paths": [
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": true,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+          }
+        ]
+      },
+      {
+        "symbol": "IWM",
+        "collision_count": 2,
+        "attempted_by": [
+          "economic_intelligence_attention",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "economic_intelligence_attention",
+        "excluded_source_paths": [
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by economic_intelligence_attention"
+          }
+        ]
+      },
+      {
+        "symbol": "JPM",
+        "collision_count": 2,
+        "attempted_by": [
+          "economic_intelligence_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "economic_intelligence_structural",
+        "excluded_source_paths": [
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
+          }
+        ]
+      },
+      {
+        "symbol": "LLY",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_d_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_a_core_floor",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "META",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_d_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_a_core_floor",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "MSFT",
+        "collision_count": 3,
+        "attempted_by": [
+          "economic_intelligence_structural",
+          "tier_d_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "economic_intelligence_structural",
+          "tier_a_core_floor",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "MSTR",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_d_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_a_core_floor",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "MU",
+        "collision_count": 2,
+        "attempted_by": [
+          "manual_conviction_favourites",
+          "tier_d_structural"
+        ],
+        "winning_source": "manual_conviction_favourites",
+        "excluded_source_paths": [
+          "tier_d_structural"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": true,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_d_position_research"
+            ],
+            "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+          }
+        ]
+      },
+      {
+        "symbol": "NBIS",
+        "collision_count": 2,
+        "attempted_by": [
+          "manual_conviction_favourites",
+          "tier_d_structural"
+        ],
+        "winning_source": "manual_conviction_favourites",
+        "excluded_source_paths": [
+          "tier_d_structural"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": true,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_d_position_research"
+            ],
+            "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+          }
+        ]
+      },
+      {
+        "symbol": "NEM",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_d_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_a_core_floor",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "NI",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_d_structural",
+          "tier_b_attention"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_b_attention",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "NVDA",
+        "collision_count": 4,
+        "attempted_by": [
+          "manual_conviction_favourites",
+          "economic_intelligence_structural",
+          "tier_d_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "manual_conviction_favourites",
+        "excluded_source_paths": [
+          "economic_intelligence_structural",
+          "tier_a_core_floor",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": true,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "intelligence_first_static_rule",
+              "economic_intelligence"
+            ],
+            "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+          },
+          {
+            "source": [
+              "tier_d_position_research"
+            ],
+            "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+          },
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+          }
+        ]
+      },
+      {
+        "symbol": "OXY",
+        "collision_count": 2,
+        "attempted_by": [
+          "economic_intelligence_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "economic_intelligence_structural",
+        "excluded_source_paths": [
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
+          }
+        ]
+      },
+      {
+        "symbol": "PG",
+        "collision_count": 2,
+        "attempted_by": [
+          "economic_intelligence_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "economic_intelligence_structural",
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "QQQ",
+        "collision_count": 2,
+        "attempted_by": [
+          "manual_conviction_favourites",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "manual_conviction_favourites",
+        "excluded_source_paths": [
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": true,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+          }
+        ]
+      },
+      {
+        "symbol": "SN",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_d_structural",
+          "tier_b_attention"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_b_attention",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "SPY",
+        "collision_count": 2,
+        "attempted_by": [
+          "manual_conviction_favourites",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "manual_conviction_favourites",
+        "excluded_source_paths": [
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": true,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+          }
+        ]
+      },
+      {
+        "symbol": "STLD",
+        "collision_count": 2,
+        "attempted_by": [
+          "tier_d_structural",
+          "tier_b_attention"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "tier_b_attention",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
+        "symbol": "TSLA",
+        "collision_count": 2,
+        "attempted_by": [
+          "manual_conviction_favourites",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "manual_conviction_favourites",
+        "excluded_source_paths": [
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": true,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+          }
+        ]
+      },
+      {
+        "symbol": "USO",
+        "collision_count": 2,
+        "attempted_by": [
+          "manual_conviction_favourites",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "manual_conviction_favourites",
+        "excluded_source_paths": [
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": true,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+          }
+        ]
+      },
+      {
+        "symbol": "XOM",
+        "collision_count": 2,
+        "attempted_by": [
+          "economic_intelligence_structural",
+          "tier_a_core_floor"
+        ],
+        "winning_source": "economic_intelligence_structural",
+        "excluded_source_paths": [
+          "tier_a_core_floor"
+        ],
+        "final_in_shadow": true,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": true,
+        "excluded_entries": [
+          {
+            "source": [
+              "tier_a_core_floor"
+            ],
+            "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
+          }
+        ]
+      }
+    ]
+  },
+  "economic_slice_analysis": {
+    "slices_active": 8,
+    "total_economic_candidates": 40,
+    "by_theme": {
+      "data_centre_power": {
+        "count": 5,
+        "symbols": [
+          "VRT",
+          "ETN",
+          "PWR",
+          "CEG",
+          "XLU"
+        ],
+        "driver": "ai_capex_growth, power_demand_growth",
+        "direct_beneficiaries": 3,
+        "etf_proxies": 1,
+        "second_order": 1
+      },
+      "semiconductors": {
+        "count": 6,
+        "symbols": [
+          "NVDA",
+          "TSM",
+          "AVGO",
+          "AMD",
+          "ASML",
+          "SMH"
+        ],
+        "driver": "ai_capex_growth, ai_infrastructure_demand",
+        "direct_beneficiaries": 5,
+        "etf_proxies": 1,
+        "second_order": 0
+      },
+      "banks": {
+        "count": 5,
+        "symbols": [
+          "JPM",
+          "BAC",
+          "WFC",
+          "GS",
+          "XLF"
+        ],
+        "driver": "yields_rising, net_interest_margin_expansion",
+        "direct_beneficiaries": 4,
+        "etf_proxies": 1,
+        "second_order": 0
+      },
+      "energy": {
+        "count": 5,
+        "symbols": [
+          "XOM",
+          "CVX",
+          "OXY",
+          "SLB",
+          "XLE"
+        ],
+        "driver": "oil_supply_shock, geopolitical_supply_risk",
+        "direct_beneficiaries": 4,
+        "etf_proxies": 1,
+        "second_order": 0
+      },
+      "defence": {
+        "count": 5,
+        "symbols": [
+          "LMT",
+          "NOC",
+          "RTX",
+          "GD",
+          "ITA"
+        ],
+        "driver": "geopolitical_risk_rising, defence_spending_expectations",
+        "direct_beneficiaries": 4,
+        "etf_proxies": 1,
+        "second_order": 0
+      },
+      "quality_cash_flow": {
+        "count": 5,
+        "symbols": [
+          "MSFT",
+          "AAPL",
+          "COST",
+          "BRK.B",
+          "QUAL"
+        ],
+        "driver": "credit_stress_rising, liquidity_tightening, risk_off_rotation",
+        "direct_beneficiaries": 4,
+        "etf_proxies": 1,
+        "second_order": 0
+      },
+      "small_caps": {
+        "count": 1,
+        "symbols": [
+          "IWM"
+        ],
+        "driver": "credit_stress_rising, liquidity_tightening, refinancing_risk_rising",
+        "direct_beneficiaries": 0,
+        "etf_proxies": 0,
+        "second_order": 0
+      },
+      "defensive_quality": {
+        "count": 8,
+        "symbols": [
+          "COST",
+          "JNJ",
+          "PG",
+          "KO",
+          "PEP",
+          "XLP",
+          "XLV",
+          "SPLV"
+        ],
+        "driver": "risk_appetite_falling, volatility_rising, defensive_rotation, breadth_deterioration",
+        "direct_beneficiaries": 5,
+        "etf_proxies": 3,
+        "second_order": 0
+      }
+    },
+    "llm_symbol_discovery_used": false,
+    "macro_transmission_deterministic": true
+  },
+  "adapter_impact_analysis": {
+    "adapter_snapshot_available": true,
+    "adapters_available": 7,
+    "adapters_unavailable": 1,
+    "adapter_symbols_read_total": 1375,
+    "adapter_unique_symbols_read": 1028,
+    "adapter_symbols_in_shadow": 49,
+    "adapter_symbols_excluded": 979,
+    "adapter_symbols_preserved": 49,
+    "adapter_enriched_candidates": 49,
+    "adapter_added_symbols": [],
+    "side_effects_triggered": false,
+    "live_data_called": false
+  },
+  "risk_off_analysis": {
+    "quality_cash_flow_candidates_generated": 5,
+    "defensive_quality_candidates_generated": 8,
+    "small_caps_headwind_candidates_generated": 1,
+    "candidates_in_shadow": 6,
+    "candidates_excluded_by_quota": 7,
+    "candidates_watchlist_only": 5,
+    "headwind_candidates_in_shadow": 1,
+    "headwind_candidates_executable": false,
+    "risk_off_symbols_preserved": [
+      "AAPL",
+      "IWM",
+      "QUAL",
+      "SPLV",
+      "XLP",
+      "XLV"
+    ],
+    "risk_off_symbols_lost": [
+      "BRK.B",
+      "COST",
+      "JNJ",
+      "KO",
+      "MSFT",
+      "PEP",
+      "PG"
+    ]
+  },
+  "route_metric_distinction": {
+    "position_route_count": 11,
+    "structural_quota_group_count": 20,
+    "structural_reason_to_care_count": 20,
+    "tier_d_structural_source_count": 0,
+    "structural_watchlist_count": 0,
+    "structural_swing_count": 9,
+    "note": "structural_quota_group_count includes all structural quota slots (position + swing routes). position_route_count counts only candidates with route=position. structural_swing_count captures banks/energy/defence candidates that are structural quota but routed to swing."
+  },
+  "economic_context_summary": {
+    "daily_economic_state_available": true,
+    "current_economic_context_available": true,
+    "theme_activation_available": true,
+    "thesis_store_available": true,
+    "active_themes": [
+      "data_centre_power",
+      "semiconductors"
+    ],
+    "strengthening_themes": [],
+    "crowded_themes": [
+      "quality_cash_flow",
+      "defensive_quality"
+    ],
+    "weakening_themes": [
+      "small_caps"
+    ],
+    "watchlist_themes": [
+      "banks",
+      "energy",
+      "defence"
+    ],
+    "invalidated_themes": [],
+    "risk_posture": "selective",
+    "regime_label": "ai_infrastructure_tailwind_shadow",
+    "thesis_count": 8,
+    "low_confidence_themes": 0,
+    "evidence_limited_themes": 0,
+    "no_live_api_called": true,
+    "live_output_changed": false
+  },
+  "quality_warnings": [
+    "Structural position quota is BINDING (20/20) \u2014 133 Tier D candidates excluded. Quota will be relieved when Day 6 adds more slices and increases max, or when Sprint 2 route_tagger partitions the pool correctly.",
+    "Tier D quality ranking IS available (discovery_score field). Top preserved: ['NVDA', 'AMD', 'NBIS', 'MU', 'ASTS']. Top excluded by score: ['TE', 'IONQ', 'APP', 'CRDO', 'RKLB'].",
+    "Manual/favourite candidates protected but not yet structurally validated \u2014 no transmission rule links them to an active theme.",
+    "ETF/proxy candidates (XLU) capped at watchlist-only \u2014 cannot consume structural or catalyst quota.",
+    "Held candidates not present in Day 7 static bootstrap \u2014 held quota is protected and will be populated when live IBKR connection is enabled.",
+    "Current pipeline stage 'current_tier_c' is not_available_in_day5_shadow_mode.",
+    "Current pipeline stage 'current_held' is not_available_in_day5_shadow_mode.",
+    "Current pipeline stage 'current_guardrails_passed' is not_available_in_day5_shadow_mode.",
+    "Current pipeline stage 'current_apex_pre_cap' is not_available_in_day5_shadow_mode.",
+    "Current pipeline stage 'current_apex_final_cap' is not_available_in_day5_shadow_mode."
+  ],
+  "live_output_changed": false
+}

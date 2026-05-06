@@ -1,0 +1,241 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-05",
+  "source_label": "intelligence_first_static_rule",
+  "rules": [
+    {
+      "rule_id": "ai_capex_growth_to_data_centre_power",
+      "driver": "corporate_capex",
+      "driver_alias": "ai_capex_growth",
+      "condition": "hyperscaler or mega-cap AI capex growth, data-centre buildout acceleration, or power demand growth from compute expansion",
+      "output_type": "theme_tailwind",
+      "affected_targets": [
+        "data_centre_power"
+      ],
+      "direction": "positive",
+      "strength": 0.85,
+      "confidence": 0.82,
+      "horizon": "multi_week_to_multi_quarter",
+      "required_confirmations": [
+        "structured_capex_evidence",
+        "sector_theme_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "blocked_if": [
+        "capex_guidance_cut",
+        "credit_stress_severe",
+        "power_theme_breakdown",
+        "valuation_crowding_extreme"
+      ],
+      "reason": "AI data-centre buildout increases demand for power equipment, cooling infrastructure, and grid capacity as hyperscalers expand compute footprint",
+      "source_type": "deterministic_rule",
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    },
+    {
+      "rule_id": "ai_capex_growth_to_semiconductors",
+      "driver": "corporate_capex",
+      "driver_alias": "ai_capex_growth",
+      "condition": "hyperscaler capex growth, AI infrastructure demand, accelerator demand, networking demand, or semiconductor leadership driven by AI buildout",
+      "output_type": "theme_tailwind",
+      "affected_targets": [
+        "semiconductors"
+      ],
+      "direction": "positive",
+      "strength": 0.88,
+      "confidence": 0.83,
+      "horizon": "multi_week_to_multi_quarter",
+      "required_confirmations": [
+        "semiconductor_relative_strength",
+        "ai_infrastructure_theme_confirmation",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "blocked_if": [
+        "capex_guidance_cut",
+        "semiconductor_sector_breakdown",
+        "valuation_crowding_extreme",
+        "export_regulatory_shock",
+        "credit_stress_severe"
+      ],
+      "reason": "AI capex acceleration drives demand for advanced accelerators, networking silicon, foundry capacity and semiconductor equipment across the AI hardware stack",
+      "source_type": "deterministic_rule",
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    },
+    {
+      "rule_id": "rates_rising_to_banks_conditional",
+      "driver": "interest_rates",
+      "driver_alias": "yields_rising",
+      "condition": "yields rising or rate curve supportive for net-interest-margin expansion \u2014 conditional on credit stress remaining contained and curve not severely inverted",
+      "output_type": "theme_tailwind",
+      "affected_targets": [
+        "banks"
+      ],
+      "direction": "conditional",
+      "strength": 0.65,
+      "confidence": 0.62,
+      "horizon": "multi_week",
+      "required_confirmations": [
+        "credit_stress_contained",
+        "yield_curve_not_severely_inverted",
+        "financial_sector_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "blocked_if": [
+        "credit_stress_rising",
+        "recession_risk_rising_sharply",
+        "deposit_stress",
+        "yield_curve_signal_negative"
+      ],
+      "reason": "Rising rates expand bank net-interest margins when credit quality is intact and curve is not inverted \u2014 conditional tailwind only; credit stress or curve inversion invalidates",
+      "source_type": "deterministic_rule",
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    },
+    {
+      "rule_id": "oil_supply_shock_to_energy",
+      "driver": "oil_energy",
+      "driver_alias": "oil_supply_shock",
+      "condition": "oil supply shock, geopolitical supply risk, or energy supply disruption driving energy sector relative strength",
+      "output_type": "theme_tailwind",
+      "affected_targets": [
+        "energy"
+      ],
+      "direction": "positive",
+      "strength": 0.78,
+      "confidence": 0.75,
+      "horizon": "short_to_multi_week",
+      "required_confirmations": [
+        "oil_energy_relative_strength",
+        "xle_or_energy_sector_confirmation",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "blocked_if": [
+        "oil_rise_is_demand_destruction",
+        "broad_risk_off_overwhelms_energy",
+        "credit_stress_severe",
+        "energy_sector_relative_strength_fails"
+      ],
+      "reason": "Oil supply disruption or geopolitical supply risk drives energy sector outperformance through integrated oil, services and E&P names",
+      "source_type": "deterministic_rule",
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    },
+    {
+      "rule_id": "geopolitical_risk_to_defence",
+      "driver": "geopolitics",
+      "driver_alias": "geopolitical_risk_rising",
+      "condition": "geopolitical risk rising, defence spending expectations increasing, conflict escalation, or sustained defence sector bid",
+      "output_type": "theme_tailwind",
+      "affected_targets": [
+        "defence"
+      ],
+      "direction": "positive",
+      "strength": 0.8,
+      "confidence": 0.76,
+      "horizon": "multi_week_to_multi_quarter",
+      "required_confirmations": [
+        "defence_sector_relative_strength",
+        "geopolitical_risk_remains_active",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "blocked_if": [
+        "risk_event_de_escalates",
+        "defence_sector_fails_to_confirm",
+        "broad_market_liquidation_overwhelms_theme"
+      ],
+      "reason": "Elevated geopolitical risk drives defence spending expectations and sustained bid for prime contractors and aerospace/defence names",
+      "source_type": "deterministic_rule",
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    },
+    {
+      "rule_id": "credit_stress_to_quality_cash_flow",
+      "driver": "credit",
+      "driver_alias": "credit_stress_rising",
+      "condition": "credit spreads widening, liquidity tightening, high-beta names under pressure, refinancing risk rising",
+      "output_type": "theme_tailwind",
+      "affected_targets": [
+        "quality_cash_flow"
+      ],
+      "direction": "positive",
+      "strength": 0.75,
+      "confidence": 0.72,
+      "horizon": "multi_week",
+      "required_confirmations": [
+        "credit_stress_indicator_active",
+        "defensive_or_quality_relative_strength",
+        "broad_risk_appetite_weak_or_selective",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "blocked_if": [
+        "market_risk_appetite_strongly_risk_on",
+        "quality_theme_fails_relative_strength",
+        "valuation_crowding_extreme",
+        "liquidity_support_rising"
+      ],
+      "reason": "Credit stress should favour companies with strong balance sheets, high cash generation, resilient demand, and lower financing dependency. Quality compounders historically outperform during credit stress as investors reduce exposure to leveraged names.",
+      "source_type": "deterministic_rule",
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    },
+    {
+      "rule_id": "credit_stress_to_small_caps_headwind",
+      "driver": "credit",
+      "driver_alias": "credit_stress_rising",
+      "condition": "credit spreads widening, liquidity tightening, refinancing risk rising for weaker balance sheets",
+      "output_type": "theme_headwind",
+      "affected_targets": [
+        "small_caps"
+      ],
+      "direction": "negative",
+      "strength": 0.7,
+      "confidence": 0.68,
+      "horizon": "multi_week",
+      "required_confirmations": [
+        "IWM_relative_weakness_or_small_cap_underperformance",
+        "credit_proxy_weakness",
+        "market_breadth_deterioration"
+      ],
+      "blocked_if": [
+        "liquidity_support_rising",
+        "credit_stress_contained",
+        "broad_risk_on_recovery_confirmed"
+      ],
+      "reason": "Credit stress and tighter liquidity typically pressure weaker balance sheets, speculative growth, and refinancing-sensitive names. Small-cap indices have higher exposure to floating-rate debt and lower credit quality than large-cap indices.",
+      "source_type": "deterministic_rule",
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    },
+    {
+      "rule_id": "risk_off_rotation_to_defensive_quality",
+      "driver": "risk_appetite",
+      "driver_alias": "risk_off_rotation",
+      "condition": "risk appetite falling, volatility rising, defensive sectors outperforming, market breadth deteriorating",
+      "output_type": "theme_tailwind",
+      "affected_targets": [
+        "defensive_quality",
+        "quality_cash_flow"
+      ],
+      "direction": "positive",
+      "strength": 0.72,
+      "confidence": 0.7,
+      "horizon": "days_to_weeks",
+      "required_confirmations": [
+        "defensive_sector_relative_strength",
+        "low_vol_or_quality_factor_relative_strength",
+        "SPY_QQQ_IWM_weakness_or_breadth_deterioration"
+      ],
+      "blocked_if": [
+        "broad_risk_on_confirmed",
+        "defensives_fail_to_outperform",
+        "risk_off_move_already_exhausted"
+      ],
+      "reason": "Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "source_type": "deterministic_rule",
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    }
+  ],
+  "last_updated": "2026-05-05"
+}

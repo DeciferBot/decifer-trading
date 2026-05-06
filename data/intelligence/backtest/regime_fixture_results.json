@@ -1,0 +1,371 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-06T05:28:21Z",
+  "mode": "local_fixture_backtest",
+  "data_source_mode": "local_fixtures_and_shadow_outputs_only",
+  "source_files": [
+    "data/intelligence/transmission_rules.json",
+    "data/intelligence/theme_taxonomy.json",
+    "data/intelligence/thematic_roster.json",
+    "data/intelligence/economic_candidate_feed.json",
+    "data/universe_builder/active_opportunity_universe_shadow.json",
+    "data/intelligence/daily_economic_state.json"
+  ],
+  "scenarios_run": 6,
+  "scenarios_passed": 6,
+  "scenarios_failed": 0,
+  "results": [
+    {
+      "scenario_id": "ai_infrastructure_tailwind",
+      "description": "AI capex growth active \u2014 data centre power + semiconductors primary themes.",
+      "input_driver_state": {
+        "ai_capex_growth": "active_shadow_inferred",
+        "corporate_capex": "watch_shadow_inferred",
+        "interest_rates": "watch_shadow_inferred",
+        "bonds_yields": "watch_shadow_inferred",
+        "oil_energy": "watch_shadow_inferred",
+        "geopolitics": "watch_shadow_inferred",
+        "credit": "watch_shadow_inferred",
+        "risk_appetite": "watch_shadow_inferred",
+        "volatility": "watch_shadow_inferred",
+        "sector_rotation": "watch_shadow_inferred",
+        "liquidity": "unavailable",
+        "valuation": "unavailable",
+        "consumer_behaviour": "unavailable",
+        "inflation": "unavailable",
+        "growth": "unavailable",
+        "usd": "unavailable"
+      },
+      "expected_outputs": {
+        "regime": "ai_infrastructure_tailwind_shadow",
+        "posture": "selective",
+        "active_theme_states": {
+          "data_centre_power": [
+            "activated",
+            "strengthening"
+          ],
+          "semiconductors": [
+            "activated",
+            "strengthening"
+          ]
+        },
+        "headwind_themes": [],
+        "non_executable": true
+      },
+      "actual_outputs": {
+        "regime": "ai_infrastructure_tailwind_shadow",
+        "posture": "selective",
+        "theme_states": {
+          "data_centre_power": "activated",
+          "semiconductors": "activated",
+          "banks": "watchlist",
+          "energy": "watchlist",
+          "defence": "watchlist",
+          "quality_cash_flow": "crowded",
+          "defensive_quality": "crowded",
+          "small_caps": "weakening"
+        },
+        "headwind_themes": [
+          "small_caps"
+        ],
+        "non_executable": true
+      },
+      "pass": true,
+      "mismatches": [],
+      "confidence_notes": "ai_capex_growth active via local transmission rules + candidate feed evidence"
+    },
+    {
+      "scenario_id": "credit_stress_watch",
+      "description": "Credit stress watch \u2014 no active structural tailwinds; cautious posture.",
+      "input_driver_state": {
+        "ai_capex_growth": "inactive_shadow",
+        "corporate_capex": "inactive_shadow",
+        "interest_rates": "watch_shadow_inferred",
+        "bonds_yields": "watch_shadow_inferred",
+        "oil_energy": "inactive_shadow",
+        "geopolitics": "inactive_shadow",
+        "credit": "watch_shadow_inferred",
+        "risk_appetite": "watch_shadow_inferred",
+        "volatility": "watch_shadow_inferred",
+        "sector_rotation": "inactive_shadow",
+        "liquidity": "unavailable",
+        "valuation": "unavailable",
+        "consumer_behaviour": "unavailable",
+        "inflation": "unavailable",
+        "growth": "unavailable",
+        "usd": "unavailable"
+      },
+      "expected_outputs": {
+        "regime": "credit_stress_watch_shadow",
+        "posture": "cautious",
+        "active_theme_states": {
+          "quality_cash_flow": [
+            "activated",
+            "crowded",
+            "watchlist"
+          ]
+        },
+        "headwind_themes": [
+          "small_caps"
+        ],
+        "non_executable": true
+      },
+      "actual_outputs": {
+        "regime": "credit_stress_watch_shadow",
+        "posture": "cautious",
+        "theme_states": {
+          "data_centre_power": "watchlist",
+          "semiconductors": "watchlist",
+          "banks": "watchlist",
+          "energy": "watchlist",
+          "defence": "watchlist",
+          "quality_cash_flow": "crowded",
+          "defensive_quality": "crowded",
+          "small_caps": "weakening"
+        },
+        "headwind_themes": [
+          "small_caps"
+        ],
+        "non_executable": true
+      },
+      "pass": true,
+      "mismatches": [],
+      "confidence_notes": "credit + risk_appetite both watch; no active structural driver. quality_cash_flow may be crowded due to structural quota binding."
+    },
+    {
+      "scenario_id": "risk_off_rotation",
+      "description": "Risk appetite active, volatility active \u2014 defensive rotation expected.",
+      "input_driver_state": {
+        "ai_capex_growth": "inactive_shadow",
+        "corporate_capex": "inactive_shadow",
+        "interest_rates": "inactive_shadow",
+        "bonds_yields": "inactive_shadow",
+        "oil_energy": "inactive_shadow",
+        "geopolitics": "inactive_shadow",
+        "credit": "watch_shadow_inferred",
+        "risk_appetite": "active_shadow_inferred",
+        "volatility": "active_shadow_inferred",
+        "sector_rotation": "watch_shadow_inferred",
+        "liquidity": "unavailable",
+        "valuation": "unavailable",
+        "consumer_behaviour": "unavailable",
+        "inflation": "unavailable",
+        "growth": "unavailable",
+        "usd": "unavailable"
+      },
+      "expected_outputs": {
+        "regime": "mixed_shadow_regime",
+        "posture": "neutral",
+        "active_theme_states": {
+          "defensive_quality": [
+            "activated",
+            "crowded",
+            "watchlist"
+          ]
+        },
+        "headwind_themes": [
+          "small_caps"
+        ],
+        "non_executable": true
+      },
+      "actual_outputs": {
+        "regime": "mixed_shadow_regime",
+        "posture": "neutral",
+        "theme_states": {
+          "data_centre_power": "watchlist",
+          "semiconductors": "watchlist",
+          "banks": "watchlist",
+          "energy": "watchlist",
+          "defence": "watchlist",
+          "quality_cash_flow": "crowded",
+          "defensive_quality": "crowded",
+          "small_caps": "weakening"
+        },
+        "headwind_themes": [
+          "small_caps"
+        ],
+        "non_executable": true
+      },
+      "pass": true,
+      "mismatches": [],
+      "confidence_notes": "risk_appetite + volatility active \u2192 mixed regime. Posture = neutral because posture logic checks risk_appetite == watch (not active). defensive_quality may be crowded due to structural quota binding."
+    },
+    {
+      "scenario_id": "oil_supply_shock",
+      "description": "Oil/energy active + geopolitics active \u2014 energy and defence themes expected.",
+      "input_driver_state": {
+        "ai_capex_growth": "inactive_shadow",
+        "corporate_capex": "inactive_shadow",
+        "interest_rates": "inactive_shadow",
+        "bonds_yields": "inactive_shadow",
+        "oil_energy": "active_shadow_inferred",
+        "geopolitics": "active_shadow_inferred",
+        "credit": "inactive_shadow",
+        "risk_appetite": "watch_shadow_inferred",
+        "volatility": "watch_shadow_inferred",
+        "sector_rotation": "watch_shadow_inferred",
+        "liquidity": "unavailable",
+        "valuation": "unavailable",
+        "consumer_behaviour": "unavailable",
+        "inflation": "unavailable",
+        "growth": "unavailable",
+        "usd": "unavailable"
+      },
+      "expected_outputs": {
+        "regime": "mixed_shadow_regime",
+        "posture": "defensive_selective",
+        "active_theme_states": {
+          "energy": [
+            "activated",
+            "strengthening",
+            "watchlist"
+          ],
+          "defence": [
+            "activated",
+            "strengthening",
+            "watchlist"
+          ]
+        },
+        "headwind_themes": [],
+        "non_executable": true
+      },
+      "actual_outputs": {
+        "regime": "mixed_shadow_regime",
+        "posture": "defensive_selective",
+        "theme_states": {
+          "data_centre_power": "watchlist",
+          "semiconductors": "watchlist",
+          "banks": "watchlist",
+          "energy": "activated",
+          "defence": "activated",
+          "quality_cash_flow": "crowded",
+          "defensive_quality": "crowded",
+          "small_caps": "weakening"
+        },
+        "headwind_themes": [
+          "small_caps"
+        ],
+        "non_executable": true
+      },
+      "pass": true,
+      "mismatches": [],
+      "confidence_notes": "oil_energy + geopolitics both active \u2192 mixed regime; energy + defence watchlist/activated"
+    },
+    {
+      "scenario_id": "rates_rising_banks_conditional",
+      "description": "Interest rates + bonds/yields active \u2014 banks conditional; rates rising context.",
+      "input_driver_state": {
+        "ai_capex_growth": "inactive_shadow",
+        "corporate_capex": "inactive_shadow",
+        "interest_rates": "active_shadow_inferred",
+        "bonds_yields": "active_shadow_inferred",
+        "oil_energy": "inactive_shadow",
+        "geopolitics": "inactive_shadow",
+        "credit": "inactive_shadow",
+        "risk_appetite": "inactive_shadow",
+        "volatility": "inactive_shadow",
+        "sector_rotation": "watch_shadow_inferred",
+        "liquidity": "unavailable",
+        "valuation": "unavailable",
+        "consumer_behaviour": "unavailable",
+        "inflation": "unavailable",
+        "growth": "unavailable",
+        "usd": "unavailable"
+      },
+      "expected_outputs": {
+        "regime": "mixed_shadow_regime",
+        "posture": "neutral",
+        "active_theme_states": {
+          "banks": [
+            "activated",
+            "strengthening",
+            "watchlist"
+          ]
+        },
+        "headwind_themes": [],
+        "non_executable": true
+      },
+      "actual_outputs": {
+        "regime": "mixed_shadow_regime",
+        "posture": "neutral",
+        "theme_states": {
+          "data_centre_power": "watchlist",
+          "semiconductors": "watchlist",
+          "banks": "activated",
+          "energy": "watchlist",
+          "defence": "watchlist",
+          "quality_cash_flow": "crowded",
+          "defensive_quality": "crowded",
+          "small_caps": "weakening"
+        },
+        "headwind_themes": [
+          "small_caps"
+        ],
+        "non_executable": true
+      },
+      "pass": true,
+      "mismatches": [],
+      "confidence_notes": "interest_rates + bonds_yields active \u2192 mixed regime; banks conditional on yield curve direction"
+    },
+    {
+      "scenario_id": "mixed_regime",
+      "description": "Oil + sector rotation active (no ai_capex, no credit+risk_appetite pattern) \u2014 mixed regime.",
+      "input_driver_state": {
+        "ai_capex_growth": "inactive_shadow",
+        "corporate_capex": "watch_shadow_inferred",
+        "interest_rates": "watch_shadow_inferred",
+        "bonds_yields": "watch_shadow_inferred",
+        "oil_energy": "active_shadow_inferred",
+        "geopolitics": "watch_shadow_inferred",
+        "credit": "watch_shadow_inferred",
+        "risk_appetite": "watch_shadow_inferred",
+        "volatility": "watch_shadow_inferred",
+        "sector_rotation": "active_shadow_inferred",
+        "liquidity": "unavailable",
+        "valuation": "unavailable",
+        "consumer_behaviour": "unavailable",
+        "inflation": "unavailable",
+        "growth": "unavailable",
+        "usd": "unavailable"
+      },
+      "expected_outputs": {
+        "regime": "mixed_shadow_regime",
+        "posture": "defensive_selective",
+        "active_theme_states": {},
+        "headwind_themes": [],
+        "non_executable": true
+      },
+      "actual_outputs": {
+        "regime": "mixed_shadow_regime",
+        "posture": "defensive_selective",
+        "theme_states": {
+          "data_centre_power": "watchlist",
+          "semiconductors": "watchlist",
+          "banks": "watchlist",
+          "energy": "activated",
+          "defence": "watchlist",
+          "quality_cash_flow": "crowded",
+          "defensive_quality": "crowded",
+          "small_caps": "weakening"
+        },
+        "headwind_themes": [
+          "small_caps"
+        ],
+        "non_executable": true
+      },
+      "pass": true,
+      "mismatches": [],
+      "confidence_notes": "oil_energy + sector_rotation active; credit + risk_appetite at watch \u2192 active drivers present \u2192 mixed_shadow_regime (not credit_stress_watch). risk_appetite=watch \u2192 defensive_selective posture."
+    }
+  ],
+  "failure_reasons": [],
+  "warnings": [],
+  "current_state_validation": "Current real state matches ai_infrastructure_tailwind scenario \u2014 confirmed",
+  "no_live_api_called": true,
+  "broker_called": false,
+  "env_inspected": false,
+  "raw_news_used": false,
+  "llm_used": false,
+  "broad_intraday_scan_used": false,
+  "live_output_changed": false
+}

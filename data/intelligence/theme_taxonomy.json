@@ -1,0 +1,329 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-05",
+  "source_label": "intelligence_first_static_rule",
+  "themes": [
+    {
+      "theme_id": "data_centre_power",
+      "name": "Data Centre Power and Infrastructure",
+      "beneficiary_types": [
+        "power_equipment",
+        "cooling_infrastructure",
+        "grid_infrastructure",
+        "data_centre_electrical_infrastructure",
+        "utilities_power_demand"
+      ],
+      "typical_horizon": "multi_week_to_multi_quarter",
+      "default_routes": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "activation_drivers": [
+        "ai_capex_growth",
+        "power_demand_growth"
+      ],
+      "confirmation_requirements": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation",
+        "management_commentary_support"
+      ],
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "capex_delay",
+        "credit_stress",
+        "power_demand_disappointment"
+      ],
+      "invalidation_examples": [
+        "hyperscaler capex cuts",
+        "management commentary weakens AI infrastructure thesis",
+        "sector relative strength breaks down",
+        "credit conditions materially tighten",
+        "theme becomes crowded without price confirmation"
+      ],
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    },
+    {
+      "theme_id": "semiconductors",
+      "name": "AI Semiconductor Infrastructure",
+      "beneficiary_types": [
+        "ai_accelerators",
+        "advanced_chips",
+        "foundry",
+        "semiconductor_equipment",
+        "networking_silicon"
+      ],
+      "typical_horizon": "multi_week_to_multi_quarter",
+      "default_routes": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "activation_drivers": [
+        "ai_capex_growth",
+        "ai_infrastructure_demand"
+      ],
+      "confirmation_requirements": [
+        "semiconductor_relative_strength",
+        "ai_infrastructure_theme_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "export_controls",
+        "capex_delay",
+        "semiconductor_cycle"
+      ],
+      "invalidation_examples": [
+        "hyperscaler capex guidance cut",
+        "export regulatory shock targeting key names",
+        "semiconductor sector ETF relative strength breaks down",
+        "valuation crowding extreme with no earnings acceleration",
+        "credit stress severe enough to defer capital spending"
+      ],
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    },
+    {
+      "theme_id": "banks",
+      "name": "Banks and Financial Services \u2014 Rates Tailwind",
+      "beneficiary_types": [
+        "money_centre_banks",
+        "capital_markets_banks",
+        "diversified_financials",
+        "bank_etf_proxy"
+      ],
+      "typical_horizon": "multi_week",
+      "default_routes": [
+        "swing",
+        "watchlist"
+      ],
+      "activation_drivers": [
+        "yields_rising",
+        "net_interest_margin_expansion"
+      ],
+      "confirmation_requirements": [
+        "credit_stress_contained",
+        "yield_curve_not_severely_inverted",
+        "financial_sector_relative_strength",
+        "price_and_volume_confirmation"
+      ],
+      "risk_flags": [
+        "credit_stress",
+        "deposit_pressure",
+        "curve_inversion",
+        "recession_risk",
+        "regulatory_risk"
+      ],
+      "invalidation_examples": [
+        "credit stress indicators rising sharply",
+        "yield curve inverts severely",
+        "recession risk materialises \u2014 loan book deterioration",
+        "deposit stress or bank-specific solvency concerns",
+        "financial sector fails to confirm yield move"
+      ],
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    },
+    {
+      "theme_id": "energy",
+      "name": "Energy \u2014 Oil Supply Shock",
+      "beneficiary_types": [
+        "integrated_oil",
+        "energy_services",
+        "exploration_and_production",
+        "energy_etf_proxy"
+      ],
+      "typical_horizon": "short_to_multi_week",
+      "default_routes": [
+        "swing",
+        "position",
+        "watchlist"
+      ],
+      "activation_drivers": [
+        "oil_supply_shock",
+        "geopolitical_supply_risk"
+      ],
+      "confirmation_requirements": [
+        "oil_energy_relative_strength",
+        "xle_or_energy_sector_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "risk_flags": [
+        "oil_demand_destruction",
+        "geopolitical_reversal",
+        "commodity_volatility",
+        "broad_risk_off"
+      ],
+      "invalidation_examples": [
+        "oil rise driven by demand destruction signal rather than supply disruption",
+        "broad risk-off overwhelms energy sector bid",
+        "credit stress severe enough to overwhelm commodity tailwind",
+        "energy sector relative strength fails to confirm oil move",
+        "geopolitical supply risk rapidly de-escalates"
+      ],
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    },
+    {
+      "theme_id": "defence",
+      "name": "Defence and Aerospace \u2014 Geopolitical Risk Bid",
+      "beneficiary_types": [
+        "prime_contractors",
+        "aerospace_defence",
+        "defence_etf_proxy"
+      ],
+      "typical_horizon": "multi_week_to_multi_quarter",
+      "default_routes": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "activation_drivers": [
+        "geopolitical_risk_rising",
+        "defence_spending_expectations"
+      ],
+      "confirmation_requirements": [
+        "defence_sector_relative_strength",
+        "geopolitical_risk_remains_active",
+        "price_and_volume_confirmation"
+      ],
+      "risk_flags": [
+        "de_escalation",
+        "budget_risk",
+        "valuation",
+        "procurement_delay"
+      ],
+      "invalidation_examples": [
+        "geopolitical risk event de-escalates sharply",
+        "defence sector fails to confirm geopolitical bid",
+        "broad market liquidation overwhelms defence theme",
+        "budget sequestration or procurement freeze",
+        "theme becomes crowded with valuation extended"
+      ],
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    },
+    {
+      "theme_id": "quality_cash_flow",
+      "name": "Quality Cash Flow and Balance Sheet Strength",
+      "beneficiary_types": [
+        "high_free_cash_flow",
+        "strong_balance_sheet",
+        "resilient_earnings",
+        "defensive_compounders",
+        "mega_cap_quality"
+      ],
+      "typical_horizon": "multi_week_to_multi_quarter",
+      "default_routes": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "activation_drivers": [
+        "credit_stress_rising",
+        "liquidity_tightening",
+        "risk_off_rotation"
+      ],
+      "confirmation_requirements": [
+        "quality_relative_strength",
+        "defensive_sector_confirmation",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "broad_market_liquidation",
+        "earnings_disappointment"
+      ],
+      "invalidation_examples": [
+        "credit stress fades and high beta leadership resumes",
+        "quality relative strength breaks down",
+        "valuation risk becomes extreme",
+        "broad risk-on confirmed"
+      ],
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    },
+    {
+      "theme_id": "defensive_quality",
+      "name": "Defensive Quality \u2014 Risk-Off Rotation",
+      "beneficiary_types": [
+        "consumer_staples",
+        "healthcare",
+        "utilities",
+        "low_volatility",
+        "quality_balance_sheet"
+      ],
+      "typical_horizon": "days_to_weeks",
+      "default_routes": [
+        "swing",
+        "watchlist"
+      ],
+      "activation_drivers": [
+        "risk_appetite_falling",
+        "volatility_rising",
+        "defensive_rotation",
+        "breadth_deterioration"
+      ],
+      "confirmation_requirements": [
+        "defensive_sector_relative_strength",
+        "low_vol_or_quality_factor_relative_strength",
+        "SPY_QQQ_weakness_or_breadth_deterioration"
+      ],
+      "risk_flags": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "invalidation_examples": [
+        "broad risk-on recovery confirmed",
+        "defensives fail to outperform in risk-off",
+        "risk-off move exhausted and mean-reversion begins",
+        "rate shock causes defensive de-rating"
+      ],
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    },
+    {
+      "theme_id": "small_caps",
+      "name": "Small Cap \u2014 Headwind / Credit Pressure",
+      "beneficiary_types": [
+        "small_cap_index_proxy"
+      ],
+      "typical_horizon": "multi_week",
+      "default_routes": [
+        "watchlist"
+      ],
+      "activation_drivers": [
+        "credit_stress_rising",
+        "liquidity_tightening",
+        "refinancing_risk_rising"
+      ],
+      "confirmation_requirements": [
+        "IWM_relative_weakness",
+        "credit_proxy_weakness",
+        "breadth_deterioration"
+      ],
+      "risk_flags": [
+        "credit_stress_easing",
+        "risk_on_rotation",
+        "liquidity_support_intervention"
+      ],
+      "invalidation_examples": [
+        "credit stress fades and small-cap relative strength recovers",
+        "liquidity support measures announced",
+        "risk-on rotation leads small-caps higher"
+      ],
+      "headwind_theme": true,
+      "watchlist_only": true,
+      "source_label": "intelligence_first_static_rule",
+      "last_reviewed": "2026-05-05"
+    }
+  ],
+  "last_updated": "2026-05-05"
+}

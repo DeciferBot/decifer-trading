@@ -1,0 +1,303 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-05T20:35:02Z",
+  "valid_for_session": "2026-05-05",
+  "mode": "shadow_local_economic_state",
+  "data_source_mode": "local_shadow_outputs_only",
+  "source_files": [
+    "data/intelligence/transmission_rules.json",
+    "data/intelligence/theme_taxonomy.json",
+    "data/intelligence/thematic_roster.json",
+    "data/intelligence/economic_candidate_feed.json",
+    "data/intelligence/source_adapter_snapshot.json",
+    "data/universe_builder/active_opportunity_universe_shadow.json",
+    "data/universe_builder/current_vs_shadow_comparison.json",
+    "data/universe_builder/universe_builder_report.json",
+    "data/universe_builder/current_pipeline_snapshot.json"
+  ],
+  "unavailable_sources": [],
+  "warnings": [
+    "Sprint 4A: all macro drivers inferred from local shadow files only. No live market data. Confidence scores are conservative estimates."
+  ],
+  "driver_scores": {
+    "ai_capex_growth": {
+      "driver_id": "ai_capex_growth",
+      "score": 0.85,
+      "state": "active_shadow_inferred",
+      "confidence": 0.4,
+      "source_label": "transmission_rules_and_candidate_feed",
+      "evidence": [
+        "transmission_rule_ai_capex_growth_present",
+        "data_centre_power_or_semiconductors_candidates_in_feed"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "corporate_capex": {
+      "driver_id": "corporate_capex",
+      "score": 0.4,
+      "state": "watch_shadow_inferred",
+      "confidence": 0.25,
+      "source_label": "economic_candidate_feed",
+      "evidence": [
+        "semiconductors_or_data_centre_power_candidates_in_feed"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "interest_rates": {
+      "driver_id": "interest_rates",
+      "score": 0.3,
+      "state": "watch_shadow_inferred",
+      "confidence": 0.25,
+      "source_label": "transmission_rules_and_candidate_feed",
+      "evidence": [
+        "banks_candidates_in_feed",
+        "yields_rising_or_banks_rule_present"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "bonds_yields": {
+      "driver_id": "bonds_yields",
+      "score": 0.3,
+      "state": "watch_shadow_inferred",
+      "confidence": 0.25,
+      "source_label": "transmission_rules_and_candidate_feed",
+      "evidence": [
+        "banks_candidates_in_feed",
+        "yields_rising_or_banks_rule_present"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "oil_energy": {
+      "driver_id": "oil_energy",
+      "score": 0.3,
+      "state": "watch_shadow_inferred",
+      "confidence": 0.25,
+      "source_label": "economic_candidate_feed",
+      "evidence": [
+        "energy_candidates_in_feed"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "geopolitics": {
+      "driver_id": "geopolitics",
+      "score": 0.3,
+      "state": "watch_shadow_inferred",
+      "confidence": 0.25,
+      "source_label": "economic_candidate_feed",
+      "evidence": [
+        "defence_candidates_in_feed"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "credit": {
+      "driver_id": "credit",
+      "score": 0.3,
+      "state": "watch_shadow_inferred",
+      "confidence": 0.25,
+      "source_label": "transmission_rules_and_candidate_feed",
+      "evidence": [
+        "credit_stress_transmission_rule_present",
+        "pressure_candidate_in_feed"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "liquidity": {
+      "driver_id": "liquidity",
+      "score": 0.0,
+      "state": "unavailable",
+      "confidence": 0.0,
+      "source_label": "local_shadow_only",
+      "evidence": [],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "unavailable_reason": "no_local_shadow_evidence_for_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "risk_appetite": {
+      "driver_id": "risk_appetite",
+      "score": 0.25,
+      "state": "watch_shadow_inferred",
+      "confidence": 0.25,
+      "source_label": "comparison_and_candidate_feed",
+      "evidence": [
+        "risk_off_analysis_in_comparison_or_report",
+        "pressure_candidate_in_feed"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "volatility": {
+      "driver_id": "volatility",
+      "score": 0.2,
+      "state": "watch_shadow_inferred",
+      "confidence": 0.25,
+      "source_label": "candidate_feed",
+      "evidence": [
+        "risk_off_headwind_signals_in_feed"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "sector_rotation": {
+      "driver_id": "sector_rotation",
+      "score": 0.2,
+      "state": "watch_shadow_inferred",
+      "confidence": 0.25,
+      "source_label": "economic_candidate_feed",
+      "evidence": [
+        "8_distinct_themes_active_in_feed"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "valuation": {
+      "driver_id": "valuation",
+      "score": 0.0,
+      "state": "unavailable",
+      "confidence": 0.0,
+      "source_label": "local_shadow_only",
+      "evidence": [],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "unavailable_reason": "no_local_shadow_evidence_for_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "consumer_behaviour": {
+      "driver_id": "consumer_behaviour",
+      "score": 0.0,
+      "state": "unavailable",
+      "confidence": 0.0,
+      "source_label": "local_shadow_only",
+      "evidence": [],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "unavailable_reason": "no_local_shadow_evidence_for_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "inflation": {
+      "driver_id": "inflation",
+      "score": 0.0,
+      "state": "unavailable",
+      "confidence": 0.0,
+      "source_label": "local_shadow_only",
+      "evidence": [],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "unavailable_reason": "no_local_shadow_evidence_for_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "growth": {
+      "driver_id": "growth",
+      "score": 0.0,
+      "state": "unavailable",
+      "confidence": 0.0,
+      "source_label": "local_shadow_only",
+      "evidence": [],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "unavailable_reason": "no_local_shadow_evidence_for_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    "usd": {
+      "driver_id": "usd",
+      "score": 0.0,
+      "state": "unavailable",
+      "confidence": 0.0,
+      "source_label": "local_shadow_only",
+      "evidence": [],
+      "freshness_status": "static_shadow_inference_sprint4a",
+      "unavailable_reason": "no_local_shadow_evidence_for_sprint4a",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    }
+  },
+  "driver_states": {
+    "ai_capex_growth": "active_shadow_inferred",
+    "corporate_capex": "watch_shadow_inferred",
+    "interest_rates": "watch_shadow_inferred",
+    "bonds_yields": "watch_shadow_inferred",
+    "oil_energy": "watch_shadow_inferred",
+    "geopolitics": "watch_shadow_inferred",
+    "credit": "watch_shadow_inferred",
+    "liquidity": "unavailable",
+    "risk_appetite": "watch_shadow_inferred",
+    "volatility": "watch_shadow_inferred",
+    "sector_rotation": "watch_shadow_inferred",
+    "valuation": "unavailable",
+    "consumer_behaviour": "unavailable",
+    "inflation": "unavailable",
+    "growth": "unavailable",
+    "usd": "unavailable"
+  },
+  "active_drivers": [
+    "ai_capex_growth"
+  ],
+  "inactive_drivers": [
+    "corporate_capex",
+    "interest_rates",
+    "bonds_yields",
+    "oil_energy",
+    "geopolitics",
+    "credit",
+    "risk_appetite",
+    "volatility",
+    "sector_rotation"
+  ],
+  "blocked_drivers": [],
+  "confidence_summary": {
+    "mean_confidence_active_drivers": 0.4,
+    "drivers_with_live_evidence": 0,
+    "drivers_unavailable": 6,
+    "inference_only": true
+  },
+  "route_pressure_summary": {
+    "position_route_count": 11,
+    "structural_quota_group_count": 20,
+    "structural_swing_count": 9,
+    "structural_watchlist_count": 0,
+    "attention_count": 0,
+    "etf_proxy_count": 0,
+    "structural_quota_binding": false,
+    "source": "active_opportunity_universe_shadow"
+  },
+  "no_live_api_called": true,
+  "broker_called": false,
+  "env_inspected": false,
+  "raw_news_used": false,
+  "llm_used": false,
+  "broad_intraday_scan_used": false,
+  "live_output_changed": false
+}

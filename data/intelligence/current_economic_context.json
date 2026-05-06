@@ -1,0 +1,108 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-05T20:35:02Z",
+  "valid_for_session": "2026-05-05",
+  "mode": "shadow_current_economic_context",
+  "data_source_mode": "local_shadow_outputs_only",
+  "economic_regime": "ai_infrastructure_tailwind_shadow",
+  "risk_posture": "selective",
+  "confidence": 0.4,
+  "active_driver_summary": [
+    {
+      "driver_id": "ai_capex_growth",
+      "state": "active_shadow_inferred",
+      "confidence": 0.4,
+      "evidence_count": 2
+    }
+  ],
+  "active_theme_summary": [
+    {
+      "theme_id": "banks",
+      "source": "economic_candidate_feed"
+    },
+    {
+      "theme_id": "data_centre_power",
+      "source": "economic_candidate_feed"
+    },
+    {
+      "theme_id": "defence",
+      "source": "economic_candidate_feed"
+    },
+    {
+      "theme_id": "defensive_quality",
+      "source": "economic_candidate_feed"
+    },
+    {
+      "theme_id": "energy",
+      "source": "economic_candidate_feed"
+    },
+    {
+      "theme_id": "quality_cash_flow",
+      "source": "economic_candidate_feed"
+    },
+    {
+      "theme_id": "semiconductors",
+      "source": "economic_candidate_feed"
+    },
+    {
+      "theme_id": "small_caps",
+      "direction": "headwind",
+      "source": "economic_candidate_feed"
+    }
+  ],
+  "route_adjustments": {
+    "POSITION": {
+      "quality_required": true,
+      "valuation_tolerance": "low",
+      "size_modifier": 1.0,
+      "entry_hurdle_modifier": 1.0,
+      "notes": "AI infrastructure structural tailwind active \u2014 position route quality standards apply; valuation tolerance constrained pending live data Sprint 4B."
+    },
+    "SWING": {
+      "catalyst_required": false,
+      "avoid_extended_entries": false,
+      "entry_hurdle_modifier": 1.0,
+      "notes": "Swing route available; standard entry criteria apply per route_tagger.py."
+    },
+    "INTRADAY_SWING": {
+      "allowed": true,
+      "event_driven_preferred": true,
+      "attention_cap_applies": true,
+      "notes": "Intraday swing available for energy/banks/event-driven themes; attention cap enforced."
+    },
+    "WATCHLIST": {
+      "allowed": true,
+      "upgrade_requires_next_universe_builder_run": true,
+      "notes": "Upgrade from watchlist to executable route requires next Universe Builder run \u2014 context alone cannot promote a candidate."
+    }
+  },
+  "risk_modifiers": {
+    "headwind_themes_active": [
+      "small_caps"
+    ],
+    "structural_quota_binding": false,
+    "attention_cap_binding": false
+  },
+  "freshness": "static_shadow_inference_sprint4a",
+  "source_files": [
+    "data/intelligence/transmission_rules.json",
+    "data/intelligence/theme_taxonomy.json",
+    "data/intelligence/thematic_roster.json",
+    "data/intelligence/economic_candidate_feed.json",
+    "data/intelligence/source_adapter_snapshot.json",
+    "data/universe_builder/active_opportunity_universe_shadow.json",
+    "data/universe_builder/current_vs_shadow_comparison.json",
+    "data/universe_builder/universe_builder_report.json",
+    "data/universe_builder/current_pipeline_snapshot.json"
+  ],
+  "warnings": [
+    "Sprint 4A: economic context inferred from local shadow files only. Context is report-only \u2014 it cannot make any candidate executable, cannot create symbols, and cannot override route_tagger.py or quota_allocator.py."
+  ],
+  "no_live_api_called": true,
+  "broker_called": false,
+  "env_inspected": false,
+  "raw_news_used": false,
+  "llm_used": false,
+  "broad_intraday_scan_used": false,
+  "live_output_changed": false
+}

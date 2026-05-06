@@ -1,0 +1,284 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-05T20:35:13Z",
+  "report_title": "Universe Builder Sprint 3 Report \u2014 Current vs Shadow Comparison",
+  "mode": "shadow_comparison_only",
+  "live_output_changed": false,
+  "current_summary": {
+    "current_pre_filter_source_pool_count": 235,
+    "current_tier_a_count": 51,
+    "current_tier_b_count": 50,
+    "current_tier_c_count": "not_available_in_day5_shadow_mode",
+    "current_tier_d_count": 150,
+    "current_favourites_count": 13,
+    "current_held_count": "not_available_in_day5_shadow_mode",
+    "current_guardrails_passed_count": "not_available_in_day5_shadow_mode",
+    "current_apex_pre_cap_count": "not_available_in_day5_shadow_mode",
+    "current_apex_final_cap_count": "not_available_in_day5_shadow_mode",
+    "unavailable_stages": [
+      "current_tier_c",
+      "current_held",
+      "current_guardrails_passed",
+      "current_apex_pre_cap",
+      "current_apex_final_cap"
+    ]
+  },
+  "shadow_summary": {
+    "shadow_total_count": 50,
+    "shadow_position_count": 11,
+    "shadow_swing_count": 9,
+    "shadow_watchlist_count": 10,
+    "shadow_attention_count": 8,
+    "shadow_structural_count": 20,
+    "shadow_economic_intelligence_count": 30,
+    "shadow_tier_d_count": 0,
+    "shadow_manual_count": 13,
+    "shadow_held_count": 0,
+    "shadow_etf_proxy_count": 9
+  },
+  "overlap": {
+    "overlap_count": 27,
+    "in_current_not_shadow_count": 208,
+    "in_shadow_not_current_count": 23
+  },
+  "tier_d_analysis": {
+    "tier_d_total_current": 150,
+    "tier_d_in_shadow_count": 5,
+    "tier_d_excluded_count": 145,
+    "tier_d_preservation_rate": 0.0333,
+    "tier_d_quality_rank_available": true,
+    "top_tier_d_preserved": [
+      "NVDA",
+      "AMD",
+      "NBIS",
+      "MU",
+      "ASTS"
+    ],
+    "top_tier_d_excluded": [
+      "TE",
+      "IONQ",
+      "APP",
+      "CRDO",
+      "RKLB",
+      "SNAP",
+      "BMNR",
+      "AFRM",
+      "DASH",
+      "BABA"
+    ],
+    "exclusion_reasons": {
+      "Structural quota full (20)": 145,
+      "Duplicate \u2014 already claimed by manual_conviction_favourites": 4,
+      "Duplicate \u2014 already claimed by economic_intelligence_structural": 1
+    }
+  },
+  "structural_analysis": {
+    "structural_candidates_shadow_count": 20,
+    "structural_quota_used": 20,
+    "structural_quota_max": 20,
+    "structural_quota_binding": true,
+    "structural_candidates_displaced_by_attention": false
+  },
+  "attention_analysis": {
+    "attention_count": 8,
+    "attention_cap": 15,
+    "attention_cap_respected": true,
+    "attention_candidates_consumed_structural_quota": false
+  },
+  "manual_held_analysis": {
+    "manual_candidates_shadow_count": 13,
+    "manual_candidates_protected": true,
+    "manual_candidates_lost": [],
+    "held_unavailable_reason": "No live IBKR connection in Day 5 static bootstrap",
+    "held_candidates_protected": true
+  },
+  "economic_analysis": {
+    "economic_candidates_total": 30,
+    "economic_candidates_in_shadow": 30,
+    "economic_candidates_executable": false,
+    "llm_symbol_discovery_used": false,
+    "raw_news_used": false,
+    "broad_intraday_scan_used": false
+  },
+  "exclusion_summary": {
+    "total_exclusions": 254,
+    "quota_full": 153,
+    "duplicates": 22,
+    "by_source": {
+      "tier_d_position_research": 150,
+      "tier_a_core_floor": 51,
+      "tier_b_daily_promoted": 43,
+      "intelligence_first_static_rule": 10,
+      "economic_intelligence": 10
+    }
+  },
+  "quota_pressure_analysis": {
+    "structural_position": {
+      "demand_total": 180,
+      "capacity": 20,
+      "accepted": 20,
+      "overflow": 160,
+      "binding": true,
+      "demand_by_theme": {
+        "data_centre_power": 4,
+        "semiconductors": 5,
+        "banks": 4,
+        "energy": 4,
+        "defence": 4,
+        "quality_cash_flow": 4,
+        "defensive_quality": 5,
+        "": 150
+      },
+      "demand_by_source": {
+        "economic_intelligence_structural": 30,
+        "tier_d_structural": 150
+      }
+    },
+    "etf_proxy": {
+      "demand_total": 9,
+      "capacity": 10,
+      "accepted": 9,
+      "overflow": 0,
+      "binding": false
+    },
+    "attention": {
+      "demand_total": 102,
+      "capacity": 15,
+      "accepted": 8,
+      "overflow": 94,
+      "binding": false
+    },
+    "catalyst_swing": {
+      "demand_total": 0,
+      "capacity": 30,
+      "accepted": 0,
+      "overflow": 0,
+      "binding": false
+    }
+  },
+  "source_collision_summary": {
+    "total_collisions": 36,
+    "symbols_lost_to_collision": 18,
+    "protected_by_manual_or_held": 11,
+    "source_path_excluded_but_symbol_preserved": 18
+  },
+  "economic_slice_summary": {
+    "slices_active": 8,
+    "total_candidates": 40,
+    "slices": [
+      "data_centre_power",
+      "semiconductors",
+      "banks",
+      "energy",
+      "defence",
+      "quality_cash_flow",
+      "small_caps",
+      "defensive_quality"
+    ],
+    "macro_transmission_deterministic": true,
+    "llm_symbol_discovery_used": false
+  },
+  "adapter_impact_analysis": {
+    "adapter_snapshot_available": true,
+    "adapters_available": 7,
+    "adapters_unavailable": 1,
+    "adapter_symbols_read_total": 1375,
+    "adapter_unique_symbols_read": 1028,
+    "adapter_symbols_in_shadow": 49,
+    "adapter_symbols_excluded": 979,
+    "adapter_symbols_preserved": 49,
+    "adapter_enriched_candidates": 49,
+    "adapter_added_symbols": [],
+    "side_effects_triggered": false,
+    "live_data_called": false
+  },
+  "risk_off_analysis": {
+    "quality_cash_flow_candidates_generated": 5,
+    "defensive_quality_candidates_generated": 8,
+    "small_caps_headwind_candidates_generated": 1,
+    "candidates_in_shadow": 6,
+    "candidates_excluded_by_quota": 7,
+    "candidates_watchlist_only": 5,
+    "headwind_candidates_in_shadow": 1,
+    "headwind_candidates_executable": false,
+    "risk_off_symbols_preserved": [
+      "AAPL",
+      "IWM",
+      "QUAL",
+      "SPLV",
+      "XLP",
+      "XLV"
+    ],
+    "risk_off_symbols_lost": [
+      "BRK.B",
+      "COST",
+      "JNJ",
+      "KO",
+      "MSFT",
+      "PEP",
+      "PG"
+    ]
+  },
+  "route_metric_distinction": {
+    "position_route_count": 11,
+    "structural_quota_group_count": 20,
+    "structural_reason_to_care_count": 20,
+    "tier_d_structural_source_count": 0,
+    "structural_watchlist_count": 0,
+    "structural_swing_count": 9
+  },
+  "economic_context_summary": {
+    "daily_economic_state_available": true,
+    "current_economic_context_available": true,
+    "theme_activation_available": true,
+    "thesis_store_available": true,
+    "active_themes": [
+      "data_centre_power",
+      "semiconductors"
+    ],
+    "strengthening_themes": [],
+    "crowded_themes": [
+      "quality_cash_flow",
+      "defensive_quality"
+    ],
+    "weakening_themes": [
+      "small_caps"
+    ],
+    "watchlist_themes": [
+      "banks",
+      "energy",
+      "defence"
+    ],
+    "invalidated_themes": [],
+    "risk_posture": "selective",
+    "regime_label": "ai_infrastructure_tailwind_shadow",
+    "thesis_count": 8,
+    "low_confidence_themes": 0,
+    "evidence_limited_themes": 0,
+    "no_live_api_called": true,
+    "live_output_changed": false
+  },
+  "quality_warnings": [
+    "Structural position quota is BINDING (20/20) \u2014 133 Tier D candidates excluded. Quota will be relieved when Day 6 adds more slices and increases max, or when Sprint 2 route_tagger partitions the pool correctly.",
+    "Tier D quality ranking IS available (discovery_score field). Top preserved: ['NVDA', 'AMD', 'NBIS', 'MU', 'ASTS']. Top excluded by score: ['TE', 'IONQ', 'APP', 'CRDO', 'RKLB'].",
+    "Manual/favourite candidates protected but not yet structurally validated \u2014 no transmission rule links them to an active theme.",
+    "ETF/proxy candidates (XLU) capped at watchlist-only \u2014 cannot consume structural or catalyst quota.",
+    "Held candidates not present in Day 7 static bootstrap \u2014 held quota is protected and will be populated when live IBKR connection is enabled.",
+    "Current pipeline stage 'current_tier_c' is not_available_in_day5_shadow_mode.",
+    "Current pipeline stage 'current_held' is not_available_in_day5_shadow_mode.",
+    "Current pipeline stage 'current_guardrails_passed' is not_available_in_day5_shadow_mode.",
+    "Current pipeline stage 'current_apex_pre_cap' is not_available_in_day5_shadow_mode.",
+    "Current pipeline stage 'current_apex_final_cap' is not_available_in_day5_shadow_mode."
+  ],
+  "interpretations": [
+    "BINDING: structural_position quota (20/20) is full. Total structural demand: 180, overflow: 160 candidates excluded. Recommendation: Sprint 2 quota_allocator.py should partition position vs swing routes, increasing effective structural capacity.",
+    "LOW PRESERVATION: Only 5/150 (3.3%) Tier D names preserved in shadow. This is expected at Day 4 with quota=20 and 150 Tier D candidates. Top excluded names by discovery_score: ['TE', 'IONQ', 'APP', 'CRDO', 'RKLB'].",
+    "VERIFIED: Attention candidates did not consume structural quota \u2014 route/quota separation is working correctly.",
+    "VERIFIED: All 13 manual conviction / favourites candidates are protected.",
+    "VERIFIED: All economic intelligence candidates are non-executable (shadow_report_only).",
+    "Sprint 3: 8 economic slices active (banks, data_centre_power, defence, defensive_quality, energy, quality_cash_flow, semiconductors, small_caps), 40 total economic candidates. All symbols from approved rosters \u2014 no LLM discovery.",
+    "HEADWIND: 1 headwind pressure candidate(s) in shadow (watchlist monitoring only \u2014 headwind_candidates_executable=False).",
+    "ROUTE DISTINCTION: structural_quota_group_count=20, position_route_count=11, structural_swing_count=9. Banks/energy/defence are structural quota but route=swing (not position).",
+    "SOURCE COLLISION: 18 symbol(s) had an economic or structural path excluded but are still present in shadow via manual_conviction or held (protected). No candidate lost to collision."
+  ]
+}

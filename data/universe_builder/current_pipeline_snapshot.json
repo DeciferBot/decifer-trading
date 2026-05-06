@@ -1,0 +1,236 @@
+{
+  "snapshot_date": "2026-05-05",
+  "live_output_changed": false,
+  "purpose": "Intelligence-First migration audit — current candidate pipeline state before any migration code is written",
+
+  "universe_counts_by_stage": {
+    "note": "Day 1 correction — the earlier '~200 symbols per cycle' was ambiguous. These are the distinct counts at each pipeline stage.",
+    "stage_1_source_pool_pre_scoring_cap": {
+      "description": "All symbols from get_dynamic_universe() + bot-level additions before any scoring cap is applied",
+      "components": "Tier A (~57) + Tier B (~50 promoted) + Tier C (variable sector rotation ~6–60) + Tier D (~150 position research) + options universe (~20–40) + favourites (13) + held (variable)",
+      "estimated_total": "250–400 symbols (many overlap between tiers — actual unique count lower)",
+      "overlap_note": "Tier D names frequently appear in Tier A/B/C already. Unique count closer to 180–250 on typical days."
+    },
+    "stage_2_pre_scoring_cap_applied": {
+      "description": "After signal_pipeline.py applies the global scoring cap before score_universe() runs",
+      "config_keys": {"max_symbols_to_score": 140, "tier_d_pre_scoring_max": 60, "tier_d_pre_scoring_min": 40},
+      "typical_count": "Up to 140 symbols enter score_universe() — Tier D capped at 60 within that 140"
+    },
+    "stage_3_live_scored_all": {
+      "description": "all_scored — every symbol scored on any dimension (signal_pipeline.py:776)",
+      "typical_count": "60–140 symbols (all symbols that received at least one dimension score)"
+    },
+    "stage_4_above_threshold": {
+      "description": "scored — symbols above min_score_to_trade threshold (14 paper / 28 live)",
+      "typical_count": "20–80 symbols depending on market conditions"
+    },
+    "stage_5_post_guardrails": {
+      "description": "After guardrails.filter_candidates() drops held, cooldown, failed-thesis, open-order, earnings-today",
+      "typical_count": "15–60 symbols"
+    },
+    "stage_6_apex_pre_cap_deduped": {
+      "description": "After dedup by symbol (best apex_cap_score wins per symbol)",
+      "typical_count": "15–60 unique symbols"
+    },
+    "stage_7_apex_final_capped": {
+      "description": "Final list sent to apex_call() — top 30 unconditional + slots 31-50 gated by expanded_band_floor=20",
+      "max_count": 50,
+      "unconditional_slots": 30
+    }
+  },
+
+  "source_map": {
+    "tier_a": {
+      "label": "Tier A — always-on floor",
+      "file": "scanner.py:395-397",
+      "function": "get_dynamic_universe()",
+      "symbols_hardcoded": true,
+      "count": 57,
+      "components": {
+        "CORE_SYMBOLS": {
+          "count": 16,
+          "symbols": ["SPY", "QQQ", "IWM", "VXX", "UVXY", "SVXY", "SPXS", "SQQQ", "IBIT", "BITO", "MSTR", "GLD", "SLV", "USO", "COPX"],
+          "description": "Macro ETFs, vol, inverse ETFs, crypto proxies, commodities"
+        },
+        "CORE_EQUITIES": {
+          "count": 41,
+          "symbols": ["NVDA","AAPL","MSFT","AMD","CRM","GOOGL","META","LLY","ABBV","MRNA","BIIB","REGN","UNH","MDT","ABT","AMZN","TSLA","NKE","MCD","TGT","WMT","COST","PG","XOM","CVX","OXY","COP","CAT","GE","HON","FCX","NEM","LIN","JPM","GS","V"],
+          "description": "Mega-cap equities across 10 sectors, always scored every cycle"
+        }
+      },
+      "staleness": "none — hardcoded",
+      "reason_to_care_label": null,
+      "route_label": null
+    },
+    "tier_b": {
+      "label": "Tier B — daily promoted",
+      "file": "universe_promoter.py",
+      "data_file": "data/daily_promoted.json",
+      "function": "load_promoted_universe()",
+      "called_from": "scanner.py:402-416",
+      "count_target": 50,
+      "refresh_schedule": ["08:00 ET", "16:15 ET"],
+      "staleness_hours": 18,
+      "scoring_weights": {
+        "gap_pct": 3.0,
+        "premarket_volume_ratio": 2.0,
+        "catalyst_score": 2.0
+      },
+      "failure_mode": "falls back to Tier A only if stale or missing",
+      "reason_to_care_label": null,
+      "route_label": null
+    },
+    "tier_c_sector": {
+      "label": "Tier C — sector rotation leaders",
+      "file": "scanner.py:418-432",
+      "function": "get_sector_rotation_bias()",
+      "method": "5-day relative strength of 11 sector ETFs vs SPY",
+      "adds": "top-3 sector ETFs + constituent stocks from _SECTOR_STOCKS dict (6 per ETF)",
+      "count_variable": true,
+      "reason_to_care_label": null,
+      "route_label": null
+    },
+    "tier_c_options": {
+      "label": "Tier C — options universe",
+      "file": "bot_trading.py:1494-1502",
+      "source": "options_scanner.OPTIONABLE_UNIVERSE",
+      "description": "Liquid optionable names pinned so options signals are always evaluated",
+      "reason_to_care_label": null,
+      "route_label": null
+    },
+    "tier_d": {
+      "label": "Tier D — position research universe",
+      "file": "scanner.py:434-449",
+      "data_file": "data/position_research_universe.json",
+      "function": "get_position_research_universe()",
+      "called_from": "universe_position.py",
+      "count_target": 150,
+      "refresh_schedule": "weekly",
+      "config_key": "position_research_universe_enabled",
+      "config_default": true,
+      "description": "Fundamental-quality discovery names, bypasses gap/premarket-volume promoter",
+      "scanner_tier_tag": "D",
+      "reason_to_care_label": null,
+      "route_label": null,
+      "score_bonus": {
+        "file": "apex_cap_score.py",
+        "function": "compute_apex_cap_score()",
+        "max_bonus": 8.0,
+        "minimum_signal_score_for_bonus": 18,
+        "type": "sort-key adjustment only — no quota protection"
+      }
+    },
+    "held_positions": {
+      "label": "Held positions — always pinned",
+      "file": "bot_trading.py:1480-1488",
+      "function": "get_open_positions()",
+      "description": "Open IBKR positions pinned into universe before scoring so PM always sees them",
+      "merge_target": "pipeline_favs",
+      "reason_to_care_label": null,
+      "route_label": "held (implicit)"
+    },
+    "favourites": {
+      "label": "Favourites — manual conviction",
+      "file": "bot_trading.py:1469-1474",
+      "data_file": "data/favourites.json",
+      "source": "dash.get('favourites', [])",
+      "current_symbols": ["ASTS","GLD","IBIT","USO","SPY","QQQ","NVDA","TSLA","AAPL","HIMS","NBIS","MU","ONDS"],
+      "count": 13,
+      "merge_target": "pipeline_favs",
+      "reason_to_care_label": null,
+      "route_label": null
+    }
+  },
+
+  "candidate_merge_flow": [
+    {"step": 1, "action": "get_dynamic_universe()", "file": "scanner.py:363", "output": "set of symbols, all tiers merged, no labels"},
+    {"step": 2, "action": "Union favourites", "file": "bot_trading.py:1471-1474", "output": "symbols += favourites"},
+    {"step": 3, "action": "Union held positions", "file": "bot_trading.py:1482-1483", "output": "symbols += held_syms"},
+    {"step": 4, "action": "Union options universe", "file": "bot_trading.py:1495-1501", "output": "symbols += OPTIONABLE_UNIVERSE"},
+    {"step": 5, "action": "run_signal_pipeline()", "file": "signal_pipeline.py:649", "output": "scored candidates with 10-dimension scores; Alpaca bars fetched per-symbol"},
+    {"step": 6, "action": "_apply_pru_score_adjustment()", "file": "signal_pipeline.py:354", "output": "Tier D candidates get effective_score with research bonus"},
+    {"step": 7, "action": "guardrails.filter_candidates()", "file": "bot_trading.py:2401", "output": "drop held/cooldown/failed-thesis/open-order/earnings-today"},
+    {"step": 8, "action": "compute_apex_cap_score()", "file": "bot_trading.py:2410-2411", "output": "Tier D candidates get sort-key bonus up to +8"},
+    {"step": 9, "action": "Dedup by symbol", "file": "bot_trading.py:2419-2455", "output": "one row per symbol, best apex_cap_score wins"},
+    {"step": 10, "action": "Sort + cap", "file": "bot_trading.py:2465-2475", "output": "top 30 unconditional + 31-50 if score >= 20, max 50"},
+    {"step": 11, "action": "apex_call()", "file": "market_intelligence.py:1226", "output": "ApexDecision with new_entries[] and pm_actions[]"},
+    {"step": 12, "action": "execute_buy()", "file": "orders_core.py", "output": "order placed or rejected with reason"}
+  ],
+
+  "apex_input_flow": {
+    "candidates_max": 50,
+    "candidates_min_unconditional": 30,
+    "candidates_extended_band_floor": 20,
+    "context_provided": ["regime", "session_character", "overnight_notes", "news_digest", "macro_calendar", "thesis_performance", "setup_patterns", "ic_weights", "open_positions"],
+    "context_missing": ["reason_to_care", "bucket_id", "transmission_direction", "route_pretag", "source_labels", "macro_rules_fired", "thesis_intact", "risk_notes"],
+    "apex_output": {
+      "new_entries": "list of {symbol, trade_type, conviction, direction, rationale}",
+      "pm_actions": "list of {symbol, action, rationale}",
+      "higher_score_skips": "audit trail for skipped high-score candidates"
+    }
+  },
+
+  "apex_cap_flow": {
+    "pre_filter": "guardrails.filter_candidates() — deterministic gates",
+    "dedup": "by symbol, best apex_cap_score wins",
+    "sort_key": "apex_cap_score (= signal score for non-Tier-D; signal score + bonus for Tier D with score >= 18)",
+    "core_limit": 30,
+    "cap_limit": 50,
+    "expanded_band_floor": 20,
+    "quota_system": "none — flat sort with sort-key bonus only",
+    "structural_protection": "none — Tier D competes against all other candidates in the same pool"
+  },
+
+  "execution_boundary": {
+    "live_data_pulled_for_full_universe": true,
+    "live_data_location": "signals.py score_universe() via ThreadPoolExecutor — Alpaca bars per symbol",
+    "execution_data_location": "orders_core.py — IBKR bid/ask + Alpaca quote at execution only",
+    "live_bot_builds_universe": true,
+    "live_bot_discovers_symbols": true,
+    "comment": "Current system violates the locked architecture boundary — live bot builds universe and scores broad intraday data. This will be corrected by the Intelligence-First migration."
+  },
+
+  "files_in_candidate_flow": [
+    "scanner.py",
+    "universe_promoter.py",
+    "universe_position.py",
+    "universe_committed.py",
+    "options_scanner.py",
+    "bot_trading.py",
+    "signal_pipeline.py",
+    "signals.py",
+    "guardrails.py",
+    "apex_cap_score.py",
+    "market_intelligence.py",
+    "orders_core.py",
+    "theme_tracker.py",
+    "catalyst_engine.py",
+    "learning.py"
+  ],
+
+  "position_candidate_disadvantage": {
+    "root_cause": "No reason_to_care label exists on any candidate when it reaches the Apex cap sort",
+    "mechanism": "Structural Tier D names and 5-minute tactical movers compete in the same flat sorted pool",
+    "current_mitigation": "apex_cap_score bonus (max +8) — sort-key nudge only, no quota protection",
+    "failure_mode": "On high-gap days, 30+ non-Tier-D names score above Tier D names even with the bonus",
+    "evidence_file": "data/tier_d_funnel.jsonl stage=apex_cap",
+    "what_migration_fixes": "reason_to_care label + structural quota (min 8 protected slots) + attention cap (max 15)"
+  },
+
+  "safe_shadow_wiring_point": {
+    "file": "bot_trading.py",
+    "after_line": 2475,
+    "description": "After _cut_candidates is finalised, before apex_call() is invoked",
+    "flag_gate": "intelligence_first_shadow_enabled (default false)",
+    "side_effects": "none — read-only comparison, writes to data/universe_builder/ only"
+  },
+
+  "feature_flags_added_this_session": [
+    {"key": "intelligence_first_shadow_enabled", "default": false, "purpose": "master switch for all shadow output"},
+    {"key": "intelligence_first_transmission_enabled", "default": false, "purpose": "run macro transmission matrix"},
+    {"key": "intelligence_first_candidate_feed_enabled", "default": false, "purpose": "run economic candidate feed"},
+    {"key": "intelligence_first_universe_builder_enabled", "default": false, "purpose": "run shadow universe builder"},
+    {"key": "intelligence_first_advisory_enabled", "default": false, "purpose": "advisory logging alongside live bot"},
+    {"key": "enable_active_opportunity_universe_handoff", "default": false, "purpose": "production wiring — never enabled during this work"}
+  ]
+}

@@ -1,0 +1,196 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-06T05:28:21Z",
+  "mode": "local_fixture_backtest",
+  "data_source_mode": "local_fixtures_and_shadow_outputs_only",
+  "source_files": [
+    "data/intelligence/transmission_rules.json",
+    "data/intelligence/theme_taxonomy.json",
+    "data/intelligence/thematic_roster.json",
+    "data/intelligence/economic_candidate_feed.json",
+    "data/universe_builder/active_opportunity_universe_shadow.json"
+  ],
+  "total_scenarios": 6,
+  "pass_count": 6,
+  "fail_count": 0,
+  "themes_tested": [
+    "banks",
+    "data_centre_power",
+    "defence",
+    "defensive_quality",
+    "energy",
+    "quality_cash_flow",
+    "semiconductors",
+    "small_caps"
+  ],
+  "false_activation_count": 0,
+  "missing_evidence_handled_correctly": true,
+  "headwind_handled_correctly": true,
+  "crowded_handled_correctly": true,
+  "crowded_themes_in_actual_state": [
+    "quality_cash_flow",
+    "defensive_quality"
+  ],
+  "scenario_results": [
+    {
+      "scenario_id": "ai_capex_active",
+      "description": "AI capex growth active \u2014 data_centre_power and semiconductors should activate/strengthen.",
+      "expected_theme_states": {
+        "data_centre_power": [
+          "activated",
+          "crowded",
+          "strengthening"
+        ],
+        "semiconductors": [
+          "activated",
+          "crowded",
+          "strengthening"
+        ]
+      },
+      "actual_theme_states": {
+        "data_centre_power": "activated",
+        "semiconductors": "activated",
+        "banks": "watchlist",
+        "energy": "watchlist",
+        "defence": "watchlist",
+        "quality_cash_flow": "crowded",
+        "defensive_quality": "crowded",
+        "small_caps": "weakening"
+      },
+      "pass": true,
+      "mismatches": [],
+      "non_executable": true
+    },
+    {
+      "scenario_id": "credit_stress_active",
+      "description": "Credit stress driver watch \u2014 quality_cash_flow should be watchlist/activated; small_caps headwind.",
+      "expected_theme_states": {
+        "quality_cash_flow": [
+          "activated",
+          "crowded",
+          "watchlist"
+        ],
+        "small_caps": [
+          "watchlist",
+          "weakening"
+        ]
+      },
+      "actual_theme_states": {
+        "data_centre_power": "watchlist",
+        "semiconductors": "watchlist",
+        "banks": "watchlist",
+        "energy": "watchlist",
+        "defence": "watchlist",
+        "quality_cash_flow": "crowded",
+        "defensive_quality": "crowded",
+        "small_caps": "weakening"
+      },
+      "pass": true,
+      "mismatches": [],
+      "non_executable": true
+    },
+    {
+      "scenario_id": "risk_off_active",
+      "description": "Risk-off rotation \u2014 defensive_quality should watchlist/activate.",
+      "expected_theme_states": {
+        "defensive_quality": [
+          "activated",
+          "crowded",
+          "watchlist"
+        ],
+        "small_caps": [
+          "watchlist",
+          "weakening"
+        ]
+      },
+      "actual_theme_states": {
+        "data_centre_power": "watchlist",
+        "semiconductors": "watchlist",
+        "banks": "watchlist",
+        "energy": "watchlist",
+        "defence": "watchlist",
+        "quality_cash_flow": "crowded",
+        "defensive_quality": "crowded",
+        "small_caps": "weakening"
+      },
+      "pass": true,
+      "mismatches": [],
+      "non_executable": true
+    },
+    {
+      "scenario_id": "oil_supply_shock",
+      "description": "Oil supply shock \u2014 energy theme should watchlist/activate.",
+      "expected_theme_states": {
+        "energy": [
+          "activated",
+          "crowded",
+          "strengthening",
+          "watchlist"
+        ]
+      },
+      "actual_theme_states": {
+        "data_centre_power": "watchlist",
+        "semiconductors": "watchlist",
+        "banks": "watchlist",
+        "energy": "activated",
+        "defence": "watchlist",
+        "quality_cash_flow": "crowded",
+        "defensive_quality": "crowded",
+        "small_caps": "weakening"
+      },
+      "pass": true,
+      "mismatches": [],
+      "non_executable": true
+    },
+    {
+      "scenario_id": "geopolitical_risk",
+      "description": "Geopolitical risk rising \u2014 defence theme should watchlist/activate.",
+      "expected_theme_states": {
+        "defence": [
+          "activated",
+          "crowded",
+          "strengthening",
+          "watchlist"
+        ]
+      },
+      "actual_theme_states": {
+        "data_centre_power": "watchlist",
+        "semiconductors": "watchlist",
+        "banks": "watchlist",
+        "energy": "watchlist",
+        "defence": "activated",
+        "quality_cash_flow": "crowded",
+        "defensive_quality": "crowded",
+        "small_caps": "weakening"
+      },
+      "pass": true,
+      "mismatches": [],
+      "non_executable": true
+    },
+    {
+      "scenario_id": "missing_evidence",
+      "description": "All drivers unavailable \u2014 no theme should have high confidence or false certainty.",
+      "expected_theme_states": {},
+      "actual_theme_states": {
+        "data_centre_power": "watchlist",
+        "semiconductors": "watchlist",
+        "banks": "watchlist",
+        "energy": "watchlist",
+        "defence": "watchlist",
+        "quality_cash_flow": "crowded",
+        "defensive_quality": "crowded",
+        "small_caps": "weakening"
+      },
+      "pass": true,
+      "mismatches": [],
+      "non_executable": true
+    }
+  ],
+  "no_live_api_called": true,
+  "broker_called": false,
+  "env_inspected": false,
+  "raw_news_used": false,
+  "llm_used": false,
+  "broad_intraday_scan_used": false,
+  "live_output_changed": false
+}

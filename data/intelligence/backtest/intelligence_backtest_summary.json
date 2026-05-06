@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-06T05:28:21Z",
+  "mode": "local_fixture_backtest_summary",
+  "data_source_mode": "local_fixtures_and_shadow_outputs_only",
+  "source_files": [
+    "data/intelligence/backtest/regime_fixture_results.json",
+    "data/intelligence/backtest/theme_activation_fixture_results.json",
+    "data/intelligence/backtest/candidate_feed_ablation_results.json",
+    "data/intelligence/backtest/risk_overlay_fixture_results.json",
+    "data/intelligence/backtest/historical_replay_results.json"
+  ],
+  "regime_fixture_status": {
+    "scenarios_run": 6,
+    "scenarios_passed": 6,
+    "scenarios_failed": 0
+  },
+  "theme_activation_fixture_status": {
+    "total_scenarios": 6,
+    "pass_count": 6,
+    "fail_count": 0,
+    "false_activation_count": 0,
+    "headwind_handled_correctly": true,
+    "crowded_handled_correctly": true
+  },
+  "candidate_feed_ablation_status": {
+    "variants_run": 7,
+    "variants_passed": 7,
+    "variants_failed": 0,
+    "key_findings_count": 6
+  },
+  "risk_overlay_fixture_status": {
+    "scenarios_run": 4,
+    "scenarios_passed": 4,
+    "headwind_candidates_executable": false,
+    "structural_displaced_by_attention": false,
+    "attention_cap_respected": true,
+    "manual_protection_preserved": true
+  },
+  "historical_replay_status": {
+    "scenarios_run": 6,
+    "scenarios_passed": 6,
+    "scenarios_failed": 0,
+    "pass_rate": 1.0,
+    "key_mismatches": [],
+    "limitations": [
+      "inflation driver unavailable \u2014 rate shock approximated through interest_rates + credit",
+      "high_multiple_growth theme not in taxonomy \u2014 growth selloff not directly testable",
+      "inflation driver unavailable \u2014 commodity shock partially expressed through oil_energy",
+      "gold_safe_haven theme not in taxonomy \u2014 safe haven demand not testable",
+      "airline/transport headwind not in taxonomy \u2014 consumer impact not testable",
+      "Current engine is well-suited for this scenario \u2014 ai_infrastructure_tailwind_shadow is the primary designed regime.",
+      "Yield curve inversion (inverted NIM) not expressible in current driver state vocabulary",
+      "high_multiple_growth theme not in taxonomy",
+      "growth driver unavailable \u2014 growth pressure not directly testable",
+      "Driver state vocabulary has no directionality (active/watch only) \u2014 'easing rates' cannot be distinguished from 'still-high rates at watch'",
+      "liquidity driver unavailable \u2014 improving liquidity conditions not expressible",
+      "Regime defaulting to credit_stress_watch_shadow is a known Sprint 4A/B limitation for watch-only scenarios; Sprint 5B fixture documents this gap for Sprint 6 resolution",
+      "liquidity driver unavailable \u2014 QE / policy support not expressible",
+      "VIX >80 extreme case \u2014 volatility active_shadow_inferred is the best approximation",
+      "Recovery/rebound phase (April 2020+) not modeled in this fixture"
+    ]
+  },
+  "overall_status": "pass_with_warnings",
+  "decision_gate": "pass_for_next_shadow_sprint",
+  "total_checks_run": 23,
+  "total_checks_passed": 23,
+  "total_checks_failed": 0,
+  "blockers": [],
+  "warnings": [
+    "Historical replay has 15 known engine limitation(s) \u2014 see historical_replay_results.json limitations list."
+  ],
+  "recommended_next_step": "Sprint 5B complete. Historical replay coverage satisfies the EIL document requirement. Advisory Mode (Sprint 6) gate is met \u2014 await Amit approval before enabling intelligence_first_advisory_enabled=true.",
+  "no_live_api_called": true,
+  "broker_called": false,
+  "env_inspected": false,
+  "raw_news_used": false,
+  "llm_used": false,
+  "broad_intraday_scan_used": false,
+  "live_output_changed": false
+}

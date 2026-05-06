@@ -1,0 +1,141 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-06T05:28:21Z",
+  "mode": "local_fixture_backtest",
+  "data_source_mode": "local_fixtures_and_shadow_outputs_only",
+  "source_files": [
+    "data/intelligence/transmission_rules.json",
+    "data/intelligence/theme_taxonomy.json",
+    "data/intelligence/thematic_roster.json",
+    "data/intelligence/economic_candidate_feed.json",
+    "data/universe_builder/active_opportunity_universe_shadow.json"
+  ],
+  "scenarios_run": 4,
+  "scenarios_passed": 4,
+  "headwind_candidates_executable": false,
+  "structural_displaced_by_attention": false,
+  "attention_cap_respected": true,
+  "manual_protection_preserved": true,
+  "no_short_or_order_instruction_generated": true,
+  "scenario_results": [
+    {
+      "scenario_id": "credit_stress_rising",
+      "description": "Credit stress rising \u2014 small_caps/high_multiple should be headwind; quality_cash_flow watchlist/activated.",
+      "actual_headwind_themes": [
+        "small_caps"
+      ],
+      "actual_crowded_themes": [
+        "quality_cash_flow",
+        "defensive_quality"
+      ],
+      "actual_theme_states": {
+        "data_centre_power": "watchlist",
+        "semiconductors": "watchlist",
+        "banks": "watchlist",
+        "energy": "watchlist",
+        "defence": "watchlist",
+        "quality_cash_flow": "crowded",
+        "defensive_quality": "crowded",
+        "small_caps": "weakening"
+      },
+      "headwind_candidates_executable": false,
+      "structural_displaced_by_attention": false,
+      "attention_cap_respected": true,
+      "manual_protection_preserved": true,
+      "no_order_instruction_generated": true,
+      "pass": true,
+      "mismatches": []
+    },
+    {
+      "scenario_id": "risk_off_rotation",
+      "description": "Risk-off rotation \u2014 defensive_quality active; attention cap respected; structural protected.",
+      "actual_headwind_themes": [
+        "small_caps"
+      ],
+      "actual_crowded_themes": [
+        "quality_cash_flow",
+        "defensive_quality"
+      ],
+      "actual_theme_states": {
+        "data_centre_power": "watchlist",
+        "semiconductors": "watchlist",
+        "banks": "watchlist",
+        "energy": "watchlist",
+        "defence": "watchlist",
+        "quality_cash_flow": "crowded",
+        "defensive_quality": "crowded",
+        "small_caps": "weakening"
+      },
+      "headwind_candidates_executable": false,
+      "structural_displaced_by_attention": false,
+      "attention_cap_respected": true,
+      "manual_protection_preserved": true,
+      "no_order_instruction_generated": true,
+      "pass": true,
+      "mismatches": []
+    },
+    {
+      "scenario_id": "oil_shock",
+      "description": "Oil shock \u2014 energy may activate/watchlist; no headwind for standard themes.",
+      "actual_headwind_themes": [
+        "small_caps"
+      ],
+      "actual_crowded_themes": [
+        "quality_cash_flow",
+        "defensive_quality"
+      ],
+      "actual_theme_states": {
+        "data_centre_power": "watchlist",
+        "semiconductors": "watchlist",
+        "banks": "watchlist",
+        "energy": "activated",
+        "defence": "watchlist",
+        "quality_cash_flow": "crowded",
+        "defensive_quality": "crowded",
+        "small_caps": "weakening"
+      },
+      "headwind_candidates_executable": false,
+      "structural_displaced_by_attention": false,
+      "attention_cap_respected": true,
+      "manual_protection_preserved": true,
+      "no_order_instruction_generated": true,
+      "pass": true,
+      "mismatches": []
+    },
+    {
+      "scenario_id": "broad_risk_off_crowded_structural",
+      "description": "Risk-off plus crowded structural quota \u2014 crowded themes visible; no auto-invalidation.",
+      "actual_headwind_themes": [
+        "small_caps"
+      ],
+      "actual_crowded_themes": [
+        "quality_cash_flow",
+        "defensive_quality"
+      ],
+      "actual_theme_states": {
+        "data_centre_power": "activated",
+        "semiconductors": "activated",
+        "banks": "watchlist",
+        "energy": "watchlist",
+        "defence": "watchlist",
+        "quality_cash_flow": "crowded",
+        "defensive_quality": "crowded",
+        "small_caps": "weakening"
+      },
+      "headwind_candidates_executable": false,
+      "structural_displaced_by_attention": false,
+      "attention_cap_respected": true,
+      "manual_protection_preserved": true,
+      "no_order_instruction_generated": true,
+      "pass": true,
+      "mismatches": []
+    }
+  ],
+  "no_live_api_called": true,
+  "broker_called": false,
+  "env_inspected": false,
+  "raw_news_used": false,
+  "llm_used": false,
+  "broad_intraday_scan_used": false,
+  "live_output_changed": false
+}

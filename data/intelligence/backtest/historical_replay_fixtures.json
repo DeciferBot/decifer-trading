@@ -1,0 +1,362 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-06T05:28:21Z",
+  "mode": "local_historical_replay_fixtures",
+  "data_source_mode": "date_anchored_manual_fixtures_only",
+  "source_files": [],
+  "description": "Date-anchored deterministic historical replay fixtures for the Economic Intelligence Layer. No live data. No API calls. All driver states are manually set based on known historical conditions and approximated using the Sprint 4A/B driver state vocabulary.",
+  "engine_limitations": [
+    "inflation driver is always unavailable in Sprint 4A/B \u2014 2022 inflation shocks cannot be modeled via driver state; approximated through credit/risk_appetite/interest_rates signals only.",
+    "liquidity driver is always unavailable in Sprint 4A/B \u2014 tightening/easing direction cannot be expressed; approximated through interest_rates/credit signals.",
+    "usd, valuation, consumer_behaviour, growth drivers are unavailable \u2014 limits scenario accuracy.",
+    "Driver state vocabulary has no directionality (active/watch only) \u2014 'easing rates' and 'rising rates' both map to active_shadow_inferred; context must be recorded in scenario notes.",
+    "Theme taxonomy covers: data_centre_power, semiconductors, banks, energy, defence, quality_cash_flow, defensive_quality, small_caps. high_multiple_growth, gold_safe_haven, and value/dividend themes are not in current taxonomy."
+  ],
+  "total_scenarios": 6,
+  "scenarios": [
+    {
+      "scenario_id": "2022_rate_inflation_shock",
+      "date_anchor": "2022-06",
+      "scenario_family": "rates_rising_inflation_pressure",
+      "description": "US CPI peaked at 9.1% (June 2022). Fed hiking at fastest pace in 40 years. Yields spike, risk-off conditions, growth/high-multiple selloff. Limitation: inflation driver unavailable in Sprint 4A/B \u2014 approximated via interest_rates + credit + risk_appetite signals.",
+      "driver_state": {
+        "ai_capex_growth": "inactive_shadow",
+        "corporate_capex": "inactive_shadow",
+        "interest_rates": "active_shadow_inferred",
+        "bonds_yields": "active_shadow_inferred",
+        "oil_energy": "watch_shadow_inferred",
+        "geopolitics": "watch_shadow_inferred",
+        "credit": "watch_shadow_inferred",
+        "risk_appetite": "watch_shadow_inferred",
+        "volatility": "watch_shadow_inferred",
+        "sector_rotation": "watch_shadow_inferred",
+        "liquidity": "unavailable",
+        "valuation": "unavailable",
+        "consumer_behaviour": "unavailable",
+        "inflation": "unavailable",
+        "growth": "unavailable",
+        "usd": "unavailable"
+      },
+      "expected_theme_states": {
+        "small_caps": [
+          "watchlist",
+          "weakening"
+        ],
+        "quality_cash_flow": [
+          "activated",
+          "crowded",
+          "watchlist"
+        ],
+        "banks": [
+          "activated",
+          "crowded",
+          "strengthening",
+          "watchlist"
+        ]
+      },
+      "expected_route_bias": "position_and_swing_caution",
+      "expected_risk_posture": "defensive_selective",
+      "expected_regime": "mixed_shadow_regime",
+      "expected_blocked_or_conditional_rules": [
+        "banks_rates_rising: conditional on yield curve direction \u2014 not automatic structural buy",
+        "inflation driver unavailable: 2022 rate shock partially expressed only"
+      ],
+      "expected_forbidden_outputs": {
+        "executable_candidates": false,
+        "symbol_discovery": false,
+        "raw_news_used": false,
+        "llm_used": false,
+        "live_api_called": false
+      },
+      "engine_limitations": [
+        "inflation driver unavailable \u2014 rate shock approximated through interest_rates + credit",
+        "high_multiple_growth theme not in taxonomy \u2014 growth selloff not directly testable"
+      ]
+    },
+    {
+      "scenario_id": "2022_ukraine_oil_geopolitical_shock",
+      "date_anchor": "2022-02",
+      "scenario_family": "geopolitical_oil_shock",
+      "description": "Russia invades Ukraine (Feb 24, 2022). Oil spikes toward $130. Defence budgets surge across NATO. Commodity shock. Energy and defence themes expected to activate/watchlist.",
+      "driver_state": {
+        "ai_capex_growth": "inactive_shadow",
+        "corporate_capex": "inactive_shadow",
+        "interest_rates": "watch_shadow_inferred",
+        "bonds_yields": "watch_shadow_inferred",
+        "oil_energy": "active_shadow_inferred",
+        "geopolitics": "active_shadow_inferred",
+        "credit": "watch_shadow_inferred",
+        "risk_appetite": "watch_shadow_inferred",
+        "volatility": "watch_shadow_inferred",
+        "sector_rotation": "watch_shadow_inferred",
+        "liquidity": "unavailable",
+        "valuation": "unavailable",
+        "consumer_behaviour": "unavailable",
+        "inflation": "unavailable",
+        "growth": "unavailable",
+        "usd": "unavailable"
+      },
+      "expected_theme_states": {
+        "energy": [
+          "activated",
+          "crowded",
+          "strengthening",
+          "watchlist"
+        ],
+        "defence": [
+          "activated",
+          "crowded",
+          "strengthening",
+          "watchlist"
+        ]
+      },
+      "expected_route_bias": "position_and_swing_energy_defence",
+      "expected_risk_posture": "defensive_selective",
+      "expected_regime": "mixed_shadow_regime",
+      "expected_blocked_or_conditional_rules": [
+        "gold_safe_haven: not in current taxonomy \u2014 unavailable",
+        "inflation driver unavailable: commodity inflation pressures partially expressed only"
+      ],
+      "expected_forbidden_outputs": {
+        "executable_candidates": false,
+        "symbol_discovery": false,
+        "raw_news_used": false,
+        "llm_used": false,
+        "live_api_called": false
+      },
+      "engine_limitations": [
+        "inflation driver unavailable \u2014 commodity shock partially expressed through oil_energy",
+        "gold_safe_haven theme not in taxonomy \u2014 safe haven demand not testable",
+        "airline/transport headwind not in taxonomy \u2014 consumer impact not testable"
+      ]
+    },
+    {
+      "scenario_id": "2023_ai_infrastructure_emergence",
+      "date_anchor": "2023-05",
+      "scenario_family": "ai_capex_structural_tailwind",
+      "description": "ChatGPT / GPT-4 launches trigger AI capex cycle (2023 Q1\u2013Q2). NVDA +120% YTD by May 2023. Data centre, semiconductor, power demand themes emerge. AI capex growth is the dominant structural tailwind. This is the scenario the Sprint 4A/B engine is best designed to express.",
+      "driver_state": {
+        "ai_capex_growth": "active_shadow_inferred",
+        "corporate_capex": "watch_shadow_inferred",
+        "interest_rates": "watch_shadow_inferred",
+        "bonds_yields": "watch_shadow_inferred",
+        "oil_energy": "inactive_shadow",
+        "geopolitics": "inactive_shadow",
+        "credit": "inactive_shadow",
+        "risk_appetite": "watch_shadow_inferred",
+        "volatility": "inactive_shadow",
+        "sector_rotation": "watch_shadow_inferred",
+        "liquidity": "unavailable",
+        "valuation": "unavailable",
+        "consumer_behaviour": "unavailable",
+        "inflation": "unavailable",
+        "growth": "unavailable",
+        "usd": "unavailable"
+      },
+      "expected_theme_states": {
+        "data_centre_power": [
+          "activated",
+          "crowded",
+          "strengthening"
+        ],
+        "semiconductors": [
+          "activated",
+          "crowded",
+          "strengthening"
+        ]
+      },
+      "expected_route_bias": "structural_position_and_swing",
+      "expected_risk_posture": "selective",
+      "expected_regime": "ai_infrastructure_tailwind_shadow",
+      "expected_blocked_or_conditional_rules": [
+        "candidate_symbols_from_approved_roster_only: no LLM symbol discovery"
+      ],
+      "expected_forbidden_outputs": {
+        "executable_candidates": false,
+        "symbol_discovery": false,
+        "raw_news_used": false,
+        "llm_used": false,
+        "live_api_called": false
+      },
+      "engine_limitations": [
+        "Current engine is well-suited for this scenario \u2014 ai_infrastructure_tailwind_shadow is the primary designed regime."
+      ]
+    },
+    {
+      "scenario_id": "2023_rate_peak_growth_pressure",
+      "date_anchor": "2023-10",
+      "scenario_family": "rates_peak_credit_watch",
+      "description": "US 10-year yield hits 5.0% (Oct 2023). Small caps, high-multiple growth under pressure. Banks conditional \u2014 yield curve still inverted. Fed peak rate uncertainty. Risk posture cautious/selective.",
+      "driver_state": {
+        "ai_capex_growth": "inactive_shadow",
+        "corporate_capex": "inactive_shadow",
+        "interest_rates": "active_shadow_inferred",
+        "bonds_yields": "active_shadow_inferred",
+        "oil_energy": "watch_shadow_inferred",
+        "geopolitics": "watch_shadow_inferred",
+        "credit": "watch_shadow_inferred",
+        "risk_appetite": "watch_shadow_inferred",
+        "volatility": "watch_shadow_inferred",
+        "sector_rotation": "watch_shadow_inferred",
+        "liquidity": "unavailable",
+        "valuation": "unavailable",
+        "consumer_behaviour": "unavailable",
+        "inflation": "unavailable",
+        "growth": "unavailable",
+        "usd": "unavailable"
+      },
+      "expected_theme_states": {
+        "small_caps": [
+          "watchlist",
+          "weakening"
+        ],
+        "quality_cash_flow": [
+          "activated",
+          "crowded",
+          "watchlist"
+        ],
+        "banks": [
+          "activated",
+          "crowded",
+          "strengthening",
+          "watchlist"
+        ]
+      },
+      "expected_route_bias": "position_caution_swing_selective",
+      "expected_risk_posture": "defensive_selective",
+      "expected_regime": "mixed_shadow_regime",
+      "expected_blocked_or_conditional_rules": [
+        "banks_rates_rising: conditional \u2014 inverted yield curve limits NIM benefit; watchlist only, not automatic structural buy",
+        "high_multiple_growth headwind: not in taxonomy \u2014 growth pressure not directly modeled"
+      ],
+      "expected_forbidden_outputs": {
+        "executable_candidates": false,
+        "symbol_discovery": false,
+        "raw_news_used": false,
+        "llm_used": false,
+        "live_api_called": false
+      },
+      "engine_limitations": [
+        "Yield curve inversion (inverted NIM) not expressible in current driver state vocabulary",
+        "high_multiple_growth theme not in taxonomy",
+        "growth driver unavailable \u2014 growth pressure not directly testable"
+      ]
+    },
+    {
+      "scenario_id": "2024_rate_cut_pivot_selective_risk_on",
+      "date_anchor": "2024-08",
+      "scenario_family": "rate_cut_pivot_risk_on",
+      "description": "Fed signals/begins cutting rates (Sep 2024 first cut). Selective risk-on. AI capex cycle ongoing. Credit broadly contained. Liquidity improving. Limitation: driver state vocab has no 'easing' direction \u2014 'watch' used as best approximation for transitioning/declining rates. Regime may appear cautious rather than risk-on due to vocabulary constraint.",
+      "driver_state": {
+        "ai_capex_growth": "watch_shadow_inferred",
+        "corporate_capex": "watch_shadow_inferred",
+        "interest_rates": "watch_shadow_inferred",
+        "bonds_yields": "watch_shadow_inferred",
+        "oil_energy": "inactive_shadow",
+        "geopolitics": "watch_shadow_inferred",
+        "credit": "watch_shadow_inferred",
+        "risk_appetite": "watch_shadow_inferred",
+        "volatility": "inactive_shadow",
+        "sector_rotation": "watch_shadow_inferred",
+        "liquidity": "unavailable",
+        "valuation": "unavailable",
+        "consumer_behaviour": "unavailable",
+        "inflation": "unavailable",
+        "growth": "unavailable",
+        "usd": "unavailable"
+      },
+      "expected_theme_states": {
+        "quality_cash_flow": [
+          "activated",
+          "crowded",
+          "watchlist"
+        ]
+      },
+      "expected_route_bias": "watchlist_and_selective_swing",
+      "expected_risk_posture": "cautious",
+      "expected_regime": "credit_stress_watch_shadow",
+      "expected_blocked_or_conditional_rules": [
+        "rate_cut_direction: not expressible in current driver state vocabulary \u2014 both rising and easing rates map to watch_shadow_inferred",
+        "selective_risk_on: current posture logic returns cautious when credit=watch + risk_appetite=watch + no active driver; risk-on nuance not expressible"
+      ],
+      "expected_forbidden_outputs": {
+        "executable_candidates": false,
+        "symbol_discovery": false,
+        "raw_news_used": false,
+        "llm_used": false,
+        "live_api_called": false
+      },
+      "engine_limitations": [
+        "Driver state vocabulary has no directionality (active/watch only) \u2014 'easing rates' cannot be distinguished from 'still-high rates at watch'",
+        "liquidity driver unavailable \u2014 improving liquidity conditions not expressible",
+        "Regime defaulting to credit_stress_watch_shadow is a known Sprint 4A/B limitation for watch-only scenarios; Sprint 5B fixture documents this gap for Sprint 6 resolution"
+      ]
+    },
+    {
+      "scenario_id": "covid_liquidity_shock_and_policy_support",
+      "date_anchor": "2020-03",
+      "scenario_family": "volatility_shock_risk_off",
+      "description": "COVID-19 global lockdowns (March 2020). VIX >80. Credit markets seize. Fed emergency QE. Risk-off extreme. Modeled as shock phase only \u2014 policy support/recovery phase not modeled (liquidity driver unavailable). Defensive and quality themes expected to activate.",
+      "driver_state": {
+        "ai_capex_growth": "inactive_shadow",
+        "corporate_capex": "inactive_shadow",
+        "interest_rates": "inactive_shadow",
+        "bonds_yields": "inactive_shadow",
+        "oil_energy": "watch_shadow_inferred",
+        "geopolitics": "inactive_shadow",
+        "credit": "watch_shadow_inferred",
+        "risk_appetite": "watch_shadow_inferred",
+        "volatility": "active_shadow_inferred",
+        "sector_rotation": "watch_shadow_inferred",
+        "liquidity": "unavailable",
+        "valuation": "unavailable",
+        "consumer_behaviour": "unavailable",
+        "inflation": "unavailable",
+        "growth": "unavailable",
+        "usd": "unavailable"
+      },
+      "expected_theme_states": {
+        "defensive_quality": [
+          "activated",
+          "crowded",
+          "watchlist"
+        ],
+        "quality_cash_flow": [
+          "activated",
+          "crowded",
+          "watchlist"
+        ],
+        "small_caps": [
+          "watchlist",
+          "weakening"
+        ]
+      },
+      "expected_route_bias": "watchlist_and_position_defensive",
+      "expected_risk_posture": "defensive_selective",
+      "expected_regime": "mixed_shadow_regime",
+      "expected_blocked_or_conditional_rules": [
+        "liquidity stress/support not expressible \u2014 Fed QE impact not modeled",
+        "recovery_phase: not modeled \u2014 only shock phase included"
+      ],
+      "expected_forbidden_outputs": {
+        "executable_candidates": false,
+        "symbol_discovery": false,
+        "raw_news_used": false,
+        "llm_used": false,
+        "live_api_called": false
+      },
+      "engine_limitations": [
+        "liquidity driver unavailable \u2014 QE / policy support not expressible",
+        "VIX >80 extreme case \u2014 volatility active_shadow_inferred is the best approximation",
+        "Recovery/rebound phase (April 2020+) not modeled in this fixture"
+      ]
+    }
+  ],
+  "no_live_api_called": true,
+  "broker_called": false,
+  "env_inspected": false,
+  "raw_news_used": false,
+  "llm_used": false,
+  "broad_intraday_scan_used": false,
+  "live_output_changed": false
+}

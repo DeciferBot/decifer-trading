@@ -1,21 +1,21 @@
 {
-  "timestamp": "2026-04-23T17:45:56.645Z",
+  "timestamp": "2026-05-06T05:06:05.444Z",
   "branch": "master",
-  "lastCommit": "6561c2c fix(alpaca_data): retry on transient ConnectionResetError in fetch_bars",
+  "lastCommit": "cdde2a1 fix(price_updater): detect stale Alpaca stream via quote timestamp",
   "roadmapPhase": null,
   "lastFilesTouched": [
     "claude/memory/checkpoint.json",
     ".claude/memory/session-history.jsonl",
+    ".githooks/pre-commit",
     "chief-decifer/state/internal/catalyst/edgar_events.json",
-    "config.py",
+    "chief-decifer/state/internal/catalyst/options_snapshots.jsonl",
+    "chief-decifer/state/internal/catalyst/sentiment_snapshots.jsonl",
     "data/audit_log.jsonl",
-    "data/decifer.db",
     "data/equity_history.json",
     "data/execution_ic.jsonl",
-    "data/signals_log.jsonl",
-    "data/trades.json"
+    "data/reconciled_trades.jsonl"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 336
+  "sessionCount": 340
 }

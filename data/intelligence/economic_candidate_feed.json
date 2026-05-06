@@ -1,0 +1,1723 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-05T20:34:59Z",
+  "fresh_until": "2026-05-07T20:34:59Z",
+  "mode": "shadow_report_only",
+  "source_files": [
+    "data/intelligence/theme_taxonomy.json",
+    "data/intelligence/thematic_roster.json"
+  ],
+  "feed_summary": {
+    "total_candidates": 40,
+    "themes_active": [
+      "banks",
+      "data_centre_power",
+      "defence",
+      "defensive_quality",
+      "energy",
+      "quality_cash_flow",
+      "semiconductors"
+    ],
+    "headwind_themes": [
+      "small_caps"
+    ],
+    "drivers_active": [
+      "ai_capex_growth, ai_infrastructure_demand",
+      "ai_capex_growth, power_demand_growth",
+      "credit_stress_rising, liquidity_tightening, refinancing_risk_rising",
+      "credit_stress_rising, liquidity_tightening, risk_off_rotation",
+      "geopolitical_risk_rising, defence_spending_expectations",
+      "oil_supply_shock, geopolitical_supply_risk",
+      "risk_appetite_falling, volatility_rising, defensive_rotation, breadth_deterioration",
+      "yields_rising, net_interest_margin_expansion"
+    ],
+    "direct_beneficiaries": 29,
+    "second_order_beneficiaries": 1,
+    "etf_proxies": 9,
+    "pressure_candidates": 1,
+    "watchlist_only": 10,
+    "headwind_candidates_executable": false,
+    "llm_symbol_discovery_used": false,
+    "raw_news_used": false,
+    "broad_intraday_scan_used": false
+  },
+  "candidates": [
+    {
+      "symbol": "VRT",
+      "included_by": "economic_intelligence",
+      "theme": "data_centre_power",
+      "driver": "ai_capex_growth, power_demand_growth",
+      "role": "direct_beneficiary",
+      "reason": "AI data-centre buildout increases demand for power equipment, cooling infrastructure, and grid capacity as hyperscalers expand compute footprint",
+      "reason_to_care": "VRT is a direct beneficiary of Data Centre Power and Infrastructure: AI data-centre buildout increases demand for power equipment, cooling infrastructure, and grid capacity as hyperscalers expand compute footprint",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.82,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "capex_delay",
+        "credit_stress",
+        "power_demand_disappointment"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation",
+        "management_commentary_support"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_growth_to_data_centre_power"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "ETN",
+      "included_by": "economic_intelligence",
+      "theme": "data_centre_power",
+      "driver": "ai_capex_growth, power_demand_growth",
+      "role": "direct_beneficiary",
+      "reason": "AI data-centre buildout increases demand for power equipment, cooling infrastructure, and grid capacity as hyperscalers expand compute footprint",
+      "reason_to_care": "ETN is a direct beneficiary of Data Centre Power and Infrastructure: AI data-centre buildout increases demand for power equipment, cooling infrastructure, and grid capacity as hyperscalers expand compute footprint",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.82,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "capex_delay",
+        "credit_stress",
+        "power_demand_disappointment"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation",
+        "management_commentary_support"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_growth_to_data_centre_power"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "PWR",
+      "included_by": "economic_intelligence",
+      "theme": "data_centre_power",
+      "driver": "ai_capex_growth, power_demand_growth",
+      "role": "direct_beneficiary",
+      "reason": "AI data-centre buildout increases demand for power equipment, cooling infrastructure, and grid capacity as hyperscalers expand compute footprint",
+      "reason_to_care": "PWR is a direct beneficiary of Data Centre Power and Infrastructure: AI data-centre buildout increases demand for power equipment, cooling infrastructure, and grid capacity as hyperscalers expand compute footprint",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.82,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "capex_delay",
+        "credit_stress",
+        "power_demand_disappointment"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation",
+        "management_commentary_support"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_growth_to_data_centre_power"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "CEG",
+      "included_by": "economic_intelligence",
+      "theme": "data_centre_power",
+      "driver": "ai_capex_growth, power_demand_growth",
+      "role": "second_order_beneficiary",
+      "reason": "AI data-centre buildout increases demand for power equipment, cooling infrastructure, and grid capacity as hyperscalers expand compute footprint",
+      "reason_to_care": "CEG is a second-order beneficiary of Data Centre Power and Infrastructure: benefits indirectly from AI data-centre buildout increases demand for power equipment, cooling infrastructure, and grid capacity as hyperscalers expand compute footprint",
+      "route_hint": [
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.67,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "capex_delay",
+        "credit_stress",
+        "power_demand_disappointment"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation",
+        "management_commentary_support"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_growth_to_data_centre_power"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "XLU",
+      "included_by": "economic_intelligence",
+      "theme": "data_centre_power",
+      "driver": "ai_capex_growth, power_demand_growth",
+      "role": "etf_proxy",
+      "reason": "AI data-centre buildout increases demand for power equipment, cooling infrastructure, and grid capacity as hyperscalers expand compute footprint",
+      "reason_to_care": "XLU is an ETF proxy for Data Centre Power and Infrastructure: sector-level exposure only, not a direct beneficiary",
+      "route_hint": [
+        "watchlist"
+      ],
+      "confidence": 0.45,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "capex_delay",
+        "credit_stress",
+        "power_demand_disappointment"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation",
+        "management_commentary_support"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_growth_to_data_centre_power"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "NVDA",
+      "included_by": "economic_intelligence",
+      "theme": "semiconductors",
+      "driver": "ai_capex_growth, ai_infrastructure_demand",
+      "role": "direct_beneficiary",
+      "reason": "AI capex acceleration drives demand for advanced accelerators, networking silicon, foundry capacity and semiconductor equipment across the AI hardware stack",
+      "reason_to_care": "NVDA is a direct beneficiary of AI Semiconductor Infrastructure: AI capex acceleration drives demand for advanced accelerators, networking silicon, foundry capacity and semiconductor equipment across the AI hardware stack",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.83,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "export_controls",
+        "capex_delay",
+        "semiconductor_cycle"
+      ],
+      "confirmation_required": [
+        "semiconductor_relative_strength",
+        "ai_infrastructure_theme_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_growth_to_semiconductors"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "TSM",
+      "included_by": "economic_intelligence",
+      "theme": "semiconductors",
+      "driver": "ai_capex_growth, ai_infrastructure_demand",
+      "role": "direct_beneficiary",
+      "reason": "AI capex acceleration drives demand for advanced accelerators, networking silicon, foundry capacity and semiconductor equipment across the AI hardware stack",
+      "reason_to_care": "TSM is a direct beneficiary of AI Semiconductor Infrastructure: AI capex acceleration drives demand for advanced accelerators, networking silicon, foundry capacity and semiconductor equipment across the AI hardware stack",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.83,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "export_controls",
+        "capex_delay",
+        "semiconductor_cycle"
+      ],
+      "confirmation_required": [
+        "semiconductor_relative_strength",
+        "ai_infrastructure_theme_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_growth_to_semiconductors"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "AVGO",
+      "included_by": "economic_intelligence",
+      "theme": "semiconductors",
+      "driver": "ai_capex_growth, ai_infrastructure_demand",
+      "role": "direct_beneficiary",
+      "reason": "AI capex acceleration drives demand for advanced accelerators, networking silicon, foundry capacity and semiconductor equipment across the AI hardware stack",
+      "reason_to_care": "AVGO is a direct beneficiary of AI Semiconductor Infrastructure: AI capex acceleration drives demand for advanced accelerators, networking silicon, foundry capacity and semiconductor equipment across the AI hardware stack",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.83,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "export_controls",
+        "capex_delay",
+        "semiconductor_cycle"
+      ],
+      "confirmation_required": [
+        "semiconductor_relative_strength",
+        "ai_infrastructure_theme_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_growth_to_semiconductors"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "AMD",
+      "included_by": "economic_intelligence",
+      "theme": "semiconductors",
+      "driver": "ai_capex_growth, ai_infrastructure_demand",
+      "role": "direct_beneficiary",
+      "reason": "AI capex acceleration drives demand for advanced accelerators, networking silicon, foundry capacity and semiconductor equipment across the AI hardware stack",
+      "reason_to_care": "AMD is a direct beneficiary of AI Semiconductor Infrastructure: AI capex acceleration drives demand for advanced accelerators, networking silicon, foundry capacity and semiconductor equipment across the AI hardware stack",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.83,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "export_controls",
+        "capex_delay",
+        "semiconductor_cycle"
+      ],
+      "confirmation_required": [
+        "semiconductor_relative_strength",
+        "ai_infrastructure_theme_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_growth_to_semiconductors"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "ASML",
+      "included_by": "economic_intelligence",
+      "theme": "semiconductors",
+      "driver": "ai_capex_growth, ai_infrastructure_demand",
+      "role": "direct_beneficiary",
+      "reason": "AI capex acceleration drives demand for advanced accelerators, networking silicon, foundry capacity and semiconductor equipment across the AI hardware stack",
+      "reason_to_care": "ASML is a direct beneficiary of AI Semiconductor Infrastructure: AI capex acceleration drives demand for advanced accelerators, networking silicon, foundry capacity and semiconductor equipment across the AI hardware stack",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.83,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "export_controls",
+        "capex_delay",
+        "semiconductor_cycle"
+      ],
+      "confirmation_required": [
+        "semiconductor_relative_strength",
+        "ai_infrastructure_theme_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_growth_to_semiconductors"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "SMH",
+      "included_by": "economic_intelligence",
+      "theme": "semiconductors",
+      "driver": "ai_capex_growth, ai_infrastructure_demand",
+      "role": "etf_proxy",
+      "reason": "AI capex acceleration drives demand for advanced accelerators, networking silicon, foundry capacity and semiconductor equipment across the AI hardware stack",
+      "reason_to_care": "SMH is an ETF proxy for AI Semiconductor Infrastructure: sector-level exposure only, not a direct beneficiary",
+      "route_hint": [
+        "watchlist"
+      ],
+      "confidence": 0.45,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "export_controls",
+        "capex_delay",
+        "semiconductor_cycle"
+      ],
+      "confirmation_required": [
+        "semiconductor_relative_strength",
+        "ai_infrastructure_theme_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_growth_to_semiconductors"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "JPM",
+      "included_by": "economic_intelligence",
+      "theme": "banks",
+      "driver": "yields_rising, net_interest_margin_expansion",
+      "role": "direct_beneficiary",
+      "reason": "Rising rates expand bank net-interest margins when credit quality is intact and curve is not inverted \u2014 conditional tailwind only; credit stress or curve inversion invalidates",
+      "reason_to_care": "JPM is a direct beneficiary of Banks and Financial Services \u2014 Rates Tailwind: Rising rates expand bank net-interest margins when credit quality is intact and curve is not inverted \u2014 conditional tailwind only; credit stress or curve inversion invalidates",
+      "route_hint": [
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.62,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "credit_stress",
+        "deposit_pressure",
+        "curve_inversion",
+        "recession_risk",
+        "regulatory_risk"
+      ],
+      "confirmation_required": [
+        "credit_stress_contained",
+        "yield_curve_not_severely_inverted",
+        "financial_sector_relative_strength",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "rates_rising_to_banks_conditional"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "BAC",
+      "included_by": "economic_intelligence",
+      "theme": "banks",
+      "driver": "yields_rising, net_interest_margin_expansion",
+      "role": "direct_beneficiary",
+      "reason": "Rising rates expand bank net-interest margins when credit quality is intact and curve is not inverted \u2014 conditional tailwind only; credit stress or curve inversion invalidates",
+      "reason_to_care": "BAC is a direct beneficiary of Banks and Financial Services \u2014 Rates Tailwind: Rising rates expand bank net-interest margins when credit quality is intact and curve is not inverted \u2014 conditional tailwind only; credit stress or curve inversion invalidates",
+      "route_hint": [
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.62,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "credit_stress",
+        "deposit_pressure",
+        "curve_inversion",
+        "recession_risk",
+        "regulatory_risk"
+      ],
+      "confirmation_required": [
+        "credit_stress_contained",
+        "yield_curve_not_severely_inverted",
+        "financial_sector_relative_strength",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "rates_rising_to_banks_conditional"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "WFC",
+      "included_by": "economic_intelligence",
+      "theme": "banks",
+      "driver": "yields_rising, net_interest_margin_expansion",
+      "role": "direct_beneficiary",
+      "reason": "Rising rates expand bank net-interest margins when credit quality is intact and curve is not inverted \u2014 conditional tailwind only; credit stress or curve inversion invalidates",
+      "reason_to_care": "WFC is a direct beneficiary of Banks and Financial Services \u2014 Rates Tailwind: Rising rates expand bank net-interest margins when credit quality is intact and curve is not inverted \u2014 conditional tailwind only; credit stress or curve inversion invalidates",
+      "route_hint": [
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.62,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "credit_stress",
+        "deposit_pressure",
+        "curve_inversion",
+        "recession_risk",
+        "regulatory_risk"
+      ],
+      "confirmation_required": [
+        "credit_stress_contained",
+        "yield_curve_not_severely_inverted",
+        "financial_sector_relative_strength",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "rates_rising_to_banks_conditional"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "GS",
+      "included_by": "economic_intelligence",
+      "theme": "banks",
+      "driver": "yields_rising, net_interest_margin_expansion",
+      "role": "direct_beneficiary",
+      "reason": "Rising rates expand bank net-interest margins when credit quality is intact and curve is not inverted \u2014 conditional tailwind only; credit stress or curve inversion invalidates",
+      "reason_to_care": "GS is a direct beneficiary of Banks and Financial Services \u2014 Rates Tailwind: Rising rates expand bank net-interest margins when credit quality is intact and curve is not inverted \u2014 conditional tailwind only; credit stress or curve inversion invalidates",
+      "route_hint": [
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.62,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "credit_stress",
+        "deposit_pressure",
+        "curve_inversion",
+        "recession_risk",
+        "regulatory_risk"
+      ],
+      "confirmation_required": [
+        "credit_stress_contained",
+        "yield_curve_not_severely_inverted",
+        "financial_sector_relative_strength",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "rates_rising_to_banks_conditional"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "XLF",
+      "included_by": "economic_intelligence",
+      "theme": "banks",
+      "driver": "yields_rising, net_interest_margin_expansion",
+      "role": "etf_proxy",
+      "reason": "Rising rates expand bank net-interest margins when credit quality is intact and curve is not inverted \u2014 conditional tailwind only; credit stress or curve inversion invalidates",
+      "reason_to_care": "XLF is an ETF proxy for Banks and Financial Services \u2014 Rates Tailwind: sector-level exposure only, not a direct beneficiary",
+      "route_hint": [
+        "watchlist"
+      ],
+      "confidence": 0.45,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "credit_stress",
+        "deposit_pressure",
+        "curve_inversion",
+        "recession_risk",
+        "regulatory_risk"
+      ],
+      "confirmation_required": [
+        "credit_stress_contained",
+        "yield_curve_not_severely_inverted",
+        "financial_sector_relative_strength",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "rates_rising_to_banks_conditional"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "XOM",
+      "included_by": "economic_intelligence",
+      "theme": "energy",
+      "driver": "oil_supply_shock, geopolitical_supply_risk",
+      "role": "direct_beneficiary",
+      "reason": "Oil supply disruption or geopolitical supply risk drives energy sector outperformance through integrated oil, services and E&P names",
+      "reason_to_care": "XOM is a direct beneficiary of Energy \u2014 Oil Supply Shock: Oil supply disruption or geopolitical supply risk drives energy sector outperformance through integrated oil, services and E&P names",
+      "route_hint": [
+        "swing",
+        "intraday_swing",
+        "watchlist"
+      ],
+      "confidence": 0.75,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "oil_demand_destruction",
+        "geopolitical_reversal",
+        "commodity_volatility",
+        "broad_risk_off"
+      ],
+      "confirmation_required": [
+        "oil_energy_relative_strength",
+        "xle_or_energy_sector_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "oil_supply_shock_to_energy"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "CVX",
+      "included_by": "economic_intelligence",
+      "theme": "energy",
+      "driver": "oil_supply_shock, geopolitical_supply_risk",
+      "role": "direct_beneficiary",
+      "reason": "Oil supply disruption or geopolitical supply risk drives energy sector outperformance through integrated oil, services and E&P names",
+      "reason_to_care": "CVX is a direct beneficiary of Energy \u2014 Oil Supply Shock: Oil supply disruption or geopolitical supply risk drives energy sector outperformance through integrated oil, services and E&P names",
+      "route_hint": [
+        "swing",
+        "intraday_swing",
+        "watchlist"
+      ],
+      "confidence": 0.75,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "oil_demand_destruction",
+        "geopolitical_reversal",
+        "commodity_volatility",
+        "broad_risk_off"
+      ],
+      "confirmation_required": [
+        "oil_energy_relative_strength",
+        "xle_or_energy_sector_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "oil_supply_shock_to_energy"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "OXY",
+      "included_by": "economic_intelligence",
+      "theme": "energy",
+      "driver": "oil_supply_shock, geopolitical_supply_risk",
+      "role": "direct_beneficiary",
+      "reason": "Oil supply disruption or geopolitical supply risk drives energy sector outperformance through integrated oil, services and E&P names",
+      "reason_to_care": "OXY is a direct beneficiary of Energy \u2014 Oil Supply Shock: Oil supply disruption or geopolitical supply risk drives energy sector outperformance through integrated oil, services and E&P names",
+      "route_hint": [
+        "swing",
+        "intraday_swing",
+        "watchlist"
+      ],
+      "confidence": 0.75,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "oil_demand_destruction",
+        "geopolitical_reversal",
+        "commodity_volatility",
+        "broad_risk_off"
+      ],
+      "confirmation_required": [
+        "oil_energy_relative_strength",
+        "xle_or_energy_sector_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "oil_supply_shock_to_energy"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "SLB",
+      "included_by": "economic_intelligence",
+      "theme": "energy",
+      "driver": "oil_supply_shock, geopolitical_supply_risk",
+      "role": "direct_beneficiary",
+      "reason": "Oil supply disruption or geopolitical supply risk drives energy sector outperformance through integrated oil, services and E&P names",
+      "reason_to_care": "SLB is a direct beneficiary of Energy \u2014 Oil Supply Shock: Oil supply disruption or geopolitical supply risk drives energy sector outperformance through integrated oil, services and E&P names",
+      "route_hint": [
+        "swing",
+        "intraday_swing",
+        "watchlist"
+      ],
+      "confidence": 0.75,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "oil_demand_destruction",
+        "geopolitical_reversal",
+        "commodity_volatility",
+        "broad_risk_off"
+      ],
+      "confirmation_required": [
+        "oil_energy_relative_strength",
+        "xle_or_energy_sector_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "oil_supply_shock_to_energy"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "XLE",
+      "included_by": "economic_intelligence",
+      "theme": "energy",
+      "driver": "oil_supply_shock, geopolitical_supply_risk",
+      "role": "etf_proxy",
+      "reason": "Oil supply disruption or geopolitical supply risk drives energy sector outperformance through integrated oil, services and E&P names",
+      "reason_to_care": "XLE is an ETF proxy for Energy \u2014 Oil Supply Shock: sector-level exposure only, not a direct beneficiary",
+      "route_hint": [
+        "watchlist"
+      ],
+      "confidence": 0.45,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "oil_demand_destruction",
+        "geopolitical_reversal",
+        "commodity_volatility",
+        "broad_risk_off"
+      ],
+      "confirmation_required": [
+        "oil_energy_relative_strength",
+        "xle_or_energy_sector_confirmation",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "oil_supply_shock_to_energy"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "LMT",
+      "included_by": "economic_intelligence",
+      "theme": "defence",
+      "driver": "geopolitical_risk_rising, defence_spending_expectations",
+      "role": "direct_beneficiary",
+      "reason": "Elevated geopolitical risk drives defence spending expectations and sustained bid for prime contractors and aerospace/defence names",
+      "reason_to_care": "LMT is a direct beneficiary of Defence and Aerospace \u2014 Geopolitical Risk Bid: Elevated geopolitical risk drives defence spending expectations and sustained bid for prime contractors and aerospace/defence names",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.76,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "de_escalation",
+        "budget_risk",
+        "valuation",
+        "procurement_delay"
+      ],
+      "confirmation_required": [
+        "defence_sector_relative_strength",
+        "geopolitical_risk_remains_active",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "geopolitical_risk_to_defence"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "NOC",
+      "included_by": "economic_intelligence",
+      "theme": "defence",
+      "driver": "geopolitical_risk_rising, defence_spending_expectations",
+      "role": "direct_beneficiary",
+      "reason": "Elevated geopolitical risk drives defence spending expectations and sustained bid for prime contractors and aerospace/defence names",
+      "reason_to_care": "NOC is a direct beneficiary of Defence and Aerospace \u2014 Geopolitical Risk Bid: Elevated geopolitical risk drives defence spending expectations and sustained bid for prime contractors and aerospace/defence names",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.76,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "de_escalation",
+        "budget_risk",
+        "valuation",
+        "procurement_delay"
+      ],
+      "confirmation_required": [
+        "defence_sector_relative_strength",
+        "geopolitical_risk_remains_active",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "geopolitical_risk_to_defence"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "RTX",
+      "included_by": "economic_intelligence",
+      "theme": "defence",
+      "driver": "geopolitical_risk_rising, defence_spending_expectations",
+      "role": "direct_beneficiary",
+      "reason": "Elevated geopolitical risk drives defence spending expectations and sustained bid for prime contractors and aerospace/defence names",
+      "reason_to_care": "RTX is a direct beneficiary of Defence and Aerospace \u2014 Geopolitical Risk Bid: Elevated geopolitical risk drives defence spending expectations and sustained bid for prime contractors and aerospace/defence names",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.76,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "de_escalation",
+        "budget_risk",
+        "valuation",
+        "procurement_delay"
+      ],
+      "confirmation_required": [
+        "defence_sector_relative_strength",
+        "geopolitical_risk_remains_active",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "geopolitical_risk_to_defence"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "GD",
+      "included_by": "economic_intelligence",
+      "theme": "defence",
+      "driver": "geopolitical_risk_rising, defence_spending_expectations",
+      "role": "direct_beneficiary",
+      "reason": "Elevated geopolitical risk drives defence spending expectations and sustained bid for prime contractors and aerospace/defence names",
+      "reason_to_care": "GD is a direct beneficiary of Defence and Aerospace \u2014 Geopolitical Risk Bid: Elevated geopolitical risk drives defence spending expectations and sustained bid for prime contractors and aerospace/defence names",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.76,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "de_escalation",
+        "budget_risk",
+        "valuation",
+        "procurement_delay"
+      ],
+      "confirmation_required": [
+        "defence_sector_relative_strength",
+        "geopolitical_risk_remains_active",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "geopolitical_risk_to_defence"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "ITA",
+      "included_by": "economic_intelligence",
+      "theme": "defence",
+      "driver": "geopolitical_risk_rising, defence_spending_expectations",
+      "role": "etf_proxy",
+      "reason": "Elevated geopolitical risk drives defence spending expectations and sustained bid for prime contractors and aerospace/defence names",
+      "reason_to_care": "ITA is an ETF proxy for Defence and Aerospace \u2014 Geopolitical Risk Bid: sector-level exposure only, not a direct beneficiary",
+      "route_hint": [
+        "watchlist"
+      ],
+      "confidence": 0.45,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "de_escalation",
+        "budget_risk",
+        "valuation",
+        "procurement_delay"
+      ],
+      "confirmation_required": [
+        "defence_sector_relative_strength",
+        "geopolitical_risk_remains_active",
+        "price_and_volume_confirmation"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "geopolitical_risk_to_defence"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "MSFT",
+      "included_by": "economic_intelligence",
+      "theme": "quality_cash_flow",
+      "driver": "credit_stress_rising, liquidity_tightening, risk_off_rotation",
+      "role": "direct_beneficiary",
+      "reason": "Credit stress should favour companies with strong balance sheets, high cash generation, resilient demand, and lower financing dependency. Quality compounders historically outperform during credit stress as investors reduce exposure to leveraged names.; Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "reason_to_care": "MSFT is a direct beneficiary of Quality Cash Flow and Balance Sheet Strength: Credit stress should favour companies with strong balance sheets, high cash generation, resilient demand, and lower financing dependency. Quality compounders historically outperform during credit stress as investors reduce exposure to leveraged names.; Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.72,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "broad_market_liquidation",
+        "earnings_disappointment"
+      ],
+      "confirmation_required": [
+        "quality_relative_strength",
+        "defensive_sector_confirmation",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "credit_stress_to_quality_cash_flow",
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "AAPL",
+      "included_by": "economic_intelligence",
+      "theme": "quality_cash_flow",
+      "driver": "credit_stress_rising, liquidity_tightening, risk_off_rotation",
+      "role": "direct_beneficiary",
+      "reason": "Credit stress should favour companies with strong balance sheets, high cash generation, resilient demand, and lower financing dependency. Quality compounders historically outperform during credit stress as investors reduce exposure to leveraged names.; Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "reason_to_care": "AAPL is a direct beneficiary of Quality Cash Flow and Balance Sheet Strength: Credit stress should favour companies with strong balance sheets, high cash generation, resilient demand, and lower financing dependency. Quality compounders historically outperform during credit stress as investors reduce exposure to leveraged names.; Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.72,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "broad_market_liquidation",
+        "earnings_disappointment"
+      ],
+      "confirmation_required": [
+        "quality_relative_strength",
+        "defensive_sector_confirmation",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "credit_stress_to_quality_cash_flow",
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "COST",
+      "included_by": "economic_intelligence",
+      "theme": "quality_cash_flow",
+      "driver": "credit_stress_rising, liquidity_tightening, risk_off_rotation",
+      "role": "direct_beneficiary",
+      "reason": "Credit stress should favour companies with strong balance sheets, high cash generation, resilient demand, and lower financing dependency. Quality compounders historically outperform during credit stress as investors reduce exposure to leveraged names.; Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "reason_to_care": "COST is a direct beneficiary of Quality Cash Flow and Balance Sheet Strength: Credit stress should favour companies with strong balance sheets, high cash generation, resilient demand, and lower financing dependency. Quality compounders historically outperform during credit stress as investors reduce exposure to leveraged names.; Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.72,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "broad_market_liquidation",
+        "earnings_disappointment"
+      ],
+      "confirmation_required": [
+        "quality_relative_strength",
+        "defensive_sector_confirmation",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "credit_stress_to_quality_cash_flow",
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "BRK.B",
+      "included_by": "economic_intelligence",
+      "theme": "quality_cash_flow",
+      "driver": "credit_stress_rising, liquidity_tightening, risk_off_rotation",
+      "role": "direct_beneficiary",
+      "reason": "Credit stress should favour companies with strong balance sheets, high cash generation, resilient demand, and lower financing dependency. Quality compounders historically outperform during credit stress as investors reduce exposure to leveraged names.; Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "reason_to_care": "BRK.B is a direct beneficiary of Quality Cash Flow and Balance Sheet Strength: Credit stress should favour companies with strong balance sheets, high cash generation, resilient demand, and lower financing dependency. Quality compounders historically outperform during credit stress as investors reduce exposure to leveraged names.; Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.72,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "broad_market_liquidation",
+        "earnings_disappointment"
+      ],
+      "confirmation_required": [
+        "quality_relative_strength",
+        "defensive_sector_confirmation",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "credit_stress_to_quality_cash_flow",
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "QUAL",
+      "included_by": "economic_intelligence",
+      "theme": "quality_cash_flow",
+      "driver": "credit_stress_rising, liquidity_tightening, risk_off_rotation",
+      "role": "etf_proxy",
+      "reason": "Credit stress should favour companies with strong balance sheets, high cash generation, resilient demand, and lower financing dependency. Quality compounders historically outperform during credit stress as investors reduce exposure to leveraged names.; Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "reason_to_care": "QUAL is an ETF proxy for Quality Cash Flow and Balance Sheet Strength: sector-level exposure only, not a direct beneficiary",
+      "route_hint": [
+        "watchlist"
+      ],
+      "confidence": 0.45,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "valuation",
+        "crowding",
+        "broad_market_liquidation",
+        "earnings_disappointment"
+      ],
+      "confirmation_required": [
+        "quality_relative_strength",
+        "defensive_sector_confirmation",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "credit_stress_to_quality_cash_flow",
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "IWM",
+      "included_by": "economic_intelligence",
+      "theme": "small_caps",
+      "driver": "credit_stress_rising, liquidity_tightening, refinancing_risk_rising",
+      "role": "pressure_candidate",
+      "reason": "Credit stress and tighter liquidity typically pressure weaker balance sheets, speculative growth, and refinancing-sensitive names. Small-cap indices have higher exposure to floating-rate debt and lower credit quality than large-cap indices.",
+      "reason_to_care": "IWM is a headwind pressure watchlist for Small Cap \u2014 Headwind / Credit Pressure: monitor for risk \u2014 Credit stress and tighter liquidity typically pressure weaker balance sheets, speculative growth, and refinancing-sensitive names. Small-cap indices have higher exposure to floating-rate debt and lower credit quality than large-cap indices.",
+      "route_hint": [
+        "watchlist"
+      ],
+      "confidence": 0.38,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "credit_stress_easing",
+        "risk_on_rotation",
+        "liquidity_support_intervention"
+      ],
+      "confirmation_required": [
+        "IWM_relative_weakness",
+        "credit_proxy_weakness",
+        "breadth_deterioration"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "credit_stress_to_small_caps_headwind"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "COST",
+      "included_by": "economic_intelligence",
+      "theme": "defensive_quality",
+      "driver": "risk_appetite_falling, volatility_rising, defensive_rotation, breadth_deterioration",
+      "role": "direct_beneficiary",
+      "reason": "Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "reason_to_care": "COST is a direct beneficiary of Defensive Quality \u2014 Risk-Off Rotation: Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "route_hint": [
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.7,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "confirmation_required": [
+        "defensive_sector_relative_strength",
+        "low_vol_or_quality_factor_relative_strength",
+        "SPY_QQQ_weakness_or_breadth_deterioration"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "JNJ",
+      "included_by": "economic_intelligence",
+      "theme": "defensive_quality",
+      "driver": "risk_appetite_falling, volatility_rising, defensive_rotation, breadth_deterioration",
+      "role": "direct_beneficiary",
+      "reason": "Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "reason_to_care": "JNJ is a direct beneficiary of Defensive Quality \u2014 Risk-Off Rotation: Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "route_hint": [
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.7,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "confirmation_required": [
+        "defensive_sector_relative_strength",
+        "low_vol_or_quality_factor_relative_strength",
+        "SPY_QQQ_weakness_or_breadth_deterioration"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "PG",
+      "included_by": "economic_intelligence",
+      "theme": "defensive_quality",
+      "driver": "risk_appetite_falling, volatility_rising, defensive_rotation, breadth_deterioration",
+      "role": "direct_beneficiary",
+      "reason": "Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "reason_to_care": "PG is a direct beneficiary of Defensive Quality \u2014 Risk-Off Rotation: Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "route_hint": [
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.7,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "confirmation_required": [
+        "defensive_sector_relative_strength",
+        "low_vol_or_quality_factor_relative_strength",
+        "SPY_QQQ_weakness_or_breadth_deterioration"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "KO",
+      "included_by": "economic_intelligence",
+      "theme": "defensive_quality",
+      "driver": "risk_appetite_falling, volatility_rising, defensive_rotation, breadth_deterioration",
+      "role": "direct_beneficiary",
+      "reason": "Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "reason_to_care": "KO is a direct beneficiary of Defensive Quality \u2014 Risk-Off Rotation: Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "route_hint": [
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.7,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "confirmation_required": [
+        "defensive_sector_relative_strength",
+        "low_vol_or_quality_factor_relative_strength",
+        "SPY_QQQ_weakness_or_breadth_deterioration"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "PEP",
+      "included_by": "economic_intelligence",
+      "theme": "defensive_quality",
+      "driver": "risk_appetite_falling, volatility_rising, defensive_rotation, breadth_deterioration",
+      "role": "direct_beneficiary",
+      "reason": "Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "reason_to_care": "PEP is a direct beneficiary of Defensive Quality \u2014 Risk-Off Rotation: Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "route_hint": [
+        "swing",
+        "watchlist"
+      ],
+      "confidence": 0.7,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "confirmation_required": [
+        "defensive_sector_relative_strength",
+        "low_vol_or_quality_factor_relative_strength",
+        "SPY_QQQ_weakness_or_breadth_deterioration"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "XLP",
+      "included_by": "economic_intelligence",
+      "theme": "defensive_quality",
+      "driver": "risk_appetite_falling, volatility_rising, defensive_rotation, breadth_deterioration",
+      "role": "etf_proxy",
+      "reason": "Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "reason_to_care": "XLP is an ETF proxy for Defensive Quality \u2014 Risk-Off Rotation: sector-level exposure only, not a direct beneficiary",
+      "route_hint": [
+        "watchlist"
+      ],
+      "confidence": 0.45,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "confirmation_required": [
+        "defensive_sector_relative_strength",
+        "low_vol_or_quality_factor_relative_strength",
+        "SPY_QQQ_weakness_or_breadth_deterioration"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "XLV",
+      "included_by": "economic_intelligence",
+      "theme": "defensive_quality",
+      "driver": "risk_appetite_falling, volatility_rising, defensive_rotation, breadth_deterioration",
+      "role": "etf_proxy",
+      "reason": "Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "reason_to_care": "XLV is an ETF proxy for Defensive Quality \u2014 Risk-Off Rotation: sector-level exposure only, not a direct beneficiary",
+      "route_hint": [
+        "watchlist"
+      ],
+      "confidence": 0.45,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "confirmation_required": [
+        "defensive_sector_relative_strength",
+        "low_vol_or_quality_factor_relative_strength",
+        "SPY_QQQ_weakness_or_breadth_deterioration"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "SPLV",
+      "included_by": "economic_intelligence",
+      "theme": "defensive_quality",
+      "driver": "risk_appetite_falling, volatility_rising, defensive_rotation, breadth_deterioration",
+      "role": "etf_proxy",
+      "reason": "Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "reason_to_care": "SPLV is an ETF proxy for Defensive Quality \u2014 Risk-Off Rotation: sector-level exposure only, not a direct beneficiary",
+      "route_hint": [
+        "watchlist"
+      ],
+      "confidence": 0.45,
+      "fresh_until": "2026-05-07T20:34:59Z",
+      "risk_flags": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "confirmation_required": [
+        "defensive_sector_relative_strength",
+        "low_vol_or_quality_factor_relative_strength",
+        "SPY_QQQ_weakness_or_breadth_deterioration"
+      ],
+      "source_labels": [
+        "intelligence_first_static_rule"
+      ],
+      "transmission_rules_fired": [
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-05T20:34:59Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    }
+  ],
+  "warnings": [],
+  "live_output_changed": false
+}
