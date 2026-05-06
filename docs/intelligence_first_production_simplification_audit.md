@@ -115,8 +115,8 @@ A production-ready, cloud-hostable trading system with clean service boundaries,
 
 | File | Classification | Remove After Cutover? | Notes |
 |------|---------------|----------------------|-------|
-| `data/intelligence/advisory_report.json` | `advisory_only` | No (keep for monitoring) | Advisory layer output; observer-only forever |
-| `data/intelligence/advisory_runtime_log.jsonl` | `advisory_only` | No (keep for monitoring) | Per-scan advisory log; valuable for retrospective analysis |
+| `data/intelligence/advisory_report.json` | `advisory_only` | No — keep only if useful for review/diagnostics | Offline advisory report output; not on execution path; retain while it provides review value |
+| `data/intelligence/advisory_runtime_log.jsonl` | `advisory_only` | No — keep during advisory observation phase | Per-scan advisory runtime log; define retention/rotation policy before cloud deployment |
 
 ### Backtest Data Files
 *Offline evaluation results. Must never be read by production runtime.*
