@@ -596,6 +596,25 @@ def reconcile_with_ibkr(ib: IB):
                     return v
         except Exception as _el_err:
             log.warning("_find_saved %s: event_log read failed: %s", key, _el_err)
+        # Step 1b: event_log pending orders (ORDER_INTENT with no ORDER_FILLED and no
+        # POSITION_CLOSED). Covers the crash-between-submit-and-fill window: the bot
+        # wrote an intent, submitted to IBKR, crashed, and IBKR filled the order while
+        # the bot was down. `open_trades()` above misses this because there is no
+        # ORDER_FILLED record yet. The most-recent pending intent for this symbol is
+        # the correct anchor. Sort by "ts" (the actual key append_intent writes) so we
+        # always pick the latest, not the oldest as last_intent_for_symbol() would
+        # (which compares the wrong "timestamp" key and defaults to empty string).
+        try:
+            from event_log import pending_orders as _el_pending
+            _candidates = [
+                p for p in _el_pending()
+                if p.get("symbol") == sym and p.get("trade_type") and p["trade_type"] != "UNKNOWN"
+            ]
+            if _candidates:
+                _best = max(_candidates, key=lambda p: p.get("ts", ""))
+                return _best
+        except Exception as _ep_err:
+            log.debug("_find_saved %s: pending_orders check failed: %s", key, _ep_err)
         # Fallback: positions.json exact key
         if key in saved_positions:
             hit = saved_positions[key]
@@ -1099,6 +1118,59 @@ def reconcile_with_ibkr(ib: IB):
                         except Exception:
                             pass
                         _safe_set_trade(key, new_entry)
+                        # Write ORDER_INTENT + ORDER_FILLED so metadata survives future restarts.
+                        # The options reconcile path previously wrote neither event — a bot restart
+                        # after a crash between entry and position close would find the option in
+                        # IBKR with no event_log anchor, causing metadata to be lost permanently.
+                        _opt_el_open = False
+                        try:
+                            from event_log import open_trades as _el_check_opt
+                            _opt_el_open = any(v.get("symbol") == sym for v in _el_check_opt().values())
+                        except Exception:
+                            pass
+                        if not _opt_el_open:
+                            _opt_ext_tid = new_entry.get("trade_id", "")
+                            if not _opt_ext_tid:
+                                try:
+                                    from event_log import last_intent_for_symbol as _li_opt
+                                    _ri = _li_opt(sym)
+                                    if _ri.get("trade_id"):
+                                        _opt_ext_tid = _ri["trade_id"]
+                                except Exception:
+                                    pass
+                            if not _opt_ext_tid:
+                                _opt_ext_tid = f"{key}_EXT_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S_%f')}"
+                                log.warning("Reconcile option: no trade_id for %s — generating EXT id %s", key, _opt_ext_tid)
+                            new_entry["trade_id"] = _opt_ext_tid
+                            with _trades_lock:
+                                if key in active_trades:
+                                    active_trades[key]["trade_id"] = _opt_ext_tid
+                            try:
+                                from event_log import append_intent as _el_intent_opt_ext
+                                _el_intent_opt_ext(
+                                    _opt_ext_tid,
+                                    sym,
+                                    direction=new_entry.get("direction", "LONG"),
+                                    trade_type=new_entry.get("trade_type", "UNKNOWN"),
+                                    instrument="option",
+                                    intended_price=ibkr_entry,
+                                    qty=int(qty),
+                                    sl=float(new_entry.get("sl") or 0.0),
+                                    tp=float(new_entry.get("tp") or 0.0),
+                                    regime=new_entry.get("entry_regime") or "UNKNOWN",
+                                    signal_scores=new_entry.get("signal_scores") or {},
+                                    conviction=float(new_entry.get("conviction") or 0.0),
+                                    reasoning=new_entry.get("reasoning") or "EXT reconcile — option metadata anchored on restart",
+                                    score=float(new_entry.get("score") or 0.0),
+                                    open_time=new_entry.get("open_time") or "",
+                                )
+                            except Exception as _ei_opt:
+                                log.warning("Reconcile: ORDER_INTENT write failed for external option %s: %s", key, _ei_opt)
+                            try:
+                                from event_log import append_fill as _el_fill_opt_ext
+                                _el_fill_opt_ext(_opt_ext_tid, sym, fill_price=ibkr_entry, fill_qty=int(qty))
+                            except Exception as _ef_opt:
+                                log.warning("Reconcile: ORDER_FILLED write failed for external option %s: %s", key, _ef_opt)
                     elif is_fx:
                         # FX position — tighter SL/TP (0.5%/1.5%) and 4-decimal precision
                         if direction == "SHORT":
@@ -1262,6 +1334,31 @@ def reconcile_with_ibkr(ib: IB):
                         except Exception:
                             pass
                         if not _el_already_open:
+                            # Write ORDER_INTENT first so the metadata anchor survives future
+                            # restarts. Without this, event_log.open_trades() returns a fill
+                            # with no intent, and last_intent_for_symbol() finds nothing —
+                            # causing metadata to be lost again on the next reconcile cycle.
+                            try:
+                                from event_log import append_intent as _el_intent_ext
+                                _el_intent_ext(
+                                    _ext_tid,
+                                    sym,
+                                    direction=new_entry.get("direction", "LONG"),
+                                    trade_type=new_entry.get("trade_type", "UNKNOWN"),
+                                    instrument=new_entry.get("instrument", "stock"),
+                                    intended_price=ibkr_entry,
+                                    qty=int(qty),
+                                    sl=float(new_entry.get("sl") or 0.0),
+                                    tp=float(new_entry.get("tp") or 0.0),
+                                    regime=new_entry.get("entry_regime") or "UNKNOWN",
+                                    signal_scores=new_entry.get("signal_scores") or {},
+                                    conviction=float(new_entry.get("conviction") or 0.0),
+                                    reasoning=new_entry.get("reasoning") or "EXT reconcile — metadata anchored on restart",
+                                    score=float(new_entry.get("score") or 0.0),
+                                    open_time=new_entry.get("open_time") or "",
+                                )
+                            except Exception as _ei_err:
+                                log.warning("Reconcile: ORDER_INTENT write failed for external stock %s: %s", sym, _ei_err)
                             try:
                                 from event_log import append_fill as _el_fill_ext
                                 _el_fill_ext(_ext_tid, sym, fill_price=ibkr_entry, fill_qty=qty)

@@ -113,6 +113,13 @@ def _persist_positions() -> None:
 # ── Decision metadata — these fields are written ONCE at trade entry ──────────
 # No function — IBKR reconciliation, re-sync, portfolio updates — may overwrite
 # these after they are set.  _safe_set_trade enforces this at the storage layer.
+#
+# metadata_status is deliberately included: once a position has real metadata
+# (trade_type != UNKNOWN), no reconcile path may stamp it MISSING.  The field
+# is either absent (normal) or "MISSING" (orphan) — once cleared it must stay
+# cleared.  Without this protection, any _safe_set_trade call that passes
+# metadata_status="MISSING" in the value dict would re-stamp an otherwise good
+# record, breaking the dashboard and forcing guardrails to queue a spurious exit.
 DECISION_METADATA_FIELDS: frozenset = frozenset(
     {
         "trade_type",
@@ -130,6 +137,7 @@ DECISION_METADATA_FIELDS: frozenset = frozenset(
         "open_time",
         "atr",
         "high_water_mark",
+        "metadata_status",   # once real metadata exists, never re-stamp as MISSING
     }
 )
 
