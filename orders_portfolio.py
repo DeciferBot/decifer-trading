@@ -1122,13 +1122,22 @@ def reconcile_with_ibkr(ib: IB):
                         # The options reconcile path previously wrote neither event — a bot restart
                         # after a crash between entry and position close would find the option in
                         # IBKR with no event_log anchor, causing metadata to be lost permanently.
-                        _opt_el_open = False
+                        # Only skip the anchor write if the event log already has a real
+                        # metadata anchor for this option (ORDER_INTENT with non-UNKNOWN
+                        # trade_type). An ORDER_FILLED without ORDER_INTENT means the old EXT
+                        # path ran — always write a fresh anchor in that case.
+                        _opt_el_anchored = False
                         try:
                             from event_log import open_trades as _el_check_opt
-                            _opt_el_open = any(v.get("symbol") == sym for v in _el_check_opt().values())
+                            _opt_el_anchored = any(
+                                v.get("symbol") == sym
+                                and v.get("trade_type")
+                                and v["trade_type"] != "UNKNOWN"
+                                for v in _el_check_opt().values()
+                            )
                         except Exception:
                             pass
-                        if not _opt_el_open:
+                        if not _opt_el_anchored:
                             _opt_ext_tid = new_entry.get("trade_id", "")
                             if not _opt_ext_tid:
                                 try:
@@ -1325,15 +1334,23 @@ def reconcile_with_ibkr(ib: IB):
                         with _trades_lock:
                             if key in active_trades:
                                 active_trades[key]["trade_id"] = _ext_tid
-                        _el_already_open = False
+                        # Only skip the anchor write if the event log already has a real
+                        # metadata anchor for this symbol (ORDER_INTENT with non-UNKNOWN
+                        # trade_type). An ORDER_FILLED without ORDER_INTENT (written by the
+                        # old EXT path before this fix) means metadata was never anchored —
+                        # always write a fresh ORDER_INTENT in that case.
+                        _el_already_anchored = False
                         try:
                             from event_log import open_trades as _el_check
-                            _el_already_open = any(
-                                v.get("symbol") == sym for v in _el_check().values()
+                            _el_already_anchored = any(
+                                v.get("symbol") == sym
+                                and v.get("trade_type")
+                                and v["trade_type"] != "UNKNOWN"
+                                for v in _el_check().values()
                             )
                         except Exception:
                             pass
-                        if not _el_already_open:
+                        if not _el_already_anchored:
                             # Write ORDER_INTENT first so the metadata anchor survives future
                             # restarts. Without this, event_log.open_trades() returns a fill
                             # with no intent, and last_intent_for_symbol() finds nothing —

@@ -9,5 +9,5 @@
 #   ./scripts/bump-version.sh <MAJOR.MINOR.PATCH> "<Codename>"
 
 
-__version__ = "3.7.15"
+__version__ = "3.7.16"
 __codename__ = "Apex"
