@@ -454,23 +454,52 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
         )
         ib.qualifyContracts(option_contract)
 
-        # ── Get current bid for limit price ──
-        ticker = ib.reqMktData(option_contract, "", False, False)
-        ib.sleep(2)  # allow quote data to arrive
+        # ── Get bid/ask: Alpaca (primary) → IBKR (secondary) → MKT fallback ──
+        # Alpaca is the declared primary data source for all market data.
+        # IBKR reqMktData for options requires a separate quote subscription
+        # that is absent for many symbols (error 10091) — that is why blind
+        # reliance on IBKR here causes stuck exits. Every other function in
+        # the options stack (options.py, price_updater.py, iv_skew.py) already
+        # uses Alpaca for option pricing; this function must do the same.
+        import math as _m
 
-        bid = getattr(ticker, "bid", None)
-        ask = getattr(ticker, "ask", None)
-        last = getattr(ticker, "last", None)
+        bid = ask = last = None
+        _bid_ok = _ask_ok = _last_ok = False
+        _ibkr_mkt_data_requested = False
+
+        try:
+            from alpaca_options import build_option_symbol, get_snapshot_greeks
+            _occ_sym = build_option_symbol(
+                pos["symbol"], pos["expiry_ibkr"], pos["right"], float(pos["strike"])
+            )
+            _snap = get_snapshot_greeks(_occ_sym)
+            if _snap:
+                _ab = float(_snap.get("bid") or 0)
+                _aa = float(_snap.get("ask") or 0)
+                if _ab > 0:
+                    bid, ask = _ab, _aa
+                    _bid_ok = True
+                    _ask_ok = _aa > 0
+        except Exception:
+            pass
+
+        if not _bid_ok:
+            ticker = ib.reqMktData(option_contract, "", False, False)
+            ib.sleep(2)
+            _ibkr_mkt_data_requested = True
+            _ib_bid = getattr(ticker, "bid", None)
+            _ib_ask = getattr(ticker, "ask", None)
+            last = getattr(ticker, "last", None)
+            if _ib_bid is not None and not _m.isnan(_ib_bid) and _ib_bid > 0:
+                bid, ask = _ib_bid, _ib_ask
+                _bid_ok = True
+                _ask_ok = _ib_ask is not None and not _m.isnan(_ib_ask) and _ib_ask > 0
+            if last is not None and not _m.isnan(last) and last > 0:
+                _last_ok = True
 
         # Determine order direction: SHORT positions close with BUY, LONG with SELL
         _is_short = pos.get("direction", "LONG").upper() == "SHORT"
         _close_action = "BUY" if _is_short else "SELL"
-
-        import math as _m
-
-        _bid_ok = bid is not None and not _m.isnan(bid) and bid > 0
-        _ask_ok = ask is not None and not _m.isnan(ask) and ask > 0
-        _last_ok = last is not None and not _m.isnan(last) and last > 0
         _retry_count = attempts["count"]
         # Only step price if the last attempt had ZERO fills (market rejected the price).
         # Partial fills mean the market IS trading at the current level — don't step further.
@@ -521,7 +550,8 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
                 if not (_bid_ok and bid < 0.05):
                     limit_price = max(limit_price, 0.05)
 
-        ib.cancelMktData(option_contract)
+        if _ibkr_mkt_data_requested:
+            ib.cancelMktData(option_contract)
 
         # Cancel all live IBKR orders on this exact contract (both directions) before
         # placing the close. IBKR rejects "Cannot have open orders on both sides of
