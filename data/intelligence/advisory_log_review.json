@@ -1,10 +1,10 @@
 {
   "schema_version": "6C.1",
-  "generated_at": "2026-05-06T06:52:03.908602+00:00",
+  "generated_at": "2026-05-06T18:00:08.692510+00:00",
   "mode": "evidence_review_only",
   "source_file": "/Users/amitchopra/Desktop/decifer trading/data/intelligence/advisory_runtime_log.jsonl",
   "review_summary": {
-    "records_read": 1,
+    "records_read": 35,
     "sessions_detected": 1,
     "session_keys": [
       "2026-05-06"
@@ -16,32 +16,59 @@
     "production_decision_changed_count": 0,
     "apex_input_changed_count": 0,
     "regime_distribution": {
-      "BULL_TRENDING": 1
+      "BULL_TRENDING": 1,
+      "TRENDING_UP": 34
     }
   },
   "candidate_overlap_analysis": {
-    "total_candidate_evaluations": 4,
-    "mean_candidates_per_record": 4.0,
+    "total_candidate_evaluations": 1920,
+    "mean_candidates_per_record": 54.86,
     "advisory_status_totals": {
-      "advisory_unresolved": 1,
-      "advisory_watch": 3
+      "advisory_defer": 273,
+      "advisory_include": 101,
+      "advisory_unresolved": 1316,
+      "advisory_watch": 230
     },
     "symbols_most_frequent": [
       {
         "symbol": "NVDA",
-        "count": 1
+        "count": 21
       },
       {
         "symbol": "AAPL",
-        "count": 1
+        "count": 21
       },
       {
-        "symbol": "MSFT",
-        "count": 1
+        "symbol": "GOOGL",
+        "count": 20
       },
       {
-        "symbol": "TSLA",
-        "count": 1
+        "symbol": "AMZN",
+        "count": 20
+      },
+      {
+        "symbol": "SPY",
+        "count": 20
+      },
+      {
+        "symbol": "QQQ",
+        "count": 20
+      },
+      {
+        "symbol": "VXX",
+        "count": 20
+      },
+      {
+        "symbol": "RKLB",
+        "count": 20
+      },
+      {
+        "symbol": "NBIS",
+        "count": 20
+      },
+      {
+        "symbol": "IWM",
+        "count": 20
       }
     ]
   },
@@ -54,15 +81,17 @@
     "flag_violation_counts": {},
     "violations": []
   },
-  "decision_gate": "insufficient_live_observation",
+  "decision_gate": "advisory_ready_for_handoff_design",
   "gate_reasons": [
-    "Insufficient observation: 1 records (need 10) and 1 sessions (need 3)"
+    "35 records across 1 sessions observed",
+    "Advisory report available and route disagreements logged",
+    "Overlap patterns sufficient for handoff design review"
   ],
   "warnings": [],
   "minimum_threshold": {
     "min_records": 10,
     "min_sessions": 3,
-    "records_met": false,
+    "records_met": true,
     "sessions_met": false
   },
   "advisory_only": true,

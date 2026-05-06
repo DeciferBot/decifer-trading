@@ -1,1 +1,18 @@
 {"ts": "2026-04-28T16:41:23.917902+00:00", "event": "deferred_exit", "text": "Closing GSAT option \u2014 deferred exit from earlier.", "symbol": "GSAT", "reason": "signal"}
+{"ts": "2026-05-05T19:35:17.512202+00:00", "event": "exit_pm", "text": "Closing AMZN into the bell.", "symbol": "AMZN", "reason": "intraday flat EOD", "news": "none"}
+{"ts": "2026-05-05T19:35:38.887706+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
+{"ts": "2026-05-05T19:41:34.311020+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
+{"ts": "2026-05-05T19:47:37.225435+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
+{"ts": "2026-05-05T19:53:35.785271+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
+{"ts": "2026-05-05T19:58:36.352022+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
+{"ts": "2026-05-05T20:20:46.230445+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
+{"ts": "2026-05-05T20:22:37.655408+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
+{"ts": "2026-05-06T06:15:50.419942+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
+{"ts": "2026-05-06T06:25:47.904817+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
+{"ts": "2026-05-06T06:48:18.121868+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
+{"ts": "2026-05-06T09:00:43.721577+00:00", "event": "trim", "text": "I trimmed IREN.", "symbol": "IREN", "pct": 50, "reason": "score_collapse_with_gain"}
+{"ts": "2026-05-06T09:02:47.172105+00:00", "event": "entry", "text": "Long on APH filled at 138.53.", "symbol": "APH", "direction": "long", "score": 71, "reason": "Quality Compounder PRU candidate with effective_score 79 (boost +8), breakout signal intact, and TRENDING_UP regime supports multi-week accumulation in a high-quality connector/components name.", "news": "none"}
+{"ts": "2026-05-06T09:02:47.680184+00:00", "event": "entry", "text": "Long on COIN filled at 201.05.", "symbol": "COIN", "direction": "long", "score": 71, "reason": "Score 71 with full trend+momentum+breakout trifecta and elevated volR=1.67 confirming genuine volume behind the move in a risk-on MOMENTUM_BULL session; crypto correlation with broader tech rally supp", "news": "none"}
+{"ts": "2026-05-06T13:47:36.723569+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
+{"ts": "2026-05-06T15:21:38.649084+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
+{"ts": "2026-05-06T15:25:22.978863+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}

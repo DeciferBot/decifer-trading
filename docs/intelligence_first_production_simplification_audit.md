@@ -405,10 +405,103 @@ A production-ready, cloud-hostable trading system with clean service boundaries,
 
 ---
 
+---
+
+## Sprint 7A Classification — Handoff Design Sprint
+
+**Sprint 7A is documentation/design only. No production code was modified. No new runtime modules were added.**
+
+### New Files Created
+
+| File | Classification | Service Layer | Runtime in Production | Temporary or Permanent | Notes |
+|------|---------------|--------------|----------------------|----------------------|-------|
+| `docs/intelligence_first_handoff_design.md` | N/A (doc) | — | No | Permanent | Production handoff design, fail-closed contract, cutover phases |
+| `docs/intelligence_first_handoff_test_plan.md` | N/A (doc) | — | No | Permanent | 17 test groups; must all pass before Sprint 7B approved |
+| `docs/intelligence_first_cutover_readiness_checklist.md` | N/A (doc) | — | No | Permanent | 14-item checklist; Amit must approve each item before production switch |
+
+### Files Modified
+
+| File | Change | Classification Impact |
+|------|--------|-----------------------|
+| `docs/intelligence_first_production_simplification_audit.md` | Sprint 7A section added | No classification change; existing entries unchanged |
+| `docs/intelligence_first_retirement_register.md` | Sprint 7A entries added | No status change to existing entries |
+
+### Existing Files Made Obsolete By Sprint 7A
+
+None. Sprint 7A is design only. No file is made obsolete until Phase 5 (scanner-led path retirement) is approved.
+
+### Duplicate Logic
+
+None introduced. Sprint 7A adds no code.
+
+### Shadow/Advisory Files — Disposition After Cutover (Sprint 7A Update)
+
+| File | Keep After Cutover? | Reason |
+|------|--------------------|----|
+| `advisory_report.json` | Keep during Phases 1–4 for regression monitoring | Offline diagnostic; remove only if operational value drops post-Phase 5 |
+| `advisory_runtime_log.jsonl` | Keep permanently, with retention/rotation policy | Observability log; cloud deployment requires log rotation SLA defined |
+| `advisory_log_review.json` | Keep on demand (regenerated) | Evidence gate output; not on execution path |
+| `current_pipeline_snapshot.json` | Remove at Phase 5 | Migration tooling only — describes old scanner topology |
+| `active_opportunity_universe_shadow.json` | Rename to `active_opportunity_universe.json` at Phase 4 | Becomes the production handoff file |
+| `current_vs_shadow_comparison.json` | Keep through Phase 5 | Regression monitoring between old and new paths |
+| `universe_builder_report.json` | Keep permanently | Sprint-level diagnostic; no removal blocker |
+
+### Backtest-Only Files — Excluded From Production Runtime
+
+All backtest files listed in prior sections remain unchanged. No new backtest files added. `backtest_intelligence.py` must not be imported in production runtime — unchanged from prior sprints.
+
+### Modules That Must NOT Be Imported In Production Runtime (Sprint 7A Addition)
+
+| Module | Why |
+|--------|-----|
+| `advisory_reporter.py` | Offline report generator; must not run on live bot path |
+| `advisory_log_reviewer.py` | Offline evidence gate tool; no production output path |
+| `backtest_intelligence.py` | Backtest isolation; contains local regime/theme copies |
+| `scanner.py` (post-Phase 5) | After production handoff is stable; not yet — scanner must remain until Phase 5 |
+
+### Cloud Runtime Impact — Sprint 7A
+
+Sprint 7A adds no runtime modules. Cloud impact = None.
+
+The **handoff reader** (to be created in Sprint 7B) will be `production_runtime` with **Low** cloud impact — reads `active_opportunity_universe.json` (local file or mounted volume) and performs pure JSON validation. No network calls. No LLM. No broker.
+
+The **Universe Builder scheduled job** (to run before market open in production) has **Low** cloud impact — reads local files, writes local files, no network calls at runtime.
+
+### Production Simplification Gates — Sprint 7A Status
+
+| Gate | Status | Notes |
+|------|--------|-------|
+| Handoff design document exists | ✅ | `docs/intelligence_first_handoff_design.md` |
+| Fail-closed contract defined | ✅ | Section 5 of handoff design |
+| Unresolved current candidate policy defined | ✅ | Section 6: Option B (approved source label required) |
+| Missing shadow candidate policy defined | ✅ | Section 7 |
+| Tier D policy defined | ✅ | Section 8: source label, not tier |
+| Route disagreement policy defined | ✅ | Section 9: vocabulary harmonisation required |
+| Handoff test plan exists | ✅ | `docs/intelligence_first_handoff_test_plan.md` |
+| Cutover readiness checklist exists | ✅ | `docs/intelligence_first_cutover_readiness_checklist.md` |
+| Production code changed | ❌ None | Sprint 7A is design only |
+| enable_active_opportunity_universe_handoff | `False` | Must remain False until Sprint 7B approved |
+| live_output_changed | `false` | Confirmed |
+
+### Anti-Bloat Confirmation — Sprint 7A
+
+| Check | Status |
+|-------|--------|
+| New runtime files added | 0 |
+| New test files added | 0 |
+| Production modules modified | 0 |
+| Duplicate logic introduced | None |
+| Production handoff triggered | No |
+| enable_active_opportunity_universe_handoff | False |
+| live_output_changed | false |
+
+---
+
 ## Update Log
 
 | Date | Action | Notes |
 |------|--------|-------|
+| 2026-05-06 | Sprint 7A | Added Sprint 7A classification section. Handoff design, test plan, and cutover checklist created (documentation only). No production code changed. Advisory evidence from 35-record observation integrated. Production simplification gates for Sprint 7A all met. |
 | 2026-05-06 | Created | Initial audit covering Sprints Day2–6B. All intelligence-first modules classified. No files recommended for immediate removal — production handoff gate not yet met. |
 | 2026-05-06 | Sprint 6B patch | Added explicit Sprint 6B file classifications (advisory_logger.py, advisory_runtime_log.jsonl, test_intelligence_sprint6b.py, bot_trading.py hook). Anti-bloat confirmation added. Real-session observation plan documented. |
 | 2026-05-06 | Sprint 6C | Added advisory_log_reviewer.py (advisory_only, offline), advisory_log_review.json (advisory_only), test_intelligence_sprint6c.py (advisory_only test, 34 tests). Validator extended with validate_advisory_log_review(). No production modules touched. |

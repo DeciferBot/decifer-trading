@@ -1,21 +1,21 @@
 {
-  "timestamp": "2026-05-06T05:06:05.444Z",
+  "timestamp": "2026-05-06T13:11:13.990Z",
   "branch": "master",
-  "lastCommit": "cdde2a1 fix(price_updater): detect stale Alpaca stream via quote timestamp",
+  "lastCommit": "6ea72f4 docs(intelligence): Real-Session Advisory Observation Phase kickoff",
   "roadmapPhase": null,
   "lastFilesTouched": [
     "claude/memory/checkpoint.json",
     ".claude/memory/session-history.jsonl",
-    ".githooks/pre-commit",
     "chief-decifer/state/internal/catalyst/edgar_events.json",
     "chief-decifer/state/internal/catalyst/options_snapshots.jsonl",
     "chief-decifer/state/internal/catalyst/sentiment_snapshots.jsonl",
     "data/audit_log.jsonl",
+    "data/daily_promoted.json",
     "data/equity_history.json",
     "data/execution_ic.jsonl",
-    "data/reconciled_trades.jsonl"
+    "data/intelligence/advisory_runtime_log.jsonl"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 340
+  "sessionCount": 343
 }

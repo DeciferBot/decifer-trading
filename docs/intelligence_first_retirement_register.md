@@ -155,6 +155,118 @@
 
 ---
 
+---
+
+### REG-009 — Scanner-led universe construction (`scanner.get_dynamic_universe()`)
+
+| Field | Value |
+|-------|-------|
+| **Legacy file** | `scanner.py:363–462` |
+| **Legacy function** | `get_dynamic_universe()` |
+| **Current responsibility** | Primary live candidate source — merges Tier A/B/C/D into scoring pool |
+| **Replacement component** | Handoff reader (to be implemented Sprint 7B) → reads `active_opportunity_universe.json` |
+| **Replacement status** | Design complete (Sprint 7A). Implementation not started. |
+| **Shadow/advisory proof** | Advisory observation: 35 records, 1 session, all safety invariants clean. Handoff design approved by Amit pending Sprint 7B. |
+| **Production impact** | High — this is the core live execution path. No change until `enable_active_opportunity_universe_handoff=True` |
+| **Removal status** | Blocked until Phase 5 (production handoff stable, ≥10 sessions, rollback tested) |
+| **Retirement condition** | 1. Handoff reader is production-stable (Phase 4, ≥10 sessions). 2. Rollback flag fully tested. 3. `test_scanner.py` universe composition tests rewritten for adapter pattern. 4. Amit approves Phase 5. |
+| **Safe removal phase** | Phase 5 — scanner-led path retirement (not yet scheduled) |
+| **Rollback risk** | High — never remove before Phase 5 gate met |
+| **Owner notes** | Tier-merge logic (Tier A/B/C/D merge) must be preserved as a tested fallback until Phase 5 confirmation. Do not modify `scanner.py` as part of Sprint 7A–7B. |
+
+---
+
+### REG-010 — Tier-only priority assumptions (flat pool, no route quotas)
+
+| Field | Value |
+|-------|-------|
+| **Legacy assumption** | Tier D symbols compete via `apex_cap_score.py` bonus score. Route is not a quota dimension. All symbols enter flat pool. |
+| **Where embedded** | `apex_cap_score.py`, `scanner.py` tier merge, implicit in scoring pipeline |
+| **Replacement component** | `quota_allocator.py` route-aware quota groups (structural/attention/etf_proxy/held/manual_conviction) |
+| **Replacement status** | Quota allocator complete (Sprint 2). Not yet wired to production path. |
+| **Shadow/advisory proof** | Advisory evidence: structural quota binding 35/35 records (demand=180, cap=20). Quota allocator shadow proof complete. |
+| **Production impact** | None yet — quota allocator is shadow-only |
+| **Removal status** | Flat-pool assumption removed in shadow. Remains in live path (scanner + apex_cap_score) until production handoff. |
+| **Retirement condition** | Production handoff Phase 4 stable. REG-001 (`apex_cap_score.py`) retirement criteria met. |
+| **Safe removal phase** | After Phase 4 (controlled production switch). |
+| **Owner notes** | The flat-pool ablation (Sprint 5A) quantified the risk: 102 attention demand vs 15 cap, 180 structural demand vs 20 cap. These are now the evidence base for the quota design. |
+
+---
+
+### REG-011 — `apex_cap_score.py` as Tier D structural protection mechanism
+
+| Field | Value |
+|-------|-------|
+| **Legacy file** | `apex_cap_score.py` |
+| **Legacy function** | `compute_apex_cap_score()` — bonus +8 for Tier D structural candidates |
+| **Replacement component** | `quota_allocator.py` structural quota group (20 protected slots, route-aware) |
+| **Replacement status** | Quota allocator shadow-complete. `apex_cap_score.py` still live in production. |
+| **Shadow/advisory proof** | Advisory evidence: 5/150 Tier D preserved in shadow (3.3%). Quota allocator provides structural protection. Score bonus provides a different form of protection (priority within flat pool). Both remain until handoff is production-stable. |
+| **Production impact** | Live — `apex_cap_score.py` still called in production scoring path |
+| **Removal status** | Blocked until production handoff is stable AND `test_tier_d_visibility.py` is rewritten for quota model |
+| **Retirement condition** | 1. Production handoff Phase 4 stable. 2. Shadow comparison shows equivalent or better Tier D structural survival under quota allocator. 3. `test_tier_d_visibility.py` rewritten and passing. 4. Amit approves. |
+| **Safe removal phase** | After Phase 4 gate confirmed stable |
+| **Rollback risk** | Medium — removing the bonus without quota in production will drop Tier D survival rate immediately |
+
+---
+
+### REG-012 — `current_pipeline_snapshot.json` as migration tool
+
+| Field | Value |
+|-------|-------|
+| **Legacy file** | `data/universe_builder/current_pipeline_snapshot.json` |
+| **Current responsibility** | Documents old pipeline topology (Tier A/B/C/D, fixed floors, promoter thresholds) for advisory comparison |
+| **Replacement component** | `active_opportunity_universe.json` (production handoff file) — post-handoff, the pipeline is described by the handoff file, not a snapshot |
+| **Replacement status** | Handoff file design complete (Sprint 7A). File will exist at Phase 4. |
+| **Production impact** | None — read-only by advisory/comparison modules only |
+| **Removal status** | Remove at Phase 5 (scanner-led path retirement) |
+| **Retirement condition** | Phase 5 approved; `active_opportunity_universe.json` is the production source; old pipeline snapshot no longer describes live system |
+| **Safe removal phase** | Phase 5 |
+| **Rollback risk** | Low — advisory/comparison modules can fallback gracefully when file absent |
+
+---
+
+### REG-013 — `advisory_report.json` as offline diagnostic
+
+| Field | Value |
+|-------|-------|
+| **Legacy file** | `data/intelligence/advisory_report.json` |
+| **Current responsibility** | Offline comparison of current pipeline vs shadow universe; consumed by advisory_logger.py at runtime |
+| **Replacement component** | Post-handoff, advisory comparison becomes less relevant (shadow IS the production source). Regression monitoring via `current_vs_shadow_comparison.json` and direct observability logs replaces advisory report. |
+| **Production impact** | Low — advisory_logger.py reads it per scan cycle when `intelligence_first_advisory_enabled=True` |
+| **Removal status** | Not yet removed — retain through Phases 1–4 for regression monitoring |
+| **Retirement condition** | Phase 4 stable (≥10 sessions). Operational monitoring consolidated. Advisory reporter no longer adds diagnostic value beyond what handoff reader logs provide. Amit approves. |
+| **Safe removal phase** | Optionally at Phase 5; not required |
+
+---
+
+### REG-014 — `advisory_runtime_log.jsonl` and `advisory_log_review.json` as observability artefacts
+
+| Field | Value |
+|-------|-------|
+| **Legacy file** | `data/intelligence/advisory_runtime_log.jsonl`, `data/intelligence/advisory_log_review.json` |
+| **Current responsibility** | Per-scan advisory runtime evidence; review gate output |
+| **Post-handoff status** | Advisory logs may continue as observability; review gate (`advisory_log_reviewer.py`) is offline only |
+| **Production impact** | Low — JSONL append per scan cycle |
+| **Removal status** | Retain with log rotation policy. Define retention before cloud deployment. |
+| **Retirement condition** | Replaced by structured log aggregator (Datadog, CloudWatch, etc.) that makes per-scan JSONL redundant. Amit approves. |
+| **Safe removal phase** | Post-Phase 4, if observability is consolidated externally |
+
+---
+
+### REG-015 — `backtest_intelligence.py` as backtest-only artefact
+
+| Field | Value |
+|-------|-------|
+| **Legacy file** | `backtest_intelligence.py` |
+| **Current responsibility** | Offline backtest and ablation framework for Economic Intelligence Layer |
+| **Production impact** | None — must never be imported in production runtime |
+| **Removal status** | Retain permanently as offline audit capability |
+| **Retirement condition** | No planned retirement. Backtest evidence is valuable for future sprint decisions. Remove only if explicitly superseded by a cloud-based backtesting framework. |
+| **Safe removal phase** | N/A |
+
+---
+
 ## Tests to Monitor (Not Delete)
 
 These tests assert behaviour tied to the current architecture. They will need to be rewritten (not deleted) when the new architecture replaces the component they test. Until then, they must continue to pass.
@@ -209,6 +321,7 @@ No dead code identified yet. Will be populated as audit deepens and new modules 
 
 | Date | Action | Notes |
 |------|--------|-------|
+| 2026-05-06 | Sprint 7A | Added REG-009 through REG-015. REG-009: scanner-led universe construction — retirement blocked until Phase 5 (handoff stable, ≥10 sessions, rollback tested). REG-010: tier-only/flat-pool assumptions — replaced in shadow by quota_allocator.py; live until handoff. REG-011: apex_cap_score.py Tier D bonus — blocked on production handoff Phase 4 stable + test_tier_d_visibility.py rewrite. REG-012: current_pipeline_snapshot.json — migration tool only; remove at Phase 5. REG-013: advisory_report.json — retain through Phases 1–4; optional removal at Phase 5. REG-014: advisory runtime log artefacts — retain with rotation policy; replace at Phase 4+ if observability consolidated externally. REG-015: backtest_intelligence.py — permanent offline capability; no retirement planned. No existing entries modified. No code removed. |
 | 2026-05-05 | Created | Day 1 audit — 6 components identified, safety test list compiled |
 | 2026-05-05 | Day 2 update | REG-005 replacement status updated: thematic_roster.json created (canonical). No new duplicate logic introduced. `macro_transmission_matrix.py` has no legacy counterpart — this is net-new architecture. |
 | 2026-05-05 | Day 3 update | `candidate_resolver.py` is net-new — no legacy counterpart. `economic_candidate_feed.json` is net-new output file. No duplicate logic introduced. Validator extended to cover feed; existing validator tests unaffected. No production code or tests removed. |
