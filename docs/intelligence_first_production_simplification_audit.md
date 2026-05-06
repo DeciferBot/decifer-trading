@@ -1,0 +1,256 @@
+# Intelligence-First Production Simplification Audit
+
+**Created:** 2026-05-06
+**Purpose:** Classify every file, function, and test added or modified during the Intelligence-First architecture work. Enforce the north star: one production system with clean service boundaries, no zombie tests, no duplicate runtime logic.
+
+**North Star:**
+A production-ready, cloud-hostable trading system with clean service boundaries, minimal duplicate logic, clear runtime contracts, observable logs, safe fail-closed behaviour and no zombie tests.
+
+**Classification vocabulary:**
+
+| Label | Meaning |
+|-------|---------|
+| `production_runtime` | Required in production deployment |
+| `advisory_only` | Read-only observer; never touches execution |
+| `shadow_only` | Shadow pipeline; not wired to live decisions |
+| `backtest_only` | Offline evaluation; excluded from runtime |
+| `adapter_only` | Read-only source adapter; no side effects |
+| `schema_validator` | Validation tooling; production-useful for CI |
+| `migration_tooling` | Temporary; removed after production handoff confirmed |
+| `deprecated_ready_to_remove` | Removal conditions met or near |
+
+**Removal gate (all 7 conditions must be met before any file is deleted):**
+1. Replacement component exists
+2. Replacement is tested
+3. Shadow/advisory evidence proves equivalent or better behaviour
+4. Production handoff no longer uses old path
+5. Rollback path is clear
+6. Replacement tests exist
+7. Owner approval recorded
+
+---
+
+## Module Classification
+
+### Production Runtime Modules
+*Required in production deployment. These must be cloud-deployable, fail-safe, and observable.*
+
+| Module | Classification | Runtime in Production | Service Layer | Cloud Impact | Notes |
+|--------|---------------|----------------------|---------------|--------------|-------|
+| `intelligence_engine.py` | `production_runtime` | Yes | Economic Intelligence Layer | Low | Reads local files; no live API. Must remain pure-read until Sprint 7+ |
+| `candidate_resolver.py` | `production_runtime` | Yes | Economic Intelligence Layer | Low | Pure deterministic; reads transmission_rules + taxonomy |
+| `macro_transmission_matrix.py` | `production_runtime` | Yes | Economic Intelligence Layer | Low | Pure logic; imported by candidate_resolver only |
+| `universe_builder.py` | `production_runtime` | Yes | Opportunity Universe Builder | Low | Writes shadow universe; production handoff gate still False |
+| `route_tagger.py` | `production_runtime` | Yes | Opportunity Universe Builder | Low | Pure deterministic; no I/O of its own |
+| `quota_allocator.py` | `production_runtime` | Yes | Opportunity Universe Builder | Low | Pure deterministic; no I/O of its own |
+| `theme_activation_engine.py` | `production_runtime` | Yes | Economic Intelligence Layer | Low | Reads local files only |
+| `thesis_store.py` | `production_runtime` | Yes | Economic Intelligence Layer | Low | Deterministic template; no LLM |
+| `compare_universes.py` | `production_runtime` | Yes | Opportunity Universe Builder | Low | Reporting/comparison only; not execution-critical |
+
+### Advisory-Only Modules
+*Observer pattern. Never touches candidates, Apex, scoring, risk, orders, or execution.*
+
+| Module | Classification | Runtime in Production | Service Layer | Cloud Impact | Notes |
+|--------|---------------|----------------------|---------------|--------------|-------|
+| `advisory_reporter.py` | `advisory_only` | No (report-only) | Advisory Layer | None | Generates offline advisory_report.json; not on live bot execution path |
+| `advisory_logger.py` | `advisory_only` | Yes, when flag=True | Advisory Layer | None | Hook in run_scan(); gated by `intelligence_first_advisory_enabled=False` |
+
+### Adapter-Only Modules
+*Read-only adapters. No side effects, no writes to source files.*
+
+| Module | Classification | Runtime in Production | Service Layer | Cloud Impact | Notes |
+|--------|---------------|----------------------|---------------|--------------|-------|
+| `intelligence_adapters.py` | `adapter_only` | Yes | Economic Intelligence Layer | None | 9 read-only adapters; must never trigger source module side effects |
+
+### Schema Validator Modules
+*Validation tooling. Production-useful for CI/CD. Not on hot execution path.*
+
+| Module | Classification | Runtime in Production | Service Layer | Cloud Impact | Notes |
+|--------|---------------|----------------------|---------------|--------------|-------|
+| `intelligence_schema_validator.py` | `schema_validator` | CI/CD only | Tooling | None | 20 validator functions; not imported by live bot |
+
+### Backtest-Only Modules
+*Offline evaluation. Must not be imported in production runtime.*
+
+| Module | Classification | Runtime in Production | Service Layer | Cloud Impact | Notes |
+|--------|---------------|----------------------|---------------|--------------|-------|
+| `backtest_intelligence.py` | `backtest_only` | No | Backtest/Evaluation | None | Reads local files; generates 7 backtest output files; must never run on live bot path |
+
+### Scripts
+| Script | Classification | Runtime in Production | Notes |
+|--------|---------------|----------------------|-------|
+| `scripts/validate_intelligence_files.py` | `schema_validator` | CI/CD only | CLI wrapper for intelligence_schema_validator |
+
+---
+
+## Data File Classification
+
+### Production Runtime Data Files
+*Read by production runtime modules. Must exist, must be fresh, must be valid.*
+
+| File | Classification | Owner Module | Fail-Closed When Missing? | Notes |
+|------|---------------|--------------|--------------------------|-------|
+| `data/intelligence/transmission_rules.json` | `production_runtime` | intelligence_engine, candidate_resolver | Yes (engine returns unavailable state) | Static; updated manually per sprint |
+| `data/intelligence/theme_taxonomy.json` | `production_runtime` | candidate_resolver, theme_activation_engine | Yes | Static; updated manually per sprint |
+| `data/intelligence/thematic_roster.json` | `production_runtime` | candidate_resolver, theme_activation_engine | Yes | Static; updated manually per sprint |
+| `data/intelligence/economic_candidate_feed.json` | `production_runtime` | universe_builder, theme_activation_engine | Yes | Generated by candidate_resolver |
+| `data/intelligence/daily_economic_state.json` | `production_runtime` | theme_activation_engine, thesis_store | Yes | Generated by intelligence_engine |
+| `data/intelligence/current_economic_context.json` | `production_runtime` | compare_universes (reporting) | No (reporting only) | Generated by intelligence_engine |
+| `data/intelligence/theme_activation.json` | `production_runtime` | thesis_store, advisory_reporter | Yes | Generated by theme_activation_engine |
+| `data/intelligence/thesis_store.json` | `production_runtime` | advisory_reporter | No (advisory only for now) | Generated by thesis_store |
+| `data/intelligence/source_adapter_snapshot.json` | `production_runtime` | universe_builder | No (degrades gracefully) | Generated by intelligence_adapters |
+| `data/universe_builder/active_opportunity_universe_shadow.json` | `production_runtime` | compare_universes | Yes (when handoff enabled) | Generated by universe_builder; becomes `active_opportunity_universe.json` at handoff |
+
+### Shadow / Comparison / Reporting Data Files
+*Comparison and diagnostic outputs. Keep until production handoff is proven stable.*
+
+| File | Classification | Remove After Cutover? | Notes |
+|------|---------------|----------------------|-------|
+| `data/universe_builder/current_vs_shadow_comparison.json` | `shadow_only` | No (keep for monitoring) | Comparison is useful post-handoff for regression tracking |
+| `data/universe_builder/universe_builder_report.json` | `shadow_only` | No (keep for monitoring) | Sprint-level report; diagnostic value |
+| `data/universe_builder/current_pipeline_snapshot.json` | `migration_tooling` | Yes (after handoff) | Describes old pipeline topology; not needed once new pipeline is live |
+
+### Advisory Data Files
+*Generated by advisory layer. Never read by execution path.*
+
+| File | Classification | Remove After Cutover? | Notes |
+|------|---------------|----------------------|-------|
+| `data/intelligence/advisory_report.json` | `advisory_only` | No (keep for monitoring) | Advisory layer output; observer-only forever |
+| `data/intelligence/advisory_runtime_log.jsonl` | `advisory_only` | No (keep for monitoring) | Per-scan advisory log; valuable for retrospective analysis |
+
+### Backtest Data Files
+*Offline evaluation results. Must never be read by production runtime.*
+
+| File | Classification | Remove After Cutover? | Notes |
+|------|---------------|----------------------|-------|
+| `data/intelligence/backtest/regime_fixture_results.json` | `backtest_only` | No (keep for audit trail) | Sprint 5A fixture results |
+| `data/intelligence/backtest/theme_activation_fixture_results.json` | `backtest_only` | No (keep for audit trail) | Sprint 5A fixture results |
+| `data/intelligence/backtest/candidate_feed_ablation_results.json` | `backtest_only` | No (keep for audit trail) | Sprint 5A ablation results |
+| `data/intelligence/backtest/risk_overlay_fixture_results.json` | `backtest_only` | No (keep for audit trail) | Sprint 5A risk overlay results |
+| `data/intelligence/backtest/intelligence_backtest_summary.json` | `backtest_only` | No (keep for audit trail) | Sprint 5A/5B summary |
+| `data/intelligence/backtest/historical_replay_fixtures.json` | `backtest_only` | No (keep for audit trail) | Sprint 5B historical scenarios |
+| `data/intelligence/backtest/historical_replay_results.json` | `backtest_only` | No (keep for audit trail) | Sprint 5B replay results |
+
+---
+
+## Test File Classification
+
+### Tests to Keep — Production Safety Tests
+*These assert correct behaviour of production execution paths. Never delete.*
+
+| Test File | Classification | What It Protects |
+|-----------|---------------|-----------------|
+| `tests/test_intelligence_day2.py` | `production_runtime` | Transmission rules, theme taxonomy, thematic roster schemas |
+| `tests/test_intelligence_day3.py` | `production_runtime` | Economic candidate feed schema and roster-only constraint |
+| `tests/test_intelligence_day4.py` | `production_runtime` | Shadow universe schema, route tags, quota groups |
+| `tests/test_intelligence_day5.py` | `production_runtime` | Comparison schema, structural candidate survival |
+| `tests/test_intelligence_day6.py` | `production_runtime` | 5-slice coverage, quota pressure diagnostics, source collision |
+| `tests/test_intelligence_day7.py` | `production_runtime` | Adapter safety contract (side_effects=false, live_data=false) |
+| `tests/test_intelligence_sprint2.py` | `production_runtime` | Route tagger rules, quota allocator correctness |
+| `tests/test_intelligence_sprint3.py` | `production_runtime` | Headwind handling, route metric distinction |
+| `tests/test_intelligence_sprint4a.py` | `production_runtime` | Daily economic state and economic context schemas |
+| `tests/test_intelligence_sprint4b.py` | `production_runtime` | Theme activation and thesis store schemas |
+| `tests/test_intelligence_sprint6b.py` | `production_runtime` | Advisory hook isolation, flag gate, no-mutation, no-production-imports |
+
+### Tests to Keep — Advisory / Shadow Validation Tests
+*Assert advisory layer correctness. Keep permanently as advisory observer-layer contract.*
+
+| Test File | Classification | What It Protects |
+|-----------|---------------|-----------------|
+| `tests/test_intelligence_sprint6a.py` | `advisory_only` | Advisory report structure, non-executable invariant, forbidden paths |
+
+### Tests to Keep — Backtest Validation Tests
+*Assert backtest output correctness. Keep for CI audit trail. Not on hot path.*
+
+| Test File | Classification | What It Protects |
+|-----------|---------------|-----------------|
+| `tests/test_intelligence_sprint5a.py` | `backtest_only` | Backtest fixtures, ablation variants, risk overlay |
+| `tests/test_intelligence_sprint5b.py` | `backtest_only` | Historical replay fixtures and results |
+
+---
+
+## Duplicate Logic Audit
+
+| Area | Verdict | Detail |
+|------|---------|--------|
+| Regime selection logic | **Justified** | `backtest_intelligence.py` has a local copy (`_select_regime_local`) — this is intentional to prevent backtest from importing production engine; no runtime duplication |
+| Theme evaluation logic | **Justified** | `backtest_intelligence.py` has `_evaluate_theme_for_driver_states` — same rationale; backtest isolation requires local copies |
+| Posture logic | **Justified** | Same rationale |
+| Route assignment | **None** | `route_tagger.py` is the single source; `universe_builder.py` delegates to it |
+| Quota allocation | **None** | `quota_allocator.py` is the single source; `universe_builder.py` delegates to it |
+| Driver state inference | **None** | `intelligence_engine.py` is the single source |
+| Advisory report reading | **None** | Only `advisory_logger.py` reads `advisory_report.json` at runtime |
+
+---
+
+## Modules That Must NOT Be Imported in Production Runtime
+
+| Module | Why |
+|--------|-----|
+| `backtest_intelligence.py` | Contains local copies of regime/theme logic; importing it would create confusion about authority; has no production output path |
+| `advisory_reporter.py` | Generates the static advisory_report.json offline; must not run on live bot execution path |
+| `scanner.py` | Only referenced as a read-only adapter source; must not be imported by intelligence modules |
+| `bot_trading.py` | Live bot; must not be imported by intelligence modules |
+| `market_intelligence.py` | Apex orchestration; must not be imported by intelligence modules |
+
+---
+
+## Production Handoff Readiness (Not Yet Enabled)
+
+| Gate | Status |
+|------|--------|
+| `enable_active_opportunity_universe_handoff` | **False** (locked) |
+| Shadow universe file stable | Yes |
+| Comparison proves structural survival | Yes — 20/20 structural slots filled |
+| Advisory layer logging accumulation needed | **Pending** — need real session log review |
+| Full suite baseline clean | Pending Amit approval to run |
+| Production simplification audit | **This document** |
+
+**Handoff will require:**
+1. Several real-session advisory_runtime_log.jsonl review
+2. `active_opportunity_universe_shadow.json` → renamed to `active_opportunity_universe.json`
+3. `enable_active_opportunity_universe_handoff = True`
+4. `current_pipeline_snapshot.json` retired (migration_tooling — no longer needed)
+5. Apex input change to read from production universe file
+6. Full suite clean run with all pre-existing failures documented
+
+---
+
+## Shadow-Only Files — Disposition After Cutover
+
+### Keep after cutover (monitoring value)
+- `data/universe_builder/current_vs_shadow_comparison.json` — regression monitoring
+- `data/universe_builder/universe_builder_report.json` — sprint-level diagnostics
+- All backtest data files — audit trail
+- All advisory data files — observer logs
+
+### Remove after cutover (migration tooling only)
+- `data/universe_builder/current_pipeline_snapshot.json` — describes old topology; obsolete once new pipeline is live
+
+---
+
+## Cloud Runtime Impact Assessment
+
+| Module | Cloud Impact | Reason |
+|--------|-------------|--------|
+| `intelligence_engine.py` | Low | Pure file reads; no network calls |
+| `candidate_resolver.py` | Low | Pure computation; no network calls |
+| `macro_transmission_matrix.py` | Low | Pure logic; no I/O |
+| `universe_builder.py` | Low | File reads/writes; no network calls |
+| `route_tagger.py` | None | Pure function; no I/O |
+| `quota_allocator.py` | None | Pure function; no I/O |
+| `theme_activation_engine.py` | Low | Pure file reads/writes |
+| `thesis_store.py` | Low | Pure file reads/writes |
+| `intelligence_adapters.py` | None | Reads static files only |
+| `advisory_logger.py` | None | Reads advisory_report.json + appends to JSONL |
+| `advisory_reporter.py` | None | Offline report generation only |
+| `backtest_intelligence.py` | None | Excluded from production runtime |
+| `intelligence_schema_validator.py` | None | CI/CD only |
+
+---
+
+## Update Log
+
+| Date | Action | Notes |
+|------|--------|-------|
+| 2026-05-06 | Created | Initial audit covering Sprints Day2–6B. All intelligence-first modules classified. No files recommended for immediate removal — production handoff gate not yet met. |
