@@ -1606,6 +1606,18 @@ def run_scan():
 
     _print_score_table(scored)
 
+    # ── Intelligence-First advisory logging hook ───────────────────────────
+    # Read-only advisory logging. Must not affect candidate selection, Apex
+    # input, scoring, risk, orders or execution.
+    # Gated by intelligence_first_advisory_enabled (default False).
+    # Any failure is swallowed — advisory never blocks the live bot.
+    if CONFIG.get("intelligence_first_advisory_enabled", False):
+        try:
+            from advisory_logger import log_advisory_context as _log_advisory
+            _log_advisory(candidates=scored, regime=regime_name)
+        except Exception as _adv_err:
+            log.debug(f"Advisory logging skipped (non-critical): {_adv_err}")
+
     # CP-1: Options scan runs before update_position_prices so both use the same
     # live-price moment. Previously options scan ran ~30s after position marks were
     # frozen from the pipeline snapshot, creating a divergent price universe between

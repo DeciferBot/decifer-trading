@@ -8,5 +8,5 @@
 # To force a specific version or change the codename:
 #   ./scripts/bump-version.sh <MAJOR.MINOR.PATCH> "<Codename>"
 
-__version__ = "3.7.3"
+__version__ = "3.7.4"
 __codename__ = "Apex"
