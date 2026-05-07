@@ -969,6 +969,55 @@ Note: `ready_for_flag_activation_design` gate removed. It was never reachable an
 
 ---
 
+## Sprint 7H.2 File Classifications
+
+**Sprint 7H.2 — Scanner-Only Removals Review**
+**Objective:** Classify all 208 scanner-only symbols (symbols present in scanner universe but absent from governed shadow universe) before activation. Review and classification only — no symbol approvals, no roster changes, no production code changes.
+
+### Created Files
+
+| File | Classification | Included in live-bot container? | Notes |
+|------|---------------|--------------------------------|-------|
+| `data/intelligence/scanner_only_removals_review.json` | Advisory/classification output | No | 160 symbol entries across 7 categories; schema v1.0; mode=review_only |
+| `docs/intelligence_first_scanner_only_removals_review_summary.md` | Advisory/design document | No | 8-section human-readable summary; activation gate assessment |
+
+### Files Explicitly NOT Modified in Sprint 7H.2
+
+| File | Reason not modified |
+|------|---------------------|
+| `data/reference/thematic_roster.json` | No symbols approved — review only |
+| `universe_builder.py` | No changes — review only |
+| `candidate_resolver.py` | No changes — review only |
+| `bot_trading.py` | No changes |
+| `scanner.py` | No changes |
+| `guardrails.py` | No changes |
+| `config.py` | No changes — flag remains False |
+| `docs/intelligence_first_retirement_register.md` | Sprint 7H.2 entry added only |
+| `docs/intelligence_first_production_simplification_audit.md` | Sprint 7H.2 entry added only |
+
+### Sprint 7H.2 Anti-Bloat Confirmation
+
+| Check | Status |
+|-------|--------|
+| New live API paths? | No |
+| New broker calls? | No |
+| New LLM calls? | No |
+| New .env reads? | No |
+| Production handoff flag changed? | No — `enable_active_opportunity_universe_handoff = False` |
+| handoff_enabled in manifest? | False |
+| publication_mode? | validation_only |
+| Live bot reads publisher outputs? | No — flag is False |
+| bot_trading.py modified? | No |
+| scanner.py modified? | No |
+| guardrails.py modified? | No |
+| Apex prompt modified? | No |
+| Risk/order/execution logic changed? | No |
+| live_output_changed | False |
+| Symbols approved? | No |
+| thematic_roster.json changed? | No |
+
+---
+
 ## Sprint 7F File Classifications
 
 **Sprint 7F — Handoff Publisher and Live Manifest Generation**
@@ -1097,6 +1146,7 @@ Note: `ready_for_flag_activation_design` gate removed. It was never reachable an
 | 2026-05-07 | Sprint 7A.1 patch | 4 blockers resolved: (1) coverage_gap_review advisory evidence source corrected — now reads candidate_matches[*].advisory_status==advisory_unresolved (not empty unsupported_current_candidates.symbols). Rebuilt with 51 real records: recurring_unsupported_current_count=110. evidence_status + required_input_missing fields added. (2) intelligence_first_advisory_enabled reset to False (observation complete, gate=advisory_ready_for_handoff_design). (3) sector_schema proxy_classifications expanded to 7 (added index_proxy, crypto_proxy, macro_proxy). Validator updated to require all 7. (4) test_intelligence_reference_data.py updated: _minimal_coverage_gap + _minimal_sector_schema fixtures corrected, 2 new evidence_status/required_input_missing tests. test_intelligence_sprint6c.py: TestInsufficientObservation → TestObservationThresholdMet (assertions updated to 35-record reality). Named symbols: SNDK/WDC/IREN in recurring_unsupported_current; MU/LRCX/STX/DOCN/NBIS covered by advisory (not unresolved). 774/774 regression, 25/25 validator, 4/4 smoke. live_output_changed=false. |
 | 2026-05-07 | Sprint 7G | Validation-Only Live Observation with Publisher Running. handoff_publisher_observer.py (read-only observer, advisory/shadow-only) net-new. Reads 4 Sprint 7F publisher output files + .fail_*.json diagnostics; writes data/live/handoff_publisher_observation_report.json atomically. 8 analysis sections: observation_summary (runs: 1ok/3fail), freshness_analysis (SLA: 10/15/20min, sla_met=true), manifest_validity_analysis (handoff_enabled=false, validation_only, safety_flags_clean), active_universe_validity_analysis (50 candidates, 0 violations), heartbeat_analysis (pass, fresh), candidate_stability_analysis (single_observation mode), fail_closed_observations (3 events surfaced from test runs), safety_analysis (all_safety_invariants_hold=true). Readiness gate: insufficient_observation (1 successful run vs 10 threshold). Observer never imports publisher. validate_handoff_publisher_observation_report added to intelligence_schema_validator.py; wired into validate_all(). validate_intelligence_files.py now validates **39 files** (Sprint 7F=38 + 1 new). NOTE: end-of-sprint report incorrectly stated "18/18" — this was a tail-truncation reporting error; actual coverage was never reduced (see Validator Count Reconciliation Note in Sprint 7G File Classifications section). .fail_*.json files are diagnostic artefacts: never read by live bot, retained during validation-only phase, must be rotated/excluded before cloud production. tests/test_handoff_publisher_observer.py net-new, 48 tests. No bot_trading.py modified. No scanner.py. No guardrails.py. No Apex. No risk/order/execution changes. live_bot_consuming_handoff=false. enable_active_opportunity_universe_handoff=False. live_output_changed=false. 48/48 observer, 356/356 Sprint 7 combined, **39/39 validator**, 9/9 smoke. |
 | 2026-05-07 | Sprint 7G.1 | Publisher Observation Run Log Patch. Root cause: `_count_publisher_runs()` capped at successful=1 (heartbeat stores only latest run); neither 10-run nor 3-session threshold reachable. Fix: `_append_run_log()` added to publisher (appends one JSONL line per successful cycle to `data/live/publisher_run_log.jsonl`); fail-safe on OS error (warns, returns False, does not corrupt manifest). Observer refactored: `_read_run_log()` reads all lines; dual-threshold gate: threshold_met = (runs≥10 OR sessions≥3), threshold_basis = "successful_runs" \| "distinct_sessions" \| "not_met"; gate `ready_for_flag_activation_design` removed → `validation_only_stable`. Observation_summary extended with run_log_exists, successful_publisher_runs, distinct_utc_sessions, threshold_met, threshold_basis. Validator extended: validate_publisher_run_log() (13 checks per line), observation_report validator updated; validate_all() now checks 40 files. `publisher_run_log.jsonl` classification: production observability output — never read by live bot; same rotation requirements as .fail_*.json before cloud production. Tests: 10 new in test_handoff_publisher.py (Group 11), 11 new in test_handoff_publisher_observer.py (Group 11). No bot_trading.py modified. No scanner.py. No guardrails.py. No Apex. live_output_changed=false. enable_active_opportunity_universe_handoff=False. **117/117 publisher, 59/59 observer, 377/377 Sprint 7 combined, 40/40 validator, 9/9 smoke. Gate: insufficient_observation (3 runs < 10, 1 session < 3).** |
+| 2026-05-07 | Sprint 7H.2 | Scanner-Only Removals Review — advisory/classification sprint only. No production code changed. No symbols approved. No thematic_roster.json changes. No universe_builder.py or candidate_resolver.py changes. No handoff flag flipped. 160 of 208 scanner-only symbols classified across 7 categories: 59 scanner_only_attention, 55 future_theme_candidate, 18 review_required, 19 unknown_requires_provider_enrichment, 3 rejected, 3 governance_gap_defect (COST/MSFT/PG — EIL-governed but quota-excluded; not a pipeline bug; requires Amit acknowledgement), 3 already_governed_elsewhere. 48 symbols below tracking threshold implicitly classified scanner_only_attention. Two artefacts created: data/intelligence/scanner_only_removals_review.json and docs/intelligence_first_scanner_only_removals_review_summary.md. Activation not hard-blocked but requires Amit acknowledgement of governance gap defects. **40/40 validator, 9/9 smoke.** |
 | 2026-05-07 | Sprint 7H.1 | Activation Readiness Operations Pack — documentation sprint only. No production code changed. No handoff flag flipped. Six new documents created: intelligence_first_cloud_deployment_runbook.md (Phase 1 deployment, startup/shutdown order, process list, required dirs, secrets policy, IBKR model, healthchecks, rollback steps), intelligence_first_activation_rollback_playbook.md (13 pre-activation conditions, activation window design, 15 activation steps, 14 rollback steps, 11 immediate + 3 deferred rollback triggers, 12-item post-activation review), intelligence_first_daily_operator_checklist.md (pre-market/during-market/post-market/emergency — 48 checks across 4 sections), intelligence_first_log_retention_and_diagnostics_policy.md (4 artefact classes, per-file retention policy, container inclusion/exclusion, live bot read policy), intelligence_first_snapshot_archive_design.md (deferred design — purpose, archive path, what to archive, retention, implementation gate), intelligence_first_scanner_only_removals_review_plan.md (known context, 6 review categories A-F, review inputs with diff code, output report template with activation gate). Three existing documents updated: intelligence_first_definitions_and_runtime_contract.md Section 17 added (9 activation readiness terms), retirement_register.md Sprint 7H.1 entry added, production_simplification_audit.md Sprint 7H.1 entry added. No new live API paths. No broker calls. No LLM calls. No .env reads. No scanner/guardrails/Apex/risk/order/execution changes. enable_active_opportunity_universe_handoff=False. live_output_changed=false. **40/40 validator, 9/9 smoke.** |
 | 2026-05-07 | Sprint 7H | Handoff Activation Design Review — design sprint only. No production code changed. No handoff flag flipped. Gate validation_only_stable reached (10 runs, 40/40, 9/9). Session diversity NOT achieved (1 UTC session, not 3 — single-session limitation documented as HIGH risk). Three design documents created: docs/intelligence_first_handoff_activation_design_review.md (8-section review: current state, evidence, 8 risks, 4 options, prerequisites, activation window, rollback design, go/no-go criteria), docs/intelligence_first_handoff_activation_checklist.md (14-section checklist with Amit approval field), docs/intelligence_first_controlled_activation_test_plan.md (78 test case design across 14 groups — design artefact, not yet implemented). Key findings: RISK-01 single-session evidence HIGH; 208 scanner-only removals acknowledged; SNDK/WDC/IREN quota-excluded but governed; no snapshot archive; fail-closed by design (no scanner fallback); PM Track B independent. Recommendation: Option A — continue observation across ≥3 distinct UTC sessions. Production activation blocked — requires 13 Go criteria + Amit explicit approval. No bot_trading.py modified. No scanner, guardrails, Apex, risk, order, execution changes. enable_active_opportunity_universe_handoff=False. live_output_changed=false. **40/40 validator, 9/9 smoke. Full suite not run (documentation-only sprint). Production activation blocked.** |
 | 2026-05-07 | Sprint 7F | Handoff Publisher and Live Manifest Generation. handoff_publisher.py (production runtime candidate / scheduled worker) net-new. Reads shadow universe, transforms candidates, publishes 4 files atomically: data/live/active_opportunity_universe.json (production_handoff_universe, validation_only, 50 candidates, all executable=false), data/live/current_manifest.json (handoff_enabled=false, validation_only, enable_flag_required=true), data/live/handoff_publisher_report.json (all 13 safety flags false, overall_status=pass), data/heartbeats/handoff_publisher.json (pass, 50 candidates). Atomic write policy: .tmp → validate → os.replace; never overwrites valid file with invalid; .fail_{timestamp}.json diagnostic on failure; heartbeat only after full cycle. 4 new validators in intelligence_schema_validator.py (validate_prod_active_universe, validate_prod_manifest, validate_handoff_publisher_report, validate_handoff_publisher_heartbeat). 2 stale test assertions updated (test_intelligence_sprint7b.py + test_intelligence_sprint7c.py "file must not exist" → "if exists, verify safety fields"). tests/test_handoff_publisher.py net-new, 107 tests. No bot_trading.py modified. No scanner.py. No guardrails.py. No Apex. No risk/order/execution changes. enable_active_opportunity_universe_handoff=False. live_output_changed=false. 107/107 publisher, 1146/1146 intelligence regression, 38/38 validator, 8/8 smoke. |
