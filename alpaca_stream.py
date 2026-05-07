@@ -321,7 +321,10 @@ class AlpacaBarStream:
             log.debug("AlpacaBarStream: universe unchanged — skipping stream restart")
             return
         if self._running:
+            old_thread = self._thread
             self.stop()
+            if old_thread and old_thread.is_alive():
+                old_thread.join(timeout=3.0)
         self.start(full_symbols)
 
     def symbols(self) -> set:
@@ -330,6 +333,7 @@ class AlpacaBarStream:
 
     def _run(self, symbols: list[str]) -> None:
         """Background thread: connect to Alpaca WebSocket and stream all channels."""
+        my_thread = threading.current_thread()
         from config import CONFIG
 
         api_key = CONFIG.get("alpaca_api_key", "")
@@ -392,7 +396,7 @@ class AlpacaBarStream:
         _MAX_TRIES = 10
         attempt = 0
 
-        while self._running and attempt < _MAX_TRIES:
+        while self._running and attempt < _MAX_TRIES and (self._thread is None or self._thread is my_thread):
             stream_start = time.time()
             try:
                 self._stream = StockDataStream(api_key, secret_key, feed=DataFeed.SIP)
@@ -404,6 +408,10 @@ class AlpacaBarStream:
             except Exception as exc:
                 if not self._running:
                     break  # intentional stop() call — exit cleanly
+                try:
+                    self._stream.stop()
+                except Exception:
+                    pass
                 alive_secs = time.time() - stream_start
                 if alive_secs > 60:
                     attempt = 0  # stream ran healthily — reset failure counter
