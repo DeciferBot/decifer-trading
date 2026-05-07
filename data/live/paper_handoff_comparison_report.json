@@ -1,0 +1,962 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-07T05:58:28Z",
+  "mode": "paper_handoff_comparison",
+  "source_files": [
+    "data/live/paper_active_opportunity_universe.json",
+    "data/live/paper_current_manifest.json",
+    "data/live/paper_handoff_validation_report.json",
+    "data/universe_builder/current_pipeline_snapshot.json",
+    "data/universe_builder/current_vs_shadow_comparison.json",
+    "data/universe_builder/universe_builder_report.json",
+    "data/intelligence/advisory_report.json",
+    "data/intelligence/advisory_log_review.json",
+    "data/intelligence/coverage_gap_review.json",
+    "data/reference/symbol_master.json",
+    "data/intelligence/economic_candidate_feed.json"
+  ],
+  "paper_manifest_summary": {
+    "available": true,
+    "handoff_mode": "paper",
+    "handoff_enabled": false,
+    "validation_status": "pass",
+    "publisher": "paper_handoff_builder",
+    "published_at": "2026-05-07T05:56:49Z",
+    "expires_at": "2026-05-08T05:56:49Z",
+    "no_executable_trade_instructions": true,
+    "live_output_changed": false
+  },
+  "paper_universe_summary": {
+    "available": true,
+    "candidate_count": 50,
+    "route_counts": {
+      "manual_conviction": 13,
+      "position": 11,
+      "swing": 9,
+      "watchlist": 10,
+      "intraday_swing": 7
+    },
+    "approval_status_counts": {
+      "manual_protected": 13,
+      "approved": 28,
+      "watchlist_allowed": 9
+    },
+    "all_executable_false": true,
+    "all_order_instruction_null": true,
+    "mode": "paper_handoff_universe",
+    "validation_status": "pass",
+    "expires_at": "2026-05-08T05:56:49Z",
+    "live_output_changed": false
+  },
+  "current_pipeline_summary": {
+    "available": true,
+    "current_pre_filter_pool": 235,
+    "tier_a_count": 51,
+    "tier_b_count": 50,
+    "tier_d_count": 150,
+    "favourites_count": 13,
+    "shadow_total": 50,
+    "shadow_position_count": 11,
+    "shadow_swing_count": 9,
+    "shadow_structural_count": 20,
+    "shadow_economic_intelligence_count": 30,
+    "shadow_manual_count": 13,
+    "overlap_count_current_vs_shadow": 27,
+    "in_current_not_shadow": 208,
+    "in_shadow_not_current": 23
+  },
+  "overlap_analysis": {
+    "current_candidates_count": 235,
+    "paper_candidates_count": 50,
+    "overlap_count": 50,
+    "in_current_not_paper_count": 50,
+    "in_paper_not_current_count": 0,
+    "in_current_not_paper": [
+      "A",
+      "ABBV",
+      "ABT",
+      "ACGL",
+      "ADP",
+      "ADSK",
+      "AEM",
+      "AFRM",
+      "AGCO",
+      "ALNY",
+      "AMZN",
+      "AON",
+      "APH",
+      "APLD",
+      "APO",
+      "APP",
+      "ARGX",
+      "ASND",
+      "AVTR",
+      "AXON",
+      "AXP",
+      "AYI",
+      "B",
+      "BA",
+      "BABA",
+      "BALL",
+      "BAP",
+      "BBY",
+      "BG",
+      "BIDU",
+      "BIIB",
+      "BITO",
+      "BJ",
+      "BK",
+      "BLK",
+      "BMNR",
+      "BR",
+      "BULL",
+      "BURL",
+      "BX",
+      "CARR",
+      "CAT",
+      "CCI",
+      "CDE",
+      "CG",
+      "CHTR",
+      "CMS",
+      "COP",
+      "COPX",
+      "COST"
+    ],
+    "in_paper_not_current": [],
+    "overlap_symbols": [
+      "AAPL",
+      "ACI",
+      "AMD",
+      "ASML",
+      "ASTS",
+      "AVGO",
+      "BAC",
+      "CBRE",
+      "CEG",
+      "CHD",
+      "CVX",
+      "EPAM",
+      "ETN",
+      "EXPE",
+      "GD",
+      "GLD",
+      "GS",
+      "HIMS",
+      "IBIT",
+      "ITA",
+      "IWM",
+      "JPM",
+      "LMT",
+      "MU",
+      "NBIS",
+      "NOC",
+      "NVDA",
+      "ONDS",
+      "OXY",
+      "PLD",
+      "PWR",
+      "QQQ",
+      "QUAL",
+      "RTX",
+      "SLB",
+      "SMH",
+      "SPLV",
+      "SPY",
+      "TCGL",
+      "TSLA",
+      "TSM",
+      "USO",
+      "VRT",
+      "WFC",
+      "XLE",
+      "XLF",
+      "XLP",
+      "XLU",
+      "XLV",
+      "XOM"
+    ],
+    "overlap_rate": 0.213,
+    "paper_unique_rate": 0.0,
+    "note": "current_candidates_count reflects advisory_report.current_candidates_count (235). Paper universe (50) is the governed shadow-only subset. Large current>paper gap is expected: paper contains only governed intelligence-layer candidates."
+  },
+  "drop_analysis": [
+    {
+      "symbol": "A",
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "ABBV",
+      "current_sources": [
+        "tier_d_structural",
+        "tier_a_always_on"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "ABT",
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "ACGL",
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "ADP",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "ADSK",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "AEM",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "AFRM",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "AGCO",
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "ALNY",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "AMZN",
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "AON",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "APH",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "APLD",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "APO",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "APP",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "ARGX",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "ASND",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "AVTR",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "AXON",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "AXP",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "AYI",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "B",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BA",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BABA",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BALL",
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BAP",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BBY",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BG",
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BIDU",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BIIB",
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BITO",
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BJ",
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BK",
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BLK",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BMNR",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BR",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BULL",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BURL",
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "BX",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "CARR",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "CAT",
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "CCI",
+      "current_sources": [
+        "tier_d_structural"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "CDE",
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "CG",
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "CHTR",
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "CMS",
+      "current_sources": [
+        "current_pool_unknown_source"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "COP",
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "COPX",
+      "current_sources": [
+        "tier_a_always_on"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    },
+    {
+      "symbol": "COST",
+      "current_sources": [
+        "tier_a_always_on",
+        "economic_candidate_feed"
+      ],
+      "advisory_status": "advisory_defer",
+      "reason_missing_from_paper": "not_in_governed_shadow_universe",
+      "likely_policy": "review_required"
+    }
+  ],
+  "addition_analysis": [],
+  "route_disagreement_analysis": {
+    "total_route_disagreements": 17,
+    "vocabulary_only_count": 9,
+    "meaningful_route_conflict_count": 8,
+    "watchlist_demotions_count": 1,
+    "swing_intraday_normalisation_count": 5,
+    "manual_conviction_normalisation_count": 4,
+    "details": [
+      {
+        "symbol": "ASTS",
+        "current_route": "position",
+        "paper_route": "manual_conviction",
+        "classification": "manual_conviction_normalisation"
+      },
+      {
+        "symbol": "CVX",
+        "current_route": "intraday_swing",
+        "paper_route": "swing",
+        "classification": "swing_intraday_normalisation"
+      },
+      {
+        "symbol": "JPM",
+        "current_route": "intraday_swing",
+        "paper_route": "swing",
+        "classification": "swing_intraday_normalisation"
+      },
+      {
+        "symbol": "USO",
+        "current_route": "intraday_swing",
+        "paper_route": "manual_conviction",
+        "classification": "meaningful_conflict"
+      },
+      {
+        "symbol": "TSLA",
+        "current_route": "intraday_swing",
+        "paper_route": "manual_conviction",
+        "classification": "meaningful_conflict"
+      },
+      {
+        "symbol": "AAPL",
+        "current_route": "intraday_swing",
+        "paper_route": "manual_conviction",
+        "classification": "meaningful_conflict"
+      },
+      {
+        "symbol": "IWM",
+        "current_route": "intraday_swing",
+        "paper_route": "watchlist",
+        "classification": "watchlist_demotion"
+      },
+      {
+        "symbol": "QQQ",
+        "current_route": "intraday_swing",
+        "paper_route": "manual_conviction",
+        "classification": "meaningful_conflict"
+      },
+      {
+        "symbol": "SPY",
+        "current_route": "intraday_swing",
+        "paper_route": "manual_conviction",
+        "classification": "meaningful_conflict"
+      },
+      {
+        "symbol": "GLD",
+        "current_route": "intraday_swing",
+        "paper_route": "manual_conviction",
+        "classification": "meaningful_conflict"
+      },
+      {
+        "symbol": "MU",
+        "current_route": "position",
+        "paper_route": "manual_conviction",
+        "classification": "manual_conviction_normalisation"
+      },
+      {
+        "symbol": "GS",
+        "current_route": "intraday_swing",
+        "paper_route": "swing",
+        "classification": "swing_intraday_normalisation"
+      },
+      {
+        "symbol": "IBIT",
+        "current_route": "intraday_swing",
+        "paper_route": "manual_conviction",
+        "classification": "meaningful_conflict"
+      },
+      {
+        "symbol": "OXY",
+        "current_route": "intraday_swing",
+        "paper_route": "swing",
+        "classification": "swing_intraday_normalisation"
+      },
+      {
+        "symbol": "XOM",
+        "current_route": "intraday_swing",
+        "paper_route": "swing",
+        "classification": "swing_intraday_normalisation"
+      },
+      {
+        "symbol": "NVDA",
+        "current_route": "position",
+        "paper_route": "manual_conviction",
+        "classification": "manual_conviction_normalisation"
+      },
+      {
+        "symbol": "NBIS",
+        "current_route": "position",
+        "paper_route": "manual_conviction",
+        "classification": "manual_conviction_normalisation"
+      }
+    ]
+  },
+  "quota_pressure_analysis": {
+    "structural_demand": 20,
+    "structural_capacity": 20,
+    "structural_overflow": 0,
+    "attention_demand": 8,
+    "attention_capacity": 15,
+    "attention_overflow": 0,
+    "quota_binding": false,
+    "symbols_excluded_due_quota_count": 156,
+    "symbols_excluded_due_quota_sample": [
+      "MSFT",
+      "COST",
+      "BRK.B",
+      "COST",
+      "JNJ",
+      "PG",
+      "KO",
+      "PEP",
+      "SNDK",
+      "WDC",
+      "IREN",
+      "TE",
+      "IONQ",
+      "APP",
+      "CRDO",
+      "RKLB",
+      "SNAP",
+      "BMNR",
+      "AFRM",
+      "DASH"
+    ],
+    "watch_symbol_quota_status": {
+      "SNDK": {
+        "in_paper_universe": false,
+        "excluded_due_quota": true,
+        "exclusion_reason": "Structural quota full (20)"
+      },
+      "WDC": {
+        "in_paper_universe": false,
+        "excluded_due_quota": true,
+        "exclusion_reason": "Structural quota full (20)"
+      },
+      "IREN": {
+        "in_paper_universe": false,
+        "excluded_due_quota": true,
+        "exclusion_reason": "Structural quota full (20)"
+      },
+      "MU": {
+        "in_paper_universe": true,
+        "excluded_due_quota": false,
+        "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+      },
+      "LRCX": {
+        "in_paper_universe": false,
+        "excluded_due_quota": false,
+        "exclusion_reason": null
+      },
+      "STX": {
+        "in_paper_universe": false,
+        "excluded_due_quota": true,
+        "exclusion_reason": "Structural quota full (20)"
+      },
+      "DOCN": {
+        "in_paper_universe": false,
+        "excluded_due_quota": false,
+        "exclusion_reason": null
+      },
+      "NBIS": {
+        "in_paper_universe": true,
+        "excluded_due_quota": false,
+        "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
+      }
+    }
+  },
+  "coverage_gap_analysis": {
+    "available": true,
+    "advisory_records_analysed": 51,
+    "evidence_status": "sufficient_advisory_input",
+    "recurring_unsupported_current_count": 110,
+    "recurring_missing_shadow_count": 23,
+    "approved_gap_symbols": [
+      "ALAB",
+      "AMAT",
+      "AME",
+      "AMP",
+      "ASML",
+      "AVGO",
+      "BAC",
+      "BC",
+      "CACI",
+      "CEG",
+      "CFG",
+      "CLH",
+      "COIN",
+      "CRBG",
+      "CRDO",
+      "CRWD",
+      "CRWG",
+      "CRWV",
+      "CVNA",
+      "CW",
+      "DASH",
+      "DKS",
+      "DLR",
+      "ELV",
+      "EOSE",
+      "EQH",
+      "EQR",
+      "ETN",
+      "EW",
+      "FPS"
+    ],
+    "review_required_symbols": [],
+    "scanner_only_attention_symbols": [],
+    "unknown_requires_provider_enrichment": [
+      "VXX",
+      "SLV",
+      "OSCR",
+      "TGT",
+      "REGN",
+      "SVXY",
+      "DDOG",
+      "MRNA",
+      "WST",
+      "VRSN"
+    ]
+  },
+  "approved_gap_symbol_analysis": {
+    "SNDK": {
+      "in_symbol_master": true,
+      "in_theme_overlay_map": true,
+      "in_theme_taxonomy": true,
+      "in_transmission_rules": true,
+      "in_thematic_roster": true,
+      "in_economic_candidate_feed": false,
+      "in_paper_active_universe": false,
+      "excluded_due_quota": true,
+      "exclusion_reason": "Structural quota full (20)",
+      "route": null,
+      "reason_to_care": null,
+      "risk_flags": [],
+      "confirmation_required": [],
+      "executable": false,
+      "order_instruction": null,
+      "note": "Governed via thematic_roster and transmission_rules. Excluded from shadow universe due to structural quota cap (20). Pipeline wiring is correct \u2014 quota is the binding constraint."
+    },
+    "WDC": {
+      "in_symbol_master": true,
+      "in_theme_overlay_map": true,
+      "in_theme_taxonomy": true,
+      "in_transmission_rules": true,
+      "in_thematic_roster": true,
+      "in_economic_candidate_feed": false,
+      "in_paper_active_universe": false,
+      "excluded_due_quota": true,
+      "exclusion_reason": "Structural quota full (20)",
+      "route": null,
+      "reason_to_care": null,
+      "risk_flags": [],
+      "confirmation_required": [],
+      "executable": false,
+      "order_instruction": null,
+      "note": "Governed via thematic_roster and transmission_rules. Excluded from shadow universe due to structural quota cap (20). Pipeline wiring is correct \u2014 quota is the binding constraint."
+    },
+    "IREN": {
+      "in_symbol_master": true,
+      "in_theme_overlay_map": true,
+      "in_theme_taxonomy": true,
+      "in_transmission_rules": true,
+      "in_thematic_roster": true,
+      "in_economic_candidate_feed": false,
+      "in_paper_active_universe": false,
+      "excluded_due_quota": true,
+      "exclusion_reason": "Structural quota full (20)",
+      "route": null,
+      "reason_to_care": null,
+      "risk_flags": [],
+      "confirmation_required": [],
+      "executable": false,
+      "order_instruction": null,
+      "note": "Governed via thematic_roster and transmission_rules. Excluded from shadow universe due to structural quota cap (20). Pipeline wiring is correct \u2014 quota is the binding constraint."
+    }
+  },
+  "safety_analysis": {
+    "paper_manifest_handoff_enabled": false,
+    "enable_active_opportunity_universe_handoff": false,
+    "production_manifest_not_written": true,
+    "production_active_universe_not_written": true,
+    "no_executable_candidates": true,
+    "no_order_instructions": true,
+    "no_scanner_fallback": true,
+    "no_apex_input_change": true,
+    "no_risk_order_execution_change": true,
+    "handoff_allowed": false,
+    "live_output_changed": false,
+    "all_safety_invariants_hold": true
+  },
+  "recommendation": "ready_for_controlled_handoff_design",
+  "warnings": [],
+  "production_candidate_source_changed": false,
+  "apex_input_changed": false,
+  "scanner_output_changed": false,
+  "risk_logic_changed": false,
+  "order_logic_changed": false,
+  "broker_called": false,
+  "trading_api_called": false,
+  "llm_called": false,
+  "raw_news_used": false,
+  "broad_intraday_scan_used": false,
+  "secrets_exposed": false,
+  "env_values_logged": false,
+  "live_output_changed": false
+}
