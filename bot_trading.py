@@ -96,6 +96,98 @@ _last_collapse_scores: dict = {}  # symbol → current_score at last score_colla
 _last_rise_scores: dict = {}  # symbol → current_score at last held_score_rise review (edge dedup)
 _last_scalp_mom_scores: dict = {}  # symbol → momentum score at last scalp_signal_lost review (edge dedup)
 
+# ── Intelligence-First controlled handoff state ───────────────────────────────
+# Populated by _get_handoff_symbol_universe() each scan cycle when the handoff
+# flag is True. Cleared at the start of each cycle. Never read by risk/order logic.
+_handoff_governance_map: dict = {}
+
+
+# ---------------------------------------------------------------------------
+# Controlled handoff private functions (Sprint 7E)
+# ---------------------------------------------------------------------------
+
+_PRODUCTION_MANIFEST_PATH = "data/live/current_manifest.json"
+
+
+def _log_handoff_fail_closed(reason: str, manifest_path: str = _PRODUCTION_MANIFEST_PATH) -> None:
+    """Write a structured fail-closed log record to the standard bot log."""
+    import logging as _logging
+    _hlog = _logging.getLogger(__name__)
+    _hlog.warning(
+        "[handoff_wiring] FAIL_CLOSED "
+        "mode=controlled_handoff "
+        "handoff_enabled=true "
+        "manifest_path=%s "
+        "fail_closed_reason=%s "
+        "scanner_fallback_attempted=False "
+        "apex_input_changed=False "
+        "risk_logic_changed=False "
+        "order_logic_changed=False "
+        "live_output_changed=False",
+        manifest_path,
+        reason,
+    )
+
+
+def _get_handoff_symbol_universe() -> tuple[list[str], dict, str | None]:
+    """
+    Load the production handoff and extract a scored-universe-compatible symbol list.
+
+    Returns (symbol_list, governance_map, fail_closed_reason).
+
+    On success:  symbol_list is non-empty; governance_map maps symbol → candidate dict;
+                 fail_closed_reason is None.
+    On failure:  symbol_list is []; governance_map is {}; fail_closed_reason is set.
+
+    Never falls back to scanner discovery.
+    Never calls broker, LLM, raw news, or broad scan.
+    """
+    try:
+        import handoff_reader as _hr
+        result = _hr.load_production_handoff(_PRODUCTION_MANIFEST_PATH)
+    except Exception as exc:
+        reason = f"handoff_reader_exception: {exc}"
+        _log_handoff_fail_closed(reason)
+        return [], {}, reason
+
+    if not result.get("handoff_allowed", False):
+        reason = result.get("fail_closed_reason") or "handoff_not_allowed"
+        _log_handoff_fail_closed(reason)
+        return [], {}, reason
+
+    accepted = result.get("accepted_candidates", [])
+    if not accepted:
+        reason = "zero_accepted_candidates"
+        _log_handoff_fail_closed(reason)
+        return [], {}, reason
+
+    try:
+        from handoff_candidate_adapter import build_governance_map as _build_gov_map
+        governance_map = _build_gov_map(accepted)
+    except Exception as exc:
+        reason = f"handoff_adapter_exception: {exc}"
+        _log_handoff_fail_closed(reason)
+        return [], {}, reason
+
+    symbol_list = list(governance_map.keys())
+    if not symbol_list:
+        reason = "zero_symbols_after_governance_map_build"
+        _log_handoff_fail_closed(reason)
+        return [], {}, reason
+
+    import logging as _logging
+    _logging.getLogger(__name__).info(
+        "[handoff_wiring] candidate_source=handoff_reader "
+        "accepted_candidate_count=%d rejected_candidate_count=%d "
+        "scanner_fallback_attempted=False scanner_output_changed=False "
+        "apex_input_changed=False risk_logic_changed=False "
+        "order_logic_changed=False live_output_changed=False",
+        len(accepted),
+        len(result.get("rejected_candidates", [])),
+    )
+    return symbol_list, governance_map, None
+
+
 # ── Last-decision writer (for Chief Decifer trade card) ───────────────────────
 
 
@@ -1443,8 +1535,30 @@ def run_scan():
             vix=regime.get("vix", "?"),
         )
 
-    clog("SCAN", "Building dynamic universe (Alpaca screening)...")
-    universe = get_dynamic_universe(ib, regime)
+    # ── Controlled handoff wiring (Sprint 7E) ────────────────────────────────
+    # When enable_active_opportunity_universe_handoff=False (default), scanner-led
+    # discovery runs unchanged.  When True, the production manifest is read and
+    # validated by handoff_reader.  On any failure the cycle fails closed — no
+    # scanner fallback, no new entries.  PM Track B (open position review) is
+    # unaffected and runs later in this function regardless of this branch.
+    _handoff_fail_closed_reason: str | None = None
+    global _handoff_governance_map
+    _handoff_governance_map = {}
+
+    if CONFIG.get("enable_active_opportunity_universe_handoff", False):
+        clog("SCAN", "[handoff_wiring] flag_state=True — loading production handoff...")
+        _hoff_symbols, _hoff_gov_map, _handoff_fail_closed_reason = _get_handoff_symbol_universe()
+        _handoff_governance_map = _hoff_gov_map
+        if _handoff_fail_closed_reason:
+            clog("HANDOFF", f"[handoff_wiring] fail_closed_reason={_handoff_fail_closed_reason}")
+            universe = []
+        else:
+            universe = _hoff_symbols
+            clog("SCAN", f"[handoff_wiring] candidate_source=handoff_reader universe={len(universe)} symbols")
+    else:
+        clog("SCAN", "Building dynamic universe (Alpaca screening)...")
+        universe = get_dynamic_universe(ib, regime)
+
     # Sector bias is cached inside get_dynamic_universe — fetch the cached result for the dashboard.
     try:
         from scanner import get_sector_rotation_bias as _get_sbias
@@ -1545,6 +1659,17 @@ def run_scan():
     regime_name = pipeline.regime_name
 
     dash["news_data"] = news_sentiment
+
+    # ── Handoff governance metadata attachment (Sprint 7E) ───────────────────
+    # Attaches handoff_* prefixed governance fields to scored dicts.
+    # Pure adapter call — does not modify score, raw_score, or signal dimensions.
+    # Only runs when handoff is enabled and succeeded (fail-closed check is below).
+    if CONFIG.get("enable_active_opportunity_universe_handoff", False) and not _handoff_fail_closed_reason and _handoff_governance_map:
+        try:
+            from handoff_candidate_adapter import attach_governance_metadata as _attach_gov
+            _attach_gov(pipeline.all_scored, _handoff_governance_map)
+        except Exception as _hoff_adapt_err:
+            log.debug("handoff governance attachment skipped: %s", _hoff_adapt_err)
 
     # BACK-007 — update directional skew display each scan
     try:
@@ -2407,6 +2532,20 @@ def run_scan():
     tradeable_now, reason_now = check_risk_conditions(pv, pnl, regime, get_open_positions(), ib=ib)
     if not tradeable_now:
         clog("RISK", f"Trading suspended before buy execution: {reason_now}")
+        dash["scanning"] = False
+        return
+
+    # ── Controlled handoff fail-closed guard (Sprint 7E) ─────────────────────
+    # When the handoff flag is True and the handoff failed validation, skip Track A
+    # entirely.  PM Track B (open position review) has already run above this point,
+    # so existing positions continue to be managed.  No scanner fallback is attempted.
+    if CONFIG.get("enable_active_opportunity_universe_handoff", False) and _handoff_fail_closed_reason is not None:
+        clog(
+            "HANDOFF",
+            f"[handoff_wiring] fail_closed — skipping Track A new entries. "
+            f"reason={_handoff_fail_closed_reason} "
+            f"scanner_fallback_attempted=False apex_input_changed=False live_output_changed=False",
+        )
         dash["scanning"] = False
         return
 
