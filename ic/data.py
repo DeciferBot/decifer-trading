@@ -28,8 +28,12 @@ def _load_signal_records(
     min_age_days: int = 0,
 ) -> list[dict]:
     """
-    Load the most recent `window` records that have a fully-populated
-    score_breakdown (all 9 dimensions present).
+    Load all records from the most recent `window` unique trading DATES that
+    have a fully-populated score_breakdown (all 9 dimensions present).
+
+    `window` is a date count, not a record count.  Each scan cycle scores
+    ~1,000 symbols, so counting records instead of dates would mean window=60
+    covers a single partial scan rather than 60 trading days.
 
     If *min_age_days* > 0, only records at least that many calendar days old
     are included.  This ensures forward-return data can actually be fetched
@@ -64,20 +68,31 @@ def _load_signal_records(
                         continue
                     for d in DIMENSIONS:
                         bd.setdefault(d, 0)
-                    if min_age_days > 0:
-                        ts_str = rec.get("ts", "")
-                        if not ts_str:
-                            continue
+                    ts_str = rec.get("ts", "")
+                    if not ts_str:
+                        continue
+                    try:
                         scan_date = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).date()
-                        if (today - scan_date).days < min_age_days:
-                            continue
+                    except Exception:
+                        continue
+                    if min_age_days > 0 and (today - scan_date).days < min_age_days:
+                        continue
+                    rec["_scan_date"] = str(scan_date)
                     records.append(rec)
                 except Exception:
                     continue
     except Exception as e:
         log.warning("_load_signal_records: read error %s: %s", path, e)
         return []
-    return records[-window:]
+
+    # Select the most recent `window` unique trading dates, then return ALL
+    # records from those dates.  This keeps IC estimates stable across the
+    # full universe scored each day rather than a single-scan slice.
+    all_dates = sorted({r["_scan_date"] for r in records})
+    if len(all_dates) <= window:
+        return records
+    cutoff_date = all_dates[-window]
+    return [r for r in records if r["_scan_date"] >= cutoff_date]
 
 
 def _dir_sign(rec: dict) -> int:

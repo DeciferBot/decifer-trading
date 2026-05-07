@@ -365,15 +365,19 @@ CONFIG = {
     # Phase 1 (current): ic_min_threshold = 0.0 — any positive IC gets weight.
     # Phase 2 (needs 100+ trades): raise ic_min_threshold to 0.03 to suppress noise.
     "ic_calculator": {
-        "rolling_window": 60,  # Number of trading *dates* in rolling IC window
+        "rolling_window": 200,  # Number of trading *dates* in rolling IC window
+        # Phase 1: 60. Phase 2 (2026-05-07): raised to 200 — 60-record window was too noisy;
+        # factor analysis on 28k records showed mtf/short_squeeze IC was spurious at n=60.
         "min_valid_records": 10,  # Legacy — kept for backward compat
         "min_valid_dates": 3,  # Min trading dates with IC before weights diverge from equal
-        "forward_horizon_days": 1,  # Forward return horizon (trading days). 1 = next close.
-        #   Phase 1: 1 day (fast bootstrap, noisier IC)
-        #   Phase 2: raise to 5 once 60+ dates accumulated
-        "ic_min_threshold": 0.0,  # Noise floor — dimensions below this get zero weight
-        #   Phase 1: 0.0 (any positive IC passes)
-        #   Phase 2: raise to 0.03 once 100+ trades available
+        "forward_horizon_days": 5,  # Forward return horizon (trading days).
+        # Phase 1: 1 day (fast bootstrap, noisier IC)
+        # Phase 2 (2026-05-07): raised to 5 — factor analysis confirmed 5d IC is more stable
+        # and predictive (news: +0.115, social: +0.072 at 5d vs noisier 1d estimates).
+        "ic_min_threshold": 0.03,  # Noise floor — dimensions below this get zero weight
+        # Phase 1: 0.0 (any positive IC passes)
+        # Phase 2 (2026-05-07): raised to 0.03 — suppresses marginal dims (flow +0.025,
+        # reversion +0.020, breakout +0.006) that are below reliable detection threshold.
         "max_single_weight": 0.40,  # HHI cap — no dimension may exceed this share of total weight
         # IC auto-disable: if a dimension's IC falls below the threshold for N
         # consecutive weekly updates, it is automatically disabled via
@@ -393,7 +397,9 @@ CONFIG = {
         # Fixes the cold-start trap: dimensions with IC=0 (no data) get zero weight →
         # never generate trades → never build IC → permanently stuck at 0.
         # Enable in paper mode. Disable once all dimensions have ≥20 trades of IC data.
-        "force_equal_weights": False,  # IC weighting active (2026-04-28, n=60, 5 dims IC>0.05)
+        "force_equal_weights": False,  # IC weighting active. Phase 2 (2026-05-07): date-based
+        # window (200 dates), 5d horizon, ic_min=0.03. Active dims: news(40%), social(26%),
+        # trend(19%), reversion(15%). squeeze/momentum/mtf zero-weighted (negative IC).
         "edge_gate_enabled": True,   # Re-enabled: mean positive IC = 0.1728 (gate: >0.02)
         # Circular: low IC → gate raises bar → fewer trades → lower IC.
         # Re-enable when system has proven IC > 0.02 across dims.

@@ -53,6 +53,7 @@ class Signal:
     candle_gate: str = "UNKNOWN"
     instrument: str = "stock"  # "stock", "fx", "option" — routes get_contract()
     scanner_tier: str = ""  # "D" for Position Research Universe; "" for Tier A/B/C
+    extension_at_entry: dict | None = None  # {atr_distance_50ema, pct_from_20d_low, pct_above_donch_high}
 
     def to_dict(self) -> dict:
         """Serialise to a JSON-safe dict (timestamp as ISO string)."""

@@ -626,6 +626,7 @@ def _scored_to_signals(scored: list, regime_name: str) -> list:
                 candle_gate=s.get("candle_gate", "UNKNOWN"),
                 instrument=s.get("instrument", "stock"),
                 scanner_tier=s.get("scanner_tier", ""),
+                extension_at_entry=s.get("extension_at_entry"),
             )
         )
     return signals
