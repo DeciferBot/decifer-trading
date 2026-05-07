@@ -1,0 +1,1226 @@
+{
+  "schema_version": "1.0",
+  "sprint": "7H.3",
+  "generated_at": "2026-05-07T18:18:18Z",
+  "mode": "calibration_only",
+  "publication_mode": "validation_only",
+  "live_output_changed": false,
+  "production_manifest_overwritten": false,
+  "production_universe_overwritten": false,
+  "handoff_enabled": false,
+  "enable_active_opportunity_universe_handoff": false,
+  "live_bot_consuming_handoff": false,
+  "broker_called": false,
+  "trading_api_called": false,
+  "llm_called": false,
+  "production_paths_intact_before": {
+    "data/live/current_manifest.json": true,
+    "data/live/active_opportunity_universe.json": true
+  },
+  "production_paths_intact_after": {
+    "data/live/current_manifest.json": true,
+    "data/live/active_opportunity_universe.json": true
+  },
+  "eil_symbol_count": 42,
+  "eil_etf_proxy_count": 9,
+  "eil_single_name_count": 33,
+  "scenarios": [
+    {
+      "label": "A_baseline",
+      "description": "Current baseline",
+      "caps": {
+        "total": 50,
+        "structural": 20,
+        "etf_proxy": 10,
+        "attention": 15,
+        "catalyst": 30
+      },
+      "timing_ms": {
+        "publisher_generation": 436.3,
+        "manifest_validation": 9.6,
+        "handoff_reader_load": 1.7,
+        "total_scenario": 451.0
+      },
+      "candidate_count": 50,
+      "structural_count": 20,
+      "attention_count": 8,
+      "etf_proxy_count": 9,
+      "manual_count": 13,
+      "held_count": 0,
+      "eil_etf_in_universe": [
+        "XLU",
+        "SMH",
+        "XLF",
+        "XLE",
+        "ITA",
+        "QUAL",
+        "XLP",
+        "XLV",
+        "SPLV"
+      ],
+      "non_eil_etf_in_universe": [],
+      "etf_crowding_ratio": 1.0,
+      "governed_excluded_count": 10,
+      "governed_excluded_symbols": [
+        "BRK.B",
+        "COST",
+        "IREN",
+        "JNJ",
+        "KO",
+        "MSFT",
+        "PEP",
+        "PG",
+        "SNDK",
+        "WDC"
+      ],
+      "scanner_only_removals_count": 6,
+      "scanner_only_removals": [
+        "ACI",
+        "CBRE",
+        "CHD",
+        "EPAM",
+        "EXPE",
+        "PLD"
+      ],
+      "governed_watch_status": {
+        "COST": "excluded",
+        "MSFT": "excluded",
+        "PG": "excluded"
+      },
+      "quota_watch_status": {
+        "SNDK": "excluded",
+        "WDC": "excluded",
+        "IREN": "excluded"
+      },
+      "theme_representation": {
+        "data_centre_power": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "VRT",
+            "ETN",
+            "PWR",
+            "CEG"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "semiconductors": {
+          "demand": 5,
+          "included": 5,
+          "symbols_in": [
+            "NVDA",
+            "TSM",
+            "AVGO",
+            "AMD",
+            "ASML"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "banks": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "JPM",
+            "BAC",
+            "WFC",
+            "GS"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "energy": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "XOM",
+            "CVX",
+            "OXY",
+            "SLB"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "defence": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "LMT",
+            "NOC",
+            "RTX",
+            "GD"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "quality_cash_flow": {
+          "demand": 4,
+          "included": 1,
+          "symbols_in": [
+            "AAPL"
+          ],
+          "symbols_out": [
+            "MSFT",
+            "COST",
+            "BRK.B"
+          ],
+          "represented": true
+        },
+        "small_caps": {
+          "demand": 1,
+          "included": 1,
+          "symbols_in": [
+            "IWM"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "defensive_quality": {
+          "demand": 5,
+          "included": 0,
+          "symbols_in": [],
+          "symbols_out": [
+            "COST",
+            "JNJ",
+            "PG",
+            "KO",
+            "PEP"
+          ],
+          "represented": false
+        },
+        "memory_storage": {
+          "demand": 2,
+          "included": 0,
+          "symbols_in": [],
+          "symbols_out": [
+            "SNDK",
+            "WDC"
+          ],
+          "represented": false
+        },
+        "ai_compute_infrastructure": {
+          "demand": 1,
+          "included": 0,
+          "symbols_in": [],
+          "symbols_out": [
+            "IREN"
+          ],
+          "represented": false
+        }
+      },
+      "themes_with_zero_single_name": [
+        "defensive_quality",
+        "memory_storage",
+        "ai_compute_infrastructure"
+      ],
+      "quota_overflow": {
+        "structural_binding": true,
+        "structural_overflow": 163,
+        "etf_binding": false,
+        "etf_overflow": 0,
+        "attention_binding": false,
+        "attention_overflow": 94,
+        "catalyst_binding": false,
+        "catalyst_overflow": 0
+      },
+      "quota_summary_used": {
+        "structural": 20,
+        "catalyst": 0,
+        "attention": 8,
+        "etf_proxy": 9,
+        "total": 50
+      },
+      "warnings": [],
+      "errors": [],
+      "output_path": "data/live/quota_calibration/scenario_A_baseline/universe.json",
+      "safety_flags": {
+        "enable_active_opportunity_universe_handoff": false,
+        "handoff_enabled": false,
+        "publication_mode": "validation_only",
+        "live_bot_consuming_handoff": false,
+        "production_candidate_source_changed": false,
+        "scanner_output_changed": false,
+        "apex_input_changed": false,
+        "risk_logic_changed": false,
+        "order_logic_changed": false,
+        "broker_called": false,
+        "trading_api_called": false,
+        "llm_called": false,
+        "raw_news_used": false,
+        "broad_intraday_scan_used": false,
+        "secrets_exposed": false,
+        "env_values_logged": false,
+        "live_output_changed": false,
+        "production_manifest_overwritten": false,
+        "production_universe_overwritten": false
+      },
+      "live_output_changed": false
+    },
+    {
+      "label": "B_moderate",
+      "description": "Moderate expansion",
+      "caps": {
+        "total": 75,
+        "structural": 35,
+        "etf_proxy": 15,
+        "attention": 20,
+        "catalyst": 30
+      },
+      "timing_ms": {
+        "publisher_generation": 9.4,
+        "manifest_validation": 11.5,
+        "handoff_reader_load": 2.1,
+        "total_scenario": 25.3
+      },
+      "candidate_count": 75,
+      "structural_count": 35,
+      "attention_count": 18,
+      "etf_proxy_count": 9,
+      "manual_count": 13,
+      "held_count": 0,
+      "eil_etf_in_universe": [
+        "XLU",
+        "SMH",
+        "XLF",
+        "XLE",
+        "ITA",
+        "QUAL",
+        "XLP",
+        "XLV",
+        "SPLV"
+      ],
+      "non_eil_etf_in_universe": [],
+      "etf_crowding_ratio": 1.0,
+      "governed_excluded_count": 0,
+      "governed_excluded_symbols": [],
+      "scanner_only_removals_count": 6,
+      "scanner_only_removals": [
+        "ACI",
+        "CBRE",
+        "CHD",
+        "EPAM",
+        "EXPE",
+        "PLD"
+      ],
+      "governed_watch_status": {
+        "COST": "included",
+        "MSFT": "included",
+        "PG": "included"
+      },
+      "quota_watch_status": {
+        "SNDK": "included",
+        "WDC": "included",
+        "IREN": "included"
+      },
+      "theme_representation": {
+        "data_centre_power": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "VRT",
+            "ETN",
+            "PWR",
+            "CEG"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "semiconductors": {
+          "demand": 5,
+          "included": 5,
+          "symbols_in": [
+            "NVDA",
+            "TSM",
+            "AVGO",
+            "AMD",
+            "ASML"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "banks": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "JPM",
+            "BAC",
+            "WFC",
+            "GS"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "energy": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "XOM",
+            "CVX",
+            "OXY",
+            "SLB"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "defence": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "LMT",
+            "NOC",
+            "RTX",
+            "GD"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "quality_cash_flow": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "MSFT",
+            "AAPL",
+            "COST",
+            "BRK.B"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "small_caps": {
+          "demand": 1,
+          "included": 1,
+          "symbols_in": [
+            "IWM"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "defensive_quality": {
+          "demand": 5,
+          "included": 5,
+          "symbols_in": [
+            "COST",
+            "JNJ",
+            "PG",
+            "KO",
+            "PEP"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "memory_storage": {
+          "demand": 2,
+          "included": 2,
+          "symbols_in": [
+            "SNDK",
+            "WDC"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "ai_compute_infrastructure": {
+          "demand": 1,
+          "included": 1,
+          "symbols_in": [
+            "IREN"
+          ],
+          "symbols_out": [],
+          "represented": true
+        }
+      },
+      "themes_with_zero_single_name": [],
+      "quota_overflow": {
+        "structural_binding": true,
+        "structural_overflow": 148,
+        "etf_binding": false,
+        "etf_overflow": 0,
+        "attention_binding": false,
+        "attention_overflow": 84,
+        "catalyst_binding": false,
+        "catalyst_overflow": 0
+      },
+      "quota_summary_used": {
+        "structural": 35,
+        "catalyst": 0,
+        "attention": 18,
+        "etf_proxy": 9,
+        "total": 75
+      },
+      "warnings": [],
+      "errors": [],
+      "output_path": "data/live/quota_calibration/scenario_B_moderate/universe.json",
+      "safety_flags": {
+        "enable_active_opportunity_universe_handoff": false,
+        "handoff_enabled": false,
+        "publication_mode": "validation_only",
+        "live_bot_consuming_handoff": false,
+        "production_candidate_source_changed": false,
+        "scanner_output_changed": false,
+        "apex_input_changed": false,
+        "risk_logic_changed": false,
+        "order_logic_changed": false,
+        "broker_called": false,
+        "trading_api_called": false,
+        "llm_called": false,
+        "raw_news_used": false,
+        "broad_intraday_scan_used": false,
+        "secrets_exposed": false,
+        "env_values_logged": false,
+        "live_output_changed": false,
+        "production_manifest_overwritten": false,
+        "production_universe_overwritten": false
+      },
+      "live_output_changed": false
+    },
+    {
+      "label": "C_production_candidate",
+      "description": "Production candidate",
+      "caps": {
+        "total": 100,
+        "structural": 50,
+        "etf_proxy": 20,
+        "attention": 20,
+        "catalyst": 30
+      },
+      "timing_ms": {
+        "publisher_generation": 10.2,
+        "manifest_validation": 15.5,
+        "handoff_reader_load": 2.1,
+        "total_scenario": 30.1
+      },
+      "candidate_count": 92,
+      "structural_count": 50,
+      "attention_count": 20,
+      "etf_proxy_count": 9,
+      "manual_count": 13,
+      "held_count": 0,
+      "eil_etf_in_universe": [
+        "XLU",
+        "SMH",
+        "XLF",
+        "XLE",
+        "ITA",
+        "QUAL",
+        "XLP",
+        "XLV",
+        "SPLV"
+      ],
+      "non_eil_etf_in_universe": [],
+      "etf_crowding_ratio": 1.0,
+      "governed_excluded_count": 0,
+      "governed_excluded_symbols": [],
+      "scanner_only_removals_count": 6,
+      "scanner_only_removals": [
+        "ACI",
+        "CBRE",
+        "CHD",
+        "EPAM",
+        "EXPE",
+        "PLD"
+      ],
+      "governed_watch_status": {
+        "COST": "included",
+        "MSFT": "included",
+        "PG": "included"
+      },
+      "quota_watch_status": {
+        "SNDK": "included",
+        "WDC": "included",
+        "IREN": "included"
+      },
+      "theme_representation": {
+        "data_centre_power": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "VRT",
+            "ETN",
+            "PWR",
+            "CEG"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "semiconductors": {
+          "demand": 5,
+          "included": 5,
+          "symbols_in": [
+            "NVDA",
+            "TSM",
+            "AVGO",
+            "AMD",
+            "ASML"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "banks": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "JPM",
+            "BAC",
+            "WFC",
+            "GS"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "energy": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "XOM",
+            "CVX",
+            "OXY",
+            "SLB"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "defence": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "LMT",
+            "NOC",
+            "RTX",
+            "GD"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "quality_cash_flow": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "MSFT",
+            "AAPL",
+            "COST",
+            "BRK.B"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "small_caps": {
+          "demand": 1,
+          "included": 1,
+          "symbols_in": [
+            "IWM"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "defensive_quality": {
+          "demand": 5,
+          "included": 5,
+          "symbols_in": [
+            "COST",
+            "JNJ",
+            "PG",
+            "KO",
+            "PEP"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "memory_storage": {
+          "demand": 2,
+          "included": 2,
+          "symbols_in": [
+            "SNDK",
+            "WDC"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "ai_compute_infrastructure": {
+          "demand": 1,
+          "included": 1,
+          "symbols_in": [
+            "IREN"
+          ],
+          "symbols_out": [],
+          "represented": true
+        }
+      },
+      "themes_with_zero_single_name": [],
+      "quota_overflow": {
+        "structural_binding": true,
+        "structural_overflow": 133,
+        "etf_binding": false,
+        "etf_overflow": 0,
+        "attention_binding": true,
+        "attention_overflow": 82,
+        "catalyst_binding": false,
+        "catalyst_overflow": 0
+      },
+      "quota_summary_used": {
+        "structural": 50,
+        "catalyst": 0,
+        "attention": 20,
+        "etf_proxy": 9,
+        "total": 92
+      },
+      "warnings": [],
+      "errors": [],
+      "output_path": "data/live/quota_calibration/scenario_C_production_candidate/universe.json",
+      "safety_flags": {
+        "enable_active_opportunity_universe_handoff": false,
+        "handoff_enabled": false,
+        "publication_mode": "validation_only",
+        "live_bot_consuming_handoff": false,
+        "production_candidate_source_changed": false,
+        "scanner_output_changed": false,
+        "apex_input_changed": false,
+        "risk_logic_changed": false,
+        "order_logic_changed": false,
+        "broker_called": false,
+        "trading_api_called": false,
+        "llm_called": false,
+        "raw_news_used": false,
+        "broad_intraday_scan_used": false,
+        "secrets_exposed": false,
+        "env_values_logged": false,
+        "live_output_changed": false,
+        "production_manifest_overwritten": false,
+        "production_universe_overwritten": false
+      },
+      "live_output_changed": false
+    },
+    {
+      "label": "D_upper_bound",
+      "description": "Upper-bound test",
+      "caps": {
+        "total": 125,
+        "structural": 65,
+        "etf_proxy": 25,
+        "attention": 25,
+        "catalyst": 35
+      },
+      "timing_ms": {
+        "publisher_generation": 22.5,
+        "manifest_validation": 14.5,
+        "handoff_reader_load": 2.5,
+        "total_scenario": 42.2
+      },
+      "candidate_count": 112,
+      "structural_count": 65,
+      "attention_count": 25,
+      "etf_proxy_count": 9,
+      "manual_count": 13,
+      "held_count": 0,
+      "eil_etf_in_universe": [
+        "XLU",
+        "SMH",
+        "XLF",
+        "XLE",
+        "ITA",
+        "QUAL",
+        "XLP",
+        "XLV",
+        "SPLV"
+      ],
+      "non_eil_etf_in_universe": [],
+      "etf_crowding_ratio": 1.0,
+      "governed_excluded_count": 0,
+      "governed_excluded_symbols": [],
+      "scanner_only_removals_count": 6,
+      "scanner_only_removals": [
+        "ACI",
+        "CBRE",
+        "CHD",
+        "EPAM",
+        "EXPE",
+        "PLD"
+      ],
+      "governed_watch_status": {
+        "COST": "included",
+        "MSFT": "included",
+        "PG": "included"
+      },
+      "quota_watch_status": {
+        "SNDK": "included",
+        "WDC": "included",
+        "IREN": "included"
+      },
+      "theme_representation": {
+        "data_centre_power": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "VRT",
+            "ETN",
+            "PWR",
+            "CEG"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "semiconductors": {
+          "demand": 5,
+          "included": 5,
+          "symbols_in": [
+            "NVDA",
+            "TSM",
+            "AVGO",
+            "AMD",
+            "ASML"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "banks": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "JPM",
+            "BAC",
+            "WFC",
+            "GS"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "energy": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "XOM",
+            "CVX",
+            "OXY",
+            "SLB"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "defence": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "LMT",
+            "NOC",
+            "RTX",
+            "GD"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "quality_cash_flow": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "MSFT",
+            "AAPL",
+            "COST",
+            "BRK.B"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "small_caps": {
+          "demand": 1,
+          "included": 1,
+          "symbols_in": [
+            "IWM"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "defensive_quality": {
+          "demand": 5,
+          "included": 5,
+          "symbols_in": [
+            "COST",
+            "JNJ",
+            "PG",
+            "KO",
+            "PEP"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "memory_storage": {
+          "demand": 2,
+          "included": 2,
+          "symbols_in": [
+            "SNDK",
+            "WDC"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "ai_compute_infrastructure": {
+          "demand": 1,
+          "included": 1,
+          "symbols_in": [
+            "IREN"
+          ],
+          "symbols_out": [],
+          "represented": true
+        }
+      },
+      "themes_with_zero_single_name": [],
+      "quota_overflow": {
+        "structural_binding": true,
+        "structural_overflow": 118,
+        "etf_binding": false,
+        "etf_overflow": 0,
+        "attention_binding": true,
+        "attention_overflow": 77,
+        "catalyst_binding": false,
+        "catalyst_overflow": 0
+      },
+      "quota_summary_used": {
+        "structural": 65,
+        "catalyst": 0,
+        "attention": 25,
+        "etf_proxy": 9,
+        "total": 112
+      },
+      "warnings": [],
+      "errors": [],
+      "output_path": "data/live/quota_calibration/scenario_D_upper_bound/universe.json",
+      "safety_flags": {
+        "enable_active_opportunity_universe_handoff": false,
+        "handoff_enabled": false,
+        "publication_mode": "validation_only",
+        "live_bot_consuming_handoff": false,
+        "production_candidate_source_changed": false,
+        "scanner_output_changed": false,
+        "apex_input_changed": false,
+        "risk_logic_changed": false,
+        "order_logic_changed": false,
+        "broker_called": false,
+        "trading_api_called": false,
+        "llm_called": false,
+        "raw_news_used": false,
+        "broad_intraday_scan_used": false,
+        "secrets_exposed": false,
+        "env_values_logged": false,
+        "live_output_changed": false,
+        "production_manifest_overwritten": false,
+        "production_universe_overwritten": false
+      },
+      "live_output_changed": false
+    },
+    {
+      "label": "E_stress",
+      "description": "Stress test",
+      "caps": {
+        "total": 150,
+        "structural": 80,
+        "etf_proxy": 30,
+        "attention": 30,
+        "catalyst": 40
+      },
+      "timing_ms": {
+        "publisher_generation": 9.5,
+        "manifest_validation": 16.1,
+        "handoff_reader_load": 3.5,
+        "total_scenario": 31.9
+      },
+      "candidate_count": 132,
+      "structural_count": 80,
+      "attention_count": 30,
+      "etf_proxy_count": 9,
+      "manual_count": 13,
+      "held_count": 0,
+      "eil_etf_in_universe": [
+        "XLU",
+        "SMH",
+        "XLF",
+        "XLE",
+        "ITA",
+        "QUAL",
+        "XLP",
+        "XLV",
+        "SPLV"
+      ],
+      "non_eil_etf_in_universe": [],
+      "etf_crowding_ratio": 1.0,
+      "governed_excluded_count": 0,
+      "governed_excluded_symbols": [],
+      "scanner_only_removals_count": 6,
+      "scanner_only_removals": [
+        "ACI",
+        "CBRE",
+        "CHD",
+        "EPAM",
+        "EXPE",
+        "PLD"
+      ],
+      "governed_watch_status": {
+        "COST": "included",
+        "MSFT": "included",
+        "PG": "included"
+      },
+      "quota_watch_status": {
+        "SNDK": "included",
+        "WDC": "included",
+        "IREN": "included"
+      },
+      "theme_representation": {
+        "data_centre_power": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "VRT",
+            "ETN",
+            "PWR",
+            "CEG"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "semiconductors": {
+          "demand": 5,
+          "included": 5,
+          "symbols_in": [
+            "NVDA",
+            "TSM",
+            "AVGO",
+            "AMD",
+            "ASML"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "banks": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "JPM",
+            "BAC",
+            "WFC",
+            "GS"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "energy": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "XOM",
+            "CVX",
+            "OXY",
+            "SLB"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "defence": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "LMT",
+            "NOC",
+            "RTX",
+            "GD"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "quality_cash_flow": {
+          "demand": 4,
+          "included": 4,
+          "symbols_in": [
+            "MSFT",
+            "AAPL",
+            "COST",
+            "BRK.B"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "small_caps": {
+          "demand": 1,
+          "included": 1,
+          "symbols_in": [
+            "IWM"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "defensive_quality": {
+          "demand": 5,
+          "included": 5,
+          "symbols_in": [
+            "COST",
+            "JNJ",
+            "PG",
+            "KO",
+            "PEP"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "memory_storage": {
+          "demand": 2,
+          "included": 2,
+          "symbols_in": [
+            "SNDK",
+            "WDC"
+          ],
+          "symbols_out": [],
+          "represented": true
+        },
+        "ai_compute_infrastructure": {
+          "demand": 1,
+          "included": 1,
+          "symbols_in": [
+            "IREN"
+          ],
+          "symbols_out": [],
+          "represented": true
+        }
+      },
+      "themes_with_zero_single_name": [],
+      "quota_overflow": {
+        "structural_binding": true,
+        "structural_overflow": 103,
+        "etf_binding": false,
+        "etf_overflow": 0,
+        "attention_binding": true,
+        "attention_overflow": 72,
+        "catalyst_binding": false,
+        "catalyst_overflow": 0
+      },
+      "quota_summary_used": {
+        "structural": 80,
+        "catalyst": 0,
+        "attention": 30,
+        "etf_proxy": 9,
+        "total": 132
+      },
+      "warnings": [],
+      "errors": [],
+      "output_path": "data/live/quota_calibration/scenario_E_stress/universe.json",
+      "safety_flags": {
+        "enable_active_opportunity_universe_handoff": false,
+        "handoff_enabled": false,
+        "publication_mode": "validation_only",
+        "live_bot_consuming_handoff": false,
+        "production_candidate_source_changed": false,
+        "scanner_output_changed": false,
+        "apex_input_changed": false,
+        "risk_logic_changed": false,
+        "order_logic_changed": false,
+        "broker_called": false,
+        "trading_api_called": false,
+        "llm_called": false,
+        "raw_news_used": false,
+        "broad_intraday_scan_used": false,
+        "secrets_exposed": false,
+        "env_values_logged": false,
+        "live_output_changed": false,
+        "production_manifest_overwritten": false,
+        "production_universe_overwritten": false
+      },
+      "live_output_changed": false
+    }
+  ],
+  "policy_analysis": {
+    "policy_findings": [
+      {
+        "scenario": "A_baseline",
+        "finding": "theme_gap",
+        "severity": "medium",
+        "detail": "Themes with no single-name representative: ['defensive_quality', 'memory_storage', 'ai_compute_infrastructure']",
+        "themes": [
+          "defensive_quality",
+          "memory_storage",
+          "ai_compute_infrastructure"
+        ]
+      },
+      {
+        "scenario": "A_baseline",
+        "finding": "etf_dominance",
+        "severity": "low",
+        "detail": "ETF crowding ratio 100.0% \u2014 most ETF slots filled by EIL proxies"
+      },
+      {
+        "scenario": "B_moderate",
+        "finding": "etf_dominance",
+        "severity": "low",
+        "detail": "ETF crowding ratio 100.0% \u2014 most ETF slots filled by EIL proxies"
+      },
+      {
+        "scenario": "C_production_candidate",
+        "finding": "etf_dominance",
+        "severity": "low",
+        "detail": "ETF crowding ratio 100.0% \u2014 most ETF slots filled by EIL proxies"
+      },
+      {
+        "scenario": "D_upper_bound",
+        "finding": "etf_dominance",
+        "severity": "low",
+        "detail": "ETF crowding ratio 100.0% \u2014 most ETF slots filled by EIL proxies"
+      },
+      {
+        "scenario": "E_stress",
+        "finding": "etf_dominance",
+        "severity": "low",
+        "detail": "ETF crowding ratio 100.0% \u2014 most ETF slots filled by EIL proxies"
+      }
+    ],
+    "recommendation_basis": [
+      {
+        "label": "A_baseline",
+        "score": -25.0
+      },
+      {
+        "label": "B_moderate",
+        "score": 5.0
+      },
+      {
+        "label": "C_production_candidate",
+        "score": 5.0
+      },
+      {
+        "label": "D_upper_bound",
+        "score": 3.75
+      },
+      {
+        "label": "E_stress",
+        "score": 2.5
+      }
+    ],
+    "recommended_scenario": "B_moderate",
+    "policy_improvements_evaluated": [
+      "separate ETF/proxy cap from single-name structural cap",
+      "require \u22651 single-name representative per active high-conviction theme",
+      "limit ETF/proxy dominance per theme",
+      "track governed-but-excluded symbols separately in quota_pressure_diagnostics",
+      "keep review_required symbols non-executable (unchanged)"
+    ],
+    "policy_change_required_for_activation": false,
+    "note": "Quota policy improvements are advisory. Current policy already tracks governed-but-excluded via exclusion_log. ETF/proxy cap is already separate in quota_allocator. Structural expansion (Scenario B or C) is the primary lever."
+  },
+  "recommended_scenario": "B_moderate",
+  "recommended_total_cap": 75,
+  "recommended_structural_cap": 35,
+  "current_cap_acceptable_for_activation": true,
+  "activation_should_wait_for_quota_change": false,
+  "safety_flags": {
+    "enable_active_opportunity_universe_handoff": false,
+    "handoff_enabled": false,
+    "publication_mode": "validation_only",
+    "live_bot_consuming_handoff": false,
+    "production_candidate_source_changed": false,
+    "scanner_output_changed": false,
+    "apex_input_changed": false,
+    "risk_logic_changed": false,
+    "order_logic_changed": false,
+    "broker_called": false,
+    "trading_api_called": false,
+    "llm_called": false,
+    "raw_news_used": false,
+    "broad_intraday_scan_used": false,
+    "secrets_exposed": false,
+    "env_values_logged": false,
+    "live_output_changed": false
+  }
+}
