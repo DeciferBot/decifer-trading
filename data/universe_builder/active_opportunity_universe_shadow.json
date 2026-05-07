@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-06T20:20:45Z",
-  "valid_for_session": "2026-05-06",
+  "generated_at": "2026-05-07T18:27:55Z",
+  "valid_for_session": "2026-05-07",
   "freshness_status": "static_bootstrap_sprint3",
   "mode": "shadow_only",
   "source_files": [
@@ -12,25 +12,25 @@
     "data/daily_promoted.json"
   ],
   "universe_summary": {
-    "total_candidates": 50,
-    "position_candidates": 11,
-    "swing_candidates": 9,
-    "intraday_swing_candidates": 7,
-    "watchlist_candidates": 10,
+    "total_candidates": 75,
+    "position_candidates": 19,
+    "swing_candidates": 13,
+    "intraday_swing_candidates": 17,
+    "watchlist_candidates": 13,
     "held_candidates": 0,
     "manual_candidates": 13,
-    "attention_candidates": 8,
-    "structural_candidates": 20,
+    "attention_candidates": 18,
+    "structural_candidates": 35,
     "catalyst_candidates": 0,
     "etf_proxy_candidates": 9,
-    "economic_intelligence_candidates": 30,
-    "current_source_candidates": 20,
-    "position_route_count": 11,
-    "structural_quota_group_count": 20,
-    "structural_reason_to_care_count": 20,
-    "tier_d_structural_source_count": 0,
-    "structural_watchlist_count": 0,
-    "structural_swing_count": 9,
+    "economic_intelligence_candidates": 40,
+    "current_source_candidates": 35,
+    "position_route_count": 19,
+    "structural_quota_group_count": 35,
+    "structural_reason_to_care_count": 35,
+    "tier_d_structural_source_count": 5,
+    "structural_watchlist_count": 3,
+    "structural_swing_count": 13,
     "llm_symbol_discovery_used": false,
     "raw_news_used": false,
     "broad_intraday_scan_used": false
@@ -38,8 +38,8 @@
   "quota_summary": {
     "structural_position": {
       "min": 8,
-      "max": 20,
-      "used": 20,
+      "max": 35,
+      "used": 35,
       "protected": true
     },
     "catalyst_swing": {
@@ -48,12 +48,12 @@
       "used": 0
     },
     "attention": {
-      "max": 15,
-      "used": 8,
+      "max": 20,
+      "used": 18,
       "capped": true
     },
     "etf_proxy": {
-      "max": 10,
+      "max": 15,
       "used": 9,
       "capped": true
     },
@@ -66,16 +66,16 @@
       "used": 13
     },
     "total": {
-      "max": 50,
-      "used": 50
+      "max": 75,
+      "used": 75
     }
   },
   "quota_pressure_diagnostics": {
     "structural_position": {
       "demand_total": 183,
-      "capacity": 20,
-      "accepted": 20,
-      "overflow": 163,
+      "capacity": 35,
+      "accepted": 35,
+      "overflow": 148,
       "binding": true,
       "demand_by_theme": {
         "data_centre_power": 4,
@@ -94,45 +94,33 @@
         "tier_d_structural": 150
       },
       "overflow_by_theme": {
-        "quality_cash_flow": 3,
-        "defensive_quality": 5,
-        "memory_storage": 2,
-        "ai_compute_infrastructure": 1,
-        "": 145
+        "": 137
       },
       "overflow_by_driver": {
-        "credit_stress_rising, liquidity_tightening, risk_off_rotation": 3,
-        "risk_appetite_falling, volatility_rising, defensive_rotation, breadth_deterioration": 5,
-        "ai_capex_growth, data_centre_buildout, memory_pricing_cycle, enterprise_ai_storage_demand": 2,
-        "ai_compute_demand, gpu_cloud_demand, data_centre_capacity, power_constraint, neocloud_growth": 1,
-        "fundamental_discovery": 145
+        "fundamental_discovery": 137
       },
       "overflow_by_reason_to_care": {
-        "structural": 11,
-        "structural_candidate_source": 145
+        "structural_candidate_source": 137
       },
       "overflow_by_route": {
-        "position": 148,
-        "swing": 5,
-        "watchlist": 3
+        "position": 137
       },
       "overflow_by_source": {
-        "economic_intelligence_structural": 11,
-        "tier_d_structural": 145
+        "tier_d_structural": 137
       }
     },
     "etf_proxy": {
       "demand_total": 9,
-      "capacity": 10,
+      "capacity": 15,
       "accepted": 9,
       "overflow": 0,
       "binding": false
     },
     "attention": {
       "demand_total": 102,
-      "capacity": 15,
-      "accepted": 8,
-      "overflow": 94,
+      "capacity": 20,
+      "accepted": 18,
+      "overflow": 84,
       "binding": false
     },
     "catalyst_swing": {
@@ -242,6 +230,23 @@
       "excluded_entries": []
     },
     {
+      "symbol": "ASND",
+      "collision_count": 2,
+      "attempted_by": [
+        "tier_d_structural",
+        "tier_b_attention"
+      ],
+      "winning_source": null,
+      "excluded_source_paths": [
+        "tier_b_attention",
+        "tier_d_structural"
+      ],
+      "final_in_shadow": false,
+      "protected_by_manual_or_held": false,
+      "source_path_excluded_but_symbol_preserved": false,
+      "excluded_entries": []
+    },
+    {
       "symbol": "ASTS",
       "collision_count": 2,
       "attempted_by": [
@@ -265,20 +270,19 @@
       ]
     },
     {
-      "symbol": "BIIB",
+      "symbol": "AYI",
       "collision_count": 2,
       "attempted_by": [
-        "tier_b_attention",
-        "tier_a_core_floor"
-      ],
-      "winning_source": null,
-      "excluded_source_paths": [
-        "tier_a_core_floor",
+        "tier_d_structural",
         "tier_b_attention"
       ],
-      "final_in_shadow": false,
+      "winning_source": "tier_b_attention",
+      "excluded_source_paths": [
+        "tier_d_structural"
+      ],
+      "final_in_shadow": true,
       "protected_by_manual_or_held": false,
-      "source_path_excluded_but_symbol_preserved": false,
+      "source_path_excluded_but_symbol_preserved": true,
       "excluded_entries": []
     },
     {
@@ -289,15 +293,28 @@
         "economic_intelligence_structural",
         "tier_a_core_floor"
       ],
-      "winning_source": null,
+      "winning_source": "economic_intelligence_structural",
       "excluded_source_paths": [
-        "economic_intelligence_structural",
         "tier_a_core_floor"
       ],
-      "final_in_shadow": false,
+      "final_in_shadow": true,
       "protected_by_manual_or_held": false,
-      "source_path_excluded_but_symbol_preserved": false,
-      "excluded_entries": []
+      "source_path_excluded_but_symbol_preserved": true,
+      "excluded_entries": [
+        {
+          "source": [
+            "intelligence_first_static_rule",
+            "economic_intelligence"
+          ],
+          "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
+        },
+        {
+          "source": [
+            "tier_a_core_floor"
+          ],
+          "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
+        }
+      ]
     },
     {
       "symbol": "CRM",
@@ -309,23 +326,6 @@
       "winning_source": null,
       "excluded_source_paths": [
         "tier_a_core_floor",
-        "tier_d_structural"
-      ],
-      "final_in_shadow": false,
-      "protected_by_manual_or_held": false,
-      "source_path_excluded_but_symbol_preserved": false,
-      "excluded_entries": []
-    },
-    {
-      "symbol": "CTVA",
-      "collision_count": 2,
-      "attempted_by": [
-        "tier_d_structural",
-        "tier_b_attention"
-      ],
-      "winning_source": null,
-      "excluded_source_paths": [
-        "tier_b_attention",
         "tier_d_structural"
       ],
       "final_in_shadow": false,
@@ -355,6 +355,23 @@
           "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
         }
       ]
+    },
+    {
+      "symbol": "DKS",
+      "collision_count": 2,
+      "attempted_by": [
+        "tier_d_structural",
+        "tier_b_attention"
+      ],
+      "winning_source": null,
+      "excluded_source_paths": [
+        "tier_b_attention",
+        "tier_d_structural"
+      ],
+      "final_in_shadow": false,
+      "protected_by_manual_or_held": false,
+      "source_path_excluded_but_symbol_preserved": false,
+      "excluded_entries": []
     },
     {
       "symbol": "FCX",
@@ -429,23 +446,6 @@
       "winning_source": null,
       "excluded_source_paths": [
         "tier_a_core_floor",
-        "tier_d_structural"
-      ],
-      "final_in_shadow": false,
-      "protected_by_manual_or_held": false,
-      "source_path_excluded_but_symbol_preserved": false,
-      "excluded_entries": []
-    },
-    {
-      "symbol": "HST",
-      "collision_count": 2,
-      "attempted_by": [
-        "tier_d_structural",
-        "tier_b_attention"
-      ],
-      "winning_source": null,
-      "excluded_source_paths": [
-        "tier_b_attention",
         "tier_d_structural"
       ],
       "final_in_shadow": false,
@@ -564,16 +564,28 @@
         "tier_d_structural",
         "tier_a_core_floor"
       ],
-      "winning_source": null,
+      "winning_source": "economic_intelligence_structural",
       "excluded_source_paths": [
-        "economic_intelligence_structural",
         "tier_a_core_floor",
         "tier_d_structural"
       ],
-      "final_in_shadow": false,
+      "final_in_shadow": true,
       "protected_by_manual_or_held": false,
-      "source_path_excluded_but_symbol_preserved": false,
-      "excluded_entries": []
+      "source_path_excluded_but_symbol_preserved": true,
+      "excluded_entries": [
+        {
+          "source": [
+            "tier_d_position_research"
+          ],
+          "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
+        },
+        {
+          "source": [
+            "tier_a_core_floor"
+          ],
+          "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
+        }
+      ]
     },
     {
       "symbol": "MSTR",
@@ -590,6 +602,22 @@
       "final_in_shadow": false,
       "protected_by_manual_or_held": false,
       "source_path_excluded_but_symbol_preserved": false,
+      "excluded_entries": []
+    },
+    {
+      "symbol": "MTD",
+      "collision_count": 2,
+      "attempted_by": [
+        "tier_d_structural",
+        "tier_b_attention"
+      ],
+      "winning_source": "tier_b_attention",
+      "excluded_source_paths": [
+        "tier_d_structural"
+      ],
+      "final_in_shadow": true,
+      "protected_by_manual_or_held": false,
+      "source_path_excluded_but_symbol_preserved": true,
       "excluded_entries": []
     },
     {
@@ -648,23 +676,6 @@
       "winning_source": null,
       "excluded_source_paths": [
         "tier_a_core_floor",
-        "tier_d_structural"
-      ],
-      "final_in_shadow": false,
-      "protected_by_manual_or_held": false,
-      "source_path_excluded_but_symbol_preserved": false,
-      "excluded_entries": []
-    },
-    {
-      "symbol": "NI",
-      "collision_count": 2,
-      "attempted_by": [
-        "tier_d_structural",
-        "tier_b_attention"
-      ],
-      "winning_source": null,
-      "excluded_source_paths": [
-        "tier_b_attention",
         "tier_d_structural"
       ],
       "final_in_shadow": false,
@@ -742,15 +753,21 @@
         "economic_intelligence_structural",
         "tier_a_core_floor"
       ],
-      "winning_source": null,
+      "winning_source": "economic_intelligence_structural",
       "excluded_source_paths": [
-        "economic_intelligence_structural",
         "tier_a_core_floor"
       ],
-      "final_in_shadow": false,
+      "final_in_shadow": true,
       "protected_by_manual_or_held": false,
-      "source_path_excluded_but_symbol_preserved": false,
-      "excluded_entries": []
+      "source_path_excluded_but_symbol_preserved": true,
+      "excluded_entries": [
+        {
+          "source": [
+            "tier_a_core_floor"
+          ],
+          "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
+        }
+      ]
     },
     {
       "symbol": "QQQ",
@@ -776,7 +793,30 @@
       ]
     },
     {
-      "symbol": "SN",
+      "symbol": "SNDK",
+      "collision_count": 2,
+      "attempted_by": [
+        "economic_intelligence_structural",
+        "tier_d_structural"
+      ],
+      "winning_source": "economic_intelligence_structural",
+      "excluded_source_paths": [
+        "tier_d_structural"
+      ],
+      "final_in_shadow": true,
+      "protected_by_manual_or_held": false,
+      "source_path_excluded_but_symbol_preserved": true,
+      "excluded_entries": [
+        {
+          "source": [
+            "tier_d_position_research"
+          ],
+          "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
+        }
+      ]
+    },
+    {
+      "symbol": "SPG",
       "collision_count": 2,
       "attempted_by": [
         "tier_d_structural",
@@ -785,23 +825,6 @@
       "winning_source": null,
       "excluded_source_paths": [
         "tier_b_attention",
-        "tier_d_structural"
-      ],
-      "final_in_shadow": false,
-      "protected_by_manual_or_held": false,
-      "source_path_excluded_but_symbol_preserved": false,
-      "excluded_entries": []
-    },
-    {
-      "symbol": "SNDK",
-      "collision_count": 2,
-      "attempted_by": [
-        "economic_intelligence_structural",
-        "tier_d_structural"
-      ],
-      "winning_source": null,
-      "excluded_source_paths": [
-        "economic_intelligence_structural",
         "tier_d_structural"
       ],
       "final_in_shadow": false,
@@ -831,23 +854,6 @@
           "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
         }
       ]
-    },
-    {
-      "symbol": "STLD",
-      "collision_count": 2,
-      "attempted_by": [
-        "tier_d_structural",
-        "tier_b_attention"
-      ],
-      "winning_source": null,
-      "excluded_source_paths": [
-        "tier_b_attention",
-        "tier_d_structural"
-      ],
-      "final_in_shadow": false,
-      "protected_by_manual_or_held": false,
-      "source_path_excluded_but_symbol_preserved": false,
-      "excluded_entries": []
     },
     {
       "symbol": "TSLA",
@@ -902,15 +908,21 @@
         "economic_intelligence_structural",
         "tier_d_structural"
       ],
-      "winning_source": null,
+      "winning_source": "economic_intelligence_structural",
       "excluded_source_paths": [
-        "economic_intelligence_structural",
         "tier_d_structural"
       ],
-      "final_in_shadow": false,
+      "final_in_shadow": true,
       "protected_by_manual_or_held": false,
-      "source_path_excluded_but_symbol_preserved": false,
-      "excluded_entries": []
+      "source_path_excluded_but_symbol_preserved": true,
+      "excluded_entries": [
+        {
+          "source": [
+            "tier_d_position_research"
+          ],
+          "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural"
+        }
+      ]
     },
     {
       "symbol": "XOM",
@@ -961,6 +973,8 @@
       "NOC",
       "RTX",
       "GD",
+      "MSFT",
+      "RKLB",
       "USO",
       "SPY",
       "QQQ",
@@ -970,6 +984,7 @@
       "XLE",
       "IWM",
       "XLV",
+      "CRDO",
       "GLD",
       "ONDS",
       "ETN",
@@ -984,15 +999,37 @@
       "OXY",
       "SLB",
       "ITA",
+      "COST",
+      "BRK.B",
       "QUAL",
+      "JNJ",
+      "PG",
+      "KO",
+      "PEP",
       "XLP",
+      "SNDK",
+      "WDC",
+      "IREN",
+      "TE",
+      "IONQ",
+      "APP",
+      "CRWG",
       "TCGL",
-      "EXPE",
-      "CHD",
-      "CBRE",
-      "EPAM",
-      "PLD",
-      "ACI"
+      "STRL",
+      "A",
+      "MTD",
+      "VRSK",
+      "CW",
+      "AYI",
+      "AME",
+      "XYL",
+      "BC",
+      "FDS",
+      "XPO",
+      "EQR",
+      "WST",
+      "ACGL",
+      "UDR"
     ],
     "side_effects_triggered": false,
     "live_data_called": false
@@ -3088,6 +3125,184 @@
       "live_output_changed": false
     },
     {
+      "symbol": "MSFT",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural",
+      "bucket_id": "quality_cash_flow_direct_beneficiary",
+      "bucket_type": "structural",
+      "route": "position",
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [
+        "credit_stress_to_quality_cash_flow",
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "transmission_direction": "tailwind",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "MSFT is a direct beneficiary of Quality Cash Flow and Balance Sheet Strength: Credit stress should favour companies with strong balance sheets, high cash generation, resilient demand, and lower financing dependency. Quality compounders historically outperform during credit stress as investors reduce exposure to leveraged names.; Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "invalidation": [
+        "valuation",
+        "crowding",
+        "broad_market_liquidation",
+        "earnings_disappointment"
+      ],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "MSFT"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "position",
+          "swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [
+        "valuation",
+        "crowding",
+        "broad_market_liquidation",
+        "earnings_disappointment"
+      ],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "COST",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural",
+      "bucket_id": "quality_cash_flow_direct_beneficiary",
+      "bucket_type": "structural",
+      "route": "position",
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [
+        "credit_stress_to_quality_cash_flow",
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "transmission_direction": "tailwind",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "COST is a direct beneficiary of Quality Cash Flow and Balance Sheet Strength: Credit stress should favour companies with strong balance sheets, high cash generation, resilient demand, and lower financing dependency. Quality compounders historically outperform during credit stress as investors reduce exposure to leveraged names.; Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "invalidation": [
+        "valuation",
+        "crowding",
+        "broad_market_liquidation",
+        "earnings_disappointment"
+      ],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "COST"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "position",
+          "swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [
+        "valuation",
+        "crowding",
+        "broad_market_liquidation",
+        "earnings_disappointment"
+      ],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "BRK.B",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural",
+      "bucket_id": "quality_cash_flow_direct_beneficiary",
+      "bucket_type": "structural",
+      "route": "position",
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [
+        "credit_stress_to_quality_cash_flow",
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "transmission_direction": "tailwind",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "BRK.B is a direct beneficiary of Quality Cash Flow and Balance Sheet Strength: Credit stress should favour companies with strong balance sheets, high cash generation, resilient demand, and lower financing dependency. Quality compounders historically outperform during credit stress as investors reduce exposure to leveraged names.; Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "invalidation": [
+        "valuation",
+        "crowding",
+        "broad_market_liquidation",
+        "earnings_disappointment"
+      ],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "BRK.B"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "position",
+          "swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [
+        "valuation",
+        "crowding",
+        "broad_market_liquidation",
+        "earnings_disappointment"
+      ],
+      "live_output_changed": false
+    },
+    {
       "symbol": "QUAL",
       "company_name": null,
       "asset_type": "equity",
@@ -3196,6 +3411,234 @@
         "credit_stress_easing",
         "risk_on_rotation",
         "liquidity_support_intervention"
+      ],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "JNJ",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural",
+      "bucket_id": "defensive_quality_direct_beneficiary",
+      "bucket_type": "structural",
+      "route": "swing",
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "transmission_direction": "tailwind",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "JNJ is a direct beneficiary of Defensive Quality \u2014 Risk-Off Rotation: Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "invalidation": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "JNJ"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "PG",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural",
+      "bucket_id": "defensive_quality_direct_beneficiary",
+      "bucket_type": "structural",
+      "route": "swing",
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "transmission_direction": "tailwind",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "PG is a direct beneficiary of Defensive Quality \u2014 Risk-Off Rotation: Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "invalidation": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "PG"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "KO",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural",
+      "bucket_id": "defensive_quality_direct_beneficiary",
+      "bucket_type": "structural",
+      "route": "swing",
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "transmission_direction": "tailwind",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "KO is a direct beneficiary of Defensive Quality \u2014 Risk-Off Rotation: Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "invalidation": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "KO"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "PEP",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural",
+      "bucket_id": "defensive_quality_direct_beneficiary",
+      "bucket_type": "structural",
+      "route": "swing",
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [
+        "risk_off_rotation_to_defensive_quality"
+      ],
+      "transmission_direction": "tailwind",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "PEP is a direct beneficiary of Defensive Quality \u2014 Risk-Off Rotation: Risk-off rotations should direct attention toward defensive, liquid, quality names rather than speculative attention names. Defensive quality includes consumer staples, healthcare, utilities, and low-volatility compounders.",
+      "invalidation": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
+      ],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "PEP"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity",
+        "broad_liquidation"
       ],
       "live_output_changed": false
     },
@@ -3368,6 +3811,454 @@
       "live_output_changed": false
     },
     {
+      "symbol": "SNDK",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural",
+      "bucket_id": "memory_storage_direct_beneficiary",
+      "bucket_type": "structural",
+      "route": "watchlist",
+      "source_labels": [
+        "reference_data_approved_theme",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [
+        "ai_capex_to_memory_storage"
+      ],
+      "transmission_direction": "tailwind",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "SNDK is a direct beneficiary of Memory and Storage \u2014 AI Data-Centre Demand: AI data-centre expansion can increase demand for high-performance memory, storage and related enterprise infrastructure. Memory/storage cycle tightening driven by AI workload growth supports SNDK, WDC and related names.",
+      "invalidation": [
+        "memory_cycle_risk",
+        "commodity_pricing",
+        "capex_sensitivity",
+        "earnings_volatility",
+        "supply_demand_reversal",
+        "valuation_risk"
+      ],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "SNDK"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [
+        "memory_cycle_risk",
+        "commodity_pricing",
+        "capex_sensitivity",
+        "earnings_volatility",
+        "supply_demand_reversal",
+        "valuation_risk"
+      ],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "WDC",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural",
+      "bucket_id": "memory_storage_direct_beneficiary",
+      "bucket_type": "structural",
+      "route": "watchlist",
+      "source_labels": [
+        "reference_data_approved_theme",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [
+        "ai_capex_to_memory_storage"
+      ],
+      "transmission_direction": "tailwind",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "WDC is a direct beneficiary of Memory and Storage \u2014 AI Data-Centre Demand: AI data-centre expansion can increase demand for high-performance memory, storage and related enterprise infrastructure. Memory/storage cycle tightening driven by AI workload growth supports SNDK, WDC and related names.",
+      "invalidation": [
+        "memory_cycle_risk",
+        "commodity_pricing",
+        "capex_sensitivity",
+        "earnings_volatility",
+        "supply_demand_reversal",
+        "valuation_risk"
+      ],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "WDC"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [
+        "memory_cycle_risk",
+        "commodity_pricing",
+        "capex_sensitivity",
+        "earnings_volatility",
+        "supply_demand_reversal",
+        "valuation_risk"
+      ],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "IREN",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural",
+      "bucket_id": "ai_compute_infrastructure_direct_beneficiary",
+      "bucket_type": "structural",
+      "route": "watchlist",
+      "source_labels": [
+        "reference_data_approved_theme",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [
+        "ai_compute_demand_to_ai_compute_infrastructure"
+      ],
+      "transmission_direction": "tailwind",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "IREN is a direct beneficiary of AI Compute Infrastructure \u2014 Neocloud and Power-Constrained Compute: AI workload demand and GPU compute scarcity can support approved AI compute infrastructure and neocloud providers, but only when financing, power and execution risks remain controlled. Confidence lower than other AI themes due to speculative risk profile.",
+      "invalidation": [
+        "speculative_growth",
+        "financing_risk",
+        "power_cost",
+        "capacity_execution_risk",
+        "customer_concentration",
+        "dilution_risk",
+        "volatility_risk"
+      ],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "IREN"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [
+        "speculative_growth",
+        "financing_risk",
+        "power_cost",
+        "capacity_execution_risk",
+        "customer_concentration",
+        "dilution_risk",
+        "volatility_risk"
+      ],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "TE",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural_candidate_source",
+      "bucket_id": "tier_d_TE",
+      "bucket_type": "structural",
+      "route": "position",
+      "source_labels": [
+        "tier_d_position_research",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "TE is in the Tier D position research universe (structural fundamental discovery)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "TE"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "position",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "IONQ",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural_candidate_source",
+      "bucket_id": "tier_d_IONQ",
+      "bucket_type": "structural",
+      "route": "position",
+      "source_labels": [
+        "tier_d_position_research",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "IONQ is in the Tier D position research universe (structural fundamental discovery)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "IONQ"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "position",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "APP",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural_candidate_source",
+      "bucket_id": "tier_d_APP",
+      "bucket_type": "structural",
+      "route": "position",
+      "source_labels": [
+        "tier_d_position_research",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "APP is in the Tier D position research universe (structural fundamental discovery)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "APP"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "position",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "CRDO",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural_candidate_source",
+      "bucket_id": "tier_d_CRDO",
+      "bucket_type": "structural",
+      "route": "position",
+      "source_labels": [
+        "tier_d_position_research",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "CRDO is in the Tier D position research universe (structural fundamental discovery)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "CRDO"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "position",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "RKLB",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "structural_candidate_source",
+      "bucket_id": "tier_d_RKLB",
+      "bucket_type": "structural",
+      "route": "position",
+      "source_labels": [
+        "tier_d_position_research",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "RKLB is in the Tier D position research universe (structural fundamental discovery)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "RKLB"
+      },
+      "quota": {
+        "group": "structural_position",
+        "protected": true
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "position",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "CRWG",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "attention_shadow_only",
+      "bucket_id": "tier_b_CRWG",
+      "bucket_type": "attention",
+      "route": "intraday_swing",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "CRWG appeared in daily promoted universe (gap/volume/catalyst score)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "CRWG"
+      },
+      "quota": {
+        "group": "attention",
+        "protected": false
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "intraday_swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
       "symbol": "TCGL",
       "company_name": null,
       "asset_type": "equity",
@@ -3412,11 +4303,11 @@
       "live_output_changed": false
     },
     {
-      "symbol": "EXPE",
+      "symbol": "STRL",
       "company_name": null,
       "asset_type": "equity",
       "reason_to_care": "attention_shadow_only",
-      "bucket_id": "tier_b_EXPE",
+      "bucket_id": "tier_b_STRL",
       "bucket_type": "attention",
       "route": "intraday_swing",
       "source_labels": [
@@ -3427,12 +4318,12 @@
       "transmission_direction": "none",
       "company_validation_status": "not_run_static_bootstrap",
       "thesis_intact": null,
-      "why_this_symbol": "EXPE appeared in daily promoted universe (gap/volume/catalyst score)",
+      "why_this_symbol": "STRL appeared in daily promoted universe (gap/volume/catalyst score)",
       "invalidation": [],
       "eligibility": {
         "status": "shadow_only_unknown",
         "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
-        "symbol": "EXPE"
+        "symbol": "STRL"
       },
       "quota": {
         "group": "attention",
@@ -3456,11 +4347,11 @@
       "live_output_changed": false
     },
     {
-      "symbol": "CHD",
+      "symbol": "A",
       "company_name": null,
       "asset_type": "equity",
       "reason_to_care": "attention_shadow_only",
-      "bucket_id": "tier_b_CHD",
+      "bucket_id": "tier_b_A",
       "bucket_type": "attention",
       "route": "intraday_swing",
       "source_labels": [
@@ -3471,12 +4362,12 @@
       "transmission_direction": "none",
       "company_validation_status": "not_run_static_bootstrap",
       "thesis_intact": null,
-      "why_this_symbol": "CHD appeared in daily promoted universe (gap/volume/catalyst score)",
+      "why_this_symbol": "A appeared in daily promoted universe (gap/volume/catalyst score)",
       "invalidation": [],
       "eligibility": {
         "status": "shadow_only_unknown",
         "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
-        "symbol": "CHD"
+        "symbol": "A"
       },
       "quota": {
         "group": "attention",
@@ -3500,11 +4391,11 @@
       "live_output_changed": false
     },
     {
-      "symbol": "CBRE",
+      "symbol": "MTD",
       "company_name": null,
       "asset_type": "equity",
       "reason_to_care": "attention_shadow_only",
-      "bucket_id": "tier_b_CBRE",
+      "bucket_id": "tier_b_MTD",
       "bucket_type": "attention",
       "route": "intraday_swing",
       "source_labels": [
@@ -3515,12 +4406,12 @@
       "transmission_direction": "none",
       "company_validation_status": "not_run_static_bootstrap",
       "thesis_intact": null,
-      "why_this_symbol": "CBRE appeared in daily promoted universe (gap/volume/catalyst score)",
+      "why_this_symbol": "MTD appeared in daily promoted universe (gap/volume/catalyst score)",
       "invalidation": [],
       "eligibility": {
         "status": "shadow_only_unknown",
         "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
-        "symbol": "CBRE"
+        "symbol": "MTD"
       },
       "quota": {
         "group": "attention",
@@ -3544,11 +4435,11 @@
       "live_output_changed": false
     },
     {
-      "symbol": "EPAM",
+      "symbol": "VRSK",
       "company_name": null,
       "asset_type": "equity",
       "reason_to_care": "attention_shadow_only",
-      "bucket_id": "tier_b_EPAM",
+      "bucket_id": "tier_b_VRSK",
       "bucket_type": "attention",
       "route": "intraday_swing",
       "source_labels": [
@@ -3559,12 +4450,12 @@
       "transmission_direction": "none",
       "company_validation_status": "not_run_static_bootstrap",
       "thesis_intact": null,
-      "why_this_symbol": "EPAM appeared in daily promoted universe (gap/volume/catalyst score)",
+      "why_this_symbol": "VRSK appeared in daily promoted universe (gap/volume/catalyst score)",
       "invalidation": [],
       "eligibility": {
         "status": "shadow_only_unknown",
         "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
-        "symbol": "EPAM"
+        "symbol": "VRSK"
       },
       "quota": {
         "group": "attention",
@@ -3588,11 +4479,11 @@
       "live_output_changed": false
     },
     {
-      "symbol": "PLD",
+      "symbol": "CW",
       "company_name": null,
       "asset_type": "equity",
       "reason_to_care": "attention_shadow_only",
-      "bucket_id": "tier_b_PLD",
+      "bucket_id": "tier_b_CW",
       "bucket_type": "attention",
       "route": "intraday_swing",
       "source_labels": [
@@ -3603,12 +4494,12 @@
       "transmission_direction": "none",
       "company_validation_status": "not_run_static_bootstrap",
       "thesis_intact": null,
-      "why_this_symbol": "PLD appeared in daily promoted universe (gap/volume/catalyst score)",
+      "why_this_symbol": "CW appeared in daily promoted universe (gap/volume/catalyst score)",
       "invalidation": [],
       "eligibility": {
         "status": "shadow_only_unknown",
         "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
-        "symbol": "PLD"
+        "symbol": "CW"
       },
       "quota": {
         "group": "attention",
@@ -3632,11 +4523,11 @@
       "live_output_changed": false
     },
     {
-      "symbol": "ACI",
+      "symbol": "AYI",
       "company_name": null,
       "asset_type": "equity",
       "reason_to_care": "attention_shadow_only",
-      "bucket_id": "tier_b_ACI",
+      "bucket_id": "tier_b_AYI",
       "bucket_type": "attention",
       "route": "intraday_swing",
       "source_labels": [
@@ -3647,12 +4538,408 @@
       "transmission_direction": "none",
       "company_validation_status": "not_run_static_bootstrap",
       "thesis_intact": null,
-      "why_this_symbol": "ACI appeared in daily promoted universe (gap/volume/catalyst score)",
+      "why_this_symbol": "AYI appeared in daily promoted universe (gap/volume/catalyst score)",
       "invalidation": [],
       "eligibility": {
         "status": "shadow_only_unknown",
         "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
-        "symbol": "ACI"
+        "symbol": "AYI"
+      },
+      "quota": {
+        "group": "attention",
+        "protected": false
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "intraday_swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "AME",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "attention_shadow_only",
+      "bucket_id": "tier_b_AME",
+      "bucket_type": "attention",
+      "route": "intraday_swing",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "AME appeared in daily promoted universe (gap/volume/catalyst score)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "AME"
+      },
+      "quota": {
+        "group": "attention",
+        "protected": false
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "intraday_swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "XYL",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "attention_shadow_only",
+      "bucket_id": "tier_b_XYL",
+      "bucket_type": "attention",
+      "route": "intraday_swing",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "XYL appeared in daily promoted universe (gap/volume/catalyst score)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "XYL"
+      },
+      "quota": {
+        "group": "attention",
+        "protected": false
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "intraday_swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "BC",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "attention_shadow_only",
+      "bucket_id": "tier_b_BC",
+      "bucket_type": "attention",
+      "route": "intraday_swing",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "BC appeared in daily promoted universe (gap/volume/catalyst score)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "BC"
+      },
+      "quota": {
+        "group": "attention",
+        "protected": false
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "intraday_swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "FDS",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "attention_shadow_only",
+      "bucket_id": "tier_b_FDS",
+      "bucket_type": "attention",
+      "route": "intraday_swing",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "FDS appeared in daily promoted universe (gap/volume/catalyst score)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "FDS"
+      },
+      "quota": {
+        "group": "attention",
+        "protected": false
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "intraday_swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "XPO",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "attention_shadow_only",
+      "bucket_id": "tier_b_XPO",
+      "bucket_type": "attention",
+      "route": "intraday_swing",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "XPO appeared in daily promoted universe (gap/volume/catalyst score)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "XPO"
+      },
+      "quota": {
+        "group": "attention",
+        "protected": false
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "intraday_swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "EQR",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "attention_shadow_only",
+      "bucket_id": "tier_b_EQR",
+      "bucket_type": "attention",
+      "route": "intraday_swing",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "EQR appeared in daily promoted universe (gap/volume/catalyst score)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "EQR"
+      },
+      "quota": {
+        "group": "attention",
+        "protected": false
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "intraday_swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "WST",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "attention_shadow_only",
+      "bucket_id": "tier_b_WST",
+      "bucket_type": "attention",
+      "route": "intraday_swing",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "WST appeared in daily promoted universe (gap/volume/catalyst score)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "WST"
+      },
+      "quota": {
+        "group": "attention",
+        "protected": false
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "intraday_swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "ACGL",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "attention_shadow_only",
+      "bucket_id": "tier_b_ACGL",
+      "bucket_type": "attention",
+      "route": "intraday_swing",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "ACGL appeared in daily promoted universe (gap/volume/catalyst score)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "ACGL"
+      },
+      "quota": {
+        "group": "attention",
+        "protected": false
+      },
+      "execution_instructions": {
+        "executable": false,
+        "allowed_routes_when_live": [
+          "intraday_swing",
+          "watchlist"
+        ],
+        "required_future_confirmation": [
+          "sector_etf_relative_strength",
+          "price_and_volume_confirmation_by_trading_bot",
+          "no_extended_chase",
+          "live_spread_and_risk_check_at_execution_only"
+        ],
+        "note": "Shadow only \u2014 no order generation permitted"
+      },
+      "risk_notes": [],
+      "live_output_changed": false
+    },
+    {
+      "symbol": "UDR",
+      "company_name": null,
+      "asset_type": "equity",
+      "reason_to_care": "attention_shadow_only",
+      "bucket_id": "tier_b_UDR",
+      "bucket_type": "attention",
+      "route": "intraday_swing",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "macro_rules_fired": [],
+      "transmission_direction": "none",
+      "company_validation_status": "not_run_static_bootstrap",
+      "thesis_intact": null,
+      "why_this_symbol": "UDR appeared in daily promoted universe (gap/volume/catalyst score)",
+      "invalidation": [],
+      "eligibility": {
+        "status": "shadow_only_unknown",
+        "reason": "Day 4 static bootstrap \u2014 no live eligibility check run",
+        "symbol": "UDR"
       },
       "quota": {
         "group": "attention",
@@ -4083,6 +5370,39 @@
       "quota": "etf_proxy"
     },
     {
+      "symbol": "MSFT",
+      "source": [
+        "intelligence_first_static_rule",
+        "economic_intelligence"
+      ],
+      "source_name": "economic_intelligence_structural",
+      "reason": "economic_intelligence_structural",
+      "route": "position",
+      "quota": "structural_position"
+    },
+    {
+      "symbol": "COST",
+      "source": [
+        "intelligence_first_static_rule",
+        "economic_intelligence"
+      ],
+      "source_name": "economic_intelligence_structural",
+      "reason": "economic_intelligence_structural",
+      "route": "position",
+      "quota": "structural_position"
+    },
+    {
+      "symbol": "BRK.B",
+      "source": [
+        "intelligence_first_static_rule",
+        "economic_intelligence"
+      ],
+      "source_name": "economic_intelligence_structural",
+      "reason": "economic_intelligence_structural",
+      "route": "position",
+      "quota": "structural_position"
+    },
+    {
       "symbol": "QUAL",
       "source": [
         "intelligence_first_static_rule",
@@ -4103,6 +5423,50 @@
       "reason": "economic_intelligence_attention",
       "route": "watchlist",
       "quota": "attention"
+    },
+    {
+      "symbol": "JNJ",
+      "source": [
+        "intelligence_first_static_rule",
+        "economic_intelligence"
+      ],
+      "source_name": "economic_intelligence_structural",
+      "reason": "economic_intelligence_structural",
+      "route": "swing",
+      "quota": "structural_position"
+    },
+    {
+      "symbol": "PG",
+      "source": [
+        "intelligence_first_static_rule",
+        "economic_intelligence"
+      ],
+      "source_name": "economic_intelligence_structural",
+      "reason": "economic_intelligence_structural",
+      "route": "swing",
+      "quota": "structural_position"
+    },
+    {
+      "symbol": "KO",
+      "source": [
+        "intelligence_first_static_rule",
+        "economic_intelligence"
+      ],
+      "source_name": "economic_intelligence_structural",
+      "reason": "economic_intelligence_structural",
+      "route": "swing",
+      "quota": "structural_position"
+    },
+    {
+      "symbol": "PEP",
+      "source": [
+        "intelligence_first_static_rule",
+        "economic_intelligence"
+      ],
+      "source_name": "economic_intelligence_structural",
+      "reason": "economic_intelligence_structural",
+      "route": "swing",
+      "quota": "structural_position"
     },
     {
       "symbol": "XLP",
@@ -4138,6 +5502,99 @@
       "quota": "etf_proxy"
     },
     {
+      "symbol": "SNDK",
+      "source": [
+        "reference_data_approved_theme",
+        "economic_intelligence"
+      ],
+      "source_name": "economic_intelligence_structural",
+      "reason": "economic_intelligence_structural",
+      "route": "watchlist",
+      "quota": "structural_position"
+    },
+    {
+      "symbol": "WDC",
+      "source": [
+        "reference_data_approved_theme",
+        "economic_intelligence"
+      ],
+      "source_name": "economic_intelligence_structural",
+      "reason": "economic_intelligence_structural",
+      "route": "watchlist",
+      "quota": "structural_position"
+    },
+    {
+      "symbol": "IREN",
+      "source": [
+        "reference_data_approved_theme",
+        "economic_intelligence"
+      ],
+      "source_name": "economic_intelligence_structural",
+      "reason": "economic_intelligence_structural",
+      "route": "watchlist",
+      "quota": "structural_position"
+    },
+    {
+      "symbol": "TE",
+      "source": [
+        "tier_d_position_research"
+      ],
+      "source_name": "tier_d_structural",
+      "reason": "tier_d_structural",
+      "route": "position",
+      "quota": "structural_position"
+    },
+    {
+      "symbol": "IONQ",
+      "source": [
+        "tier_d_position_research"
+      ],
+      "source_name": "tier_d_structural",
+      "reason": "tier_d_structural",
+      "route": "position",
+      "quota": "structural_position"
+    },
+    {
+      "symbol": "APP",
+      "source": [
+        "tier_d_position_research"
+      ],
+      "source_name": "tier_d_structural",
+      "reason": "tier_d_structural",
+      "route": "position",
+      "quota": "structural_position"
+    },
+    {
+      "symbol": "CRDO",
+      "source": [
+        "tier_d_position_research"
+      ],
+      "source_name": "tier_d_structural",
+      "reason": "tier_d_structural",
+      "route": "position",
+      "quota": "structural_position"
+    },
+    {
+      "symbol": "RKLB",
+      "source": [
+        "tier_d_position_research"
+      ],
+      "source_name": "tier_d_structural",
+      "reason": "tier_d_structural",
+      "route": "position",
+      "quota": "structural_position"
+    },
+    {
+      "symbol": "CRWG",
+      "source": [
+        "tier_b_daily_promoted"
+      ],
+      "source_name": "tier_b_attention",
+      "reason": "tier_b_attention",
+      "route": "intraday_swing",
+      "quota": "attention"
+    },
+    {
       "symbol": "TCGL",
       "source": [
         "tier_b_daily_promoted"
@@ -4148,7 +5605,7 @@
       "quota": "attention"
     },
     {
-      "symbol": "EXPE",
+      "symbol": "STRL",
       "source": [
         "tier_b_daily_promoted"
       ],
@@ -4158,7 +5615,7 @@
       "quota": "attention"
     },
     {
-      "symbol": "CHD",
+      "symbol": "A",
       "source": [
         "tier_b_daily_promoted"
       ],
@@ -4168,7 +5625,7 @@
       "quota": "attention"
     },
     {
-      "symbol": "CBRE",
+      "symbol": "MTD",
       "source": [
         "tier_b_daily_promoted"
       ],
@@ -4178,7 +5635,7 @@
       "quota": "attention"
     },
     {
-      "symbol": "EPAM",
+      "symbol": "VRSK",
       "source": [
         "tier_b_daily_promoted"
       ],
@@ -4188,7 +5645,7 @@
       "quota": "attention"
     },
     {
-      "symbol": "PLD",
+      "symbol": "CW",
       "source": [
         "tier_b_daily_promoted"
       ],
@@ -4198,7 +5655,97 @@
       "quota": "attention"
     },
     {
-      "symbol": "ACI",
+      "symbol": "AYI",
+      "source": [
+        "tier_b_daily_promoted"
+      ],
+      "source_name": "tier_b_attention",
+      "reason": "tier_b_attention",
+      "route": "intraday_swing",
+      "quota": "attention"
+    },
+    {
+      "symbol": "AME",
+      "source": [
+        "tier_b_daily_promoted"
+      ],
+      "source_name": "tier_b_attention",
+      "reason": "tier_b_attention",
+      "route": "intraday_swing",
+      "quota": "attention"
+    },
+    {
+      "symbol": "XYL",
+      "source": [
+        "tier_b_daily_promoted"
+      ],
+      "source_name": "tier_b_attention",
+      "reason": "tier_b_attention",
+      "route": "intraday_swing",
+      "quota": "attention"
+    },
+    {
+      "symbol": "BC",
+      "source": [
+        "tier_b_daily_promoted"
+      ],
+      "source_name": "tier_b_attention",
+      "reason": "tier_b_attention",
+      "route": "intraday_swing",
+      "quota": "attention"
+    },
+    {
+      "symbol": "FDS",
+      "source": [
+        "tier_b_daily_promoted"
+      ],
+      "source_name": "tier_b_attention",
+      "reason": "tier_b_attention",
+      "route": "intraday_swing",
+      "quota": "attention"
+    },
+    {
+      "symbol": "XPO",
+      "source": [
+        "tier_b_daily_promoted"
+      ],
+      "source_name": "tier_b_attention",
+      "reason": "tier_b_attention",
+      "route": "intraday_swing",
+      "quota": "attention"
+    },
+    {
+      "symbol": "EQR",
+      "source": [
+        "tier_b_daily_promoted"
+      ],
+      "source_name": "tier_b_attention",
+      "reason": "tier_b_attention",
+      "route": "intraday_swing",
+      "quota": "attention"
+    },
+    {
+      "symbol": "WST",
+      "source": [
+        "tier_b_daily_promoted"
+      ],
+      "source_name": "tier_b_attention",
+      "reason": "tier_b_attention",
+      "route": "intraday_swing",
+      "quota": "attention"
+    },
+    {
+      "symbol": "ACGL",
+      "source": [
+        "tier_b_daily_promoted"
+      ],
+      "source_name": "tier_b_attention",
+      "reason": "tier_b_attention",
+      "route": "intraday_swing",
+      "quota": "attention"
+    },
+    {
+      "symbol": "UDR",
       "source": [
         "tier_b_daily_promoted"
       ],
@@ -4220,16 +5767,6 @@
       "quota_group": "structural_position"
     },
     {
-      "symbol": "MSFT",
-      "excluded_by": [
-        "intelligence_first_static_rule",
-        "economic_intelligence"
-      ],
-      "source": "economic_intelligence_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
       "symbol": "AAPL",
       "excluded_by": [
         "intelligence_first_static_rule",
@@ -4246,142 +5783,7 @@
         "economic_intelligence"
       ],
       "source": "economic_intelligence_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
-      "symbol": "BRK.B",
-      "excluded_by": [
-        "intelligence_first_static_rule",
-        "economic_intelligence"
-      ],
-      "source": "economic_intelligence_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
-      "symbol": "COST",
-      "excluded_by": [
-        "intelligence_first_static_rule",
-        "economic_intelligence"
-      ],
-      "source": "economic_intelligence_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
-      "symbol": "JNJ",
-      "excluded_by": [
-        "intelligence_first_static_rule",
-        "economic_intelligence"
-      ],
-      "source": "economic_intelligence_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
-      "symbol": "PG",
-      "excluded_by": [
-        "intelligence_first_static_rule",
-        "economic_intelligence"
-      ],
-      "source": "economic_intelligence_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
-      "symbol": "KO",
-      "excluded_by": [
-        "intelligence_first_static_rule",
-        "economic_intelligence"
-      ],
-      "source": "economic_intelligence_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
-      "symbol": "PEP",
-      "excluded_by": [
-        "intelligence_first_static_rule",
-        "economic_intelligence"
-      ],
-      "source": "economic_intelligence_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
-      "symbol": "SNDK",
-      "excluded_by": [
-        "reference_data_approved_theme",
-        "economic_intelligence"
-      ],
-      "source": "economic_intelligence_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
-      "symbol": "WDC",
-      "excluded_by": [
-        "reference_data_approved_theme",
-        "economic_intelligence"
-      ],
-      "source": "economic_intelligence_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
-      "symbol": "IREN",
-      "excluded_by": [
-        "reference_data_approved_theme",
-        "economic_intelligence"
-      ],
-      "source": "economic_intelligence_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
-      "symbol": "TE",
-      "excluded_by": [
-        "tier_d_position_research"
-      ],
-      "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
-      "symbol": "IONQ",
-      "excluded_by": [
-        "tier_d_position_research"
-      ],
-      "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
-      "symbol": "APP",
-      "excluded_by": [
-        "tier_d_position_research"
-      ],
-      "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
-      "symbol": "CRDO",
-      "excluded_by": [
-        "tier_d_position_research"
-      ],
-      "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
-      "quota_group": "structural_position"
-    },
-    {
-      "symbol": "RKLB",
-      "excluded_by": [
-        "tier_d_position_research"
-      ],
-      "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
       "quota_group": "structural_position"
     },
     {
@@ -4390,7 +5792,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4399,7 +5801,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4408,7 +5810,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4417,7 +5819,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4426,7 +5828,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4435,7 +5837,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4444,7 +5846,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4453,7 +5855,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4462,7 +5864,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4480,7 +5882,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4489,7 +5891,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4498,7 +5900,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4507,7 +5909,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4516,7 +5918,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4525,7 +5927,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4534,7 +5936,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4543,7 +5945,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4552,7 +5954,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4561,7 +5963,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4570,7 +5972,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4579,7 +5981,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4588,7 +5990,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4597,7 +5999,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4615,7 +6017,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
       "quota_group": "structural_position"
     },
     {
@@ -4633,7 +6035,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
       "quota_group": "structural_position"
     },
     {
@@ -4642,7 +6044,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4651,7 +6053,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4660,7 +6062,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4669,7 +6071,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4678,7 +6080,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4687,7 +6089,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4696,7 +6098,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4705,7 +6107,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4714,7 +6116,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4723,7 +6125,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
       "quota_group": "structural_position"
     },
     {
@@ -4732,7 +6134,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4741,7 +6143,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4750,7 +6152,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4759,7 +6161,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4768,7 +6170,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4777,7 +6179,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4786,7 +6188,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4795,7 +6197,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4804,7 +6206,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4813,7 +6215,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4822,7 +6224,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4831,7 +6233,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4840,7 +6242,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4849,7 +6251,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4858,7 +6260,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4867,7 +6269,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4876,7 +6278,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4885,7 +6287,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4894,7 +6296,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4903,7 +6305,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4912,7 +6314,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4921,7 +6323,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4930,7 +6332,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4939,7 +6341,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4948,7 +6350,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4957,7 +6359,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4966,7 +6368,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4975,7 +6377,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4984,7 +6386,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -4993,7 +6395,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5002,7 +6404,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5011,7 +6413,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5020,7 +6422,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5029,7 +6431,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5038,7 +6440,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5047,7 +6449,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5056,7 +6458,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5065,7 +6467,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5074,7 +6476,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5083,7 +6485,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5092,7 +6494,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5101,7 +6503,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5110,7 +6512,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5119,7 +6521,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5128,7 +6530,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5137,7 +6539,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5146,7 +6548,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5155,7 +6557,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5164,7 +6566,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5173,7 +6575,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5182,7 +6584,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5191,7 +6593,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5200,7 +6602,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5209,7 +6611,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5218,7 +6620,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5227,7 +6629,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5236,7 +6638,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5245,7 +6647,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5254,7 +6656,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5263,7 +6665,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5272,7 +6674,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5281,7 +6683,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5290,7 +6692,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5299,7 +6701,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5308,7 +6710,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5317,7 +6719,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5326,7 +6728,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5335,7 +6737,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5344,7 +6746,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5353,7 +6755,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5362,7 +6764,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5371,7 +6773,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5380,7 +6782,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5389,7 +6791,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5398,7 +6800,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5407,7 +6809,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5416,7 +6818,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5425,7 +6827,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5434,7 +6836,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5443,7 +6845,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5452,7 +6854,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5461,7 +6863,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5470,7 +6872,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5488,7 +6890,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5497,7 +6899,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5515,7 +6917,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5524,7 +6926,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5533,7 +6935,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5542,7 +6944,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5551,7 +6953,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5560,7 +6962,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5569,7 +6971,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5578,7 +6980,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5587,7 +6989,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5596,7 +6998,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5605,7 +7007,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5614,7 +7016,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5623,7 +7025,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5632,7 +7034,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5641,7 +7043,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5650,7 +7052,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5659,7 +7061,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5668,7 +7070,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5677,7 +7079,7 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
@@ -5686,34 +7088,25 @@
         "tier_d_position_research"
       ],
       "source": "tier_d_structural",
-      "reason": "Structural quota full (20)",
+      "reason": "Structural quota full (35)",
       "quota_group": "structural_position"
     },
     {
-      "symbol": "YUM",
+      "symbol": "VRSN",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "LYV",
+      "symbol": "BF.B",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
-      "quota_group": "attention"
-    },
-    {
-      "symbol": "MSI",
-      "excluded_by": [
-        "tier_b_daily_promoted"
-      ],
-      "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
@@ -5722,34 +7115,16 @@
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "BJ",
+      "symbol": "SNA",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
-      "quota_group": "attention"
-    },
-    {
-      "symbol": "NRG",
-      "excluded_by": [
-        "tier_b_daily_promoted"
-      ],
-      "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
-      "quota_group": "attention"
-    },
-    {
-      "symbol": "BIIB",
-      "excluded_by": [
-        "tier_b_daily_promoted"
-      ],
-      "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
@@ -5758,79 +7133,61 @@
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "NTRA",
+      "symbol": "MORN",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "AGCO",
+      "symbol": "SSNC",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "OSK",
+      "symbol": "CLH",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "DOV",
+      "symbol": "GRMN",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "BK",
+      "symbol": "ITW",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "SPXC",
+      "symbol": "STE",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
-      "quota_group": "attention"
-    },
-    {
-      "symbol": "LII",
-      "excluded_by": [
-        "tier_b_daily_promoted"
-      ],
-      "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
-      "quota_group": "attention"
-    },
-    {
-      "symbol": "ACGL",
-      "excluded_by": [
-        "tier_b_daily_promoted"
-      ],
-      "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
@@ -5839,169 +7196,187 @@
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "EIX",
+      "symbol": "TDY",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "HIG",
+      "symbol": "ALGN",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "ITT",
+      "symbol": "TW",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "DTE",
+      "symbol": "SPG",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "STLD",
+      "symbol": "CFG",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "IEX",
+      "symbol": "OTIS",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "EQIX",
+      "symbol": "DLR",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "HST",
+      "symbol": "ROL",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "JLL",
+      "symbol": "PNC",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "SNX",
+      "symbol": "DKS",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "VMC",
+      "symbol": "VLTO",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "A",
+      "symbol": "PSA",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "CMS",
+      "symbol": "ASND",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "NSC",
+      "symbol": "MTB",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "GWW",
+      "symbol": "MUSA",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "CPAY",
+      "symbol": "CACI",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "ED",
+      "symbol": "AMP",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
-      "symbol": "BG",
+      "symbol": "TYL",
       "excluded_by": [
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
+      "quota_group": "attention"
+    },
+    {
+      "symbol": "TPG",
+      "excluded_by": [
+        "tier_b_daily_promoted"
+      ],
+      "source": "tier_b_attention",
+      "reason": "Total universe cap reached (75)",
+      "quota_group": "attention"
+    },
+    {
+      "symbol": "ELV",
+      "excluded_by": [
+        "tier_b_daily_promoted"
+      ],
+      "source": "tier_b_attention",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
@@ -6010,70 +7385,7 @@
         "tier_b_daily_promoted"
       ],
       "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
-      "quota_group": "attention"
-    },
-    {
-      "symbol": "IXUS",
-      "excluded_by": [
-        "tier_b_daily_promoted"
-      ],
-      "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
-      "quota_group": "attention"
-    },
-    {
-      "symbol": "TPR",
-      "excluded_by": [
-        "tier_b_daily_promoted"
-      ],
-      "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
-      "quota_group": "attention"
-    },
-    {
-      "symbol": "USFD",
-      "excluded_by": [
-        "tier_b_daily_promoted"
-      ],
-      "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
-      "quota_group": "attention"
-    },
-    {
-      "symbol": "NI",
-      "excluded_by": [
-        "tier_b_daily_promoted"
-      ],
-      "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
-      "quota_group": "attention"
-    },
-    {
-      "symbol": "CTVA",
-      "excluded_by": [
-        "tier_b_daily_promoted"
-      ],
-      "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
-      "quota_group": "attention"
-    },
-    {
-      "symbol": "SN",
-      "excluded_by": [
-        "tier_b_daily_promoted"
-      ],
-      "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
-      "quota_group": "attention"
-    },
-    {
-      "symbol": "BALL",
-      "excluded_by": [
-        "tier_b_daily_promoted"
-      ],
-      "source": "tier_b_attention",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "attention"
     },
     {
@@ -6109,7 +7421,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6118,7 +7430,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6127,7 +7439,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6136,7 +7448,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6145,7 +7457,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6163,7 +7475,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6172,7 +7484,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6190,7 +7502,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6208,7 +7520,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6235,7 +7547,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6253,7 +7565,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6262,7 +7574,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6271,7 +7583,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6280,7 +7592,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6289,7 +7601,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6298,7 +7610,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6307,7 +7619,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6316,7 +7628,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6325,7 +7637,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6334,7 +7646,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6343,7 +7655,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6352,7 +7664,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6370,7 +7682,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6379,7 +7691,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6388,7 +7700,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6397,7 +7709,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6406,7 +7718,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6415,7 +7727,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6451,7 +7763,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6460,7 +7772,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6469,7 +7781,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6478,7 +7790,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6487,7 +7799,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6496,7 +7808,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6505,7 +7817,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     },
     {
@@ -6532,7 +7844,7 @@
         "tier_a_core_floor"
       ],
       "source": "tier_a_core_floor",
-      "reason": "Total universe cap reached (50)",
+      "reason": "Total universe cap reached (75)",
       "quota_group": "current_source_unclassified"
     }
   ],

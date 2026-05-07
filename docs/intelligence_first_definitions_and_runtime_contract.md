@@ -341,3 +341,19 @@ These terms are added in Sprint 7H.1 to support the controlled activation sprint
 | **Activation Window** | The time period during which `enable_active_opportunity_universe_handoff = True`. The window begins at the flag flip and ends at rollback or explicit close. The minimum window is 2 complete scan cycles. Monitoring during the window is mandatory. The window is controlled by Amit only — no automated activation. |
 | **Rollback Trigger** | A specific observable condition that causes an immediate rollback during the activation window. Triggers include: `_handoff_fail_closed_reason` non-null, scanner fallback firing while flag=True, manifest SLA expiry during handoff read, publisher heartbeat fail-closed. Full trigger list: `docs/intelligence_first_activation_rollback_playbook.md` Section 5. |
 | **Operator Checklist** | `docs/intelligence_first_daily_operator_checklist.md`. A daily operational runsheet with four sections: pre-market checks, during-market monitoring, post-market summary, and emergency procedures. Applied in both validation-only mode and controlled activation mode. |
+
+---
+
+## 18. Sprint 7I — Quota Policy Terms
+
+These terms are added in Sprint 7I to support the 75/35 quota promotion and observation gate reset.
+
+| Term | Definition |
+|------|-----------|
+| **Quota Policy Version** | A string constant (`QUOTA_POLICY_VERSION` in `quota_allocator.py`) that identifies the active quota configuration. Format: `"<total_cap>_<structural_cap>"`. Sprint 7I value: `"75_35"`. Written to every `publisher_run_log.jsonl` entry. Used by the observer to count `successful_runs_for_current_quota` and `distinct_sessions_for_current_quota`, which determine the activation readiness gate for the current quota design. |
+| **Quota Policy Promotion** | The act of raising the handoff universe caps from the safety validation cap (50/20) to the production candidate cap (75/35) in validation-only mode, without flipping `enable_active_opportunity_universe_handoff`. Sprint 7I is the first quota policy promotion in the Intelligence-First architecture. |
+| **Successful Runs for Current Quota** | The count of `publisher_run_log.jsonl` entries where `validation_status = pass` AND `quota_policy_version` matches the current `QUOTA_POLICY_VERSION`. This count resets to zero whenever the quota policy version changes. Used as the primary run counter in the activation readiness gate from Sprint 7I onwards. |
+| **Distinct Sessions for Current Quota** | The count of distinct UTC dates in `publisher_run_log.jsonl` entries that match the current quota policy version. The preferred gate basis for activation readiness. Requires runs spanning ≥ 3 separate calendar days under the current quota policy. |
+| **Observation Gate Reset** | When the quota policy changes (e.g. from 50/20 to 75/35), the activation readiness gate resets to `insufficient_observation` for the new policy, even if the old policy had met the threshold. The old runs remain in the log but do not count toward the new policy's gate. |
+| **Safety Validation Cap** | The conservative quota configuration (50/20) used during the initial publisher validation phase (Sprints 7F–7H). Purpose: validate publisher mechanics, manifest schema, fail-closed path, and reader integration with a small, manageable universe. Superseded by the production candidate cap in Sprint 7I. |
+| **Production Candidate Cap** | The quota configuration (75/35) identified by Sprint 7H.3 calibration as the minimum that eliminates all governed-but-excluded symbols, gives every active EIL theme ≥ 1 single-name representative, includes COST/MSFT/PG/SNDK/WDC/IREN, and has no runtime performance concern. Active from Sprint 7I in validation-only mode. |

@@ -118,6 +118,15 @@ _CANDIDATE_REQUIRED_FIELDS = (
     "executable", "order_instruction", "live_output_changed",
 )
 
+# Quota policy — must match quota_allocator.QUOTA_POLICY_VERSION
+_QUOTA_POLICY_VERSION = "75_35"
+_QUOTA_POLICY_TOTAL = 75
+_QUOTA_POLICY_STRUCTURAL = 35
+
+# Watch symbols tracked per Sprint 7H.2 / 7I
+_GOVERNED_WATCH  = ["COST", "MSFT", "PG"]    # governance_gap_defect (EIL-governed, quota-excluded at 50/20)
+_QUOTA_WATCH     = ["SNDK", "WDC", "IREN"]   # already_governed_elsewhere (EIL-governed, quota-excluded)
+
 # ---------------------------------------------------------------------------
 # Utilities
 # ---------------------------------------------------------------------------
@@ -299,12 +308,26 @@ def _analyse_active_universe(warnings: list[str]) -> dict:
     for issue in issues:
         warnings.append(f"active_universe issue: {issue}")
 
+    included_syms = {c.get("symbol") for c in candidates if c.get("symbol")}
+    structural_count = sum(
+        1 for c in candidates if c.get("quota_group") == "structural_position"
+    )
+    governed_watch_status = {
+        sym: ("included" if sym in included_syms else "excluded")
+        for sym in _GOVERNED_WATCH
+    }
+    quota_watch_status = {
+        sym: ("included" if sym in included_syms else "excluded")
+        for sym in _QUOTA_WATCH
+    }
+
     return {
         "exists": True,
         "mode": universe.get("mode"),
         "publication_mode": universe.get("publication_mode"),
         "validation_status": universe.get("validation_status"),
         "candidate_count": len(candidates),
+        "structural_count": structural_count,
         "no_executable_trade_instructions": universe.get("no_executable_trade_instructions"),
         "executable_violations": executable_violations,
         "order_instruction_violations": order_violations,
@@ -312,6 +335,8 @@ def _analyse_active_universe(warnings: list[str]) -> dict:
         "candidate_field_issues": field_issues[:10],  # cap for readability
         "issues": issues,
         "issue_count": len(issues),
+        "governed_watch_status": governed_watch_status,
+        "quota_watch_status": quota_watch_status,
     }
 
 
@@ -468,6 +493,9 @@ def _read_run_log() -> dict:
             "distinct_utc_dates": [],
             "first_observed_at": None,
             "last_observed_at": None,
+            "successful_runs_for_current_quota": 0,
+            "distinct_sessions_for_current_quota": 0,
+            "quota_observation_start": None,
         }
 
     records: list[dict] = []
@@ -492,11 +520,26 @@ def _read_run_log() -> dict:
             "first_observed_at": None,
             "last_observed_at": None,
             "parse_errors": parse_errors,
+            "successful_runs_for_current_quota": 0,
+            "distinct_sessions_for_current_quota": 0,
+            "quota_observation_start": None,
         }
 
     successful = [r for r in records if r.get("validation_status") == "pass"]
     utc_dates = sorted({r["utc_date"] for r in successful if r.get("utc_date")})
     timestamps = sorted(r["completed_at"] for r in successful if r.get("completed_at"))
+
+    # Quota-policy-aware counts: only runs with the current quota policy version
+    current_policy_runs = [
+        r for r in successful
+        if r.get("quota_policy_version") == _QUOTA_POLICY_VERSION
+    ]
+    current_policy_dates = sorted({
+        r["utc_date"] for r in current_policy_runs if r.get("utc_date")
+    })
+    current_policy_timestamps = sorted(
+        r["completed_at"] for r in current_policy_runs if r.get("completed_at")
+    )
 
     return {
         "run_log_exists": True,
@@ -507,6 +550,10 @@ def _read_run_log() -> dict:
         "first_observed_at": timestamps[0] if timestamps else None,
         "last_observed_at": timestamps[-1] if timestamps else None,
         "parse_errors": parse_errors,
+        # Quota-policy-aware fields (Sprint 7I)
+        "successful_runs_for_current_quota": len(current_policy_runs),
+        "distinct_sessions_for_current_quota": len(current_policy_dates),
+        "quota_observation_start": current_policy_timestamps[0] if current_policy_timestamps else None,
     }
 
 
@@ -527,11 +574,17 @@ def _determine_readiness_gate(
     successful_runs = run_log.get("successful_runs", 0)
     distinct_sessions = run_log.get("distinct_sessions", 0)
 
-    threshold_met = (successful_runs >= _MIN_RUNS_FOR_STABLE
-                     or distinct_sessions >= _MIN_SESSIONS_FOR_STABLE)
-    if successful_runs >= _MIN_RUNS_FOR_STABLE:
+    # Sprint 7I: gate uses quota-policy-aware counts when available
+    quota_runs = run_log.get("successful_runs_for_current_quota", 0)
+    quota_sessions = run_log.get("distinct_sessions_for_current_quota", 0)
+    gate_runs = quota_runs if quota_runs > 0 else successful_runs
+    gate_sessions = quota_sessions if quota_sessions > 0 else distinct_sessions
+
+    threshold_met = (gate_runs >= _MIN_RUNS_FOR_STABLE
+                     or gate_sessions >= _MIN_SESSIONS_FOR_STABLE)
+    if gate_runs >= _MIN_RUNS_FOR_STABLE:
         threshold_basis = "successful_runs"
-    elif distinct_sessions >= _MIN_SESSIONS_FOR_STABLE:
+    elif gate_sessions >= _MIN_SESSIONS_FOR_STABLE:
         threshold_basis = "distinct_sessions"
     else:
         threshold_basis = "not_met"
@@ -626,6 +679,18 @@ def run_observer() -> dict:
         "heartbeat_exists": heartbeat_analysis.get("exists", False),
         "publisher_report_exists": publisher_report_analysis.get("exists", False),
         "readiness_gate": readiness_gate,
+        # Sprint 7I: quota policy tracking
+        "quota_policy_version": _QUOTA_POLICY_VERSION,
+        "quota_policy_total_cap": _QUOTA_POLICY_TOTAL,
+        "quota_policy_structural_cap": _QUOTA_POLICY_STRUCTURAL,
+        "quota_observation_required": True,
+        "quota_observation_start": run_log.get("quota_observation_start"),
+        "successful_runs_for_current_quota": run_log.get("successful_runs_for_current_quota", 0),
+        "distinct_sessions_for_current_quota": run_log.get("distinct_sessions_for_current_quota", 0),
+        "candidate_count": universe_analysis.get("candidate_count"),
+        "structural_count": universe_analysis.get("structural_count"),
+        "governed_watch_status": universe_analysis.get("governed_watch_status"),
+        "quota_watch_status": universe_analysis.get("quota_watch_status"),
     }
 
     report = {

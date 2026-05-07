@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-07T16:49:48Z",
-  "expires_at": "2026-05-07T17:04:48Z",
+  "generated_at": "2026-05-07T18:27:59Z",
+  "expires_at": "2026-05-07T18:42:59Z",
   "mode": "production_handoff_universe",
   "publication_mode": "validation_only",
   "source_shadow_file": "data/universe_builder/active_opportunity_universe_shadow.json",
@@ -14,11 +14,11 @@
   ],
   "validation_status": "pass",
   "universe_summary": {
-    "total_candidates": 50,
-    "shadow_total": 50,
-    "structural_candidates": 20,
+    "total_candidates": 75,
+    "shadow_total": 75,
+    "structural_candidates": 35,
     "manual_candidates": 13,
-    "attention_candidates": 8,
+    "attention_candidates": 18,
     "etf_proxy_candidates": 9
   },
   "candidates": [
@@ -1326,6 +1326,118 @@
       "live_output_changed": false
     },
     {
+      "symbol": "MSFT",
+      "route": "position",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "reason_to_care": "structural",
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [
+        "defensive_quality",
+        "quality_cash_flow"
+      ],
+      "risk_flags": [
+        "broad_market_liquidation",
+        "crowding",
+        "earnings_disappointment",
+        "valuation"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "COST",
+      "route": "position",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "reason_to_care": "structural",
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [
+        "defensive_quality",
+        "quality_cash_flow"
+      ],
+      "risk_flags": [
+        "broad_market_liquidation",
+        "crowding",
+        "earnings_disappointment",
+        "valuation"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "BRK.B",
+      "route": "position",
+      "route_hint": [
+        "position",
+        "swing",
+        "watchlist"
+      ],
+      "reason_to_care": "structural",
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [
+        "defensive_quality",
+        "quality_cash_flow"
+      ],
+      "risk_flags": [
+        "broad_market_liquidation",
+        "crowding",
+        "earnings_disappointment",
+        "valuation"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
       "symbol": "QUAL",
       "route": "watchlist",
       "route_hint": [
@@ -1389,6 +1501,146 @@
       ],
       "approval_status": "approved",
       "quota_group": "attention",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "JNJ",
+      "route": "swing",
+      "route_hint": [
+        "swing",
+        "watchlist"
+      ],
+      "reason_to_care": "structural",
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [
+        "defensive_quality"
+      ],
+      "risk_flags": [
+        "broad_liquidation",
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "PG",
+      "route": "swing",
+      "route_hint": [
+        "swing",
+        "watchlist"
+      ],
+      "reason_to_care": "structural",
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [
+        "defensive_quality"
+      ],
+      "risk_flags": [
+        "broad_liquidation",
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "KO",
+      "route": "swing",
+      "route_hint": [
+        "swing",
+        "watchlist"
+      ],
+      "reason_to_care": "structural",
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [
+        "defensive_quality"
+      ],
+      "risk_flags": [
+        "broad_liquidation",
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "PEP",
+      "route": "swing",
+      "route_hint": [
+        "swing",
+        "watchlist"
+      ],
+      "reason_to_care": "structural",
+      "source_labels": [
+        "intelligence_first_static_rule",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [
+        "defensive_quality"
+      ],
+      "risk_flags": [
+        "broad_liquidation",
+        "defensive_crowding",
+        "false_risk_off_signal",
+        "rate_sensitivity"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
       "freshness_status": "fresh",
       "executable": false,
       "order_instruction": null,
@@ -1497,6 +1749,279 @@
       "live_output_changed": false
     },
     {
+      "symbol": "SNDK",
+      "route": "watchlist",
+      "route_hint": [
+        "watchlist"
+      ],
+      "reason_to_care": "structural",
+      "source_labels": [
+        "reference_data_approved_theme",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [
+        "memory_storage"
+      ],
+      "risk_flags": [
+        "capex_sensitivity",
+        "commodity_pricing",
+        "earnings_volatility",
+        "memory_cycle_risk",
+        "supply_demand_reversal",
+        "valuation_risk"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "WDC",
+      "route": "watchlist",
+      "route_hint": [
+        "watchlist"
+      ],
+      "reason_to_care": "structural",
+      "source_labels": [
+        "reference_data_approved_theme",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [
+        "memory_storage"
+      ],
+      "risk_flags": [
+        "capex_sensitivity",
+        "commodity_pricing",
+        "earnings_volatility",
+        "memory_cycle_risk",
+        "supply_demand_reversal",
+        "valuation_risk"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "IREN",
+      "route": "watchlist",
+      "route_hint": [
+        "watchlist"
+      ],
+      "reason_to_care": "structural",
+      "source_labels": [
+        "reference_data_approved_theme",
+        "economic_intelligence",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [
+        "ai_compute_infrastructure"
+      ],
+      "risk_flags": [
+        "capacity_execution_risk",
+        "customer_concentration",
+        "dilution_risk",
+        "financing_risk",
+        "power_cost",
+        "speculative_growth",
+        "volatility_risk"
+      ],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "TE",
+      "route": "position",
+      "route_hint": [
+        "position",
+        "watchlist"
+      ],
+      "reason_to_care": "structural_candidate_source",
+      "source_labels": [
+        "tier_d_position_research",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "IONQ",
+      "route": "position",
+      "route_hint": [
+        "position",
+        "watchlist"
+      ],
+      "reason_to_care": "structural_candidate_source",
+      "source_labels": [
+        "tier_d_position_research",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "APP",
+      "route": "position",
+      "route_hint": [
+        "position",
+        "watchlist"
+      ],
+      "reason_to_care": "structural_candidate_source",
+      "source_labels": [
+        "tier_d_position_research",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "CRDO",
+      "route": "position",
+      "route_hint": [
+        "position",
+        "watchlist"
+      ],
+      "reason_to_care": "structural_candidate_source",
+      "source_labels": [
+        "tier_d_position_research",
+        "overnight_research_read_only",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "RKLB",
+      "route": "position",
+      "route_hint": [
+        "position",
+        "watchlist"
+      ],
+      "reason_to_care": "structural_candidate_source",
+      "source_labels": [
+        "tier_d_position_research",
+        "legacy_theme_tracker_read_only",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "structural_position",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "CRWG",
+      "route": "intraday_swing",
+      "route_hint": [
+        "intraday_swing",
+        "watchlist"
+      ],
+      "reason_to_care": "attention_shadow_only",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "attention",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
       "symbol": "TCGL",
       "route": "intraday_swing",
       "route_hint": [
@@ -1524,7 +2049,7 @@
       "live_output_changed": false
     },
     {
-      "symbol": "EXPE",
+      "symbol": "STRL",
       "route": "intraday_swing",
       "route_hint": [
         "intraday_swing",
@@ -1551,7 +2076,7 @@
       "live_output_changed": false
     },
     {
-      "symbol": "CHD",
+      "symbol": "A",
       "route": "intraday_swing",
       "route_hint": [
         "intraday_swing",
@@ -1578,7 +2103,7 @@
       "live_output_changed": false
     },
     {
-      "symbol": "CBRE",
+      "symbol": "MTD",
       "route": "intraday_swing",
       "route_hint": [
         "intraday_swing",
@@ -1605,7 +2130,7 @@
       "live_output_changed": false
     },
     {
-      "symbol": "EPAM",
+      "symbol": "VRSK",
       "route": "intraday_swing",
       "route_hint": [
         "intraday_swing",
@@ -1632,7 +2157,7 @@
       "live_output_changed": false
     },
     {
-      "symbol": "PLD",
+      "symbol": "CW",
       "route": "intraday_swing",
       "route_hint": [
         "intraday_swing",
@@ -1659,7 +2184,250 @@
       "live_output_changed": false
     },
     {
-      "symbol": "ACI",
+      "symbol": "AYI",
+      "route": "intraday_swing",
+      "route_hint": [
+        "intraday_swing",
+        "watchlist"
+      ],
+      "reason_to_care": "attention_shadow_only",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "attention",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "AME",
+      "route": "intraday_swing",
+      "route_hint": [
+        "intraday_swing",
+        "watchlist"
+      ],
+      "reason_to_care": "attention_shadow_only",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "attention",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "XYL",
+      "route": "intraday_swing",
+      "route_hint": [
+        "intraday_swing",
+        "watchlist"
+      ],
+      "reason_to_care": "attention_shadow_only",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "attention",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "BC",
+      "route": "intraday_swing",
+      "route_hint": [
+        "intraday_swing",
+        "watchlist"
+      ],
+      "reason_to_care": "attention_shadow_only",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "attention",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "FDS",
+      "route": "intraday_swing",
+      "route_hint": [
+        "intraday_swing",
+        "watchlist"
+      ],
+      "reason_to_care": "attention_shadow_only",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "attention",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "XPO",
+      "route": "intraday_swing",
+      "route_hint": [
+        "intraday_swing",
+        "watchlist"
+      ],
+      "reason_to_care": "attention_shadow_only",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "attention",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "EQR",
+      "route": "intraday_swing",
+      "route_hint": [
+        "intraday_swing",
+        "watchlist"
+      ],
+      "reason_to_care": "attention_shadow_only",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "attention",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "WST",
+      "route": "intraday_swing",
+      "route_hint": [
+        "intraday_swing",
+        "watchlist"
+      ],
+      "reason_to_care": "attention_shadow_only",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "attention",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "ACGL",
+      "route": "intraday_swing",
+      "route_hint": [
+        "intraday_swing",
+        "watchlist"
+      ],
+      "reason_to_care": "attention_shadow_only",
+      "source_labels": [
+        "tier_b_daily_promoted",
+        "committed_universe_read_only"
+      ],
+      "theme_ids": [],
+      "risk_flags": [],
+      "confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "approval_status": "approved",
+      "quota_group": "attention",
+      "freshness_status": "fresh",
+      "executable": false,
+      "order_instruction": null,
+      "live_output_changed": false
+    },
+    {
+      "symbol": "UDR",
       "route": "intraday_swing",
       "route_hint": [
         "intraday_swing",

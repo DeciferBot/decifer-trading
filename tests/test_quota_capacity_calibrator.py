@@ -192,18 +192,19 @@ def test_report_live_output_changed_false(report):
     assert report["production_universe_overwritten"] is False
 
 
-# 14. No production modules modified (universe_builder, quota_allocator unchanged)
+# 14. No production modules modified — calibrator context manager restores constants
+# Sprint 7I promoted production constants to 75/35; these assertions verify the
+# current production values (not the pre-7I 50/20 values).
 def test_no_production_modules_modified():
     import quota_allocator
-    # Verify production constants are restored to original values
-    assert quota_allocator._TOTAL_MAX == 50, \
-        f"quota_allocator._TOTAL_MAX was not restored: {quota_allocator._TOTAL_MAX}"
-    assert quota_allocator._STRUCTURAL_MAX == 20, \
-        f"quota_allocator._STRUCTURAL_MAX was not restored: {quota_allocator._STRUCTURAL_MAX}"
-    assert quota_allocator._ETF_PROXY_MAX == 10, \
-        f"quota_allocator._ETF_PROXY_MAX was not restored: {quota_allocator._ETF_PROXY_MAX}"
-    assert quota_allocator._ATTENTION_MAX == 15, \
-        f"quota_allocator._ATTENTION_MAX was not restored: {quota_allocator._ATTENTION_MAX}"
+    assert quota_allocator._TOTAL_MAX == 75, \
+        f"quota_allocator._TOTAL_MAX unexpected: {quota_allocator._TOTAL_MAX}"
+    assert quota_allocator._STRUCTURAL_MAX == 35, \
+        f"quota_allocator._STRUCTURAL_MAX unexpected: {quota_allocator._STRUCTURAL_MAX}"
+    assert quota_allocator._ETF_PROXY_MAX == 15, \
+        f"quota_allocator._ETF_PROXY_MAX unexpected: {quota_allocator._ETF_PROXY_MAX}"
+    assert quota_allocator._ATTENTION_MAX == 20, \
+        f"quota_allocator._ATTENTION_MAX unexpected: {quota_allocator._ATTENTION_MAX}"
 
 
 # 15. Scenario A matches current production baseline

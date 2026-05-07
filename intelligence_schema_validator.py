@@ -85,13 +85,15 @@ _VALID_QUOTA_GROUPS = {
     "structural_position", "catalyst_swing", "attention",
     "etf_proxy", "held", "manual_conviction", "current_source_unclassified",
 }
+# Sprint 7I: promoted to 75/35 production candidate quota policy.
+# Evidence: Sprint 7H.3 calibration. Matches quota_allocator.QUOTA_POLICY_VERSION = "75_35".
 _QUOTA_CAPS = {
-    "attention": 15,
-    "etf_proxy": 10,
-    "structural_position": 20,
+    "attention": 20,
+    "etf_proxy": 15,
+    "structural_position": 35,
     "catalyst_swing": 30,
 }
-_TOTAL_MAX = 50
+_TOTAL_MAX = 75
 
 _COMPARISON_REQUIRED_TOP_KEYS = [
     "schema_version", "generated_at", "mode", "source_files",
@@ -3561,6 +3563,28 @@ def validate_handoff_publisher_observation_report(path: str) -> ValidationResult
         result.fail("observation_report: observation_summary missing 'threshold_met'")
     if "threshold_basis" not in obs:
         result.fail("observation_report: observation_summary missing 'threshold_basis'")
+
+    # Sprint 7I: quota policy tracking in observation report
+    if "quota_policy_version" not in obs:
+        result.warn(
+            "observation_report: observation_summary missing 'quota_policy_version' — "
+            "expected 'quota_policy_version': '75_35' from Sprint 7I onwards"
+        )
+    elif obs.get("quota_policy_version") != "75_35":
+        result.warn(
+            f"observation_report: quota_policy_version is {obs['quota_policy_version']!r} — "
+            f"expected '75_35' (Sprint 7I production candidate policy)"
+        )
+    if "successful_runs_for_current_quota" not in obs:
+        result.warn(
+            "observation_report: observation_summary missing 'successful_runs_for_current_quota' "
+            "— expected from Sprint 7I onwards"
+        )
+    if "distinct_sessions_for_current_quota" not in obs:
+        result.warn(
+            "observation_report: observation_summary missing 'distinct_sessions_for_current_quota' "
+            "— expected from Sprint 7I onwards"
+        )
 
     return result
 

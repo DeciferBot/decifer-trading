@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-07T16:49:48Z",
+  "generated_at": "2026-05-07T18:27:59Z",
   "mode": "handoff_publisher_report",
   "publication_mode": "validation_only",
   "source_files": [
@@ -24,8 +24,8 @@
     "overall_status": "pass"
   },
   "candidate_summary": {
-    "shadow_count": 50,
-    "accepted_count": 50,
+    "shadow_count": 75,
+    "accepted_count": 75,
     "rejected_count": 0
   },
   "rejected_candidates": [],

@@ -131,6 +131,15 @@ def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _quota_policy_version() -> str:
+    """Return the current quota policy version string from quota_allocator."""
+    try:
+        from quota_allocator import QUOTA_POLICY_VERSION
+        return QUOTA_POLICY_VERSION
+    except Exception:
+        return "unknown"
+
+
 def _ts(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -223,6 +232,7 @@ def _append_run_log(
         "manifest_expires_at": manifest_expires_at,
         "freshness_status": "fresh",
         "source_shadow_file": source_shadow_file,
+        "quota_policy_version": _quota_policy_version(),
         "safety_flags": {k: v for k, v in _SAFETY.items()},
         "live_output_changed": False,
         "secrets_exposed": False,

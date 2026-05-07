@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "published_at": "2026-05-07T16:49:48Z",
-  "expires_at": "2026-05-07T17:04:48Z",
+  "published_at": "2026-05-07T18:27:59Z",
+  "expires_at": "2026-05-07T18:42:59Z",
   "validation_status": "pass",
   "handoff_mode": "production_validation",
   "publication_mode": "validation_only",

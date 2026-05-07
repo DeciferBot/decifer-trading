@@ -32,13 +32,19 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-_TOTAL_MAX = 50
+# Sprint 7I: promoted from 50/20 (safety validation cap) to 75/35 (production candidate cap).
+# Evidence: Sprint 7H.3 calibration — 75/35 is the minimum that eliminates all governed-but-excluded
+# symbols and gives every active EIL theme ≥1 single-name representative.
+# Observation gate for this policy: ≥10 successful publisher runs OR ≥3 distinct UTC sessions.
+QUOTA_POLICY_VERSION = "75_35"
+
+_TOTAL_MAX = 75
 _STRUCTURAL_MIN = 8
-_STRUCTURAL_MAX = 20
+_STRUCTURAL_MAX = 35
 _CATALYST_MAX = 30
 _CATALYST_MIN = 10
-_ATTENTION_MAX = 15   # shared: attention + current_source_unclassified
-_ETF_PROXY_MAX = 10
+_ATTENTION_MAX = 20   # shared: attention + current_source_unclassified — scaled with total cap
+_ETF_PROXY_MAX = 15   # scaled with total cap; ETF supply is capped at 9 by EIL feed
 
 _PROTECTED_GROUPS = frozenset({"held", "manual_conviction"})
 _STRUCTURAL_GROUP = "structural_position"

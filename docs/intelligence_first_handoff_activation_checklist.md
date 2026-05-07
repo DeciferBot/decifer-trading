@@ -206,3 +206,7 @@ Complete within 24 hours of activation or immediately after any rollback.
 | 14.3 | Amit approves activation | **REQUIRED — must be explicit** |
 | 14.4 | Approval recorded at (UTC) | |
 | 14.5 | Activation sprint name/number | |
+| 14.6 | Quota policy version at activation | Must be `75_35` (Sprint 7I production candidate cap) |
+| 14.7 | Governance gap defect acknowledgement | **RECORDED — 2026-05-07**: "COST, MSFT, and PG are governed by the economic intelligence layer (defensive_quality / quality_cash_flow themes) but excluded from the shadow universe due to structural quota pressure under the 50/20 policy. Under the 75/35 policy (Sprint 7I), COST, MSFT, and PG are included in the handoff universe. No code change required beyond the quota promotion already shipped in Sprint 7I." |
+| 14.8 | successful_runs_for_current_quota at activation | Must be ≥ 10 OR distinct_sessions_for_current_quota ≥ 3 |
+| 14.9 | distinct_sessions_for_current_quota at activation | Preferred gate basis — must span ≥ 3 distinct UTC dates under 75/35 policy |
