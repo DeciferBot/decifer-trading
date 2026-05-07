@@ -1,0 +1,9 @@
+{
+  "fail_closed_reason": "output_validation_failed: manifest: active_universe_file does not exist: 'data/live/active_opportunity_universe.json'",
+  "context": {
+    "output_errors": [
+      "manifest: active_universe_file does not exist: 'data/live/active_opportunity_universe.json'"
+    ]
+  },
+  "generated_at": "2026-05-07T15:25:29Z"
+}
