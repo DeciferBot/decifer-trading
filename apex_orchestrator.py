@@ -103,6 +103,54 @@ def _write_response_snapshot(cycle_id: str, raw_response: str) -> None:
 
 # ── Input builders ───────────────────────────────────────────────────────────
 
+def _build_closure_snapshot() -> tuple[list[dict], list[dict]]:
+    """
+    Snapshot recently_closed and failed_thesis_closed for Apex context.
+    Returns (rc_list, ftc_list) — read-only; never mutates the registries.
+    """
+    try:
+        from orders_state import (  # local import — avoids circular dependency at module load
+            recently_closed,
+            failed_thesis_closed,
+            _recently_closed_lock,
+        )
+        _now = datetime.now(UTC)
+        _cooldown_min = CONFIG.get("reentry_cooldown_minutes", 30)
+        _ftc_hours = CONFIG.get("failed_thesis_cooldown_hours", 4)
+
+        with _recently_closed_lock:
+            _rc_copy = dict(recently_closed)
+
+        rc_list = [
+            {
+                "symbol": sym,
+                "minutes_ago": round((_now - datetime.fromisoformat(ts)).total_seconds() / 60, 1),
+                "cooldown_remaining_min": round(
+                    _cooldown_min - (_now - datetime.fromisoformat(ts)).total_seconds() / 60, 1
+                ),
+            }
+            for sym, ts in _rc_copy.items()
+            if (_now - datetime.fromisoformat(ts)).total_seconds() < _cooldown_min * 60
+        ]
+
+        _ftc_copy = dict(failed_thesis_closed)
+        ftc_list = [
+            {
+                "symbol": sym,
+                "hours_ago": round((_now - datetime.fromisoformat(entry["ts"])).total_seconds() / 3600, 1),
+                "close_price": entry.get("close_price"),
+                "cooldown_remaining_h": round(
+                    _ftc_hours - (_now - datetime.fromisoformat(entry["ts"])).total_seconds() / 3600, 1
+                ),
+            }
+            for sym, entry in _ftc_copy.items()
+        ]
+        return rc_list, ftc_list
+    except Exception as _e:
+        log.debug("apex_orchestrator: closure snapshot failed — %s", _e)
+        return [], []
+
+
 def build_scan_cycle_apex_input(
     candidates: list[dict],
     review_positions: list[dict] | None = None,
@@ -112,6 +160,7 @@ def build_scan_cycle_apex_input(
     options_flow: list[dict] | None = None,
 ) -> dict:
     """Build a SCAN_CYCLE ApexInput dict from guardrails-filtered inputs."""
+    _rc, _ftc = _build_closure_snapshot()
     return {
         "trigger_type": "SCAN_CYCLE",
         "trigger_context": None,
@@ -124,6 +173,8 @@ def build_scan_cycle_apex_input(
         },
         "portfolio_state": portfolio_state or {},
         "scan_ts": datetime.now(UTC).isoformat(),
+        "recently_closed": _rc,
+        "failed_thesis_closed": _ftc,
     }
 
 
@@ -278,6 +329,43 @@ def _run_apex_pipeline(
         log.warning("apex_orchestrator: semantic filter error (non-fatal) — %s", e)
 
     would, rejected = _summarise_dispatch(decision, candidates_by_symbol)
+
+    # ── Pre-dispatch drift gate ───────────────────────────────────────────
+    # Reject entries where live price has moved more than max_entry_price_drift_pct
+    # in the thesis direction since the signal was scored. Prevents executing into
+    # an exhausted thesis when the stock already ran before the scan cycle executed.
+    _drift_threshold = CONFIG.get("max_entry_price_drift_pct", 0.05)
+    if _drift_threshold > 0 and would:
+        try:
+            from alpaca_stream import QUOTE_CACHE as _QCACHE
+            filtered_would: list[Any] = []
+            for _entry in would:
+                _sym = _entry.get("symbol")
+                _cand = candidates_by_symbol.get(_sym) or {}
+                _scored_px = float(_cand.get("price") or 0.0)
+                _direction = _cand.get("direction", "LONG")
+                if _scored_px > 0:
+                    _q = _QCACHE.get(_sym)
+                    if _q:
+                        _live_px = (_q["bid"] + _q["ask"]) / 2
+                        if _live_px > 0:
+                            _raw_drift = (_live_px - _scored_px) / _scored_px
+                            _thesis_drift = _raw_drift if _direction == "LONG" else -_raw_drift
+                            if _thesis_drift > _drift_threshold:
+                                log.warning(
+                                    "apex_orchestrator: drift gate rejected %s — "
+                                    "scored_px=%.2f live_px=%.2f drift=+%.1f%% "
+                                    "(threshold %.1f%%) dir=%s",
+                                    _sym, _scored_px, _live_px,
+                                    _thesis_drift * 100, _drift_threshold * 100, _direction,
+                                )
+                                _entry["_drift_rejected"] = True
+                                rejected.append(_entry)
+                                continue
+                filtered_would.append(_entry)
+            would = filtered_would
+        except ImportError:
+            pass  # alpaca_stream not wired — gate skipped; execute_buy guards still apply
 
     # ── Prompt and response snapshots ────────────────────────────────────
     _apex_meta_for_snap = decision.get("_meta") or {}

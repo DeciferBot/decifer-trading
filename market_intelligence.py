@@ -1030,10 +1030,15 @@ def _format_candidate_line(c: dict) -> str:
     headlines = " | ".join((c.get("news_headlines") or [])[:3]) or "-"
     dar_val = c.get("dar")
     dar_str = "pre-mkt" if dar_val is None else dar_val
+    _price = c.get("price") or 0.0
+    _day_chg = c.get("premarket_gap_pct") or 0.0
+    _price_str = f"{_price:.2f}" if _price else "?"
+    _day_chg_str = f"{_day_chg:+.1%}" if _day_chg else "+0.0%"
     line = (
         f"{c.get('symbol')}: effective_score={effective_score} raw_score={raw_score} "
         f"tier={tier} origin={origin} band={band} slot={slot} "
         f"dir={c.get('direction')} "
+        f"price_at_score={_price_str} day_chg={_day_chg_str} "
         f"DAR={dar_str} [{dims}] atr5={c.get('atr_5m')} atrD={c.get('atr_daily')} "
         f"volR={c.get('vol_ratio')} tape={c.get('daily_tape_score')} "
         f"rs={c.get('stock_rs_vs_spy')} cat={c.get('catalyst_score')} "
@@ -1160,6 +1165,27 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
         f"  new_entries_likely_blocked={'YES — near allocation limit' if _likely_blocked else 'no'}"
         + (" (prefer entries that close correlated or offsetting positions)" if _likely_blocked else "")
     )
+
+    _rc = apex_input.get("recently_closed") or []
+    _ftc = apex_input.get("failed_thesis_closed") or []
+    parts.append("\n[RECENT CLOSURES]")
+    if not _rc and not _ftc:
+        parts.append("  (none)")
+    for _r in _rc:
+        parts.append(
+            f"  recently_closed: {_r['symbol']} "
+            f"(closed {_r['minutes_ago']}m ago, "
+            f"cooldown {_r['cooldown_remaining_min']:.0f}m remaining) — do not re-enter yet"
+        )
+    for _f in _ftc:
+        _px = f"close_px={_f['close_price']:.2f} " if _f.get("close_price") else ""
+        _rem = _f.get("cooldown_remaining_h", 0)
+        _rem_str = f"{_rem:.1f}h remaining" if _rem > 0 else "cooldown expired, needs 1% dislocation"
+        parts.append(
+            f"  failed_thesis: {_f['symbol']} "
+            f"(closed {_f['hours_ago']}h ago, wrong_if fired, {_px}"
+            f"{_rem_str}) — thesis failed; do not re-enter same direction"
+        )
 
     parts.append(f"\n[TRACK A — NEW CANDIDATES] ({len(candidates)})")
     if not candidates:

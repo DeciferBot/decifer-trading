@@ -188,6 +188,7 @@ CONFIG = {
     "consecutive_loss_pause": 999,  # Paper learning mode: effectively disabled (live: 5)
     "reentry_cooldown_minutes": 30,  # Block re-entry after close (lifecycle gate)
     "failed_thesis_cooldown_hours": 4,  # Extended cooldown when INTRADAY wrong_if was triggered
+    "max_entry_price_drift_pct": 0.05,  # Pre-dispatch drift gate: reject entry if live price moved >5% in thesis dir since scoring
     "score_persistence_scans": 0,  # Disabled — beta trader fires on scan-1 conviction (live: 2)
     "persistence_conviction_bypass": 36,  # Score >= this passes persistence gate immediately (scan-1 safe)
     # ── HELD-POSITION SCALE-UP TRIGGER ────────────────────────────
