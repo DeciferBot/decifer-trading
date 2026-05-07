@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-07T16:11:26Z",
-  "expires_at": "2026-05-07T16:26:26Z",
+  "generated_at": "2026-05-07T16:49:48Z",
+  "expires_at": "2026-05-07T17:04:48Z",
   "mode": "production_handoff_universe",
   "publication_mode": "validation_only",
   "source_shadow_file": "data/universe_builder/active_opportunity_universe_shadow.json",

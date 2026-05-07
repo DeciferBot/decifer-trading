@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-07T16:11:29Z",
+  "generated_at": "2026-05-07T16:49:48Z",
   "mode": "validation_only_handoff_publisher_observation",
   "source_files": [
     "data/live/current_manifest.json",
@@ -13,34 +13,34 @@
     "data/live/publisher_run_log.jsonl"
   ],
   "observation_summary": {
-    "records_observed": 7,
+    "records_observed": 16,
     "first_observed_at": "2026-05-07T16:11:11Z",
-    "last_observed_at": "2026-05-07T16:11:26Z",
-    "publisher_runs_detected": 7,
-    "successful_publishes": 3,
-    "failed_publishes": 4,
+    "last_observed_at": "2026-05-07T16:49:48Z",
+    "publisher_runs_detected": 16,
+    "successful_publishes": 10,
+    "failed_publishes": 6,
     "run_log_exists": true,
-    "run_log_records": 3,
-    "successful_publisher_runs": 3,
+    "run_log_records": 10,
+    "successful_publisher_runs": 10,
     "distinct_utc_sessions": 1,
     "distinct_utc_dates": [
       "2026-05-07"
     ],
-    "threshold_met": false,
-    "threshold_basis": "not_met",
+    "threshold_met": true,
+    "threshold_basis": "successful_runs",
     "current_manifest_exists": true,
     "active_universe_exists": true,
     "heartbeat_exists": true,
     "publisher_report_exists": true,
-    "readiness_gate": "insufficient_observation"
+    "readiness_gate": "validation_only_stable"
   },
   "freshness_analysis": {
-    "manifest_age_seconds": 3.8,
+    "manifest_age_seconds": 0.2,
     "manifest_freshness": "fresh",
-    "manifest_expires_at": "2026-05-07T16:26:26Z",
-    "universe_age_seconds": 3.8,
+    "manifest_expires_at": "2026-05-07T17:04:48Z",
+    "universe_age_seconds": 0.2,
     "universe_freshness": "fresh",
-    "heartbeat_age_seconds": 3.8,
+    "heartbeat_age_seconds": 0.2,
     "heartbeat_freshness": "fresh",
     "sla_primary_threshold_seconds": 600,
     "sla_stale_threshold_seconds": 900,
@@ -48,8 +48,8 @@
     "sla_met": true,
     "stale_count": 0,
     "expired_count": 0,
-    "max_age_seconds": 3.8,
-    "average_age_seconds": 3.8
+    "max_age_seconds": 0.2,
+    "average_age_seconds": 0.2
   },
   "manifest_validity_analysis": {
     "exists": true,
@@ -83,9 +83,9 @@
     "exists": true,
     "worker": "handoff_publisher",
     "validation_status": "pass",
-    "last_success_at": "2026-05-07T16:11:26Z",
-    "last_attempt_at": "2026-05-07T16:11:26Z",
-    "last_success_age_seconds": 3.8,
+    "last_success_at": "2026-05-07T16:49:48Z",
+    "last_attempt_at": "2026-05-07T16:49:48Z",
+    "last_success_age_seconds": 0.2,
     "last_success_freshness": "fresh",
     "candidate_count": 50,
     "fail_closed_reason": null
@@ -164,10 +164,10 @@
     "route_changes": null,
     "quota_group_changes": null,
     "validation_status_changes": null,
-    "note": "run_log_records=3 \u2014 candidate-level stability diff requires snapshot archive (not yet implemented)"
+    "note": "run_log_records=10 \u2014 candidate-level stability diff requires snapshot archive (not yet implemented)"
   },
   "fail_closed_observations": {
-    "fail_closed_events": 4,
+    "fail_closed_events": 6,
     "fail_diagnostics_found": [
       {
         "file": "data/live/.fail_20260507T152529Z.json",
@@ -188,6 +188,16 @@
         "file": "data/live/.fail_20260507T154300Z.json",
         "fail_closed_reason": "source_read_error: file not found: /var/folders/93/_t7k5kmd4tlc0p5x244dd1th0000gn/T/tmp0k3v270_/nonexistent.json",
         "generated_at": "2026-05-07T15:43:00Z"
+      },
+      {
+        "file": "data/live/.fail_20260507T161859Z.json",
+        "fail_closed_reason": "source_read_error: file not found: /var/folders/93/_t7k5kmd4tlc0p5x244dd1th0000gn/T/tmptd3ek623/nonexistent.json",
+        "generated_at": "2026-05-07T16:18:59Z"
+      },
+      {
+        "file": "data/live/.fail_20260507T161930Z.json",
+        "fail_closed_reason": "source_read_error: file not found: /var/folders/93/_t7k5kmd4tlc0p5x244dd1th0000gn/T/tmpj2x3fa6j/nonexistent.json",
+        "generated_at": "2026-05-07T16:19:30Z"
       }
     ],
     "manifest_missing_events": 0,
@@ -209,7 +219,7 @@
     "live_output_changed": false,
     "all_safety_invariants_hold": true
   },
-  "readiness_gate": "insufficient_observation",
+  "readiness_gate": "validation_only_stable",
   "warnings": [],
   "production_candidate_source_changed": false,
   "live_bot_consuming_handoff": false,
