@@ -690,6 +690,57 @@ These modules must not be imported by the live trading bot (`bot_trading.py` or 
 
 ---
 
+## Sprint 7D File Classifications
+
+**Sprint 7D — Controlled Handoff Wiring Design**
+**Objective:** Produce all design documents required before Sprint 7E implementation. Resolve metric reconciliation anomaly. No production code changed. No handoff triggered. No tests added.
+
+### New Documentation Files
+
+| File | Classification | Runtime needed | Notes |
+|------|---------------|----------------|-------|
+| `docs/intelligence_first_paper_current_metric_reconciliation.md` | documentation | No | Resolves Sprint 7C metric anomaly; establishes locked metric definitions for Sprint 7E |
+| `docs/intelligence_first_controlled_handoff_wiring_design.md` | documentation | No | 15 sections; wiring at bot_trading.py:1447; candidate shape mapping; fail-closed; rollback; Apex boundary |
+| `docs/intelligence_first_controlled_handoff_implementation_test_plan.md` | documentation | No | 10 test groups; 86+ test cases; full suite required for Sprint 7E |
+| `docs/intelligence_first_controlled_handoff_risk_review.md` | documentation | No | 11 risks; residual RISK-08 acknowledged; go/no-go criteria defined |
+
+### New Modules Required by Sprint 7E (not yet created)
+
+| File | Classification | Included in live-bot container? | Notes |
+|------|---------------|--------------------------------|-------|
+| `handoff_candidate_adapter.py` | Adapter-only | Yes (called by bot_trading.py when flag=True) | Pure function; no I/O; no side effects; attaches handoff_* prefixed governance fields to scored dicts |
+| `tests/test_handoff_wiring_integration.py` | Test — production runtime | No | Full integration test suite (10 groups); required before Sprint 7E is declared complete |
+
+### Key Architecture Decisions Formalised in Sprint 7D
+
+| Decision | Document |
+|----------|---------|
+| Wiring point is `bot_trading.py:1447` — `get_dynamic_universe()` call | wiring_design.md §4 |
+| `handoff_reader.py` is the candidate-source boundary reader — NOT a `universe_builder.py` dependency | wiring_design.md §1; definitions §8 |
+| No scanner fallback on any fail-closed condition — ever | wiring_design.md §9; risk_review RISK-02 |
+| 208 scanner-only removals are the defined consequence of the handoff — not a bug | metric_reconciliation.md §5; risk_review RISK-08 |
+| Sprint 7C "current" was enriched — `in_shadow_not_current_symbols` must NOT be in current baseline | metric_reconciliation.md §2 |
+| Governance metadata uses `handoff_*` prefix — no field collision with existing scored dicts | wiring_design.md §6; risk_review RISK-09 |
+| `handoff_candidate_adapter.py` must never modify `score`, `raw_score`, or signal dimensions | wiring_design.md §6; test_plan Group 5 |
+| Dry-run compare mode (`enable_handoff_dry_run_compare`) is separate from handoff flag — different semantics | wiring_design.md §8 |
+
+### Sprint 7D Anti-Bloat Confirmation
+
+| Check | Status |
+|-------|--------|
+| New production runtime modules added? | No — documentation only in Sprint 7D; handoff_candidate_adapter.py deferred to Sprint 7E |
+| New live API paths in production bot? | No |
+| New broker calls? | No |
+| New LLM calls? | No |
+| New .env reads? | No |
+| Production handoff flag changed? | No — `enable_active_opportunity_universe_handoff = False` |
+| Production code modified? | No — zero production file changes |
+| Tests added? | No — design sprint; tests deferred to Sprint 7E |
+| Duplicate logic introduced? | No |
+| live_output_changed | False |
+
+---
+
 ## Update Log
 
 | Date | Action | Notes |
@@ -706,3 +757,4 @@ These modules must not be imported by the live trading bot (`bot_trading.py` or 
 | 2026-05-07 | Sprint 7A.3 patch | Precise safety flag terminology applied. provider_fetch_tester.py: old generic live_api_called=false replaced with 13 precise flags — data_provider_api_called=true (fetches were made), trading_api_called=false, broker_order/account/position/execution_api_called=false, ibkr_market_data_connection_attempted=true, ibkr_order_account_position_calls=false, env_presence_checked=true, env_values_logged=false, env_file_read=true, secrets_exposed=false, live_output_changed=false. IBKR TCP probe relabelled market_data_gateway_tcp_probe with explicit "not a trading failure" detail. factor_registry.py data_quality_report flags updated: live_api_called+env_inspected → data_provider_api_called=false, live_trading_api_called=false, env_presence_checked=false, env_values_logged=false, secrets_exposed=false. Validator updated for new safety block. 34/34 tests, 30/30 validator, 4/4 smoke. live_output_changed=false. |
 | 2026-05-07 | Sprint 7A.3 | Factor Registry + Provider Capability Audit delivered. factor_registry.py (73 factors, 13 categories, 10 layers, all must_not_trigger_trade_directly=True); provider_fetch_tester.py (12/15 passed: Alpaca 3/3, FMP 5/5, AV 2/4, yfinance 2/2, IBKR 0/1 gateway not running); 5 new validators in intelligence_schema_validator.py (validate_factor_registry, validate_provider_capability_matrix, validate_provider_fetch_test_results, validate_layer_factor_map, validate_data_quality_report); tests/test_intelligence_factor_registry.py (32 tests). Key provider findings: Alpaca primary for OHLCV/quotes/options (3/3), FMP primary for fundamentals/news/analyst (5/5), Alpha Vantage OVERVIEW+RSI premium-only (upgrade required), Alpha Vantage TIME_SERIES_DAILY + FEDERAL_FUNDS_RATE confirmed working (2/4). No production modules touched. env_inspected=false. secrets_exposed=false. live_output_changed=false. enable_active_opportunity_universe_handoff=False. 32/32 new tests, 30/30 validate_intelligence_files, 4/4 smoke. |
 | 2026-05-07 | Sprint 7A.1 patch | 4 blockers resolved: (1) coverage_gap_review advisory evidence source corrected — now reads candidate_matches[*].advisory_status==advisory_unresolved (not empty unsupported_current_candidates.symbols). Rebuilt with 51 real records: recurring_unsupported_current_count=110. evidence_status + required_input_missing fields added. (2) intelligence_first_advisory_enabled reset to False (observation complete, gate=advisory_ready_for_handoff_design). (3) sector_schema proxy_classifications expanded to 7 (added index_proxy, crypto_proxy, macro_proxy). Validator updated to require all 7. (4) test_intelligence_reference_data.py updated: _minimal_coverage_gap + _minimal_sector_schema fixtures corrected, 2 new evidence_status/required_input_missing tests. test_intelligence_sprint6c.py: TestInsufficientObservation → TestObservationThresholdMet (assertions updated to 35-record reality). Named symbols: SNDK/WDC/IREN in recurring_unsupported_current; MU/LRCX/STX/DOCN/NBIS covered by advisory (not unresolved). 774/774 regression, 25/25 validator, 4/4 smoke. live_output_changed=false. |
+| 2026-05-07 | Sprint 7D | Controlled Handoff Wiring Design — documentation sprint only. No production code modified. No tests added. No handoff triggered. Four new documentation files: (1) intelligence_first_paper_current_metric_reconciliation.md — resolves Sprint 7C metric anomaly. Sprint 7C built "current" as enriched set (overlap+in_current_not_shadow+in_shadow_not_current), masking 23 additive shadow-only symbols. Correct picture: 27 true overlap with scanner, 23 additions (addition_rate=0.46), 208 removals (removal_rate=0.89). Metric definitions locked for Sprint 7E: "current" = true get_dynamic_universe() output only; shadow-only symbols excluded from current baseline. (2) intelligence_first_controlled_handoff_wiring_design.md — 15 sections. Wiring at bot_trading.py:1447 (single conditional branch). _get_handoff_symbol_universe() returns list[str] — identical type to scanner. handoff_candidate_adapter.py (new, adapter-only, pure) attaches handoff_* prefixed governance fields post-scoring. Fail-closed: no scanner fallback, PM Track B independent, bot not killed. Rollback: flag flip, scanner restores next cycle. Do NOT touch: scanner.py, signal_pipeline.py, signals/__init__.py, apex_orchestrator.py, guardrails.py, orders_core.py, bot_ibkr.py. (3) intelligence_first_controlled_handoff_implementation_test_plan.md — 10 test groups covering flag=False path, flag=True valid/invalid manifest, all 21 Sprint 7B fail-closed conditions, adapter pure function tests, Apex boundary, rollback, dry-run compare mode. Full suite required (bot_trading.py will be modified). (4) intelligence_first_controlled_handoff_risk_review.md — 11 risks with likelihood/impact/mitigation/test coverage. Residual: RISK-08 (208 removals — documented architectural consequence; rollback available; Amit must acknowledge). Definitions doc updated with 10 new terms. enable_active_opportunity_universe_handoff remains False. live_output_changed=false. |

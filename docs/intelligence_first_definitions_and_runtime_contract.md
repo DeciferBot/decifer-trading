@@ -195,6 +195,33 @@ The operational mode of the handoff: `paper` (paper account), `live` (live accou
 ### Paper Handoff Reader
 The component in `bot_trading.py` that reads and validates `current_manifest.json` when handoff is enabled. Not yet implemented — Sprint 7B.
 
+### Handoff Reader (`handoff_reader.py`)
+The production candidate-source boundary reader. Reads `data/live/current_manifest.json`, validates all fail-closed conditions (21 conditions from Sprint 7B), and returns a structured result including `handoff_allowed`. This is NOT a dependency of `universe_builder.py` — it is the interface between the Intelligence-First pipeline and `bot_trading.py`. The universe builder produces universe files; `handoff_reader.py` consumes them on the live bot side.
+
+### Controlled Handoff Wiring
+The addition of a single feature-flag conditional at `bot_trading.py:1447` that routes candidate discovery through `handoff_reader.py` (when `enable_active_opportunity_universe_handoff=True`) instead of `get_dynamic_universe()`. The wiring point returns `list[str]` — the same type as the scanner path — so all downstream scoring, guardrails, and Apex logic are unchanged.
+
+### Candidate-Source Boundary
+The point in `bot_trading.py` where the universe of symbols to score is determined. Currently this is the `get_dynamic_universe()` call at line 1447. After Sprint 7E wiring, this boundary either routes to the scanner (flag=False) or to `handoff_reader.py` (flag=True). Nothing downstream of this boundary changes.
+
+### Fail-Closed (Handoff Context)
+When `enable_active_opportunity_universe_handoff=True` and any of the 21 fail-closed conditions fire: new entries for the current scan cycle are skipped; existing position management (PM Track B) continues independently; scanner is NOT called as fallback; the reason is logged; `live_output_changed=false`. The bot process is not killed.
+
+### No Fallback Discovery
+The invariant that the scanner is never called as a fallback when the handoff path fails. This is the core safety property of the controlled handoff design. Any code that calls `get_dynamic_universe()` when `enable_active_opportunity_universe_handoff=True` is a bug.
+
+### Dry-Run Compare Mode
+A separate optional mode (`enable_handoff_dry_run_compare=True`) that runs the handoff reader in read-only parallel while the scanner remains the source of truth. Does not replace candidates. Does not change Apex input. Writes comparison log to `data/live/handoff_dry_run_compare_log.jsonl`. Must not add latency to the critical path.
+
+### True Live Scanner Set
+The set of symbols returned by `get_dynamic_universe()` at any given scan cycle — currently ~235 symbols. Distinct from the advisory-tracked set (which includes shadow-only symbols not in the scanner). The correct baseline for measuring additive vs subtractive impact of the handoff. Must NOT include `in_shadow_not_current_symbols` when computing overlap metrics (see metric reconciliation document).
+
+### Advisory-Tracked Set
+The union of scanner output and shadow-only symbols used by the advisory comparator. Includes 23 symbols that are in the shadow universe but not returned by the scanner. This is a superset of the true live scanner set and must not be used as the "current" baseline in handoff comparison metrics.
+
+### Handoff Candidate Adapter (`handoff_candidate_adapter.py`)
+A thin adapter-only module (no I/O, no side effects) that attaches governance metadata from handoff candidates to scored dicts after `run_signal_pipeline()` completes. Adds `handoff_*` prefixed fields only. Never modifies `score`, `raw_score`, or signal dimensions. Never adds `executable` or `order_instruction` fields.
+
 ---
 
 ## 9. Advisory versus Production Definitions
