@@ -323,3 +323,21 @@ These terms are deprecated. They must not appear in new code, tests, or document
 | `trade_log.py` (SQLite WAL) | `event_log.py` (JSONL write-ahead) | Replaced 2026-04-28 |
 | `trade_store.py` | `training_store.py` | Replaced 2026-04-28 |
 | TradingView Screener | Three-tier committed universe | Removed; replaced by Alpaca-sourced universe |
+
+---
+
+## 17. Sprint 7H.1 — Activation Readiness Terms
+
+These terms are added in Sprint 7H.1 to support the controlled activation sprint documentation pack.
+
+| Term | Definition |
+|------|-----------|
+| **Activation Readiness** | The state in which all pre-activation conditions are met: `readiness_gate = validation_only_stable`, `distinct_utc_sessions ≥ 3`, `threshold_basis = distinct_sessions`, validator passing 40/40, smoke tests 9/9, and Amit's explicit approval recorded in the activation checklist. Activation readiness does not mean activation is imminent — it means activation may proceed when Amit initiates it. |
+| **Validation-Only Observation** | The operational phase in which the handoff publisher runs on schedule, produces valid manifests, and accumulates `publisher_run_log.jsonl` entries, but `enable_active_opportunity_universe_handoff = False` and the live bot never reads the manifest. All publisher output remains advisory. This phase ends when Amit explicitly approves the controlled activation sprint. |
+| **Publisher Run Log** | `data/live/publisher_run_log.jsonl`. An append-only JSONL file with one line per successful publisher cycle (`validation_status = pass`). Used by the observer to count `successful_publisher_runs` and `distinct_utc_sessions` for the dual-threshold readiness gate. Never read by the live bot. Never truncated or overwritten. |
+| **Cross-Session Validation** | The condition that `publisher_run_log.jsonl` spans ≥ 3 distinct UTC dates. This is the preferred basis for `threshold_met = true` in the observer gate (`threshold_basis = distinct_sessions`). Cross-session validation provides evidence that the publisher operates consistently across market sessions, not just within a single window. |
+| **Snapshot Archive** | A per-cycle archive of publisher outputs (`current_manifest.json`, `active_opportunity_universe.json`, `handoff_publisher_report.json`) stored in `data/live/snapshots/{run_id}/`. Not yet implemented. Design is documented in `docs/intelligence_first_snapshot_archive_design.md`. Implementation is gated on completion of the controlled activation sprint. |
+| **Scanner-Only Removal** | A symbol that appears in the Alpaca scanner discovery path but is absent from the handoff shadow universe. When the handoff flag is True, scanner-only symbols do not appear in Track A. The full set of scanner-only removals is reviewed before activation per `docs/intelligence_first_scanner_only_removals_review_plan.md`. |
+| **Activation Window** | The time period during which `enable_active_opportunity_universe_handoff = True`. The window begins at the flag flip and ends at rollback or explicit close. The minimum window is 2 complete scan cycles. Monitoring during the window is mandatory. The window is controlled by Amit only — no automated activation. |
+| **Rollback Trigger** | A specific observable condition that causes an immediate rollback during the activation window. Triggers include: `_handoff_fail_closed_reason` non-null, scanner fallback firing while flag=True, manifest SLA expiry during handoff read, publisher heartbeat fail-closed. Full trigger list: `docs/intelligence_first_activation_rollback_playbook.md` Section 5. |
+| **Operator Checklist** | `docs/intelligence_first_daily_operator_checklist.md`. A daily operational runsheet with four sections: pre-market checks, during-market monitoring, post-market summary, and emergency procedures. Applied in both validation-only mode and controlled activation mode. |
