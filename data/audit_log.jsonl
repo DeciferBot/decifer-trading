@@ -9882,3 +9882,6 @@
 {"ts": "2026-05-07T17:36:03.286935Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 3, "regime": "TRENDING_UP"}
 {"ts": "2026-05-07T17:43:35.552043Z", "event": "SCORING_GAP", "consecutive_zero_scans": 6, "universe_size": 114, "regime": "TRENDING_UP"}
 {"ts": "2026-05-07T17:44:00.158956Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T17:52:20.093360Z", "event": "SCORING_GAP", "consecutive_zero_scans": 7, "universe_size": 114, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T17:54:37.311089Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 4, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:INTC,TGT,AMAT; drawdown", "actions": [], "ts": "2026-05-07T13:55:31.198482-04:00"}
