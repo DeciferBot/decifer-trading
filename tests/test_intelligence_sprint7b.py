@@ -496,14 +496,35 @@ class TestProductionNoTouch:
             )
 
     def test_production_manifest_not_written(self):
-        assert not os.path.exists("data/live/current_manifest.json"), (
-            "Production current_manifest.json must NOT be written in Sprint 7B"
-        )
+        # Sprint 7B: these files were not written by Sprint 7B.
+        # Sprint 7F (handoff_publisher.py) now writes them with handoff_enabled=false and
+        # publication_mode=validation_only. If they exist, verify they are safe.
+        path = "data/live/current_manifest.json"
+        if os.path.exists(path):
+            import json as _json
+            data = _json.load(open(path))
+            assert data.get("handoff_enabled") is False, (
+                "If current_manifest.json exists, handoff_enabled must be false"
+            )
+            assert data.get("publication_mode") == "validation_only", (
+                "If current_manifest.json exists, publication_mode must be validation_only"
+            )
 
     def test_production_active_universe_not_written(self):
-        assert not os.path.exists("data/live/active_opportunity_universe.json"), (
-            "Production active_opportunity_universe.json must NOT be written in Sprint 7B"
-        )
+        # Sprint 7B: these files were not written by Sprint 7B.
+        # Sprint 7F (handoff_publisher.py) now writes them with publication_mode=validation_only.
+        # If they exist, verify they are safe.
+        path = "data/live/active_opportunity_universe.json"
+        if os.path.exists(path):
+            import json as _json
+            data = _json.load(open(path))
+            assert data.get("publication_mode") == "validation_only", (
+                "If active_opportunity_universe.json exists, publication_mode must be validation_only"
+            )
+            for c in data.get("candidates", []):
+                assert c.get("executable") is not True, (
+                    f"candidate {c.get('symbol')} has executable=true — not safe"
+                )
 
 
 # ---------------------------------------------------------------------------

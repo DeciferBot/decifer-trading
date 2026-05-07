@@ -1992,6 +1992,25 @@ def validate_all(base_dir: str = "data/intelligence") -> dict[str, ValidationRes
             comparison_report_path
         )
 
+    # Sprint 7F — production publisher files (optional, only if present)
+    prod_universe_path = os.path.join(live_dir, "active_opportunity_universe.json")
+    if os.path.exists(prod_universe_path):
+        results["prod_active_opportunity_universe"] = validate_prod_active_universe(
+            prod_universe_path
+        )
+
+    prod_manifest_path = os.path.join(live_dir, "current_manifest.json")
+    if os.path.exists(prod_manifest_path):
+        results["prod_current_manifest"] = validate_prod_manifest(prod_manifest_path)
+
+    publisher_report_path = os.path.join(live_dir, "handoff_publisher_report.json")
+    if os.path.exists(publisher_report_path):
+        results["handoff_publisher_report"] = validate_handoff_publisher_report(publisher_report_path)
+
+    heartbeat_path = os.path.join(os.path.dirname(base_dir), "heartbeats", "handoff_publisher.json")
+    if os.path.exists(heartbeat_path):
+        results["handoff_publisher_heartbeat"] = validate_handoff_publisher_heartbeat(heartbeat_path)
+
     return results
 
 
@@ -3223,5 +3242,212 @@ def validate_paper_handoff_comparison_report(path: str) -> ValidationResult:
     for section in ("drop_analysis", "addition_analysis"):
         if not isinstance(data.get(section), list):
             result.fail(f"paper_handoff_comparison_report: {section} must be a list")
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Sprint 7F — Production handoff publisher files
+# ---------------------------------------------------------------------------
+
+_PROD_UNIVERSE_REQUIRED_TOP_KEYS = [
+    "schema_version", "generated_at", "expires_at", "mode",
+    "publication_mode", "source_shadow_file", "source_files",
+    "validation_status", "universe_summary", "candidates", "warnings",
+    "no_executable_trade_instructions", "live_output_changed",
+    "secrets_exposed", "env_values_logged",
+]
+
+_PROD_MANIFEST_REQUIRED_TOP_KEYS = [
+    "schema_version", "published_at", "expires_at", "validation_status",
+    "handoff_mode", "publication_mode", "handoff_enabled",
+    "enable_flag_required", "active_universe_file",
+    "source_snapshot_versions", "publisher", "warnings",
+    "no_executable_trade_instructions", "live_output_changed",
+    "secrets_exposed", "env_values_logged",
+]
+
+_PUBLISHER_REPORT_REQUIRED_TOP_KEYS = [
+    "schema_version", "generated_at", "mode", "publication_mode",
+    "source_files", "output_files", "validation_summary",
+    "candidate_summary", "atomic_write_summary", "heartbeat_summary",
+    "safety_flags", "ready_for_consumption", "handoff_enabled",
+    "enable_active_opportunity_universe_handoff_config_state",
+    "live_output_changed", "secrets_exposed", "env_values_logged",
+]
+
+_PUBLISHER_REPORT_SAFETY_MUST_BE_FALSE = (
+    "production_candidate_source_changed", "scanner_output_changed",
+    "apex_input_changed", "risk_logic_changed", "order_logic_changed",
+    "broker_called", "trading_api_called", "llm_called",
+    "raw_news_used", "broad_intraday_scan_used",
+    "secrets_exposed", "env_values_logged", "live_output_changed",
+)
+
+_HEARTBEAT_REQUIRED_KEYS = [
+    "worker", "last_success_at", "last_attempt_at", "validation_status",
+    "active_universe_file", "current_manifest_file", "candidate_count",
+    "fail_closed_reason", "live_output_changed", "secrets_exposed",
+    "env_values_logged",
+]
+
+
+def validate_prod_active_universe(path: str) -> ValidationResult:
+    """Validate data/live/active_opportunity_universe.json (Sprint 7F)."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("prod_active_universe: not a dict")
+        return result
+
+    for key in _PROD_UNIVERSE_REQUIRED_TOP_KEYS:
+        if key not in data:
+            result.fail(f"prod_active_universe: missing required field '{key}'")
+
+    if data.get("mode") != "production_handoff_universe":
+        result.fail(f"prod_active_universe: mode must be 'production_handoff_universe', got {data.get('mode')!r}")
+
+    if data.get("publication_mode") != "validation_only":
+        result.fail(f"prod_active_universe: publication_mode must be 'validation_only', got {data.get('publication_mode')!r}")
+
+    if data.get("no_executable_trade_instructions") is not True:
+        result.fail("prod_active_universe: no_executable_trade_instructions must be true")
+
+    for flag in ("live_output_changed", "secrets_exposed", "env_values_logged"):
+        if data.get(flag) is not False:
+            result.fail(f"prod_active_universe: {flag} must be false")
+
+    candidates = data.get("candidates")
+    if not isinstance(candidates, list):
+        result.fail("prod_active_universe: candidates must be a list")
+    else:
+        if len(candidates) == 0:
+            result.warn("prod_active_universe: candidates list is empty")
+        for i, cand in enumerate(candidates):
+            sym = cand.get("symbol", f"idx_{i}")
+            if cand.get("executable") is True:
+                result.fail(f"prod_active_universe: candidate {sym} has executable=true")
+            if cand.get("order_instruction") is not None:
+                result.fail(f"prod_active_universe: candidate {sym} has non-null order_instruction")
+            if cand.get("live_output_changed") is not False:
+                result.fail(f"prod_active_universe: candidate {sym} has live_output_changed!=false")
+
+    if "validation_status" not in data:
+        result.fail("prod_active_universe: validation_status missing")
+
+    return result
+
+
+def validate_prod_manifest(path: str) -> ValidationResult:
+    """Validate data/live/current_manifest.json (Sprint 7F)."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("prod_manifest: not a dict")
+        return result
+
+    for key in _PROD_MANIFEST_REQUIRED_TOP_KEYS:
+        if key not in data:
+            result.fail(f"prod_manifest: missing required field '{key}'")
+
+    if data.get("handoff_enabled") is not False:
+        result.fail(f"prod_manifest: handoff_enabled must be false (Sprint 7F), got {data.get('handoff_enabled')!r}")
+
+    if data.get("publication_mode") != "validation_only":
+        result.fail(f"prod_manifest: publication_mode must be 'validation_only', got {data.get('publication_mode')!r}")
+
+    if data.get("enable_flag_required") is not True:
+        result.fail("prod_manifest: enable_flag_required must be true")
+
+    if data.get("no_executable_trade_instructions") is not True:
+        result.fail("prod_manifest: no_executable_trade_instructions must be true")
+
+    for flag in ("live_output_changed", "secrets_exposed", "env_values_logged"):
+        if data.get(flag) is not False:
+            result.fail(f"prod_manifest: {flag} must be false")
+
+    if "validation_status" not in data:
+        result.fail("prod_manifest: validation_status missing")
+
+    auf = data.get("active_universe_file") or ""
+    if auf and not os.path.exists(auf):
+        result.fail(f"prod_manifest: active_universe_file does not exist: {auf!r}")
+
+    if not isinstance(data.get("source_snapshot_versions"), dict):
+        result.fail("prod_manifest: source_snapshot_versions must be a dict")
+
+    return result
+
+
+def validate_handoff_publisher_report(path: str) -> ValidationResult:
+    """Validate data/live/handoff_publisher_report.json (Sprint 7F)."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("handoff_publisher_report: not a dict")
+        return result
+
+    for key in _PUBLISHER_REPORT_REQUIRED_TOP_KEYS:
+        if key not in data:
+            result.fail(f"handoff_publisher_report: missing required field '{key}'")
+
+    if data.get("mode") != "handoff_publisher_report":
+        result.fail(f"handoff_publisher_report: mode must be 'handoff_publisher_report', got {data.get('mode')!r}")
+
+    if data.get("publication_mode") != "validation_only":
+        result.fail(f"handoff_publisher_report: publication_mode must be 'validation_only'")
+
+    if data.get("handoff_enabled") is not False:
+        result.fail(f"handoff_publisher_report: handoff_enabled must be false")
+
+    if data.get("enable_active_opportunity_universe_handoff_config_state") is not False:
+        result.fail("handoff_publisher_report: enable_active_opportunity_universe_handoff_config_state must be false")
+
+    for flag in _PUBLISHER_REPORT_SAFETY_MUST_BE_FALSE:
+        if data.get(flag) is not False:
+            result.fail(f"handoff_publisher_report: {flag} must be false, got {data.get(flag)!r}")
+
+    if not isinstance(data.get("validation_summary"), dict):
+        result.fail("handoff_publisher_report: validation_summary must be a dict")
+
+    if not isinstance(data.get("candidate_summary"), dict):
+        result.fail("handoff_publisher_report: candidate_summary must be a dict")
+
+    if not isinstance(data.get("atomic_write_summary"), dict):
+        result.fail("handoff_publisher_report: atomic_write_summary must be a dict")
+
+    return result
+
+
+def validate_handoff_publisher_heartbeat(path: str) -> ValidationResult:
+    """Validate data/heartbeats/handoff_publisher.json (Sprint 7F)."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("handoff_publisher_heartbeat: not a dict")
+        return result
+
+    for key in _HEARTBEAT_REQUIRED_KEYS:
+        if key not in data:
+            result.fail(f"handoff_publisher_heartbeat: missing required field '{key}'")
+
+    if data.get("worker") != "handoff_publisher":
+        result.fail(f"handoff_publisher_heartbeat: worker must be 'handoff_publisher', got {data.get('worker')!r}")
+
+    for flag in ("live_output_changed", "secrets_exposed", "env_values_logged"):
+        if data.get(flag) is not False:
+            result.fail(f"handoff_publisher_heartbeat: {flag} must be false")
 
     return result

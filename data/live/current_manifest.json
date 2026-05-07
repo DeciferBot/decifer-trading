@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "published_at": "2026-05-07T15:26:30Z",
+  "expires_at": "2026-05-07T15:41:30Z",
+  "validation_status": "pass",
+  "handoff_mode": "production_validation",
+  "publication_mode": "validation_only",
+  "handoff_enabled": false,
+  "enable_flag_required": true,
+  "ready_for_consumption": true,
+  "active_universe_file": "data/live/active_opportunity_universe.json",
+  "economic_context_file": "data/intelligence/current_economic_context.json",
+  "theme_activation_file": "data/intelligence/theme_activation.json",
+  "thesis_store_file": "data/intelligence/thesis_store.json",
+  "symbol_master_file": "data/reference/symbol_master.json",
+  "source_snapshot_versions": {
+    "data/intelligence/current_economic_context.json": "2026-05-06T20:20:57Z",
+    "data/intelligence/theme_activation.json": "2026-05-06T20:20:57Z",
+    "data/intelligence/thesis_store.json": "2026-05-06T20:20:58Z",
+    "data/reference/symbol_master.json": "2026-05-06T20:20:40.468823+00:00",
+    "data/reference/layer_factor_map.json": "2026-05-06T20:57:26.209912+00:00",
+    "data/reference/data_quality_report.json": "2026-05-06T20:57:26.210051+00:00"
+  },
+  "publisher": "handoff_publisher",
+  "fail_closed_reason": null,
+  "warnings": [],
+  "no_executable_trade_instructions": true,
+  "live_output_changed": false,
+  "secrets_exposed": false,
+  "env_values_logged": false
+}
