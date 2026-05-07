@@ -9842,3 +9842,10 @@
 {"ts": "2026-05-05T16:57:59.290293Z", "event": "SUBMITTED", "symbol": "QQQ", "order_id": 13851, "side": "SELL", "qty": 22, "order_type": "STP LMT", "limit_price": 666.72, "fill_price": null}
 {"ts": "2026-05-05T16:57:59.514976Z", "event": "SUBMITTED", "symbol": "QQQ", "order_id": 13852, "side": "SELL", "qty": 22, "order_type": "LMT", "limit_price": 689.06, "fill_price": null}
 {"ts": "2026-05-05T16:58:04.898403Z", "event": "fill_watcher_started", "symbol": "SPXS", "order_id": 12345, "original_limit": 100.2, "price_boundary": 100.7, "side": "BUY"}
+{"ts": "2026-05-07T15:47:44.830591Z", "event": "SCORING_GAP", "consecutive_zero_scans": 12, "universe_size": 114, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T15:47:59.440698Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 4, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T15:54:32.356055Z", "event": "SCORING_GAP", "consecutive_zero_scans": 13, "universe_size": 114, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T15:54:49.421096Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 4, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:AAPL; drawdown", "actions": [{"symbol": "XLK", "action": "HOLD", "trim_pct": 50, "reasoning": "regime_flip_resolved_bullish"}], "ts": "2026-05-07T11:55:22.171747-04:00"}
+{"ts": "2026-05-07T16:01:53.186008Z", "event": "SCORING_GAP", "consecutive_zero_scans": 14, "universe_size": 114, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T16:02:13.581354Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 2, "regime": "TRENDING_UP"}
