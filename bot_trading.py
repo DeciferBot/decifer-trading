@@ -1010,6 +1010,11 @@ def _maybe_eod_options_review(regime: dict):
         _session_stop_count = 0
         _cascade_reviewed_this_session = False
         _trimmed_today = set()
+        try:
+            from orders_state import reset_closed_today
+            reset_closed_today()
+        except Exception:
+            pass
         _pm_reviewed_regime = {}
         _last_pm_review_ts = None
         _last_news_scores = {}

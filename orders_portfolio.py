@@ -1815,6 +1815,8 @@ def _resolve_exiting_positions(ib: IB, price_map: dict, positions_keys: set) -> 
         with _trades_lock:
             with _recently_closed_lock:
                 recently_closed[_sym] = now_ts
+            from orders_state import mark_closed_today
+            mark_closed_today(_sym)
             active_trades.pop(k, None)
 
     _save_positions_file()

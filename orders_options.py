@@ -763,6 +763,8 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
             except Exception as _ts_err_opt:
                 log.warning("training_store.append failed for %s: %s", opt_key, _ts_err_opt)
             recently_closed[pos["symbol"]] = datetime.now(UTC).isoformat()
+            from orders_state import mark_closed_today
+            mark_closed_today(pos["symbol"])
             del active_trades[opt_key]
         return True
 

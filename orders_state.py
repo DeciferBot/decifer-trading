@@ -46,6 +46,33 @@ recently_closed: dict = {}
 # edge of the cooldown window. Use this lock for all reads and writes.
 _recently_closed_lock = threading.Lock()
 
+# ── Same-day closed registry ─────────────────────────────────────────────────
+# Tracks symbols that had any position close today (TP, stop, manual).
+# Used to gate options re-entry — stock re-entry is still allowed.
+# Reset at session start via reset_closed_today().
+_closed_today: set = set()
+_closed_today_lock = threading.Lock()
+
+
+def mark_closed_today(symbol: str) -> None:
+    """Record that symbol had a position close today. Blocks options re-entry."""
+    with _closed_today_lock:
+        _closed_today.add(symbol)
+
+
+def was_closed_today(symbol: str) -> bool:
+    """Return True if symbol had any close today (options gate check)."""
+    with _closed_today_lock:
+        return symbol in _closed_today
+
+
+def reset_closed_today() -> None:
+    """Clear the same-day closed registry. Called at session open."""
+    with _closed_today_lock:
+        _closed_today.clear()
+    log.debug("reset_closed_today: same-day options gate cleared")
+
+
 # ── Thesis-failure extended cooldown registry ─────────────────────────────────
 # symbol → ISO timestamp of close when the INTRADAY wrong_if condition fired.
 # Blocks re-entry for failed_thesis_cooldown_hours (default 4h) and requires

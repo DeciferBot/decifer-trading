@@ -2457,6 +2457,8 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             with _trades_lock:
                 with _recently_closed_lock:  # RB-4: nest inside _trades_lock (consistent acquisition order — never reversed)
                     recently_closed[symbol] = now_ts
+                from orders_state import mark_closed_today
+                mark_closed_today(symbol)
                 active_trades.pop(_trade_key, None)
                 # Collect linked option legs before releasing lock so another thread can't mutate state.
                 # Only sweep when closing a stock/ETF — options and FX have no child legs.

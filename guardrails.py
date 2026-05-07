@@ -94,7 +94,12 @@ def filter_candidates(
 
         sig["allowed_trade_types"] = allowed
         sig["default_trade_type"] = _default_trade_type(sig)
-        sig["options_eligible"] = (sym not in _NO_OPTIONS) and (sym not in _LONG_ONLY)
+        from orders_state import was_closed_today
+        options_ok = (sym not in _NO_OPTIONS) and (sym not in _LONG_ONLY)
+        if options_ok and was_closed_today(sym):
+            options_ok = False
+            log.info("filter_candidates: %s options_eligible=False — closed earlier today", sym)
+        sig["options_eligible"] = options_ok
         kept.append(sig)
     return kept
 
@@ -349,6 +354,23 @@ def filter_semantic_violations(
             ); continue
         if entry.get("instrument") in ("call", "put") and not cand.get("options_eligible", True):
             log.warning("filter_semantic_violations: %s options not eligible — dropping", sym); continue
+        if entry.get("instrument") in ("call", "put"):
+            gap_pct = abs(cand.get("premarket_gap_pct") or 0.0)
+            vwap_dist = cand.get("vwap_dist") or 0.0
+            max_gap = CONFIG.get("entry_gate", {}).get("options_max_gap_pct", 0.05)
+            max_vwap = CONFIG.get("entry_gate", {}).get("options_max_vwap_dist_pct", 3.0)
+            if gap_pct > max_gap:
+                log.warning(
+                    "filter_semantic_violations: %s instrument downgraded call→stock (gap=%.1f%% > %.1f%%)",
+                    sym, gap_pct * 100, max_gap * 100,
+                )
+                entry["instrument"] = "stock"
+            elif vwap_dist > max_vwap:
+                log.warning(
+                    "filter_semantic_violations: %s instrument downgraded call→stock (vwap_dist=%.1f%% > %.1f%%)",
+                    sym, vwap_dist, max_vwap,
+                )
+                entry["instrument"] = "stock"
         kept.append(entry)
     decision = {**decision, "new_entries": kept}
     return decision

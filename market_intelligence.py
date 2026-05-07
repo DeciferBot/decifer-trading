@@ -842,11 +842,14 @@ TRACK A — NEW ENTRIES (per candidate you accept):
                IMPORTANT: divergence_flags restrict instrument to "stock" only — they
                do NOT veto the stock trade itself. Never AVOID a stock trade solely
                because divergence_flags is non-empty.
+               IMPORTANT: DAR=pre-mkt or DAR < 0.5 → instrument MUST be "stock".
+               See DAR FIELD NOTE below.
                IMPORTANT: session_character (including FEAR_ELEVATED) does NOT restrict
                instrument selection. "Reduce size on speculative plays" in FEAR_ELEVATED
                applies to conviction level (use MEDIUM, not HIGH) — not to instrument type.
-               An options_eligible SWING/POSITION candidate with strong directional signal
-               warrants "call" or "put" regardless of session_character.
+               IMPORTANT: when session_age_minutes > 90, the morning gap-up move has
+               already occurred. If your counter_argument identifies gap-chasing, extended
+               price, or mean-reversion risk, use "stock" not "call"/"put".
                MUST be null (omit the field entirely) when trade_type=AVOID.
   rationale:   One sentence. Required even for AVOID.
   counter_argument / key_risk: one short sentence each (null for AVOID)
@@ -868,13 +871,15 @@ TRACK B — FLAG MEANINGS:
   thesis_driver_failure: Intraday position in loss territory — thesis likely invalidated.
   score_collapse: Current signal score has fallen below entry threshold.
 
-DAR FIELD NOTE (Data Availability Ratio):
-  DAR=pre-mkt means intraday data has not yet opened — it is a data pipeline
-  artifact, NOT a signal quality indicator. A candidate showing DAR=pre-mkt
-  with a strong score (35+) and clean signal dimensions is fully valid and
-  MUST NOT be vetoed solely because DAR is unavailable. Options eligibility
-  still requires high DAR (per instrument rules below), but stock entries
-  must be evaluated on score and signal dimensions alone when DAR=pre-mkt.
+DAR FIELD NOTE (Direction Agreement Ratio):
+  DAR measures directional consensus across the 10 signal dimensions.
+  DAR=1.0 means all dimensions agree on direction. DAR→0 means dimensions
+  are split. DAR=pre-mkt means the value could not be computed this cycle.
+  LOW DAR OR DAR=pre-mkt IS a signal quality concern — it means directional
+  conviction is weak or unverified. Rules:
+  • DAR=pre-mkt or DAR < 0.5 → instrument MUST be "stock". Never "call"/"put".
+  • Stock entries are still valid on score and signal dimensions when DAR=pre-mkt.
+  • Do NOT veto a stock trade solely because DAR is low or unavailable.
 
 NEWS_FINBERT_SENTIMENT FIELD NOTE:
   The news_finbert_sentiment on each candidate is currently ADVISORY ONLY.
@@ -1039,6 +1044,7 @@ def _format_candidate_line(c: dict) -> str:
         f"tier={tier} origin={origin} band={band} slot={slot} "
         f"dir={c.get('direction')} "
         f"price_at_score={_price_str} day_chg={_day_chg_str} "
+        f"vwap_dist={str(round(c.get('vwap_dist') or 0, 1)) + '%' if c.get('vwap_dist') is not None else 'n/a'} "
         f"DAR={dar_str} [{dims}] atr5={c.get('atr_5m')} atrD={c.get('atr_daily')} "
         f"volR={c.get('vol_ratio')} tape={c.get('daily_tape_score')} "
         f"rs={c.get('stock_rs_vs_spy')} cat={c.get('catalyst_score')} "
@@ -1104,6 +1110,12 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
     )
     review = apex_input.get("track_b") or []
 
+    # Compute session age fresh every call — zero cost, always current.
+    # 9:30 AM ET = 13:30 UTC.
+    _now_utc = datetime.now(UTC)
+    _market_open_utc = _now_utc.replace(hour=13, minute=30, second=0, microsecond=0)
+    session_age_minutes = max(0, int((_now_utc - _market_open_utc).total_seconds() / 60))
+
     parts: list[str] = [f"[TRIGGER] {trig}"]
     if tctx:
         parts.append(f"  context: {json.dumps(tctx, default=str)}")
@@ -1111,6 +1123,7 @@ def _build_apex_user_prompt(apex_input: dict, sctx: SessionContext | None) -> st
     parts.append("\n[MARKET CONTEXT]")
     parts.append(f"  regime={regime.get('regime')} vix={regime.get('vix')}")
     parts.append(f"  tape={mctx.get('tape')}")
+    parts.append(f"  session_age_minutes={session_age_minutes}  (minutes since 9:30 AM ET; 0=pre-market)")
     if sctx:
         parts.append(f"  market_read (cached): {sctx.market_read}")
         if sctx.overnight_text:
@@ -1323,6 +1336,36 @@ def apex_call(
         fb = _fallback_decision(apex_input, reason=f"schema_error:{e}")
         fb["_meta"] = {**_meta, "error": "schema_error"}
         return fb
+
+    # ── Counter-argument post-processor ──────────────────────────────────────
+    # If Apex's own counter_argument or key_risk identifies a known failure
+    # pattern (gap-chasing, extended entry, mean-reversion risk) AND it selected
+    # a call/put, downgrade instrument to stock deterministically.
+    _ca_triggers = CONFIG.get(
+        "options_ca_trigger_phrases",
+        ["gap", "chasing", "extended", "mean reversion", "distribution",
+         "exhaustion", "fade", "post-earnings", "already moved", "gap-up"],
+    )
+    for _entry in decision.get("new_entries", []):
+        if _entry.get("instrument") not in ("call", "put"):
+            continue
+        _ca_text = " ".join(filter(None, [
+            _entry.get("counter_argument") or "",
+            _entry.get("key_risk") or "",
+        ])).lower()
+        for _phrase in _ca_triggers:
+            if _phrase.lower() in _ca_text:
+                log.warning(
+                    "apex_post_processor: %s instrument downgraded call→stock "
+                    "(counter_argument trigger: '%s')",
+                    _entry.get("symbol"), _phrase,
+                )
+                _entry["instrument"] = "stock"
+                _meta.setdefault("ca_downgrades", []).append(
+                    {"symbol": _entry.get("symbol"), "trigger": _phrase}
+                )
+                break
+    # ─────────────────────────────────────────────────────────────────────────
 
     # higher_score_skips is required in the schema but the model may omit it.
     # Tolerate absence by defaulting to [] and flagging for audit.

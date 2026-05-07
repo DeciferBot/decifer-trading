@@ -923,6 +923,11 @@ CONFIG = {
         "intraday_dead_window_penalty":      4,     # extra score pts required 11:00–14:30 (live: 8)
         "intraday_wide_spread_penalty":      4,     # extra score pts if spread elevated
 
+        # OPTIONS extension gates — if gap or VWAP distance exceeds these, calls/puts
+        # downgrade to stock regardless of options_eligible
+        "options_max_gap_pct":        0.05,   # 5% gap → restrict to stock
+        "options_max_vwap_dist_pct":  3.0,    # 3% above VWAP → restrict to stock
+
         # SWING thresholds
         "swing_min_earnings_days_away":      5,     # earnings closer than this → reject
         "swing_max_short_float_pct":        30.0,   # short float above this → reject (no squeeze)

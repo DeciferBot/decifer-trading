@@ -16,3 +16,4 @@
 {"ts": "2026-05-06T13:47:36.723569+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
 {"ts": "2026-05-06T15:21:38.649084+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
 {"ts": "2026-05-06T15:25:22.978863+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}
+{"ts": "2026-05-07T16:48:52.767423+00:00", "event": "entry", "text": "Long on AMAT filled at 410.53.", "symbol": "AMAT", "direction": "long", "score": 87, "reason": "Score 87 semiconductor equipment name gapping +8% on AMD/LRCX peer strength, with strong trend and momentum dimensions aligned to the sector catalyst.", "news": "none"}

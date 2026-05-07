@@ -9849,3 +9849,36 @@
 {"type": "portfolio_review", "trigger": "news_hit:AAPL; drawdown", "actions": [{"symbol": "XLK", "action": "HOLD", "trim_pct": 50, "reasoning": "regime_flip_resolved_bullish"}], "ts": "2026-05-07T11:55:22.171747-04:00"}
 {"ts": "2026-05-07T16:01:53.186008Z", "event": "SCORING_GAP", "consecutive_zero_scans": 14, "universe_size": 114, "regime": "TRENDING_UP"}
 {"ts": "2026-05-07T16:02:13.581354Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 2, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T16:07:38.400738Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 4, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:INTC,STRL,XLK,AAPL,TGT,WMT,MAS; drawdown; stale_position:APH,SPY,INTC,NVDA,NBIS,STRL,XLK,CRWV,RKLB,AAPL,IBIT,TGT,MSFT,SNDK,EOSE,WMT,MAS", "actions": [{"symbol": "XLK", "action": "HOLD", "trim_pct": 50, "reasoning": "regime_flip_favorable"}], "ts": "2026-05-07T12:08:11.584060-04:00"}
+{"ts": "2026-05-07T16:09:32.145246Z", "event": "SUBMITTED", "symbol": "DDOG", "order_id": 15639, "side": "BUY", "qty": 19, "order_type": "LMT", "limit_price": 11.7, "fill_price": null}
+{"ts": "2026-05-07T16:18:27.536621Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 6, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T16:27:05.713451Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 4, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T16:27:36.769439Z", "event": "CANCELLED", "symbol": "XLK", "order_id": 15654, "side": "SELL", "qty": 169, "order_type": "MKT", "limit_price": 0, "fill_price": null}
+{"ts": "2026-05-07T16:27:39.131575Z", "event": "SUBMITTED", "symbol": "XLK", "order_id": 15655, "side": "SELL", "qty": 169, "order_type": "STP LMT", "limit_price": 161.47, "fill_price": null}
+{"ts": "2026-05-07T16:27:39.452547Z", "event": "SUBMITTED", "symbol": "XLK", "order_id": 15656, "side": "SELL", "qty": 169, "order_type": "LMT", "limit_price": 171.9, "fill_price": null}
+{"ts": "2026-05-07T16:33:09.557980Z", "event": "SUBMITTED", "symbol": "XLK", "order_id": 15663, "side": "SELL", "qty": 169, "order_type": "STP LMT", "limit_price": 170.17, "fill_price": null}
+{"ts": "2026-05-07T16:34:09.563291Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 5, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T16:40:36.401793Z", "event": "SCORING_GAP", "consecutive_zero_scans": 3, "universe_size": 114, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T16:40:52.323316Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 3, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "scalp_signal_lost:XLK; news_hit:SPY,INTC,AAPL,DDOG; drawdown", "actions": [], "ts": "2026-05-07T12:41:22.638500-04:00"}
+{"ts": "2026-05-07T16:42:45.802708Z", "event": "CANCELLED", "symbol": "XLK", "order_id": 15669, "side": "SELL", "qty": 169, "order_type": "MKT", "limit_price": 0, "fill_price": null}
+{"ts": "2026-05-07T16:46:28.398142Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 4, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:INTC,STRL,TGT,WMT,MAS,DDOG; drawdown; stale_position:APH,SPY,INTC,NVDA,NBIS,STRL,CRWV,RKLB,AAPL,IBIT,TGT,MSFT,SNDK,EOSE,WMT,MAS", "actions": [], "ts": "2026-05-07T12:47:04.400011-04:00"}
+{"ts": "2026-05-07T16:48:33.505125Z", "event": "SUBMITTED", "symbol": "AMAT", "order_id": 15678, "side": "SELL", "qty": 133, "order_type": "STP LMT", "limit_price": 394.31, "fill_price": null}
+{"ts": "2026-05-07T16:48:33.627928Z", "event": "SUBMITTED", "symbol": "AMAT", "order_id": 15677, "side": "BUY", "qty": 133, "order_type": "LMT", "limit_price": 411.17, "fill_price": null}
+{"ts": "2026-05-07T16:48:35.077584Z", "event": "fill_watcher_started", "symbol": "AMAT", "order_id": 15677, "original_limit": 411.17, "price_boundary": 413.23, "side": "BUY"}
+{"ts": "2026-05-07T16:49:20.193837Z", "event": "fill_watcher_filled", "symbol": "AMAT", "order_id": 15677, "attempts": 0, "fill_limit": 411.17}
+{"ts": "2026-05-07T16:58:42.311862Z", "event": "options_scan", "symbols_scanned": 20, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T17:07:34.356205Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 4, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T17:13:36.202616Z", "event": "SUBMITTED", "symbol": "DDOG", "order_id": 15712, "side": "SELL", "qty": 19, "order_type": "LMT", "limit_price": 8.65, "fill_price": null}
+{"ts": "2026-05-07T17:15:09.248688Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T17:21:43.462297Z", "event": "SCORING_GAP", "consecutive_zero_scans": 3, "universe_size": 114, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T17:21:59.301572Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 3, "regime": "TRENDING_UP"}
+{"type": "portfolio_review", "trigger": "news_hit:INTC,AMAT; drawdown", "actions": [], "ts": "2026-05-07T13:22:38.334894-04:00"}
+{"ts": "2026-05-07T17:29:04.777872Z", "event": "SCORING_GAP", "consecutive_zero_scans": 4, "universe_size": 114, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T17:29:18.698279Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 4, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T17:35:43.918407Z", "event": "SCORING_GAP", "consecutive_zero_scans": 5, "universe_size": 114, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T17:36:03.286935Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 3, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T17:43:35.552043Z", "event": "SCORING_GAP", "consecutive_zero_scans": 6, "universe_size": 114, "regime": "TRENDING_UP"}
+{"ts": "2026-05-07T17:44:00.158956Z", "event": "options_scan", "symbols_scanned": 0, "signals_found": 2, "regime": "TRENDING_UP"}
