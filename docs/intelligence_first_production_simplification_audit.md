@@ -621,6 +621,40 @@ These modules must not be imported by the live trading bot (`bot_trading.py` or 
 
 ---
 
+## Sprint 7C File Classifications
+
+**Sprint 7C — Paper Handoff Comparison and Dry-Run Decision Evidence**
+
+| File | Classification | Included in live-bot container? | Notes |
+|------|---------------|--------------------------------|-------|
+| `paper_handoff_comparator.py` | Temporary migration / dry-run validation tool | No | One-shot comparison tool. Not a runtime process. Remove or retire after controlled production handoff is stable. |
+| `data/live/paper_handoff_comparison_report.json` | Dry-run evidence artefact | No | Produced by comparator. Not a live input. May be retained as cutover audit evidence. |
+| `tests/test_intelligence_sprint7c.py` | Test — advisory pipeline | No | 48 tests across 7 classes. |
+
+### Sprint 7C Key Findings
+
+1. **Paper candidates are a governed subset of the current pipeline** — 50 paper candidates vs 235 current candidates. The gap is expected: paper contains only governed intelligence-layer candidates; the current pipeline also includes all scanner-sourced tier_a/b/d attention candidates.
+2. **SNDK/WDC/IREN are correctly governed but excluded by structural quota** — All three are in thematic_roster, transmission_rules, theme_taxonomy, and symbol_master. Exclusion is due to structural quota cap (20). Pipeline wiring is correct; quota is the binding constraint, not a coverage failure.
+3. **Route disagreements are vocabulary-only** — 17 disagreements total; 14 are swing/intraday normalisation or manual_conviction normalisation. 3 meaningful watchlist demotions are expected (paper routes are more conservative).
+4. **Recommendation: `ready_for_controlled_handoff_design`** — All safety invariants hold, governed symbols are correctly handled, quota constraint is documented. Next step is Sprint 7D controlled handoff wiring design (not implementation).
+5. **`handoff_reader.py` is the future live-bot / candidate-source boundary reader, not a `universe_builder.py` dependency** — `universe_builder.py` produces universe files; it must not consume the handoff reader.
+
+### Sprint 7C Anti-Bloat Confirmation
+
+| Check | Result |
+|-------|--------|
+| New modules added beyond spec? | No |
+| New production bot imports added? | No |
+| Scanner fallback introduced? | No |
+| LLM called? | No |
+| Broker called? | No |
+| New config flags added? | No |
+| Tests added? | Yes — 48 tests (spec requirement) |
+| Duplicate logic introduced? | No |
+| live_output_changed | False |
+
+---
+
 ## Sprint 7B File Classifications
 
 **Sprint 7B — Paper Handoff Reader Validation**
@@ -666,6 +700,7 @@ These modules must not be imported by the live trading bot (`bot_trading.py` or 
 | 2026-05-06 | Real-Session Observation Phase | intelligence_first_advisory_enabled set True (v3.7.10). enable_active_opportunity_universe_handoff remains False. Pre-existing test failures partially fixed (v3.7.9). No candidate/Apex/scoring/risk/order/execution changes. Advisory file cutover classifications added. Advisory modules-must-not-import list formalised. |
 | 2026-05-06 | Sprint 7A.1 | Added reference_data_builder.py (advisory_only, build tool), data/reference/sector_schema.json, data/reference/symbol_master.json, data/reference/theme_overlay_map.json (82 themes), data/intelligence/coverage_gap_review.json, tests/test_intelligence_reference_data.py (42 tests). Validator extended with 4 new validators; advisory_log_review missing return fixed. No production modules touched. enable_active_opportunity_universe_handoff = False. |
 | 2026-05-07 | Sprint 7A.2 | Approved Theme Overlay / Roster Governance delivered. 2 new governed themes (memory_storage, ai_compute_infrastructure), 2 new transmission rules, 2 new roster entries, 2 new overlay entries. SNDK/WDC approved under memory_storage (occurrence_count=22). IREN approved under ai_compute_infrastructure with caution (occurrence_count=10, confidence=0.60). STX remains review_required. Economic candidate feed grows to 43 (was 26). candidate_resolver.py: ai_compute_demand added to default drivers. Validator: conditional_positive, swing_or_watchlist, watchlist_or_swing added as valid values. 2 stale test assertions updated (Day2 blocked_condition, Day6 valid directions). No production modules touched. No favourites workaround. enable_active_opportunity_universe_handoff=False. 804/804 regression, 25/25 validator, 4/4 smoke. live_output_changed=false. Sprint 7B blocked until Sprint 7A.2 accepted. |
+| 2026-05-07 | Sprint 7C | Paper Handoff Comparison and Dry-Run Decision Evidence delivered. paper_handoff_comparator.py (temporary migration / dry-run tool); paper_handoff_comparison_report.json (dry-run evidence artefact). Comparison: 50 paper candidates, overlap 50/50 with tracked advisory set, 17 route disagreements (14 vocabulary-only), quota_binding=False, structural_overflow=0. SNDK/WDC/IREN: governed via roster+transmission_rules, excluded_due_quota=True (documented and expected), executable=False. Recommendation: ready_for_controlled_handoff_design. 1 new validator (validate_paper_handoff_comparison_report). No production files written. No bot imports changed. enable_active_opportunity_universe_handoff=False. live_output_changed=false. 48/48 Sprint 7C, 939/939 intelligence regression, 37/37 validator, 6/6 smoke. |
 | 2026-05-07 | Sprint 7B | Paper Handoff Reader Validation delivered. handoff_reader.py (production runtime candidate, 7-function public API, no bot imports, fail-closed with no scanner fallback); paper_handoff_builder.py (temporary migration tool, transforms shadow → paper artefacts); 3 paper artefacts written to data/live/ (paper_active_opportunity_universe.json 50 candidates, paper_current_manifest.json handoff_enabled=False, paper_handoff_validation_report.json handoff_allowed=False); intelligence_schema_validator.py extended with 3 new validators; tests/test_intelligence_sprint7b.py (53 tests, 12 classes). data/live/current_manifest.json and data/live/active_opportunity_universe.json NOT written. No bot imports changed. No scanner fallback. enable_active_opportunity_universe_handoff=False. live_output_changed=false. 53/53 Sprint 7B, 891/891 intelligence regression, 36/36 validator, 5/5 smoke. |
 | 2026-05-07 | Sprint 7A.4 | Runtime Orchestration and Cloud Process Architecture — design/documentation sprint. No production code modified. No production handoff triggered. Five documents created: intelligence_first_runtime_orchestration.md (12 processes, dependency model, live bot isolation rule), intelligence_first_cloud_process_map.md (3-phase cloud deployment, Docker Compose YAML, secrets policy, env var matrix, retention, healthcheck), intelligence_first_snapshot_contract.md (18-field universal schema, 9 fail-closed conditions, freshness SLA table, live manifest contract + example), intelligence_first_runtime_failure_modes.md (30 failure modes, all 12 processes), intelligence_first_definitions_and_runtime_contract.md (30+ terms, 13 deprecated terms, scanner vs market sensor distinction). Production container exclusions formalised: provider_fetch_tester.py, factor_registry.py, backtest_intelligence.py, advisory_reporter.py, advisory_log_reviewer.py, reference_data_builder.py. Handoff Publisher = single authorised writer of data/live/current_manifest.json. live_output_changed=false. enable_active_opportunity_universe_handoff=False. |
 | 2026-05-07 | Sprint 7A.3 patch | Precise safety flag terminology applied. provider_fetch_tester.py: old generic live_api_called=false replaced with 13 precise flags — data_provider_api_called=true (fetches were made), trading_api_called=false, broker_order/account/position/execution_api_called=false, ibkr_market_data_connection_attempted=true, ibkr_order_account_position_calls=false, env_presence_checked=true, env_values_logged=false, env_file_read=true, secrets_exposed=false, live_output_changed=false. IBKR TCP probe relabelled market_data_gateway_tcp_probe with explicit "not a trading failure" detail. factor_registry.py data_quality_report flags updated: live_api_called+env_inspected → data_provider_api_called=false, live_trading_api_called=false, env_presence_checked=false, env_values_logged=false, secrets_exposed=false. Validator updated for new safety block. 34/34 tests, 30/30 validator, 4/4 smoke. live_output_changed=false. |

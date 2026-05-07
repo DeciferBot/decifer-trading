@@ -1985,6 +1985,13 @@ def validate_all(base_dir: str = "data/intelligence") -> dict[str, ValidationRes
             paper_report_path
         )
 
+    # Sprint 7C — paper handoff comparison report (optional, only if present)
+    comparison_report_path = os.path.join(live_dir, "paper_handoff_comparison_report.json")
+    if os.path.exists(comparison_report_path):
+        results["paper_handoff_comparison_report"] = validate_paper_handoff_comparison_report(
+            comparison_report_path
+        )
+
     return results
 
 
@@ -3103,5 +3110,118 @@ def validate_paper_handoff_validation_report(path: str) -> ValidationResult:
                 result.fail(
                     f"paper_handoff_validation_report: candidate_validation_summary missing '{k}'"
                 )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Sprint 7C — paper_handoff_comparison_report.json validator
+# ---------------------------------------------------------------------------
+
+_COMPARISON_REPORT_REQUIRED_TOP_KEYS = [
+    "schema_version", "generated_at", "mode",
+    "paper_manifest_summary", "paper_universe_summary", "current_pipeline_summary",
+    "overlap_analysis", "drop_analysis", "addition_analysis",
+    "route_disagreement_analysis", "quota_pressure_analysis",
+    "coverage_gap_analysis", "approved_gap_symbol_analysis",
+    "safety_analysis", "recommendation",
+    "production_candidate_source_changed", "apex_input_changed",
+    "scanner_output_changed", "risk_logic_changed", "order_logic_changed",
+    "broker_called", "trading_api_called", "llm_called",
+    "raw_news_used", "broad_intraday_scan_used",
+    "secrets_exposed", "env_values_logged", "live_output_changed",
+]
+
+_COMPARISON_SAFETY_MUST_BE_FALSE = {
+    "production_candidate_source_changed", "apex_input_changed",
+    "scanner_output_changed", "risk_logic_changed", "order_logic_changed",
+    "broker_called", "trading_api_called", "llm_called",
+    "raw_news_used", "broad_intraday_scan_used",
+    "secrets_exposed", "env_values_logged", "live_output_changed",
+}
+
+_VALID_COMPARISON_RECOMMENDATIONS = {
+    "continue_paper_comparison",
+    "ready_for_controlled_handoff_design",
+    "fix_paper_handoff_validation",
+    "fix_coverage_or_quota_before_handoff",
+    "insufficient_evidence",
+}
+
+_COMPARISON_GOVERNED_GAP_SYMBOLS = ("SNDK", "WDC", "IREN")
+
+
+def validate_paper_handoff_comparison_report(path: str) -> ValidationResult:
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("paper_handoff_comparison_report: not a dict")
+        return result
+
+    # Required top-level fields
+    for key in _COMPARISON_REPORT_REQUIRED_TOP_KEYS:
+        if key not in data:
+            result.fail(f"paper_handoff_comparison_report: missing required field '{key}'")
+
+    # mode must be paper_handoff_comparison
+    if data.get("mode") != "paper_handoff_comparison":
+        result.fail(
+            f"paper_handoff_comparison_report: mode must be 'paper_handoff_comparison', "
+            f"got {data.get('mode')!r}"
+        )
+
+    # All safety flags must be False
+    for flag in _COMPARISON_SAFETY_MUST_BE_FALSE:
+        if data.get(flag) is not False:
+            result.fail(
+                f"paper_handoff_comparison_report: {flag} must be false, "
+                f"got {data.get(flag)!r}"
+            )
+
+    # recommendation must be a valid value
+    rec = data.get("recommendation")
+    if rec not in _VALID_COMPARISON_RECOMMENDATIONS:
+        result.fail(
+            f"paper_handoff_comparison_report: recommendation {rec!r} is not a valid value; "
+            f"must be one of {sorted(_VALID_COMPARISON_RECOMMENDATIONS)}"
+        )
+
+    # safety_analysis must exist and be a dict
+    if not isinstance(data.get("safety_analysis"), dict):
+        result.fail("paper_handoff_comparison_report: safety_analysis must be a dict")
+
+    # approved_gap_symbol_analysis must include SNDK, WDC, IREN
+    aga = data.get("approved_gap_symbol_analysis")
+    if not isinstance(aga, dict):
+        result.fail("paper_handoff_comparison_report: approved_gap_symbol_analysis must be a dict")
+    else:
+        for sym in _COMPARISON_GOVERNED_GAP_SYMBOLS:
+            if sym not in aga:
+                result.fail(
+                    f"paper_handoff_comparison_report: approved_gap_symbol_analysis "
+                    f"missing required symbol '{sym}'"
+                )
+            else:
+                sym_data = aga[sym]
+                if sym_data.get("executable") is not False:
+                    result.fail(
+                        f"paper_handoff_comparison_report: approved_gap_symbol_analysis[{sym}] "
+                        f"executable must be False"
+                    )
+
+    # Required analysis sections must be dicts/lists
+    for section in (
+        "overlap_analysis", "route_disagreement_analysis",
+        "quota_pressure_analysis", "coverage_gap_analysis",
+    ):
+        if not isinstance(data.get(section), dict):
+            result.fail(f"paper_handoff_comparison_report: {section} must be a dict")
+
+    for section in ("drop_analysis", "addition_analysis"):
+        if not isinstance(data.get(section), list):
+            result.fail(f"paper_handoff_comparison_report: {section} must be a list")
 
     return result
