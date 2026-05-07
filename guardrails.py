@@ -85,6 +85,8 @@ def filter_candidates(
         reg = ((regime or {}).get("regime") or "").upper()
         if direction == "SHORT" and reg == "TRENDING_UP":
             log.info("filter_candidates: %s dropped — SHORT blocked in TRENDING_UP structural regime", sym); continue
+        if direction == "SHORT" and not CONFIG.get("safety_overlay", {}).get("ALLOW_SHORT", True):
+            log.info("filter_candidates: %s dropped — SHORT disabled (ALLOW_SHORT=False)", sym); continue
 
         allowed = compute_allowed_trade_types(sym, regime or {}, minutes_to_close)
         if not allowed or allowed == ["AVOID"]:
@@ -104,6 +106,8 @@ def compute_allowed_trade_types(
 ) -> list[str]:
     """Return allowed trade types for this symbol in this regime at this time."""
     allowed = ["INTRADAY", "SWING", "POSITION"]
+    if not CONFIG.get("safety_overlay", {}).get("ALLOW_INTRADAY", True):
+        allowed = [t for t in allowed if t not in ("INTRADAY", "SCALP")]
     reg = (regime.get("regime") or "").upper()
     if reg in ("PANIC", "CAPITULATION") or symbol in _LONG_ONLY:
         if "POSITION" in allowed:

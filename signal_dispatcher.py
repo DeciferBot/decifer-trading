@@ -11,6 +11,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from config import CONFIG
 from market_intelligence import classify_signals
 from options import find_best_contract
 from orders_core import execute_buy, execute_short
@@ -981,21 +982,25 @@ def dispatch(
                         **_origin_extras,
                     )
                 elif direction == "SHORT":
-                    ok = execute_short(
-                        ib=ib,
-                        symbol=sym,
-                        price=price,
-                        atr=atr,
-                        score=score,
-                        portfolio_value=portfolio_value,
-                        regime=regime,
-                        reasoning=rationale,
-                        signal_scores=signal_scores,
-                        open_time=datetime.now(UTC).isoformat(),
-                        trade_type=trade_type,
-                        conviction=ext_mult,
-                        **_origin_extras,
-                    )
+                    if not CONFIG.get("safety_overlay", {}).get("ALLOW_SHORT", True):
+                        log.warning("dispatch: %s SHORT blocked — ALLOW_SHORT=False in config", sym)
+                        ok = False
+                    else:
+                        ok = execute_short(
+                            ib=ib,
+                            symbol=sym,
+                            price=price,
+                            atr=atr,
+                            score=score,
+                            portfolio_value=portfolio_value,
+                            regime=regime,
+                            reasoning=rationale,
+                            signal_scores=signal_scores,
+                            open_time=datetime.now(UTC).isoformat(),
+                            trade_type=trade_type,
+                            conviction=ext_mult,
+                            **_origin_extras,
+                        )
                 else:
                     ok = False
                     report["errors"].append(f"{sym}: unknown direction {direction!r}")
@@ -1060,15 +1065,19 @@ def dispatch(
                         qty_override=add_qty,
                     )
                 else:
-                    ok = execute_short(
-                        ib=ib, symbol=sym, price=price, atr=atr, score=score,
-                        portfolio_value=portfolio_value, regime=regime or {},
-                        reasoning=rationale, signal_scores={},
-                        open_time=datetime.now(UTC).isoformat(),
-                        trade_type=pos.get("trade_type") or "INTRADAY",
-                        conviction=1.0,
-                        qty_override=add_qty,
-                    )
+                    if not CONFIG.get("safety_overlay", {}).get("ALLOW_SHORT", True):
+                        log.warning("dispatch: %s SHORT ADD blocked — ALLOW_SHORT=False in config", sym)
+                        ok = False
+                    else:
+                        ok = execute_short(
+                            ib=ib, symbol=sym, price=price, atr=atr, score=score,
+                            portfolio_value=portfolio_value, regime=regime or {},
+                            reasoning=rationale, signal_scores={},
+                            open_time=datetime.now(UTC).isoformat(),
+                            trade_type=pos.get("trade_type") or "INTRADAY",
+                            conviction=1.0,
+                            qty_override=add_qty,
+                        )
                 rec["executed"] = bool(ok)
             else:
                 report["errors"].append(f"{sym}: unknown action {action_type!r}")

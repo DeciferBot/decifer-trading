@@ -178,6 +178,8 @@ CONFIG = {
         "daily_loss_halt_pct": 0.15,                # -15% full halt, scan aborts
         "per_symbol_hard_loss_pct": None,  # None = disabled; e.g. 0.15 → exit at -15%
         "reconcile_every_cycle": True,
+        "ALLOW_SHORT": False,      # paper: disabled — net -$105K on 199 short trades; flip True to re-enable
+        "ALLOW_INTRADAY": False,   # paper: disabled — no edge at intraday horizon (-$95.8K, 253 trades); flip True to re-enable
     },
     "min_cash_reserve": 0.10,  # 10% cash floor — hard stop on new entries
     "max_single_position": 0.06,  # Cross-instrument exposure guard (stock+option stacking on same name). (live: tbd — was 0.15 paper / 0.10 live before 2026-04-28)

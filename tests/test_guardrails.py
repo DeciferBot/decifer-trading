@@ -147,7 +147,9 @@ class TestAllowedTradeTypesUnchanged:
 
     def test_tier_d_quality_compounder_allowed_includes_intraday_and_swing(self):
         """filter_candidates must not strip INTRADAY or SWING from allowed list
-        for a Tier D Quality Compounder — only default_tt changes."""
+        for a Tier D Quality Compounder — only default_tt changes.
+        Patched with ALLOW_INTRADAY=True to isolate Tier D logic from the config gate."""
+        import guardrails
         from guardrails import filter_candidates
 
         sig = _sig(
@@ -156,10 +158,12 @@ class TestAllowedTradeTypesUnchanged:
             price=100.0,
         )
         # Patch the lazy imports inside filter_candidates so no real state is read
+        # Patch ALLOW_INTRADAY=True so this test isolates Tier D logic from the config gate
         with (
             patch("orders_guards.has_open_order_for", return_value=False),
             patch("orders_state._is_recently_closed", return_value=False),
             patch("orders_state.is_failed_thesis_blocked", return_value=(False, "")),
+            patch.dict(guardrails.CONFIG.setdefault("safety_overlay", {}), {"ALLOW_INTRADAY": True, "ALLOW_SHORT": True}),
         ):
             result = filter_candidates(
                 [sig],
@@ -171,7 +175,7 @@ class TestAllowedTradeTypesUnchanged:
         assert result, "Tier D Quality Compounder must not be dropped by filter_candidates"
         candidate = result[0]
         allowed = candidate.get("allowed_trade_types", [])
-        assert "INTRADAY" in allowed, "INTRADAY must remain in allowed_trade_types"
+        assert "INTRADAY" in allowed, "INTRADAY must remain in allowed_trade_types when ALLOW_INTRADAY=True"
         assert "SWING" in allowed, "SWING must remain in allowed_trade_types"
         assert "POSITION" in allowed, "POSITION must remain in allowed_trade_types"
         assert candidate.get("default_trade_type") == "POSITION"
