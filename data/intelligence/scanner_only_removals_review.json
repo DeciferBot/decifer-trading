@@ -1,0 +1,3748 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-07T17:53:45Z",
+  "sprint": "7H.2",
+  "mode": "review_only",
+  "review_description": "Scanner-only removals review. Classification of symbols present in current scanner universe but absent from governed shadow universe. No symbols approved, no roster changes. Advisory only.",
+  "source_files": {
+    "current_vs_shadow": "data/universe_builder/current_vs_shadow_comparison.json",
+    "paper_handoff_comparison": "data/live/paper_handoff_comparison_report.json",
+    "coverage_gap_review": "data/intelligence/coverage_gap_review.json",
+    "symbol_master": "data/reference/symbol_master.json",
+    "theme_overlay_map": "data/reference/theme_overlay_map.json",
+    "economic_candidate_feed": "data/intelligence/economic_candidate_feed.json",
+    "advisory_report": "data/intelligence/advisory_report.json"
+  },
+  "review_summary": {
+    "total_scanner_only_per_comparison_report": 208,
+    "total_reviewed": 160,
+    "unreviewed_below_tracking_threshold": 48,
+    "note_on_unreviewed": "The 48 unreviewed symbols were below the tracking threshold in the advisory runtime log (fewer than 2 appearances across 51 records). They are pure scanner-discovery candidates with no advisory or coverage gap evidence. They are classified implicitly as scanner_only_attention pending future observation.",
+    "category_counts": {
+      "future_theme_candidate": 55,
+      "scanner_only_attention": 59,
+      "review_required": 18,
+      "unknown_requires_provider_enrichment": 19,
+      "rejected": 3,
+      "governance_gap_defect": 3,
+      "already_governed_elsewhere": 3
+    },
+    "blockers_found": true,
+    "blocker_count": 3,
+    "any_activation_blocking_defects": true
+  },
+  "governance_gap_defects": {
+    "count": 3,
+    "symbols": [
+      "COST",
+      "MSFT",
+      "PG"
+    ],
+    "details": [
+      {
+        "symbol": "COST",
+        "seen_in_sources": [
+          "advisory_report",
+          "economic_candidate_feed",
+          "paper_handoff_comparison",
+          "symbol_master",
+          "theme_overlay_map"
+        ],
+        "current_source_labels": [
+          "tier_a_always_on",
+          "economic_candidate_feed"
+        ],
+        "sector": "consumer_staples",
+        "industry": "discount_retail",
+        "possible_theme_overlays": [
+          "quality_cash_flow",
+          "defensive_quality",
+          "consumer_discretionary_retail"
+        ],
+        "approval_status": "approved",
+        "classification_status": "classified_local",
+        "classification_category": "governance_gap_defect",
+        "reason_for_removal": "not_in_governed_shadow_universe",
+        "recommended_action": "review_quota_or_cap_with_amit",
+        "requires_human_review": true,
+        "can_block_activation": true,
+        "notes": "Present in economic_candidate_feed (theme: defensive_quality, route_hint: ['swing', 'watchlist']) but absent from shadow universe. Economic intelligence pipeline sources it correctly; exclusion is at universe_builder quota/cap stage (structural quota 20 or total cap 50). Requires review: if this symbol deserves a shadow slot, quota or routing must be adjusted."
+      },
+      {
+        "symbol": "MSFT",
+        "seen_in_sources": [
+          "coverage_gap_review",
+          "economic_candidate_feed",
+          "symbol_master",
+          "theme_overlay_map"
+        ],
+        "current_source_labels": [],
+        "sector": "information_technology",
+        "industry": "software",
+        "possible_theme_overlays": [
+          "quality_cash_flow",
+          "cloud_computing"
+        ],
+        "approval_status": "approved",
+        "classification_status": "classified_local",
+        "classification_category": "governance_gap_defect",
+        "reason_for_removal": "not_in_governed_shadow_universe",
+        "recommended_action": "review_quota_or_cap_with_amit",
+        "requires_human_review": true,
+        "can_block_activation": true,
+        "notes": "Present in economic_candidate_feed (theme: quality_cash_flow, route_hint: ['position', 'swing', 'watchlist']) but absent from shadow universe. Economic intelligence pipeline sources it correctly; exclusion is at universe_builder quota/cap stage (structural quota 20 or total cap 50). Requires review: if this symbol deserves a shadow slot, quota or routing must be adjusted."
+      },
+      {
+        "symbol": "PG",
+        "seen_in_sources": [
+          "coverage_gap_review",
+          "economic_candidate_feed",
+          "symbol_master",
+          "theme_overlay_map"
+        ],
+        "current_source_labels": [],
+        "sector": "consumer_staples",
+        "industry": "household_products",
+        "possible_theme_overlays": [
+          "defensive_quality",
+          "consumer_staples_food_bev"
+        ],
+        "approval_status": "approved",
+        "classification_status": "classified_local",
+        "classification_category": "governance_gap_defect",
+        "reason_for_removal": "not_in_governed_shadow_universe",
+        "recommended_action": "review_quota_or_cap_with_amit",
+        "requires_human_review": true,
+        "can_block_activation": true,
+        "notes": "Present in economic_candidate_feed (theme: defensive_quality, route_hint: ['swing', 'watchlist']) but absent from shadow universe. Economic intelligence pipeline sources it correctly; exclusion is at universe_builder quota/cap stage (structural quota 20 or total cap 50). Requires review: if this symbol deserves a shadow slot, quota or routing must be adjusted."
+      }
+    ],
+    "activation_implication": "governance_gap_defects require review with Amit before activation. The symbols are present in the economic_candidate_feed but excluded from shadow universe at quota/cap stage. This is not necessarily a bug \u2014 it may be expected quota pressure \u2014 but must be acknowledged as a deliberate architectural choice before flag flip."
+  },
+  "future_theme_candidates": {
+    "count": 55,
+    "symbols": [
+      "A",
+      "ABBV",
+      "ABT",
+      "ACGL",
+      "AEM",
+      "AFRM",
+      "ALNY",
+      "AMAT",
+      "AMP",
+      "AMZN",
+      "AON",
+      "APLD",
+      "APO",
+      "APP",
+      "ARGX",
+      "AXP",
+      "BA",
+      "BABA",
+      "BLK",
+      "BX",
+      "CAT",
+      "CG",
+      "COIN",
+      "CRWD",
+      "CRWV",
+      "DLR",
+      "ELV",
+      "EOSE",
+      "EQR",
+      "EW",
+      "GE",
+      "GOOGL",
+      "GPN",
+      "HUM",
+      "IONQ",
+      "LEU",
+      "MCD",
+      "MDT",
+      "MS",
+      "NFLX",
+      "OKLO",
+      "ONTO",
+      "PODD",
+      "RGTI",
+      "RKLB",
+      "SMCI",
+      "SNAP",
+      "STRL",
+      "TOST",
+      "TTD",
+      "TVTX",
+      "UDR",
+      "UNH",
+      "V",
+      "XLK"
+    ],
+    "note": "These symbols have existing theme overlay mappings in theme_overlay_map.json but are not yet governed via thematic_roster. They are safe to remain scanner-only for now. Roster addition is deferred to a future sprint, not activation sprint."
+  },
+  "review_required": {
+    "count": 18,
+    "symbols": [
+      "ALAB",
+      "AME",
+      "BC",
+      "BIIB",
+      "CACI",
+      "CFG",
+      "CLH",
+      "COP",
+      "COPX",
+      "CRBG",
+      "CRDO",
+      "CRWG",
+      "CVNA",
+      "CW",
+      "DASH",
+      "DKS",
+      "EQH",
+      "FPS"
+    ],
+    "note": "Prominent large-cap or Tier A always-on scanner symbols not in shadow. May warrant economic intelligence layer coverage. Require Amit review before any roster addition. Do not block activation if governance gap defect count is 0 within this group."
+  },
+  "scanner_only_attention": {
+    "count": 59,
+    "symbols": [
+      "ADP",
+      "ADSK",
+      "AGCO",
+      "APH",
+      "ASND",
+      "AVTR",
+      "AXON",
+      "AYI",
+      "B",
+      "BALL",
+      "BAP",
+      "BBY",
+      "BG",
+      "BIDU",
+      "BJ",
+      "BK",
+      "BR",
+      "BURL",
+      "CARR",
+      "CCI",
+      "CDE",
+      "CHTR",
+      "CMS",
+      "HAS",
+      "INTC",
+      "ITW",
+      "JOBY",
+      "LIN",
+      "MNDY",
+      "MORN",
+      "MTB",
+      "MUSA",
+      "NKE",
+      "ORCL",
+      "OTIS",
+      "PNC",
+      "PSA",
+      "QCOM",
+      "RL",
+      "ROL",
+      "SNA",
+      "SSNC",
+      "STE",
+      "SWK",
+      "SYF",
+      "TDY",
+      "TE",
+      "TKO",
+      "TPG",
+      "TTWO",
+      "TW",
+      "TYL",
+      "U",
+      "VLTO",
+      "VRSK",
+      "WAT",
+      "WMT",
+      "XPO",
+      "XYL"
+    ],
+    "note": "Pure scanner discovery with no theme overlay and no economic feed presence. Safe to remain scanner-only. Do not block activation."
+  },
+  "rejected": {
+    "count": 3,
+    "symbols": [
+      "BMNR",
+      "BULL",
+      "UAMY"
+    ],
+    "note": "Symbols below the governance bar. Not suitable for themed governance. Scanner discovery artefacts."
+  },
+  "unknown_requires_provider_enrichment": {
+    "count": 19,
+    "symbols": [
+      "BF.B",
+      "BITO",
+      "CBOE",
+      "DDOG",
+      "EBAY",
+      "FUTU",
+      "INFQ",
+      "MRNA",
+      "MSTR",
+      "OSCR",
+      "REGN",
+      "SLV",
+      "SVXY",
+      "TGT",
+      "VRSN",
+      "VXX",
+      "WST",
+      "XNDU",
+      "YSS"
+    ],
+    "note": "Symbols requiring FMP or provider enrichment before classification. Complex instruments (vol proxies, crypto proxies, foreign-listed, unknown tickers). Do not block activation."
+  },
+  "already_governed_elsewhere": {
+    "count": 3,
+    "symbols": [
+      "IREN",
+      "SNDK",
+      "WDC"
+    ],
+    "note": "Symbols governed via thematic_roster and transmission_rules. Excluded from shadow universe due to structural_position quota cap (20). Pipeline wiring is correct. Will appear in shadow universe when quota is expanded or when a lower-priority structural candidate is replaced."
+  },
+  "activation_assessment": {
+    "governance_gap_defect_count": 3,
+    "governance_gap_symbols": [
+      "COST",
+      "MSFT",
+      "PG"
+    ],
+    "can_block_activation": true,
+    "recommendation": "REVIEW_REQUIRED_BEFORE_ACTIVATION: governance_gap_defects found. Symbols in economic_candidate_feed absent from shadow universe require Amit acknowledgement before flag flip. This is likely expected quota pressure, not a pipeline bug, but must be explicitly acknowledged."
+  },
+  "safety_flags": {
+    "no_symbols_approved": true,
+    "no_roster_changes": true,
+    "no_universe_builder_changes": true,
+    "no_candidate_resolver_changes": true,
+    "no_production_code_changes": true,
+    "no_flag_flip": true,
+    "live_output_changed": false,
+    "advisory_only": true
+  },
+  "symbols": [
+    {
+      "symbol": "A",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "current_pool_unknown_source"
+      ],
+      "sector": "health_care",
+      "industry": "life_sciences_tools",
+      "possible_theme_overlays": [
+        "genomics_diagnostics"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (genomics_diagnostics) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: health_care, industry: life_sciences_tools."
+    },
+    {
+      "symbol": "ABBV",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural",
+        "tier_a_always_on"
+      ],
+      "sector": "health_care",
+      "industry": "pharma",
+      "possible_theme_overlays": [
+        "pharma_large_cap"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (pharma_large_cap) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: health_care, industry: pharma."
+    },
+    {
+      "symbol": "ABT",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_a_always_on"
+      ],
+      "sector": "health_care",
+      "industry": "medical_devices",
+      "possible_theme_overlays": [
+        "medical_devices"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (medical_devices) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: health_care, industry: medical_devices."
+    },
+    {
+      "symbol": "ACGL",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "current_pool_unknown_source"
+      ],
+      "sector": "financials",
+      "industry": "insurance_reinsurance",
+      "possible_theme_overlays": [
+        "insurance"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (insurance) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: financials, industry: insurance_reinsurance."
+    },
+    {
+      "symbol": "ADP",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "industrials",
+      "industry": "hr_services",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: industrials, industry: hr_services. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "ADSK",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "information_technology",
+      "industry": "software",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: information_technology, industry: software. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "AEM",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "materials",
+      "industry": "gold_mining",
+      "possible_theme_overlays": [
+        "gold_mining"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (gold_mining) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: materials, industry: gold_mining."
+    },
+    {
+      "symbol": "AFRM",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "financials",
+      "industry": "fintech",
+      "possible_theme_overlays": [
+        "fintech"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (fintech) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: financials, industry: fintech."
+    },
+    {
+      "symbol": "AGCO",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "current_pool_unknown_source"
+      ],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: unknown, industry: unknown. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "ALAB",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "semiconductors",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: information_technology, industry: semiconductors. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "ALNY",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "health_care",
+      "industry": "biotech",
+      "possible_theme_overlays": [
+        "biotech_rare_disease"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (biotech_rare_disease) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: health_care, industry: biotech."
+    },
+    {
+      "symbol": "AMAT",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "semiconductor_equipment",
+      "possible_theme_overlays": [
+        "semiconductor_equipment"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (semiconductor_equipment) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: information_technology, industry: semiconductor_equipment."
+    },
+    {
+      "symbol": "AME",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "electronic_instruments",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: industrials, industry: electronic_instruments. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "AMP",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "asset_management",
+      "possible_theme_overlays": [
+        "asset_management"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (asset_management) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: financials, industry: asset_management."
+    },
+    {
+      "symbol": "AMZN",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_a_always_on"
+      ],
+      "sector": "consumer_discretionary",
+      "industry": "ecommerce",
+      "possible_theme_overlays": [
+        "cloud_computing",
+        "consumer_discretionary_retail",
+        "ecommerce_marketplace"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (cloud_computing, consumer_discretionary_retail, ecommerce_marketplace) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: consumer_discretionary, industry: ecommerce."
+    },
+    {
+      "symbol": "AON",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "financials",
+      "industry": "insurance",
+      "possible_theme_overlays": [
+        "insurance"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (insurance) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: financials, industry: insurance."
+    },
+    {
+      "symbol": "APH",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "information_technology",
+      "industry": "electronic_components",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: information_technology, industry: electronic_components. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "APLD",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "information_technology",
+      "industry": "ai_infrastructure",
+      "possible_theme_overlays": [
+        "ai_infrastructure_hardware"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (ai_infrastructure_hardware) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: information_technology, industry: ai_infrastructure."
+    },
+    {
+      "symbol": "APO",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "financials",
+      "industry": "asset_management",
+      "possible_theme_overlays": [
+        "investment_banking",
+        "asset_management"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (investment_banking, asset_management) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: financials, industry: asset_management."
+    },
+    {
+      "symbol": "APP",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "information_technology",
+      "industry": "software",
+      "possible_theme_overlays": [
+        "enterprise_software",
+        "ai_application_software"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (enterprise_software, ai_application_software) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: information_technology, industry: software."
+    },
+    {
+      "symbol": "ARGX",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "health_care",
+      "industry": "biotech",
+      "possible_theme_overlays": [
+        "biotech_rare_disease"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (biotech_rare_disease) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: health_care, industry: biotech."
+    },
+    {
+      "symbol": "ASND",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "health_care",
+      "industry": "biotech",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: health_care, industry: biotech. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "AVTR",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "health_care",
+      "industry": "life_sciences_tools",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: health_care, industry: life_sciences_tools. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "AXON",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "industrials",
+      "industry": "public_safety_tech",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: industrials, industry: public_safety_tech. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "AXP",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "financials",
+      "industry": "payments",
+      "possible_theme_overlays": [
+        "payments_processing"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (payments_processing) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: financials, industry: payments."
+    },
+    {
+      "symbol": "AYI",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "industrials",
+      "industry": "lighting",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: industrials, industry: lighting. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "B",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "materials",
+      "industry": "industrial_metals",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: materials, industry: industrial_metals. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "BA",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "industrials",
+      "industry": "aerospace_defense",
+      "possible_theme_overlays": [
+        "aerospace_manufacturing"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (aerospace_manufacturing) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: industrials, industry: aerospace_defense."
+    },
+    {
+      "symbol": "BABA",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "consumer_discretionary",
+      "industry": "ecommerce",
+      "possible_theme_overlays": [
+        "ecommerce_marketplace"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (ecommerce_marketplace) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: consumer_discretionary, industry: ecommerce."
+    },
+    {
+      "symbol": "BALL",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "current_pool_unknown_source"
+      ],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: unknown, industry: unknown. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "BAP",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "financials",
+      "industry": "banks_diversified",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: financials, industry: banks_diversified. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "BBY",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "consumer_discretionary",
+      "industry": "consumer_electronics_retail",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: consumer_discretionary, industry: consumer_electronics_retail. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "BC",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "consumer_discretionary",
+      "industry": "recreational_vehicles",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: consumer_discretionary, industry: recreational_vehicles. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "BF.B",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Dual share class (Brown-Forman B). Non-standard ticker. Requires provider enrichment and share class clarification."
+    },
+    {
+      "symbol": "BG",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "current_pool_unknown_source"
+      ],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: unknown, industry: unknown. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "BIDU",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "communication_services",
+      "industry": "internet_search",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: communication_services, industry: internet_search. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "BIIB",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_a_always_on"
+      ],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_for_economic_intelligence_coverage",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "Prominent large-cap or Tier A always-on scanner symbol not in shadow. Advisory: advisory_defer. Sector: unknown, industry: unknown. May warrant economic intelligence layer coverage."
+    },
+    {
+      "symbol": "BITO",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_a_always_on"
+      ],
+      "sector": "etf_proxy",
+      "industry": "crypto_futures_etf",
+      "possible_theme_overlays": [
+        "crypto_exchange",
+        "crypto_etf"
+      ],
+      "approval_status": "approved",
+      "classification_status": "etf_proxy_classification",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Crypto-proxy instrument. Already have IBIT in shadow. Requires enrichment and evaluation of incremental value before governance decision."
+    },
+    {
+      "symbol": "BJ",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "current_pool_unknown_source"
+      ],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: unknown, industry: unknown. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "BK",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "current_pool_unknown_source"
+      ],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: unknown, industry: unknown. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "BLK",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "financials",
+      "industry": "asset_management",
+      "possible_theme_overlays": [
+        "asset_management"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (asset_management) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: financials, industry: asset_management."
+    },
+    {
+      "symbol": "BMNR",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "health_care",
+      "industry": "biotech",
+      "possible_theme_overlays": [
+        "biotech_oncology"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "rejected",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "do_not_govern",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Micro-cap mining/materials name. No thematic fit in governed universe. Scanner discovery artefact below governance bar."
+    },
+    {
+      "symbol": "BR",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "financials",
+      "industry": "financial_services",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: financials, industry: financial_services. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "BULL",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "etf_proxy",
+      "industry": "leveraged_etf",
+      "possible_theme_overlays": [
+        "leveraged_etf"
+      ],
+      "approval_status": "approved",
+      "classification_status": "etf_proxy_classification",
+      "classification_category": "rejected",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "do_not_govern",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Leveraged 3\u00d7 bull ETF. Redundant given SPY and QQQ already in shadow universe. No incremental value."
+    },
+    {
+      "symbol": "BURL",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "current_pool_unknown_source"
+      ],
+      "sector": "consumer_discretionary",
+      "industry": "off_price_retail",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: consumer_discretionary, industry: off_price_retail. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "BX",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "financials",
+      "industry": "asset_management",
+      "possible_theme_overlays": [
+        "investment_banking",
+        "asset_management"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (investment_banking, asset_management) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: financials, industry: asset_management."
+    },
+    {
+      "symbol": "CACI",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "government_it_services",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: industrials, industry: government_it_services. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "CARR",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "industrials",
+      "industry": "hvac",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: industrials, industry: hvac. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "CAT",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_a_always_on"
+      ],
+      "sector": "industrials",
+      "industry": "construction_machinery",
+      "possible_theme_overlays": [
+        "industrial_conglomerates"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (industrial_conglomerates) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: industrials, industry: construction_machinery."
+    },
+    {
+      "symbol": "CBOE",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Coverage gap review recommends enrichment. Sector: unknown, industry: unknown. Cannot classify without richer data."
+    },
+    {
+      "symbol": "CCI",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_d_structural"
+      ],
+      "sector": "real_estate",
+      "industry": "cell_tower_reit",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: real_estate, industry: cell_tower_reit. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "CDE",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "current_pool_unknown_source"
+      ],
+      "sector": "materials",
+      "industry": "silver_mining",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: materials, industry: silver_mining. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "CFG",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "banks_regional",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: financials, industry: banks_regional. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "CG",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "current_pool_unknown_source"
+      ],
+      "sector": "financials",
+      "industry": "asset_management",
+      "possible_theme_overlays": [
+        "investment_banking"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (investment_banking) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: financials, industry: asset_management."
+    },
+    {
+      "symbol": "CHTR",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "current_pool_unknown_source"
+      ],
+      "sector": "communication_services",
+      "industry": "cable_broadband",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: communication_services, industry: cable_broadband. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "CLH",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "environmental_services",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: industrials, industry: environmental_services. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "CMS",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "current_pool_unknown_source"
+      ],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: advisory_defer. Sector: unknown, industry: unknown. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "COIN",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "crypto_exchange",
+      "possible_theme_overlays": [
+        "fintech",
+        "crypto_exchange"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (fintech, crypto_exchange) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: financials, industry: crypto_exchange."
+    },
+    {
+      "symbol": "COP",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_a_always_on"
+      ],
+      "sector": "energy",
+      "industry": "oil_gas_ep",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_for_economic_intelligence_coverage",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "Prominent large-cap or Tier A always-on scanner symbol not in shadow. Advisory: advisory_defer. Sector: energy, industry: oil_gas_ep. May warrant economic intelligence layer coverage."
+    },
+    {
+      "symbol": "COPX",
+      "seen_in_sources": [
+        "advisory_report",
+        "paper_handoff_comparison",
+        "symbol_master"
+      ],
+      "current_source_labels": [
+        "tier_a_always_on"
+      ],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_for_economic_intelligence_coverage",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "Prominent large-cap or Tier A always-on scanner symbol not in shadow. Advisory: advisory_defer. Sector: unknown, industry: unknown. May warrant economic intelligence layer coverage."
+    },
+    {
+      "symbol": "COST",
+      "seen_in_sources": [
+        "advisory_report",
+        "economic_candidate_feed",
+        "paper_handoff_comparison",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [
+        "tier_a_always_on",
+        "economic_candidate_feed"
+      ],
+      "sector": "consumer_staples",
+      "industry": "discount_retail",
+      "possible_theme_overlays": [
+        "quality_cash_flow",
+        "defensive_quality",
+        "consumer_discretionary_retail"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "governance_gap_defect",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_quota_or_cap_with_amit",
+      "requires_human_review": true,
+      "can_block_activation": true,
+      "notes": "Present in economic_candidate_feed (theme: defensive_quality, route_hint: ['swing', 'watchlist']) but absent from shadow universe. Economic intelligence pipeline sources it correctly; exclusion is at universe_builder quota/cap stage (structural quota 20 or total cap 50). Requires review: if this symbol deserves a shadow slot, quota or routing must be adjusted."
+    },
+    {
+      "symbol": "CRBG",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "insurance",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: financials, industry: insurance. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "CRDO",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "semiconductors",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: information_technology, industry: semiconductors. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "CRWD",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "cybersecurity",
+      "possible_theme_overlays": [
+        "cybersecurity"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (cybersecurity) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: information_technology, industry: cybersecurity."
+    },
+    {
+      "symbol": "CRWG",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "software",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: information_technology, industry: software. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "CRWV",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "ai_infrastructure",
+      "possible_theme_overlays": [
+        "ai_infrastructure_hardware"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (ai_infrastructure_hardware) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: information_technology, industry: ai_infrastructure."
+    },
+    {
+      "symbol": "CVNA",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "consumer_discretionary",
+      "industry": "automotive_retail",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: consumer_discretionary, industry: automotive_retail. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "CW",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "aerospace_components",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: industrials, industry: aerospace_components. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "DASH",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "consumer_discretionary",
+      "industry": "food_delivery",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: consumer_discretionary, industry: food_delivery. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "DDOG",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Coverage gap review recommends enrichment. Sector: unknown, industry: unknown. Cannot classify without richer data."
+    },
+    {
+      "symbol": "DKS",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "consumer_discretionary",
+      "industry": "sporting_goods_retail",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: consumer_discretionary, industry: sporting_goods_retail. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "DLR",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "real_estate",
+      "industry": "data_centre_reit",
+      "possible_theme_overlays": [
+        "data_centre_reit"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (data_centre_reit) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: real_estate, industry: data_centre_reit."
+    },
+    {
+      "symbol": "EBAY",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Coverage gap review recommends enrichment. Sector: unknown, industry: unknown. Cannot classify without richer data."
+    },
+    {
+      "symbol": "ELV",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "health_care",
+      "industry": "health_insurance",
+      "possible_theme_overlays": [
+        "health_insurance"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (health_insurance) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: health_care, industry: health_insurance."
+    },
+    {
+      "symbol": "EOSE",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "energy_storage",
+      "possible_theme_overlays": [
+        "energy_storage"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (energy_storage) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: industrials, industry: energy_storage."
+    },
+    {
+      "symbol": "EQH",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "insurance",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: financials, industry: insurance. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "EQR",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "real_estate",
+      "industry": "residential_reit",
+      "possible_theme_overlays": [
+        "residential_reit"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (residential_reit) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: real_estate, industry: residential_reit."
+    },
+    {
+      "symbol": "EW",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "health_care",
+      "industry": "medical_devices",
+      "possible_theme_overlays": [
+        "medical_devices"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (medical_devices) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: health_care, industry: medical_devices."
+    },
+    {
+      "symbol": "FPS",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "materials",
+      "industry": "specialty_materials",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "review_required",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_with_amit_before_roster_add",
+      "requires_human_review": true,
+      "can_block_activation": false,
+      "notes": "In paper comparator approved_gap_symbols list. Has partial governance context. Sector: materials, industry: specialty_materials. Requires Amit review before roster addition."
+    },
+    {
+      "symbol": "FUTU",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "brokerage",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Foreign-listed broker (FUTU Holdings). Limited US market data coverage. Requires provider enrichment before classification."
+    },
+    {
+      "symbol": "GE",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "aerospace_defense",
+      "possible_theme_overlays": [
+        "aerospace_manufacturing"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (aerospace_manufacturing) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: industrials, industry: aerospace_defense."
+    },
+    {
+      "symbol": "GOOGL",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "communication_services",
+      "industry": "internet_search",
+      "possible_theme_overlays": [
+        "cloud_computing",
+        "internet_platform"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (cloud_computing, internet_platform) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: communication_services, industry: internet_search."
+    },
+    {
+      "symbol": "GPN",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "payments",
+      "possible_theme_overlays": [
+        "payments_processing"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (payments_processing) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: financials, industry: payments."
+    },
+    {
+      "symbol": "HAS",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "consumer_discretionary",
+      "industry": "toys_games",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: consumer_discretionary, industry: toys_games. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "HUM",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "health_care",
+      "industry": "health_insurance",
+      "possible_theme_overlays": [
+        "health_insurance"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (health_insurance) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: health_care, industry: health_insurance."
+    },
+    {
+      "symbol": "INFQ",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "semiconductors",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_fmp_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Ticker not identifiable from available reference data. Requires FMP company overview enrichment before classification."
+    },
+    {
+      "symbol": "INTC",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "semiconductors",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: information_technology, industry: semiconductors. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "IONQ",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "quantum_computing",
+      "possible_theme_overlays": [
+        "quantum_computing"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (quantum_computing) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: information_technology, industry: quantum_computing."
+    },
+    {
+      "symbol": "IREN",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "economic_candidate_feed",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "ai_infrastructure",
+      "possible_theme_overlays": [
+        "ai_compute_infrastructure",
+        "ai_infrastructure_hardware"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "already_governed_elsewhere",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "continue_observation_quota_will_resolve",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Governed via thematic_roster and transmission_rules. Excluded from shadow universe because structural_position quota (20) is full. Pipeline wiring correct \u2014 quota is the binding constraint."
+    },
+    {
+      "symbol": "ITW",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "industrial_conglomerate",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: industrials, industry: industrial_conglomerate. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "JOBY",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "evtol_aviation",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: industrials, industry: evtol_aviation. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "LEU",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "materials",
+      "industry": "uranium_enrichment",
+      "possible_theme_overlays": [
+        "uranium"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (uranium) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: materials, industry: uranium_enrichment."
+    },
+    {
+      "symbol": "LIN",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "materials",
+      "industry": "industrial_gases",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: materials, industry: industrial_gases. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "MCD",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "consumer_discretionary",
+      "industry": "restaurants",
+      "possible_theme_overlays": [
+        "restaurants_qsr"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (restaurants_qsr) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: consumer_discretionary, industry: restaurants."
+    },
+    {
+      "symbol": "MDT",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "health_care",
+      "industry": "medical_devices",
+      "possible_theme_overlays": [
+        "medical_devices"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (medical_devices) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: health_care, industry: medical_devices."
+    },
+    {
+      "symbol": "MNDY",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "software",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: information_technology, industry: software. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "MORN",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "financial_data",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: financials, industry: financial_data. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "MRNA",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Coverage gap review recommends enrichment. Sector: unknown, industry: unknown. Cannot classify without richer data."
+    },
+    {
+      "symbol": "MS",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "investment_banking",
+      "possible_theme_overlays": [
+        "investment_banking"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (investment_banking) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: financials, industry: investment_banking."
+    },
+    {
+      "symbol": "MSFT",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "economic_candidate_feed",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "software",
+      "possible_theme_overlays": [
+        "quality_cash_flow",
+        "cloud_computing"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "governance_gap_defect",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_quota_or_cap_with_amit",
+      "requires_human_review": true,
+      "can_block_activation": true,
+      "notes": "Present in economic_candidate_feed (theme: quality_cash_flow, route_hint: ['position', 'swing', 'watchlist']) but absent from shadow universe. Economic intelligence pipeline sources it correctly; exclusion is at universe_builder quota/cap stage (structural quota 20 or total cap 50). Requires review: if this symbol deserves a shadow slot, quota or routing must be adjusted."
+    },
+    {
+      "symbol": "MSTR",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "crypto_holding",
+      "possible_theme_overlays": [
+        "crypto_exchange"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Crypto-proxy instrument. Already have IBIT in shadow. Requires enrichment and evaluation of incremental value before governance decision."
+    },
+    {
+      "symbol": "MTB",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "banks_regional",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: financials, industry: banks_regional. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "MUSA",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "consumer_staples",
+      "industry": "convenience_fuel_retail",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: consumer_staples, industry: convenience_fuel_retail. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "NFLX",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "communication_services",
+      "industry": "streaming",
+      "possible_theme_overlays": [
+        "streaming_media"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (streaming_media) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: communication_services, industry: streaming."
+    },
+    {
+      "symbol": "NKE",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "consumer_discretionary",
+      "industry": "apparel_footwear",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: consumer_discretionary, industry: apparel_footwear. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "OKLO",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "advanced_nuclear",
+      "possible_theme_overlays": [
+        "nuclear_power"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (nuclear_power) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: information_technology, industry: advanced_nuclear."
+    },
+    {
+      "symbol": "ONTO",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "semiconductor_equipment",
+      "possible_theme_overlays": [
+        "semiconductor_equipment"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (semiconductor_equipment) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: information_technology, industry: semiconductor_equipment."
+    },
+    {
+      "symbol": "ORCL",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "software",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: information_technology, industry: software. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "OSCR",
+      "seen_in_sources": [
+        "coverage_gap_review"
+      ],
+      "current_source_labels": [],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown",
+      "classification_status": "unknown",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Coverage gap review recommends enrichment. Sector: unknown, industry: unknown. Cannot classify without richer data."
+    },
+    {
+      "symbol": "OTIS",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "elevators",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: industrials, industry: elevators. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "PG",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "economic_candidate_feed",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "consumer_staples",
+      "industry": "household_products",
+      "possible_theme_overlays": [
+        "defensive_quality",
+        "consumer_staples_food_bev"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "governance_gap_defect",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "review_quota_or_cap_with_amit",
+      "requires_human_review": true,
+      "can_block_activation": true,
+      "notes": "Present in economic_candidate_feed (theme: defensive_quality, route_hint: ['swing', 'watchlist']) but absent from shadow universe. Economic intelligence pipeline sources it correctly; exclusion is at universe_builder quota/cap stage (structural quota 20 or total cap 50). Requires review: if this symbol deserves a shadow slot, quota or routing must be adjusted."
+    },
+    {
+      "symbol": "PNC",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "banks_diversified",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: financials, industry: banks_diversified. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "PODD",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "health_care",
+      "industry": "medical_devices",
+      "possible_theme_overlays": [
+        "medical_devices"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (medical_devices) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: health_care, industry: medical_devices."
+    },
+    {
+      "symbol": "PSA",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "real_estate",
+      "industry": "storage_reit",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: real_estate, industry: storage_reit. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "QCOM",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "semiconductors",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: information_technology, industry: semiconductors. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "REGN",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Coverage gap review recommends enrichment. Sector: unknown, industry: unknown. Cannot classify without richer data."
+    },
+    {
+      "symbol": "RGTI",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "quantum_computing",
+      "possible_theme_overlays": [
+        "quantum_computing"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (quantum_computing) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: information_technology, industry: quantum_computing."
+    },
+    {
+      "symbol": "RKLB",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "space_launch",
+      "possible_theme_overlays": [
+        "space_launch"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (space_launch) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: industrials, industry: space_launch."
+    },
+    {
+      "symbol": "RL",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "consumer_discretionary",
+      "industry": "apparel_footwear",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: consumer_discretionary, industry: apparel_footwear. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "ROL",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "pest_control",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: industrials, industry: pest_control. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "SLV",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "commodity_proxy",
+      "industry": "silver_etf",
+      "possible_theme_overlays": [
+        "commodity_etf_silver"
+      ],
+      "approval_status": "approved",
+      "classification_status": "commodity_proxy",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_then_evaluate_vs_existing_proxies",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Commodity proxy ETF (silver). Evaluate whether duplicate commodity exposure adds value vs existing GLD/USO/XLE in shadow before governing."
+    },
+    {
+      "symbol": "SMCI",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "technology_hardware",
+      "possible_theme_overlays": [
+        "ai_infrastructure_hardware"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (ai_infrastructure_hardware) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: information_technology, industry: technology_hardware."
+    },
+    {
+      "symbol": "SNA",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "tools",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: industrials, industry: tools. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "SNAP",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "communication_services",
+      "industry": "social_media",
+      "possible_theme_overlays": [
+        "internet_platform",
+        "social_media"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (internet_platform, social_media) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: communication_services, industry: social_media."
+    },
+    {
+      "symbol": "SNDK",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "economic_candidate_feed",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "semiconductors",
+      "possible_theme_overlays": [
+        "memory_storage"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "already_governed_elsewhere",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "continue_observation_quota_will_resolve",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Governed via thematic_roster and transmission_rules. Excluded from shadow universe because structural_position quota (20) is full. Pipeline wiring correct \u2014 quota is the binding constraint."
+    },
+    {
+      "symbol": "SSNC",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "financial_software",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: financials, industry: financial_software. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "STE",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "health_care",
+      "industry": "medical_equipment_services",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: health_care, industry: medical_equipment_services. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "STRL",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "construction_engineering",
+      "possible_theme_overlays": [
+        "construction_engineering"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (construction_engineering) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: industrials, industry: construction_engineering."
+    },
+    {
+      "symbol": "SVXY",
+      "seen_in_sources": [
+        "coverage_gap_review"
+      ],
+      "current_source_labels": [],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown",
+      "classification_status": "unknown",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Coverage gap review recommends enrichment. Sector: unknown, industry: unknown. Cannot classify without richer data."
+    },
+    {
+      "symbol": "SWK",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "tools",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: industrials, industry: tools. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "SYF",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "consumer_finance",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: financials, industry: consumer_finance. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "TDY",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "aerospace_electronics",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: industrials, industry: aerospace_electronics. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "TE",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "industrial_conglomerate",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: industrials, industry: industrial_conglomerate. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "TGT",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Coverage gap review recommends enrichment. Sector: unknown, industry: unknown. Cannot classify without richer data."
+    },
+    {
+      "symbol": "TKO",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "communication_services",
+      "industry": "live_entertainment",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: communication_services, industry: live_entertainment. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "TOST",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "fintech",
+      "possible_theme_overlays": [
+        "fintech"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (fintech) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: financials, industry: fintech."
+    },
+    {
+      "symbol": "TPG",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "asset_management",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: financials, industry: asset_management. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "TTD",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "communication_services",
+      "industry": "advertising_tech",
+      "possible_theme_overlays": [
+        "advertising_tech"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (advertising_tech) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: communication_services, industry: advertising_tech."
+    },
+    {
+      "symbol": "TTWO",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "consumer_discretionary",
+      "industry": "gaming",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: consumer_discretionary, industry: gaming. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "TVTX",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "health_care",
+      "industry": "biotech",
+      "possible_theme_overlays": [
+        "biotech_rare_disease"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (biotech_rare_disease) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: health_care, industry: biotech."
+    },
+    {
+      "symbol": "TW",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "financial_exchanges",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: financials, industry: financial_exchanges. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "TYL",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "government_software",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: industrials, industry: government_software. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "U",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "software",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: information_technology, industry: software. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "UAMY",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "materials",
+      "industry": "antimony_mining",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "rejected",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "do_not_govern",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Micro-cap mining/materials name. No thematic fit in governed universe. Scanner discovery artefact below governance bar."
+    },
+    {
+      "symbol": "UDR",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "real_estate",
+      "industry": "residential_reit",
+      "possible_theme_overlays": [
+        "residential_reit"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (residential_reit) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: real_estate, industry: residential_reit."
+    },
+    {
+      "symbol": "UNH",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "health_care",
+      "industry": "health_insurance",
+      "possible_theme_overlays": [
+        "health_insurance"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (health_insurance) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: health_care, industry: health_insurance."
+    },
+    {
+      "symbol": "V",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "financials",
+      "industry": "payments",
+      "possible_theme_overlays": [
+        "payments_processing"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (payments_processing) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: financials, industry: payments."
+    },
+    {
+      "symbol": "VLTO",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "measurement_instruments",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: industrials, industry: measurement_instruments. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "VRSK",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "data_analytics",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: industrials, industry: data_analytics. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "VRSN",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Coverage gap review recommends enrichment. Sector: unknown, industry: unknown. Cannot classify without richer data."
+    },
+    {
+      "symbol": "VXX",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "volatility_proxy",
+      "industry": "vix_futures_etp",
+      "possible_theme_overlays": [
+        "volatility_product"
+      ],
+      "approval_status": "approved",
+      "classification_status": "volatility_proxy",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Volatility proxy instrument. Complex leveraged/derivative product. Requires enrichment before governance decision."
+    },
+    {
+      "symbol": "WAT",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "health_care",
+      "industry": "life_sciences_tools",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: health_care, industry: life_sciences_tools. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "WDC",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "economic_candidate_feed",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "technology_hardware",
+      "possible_theme_overlays": [
+        "memory_storage"
+      ],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "already_governed_elsewhere",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "continue_observation_quota_will_resolve",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Governed via thematic_roster and transmission_rules. Excluded from shadow universe because structural_position quota (20) is full. Pipeline wiring correct \u2014 quota is the binding constraint."
+    },
+    {
+      "symbol": "WMT",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "consumer_staples",
+      "industry": "discount_retail",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: consumer_staples, industry: discount_retail. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "WST",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "unknown",
+      "industry": "unknown",
+      "possible_theme_overlays": [],
+      "approval_status": "unknown_requires_provider_enrichment",
+      "classification_status": "unknown_requires_provider_enrichment",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_provider_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Coverage gap review recommends enrichment. Sector: unknown, industry: unknown. Cannot classify without richer data."
+    },
+    {
+      "symbol": "XLK",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master",
+        "theme_overlay_map"
+      ],
+      "current_source_labels": [],
+      "sector": "etf_proxy",
+      "industry": "technology_sector_etf",
+      "possible_theme_overlays": [
+        "sector_etf_technology"
+      ],
+      "approval_status": "approved",
+      "classification_status": "etf_proxy_classification",
+      "classification_category": "future_theme_candidate",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "evaluate_for_future_theme_roster",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Has theme overlay (sector_etf_technology) but not yet in governed shadow universe. Candidate for future thematic roster addition after activation sprint. No governance gap \u2014 theme exists but roster slot not yet allocated. Sector: etf_proxy, industry: technology_sector_etf."
+    },
+    {
+      "symbol": "XNDU",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "semiconductors",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_fmp_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Ticker not identifiable from available reference data. Requires FMP company overview enrichment before classification."
+    },
+    {
+      "symbol": "XPO",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "logistics",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: industrials, industry: logistics. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "XYL",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "industrials",
+      "industry": "water_equipment",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "scanner_only_attention",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "monitor_via_scanner_only",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Pure scanner discovery (Tier D structural or dynamic source). No theme overlay. Not in economic feed. Advisory: add_to_approved_roster. Sector: industrials, industry: water_equipment. Acceptable to remain scanner-only \u2014 no governance urgency."
+    },
+    {
+      "symbol": "YSS",
+      "seen_in_sources": [
+        "coverage_gap_review",
+        "symbol_master"
+      ],
+      "current_source_labels": [],
+      "sector": "information_technology",
+      "industry": "software",
+      "possible_theme_overlays": [],
+      "approval_status": "approved",
+      "classification_status": "classified_local",
+      "classification_category": "unknown_requires_provider_enrichment",
+      "reason_for_removal": "not_in_governed_shadow_universe",
+      "recommended_action": "enrich_via_fmp_then_reclassify",
+      "requires_human_review": false,
+      "can_block_activation": false,
+      "notes": "Ticker not identifiable from available reference data. Requires FMP company overview enrichment before classification."
+    }
+  ]
+}
