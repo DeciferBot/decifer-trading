@@ -1,0 +1,495 @@
+{
+  "meta": {
+    "generated_at": "2026-05-07T17:00:59.623592+00:00",
+    "total_records_analysed": 28001,
+    "unique_symbols": 626,
+    "date_range": "2026-03-30 \u2192 2026-05-05",
+    "horizons_days": [
+      1,
+      5,
+      10,
+      20
+    ],
+    "min_n_for_ic": 30
+  },
+  "overall": {
+    "h1": {
+      "trend": 0.0195,
+      "momentum": -0.013,
+      "squeeze": -0.0726,
+      "flow": 0.0464,
+      "breakout": 0.034,
+      "mtf": -0.0933,
+      "news": 0.083,
+      "social": 0.1079,
+      "reversion": 0.0011,
+      "_n": 27761
+    },
+    "h5": {
+      "trend": 0.0407,
+      "momentum": -0.0176,
+      "squeeze": -0.1228,
+      "flow": 0.0246,
+      "breakout": 0.0064,
+      "mtf": -0.0179,
+      "news": 0.1152,
+      "social": 0.0717,
+      "reversion": 0.0204,
+      "_n": 27757
+    },
+    "h10": {
+      "trend": 0.0578,
+      "momentum": -0.0609,
+      "squeeze": -0.1295,
+      "flow": 0.0293,
+      "breakout": 0.0289,
+      "mtf": -0.0153,
+      "news": 0.1802,
+      "social": 0.016,
+      "reversion": 0.0111,
+      "_n": 20453
+    },
+    "h20": {
+      "trend": 0.0459,
+      "momentum": 0.0525,
+      "squeeze": -0.1362,
+      "flow": -0.0046,
+      "breakout": -0.0003,
+      "mtf": 0.0734,
+      "news": 0.0197,
+      "social": -0.0177,
+      "reversion": 0.0178,
+      "_n": 7427
+    }
+  },
+  "by_regime": {
+    "BEAR_TRENDING": {
+      "h1": {
+        "trend": 0.0408,
+        "momentum": 0.0643,
+        "squeeze": -0.2405,
+        "flow": 0.0034,
+        "breakout": 0.0919,
+        "mtf": -0.1895,
+        "news": 0.0157,
+        "social": 0.3157,
+        "reversion": 0.0293,
+        "_n": 3374
+      },
+      "h5": {
+        "trend": -0.0249,
+        "momentum": 0.1537,
+        "squeeze": -0.3045,
+        "flow": 0.0089,
+        "breakout": 0.114,
+        "mtf": -0.144,
+        "news": 0.1155,
+        "social": 0.1645,
+        "reversion": 0.0445,
+        "_n": 3370
+      },
+      "h10": {
+        "trend": 0.0189,
+        "momentum": 0.1577,
+        "squeeze": -0.2455,
+        "flow": -0.0097,
+        "breakout": 0.067,
+        "mtf": -0.0797,
+        "news": 0.1516,
+        "social": 0.0497,
+        "reversion": 0.0823,
+        "_n": 3370
+      },
+      "h20": {
+        "trend": 0.1087,
+        "momentum": 0.1445,
+        "squeeze": -0.2329,
+        "flow": -0.0145,
+        "breakout": 0.0289,
+        "mtf": 0.0566,
+        "news": 0.1202,
+        "social": 0.0111,
+        "reversion": 0.0531,
+        "_n": 3370
+      }
+    },
+    "CHOPPY": {
+      "h1": {
+        "trend": 0.0067,
+        "momentum": 0.0124,
+        "squeeze": 0.003,
+        "flow": -0.0226,
+        "breakout": -0.0572,
+        "mtf": -0.054,
+        "news": 0.1083,
+        "social": 0.049,
+        "reversion": -0.0235,
+        "_n": 4021
+      },
+      "h5": {
+        "trend": -0.0032,
+        "momentum": 0.0386,
+        "squeeze": -0.0227,
+        "flow": 0.0254,
+        "breakout": -0.0309,
+        "mtf": -0.0061,
+        "news": 0.1083,
+        "social": 0.0318,
+        "reversion": 0.0263,
+        "_n": 4021
+      },
+      "h10": {
+        "trend": 0.0393,
+        "momentum": -0.0132,
+        "squeeze": -0.0148,
+        "flow": 0.0418,
+        "breakout": -0.0332,
+        "mtf": 0.0355,
+        "news": 0.1342,
+        "social": 0.0406,
+        "reversion": -0.0314,
+        "_n": 4021
+      },
+      "h20": {
+        "trend": -0.0027,
+        "momentum": -0.0246,
+        "squeeze": -0.0051,
+        "flow": 0.0284,
+        "breakout": -0.0303,
+        "mtf": 0.0881,
+        "news": -0.0521,
+        "social": -0.0616,
+        "reversion": -0.0157,
+        "_n": 4021
+      }
+    },
+    "MOMENTUM_BULL": {
+      "h1": {},
+      "h5": {},
+      "h10": {},
+      "h20": {}
+    },
+    "RANGE_BOUND": {
+      "h1": {
+        "trend": -0.0553,
+        "momentum": -0.1604,
+        "squeeze": 0.0635,
+        "flow": -0.0838,
+        "breakout": -0.049,
+        "mtf": -0.1312,
+        "news": 0.0155,
+        "social": 0.1251,
+        "reversion": 0.0123,
+        "iv_skew": -0.0953,
+        "pead": 0.0,
+        "short_squeeze": -0.0047,
+        "_n": 672
+      },
+      "h5": {
+        "trend": 0.043,
+        "momentum": -0.1213,
+        "squeeze": 0.1109,
+        "flow": -0.0433,
+        "breakout": -0.0055,
+        "mtf": -0.0962,
+        "news": 0.0471,
+        "social": 0.1591,
+        "reversion": 0.0463,
+        "iv_skew": -0.0606,
+        "pead": 0.0,
+        "short_squeeze": 0.0723,
+        "_n": 672
+      },
+      "h10": {
+        "trend": 0.0645,
+        "momentum": -0.1263,
+        "squeeze": 0.0967,
+        "flow": -0.0556,
+        "breakout": -0.0428,
+        "mtf": -0.0407,
+        "news": 0.0294,
+        "social": 0.1417,
+        "reversion": -0.0152,
+        "iv_skew": -0.0498,
+        "pead": 0.0,
+        "short_squeeze": 0.0054,
+        "_n": 672
+      },
+      "h20": {}
+    },
+    "TRENDING_UP": {
+      "h1": {
+        "trend": 0.0198,
+        "momentum": 0.0188,
+        "squeeze": -0.0053,
+        "flow": 0.0494,
+        "breakout": 0.0031,
+        "mtf": -0.0607,
+        "news": 0.0049,
+        "social": 0.0206,
+        "reversion": -0.0187,
+        "_n": 19694
+      },
+      "h5": {
+        "trend": 0.0573,
+        "momentum": 0.0077,
+        "squeeze": -0.0155,
+        "flow": 0.0223,
+        "breakout": -0.0217,
+        "mtf": 0.0556,
+        "news": -0.0178,
+        "social": -0.0079,
+        "reversion": 0.015,
+        "_n": 19694
+      },
+      "h10": {
+        "trend": 0.0656,
+        "momentum": -0.033,
+        "squeeze": 0.0074,
+        "flow": -0.0185,
+        "breakout": -0.0083,
+        "mtf": 0.0382,
+        "news": -0.0304,
+        "social": 0.0069,
+        "reversion": -0.0018,
+        "_n": 12390
+      },
+      "h20": {
+        "trend": 0.2914,
+        "momentum": 0.0,
+        "squeeze": -0.1516,
+        "flow": 0.0772,
+        "breakout": -0.086,
+        "mtf": -0.425,
+        "news": 0.3912,
+        "social": 0.0,
+        "reversion": 0.0,
+        "_n": 36
+      }
+    }
+  },
+  "quantile_returns": {
+    "trend": [
+      {
+        "bucket": 1,
+        "score_range": [
+          0.0,
+          1.0
+        ],
+        "mean_score": 0.0,
+        "mean_return_pct": 2.399,
+        "n": 4542
+      },
+      {
+        "bucket": 2,
+        "score_range": [
+          1.0,
+          4.0
+        ],
+        "mean_score": 1.99,
+        "mean_return_pct": 6.51,
+        "n": 5284
+      },
+      {
+        "bucket": 4,
+        "score_range": [
+          4.0,
+          6.0
+        ],
+        "mean_score": 4.29,
+        "mean_return_pct": 1.614,
+        "n": 9874
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          6.0,
+          13.0
+        ],
+        "mean_score": 6.74,
+        "mean_return_pct": 3.8,
+        "n": 8057
+      }
+    ],
+    "momentum": [
+      {
+        "bucket": 1,
+        "score_range": [
+          0.0,
+          4.0
+        ],
+        "mean_score": 1.15,
+        "mean_return_pct": 2.719,
+        "n": 5127
+      },
+      {
+        "bucket": 2,
+        "score_range": [
+          4.0,
+          6.0
+        ],
+        "mean_score": 4.29,
+        "mean_return_pct": 5.723,
+        "n": 3435
+      },
+      {
+        "bucket": 3,
+        "score_range": [
+          6.0,
+          7.0
+        ],
+        "mean_score": 6.0,
+        "mean_return_pct": 3.96,
+        "n": 7199
+      },
+      {
+        "bucket": 4,
+        "score_range": [
+          7.0,
+          8.0
+        ],
+        "mean_score": 7.0,
+        "mean_return_pct": 3.572,
+        "n": 6383
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          8.0,
+          13.0
+        ],
+        "mean_score": 9.51,
+        "mean_return_pct": 1.237,
+        "n": 5613
+      }
+    ],
+    "breakout": [
+      {
+        "bucket": 4,
+        "score_range": [
+          0.0,
+          3.0
+        ],
+        "mean_score": 0.05,
+        "mean_return_pct": 3.41,
+        "n": 20615
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          3.0,
+          13.0
+        ],
+        "mean_score": 3.74,
+        "mean_return_pct": 3.019,
+        "n": 7142
+      }
+    ],
+    "flow": [
+      {
+        "bucket": 1,
+        "score_range": [
+          1.0,
+          4.0
+        ],
+        "mean_score": 2.27,
+        "mean_return_pct": 3.339,
+        "n": 3693
+      },
+      {
+        "bucket": 3,
+        "score_range": [
+          4.0,
+          5.0
+        ],
+        "mean_score": 4.0,
+        "mean_return_pct": 3.814,
+        "n": 11266
+      },
+      {
+        "bucket": 4,
+        "score_range": [
+          5.0,
+          6.0
+        ],
+        "mean_score": 5.0,
+        "mean_return_pct": 1.323,
+        "n": 2430
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          6.0,
+          10.0
+        ],
+        "mean_score": 6.63,
+        "mean_return_pct": 3.216,
+        "n": 10368
+      }
+    ],
+    "reversion": [
+      {
+        "bucket": 5,
+        "score_range": [
+          0.0,
+          13.0
+        ],
+        "mean_score": 0.43,
+        "mean_return_pct": 3.309,
+        "n": 27757
+      }
+    ],
+    "overnight_drift": [
+      {
+        "bucket": 1,
+        "score_range": [
+          0.0,
+          1.0
+        ],
+        "mean_score": 0.0,
+        "mean_return_pct": -0.068,
+        "n": 3266
+      },
+      {
+        "bucket": 2,
+        "score_range": [
+          1.0,
+          3.0
+        ],
+        "mean_score": 1.54,
+        "mean_return_pct": 0.665,
+        "n": 3527
+      },
+      {
+        "bucket": 3,
+        "score_range": [
+          3.0,
+          6.0
+        ],
+        "mean_score": 3.85,
+        "mean_return_pct": 0.797,
+        "n": 4149
+      },
+      {
+        "bucket": 4,
+        "score_range": [
+          6.0,
+          10.0
+        ],
+        "mean_score": 7.18,
+        "mean_return_pct": 0.728,
+        "n": 4427
+      },
+      {
+        "bucket": 5,
+        "score_range": [
+          10.0,
+          10.0
+        ],
+        "mean_score": 10.0,
+        "mean_return_pct": 2.257,
+        "n": 4637
+      }
+    ]
+  }
+}

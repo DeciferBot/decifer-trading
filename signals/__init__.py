@@ -1068,6 +1068,27 @@ def fetch_multi_timeframe(
         except Exception:
             pass
 
+        # Extension-at-entry metadata — written to ORDER_INTENT for post-hoc analysis.
+        # Answers: "how extended was the stock when we entered?"
+        # atr_distance_50ema  : ATR-normalised distance from the 50-day EMA (positive = above trend)
+        # pct_from_20d_low    : % gain from the 20-day Donchian low (simple "already run" proxy)
+        # pct_above_donch_high: % above the 20-day Donchian high (near 0 = fresh break, large = stale)
+        _ext_at_entry: dict | None = None
+        try:
+            if sig_1d:
+                _p1d = sig_1d.get("price", sig_5m["price"])
+                _atr_d = sig_1d.get("atr") or 1.0
+                _et = sig_1d.get("ema_trend") or _p1d
+                _dh = sig_1d.get("donch_high") or _p1d
+                _dl = sig_1d.get("donch_low") or _p1d
+                _ext_at_entry = {
+                    "atr_distance_50ema": round((_p1d - _et) / _atr_d, 2),
+                    "pct_from_20d_low": round((_p1d / _dl - 1) * 100, 1) if _dl > 0 else None,
+                    "pct_above_donch_high": round((_p1d / _dh - 1) * 100, 1) if _dh > 0 else None,
+                }
+        except Exception:
+            pass
+
         return {
             "symbol": symbol,
             "price": sig_5m["price"],
@@ -1103,6 +1124,8 @@ def fetch_multi_timeframe(
             "stock_5d_return": _stock_5d,
             "news_finbert_sentiment": None,   # populated when FinBERT is wired
             "news_finbert_confidence": None,
+            # Extension-at-entry metadata — written to ORDER_INTENT, never used in scoring
+            "extension_at_entry": _ext_at_entry,
             # L1.5 fields — set by guardrails.filter_candidates(), not here
             "allowed_trade_types": [],
             "default_trade_type": None,

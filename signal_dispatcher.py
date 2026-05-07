@@ -542,6 +542,7 @@ def dispatch_signals(
                         pattern_id=pattern_id,
                         market_read=market_read,
                         entry_context=_entry_ctx,
+                        extension_at_entry=signal.extension_at_entry,
                     )
                 else:
                     success = False
@@ -961,6 +962,7 @@ def dispatch(
                     "tier_d_gate_version":               "phase_1" if _is_tier_d else None,
                     "apex_path":                         "track_a_main",
                     "entry_gate_reason":                 payload.get("entry_gate_reason"),
+                    "extension_at_entry":                payload.get("extension_at_entry"),
                 }.items() if v is not None
             }
 
