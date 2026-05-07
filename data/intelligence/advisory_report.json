@@ -1,21 +1,21 @@
 {
   "schema_version": "1.0.0",
-  "generated_at": "2026-05-06T05:56:15.204094+00:00",
+  "generated_at": "2026-05-06T20:21:07.373761+00:00",
   "valid_for_session": "offline_static_bootstrap",
   "mode": "offline_advisory_report",
   "data_source_mode": "local_shadow_outputs_only",
   "source_files": [
-    "/Users/amitchopra/Desktop/decifer trading/data/universe_builder/current_pipeline_snapshot.json",
-    "/Users/amitchopra/Desktop/decifer trading/data/universe_builder/active_opportunity_universe_shadow.json",
-    "/Users/amitchopra/Desktop/decifer trading/data/universe_builder/current_vs_shadow_comparison.json",
-    "/Users/amitchopra/Desktop/decifer trading/data/universe_builder/universe_builder_report.json",
-    "/Users/amitchopra/Desktop/decifer trading/data/intelligence/economic_candidate_feed.json",
-    "/Users/amitchopra/Desktop/decifer trading/data/intelligence/current_economic_context.json",
-    "/Users/amitchopra/Desktop/decifer trading/data/intelligence/theme_activation.json",
-    "/Users/amitchopra/Desktop/decifer trading/data/intelligence/thesis_store.json",
-    "/Users/amitchopra/Desktop/decifer trading/data/intelligence/backtest/intelligence_backtest_summary.json",
-    "/Users/amitchopra/Desktop/decifer trading/data/intelligence/backtest/historical_replay_results.json",
-    "/Users/amitchopra/Desktop/decifer trading/data/intelligence/source_adapter_snapshot.json"
+    "/Users/amitchopra/Desktop/decifer trading/.claude/worktrees/infallible-raman-407844/data/universe_builder/current_pipeline_snapshot.json",
+    "/Users/amitchopra/Desktop/decifer trading/.claude/worktrees/infallible-raman-407844/data/universe_builder/active_opportunity_universe_shadow.json",
+    "/Users/amitchopra/Desktop/decifer trading/.claude/worktrees/infallible-raman-407844/data/universe_builder/current_vs_shadow_comparison.json",
+    "/Users/amitchopra/Desktop/decifer trading/.claude/worktrees/infallible-raman-407844/data/universe_builder/universe_builder_report.json",
+    "/Users/amitchopra/Desktop/decifer trading/.claude/worktrees/infallible-raman-407844/data/intelligence/economic_candidate_feed.json",
+    "/Users/amitchopra/Desktop/decifer trading/.claude/worktrees/infallible-raman-407844/data/intelligence/current_economic_context.json",
+    "/Users/amitchopra/Desktop/decifer trading/.claude/worktrees/infallible-raman-407844/data/intelligence/theme_activation.json",
+    "/Users/amitchopra/Desktop/decifer trading/.claude/worktrees/infallible-raman-407844/data/intelligence/thesis_store.json",
+    "/Users/amitchopra/Desktop/decifer trading/.claude/worktrees/infallible-raman-407844/data/intelligence/backtest/intelligence_backtest_summary.json",
+    "/Users/amitchopra/Desktop/decifer trading/.claude/worktrees/infallible-raman-407844/data/intelligence/backtest/historical_replay_results.json",
+    "/Users/amitchopra/Desktop/decifer trading/.claude/worktrees/infallible-raman-407844/data/intelligence/source_adapter_snapshot.json"
   ],
   "advisory_summary": {
     "current_candidates_count": 235,
@@ -247,15 +247,15 @@
         "semiconductors"
       ],
       "driver_ids": [
-        "ai_capex_growth",
-        "ai_infrastructure_demand"
+        "ai_infrastructure_demand",
+        "ai_capex_growth"
       ],
       "source_labels": [
         "favourites_manual_conviction",
         "legacy_theme_tracker_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "active",
       "theme_state": "activated",
       "quota_group": "manual_conviction",
       "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites",
@@ -318,15 +318,15 @@
       ],
       "driver_ids": [
         "credit_stress_rising",
-        "risk_off_rotation",
-        "liquidity_tightening"
+        "liquidity_tightening",
+        "risk_off_rotation"
       ],
       "source_labels": [
         "favourites_manual_conviction",
         "legacy_theme_tracker_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "crowded",
       "theme_state": "crowded",
       "quota_group": "manual_conviction",
       "exclusion_reason": "Duplicate \u2014 already claimed by manual_conviction_favourites",
@@ -482,8 +482,8 @@
         "data_centre_power"
       ],
       "driver_ids": [
-        "ai_capex_growth",
-        "power_demand_growth"
+        "power_demand_growth",
+        "ai_capex_growth"
       ],
       "source_labels": [
         "intelligence_first_static_rule",
@@ -491,7 +491,7 @@
         "legacy_theme_tracker_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "active",
       "theme_state": "activated",
       "quota_group": "structural_position",
       "exclusion_reason": null,
@@ -520,15 +520,15 @@
         "data_centre_power"
       ],
       "driver_ids": [
-        "ai_capex_growth",
-        "power_demand_growth"
+        "power_demand_growth",
+        "ai_capex_growth"
       ],
       "source_labels": [
         "intelligence_first_static_rule",
         "economic_intelligence",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "active",
       "theme_state": "activated",
       "quota_group": "structural_position",
       "exclusion_reason": null,
@@ -557,15 +557,15 @@
         "data_centre_power"
       ],
       "driver_ids": [
-        "ai_capex_growth",
-        "power_demand_growth"
+        "power_demand_growth",
+        "ai_capex_growth"
       ],
       "source_labels": [
         "intelligence_first_static_rule",
         "economic_intelligence",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "active",
       "theme_state": "activated",
       "quota_group": "structural_position",
       "exclusion_reason": null,
@@ -595,8 +595,8 @@
         "data_centre_power"
       ],
       "driver_ids": [
-        "ai_capex_growth",
-        "power_demand_growth"
+        "power_demand_growth",
+        "ai_capex_growth"
       ],
       "source_labels": [
         "intelligence_first_static_rule",
@@ -604,7 +604,7 @@
         "legacy_theme_tracker_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "active",
       "theme_state": "activated",
       "quota_group": "structural_position",
       "exclusion_reason": null,
@@ -634,8 +634,8 @@
         "data_centre_power"
       ],
       "driver_ids": [
-        "ai_capex_growth",
-        "power_demand_growth"
+        "power_demand_growth",
+        "ai_capex_growth"
       ],
       "source_labels": [
         "intelligence_first_static_rule",
@@ -643,7 +643,7 @@
         "overnight_research_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "active",
       "theme_state": "activated",
       "quota_group": "etf_proxy",
       "exclusion_reason": null,
@@ -673,8 +673,8 @@
         "semiconductors"
       ],
       "driver_ids": [
-        "ai_capex_growth",
-        "ai_infrastructure_demand"
+        "ai_infrastructure_demand",
+        "ai_capex_growth"
       ],
       "source_labels": [
         "intelligence_first_static_rule",
@@ -682,7 +682,7 @@
         "legacy_theme_tracker_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "active",
       "theme_state": "activated",
       "quota_group": "structural_position",
       "exclusion_reason": null,
@@ -712,8 +712,8 @@
         "semiconductors"
       ],
       "driver_ids": [
-        "ai_capex_growth",
-        "ai_infrastructure_demand"
+        "ai_infrastructure_demand",
+        "ai_capex_growth"
       ],
       "source_labels": [
         "intelligence_first_static_rule",
@@ -721,7 +721,7 @@
         "legacy_theme_tracker_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "active",
       "theme_state": "activated",
       "quota_group": "structural_position",
       "exclusion_reason": null,
@@ -754,8 +754,8 @@
         "semiconductors"
       ],
       "driver_ids": [
-        "ai_capex_growth",
-        "ai_infrastructure_demand"
+        "ai_infrastructure_demand",
+        "ai_capex_growth"
       ],
       "source_labels": [
         "intelligence_first_static_rule",
@@ -764,7 +764,7 @@
         "overnight_research_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "active",
       "theme_state": "activated",
       "quota_group": "structural_position",
       "exclusion_reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
@@ -795,8 +795,8 @@
         "semiconductors"
       ],
       "driver_ids": [
-        "ai_capex_growth",
-        "ai_infrastructure_demand"
+        "ai_infrastructure_demand",
+        "ai_capex_growth"
       ],
       "source_labels": [
         "intelligence_first_static_rule",
@@ -805,7 +805,7 @@
         "overnight_research_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "active",
       "theme_state": "activated",
       "quota_group": "structural_position",
       "exclusion_reason": null,
@@ -834,15 +834,15 @@
         "semiconductors"
       ],
       "driver_ids": [
-        "ai_capex_growth",
-        "ai_infrastructure_demand"
+        "ai_infrastructure_demand",
+        "ai_capex_growth"
       ],
       "source_labels": [
         "intelligence_first_static_rule",
         "economic_intelligence",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "active",
       "theme_state": "activated",
       "quota_group": "etf_proxy",
       "exclusion_reason": null,
@@ -880,7 +880,7 @@
         "economic_intelligence",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "structural_position",
       "exclusion_reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
@@ -917,7 +917,7 @@
         "economic_intelligence",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "structural_position",
       "exclusion_reason": null,
@@ -954,7 +954,7 @@
         "economic_intelligence",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "structural_position",
       "exclusion_reason": null,
@@ -992,7 +992,7 @@
         "economic_intelligence",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "structural_position",
       "exclusion_reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
@@ -1031,7 +1031,7 @@
         "overnight_research_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "etf_proxy",
       "exclusion_reason": null,
@@ -1069,7 +1069,7 @@
         "economic_intelligence",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "structural_position",
       "exclusion_reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
@@ -1107,7 +1107,7 @@
         "economic_intelligence",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "structural_position",
       "exclusion_reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
@@ -1145,7 +1145,7 @@
         "economic_intelligence",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "structural_position",
       "exclusion_reason": "Duplicate \u2014 already claimed by economic_intelligence_structural",
@@ -1182,7 +1182,7 @@
         "economic_intelligence",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "structural_position",
       "exclusion_reason": null,
@@ -1221,7 +1221,7 @@
         "overnight_research_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "etf_proxy",
       "exclusion_reason": null,
@@ -1260,7 +1260,7 @@
         "legacy_theme_tracker_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "structural_position",
       "exclusion_reason": null,
@@ -1299,7 +1299,7 @@
         "legacy_theme_tracker_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "structural_position",
       "exclusion_reason": null,
@@ -1338,7 +1338,7 @@
         "legacy_theme_tracker_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "structural_position",
       "exclusion_reason": null,
@@ -1377,7 +1377,7 @@
         "legacy_theme_tracker_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "structural_position",
       "exclusion_reason": null,
@@ -1414,7 +1414,7 @@
         "economic_intelligence",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "watchlist",
       "theme_state": "watchlist",
       "quota_group": "etf_proxy",
       "exclusion_reason": null,
@@ -1444,15 +1444,15 @@
       ],
       "driver_ids": [
         "credit_stress_rising",
-        "risk_off_rotation",
-        "liquidity_tightening"
+        "liquidity_tightening",
+        "risk_off_rotation"
       ],
       "source_labels": [
         "intelligence_first_static_rule",
         "economic_intelligence",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "crowded",
       "theme_state": "crowded",
       "quota_group": "etf_proxy",
       "exclusion_reason": null,
@@ -1484,8 +1484,8 @@
       ],
       "driver_ids": [
         "credit_stress_rising",
-        "refinancing_risk_rising",
-        "liquidity_tightening"
+        "liquidity_tightening",
+        "refinancing_risk_rising"
       ],
       "source_labels": [
         "intelligence_first_static_rule",
@@ -1493,7 +1493,7 @@
         "overnight_research_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "weakened",
       "theme_state": "weakening",
       "quota_group": "attention",
       "exclusion_reason": "Duplicate \u2014 already claimed by economic_intelligence_attention",
@@ -1532,7 +1532,7 @@
         "economic_intelligence",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "crowded",
       "theme_state": "crowded",
       "quota_group": "etf_proxy",
       "exclusion_reason": null,
@@ -1573,7 +1573,7 @@
         "overnight_research_read_only",
         "committed_universe_read_only"
       ],
-      "thesis_status": "new",
+      "thesis_status": "crowded",
       "theme_state": "crowded",
       "quota_group": "etf_proxy",
       "exclusion_reason": null,
@@ -1610,7 +1610,7 @@
         "intelligence_first_static_rule",
         "economic_intelligence"
       ],
-      "thesis_status": "new",
+      "thesis_status": "crowded",
       "theme_state": "crowded",
       "quota_group": "etf_proxy",
       "exclusion_reason": null,
@@ -3024,16 +3024,16 @@
         "defensive_quality"
       ],
       "driver_ids": [
-        "breadth_deterioration",
+        "defensive_rotation",
         "risk_off_rotation",
+        "risk_appetite_falling",
         "credit_stress_rising",
         "volatility_rising",
-        "liquidity_tightening",
-        "defensive_rotation",
-        "risk_appetite_falling"
+        "breadth_deterioration",
+        "liquidity_tightening"
       ],
       "source_labels": [],
-      "thesis_status": "new",
+      "thesis_status": "crowded",
       "theme_state": "crowded",
       "quota_group": null,
       "exclusion_reason": "Structural quota full (20)",
@@ -3398,10 +3398,10 @@
     ]
   },
   "structural_quota_advisory": {
-    "structural_demand_count": 180,
+    "structural_demand_count": 183,
     "structural_capacity": 20,
     "structural_accepted": 20,
-    "structural_overflow_count": 160,
+    "structural_overflow_count": 163,
     "structural_quota_binding": true,
     "overflow_by_theme": {},
     "overflow_by_source": {},
@@ -3421,7 +3421,9 @@
     ],
     "crowded_themes": [
       "quality_cash_flow",
-      "defensive_quality"
+      "defensive_quality",
+      "memory_storage",
+      "ai_compute_infrastructure"
     ],
     "risk_off_themes": [
       "quality_cash_flow",
@@ -3431,7 +3433,7 @@
     "executable_headwind_candidates": false,
     "short_or_hedge_instruction_generated": false,
     "findings": [
-      "Crowded themes (quality_cash_flow, defensive_quality) \u2014 structural quota binding + excluded candidates; watchlist-only advisory",
+      "Crowded themes (quality_cash_flow, defensive_quality, memory_storage, ai_compute_infrastructure) \u2014 structural quota binding + excluded candidates; watchlist-only advisory",
       "Weakening themes (small_caps) \u2014 headwind direction; pressure candidate advisory_watch only",
       "1 headwind candidates present \u2014 all advisory_watch, none executable",
       "No short or hedge execution instructions generated \u2014 headwind monitoring only"

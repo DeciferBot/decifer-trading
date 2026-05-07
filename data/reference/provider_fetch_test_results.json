@@ -1,0 +1,238 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-06T20:57:40.785473+00:00",
+  "source": "provider_fetch_tester",
+  "test_symbol": "AAPL",
+  "safety": {
+    "data_provider_api_called": true,
+    "trading_api_called": false,
+    "broker_order_api_called": false,
+    "broker_account_api_called": false,
+    "broker_position_api_called": false,
+    "broker_execution_api_called": false,
+    "ibkr_market_data_connection_attempted": true,
+    "ibkr_order_account_position_calls": false,
+    "env_presence_checked": true,
+    "env_values_logged": false,
+    "env_file_read": true,
+    "secrets_exposed": false,
+    "live_output_changed": false
+  },
+  "summary": {
+    "total_tests": 15,
+    "passed": 12,
+    "failed": 3,
+    "pass_rate": 0.8,
+    "avg_latency_ms": 967.9,
+    "max_latency_ms": 2304.2,
+    "by_provider": {
+      "alpaca": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0
+      },
+      "fmp": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0
+      },
+      "alpha_vantage": {
+        "total": 4,
+        "passed": 2,
+        "failed": 2
+      },
+      "yfinance": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0
+      },
+      "ibkr": {
+        "total": 1,
+        "passed": 0,
+        "failed": 1
+      }
+    }
+  },
+  "results": [
+    {
+      "provider": "alpaca",
+      "endpoint": "StockHistoricalDataClient.get_stock_bars",
+      "success": true,
+      "latency_ms": 666.4,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "OHLCV daily bars \u2014 reference data layer",
+      "data_sample": "5 bars",
+      "error": ""
+    },
+    {
+      "provider": "alpaca",
+      "endpoint": "StockHistoricalDataClient.get_stock_latest_quote",
+      "success": true,
+      "latency_ms": 634.2,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "Real-time bid/ask \u2014 market sensor layer",
+      "data_sample": "bid=287.45 ask=287.57",
+      "error": ""
+    },
+    {
+      "provider": "alpaca",
+      "endpoint": "OptionHistoricalDataClient.get_option_chain",
+      "success": true,
+      "latency_ms": 2304.2,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "Option chain \u2014 options data layer",
+      "data_sample": "3220 contracts",
+      "error": ""
+    },
+    {
+      "provider": "fmp",
+      "endpoint": "GET /stable/profile",
+      "success": true,
+      "latency_ms": 849.3,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "Company profile \u2014 fundamentals layer",
+      "data_sample": "1 record(s)",
+      "error": ""
+    },
+    {
+      "provider": "fmp",
+      "endpoint": "GET /stable/key_metrics_ttm",
+      "success": true,
+      "latency_ms": 829.2,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "Key metrics TTM \u2014 quality layer",
+      "data_sample": "1 record(s)",
+      "error": ""
+    },
+    {
+      "provider": "fmp",
+      "endpoint": "GET /stable/earnings",
+      "success": true,
+      "latency_ms": 807.5,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "Earnings history \u2014 catalyst layer",
+      "data_sample": "3 record(s)",
+      "error": ""
+    },
+    {
+      "provider": "fmp",
+      "endpoint": "GET /stable/price_target_consensus",
+      "success": true,
+      "latency_ms": 811.7,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "Price target consensus \u2014 analyst layer",
+      "data_sample": "1 record(s)",
+      "error": ""
+    },
+    {
+      "provider": "fmp",
+      "endpoint": "GET /stable/news_stock",
+      "success": true,
+      "latency_ms": 836.6,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "Stock news \u2014 news layer",
+      "data_sample": "3 record(s)",
+      "error": ""
+    },
+    {
+      "provider": "alpha_vantage",
+      "endpoint": "GET ?function=TIME_SERIES_DAILY",
+      "success": true,
+      "latency_ms": 1287.0,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "Daily OHLCV \u2014 price data (free tier)",
+      "data_sample": "response ok",
+      "error": ""
+    },
+    {
+      "provider": "alpha_vantage",
+      "endpoint": "GET ?function=OVERVIEW",
+      "success": false,
+      "latency_ms": 358.7,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "Company overview \u2014 fundamentals (may rate-limit on free)",
+      "data_sample": "",
+      "error": "Premium endpoint \u2014 upgrade required"
+    },
+    {
+      "provider": "alpha_vantage",
+      "endpoint": "GET ?function=FEDERAL_FUNDS_RATE",
+      "success": true,
+      "latency_ms": 712.6,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "Fed funds rate \u2014 macro layer",
+      "data_sample": "response ok",
+      "error": ""
+    },
+    {
+      "provider": "alpha_vantage",
+      "endpoint": "GET ?function=RSI",
+      "success": false,
+      "latency_ms": 380.1,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "RSI indicator \u2014 technical layer (may rate-limit)",
+      "data_sample": "",
+      "error": "Premium endpoint \u2014 upgrade required"
+    },
+    {
+      "provider": "yfinance",
+      "endpoint": "Ticker.history(daily)",
+      "success": true,
+      "latency_ms": 1217.2,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "Daily OHLCV \u2014 fallback price data",
+      "data_sample": "5 rows",
+      "error": ""
+    },
+    {
+      "provider": "yfinance",
+      "endpoint": "Ticker.info",
+      "success": true,
+      "latency_ms": 659.0,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "Company info \u2014 fallback fundamentals",
+      "data_sample": "symbol=AAPL",
+      "error": ""
+    },
+    {
+      "provider": "ibkr",
+      "endpoint": "market_data_gateway_tcp_probe 127.0.0.1:7497",
+      "success": false,
+      "latency_ms": 0.0,
+      "credentials_present": true,
+      "secrets_exposed": false,
+      "live_output_changed": false,
+      "detail": "IB Gateway market-data port not reachable \u2014 gateway not running. Expected when TWS/IB Gateway is closed outside market hours. Not a trading failure \u2014 no order/account/position calls attempted.",
+      "data_sample": "",
+      "error": "[Errno 61] Connection refused"
+    }
+  ]
+}

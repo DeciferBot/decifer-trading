@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-06T05:28:21Z",
+  "generated_at": "2026-05-06T20:21:03Z",
   "mode": "local_fixture_backtest",
   "data_source_mode": "local_fixtures_and_shadow_outputs_only",
   "source_files": [
@@ -63,7 +63,9 @@
           "defence": "watchlist",
           "quality_cash_flow": "crowded",
           "defensive_quality": "crowded",
-          "small_caps": "weakening"
+          "small_caps": "weakening",
+          "memory_storage": "crowded",
+          "ai_compute_infrastructure": "crowded"
         },
         "headwind_themes": [
           "small_caps"
@@ -121,7 +123,9 @@
           "defence": "watchlist",
           "quality_cash_flow": "crowded",
           "defensive_quality": "crowded",
-          "small_caps": "weakening"
+          "small_caps": "weakening",
+          "memory_storage": "crowded",
+          "ai_compute_infrastructure": "crowded"
         },
         "headwind_themes": [
           "small_caps"
@@ -179,7 +183,9 @@
           "defence": "watchlist",
           "quality_cash_flow": "crowded",
           "defensive_quality": "crowded",
-          "small_caps": "weakening"
+          "small_caps": "weakening",
+          "memory_storage": "crowded",
+          "ai_compute_infrastructure": "crowded"
         },
         "headwind_themes": [
           "small_caps"
@@ -240,7 +246,9 @@
           "defence": "activated",
           "quality_cash_flow": "crowded",
           "defensive_quality": "crowded",
-          "small_caps": "weakening"
+          "small_caps": "weakening",
+          "memory_storage": "crowded",
+          "ai_compute_infrastructure": "crowded"
         },
         "headwind_themes": [
           "small_caps"
@@ -296,7 +304,9 @@
           "defence": "watchlist",
           "quality_cash_flow": "crowded",
           "defensive_quality": "crowded",
-          "small_caps": "weakening"
+          "small_caps": "weakening",
+          "memory_storage": "crowded",
+          "ai_compute_infrastructure": "crowded"
         },
         "headwind_themes": [
           "small_caps"
@@ -346,7 +356,9 @@
           "defence": "watchlist",
           "quality_cash_flow": "crowded",
           "defensive_quality": "crowded",
-          "small_caps": "weakening"
+          "small_caps": "weakening",
+          "memory_storage": "crowded",
+          "ai_compute_infrastructure": "crowded"
         },
         "headwind_themes": [
           "small_caps"

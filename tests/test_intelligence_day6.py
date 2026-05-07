@@ -545,8 +545,9 @@ class TestValidatorPassesAllDay6Files:
     def test_transmission_rules_all_valid_directions(self):
         with open(_RULES_PATH) as f:
             data = json.load(f)
+        _VALID = {"positive", "negative", "conditional", "conditional_positive"}
         for rule in data["rules"]:
-            assert rule["direction"] in ("positive", "negative", "conditional")
+            assert rule["direction"] in _VALID, f"rule {rule['rule_id']}: invalid direction '{rule['direction']}';"
 
     def test_banks_rule_has_conditional_direction(self):
         with open(_RULES_PATH) as f:

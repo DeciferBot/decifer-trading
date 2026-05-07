@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-06T05:28:21Z",
+  "generated_at": "2026-05-06T20:21:03Z",
   "mode": "local_historical_replay_fixtures",
   "data_source_mode": "date_anchored_manual_fixtures_only",
   "source_files": [],

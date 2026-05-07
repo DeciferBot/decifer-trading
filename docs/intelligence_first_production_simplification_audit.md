@@ -405,95 +405,254 @@ A production-ready, cloud-hostable trading system with clean service boundaries,
 
 ---
 
----
+## Sprint 7A.1 File Classifications
 
-## Sprint 7A Classification — Handoff Design Sprint
+**Sprint 7A.1 — Exhaustive Reference Data Layer**
+**Objective:** Build a local, static, API-free symbol classification layer that supports the production handoff reader. No production code touched. No external calls. No .env inspection.
 
-**Sprint 7A is documentation/design only. No production code was modified. No new runtime modules were added.**
+### reference_data_builder.py
 
-### New Files Created
+| Field | Value |
+|-------|-------|
+| Classification | `advisory_only` |
+| Service layer | Reference Data / Build Tool |
+| Runtime needed in production | No — offline build tool only; run to regenerate reference files |
+| Temporary or permanent | Permanent while reference data layer is active |
+| Production purpose | Reads all approved local source files; classifies symbols; writes sector_schema.json, symbol_master.json, theme_overlay_map.json, coverage_gap_review.json |
+| Must not affect execution | Yes — no production imports, no live API, no broker, no .env, no LLM |
+| Safety invariants | `favourites_used_as_discovery=false`, `live_api_called=false`, `llm_called=false`, `env_inspected=false` embedded in outputs |
+| Removal condition | Remove if reference data layer is replaced by external provider integration |
 
-| File | Classification | Service Layer | Runtime in Production | Temporary or Permanent | Notes |
-|------|---------------|--------------|----------------------|----------------------|-------|
-| `docs/intelligence_first_handoff_design.md` | N/A (doc) | — | No | Permanent | Production handoff design, fail-closed contract, cutover phases |
-| `docs/intelligence_first_handoff_test_plan.md` | N/A (doc) | — | No | Permanent | 17 test groups; must all pass before Sprint 7B approved |
-| `docs/intelligence_first_cutover_readiness_checklist.md` | N/A (doc) | — | No | Permanent | 14-item checklist; Amit must approve each item before production switch |
+### data/reference/sector_schema.json
 
-### Files Modified
+| Field | Value |
+|-------|-------|
+| Classification | `advisory_only` |
+| Service layer | Reference Data |
+| Runtime needed in production | No — static reference file; read only by advisors and offline tools |
+| Temporary or permanent | Permanent — regenerate via reference_data_builder when sector hierarchy changes |
+| Production purpose | GICS-like sector/industry hierarchy + proxy classification definitions; used by symbol_master and validators |
 
-| File | Change | Classification Impact |
-|------|--------|-----------------------|
-| `docs/intelligence_first_production_simplification_audit.md` | Sprint 7A section added | No classification change; existing entries unchanged |
-| `docs/intelligence_first_retirement_register.md` | Sprint 7A entries added | No status change to existing entries |
+### data/reference/symbol_master.json
 
-### Existing Files Made Obsolete By Sprint 7A
+| Field | Value |
+|-------|-------|
+| Classification | `advisory_only` |
+| Service layer | Reference Data |
+| Runtime needed in production | No — static reference; feeds coverage analysis and handoff reader design |
+| Temporary or permanent | Permanent — regenerate via reference_data_builder when source files change |
+| Production purpose | Per-symbol sector, industry, classification_status, approval_status, sources; ~1000+ symbols |
+| Safety invariant | `favourites_used_as_discovery: false` enforced in schema and validated by validator |
 
-None. Sprint 7A is design only. No file is made obsolete until Phase 5 (scanner-led path retirement) is approved.
+### data/reference/theme_overlay_map.json
 
-### Duplicate Logic
+| Field | Value |
+|-------|-------|
+| Classification | `advisory_only` |
+| Service layer | Reference Data |
+| Runtime needed in production | No — static reference; used by handoff design and coverage gap analysis |
+| Temporary or permanent | Permanent — add new overlays as new themes emerge |
+| Production purpose | 82+ theme overlays with supply_chain_role, risk_flags, canonical_symbols, proxy_symbols; covers all sectors |
+| Anti-bloat note | Does NOT automatically approve symbols — approval requires separate action in symbol_master |
 
-None introduced. Sprint 7A adds no code.
+### data/intelligence/coverage_gap_review.json
 
-### Shadow/Advisory Files — Disposition After Cutover (Sprint 7A Update)
+| Field | Value |
+|-------|-------|
+| Classification | `advisory_only` |
+| Service layer | Evidence / Coverage Analysis |
+| Runtime needed in production | No — offline gap analysis output |
+| Temporary or permanent | Regenerated on demand; keep as evidence artefact |
+| Production purpose | Recurring missing shadow + unsupported current symbols from advisory log; recommended_action per symbol |
 
-| File | Keep After Cutover? | Reason |
-|------|--------------------|----|
-| `advisory_report.json` | Keep during Phases 1–4 for regression monitoring | Offline diagnostic; remove only if operational value drops post-Phase 5 |
-| `advisory_runtime_log.jsonl` | Keep permanently, with retention/rotation policy | Observability log; cloud deployment requires log rotation SLA defined |
-| `advisory_log_review.json` | Keep on demand (regenerated) | Evidence gate output; not on execution path |
-| `current_pipeline_snapshot.json` | Remove at Phase 5 | Migration tooling only — describes old scanner topology |
-| `active_opportunity_universe_shadow.json` | Rename to `active_opportunity_universe.json` at Phase 4 | Becomes the production handoff file |
-| `current_vs_shadow_comparison.json` | Keep through Phase 5 | Regression monitoring between old and new paths |
-| `universe_builder_report.json` | Keep permanently | Sprint-level diagnostic; no removal blocker |
+### tests/test_intelligence_reference_data.py
 
-### Backtest-Only Files — Excluded From Production Runtime
+| Field | Value |
+|-------|-------|
+| Classification | `advisory_only` |
+| Service layer | Test / Evidence |
+| Runtime needed in production | No |
+| Temporary or permanent | Permanent — 42 tests covering all 4 validators and builder safety invariants |
+| Test coverage | Group A: sector_schema (6), Group B: symbol_master (10), Group C: theme_overlay_map (9), Group D: coverage_gap_review (7), Group E: builder safety invariants (6), integration (4) |
 
-All backtest files listed in prior sections remain unchanged. No new backtest files added. `backtest_intelligence.py` must not be imported in production runtime — unchanged from prior sprints.
+### intelligence_schema_validator.py (Sprint 7A.1 changes)
 
-### Modules That Must NOT Be Imported In Production Runtime (Sprint 7A Addition)
+| Change | Detail |
+|--------|--------|
+| 4 new validators added | `validate_sector_schema`, `validate_symbol_master`, `validate_theme_overlay_map`, `validate_coverage_gap_review` |
+| 1 existing bug fixed | `validate_advisory_log_review` was missing `return result` — added |
+| `validate_all()` extended | 4 new optional file checks added; all guarded by `os.path.exists()` |
+| No new production imports | Validator reads local files only; no live API, no broker, no .env |
 
-| Module | Why |
-|--------|-----|
-| `advisory_reporter.py` | Offline report generator; must not run on live bot path |
-| `advisory_log_reviewer.py` | Offline evidence gate tool; no production output path |
-| `backtest_intelligence.py` | Backtest isolation; contains local regime/theme copies |
-| `scanner.py` (post-Phase 5) | After production handoff is stable; not yet — scanner must remain until Phase 5 |
-
-### Cloud Runtime Impact — Sprint 7A
-
-Sprint 7A adds no runtime modules. Cloud impact = None.
-
-The **handoff reader** (to be created in Sprint 7B) will be `production_runtime` with **Low** cloud impact — reads `active_opportunity_universe.json` (local file or mounted volume) and performs pure JSON validation. No network calls. No LLM. No broker.
-
-The **Universe Builder scheduled job** (to run before market open in production) has **Low** cloud impact — reads local files, writes local files, no network calls at runtime.
-
-### Production Simplification Gates — Sprint 7A Status
-
-| Gate | Status | Notes |
-|------|--------|-------|
-| Handoff design document exists | ✅ | `docs/intelligence_first_handoff_design.md` |
-| Fail-closed contract defined | ✅ | Section 5 of handoff design |
-| Unresolved current candidate policy defined | ✅ | Section 6: Option B (approved source label required) |
-| Missing shadow candidate policy defined | ✅ | Section 7 |
-| Tier D policy defined | ✅ | Section 8: source label, not tier |
-| Route disagreement policy defined | ✅ | Section 9: vocabulary harmonisation required |
-| Handoff test plan exists | ✅ | `docs/intelligence_first_handoff_test_plan.md` |
-| Cutover readiness checklist exists | ✅ | `docs/intelligence_first_cutover_readiness_checklist.md` |
-| Production code changed | ❌ None | Sprint 7A is design only |
-| enable_active_opportunity_universe_handoff | `False` | Must remain False until Sprint 7B approved |
-| live_output_changed | `false` | Confirmed |
-
-### Anti-Bloat Confirmation — Sprint 7A
+### Sprint 7A.1 Anti-Bloat Confirmation
 
 | Check | Status |
 |-------|--------|
-| New runtime files added | 0 |
-| New test files added | 0 |
-| Production modules modified | 0 |
-| Duplicate logic introduced | None |
-| Production handoff triggered | No |
-| enable_active_opportunity_universe_handoff | False |
-| live_output_changed | false |
+| New production runtime modules? | No — all new files are `advisory_only` or reference data |
+| New live API paths? | No |
+| New broker calls? | No |
+| New LLM calls? | No |
+| New .env reads? | No |
+| Duplicate logic introduced? | No — reference builder is the single source; validator extends existing validate_all() pattern |
+| Production handoff flag changed? | No — `enable_active_opportunity_universe_handoff = False` |
+
+---
+
+## Sprint 7A.2 File Classifications
+
+**Sprint 7A.2 — Approved Theme Overlay / Roster Governance**
+**Objective:** Convert coverage_gap_review.json recommendations into governed intelligence-layer coverage through the full architecture. No production modules touched. No external calls. No .env inspection. No favourites workaround. No production handoff.
+
+### New / Modified Intelligence-Layer Files
+
+| File | Classification | Runtime needed | Notes |
+|------|---------------|----------------|-------|
+| `data/intelligence/theme_taxonomy.json` | shadow-only | No | Extended with memory_storage and ai_compute_infrastructure themes |
+| `data/intelligence/transmission_rules.json` | shadow-only | No | Extended with 2 new rules (ai_capex_to_memory_storage, ai_compute_demand_to_ai_compute_infrastructure) |
+| `data/intelligence/thematic_roster.json` | shadow-only | No | Extended with 2 new roster entries (memory_storage, ai_compute_infrastructure) |
+| `data/reference/theme_overlay_map.json` | advisory-only | No | Regenerated: 84 themes (was 82) |
+| `data/intelligence/economic_candidate_feed.json` | shadow-only | No | Regenerated: 43 candidates (was 26); SNDK/WDC/IREN now present |
+| `candidate_resolver.py` | shadow-only | No | ai_compute_demand added to default active_drivers list |
+| `reference_data_builder.py` | advisory-only | No | 2 new governed overlay entries in _build_theme_overlay_map() |
+| `intelligence_schema_validator.py` | advisory-only | No | _VALID_DIRECTIONS extended; _VALID_ROUTE_BIASES extended |
+| `tests/test_intelligence_sprint7a2.py` | advisory-only test | No | 30 tests covering governance, feed presence, exclusion invariants, safety flags |
+
+### Sprint 7A.2 Anti-Bloat Confirmation
+
+| Check | Status |
+|-------|--------|
+| New production runtime modules? | No — all changes in shadow/advisory layer only |
+| New live API paths? | No |
+| New broker calls? | No |
+| New LLM calls? | No |
+| New .env reads? | No |
+| Favourites workaround used? | No — all symbols approved through full governance chain |
+| Duplicate logic introduced? | No — new themes extend existing taxonomy/roster/rule pattern |
+| Production handoff flag changed? | No — `enable_active_opportunity_universe_handoff = False` |
+| IREN caution observed? | Yes — lower confidence (0.60 vs 0.72/0.82), watchlist_or_swing route bias, review_required_symbols=[] (IREN individually approved, others not implied) |
+
+---
+
+## Sprint 7A.3 File Classifications
+
+**Sprint 7A.3 — Factor Registry + Provider Capability Audit**
+**Objective:** Define the data-factor contract for the final production system. Determine what factors can be fetched, from which providers, which are production-suitable, and which architecture layer owns them. No production code modified. No live API calls during generation. No .env inspection.
+
+### New / Modified Files
+
+| File | Classification | Runtime needed | Notes |
+|------|---------------|----------------|-------|
+| `factor_registry.py` | advisory/reference-only | No | Static generator — no live API, no .env, no broker. Writes to data/reference/ only. |
+| `provider_fetch_tester.py` | advisory/reference-only | No | Safe connectivity tester — read-only market data fetches only. No positions/orders/account calls. |
+| `data/reference/factor_registry.json` | reference-data | No | 73 factors, 13 categories, 10 layers. All factors have must_not_trigger_trade_directly=True. |
+| `data/reference/provider_capability_matrix.json` | reference-data | No | 6 providers, per-category suitability tiers. |
+| `data/reference/layer_factor_map.json` | reference-data | No | Factor ownership by architecture layer. |
+| `data/reference/data_quality_report.json` | reference-data | No | 9 production-ready categories, 2 partial, 2 unavailable. |
+| `data/reference/provider_fetch_test_results.json` | reference-data | No | 12/15 passed. Alpaca 3/3, FMP 5/5, AV 2/4, yfinance 2/2, IBKR 0/1 (expected). |
+| `intelligence_schema_validator.py` | advisory-only | No | 5 new validators added and wired into validate_all(). Stale duplicate return removed. |
+| `tests/test_intelligence_factor_registry.py` | advisory-only test | No | 32 tests covering all 5 new files and validators. |
+
+### Sprint 7A.3 Anti-Bloat Confirmation
+
+| Check | Status |
+|-------|--------|
+| New production runtime modules? | No — factor_registry.py and provider_fetch_tester.py are offline build tools only |
+| New live API paths in production bot? | No |
+| New broker calls? | No |
+| New LLM calls? | No |
+| New .env reads? | No — dotenv loaded for testing only; env_inspected=false in all outputs |
+| Secrets in output files? | No — secrets_exposed=false in all results |
+| Production handoff flag changed? | No — `enable_active_opportunity_universe_handoff = False` |
+
+---
+
+## Sprint 7A.4 File Classifications
+
+**Sprint 7A.4 — Runtime Orchestration and Cloud Process Architecture**
+**Objective:** Produce the authoritative design documents that govern runtime process contracts, cloud deployment, snapshot validity, failure modes, and terminology. Design sprint only — no production code, no handoff.
+
+### New Documentation Files
+
+| File | Classification | Runtime needed | Notes |
+|------|---------------|----------------|-------|
+| `docs/intelligence_first_runtime_orchestration.md` | documentation | No | 12 processes defined with schedules, dependencies, outputs, restart policies, SLAs |
+| `docs/intelligence_first_cloud_process_map.md` | documentation | No | 3-phase cloud deployment model; Phase 1 Docker Compose YAML; secrets + env var policy |
+| `docs/intelligence_first_snapshot_contract.md` | documentation | No | Universal Snapshot Schema (18 fields); 9 fail-closed conditions; freshness SLA table; live manifest contract |
+| `docs/intelligence_first_runtime_failure_modes.md` | documentation | No | 30 failure modes across all 12 processes with detection, response, log, alert, risk classification |
+| `docs/intelligence_first_definitions_and_runtime_contract.md` | documentation | No | Authoritative terminology whitepaper; 16 sections; 30+ terms; 13 deprecated terms formalised |
+
+### Modules Excluded from Live Trading Bot Import Path (formalised in Sprint 7A.4)
+
+These modules must not be imported by the live trading bot (`bot_trading.py` or any module it imports at runtime). Note: some may run in separate offline or scheduled production workers — they are excluded from the **live bot's import path**, not necessarily from all production deployment.
+
+| Module | Exclusion scope | Reason |
+|--------|-----------------|--------|
+| `provider_fetch_tester.py` | Excluded from all runtime containers | Diagnostic connectivity tool only |
+| `factor_registry.py` | Excluded from all runtime containers | Reference build tool; run offline only |
+| `backtest_intelligence.py` | Excluded from all runtime containers | Offline research; local regime/theme copies |
+| `advisory_reporter.py` | Excluded from live-bot import path | Shadow pipeline; offline report generation |
+| `advisory_log_reviewer.py` | Excluded from live-bot import path | Shadow pipeline; offline evidence gate |
+| `reference_data_builder.py` | Excluded from live-bot import path; runs as a separate scheduled offline production worker | Must never be imported by live bot at runtime |
+
+### Key Architecture Decisions Formalised
+
+| Decision | Document Section |
+|----------|----------------|
+| `data/live/current_manifest.json` is written by `handoff_validator_publisher` only — no other process writes to this path | snapshot_contract.md §6.1 |
+| When `handoff_enabled=True` and manifest fails any check, bot must NOT fall back to scanner discovery — degrade gracefully instead | snapshot_contract.md §6.3 rule 6 |
+| Scanner discovers AND scores in live bot (pre-handoff); Market Sensor scores pre-approved symbols as independent worker (post-handoff) | definitions_and_runtime_contract.md §10 |
+| Fail-closed means safest action when input missing/stale/invalid — not a crash; bot continues managing existing positions | definitions_and_runtime_contract.md §14 |
+| Advisory layer must never be imported by `bot_trading.py` at the module level — only the hook imports it conditionally | runtime_orchestration.md §5 |
+
+### Sprint 7A.4 Anti-Bloat Confirmation
+
+| Check | Status |
+|-------|--------|
+| New production runtime modules? | No — documentation only |
+| New live API paths in production bot? | No |
+| New broker calls? | No |
+| New LLM calls? | No |
+| New .env reads? | No |
+| Production handoff flag changed? | No — `enable_active_opportunity_universe_handoff = False` |
+| Production code modified? | No — zero production file changes |
+| Tests added? | No — design sprint; testing deferred to implementation sprint |
+| Duplicate logic introduced? | No |
+| live_output_changed | False |
+
+---
+
+## Sprint 7B File Classifications
+
+**Sprint 7B — Paper Handoff Reader Validation**
+
+| File | Classification | Included in live-bot container? | Notes |
+|------|---------------|--------------------------------|-------|
+| `handoff_reader.py` | Production runtime candidate | **Yes (when handoff enabled)** | 7-function public API for reading and validating handoff files. Read-only. No scanner, no bot imports. Currently has no callers — wired only when `enable_active_opportunity_universe_handoff=True` (blocked). |
+| `paper_handoff_builder.py` | Temporary migration / advisory-only tool | No | Transforms shadow universe → paper artefacts. Not imported by live bot. One-shot tool, not a recurring runtime process. |
+| `data/live/paper_active_opportunity_universe.json` | Paper artefact | No | 50 accepted candidates, executable=false for all, mode=paper_handoff_universe. Not the production active universe file. |
+| `data/live/paper_current_manifest.json` | Paper artefact | No | handoff_enabled=False, handoff_mode=paper. Not `data/live/current_manifest.json`. |
+| `data/live/paper_handoff_validation_report.json` | Paper artefact | No | handoff_allowed=False always. Mode=paper_handoff_validation. |
+| `tests/test_intelligence_sprint7b.py` | Test — advisory pipeline | No | 53 tests across 12 classes. |
+
+### Sprint 7B Key Architecture Decisions
+
+1. **`handoff_reader.py` is fail-closed with no scanner fallback** — on any failure, `handoff_allowed=False` and `candidate_count_allowed=0`. No fallback to the legacy scanner is permitted.
+2. **`data/live/current_manifest.json` and `data/live/active_opportunity_universe.json` are never written** — reserved exclusively for the production handoff path when `enable_active_opportunity_universe_handoff=True`.
+3. **Paper artefacts use 24-hour expiry** — validation artefacts run on-demand, not every 15 minutes; shorter SLA would cause immediate test failure.
+4. **`paper_handoff_builder.py` derives approval_status, theme_ids, risk_flags, route_hint from shadow candidate fields** — shadow candidates do not carry these fields explicitly; all derived during transformation.
+5. **`handoff_allowed` is always `False` in Sprint 7B** — even when all structural validation passes, because `handoff_enabled=False` in the manifest is an absolute gate.
+
+### Sprint 7B Anti-Bloat Confirmation
+
+| Check | Result |
+|-------|--------|
+| New modules added beyond spec? | No |
+| New production bot imports added? | No — `handoff_reader.py` has no callers in live bot |
+| Scanner fallback introduced? | No |
+| New config flags added? | No |
+| Tests added? | Yes — 53 tests (spec requirement) |
+| Duplicate logic introduced? | No |
+| live_output_changed | False |
 
 ---
 
@@ -501,8 +660,14 @@ The **Universe Builder scheduled job** (to run before market open in production)
 
 | Date | Action | Notes |
 |------|--------|-------|
-| 2026-05-06 | Sprint 7A | Added Sprint 7A classification section. Handoff design, test plan, and cutover checklist created (documentation only). No production code changed. Advisory evidence from 35-record observation integrated. Production simplification gates for Sprint 7A all met. |
 | 2026-05-06 | Created | Initial audit covering Sprints Day2–6B. All intelligence-first modules classified. No files recommended for immediate removal — production handoff gate not yet met. |
 | 2026-05-06 | Sprint 6B patch | Added explicit Sprint 6B file classifications (advisory_logger.py, advisory_runtime_log.jsonl, test_intelligence_sprint6b.py, bot_trading.py hook). Anti-bloat confirmation added. Real-session observation plan documented. |
 | 2026-05-06 | Sprint 6C | Added advisory_log_reviewer.py (advisory_only, offline), advisory_log_review.json (advisory_only), test_intelligence_sprint6c.py (advisory_only test, 34 tests). Validator extended with validate_advisory_log_review(). No production modules touched. |
 | 2026-05-06 | Real-Session Observation Phase | intelligence_first_advisory_enabled set True (v3.7.10). enable_active_opportunity_universe_handoff remains False. Pre-existing test failures partially fixed (v3.7.9). No candidate/Apex/scoring/risk/order/execution changes. Advisory file cutover classifications added. Advisory modules-must-not-import list formalised. |
+| 2026-05-06 | Sprint 7A.1 | Added reference_data_builder.py (advisory_only, build tool), data/reference/sector_schema.json, data/reference/symbol_master.json, data/reference/theme_overlay_map.json (82 themes), data/intelligence/coverage_gap_review.json, tests/test_intelligence_reference_data.py (42 tests). Validator extended with 4 new validators; advisory_log_review missing return fixed. No production modules touched. enable_active_opportunity_universe_handoff = False. |
+| 2026-05-07 | Sprint 7A.2 | Approved Theme Overlay / Roster Governance delivered. 2 new governed themes (memory_storage, ai_compute_infrastructure), 2 new transmission rules, 2 new roster entries, 2 new overlay entries. SNDK/WDC approved under memory_storage (occurrence_count=22). IREN approved under ai_compute_infrastructure with caution (occurrence_count=10, confidence=0.60). STX remains review_required. Economic candidate feed grows to 43 (was 26). candidate_resolver.py: ai_compute_demand added to default drivers. Validator: conditional_positive, swing_or_watchlist, watchlist_or_swing added as valid values. 2 stale test assertions updated (Day2 blocked_condition, Day6 valid directions). No production modules touched. No favourites workaround. enable_active_opportunity_universe_handoff=False. 804/804 regression, 25/25 validator, 4/4 smoke. live_output_changed=false. Sprint 7B blocked until Sprint 7A.2 accepted. |
+| 2026-05-07 | Sprint 7B | Paper Handoff Reader Validation delivered. handoff_reader.py (production runtime candidate, 7-function public API, no bot imports, fail-closed with no scanner fallback); paper_handoff_builder.py (temporary migration tool, transforms shadow → paper artefacts); 3 paper artefacts written to data/live/ (paper_active_opportunity_universe.json 50 candidates, paper_current_manifest.json handoff_enabled=False, paper_handoff_validation_report.json handoff_allowed=False); intelligence_schema_validator.py extended with 3 new validators; tests/test_intelligence_sprint7b.py (53 tests, 12 classes). data/live/current_manifest.json and data/live/active_opportunity_universe.json NOT written. No bot imports changed. No scanner fallback. enable_active_opportunity_universe_handoff=False. live_output_changed=false. 53/53 Sprint 7B, 891/891 intelligence regression, 36/36 validator, 5/5 smoke. |
+| 2026-05-07 | Sprint 7A.4 | Runtime Orchestration and Cloud Process Architecture — design/documentation sprint. No production code modified. No production handoff triggered. Five documents created: intelligence_first_runtime_orchestration.md (12 processes, dependency model, live bot isolation rule), intelligence_first_cloud_process_map.md (3-phase cloud deployment, Docker Compose YAML, secrets policy, env var matrix, retention, healthcheck), intelligence_first_snapshot_contract.md (18-field universal schema, 9 fail-closed conditions, freshness SLA table, live manifest contract + example), intelligence_first_runtime_failure_modes.md (30 failure modes, all 12 processes), intelligence_first_definitions_and_runtime_contract.md (30+ terms, 13 deprecated terms, scanner vs market sensor distinction). Production container exclusions formalised: provider_fetch_tester.py, factor_registry.py, backtest_intelligence.py, advisory_reporter.py, advisory_log_reviewer.py, reference_data_builder.py. Handoff Publisher = single authorised writer of data/live/current_manifest.json. live_output_changed=false. enable_active_opportunity_universe_handoff=False. |
+| 2026-05-07 | Sprint 7A.3 patch | Precise safety flag terminology applied. provider_fetch_tester.py: old generic live_api_called=false replaced with 13 precise flags — data_provider_api_called=true (fetches were made), trading_api_called=false, broker_order/account/position/execution_api_called=false, ibkr_market_data_connection_attempted=true, ibkr_order_account_position_calls=false, env_presence_checked=true, env_values_logged=false, env_file_read=true, secrets_exposed=false, live_output_changed=false. IBKR TCP probe relabelled market_data_gateway_tcp_probe with explicit "not a trading failure" detail. factor_registry.py data_quality_report flags updated: live_api_called+env_inspected → data_provider_api_called=false, live_trading_api_called=false, env_presence_checked=false, env_values_logged=false, secrets_exposed=false. Validator updated for new safety block. 34/34 tests, 30/30 validator, 4/4 smoke. live_output_changed=false. |
+| 2026-05-07 | Sprint 7A.3 | Factor Registry + Provider Capability Audit delivered. factor_registry.py (73 factors, 13 categories, 10 layers, all must_not_trigger_trade_directly=True); provider_fetch_tester.py (12/15 passed: Alpaca 3/3, FMP 5/5, AV 2/4, yfinance 2/2, IBKR 0/1 gateway not running); 5 new validators in intelligence_schema_validator.py (validate_factor_registry, validate_provider_capability_matrix, validate_provider_fetch_test_results, validate_layer_factor_map, validate_data_quality_report); tests/test_intelligence_factor_registry.py (32 tests). Key provider findings: Alpaca primary for OHLCV/quotes/options (3/3), FMP primary for fundamentals/news/analyst (5/5), Alpha Vantage OVERVIEW+RSI premium-only (upgrade required), Alpha Vantage TIME_SERIES_DAILY + FEDERAL_FUNDS_RATE confirmed working (2/4). No production modules touched. env_inspected=false. secrets_exposed=false. live_output_changed=false. enable_active_opportunity_universe_handoff=False. 32/32 new tests, 30/30 validate_intelligence_files, 4/4 smoke. |
+| 2026-05-07 | Sprint 7A.1 patch | 4 blockers resolved: (1) coverage_gap_review advisory evidence source corrected — now reads candidate_matches[*].advisory_status==advisory_unresolved (not empty unsupported_current_candidates.symbols). Rebuilt with 51 real records: recurring_unsupported_current_count=110. evidence_status + required_input_missing fields added. (2) intelligence_first_advisory_enabled reset to False (observation complete, gate=advisory_ready_for_handoff_design). (3) sector_schema proxy_classifications expanded to 7 (added index_proxy, crypto_proxy, macro_proxy). Validator updated to require all 7. (4) test_intelligence_reference_data.py updated: _minimal_coverage_gap + _minimal_sector_schema fixtures corrected, 2 new evidence_status/required_input_missing tests. test_intelligence_sprint6c.py: TestInsufficientObservation → TestObservationThresholdMet (assertions updated to 35-record reality). Named symbols: SNDK/WDC/IREN in recurring_unsupported_current; MU/LRCX/STX/DOCN/NBIS covered by advisory (not unresolved). 774/774 regression, 25/25 validator, 4/4 smoke. live_output_changed=false. |

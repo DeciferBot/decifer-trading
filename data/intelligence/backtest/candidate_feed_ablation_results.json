@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-06T05:28:21Z",
+  "generated_at": "2026-05-06T20:21:03Z",
   "mode": "local_fixture_backtest",
   "data_source_mode": "local_fixtures_and_shadow_outputs_only",
   "source_files": [
@@ -12,7 +12,7 @@
   "key_findings": [
     "[no_economic_candidate_feed] Removing economic candidate feed reduces reason_to_care coverage by 30 candidates. Structural candidates from economic feed are lost; only Tier D and legacy sources remain.",
     "[no_route_tagger] Without route_tagger, all candidates flatten to watchlist route. Position and swing route quality cannot be measured. Route clarity = zero.",
-    "[no_quota_allocator] Without quota_allocator, universe grows from 50 to ~283. Attention cap not enforced: up to 102 attention candidates. Structural overflow of 160 candidates would be included. This is a flat-pool risk \u2014 no route protection, no quota discipline.",
+    "[no_quota_allocator] Without quota_allocator, universe grows from 50 to ~286. Attention cap not enforced: up to 102 attention candidates. Structural overflow of 163 candidates would be included. This is a flat-pool risk \u2014 no route protection, no quota discipline.",
     "[no_headwind_pressure_candidates] Without headwind pressure candidates, risk-theme monitoring loses watchlist coverage. Removed 1 headwind candidate(s). Credit stress and risk-off themes become invisible to the universe.",
     "[no_manual_protection] Without manual protection, 13 manually convicted symbols lose protected status and compete for quota with economic candidates. Favourites (ASTS, GLD, IBIT, etc.) may be excluded by structural quota pressure.",
     "[no_attention_cap] Without attention cap, up to 102 attention candidates would compete for universe slots (cap is 15). Attention crowding risk is real \u2014 attention overwhelms structural and position candidates without quota_allocator's cap enforcement."
@@ -37,9 +37,9 @@
       "manual_protection_preserved": true,
       "economic_candidates_preserved": true,
       "live_output_changed": false,
-      "tier_d_preservation_rate": 0.1111,
+      "tier_d_preservation_rate": 0.1093,
       "source_collision_handled": true,
-      "structural_overflow_count": 160,
+      "structural_overflow_count": 163,
       "attention_overflow_count": 94,
       "structural_quota_binding": true
     },
@@ -89,8 +89,8 @@
     },
     {
       "variant_label": "no_quota_allocator",
-      "total_candidates": 283,
-      "structural_candidates": 180,
+      "total_candidates": 286,
+      "structural_candidates": 183,
       "position_route_count": 11,
       "swing_route_count": 9,
       "watchlist_count": 10,
@@ -105,9 +105,9 @@
       "attention_cap_respected": false,
       "manual_protection_preserved": true,
       "economic_candidates_preserved": true,
-      "structural_overflow_exposed": 160,
+      "structural_overflow_exposed": 163,
       "attention_overflow_exposed": 94,
-      "finding": "Without quota_allocator, universe grows from 50 to ~283. Attention cap not enforced: up to 102 attention candidates. Structural overflow of 160 candidates would be included. This is a flat-pool risk \u2014 no route protection, no quota discipline.",
+      "finding": "Without quota_allocator, universe grows from 50 to ~286. Attention cap not enforced: up to 102 attention candidates. Structural overflow of 163 candidates would be included. This is a flat-pool risk \u2014 no route protection, no quota discipline.",
       "live_output_changed": false
     },
     {

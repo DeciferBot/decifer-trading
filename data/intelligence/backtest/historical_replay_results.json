@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-06T05:28:21Z",
+  "generated_at": "2026-05-06T20:21:03Z",
   "mode": "local_historical_replay_fixtures",
   "data_source_mode": "date_anchored_manual_fixtures_only",
   "source_files": [
@@ -45,7 +45,9 @@
         "defence": "watchlist",
         "quality_cash_flow": "crowded",
         "defensive_quality": "crowded",
-        "small_caps": "weakening"
+        "small_caps": "weakening",
+        "memory_storage": "crowded",
+        "ai_compute_infrastructure": "crowded"
       },
       "expected_route_bias": "position_and_swing_caution",
       "actual_route_bias": "shadow_inference_only",
@@ -98,7 +100,9 @@
         "defence": "activated",
         "quality_cash_flow": "crowded",
         "defensive_quality": "crowded",
-        "small_caps": "weakening"
+        "small_caps": "weakening",
+        "memory_storage": "crowded",
+        "ai_compute_infrastructure": "crowded"
       },
       "expected_route_bias": "position_and_swing_energy_defence",
       "actual_route_bias": "shadow_inference_only",
@@ -150,7 +154,9 @@
         "defence": "watchlist",
         "quality_cash_flow": "crowded",
         "defensive_quality": "crowded",
-        "small_caps": "weakening"
+        "small_caps": "weakening",
+        "memory_storage": "crowded",
+        "ai_compute_infrastructure": "crowded"
       },
       "expected_route_bias": "structural_position_and_swing",
       "actual_route_bias": "shadow_inference_only",
@@ -204,7 +210,9 @@
         "defence": "watchlist",
         "quality_cash_flow": "crowded",
         "defensive_quality": "crowded",
-        "small_caps": "weakening"
+        "small_caps": "weakening",
+        "memory_storage": "crowded",
+        "ai_compute_infrastructure": "crowded"
       },
       "expected_route_bias": "position_caution_swing_selective",
       "actual_route_bias": "shadow_inference_only",
@@ -251,7 +259,9 @@
         "defence": "watchlist",
         "quality_cash_flow": "crowded",
         "defensive_quality": "crowded",
-        "small_caps": "weakening"
+        "small_caps": "weakening",
+        "memory_storage": "crowded",
+        "ai_compute_infrastructure": "crowded"
       },
       "expected_route_bias": "watchlist_and_selective_swing",
       "actual_route_bias": "shadow_inference_only",
@@ -307,7 +317,9 @@
         "defence": "watchlist",
         "quality_cash_flow": "crowded",
         "defensive_quality": "crowded",
-        "small_caps": "weakening"
+        "small_caps": "weakening",
+        "memory_storage": "crowded",
+        "ai_compute_infrastructure": "crowded"
       },
       "expected_route_bias": "watchlist_and_position_defensive",
       "actual_route_bias": "shadow_inference_only",

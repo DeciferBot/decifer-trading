@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "published_at": "2026-05-07T05:27:01Z",
+  "expires_at": "2026-05-08T05:27:01Z",
+  "validation_status": "pass",
+  "handoff_mode": "paper",
+  "handoff_enabled": false,
+  "active_universe_file": "data/live/paper_active_opportunity_universe.json",
+  "economic_context_file": "data/intelligence/current_economic_context.json",
+  "company_quality_file": null,
+  "catalyst_snapshot_file": null,
+  "technical_snapshot_file": null,
+  "risk_snapshot_file": null,
+  "source_snapshot_versions": {
+    "data/live/paper_active_opportunity_universe.json": "2026-05-07T05:27:01Z",
+    "data/intelligence/current_economic_context.json": "2026-05-06T20:20:57Z"
+  },
+  "publisher": "paper_handoff_builder",
+  "fail_closed_reason": null,
+  "warnings": [],
+  "no_executable_trade_instructions": true,
+  "live_output_changed": false,
+  "secrets_exposed": false,
+  "env_values_logged": false
+}

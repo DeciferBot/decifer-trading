@@ -1,20 +1,22 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-05T20:34:59Z",
-  "fresh_until": "2026-05-07T20:34:59Z",
+  "generated_at": "2026-05-06T20:23:36Z",
+  "fresh_until": "2026-05-08T20:23:36Z",
   "mode": "shadow_report_only",
   "source_files": [
     "data/intelligence/theme_taxonomy.json",
     "data/intelligence/thematic_roster.json"
   ],
   "feed_summary": {
-    "total_candidates": 40,
+    "total_candidates": 43,
     "themes_active": [
+      "ai_compute_infrastructure",
       "banks",
       "data_centre_power",
       "defence",
       "defensive_quality",
       "energy",
+      "memory_storage",
       "quality_cash_flow",
       "semiconductors"
     ],
@@ -23,7 +25,9 @@
     ],
     "drivers_active": [
       "ai_capex_growth, ai_infrastructure_demand",
+      "ai_capex_growth, data_centre_buildout, memory_pricing_cycle, enterprise_ai_storage_demand",
       "ai_capex_growth, power_demand_growth",
+      "ai_compute_demand, gpu_cloud_demand, data_centre_capacity, power_constraint, neocloud_growth",
       "credit_stress_rising, liquidity_tightening, refinancing_risk_rising",
       "credit_stress_rising, liquidity_tightening, risk_off_rotation",
       "geopolitical_risk_rising, defence_spending_expectations",
@@ -31,11 +35,11 @@
       "risk_appetite_falling, volatility_rising, defensive_rotation, breadth_deterioration",
       "yields_rising, net_interest_margin_expansion"
     ],
-    "direct_beneficiaries": 29,
+    "direct_beneficiaries": 32,
     "second_order_beneficiaries": 1,
     "etf_proxies": 9,
     "pressure_candidates": 1,
-    "watchlist_only": 10,
+    "watchlist_only": 13,
     "headwind_candidates_executable": false,
     "llm_symbol_discovery_used": false,
     "raw_news_used": false,
@@ -56,7 +60,7 @@
         "watchlist"
       ],
       "confidence": 0.82,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -81,7 +85,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -99,7 +103,7 @@
         "watchlist"
       ],
       "confidence": 0.82,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -124,7 +128,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -142,7 +146,7 @@
         "watchlist"
       ],
       "confidence": 0.82,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -167,7 +171,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -184,7 +188,7 @@
         "watchlist"
       ],
       "confidence": 0.67,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -209,7 +213,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -225,7 +229,7 @@
         "watchlist"
       ],
       "confidence": 0.45,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -250,7 +254,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -268,7 +272,7 @@
         "watchlist"
       ],
       "confidence": 0.83,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -293,7 +297,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -311,7 +315,7 @@
         "watchlist"
       ],
       "confidence": 0.83,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -336,7 +340,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -354,7 +358,7 @@
         "watchlist"
       ],
       "confidence": 0.83,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -379,7 +383,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -397,7 +401,7 @@
         "watchlist"
       ],
       "confidence": 0.83,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -422,7 +426,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -440,7 +444,7 @@
         "watchlist"
       ],
       "confidence": 0.83,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -465,7 +469,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -481,7 +485,7 @@
         "watchlist"
       ],
       "confidence": 0.45,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -506,7 +510,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -523,7 +527,7 @@
         "watchlist"
       ],
       "confidence": 0.62,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "credit_stress",
         "deposit_pressure",
@@ -549,7 +553,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -566,7 +570,7 @@
         "watchlist"
       ],
       "confidence": 0.62,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "credit_stress",
         "deposit_pressure",
@@ -592,7 +596,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -609,7 +613,7 @@
         "watchlist"
       ],
       "confidence": 0.62,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "credit_stress",
         "deposit_pressure",
@@ -635,7 +639,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -652,7 +656,7 @@
         "watchlist"
       ],
       "confidence": 0.62,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "credit_stress",
         "deposit_pressure",
@@ -678,7 +682,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -694,7 +698,7 @@
         "watchlist"
       ],
       "confidence": 0.45,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "credit_stress",
         "deposit_pressure",
@@ -720,7 +724,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -738,7 +742,7 @@
         "watchlist"
       ],
       "confidence": 0.75,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "oil_demand_destruction",
         "geopolitical_reversal",
@@ -762,7 +766,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -780,7 +784,7 @@
         "watchlist"
       ],
       "confidence": 0.75,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "oil_demand_destruction",
         "geopolitical_reversal",
@@ -804,7 +808,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -822,7 +826,7 @@
         "watchlist"
       ],
       "confidence": 0.75,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "oil_demand_destruction",
         "geopolitical_reversal",
@@ -846,7 +850,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -864,7 +868,7 @@
         "watchlist"
       ],
       "confidence": 0.75,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "oil_demand_destruction",
         "geopolitical_reversal",
@@ -888,7 +892,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -904,7 +908,7 @@
         "watchlist"
       ],
       "confidence": 0.45,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "oil_demand_destruction",
         "geopolitical_reversal",
@@ -928,7 +932,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -946,7 +950,7 @@
         "watchlist"
       ],
       "confidence": 0.76,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "de_escalation",
         "budget_risk",
@@ -970,7 +974,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -988,7 +992,7 @@
         "watchlist"
       ],
       "confidence": 0.76,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "de_escalation",
         "budget_risk",
@@ -1012,7 +1016,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1030,7 +1034,7 @@
         "watchlist"
       ],
       "confidence": 0.76,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "de_escalation",
         "budget_risk",
@@ -1054,7 +1058,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1072,7 +1076,7 @@
         "watchlist"
       ],
       "confidence": 0.76,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "de_escalation",
         "budget_risk",
@@ -1096,7 +1100,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1112,7 +1116,7 @@
         "watchlist"
       ],
       "confidence": 0.45,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "de_escalation",
         "budget_risk",
@@ -1136,7 +1140,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1154,7 +1158,7 @@
         "watchlist"
       ],
       "confidence": 0.72,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -1179,7 +1183,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1197,7 +1201,7 @@
         "watchlist"
       ],
       "confidence": 0.72,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -1222,7 +1226,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1240,7 +1244,7 @@
         "watchlist"
       ],
       "confidence": 0.72,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -1265,7 +1269,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1283,7 +1287,7 @@
         "watchlist"
       ],
       "confidence": 0.72,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -1308,7 +1312,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1324,7 +1328,7 @@
         "watchlist"
       ],
       "confidence": 0.45,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "valuation",
         "crowding",
@@ -1349,7 +1353,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1365,7 +1369,7 @@
         "watchlist"
       ],
       "confidence": 0.38,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "credit_stress_easing",
         "risk_on_rotation",
@@ -1388,7 +1392,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1405,7 +1409,7 @@
         "watchlist"
       ],
       "confidence": 0.7,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "defensive_crowding",
         "false_risk_off_signal",
@@ -1429,7 +1433,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1446,7 +1450,7 @@
         "watchlist"
       ],
       "confidence": 0.7,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "defensive_crowding",
         "false_risk_off_signal",
@@ -1470,7 +1474,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1487,7 +1491,7 @@
         "watchlist"
       ],
       "confidence": 0.7,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "defensive_crowding",
         "false_risk_off_signal",
@@ -1511,7 +1515,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1528,7 +1532,7 @@
         "watchlist"
       ],
       "confidence": 0.7,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "defensive_crowding",
         "false_risk_off_signal",
@@ -1552,7 +1556,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1569,7 +1573,7 @@
         "watchlist"
       ],
       "confidence": 0.7,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "defensive_crowding",
         "false_risk_off_signal",
@@ -1593,7 +1597,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1609,7 +1613,7 @@
         "watchlist"
       ],
       "confidence": 0.45,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "defensive_crowding",
         "false_risk_off_signal",
@@ -1633,7 +1637,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1649,7 +1653,7 @@
         "watchlist"
       ],
       "confidence": 0.45,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "defensive_crowding",
         "false_risk_off_signal",
@@ -1673,7 +1677,7 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     },
@@ -1689,7 +1693,7 @@
         "watchlist"
       ],
       "confidence": 0.45,
-      "fresh_until": "2026-05-07T20:34:59Z",
+      "fresh_until": "2026-05-08T20:23:36Z",
       "risk_flags": [
         "defensive_crowding",
         "false_risk_off_signal",
@@ -1713,7 +1717,137 @@
         "no_extended_chase",
         "live_spread_and_risk_check_at_execution_only"
       ],
-      "generated_at": "2026-05-05T20:34:59Z",
+      "generated_at": "2026-05-06T20:23:36Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "SNDK",
+      "included_by": "economic_intelligence",
+      "theme": "memory_storage",
+      "driver": "ai_capex_growth, data_centre_buildout, memory_pricing_cycle, enterprise_ai_storage_demand",
+      "role": "direct_beneficiary",
+      "reason": "AI data-centre expansion can increase demand for high-performance memory, storage and related enterprise infrastructure. Memory/storage cycle tightening driven by AI workload growth supports SNDK, WDC and related names.",
+      "reason_to_care": "SNDK is a direct beneficiary of Memory and Storage \u2014 AI Data-Centre Demand: AI data-centre expansion can increase demand for high-performance memory, storage and related enterprise infrastructure. Memory/storage cycle tightening driven by AI workload growth supports SNDK, WDC and related names.",
+      "route_hint": [
+        "watchlist"
+      ],
+      "confidence": 0.72,
+      "fresh_until": "2026-05-08T20:23:36Z",
+      "risk_flags": [
+        "memory_cycle_risk",
+        "commodity_pricing",
+        "capex_sensitivity",
+        "earnings_volatility",
+        "supply_demand_reversal",
+        "valuation_risk"
+      ],
+      "confirmation_required": [
+        "storage_memory_relative_strength",
+        "earnings_commentary_support",
+        "ai_capex_or_enterprise_storage_demand_support",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "source_labels": [
+        "reference_data_approved_theme"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_to_memory_storage"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-06T20:23:36Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "WDC",
+      "included_by": "economic_intelligence",
+      "theme": "memory_storage",
+      "driver": "ai_capex_growth, data_centre_buildout, memory_pricing_cycle, enterprise_ai_storage_demand",
+      "role": "direct_beneficiary",
+      "reason": "AI data-centre expansion can increase demand for high-performance memory, storage and related enterprise infrastructure. Memory/storage cycle tightening driven by AI workload growth supports SNDK, WDC and related names.",
+      "reason_to_care": "WDC is a direct beneficiary of Memory and Storage \u2014 AI Data-Centre Demand: AI data-centre expansion can increase demand for high-performance memory, storage and related enterprise infrastructure. Memory/storage cycle tightening driven by AI workload growth supports SNDK, WDC and related names.",
+      "route_hint": [
+        "watchlist"
+      ],
+      "confidence": 0.72,
+      "fresh_until": "2026-05-08T20:23:36Z",
+      "risk_flags": [
+        "memory_cycle_risk",
+        "commodity_pricing",
+        "capex_sensitivity",
+        "earnings_volatility",
+        "supply_demand_reversal",
+        "valuation_risk"
+      ],
+      "confirmation_required": [
+        "storage_memory_relative_strength",
+        "earnings_commentary_support",
+        "ai_capex_or_enterprise_storage_demand_support",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "source_labels": [
+        "reference_data_approved_theme"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_to_memory_storage"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-06T20:23:36Z",
+      "mode": "shadow_report_only",
+      "live_output_changed": false
+    },
+    {
+      "symbol": "IREN",
+      "included_by": "economic_intelligence",
+      "theme": "ai_compute_infrastructure",
+      "driver": "ai_compute_demand, gpu_cloud_demand, data_centre_capacity, power_constraint, neocloud_growth",
+      "role": "direct_beneficiary",
+      "reason": "AI workload demand and GPU compute scarcity can support approved AI compute infrastructure and neocloud providers, but only when financing, power and execution risks remain controlled. Confidence lower than other AI themes due to speculative risk profile.",
+      "reason_to_care": "IREN is a direct beneficiary of AI Compute Infrastructure \u2014 Neocloud and Power-Constrained Compute: AI workload demand and GPU compute scarcity can support approved AI compute infrastructure and neocloud providers, but only when financing, power and execution risks remain controlled. Confidence lower than other AI themes due to speculative risk profile.",
+      "route_hint": [
+        "watchlist"
+      ],
+      "confidence": 0.6,
+      "fresh_until": "2026-05-08T20:23:36Z",
+      "risk_flags": [
+        "speculative_growth",
+        "financing_risk",
+        "power_cost",
+        "capacity_execution_risk",
+        "customer_concentration",
+        "dilution_risk",
+        "volatility_risk"
+      ],
+      "confirmation_required": [
+        "ai_compute_demand_confirmation",
+        "customer_or_capacity_commentary",
+        "financing_and_power_cost_risk_review",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "source_labels": [
+        "reference_data_approved_theme"
+      ],
+      "transmission_rules_fired": [
+        "ai_compute_demand_to_ai_compute_infrastructure"
+      ],
+      "market_confirmation_required": [
+        "sector_etf_relative_strength",
+        "price_and_volume_confirmation_by_trading_bot",
+        "no_extended_chase",
+        "live_spread_and_risk_check_at_execution_only"
+      ],
+      "generated_at": "2026-05-06T20:23:36Z",
       "mode": "shadow_report_only",
       "live_output_changed": false
     }

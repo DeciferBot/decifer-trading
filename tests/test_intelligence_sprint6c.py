@@ -228,24 +228,24 @@ class TestDecisionGateValue(unittest.TestCase):
         self.assertGreater(len(self.data.get("gate_reasons", [])), 0)
 
 
-class TestInsufficientObservation(unittest.TestCase):
-    """(3 tests) With current 1-record log, gate = insufficient_live_observation."""
+class TestObservationThresholdMet(unittest.TestCase):
+    """(3 tests) Observation complete: 35-record log, gate = advisory_ready_for_handoff_design."""
 
     @classmethod
     def setUpClass(cls):
         with open(_REVIEW_PATH, encoding="utf-8") as f:
             cls.data = json.load(f)
 
-    def test_records_below_threshold(self):
+    def test_records_at_or_above_threshold(self):
         rs = self.data.get("review_summary", {})
-        self.assertLess(rs.get("records_read", 0), 10)
+        self.assertGreaterEqual(rs.get("records_read", 0), 10)
 
-    def test_sessions_below_threshold(self):
+    def test_sessions_below_multi_session_threshold(self):
         rs = self.data.get("review_summary", {})
         self.assertLess(rs.get("sessions_detected", 0), 3)
 
-    def test_gate_is_insufficient(self):
-        self.assertEqual(self.data.get("decision_gate"), "insufficient_live_observation")
+    def test_gate_is_ready_for_handoff_design(self):
+        self.assertEqual(self.data.get("decision_gate"), "advisory_ready_for_handoff_design")
 
 
 class TestZeroRecordCase(unittest.TestCase):

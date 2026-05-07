@@ -1,0 +1,1445 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-06T20:20:40.467671+00:00",
+  "source": "reference_data_builder",
+  "theme_count": 84,
+  "themes": [
+    {
+      "theme_id": "data_centre_power",
+      "theme_name": "Data Centre Power Infrastructure",
+      "description": "Direct beneficiaries of AI data-centre power demand: cooling, power management, grid engineering, nuclear baseload.",
+      "supply_chain_role": "critical_infrastructure_build_out",
+      "risk_flags": [
+        "capex_cycle_dependency",
+        "utility_regulation"
+      ],
+      "canonical_symbols": [
+        "VRT",
+        "ETN",
+        "PWR",
+        "CEG"
+      ],
+      "proxy_symbols": [
+        "XLU"
+      ],
+      "source": "thematic_roster"
+    },
+    {
+      "theme_id": "semiconductors",
+      "theme_name": "AI Semiconductor Infrastructure",
+      "description": "GPU accelerators, foundry capacity, advanced packaging, EUV lithography — the compute stack for AI.",
+      "supply_chain_role": "end_market_demand_driver",
+      "risk_flags": [
+        "geopolitical_export_controls",
+        "capex_cycle",
+        "customer_concentration"
+      ],
+      "canonical_symbols": [
+        "NVDA",
+        "TSM",
+        "AVGO",
+        "AMD",
+        "ASML"
+      ],
+      "proxy_symbols": [
+        "SMH"
+      ],
+      "source": "thematic_roster"
+    },
+    {
+      "theme_id": "banks",
+      "theme_name": "Rate-Sensitive Banks",
+      "description": "Net-interest-margin beneficiaries when rates rising and credit contained.",
+      "supply_chain_role": "financial_intermediary",
+      "risk_flags": [
+        "credit_cycle_turn",
+        "deposit_beta_compression",
+        "regulatory_capital"
+      ],
+      "canonical_symbols": [
+        "JPM",
+        "BAC",
+        "WFC",
+        "GS"
+      ],
+      "proxy_symbols": [
+        "XLF"
+      ],
+      "source": "thematic_roster"
+    },
+    {
+      "theme_id": "energy",
+      "theme_name": "Oil Supply Shock Beneficiaries",
+      "description": "Integrated oil, E&P, and oilfield services — responsive to supply-side shocks.",
+      "supply_chain_role": "commodity_producer",
+      "risk_flags": [
+        "oil_price_volatility",
+        "energy_transition_headwind",
+        "geopolitical_risk"
+      ],
+      "canonical_symbols": [
+        "XOM",
+        "CVX",
+        "OXY",
+        "SLB"
+      ],
+      "proxy_symbols": [
+        "XLE"
+      ],
+      "source": "thematic_roster"
+    },
+    {
+      "theme_id": "defence",
+      "theme_name": "Defence & Aerospace",
+      "description": "Prime contractors with long-cycle government contracts — beneficiaries of elevated defence budgets.",
+      "supply_chain_role": "government_prime_contractor",
+      "risk_flags": [
+        "budget_sequestration",
+        "programme_cost_overruns",
+        "geopolitical_dependency"
+      ],
+      "canonical_symbols": [
+        "LMT",
+        "NOC",
+        "RTX",
+        "GD"
+      ],
+      "proxy_symbols": [
+        "ITA"
+      ],
+      "source": "thematic_roster"
+    },
+    {
+      "theme_id": "quality_cash_flow",
+      "theme_name": "Quality Cash Flow Compounders",
+      "description": "High-moat businesses with durable free cash flow and secular growth.",
+      "supply_chain_role": "platform_business",
+      "risk_flags": [
+        "valuation_multiple_compression",
+        "regulatory_antitrust"
+      ],
+      "canonical_symbols": [
+        "MSFT",
+        "AAPL",
+        "COST",
+        "BRK.B"
+      ],
+      "proxy_symbols": [
+        "QUAL"
+      ],
+      "source": "thematic_roster"
+    },
+    {
+      "theme_id": "defensive_quality",
+      "theme_name": "Defensive Quality / Staples",
+      "description": "Consumer staples and healthcare with low beta, pricing power, and dividend reliability.",
+      "supply_chain_role": "consumer_staples_anchor",
+      "risk_flags": [
+        "currency_headwinds",
+        "input_cost_inflation"
+      ],
+      "canonical_symbols": [
+        "COST",
+        "JNJ",
+        "PG",
+        "KO",
+        "PEP"
+      ],
+      "proxy_symbols": [
+        "XLP",
+        "XLV",
+        "SPLV"
+      ],
+      "source": "thematic_roster"
+    },
+    {
+      "theme_id": "small_caps",
+      "theme_name": "Small Cap Recovery",
+      "description": "Broad small-cap universe — rate-sensitive, domestic-revenue heavy. Headwind roster: trade with caution.",
+      "supply_chain_role": "broad_domestic_economy",
+      "risk_flags": [
+        "rate_sensitivity",
+        "credit_availability",
+        "headwind_regime"
+      ],
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "IWM"
+      ],
+      "source": "thematic_roster",
+      "headwind_roster": true
+    },
+    {
+      "theme_id": "memory_storage",
+      "theme_name": "Memory and Storage — AI Data-Centre Demand",
+      "description": "Memory/storage names with recurring advisory gap evidence. Approved via coverage_gap_review (22 occurrences each). AI data-centre storage demand and memory cycle tightening.",
+      "supply_chain_role": "ai_storage_infrastructure",
+      "risk_flags": [
+        "memory_cycle_risk",
+        "commodity_pricing",
+        "capex_sensitivity",
+        "earnings_volatility",
+        "supply_demand_reversal",
+        "valuation_risk"
+      ],
+      "canonical_symbols": [
+        "SNDK",
+        "WDC"
+      ],
+      "proxy_symbols": [],
+      "source": "thematic_roster",
+      "approval_source": "coverage_gap_review"
+    },
+    {
+      "theme_id": "ai_compute_infrastructure",
+      "theme_name": "AI Compute Infrastructure — Neocloud and Power-Constrained Compute",
+      "description": "Approved AI compute infrastructure/neocloud names. IREN approved with caution (10 occurrences as advisory_unresolved). Speculative risk profile: financing, power cost, capacity execution.",
+      "supply_chain_role": "ai_compute_capacity_provider",
+      "risk_flags": [
+        "speculative_growth",
+        "financing_risk",
+        "power_cost",
+        "capacity_execution_risk",
+        "customer_concentration",
+        "dilution_risk",
+        "volatility_risk"
+      ],
+      "canonical_symbols": [
+        "IREN"
+      ],
+      "proxy_symbols": [],
+      "source": "thematic_roster",
+      "approval_source": "coverage_gap_review"
+    },
+    {
+      "theme_id": "ai_infrastructure_hardware",
+      "theme_name": "AI Infrastructure Hardware",
+      "description": "Servers, networking, power supplies, and cooling — physical layer of AI compute.",
+      "supply_chain_role": "hardware_platform",
+      "risk_flags": [
+        "capex_cycle",
+        "customer_concentration",
+        "component_shortage"
+      ],
+      "canonical_symbols": [
+        "SMCI",
+        "DELL",
+        "APLD",
+        "CRWV",
+        "IREN",
+        "WULF"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "semiconductor_equipment",
+      "theme_name": "Semiconductor Equipment",
+      "description": "Capital equipment for advanced chip fabrication — bottleneck for all leading-edge capacity.",
+      "supply_chain_role": "upstream_bottleneck",
+      "risk_flags": [
+        "export_control_risk",
+        "cyclical_capex",
+        "customer_concentration_tsmc"
+      ],
+      "canonical_symbols": [
+        "ASML",
+        "AMAT",
+        "LRCX",
+        "KLAC",
+        "TER",
+        "ONTO"
+      ],
+      "proxy_symbols": [
+        "SMH"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "cloud_computing",
+      "theme_name": "Cloud Computing",
+      "description": "Hyperscaler cloud platforms and cloud-native software — subscription revenue, network effects.",
+      "supply_chain_role": "hyperscaler_platform",
+      "risk_flags": [
+        "multi_cloud_commoditisation",
+        "regulatory_antitrust"
+      ],
+      "canonical_symbols": [
+        "AMZN",
+        "MSFT",
+        "GOOGL",
+        "SNOW",
+        "MDB"
+      ],
+      "proxy_symbols": [
+        "IGV"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "enterprise_software",
+      "theme_name": "Enterprise Software",
+      "description": "Recurring-revenue SaaS with high switching costs — CRM, ERP, workflow, analytics.",
+      "supply_chain_role": "recurring_revenue_platform",
+      "risk_flags": [
+        "ai_commoditisation_of_features",
+        "budget_freeze_risk"
+      ],
+      "canonical_symbols": [
+        "CRM",
+        "NOW",
+        "INTU",
+        "ADBE",
+        "PLTR",
+        "APP"
+      ],
+      "proxy_symbols": [
+        "IGV"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "cybersecurity",
+      "theme_name": "Cybersecurity",
+      "description": "Zero-trust, endpoint, cloud security — beneficiaries of rising threat surface and compliance mandates.",
+      "supply_chain_role": "mission_critical_security",
+      "risk_flags": [
+        "vendor_consolidation",
+        "platform_competition_from_msft"
+      ],
+      "canonical_symbols": [
+        "PANW",
+        "CRWD",
+        "NET",
+        "FTNT"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "ai_application_software",
+      "theme_name": "AI Application Software",
+      "description": "Software natively embedding AI inference at the application layer — highest monetisation leverage on AI adoption.",
+      "supply_chain_role": "application_layer_ai",
+      "risk_flags": [
+        "model_commoditisation",
+        "open_source_disruption"
+      ],
+      "canonical_symbols": [
+        "PLTR",
+        "APP",
+        "SNOW",
+        "TEAM"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "fintech",
+      "theme_name": "Fintech & Digital Payments",
+      "description": "Digital payments, neobanks, BNPL, brokerage disruption — beneficiaries of cash-to-digital shift.",
+      "supply_chain_role": "financial_intermediary_disruptor",
+      "risk_flags": [
+        "regulatory_scrutiny",
+        "credit_cycle_exposure",
+        "incumbent_response"
+      ],
+      "canonical_symbols": [
+        "SOFI",
+        "AFRM",
+        "HOOD",
+        "COIN",
+        "TOST"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "internet_platform",
+      "theme_name": "Internet Platform / Search / Social",
+      "description": "Ad-supported internet platforms with massive DAU scale — duopoly in search and social.",
+      "supply_chain_role": "ad_network_monopoly",
+      "risk_flags": [
+        "regulatory_antitrust",
+        "ad_spend_cyclicality",
+        "ai_disruption_to_search"
+      ],
+      "canonical_symbols": [
+        "GOOGL",
+        "META",
+        "SNAP"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "streaming_media",
+      "theme_name": "Streaming & Digital Media",
+      "description": "Subscription streaming, music, and live events — beneficiaries of cord-cutting acceleration.",
+      "supply_chain_role": "content_distribution",
+      "risk_flags": [
+        "content_cost_inflation",
+        "subscriber_saturation"
+      ],
+      "canonical_symbols": [
+        "NFLX",
+        "SPOT",
+        "DIS"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "biotech_oncology",
+      "theme_name": "Biotech — Oncology",
+      "description": "Clinical-stage and commercial oncology biotechs — binary catalyst risk, blockbuster TAM.",
+      "supply_chain_role": "clinical_stage_binary",
+      "risk_flags": [
+        "fda_binary_readout",
+        "trial_failure",
+        "competitive_indication"
+      ],
+      "canonical_symbols": [
+        "RVMD",
+        "BMNR"
+      ],
+      "proxy_symbols": [
+        "XBI"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "biotech_rare_disease",
+      "theme_name": "Biotech — Rare Disease",
+      "description": "Rare disease / orphan drug biotechs — high pricing power, fast FDA review, smaller patient populations.",
+      "supply_chain_role": "orphan_drug_developer",
+      "risk_flags": [
+        "payer_coverage_risk",
+        "fda_binary_readout"
+      ],
+      "canonical_symbols": [
+        "ALNY",
+        "ARGX",
+        "TVTX",
+        "PRAX"
+      ],
+      "proxy_symbols": [
+        "XBI"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "medical_devices",
+      "theme_name": "Medical Devices",
+      "description": "Implantable, surgical, and monitoring devices — recurring consumable revenue with procedure volume leverage.",
+      "supply_chain_role": "hospital_capital_consumables",
+      "risk_flags": [
+        "hospital_capex_cycle",
+        "reimbursement_risk",
+        "procedure_volume_sensitivity"
+      ],
+      "canonical_symbols": [
+        "ABT",
+        "BSX",
+        "MDT",
+        "ISRG",
+        "PODD",
+        "EW"
+      ],
+      "proxy_symbols": [
+        "XLV"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "pharma_large_cap",
+      "theme_name": "Large Cap Pharma",
+      "description": "Diversified large pharma with patent-protected blockbusters — dividend stability.",
+      "supply_chain_role": "blockbuster_drug_franchise",
+      "risk_flags": [
+        "patent_cliff",
+        "drug_pricing_regulation",
+        "pipeline_binary_risk"
+      ],
+      "canonical_symbols": [
+        "LLY",
+        "JNJ",
+        "MRK",
+        "ABBV",
+        "PFE",
+        "AMGN",
+        "NVO"
+      ],
+      "proxy_symbols": [
+        "XLV"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "health_insurance",
+      "theme_name": "Health Insurance / Managed Care",
+      "description": "Health insurers — premium revenue, MLR leverage, Medicaid/Medicare exposure.",
+      "supply_chain_role": "healthcare_payer",
+      "risk_flags": [
+        "medical_cost_ratio_deterioration",
+        "cms_reimbursement_cuts"
+      ],
+      "canonical_symbols": [
+        "UNH",
+        "HUM",
+        "ELV"
+      ],
+      "proxy_symbols": [
+        "XLV"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "obesity_drugs",
+      "theme_name": "GLP-1 / Obesity Drugs",
+      "description": "GLP-1 agonist beneficiaries — LLY and NVO lead; supply chain and adjacent beneficiaries.",
+      "supply_chain_role": "blockbuster_single_drug_platform",
+      "risk_flags": [
+        "single_drug_dependency",
+        "competitive_pipeline",
+        "payer_access_limits"
+      ],
+      "canonical_symbols": [
+        "LLY",
+        "NVO"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "genomics_diagnostics",
+      "theme_name": "Genomics & Diagnostics",
+      "description": "Next-gen sequencing, liquid biopsy, multi-cancer early detection — high-growth diagnostic platforms.",
+      "supply_chain_role": "diagnostic_platform",
+      "risk_flags": [
+        "reimbursement_coverage_uncertainty",
+        "competitive_intensity"
+      ],
+      "canonical_symbols": [
+        "TMO",
+        "A"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "investment_banking",
+      "theme_name": "Investment Banking & Capital Markets",
+      "description": "M&A advisory, ECM/DCM underwriting, trading revenue — cyclical leverage to deal flow.",
+      "supply_chain_role": "capital_markets_intermediary",
+      "risk_flags": [
+        "m_and_a_cycle",
+        "rate_environment",
+        "trading_vol_dependency"
+      ],
+      "canonical_symbols": [
+        "GS",
+        "MS",
+        "BX",
+        "APO",
+        "CG"
+      ],
+      "proxy_symbols": [
+        "XLF"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "asset_management",
+      "theme_name": "Asset Management",
+      "description": "Fee-based AUM businesses — beneficiaries of rising equity markets and alternative allocations.",
+      "supply_chain_role": "capital_allocator",
+      "risk_flags": [
+        "aum_market_sensitivity",
+        "fee_compression"
+      ],
+      "canonical_symbols": [
+        "BLK",
+        "BX",
+        "APO",
+        "AMP"
+      ],
+      "proxy_symbols": [
+        "XLF"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "insurance",
+      "theme_name": "Insurance & Reinsurance",
+      "description": "P&C and specialty insurance — float income, underwriting discipline, hard market pricing.",
+      "supply_chain_role": "risk_transfer",
+      "risk_flags": [
+        "catastrophe_loss_exposure",
+        "reserve_adequacy"
+      ],
+      "canonical_symbols": [
+        "PGR",
+        "AON",
+        "ACGL"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "payments_processing",
+      "theme_name": "Payments & Processing",
+      "description": "Card network duopoly and payment processors — network effect moats, volume leverage.",
+      "supply_chain_role": "payment_network_moat",
+      "risk_flags": [
+        "cbdc_disruption",
+        "crypto_displacement",
+        "regulatory_interchange_caps"
+      ],
+      "canonical_symbols": [
+        "V",
+        "MA",
+        "AXP",
+        "FISV",
+        "GPN"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "crypto_exchange",
+      "theme_name": "Crypto Exchange & Holdings",
+      "description": "Regulated crypto exchanges and BTC holding companies — vol and price-level leverage.",
+      "supply_chain_role": "crypto_market_infrastructure",
+      "risk_flags": [
+        "regulatory_uncertainty",
+        "crypto_price_vol",
+        "security_risk"
+      ],
+      "canonical_symbols": [
+        "COIN",
+        "MSTR"
+      ],
+      "proxy_symbols": [
+        "IBIT",
+        "BITO"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "aerospace_manufacturing",
+      "theme_name": "Aerospace Manufacturing",
+      "description": "Commercial and military aerospace — production ramp, supply chain normalisation.",
+      "supply_chain_role": "prime_airframe_manufacturer",
+      "risk_flags": [
+        "supply_chain_bottleneck",
+        "certification_risk",
+        "labour_disputes"
+      ],
+      "canonical_symbols": [
+        "BA",
+        "GE",
+        "HWM"
+      ],
+      "proxy_symbols": [
+        "ITA"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "electrical_equipment",
+      "theme_name": "Electrical Equipment & Grid",
+      "description": "Power management, transformers, switchgear — infrastructure backbone for AI power demand.",
+      "supply_chain_role": "grid_equipment_supplier",
+      "risk_flags": [
+        "lead_time_constraints",
+        "utility_capex_cycle"
+      ],
+      "canonical_symbols": [
+        "ETN",
+        "GEV"
+      ],
+      "proxy_symbols": [
+        "XLI"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "construction_engineering",
+      "theme_name": "Construction & Engineering",
+      "description": "EPC contractors, electrical/grid infrastructure build-out, data-centre construction.",
+      "supply_chain_role": "infrastructure_contractor",
+      "risk_flags": [
+        "project_execution_risk",
+        "cost_overrun",
+        "permit_delay"
+      ],
+      "canonical_symbols": [
+        "PWR",
+        "STRL"
+      ],
+      "proxy_symbols": [
+        "XLI"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "automation_robotics",
+      "theme_name": "Industrial Automation & Robotics",
+      "description": "Factory automation, robotics, industrial AI — beneficiaries of reshoring and labour cost inflation.",
+      "supply_chain_role": "manufacturing_capex_cycle",
+      "risk_flags": [
+        "capex_cycle_delay",
+        "adoption_rate_uncertainty"
+      ],
+      "canonical_symbols": [
+        "SYM"
+      ],
+      "proxy_symbols": [
+        "XLI"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "industrial_conglomerates",
+      "theme_name": "Industrial Conglomerates",
+      "description": "Diversified industrial holding companies — defensive cash flows, portfolio optionality.",
+      "supply_chain_role": "diversified_industrial",
+      "risk_flags": [
+        "conglomerate_discount",
+        "segment_mix_shift"
+      ],
+      "canonical_symbols": [
+        "HON",
+        "CAT",
+        "DE"
+      ],
+      "proxy_symbols": [
+        "XLI"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "logistics_transportation",
+      "theme_name": "Logistics & Transportation",
+      "description": "Airlines, rails, freight — volume leverage to economic cycle.",
+      "supply_chain_role": "freight_volume_lever",
+      "risk_flags": [
+        "fuel_cost_passthrough",
+        "demand_cyclicality",
+        "labour_cost"
+      ],
+      "canonical_symbols": [
+        "DAL",
+        "UAL",
+        "UNP"
+      ],
+      "proxy_symbols": [
+        "XLI"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "nuclear_power",
+      "theme_name": "Nuclear Power",
+      "description": "Clean baseload power generation — beneficiaries of AI data-centre power procurement and decarbonisation.",
+      "supply_chain_role": "baseload_clean_energy",
+      "risk_flags": [
+        "regulatory_approval_timeline",
+        "construction_cost_overrun"
+      ],
+      "canonical_symbols": [
+        "CEG",
+        "OKLO",
+        "TLN"
+      ],
+      "proxy_symbols": [
+        "XLU"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "renewable_energy",
+      "theme_name": "Renewable Energy",
+      "description": "Solar, wind, and clean electricity generation and distribution.",
+      "supply_chain_role": "clean_power_generation",
+      "risk_flags": [
+        "ira_subsidy_policy_risk",
+        "grid_interconnection_queue"
+      ],
+      "canonical_symbols": [
+        "NEE",
+        "BE"
+      ],
+      "proxy_symbols": [
+        "XLU"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "energy_storage",
+      "theme_name": "Energy Storage",
+      "description": "Battery and long-duration storage — grid balancing and EV supply chain.",
+      "supply_chain_role": "grid_stabilisation",
+      "risk_flags": [
+        "technology_cost_curve",
+        "supply_chain_lithium"
+      ],
+      "canonical_symbols": [
+        "EOSE"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "uranium",
+      "theme_name": "Uranium & Nuclear Fuel",
+      "description": "Uranium miners and enrichers — supply constraint + nuclear renaissance tailwind.",
+      "supply_chain_role": "nuclear_fuel_supply",
+      "risk_flags": [
+        "uranium_spot_price_vol",
+        "enrichment_capacity"
+      ],
+      "canonical_symbols": [
+        "UUUU",
+        "LEU"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "gold_mining",
+      "theme_name": "Gold Mining",
+      "description": "Senior and royalty gold miners — inflation hedge, FX diversifier, leveraged to spot gold.",
+      "supply_chain_role": "gold_beta_leverage",
+      "risk_flags": [
+        "operating_cost_inflation",
+        "geopolitical_asset_risk"
+      ],
+      "canonical_symbols": [
+        "NEM",
+        "AEM",
+        "RGLD"
+      ],
+      "proxy_symbols": [
+        "GDX",
+        "GLD"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "copper_mining",
+      "theme_name": "Copper & Base Metals",
+      "description": "Copper producers — infrastructure and EV demand proxy.",
+      "supply_chain_role": "industrial_metals_supply",
+      "risk_flags": [
+        "china_demand_sensitivity",
+        "mine_supply_disruption"
+      ],
+      "canonical_symbols": [
+        "FCX"
+      ],
+      "proxy_symbols": [
+        "XLB"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "consumer_discretionary_retail",
+      "theme_name": "Consumer Retail",
+      "description": "Discretionary retail including e-commerce, specialty, and value retail.",
+      "supply_chain_role": "consumer_demand_barometer",
+      "risk_flags": [
+        "consumer_credit_health",
+        "inventory_cycle"
+      ],
+      "canonical_symbols": [
+        "AMZN",
+        "HD",
+        "COST"
+      ],
+      "proxy_symbols": [
+        "XLY"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "consumer_staples_food_bev",
+      "theme_name": "Consumer Staples — Food & Beverage",
+      "description": "Branded food, beverage, and personal care — pricing power, dividend reliability.",
+      "supply_chain_role": "non_cyclical_consumer_spend",
+      "risk_flags": [
+        "input_cost_inflation",
+        "private_label_substitution"
+      ],
+      "canonical_symbols": [
+        "KO",
+        "PEP",
+        "PG"
+      ],
+      "proxy_symbols": [
+        "XLP"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "luxury_consumer",
+      "theme_name": "Luxury Consumer",
+      "description": "Aspirational and luxury brands — wealth effect leverage, China exposure.",
+      "supply_chain_role": "aspirational_brand",
+      "risk_flags": [
+        "china_slowdown",
+        "aspirational_consumer_trade_down"
+      ],
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "XLY"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "automotive",
+      "theme_name": "Automotive & EV",
+      "description": "EV transition — Tesla dominance, legacy OEM transition, EV infrastructure.",
+      "supply_chain_role": "ev_transition_play",
+      "risk_flags": [
+        "ev_demand_normalisation",
+        "battery_cost_curve",
+        "competitive_intensity"
+      ],
+      "canonical_symbols": [
+        "TSLA",
+        "LCID"
+      ],
+      "proxy_symbols": [
+        "XLY"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "travel_hospitality",
+      "theme_name": "Travel & Hospitality",
+      "description": "Online travel, hotels, airlines — post-COVID recovery and leisure demand.",
+      "supply_chain_role": "cyclical_leisure_demand",
+      "risk_flags": [
+        "macro_demand_sensitivity",
+        "fuel_cost"
+      ],
+      "canonical_symbols": [
+        "BKNG",
+        "DAL",
+        "UAL"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "wireless_telecom",
+      "theme_name": "Wireless Telecom",
+      "description": "Mobile network operators — stable FCF, dividend, 5G spectrum leverage.",
+      "supply_chain_role": "network_utility",
+      "risk_flags": [
+        "spectrum_cost",
+        "arpu_compression",
+        "5g_capex_payback"
+      ],
+      "canonical_symbols": [
+        "TMUS",
+        "VZ",
+        "T"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "media_entertainment",
+      "theme_name": "Media & Entertainment",
+      "description": "Traditional and digital media, live events, gaming — content monetisation.",
+      "supply_chain_role": "content_owner_distributor",
+      "risk_flags": [
+        "content_cost_inflation",
+        "cord_cutting_acceleration"
+      ],
+      "canonical_symbols": [
+        "DIS",
+        "LYV"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "social_media",
+      "theme_name": "Social Media",
+      "description": "User-generated content platforms — DAU/MAU monetisation via advertising.",
+      "supply_chain_role": "ad_supported_platform",
+      "risk_flags": [
+        "regulatory_risk",
+        "teen_usage_decline",
+        "ad_spend_cyclicality"
+      ],
+      "canonical_symbols": [
+        "META",
+        "SNAP"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "advertising_tech",
+      "theme_name": "Advertising Technology",
+      "description": "Programmatic ad infrastructure — demand-side platforms, ad measurement, commerce media.",
+      "supply_chain_role": "ad_infrastructure",
+      "risk_flags": [
+        "cookie_deprecation",
+        "google_antitrust",
+        "ad_spend_cyclicality"
+      ],
+      "canonical_symbols": [
+        "TTD"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "data_centre_reit",
+      "theme_name": "Data Centre REIT",
+      "description": "Wholesale and colocation data centres — AI-driven hyperscaler demand for physical compute space.",
+      "supply_chain_role": "physical_ai_compute_infrastructure",
+      "risk_flags": [
+        "power_availability",
+        "hyperscaler_build_own_risk"
+      ],
+      "canonical_symbols": [
+        "DLR"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "industrial_reit",
+      "theme_name": "Industrial REIT",
+      "description": "Logistics warehouses and last-mile distribution — e-commerce fulfilment demand.",
+      "supply_chain_role": "logistics_real_estate",
+      "risk_flags": [
+        "rent_growth_normalisation",
+        "supply_overhang"
+      ],
+      "canonical_symbols": [],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "residential_reit",
+      "theme_name": "Residential REIT",
+      "description": "Apartment and single-family rental — housing affordability crisis beneficiaries.",
+      "supply_chain_role": "rental_housing_operator",
+      "risk_flags": [
+        "rent_control_legislation",
+        "supply_pipeline"
+      ],
+      "canonical_symbols": [
+        "EQR",
+        "UDR"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "broad_market_index",
+      "theme_name": "Broad Market Index",
+      "description": "S&P 500, Nasdaq 100, total market, and international index ETFs.",
+      "supply_chain_role": "passive_index_exposure",
+      "risk_flags": [
+        "concentration_risk_mega_cap"
+      ],
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "SPY",
+        "QQQ",
+        "QQQM",
+        "VOO",
+        "VTI",
+        "IWM",
+        "DIA",
+        "RSP",
+        "IVV",
+        "EEM",
+        "EFA"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "sector_etf_technology",
+      "theme_name": "Technology Sector ETF",
+      "description": "XLK and equivalent sector ETFs.",
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "XLK",
+        "IGV",
+        "SMH",
+        "SOXX"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "sector_etf_healthcare",
+      "theme_name": "Healthcare Sector ETF",
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "XLV",
+        "XBI"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "sector_etf_financials",
+      "theme_name": "Financials Sector ETF",
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "XLF",
+        "KRE"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "sector_etf_energy",
+      "theme_name": "Energy Sector ETF",
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "XLE"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "sector_etf_industrials",
+      "theme_name": "Industrials Sector ETF",
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "XLI",
+        "ITA"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "sector_etf_consumer_discretionary",
+      "theme_name": "Consumer Discretionary Sector ETF",
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "XLY"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "sector_etf_consumer_staples",
+      "theme_name": "Consumer Staples Sector ETF",
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "XLP"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "sector_etf_materials",
+      "theme_name": "Materials Sector ETF",
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "XLB",
+        "GDX"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "sector_etf_real_estate",
+      "theme_name": "Real Estate Sector ETF",
+      "canonical_symbols": [],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "sector_etf_communication",
+      "theme_name": "Communication Services Sector ETF",
+      "canonical_symbols": [],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "sector_etf_utilities",
+      "theme_name": "Utilities Sector ETF",
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "XLU"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "leveraged_etf",
+      "theme_name": "Leveraged ETF",
+      "description": "2x/3x leveraged ETFs — path-dependency decay risk, short-duration only.",
+      "supply_chain_role": "leveraged_beta_amplifier",
+      "risk_flags": [
+        "vol_decay",
+        "path_dependency",
+        "not_for_swing_holding"
+      ],
+      "canonical_symbols": [
+        "SOXL",
+        "TQQQ",
+        "TSLL",
+        "NVDL",
+        "BULL"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "inverse_etf",
+      "theme_name": "Inverse ETF",
+      "description": "Inverse and leveraged-inverse ETFs — short-duration bearish exposure.",
+      "supply_chain_role": "inverse_beta",
+      "risk_flags": [
+        "vol_decay",
+        "rebalance_drag"
+      ],
+      "canonical_symbols": [
+        "SQQQ",
+        "SOXS",
+        "SPXS"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "bond_etf",
+      "theme_name": "Bond ETF",
+      "description": "Fixed income ETFs covering treasuries, IG, and HY corporates.",
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "TLT",
+        "HYG",
+        "LQD",
+        "SGOV",
+        "BIL",
+        "VCLT",
+        "VCIT"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "commodity_etf_gold",
+      "theme_name": "Gold Commodity ETF",
+      "description": "Physical gold ETFs — inflation hedge, FX reserve diversification.",
+      "supply_chain_role": "gold_spot_exposure",
+      "risk_flags": [
+        "opportunity_cost_vs_rates"
+      ],
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "GLD"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "commodity_etf_oil",
+      "theme_name": "Crude Oil Commodity ETF",
+      "description": "Crude oil futures ETF — supply shock and geopolitical hedge.",
+      "supply_chain_role": "oil_spot_proxy",
+      "risk_flags": [
+        "contango_roll_cost"
+      ],
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "USO"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "commodity_etf_silver",
+      "theme_name": "Silver Commodity ETF",
+      "description": "Physical silver ETF — industrial + monetary hybrid.",
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "SLV"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "crypto_etf",
+      "theme_name": "Crypto ETF",
+      "description": "Spot and futures-based Bitcoin and Ethereum ETFs.",
+      "supply_chain_role": "regulated_crypto_exposure",
+      "risk_flags": [
+        "crypto_vol",
+        "regulatory_uncertainty"
+      ],
+      "canonical_symbols": [],
+      "proxy_symbols": [
+        "IBIT",
+        "BITO"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "volatility_product",
+      "theme_name": "Volatility Product",
+      "description": "VIX-linked ETPs — negative carry in contango, only useful for short-term hedges.",
+      "supply_chain_role": "tail_hedge",
+      "risk_flags": [
+        "negative_carry",
+        "contango_decay",
+        "unsuitable_for_long_hold"
+      ],
+      "canonical_symbols": [
+        "UVXY",
+        "VXX"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "quantum_computing",
+      "theme_name": "Quantum Computing",
+      "description": "Early-stage quantum hardware and software companies — binary technology milestones, long time-to-commercial-scale.",
+      "supply_chain_role": "next_generation_compute",
+      "risk_flags": [
+        "pre_revenue_binary_risk",
+        "decoherence_engineering_challenge",
+        "long_commercialisation_timeline"
+      ],
+      "canonical_symbols": [
+        "IONQ",
+        "QBTS",
+        "RGTI"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "space_launch",
+      "theme_name": "Space Launch & Satellite",
+      "description": "Commercial space launch, satellite connectivity, and space-as-infrastructure — new market formation.",
+      "supply_chain_role": "space_infrastructure",
+      "risk_flags": [
+        "launch_failure_risk",
+        "regulatory_spectrum",
+        "capex_intensity"
+      ],
+      "canonical_symbols": [
+        "RKLB",
+        "ASTS",
+        "ONDS"
+      ],
+      "proxy_symbols": [],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "restaurants_qsr",
+      "theme_name": "Restaurants & Quick Service",
+      "description": "QSR and fast-casual restaurant chains — franchised asset-light models, stable traffic.",
+      "supply_chain_role": "consumer_staples_adjacent",
+      "risk_flags": [
+        "labour_cost_inflation",
+        "commodity_food_cost"
+      ],
+      "canonical_symbols": [
+        "MCD"
+      ],
+      "proxy_symbols": [
+        "XLY"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "ecommerce_marketplace",
+      "theme_name": "E-Commerce Marketplace",
+      "description": "Online retail marketplaces and platforms — GMV growth, logistics network, third-party seller ecosystem.",
+      "supply_chain_role": "retail_distribution_platform",
+      "risk_flags": [
+        "logistics_cost",
+        "regulatory_antitrust",
+        "competition_from_temu_shein"
+      ],
+      "canonical_symbols": [
+        "AMZN",
+        "SHOP",
+        "MELI",
+        "BABA"
+      ],
+      "proxy_symbols": [
+        "XLY"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "digital_health",
+      "theme_name": "Digital Health & Telehealth",
+      "description": "Consumer-facing digital health, telehealth, and at-home diagnostics — disrupting traditional care delivery.",
+      "supply_chain_role": "healthcare_access_disruption",
+      "risk_flags": [
+        "reimbursement_uncertainty",
+        "regulatory_prescription_rules"
+      ],
+      "canonical_symbols": [
+        "HIMS"
+      ],
+      "proxy_symbols": [
+        "XBI"
+      ],
+      "source": "reference_data_builder"
+    },
+    {
+      "theme_id": "emerging_or_unclassified_theme",
+      "theme_name": "Emerging or Unclassified Theme",
+      "description": "Catch-all for symbols that are real equities but do not yet fit a named theme. Prevents any valid symbol from being dropped from analysis.",
+      "supply_chain_role": "unclassified",
+      "risk_flags": [
+        "requires_manual_theme_assignment"
+      ],
+      "canonical_symbols": [],
+      "proxy_symbols": [],
+      "source": "reference_data_builder",
+      "meta_overlay": true
+    },
+    {
+      "theme_id": "scanner_only_attention",
+      "theme_name": "Scanner-Only Attention",
+      "description": "Symbols that appear in scanner output but have no approved intelligence theme. Tracked for coverage-gap evidence only — not admitted to shadow universe without a theme assignment.",
+      "supply_chain_role": "scanner_signal_only",
+      "risk_flags": [
+        "no_intelligence_context",
+        "theme_required_before_admission"
+      ],
+      "canonical_symbols": [],
+      "proxy_symbols": [],
+      "source": "reference_data_builder",
+      "meta_overlay": true
+    },
+    {
+      "theme_id": "event_driven_special_situation",
+      "theme_name": "Event-Driven / Special Situation",
+      "description": "Symbols in the system because of a specific catalyst — earnings, M&A, regulatory. Not a structural theme. Eligible for universe while catalyst is active.",
+      "supply_chain_role": "event_catalyst",
+      "risk_flags": [
+        "event_expiry",
+        "catalyst_failure"
+      ],
+      "canonical_symbols": [],
+      "proxy_symbols": [],
+      "source": "reference_data_builder",
+      "meta_overlay": true
+    },
+    {
+      "theme_id": "unknown_requires_provider_enrichment",
+      "theme_name": "Unknown — Requires Provider Enrichment",
+      "description": "Symbol cannot be classified from local sources alone. Must be enriched via FMP or another approved provider before a theme can be assigned.",
+      "supply_chain_role": "unknown",
+      "risk_flags": [
+        "classification_blocked",
+        "no_admission_until_classified"
+      ],
+      "canonical_symbols": [],
+      "proxy_symbols": [],
+      "source": "reference_data_builder",
+      "meta_overlay": true
+    }
+  ]
+}

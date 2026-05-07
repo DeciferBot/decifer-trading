@@ -1,0 +1,291 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-06T20:57:26.210051+00:00",
+  "source": "factor_registry",
+  "provider_summary": {
+    "alpaca": {
+      "status": "active",
+      "suitability": "primary for market data, quotes, options",
+      "plan": "Algo Trader Plus"
+    },
+    "fmp": {
+      "status": "active",
+      "suitability": "primary for fundamentals, events, analyst, news",
+      "plan": "Premium (750 calls/min)"
+    },
+    "alpha_vantage": {
+      "status": "active_limited",
+      "suitability": "secondary/fallback; free plan rate-limited",
+      "plan": "Free (25 req/day)"
+    },
+    "yfinance": {
+      "status": "active_research_only",
+      "suitability": "research/fallback only; unofficial",
+      "plan": "Free"
+    },
+    "ibkr": {
+      "status": "unavailable_gateway",
+      "suitability": "primary for broker/execution layer; gateway not configured",
+      "plan": "TWS required"
+    },
+    "local_files": {
+      "status": "active",
+      "suitability": "primary for reference/shadow layer",
+      "plan": "None"
+    }
+  },
+  "factor_coverage_summary": [
+    {
+      "category": "analyst_actions",
+      "coverage_status": "covered",
+      "primary_provider": "fmp",
+      "fallback_providers": [],
+      "production_ready": true,
+      "factors_in_category": 4,
+      "production_runtime_factors": 4
+    },
+    {
+      "category": "earnings_events",
+      "coverage_status": "covered",
+      "primary_provider": "fmp",
+      "fallback_providers": [],
+      "production_ready": true,
+      "factors_in_category": 5,
+      "production_runtime_factors": 5
+    },
+    {
+      "category": "fundamentals",
+      "coverage_status": "partially_covered",
+      "primary_provider": "fmp",
+      "fallback_providers": [
+        "alpha_vantage"
+      ],
+      "production_ready": false,
+      "factors_in_category": 7,
+      "production_runtime_factors": 0
+    },
+    {
+      "category": "liquidity_microstructure",
+      "coverage_status": "covered",
+      "primary_provider": "alpaca",
+      "fallback_providers": [],
+      "production_ready": true,
+      "factors_in_category": 4,
+      "production_runtime_factors": 4
+    },
+    {
+      "category": "macro_economic",
+      "coverage_status": "unavailable",
+      "primary_provider": null,
+      "fallback_providers": [
+        "alpaca",
+        "alpha_vantage"
+      ],
+      "production_ready": false,
+      "factors_in_category": 6,
+      "production_runtime_factors": 2
+    },
+    {
+      "category": "news",
+      "coverage_status": "covered",
+      "primary_provider": "fmp",
+      "fallback_providers": [],
+      "production_ready": true,
+      "factors_in_category": 2,
+      "production_runtime_factors": 2
+    },
+    {
+      "category": "options_data",
+      "coverage_status": "covered",
+      "primary_provider": "alpaca",
+      "fallback_providers": [],
+      "production_ready": true,
+      "factors_in_category": 6,
+      "production_runtime_factors": 6
+    },
+    {
+      "category": "ownership_short_flow",
+      "coverage_status": "unavailable",
+      "primary_provider": null,
+      "fallback_providers": [
+        "fmp"
+      ],
+      "production_ready": false,
+      "factors_in_category": 3,
+      "production_runtime_factors": 2
+    },
+    {
+      "category": "price_ohlcv",
+      "coverage_status": "covered",
+      "primary_provider": "alpaca",
+      "fallback_providers": [
+        "alpha_vantage",
+        "yfinance",
+        "ibkr"
+      ],
+      "production_ready": true,
+      "factors_in_category": 7,
+      "production_runtime_factors": 6
+    },
+    {
+      "category": "reference_symbol_identity",
+      "coverage_status": "covered",
+      "primary_provider": "fmp",
+      "fallback_providers": [],
+      "production_ready": true,
+      "factors_in_category": 9,
+      "production_runtime_factors": 8
+    },
+    {
+      "category": "risk_portfolio_broker",
+      "coverage_status": "requires_broker_subscription",
+      "primary_provider": "ibkr",
+      "fallback_providers": [],
+      "production_ready": false,
+      "factors_in_category": 5,
+      "production_runtime_factors": 5
+    },
+    {
+      "category": "sector_industry_theme",
+      "coverage_status": "covered",
+      "primary_provider": "local_files",
+      "fallback_providers": [],
+      "production_ready": true,
+      "factors_in_category": 3,
+      "production_runtime_factors": 2
+    },
+    {
+      "category": "technical_indicators",
+      "coverage_status": "covered",
+      "primary_provider": "alpaca",
+      "fallback_providers": [
+        "alpha_vantage"
+      ],
+      "production_ready": true,
+      "factors_in_category": 12,
+      "production_runtime_factors": 12
+    }
+  ],
+  "missing_factor_summary": {
+    "categories_unavailable": [
+      "macro_economic",
+      "ownership_short_flow"
+    ],
+    "categories_partial": [
+      "fundamentals",
+      "risk_portfolio_broker"
+    ],
+    "notes": "risk_portfolio_broker requires IBKR gateway; fundamentals offline-only; macro partially available"
+  },
+  "duplicate_factor_sources": [
+    {
+      "factor": "ohlcv_daily",
+      "providers": [
+        "alpaca",
+        "alpha_vantage",
+        "yfinance"
+      ],
+      "resolution": "alpaca primary; others fallback"
+    },
+    {
+      "factor": "fundamentals",
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "resolution": "fmp primary; yfinance research fallback"
+    }
+  ],
+  "recommended_primary_sources": {
+    "market_data_ohlcv": "alpaca",
+    "quotes_real_time": "alpaca",
+    "options": "alpaca",
+    "fundamentals": "fmp",
+    "earnings_calendar": "fmp",
+    "analyst_actions": "fmp",
+    "structured_news": "fmp",
+    "macro_indicators": "alpha_vantage_or_fmp",
+    "broker_execution": "ibkr",
+    "reference_classification": "local_files_then_fmp"
+  },
+  "recommended_fallback_sources": {
+    "market_data_ohlcv": "yfinance",
+    "fundamentals": "yfinance",
+    "macro_indicators": "yfinance"
+  },
+  "production_blockers": [
+    {
+      "blocker": "IBKR gateway not configured",
+      "affected_categories": [
+        "risk_portfolio_broker"
+      ],
+      "severity": "high",
+      "resolution": "configure IBKR_HOST, IBKR_PORT, IBKR_CLIENT_ID for live deployment"
+    },
+    {
+      "blocker": "Alpha Vantage free plan rate-limited (25/day)",
+      "affected_categories": [
+        "technical_indicators",
+        "macro_economic"
+      ],
+      "severity": "medium",
+      "resolution": "upgrade plan or use alpaca/fmp as primary; alpha_vantage as fallback only"
+    },
+    {
+      "blocker": "FMP /v3/ legacy endpoints deprecated",
+      "affected_categories": [
+        "reference_symbol_identity",
+        "fundamentals"
+      ],
+      "severity": "low",
+      "resolution": "already using /stable/ endpoints; audit remaining callers"
+    }
+  ],
+  "data_license_risks": [
+    {
+      "provider": "yfinance",
+      "risk": "unofficial scraping API; ToS risk; no SLA",
+      "recommendation": "research/backtest only; not production primary"
+    },
+    {
+      "provider": "fmp",
+      "risk": "paid subscription required; license terms apply to commercial use",
+      "recommendation": "review FMP commercial license for production deployment"
+    }
+  ],
+  "rate_limit_risks": [
+    {
+      "provider": "alpha_vantage",
+      "risk": "25 requests/day on free plan; premium upgrade required for production",
+      "current_status": "rate_limited_in_testing"
+    },
+    {
+      "provider": "alpaca",
+      "risk": "rate limits apply; monitor under high-frequency scan cycles",
+      "current_status": "within_limits"
+    }
+  ],
+  "cloud_runtime_implications": {
+    "alpaca": "low \u2014 REST API, no gateway required",
+    "fmp": "low \u2014 REST API, no gateway required",
+    "alpha_vantage": "low \u2014 REST API; rate limit is a concern",
+    "ibkr": "high \u2014 requires persistent TWS/IB Gateway connection; firewall/NAT handling required in cloud",
+    "yfinance": "medium \u2014 unofficial; risk of blocking or breakage in headless/cloud environment"
+  },
+  "next_actions": [
+    "Configure IBKR gateway for execution-layer testing",
+    "Upgrade Alpha Vantage plan or confirm alpha_vantage is fallback only",
+    "Audit all FMP callers to confirm /stable/ endpoint migration complete",
+    "Add provider health-check job to daily intelligence pipeline",
+    "Add yfinance guarded import to prevent accidental production use"
+  ],
+  "production_ready_categories": 9,
+  "partial_categories": 2,
+  "unavailable_categories": 2,
+  "live_output_changed": false,
+  "data_provider_api_called": false,
+  "live_trading_api_called": false,
+  "env_presence_checked": false,
+  "env_values_logged": false,
+  "secrets_exposed": false
+}

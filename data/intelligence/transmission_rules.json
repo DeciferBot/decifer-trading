@@ -235,7 +235,72 @@
       "source_type": "deterministic_rule",
       "source_label": "intelligence_first_static_rule",
       "last_reviewed": "2026-05-05"
+    },
+    {
+      "rule_id": "ai_capex_to_memory_storage",
+      "driver": "corporate_capex",
+      "driver_alias": "ai_capex_growth",
+      "condition": "AI data-centre expansion, hyperscaler capex growth, or enterprise AI storage demand driving memory and storage cycle tightening",
+      "output_type": "theme_tailwind",
+      "affected_targets": [
+        "memory_storage"
+      ],
+      "direction": "positive",
+      "strength": 0.72,
+      "confidence": 0.72,
+      "horizon": "multi_week_to_multi_quarter",
+      "required_confirmations": [
+        "storage_memory_relative_strength",
+        "enterprise_storage_demand_support",
+        "ai_capex_confirmation",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "blocked_if": [
+        "capex_guidance_cut",
+        "memory_pricing_reverses",
+        "storage_demand_weakens",
+        "ai_capex_guidance_cuts",
+        "sector_relative_strength_fails",
+        "valuation_crowding_extreme"
+      ],
+      "reason": "AI data-centre expansion can increase demand for high-performance memory, storage and related enterprise infrastructure. Memory/storage cycle tightening driven by AI workload growth supports SNDK, WDC and related names.",
+      "source_type": "deterministic_rule",
+      "source_label": "reference_data_approved_theme",
+      "approval_source": "coverage_gap_review",
+      "last_reviewed": "2026-05-07"
+    },
+    {
+      "rule_id": "ai_compute_demand_to_ai_compute_infrastructure",
+      "driver": "corporate_capex",
+      "driver_alias": "ai_compute_demand",
+      "condition": "AI workload demand, GPU compute scarcity, or power-constrained data-centre capacity supporting approved AI compute infrastructure operators",
+      "output_type": "theme_tailwind",
+      "affected_targets": [
+        "ai_compute_infrastructure"
+      ],
+      "direction": "conditional_positive",
+      "strength": 0.60,
+      "confidence": 0.60,
+      "horizon": "multi_week_to_multi_quarter",
+      "required_confirmations": [
+        "ai_compute_demand_confirmation",
+        "company_capacity_or_customer_evidence",
+        "financing_risk_review",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "blocked_if": [
+        "financing_risk_rises",
+        "power_cost_rises",
+        "customer_concentration_risk_worsens",
+        "capacity_execution_risk_increases",
+        "speculative_crowding_extreme"
+      ],
+      "reason": "AI workload demand and GPU compute scarcity can support approved AI compute infrastructure and neocloud providers, but only when financing, power and execution risks remain controlled. Confidence lower than other AI themes due to speculative risk profile.",
+      "source_type": "deterministic_rule",
+      "source_label": "reference_data_approved_theme",
+      "approval_source": "coverage_gap_review",
+      "last_reviewed": "2026-05-07"
     }
   ],
-  "last_updated": "2026-05-05"
+  "last_updated": "2026-05-07"
 }

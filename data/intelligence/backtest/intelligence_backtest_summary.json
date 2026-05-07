@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-06T05:28:21Z",
+  "generated_at": "2026-05-06T20:21:03Z",
   "mode": "local_fixture_backtest_summary",
   "data_source_mode": "local_fixtures_and_shadow_outputs_only",
   "source_files": [

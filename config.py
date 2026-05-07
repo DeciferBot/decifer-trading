@@ -967,7 +967,7 @@ CONFIG = {
     "intelligence_first_transmission_enabled":    False,  # run macro transmission matrix (safe to enable)
     "intelligence_first_candidate_feed_enabled":  False,  # run economic candidate feed (safe to enable)
     "intelligence_first_universe_builder_enabled": False, # run shadow universe builder (safe to enable)
-    "intelligence_first_advisory_enabled":        True,   # advisory logging alongside live bot — Real-Session Observation Phase
+    "intelligence_first_advisory_enabled":        False,  # advisory logging alongside live bot — Sprint 6C observation complete, gate met (advisory_ready_for_handoff_design)
     "enable_active_opportunity_universe_handoff": False,  # PRODUCTION WIRING — never enable during migration
 }
 

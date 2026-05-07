@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-05T20:35:06Z",
-  "valid_for_session": "2026-05-05",
+  "generated_at": "2026-05-06T20:20:57Z",
+  "valid_for_session": "2026-05-06",
   "mode": "shadow_theme_activation",
   "data_source_mode": "local_shadow_outputs_only",
   "source_files": [
@@ -18,12 +18,12 @@
     "Sprint 4B: theme activation inferred from local shadow files only. No live market data. Confidence scores are conservative estimates. Theme activation cannot create symbols or executable candidates."
   ],
   "activation_summary": {
-    "total_themes": 8,
+    "total_themes": 10,
     "activated": 2,
     "strengthening": 0,
     "watchlist": 3,
     "weakening": 1,
-    "crowded": 2,
+    "crowded": 4,
     "invalidated": 0,
     "dormant": 0,
     "low_confidence_count": 0,
@@ -77,7 +77,7 @@
       "candidates_excluded_count": 0,
       "quota_pressure": {
         "structural_quota_binding": true,
-        "overflow": 160
+        "overflow": 163
       },
       "evidence": [
         "driver_ai_capex_growth_active_via_rule_ai_capex_growth_to_data_centre_power",
@@ -135,7 +135,7 @@
       "candidates_excluded_count": 0,
       "quota_pressure": {
         "structural_quota_binding": true,
-        "overflow": 160
+        "overflow": 163
       },
       "evidence": [
         "driver_ai_capex_growth_active_via_rule_ai_capex_growth_to_semiconductors",
@@ -192,7 +192,7 @@
       "candidates_excluded_count": 0,
       "quota_pressure": {
         "structural_quota_binding": true,
-        "overflow": 160
+        "overflow": 163
       },
       "evidence": [
         "driver_yields_rising_watch_via_rule_rates_rising_to_banks_conditional",
@@ -247,7 +247,7 @@
       "candidates_excluded_count": 0,
       "quota_pressure": {
         "structural_quota_binding": true,
-        "overflow": 160
+        "overflow": 163
       },
       "evidence": [
         "driver_oil_supply_shock_watch_via_rule_oil_supply_shock_to_energy",
@@ -302,7 +302,7 @@
       "candidates_excluded_count": 0,
       "quota_pressure": {
         "structural_quota_binding": true,
-        "overflow": 160
+        "overflow": 163
       },
       "evidence": [
         "driver_geopolitical_risk_rising_watch_via_rule_geopolitical_risk_to_defence",
@@ -358,7 +358,7 @@
       "candidates_excluded_count": 3,
       "quota_pressure": {
         "structural_quota_binding": true,
-        "overflow": 160
+        "overflow": 163
       },
       "evidence": [
         "driver_credit_stress_rising_watch_via_rule_credit_stress_to_quality_cash_flow",
@@ -413,7 +413,7 @@
       "candidates_excluded_count": 5,
       "quota_pressure": {
         "structural_quota_binding": true,
-        "overflow": 160
+        "overflow": 163
       },
       "evidence": [
         "driver_risk_off_rotation_watch_via_rule_risk_off_rotation_to_defensive_quality",
@@ -467,13 +467,130 @@
       "candidates_excluded_count": 0,
       "quota_pressure": {
         "structural_quota_binding": true,
-        "overflow": 160
+        "overflow": 163
       },
       "evidence": [
         "driver_credit_stress_rising_watch_via_rule_credit_stress_to_small_caps_headwind",
         "1_candidates_in_economic_feed",
         "1_candidates_in_shadow_universe",
         "pressure_candidate_present_in_feed"
+      ],
+      "evidence_limited": false,
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "memory_storage",
+      "state": "crowded",
+      "previous_state": null,
+      "activated_by": [
+        "ai_capex_to_memory_storage"
+      ],
+      "weakened_by": [],
+      "invalidated_by": [],
+      "active_drivers": [
+        "ai_capex_growth"
+      ],
+      "transmission_rules_fired": [
+        "ai_capex_to_memory_storage"
+      ],
+      "direction": "tailwind",
+      "confidence": 0.3,
+      "horizon": "multi_week_to_multi_quarter",
+      "reason": "Theme memory_storage direction=tailwind, state=crowded, driver_state=active_shadow_inferred, candidates=2",
+      "confirmation_requirements": [
+        "storage_memory_relative_strength",
+        "earnings_commentary_support",
+        "ai_capex_or_enterprise_storage_demand_support",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "risk_flags": [
+        "memory_cycle_risk",
+        "commodity_pricing",
+        "capex_sensitivity",
+        "earnings_volatility",
+        "supply_demand_reversal",
+        "valuation_risk"
+      ],
+      "invalidation_rules": [
+        "memory pricing reverses",
+        "AI capex guidance cuts",
+        "storage demand disappoints",
+        "sector relative strength fails",
+        "management commentary weakens thesis"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "route_bias": "swing_or_watchlist",
+      "candidate_count": 2,
+      "candidates_in_shadow_count": 0,
+      "candidates_excluded_count": 2,
+      "quota_pressure": {
+        "structural_quota_binding": true,
+        "overflow": 163
+      },
+      "evidence": [
+        "driver_ai_capex_growth_active_via_rule_ai_capex_to_memory_storage",
+        "2_candidates_in_economic_feed"
+      ],
+      "evidence_limited": false,
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "ai_compute_infrastructure",
+      "state": "crowded",
+      "previous_state": null,
+      "activated_by": [],
+      "weakened_by": [],
+      "invalidated_by": [],
+      "active_drivers": [
+        "ai_compute_demand"
+      ],
+      "transmission_rules_fired": [
+        "ai_compute_demand_to_ai_compute_infrastructure"
+      ],
+      "direction": "tailwind",
+      "confidence": 0.3,
+      "horizon": "multi_week_to_multi_quarter",
+      "reason": "Theme ai_compute_infrastructure direction=tailwind, state=crowded, driver_state=watch_shadow_inferred, candidates=1",
+      "confirmation_requirements": [
+        "ai_compute_demand_confirmation",
+        "customer_or_capacity_commentary",
+        "financing_and_power_cost_risk_review",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "risk_flags": [
+        "speculative_growth",
+        "financing_risk",
+        "power_cost",
+        "capacity_execution_risk",
+        "customer_concentration",
+        "dilution_risk",
+        "volatility_risk"
+      ],
+      "invalidation_rules": [
+        "financing risk rises",
+        "capacity buildout disappoints",
+        "AI compute demand weakens",
+        "power costs rise materially",
+        "customer concentration risk worsens"
+      ],
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "route_bias": "watchlist_or_swing",
+      "candidate_count": 1,
+      "candidates_in_shadow_count": 0,
+      "candidates_excluded_count": 1,
+      "quota_pressure": {
+        "structural_quota_binding": true,
+        "overflow": 163
+      },
+      "evidence": [
+        "driver_ai_compute_demand_watch_via_rule_ai_compute_demand_to_ai_compute_infrastructure",
+        "1_candidates_in_economic_feed"
       ],
       "evidence_limited": false,
       "source_label": "intelligence_first_static_rule",

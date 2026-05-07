@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-05T20:35:13Z",
+  "generated_at": "2026-05-06T20:20:45Z",
   "mode": "shadow_comparison_only",
   "source_files": [
     "data/universe_builder/current_pipeline_snapshot.json",
@@ -325,9 +325,9 @@
     "broad_intraday_scan_used": false
   },
   "exclusion_analysis": {
-    "total_exclusions": 254,
+    "total_exclusions": 257,
     "exclusions_by_reason": {
-      "Structural quota full (20)": 153,
+      "Structural quota full (20)": 156,
       "Total universe cap reached (50)": 79,
       "Duplicate \u2014 already claimed by manual_conviction_favourites": 14,
       "Duplicate \u2014 already claimed by economic_intelligence_structural": 7,
@@ -337,20 +337,21 @@
       "tier_d_position_research": 150,
       "tier_a_core_floor": 51,
       "tier_b_daily_promoted": 43,
+      "economic_intelligence": 13,
       "intelligence_first_static_rule": 10,
-      "economic_intelligence": 10
+      "reference_data_approved_theme": 3
     },
     "exclusions_by_quota_group": {},
     "duplicate_exclusions": 22,
-    "quota_full_exclusions": 153,
+    "quota_full_exclusions": 156,
     "malformed_candidate_exclusions": 0
   },
   "quota_pressure_analysis": {
     "structural_position": {
-      "demand_total": 180,
+      "demand_total": 183,
       "capacity": 20,
       "accepted": 20,
-      "overflow": 160,
+      "overflow": 163,
       "binding": true,
       "demand_by_theme": {
         "data_centre_power": 4,
@@ -360,10 +361,12 @@
         "defence": 4,
         "quality_cash_flow": 4,
         "defensive_quality": 5,
+        "memory_storage": 2,
+        "ai_compute_infrastructure": 1,
         "": 150
       },
       "demand_by_source": {
-        "economic_intelligence_structural": 30,
+        "economic_intelligence_structural": 33,
         "tier_d_structural": 150
       }
     },
@@ -390,9 +393,9 @@
     }
   },
   "source_collision_analysis": {
-    "total_collisions": 36,
+    "total_collisions": 38,
     "collisions_where_symbol_still_in_shadow": 18,
-    "collisions_where_symbol_lost": 18,
+    "collisions_where_symbol_lost": 20,
     "collisions_protected_by_manual_or_held": 11,
     "source_path_excluded_but_symbol_preserved": 18,
     "collision_detail": [
@@ -1045,6 +1048,23 @@
         "excluded_entries": []
       },
       {
+        "symbol": "SNDK",
+        "collision_count": 2,
+        "attempted_by": [
+          "economic_intelligence_structural",
+          "tier_d_structural"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "economic_intelligence_structural",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
         "symbol": "SPY",
         "collision_count": 2,
         "attempted_by": [
@@ -1131,6 +1151,23 @@
         ]
       },
       {
+        "symbol": "WDC",
+        "collision_count": 2,
+        "attempted_by": [
+          "economic_intelligence_structural",
+          "tier_d_structural"
+        ],
+        "winning_source": null,
+        "excluded_source_paths": [
+          "economic_intelligence_structural",
+          "tier_d_structural"
+        ],
+        "final_in_shadow": false,
+        "protected_by_manual_or_held": false,
+        "source_path_excluded_but_symbol_preserved": false,
+        "excluded_entries": []
+      },
+      {
         "symbol": "XOM",
         "collision_count": 2,
         "attempted_by": [
@@ -1156,8 +1193,8 @@
     ]
   },
   "economic_slice_analysis": {
-    "slices_active": 8,
-    "total_economic_candidates": 40,
+    "slices_active": 10,
+    "total_economic_candidates": 43,
     "by_theme": {
       "data_centre_power": {
         "count": 5,
@@ -1269,6 +1306,27 @@
         "driver": "risk_appetite_falling, volatility_rising, defensive_rotation, breadth_deterioration",
         "direct_beneficiaries": 5,
         "etf_proxies": 3,
+        "second_order": 0
+      },
+      "memory_storage": {
+        "count": 2,
+        "symbols": [
+          "SNDK",
+          "WDC"
+        ],
+        "driver": "ai_capex_growth, data_centre_buildout, memory_pricing_cycle, enterprise_ai_storage_demand",
+        "direct_beneficiaries": 2,
+        "etf_proxies": 0,
+        "second_order": 0
+      },
+      "ai_compute_infrastructure": {
+        "count": 1,
+        "symbols": [
+          "IREN"
+        ],
+        "driver": "ai_compute_demand, gpu_cloud_demand, data_centre_capacity, power_constraint, neocloud_growth",
+        "direct_beneficiaries": 1,
+        "etf_proxies": 0,
         "second_order": 0
       }
     },
