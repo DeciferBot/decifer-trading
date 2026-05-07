@@ -1,0 +1,5 @@
+{
+  "fail_closed_reason": "source_read_error: file not found: /var/folders/93/_t7k5kmd4tlc0p5x244dd1th0000gn/T/tmp0zp31t5p/nonexistent.json",
+  "context": {},
+  "generated_at": "2026-05-07T15:31:07Z"
+}

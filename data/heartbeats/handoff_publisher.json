@@ -1,7 +1,7 @@
 {
   "worker": "handoff_publisher",
-  "last_success_at": "2026-05-07T15:26:30Z",
-  "last_attempt_at": "2026-05-07T15:26:30Z",
+  "last_success_at": "2026-05-07T15:40:46Z",
+  "last_attempt_at": "2026-05-07T15:40:46Z",
   "validation_status": "pass",
   "active_universe_file": "data/live/active_opportunity_universe.json",
   "current_manifest_file": "data/live/current_manifest.json",

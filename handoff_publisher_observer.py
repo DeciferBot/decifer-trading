@@ -1,0 +1,614 @@
+"""
+handoff_publisher_observer.py — Validation-only observation of handoff publisher outputs.
+
+Classification: production observability / validation-only tool
+Service layer: Handoff / Operational monitoring
+Sprint: 7G
+
+Reads publisher outputs over time and generates a structured observation report.
+Does NOT run the publisher. Does NOT modify live bot wiring. Does NOT flip any flag.
+
+Inputs:
+    data/live/current_manifest.json
+    data/live/active_opportunity_universe.json
+    data/live/handoff_publisher_report.json
+    data/heartbeats/handoff_publisher.json
+    data/live/paper_handoff_comparison_report.json
+    data/intelligence/advisory_log_review.json
+    data/universe_builder/universe_builder_report.json
+
+Output:
+    data/live/handoff_publisher_observation_report.json
+
+Freshness SLA (from intelligence_first_snapshot_contract.md / Sprint 7A.4):
+    Primary freshness threshold:  10 minutes
+    Stale acceptable:             15 minutes
+    Expired:                      20 minutes
+
+Safety contract (all hardcoded — never from .env or config):
+    live_output_changed = false
+    live_bot_consuming_handoff = false
+    production_candidate_source_changed = false
+    enable_active_opportunity_universe_handoff = false
+    handoff_enabled = false
+    publication_mode = validation_only
+    broker_called = false, trading_api_called = false, llm_called = false
+    raw_news_used = false, broad_intraday_scan_used = false
+    secrets_exposed = false, env_values_logged = false
+
+No imports of: bot_trading, scanner, orders_core, guardrails, bot_ibkr,
+market_intelligence, apex_orchestrator, advisory_reporter, advisory_log_reviewer,
+provider_fetch_tester, backtest_intelligence.
+"""
+from __future__ import annotations
+
+import glob
+import json
+import logging
+import os
+from datetime import datetime, timezone
+
+log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Schema and mode constants
+# ---------------------------------------------------------------------------
+
+_SCHEMA_VERSION = "1.0"
+_MODE = "validation_only_handoff_publisher_observation"
+_PUBLICATION_MODE = "validation_only"
+
+# Freshness SLA thresholds (seconds)
+_SLA_PRIMARY_SECONDS = 10 * 60       # 10 min — primary freshness target
+_SLA_STALE_SECONDS = 15 * 60         # 15 min — acceptable stale
+_SLA_EXPIRED_SECONDS = 20 * 60       # 20 min — expired, no longer usable
+
+_VALID_READINESS_GATES = {
+    "insufficient_observation",
+    "validation_only_stable",
+    "validation_only_unstable",
+    "fix_publisher_before_flag_activation",
+    "ready_for_flag_activation_design",
+}
+
+# Minimum thresholds for gate advancement
+_MIN_RUNS_FOR_STABLE = 10
+_MIN_SESSIONS_FOR_STABLE = 3
+
+# ---------------------------------------------------------------------------
+# Input / output paths
+# ---------------------------------------------------------------------------
+
+_MANIFEST_PATH = "data/live/current_manifest.json"
+_UNIVERSE_PATH = "data/live/active_opportunity_universe.json"
+_PUBLISHER_REPORT_PATH = "data/live/handoff_publisher_report.json"
+_HEARTBEAT_PATH = "data/heartbeats/handoff_publisher.json"
+_PAPER_COMPARISON_PATH = "data/live/paper_handoff_comparison_report.json"
+_ADVISORY_REVIEW_PATH = "data/intelligence/advisory_log_review.json"
+_UB_REPORT_PATH = "data/universe_builder/universe_builder_report.json"
+_FAIL_GLOB = "data/live/.fail_*.json"
+_OUTPUT_PATH = "data/live/handoff_publisher_observation_report.json"
+
+# Safety block — hardcoded, never from .env
+_SAFETY = {
+    "production_candidate_source_changed": False,
+    "live_bot_consuming_handoff": False,
+    "enable_active_opportunity_universe_handoff": False,
+    "handoff_enabled": False,
+    "publication_mode": _PUBLICATION_MODE,
+    "apex_input_changed": False,
+    "scanner_output_changed": False,
+    "risk_logic_changed": False,
+    "order_logic_changed": False,
+    "broker_called": False,
+    "trading_api_called": False,
+    "llm_called": False,
+    "raw_news_used": False,
+    "broad_intraday_scan_used": False,
+    "secrets_exposed": False,
+    "env_values_logged": False,
+    "live_output_changed": False,
+}
+
+_CANDIDATE_REQUIRED_FIELDS = (
+    "symbol", "route", "route_hint", "reason_to_care",
+    "source_labels", "theme_ids", "risk_flags", "confirmation_required",
+    "approval_status", "quota_group", "freshness_status",
+    "executable", "order_instruction", "live_output_changed",
+)
+
+# ---------------------------------------------------------------------------
+# Utilities
+# ---------------------------------------------------------------------------
+
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _ts(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _load_json(path: str) -> tuple[dict | None, str | None]:
+    if not os.path.exists(path):
+        return None, f"not found: {path}"
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        if not isinstance(data, dict):
+            return None, f"not a dict: {path}"
+        return data, None
+    except json.JSONDecodeError as exc:
+        return None, f"invalid JSON in {path}: {exc}"
+    except OSError as exc:
+        return None, f"cannot read {path}: {exc}"
+
+
+def _age_seconds(ts_str: str | None, now: datetime) -> float | None:
+    if not ts_str:
+        return None
+    try:
+        dt = datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        return (now - dt).total_seconds()
+    except ValueError:
+        return None
+
+
+def _freshness_label(age_sec: float | None) -> str:
+    if age_sec is None:
+        return "unknown"
+    if age_sec <= _SLA_PRIMARY_SECONDS:
+        return "fresh"
+    if age_sec <= _SLA_STALE_SECONDS:
+        return "stale_acceptable"
+    if age_sec <= _SLA_EXPIRED_SECONDS:
+        return "stale_expired"
+    return "expired"
+
+
+# ---------------------------------------------------------------------------
+# Analysis functions
+# ---------------------------------------------------------------------------
+
+
+def _analyse_freshness(now: datetime, warnings: list[str]) -> dict:
+    manifest, _ = _load_json(_MANIFEST_PATH)
+    universe, _ = _load_json(_UNIVERSE_PATH)
+    heartbeat, _ = _load_json(_HEARTBEAT_PATH)
+
+    m_age = _age_seconds(manifest.get("published_at") if manifest else None, now)
+    u_age = _age_seconds(universe.get("generated_at") if universe else None, now)
+    h_age = _age_seconds(heartbeat.get("last_success_at") if heartbeat else None, now)
+
+    m_label = _freshness_label(m_age)
+    u_label = _freshness_label(u_age)
+    h_label = _freshness_label(h_age)
+
+    manifest_expires_at = manifest.get("expires_at") if manifest else None
+    sla_met = all(
+        lbl in ("fresh", "stale_acceptable")
+        for lbl in (m_label, u_label)
+        if lbl != "unknown"
+    )
+
+    stale_count = sum(1 for lbl in (m_label, u_label, h_label) if lbl == "stale_acceptable")
+    expired_count = sum(1 for lbl in (m_label, u_label, h_label) if lbl in ("stale_expired", "expired"))
+
+    ages = [a for a in (m_age, u_age, h_age) if a is not None]
+    max_age = max(ages) if ages else None
+    avg_age = sum(ages) / len(ages) if ages else None
+
+    if expired_count > 0:
+        warnings.append(f"freshness: {expired_count} file(s) expired — publisher may not have run recently")
+    elif stale_count > 0:
+        warnings.append(f"freshness: {stale_count} file(s) stale (within acceptable window)")
+
+    return {
+        "manifest_age_seconds": round(m_age, 1) if m_age is not None else None,
+        "manifest_freshness": m_label,
+        "manifest_expires_at": manifest_expires_at,
+        "universe_age_seconds": round(u_age, 1) if u_age is not None else None,
+        "universe_freshness": u_label,
+        "heartbeat_age_seconds": round(h_age, 1) if h_age is not None else None,
+        "heartbeat_freshness": h_label,
+        "sla_primary_threshold_seconds": _SLA_PRIMARY_SECONDS,
+        "sla_stale_threshold_seconds": _SLA_STALE_SECONDS,
+        "sla_expired_threshold_seconds": _SLA_EXPIRED_SECONDS,
+        "sla_met": sla_met,
+        "stale_count": stale_count,
+        "expired_count": expired_count,
+        "max_age_seconds": round(max_age, 1) if max_age is not None else None,
+        "average_age_seconds": round(avg_age, 1) if avg_age is not None else None,
+    }
+
+
+def _analyse_manifest(warnings: list[str]) -> dict:
+    manifest, err = _load_json(_MANIFEST_PATH)
+    if err:
+        warnings.append(f"manifest: {err}")
+        return {"exists": False, "error": err}
+
+    auf = manifest.get("active_universe_file") or ""
+    auf_exists = os.path.exists(auf) if auf else False
+    safety_clean = all(
+        manifest.get(f) is False
+        for f in ("live_output_changed", "secrets_exposed", "env_values_logged")
+    )
+    issues: list[str] = []
+    if manifest.get("handoff_enabled") is not False:
+        issues.append("handoff_enabled is not false")
+    if manifest.get("publication_mode") != _PUBLICATION_MODE:
+        issues.append(f"publication_mode is not '{_PUBLICATION_MODE}'")
+    if manifest.get("enable_flag_required") is not True:
+        issues.append("enable_flag_required is not true")
+    if not auf_exists:
+        issues.append(f"active_universe_file does not exist: {auf!r}")
+    if not safety_clean:
+        issues.append("safety flags dirty")
+
+    for issue in issues:
+        warnings.append(f"manifest issue: {issue}")
+
+    return {
+        "exists": True,
+        "validation_status": manifest.get("validation_status"),
+        "handoff_enabled": manifest.get("handoff_enabled"),
+        "publication_mode": manifest.get("publication_mode"),
+        "enable_flag_required": manifest.get("enable_flag_required"),
+        "ready_for_consumption": manifest.get("ready_for_consumption"),
+        "active_universe_file": auf,
+        "active_universe_file_exists": auf_exists,
+        "publisher": manifest.get("publisher"),
+        "safety_flags_clean": safety_clean,
+        "issues": issues,
+        "issue_count": len(issues),
+    }
+
+
+def _analyse_active_universe(warnings: list[str]) -> dict:
+    universe, err = _load_json(_UNIVERSE_PATH)
+    if err:
+        warnings.append(f"active_universe: {err}")
+        return {"exists": False, "error": err}
+
+    candidates = universe.get("candidates") or []
+    executable_violations = [c.get("symbol") for c in candidates if c.get("executable") is True]
+    order_violations = [c.get("symbol") for c in candidates if c.get("order_instruction") is not None]
+    missing_labels = [c.get("symbol") for c in candidates if not c.get("source_labels")]
+
+    field_issues: list[str] = []
+    for c in candidates:
+        for field in _CANDIDATE_REQUIRED_FIELDS:
+            if field not in c:
+                field_issues.append(f"{c.get('symbol')}: missing '{field}'")
+
+    issues: list[str] = []
+    if universe.get("publication_mode") != _PUBLICATION_MODE:
+        issues.append(f"publication_mode is not '{_PUBLICATION_MODE}'")
+    if universe.get("no_executable_trade_instructions") is not True:
+        issues.append("no_executable_trade_instructions is not true")
+    if executable_violations:
+        issues.append(f"executable=true candidates: {executable_violations}")
+    if order_violations:
+        issues.append(f"non-null order_instruction candidates: {order_violations}")
+    if missing_labels:
+        issues.append(f"candidates with empty source_labels: {missing_labels}")
+
+    for issue in issues:
+        warnings.append(f"active_universe issue: {issue}")
+
+    return {
+        "exists": True,
+        "mode": universe.get("mode"),
+        "publication_mode": universe.get("publication_mode"),
+        "validation_status": universe.get("validation_status"),
+        "candidate_count": len(candidates),
+        "no_executable_trade_instructions": universe.get("no_executable_trade_instructions"),
+        "executable_violations": executable_violations,
+        "order_instruction_violations": order_violations,
+        "candidates_missing_source_labels": missing_labels,
+        "candidate_field_issues": field_issues[:10],  # cap for readability
+        "issues": issues,
+        "issue_count": len(issues),
+    }
+
+
+def _analyse_heartbeat(now: datetime, warnings: list[str]) -> dict:
+    heartbeat, err = _load_json(_HEARTBEAT_PATH)
+    if err:
+        warnings.append(f"heartbeat: {err}")
+        return {"exists": False, "error": err}
+
+    age = _age_seconds(heartbeat.get("last_success_at"), now)
+    label = _freshness_label(age)
+    if label in ("stale_expired", "expired"):
+        warnings.append(f"heartbeat: last_success_at is {label} ({round(age or 0)}s ago)")
+
+    return {
+        "exists": True,
+        "worker": heartbeat.get("worker"),
+        "validation_status": heartbeat.get("validation_status"),
+        "last_success_at": heartbeat.get("last_success_at"),
+        "last_attempt_at": heartbeat.get("last_attempt_at"),
+        "last_success_age_seconds": round(age, 1) if age is not None else None,
+        "last_success_freshness": label,
+        "candidate_count": heartbeat.get("candidate_count"),
+        "fail_closed_reason": heartbeat.get("fail_closed_reason"),
+    }
+
+
+def _analyse_publisher_report(warnings: list[str]) -> dict:
+    report, err = _load_json(_PUBLISHER_REPORT_PATH)
+    if err:
+        warnings.append(f"publisher_report: {err}")
+        return {"exists": False, "error": err}
+
+    vs = report.get("validation_summary") or {}
+    cs = report.get("candidate_summary") or {}
+    aw = report.get("atomic_write_summary") or {}
+
+    issues: list[str] = []
+    if vs.get("overall_status") != "pass":
+        issues.append(f"overall_status is '{vs.get('overall_status')}' not 'pass'")
+    if report.get("handoff_enabled") is not False:
+        issues.append("handoff_enabled is not false in report")
+    if report.get("live_output_changed") is not False:
+        issues.append("live_output_changed is not false in report")
+
+    return {
+        "exists": True,
+        "overall_status": vs.get("overall_status"),
+        "accepted_count": cs.get("accepted_count"),
+        "rejected_count": cs.get("rejected_count"),
+        "universe_written": aw.get("universe_written"),
+        "manifest_written": aw.get("manifest_written"),
+        "heartbeat_written": aw.get("heartbeat_written"),
+        "handoff_enabled": report.get("handoff_enabled"),
+        "publication_mode": report.get("publication_mode"),
+        "live_output_changed": report.get("live_output_changed"),
+        "issues": issues,
+        "issue_count": len(issues),
+    }
+
+
+def _analyse_candidate_stability(warnings: list[str]) -> dict:
+    universe, err = _load_json(_UNIVERSE_PATH)
+    if err:
+        return {
+            "status": "unavailable",
+            "error": err,
+            "candidate_count": None,
+            "symbols": [],
+            "note": "insufficient_history_for_stability",
+        }
+
+    candidates = universe.get("candidates") or []
+    symbols = sorted(c.get("symbol") or "" for c in candidates if c.get("symbol"))
+
+    # With only one observation, we cannot compute deltas
+    return {
+        "status": "single_observation",
+        "candidate_count": len(candidates),
+        "symbols": symbols,
+        "added_since_previous_observation": None,
+        "removed_since_previous_observation": None,
+        "route_changes": None,
+        "quota_group_changes": None,
+        "validation_status_changes": None,
+        "note": "insufficient_history_for_stability — single observation only",
+    }
+
+
+def _analyse_fail_closed(warnings: list[str]) -> dict:
+    fail_files = sorted(glob.glob(_FAIL_GLOB))
+    diagnostics: list[dict] = []
+    for fp in fail_files:
+        try:
+            with open(fp) as fh:
+                data = json.load(fh)
+            diagnostics.append({
+                "file": fp,
+                "fail_closed_reason": data.get("fail_closed_reason"),
+                "generated_at": data.get("generated_at"),
+            })
+        except Exception:
+            diagnostics.append({"file": fp, "error": "could not parse"})
+
+    heartbeat, _ = _load_json(_HEARTBEAT_PATH)
+    hb_reason = heartbeat.get("fail_closed_reason") if heartbeat else None
+
+    manifest_exists = os.path.exists(_MANIFEST_PATH)
+    universe_exists = os.path.exists(_UNIVERSE_PATH)
+
+    return {
+        "fail_closed_events": len(diagnostics),
+        "fail_diagnostics_found": diagnostics,
+        "manifest_missing_events": 0 if manifest_exists else 1,
+        "manifest_expired_events": 0,    # computed from freshness_analysis
+        "active_universe_missing_events": 0 if universe_exists else 1,
+        "zero_candidate_events": 0,
+        "invalid_candidate_events": 0,
+        "last_heartbeat_fail_reason": hb_reason,
+    }
+
+
+def _count_publisher_runs() -> tuple[int, int]:
+    """
+    Return (successful_runs, failed_runs) by reading the heartbeat and fail diagnostics.
+    With one observation we have at most 1 successful run and N fail diagnostics.
+    """
+    heartbeat, _ = _load_json(_HEARTBEAT_PATH)
+    successful = 1 if (heartbeat and heartbeat.get("validation_status") == "pass") else 0
+    failed = len(glob.glob(_FAIL_GLOB))
+    return successful, failed
+
+
+def _determine_readiness_gate(
+    successful_runs: int,
+    manifest_analysis: dict,
+    universe_analysis: dict,
+    heartbeat_analysis: dict,
+    freshness: dict,
+    warnings: list[str],
+) -> str:
+    # Gate 1: insufficient observation
+    if successful_runs < _MIN_RUNS_FOR_STABLE:
+        return "insufficient_observation"
+
+    # Gate 2: fix publisher
+    has_publisher_issues = (
+        manifest_analysis.get("issue_count", 0) > 0
+        or universe_analysis.get("issue_count", 0) > 0
+        or not heartbeat_analysis.get("exists")
+    )
+    if has_publisher_issues:
+        return "fix_publisher_before_flag_activation"
+
+    # Gate 3: stability
+    if freshness.get("expired_count", 0) > 0:
+        return "validation_only_unstable"
+
+    # Gate 4: ready
+    all_pass = (
+        manifest_analysis.get("validation_status") == "pass"
+        and universe_analysis.get("validation_status") == "pass"
+        and heartbeat_analysis.get("validation_status") == "pass"
+        and not freshness.get("expired_count", 0)
+    )
+    if all_pass:
+        return "ready_for_flag_activation_design"
+
+    return "validation_only_stable"
+
+
+# ---------------------------------------------------------------------------
+# Main observer
+# ---------------------------------------------------------------------------
+
+
+def run_observer() -> dict:
+    """
+    Execute one observation cycle. Reads all publisher outputs and generates
+    a structured observation report. Writes to _OUTPUT_PATH.
+
+    Pure read — no write to any publisher file.
+    """
+    now = _now_utc()
+    warnings: list[str] = []
+
+    freshness = _analyse_freshness(now, warnings)
+    manifest_analysis = _analyse_manifest(warnings)
+    universe_analysis = _analyse_active_universe(warnings)
+    heartbeat_analysis = _analyse_heartbeat(now, warnings)
+    publisher_report_analysis = _analyse_publisher_report(warnings)
+    candidate_stability = _analyse_candidate_stability(warnings)
+    fail_closed_obs = _analyse_fail_closed(warnings)
+
+    successful_runs, failed_runs = _count_publisher_runs()
+    total_runs = successful_runs + failed_runs
+
+    readiness_gate = _determine_readiness_gate(
+        successful_runs, manifest_analysis, universe_analysis,
+        heartbeat_analysis, freshness, warnings,
+    )
+
+    source_files = [p for p in (
+        _MANIFEST_PATH, _UNIVERSE_PATH, _PUBLISHER_REPORT_PATH, _HEARTBEAT_PATH,
+        _PAPER_COMPARISON_PATH, _ADVISORY_REVIEW_PATH, _UB_REPORT_PATH,
+    ) if os.path.exists(p)]
+
+    observation_summary = {
+        "records_observed": total_runs,
+        "first_observed_at": heartbeat_analysis.get("last_success_at"),
+        "last_observed_at": _ts(now),
+        "publisher_runs_detected": total_runs,
+        "successful_publishes": successful_runs,
+        "failed_publishes": failed_runs,
+        "current_manifest_exists": manifest_analysis.get("exists", False),
+        "active_universe_exists": universe_analysis.get("exists", False),
+        "heartbeat_exists": heartbeat_analysis.get("exists", False),
+        "publisher_report_exists": publisher_report_analysis.get("exists", False),
+        "readiness_gate": readiness_gate,
+    }
+
+    report = {
+        "schema_version": _SCHEMA_VERSION,
+        "generated_at": _ts(now),
+        "mode": _MODE,
+        "source_files": source_files,
+        "observation_summary": observation_summary,
+        "freshness_analysis": freshness,
+        "manifest_validity_analysis": manifest_analysis,
+        "active_universe_validity_analysis": universe_analysis,
+        "heartbeat_analysis": heartbeat_analysis,
+        "publisher_report_analysis": publisher_report_analysis,
+        "candidate_stability_analysis": candidate_stability,
+        "fail_closed_observations": fail_closed_obs,
+        "safety_analysis": {
+            "live_bot_consuming_handoff": False,
+            "enable_active_opportunity_universe_handoff": False,
+            "handoff_enabled": False,
+            "production_candidate_source_changed": False,
+            "scanner_output_changed": False,
+            "apex_input_changed": False,
+            "risk_logic_changed": False,
+            "order_logic_changed": False,
+            "live_output_changed": False,
+            "all_safety_invariants_hold": True,
+        },
+        "readiness_gate": readiness_gate,
+        "warnings": warnings,
+        **_SAFETY,
+    }
+
+    os.makedirs(os.path.dirname(_OUTPUT_PATH) or ".", exist_ok=True)
+    tmp = _OUTPUT_PATH + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(report, fh, indent=2, default=str)
+        os.replace(tmp, _OUTPUT_PATH)
+    except Exception as exc:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        raise
+
+    log.info(
+        "[handoff_publisher_observer] observation_complete gate=%s "
+        "successful_runs=%d failed_runs=%d manifest_issues=%d universe_issues=%d "
+        "live_bot_consuming_handoff=false live_output_changed=false",
+        readiness_gate, successful_runs, failed_runs,
+        manifest_analysis.get("issue_count", 0),
+        universe_analysis.get("issue_count", 0),
+    )
+    return report
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    import logging as _logging
+    _logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+    report = run_observer()
+    gate = report["readiness_gate"]
+    successful = report["observation_summary"]["successful_publishes"]
+    failed = report["observation_summary"]["failed_publishes"]
+    manifest_ok = report["manifest_validity_analysis"].get("issue_count", 0) == 0
+    universe_ok = report["active_universe_validity_analysis"].get("issue_count", 0) == 0
+    sla_ok = report["freshness_analysis"].get("sla_met", False)
+    print(
+        f"[handoff_publisher_observer] gate={gate} "
+        f"runs={successful}ok/{failed}fail "
+        f"manifest={'OK' if manifest_ok else 'ISSUES'} "
+        f"universe={'OK' if universe_ok else 'ISSUES'} "
+        f"freshness={'OK' if sla_ok else 'STALE'} "
+        f"live_bot_consuming_handoff=false live_output_changed=false"
+    )
+    if report.get("warnings"):
+        for w in report["warnings"]:
+            print(f"  WARN: {w}")

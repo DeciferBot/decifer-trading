@@ -2011,6 +2011,13 @@ def validate_all(base_dir: str = "data/intelligence") -> dict[str, ValidationRes
     if os.path.exists(heartbeat_path):
         results["handoff_publisher_heartbeat"] = validate_handoff_publisher_heartbeat(heartbeat_path)
 
+    # Sprint 7G — handoff publisher observation report (optional, only if present)
+    observation_path = os.path.join(live_dir, "handoff_publisher_observation_report.json")
+    if os.path.exists(observation_path):
+        results["handoff_publisher_observation_report"] = validate_handoff_publisher_observation_report(
+            observation_path
+        )
+
     return results
 
 
@@ -3449,5 +3456,92 @@ def validate_handoff_publisher_heartbeat(path: str) -> ValidationResult:
     for flag in ("live_output_changed", "secrets_exposed", "env_values_logged"):
         if data.get(flag) is not False:
             result.fail(f"handoff_publisher_heartbeat: {flag} must be false")
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Sprint 7G — handoff_publisher_observation_report.json validator
+# ---------------------------------------------------------------------------
+_OBSERVATION_REPORT_REQUIRED_KEYS = [
+    "schema_version", "generated_at", "mode", "source_files",
+    "observation_summary", "freshness_analysis", "manifest_validity_analysis",
+    "active_universe_validity_analysis", "heartbeat_analysis",
+    "candidate_stability_analysis", "fail_closed_observations",
+    "safety_analysis", "readiness_gate", "warnings",
+    "live_bot_consuming_handoff", "enable_active_opportunity_universe_handoff",
+    "handoff_enabled", "publication_mode", "live_output_changed",
+]
+
+_OBSERVATION_SAFETY_FLAGS_MUST_BE_FALSE = [
+    "live_bot_consuming_handoff",
+    "enable_active_opportunity_universe_handoff",
+    "handoff_enabled",
+    "production_candidate_source_changed",
+    "scanner_output_changed",
+    "apex_input_changed",
+    "risk_logic_changed",
+    "order_logic_changed",
+    "live_output_changed",
+]
+
+_VALID_OBSERVATION_READINESS_GATES = {
+    "insufficient_observation",
+    "validation_only_stable",
+    "validation_only_unstable",
+    "fix_publisher_before_flag_activation",
+    "ready_for_flag_activation_design",
+}
+
+
+def validate_handoff_publisher_observation_report(path: str) -> ValidationResult:
+    """Validate data/live/handoff_publisher_observation_report.json (Sprint 7G)."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("observation_report: not a dict")
+        return result
+
+    for key in _OBSERVATION_REPORT_REQUIRED_KEYS:
+        if key not in data:
+            result.fail(f"observation_report: missing required field '{key}'")
+
+    if data.get("mode") != "validation_only_handoff_publisher_observation":
+        result.fail(
+            f"observation_report: mode must be 'validation_only_handoff_publisher_observation', "
+            f"got {data.get('mode')!r}"
+        )
+
+    if data.get("publication_mode") != "validation_only":
+        result.fail(
+            f"observation_report: publication_mode must be 'validation_only', "
+            f"got {data.get('publication_mode')!r}"
+        )
+
+    readiness_gate = data.get("readiness_gate")
+    if readiness_gate not in _VALID_OBSERVATION_READINESS_GATES:
+        result.fail(
+            f"observation_report: readiness_gate {readiness_gate!r} not in valid set"
+        )
+
+    for flag in _OBSERVATION_SAFETY_FLAGS_MUST_BE_FALSE:
+        if data.get(flag) is not False:
+            result.fail(f"observation_report: {flag} must be false")
+
+    if not isinstance(data.get("observation_summary"), dict):
+        result.fail("observation_report: observation_summary must be a dict")
+
+    if not isinstance(data.get("freshness_analysis"), dict):
+        result.fail("observation_report: freshness_analysis must be a dict")
+
+    if not isinstance(data.get("safety_analysis"), dict):
+        result.fail("observation_report: safety_analysis must be a dict")
+    else:
+        sa = data["safety_analysis"]
+        if sa.get("all_safety_invariants_hold") is not True:
+            result.fail("observation_report: safety_analysis.all_safety_invariants_hold must be true")
 
     return result
