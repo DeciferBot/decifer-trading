@@ -3,7 +3,7 @@ handoff_reader.py — Production-runtime candidate reader contract for Intellige
 
 Classification: production runtime candidate
 Service layer: handoff reader / live bot boundary
-Sprint: 7B
+Sprint: 7B (initial), 7E (load_production_handoff added)
 
 Reads and validates a handoff manifest and active universe file.
 All functions are pure file-read/validation. No side effects except
@@ -22,6 +22,7 @@ Public API:
     validate_candidate(candidate)         -> dict
     build_handoff_validation_result(...)  -> dict
     load_paper_handoff(manifest_path)     -> dict
+    load_production_handoff(manifest_path) -> dict   [Sprint 7E]
 """
 from __future__ import annotations
 
@@ -557,4 +558,145 @@ def load_paper_handoff(manifest_path: str) -> dict:
     return build_handoff_validation_result(
         manifest_path, universe_path,
         manifest_val, univ_val, candidate_results,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Sprint 7E — Production handoff loader
+# ---------------------------------------------------------------------------
+
+def _production_result(
+    manifest_path: str,
+    universe_path: str,
+    handoff_allowed: bool,
+    fail_closed_reason: str | None,
+    accepted_candidates: list[dict],
+    rejected_candidates: list[dict] | None = None,
+) -> dict:
+    """Build a production handoff result dict."""
+    return {
+        "schema_version": _SCHEMA_VERSION,
+        "generated_at": _now_utc().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "mode": "production_handoff",
+        "manifest_path": manifest_path,
+        "active_universe_path": universe_path,
+        "handoff_allowed": handoff_allowed,
+        "fail_closed_reason": fail_closed_reason,
+        "accepted_candidates": accepted_candidates,
+        "rejected_candidates": rejected_candidates or [],
+        "accepted_candidate_count": len(accepted_candidates),
+        "rejected_candidate_count": len(rejected_candidates or []),
+        "scanner_fallback_attempted": False,
+        "apex_input_changed": False,
+        "risk_logic_changed": False,
+        "order_logic_changed": False,
+        "live_output_changed": False,
+    }
+
+
+def load_production_handoff(manifest_path: str) -> dict:
+    """
+    Load and validate the production handoff manifest and active universe.
+
+    Unlike load_paper_handoff(), this function sets handoff_allowed=True when:
+    - manifest["handoff_enabled"] is True
+    - manifest passes all validation checks (not expired, validation_status=pass, etc.)
+    - active universe passes all validation checks
+    - at least one candidate passes per-candidate validation
+
+    accepted_candidates contains the original candidate dicts (not validation wrappers),
+    suitable for governance map construction by the caller.
+
+    Fail closed on any failure. Never falls back to scanner discovery.
+    Never calls broker, LLM, provider ingestion, raw news, or broad scan.
+
+    Returns a production result dict with:
+        handoff_allowed: bool
+        fail_closed_reason: str | None
+        accepted_candidates: list[dict]  (original candidate dicts)
+        rejected_candidates: list[dict]  (original candidate dicts that failed)
+        scanner_fallback_attempted: False (invariant)
+    """
+    # Step 1: Read manifest
+    read_res = read_manifest(manifest_path)
+    if not read_res["ok"]:
+        err = read_res["error"] or "manifest_read_failed"
+        return _production_result(
+            manifest_path, "", False,
+            fail_closed_reason=err,
+            accepted_candidates=[],
+        )
+
+    manifest = read_res["manifest"]
+
+    # Check handoff_enabled before full validation for a precise fail reason
+    if not manifest.get("handoff_enabled", False):
+        return _production_result(
+            manifest_path, "", False,
+            fail_closed_reason="handoff_disabled_in_manifest",
+            accepted_candidates=[],
+        )
+
+    # Step 2: Validate manifest
+    manifest_val = validate_manifest(manifest)
+    if not manifest_val["ok"]:
+        reason = manifest_val.get("fail_closed_reason") or "manifest_invalid"
+        return _production_result(
+            manifest_path, "", False,
+            fail_closed_reason=reason,
+            accepted_candidates=[],
+        )
+
+    # Step 3: Read active universe (manifest reference only — no fallback)
+    univ_read = read_active_universe(manifest)
+    universe_path = univ_read.get("path", "")
+    if not univ_read["ok"]:
+        err = univ_read["error"] or "active_universe_read_failed"
+        return _production_result(
+            manifest_path, universe_path, False,
+            fail_closed_reason=err,
+            accepted_candidates=[],
+        )
+
+    universe = univ_read["universe"]
+
+    # Step 4: Validate active universe
+    univ_val = validate_active_universe(universe)
+    if not univ_val["ok"]:
+        reason = univ_val.get("fail_closed_reason") or "active_universe_invalid"
+        return _production_result(
+            manifest_path, universe_path, False,
+            fail_closed_reason=reason,
+            accepted_candidates=[],
+        )
+
+    # Step 5: Validate each candidate; keep original dicts paired with results
+    candidates = universe.get("candidates", [])
+    if not isinstance(candidates, list):
+        candidates = []
+
+    accepted_originals: list[dict] = []
+    rejected_originals: list[dict] = []
+    for c in candidates:
+        r = validate_candidate(c)
+        if r.get("ok"):
+            accepted_originals.append(c)
+        else:
+            rejected_originals.append(c)
+
+    # Zero accepted candidates → fail closed
+    if not accepted_originals:
+        return _production_result(
+            manifest_path, universe_path, False,
+            fail_closed_reason="zero_accepted_candidates",
+            accepted_candidates=[],
+            rejected_candidates=rejected_originals,
+        )
+
+    # All checks passed — handoff_allowed=True
+    return _production_result(
+        manifest_path, universe_path, True,
+        fail_closed_reason=None,
+        accepted_candidates=accepted_originals,
+        rejected_candidates=rejected_originals,
     )
