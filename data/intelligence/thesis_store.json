@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-05T20:35:06Z",
-  "valid_for_session": "2026-05-05",
+  "generated_at": "2026-05-06T20:20:58Z",
+  "valid_for_session": "2026-05-06",
   "mode": "shadow_thesis_store",
   "data_source_mode": "local_shadow_outputs_only",
   "source_files": [
@@ -15,15 +15,15 @@
     "Sprint 4B: thesis store built from local shadow files only using deterministic template \u2014 no LLM. Thesis store cannot create symbols, trades, or executable candidates. Not a trade signal."
   ],
   "thesis_summary": {
-    "total_theses": 8,
-    "new": 8,
-    "active": 0,
+    "total_theses": 10,
+    "new": 2,
+    "active": 2,
     "strengthened": 0,
-    "weakened": 0,
-    "crowded": 0,
+    "weakened": 1,
+    "crowded": 2,
     "invalidated": 0,
     "unchanged": 0,
-    "watchlist": 0,
+    "watchlist": 3,
     "low_confidence_count": 0,
     "evidence_limited_count": 0,
     "no_live_api_called": true,
@@ -33,11 +33,13 @@
     {
       "theme_id": "data_centre_power",
       "current_thesis": "Theme data_centre_power is activated because drivers ai_capex_growth fired rules ai_capex_growth_to_data_centre_power. Candidate exposure is 5 symbols, with 5 currently in the shadow universe. Key risks are valuation; crowding; capex_delay. Confirmation still required: sector_etf_relative_strength; price_and_volume_confirmation; management_commentary_support.",
-      "previous_thesis": null,
-      "status": "new",
-      "previous_status": null,
-      "status_change": "created",
-      "changed_by": [],
+      "previous_thesis": "Theme data_centre_power is activated because drivers ai_capex_growth fired rules ai_capex_growth_to_data_centre_power. Candidate exposure is 5 symbols, with 5 currently in the shadow universe. Key risks are valuation; crowding; capex_delay. Confirmation still required: sector_etf_relative_strength; price_and_volume_confirmation; management_commentary_support.",
+      "status": "active",
+      "previous_status": "new",
+      "status_change": "changed_from_new_to_active",
+      "changed_by": [
+        "ai_capex_growth"
+      ],
       "evidence": [
         "driver_ai_capex_growth_active_via_rule_ai_capex_growth_to_data_centre_power",
         "5_candidates_in_economic_feed",
@@ -76,7 +78,7 @@
         "credit_stress",
         "power_demand_disappointment"
       ],
-      "last_updated": "2026-05-05T20:35:06Z",
+      "last_updated": "2026-05-06T20:20:58Z",
       "freshness_status": "static_shadow_inference_sprint4b",
       "source_label": "intelligence_first_static_rule",
       "used_live_data": false,
@@ -86,11 +88,13 @@
     {
       "theme_id": "semiconductors",
       "current_thesis": "Theme semiconductors is activated because drivers ai_capex_growth fired rules ai_capex_growth_to_semiconductors. Candidate exposure is 6 symbols, with 6 currently in the shadow universe. Key risks are valuation; crowding; export_controls. Confirmation still required: semiconductor_relative_strength; ai_infrastructure_theme_confirmation; price_and_volume_confirmation.",
-      "previous_thesis": null,
-      "status": "new",
-      "previous_status": null,
-      "status_change": "created",
-      "changed_by": [],
+      "previous_thesis": "Theme semiconductors is activated because drivers ai_capex_growth fired rules ai_capex_growth_to_semiconductors. Candidate exposure is 6 symbols, with 6 currently in the shadow universe. Key risks are valuation; crowding; export_controls. Confirmation still required: semiconductor_relative_strength; ai_infrastructure_theme_confirmation; price_and_volume_confirmation.",
+      "status": "active",
+      "previous_status": "new",
+      "status_change": "changed_from_new_to_active",
+      "changed_by": [
+        "ai_capex_growth"
+      ],
       "evidence": [
         "driver_ai_capex_growth_active_via_rule_ai_capex_growth_to_semiconductors",
         "6_candidates_in_economic_feed",
@@ -130,7 +134,7 @@
         "capex_delay",
         "semiconductor_cycle"
       ],
-      "last_updated": "2026-05-05T20:35:06Z",
+      "last_updated": "2026-05-06T20:20:58Z",
       "freshness_status": "static_shadow_inference_sprint4b",
       "source_label": "intelligence_first_static_rule",
       "used_live_data": false,
@@ -140,11 +144,13 @@
     {
       "theme_id": "banks",
       "current_thesis": "Theme banks is watchlist because drivers yields_rising fired rules rates_rising_to_banks_conditional. Candidate exposure is 5 symbols, with 5 currently in the shadow universe. Key risks are credit_stress; deposit_pressure; curve_inversion. Confirmation still required: credit_stress_contained; yield_curve_not_severely_inverted; financial_sector_relative_strength.",
-      "previous_thesis": null,
-      "status": "new",
-      "previous_status": null,
-      "status_change": "created",
-      "changed_by": [],
+      "previous_thesis": "Theme banks is watchlist because drivers yields_rising fired rules rates_rising_to_banks_conditional. Candidate exposure is 5 symbols, with 5 currently in the shadow universe. Key risks are credit_stress; deposit_pressure; curve_inversion. Confirmation still required: credit_stress_contained; yield_curve_not_severely_inverted; financial_sector_relative_strength.",
+      "status": "watchlist",
+      "previous_status": "new",
+      "status_change": "changed_from_new_to_watchlist",
+      "changed_by": [
+        "yields_rising"
+      ],
       "evidence": [
         "driver_yields_rising_watch_via_rule_rates_rising_to_banks_conditional",
         "5_candidates_in_economic_feed",
@@ -183,7 +189,7 @@
         "recession_risk",
         "regulatory_risk"
       ],
-      "last_updated": "2026-05-05T20:35:06Z",
+      "last_updated": "2026-05-06T20:20:58Z",
       "freshness_status": "static_shadow_inference_sprint4b",
       "source_label": "intelligence_first_static_rule",
       "used_live_data": false,
@@ -193,11 +199,13 @@
     {
       "theme_id": "energy",
       "current_thesis": "Theme energy is watchlist because drivers oil_supply_shock fired rules oil_supply_shock_to_energy. Candidate exposure is 5 symbols, with 5 currently in the shadow universe. Key risks are oil_demand_destruction; geopolitical_reversal; commodity_volatility. Confirmation still required: oil_energy_relative_strength; xle_or_energy_sector_confirmation; price_and_volume_confirmation.",
-      "previous_thesis": null,
-      "status": "new",
-      "previous_status": null,
-      "status_change": "created",
-      "changed_by": [],
+      "previous_thesis": "Theme energy is watchlist because drivers oil_supply_shock fired rules oil_supply_shock_to_energy. Candidate exposure is 5 symbols, with 5 currently in the shadow universe. Key risks are oil_demand_destruction; geopolitical_reversal; commodity_volatility. Confirmation still required: oil_energy_relative_strength; xle_or_energy_sector_confirmation; price_and_volume_confirmation.",
+      "status": "watchlist",
+      "previous_status": "new",
+      "status_change": "changed_from_new_to_watchlist",
+      "changed_by": [
+        "oil_supply_shock"
+      ],
       "evidence": [
         "driver_oil_supply_shock_watch_via_rule_oil_supply_shock_to_energy",
         "5_candidates_in_economic_feed",
@@ -235,7 +243,7 @@
         "commodity_volatility",
         "broad_risk_off"
       ],
-      "last_updated": "2026-05-05T20:35:06Z",
+      "last_updated": "2026-05-06T20:20:58Z",
       "freshness_status": "static_shadow_inference_sprint4b",
       "source_label": "intelligence_first_static_rule",
       "used_live_data": false,
@@ -245,11 +253,13 @@
     {
       "theme_id": "defence",
       "current_thesis": "Theme defence is watchlist because drivers geopolitical_risk_rising fired rules geopolitical_risk_to_defence. Candidate exposure is 5 symbols, with 5 currently in the shadow universe. Key risks are de_escalation; budget_risk; valuation. Confirmation still required: defence_sector_relative_strength; geopolitical_risk_remains_active; price_and_volume_confirmation.",
-      "previous_thesis": null,
-      "status": "new",
-      "previous_status": null,
-      "status_change": "created",
-      "changed_by": [],
+      "previous_thesis": "Theme defence is watchlist because drivers geopolitical_risk_rising fired rules geopolitical_risk_to_defence. Candidate exposure is 5 symbols, with 5 currently in the shadow universe. Key risks are de_escalation; budget_risk; valuation. Confirmation still required: defence_sector_relative_strength; geopolitical_risk_remains_active; price_and_volume_confirmation.",
+      "status": "watchlist",
+      "previous_status": "new",
+      "status_change": "changed_from_new_to_watchlist",
+      "changed_by": [
+        "geopolitical_risk_rising"
+      ],
       "evidence": [
         "driver_geopolitical_risk_rising_watch_via_rule_geopolitical_risk_to_defence",
         "5_candidates_in_economic_feed",
@@ -287,7 +297,7 @@
         "valuation",
         "procurement_delay"
       ],
-      "last_updated": "2026-05-05T20:35:06Z",
+      "last_updated": "2026-05-06T20:20:58Z",
       "freshness_status": "static_shadow_inference_sprint4b",
       "source_label": "intelligence_first_static_rule",
       "used_live_data": false,
@@ -297,11 +307,14 @@
     {
       "theme_id": "quality_cash_flow",
       "current_thesis": "Theme quality_cash_flow is crowded because drivers credit_stress_rising, risk_off_rotation fired rules credit_stress_to_quality_cash_flow, risk_off_rotation_to_defensive_quality. Candidate exposure is 5 symbols, with 2 currently in the shadow universe. Key risks are valuation; crowding; broad_market_liquidation. Confirmation still required: quality_relative_strength; defensive_sector_confirmation; price_and_volume_confirmation_by_trading_bot.",
-      "previous_thesis": null,
-      "status": "new",
-      "previous_status": null,
-      "status_change": "created",
-      "changed_by": [],
+      "previous_thesis": "Theme quality_cash_flow is crowded because drivers credit_stress_rising, risk_off_rotation fired rules credit_stress_to_quality_cash_flow, risk_off_rotation_to_defensive_quality. Candidate exposure is 5 symbols, with 2 currently in the shadow universe. Key risks are valuation; crowding; broad_market_liquidation. Confirmation still required: quality_relative_strength; defensive_sector_confirmation; price_and_volume_confirmation_by_trading_bot.",
+      "status": "crowded",
+      "previous_status": "new",
+      "status_change": "changed_from_new_to_crowded",
+      "changed_by": [
+        "credit_stress_rising",
+        "risk_off_rotation"
+      ],
       "evidence": [
         "driver_credit_stress_rising_watch_via_rule_credit_stress_to_quality_cash_flow",
         "driver_risk_off_rotation_watch_via_rule_risk_off_rotation_to_defensive_quality",
@@ -339,7 +352,7 @@
         "broad_market_liquidation",
         "earnings_disappointment"
       ],
-      "last_updated": "2026-05-05T20:35:06Z",
+      "last_updated": "2026-05-06T20:20:58Z",
       "freshness_status": "static_shadow_inference_sprint4b",
       "source_label": "intelligence_first_static_rule",
       "used_live_data": false,
@@ -349,11 +362,13 @@
     {
       "theme_id": "defensive_quality",
       "current_thesis": "Theme defensive_quality is crowded because drivers risk_off_rotation fired rules risk_off_rotation_to_defensive_quality. Candidate exposure is 8 symbols, with 3 currently in the shadow universe. Key risks are defensive_crowding; false_risk_off_signal; rate_sensitivity. Confirmation still required: defensive_sector_relative_strength; low_vol_or_quality_factor_relative_strength; SPY_QQQ_weakness_or_breadth_deterioration.",
-      "previous_thesis": null,
-      "status": "new",
-      "previous_status": null,
-      "status_change": "created",
-      "changed_by": [],
+      "previous_thesis": "Theme defensive_quality is crowded because drivers risk_off_rotation fired rules risk_off_rotation_to_defensive_quality. Candidate exposure is 8 symbols, with 3 currently in the shadow universe. Key risks are defensive_crowding; false_risk_off_signal; rate_sensitivity. Confirmation still required: defensive_sector_relative_strength; low_vol_or_quality_factor_relative_strength; SPY_QQQ_weakness_or_breadth_deterioration.",
+      "status": "crowded",
+      "previous_status": "new",
+      "status_change": "changed_from_new_to_crowded",
+      "changed_by": [
+        "risk_off_rotation"
+      ],
       "evidence": [
         "driver_risk_off_rotation_watch_via_rule_risk_off_rotation_to_defensive_quality",
         "8_candidates_in_economic_feed",
@@ -392,7 +407,7 @@
         "rate_sensitivity",
         "broad_liquidation"
       ],
-      "last_updated": "2026-05-05T20:35:06Z",
+      "last_updated": "2026-05-06T20:20:58Z",
       "freshness_status": "static_shadow_inference_sprint4b",
       "source_label": "intelligence_first_static_rule",
       "used_live_data": false,
@@ -402,11 +417,13 @@
     {
       "theme_id": "small_caps",
       "current_thesis": "Theme small_caps is weakening because drivers credit_stress_rising fired rules credit_stress_to_small_caps_headwind. Candidate exposure is 1 symbols, with 1 currently in the shadow universe. Key risks are credit_stress_easing; risk_on_rotation; liquidity_support_intervention. Confirmation still required: IWM_relative_weakness; credit_proxy_weakness; breadth_deterioration.",
-      "previous_thesis": null,
-      "status": "new",
-      "previous_status": null,
-      "status_change": "created",
-      "changed_by": [],
+      "previous_thesis": "Theme small_caps is weakening because drivers credit_stress_rising fired rules credit_stress_to_small_caps_headwind. Candidate exposure is 1 symbols, with 1 currently in the shadow universe. Key risks are credit_stress_easing; risk_on_rotation; liquidity_support_intervention. Confirmation still required: IWM_relative_weakness; credit_proxy_weakness; breadth_deterioration.",
+      "status": "weakened",
+      "previous_status": "new",
+      "status_change": "changed_from_new_to_weakened",
+      "changed_by": [
+        "credit_stress_rising"
+      ],
       "evidence": [
         "driver_credit_stress_rising_watch_via_rule_credit_stress_to_small_caps_headwind",
         "1_candidates_in_economic_feed",
@@ -436,7 +453,105 @@
         "risk_on_rotation",
         "liquidity_support_intervention"
       ],
-      "last_updated": "2026-05-05T20:35:06Z",
+      "last_updated": "2026-05-06T20:20:58Z",
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "memory_storage",
+      "current_thesis": "Theme memory_storage is crowded because drivers ai_capex_growth fired rules ai_capex_to_memory_storage. Candidate exposure is 2 symbols, with 0 currently in the shadow universe. Key risks are memory_cycle_risk; commodity_pricing; capex_sensitivity. Confirmation still required: storage_memory_relative_strength; earnings_commentary_support; ai_capex_or_enterprise_storage_demand_support.",
+      "previous_thesis": null,
+      "status": "new",
+      "previous_status": null,
+      "status_change": "created",
+      "changed_by": [],
+      "evidence": [
+        "driver_ai_capex_growth_active_via_rule_ai_capex_to_memory_storage",
+        "2_candidates_in_economic_feed"
+      ],
+      "confidence": 0.3,
+      "horizon": "multi_week_to_multi_quarter",
+      "affected_symbols": [
+        "SNDK",
+        "WDC"
+      ],
+      "candidate_route_hints": [
+        "watchlist"
+      ],
+      "invalidation": [
+        "memory pricing reverses",
+        "AI capex guidance cuts",
+        "storage demand disappoints",
+        "sector relative strength fails",
+        "management commentary weakens thesis"
+      ],
+      "confirmation_required": [
+        "storage_memory_relative_strength",
+        "earnings_commentary_support",
+        "ai_capex_or_enterprise_storage_demand_support",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "risk_flags": [
+        "memory_cycle_risk",
+        "commodity_pricing",
+        "capex_sensitivity",
+        "earnings_volatility",
+        "supply_demand_reversal",
+        "valuation_risk"
+      ],
+      "last_updated": "2026-05-06T20:20:58Z",
+      "freshness_status": "static_shadow_inference_sprint4b",
+      "source_label": "intelligence_first_static_rule",
+      "used_live_data": false,
+      "used_raw_news": false,
+      "used_llm": false
+    },
+    {
+      "theme_id": "ai_compute_infrastructure",
+      "current_thesis": "Theme ai_compute_infrastructure is crowded because drivers ai_compute_demand fired rules ai_compute_demand_to_ai_compute_infrastructure. Candidate exposure is 1 symbols, with 0 currently in the shadow universe. Key risks are speculative_growth; financing_risk; power_cost. Confirmation still required: ai_compute_demand_confirmation; customer_or_capacity_commentary; financing_and_power_cost_risk_review.",
+      "previous_thesis": null,
+      "status": "new",
+      "previous_status": null,
+      "status_change": "created",
+      "changed_by": [],
+      "evidence": [
+        "driver_ai_compute_demand_watch_via_rule_ai_compute_demand_to_ai_compute_infrastructure",
+        "1_candidates_in_economic_feed"
+      ],
+      "confidence": 0.3,
+      "horizon": "multi_week_to_multi_quarter",
+      "affected_symbols": [
+        "IREN"
+      ],
+      "candidate_route_hints": [
+        "watchlist"
+      ],
+      "invalidation": [
+        "financing risk rises",
+        "capacity buildout disappoints",
+        "AI compute demand weakens",
+        "power costs rise materially",
+        "customer concentration risk worsens"
+      ],
+      "confirmation_required": [
+        "ai_compute_demand_confirmation",
+        "customer_or_capacity_commentary",
+        "financing_and_power_cost_risk_review",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "risk_flags": [
+        "speculative_growth",
+        "financing_risk",
+        "power_cost",
+        "capacity_execution_risk",
+        "customer_concentration",
+        "dilution_risk",
+        "volatility_risk"
+      ],
+      "last_updated": "2026-05-06T20:20:58Z",
       "freshness_status": "static_shadow_inference_sprint4b",
       "source_label": "intelligence_first_static_rule",
       "used_live_data": false,

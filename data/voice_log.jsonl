@@ -1,1 +1,2 @@
 {"ts": "2026-04-28T16:41:23.917902+00:00", "event": "deferred_exit", "text": "Closing GSAT option \u2014 deferred exit from earlier.", "symbol": "GSAT", "reason": "signal"}
+{"ts": "2026-05-06T20:51:58.639036+00:00", "event": "deferred_exit", "text": "Closing TEST option \u2014 deferred exit from earlier.", "symbol": "TEST", "reason": "signal"}

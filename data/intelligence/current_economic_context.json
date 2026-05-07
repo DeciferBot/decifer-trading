@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-05T20:35:02Z",
-  "valid_for_session": "2026-05-05",
+  "generated_at": "2026-05-06T20:20:57Z",
+  "valid_for_session": "2026-05-06",
   "mode": "shadow_current_economic_context",
   "data_source_mode": "local_shadow_outputs_only",
   "economic_regime": "ai_infrastructure_tailwind_shadow",
@@ -16,6 +16,10 @@
     }
   ],
   "active_theme_summary": [
+    {
+      "theme_id": "ai_compute_infrastructure",
+      "source": "economic_candidate_feed"
+    },
     {
       "theme_id": "banks",
       "source": "economic_candidate_feed"
@@ -34,6 +38,10 @@
     },
     {
       "theme_id": "energy",
+      "source": "economic_candidate_feed"
+    },
+    {
+      "theme_id": "memory_storage",
       "source": "economic_candidate_feed"
     },
     {

@@ -323,7 +323,101 @@
       "watchlist_only": true,
       "source_label": "intelligence_first_static_rule",
       "last_reviewed": "2026-05-05"
+    },
+    {
+      "theme_id": "memory_storage",
+      "name": "Memory and Storage — AI Data-Centre Demand",
+      "beneficiary_types": [
+        "memory_suppliers",
+        "storage_suppliers",
+        "enterprise_storage_infrastructure",
+        "ai_data_centre_storage_beneficiaries"
+      ],
+      "typical_horizon": "multi_week_to_multi_quarter",
+      "default_routes": [
+        "swing",
+        "watchlist",
+        "position"
+      ],
+      "activation_drivers": [
+        "ai_capex_growth",
+        "data_centre_buildout",
+        "memory_pricing_cycle",
+        "enterprise_ai_storage_demand"
+      ],
+      "confirmation_requirements": [
+        "storage_memory_relative_strength",
+        "earnings_commentary_support",
+        "ai_capex_or_enterprise_storage_demand_support",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "risk_flags": [
+        "memory_cycle_risk",
+        "commodity_pricing",
+        "capex_sensitivity",
+        "earnings_volatility",
+        "supply_demand_reversal",
+        "valuation_risk"
+      ],
+      "invalidation_examples": [
+        "memory pricing reverses",
+        "AI capex guidance cuts",
+        "storage demand disappoints",
+        "sector relative strength fails",
+        "management commentary weakens thesis"
+      ],
+      "source_label": "reference_data_approved_theme",
+      "approval_source": "coverage_gap_review",
+      "last_reviewed": "2026-05-07"
+    },
+    {
+      "theme_id": "ai_compute_infrastructure",
+      "name": "AI Compute Infrastructure — Neocloud and Power-Constrained Compute",
+      "beneficiary_types": [
+        "ai_compute_infrastructure",
+        "neocloud_providers",
+        "power_constrained_compute_operators",
+        "data_centre_compute_capacity_providers"
+      ],
+      "typical_horizon": "multi_week_to_multi_quarter",
+      "default_routes": [
+        "watchlist",
+        "swing",
+        "position"
+      ],
+      "activation_drivers": [
+        "ai_compute_demand",
+        "gpu_cloud_demand",
+        "data_centre_capacity",
+        "power_constraint",
+        "neocloud_growth"
+      ],
+      "confirmation_requirements": [
+        "ai_compute_demand_confirmation",
+        "customer_or_capacity_commentary",
+        "financing_and_power_cost_risk_review",
+        "price_and_volume_confirmation_by_trading_bot"
+      ],
+      "risk_flags": [
+        "speculative_growth",
+        "financing_risk",
+        "power_cost",
+        "capacity_execution_risk",
+        "customer_concentration",
+        "dilution_risk",
+        "volatility_risk"
+      ],
+      "invalidation_examples": [
+        "financing risk rises",
+        "capacity buildout disappoints",
+        "AI compute demand weakens",
+        "power costs rise materially",
+        "customer concentration risk worsens"
+      ],
+      "source_label": "reference_data_approved_theme",
+      "approval_source": "coverage_gap_review",
+      "last_reviewed": "2026-05-07"
     }
   ],
-  "last_updated": "2026-05-05"
+  "last_updated": "2026-05-07"
 }

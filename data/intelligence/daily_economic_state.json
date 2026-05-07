@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-05T20:35:02Z",
-  "valid_for_session": "2026-05-05",
+  "generated_at": "2026-05-06T20:20:57Z",
+  "valid_for_session": "2026-05-06",
   "mode": "shadow_local_economic_state",
   "data_source_mode": "local_shadow_outputs_only",
   "source_files": [
@@ -171,7 +171,7 @@
       "confidence": 0.25,
       "source_label": "economic_candidate_feed",
       "evidence": [
-        "8_distinct_themes_active_in_feed"
+        "10_distinct_themes_active_in_feed"
       ],
       "freshness_status": "static_shadow_inference_sprint4a",
       "used_live_data": false,

@@ -28,9 +28,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 _VALID_OUTPUT_TYPES = {"theme_tailwind", "theme_headwind", "sector_tailwind", "sector_headwind"}
-_VALID_DIRECTIONS = {"positive", "negative", "conditional"}
+_VALID_DIRECTIONS = {"positive", "negative", "conditional", "conditional_positive"}
 _VALID_ROUTES = {"position", "swing", "intraday_swing", "watchlist", "held", "manual_conviction", "do_not_touch"}
-_VALID_ROUTE_BIASES = {"position_or_swing", "position_only", "swing_only", "watchlist_only", "swing_or_intraday"}
+_VALID_ROUTE_BIASES = {"position_or_swing", "position_only", "swing_only", "watchlist_only", "swing_or_intraday", "swing_or_watchlist", "watchlist_or_swing"}
 _VALID_LIQUIDITY_CLASSES = {"high", "medium", "low"}
 
 _TRANSMISSION_RULES_REQUIRED_FIELDS = [
@@ -1926,6 +1926,65 @@ def validate_all(base_dir: str = "data/intelligence") -> dict[str, ValidationRes
     if os.path.exists(review_path):
         results["advisory_log_review"] = validate_advisory_log_review(review_path)
 
+    # Sprint 7A.1 — reference data layer (optional, only if present)
+    ref_dir = os.path.join(os.path.dirname(base_dir), "reference")
+
+    sector_schema_path = os.path.join(ref_dir, "sector_schema.json")
+    if os.path.exists(sector_schema_path):
+        results["sector_schema"] = validate_sector_schema(sector_schema_path)
+
+    symbol_master_path = os.path.join(ref_dir, "symbol_master.json")
+    if os.path.exists(symbol_master_path):
+        results["symbol_master"] = validate_symbol_master(symbol_master_path)
+
+    theme_overlay_path = os.path.join(ref_dir, "theme_overlay_map.json")
+    if os.path.exists(theme_overlay_path):
+        results["theme_overlay_map"] = validate_theme_overlay_map(theme_overlay_path)
+
+    coverage_gap_path = os.path.join(base_dir, "coverage_gap_review.json")
+    if os.path.exists(coverage_gap_path):
+        results["coverage_gap_review"] = validate_coverage_gap_review(coverage_gap_path)
+
+    # Sprint 7A.3 — factor registry and provider files
+    factor_registry_path = os.path.join(ref_dir, "factor_registry.json")
+    if os.path.exists(factor_registry_path):
+        results["factor_registry"] = validate_factor_registry(factor_registry_path)
+
+    provider_cap_path = os.path.join(ref_dir, "provider_capability_matrix.json")
+    if os.path.exists(provider_cap_path):
+        results["provider_capability_matrix"] = validate_provider_capability_matrix(provider_cap_path)
+
+    fetch_test_path = os.path.join(ref_dir, "provider_fetch_test_results.json")
+    if os.path.exists(fetch_test_path):
+        results["provider_fetch_test_results"] = validate_provider_fetch_test_results(fetch_test_path)
+
+    layer_map_path = os.path.join(ref_dir, "layer_factor_map.json")
+    if os.path.exists(layer_map_path):
+        results["layer_factor_map"] = validate_layer_factor_map(layer_map_path)
+
+    data_quality_path = os.path.join(ref_dir, "data_quality_report.json")
+    if os.path.exists(data_quality_path):
+        results["data_quality_report"] = validate_data_quality_report(data_quality_path)
+
+    # Sprint 7B — paper handoff files (optional, only if present)
+    live_dir = os.path.join(os.path.dirname(base_dir), "live")
+
+    paper_universe_path = os.path.join(live_dir, "paper_active_opportunity_universe.json")
+    if os.path.exists(paper_universe_path):
+        results["paper_active_opportunity_universe"] = validate_paper_active_universe(
+            paper_universe_path
+        )
+
+    paper_manifest_path = os.path.join(live_dir, "paper_current_manifest.json")
+    if os.path.exists(paper_manifest_path):
+        results["paper_current_manifest"] = validate_paper_manifest(paper_manifest_path)
+
+    paper_report_path = os.path.join(live_dir, "paper_handoff_validation_report.json")
+    if os.path.exists(paper_report_path):
+        results["paper_handoff_validation_report"] = validate_paper_handoff_validation_report(
+            paper_report_path
+        )
+
     return results
 
 
@@ -2224,5 +2283,825 @@ def validate_advisory_log_review(path: str) -> "ValidationResult":
             "advisory_log_review: no records observed yet — "
             "advisory_runtime_log.jsonl is empty or missing"
         )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Sprint 7A.1 — Reference data layer validators
+# ---------------------------------------------------------------------------
+
+_VALID_CLASSIFICATION_STATUSES = {
+    "classified_local",
+    "classified_from_existing_source",
+    "etf_proxy_classification",
+    "commodity_proxy",
+    "volatility_proxy",
+    "unknown_requires_provider_enrichment",
+    "non_equity_proxy",
+    "index_or_macro_proxy",
+    "crypto_proxy",
+    "delisted_or_inactive_unknown",
+}
+
+_VALID_APPROVAL_STATUSES = {
+    "approved",
+    "review_required",
+    "scanner_only_attention",
+    "rejected",
+    "unknown_requires_provider_enrichment",
+    "legacy_source_only",
+}
+
+_VALID_RECOMMENDED_ACTIONS = {
+    "add_to_approved_roster",
+    "add_to_review_required",
+    "keep_scanner_only_attention",
+    "reject_from_intelligence_coverage",
+    "needs_provider_enrichment",
+    "needs_new_theme",
+    "already_covered",
+}
+
+_SECTOR_SCHEMA_REQUIRED_KEYS = ["schema_version", "generated_at", "sectors", "proxy_classifications"]
+_SYMBOL_MASTER_REQUIRED_KEYS = [
+    "schema_version", "generated_at", "symbol_count", "symbols",
+    "favourites_used_as_discovery", "live_api_called", "llm_called", "env_inspected",
+]
+_SYMBOL_RECORD_REQUIRED_KEYS = ["symbol", "sector", "industry", "classification_status", "approval_status", "sources"]
+_THEME_OVERLAY_REQUIRED_KEYS = ["schema_version", "generated_at", "theme_count", "themes"]
+_THEME_RECORD_REQUIRED_KEYS = ["theme_id", "canonical_symbols", "proxy_symbols", "source"]
+_COVERAGE_GAP_REQUIRED_KEYS = [
+    "schema_version", "generated_at", "advisory_records_analysed",
+    "evidence_status", "required_input_missing",
+    "recurring_missing_shadow_count", "recurring_unsupported_current_count",
+    "recurring_missing_shadow", "recurring_unsupported_current",
+    "live_api_called", "llm_called", "env_inspected",
+]
+
+_VALID_EVIDENCE_STATUSES = {
+    "sufficient_advisory_input",
+    "partial_advisory_input",
+    "insufficient_or_stale_advisory_input",
+}
+_COVERAGE_GAP_ENTRY_REQUIRED_KEYS = [
+    "symbol", "occurrence_count", "total_records", "occurrence_rate",
+    "counter_type", "sector", "industry", "classification_status", "recommended_action",
+]
+
+
+def validate_sector_schema(path: str) -> "ValidationResult":
+    """Validate data/reference/sector_schema.json."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("sector_schema: not a dict")
+        return result
+
+    for key in _SECTOR_SCHEMA_REQUIRED_KEYS:
+        if key not in data:
+            result.fail(f"sector_schema: missing required key '{key}'")
+
+    sectors = data.get("sectors", [])
+    if not isinstance(sectors, list):
+        result.fail("sector_schema: sectors must be a list")
+    elif len(sectors) < 10:
+        result.fail(f"sector_schema: expected ≥10 sectors, got {len(sectors)}")
+    else:
+        for i, sec in enumerate(sectors):
+            if not isinstance(sec, dict):
+                result.fail(f"sector_schema.sectors[{i}]: not a dict")
+                continue
+            for key in ("sector_id", "sector_name", "industries"):
+                if key not in sec:
+                    result.fail(f"sector_schema.sectors[{i}]: missing key '{key}'")
+            if not isinstance(sec.get("industries"), list):
+                result.fail(f"sector_schema.sectors[{i}]: industries must be a list")
+
+    # Required proxy classification types per Sprint 7A.1 patch:
+    # ETF Proxy, Index Proxy, Commodity Proxy, Crypto Proxy, Volatility Proxy, Macro Proxy, Unknown
+    required_proxy_ids = {
+        "etf_proxy", "index_proxy", "commodity_proxy",
+        "crypto_proxy", "volatility_proxy", "macro_proxy", "unknown",
+    }
+    proxy_classes = data.get("proxy_classifications", [])
+    if not isinstance(proxy_classes, list):
+        result.fail("sector_schema: proxy_classifications must be a list")
+    else:
+        seen_proxy_ids = {p.get("classification_id") for p in proxy_classes if isinstance(p, dict)}
+        for pid in sorted(required_proxy_ids - seen_proxy_ids):
+            result.fail(f"sector_schema: required proxy_classification '{pid}' is missing")
+
+    if data.get("source") != "reference_data_builder":
+        result.warn("sector_schema: source is not 'reference_data_builder'")
+
+    return result
+
+
+def validate_symbol_master(path: str) -> "ValidationResult":
+    """Validate data/reference/symbol_master.json."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("symbol_master: not a dict")
+        return result
+
+    for key in _SYMBOL_MASTER_REQUIRED_KEYS:
+        if key not in data:
+            result.fail(f"symbol_master: missing required key '{key}'")
+
+    # Safety invariants
+    if data.get("favourites_used_as_discovery") is not False:
+        result.fail("symbol_master: favourites_used_as_discovery must be false")
+    if data.get("live_api_called") is not False:
+        result.fail("symbol_master: live_api_called must be false")
+    if data.get("llm_called") is not False:
+        result.fail("symbol_master: llm_called must be false")
+    if data.get("env_inspected") is not False:
+        result.fail("symbol_master: env_inspected must be false")
+
+    symbols = data.get("symbols", [])
+    if not isinstance(symbols, list):
+        result.fail("symbol_master: symbols must be a list")
+        return result
+
+    declared_count = data.get("symbol_count", -1)
+    if declared_count != len(symbols):
+        result.fail(
+            f"symbol_master: symbol_count={declared_count} does not match "
+            f"len(symbols)={len(symbols)}"
+        )
+
+    if len(symbols) < 100:
+        result.fail(f"symbol_master: expected ≥100 symbols, got {len(symbols)}")
+
+    seen = set()
+    for i, rec in enumerate(symbols[:50]):  # validate first 50 for speed
+        if not isinstance(rec, dict):
+            result.fail(f"symbol_master.symbols[{i}]: not a dict")
+            continue
+        for key in _SYMBOL_RECORD_REQUIRED_KEYS:
+            if key not in rec:
+                result.fail(f"symbol_master.symbols[{i}]: missing key '{key}'")
+        sym = rec.get("symbol", "")
+        if sym in seen:
+            result.fail(f"symbol_master: duplicate symbol '{sym}'")
+        seen.add(sym)
+        cs = rec.get("classification_status", "")
+        if cs not in _VALID_CLASSIFICATION_STATUSES:
+            result.fail(f"symbol_master.symbols[{i}]: invalid classification_status '{cs}'")
+        ap = rec.get("approval_status", "")
+        if ap not in _VALID_APPROVAL_STATUSES:
+            result.fail(f"symbol_master.symbols[{i}]: invalid approval_status '{ap}'")
+        if not isinstance(rec.get("sources"), list):
+            result.fail(f"symbol_master.symbols[{i}]: sources must be a list")
+
+    return result
+
+
+def validate_theme_overlay_map(path: str) -> "ValidationResult":
+    """Validate data/reference/theme_overlay_map.json."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("theme_overlay_map: not a dict")
+        return result
+
+    for key in _THEME_OVERLAY_REQUIRED_KEYS:
+        if key not in data:
+            result.fail(f"theme_overlay_map: missing required key '{key}'")
+
+    themes = data.get("themes", [])
+    if not isinstance(themes, list):
+        result.fail("theme_overlay_map: themes must be a list")
+        return result
+
+    if len(themes) < 80:
+        result.fail(f"theme_overlay_map: expected ≥80 themes, got {len(themes)}")
+
+    declared_count = data.get("theme_count", -1)
+    if declared_count != len(themes):
+        result.fail(
+            f"theme_overlay_map: theme_count={declared_count} does not match "
+            f"len(themes)={len(themes)}"
+        )
+
+    # Check meta-overlays are present
+    required_meta = {
+        "emerging_or_unclassified_theme",
+        "scanner_only_attention",
+        "event_driven_special_situation",
+        "unknown_requires_provider_enrichment",
+    }
+    seen_ids = set()
+    for i, t in enumerate(themes):
+        if not isinstance(t, dict):
+            result.fail(f"theme_overlay_map.themes[{i}]: not a dict")
+            continue
+        for key in _THEME_RECORD_REQUIRED_KEYS:
+            if key not in t:
+                result.fail(f"theme_overlay_map.themes[{i}]: missing key '{key}'")
+        tid = t.get("theme_id", "")
+        if tid in seen_ids:
+            result.fail(f"theme_overlay_map: duplicate theme_id '{tid}'")
+        seen_ids.add(tid)
+        if not isinstance(t.get("canonical_symbols"), list):
+            result.fail(f"theme_overlay_map.themes[{i}]: canonical_symbols must be a list")
+        if not isinstance(t.get("proxy_symbols"), list):
+            result.fail(f"theme_overlay_map.themes[{i}]: proxy_symbols must be a list")
+
+    missing_meta = required_meta - seen_ids
+    for meta_id in missing_meta:
+        result.fail(f"theme_overlay_map: required meta-overlay '{meta_id}' is missing")
+
+    return result
+
+
+def validate_coverage_gap_review(path: str) -> "ValidationResult":
+    """Validate data/intelligence/coverage_gap_review.json."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("coverage_gap_review: not a dict")
+        return result
+
+    for key in _COVERAGE_GAP_REQUIRED_KEYS:
+        if key not in data:
+            result.fail(f"coverage_gap_review: missing required key '{key}'")
+
+    # Safety invariants
+    if data.get("live_api_called") is not False:
+        result.fail("coverage_gap_review: live_api_called must be false")
+    if data.get("llm_called") is not False:
+        result.fail("coverage_gap_review: llm_called must be false")
+    if data.get("env_inspected") is not False:
+        result.fail("coverage_gap_review: env_inspected must be false")
+
+    # Evidence status
+    es = data.get("evidence_status", "")
+    if es not in _VALID_EVIDENCE_STATUSES:
+        result.fail(f"coverage_gap_review: invalid evidence_status '{es}'")
+    if not isinstance(data.get("required_input_missing"), bool):
+        result.fail("coverage_gap_review: required_input_missing must be a boolean")
+
+    for section in ("recurring_missing_shadow", "recurring_unsupported_current"):
+        entries = data.get(section, [])
+        if not isinstance(entries, list):
+            result.fail(f"coverage_gap_review: {section} must be a list")
+            continue
+        for i, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                result.fail(f"coverage_gap_review.{section}[{i}]: not a dict")
+                continue
+            for key in _COVERAGE_GAP_ENTRY_REQUIRED_KEYS:
+                if key not in entry:
+                    result.fail(f"coverage_gap_review.{section}[{i}]: missing key '{key}'")
+            ra = entry.get("recommended_action", "")
+            if ra not in _VALID_RECOMMENDED_ACTIONS:
+                result.fail(
+                    f"coverage_gap_review.{section}[{i}]: invalid recommended_action '{ra}'"
+                )
+
+    # Declared counts must match list lengths
+    for section, count_key in [
+        ("recurring_missing_shadow", "recurring_missing_shadow_count"),
+        ("recurring_unsupported_current", "recurring_unsupported_current_count"),
+    ]:
+        declared = data.get(count_key, -1)
+        actual = len(data.get(section, []))
+        if declared != actual:
+            result.fail(
+                f"coverage_gap_review: {count_key}={declared} does not match "
+                f"len({section})={actual}"
+            )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Sprint 7A.3 — factor_registry.json validator
+# ---------------------------------------------------------------------------
+_FACTOR_REGISTRY_REQUIRED_KEYS = {
+    "schema_version", "generated_at", "source", "total_factors", "categories",
+    "factors", "live_output_changed", "llm_called", "live_api_called", "env_inspected",
+}
+_FACTOR_REQUIRED_KEYS = {
+    "factor_id", "factor_name", "category", "owning_layer", "consuming_layers",
+    "providers", "primary_provider", "production_runtime_allowed",
+    "offline_job_allowed", "update_frequency", "freshness_sla",
+    "must_not_trigger_trade_directly",
+}
+
+
+def validate_factor_registry(path: str) -> "ValidationResult":
+    """Validate data/reference/factor_registry.json."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("factor_registry: not a dict")
+        return result
+
+    for key in _FACTOR_REGISTRY_REQUIRED_KEYS:
+        if key not in data:
+            result.fail(f"factor_registry: missing required key '{key}'")
+
+    for flag in ("live_output_changed", "llm_called", "live_api_called", "env_inspected"):
+        if data.get(flag) is not False:
+            result.fail(f"factor_registry: {flag} must be false")
+
+    factors = data.get("factors", [])
+    if not isinstance(factors, list):
+        result.fail("factor_registry: factors must be a list")
+        return result
+    if len(factors) == 0:
+        result.fail("factor_registry: factors list is empty")
+
+    seen_ids: set[str] = set()
+    for i, factor in enumerate(factors):
+        if not isinstance(factor, dict):
+            result.fail(f"factor_registry.factors[{i}]: not a dict")
+            continue
+        for key in _FACTOR_REQUIRED_KEYS:
+            if key not in factor:
+                result.fail(f"factor_registry.factors[{i}]: missing key '{key}'")
+        fid = factor.get("factor_id", "")
+        if fid in seen_ids:
+            result.fail(f"factor_registry: duplicate factor_id '{fid}'")
+        seen_ids.add(fid)
+        if factor.get("must_not_trigger_trade_directly") is not True:
+            result.fail(
+                f"factor_registry.factors[{i}] ('{fid}'): "
+                "must_not_trigger_trade_directly must be true"
+            )
+        if not isinstance(factor.get("consuming_layers"), list):
+            result.fail(f"factor_registry.factors[{i}]: consuming_layers must be a list")
+        if not isinstance(factor.get("providers"), list):
+            result.fail(f"factor_registry.factors[{i}]: providers must be a list")
+
+    declared = data.get("total_factors", -1)
+    if declared != len(factors):
+        result.fail(
+            f"factor_registry: total_factors={declared} does not match len(factors)={len(factors)}"
+        )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Sprint 7A.3 — provider_capability_matrix.json validator
+# ---------------------------------------------------------------------------
+_PROVIDER_CAP_REQUIRED_KEYS = {
+    "schema_version", "generated_at", "source", "provider_count",
+    "providers", "live_output_changed",
+}
+_VALID_CAPABILITY_TIERS = {
+    "primary_candidate", "secondary_candidate", "fallback_only",
+    "research_only", "not_suitable",
+}
+
+
+def validate_provider_capability_matrix(path: str) -> "ValidationResult":
+    """Validate data/reference/provider_capability_matrix.json."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("provider_capability_matrix: not a dict")
+        return result
+
+    for key in _PROVIDER_CAP_REQUIRED_KEYS:
+        if key not in data:
+            result.fail(f"provider_capability_matrix: missing required key '{key}'")
+
+    if data.get("live_output_changed") is not False:
+        result.fail("provider_capability_matrix: live_output_changed must be false")
+
+    providers = data.get("providers", [])
+    if not isinstance(providers, list):
+        result.fail("provider_capability_matrix: providers must be a list")
+        return result
+
+    seen_names: set[str] = set()
+    for i, prov in enumerate(providers):
+        if not isinstance(prov, dict):
+            result.fail(f"provider_capability_matrix.providers[{i}]: not a dict")
+            continue
+        name = prov.get("provider_name", "")
+        if not name:
+            result.fail(f"provider_capability_matrix.providers[{i}]: missing provider_name")
+        if name in seen_names:
+            result.fail(f"provider_capability_matrix: duplicate provider_name '{name}'")
+        seen_names.add(name)
+        caps = prov.get("capabilities", [])
+        if not isinstance(caps, list):
+            result.fail(f"provider_capability_matrix.providers[{i}]: capabilities must be a list")
+            continue
+        for j, cap in enumerate(caps):
+            if not isinstance(cap, dict):
+                result.fail(
+                    f"provider_capability_matrix.providers[{i}].capabilities[{j}]: not a dict"
+                )
+                continue
+            # field is named production_suitability in the generated output
+            tier = cap.get("production_suitability", cap.get("tier", ""))
+            if tier not in _VALID_CAPABILITY_TIERS:
+                result.fail(
+                    f"provider_capability_matrix.providers[{i}] ('{name}')"
+                    f".capabilities[{j}]: invalid production_suitability '{tier}'"
+                )
+
+    declared = data.get("provider_count", -1)
+    if declared != len(providers):
+        result.fail(
+            f"provider_capability_matrix: provider_count={declared} does not match "
+            f"len(providers)={len(providers)}"
+        )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Sprint 7A.3 — provider_fetch_test_results.json validator
+# ---------------------------------------------------------------------------
+_FETCH_TEST_REQUIRED_KEYS = {
+    "schema_version", "generated_at", "source", "test_symbol",
+    "safety", "summary", "results",
+}
+_FETCH_RESULT_REQUIRED_KEYS = {
+    "provider", "endpoint", "success", "latency_ms",
+    "credentials_present", "secrets_exposed", "live_output_changed",
+}
+# Flags in the top-level safety block that must always be false (trading/broker/secret)
+_FETCH_SAFETY_MUST_BE_FALSE = {
+    "trading_api_called",
+    "broker_order_api_called",
+    "broker_account_api_called",
+    "broker_position_api_called",
+    "broker_execution_api_called",
+    "ibkr_order_account_position_calls",
+    "env_values_logged",
+    "secrets_exposed",
+    "live_output_changed",
+}
+# Required keys in the safety block (some may be true — e.g. data_provider_api_called)
+_FETCH_SAFETY_REQUIRED_KEYS = _FETCH_SAFETY_MUST_BE_FALSE | {
+    "data_provider_api_called",
+    "ibkr_market_data_connection_attempted",
+    "env_presence_checked",
+    "env_file_read",
+}
+
+
+def validate_provider_fetch_test_results(path: str) -> "ValidationResult":
+    """Validate data/reference/provider_fetch_test_results.json."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("provider_fetch_test_results: not a dict")
+        return result
+
+    for key in _FETCH_TEST_REQUIRED_KEYS:
+        if key not in data:
+            result.fail(f"provider_fetch_test_results: missing required key '{key}'")
+
+    safety = data.get("safety", {})
+    if not isinstance(safety, dict):
+        result.fail("provider_fetch_test_results: safety must be a dict")
+    else:
+        for flag in _FETCH_SAFETY_REQUIRED_KEYS:
+            if flag not in safety:
+                result.fail(f"provider_fetch_test_results.safety: missing flag '{flag}'")
+        for flag in _FETCH_SAFETY_MUST_BE_FALSE:
+            if safety.get(flag) is not False:
+                result.fail(f"provider_fetch_test_results.safety.{flag} must be false")
+
+    results_list = data.get("results", [])
+    if not isinstance(results_list, list):
+        result.fail("provider_fetch_test_results: results must be a list")
+        return result
+
+    for i, res in enumerate(results_list):
+        if not isinstance(res, dict):
+            result.fail(f"provider_fetch_test_results.results[{i}]: not a dict")
+            continue
+        for key in _FETCH_RESULT_REQUIRED_KEYS:
+            if key not in res:
+                result.fail(f"provider_fetch_test_results.results[{i}]: missing key '{key}'")
+        if res.get("secrets_exposed") is not False:
+            result.fail(f"provider_fetch_test_results.results[{i}]: secrets_exposed must be false")
+        if res.get("live_output_changed") is not False:
+            result.fail(f"provider_fetch_test_results.results[{i}]: live_output_changed must be false")
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Sprint 7A.3 — layer_factor_map.json validator
+# ---------------------------------------------------------------------------
+_LAYER_MAP_REQUIRED_KEYS = {
+    "schema_version", "generated_at", "source", "layers", "live_output_changed",
+}
+
+
+def validate_layer_factor_map(path: str) -> "ValidationResult":
+    """Validate data/reference/layer_factor_map.json."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("layer_factor_map: not a dict")
+        return result
+
+    for key in _LAYER_MAP_REQUIRED_KEYS:
+        if key not in data:
+            result.fail(f"layer_factor_map: missing required key '{key}'")
+
+    if data.get("live_output_changed") is not False:
+        result.fail("layer_factor_map: live_output_changed must be false")
+
+    layers = data.get("layers", [])
+    if not isinstance(layers, list):
+        result.fail("layer_factor_map: layers must be a list")
+        return result
+    if len(layers) == 0:
+        result.fail("layer_factor_map: layers list is empty")
+
+    # layers is a list of dicts with layer_id, layer_name, factor_ids, factor_count
+    for i, layer_data in enumerate(layers):
+        if not isinstance(layer_data, dict):
+            result.fail(f"layer_factor_map.layers[{i}]: not a dict")
+            continue
+        layer_name = layer_data.get("layer_name", layer_data.get("layer_id", f"index-{i}"))
+        for key in ("factor_count", "factor_ids"):
+            if key not in layer_data:
+                result.fail(f"layer_factor_map.layers[{i}] ('{layer_name}'): missing key '{key}'")
+        factor_ids = layer_data.get("factor_ids", [])
+        if not isinstance(factor_ids, list):
+            result.fail(f"layer_factor_map.layers[{i}] ('{layer_name}'): factor_ids must be a list")
+            continue
+        declared = layer_data.get("factor_count", -1)
+        if declared != len(factor_ids):
+            result.fail(
+                f"layer_factor_map.layers[{i}] ('{layer_name}'): factor_count={declared} "
+                f"does not match len(factor_ids)={len(factor_ids)}"
+            )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Sprint 7A.3 — data_quality_report.json validator
+# ---------------------------------------------------------------------------
+_DATA_QUALITY_REQUIRED_KEYS = {
+    "schema_version", "generated_at", "source",
+    "provider_summary", "factor_coverage_summary",
+    "production_ready_categories", "partial_categories", "unavailable_categories",
+    "live_output_changed", "data_provider_api_called", "live_trading_api_called",
+    "env_values_logged", "secrets_exposed",
+}
+
+
+def validate_data_quality_report(path: str) -> "ValidationResult":
+    """Validate data/reference/data_quality_report.json."""
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("data_quality_report: not a dict")
+        return result
+
+    for key in _DATA_QUALITY_REQUIRED_KEYS:
+        if key not in data:
+            result.fail(f"data_quality_report: missing required key '{key}'")
+
+    # All of these must be false (static generator — no API calls)
+    for flag in (
+        "live_output_changed", "data_provider_api_called", "live_trading_api_called",
+        "env_values_logged", "secrets_exposed",
+    ):
+        if data.get(flag) is not False:
+            result.fail(f"data_quality_report: {flag} must be false")
+
+    # These are counts (int) not lists in the generated output
+    for section in ("production_ready_categories", "partial_categories", "unavailable_categories"):
+        if not isinstance(data.get(section), int):
+            result.fail(f"data_quality_report: {section} must be an int")
+
+    if not isinstance(data.get("provider_summary"), dict):
+        result.fail("data_quality_report: provider_summary must be a dict")
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Sprint 7B — paper handoff validators
+# ---------------------------------------------------------------------------
+
+_PAPER_UNIVERSE_REQUIRED_TOP_KEYS = [
+    "schema_version", "generated_at", "expires_at", "mode",
+    "source_shadow_file", "source_files", "validation_status",
+    "universe_summary", "candidates",
+    "no_executable_trade_instructions", "live_output_changed",
+    "secrets_exposed", "env_values_logged",
+]
+
+_PAPER_MANIFEST_REQUIRED_TOP_KEYS = [
+    "schema_version", "published_at", "expires_at", "validation_status",
+    "handoff_mode", "handoff_enabled", "active_universe_file",
+    "source_snapshot_versions", "publisher",
+    "no_executable_trade_instructions", "live_output_changed",
+    "secrets_exposed", "env_values_logged",
+]
+
+_PAPER_REPORT_REQUIRED_TOP_KEYS = [
+    "schema_version", "generated_at", "mode",
+    "manifest_path", "active_universe_path",
+    "manifest_validation", "active_universe_validation",
+    "candidate_validation_summary",
+    "accepted_candidates_count", "rejected_candidates_count",
+    "handoff_allowed",
+    "production_candidate_source_changed", "apex_input_changed",
+    "scanner_output_changed", "risk_logic_changed", "order_logic_changed",
+    "broker_called", "trading_api_called", "llm_called",
+    "raw_news_used", "broad_intraday_scan_used",
+    "secrets_exposed", "env_values_logged", "live_output_changed",
+]
+
+_PAPER_SAFETY_MUST_BE_FALSE = {
+    "live_output_changed", "secrets_exposed", "env_values_logged",
+    "production_candidate_source_changed", "apex_input_changed",
+    "scanner_output_changed", "risk_logic_changed", "order_logic_changed",
+    "broker_called", "trading_api_called", "llm_called",
+    "raw_news_used", "broad_intraday_scan_used",
+    "handoff_allowed",
+}
+
+
+def validate_paper_active_universe(path: str) -> ValidationResult:
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("paper_active_universe: not a dict")
+        return result
+
+    for key in _PAPER_UNIVERSE_REQUIRED_TOP_KEYS:
+        if key not in data:
+            result.fail(f"paper_active_universe: missing required field '{key}'")
+
+    # mode must be paper_handoff_universe
+    if data.get("mode") != "paper_handoff_universe":
+        result.fail(f"paper_active_universe: mode must be 'paper_handoff_universe', got {data.get('mode')!r}")
+
+    # no_executable_trade_instructions must be True
+    if data.get("no_executable_trade_instructions") is not True:
+        result.fail("paper_active_universe: no_executable_trade_instructions must be true")
+
+    # Safety flags must be False
+    for flag in ("live_output_changed", "secrets_exposed", "env_values_logged"):
+        if data.get(flag) is not False:
+            result.fail(f"paper_active_universe: {flag} must be false")
+
+    # candidates must be a non-empty list
+    candidates = data.get("candidates")
+    if not isinstance(candidates, list):
+        result.fail("paper_active_universe: candidates must be a list")
+    else:
+        if len(candidates) == 0:
+            result.warn("paper_active_universe: candidates list is empty")
+        for i, cand in enumerate(candidates):
+            sym = cand.get("symbol", f"idx_{i}")
+            if cand.get("executable") is True:
+                result.fail(f"paper_active_universe: candidate {sym} has executable=true")
+            if cand.get("order_instruction") is not None:
+                result.fail(f"paper_active_universe: candidate {sym} has non-null order_instruction")
+            if cand.get("live_output_changed") is not False:
+                result.fail(f"paper_active_universe: candidate {sym} has live_output_changed!=false")
+
+    if "validation_status" not in data:
+        result.fail("paper_active_universe: validation_status missing")
+
+    return result
+
+
+def validate_paper_manifest(path: str) -> ValidationResult:
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("paper_manifest: not a dict")
+        return result
+
+    for key in _PAPER_MANIFEST_REQUIRED_TOP_KEYS:
+        if key not in data:
+            result.fail(f"paper_manifest: missing required field '{key}'")
+
+    # handoff_enabled must be False
+    if data.get("handoff_enabled") is not False:
+        result.fail(
+            f"paper_manifest: handoff_enabled must be false (Sprint 7B), "
+            f"got {data.get('handoff_enabled')!r}"
+        )
+
+    # handoff_mode must be "paper"
+    if data.get("handoff_mode") != "paper":
+        result.fail(f"paper_manifest: handoff_mode must be 'paper', got {data.get('handoff_mode')!r}")
+
+    # no_executable_trade_instructions must be True
+    if data.get("no_executable_trade_instructions") is not True:
+        result.fail("paper_manifest: no_executable_trade_instructions must be true")
+
+    # Safety flags must be False
+    for flag in ("live_output_changed", "secrets_exposed", "env_values_logged"):
+        if data.get(flag) is not False:
+            result.fail(f"paper_manifest: {flag} must be false")
+
+    if "validation_status" not in data:
+        result.fail("paper_manifest: validation_status missing")
+
+    # active_universe_file must not point to production files
+    auf = data.get("active_universe_file") or ""
+    if auf.endswith("active_opportunity_universe.json") and "paper_" not in auf:
+        result.fail(
+            "paper_manifest: active_universe_file must not point to production universe; "
+            f"got {auf!r}"
+        )
+
+    if not isinstance(data.get("source_snapshot_versions"), dict):
+        result.fail("paper_manifest: source_snapshot_versions must be a dict")
+
+    return result
+
+
+def validate_paper_handoff_validation_report(path: str) -> ValidationResult:
+    result = ValidationResult()
+    data, err = _load_json(path)
+    if err:
+        result.fail(err)
+        return result
+    if not isinstance(data, dict):
+        result.fail("paper_handoff_validation_report: not a dict")
+        return result
+
+    for key in _PAPER_REPORT_REQUIRED_TOP_KEYS:
+        if key not in data:
+            result.fail(f"paper_handoff_validation_report: missing required field '{key}'")
+
+    # mode must be paper_handoff_validation
+    if data.get("mode") != "paper_handoff_validation":
+        result.fail(
+            f"paper_handoff_validation_report: mode must be 'paper_handoff_validation', "
+            f"got {data.get('mode')!r}"
+        )
+
+    # All must-be-false flags
+    for flag in _PAPER_SAFETY_MUST_BE_FALSE:
+        if data.get(flag) is not False:
+            result.fail(
+                f"paper_handoff_validation_report: {flag} must be false, "
+                f"got {data.get(flag)!r}"
+            )
+
+    for section in ("manifest_validation", "active_universe_validation"):
+        if not isinstance(data.get(section), dict):
+            result.fail(f"paper_handoff_validation_report: {section} must be a dict")
+
+    cvs = data.get("candidate_validation_summary")
+    if not isinstance(cvs, dict):
+        result.fail("paper_handoff_validation_report: candidate_validation_summary must be a dict")
+    else:
+        for k in ("total", "accepted", "rejected"):
+            if k not in cvs:
+                result.fail(
+                    f"paper_handoff_validation_report: candidate_validation_summary missing '{k}'"
+                )
 
     return result

@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-07T05:27:01Z",
+  "mode": "paper_handoff_validation",
+  "manifest_path": "data/live/paper_current_manifest.json",
+  "active_universe_path": "data/live/paper_active_opportunity_universe.json",
+  "manifest_validation": {
+    "ok": true,
+    "errors": [],
+    "warnings": []
+  },
+  "active_universe_validation": {
+    "ok": true,
+    "errors": [],
+    "warnings": []
+  },
+  "candidate_validation_summary": {
+    "total": 50,
+    "accepted": 50,
+    "rejected": 0
+  },
+  "rejected_candidates": [],
+  "accepted_candidates_count": 50,
+  "rejected_candidates_count": 0,
+  "fail_closed_tests": {
+    "manifest_ok": true,
+    "universe_ok": true,
+    "all_candidates_accepted": true,
+    "overall_structure_valid": true,
+    "fail_closed_reasons": []
+  },
+  "handoff_allowed": false,
+  "production_candidate_source_changed": false,
+  "apex_input_changed": false,
+  "scanner_output_changed": false,
+  "risk_logic_changed": false,
+  "order_logic_changed": false,
+  "broker_called": false,
+  "trading_api_called": false,
+  "llm_called": false,
+  "raw_news_used": false,
+  "broad_intraday_scan_used": false,
+  "secrets_exposed": false,
+  "env_values_logged": false,
+  "live_output_changed": false,
+  "builder_rejected_shadow_candidates": [],
+  "builder_rejected_shadow_candidates_count": 0
+}

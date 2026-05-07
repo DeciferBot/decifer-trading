@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-06T05:28:21Z",
+  "generated_at": "2026-05-06T20:21:03Z",
   "mode": "local_fixture_backtest",
   "data_source_mode": "local_fixtures_and_shadow_outputs_only",
   "source_files": [
@@ -14,11 +14,13 @@
   "pass_count": 6,
   "fail_count": 0,
   "themes_tested": [
+    "ai_compute_infrastructure",
     "banks",
     "data_centre_power",
     "defence",
     "defensive_quality",
     "energy",
+    "memory_storage",
     "quality_cash_flow",
     "semiconductors",
     "small_caps"
@@ -29,7 +31,9 @@
   "crowded_handled_correctly": true,
   "crowded_themes_in_actual_state": [
     "quality_cash_flow",
-    "defensive_quality"
+    "defensive_quality",
+    "memory_storage",
+    "ai_compute_infrastructure"
   ],
   "scenario_results": [
     {
@@ -55,7 +59,9 @@
         "defence": "watchlist",
         "quality_cash_flow": "crowded",
         "defensive_quality": "crowded",
-        "small_caps": "weakening"
+        "small_caps": "weakening",
+        "memory_storage": "crowded",
+        "ai_compute_infrastructure": "crowded"
       },
       "pass": true,
       "mismatches": [],
@@ -83,7 +89,9 @@
         "defence": "watchlist",
         "quality_cash_flow": "crowded",
         "defensive_quality": "crowded",
-        "small_caps": "weakening"
+        "small_caps": "weakening",
+        "memory_storage": "crowded",
+        "ai_compute_infrastructure": "crowded"
       },
       "pass": true,
       "mismatches": [],
@@ -111,7 +119,9 @@
         "defence": "watchlist",
         "quality_cash_flow": "crowded",
         "defensive_quality": "crowded",
-        "small_caps": "weakening"
+        "small_caps": "weakening",
+        "memory_storage": "crowded",
+        "ai_compute_infrastructure": "crowded"
       },
       "pass": true,
       "mismatches": [],
@@ -136,7 +146,9 @@
         "defence": "watchlist",
         "quality_cash_flow": "crowded",
         "defensive_quality": "crowded",
-        "small_caps": "weakening"
+        "small_caps": "weakening",
+        "memory_storage": "crowded",
+        "ai_compute_infrastructure": "crowded"
       },
       "pass": true,
       "mismatches": [],
@@ -161,7 +173,9 @@
         "defence": "activated",
         "quality_cash_flow": "crowded",
         "defensive_quality": "crowded",
-        "small_caps": "weakening"
+        "small_caps": "weakening",
+        "memory_storage": "crowded",
+        "ai_compute_infrastructure": "crowded"
       },
       "pass": true,
       "mismatches": [],
@@ -179,7 +193,9 @@
         "defence": "watchlist",
         "quality_cash_flow": "crowded",
         "defensive_quality": "crowded",
-        "small_caps": "weakening"
+        "small_caps": "weakening",
+        "memory_storage": "crowded",
+        "ai_compute_infrastructure": "crowded"
       },
       "pass": true,
       "mismatches": [],

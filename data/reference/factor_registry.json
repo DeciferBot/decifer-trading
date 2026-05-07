@@ -1,0 +1,1526 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-06T20:57:26.208892+00:00",
+  "source": "factor_registry",
+  "total_factors": 73,
+  "categories": [
+    "analyst_actions",
+    "earnings_events",
+    "fundamentals",
+    "liquidity_microstructure",
+    "macro_economic",
+    "news",
+    "options_data",
+    "ownership_short_flow",
+    "price_ohlcv",
+    "reference_symbol_identity",
+    "risk_portfolio_broker",
+    "sector_industry_theme",
+    "technical_indicators"
+  ],
+  "factors": [
+    {
+      "factor_id": "symbol_identity",
+      "factor_name": "Symbol / Ticker",
+      "category": "reference_symbol_identity",
+      "owning_layer": "Reference Data Layer",
+      "consuming_layers": [
+        "Market Sensor / Technical Layer",
+        "Catalyst / Event Intelligence Layer",
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "fmp",
+        "alpaca",
+        "local_files"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "alpaca",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "static",
+      "freshness_sla": "weekly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "company_name",
+      "factor_name": "Company Name",
+      "category": "reference_symbol_identity",
+      "owning_layer": "Reference Data Layer",
+      "consuming_layers": [
+        "Advisory / Observability"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "static",
+      "freshness_sla": "weekly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "exchange",
+      "factor_name": "Exchange",
+      "category": "reference_symbol_identity",
+      "owning_layer": "Reference Data Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "fmp",
+        "alpaca"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "alpaca",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "static",
+      "freshness_sla": "weekly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "sector",
+      "factor_name": "Sector",
+      "category": "reference_symbol_identity",
+      "owning_layer": "Reference Data Layer",
+      "consuming_layers": [
+        "Economic Intelligence Layer",
+        "Universe Builder",
+        "Advisory / Observability"
+      ],
+      "providers": [
+        "fmp",
+        "local_files"
+      ],
+      "primary_provider": "local_files",
+      "fallback_provider": "fmp",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "monthly",
+      "freshness_sla": "monthly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "industry",
+      "factor_name": "Industry / Sub-Industry",
+      "category": "reference_symbol_identity",
+      "owning_layer": "Reference Data Layer",
+      "consuming_layers": [
+        "Economic Intelligence Layer",
+        "Universe Builder"
+      ],
+      "providers": [
+        "fmp",
+        "local_files"
+      ],
+      "primary_provider": "local_files",
+      "fallback_provider": "fmp",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "monthly",
+      "freshness_sla": "monthly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "market_cap",
+      "factor_name": "Market Capitalisation",
+      "category": "reference_symbol_identity",
+      "owning_layer": "Reference Data Layer",
+      "consuming_layers": [
+        "Universe Builder",
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "fmp",
+        "alpaca",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "shares_outstanding",
+      "factor_name": "Shares Outstanding",
+      "category": "reference_symbol_identity",
+      "owning_layer": "Reference Data Layer",
+      "consuming_layers": [
+        "Company Quality / Fundamentals Layer"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "quarterly",
+      "freshness_sla": "quarterly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "asset_type",
+      "factor_name": "Asset Type (stock/ETF/ADR)",
+      "category": "reference_symbol_identity",
+      "owning_layer": "Reference Data Layer",
+      "consuming_layers": [
+        "Universe Builder",
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "fmp",
+        "alpaca",
+        "local_files"
+      ],
+      "primary_provider": "local_files",
+      "fallback_provider": "fmp",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "static",
+      "freshness_sla": "weekly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "optionable_status",
+      "factor_name": "Optionable Status",
+      "category": "reference_symbol_identity",
+      "owning_layer": "Reference Data Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "alpaca"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "ohlcv_daily",
+      "factor_name": "Daily OHLCV Bars",
+      "category": "price_ohlcv",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness",
+        "Universe Builder",
+        "Backtest / Research Only"
+      ],
+      "providers": [
+        "alpaca",
+        "alpha_vantage",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "ohlcv_intraday",
+      "factor_name": "Intraday OHLCV Bars",
+      "category": "price_ohlcv",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness",
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "alpaca",
+        "alpha_vantage"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": false,
+      "update_frequency": "intraday",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "latest_quote",
+      "factor_name": "Latest Bid / Ask Quote",
+      "category": "price_ohlcv",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer",
+        "Trading Bot / Entry Readiness"
+      ],
+      "providers": [
+        "alpaca"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": false,
+      "update_frequency": "real_time",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "previous_close",
+      "factor_name": "Previous Close",
+      "category": "price_ohlcv",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness",
+        "Universe Builder"
+      ],
+      "providers": [
+        "alpaca",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "gap_percent",
+      "factor_name": "Gap Percent vs Previous Close",
+      "category": "price_ohlcv",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness"
+      ],
+      "providers": [
+        "alpaca",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": false,
+      "update_frequency": "intraday",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "week52_high_low",
+      "factor_name": "52-Week High and Low",
+      "category": "price_ohlcv",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness",
+        "Universe Builder"
+      ],
+      "providers": [
+        "alpaca",
+        "yfinance",
+        "fmp"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "adjusted_history",
+      "factor_name": "Split-Adjusted Price History",
+      "category": "price_ohlcv",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Backtest / Research Only"
+      ],
+      "providers": [
+        "alpaca",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "sma_20",
+      "factor_name": "Simple Moving Average 20",
+      "category": "technical_indicators",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness"
+      ],
+      "providers": [
+        "alpaca",
+        "alpha_vantage",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "alpha_vantage",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "sma_50",
+      "factor_name": "Simple Moving Average 50",
+      "category": "technical_indicators",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness",
+        "Universe Builder"
+      ],
+      "providers": [
+        "alpaca",
+        "alpha_vantage",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "alpha_vantage",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "sma_200",
+      "factor_name": "Simple Moving Average 200",
+      "category": "technical_indicators",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness",
+        "Universe Builder"
+      ],
+      "providers": [
+        "alpaca",
+        "alpha_vantage",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "alpha_vantage",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "ema_8",
+      "factor_name": "Exponential Moving Average 8",
+      "category": "technical_indicators",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness"
+      ],
+      "providers": [
+        "alpaca",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "rsi",
+      "factor_name": "RSI (14-period)",
+      "category": "technical_indicators",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness"
+      ],
+      "providers": [
+        "alpaca",
+        "alpha_vantage",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "alpha_vantage",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "macd",
+      "factor_name": "MACD (12/26/9)",
+      "category": "technical_indicators",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness"
+      ],
+      "providers": [
+        "alpaca",
+        "alpha_vantage",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "alpha_vantage",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "atr",
+      "factor_name": "Average True Range",
+      "category": "technical_indicators",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness",
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "alpaca",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "vwap",
+      "factor_name": "VWAP",
+      "category": "technical_indicators",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "alpaca"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": false,
+      "update_frequency": "intraday",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "relative_volume",
+      "factor_name": "Relative Volume vs 20-Day Average",
+      "category": "technical_indicators",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness",
+        "Universe Builder"
+      ],
+      "providers": [
+        "alpaca",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "intraday",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "bollinger_bands",
+      "factor_name": "Bollinger Bands",
+      "category": "technical_indicators",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness"
+      ],
+      "providers": [
+        "alpaca",
+        "alpha_vantage",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "alpha_vantage",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "distance_from_200dma",
+      "factor_name": "Distance from 200-Day Moving Average (%)",
+      "category": "technical_indicators",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness",
+        "Universe Builder"
+      ],
+      "providers": [
+        "alpaca",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "sector_relative_strength",
+      "factor_name": "Sector Relative Strength vs SPY",
+      "category": "technical_indicators",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Universe Builder",
+        "Economic Intelligence Layer"
+      ],
+      "providers": [
+        "alpaca",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "bid_ask_spread",
+      "factor_name": "Bid / Ask Spread",
+      "category": "liquidity_microstructure",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer",
+        "Trading Bot / Entry Readiness"
+      ],
+      "providers": [
+        "alpaca"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": false,
+      "update_frequency": "real_time",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "spread_percent",
+      "factor_name": "Spread as % of Price",
+      "category": "liquidity_microstructure",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "alpaca"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": false,
+      "update_frequency": "real_time",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "average_dollar_volume",
+      "factor_name": "Average Dollar Volume (20-Day)",
+      "category": "liquidity_microstructure",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Universe Builder",
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "alpaca",
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "marketability",
+      "factor_name": "Marketability Score (liquidity proxy)",
+      "category": "liquidity_microstructure",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Universe Builder",
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "local_files"
+      ],
+      "primary_provider": "local_files",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "options_availability",
+      "factor_name": "Options Availability Flag",
+      "category": "options_data",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer",
+        "Trading Bot / Entry Readiness"
+      ],
+      "providers": [
+        "alpaca"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "option_chain",
+      "factor_name": "Option Chain (strikes, expirations)",
+      "category": "options_data",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "alpaca"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": false,
+      "update_frequency": "real_time",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "option_greeks",
+      "factor_name": "Option Greeks (delta, gamma, theta, vega)",
+      "category": "options_data",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "alpaca"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": false,
+      "update_frequency": "real_time",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "implied_volatility",
+      "factor_name": "Implied Volatility",
+      "category": "options_data",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer",
+        "Trading Bot / Entry Readiness"
+      ],
+      "providers": [
+        "alpaca"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "intraday",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "option_spread_quality",
+      "factor_name": "Option Spread Quality (bid/ask ratio)",
+      "category": "options_data",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "alpaca"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": false,
+      "update_frequency": "real_time",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "open_interest",
+      "factor_name": "Open Interest",
+      "category": "options_data",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "alpaca"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "revenue_growth",
+      "factor_name": "Revenue Growth (YoY %)",
+      "category": "fundamentals",
+      "owning_layer": "Company Quality / Fundamentals Layer",
+      "consuming_layers": [
+        "Catalyst / Event Intelligence Layer",
+        "Universe Builder",
+        "Backtest / Research Only"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "quarterly",
+      "freshness_sla": "quarterly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "eps_growth",
+      "factor_name": "EPS Growth (YoY %)",
+      "category": "fundamentals",
+      "owning_layer": "Company Quality / Fundamentals Layer",
+      "consuming_layers": [
+        "Catalyst / Event Intelligence Layer",
+        "Universe Builder"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "quarterly",
+      "freshness_sla": "quarterly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "gross_margin",
+      "factor_name": "Gross Margin",
+      "category": "fundamentals",
+      "owning_layer": "Company Quality / Fundamentals Layer",
+      "consuming_layers": [
+        "Backtest / Research Only"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "quarterly",
+      "freshness_sla": "quarterly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "free_cash_flow",
+      "factor_name": "Free Cash Flow",
+      "category": "fundamentals",
+      "owning_layer": "Company Quality / Fundamentals Layer",
+      "consuming_layers": [
+        "Universe Builder",
+        "Backtest / Research Only"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "quarterly",
+      "freshness_sla": "quarterly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "valuation_multiples",
+      "factor_name": "P/E, EV/EBITDA, P/S, P/FCF",
+      "category": "fundamentals",
+      "owning_layer": "Company Quality / Fundamentals Layer",
+      "consuming_layers": [
+        "Universe Builder",
+        "Backtest / Research Only"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "roe_roic",
+      "factor_name": "ROE and ROIC",
+      "category": "fundamentals",
+      "owning_layer": "Company Quality / Fundamentals Layer",
+      "consuming_layers": [
+        "Backtest / Research Only"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "quarterly",
+      "freshness_sla": "quarterly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "balance_sheet_strength",
+      "factor_name": "Net Debt, Cash, Current Ratio",
+      "category": "fundamentals",
+      "owning_layer": "Company Quality / Fundamentals Layer",
+      "consuming_layers": [
+        "Backtest / Research Only"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "quarterly",
+      "freshness_sla": "quarterly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "earnings_date",
+      "factor_name": "Earnings Date",
+      "category": "earnings_events",
+      "owning_layer": "Catalyst / Event Intelligence Layer",
+      "consuming_layers": [
+        "Trading Bot / Entry Readiness",
+        "Universe Builder",
+        "Advisory / Observability"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "eps_actual_vs_estimate",
+      "factor_name": "EPS Actual vs Estimate + Surprise %",
+      "category": "earnings_events",
+      "owning_layer": "Catalyst / Event Intelligence Layer",
+      "consuming_layers": [
+        "Catalyst / Event Intelligence Layer",
+        "Universe Builder"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "quarterly",
+      "freshness_sla": "at_earnings",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "revenue_surprise",
+      "factor_name": "Revenue Surprise %",
+      "category": "earnings_events",
+      "owning_layer": "Catalyst / Event Intelligence Layer",
+      "consuming_layers": [
+        "Catalyst / Event Intelligence Layer"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "quarterly",
+      "freshness_sla": "at_earnings",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "guidance_revision",
+      "factor_name": "Guidance Raise / Cut",
+      "category": "earnings_events",
+      "owning_layer": "Catalyst / Event Intelligence Layer",
+      "consuming_layers": [
+        "Catalyst / Event Intelligence Layer",
+        "Universe Builder"
+      ],
+      "providers": [
+        "fmp"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "quarterly",
+      "freshness_sla": "at_earnings",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "dividends_splits",
+      "factor_name": "Dividends and Splits Calendar",
+      "category": "earnings_events",
+      "owning_layer": "Catalyst / Event Intelligence Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "fmp",
+        "alpaca",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "analyst_rating",
+      "factor_name": "Analyst Rating (Buy/Hold/Sell)",
+      "category": "analyst_actions",
+      "owning_layer": "Catalyst / Event Intelligence Layer",
+      "consuming_layers": [
+        "Catalyst / Event Intelligence Layer",
+        "Universe Builder"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "upgrade_downgrade",
+      "factor_name": "Upgrade / Downgrade Event",
+      "category": "analyst_actions",
+      "owning_layer": "Catalyst / Event Intelligence Layer",
+      "consuming_layers": [
+        "Catalyst / Event Intelligence Layer"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "price_target_consensus",
+      "factor_name": "Analyst Price Target Consensus",
+      "category": "analyst_actions",
+      "owning_layer": "Catalyst / Event Intelligence Layer",
+      "consuming_layers": [
+        "Catalyst / Event Intelligence Layer",
+        "Universe Builder"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "estimate_revision_direction",
+      "factor_name": "Estimate Revision Trend",
+      "category": "analyst_actions",
+      "owning_layer": "Catalyst / Event Intelligence Layer",
+      "consuming_layers": [
+        "Catalyst / Event Intelligence Layer"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "structured_company_news",
+      "factor_name": "Structured Company News (source-labelled)",
+      "category": "news",
+      "owning_layer": "Catalyst / Event Intelligence Layer",
+      "consuming_layers": [
+        "Catalyst / Event Intelligence Layer",
+        "Advisory / Observability"
+      ],
+      "providers": [
+        "fmp"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "intraday",
+      "freshness_sla": "within_15_minutes",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "press_releases",
+      "factor_name": "Press Releases",
+      "category": "news",
+      "owning_layer": "Catalyst / Event Intelligence Layer",
+      "consuming_layers": [
+        "Catalyst / Event Intelligence Layer"
+      ],
+      "providers": [
+        "fmp"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "intraday",
+      "freshness_sla": "within_15_minutes",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "fed_funds_rate",
+      "factor_name": "Fed Funds Rate",
+      "category": "macro_economic",
+      "owning_layer": "Economic Intelligence Layer",
+      "consuming_layers": [
+        "Economic Intelligence Layer"
+      ],
+      "providers": [
+        "alpha_vantage",
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "alpha_vantage",
+      "fallback_provider": "fmp",
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "monthly",
+      "freshness_sla": "monthly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "treasury_yields",
+      "factor_name": "Treasury Yields (2Y, 5Y, 10Y, 30Y)",
+      "category": "macro_economic",
+      "owning_layer": "Economic Intelligence Layer",
+      "consuming_layers": [
+        "Economic Intelligence Layer"
+      ],
+      "providers": [
+        "alpha_vantage",
+        "yfinance",
+        "alpaca"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "vix",
+      "factor_name": "VIX Volatility Index",
+      "category": "macro_economic",
+      "owning_layer": "Economic Intelligence Layer",
+      "consuming_layers": [
+        "Economic Intelligence Layer",
+        "Universe Builder"
+      ],
+      "providers": [
+        "alpaca",
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "intraday",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "cpi_ppi",
+      "factor_name": "CPI and PPI",
+      "category": "macro_economic",
+      "owning_layer": "Economic Intelligence Layer",
+      "consuming_layers": [
+        "Economic Intelligence Layer"
+      ],
+      "providers": [
+        "alpha_vantage",
+        "fmp"
+      ],
+      "primary_provider": "alpha_vantage",
+      "fallback_provider": "fmp",
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "monthly",
+      "freshness_sla": "monthly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "sector_etf_performance",
+      "factor_name": "Sector ETF Daily Performance",
+      "category": "macro_economic",
+      "owning_layer": "Economic Intelligence Layer",
+      "consuming_layers": [
+        "Economic Intelligence Layer",
+        "Universe Builder"
+      ],
+      "providers": [
+        "alpaca",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "oil_commodities",
+      "factor_name": "Oil / Gold / Silver / Copper Prices",
+      "category": "macro_economic",
+      "owning_layer": "Economic Intelligence Layer",
+      "consuming_layers": [
+        "Economic Intelligence Layer"
+      ],
+      "providers": [
+        "alpha_vantage",
+        "alpaca",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "sector_etf_relative_strength",
+      "factor_name": "Sector ETF Relative Strength vs SPY",
+      "category": "sector_industry_theme",
+      "owning_layer": "Economic Intelligence Layer",
+      "consuming_layers": [
+        "Universe Builder",
+        "Advisory / Observability"
+      ],
+      "providers": [
+        "alpaca",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "theme_activation_evidence",
+      "factor_name": "Theme Activation Evidence (local shadow)",
+      "category": "sector_industry_theme",
+      "owning_layer": "Economic Intelligence Layer",
+      "consuming_layers": [
+        "Universe Builder",
+        "Advisory / Observability"
+      ],
+      "providers": [
+        "local_files"
+      ],
+      "primary_provider": "local_files",
+      "fallback_provider": null,
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "breadth_indicators",
+      "factor_name": "Market Breadth (advance/decline, % above MA)",
+      "category": "sector_industry_theme",
+      "owning_layer": "Economic Intelligence Layer",
+      "consuming_layers": [
+        "Economic Intelligence Layer",
+        "Universe Builder"
+      ],
+      "providers": [
+        "alpaca",
+        "yfinance"
+      ],
+      "primary_provider": "alpaca",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "short_interest",
+      "factor_name": "Short Interest and Short Float %",
+      "category": "ownership_short_flow",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Universe Builder",
+        "Trading Bot / Entry Readiness"
+      ],
+      "providers": [
+        "fmp"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "bi_weekly",
+      "freshness_sla": "bi_weekly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "institutional_ownership",
+      "factor_name": "Institutional Ownership %",
+      "category": "ownership_short_flow",
+      "owning_layer": "Market Sensor / Technical Layer",
+      "consuming_layers": [
+        "Backtest / Research Only"
+      ],
+      "providers": [
+        "fmp",
+        "yfinance"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": "yfinance",
+      "production_runtime_allowed": false,
+      "offline_job_allowed": true,
+      "update_frequency": "quarterly",
+      "freshness_sla": "quarterly",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "insider_transactions",
+      "factor_name": "Insider Transactions (Form 4)",
+      "category": "ownership_short_flow",
+      "owning_layer": "Catalyst / Event Intelligence Layer",
+      "consuming_layers": [
+        "Catalyst / Event Intelligence Layer",
+        "Backtest / Research Only"
+      ],
+      "providers": [
+        "fmp"
+      ],
+      "primary_provider": "fmp",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": true,
+      "update_frequency": "daily",
+      "freshness_sla": "end_of_day",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "current_positions",
+      "factor_name": "Current Positions",
+      "category": "risk_portfolio_broker",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "ibkr"
+      ],
+      "primary_provider": "ibkr",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": false,
+      "update_frequency": "real_time",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "buying_power",
+      "factor_name": "Buying Power / Cash Available",
+      "category": "risk_portfolio_broker",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "ibkr"
+      ],
+      "primary_provider": "ibkr",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": false,
+      "update_frequency": "real_time",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "order_status",
+      "factor_name": "Order Status and Fills",
+      "category": "risk_portfolio_broker",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer"
+      ],
+      "providers": [
+        "ibkr"
+      ],
+      "primary_provider": "ibkr",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": false,
+      "update_frequency": "real_time",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "portfolio_pnl",
+      "factor_name": "Portfolio P&L (realised and unrealised)",
+      "category": "risk_portfolio_broker",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer",
+        "Advisory / Observability"
+      ],
+      "providers": [
+        "ibkr"
+      ],
+      "primary_provider": "ibkr",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": false,
+      "update_frequency": "real_time",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    },
+    {
+      "factor_id": "sector_exposure",
+      "factor_name": "Sector / Symbol Portfolio Exposure",
+      "category": "risk_portfolio_broker",
+      "owning_layer": "Execution / Risk Layer",
+      "consuming_layers": [
+        "Execution / Risk Layer",
+        "Advisory / Observability"
+      ],
+      "providers": [
+        "ibkr"
+      ],
+      "primary_provider": "ibkr",
+      "fallback_provider": null,
+      "production_runtime_allowed": true,
+      "offline_job_allowed": false,
+      "update_frequency": "real_time",
+      "freshness_sla": "real_time",
+      "must_not_trigger_trade_directly": true
+    }
+  ],
+  "live_output_changed": false,
+  "llm_called": false,
+  "live_api_called": false,
+  "env_inspected": false
+}

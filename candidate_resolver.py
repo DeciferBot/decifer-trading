@@ -472,6 +472,7 @@ def generate_feed(
                 "geopolitical_risk_rising",
                 "credit_stress_rising",    # Sprint 3
                 "risk_off_rotation",       # Sprint 3
+                "ai_compute_demand",       # Sprint 7A.2: neocloud/AI compute infrastructure
             ],
             "blocked_conditions": [],
         })

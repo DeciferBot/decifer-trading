@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-05T20:35:13Z",
+  "generated_at": "2026-05-06T20:20:46Z",
   "report_title": "Universe Builder Sprint 3 Report \u2014 Current vs Shadow Comparison",
   "mode": "shadow_comparison_only",
   "live_output_changed": false,
@@ -101,23 +101,24 @@
     "broad_intraday_scan_used": false
   },
   "exclusion_summary": {
-    "total_exclusions": 254,
-    "quota_full": 153,
+    "total_exclusions": 257,
+    "quota_full": 156,
     "duplicates": 22,
     "by_source": {
       "tier_d_position_research": 150,
       "tier_a_core_floor": 51,
       "tier_b_daily_promoted": 43,
+      "economic_intelligence": 13,
       "intelligence_first_static_rule": 10,
-      "economic_intelligence": 10
+      "reference_data_approved_theme": 3
     }
   },
   "quota_pressure_analysis": {
     "structural_position": {
-      "demand_total": 180,
+      "demand_total": 183,
       "capacity": 20,
       "accepted": 20,
-      "overflow": 160,
+      "overflow": 163,
       "binding": true,
       "demand_by_theme": {
         "data_centre_power": 4,
@@ -127,10 +128,12 @@
         "defence": 4,
         "quality_cash_flow": 4,
         "defensive_quality": 5,
+        "memory_storage": 2,
+        "ai_compute_infrastructure": 1,
         "": 150
       },
       "demand_by_source": {
-        "economic_intelligence_structural": 30,
+        "economic_intelligence_structural": 33,
         "tier_d_structural": 150
       }
     },
@@ -157,14 +160,14 @@
     }
   },
   "source_collision_summary": {
-    "total_collisions": 36,
-    "symbols_lost_to_collision": 18,
+    "total_collisions": 38,
+    "symbols_lost_to_collision": 20,
     "protected_by_manual_or_held": 11,
     "source_path_excluded_but_symbol_preserved": 18
   },
   "economic_slice_summary": {
-    "slices_active": 8,
-    "total_candidates": 40,
+    "slices_active": 10,
+    "total_candidates": 43,
     "slices": [
       "data_centre_power",
       "semiconductors",
@@ -173,7 +176,9 @@
       "defence",
       "quality_cash_flow",
       "small_caps",
-      "defensive_quality"
+      "defensive_quality",
+      "memory_storage",
+      "ai_compute_infrastructure"
     ],
     "macro_transmission_deterministic": true,
     "llm_symbol_discovery_used": false
@@ -271,12 +276,12 @@
     "Current pipeline stage 'current_apex_final_cap' is not_available_in_day5_shadow_mode."
   ],
   "interpretations": [
-    "BINDING: structural_position quota (20/20) is full. Total structural demand: 180, overflow: 160 candidates excluded. Recommendation: Sprint 2 quota_allocator.py should partition position vs swing routes, increasing effective structural capacity.",
+    "BINDING: structural_position quota (20/20) is full. Total structural demand: 183, overflow: 163 candidates excluded. Recommendation: Sprint 2 quota_allocator.py should partition position vs swing routes, increasing effective structural capacity.",
     "LOW PRESERVATION: Only 5/150 (3.3%) Tier D names preserved in shadow. This is expected at Day 4 with quota=20 and 150 Tier D candidates. Top excluded names by discovery_score: ['TE', 'IONQ', 'APP', 'CRDO', 'RKLB'].",
     "VERIFIED: Attention candidates did not consume structural quota \u2014 route/quota separation is working correctly.",
     "VERIFIED: All 13 manual conviction / favourites candidates are protected.",
     "VERIFIED: All economic intelligence candidates are non-executable (shadow_report_only).",
-    "Sprint 3: 8 economic slices active (banks, data_centre_power, defence, defensive_quality, energy, quality_cash_flow, semiconductors, small_caps), 40 total economic candidates. All symbols from approved rosters \u2014 no LLM discovery.",
+    "Sprint 3: 10 economic slices active (ai_compute_infrastructure, banks, data_centre_power, defence, defensive_quality, energy, memory_storage, quality_cash_flow, semiconductors, small_caps), 43 total economic candidates. All symbols from approved rosters \u2014 no LLM discovery.",
     "HEADWIND: 1 headwind pressure candidate(s) in shadow (watchlist monitoring only \u2014 headwind_candidates_executable=False).",
     "ROUTE DISTINCTION: structural_quota_group_count=20, position_route_count=11, structural_swing_count=9. Banks/energy/defence are structural quota but route=swing (not position).",
     "SOURCE COLLISION: 18 symbol(s) had an economic or structural path excluded but are still present in shadow via manual_conviction or held (protected). No candidate lost to collision."

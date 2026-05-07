@@ -1,0 +1,319 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-06T20:20:40.467324+00:00",
+  "source": "reference_data_builder",
+  "sectors": [
+    {
+      "sector_id": "information_technology",
+      "sector_name": "Information Technology",
+      "gics_code": "45",
+      "industries": [
+        "semiconductors",
+        "semiconductor_equipment",
+        "software",
+        "technology_hardware",
+        "it_services",
+        "networking",
+        "cybersecurity",
+        "electronic_components",
+        "quantum_computing",
+        "ai_infrastructure",
+        "clean_energy_tech",
+        "advanced_nuclear",
+        "optical_components",
+        "enterprise_hardware",
+        "measurement_instruments"
+      ]
+    },
+    {
+      "sector_id": "communication_services",
+      "sector_name": "Communication Services",
+      "gics_code": "50",
+      "industries": [
+        "internet_search",
+        "social_media",
+        "streaming",
+        "media_entertainment",
+        "live_entertainment",
+        "telecom",
+        "telecom_equipment",
+        "cable_broadband",
+        "advertising_tech",
+        "satellite"
+      ]
+    },
+    {
+      "sector_id": "consumer_discretionary",
+      "sector_name": "Consumer Discretionary",
+      "gics_code": "25",
+      "industries": [
+        "ecommerce",
+        "automotive_ev",
+        "automotive_retail",
+        "automotive_rental",
+        "apparel_footwear",
+        "home_improvement",
+        "food_delivery",
+        "rideshare",
+        "restaurants",
+        "travel_online",
+        "gaming",
+        "sporting_goods_retail",
+        "recreational_vehicles",
+        "off_price_retail",
+        "consumer_electronics",
+        "auto_parts_retail",
+        "pool_supplies",
+        "digital_health",
+        "toys_games"
+      ]
+    },
+    {
+      "sector_id": "consumer_staples",
+      "sector_name": "Consumer Staples",
+      "gics_code": "30",
+      "industries": [
+        "beverages",
+        "beverages_spirits",
+        "household_products",
+        "discount_retail",
+        "convenience_fuel_retail"
+      ]
+    },
+    {
+      "sector_id": "health_care",
+      "sector_name": "Health Care",
+      "gics_code": "35",
+      "industries": [
+        "pharma",
+        "biotech",
+        "medical_devices",
+        "health_insurance",
+        "life_sciences_tools",
+        "medical_equipment_services",
+        "data_analytics"
+      ]
+    },
+    {
+      "sector_id": "financials",
+      "sector_name": "Financials",
+      "gics_code": "40",
+      "industries": [
+        "banks_diversified",
+        "banks_regional",
+        "investment_banking",
+        "asset_management",
+        "brokerage",
+        "payments",
+        "consumer_finance",
+        "fintech",
+        "insurance",
+        "insurance_reinsurance",
+        "financial_data",
+        "financial_software",
+        "financial_exchanges",
+        "financial_services",
+        "crypto_exchange",
+        "crypto_holding",
+        "specialty_finance"
+      ]
+    },
+    {
+      "sector_id": "industrials",
+      "sector_name": "Industrials",
+      "gics_code": "20",
+      "industries": [
+        "aerospace_defense",
+        "aerospace_components",
+        "aerospace_electronics",
+        "power_equipment",
+        "electrical_equipment",
+        "construction_engineering",
+        "construction_machinery",
+        "agricultural_machinery",
+        "industrial_conglomerate",
+        "railroads",
+        "airlines",
+        "hvac",
+        "elevators",
+        "hr_services",
+        "tools",
+        "logistics",
+        "government_it_services",
+        "government_software",
+        "automation_robotics",
+        "space_launch",
+        "evtol_aviation",
+        "aircraft_leasing",
+        "lighting",
+        "water_equipment",
+        "environmental_services",
+        "pest_control",
+        "public_safety_tech",
+        "energy_storage",
+        "power_management"
+      ]
+    },
+    {
+      "sector_id": "energy",
+      "sector_name": "Energy",
+      "gics_code": "10",
+      "industries": [
+        "integrated_oil_gas",
+        "oil_gas_ep",
+        "oilfield_services",
+        "oil_gas_midstream",
+        "power_generation"
+      ]
+    },
+    {
+      "sector_id": "materials",
+      "sector_name": "Materials",
+      "gics_code": "15",
+      "industries": [
+        "gold_mining",
+        "gold_royalty",
+        "silver_mining",
+        "copper_mining",
+        "uranium_mining",
+        "uranium_enrichment",
+        "industrial_gases",
+        "specialty_chemicals",
+        "agricultural_chemicals",
+        "industrial_metals",
+        "specialty_materials",
+        "antimony_mining",
+        "steel",
+        "building_materials"
+      ]
+    },
+    {
+      "sector_id": "real_estate",
+      "sector_name": "Real Estate",
+      "gics_code": "60",
+      "industries": [
+        "residential_reit",
+        "data_centre_reit",
+        "storage_reit",
+        "retail_reit",
+        "cell_tower_reit",
+        "hotel_reit",
+        "real_estate_services"
+      ]
+    },
+    {
+      "sector_id": "utilities",
+      "sector_name": "Utilities",
+      "gics_code": "55",
+      "industries": [
+        "nuclear_power",
+        "renewable_electric",
+        "electric_gas_utility"
+      ]
+    }
+  ],
+  "proxy_classifications": [
+    {
+      "classification_id": "etf_proxy",
+      "description": "Exchange-traded funds covering broad market, sector, leverage, or inverse exposure",
+      "sub_types": [
+        "sp500_etf",
+        "nasdaq100_etf",
+        "small_cap_etf",
+        "total_market_etf",
+        "equal_weight_sp500_etf",
+        "emerging_markets_etf",
+        "international_developed_etf",
+        "technology_sector_etf",
+        "semiconductor_etf",
+        "software_etf",
+        "financials_sector_etf",
+        "healthcare_sector_etf",
+        "energy_sector_etf",
+        "consumer_staples_sector_etf",
+        "consumer_discretionary_etf",
+        "industrials_sector_etf",
+        "materials_sector_etf",
+        "utilities_sector_etf",
+        "aerospace_defense_etf",
+        "quality_factor_etf",
+        "low_volatility_etf",
+        "regional_bank_etf",
+        "biotech_etf",
+        "leveraged_nasdaq_etf",
+        "inverse_nasdaq_etf",
+        "leveraged_semiconductor_etf",
+        "inverse_semiconductor_etf",
+        "leveraged_inverse_sp500_etf",
+        "leveraged_single_stock_etf",
+        "leveraged_etf",
+        "inverse_etf",
+        "long_treasury_etf",
+        "short_treasury_etf",
+        "tbill_etf",
+        "high_yield_bond_etf",
+        "investment_grade_bond_etf",
+        "long_corp_bond_etf",
+        "intermediate_corp_bond_etf",
+        "crypto_futures_etf",
+        "spot_bitcoin_etf",
+        "south_korea_etf",
+        "brazil_etf",
+        "china_etf",
+        "dow_jones_etf"
+      ]
+    },
+    {
+      "classification_id": "index_proxy",
+      "description": "Index-tracking instruments representing a benchmark rather than a directly tradable security (e.g. ^VIX, ^SPX). Used as reference data only.",
+      "sub_types": [
+        "volatility_index",
+        "equity_index",
+        "rate_index"
+      ]
+    },
+    {
+      "classification_id": "commodity_proxy",
+      "description": "ETFs or physical trusts providing direct commodity exposure (gold, silver, crude oil)",
+      "sub_types": [
+        "gold_etf",
+        "silver_etf",
+        "crude_oil_etf"
+      ]
+    },
+    {
+      "classification_id": "crypto_proxy",
+      "description": "Spot or futures-based cryptocurrency ETFs and crypto-holding companies providing regulated crypto exposure",
+      "sub_types": [
+        "spot_bitcoin_etf",
+        "crypto_futures_etf",
+        "crypto_holding_company"
+      ]
+    },
+    {
+      "classification_id": "volatility_proxy",
+      "description": "Volatility-linked ETPs (VIX futures, leveraged/inverse VIX) — negative carry in contango; short-duration hedge only",
+      "sub_types": [
+        "vix_futures_etp",
+        "leveraged_vix_etf",
+        "inverse_vix_etf"
+      ]
+    },
+    {
+      "classification_id": "macro_proxy",
+      "description": "Instruments providing broad macro economic regime exposure not captured by a single sector ETF (dollar, rates, inflation)",
+      "sub_types": [
+        "dollar_index_etf",
+        "rate_sensitive_etf",
+        "inflation_proxy_etf"
+      ]
+    },
+    {
+      "classification_id": "unknown",
+      "description": "Symbol not classifiable from local sources — requires provider enrichment before sector or theme can be assigned",
+      "sub_types": [
+        "unknown_requires_provider_enrichment"
+      ]
+    }
+  ]
+}

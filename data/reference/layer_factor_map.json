@@ -1,0 +1,147 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-06T20:57:26.209912+00:00",
+  "source": "factor_registry",
+  "layers": [
+    {
+      "layer_id": "reference_data_layer",
+      "layer_name": "Reference Data Layer",
+      "factor_ids": [
+        "symbol_identity",
+        "company_name",
+        "exchange",
+        "sector",
+        "industry",
+        "market_cap",
+        "shares_outstanding",
+        "asset_type",
+        "optionable_status"
+      ],
+      "factor_count": 9
+    },
+    {
+      "layer_id": "economic_intelligence_layer",
+      "layer_name": "Economic Intelligence Layer",
+      "factor_ids": [
+        "fed_funds_rate",
+        "treasury_yields",
+        "vix",
+        "cpi_ppi",
+        "sector_etf_performance",
+        "oil_commodities",
+        "sector_etf_relative_strength",
+        "theme_activation_evidence",
+        "breadth_indicators"
+      ],
+      "factor_count": 9
+    },
+    {
+      "layer_id": "company_quality___fundamentals_layer",
+      "layer_name": "Company Quality / Fundamentals Layer",
+      "factor_ids": [
+        "revenue_growth",
+        "eps_growth",
+        "gross_margin",
+        "free_cash_flow",
+        "valuation_multiples",
+        "roe_roic",
+        "balance_sheet_strength"
+      ],
+      "factor_count": 7
+    },
+    {
+      "layer_id": "catalyst___event_intelligence_layer",
+      "layer_name": "Catalyst / Event Intelligence Layer",
+      "factor_ids": [
+        "earnings_date",
+        "eps_actual_vs_estimate",
+        "revenue_surprise",
+        "guidance_revision",
+        "dividends_splits",
+        "analyst_rating",
+        "upgrade_downgrade",
+        "price_target_consensus",
+        "estimate_revision_direction",
+        "structured_company_news",
+        "press_releases",
+        "insider_transactions"
+      ],
+      "factor_count": 12
+    },
+    {
+      "layer_id": "market_sensor___technical_layer",
+      "layer_name": "Market Sensor / Technical Layer",
+      "factor_ids": [
+        "ohlcv_daily",
+        "ohlcv_intraday",
+        "latest_quote",
+        "previous_close",
+        "gap_percent",
+        "week52_high_low",
+        "adjusted_history",
+        "sma_20",
+        "sma_50",
+        "sma_200",
+        "ema_8",
+        "rsi",
+        "macd",
+        "atr",
+        "vwap",
+        "relative_volume",
+        "bollinger_bands",
+        "distance_from_200dma",
+        "sector_relative_strength",
+        "short_interest",
+        "institutional_ownership"
+      ],
+      "factor_count": 21
+    },
+    {
+      "layer_id": "universe_builder",
+      "layer_name": "Universe Builder",
+      "factor_ids": [],
+      "factor_count": 0
+    },
+    {
+      "layer_id": "trading_bot___entry_readiness",
+      "layer_name": "Trading Bot / Entry Readiness",
+      "factor_ids": [],
+      "factor_count": 0
+    },
+    {
+      "layer_id": "execution___risk_layer",
+      "layer_name": "Execution / Risk Layer",
+      "factor_ids": [
+        "bid_ask_spread",
+        "spread_percent",
+        "average_dollar_volume",
+        "marketability",
+        "options_availability",
+        "option_chain",
+        "option_greeks",
+        "implied_volatility",
+        "option_spread_quality",
+        "open_interest",
+        "current_positions",
+        "buying_power",
+        "order_status",
+        "portfolio_pnl",
+        "sector_exposure"
+      ],
+      "factor_count": 15
+    },
+    {
+      "layer_id": "advisory___observability",
+      "layer_name": "Advisory / Observability",
+      "factor_ids": [],
+      "factor_count": 0
+    },
+    {
+      "layer_id": "backtest___research_only",
+      "layer_name": "Backtest / Research Only",
+      "factor_ids": [],
+      "factor_count": 0
+    }
+  ],
+  "live_output_changed": false
+}

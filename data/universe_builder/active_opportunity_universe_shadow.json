@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-05T20:35:00Z",
-  "valid_for_session": "2026-05-05",
+  "generated_at": "2026-05-06T20:20:45Z",
+  "valid_for_session": "2026-05-06",
   "freshness_status": "static_bootstrap_sprint3",
   "mode": "shadow_only",
   "source_files": [
@@ -72,10 +72,10 @@
   },
   "quota_pressure_diagnostics": {
     "structural_position": {
-      "demand_total": 180,
+      "demand_total": 183,
       "capacity": 20,
       "accepted": 20,
-      "overflow": 160,
+      "overflow": 163,
       "binding": true,
       "demand_by_theme": {
         "data_centre_power": 4,
@@ -85,32 +85,39 @@
         "defence": 4,
         "quality_cash_flow": 4,
         "defensive_quality": 5,
+        "memory_storage": 2,
+        "ai_compute_infrastructure": 1,
         "": 150
       },
       "demand_by_source": {
-        "economic_intelligence_structural": 30,
+        "economic_intelligence_structural": 33,
         "tier_d_structural": 150
       },
       "overflow_by_theme": {
         "quality_cash_flow": 3,
         "defensive_quality": 5,
+        "memory_storage": 2,
+        "ai_compute_infrastructure": 1,
         "": 145
       },
       "overflow_by_driver": {
         "credit_stress_rising, liquidity_tightening, risk_off_rotation": 3,
         "risk_appetite_falling, volatility_rising, defensive_rotation, breadth_deterioration": 5,
+        "ai_capex_growth, data_centre_buildout, memory_pricing_cycle, enterprise_ai_storage_demand": 2,
+        "ai_compute_demand, gpu_cloud_demand, data_centre_capacity, power_constraint, neocloud_growth": 1,
         "fundamental_discovery": 145
       },
       "overflow_by_reason_to_care": {
-        "structural": 8,
+        "structural": 11,
         "structural_candidate_source": 145
       },
       "overflow_by_route": {
         "position": 148,
-        "swing": 5
+        "swing": 5,
+        "watchlist": 3
       },
       "overflow_by_source": {
-        "economic_intelligence_structural": 8,
+        "economic_intelligence_structural": 11,
         "tier_d_structural": 145
       }
     },
@@ -786,6 +793,23 @@
       "excluded_entries": []
     },
     {
+      "symbol": "SNDK",
+      "collision_count": 2,
+      "attempted_by": [
+        "economic_intelligence_structural",
+        "tier_d_structural"
+      ],
+      "winning_source": null,
+      "excluded_source_paths": [
+        "economic_intelligence_structural",
+        "tier_d_structural"
+      ],
+      "final_in_shadow": false,
+      "protected_by_manual_or_held": false,
+      "source_path_excluded_but_symbol_preserved": false,
+      "excluded_entries": []
+    },
+    {
       "symbol": "SPY",
       "collision_count": 2,
       "attempted_by": [
@@ -870,6 +894,23 @@
           "reason": "Duplicate \u2014 already claimed by manual_conviction_favourites"
         }
       ]
+    },
+    {
+      "symbol": "WDC",
+      "collision_count": 2,
+      "attempted_by": [
+        "economic_intelligence_structural",
+        "tier_d_structural"
+      ],
+      "winning_source": null,
+      "excluded_source_paths": [
+        "economic_intelligence_structural",
+        "tier_d_structural"
+      ],
+      "final_in_shadow": false,
+      "protected_by_manual_or_held": false,
+      "source_path_excluded_but_symbol_preserved": false,
+      "excluded_entries": []
     },
     {
       "symbol": "XOM",
@@ -4262,6 +4303,36 @@
       "symbol": "PEP",
       "excluded_by": [
         "intelligence_first_static_rule",
+        "economic_intelligence"
+      ],
+      "source": "economic_intelligence_structural",
+      "reason": "Structural quota full (20)",
+      "quota_group": "structural_position"
+    },
+    {
+      "symbol": "SNDK",
+      "excluded_by": [
+        "reference_data_approved_theme",
+        "economic_intelligence"
+      ],
+      "source": "economic_intelligence_structural",
+      "reason": "Structural quota full (20)",
+      "quota_group": "structural_position"
+    },
+    {
+      "symbol": "WDC",
+      "excluded_by": [
+        "reference_data_approved_theme",
+        "economic_intelligence"
+      ],
+      "source": "economic_intelligence_structural",
+      "reason": "Structural quota full (20)",
+      "quota_group": "structural_position"
+    },
+    {
+      "symbol": "IREN",
+      "excluded_by": [
+        "reference_data_approved_theme",
         "economic_intelligence"
       ],
       "source": "economic_intelligence_structural",

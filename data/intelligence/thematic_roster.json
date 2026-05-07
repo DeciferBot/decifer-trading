@@ -146,7 +146,40 @@
       "notes": "IWM (iShares Russell 2000 ETF) as small-cap proxy. Used for headwind monitoring only under credit stress \u2014 watchlist-only, non-executable. No core symbols \u2014 individual small-cap selection requires additional intelligence layer not yet built.",
       "last_reviewed": "2026-05-05",
       "source_label": "intelligence_first_static_rule"
+    },
+    {
+      "theme_id": "memory_storage",
+      "core_symbols": [
+        "SNDK",
+        "WDC"
+      ],
+      "etf_proxies": [],
+      "route_bias": "swing_or_watchlist",
+      "minimum_liquidity_class": "high",
+      "max_candidates": 4,
+      "notes": "Approved memory/storage names with recurring advisory gap evidence. SNDK (SanDisk) and WDC (Western Digital) approved via coverage_gap_review: 22 occurrences each as advisory_unresolved current candidates. MU already covered under semiconductors. STX remains review_required pending additional coverage evidence.",
+      "last_reviewed": "2026-05-07",
+      "source_label": "reference_data_approved_theme",
+      "approval_source": "coverage_gap_review",
+      "review_required_symbols": [
+        "STX"
+      ]
+    },
+    {
+      "theme_id": "ai_compute_infrastructure",
+      "core_symbols": [
+        "IREN"
+      ],
+      "etf_proxies": [],
+      "route_bias": "watchlist_or_swing",
+      "minimum_liquidity_class": "medium",
+      "max_candidates": 3,
+      "notes": "Approved AI compute infrastructure names. IREN approved with caution via coverage_gap_review: 10 occurrences as advisory_unresolved current candidates. IREN is a power-constrained neocloud/compute operator with speculative risk profile. Approval does not imply all neocloud, bitcoin-miner or power-compute names are approved. NBIS and DOCN are already covered by the advisory system and do not require roster changes. Additional names remain review_required.",
+      "last_reviewed": "2026-05-07",
+      "source_label": "reference_data_approved_theme",
+      "approval_source": "coverage_gap_review",
+      "review_required_symbols": []
     }
   ],
-  "last_updated": "2026-05-05"
+  "last_updated": "2026-05-07"
 }
