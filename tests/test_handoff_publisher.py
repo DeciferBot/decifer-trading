@@ -1,8 +1,8 @@
 """
-tests/test_handoff_publisher.py — Sprint 7F handoff publisher tests.
+tests/test_handoff_publisher.py — Sprint 7F / 7G.1 handoff publisher tests.
 
 Classification: production runtime test
-Sprint: 7F
+Sprint: 7F / 7G.1
 
 Tests:
   Group 1  — File existence and output generation
@@ -15,6 +15,7 @@ Tests:
   Group 8  — Atomic write policy
   Group 9  — Import safety (AST)
   Group 10 — Regression (Sprint 7E, 7C, smoke)
+  Group 11 — Run log (Sprint 7G.1)
 
 No broker calls, no LLM calls, no live API calls.
 """
@@ -27,6 +28,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
@@ -859,3 +861,191 @@ class TestSmokeSpotCheck(unittest.TestCase):
         # Flag remains false
         import config
         self.assertFalse(config.CONFIG.get("enable_active_opportunity_universe_handoff", False))
+
+
+# ---------------------------------------------------------------------------
+# Group 11 — Run log (Sprint 7G.1)
+# ---------------------------------------------------------------------------
+
+class TestRunLog(unittest.TestCase):
+    """Group 11: publisher_run_log.jsonl creation, appending, and validation."""
+
+    _RUN_LOG_PATH = os.path.join(_ROOT, "data/live/publisher_run_log.jsonl")
+    _REQUIRED_FIELDS = (
+        "schema_version", "run_id", "worker", "completed_at", "utc_date",
+        "validation_status", "publication_mode", "handoff_enabled",
+        "enable_active_opportunity_universe_handoff",
+        "active_universe_file", "current_manifest_file", "candidate_count",
+        "manifest_expires_at", "freshness_status", "source_shadow_file",
+        "safety_flags", "live_output_changed", "secrets_exposed", "env_values_logged",
+    )
+
+    def _minimal_record(self, utc_date: str = "2026-05-07") -> dict:
+        return {
+            "schema_version": "1.0",
+            "run_id": "test-run-id-001",
+            "worker": "handoff_publisher",
+            "completed_at": f"{utc_date}T12:00:00Z",
+            "utc_date": utc_date,
+            "validation_status": "pass",
+            "publication_mode": "validation_only",
+            "handoff_enabled": False,
+            "enable_active_opportunity_universe_handoff": False,
+            "active_universe_file": "data/live/active_opportunity_universe.json",
+            "current_manifest_file": "data/live/current_manifest.json",
+            "candidate_count": 10,
+            "manifest_expires_at": f"{utc_date}T12:15:00Z",
+            "freshness_status": "fresh",
+            "source_shadow_file": "data/universe_builder/active_opportunity_universe_shadow.json",
+            "safety_flags": {
+                "production_candidate_source_changed": False,
+                "scanner_output_changed": False,
+                "live_output_changed": False,
+            },
+            "live_output_changed": False,
+            "secrets_exposed": False,
+            "env_values_logged": False,
+        }
+
+    # Test 1 — file exists
+    def test_run_log_file_created_after_successful_publish(self):
+        """publisher_run_log.jsonl exists after publisher has run."""
+        self.assertTrue(
+            os.path.isfile(self._RUN_LOG_PATH),
+            f"publisher_run_log.jsonl not found at {self._RUN_LOG_PATH}",
+        )
+
+    # Test 2 — single append writes exactly one line
+    def test_one_successful_publish_appends_one_line(self):
+        """Single _append_run_log call writes exactly one JSONL line."""
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher as hp
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = os.path.join(tmpdir, "data", "live", "publisher_run_log.jsonl")
+            with unittest.mock.patch.object(hp, "_OUTPUT_RUN_LOG", log_path):
+                now = datetime.now(timezone.utc)
+                ok = hp._append_run_log(now, 5, "2026-05-07T12:15:00Z", "shadow.json", [])
+            self.assertTrue(ok)
+            with open(log_path) as f:
+                lines = [l for l in f if l.strip()]
+            self.assertEqual(len(lines), 1)
+
+    # Test 3 — multiple appends accumulate lines
+    def test_multiple_successful_publishes_append_multiple_lines(self):
+        """Three _append_run_log calls write exactly three JSONL lines."""
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher as hp
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = os.path.join(tmpdir, "data", "live", "publisher_run_log.jsonl")
+            with unittest.mock.patch.object(hp, "_OUTPUT_RUN_LOG", log_path):
+                now = datetime.now(timezone.utc)
+                for _ in range(3):
+                    hp._append_run_log(now, 5, "2026-05-07T12:15:00Z", "shadow.json", [])
+            with open(log_path) as f:
+                lines = [l for l in f if l.strip()]
+            self.assertEqual(len(lines), 3)
+
+    # Test 4 — append failure: returns False, adds warning, does not corrupt
+    def test_failed_publish_does_not_append_success_line(self):
+        """If file write raises OSError, _append_run_log returns False and records warning."""
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher as hp
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = os.path.join(tmpdir, "data", "live", "publisher_run_log.jsonl")
+            with unittest.mock.patch.object(hp, "_OUTPUT_RUN_LOG", log_path):
+                with unittest.mock.patch("builtins.open", side_effect=OSError("disk full")):
+                    warnings_list: list[str] = []
+                    ok = hp._append_run_log(
+                        datetime.now(timezone.utc), 5, "", "shadow.json", warnings_list
+                    )
+            self.assertFalse(ok)
+            self.assertTrue(
+                any("run_log_write_failed" in w for w in warnings_list),
+                f"Expected 'run_log_write_failed' in warnings, got: {warnings_list}",
+            )
+
+    # Test 5 — required fields present in every line
+    def test_run_log_line_has_required_fields(self):
+        """Every line in the live publisher_run_log.jsonl has all required fields."""
+        with open(self._RUN_LOG_PATH, "r", encoding="utf-8") as f:
+            lines = [l.strip() for l in f if l.strip()]
+        self.assertTrue(lines, "publisher_run_log.jsonl has no records")
+        for i, line in enumerate(lines):
+            rec = json.loads(line)
+            for field in self._REQUIRED_FIELDS:
+                self.assertIn(field, rec, f"Line {i + 1}: missing field '{field}'")
+
+    # Test 6 — safety_flags dict has no True values
+    def test_run_log_safety_flags_are_clean(self):
+        """safety_flags dict in each run log line has no True values."""
+        with open(self._RUN_LOG_PATH, "r", encoding="utf-8") as f:
+            lines = [l.strip() for l in f if l.strip()]
+        for i, line in enumerate(lines):
+            rec = json.loads(line)
+            flags = rec.get("safety_flags", {})
+            true_flags = [k for k, v in flags.items() if v is True]
+            self.assertEqual(
+                true_flags, [],
+                f"Line {i + 1}: safety_flags has True values: {true_flags}",
+            )
+
+    # Test 7 — validator accepts the live run log
+    def test_validator_accepts_valid_run_log(self):
+        """validate_publisher_run_log passes on the actual publisher_run_log.jsonl."""
+        sys.path.insert(0, _ROOT)
+        import intelligence_schema_validator as isv
+
+        result = isv.validate_publisher_run_log(self._RUN_LOG_PATH)
+        self.assertTrue(result.ok, f"validator rejected valid run log: {result.errors}")
+
+    # Test 8 — validator rejects malformed JSONL
+    def test_validator_rejects_malformed_jsonl_line(self):
+        """validate_publisher_run_log fails when a line is not valid JSON."""
+        sys.path.insert(0, _ROOT)
+        import intelligence_schema_validator as isv
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as fh:
+            fh.write("not valid json\n")
+            tmp = fh.name
+        try:
+            result = isv.validate_publisher_run_log(tmp)
+            self.assertFalse(result.ok, "validator should reject malformed JSONL")
+        finally:
+            os.unlink(tmp)
+
+    # Test 9 — validator rejects handoff_enabled=true
+    def test_validator_rejects_handoff_enabled_true(self):
+        """validate_publisher_run_log fails when handoff_enabled=true in a record."""
+        sys.path.insert(0, _ROOT)
+        import intelligence_schema_validator as isv
+
+        rec = self._minimal_record()
+        rec["handoff_enabled"] = True
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as fh:
+            fh.write(json.dumps(rec) + "\n")
+            tmp = fh.name
+        try:
+            result = isv.validate_publisher_run_log(tmp)
+            self.assertFalse(result.ok, "validator should reject handoff_enabled=true")
+        finally:
+            os.unlink(tmp)
+
+    # Test 10 — validator rejects live_output_changed=true
+    def test_validator_rejects_live_output_changed_true(self):
+        """validate_publisher_run_log fails when live_output_changed=true in a record."""
+        sys.path.insert(0, _ROOT)
+        import intelligence_schema_validator as isv
+
+        rec = self._minimal_record()
+        rec["live_output_changed"] = True
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as fh:
+            fh.write(json.dumps(rec) + "\n")
+            tmp = fh.name
+        try:
+            result = isv.validate_publisher_run_log(tmp)
+            self.assertFalse(result.ok, "validator should reject live_output_changed=true")
+        finally:
+            os.unlink(tmp)

@@ -3,7 +3,7 @@ handoff_publisher_observer.py — Validation-only observation of handoff publish
 
 Classification: production observability / validation-only tool
 Service layer: Handoff / Operational monitoring
-Sprint: 7G
+Sprint: 7G / 7G.1
 
 Reads publisher outputs over time and generates a structured observation report.
 Does NOT run the publisher. Does NOT modify live bot wiring. Does NOT flip any flag.
@@ -87,6 +87,7 @@ _PAPER_COMPARISON_PATH = "data/live/paper_handoff_comparison_report.json"
 _ADVISORY_REVIEW_PATH = "data/intelligence/advisory_log_review.json"
 _UB_REPORT_PATH = "data/universe_builder/universe_builder_report.json"
 _FAIL_GLOB = "data/live/.fail_*.json"
+_RUN_LOG_PATH = "data/live/publisher_run_log.jsonl"
 _OUTPUT_PATH = "data/live/handoff_publisher_observation_report.json"
 
 # Safety block — hardcoded, never from .env
@@ -372,7 +373,7 @@ def _analyse_publisher_report(warnings: list[str]) -> dict:
     }
 
 
-def _analyse_candidate_stability(warnings: list[str]) -> dict:
+def _analyse_candidate_stability(run_log_records: int, warnings: list[str]) -> dict:
     universe, err = _load_json(_UNIVERSE_PATH)
     if err:
         return {
@@ -386,9 +387,23 @@ def _analyse_candidate_stability(warnings: list[str]) -> dict:
     candidates = universe.get("candidates") or []
     symbols = sorted(c.get("symbol") or "" for c in candidates if c.get("symbol"))
 
-    # With only one observation, we cannot compute deltas
+    if run_log_records < 2:
+        return {
+            "status": "single_observation",
+            "candidate_count": len(candidates),
+            "symbols": symbols,
+            "added_since_previous_observation": None,
+            "removed_since_previous_observation": None,
+            "route_changes": None,
+            "quota_group_changes": None,
+            "validation_status_changes": None,
+            "note": "insufficient_history_for_stability — single observation only",
+        }
+
+    # Multiple runs observed — candidate-level diff requires snapshot archive.
+    # Run log records run counts only; symbol-level deltas need future snapshot storage.
     return {
-        "status": "single_observation",
+        "status": "multi_observation_available",
         "candidate_count": len(candidates),
         "symbols": symbols,
         "added_since_previous_observation": None,
@@ -396,7 +411,10 @@ def _analyse_candidate_stability(warnings: list[str]) -> dict:
         "route_changes": None,
         "quota_group_changes": None,
         "validation_status_changes": None,
-        "note": "insufficient_history_for_stability — single observation only",
+        "note": (
+            f"run_log_records={run_log_records} — candidate-level stability diff "
+            "requires snapshot archive (not yet implemented)"
+        ),
     }
 
 
@@ -433,28 +451,94 @@ def _analyse_fail_closed(warnings: list[str]) -> dict:
     }
 
 
-def _count_publisher_runs() -> tuple[int, int]:
+def _read_run_log() -> dict:
     """
-    Return (successful_runs, failed_runs) by reading the heartbeat and fail diagnostics.
-    With one observation we have at most 1 successful run and N fail diagnostics.
+    Read publisher_run_log.jsonl and return run statistics.
+    Returns dict with: records, successful_runs, distinct_sessions,
+    first_observed_at, last_observed_at, run_log_exists.
+
+    Classification: reads production observability output — never writes to live bot inputs.
     """
-    heartbeat, _ = _load_json(_HEARTBEAT_PATH)
-    successful = 1 if (heartbeat and heartbeat.get("validation_status") == "pass") else 0
-    failed = len(glob.glob(_FAIL_GLOB))
-    return successful, failed
+    if not os.path.exists(_RUN_LOG_PATH):
+        return {
+            "run_log_exists": False,
+            "run_log_records": 0,
+            "successful_runs": 0,
+            "distinct_sessions": 0,
+            "distinct_utc_dates": [],
+            "first_observed_at": None,
+            "last_observed_at": None,
+        }
+
+    records: list[dict] = []
+    parse_errors = 0
+    try:
+        with open(_RUN_LOG_PATH, "r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    records.append(json.loads(line))
+                except json.JSONDecodeError:
+                    parse_errors += 1
+    except OSError:
+        return {
+            "run_log_exists": True,
+            "run_log_records": 0,
+            "successful_runs": 0,
+            "distinct_sessions": 0,
+            "distinct_utc_dates": [],
+            "first_observed_at": None,
+            "last_observed_at": None,
+            "parse_errors": parse_errors,
+        }
+
+    successful = [r for r in records if r.get("validation_status") == "pass"]
+    utc_dates = sorted({r["utc_date"] for r in successful if r.get("utc_date")})
+    timestamps = sorted(r["completed_at"] for r in successful if r.get("completed_at"))
+
+    return {
+        "run_log_exists": True,
+        "run_log_records": len(records),
+        "successful_runs": len(successful),
+        "distinct_sessions": len(utc_dates),
+        "distinct_utc_dates": utc_dates,
+        "first_observed_at": timestamps[0] if timestamps else None,
+        "last_observed_at": timestamps[-1] if timestamps else None,
+        "parse_errors": parse_errors,
+    }
 
 
 def _determine_readiness_gate(
-    successful_runs: int,
+    run_log: dict,
     manifest_analysis: dict,
     universe_analysis: dict,
     heartbeat_analysis: dict,
     freshness: dict,
     warnings: list[str],
-) -> str:
+) -> tuple[str, bool, str]:
+    """
+    Return (gate, threshold_met, threshold_basis).
+
+    Threshold: successful_publisher_runs >= 10 OR distinct_utc_sessions >= 3.
+    threshold_basis: 'successful_runs' | 'distinct_sessions' | 'not_met'
+    """
+    successful_runs = run_log.get("successful_runs", 0)
+    distinct_sessions = run_log.get("distinct_sessions", 0)
+
+    threshold_met = (successful_runs >= _MIN_RUNS_FOR_STABLE
+                     or distinct_sessions >= _MIN_SESSIONS_FOR_STABLE)
+    if successful_runs >= _MIN_RUNS_FOR_STABLE:
+        threshold_basis = "successful_runs"
+    elif distinct_sessions >= _MIN_SESSIONS_FOR_STABLE:
+        threshold_basis = "distinct_sessions"
+    else:
+        threshold_basis = "not_met"
+
     # Gate 1: insufficient observation
-    if successful_runs < _MIN_RUNS_FOR_STABLE:
-        return "insufficient_observation"
+    if not threshold_met:
+        return "insufficient_observation", False, "not_met"
 
     # Gate 2: fix publisher
     has_publisher_issues = (
@@ -463,13 +547,13 @@ def _determine_readiness_gate(
         or not heartbeat_analysis.get("exists")
     )
     if has_publisher_issues:
-        return "fix_publisher_before_flag_activation"
+        return "fix_publisher_before_flag_activation", True, threshold_basis
 
-    # Gate 3: stability
+    # Gate 3: freshness expired
     if freshness.get("expired_count", 0) > 0:
-        return "validation_only_unstable"
+        return "validation_only_unstable", True, threshold_basis
 
-    # Gate 4: ready
+    # Gate 4: all pass
     all_pass = (
         manifest_analysis.get("validation_status") == "pass"
         and universe_analysis.get("validation_status") == "pass"
@@ -477,9 +561,9 @@ def _determine_readiness_gate(
         and not freshness.get("expired_count", 0)
     )
     if all_pass:
-        return "ready_for_flag_activation_design"
+        return "validation_only_stable", True, threshold_basis
 
-    return "validation_only_stable"
+    return "validation_only_unstable", True, threshold_basis
 
 
 # ---------------------------------------------------------------------------
@@ -502,14 +586,17 @@ def run_observer() -> dict:
     universe_analysis = _analyse_active_universe(warnings)
     heartbeat_analysis = _analyse_heartbeat(now, warnings)
     publisher_report_analysis = _analyse_publisher_report(warnings)
-    candidate_stability = _analyse_candidate_stability(warnings)
     fail_closed_obs = _analyse_fail_closed(warnings)
 
-    successful_runs, failed_runs = _count_publisher_runs()
-    total_runs = successful_runs + failed_runs
+    run_log = _read_run_log()
+    successful_runs = run_log["successful_runs"]
+    failed_runs = len(glob.glob(_FAIL_GLOB))
+    total_runs = run_log["run_log_records"] + failed_runs
 
-    readiness_gate = _determine_readiness_gate(
-        successful_runs, manifest_analysis, universe_analysis,
+    candidate_stability = _analyse_candidate_stability(run_log["run_log_records"], warnings)
+
+    readiness_gate, threshold_met, threshold_basis = _determine_readiness_gate(
+        run_log, manifest_analysis, universe_analysis,
         heartbeat_analysis, freshness, warnings,
     )
 
@@ -517,14 +604,23 @@ def run_observer() -> dict:
         _MANIFEST_PATH, _UNIVERSE_PATH, _PUBLISHER_REPORT_PATH, _HEARTBEAT_PATH,
         _PAPER_COMPARISON_PATH, _ADVISORY_REVIEW_PATH, _UB_REPORT_PATH,
     ) if os.path.exists(p)]
+    if run_log["run_log_exists"]:
+        source_files.append(_RUN_LOG_PATH)
 
     observation_summary = {
         "records_observed": total_runs,
-        "first_observed_at": heartbeat_analysis.get("last_success_at"),
-        "last_observed_at": _ts(now),
+        "first_observed_at": run_log.get("first_observed_at") or heartbeat_analysis.get("last_success_at"),
+        "last_observed_at": run_log.get("last_observed_at") or _ts(now),
         "publisher_runs_detected": total_runs,
         "successful_publishes": successful_runs,
         "failed_publishes": failed_runs,
+        "run_log_exists": run_log["run_log_exists"],
+        "run_log_records": run_log["run_log_records"],
+        "successful_publisher_runs": successful_runs,
+        "distinct_utc_sessions": run_log["distinct_sessions"],
+        "distinct_utc_dates": run_log.get("distinct_utc_dates", []),
+        "threshold_met": threshold_met,
+        "threshold_basis": threshold_basis,
         "current_manifest_exists": manifest_analysis.get("exists", False),
         "active_universe_exists": universe_analysis.get("exists", False),
         "heartbeat_exists": heartbeat_analysis.get("exists", False),
@@ -578,9 +674,11 @@ def run_observer() -> dict:
 
     log.info(
         "[handoff_publisher_observer] observation_complete gate=%s "
-        "successful_runs=%d failed_runs=%d manifest_issues=%d universe_issues=%d "
+        "successful_runs=%d distinct_sessions=%d failed_runs=%d threshold_met=%s "
+        "manifest_issues=%d universe_issues=%d "
         "live_bot_consuming_handoff=false live_output_changed=false",
-        readiness_gate, successful_runs, failed_runs,
+        readiness_gate, successful_runs, run_log["distinct_sessions"], failed_runs,
+        threshold_met,
         manifest_analysis.get("issue_count", 0),
         universe_analysis.get("issue_count", 0),
     )
@@ -596,14 +694,19 @@ if __name__ == "__main__":
     _logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
     report = run_observer()
     gate = report["readiness_gate"]
-    successful = report["observation_summary"]["successful_publishes"]
-    failed = report["observation_summary"]["failed_publishes"]
+    obs = report["observation_summary"]
+    successful = obs["successful_publisher_runs"]
+    sessions = obs["distinct_utc_sessions"]
+    failed = obs["failed_publishes"]
+    threshold_met = obs["threshold_met"]
+    threshold_basis = obs["threshold_basis"]
     manifest_ok = report["manifest_validity_analysis"].get("issue_count", 0) == 0
     universe_ok = report["active_universe_validity_analysis"].get("issue_count", 0) == 0
     sla_ok = report["freshness_analysis"].get("sla_met", False)
     print(
         f"[handoff_publisher_observer] gate={gate} "
-        f"runs={successful}ok/{failed}fail "
+        f"runs={successful}ok/{failed}fail sessions={sessions} "
+        f"threshold={'MET:'+threshold_basis if threshold_met else 'not_met'} "
         f"manifest={'OK' if manifest_ok else 'ISSUES'} "
         f"universe={'OK' if universe_ok else 'ISSUES'} "
         f"freshness={'OK' if sla_ok else 'STALE'} "

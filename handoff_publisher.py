@@ -3,7 +3,7 @@ handoff_publisher.py — Production handoff publisher (scheduled worker).
 
 Classification: production runtime candidate / scheduled worker
 Service layer: Handoff / Live manifest generation
-Sprint: 7F
+Sprint: 7F / 7G.1
 
 Reads the validated Intelligence-First shadow universe and publishes:
 
@@ -81,6 +81,7 @@ _OUTPUT_UNIVERSE = "data/live/active_opportunity_universe.json"
 _OUTPUT_MANIFEST = "data/live/current_manifest.json"
 _OUTPUT_REPORT = "data/live/handoff_publisher_report.json"
 _OUTPUT_HEARTBEAT = "data/heartbeats/handoff_publisher.json"
+_OUTPUT_RUN_LOG = "data/live/publisher_run_log.jsonl"
 
 # ---------------------------------------------------------------------------
 # Safety block — hardcoded, never from .env or config
@@ -181,6 +182,61 @@ def _write_fail_diagnostic(reason: str, context: dict) -> str:
     except OSError:
         pass
     return fail_path
+
+
+# ---------------------------------------------------------------------------
+# Publisher run log — append-only, one line per successful cycle
+# Classification: production observability output, not live bot input
+# ---------------------------------------------------------------------------
+
+
+def _append_run_log(
+    now: datetime,
+    candidate_count: int,
+    manifest_expires_at: str,
+    source_shadow_file: str,
+    warnings: list[str],
+) -> bool:
+    """
+    Append one JSON line to publisher_run_log.jsonl after a fully successful cycle.
+
+    Called only after all 4 outputs (universe, manifest, report, heartbeat) are written.
+    If append fails: records run_log_write_failed warning, does NOT corrupt manifest.
+    Returns True on success, False on failure.
+
+    Classification: production observability output — never read by live bot.
+    """
+    import uuid
+    record = {
+        "schema_version": _SCHEMA_VERSION,
+        "run_id": str(uuid.uuid4()),
+        "worker": "handoff_publisher",
+        "completed_at": _ts(now),
+        "utc_date": now.strftime("%Y-%m-%d"),
+        "validation_status": "pass",
+        "publication_mode": _PUBLICATION_MODE,
+        "handoff_enabled": False,
+        "enable_active_opportunity_universe_handoff": False,
+        "active_universe_file": _OUTPUT_UNIVERSE,
+        "current_manifest_file": _OUTPUT_MANIFEST,
+        "candidate_count": candidate_count,
+        "manifest_expires_at": manifest_expires_at,
+        "freshness_status": "fresh",
+        "source_shadow_file": source_shadow_file,
+        "safety_flags": {k: v for k, v in _SAFETY.items()},
+        "live_output_changed": False,
+        "secrets_exposed": False,
+        "env_values_logged": False,
+    }
+    try:
+        os.makedirs(os.path.dirname(_OUTPUT_RUN_LOG) or ".", exist_ok=True)
+        with open(_OUTPUT_RUN_LOG, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, default=str) + "\n")
+        return True
+    except Exception as exc:
+        warnings.append(f"run_log_write_failed: {exc}")
+        log.warning("[handoff_publisher] run_log_write_failed: %s", exc)
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -597,6 +653,14 @@ def run_publisher() -> dict:
         atomic_summary["heartbeat_written"] = True
     except Exception as exc:
         warnings.append(f"heartbeat write failed (non-critical): {exc}")
+
+    # --- Step 7b: Append run log (after all 4 outputs written successfully) ---
+    # Failure is non-critical: warns but does not corrupt manifest or prevent report.
+    run_log_ok = _append_run_log(
+        now, len(accepted), manifest_doc.get("expires_at", ""),
+        _SHADOW_UNIVERSE_PATH, warnings,
+    )
+    atomic_summary["run_log_written"] = run_log_ok
 
     # --- Step 8: Publisher report ---
     validation_summary = {

@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-07T15:40:48Z",
+  "generated_at": "2026-05-07T16:11:29Z",
   "mode": "validation_only_handoff_publisher_observation",
   "source_files": [
     "data/live/current_manifest.json",
@@ -9,15 +9,25 @@
     "data/heartbeats/handoff_publisher.json",
     "data/live/paper_handoff_comparison_report.json",
     "data/intelligence/advisory_log_review.json",
-    "data/universe_builder/universe_builder_report.json"
+    "data/universe_builder/universe_builder_report.json",
+    "data/live/publisher_run_log.jsonl"
   ],
   "observation_summary": {
-    "records_observed": 4,
-    "first_observed_at": "2026-05-07T15:40:46Z",
-    "last_observed_at": "2026-05-07T15:40:48Z",
-    "publisher_runs_detected": 4,
-    "successful_publishes": 1,
-    "failed_publishes": 3,
+    "records_observed": 7,
+    "first_observed_at": "2026-05-07T16:11:11Z",
+    "last_observed_at": "2026-05-07T16:11:26Z",
+    "publisher_runs_detected": 7,
+    "successful_publishes": 3,
+    "failed_publishes": 4,
+    "run_log_exists": true,
+    "run_log_records": 3,
+    "successful_publisher_runs": 3,
+    "distinct_utc_sessions": 1,
+    "distinct_utc_dates": [
+      "2026-05-07"
+    ],
+    "threshold_met": false,
+    "threshold_basis": "not_met",
     "current_manifest_exists": true,
     "active_universe_exists": true,
     "heartbeat_exists": true,
@@ -25,12 +35,12 @@
     "readiness_gate": "insufficient_observation"
   },
   "freshness_analysis": {
-    "manifest_age_seconds": 2.5,
+    "manifest_age_seconds": 3.8,
     "manifest_freshness": "fresh",
-    "manifest_expires_at": "2026-05-07T15:55:46Z",
-    "universe_age_seconds": 2.5,
+    "manifest_expires_at": "2026-05-07T16:26:26Z",
+    "universe_age_seconds": 3.8,
     "universe_freshness": "fresh",
-    "heartbeat_age_seconds": 2.5,
+    "heartbeat_age_seconds": 3.8,
     "heartbeat_freshness": "fresh",
     "sla_primary_threshold_seconds": 600,
     "sla_stale_threshold_seconds": 900,
@@ -38,8 +48,8 @@
     "sla_met": true,
     "stale_count": 0,
     "expired_count": 0,
-    "max_age_seconds": 2.5,
-    "average_age_seconds": 2.5
+    "max_age_seconds": 3.8,
+    "average_age_seconds": 3.8
   },
   "manifest_validity_analysis": {
     "exists": true,
@@ -73,9 +83,9 @@
     "exists": true,
     "worker": "handoff_publisher",
     "validation_status": "pass",
-    "last_success_at": "2026-05-07T15:40:46Z",
-    "last_attempt_at": "2026-05-07T15:40:46Z",
-    "last_success_age_seconds": 2.5,
+    "last_success_at": "2026-05-07T16:11:26Z",
+    "last_attempt_at": "2026-05-07T16:11:26Z",
+    "last_success_age_seconds": 3.8,
     "last_success_freshness": "fresh",
     "candidate_count": 50,
     "fail_closed_reason": null
@@ -95,7 +105,7 @@
     "issue_count": 0
   },
   "candidate_stability_analysis": {
-    "status": "single_observation",
+    "status": "multi_observation_available",
     "candidate_count": 50,
     "symbols": [
       "AAPL",
@@ -154,10 +164,10 @@
     "route_changes": null,
     "quota_group_changes": null,
     "validation_status_changes": null,
-    "note": "insufficient_history_for_stability \u2014 single observation only"
+    "note": "run_log_records=3 \u2014 candidate-level stability diff requires snapshot archive (not yet implemented)"
   },
   "fail_closed_observations": {
-    "fail_closed_events": 3,
+    "fail_closed_events": 4,
     "fail_diagnostics_found": [
       {
         "file": "data/live/.fail_20260507T152529Z.json",
@@ -173,6 +183,11 @@
         "file": "data/live/.fail_20260507T153107Z.json",
         "fail_closed_reason": "source_read_error: file not found: /var/folders/93/_t7k5kmd4tlc0p5x244dd1th0000gn/T/tmp0zp31t5p/nonexistent.json",
         "generated_at": "2026-05-07T15:31:07Z"
+      },
+      {
+        "file": "data/live/.fail_20260507T154300Z.json",
+        "fail_closed_reason": "source_read_error: file not found: /var/folders/93/_t7k5kmd4tlc0p5x244dd1th0000gn/T/tmp0k3v270_/nonexistent.json",
+        "generated_at": "2026-05-07T15:43:00Z"
       }
     ],
     "manifest_missing_events": 0,

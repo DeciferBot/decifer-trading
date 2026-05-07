@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-07T15:40:46Z",
+  "generated_at": "2026-05-07T16:11:26Z",
   "mode": "handoff_publisher_report",
   "publication_mode": "validation_only",
   "source_files": [
@@ -33,7 +33,8 @@
     "universe_written": true,
     "manifest_written": true,
     "heartbeat_written": true,
-    "errors": []
+    "errors": [],
+    "run_log_written": true
   },
   "heartbeat_summary": {
     "written": true,

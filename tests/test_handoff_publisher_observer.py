@@ -1,5 +1,5 @@
 """
-tests/test_handoff_publisher_observer.py — Sprint 7G: Validation-Only Live Observation
+tests/test_handoff_publisher_observer.py — Sprint 7G / 7G.1: Validation-Only Live Observation
 
 Covers:
   - handoff_publisher_observer.py module exists
@@ -11,6 +11,7 @@ Covers:
   - import safety (no forbidden modules)
   - Sprint 7F regression
   - smoke
+  - run log gate logic (Sprint 7G.1)
 """
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ import ast
 import glob
 import json
 import os
+import sys
 import tempfile
 import time
 import unittest.mock as mock
@@ -41,7 +43,6 @@ _VALID_READINESS_GATES = {
     "validation_only_stable",
     "validation_only_unstable",
     "fix_publisher_before_flag_activation",
-    "ready_for_flag_activation_design",
 }
 
 _SAFETY_FLAGS_MUST_BE_FALSE = [
@@ -319,6 +320,7 @@ class TestFailClosedBehaviour:
                 "_UNIVERSE_PATH": os.path.join(tmpdir, "active_opportunity_universe.json"),
                 "_HEARTBEAT_PATH": os.path.join(tmpdir, "handoff_publisher.json"),
                 "_PUBLISHER_REPORT_PATH": os.path.join(tmpdir, "handoff_publisher_report.json"),
+                "_RUN_LOG_PATH": os.path.join(tmpdir, "publisher_run_log.jsonl"),
                 "_OUTPUT_PATH": os.path.join(tmpdir, "observation_report.json"),
                 "_FAIL_GLOB": os.path.join(tmpdir, ".fail_*.json"),
             }
@@ -400,3 +402,191 @@ class TestSmokeSpotCheck:
         assert isinstance(report.get("safety_analysis"), dict)
         sa = report["safety_analysis"]
         assert sa.get("all_safety_invariants_hold") is True
+
+
+# ---------------------------------------------------------------------------
+# Group 11 — Run log gate logic (Sprint 7G.1)
+# ---------------------------------------------------------------------------
+
+_RUN_LOG_PATH = os.path.join(_ROOT, "data", "live", "publisher_run_log.jsonl")
+
+
+def _make_run_log_record(utc_date: str = "2026-05-07", n: int = 0) -> dict:
+    return {
+        "schema_version": "1.0",
+        "run_id": f"test-{utc_date}-{n:03d}",
+        "worker": "handoff_publisher",
+        "completed_at": f"{utc_date}T12:00:{n:02d}Z",
+        "utc_date": utc_date,
+        "validation_status": "pass",
+        "publication_mode": "validation_only",
+        "handoff_enabled": False,
+        "enable_active_opportunity_universe_handoff": False,
+        "active_universe_file": "data/live/active_opportunity_universe.json",
+        "current_manifest_file": "data/live/current_manifest.json",
+        "candidate_count": 10,
+        "manifest_expires_at": f"{utc_date}T12:15:00Z",
+        "freshness_status": "fresh",
+        "source_shadow_file": "data/universe_builder/active_opportunity_universe_shadow.json",
+        "safety_flags": {"live_output_changed": False, "secrets_exposed": False},
+        "live_output_changed": False,
+        "secrets_exposed": False,
+        "env_values_logged": False,
+    }
+
+
+def _write_run_log(path: str, records: list[dict]) -> None:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        for rec in records:
+            fh.write(json.dumps(rec) + "\n")
+
+
+class TestRunLogObservation:
+    """Group 11: Sprint 7G.1 — run log gate logic in observer."""
+
+    def _clean_analysis(self) -> tuple[dict, dict, dict, dict]:
+        manifest = {"validation_status": "pass", "issue_count": 0, "handoff_enabled": False}
+        universe = {"validation_status": "pass", "issue_count": 0}
+        heartbeat = {"exists": True, "validation_status": "pass"}
+        freshness = {"expired_count": 0, "sla_met": True}
+        return manifest, universe, heartbeat, freshness
+
+    # Test 11 — observer reads successful_publisher_runs from run log
+    def test_observer_uses_run_log_not_heartbeat_for_run_count(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        records = [_make_run_log_record("2026-05-07", i) for i in range(5)]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = os.path.join(tmpdir, "publisher_run_log.jsonl")
+            _write_run_log(log_path, records)
+            with mock.patch.object(hpo, "_RUN_LOG_PATH", log_path):
+                run_log = hpo._read_run_log()
+        assert run_log["successful_runs"] == 5
+        assert run_log["run_log_exists"] is True
+
+    # Test 12 — observer counts distinct UTC sessions
+    def test_observer_counts_distinct_utc_sessions(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        records = [
+            _make_run_log_record("2026-05-05", 0),
+            _make_run_log_record("2026-05-06", 0),
+            _make_run_log_record("2026-05-07", 0),
+        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_path = os.path.join(tmpdir, "publisher_run_log.jsonl")
+            _write_run_log(log_path, records)
+            with mock.patch.object(hpo, "_RUN_LOG_PATH", log_path):
+                run_log = hpo._read_run_log()
+        assert run_log["distinct_sessions"] == 3
+
+    # Test 13 — gate remains insufficient_observation below both thresholds
+    def test_observer_gate_insufficient_observation_below_thresholds(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        run_log = {"successful_runs": 3, "distinct_sessions": 1, "run_log_exists": True}
+        manifest, universe, heartbeat, freshness = self._clean_analysis()
+        gate, threshold_met, basis = hpo._determine_readiness_gate(
+            run_log, manifest, universe, heartbeat, freshness, []
+        )
+        assert gate == "insufficient_observation"
+        assert threshold_met is False
+        assert basis == "not_met"
+
+    # Test 14 — gate advances when successful_publisher_runs >= 10
+    def test_observer_gate_advances_on_10_successful_runs(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        run_log = {"successful_runs": 10, "distinct_sessions": 1, "run_log_exists": True}
+        manifest, universe, heartbeat, freshness = self._clean_analysis()
+        gate, threshold_met, basis = hpo._determine_readiness_gate(
+            run_log, manifest, universe, heartbeat, freshness, []
+        )
+        assert gate != "insufficient_observation"
+        assert threshold_met is True
+        assert basis == "successful_runs"
+
+    # Test 15 — gate advances when distinct_utc_sessions >= 3
+    def test_observer_gate_advances_on_3_distinct_sessions(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        run_log = {"successful_runs": 3, "distinct_sessions": 3, "run_log_exists": True}
+        manifest, universe, heartbeat, freshness = self._clean_analysis()
+        gate, threshold_met, basis = hpo._determine_readiness_gate(
+            run_log, manifest, universe, heartbeat, freshness, []
+        )
+        assert gate != "insufficient_observation"
+        assert threshold_met is True
+        assert basis == "distinct_sessions"
+
+    # Test 16 — gate does not advance if publisher has issues even above threshold
+    def test_observer_does_not_advance_if_publisher_has_issues(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        run_log = {"successful_runs": 10, "distinct_sessions": 3, "run_log_exists": True}
+        manifest = {"validation_status": "fail", "issue_count": 2, "handoff_enabled": False}
+        _, universe, heartbeat, freshness = self._clean_analysis()
+        gate, threshold_met, basis = hpo._determine_readiness_gate(
+            run_log, manifest, universe, heartbeat, freshness, []
+        )
+        assert gate == "fix_publisher_before_flag_activation"
+        assert threshold_met is True
+
+    # Test 17 — missing run log returns insufficient_observation
+    def test_observer_handles_missing_run_log_as_insufficient_observation(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            missing_path = os.path.join(tmpdir, "nonexistent_run_log.jsonl")
+            with mock.patch.object(hpo, "_RUN_LOG_PATH", missing_path):
+                run_log = hpo._read_run_log()
+        assert run_log["run_log_exists"] is False
+        assert run_log["successful_runs"] == 0
+        assert run_log["distinct_sessions"] == 0
+        # confirm that gate logic treats 0 runs / 0 sessions as insufficient
+        manifest, universe, heartbeat, freshness = self._clean_analysis()
+        gate, threshold_met, _ = hpo._determine_readiness_gate(
+            run_log, manifest, universe, heartbeat, freshness, []
+        )
+        assert gate == "insufficient_observation"
+        assert threshold_met is False
+
+    # Test 18 — heartbeat still reports latest run health
+    def test_heartbeat_still_reports_latest_run_health(self):
+        from intelligence_schema_validator import validate_handoff_publisher_heartbeat
+        heartbeat_path = os.path.join(_ROOT, "data", "heartbeats", "handoff_publisher.json")
+        if not os.path.isfile(heartbeat_path):
+            pytest.skip("heartbeat not present")
+        result = validate_handoff_publisher_heartbeat(heartbeat_path)
+        assert result.ok, f"heartbeat validation failed: {result.errors}"
+
+    # Test 19 — live bot does not read publisher_run_log
+    def test_live_bot_does_not_read_run_log(self):
+        forbidden_ref = "publisher_run_log"
+        for fname in ("bot_trading.py", "scanner.py", "orders_core.py"):
+            fpath = os.path.join(_ROOT, fname)
+            if not os.path.isfile(fpath):
+                continue
+            with open(fpath, encoding="utf-8") as f:
+                content = f.read()
+            assert forbidden_ref not in content, (
+                f"{fname} references {forbidden_ref!r} — live bot must not read run log"
+            )
+
+    # Test 20 — production_candidate_source_changed is false in observation report
+    def test_no_production_candidate_source_changed(self):
+        report = _load_report()
+        assert report.get("production_candidate_source_changed") is False
+
+    # Test 21 — live_output_changed is false in observation report
+    def test_live_output_changed_is_false_in_report(self):
+        report = _load_report()
+        assert report.get("live_output_changed") is False

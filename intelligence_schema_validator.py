@@ -2018,6 +2018,11 @@ def validate_all(base_dir: str = "data/intelligence") -> dict[str, ValidationRes
             observation_path
         )
 
+    # Sprint 7G.1 — publisher run log (optional, only if present)
+    run_log_path = os.path.join(live_dir, "publisher_run_log.jsonl")
+    if os.path.exists(run_log_path):
+        results["publisher_run_log"] = validate_publisher_run_log(run_log_path)
+
     return results
 
 
@@ -3543,5 +3548,116 @@ def validate_handoff_publisher_observation_report(path: str) -> ValidationResult
         sa = data["safety_analysis"]
         if sa.get("all_safety_invariants_hold") is not True:
             result.fail("observation_report: safety_analysis.all_safety_invariants_hold must be true")
+
+    # Sprint 7G.1: validate run_log fields in observation report
+    obs = data.get("observation_summary", {})
+    if "run_log_exists" not in obs:
+        result.fail("observation_report: observation_summary missing 'run_log_exists'")
+    if "successful_publisher_runs" not in obs:
+        result.fail("observation_report: observation_summary missing 'successful_publisher_runs'")
+    if "distinct_utc_sessions" not in obs:
+        result.fail("observation_report: observation_summary missing 'distinct_utc_sessions'")
+    if "threshold_met" not in obs:
+        result.fail("observation_report: observation_summary missing 'threshold_met'")
+    if "threshold_basis" not in obs:
+        result.fail("observation_report: observation_summary missing 'threshold_basis'")
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Sprint 7G.1 — publisher_run_log.jsonl validator
+# ---------------------------------------------------------------------------
+_RUN_LOG_REQUIRED_FIELDS = (
+    "schema_version", "run_id", "worker", "completed_at", "utc_date",
+    "validation_status", "publication_mode", "handoff_enabled",
+    "enable_active_opportunity_universe_handoff",
+    "active_universe_file", "current_manifest_file", "candidate_count",
+    "manifest_expires_at", "freshness_status", "source_shadow_file",
+    "safety_flags", "live_output_changed", "secrets_exposed", "env_values_logged",
+)
+
+
+def validate_publisher_run_log(path: str) -> ValidationResult:
+    """Validate data/live/publisher_run_log.jsonl (Sprint 7G.1).
+
+    Classification: production observability output — never read by live bot.
+    Validates every line individually.
+    """
+    result = ValidationResult()
+    if not os.path.exists(path):
+        result.fail(f"publisher_run_log: file not found: {path}")
+        return result
+
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            raw_lines = [l.rstrip("\n") for l in fh if l.strip()]
+    except OSError as exc:
+        result.fail(f"publisher_run_log: cannot read: {exc}")
+        return result
+
+    if not raw_lines:
+        result.warn("publisher_run_log: file exists but has no records")
+        return result
+
+    for i, line in enumerate(raw_lines):
+        lineno = i + 1
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError as exc:
+            result.fail(f"publisher_run_log line {lineno}: invalid JSON: {exc}")
+            continue
+
+        if not isinstance(rec, dict):
+            result.fail(f"publisher_run_log line {lineno}: not a dict")
+            continue
+
+        for field in _RUN_LOG_REQUIRED_FIELDS:
+            if field not in rec:
+                result.fail(f"publisher_run_log line {lineno}: missing field '{field}'")
+
+        if rec.get("worker") != "handoff_publisher":
+            result.fail(
+                f"publisher_run_log line {lineno}: worker must be 'handoff_publisher', "
+                f"got {rec.get('worker')!r}"
+            )
+
+        if rec.get("validation_status") != "pass":
+            result.fail(
+                f"publisher_run_log line {lineno}: validation_status must be 'pass', "
+                f"got {rec.get('validation_status')!r}"
+            )
+
+        if rec.get("publication_mode") != "validation_only":
+            result.fail(
+                f"publisher_run_log line {lineno}: publication_mode must be 'validation_only'"
+            )
+
+        if rec.get("handoff_enabled") is not False:
+            result.fail(f"publisher_run_log line {lineno}: handoff_enabled must be false")
+
+        if rec.get("enable_active_opportunity_universe_handoff") is not False:
+            result.fail(
+                f"publisher_run_log line {lineno}: enable_active_opportunity_universe_handoff must be false"
+            )
+
+        if not isinstance(rec.get("candidate_count"), int) or rec.get("candidate_count", 0) <= 0:
+            result.fail(f"publisher_run_log line {lineno}: candidate_count must be a positive int")
+
+        if not isinstance(rec.get("safety_flags"), dict):
+            result.fail(f"publisher_run_log line {lineno}: safety_flags must be a dict")
+
+        for flag in ("live_output_changed", "secrets_exposed", "env_values_logged"):
+            if rec.get(flag) is not False:
+                result.fail(f"publisher_run_log line {lineno}: {flag} must be false")
+
+        if not rec.get("utc_date"):
+            result.fail(f"publisher_run_log line {lineno}: utc_date must be present")
+
+        for forbidden in ("executable", "order_instruction"):
+            if forbidden in rec:
+                result.fail(
+                    f"publisher_run_log line {lineno}: forbidden field '{forbidden}' present"
+                )
 
     return result
