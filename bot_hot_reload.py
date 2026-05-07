@@ -85,8 +85,8 @@ def check_and_reload() -> list:
             except Exception as e:
                 clog("ERROR", f"Hot reload failed for {mod_name}: {e}")
 
-    # Special case: dashboard.py — update the HTML served to browser
-    dash_path = os.path.join(base, "dashboard.py")
+    # Special case: dashboard HTML — watch the static file, not the loader
+    dash_path = os.path.join(base, "static", "dashboard.html")
     dash_current = _file_hash(dash_path)
     if dash_current and dash_current != _file_hashes.get("dashboard", ""):
         try:
@@ -97,7 +97,7 @@ def check_and_reload() -> list:
                 _bot.DASHBOARD_HTML = _dash.DASHBOARD_HTML
             _file_hashes["dashboard"] = dash_current
             changed.append("dashboard")
-            clog("INFO", "🔄 Hot reload: dashboard.py updated — refresh browser to see changes")
+            clog("INFO", "🔄 Hot reload: dashboard.html updated — refresh browser to see changes")
         except Exception as e:
             clog("ERROR", f"Hot reload failed for dashboard: {e}")
 
