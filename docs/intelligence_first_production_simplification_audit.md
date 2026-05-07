@@ -741,6 +741,57 @@ These modules must not be imported by the live trading bot (`bot_trading.py` or 
 
 ---
 
+## Sprint 7F File Classifications
+
+**Sprint 7F — Handoff Publisher and Live Manifest Generation**
+**Objective:** Create the scheduled worker that produces production-named handoff files from the validated shadow pipeline. Publication mode = validation_only. enable_active_opportunity_universe_handoff remains False.
+
+### Created / Modified Files
+
+| File | Classification | Included in live-bot container? | Notes |
+|------|---------------|--------------------------------|-------|
+| `handoff_publisher.py` | Production runtime candidate / scheduled worker | No (separate process) | Net-new. Reads shadow universe → atomic-writes 4 output files. No imports of bot_trading/scanner/orders_core/guardrails/bot_ibkr/apex_orchestrator. |
+| `data/live/active_opportunity_universe.json` | Production runtime (output) | Read by bot when flag=True | Written atomically. mode=production_handoff_universe, publication_mode=validation_only, 50 candidates, all executable=false. |
+| `data/live/current_manifest.json` | Production runtime (output) | Read by bot when flag=True | Written atomically. handoff_enabled=false, enable_flag_required=true, validation_status=pass. |
+| `data/live/handoff_publisher_report.json` | Production runtime (observability) | No | Cycle-level report. All 13 safety flags false. |
+| `data/heartbeats/handoff_publisher.json` | Production runtime (observability) | No | Written only after successful publish cycle. |
+| `tests/test_handoff_publisher.py` | Test — production runtime | No | Net-new. 107 tests, 10 groups. |
+| `intelligence_schema_validator.py` | Advisory/shadow-only (tooling) | No | Extended with 4 new validators wired into validate_all(). |
+| `tests/test_intelligence_sprint7b.py` | Test — advisory-only | No | 2 stale assertions updated: file-absence → content-safety check. |
+| `tests/test_intelligence_sprint7c.py` | Test — advisory-only | No | 2 stale assertions updated: file-absence → content-safety check. |
+
+### Key Architecture Decisions Formalised in Sprint 7F
+
+| Decision | Rationale |
+|----------|-----------|
+| Publisher writes universe first, then manifest | Manifest validator checks `active_universe_file` exists — chicken/egg resolved by sequencing writes |
+| Pre-write manifest validation skips file-existence check | Universe not yet written at pre-write check; post-write check re-validates with file-existence |
+| `data/heartbeats/` created as new directory | Heartbeat dir decoupled from `data/live/` — clean separation of operational state from handoff artefacts |
+| Sprint 7B/7C test assertions updated (not deleted) | Old "file must not exist" invariant is now superseded by "if exists, must be validation_only + non-executable" |
+| Publisher is a separate process, not imported by bot | Live bot isolation rule — publisher has no bot runtime imports |
+
+### Sprint 7F Anti-Bloat Confirmation
+
+| Check | Status |
+|-------|--------|
+| New live API paths? | No |
+| New broker calls? | No |
+| New LLM calls? | No |
+| New .env reads? | No |
+| Production handoff flag changed? | No — `enable_active_opportunity_universe_handoff = False` |
+| handoff_enabled in manifest? | False |
+| publication_mode? | validation_only |
+| Live bot reads publisher outputs? | No — flag is False |
+| bot_trading.py modified? | No |
+| scanner.py modified? | No |
+| guardrails.py modified? | No |
+| Apex prompt modified? | No |
+| Risk/order/execution logic changed? | No |
+| Duplicate publisher path? | No — single publisher, single shadow source |
+| live_output_changed | False |
+
+---
+
 ## Sprint 7E File Classifications
 
 **Sprint 7E — Controlled Handoff Wiring Implementation**
@@ -816,5 +867,6 @@ These modules must not be imported by the live trading bot (`bot_trading.py` or 
 | 2026-05-07 | Sprint 7A.3 patch | Precise safety flag terminology applied. provider_fetch_tester.py: old generic live_api_called=false replaced with 13 precise flags — data_provider_api_called=true (fetches were made), trading_api_called=false, broker_order/account/position/execution_api_called=false, ibkr_market_data_connection_attempted=true, ibkr_order_account_position_calls=false, env_presence_checked=true, env_values_logged=false, env_file_read=true, secrets_exposed=false, live_output_changed=false. IBKR TCP probe relabelled market_data_gateway_tcp_probe with explicit "not a trading failure" detail. factor_registry.py data_quality_report flags updated: live_api_called+env_inspected → data_provider_api_called=false, live_trading_api_called=false, env_presence_checked=false, env_values_logged=false, secrets_exposed=false. Validator updated for new safety block. 34/34 tests, 30/30 validator, 4/4 smoke. live_output_changed=false. |
 | 2026-05-07 | Sprint 7A.3 | Factor Registry + Provider Capability Audit delivered. factor_registry.py (73 factors, 13 categories, 10 layers, all must_not_trigger_trade_directly=True); provider_fetch_tester.py (12/15 passed: Alpaca 3/3, FMP 5/5, AV 2/4, yfinance 2/2, IBKR 0/1 gateway not running); 5 new validators in intelligence_schema_validator.py (validate_factor_registry, validate_provider_capability_matrix, validate_provider_fetch_test_results, validate_layer_factor_map, validate_data_quality_report); tests/test_intelligence_factor_registry.py (32 tests). Key provider findings: Alpaca primary for OHLCV/quotes/options (3/3), FMP primary for fundamentals/news/analyst (5/5), Alpha Vantage OVERVIEW+RSI premium-only (upgrade required), Alpha Vantage TIME_SERIES_DAILY + FEDERAL_FUNDS_RATE confirmed working (2/4). No production modules touched. env_inspected=false. secrets_exposed=false. live_output_changed=false. enable_active_opportunity_universe_handoff=False. 32/32 new tests, 30/30 validate_intelligence_files, 4/4 smoke. |
 | 2026-05-07 | Sprint 7A.1 patch | 4 blockers resolved: (1) coverage_gap_review advisory evidence source corrected — now reads candidate_matches[*].advisory_status==advisory_unresolved (not empty unsupported_current_candidates.symbols). Rebuilt with 51 real records: recurring_unsupported_current_count=110. evidence_status + required_input_missing fields added. (2) intelligence_first_advisory_enabled reset to False (observation complete, gate=advisory_ready_for_handoff_design). (3) sector_schema proxy_classifications expanded to 7 (added index_proxy, crypto_proxy, macro_proxy). Validator updated to require all 7. (4) test_intelligence_reference_data.py updated: _minimal_coverage_gap + _minimal_sector_schema fixtures corrected, 2 new evidence_status/required_input_missing tests. test_intelligence_sprint6c.py: TestInsufficientObservation → TestObservationThresholdMet (assertions updated to 35-record reality). Named symbols: SNDK/WDC/IREN in recurring_unsupported_current; MU/LRCX/STX/DOCN/NBIS covered by advisory (not unresolved). 774/774 regression, 25/25 validator, 4/4 smoke. live_output_changed=false. |
+| 2026-05-07 | Sprint 7F | Handoff Publisher and Live Manifest Generation. handoff_publisher.py (production runtime candidate / scheduled worker) net-new. Reads shadow universe, transforms candidates, publishes 4 files atomically: data/live/active_opportunity_universe.json (production_handoff_universe, validation_only, 50 candidates, all executable=false), data/live/current_manifest.json (handoff_enabled=false, validation_only, enable_flag_required=true), data/live/handoff_publisher_report.json (all 13 safety flags false, overall_status=pass), data/heartbeats/handoff_publisher.json (pass, 50 candidates). Atomic write policy: .tmp → validate → os.replace; never overwrites valid file with invalid; .fail_{timestamp}.json diagnostic on failure; heartbeat only after full cycle. 4 new validators in intelligence_schema_validator.py (validate_prod_active_universe, validate_prod_manifest, validate_handoff_publisher_report, validate_handoff_publisher_heartbeat). 2 stale test assertions updated (test_intelligence_sprint7b.py + test_intelligence_sprint7c.py "file must not exist" → "if exists, verify safety fields"). tests/test_handoff_publisher.py net-new, 107 tests. No bot_trading.py modified. No scanner.py. No guardrails.py. No Apex. No risk/order/execution changes. enable_active_opportunity_universe_handoff=False. live_output_changed=false. 107/107 publisher, 1146/1146 intelligence regression, 38/38 validator, 8/8 smoke. |
 | 2026-05-07 | Sprint 7E | Controlled Handoff Wiring Implementation — production code wired, flag remains False. Three files modified/created: (1) handoff_reader.py extended: _production_result() helper and load_production_handoff(manifest_path) added. 5-step validation chain: read_manifest → check handoff_enabled → validate_manifest → read_active_universe → validate_active_universe → per-candidate validation. Returns original candidate dicts in accepted_candidates (not wrappers) so governance map can be built. handoff_allowed=True only when all steps pass. (2) handoff_candidate_adapter.py net-new, adapter-only, pure, no I/O. Two functions: build_governance_map(accepted_candidates) → {symbol: candidate_dict} and attach_governance_metadata(scored_dicts, governance_map) → None (in-place, 13 handoff_* prefixed fields, never touches score/raw_score/signal dimensions). No imports of scanner/bot_trading/orders_core/guardrails/bot_ibkr/market_intelligence/apex_orchestrator/advisory_reporter/advisory_log_reviewer/provider_fetch_tester/backtest_intelligence. Classification: adapter-only / production runtime when flag=True. (3) bot_trading.py 4 changes: module-level _handoff_governance_map: dict = {} and _PRODUCTION_MANIFEST_PATH = "data/live/current_manifest.json"; _log_handoff_fail_closed(reason, manifest_path) structured warning logger; _get_handoff_symbol_universe() → (list[str], dict, str|None) — wraps load_production_handoff in try/except, fail-closed ([], {}, reason) on any failure; wiring conditional at candidate-source boundary — when flag=True calls _get_handoff_symbol_universe() instead of get_dynamic_universe(); governance attachment after run_signal_pipeline(); fail-closed guard before Track A returns early (PM Track B already ran above — fully independent). (4) tests/test_handoff_wiring_integration.py net-new: 100 tests, 11 groups. scanner_fallback_attempted=False, apex_input_changed=False, live_output_changed=False invariants verified by test suite. enable_active_opportunity_universe_handoff remains False. No scanner.py changes. No guardrails.py changes. No Apex prompt changes. No risk/order/execution logic changed. live_output_changed=false. 100/100 Sprint 7E, 939/939 intelligence regression, 34/34 validator, 7/7 smoke, 3228/3228 full suite (0 failures). |
 | 2026-05-07 | Sprint 7D | Controlled Handoff Wiring Design — documentation sprint only. No production code modified. No tests added. No handoff triggered. Four new documentation files: (1) intelligence_first_paper_current_metric_reconciliation.md — resolves Sprint 7C metric anomaly. Sprint 7C built "current" as enriched set (overlap+in_current_not_shadow+in_shadow_not_current), masking 23 additive shadow-only symbols. Correct picture: 27 true overlap with scanner, 23 additions (addition_rate=0.46), 208 removals (removal_rate=0.89). Metric definitions locked for Sprint 7E: "current" = true get_dynamic_universe() output only; shadow-only symbols excluded from current baseline. (2) intelligence_first_controlled_handoff_wiring_design.md — 15 sections. Wiring at bot_trading.py:1447 (single conditional branch). _get_handoff_symbol_universe() returns list[str] — identical type to scanner. handoff_candidate_adapter.py (new, adapter-only, pure) attaches handoff_* prefixed governance fields post-scoring. Fail-closed: no scanner fallback, PM Track B independent, bot not killed. Rollback: flag flip, scanner restores next cycle. Do NOT touch: scanner.py, signal_pipeline.py, signals/__init__.py, apex_orchestrator.py, guardrails.py, orders_core.py, bot_ibkr.py. (3) intelligence_first_controlled_handoff_implementation_test_plan.md — 10 test groups covering flag=False path, flag=True valid/invalid manifest, all 21 Sprint 7B fail-closed conditions, adapter pure function tests, Apex boundary, rollback, dry-run compare mode. Full suite required (bot_trading.py will be modified). (4) intelligence_first_controlled_handoff_risk_review.md — 11 risks with likelihood/impact/mitigation/test coverage. Residual: RISK-08 (208 removals — documented architectural consequence; rollback available; Amit must acknowledge). Definitions doc updated with 10 new terms. enable_active_opportunity_universe_handoff remains False. live_output_changed=false. |

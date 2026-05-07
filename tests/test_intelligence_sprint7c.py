@@ -259,14 +259,33 @@ class TestSafetyInvariants:
         assert report.get("live_output_changed") is False
 
     def test_no_production_manifest_written(self):
-        assert not os.path.isfile(_PRODUCTION_MANIFEST_PATH), (
-            f"Production manifest was written: {_PRODUCTION_MANIFEST_PATH}"
-        )
+        # Sprint 7C: these files were not written by Sprint 7C.
+        # Sprint 7F (handoff_publisher.py) now writes them with handoff_enabled=false.
+        # If they exist, verify safe content rather than asserting absence.
+        if os.path.isfile(_PRODUCTION_MANIFEST_PATH):
+            import json as _json
+            data = _json.load(open(_PRODUCTION_MANIFEST_PATH))
+            assert data.get("handoff_enabled") is False, (
+                "current_manifest.json exists but handoff_enabled must be false"
+            )
+            assert data.get("publication_mode") == "validation_only", (
+                "current_manifest.json exists but publication_mode must be validation_only"
+            )
 
     def test_no_production_active_universe_written(self):
-        assert not os.path.isfile(_PRODUCTION_UNIVERSE_PATH), (
-            f"Production active universe was written: {_PRODUCTION_UNIVERSE_PATH}"
-        )
+        # Sprint 7C: these files were not written by Sprint 7C.
+        # Sprint 7F (handoff_publisher.py) now writes them with publication_mode=validation_only.
+        # If they exist, verify safe content rather than asserting absence.
+        if os.path.isfile(_PRODUCTION_UNIVERSE_PATH):
+            import json as _json
+            data = _json.load(open(_PRODUCTION_UNIVERSE_PATH))
+            assert data.get("publication_mode") == "validation_only", (
+                "active_opportunity_universe.json exists but publication_mode must be validation_only"
+            )
+            for c in data.get("candidates", []):
+                assert c.get("executable") is not True, (
+                    f"candidate {c.get('symbol')} has executable=true"
+                )
 
     def test_safety_analysis_exists(self):
         report = _load_report()

@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-07T15:26:30Z",
+  "mode": "handoff_publisher_report",
+  "publication_mode": "validation_only",
+  "source_files": [
+    "data/universe_builder/active_opportunity_universe_shadow.json",
+    "data/intelligence/current_economic_context.json",
+    "data/intelligence/theme_activation.json",
+    "data/intelligence/thesis_store.json",
+    "data/reference/symbol_master.json",
+    "data/reference/layer_factor_map.json",
+    "data/reference/data_quality_report.json"
+  ],
+  "output_files": [
+    "data/live/active_opportunity_universe.json",
+    "data/live/current_manifest.json",
+    "data/heartbeats/handoff_publisher.json"
+  ],
+  "validation_summary": {
+    "source_errors": [],
+    "output_errors": [],
+    "candidate_errors": [],
+    "overall_status": "pass"
+  },
+  "candidate_summary": {
+    "shadow_count": 50,
+    "accepted_count": 50,
+    "rejected_count": 0
+  },
+  "rejected_candidates": [],
+  "atomic_write_summary": {
+    "universe_written": true,
+    "manifest_written": true,
+    "heartbeat_written": true,
+    "errors": []
+  },
+  "heartbeat_summary": {
+    "written": true,
+    "path": "data/heartbeats/handoff_publisher.json"
+  },
+  "safety_flags": {
+    "production_candidate_source_changed": false,
+    "scanner_output_changed": false,
+    "apex_input_changed": false,
+    "risk_logic_changed": false,
+    "order_logic_changed": false,
+    "broker_called": false,
+    "trading_api_called": false,
+    "llm_called": false,
+    "raw_news_used": false,
+    "broad_intraday_scan_used": false,
+    "secrets_exposed": false,
+    "env_values_logged": false,
+    "live_output_changed": false
+  },
+  "ready_for_consumption": true,
+  "handoff_enabled": false,
+  "enable_active_opportunity_universe_handoff_config_state": false,
+  "production_candidate_source_changed": false,
+  "scanner_output_changed": false,
+  "apex_input_changed": false,
+  "risk_logic_changed": false,
+  "order_logic_changed": false,
+  "broker_called": false,
+  "trading_api_called": false,
+  "llm_called": false,
+  "raw_news_used": false,
+  "broad_intraday_scan_used": false,
+  "secrets_exposed": false,
+  "env_values_logged": false,
+  "live_output_changed": false
+}
