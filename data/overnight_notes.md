@@ -1,129 +1,120 @@
-OVERNIGHT RESEARCH NOTES — 2026-05-06
-Generated: 2026-05-06 06:18 ET
+OVERNIGHT RESEARCH NOTES — 2026-05-08
+Generated: 2026-05-08 06:15 ET
 
 PRE-MARKET / AFTER-HOURS TONE:
-  SPY   $729.72  +1.63%  (gap-up)
-  QQQ   $691.20  +2.72%  (gap-up)
-  IWM   $287.29  +3.39%  (gap-up)
+  SPY   $734.87  +0.14%  (flat)
+  QQQ   $699.33  +0.51%  (gap-up)
+  IWM   $283.19  -1.26%  (gap-down)
   ---  sector ETFs  ---
-  XLF   $51.86  +0.54%  (gap-up)
-  XLK   $168.62  +4.05%  (gap-up)
-  XLE   $57.04  -3.96%  (gap-down)
-  XLV   $145.79  +0.73%  (gap-up)
-  XLI   $174.65  +2.15%  (gap-up)
-  XLU   $46.47  +0.22%  (gap-up)
-  XLB   $51.89  +2.45%  (gap-up)
-  XLRE  $44.17  +0.20%  (gap-up)
+  XLF   $51.69  -0.29%  (gap-down)
+  XLK   $171.12  +0.64%  (gap-up)
+  XLE   $56.01  -1.74%  (gap-down)
+  XLV   $144.73  -0.46%  (gap-down)
+  XLI   $174.00  -1.62%  (gap-down)
+  XLU   $45.23  -1.05%  (gap-down)
+  XLB   $51.64  -1.47%  (gap-down)
+  XLRE  $44.37  -0.83%  (gap-down)
 
 PRE-MARKET MOVERS (>1.5% gap vs yesterday's close):
-  SOXL   $  161.33  +26.48%  (gap-up)
-  AMD    $  420.60  +23.15%  (gap-up)
-  INTC   $  114.74  +19.80%  (gap-up)
-  SNDK   $ 1482.25  +18.03%  (gap-up)
-  MU     $  676.75  +17.40%  (gap-up)
-  IREN   $   55.82  +12.81%  (gap-up)
-  EWY    $  182.10  +11.31%  (gap-up)
-  CRDO   $  199.40  +10.74%  (gap-up)
-  LRCX   $  284.71  +10.11%  (gap-up)
-  ASML   $ 1516.02  +9.36%  (gap-up)
-  SOXX   $  501.74  +8.59%  (gap-up)
-  WDC    $  480.02  +8.51%  (gap-up)
-  TQQQ   $   70.29  +8.29%  (gap-up)
-  AMAT   $  423.06  +8.09%  (gap-up)
-  IONQ   $   49.38  +7.93%  (gap-up)
+  CRWV   $  120.22  -12.87%  (gap-down)
+  IONQ   $   48.15  -8.41%  (gap-down)
+  TSLL   $   14.69  +8.17%  (gap-up)
+  NBIS   $  182.04  -6.69%  (gap-down)
+  QBTS   $   22.30  -6.42%  (gap-down)
+  STRL   $  829.36  -6.42%  (gap-down)
+  CAR    $  154.00  -6.23%  (gap-down)
+  APP    $  497.00  +6.01%  (gap-up)
+  COIN   $  187.40  -5.33%  (gap-down)
+  RVMD   $  143.13  -5.26%  (gap-down)
+  MRVL   $  163.49  -5.03%  (gap-down)
+  BE     $  272.00  -4.72%  (gap-down)
+  GEV    $ 1066.66  -4.67%  (gap-down)
+  NOW    $   92.75  +4.15%  (gap-up)
+  TSLA   $  415.01  +4.08%  (gap-up)
 
 YESTERDAY'S PERFORMANCE:
-  Trades: 23 (18W/5L)  Win rate: 78%  P&L: $+39,546.84
-  Best:  ALAB LONG +$8,873.58  (tp_hit / FEAR_ELEVATED)
-  Worst: USO LONG $-1,467.65  (regime_flip / MOMENTUM_BULL)
+  Trades: 4 (1W/3L)  Win rate: 25%  P&L: $-13,616.76
+  Best:  XLK LONG +$914.26  (sell_filled / MOMENTUM_BULL)
+  Worst: CRWV LONG $-5,751.80  (sl_hit / )
   By regime:
-    MOMENTUM_BULL: 6 trades  67% WR  $-588.87
-    TRENDING_UP: 4 trades  75% WR  $+7,720.02
-    : 10 trades  80% WR  $+15,488.32
-    FEAR_ELEVATED: 3 trades  100% WR  $+16,927.37
+    : 2 trades  0% WR  $-10,875.05
   By dimension (non-zero entry scores):
-    social            9 trades  78% WR  $+24,749
-    insider_buying    8 trades  75% WR  $+24,517
-    trend            13 trades  77% WR  $+24,059
-    momentum         13 trades  77% WR  $+24,059
-    flow             13 trades  77% WR  $+24,059
-    mtf              13 trades  77% WR  $+24,059
-    overnight_drift  13 trades  77% WR  $+24,059
-    news             12 trades  75% WR  $+23,825
-    iv_skew           4 trades  100% WR  $+16,049
-    breakout          5 trades  60% WR  $+9,021
-    squeeze           5 trades  60% WR  $+6,407
-  FLAG: High trade count — overtrading risk
+    trend             2 trades  50% WR  $-2,742
+    momentum          2 trades  50% WR  $-2,742
+    flow              2 trades  50% WR  $-2,742
+    mtf               2 trades  50% WR  $-2,742
+    news              2 trades  50% WR  $-2,742
+    overnight_drift   2 trades  50% WR  $-2,742
+  FLAG: Win rate < 40% — entry selectivity concern
 
 ECONOMIC CALENDAR — Next 5 Days:
-  Wed May 6: Fed Hammack Speech [MEDIUM]
-  Wed May 6: Fed Goolsbee Speech [MEDIUM]
-  Wed May 6: EIA Crude Oil Stocks Change (May/01) [MEDIUM]
-  Wed May 6: EIA Gasoline Stocks Change (May/01) [MEDIUM]
-  Wed May 6: Fed Musalem Speech [MEDIUM]
-  Wed May 6: ADP Employment Change (Apr) [MEDIUM]
-  Wed May 6: MBA 30-Year Mortgage Rate (May/01) [MEDIUM]
-  Thu May 7: Fed Williams Speech [MEDIUM]
-  Thu May 7: Fed Hammack Speech [MEDIUM]
-  Thu May 7: Nonfarm Productivity QoQ (Q1) [MEDIUM]
-  Thu May 7: Initial Jobless Claims (May/02) [MEDIUM]
-  Thu May 7: Unit Labour Costs QoQ (Q1) [MEDIUM]
   Fri May 8: Fed Bowman Speech [MEDIUM]
+  Fri May 8: Fed Waller Speech [MEDIUM]
   Fri May 8: Fed Daly Speech [MEDIUM]
   Fri May 8: Fed Goolsbee Speech [MEDIUM]
-  Fri May 8: Fed Waller Speech [MEDIUM]
-  Fri May 8: CFTC Nasdaq 100 speculative net positions [MEDIUM]
-  Fri May 8: CFTC Gold Speculative net positions [MEDIUM]
   Fri May 8: CFTC Crude Oil speculative net positions [MEDIUM]
   Fri May 8: CFTC S&P 500 speculative net positions [MEDIUM]
+  Fri May 8: CFTC Gold Speculative net positions [MEDIUM]
+  Fri May 8: CFTC Nasdaq 100 speculative net positions [MEDIUM]
   Fri May 8: Michigan 1 Year Inflation Expectations (May) [MEDIUM]
   Fri May 8: Michigan Consumer Sentiment (May) [HIGH]
   Fri May 8: Non Farm Payrolls (Apr) [HIGH]
+  Fri May 8: Unemployment Rate (Apr) [HIGH]
   Fri May 8: Participation Rate (Apr) [MEDIUM]
   Fri May 8: Average Hourly Earnings YoY (Apr) [MEDIUM]
   Fri May 8: Average Hourly Earnings MoM (Apr) [MEDIUM]
-  Fri May 8: Unemployment Rate (Apr) [HIGH]
   Fri May 8: Fed Cook Speech [MEDIUM]
   Sat May 9: No high-impact events
   Sun May 10: No high-impact events
   Mon May 11: Existing Home Sales MoM (Apr) [MEDIUM]
   Mon May 11: Existing Home Sales (Apr) [HIGH]
+  Tue May 12: API Crude Oil Stock Change (May/08) [MEDIUM]
+  Tue May 12: Monthly Budget Statement (Apr) [MEDIUM]
+  Tue May 12: Budget Balance (Apr) [MEDIUM]
+  Tue May 12: WASDE Report [MEDIUM]
+  Tue May 12: Inflation Rate MoM (Apr) [HIGH]
+  Tue May 12: CPI YoY (Apr) [MEDIUM]
+  Tue May 12: CPI MoM (Apr) [HIGH]
+  Tue May 12: Inflation Rate YoY (Apr) [HIGH]
+  Tue May 12: CPI s.a (Apr) [MEDIUM]
+  Tue May 12: CPI (Apr) [MEDIUM]
+  Tue May 12: Fed Williams Speech [MEDIUM]
+  Wed May 13: CPI [HIGH]
+  Wed May 13: Fed Kashkari Speech [MEDIUM]
+  Wed May 13: EIA Gasoline Stocks Change (May/08) [MEDIUM]
+  Wed May 13: EIA Crude Oil Stocks Change (May/08) [MEDIUM]
+  Wed May 13: Core PPI MoM (Apr) [MEDIUM]
+  Wed May 13: Producer Price Index MoM (Apr) [HIGH]
+  Wed May 13: MBA 30-Year Mortgage Rate (May/08) [MEDIUM]
+  Wed May 13: OPEC Monthly Report [MEDIUM]
 
 EARNINGS — Next 5 Days:  (Alpha Vantage — dates only)
-  Wed May 6: EBAY  
-  Thu May 7: COIN  
-  Thu May 7: IREN  
-  Thu May 7: RKLB  
+  Wed May 13: EOSE  
 
 Analyst changes: none in last 24h for tracked universe
 
-MARKET NEWS — Last 16h (FMP, 40 articles):
-  ▼ [META]   6h ago   'SAFEGUARDS FOR PEOPLE OF CERTAIN AGES': Inside the precedent Meta case could set
-  ▲ [AMD]    7h ago   AMD tops estimates, lifts forecast: so why is smart money walking away?
-  ▼ [TSLA]   7h ago   Tesla to recall over 218,800 U.S. vehicles on rearview image issue
-  ▲ [MSFT]   7h ago   CallTower Achieves Microsoft Support Services Designation
-  ▼ [GOOGL]  7h ago   Reach revenue falls as Google traffic slump continues to hit digital income
-  ▼ [GOOG]   7h ago   Reach revenue falls as Google traffic slump continues to hit digital income
-  ▲ [META]   10h ago  Artisan Value Fund Q1 2026 Portfolio Activity
-  ▲ [AMZN]   10h ago  Artisan Value Fund Q1 2026 Portfolio Activity
-  ▲ [MSFT]   11h ago  Microsoft's AI Engine Is Already Running Ahead
-  ▲ [AMD]    15h ago  Advanced Micro Devices (AMD) Beats Q1 Earnings and Revenue Estimates
-  ▼ [AAPL]   15h ago  Cotchett, Pitre & McCarthy Announces a Proposed $250 Million Settlement in Apple AI False 
-  ▼ [AMD]    16h ago  AMD Q1: I Love The Progress, But Nvidia Is The Better Buy Right Now (Downgrade)
+MARKET NEWS — Last 16h (FMP, 29 articles):
+  ▲ [RKLB]   6h ago   Rocket Lab Stock Soars After Earnings Beat. The Space Race Is On.
+  ▲ [NVDA]   7h ago   Nvidia's $2.2 Billion Investment in This Rapidly Growing AI Company Is Working Out Great
+  ▲ [NVDA]   11h ago  Nvidia to invest up to $2.1 billion in IREN AI infrastructure deal
+  ▲ [RKLB]   14h ago  Rocket Lab Corporation (RKLB) Reports Q1 Loss, Beats Revenue Estimates
+  ▼ [META]   15h ago  Should You Buy Meta Stock on the Dip?
+  ▲ [NVDA]   15h ago  Nvidia CEO says AI partnership with Corning will 'revitalize American manufacturing'
+  ▼ [NVDA]   15h ago  Nvidia (NVDA) Advances While Market Declines: Some Information for Investors
+  ─ [SPY]    4h ago   RBC lifts year-end S&P 500 forecast as AI sectors fuel rally
+  ─ [NVDA]   5h ago   Nvidia Stock Rises After IREN AI Tie-Up. Why It Keeps Making ‘Circular' Deals.
+  ─ [GOOGL]  5h ago   Machine learning algorithm predicts Google stock price on May 31, 2026
+  ─ [GOOGL]  5h ago   Google faces new UK lawsuit over online display ads
+  ─ [NVDA]   7h ago   US suspects Nvidia chips smuggled to Alibaba via Thailand, Bloomberg News reports
 
-Net bias: neutral  (6 bullish / 6 bearish / 28 neutral)
+Net bias: bullish  (5 bullish / 2 bearish / 22 neutral)
   AVOID (bearish catalyst):
-    META   — 'SAFEGUARDS FOR PEOPLE OF CERTAIN AGES': Inside the preceden
-    TSLA   — Tesla to recall over 218
-    GOOGL  — Reach revenue falls as Google traffic slump continues to hit
-    GOOG   — Reach revenue falls as Google traffic slump continues to hit
-    AAPL   — Cotchett
+    META   — Should You Buy Meta Stock on the Dip?
+    NVDA   — Nvidia (NVDA) Advances While Market Declines: Some Informati
   FAVOR (bullish catalyst):
-    AMD    — AMD tops estimates
-    MSFT   — CallTower Achieves Microsoft Support Services Designation
-    AMZN   — Artisan Value Fund Q1 2026 Portfolio Activity
+    RKLB   — Rocket Lab Stock Soars After Earnings Beat. The Space Race I
 
 MACRO (daily):
-  10Y-2Y Spread: 0.50%  (as of 2026-05-05)  prior: 0.50
-  10Y Treasury: 4.45%  (as of 2026-05-04)  prior: 4.39
-  WTI Crude: 99.89$/bbl  (as of 2026-04-27)  prior: 98.42
+  10Y-2Y Spread: 0.49%  (as of 2026-05-07)  prior: 0.49
+  10Y Treasury: 4.36%  (as of 2026-05-06)  prior: 4.43
+  WTI Crude: 109.76$/bbl  (as of 2026-05-04)  prior: 105.38
