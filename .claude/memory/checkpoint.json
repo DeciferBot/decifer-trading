@@ -1,21 +1,21 @@
 {
-  "timestamp": "2026-05-06T13:11:13.990Z",
+  "timestamp": "2026-05-09T06:34:09.216Z",
   "branch": "master",
-  "lastCommit": "6ea72f4 docs(intelligence): Real-Session Advisory Observation Phase kickoff",
+  "lastCommit": "343810c feat(intelligence): Sprint 7I — promote quota policy to 75/35 in validation-only mode",
   "roadmapPhase": null,
   "lastFilesTouched": [
     "claude/memory/checkpoint.json",
     ".claude/memory/session-history.jsonl",
+    "chief-decifer/state/internal/catalyst/candidates_2026-05-07.json",
     "chief-decifer/state/internal/catalyst/edgar_events.json",
     "chief-decifer/state/internal/catalyst/options_snapshots.jsonl",
+    "chief-decifer/state/internal/catalyst/sec_tickers.json",
     "chief-decifer/state/internal/catalyst/sentiment_snapshots.jsonl",
-    "data/audit_log.jsonl",
-    "data/daily_promoted.json",
-    "data/equity_history.json",
-    "data/execution_ic.jsonl",
-    "data/intelligence/advisory_runtime_log.jsonl"
+    "data/apex_conversation_log.jsonl",
+    "data/apex_decision_audit.jsonl",
+    "data/apex_prompt_snapshot.jsonl"
   ],
   "openTodos": [],
   "notes": null,
-  "sessionCount": 343
+  "sessionCount": 346
 }
