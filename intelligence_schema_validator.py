@@ -3510,7 +3510,9 @@ _OBSERVATION_REPORT_REQUIRED_KEYS = [
 _OBSERVATION_SAFETY_FLAGS_MUST_BE_FALSE = [
     "live_bot_consuming_handoff",
     "enable_active_opportunity_universe_handoff",
-    "handoff_enabled",
+    # handoff_enabled is intentionally excluded: it reflects the manifest state and may be
+    # True in controlled_activation mode. The observer's own guarantee is expressed in
+    # safety_analysis (which always has all_safety_invariants_hold=True).
     "production_candidate_source_changed",
     "scanner_output_changed",
     "apex_input_changed",
@@ -3524,7 +3526,9 @@ _VALID_OBSERVATION_READINESS_GATES = {
     "validation_only_stable",
     "validation_only_unstable",
     "fix_publisher_before_flag_activation",
-    "ready_for_flag_activation_design",
+    # Sprint 7J.3: controlled_activation mode gates
+    "controlled_activation_ready",
+    "controlled_activation_unstable",
 }
 
 
@@ -3549,21 +3553,48 @@ def validate_handoff_publisher_observation_report(path: str) -> ValidationResult
             f"got {data.get('mode')!r}"
         )
 
-    if data.get("publication_mode") != "validation_only":
+    # Sprint 7J.3: publication_mode may be 'validation_only' or 'controlled_activation'.
+    # Validate the combination of publication_mode + handoff_enabled (must match expected).
+    pub_mode = data.get("publication_mode")
+    _valid_pub_modes = {"validation_only", "controlled_activation"}
+    if pub_mode not in _valid_pub_modes:
         result.fail(
-            f"observation_report: publication_mode must be 'validation_only', "
-            f"got {data.get('publication_mode')!r}"
+            f"observation_report: publication_mode must be one of {sorted(_valid_pub_modes)}, "
+            f"got {pub_mode!r}"
         )
+    else:
+        # Mode-aware handoff_enabled check
+        expected_handoff = pub_mode == "controlled_activation"
+        actual_handoff = data.get("handoff_enabled")
+        if actual_handoff is not expected_handoff:
+            result.fail(
+                f"observation_report: publication_mode='{pub_mode}' requires "
+                f"handoff_enabled={expected_handoff}, got {actual_handoff!r}"
+            )
 
     readiness_gate = data.get("readiness_gate")
     if readiness_gate not in _VALID_OBSERVATION_READINESS_GATES:
         result.fail(
-            f"observation_report: readiness_gate {readiness_gate!r} not in valid set"
+            f"observation_report: readiness_gate {readiness_gate!r} not in valid set "
+            f"{sorted(_VALID_OBSERVATION_READINESS_GATES)}"
         )
 
     for flag in _OBSERVATION_SAFETY_FLAGS_MUST_BE_FALSE:
         if data.get(flag) is not False:
             result.fail(f"observation_report: {flag} must be false")
+
+    # Sprint 7J.3: mode_context section must be present
+    mode_ctx = data.get("mode_context")
+    if mode_ctx is not None:
+        if not isinstance(mode_ctx, dict):
+            result.fail("observation_report: mode_context must be a dict")
+        else:
+            if "mode_interpretation" not in mode_ctx:
+                result.warn("observation_report: mode_context missing 'mode_interpretation'")
+            if "manifest_mode_valid" not in mode_ctx:
+                result.warn("observation_report: mode_context missing 'manifest_mode_valid'")
+            if "manifest_allows_handoff" not in mode_ctx:
+                result.warn("observation_report: mode_context missing 'manifest_allows_handoff'")
 
     if not isinstance(data.get("observation_summary"), dict):
         result.fail("observation_report: observation_summary must be a dict")

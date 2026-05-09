@@ -43,12 +43,16 @@ _VALID_READINESS_GATES = {
     "validation_only_stable",
     "validation_only_unstable",
     "fix_publisher_before_flag_activation",
+    # Sprint 7J.3: controlled_activation mode gates
+    "controlled_activation_ready",
+    "controlled_activation_unstable",
 }
 
+# Note: handoff_enabled is intentionally excluded — it reflects the manifest state and may
+# be True in controlled_activation mode. It is NOT an observer action invariant.
 _SAFETY_FLAGS_MUST_BE_FALSE = [
     "live_bot_consuming_handoff",
     "enable_active_opportunity_universe_handoff",
-    "handoff_enabled",
     "production_candidate_source_changed",
     "scanner_output_changed",
     "apex_input_changed",
@@ -139,9 +143,13 @@ class TestModeAndSchemaFields:
         report = _load_report()
         assert "generated_at" in report
 
-    def test_publication_mode_correct(self):
+    def test_publication_mode_is_valid(self):
+        # Sprint 7J.4: accepts both validation_only and controlled_activation modes.
         report = _load_report()
-        assert report.get("publication_mode") == "validation_only"
+        valid_modes = {"validation_only", "controlled_activation"}
+        assert report.get("publication_mode") in valid_modes, (
+            f"publication_mode {report.get('publication_mode')!r} not in {valid_modes}"
+        )
 
     def test_source_files_is_list(self):
         report = _load_report()
@@ -192,8 +200,17 @@ class TestSafetyInvariants:
     def test_enable_active_opportunity_universe_handoff_false(self):
         assert _load_report().get("enable_active_opportunity_universe_handoff") is False
 
-    def test_handoff_enabled_false(self):
-        assert _load_report().get("handoff_enabled") is False
+    def test_handoff_enabled_matches_mode(self):
+        # Sprint 7J.4: handoff_enabled reflects the manifest state.
+        # validation_only → handoff_enabled must be False.
+        # controlled_activation → handoff_enabled must be True.
+        report = _load_report()
+        pub_mode = report.get("publication_mode")
+        expected = pub_mode == "controlled_activation"
+        assert report.get("handoff_enabled") is expected, (
+            f"publication_mode={pub_mode!r} requires handoff_enabled={expected}, "
+            f"got {report.get('handoff_enabled')!r}"
+        )
 
     def test_live_output_changed_false(self):
         assert _load_report().get("live_output_changed") is False
@@ -232,20 +249,12 @@ class TestReadinessGate:
             f"readiness_gate {gate!r} not in valid set"
         )
 
-    def test_readiness_gate_is_valid(self):
-        # Sprint 7G: gate starts at insufficient_observation.
-        # Sprint 7I/7J: gate advances to validation_only_stable once both thresholds
-        # (successful_runs>=10, distinct_sessions>=3) are met under 75/35 quota policy.
-        _valid_gates = {
-            "insufficient_observation",
-            "validation_only_stable",
-            "validation_only_unstable",
-            "fix_publisher_before_flag_activation",
-            "ready_for_flag_activation_design",
-        }
+    def test_readiness_gate_is_valid_for_current_mode(self):
+        # Sprint 7J.4: duplicate removed; uses module-level _VALID_READINESS_GATES
+        # which includes both validation_only and controlled_activation gate values.
         gate = _load_report().get("readiness_gate")
-        assert gate in _valid_gates, (
-            f"readiness_gate {gate!r} not in valid set {_valid_gates}"
+        assert gate in _VALID_READINESS_GATES, (
+            f"readiness_gate {gate!r} not in valid set {_VALID_READINESS_GATES}"
         )
 
 
@@ -289,9 +298,17 @@ class TestManifestAndUniverseValidity:
             f"manifest validation_status: {mv.get('validation_status')}"
         )
 
-    def test_manifest_handoff_enabled_false(self):
-        mv = _load_report().get("manifest_validity_analysis", {})
-        assert mv.get("handoff_enabled") is False
+    def test_manifest_handoff_enabled_matches_mode(self):
+        # Sprint 7J.4: handoff_enabled in manifest analysis reflects the manifest state.
+        # validation_only → False; controlled_activation → True.
+        report = _load_report()
+        pub_mode = report.get("publication_mode")
+        expected = pub_mode == "controlled_activation"
+        mv = report.get("manifest_validity_analysis", {})
+        assert mv.get("handoff_enabled") is expected, (
+            f"publication_mode={pub_mode!r} requires manifest handoff_enabled={expected}, "
+            f"got {mv.get('handoff_enabled')!r}"
+        )
 
     def test_universe_validity_passes(self):
         uv = _load_report().get("active_universe_validity_analysis", {})
@@ -403,7 +420,13 @@ class TestSmokeSpotCheck:
         assert report.get("mode") == "validation_only_handoff_publisher_observation"
         assert report.get("live_bot_consuming_handoff") is False
         assert report.get("live_output_changed") is False
-        assert report.get("handoff_enabled") is False
+        # Sprint 7J.4: handoff_enabled reflects manifest state — mode-aware check.
+        pub_mode = report.get("publication_mode")
+        expected_handoff = pub_mode == "controlled_activation"
+        assert report.get("handoff_enabled") is expected_handoff, (
+            f"publication_mode={pub_mode!r} requires handoff_enabled={expected_handoff}, "
+            f"got {report.get('handoff_enabled')!r}"
+        )
         assert report.get("enable_active_opportunity_universe_handoff") is False
         assert report.get("readiness_gate") in _VALID_READINESS_GATES
         assert isinstance(report.get("observation_summary"), dict)
@@ -598,3 +621,376 @@ class TestRunLogObservation:
     def test_live_output_changed_is_false_in_report(self):
         report = _load_report()
         assert report.get("live_output_changed") is False
+
+
+# ---------------------------------------------------------------------------
+# Group 12 — Sprint 7J.3: Mode-aware observer (controlled_activation support)
+# ---------------------------------------------------------------------------
+
+
+def _make_min_valid_report(publication_mode: str, readiness_gate: str) -> dict:
+    """Build a minimal but validator-compliant observation report for the given mode."""
+    handoff_enabled = publication_mode == "controlled_activation"
+    obs_summary = {
+        "readiness_gate": readiness_gate,
+        "successful_publisher_runs": 10,
+        "distinct_utc_sessions": 3,
+        "threshold_met": True,
+        "threshold_basis": "distinct_sessions",
+        "run_log_exists": True,
+        "current_manifest_exists": True,
+        "active_universe_exists": True,
+        "heartbeat_exists": True,
+        "publisher_report_exists": True,
+    }
+    return {
+        "schema_version": "1.0",
+        "generated_at": "2026-05-09T10:00:00Z",
+        "mode": "validation_only_handoff_publisher_observation",
+        "source_files": [],
+        "observation_summary": obs_summary,
+        "freshness_analysis": {},
+        "manifest_validity_analysis": {},
+        "active_universe_validity_analysis": {},
+        "heartbeat_analysis": {},
+        "candidate_stability_analysis": {},
+        "fail_closed_observations": {},
+        "safety_analysis": {"all_safety_invariants_hold": True},
+        "readiness_gate": readiness_gate,
+        "warnings": [],
+        "handoff_enabled": handoff_enabled,
+        "publication_mode": publication_mode,
+        "live_bot_consuming_handoff": False,
+        "enable_active_opportunity_universe_handoff": False,
+        "live_output_changed": False,
+        "production_candidate_source_changed": False,
+        "scanner_output_changed": False,
+        "apex_input_changed": False,
+        "risk_logic_changed": False,
+        "order_logic_changed": False,
+    }
+
+
+class TestModeAwareness:
+    """Group 12 — Sprint 7J.3: Mode-aware observer (controlled_activation support)."""
+
+    def _ca_manifest_analysis(self) -> dict:
+        """A clean controlled_activation manifest analysis (no issues)."""
+        return {
+            "exists": True,
+            "validation_status": "pass",
+            "handoff_enabled": True,
+            "publication_mode": "controlled_activation",
+            "enable_flag_required": True,
+            "ready_for_consumption": True,
+            "active_universe_file": "data/live/active_opportunity_universe.json",
+            "active_universe_file_exists": True,
+            "publisher": "handoff_publisher",
+            "safety_flags_clean": True,
+            "issues": [],
+            "issue_count": 0,
+        }
+
+    def _vo_manifest_analysis(self) -> dict:
+        """A clean validation_only manifest analysis (no issues)."""
+        return {
+            "exists": True,
+            "validation_status": "pass",
+            "handoff_enabled": False,
+            "publication_mode": "validation_only",
+            "enable_flag_required": True,
+            "ready_for_consumption": True,
+            "active_universe_file": "data/live/active_opportunity_universe.json",
+            "active_universe_file_exists": True,
+            "publisher": "handoff_publisher",
+            "safety_flags_clean": True,
+            "issues": [],
+            "issue_count": 0,
+        }
+
+    def _clean_universe(self) -> dict:
+        return {
+            "exists": True,
+            "validation_status": "pass",
+            "issue_count": 0,
+            "candidate_count": 50,
+            "executable_violations": [],
+            "order_instruction_violations": [],
+        }
+
+    def _clean_heartbeat(self) -> dict:
+        return {"exists": True, "validation_status": "pass"}
+
+    def _clean_freshness(self) -> dict:
+        return {"expired_count": 0, "sla_met": True}
+
+    def _threshold_run_log(self) -> dict:
+        """Run log with both thresholds met."""
+        return {
+            "successful_runs": 10,
+            "distinct_sessions": 3,
+            "run_log_exists": True,
+            "run_log_records": 10,
+            "successful_runs_for_current_quota": 10,
+            "distinct_sessions_for_current_quota": 3,
+        }
+
+    def _write_manifest(self, tmpdir: str, publication_mode: str, handoff_enabled: bool) -> str:
+        manifest_path = os.path.join(tmpdir, "current_manifest.json")
+        universe_path = os.path.join(tmpdir, "universe.json")
+        with open(universe_path, "w") as f:
+            json.dump({}, f)
+        manifest_data = {
+            "validation_status": "pass",
+            "publication_mode": publication_mode,
+            "handoff_enabled": handoff_enabled,
+            "enable_flag_required": True,
+            "active_universe_file": universe_path,
+            "live_output_changed": False,
+            "secrets_exposed": False,
+            "env_values_logged": False,
+        }
+        with open(manifest_path, "w") as f:
+            json.dump(manifest_data, f)
+        return manifest_path
+
+    # Test 1 — validation_only manifest with handoff_enabled=false is accepted
+    def test_vo_manifest_handoff_false_accepted(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = self._write_manifest(tmpdir, "validation_only", False)
+            with mock.patch.object(hpo, "_MANIFEST_PATH", manifest_path):
+                warnings: list = []
+                result = hpo._analyse_manifest(warnings, expected_mode="validation_only")
+        assert result["issue_count"] == 0, f"Unexpected issues: {result['issues']}"
+        assert result["handoff_enabled"] is False
+
+    # Test 2 — validation_only manifest with handoff_enabled=true is rejected
+    def test_vo_manifest_handoff_true_rejected(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = self._write_manifest(tmpdir, "validation_only", True)
+            with mock.patch.object(hpo, "_MANIFEST_PATH", manifest_path):
+                warnings: list = []
+                result = hpo._analyse_manifest(warnings, expected_mode="validation_only")
+        assert result["issue_count"] > 0
+        assert any("handoff_enabled" in issue for issue in result["issues"])
+
+    # Test 3 — controlled_activation manifest with handoff_enabled=true is accepted
+    def test_ca_manifest_handoff_true_accepted(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = self._write_manifest(tmpdir, "controlled_activation", True)
+            with mock.patch.object(hpo, "_MANIFEST_PATH", manifest_path):
+                warnings: list = []
+                result = hpo._analyse_manifest(warnings, expected_mode="controlled_activation")
+        assert result["issue_count"] == 0, f"Unexpected issues: {result['issues']}"
+        assert result["handoff_enabled"] is True
+
+    # Test 4 — controlled_activation manifest with handoff_enabled=false is rejected
+    def test_ca_manifest_handoff_false_rejected(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = self._write_manifest(tmpdir, "controlled_activation", False)
+            with mock.patch.object(hpo, "_MANIFEST_PATH", manifest_path):
+                warnings: list = []
+                result = hpo._analyse_manifest(warnings, expected_mode="controlled_activation")
+        assert result["issue_count"] > 0
+        assert any("handoff_enabled" in issue for issue in result["issues"])
+
+    # Test 5 — controlled_activation does not trigger fix_publisher_before_flag_activation
+    def test_ca_mode_does_not_trigger_fix_publisher_gate(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        run_log = self._threshold_run_log()
+        manifest = self._ca_manifest_analysis()
+        universe = self._clean_universe()
+        heartbeat = self._clean_heartbeat()
+        freshness = self._clean_freshness()
+        gate, threshold_met, _ = hpo._determine_readiness_gate(
+            run_log, manifest, universe, heartbeat, freshness, [],
+            current_mode="controlled_activation",
+        )
+        assert gate != "fix_publisher_before_flag_activation", (
+            f"controlled_activation mode with clean manifest triggered gate={gate!r}"
+        )
+        assert threshold_met is True
+
+    # Test 6 — controlled_activation report includes mode_interpretation=controlled_activation_precheck
+    def test_ca_mode_context_has_correct_interpretation(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        manifest_analysis = self._ca_manifest_analysis()
+        universe_analysis = self._clean_universe()
+        mode_context = hpo._build_mode_context(
+            "controlled_activation", manifest_analysis, universe_analysis
+        )
+        assert mode_context["mode_interpretation"] == "controlled_activation_precheck"
+
+    # Test 7 — controlled_activation report includes manifest_allows_handoff=true
+    def test_ca_mode_context_manifest_allows_handoff_true(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        manifest_analysis = self._ca_manifest_analysis()
+        universe_analysis = self._clean_universe()
+        mode_context = hpo._build_mode_context(
+            "controlled_activation", manifest_analysis, universe_analysis
+        )
+        assert mode_context["manifest_allows_handoff"] is True
+
+    # Test 8 — controlled_activation report states bot flag disabled when config flag=False
+    def test_ca_mode_context_reports_bot_flag_disabled(self):
+        """Validates pre-activation state: manifest CA-ready but bot flag=False → blocked.
+        Skips during Sprint 7J.4 controlled activation when the flag is intentionally True."""
+        sys.path.insert(0, _ROOT)
+        import config
+        import handoff_publisher_observer as hpo
+
+        if config.CONFIG.get("enable_active_opportunity_universe_handoff", False) is True:
+            pytest.skip("Flag is intentionally True — Sprint 7J.4 controlled activation; bot_consumption_allowed is now True")
+
+        manifest_analysis = self._ca_manifest_analysis()
+        universe_analysis = self._clean_universe()
+        # config.enable_active_opportunity_universe_handoff is False in worktree
+        mode_context = hpo._build_mode_context(
+            "controlled_activation", manifest_analysis, universe_analysis
+        )
+        # manifest_allows_handoff=True but bot flag=False → consumption blocked
+        assert mode_context["bot_consumption_allowed"] is False
+        assert mode_context["bot_consumption_note"] == "manifest_ready_but_bot_flag_disabled"
+
+    # Test 9 — unknown publication_mode is rejected by _get_current_mode
+    def test_unknown_publication_mode_rejected_by_get_current_mode(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_path = os.path.join(tmpdir, "current_manifest.json")
+            with open(manifest_path, "w") as f:
+                json.dump({"publication_mode": "not_a_valid_mode"}, f)
+            with mock.patch.object(hpo, "_MANIFEST_PATH", manifest_path):
+                mode = hpo._get_current_mode()
+        assert mode == "unknown"
+
+    # Test 10a — readiness_gate is valid for validation_only mode
+    def test_readiness_gate_valid_for_validation_only_mode(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        run_log = self._threshold_run_log()
+        manifest = self._vo_manifest_analysis()
+        universe = self._clean_universe()
+        heartbeat = self._clean_heartbeat()
+        freshness = self._clean_freshness()
+        gate, _, _ = hpo._determine_readiness_gate(
+            run_log, manifest, universe, heartbeat, freshness, [],
+            current_mode="validation_only",
+        )
+        assert gate in _VALID_READINESS_GATES
+
+    # Test 10b — readiness_gate is valid for controlled_activation mode
+    def test_readiness_gate_valid_for_controlled_activation_mode(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        run_log = self._threshold_run_log()
+        manifest = self._ca_manifest_analysis()
+        universe = self._clean_universe()
+        heartbeat = self._clean_heartbeat()
+        freshness = self._clean_freshness()
+        gate, _, _ = hpo._determine_readiness_gate(
+            run_log, manifest, universe, heartbeat, freshness, [],
+            current_mode="controlled_activation",
+        )
+        assert gate in _VALID_READINESS_GATES
+
+    # Test 11 — live_output_changed is hardcoded False in _SAFETY (never changes by mode)
+    def test_live_output_changed_always_false_in_safety(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        assert hpo._SAFETY.get("live_output_changed") is False
+
+    # Test 12 — no broker calls in observer (static import check)
+    def test_no_broker_calls_in_observer(self):
+        imported = _observer_imports()
+        broker_modules = {m for m in imported if "ibkr" in m.lower() or "broker" in m.lower()}
+        assert not broker_modules, f"Observer imports broker module: {broker_modules}"
+
+    # Test 13 — no LLM calls in observer
+    def test_no_llm_calls_in_observer(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        assert hpo._SAFETY.get("llm_called") is False
+
+    # Test 14 — no live bot consumption in observer
+    def test_no_live_bot_consumption_in_observer(self):
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        assert hpo._SAFETY.get("live_bot_consuming_handoff") is False
+
+    # Test 15 — validator accepts a controlled_activation observation report
+    def test_validator_accepts_controlled_activation_report(self):
+        from intelligence_schema_validator import validate_handoff_publisher_observation_report
+        with tempfile.TemporaryDirectory() as tmpdir:
+            report_path = os.path.join(tmpdir, "obs_report.json")
+            report = _make_min_valid_report("controlled_activation", "controlled_activation_ready")
+            with open(report_path, "w") as f:
+                json.dump(report, f)
+            result = validate_handoff_publisher_observation_report(report_path)
+        assert result.ok, f"Validator rejected controlled_activation report: {result.errors}"
+
+    # Test 16 — validator accepts a validation_only observation report
+    def test_validator_accepts_validation_only_report(self):
+        from intelligence_schema_validator import validate_handoff_publisher_observation_report
+        with tempfile.TemporaryDirectory() as tmpdir:
+            report_path = os.path.join(tmpdir, "obs_report.json")
+            report = _make_min_valid_report("validation_only", "validation_only_stable")
+            with open(report_path, "w") as f:
+                json.dump(report, f)
+            result = validate_handoff_publisher_observation_report(report_path)
+        assert result.ok, f"Validator rejected validation_only report: {result.errors}"
+
+    # Test 17 — smoke: mode awareness produces valid gates for both modes
+    @pytest.mark.smoke
+    def test_smoke_mode_awareness_7j3(self):
+        """Smoke: observer is mode-aware and produces valid gates for both modes."""
+        sys.path.insert(0, _ROOT)
+        import handoff_publisher_observer as hpo
+
+        run_log = self._threshold_run_log()
+        universe = self._clean_universe()
+        heartbeat = self._clean_heartbeat()
+        freshness = self._clean_freshness()
+
+        # validation_only path
+        vo_manifest = self._vo_manifest_analysis()
+        gate_vo, tm_vo, _ = hpo._determine_readiness_gate(
+            run_log, vo_manifest, universe, heartbeat, freshness, [],
+            current_mode="validation_only",
+        )
+        assert gate_vo in _VALID_READINESS_GATES
+        assert tm_vo is True
+
+        # controlled_activation path — clean manifest must NOT trigger fix_publisher gate
+        ca_manifest = self._ca_manifest_analysis()
+        gate_ca, tm_ca, _ = hpo._determine_readiness_gate(
+            run_log, ca_manifest, universe, heartbeat, freshness, [],
+            current_mode="controlled_activation",
+        )
+        assert gate_ca in _VALID_READINESS_GATES
+        assert gate_ca != "fix_publisher_before_flag_activation"
+        assert tm_ca is True

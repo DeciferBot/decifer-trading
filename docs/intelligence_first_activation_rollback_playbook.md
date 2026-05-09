@@ -1,11 +1,13 @@
 # Intelligence-First Activation and Rollback Playbook
 
-**Sprint:** 7H.1 — Operations readiness | **Updated:** 7J.1 — Two-Key Activation Gate Patch
+**Sprint:** 7H.1 — Operations readiness | **Updated:** 7J.3 — Observer Mode-Awareness Patch
 **Status:** Pre-activation playbook. Activation flag is False. Do not execute Section 3 until Amit approves controlled activation sprint and all checklist items in `docs/intelligence_first_handoff_activation_checklist.md` are verified.
-**Classification:** Advisory/design document. No live bot code changed in Sprint 7J.1.
+**Classification:** Advisory/design document. No live bot code changed in Sprints 7J.1–7J.3.
 **Reference:** See `docs/intelligence_first_handoff_activation_checklist.md` for the pre-activation checklist. See `docs/intelligence_first_cloud_deployment_runbook.md` for infrastructure context.
 
 **Sprint 7J.1 — Two-Key Activation Model:** Section 3 (Activation Steps) has been updated to reflect the two-key sequence. Key 1 = `enable_active_opportunity_universe_handoff = True` in `config.py`. Key 2 = `python3 handoff_publisher.py --mode controlled_activation` (writes `handoff_enabled=true` programmatically — no manual manifest edit required). Both keys must be set within the same activation window. For rollback: run `python3 handoff_publisher.py` (default `--mode validation_only`) to reset `handoff_enabled=false` in the manifest, then set the config flag to `False`.
+
+**Sprint 7J.3 — Observer Mode Awareness:** `handoff_publisher_observer.py` is now mode-aware. Running the observer immediately after Key 2 (`--mode controlled_activation`) will correctly report `gate=controlled_activation_ready` (not `fix_publisher_before_flag_activation`). Step 3.2 must be run AFTER Key 2 and will yield a `controlled_activation_ready` gate when the manifest is correctly in `controlled_activation` mode.
 
 ---
 

@@ -982,7 +982,7 @@ CONFIG = {
     "intelligence_first_candidate_feed_enabled":  False,  # run economic candidate feed (safe to enable)
     "intelligence_first_universe_builder_enabled": False, # run shadow universe builder (safe to enable)
     "intelligence_first_advisory_enabled":        False,  # advisory logging alongside live bot — Sprint 6C observation complete, gate met (advisory_ready_for_handoff_design)
-    "enable_active_opportunity_universe_handoff": False,  # PRODUCTION WIRING — Sprint 7J blocked: see activation report
+    "enable_active_opportunity_universe_handoff": True,   # PRODUCTION WIRING — Sprint 7J.4 controlled activation — Amit approved 2026-05-09
 }
 
 

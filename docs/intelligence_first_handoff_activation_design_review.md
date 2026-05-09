@@ -1,9 +1,9 @@
 # Intelligence-First Handoff Activation Design Review
 
-**Sprint:** 7H — Design Review Only | **Updated in:** 7J.1 — Two-Key Activation Gate Patch
-**Status:** Two-key activation gate implemented (Sprint 7J.1). Flag activation blocked pending Amit approval.
+**Sprint:** 7H — Design Review Only | **Updated in:** 7J.3 — Observer Mode-Awareness Patch
+**Status:** Two-key activation gate implemented (Sprint 7J.1). Observer is now mode-aware (Sprint 7J.3). Flag activation blocked pending Amit approval.
 **Date:** 2026-05-07 | **Updated:** 2026-05-09
-**Classification:** Advisory/design document. No live bot code changed in Sprint 7J.1.
+**Classification:** Advisory/design document. No live bot code changed in Sprints 7J.1–7J.3.
 
 ---
 
