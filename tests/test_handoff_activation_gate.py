@@ -344,26 +344,87 @@ def test_validation_only_after_controlled_activation_resets_handoff_enabled():
 
 
 # ---------------------------------------------------------------------------
-# 18. enable_active_opportunity_universe_handoff remains False in config
+# 18. Two-key gate: Key 1 active since Sprint 7J.4; Key 2 still required
+# (replaces Sprint 7J.1 guard "test_bot_flag_remains_false")
 # ---------------------------------------------------------------------------
-def test_bot_flag_remains_false():
-    """Bot config flag must remain False throughout Sprint 7J.1."""
+def test_two_key_gate_key1_now_active():
+    """
+    Sprint 7J.4 activated Key 1 (config flag = True).
+    This test confirms Key 1 is set AND that Key 2 (manifest handoff_enabled)
+    is still independently required — Key 1 alone does not grant consumption.
+
+    Two assertions:
+      (a) config flag IS True  — Key 1 is active.
+      (b) validation_only manifest → reader fails closed even with Key 1 = True.
+      (c) controlled_activation manifest + Key 1 = True → reader allows.
+    """
     import config
-    val = config.CONFIG.get("enable_active_opportunity_universe_handoff")
-    assert val is False, \
-        f"enable_active_opportunity_universe_handoff must be False, got {val!r}"
+    # (a) Key 1 active since Sprint 7J.4
+    assert config.CONFIG.get("enable_active_opportunity_universe_handoff") is True, (
+        "enable_active_opportunity_universe_handoff must be True (Sprint 7J.4 activated Key 1). "
+        "If this assertion fails, Key 1 was rolled back — check config.py line ~985."
+    )
+
+    # (b) Key 1 alone is insufficient — validation_only manifest must fail closed
+    _run_publisher_mode("validation_only")
+    result_vo = _load_production_handoff()
+    assert result_vo.get("handoff_allowed") is False, (
+        "Key 1 alone must NOT be sufficient: reader must reject validation_only manifest "
+        "even when enable_active_opportunity_universe_handoff=True in config."
+    )
+    assert result_vo.get("fail_closed_reason") == "handoff_disabled_in_manifest", (
+        f"Expected fail_closed_reason='handoff_disabled_in_manifest', "
+        f"got {result_vo.get('fail_closed_reason')!r}"
+    )
+
+    # (c) Both keys active — controlled_activation manifest must allow handoff
+    _run_publisher_mode("controlled_activation")
+    try:
+        result_ca = _load_production_handoff()
+        assert result_ca.get("handoff_allowed") is True, (
+            "Both keys active: reader must allow handoff for controlled_activation manifest "
+            f"with Key 1=True. fail_closed_reason={result_ca.get('fail_closed_reason')!r}"
+        )
+        assert result_ca.get("fail_closed_reason") is None
+        assert result_ca.get("accepted_candidate_count", 0) > 0, (
+            "controlled_activation + Key 1=True must yield at least one accepted candidate"
+        )
+    finally:
+        _run_publisher_mode("validation_only")
 
 
 # ---------------------------------------------------------------------------
-# 19. live bot does not consume handoff in this sprint
+# 19. Track A is blocked when Key 2 is absent (manifest fail-closed proof)
+# (replaces Sprint 7J.1 guard "test_live_bot_not_consuming_handoff")
 # ---------------------------------------------------------------------------
-def test_live_bot_not_consuming_handoff():
-    """Observer safety analysis must confirm live bot is not consuming handoff."""
-    with open("data/live/handoff_publisher_observation_report.json") as f:
-        obs = json.load(f)
-    sa = obs.get("safety_analysis", {})
-    assert sa.get("live_bot_consuming_handoff") is False
-    assert sa.get("enable_active_opportunity_universe_handoff") is False
+def test_track_a_blocked_without_key2():
+    """
+    Track A new entries require BOTH keys.
+    Even with Key 1 active (config=True), a validation_only manifest means
+    load_production_handoff() returns handoff_allowed=False and a non-null
+    fail_closed_reason — which is the exact condition bot_trading checks
+    to skip Track A entirely (line ~2550: if _handoff_fail_closed_reason is not None).
+
+    This test proves the bot-side implication without running a live scan cycle.
+    """
+    _run_publisher_mode("validation_only")
+
+    result = _load_production_handoff()
+
+    # Reader must be fail-closed
+    assert result.get("handoff_allowed") is False, (
+        "validation_only manifest must cause handoff_allowed=False"
+    )
+    assert result.get("accepted_candidate_count", -1) == 0, (
+        "No candidates may be accepted when reader fails closed"
+    )
+
+    # fail_closed_reason must be a non-empty string — this is what bot_trading
+    # checks for the Track A skip guard (if _handoff_fail_closed_reason is not None)
+    reason = result.get("fail_closed_reason")
+    assert isinstance(reason, str) and reason, (
+        f"fail_closed_reason must be a non-empty string for the Track A guard, got {reason!r}"
+    )
 
 
 # ---------------------------------------------------------------------------
