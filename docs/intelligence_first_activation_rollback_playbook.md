@@ -1,9 +1,11 @@
 # Intelligence-First Activation and Rollback Playbook
 
-**Sprint:** 7H.1 — Operations readiness
+**Sprint:** 7H.1 — Operations readiness | **Updated:** 7J.1 — Two-Key Activation Gate Patch
 **Status:** Pre-activation playbook. Activation flag is False. Do not execute Section 3 until Amit approves controlled activation sprint and all checklist items in `docs/intelligence_first_handoff_activation_checklist.md` are verified.
-**Classification:** Advisory/design document. No production code changed.
+**Classification:** Advisory/design document. No live bot code changed in Sprint 7J.1.
 **Reference:** See `docs/intelligence_first_handoff_activation_checklist.md` for the pre-activation checklist. See `docs/intelligence_first_cloud_deployment_runbook.md` for infrastructure context.
+
+**Sprint 7J.1 — Two-Key Activation Model:** Section 3 (Activation Steps) has been updated to reflect the two-key sequence. Key 1 = `enable_active_opportunity_universe_handoff = True` in `config.py`. Key 2 = `python3 handoff_publisher.py --mode controlled_activation` (writes `handoff_enabled=true` programmatically — no manual manifest edit required). Both keys must be set within the same activation window. For rollback: run `python3 handoff_publisher.py` (default `--mode validation_only`) to reset `handoff_enabled=false` in the manifest, then set the config flag to `False`.
 
 ---
 
@@ -71,13 +73,16 @@ During the activation window, the following must be monitored continuously:
 
 Execute in exact order. Do not skip. Record timestamp for each step.
 
+**Two-Key Activation Sequence (Sprint 7J.1):** Key 2 (publisher controlled_activation) must be run BEFORE Key 1 (config flag flip) so the bot reads a valid `handoff_enabled=true` manifest on the first post-activation scan cycle.
+
 | Step | Action | Verification |
 |------|--------|-------------|
-| 3.1 | Run `python3 handoff_publisher.py` — fresh publish cycle | Confirm `publish_cycle=success` in output |
+| 3.1 | Run `python3 handoff_publisher.py` — fresh validation_only cycle | Confirm `publish_cycle=success` in output |
 | 3.2 | Run `python3 handoff_publisher_observer.py` — confirm stable gate | Confirm `readiness_gate=validation_only_stable` |
 | 3.3 | Confirm manifest age < 600s in observer output | Read `manifest_age_seconds` |
 | 3.4 | Open `config.py` — locate `enable_active_opportunity_universe_handoff` | Confirm value is `False` before edit |
-| 3.5 | Set `enable_active_opportunity_universe_handoff = True` | Single-line change |
+| 3.5a | **[Key 2]** Run `python3 handoff_publisher.py --mode controlled_activation` | Confirm `publish_cycle=success`; confirm manifest `handoff_enabled=true`; confirm `handoff_mode=live` |
+| 3.5b | **[Key 1]** Set `enable_active_opportunity_universe_handoff = True` in `config.py` | Single-line change; both keys now set |
 | 3.6 | Do NOT commit yet — wait for first cycle confirmation | See step 3.8 |
 | 3.7 | If bot does not hot-reload config, restart bot: `supervisorctl restart live_trading_bot` or `docker-compose restart bot` | Confirm restart completes |
 | 3.8 | Wait for first scan cycle to complete | Observe bot log |
@@ -86,7 +91,7 @@ Execute in exact order. Do not skip. Record timestamp for each step.
 | 3.11 | Confirm in bot log: `_handoff_fail_closed_reason=None` | No fail-closed event |
 | 3.12 | Confirm Track B continues to fire independently | Check Track B log entries |
 | 3.13 | Record activation timestamp in `docs/intelligence_first_handoff_activation_checklist.md` Section 11 | |
-| 3.14 | Commit the config change: `git commit -m "feat(config): activate handoff flag — controlled activation sprint"` | |
+| 3.14 | Commit both changes: `git commit -m "feat(config): activate handoff flag — controlled activation sprint"` | Include config.py only (publisher runs on cron, not committed) |
 | 3.15 | Push to master | |
 
 **If step 3.9 or 3.10 does not confirm within 2 cycles:** trigger rollback immediately. Do not wait.
@@ -102,7 +107,8 @@ Execute rollback whenever any rollback trigger fires (see Section 5). Rollback i
 | Step | Action | Verification |
 |------|--------|-------------|
 | 4.1 | Open `config.py` — locate `enable_active_opportunity_universe_handoff` | Confirm current value is `True` |
-| 4.2 | Set `enable_active_opportunity_universe_handoff = False` | Single-line change |
+| 4.1b | **[Key 2 rollback]** Run `python3 handoff_publisher.py` (default: validation_only) | Confirms manifest `handoff_enabled=false` reset; no `--mode` flag needed — default is validation_only |
+| 4.2 | Set `enable_active_opportunity_universe_handoff = False` in `config.py` | Single-line change; Key 1 reverted |
 | 4.3 | If bot does not hot-reload config, restart bot | Confirm restart completes |
 | 4.4 | Wait for first scan cycle post-restart | Observe bot log |
 | 4.5 | Confirm in bot log: `Building dynamic universe (Alpaca screening)...` | Scanner path restored |

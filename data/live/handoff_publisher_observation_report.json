@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-07T18:28:02Z",
+  "generated_at": "2026-05-09T06:47:33Z",
   "mode": "validation_only_handoff_publisher_observation",
   "source_files": [
     "data/live/current_manifest.json",
@@ -13,33 +13,35 @@
     "data/live/publisher_run_log.jsonl"
   ],
   "observation_summary": {
-    "records_observed": 19,
+    "records_observed": 37,
     "first_observed_at": "2026-05-07T16:11:11Z",
-    "last_observed_at": "2026-05-07T18:27:59Z",
-    "publisher_runs_detected": 19,
-    "successful_publishes": 13,
-    "failed_publishes": 6,
+    "last_observed_at": "2026-05-09T06:47:16Z",
+    "publisher_runs_detected": 37,
+    "successful_publishes": 30,
+    "failed_publishes": 7,
     "run_log_exists": true,
-    "run_log_records": 13,
-    "successful_publisher_runs": 13,
-    "distinct_utc_sessions": 1,
+    "run_log_records": 30,
+    "successful_publisher_runs": 30,
+    "distinct_utc_sessions": 3,
     "distinct_utc_dates": [
-      "2026-05-07"
+      "2026-05-07",
+      "2026-05-08",
+      "2026-05-09"
     ],
-    "threshold_met": false,
-    "threshold_basis": "not_met",
+    "threshold_met": true,
+    "threshold_basis": "successful_runs",
     "current_manifest_exists": true,
     "active_universe_exists": true,
     "heartbeat_exists": true,
     "publisher_report_exists": true,
-    "readiness_gate": "insufficient_observation",
+    "readiness_gate": "validation_only_stable",
     "quota_policy_version": "75_35",
     "quota_policy_total_cap": 75,
     "quota_policy_structural_cap": 35,
     "quota_observation_required": true,
     "quota_observation_start": "2026-05-07T18:27:59Z",
-    "successful_runs_for_current_quota": 1,
-    "distinct_sessions_for_current_quota": 1,
+    "successful_runs_for_current_quota": 18,
+    "distinct_sessions_for_current_quota": 3,
     "candidate_count": 75,
     "structural_count": 35,
     "governed_watch_status": {
@@ -54,12 +56,12 @@
     }
   },
   "freshness_analysis": {
-    "manifest_age_seconds": 3.7,
+    "manifest_age_seconds": 17.3,
     "manifest_freshness": "fresh",
-    "manifest_expires_at": "2026-05-07T18:42:59Z",
-    "universe_age_seconds": 3.7,
+    "manifest_expires_at": "2026-05-09T07:02:16Z",
+    "universe_age_seconds": 17.3,
     "universe_freshness": "fresh",
-    "heartbeat_age_seconds": 3.7,
+    "heartbeat_age_seconds": 17.3,
     "heartbeat_freshness": "fresh",
     "sla_primary_threshold_seconds": 600,
     "sla_stale_threshold_seconds": 900,
@@ -67,8 +69,8 @@
     "sla_met": true,
     "stale_count": 0,
     "expired_count": 0,
-    "max_age_seconds": 3.7,
-    "average_age_seconds": 3.7
+    "max_age_seconds": 17.3,
+    "average_age_seconds": 17.3
   },
   "manifest_validity_analysis": {
     "exists": true,
@@ -113,9 +115,9 @@
     "exists": true,
     "worker": "handoff_publisher",
     "validation_status": "pass",
-    "last_success_at": "2026-05-07T18:27:59Z",
-    "last_attempt_at": "2026-05-07T18:27:59Z",
-    "last_success_age_seconds": 3.7,
+    "last_success_at": "2026-05-09T06:47:16Z",
+    "last_attempt_at": "2026-05-09T06:47:16Z",
+    "last_success_age_seconds": 17.3,
     "last_success_freshness": "fresh",
     "candidate_count": 75,
     "fail_closed_reason": null
@@ -219,10 +221,10 @@
     "route_changes": null,
     "quota_group_changes": null,
     "validation_status_changes": null,
-    "note": "run_log_records=13 \u2014 candidate-level stability diff requires snapshot archive (not yet implemented)"
+    "note": "run_log_records=30 \u2014 candidate-level stability diff requires snapshot archive (not yet implemented)"
   },
   "fail_closed_observations": {
-    "fail_closed_events": 6,
+    "fail_closed_events": 7,
     "fail_diagnostics_found": [
       {
         "file": "data/live/.fail_20260507T152529Z.json",
@@ -253,6 +255,11 @@
         "file": "data/live/.fail_20260507T161930Z.json",
         "fail_closed_reason": "source_read_error: file not found: /var/folders/93/_t7k5kmd4tlc0p5x244dd1th0000gn/T/tmpj2x3fa6j/nonexistent.json",
         "generated_at": "2026-05-07T16:19:30Z"
+      },
+      {
+        "file": "data/live/.fail_20260507T185125Z.json",
+        "fail_closed_reason": "source_read_error: file not found: /var/folders/93/_t7k5kmd4tlc0p5x244dd1th0000gn/T/tmp45m4du68/nonexistent.json",
+        "generated_at": "2026-05-07T18:51:25Z"
       }
     ],
     "manifest_missing_events": 0,
@@ -274,7 +281,7 @@
     "live_output_changed": false,
     "all_safety_invariants_hold": true
   },
-  "readiness_gate": "insufficient_observation",
+  "readiness_gate": "validation_only_stable",
   "warnings": [],
   "production_candidate_source_changed": false,
   "live_bot_consuming_handoff": false,

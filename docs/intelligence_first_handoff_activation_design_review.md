@@ -1,9 +1,9 @@
 # Intelligence-First Handoff Activation Design Review
 
-**Sprint:** 7H — Design Review Only
-**Status:** Design review complete. Flag activation blocked pending Amit approval.
-**Date:** 2026-05-07
-**Classification:** Advisory/design document. No production code changed.
+**Sprint:** 7H — Design Review Only | **Updated in:** 7J.1 — Two-Key Activation Gate Patch
+**Status:** Two-key activation gate implemented (Sprint 7J.1). Flag activation blocked pending Amit approval.
+**Date:** 2026-05-07 | **Updated:** 2026-05-09
+**Classification:** Advisory/design document. No live bot code changed in Sprint 7J.1.
 
 ---
 
@@ -28,9 +28,11 @@
 | Flag | Value |
 |------|-------|
 | `enable_active_opportunity_universe_handoff` | **False** |
-| `handoff_enabled` (in manifest) | **false** |
-| `publication_mode` | **validation_only** |
+| `handoff_enabled` (in manifest) | **false** (validation_only default) / **true** (controlled_activation mode) |
+| `publication_mode` | **validation_only** (default) — use `--mode controlled_activation` for second key |
 | `live_bot_consuming_handoff` | **false** |
+
+**Sprint 7J.1 two-key model:** `handoff_enabled=true` is now written programmatically by `python3 handoff_publisher.py --mode controlled_activation`. No manual manifest edit required. Activation requires BOTH keys: (1) `enable_active_opportunity_universe_handoff=True` in `config.py` AND (2) publisher running in `controlled_activation` mode.
 
 ### Current Bot Path
 
@@ -42,13 +44,13 @@ The live bot is **scanner-led**. `get_dynamic_universe()` runs on every scan cyc
 
 | Metric | Value |
 |--------|-------|
-| Successful publisher runs | 10 |
+| Successful publisher runs (75/35 quota policy) | 17 |
 | Failed publisher runs | 6 (all test artefacts — sprint development) |
-| Distinct UTC sessions | 1 (2026-05-07) |
+| Distinct UTC sessions (75/35 quota policy) | 3 (2026-05-07, 2026-05-08, 2026-05-09) — **gate met** |
 | Live observation failures | 0 |
 | Validator result | 40/40 PASS |
 | Smoke result | 9/9 PASS |
-| Candidate count per run | 50 (stable across all 10 runs) |
+| Candidate count per run | 75 (stable — Sprint 7I quota promotion) |
 | Executable candidates | 0 |
 | Order instructions | 0 |
 | Safety invariants | All 13 clean across all runs |

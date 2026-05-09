@@ -3324,8 +3324,13 @@ def validate_prod_active_universe(path: str) -> ValidationResult:
     if data.get("mode") != "production_handoff_universe":
         result.fail(f"prod_active_universe: mode must be 'production_handoff_universe', got {data.get('mode')!r}")
 
-    if data.get("publication_mode") != "validation_only":
-        result.fail(f"prod_active_universe: publication_mode must be 'validation_only', got {data.get('publication_mode')!r}")
+    # Sprint 7J.1: accept both validation_only and controlled_activation modes.
+    _valid_pub_modes = {"validation_only", "controlled_activation"}
+    if data.get("publication_mode") not in _valid_pub_modes:
+        result.fail(
+            f"prod_active_universe: publication_mode must be one of {sorted(_valid_pub_modes)}, "
+            f"got {data.get('publication_mode')!r}"
+        )
 
     if data.get("no_executable_trade_instructions") is not True:
         result.fail("prod_active_universe: no_executable_trade_instructions must be true")
@@ -3370,11 +3375,23 @@ def validate_prod_manifest(path: str) -> ValidationResult:
         if key not in data:
             result.fail(f"prod_manifest: missing required field '{key}'")
 
-    if data.get("handoff_enabled") is not False:
-        result.fail(f"prod_manifest: handoff_enabled must be false (Sprint 7F), got {data.get('handoff_enabled')!r}")
-
-    if data.get("publication_mode") != "validation_only":
-        result.fail(f"prod_manifest: publication_mode must be 'validation_only', got {data.get('publication_mode')!r}")
+    # Sprint 7J.1: two-key activation gate.
+    # validation_only → handoff_enabled=false.
+    # controlled_activation → handoff_enabled=true.
+    _valid_pub_modes = {"validation_only", "controlled_activation"}
+    pub_mode = data.get("publication_mode")
+    if pub_mode not in _valid_pub_modes:
+        result.fail(
+            f"prod_manifest: publication_mode must be one of {sorted(_valid_pub_modes)}, "
+            f"got {pub_mode!r}"
+        )
+    else:
+        expected_handoff_enabled = (pub_mode == "controlled_activation")
+        if data.get("handoff_enabled") is not expected_handoff_enabled:
+            result.fail(
+                f"prod_manifest: handoff_enabled must be {expected_handoff_enabled!r} "
+                f"for publication_mode={pub_mode!r}, got {data.get('handoff_enabled')!r}"
+            )
 
     if data.get("enable_flag_required") is not True:
         result.fail("prod_manifest: enable_flag_required must be true")
@@ -3417,11 +3434,21 @@ def validate_handoff_publisher_report(path: str) -> ValidationResult:
     if data.get("mode") != "handoff_publisher_report":
         result.fail(f"handoff_publisher_report: mode must be 'handoff_publisher_report', got {data.get('mode')!r}")
 
-    if data.get("publication_mode") != "validation_only":
-        result.fail(f"handoff_publisher_report: publication_mode must be 'validation_only'")
-
-    if data.get("handoff_enabled") is not False:
-        result.fail(f"handoff_publisher_report: handoff_enabled must be false")
+    # Sprint 7J.1: accept both modes; validate handoff_enabled consistency.
+    _valid_pub_modes = {"validation_only", "controlled_activation"}
+    rpt_pub_mode = data.get("publication_mode")
+    if rpt_pub_mode not in _valid_pub_modes:
+        result.fail(
+            f"handoff_publisher_report: publication_mode must be one of {sorted(_valid_pub_modes)}, "
+            f"got {rpt_pub_mode!r}"
+        )
+    else:
+        expected_he = (rpt_pub_mode == "controlled_activation")
+        if data.get("handoff_enabled") is not expected_he:
+            result.fail(
+                f"handoff_publisher_report: handoff_enabled must be {expected_he!r} "
+                f"for publication_mode={rpt_pub_mode!r}, got {data.get('handoff_enabled')!r}"
+            )
 
     if data.get("enable_active_opportunity_universe_handoff_config_state") is not False:
         result.fail("handoff_publisher_report: enable_active_opportunity_universe_handoff_config_state must be false")
@@ -3652,13 +3679,21 @@ def validate_publisher_run_log(path: str) -> ValidationResult:
                 f"got {rec.get('validation_status')!r}"
             )
 
-        if rec.get("publication_mode") != "validation_only":
+        # Sprint 7J.1: accept both modes; validate handoff_enabled consistency per record.
+        _valid_log_modes = {"validation_only", "controlled_activation"}
+        rec_pub_mode = rec.get("publication_mode")
+        if rec_pub_mode not in _valid_log_modes:
             result.fail(
-                f"publisher_run_log line {lineno}: publication_mode must be 'validation_only'"
+                f"publisher_run_log line {lineno}: publication_mode must be one of "
+                f"{sorted(_valid_log_modes)}, got {rec_pub_mode!r}"
             )
-
-        if rec.get("handoff_enabled") is not False:
-            result.fail(f"publisher_run_log line {lineno}: handoff_enabled must be false")
+        else:
+            expected_he = (rec_pub_mode == "controlled_activation")
+            if rec.get("handoff_enabled") is not expected_he:
+                result.fail(
+                    f"publisher_run_log line {lineno}: handoff_enabled must be {expected_he!r} "
+                    f"for publication_mode={rec_pub_mode!r}, got {rec.get('handoff_enabled')!r}"
+                )
 
         if rec.get("enable_active_opportunity_universe_handoff") is not False:
             result.fail(

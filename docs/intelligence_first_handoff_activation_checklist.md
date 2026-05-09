@@ -1,7 +1,7 @@
 # Intelligence-First Handoff Activation Checklist
 
-**Sprint:** 7H design artefact — for use in controlled activation sprint only
-**Status:** Pre-activation. Flag is False. Checklist is not active.
+**Sprint:** 7H design artefact — updated Sprint 7J.1 for two-key activation model — for use in controlled activation sprint only
+**Status:** Pre-activation. Flag is False. Checklist is not active. Two-key model implemented (Sprint 7J.1).
 **Classification:** Advisory/design document. Do not use until Amit explicitly approves activation sprint.
 
 ---
@@ -67,9 +67,12 @@ Run: `python3 -c "import json; from intelligence_schema_validator import validat
 
 ---
 
-## Section 5 — Publisher Freshness Check
+## Section 5 — Publisher Freshness Check (Two-Key Activation)
 
-Run: `python3 handoff_publisher.py && python3 handoff_publisher_observer.py`
+**Sprint 7J.1 note:** Before activation, run a validation_only cycle to confirm publisher health. Do NOT run `--mode controlled_activation` until Section 14 (Amit approval) is complete. The controlled_activation mode writes `handoff_enabled=true` and is Key 2 of the two-key activation sequence — it must be run immediately before the config flag flip (Key 1).
+
+Run (pre-activation freshness check): `python3 handoff_publisher.py && python3 handoff_publisher_observer.py`
+Run (Key 2 — immediately before flag flip): `python3 handoff_publisher.py --mode controlled_activation`
 
 | # | Check | Result | Notes |
 |---|-------|--------|-------|

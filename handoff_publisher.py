@@ -3,7 +3,7 @@ handoff_publisher.py — Production handoff publisher (scheduled worker).
 
 Classification: production runtime candidate / scheduled worker
 Service layer: Handoff / Live manifest generation
-Sprint: 7F / 7G.1
+Sprint: 7F / 7G.1 / 7J.1
 
 Reads the validated Intelligence-First shadow universe and publishes:
 
@@ -12,12 +12,27 @@ Reads the validated Intelligence-First shadow universe and publishes:
     data/live/handoff_publisher_report.json
     data/heartbeats/handoff_publisher.json
 
-Publication mode in Sprint 7F: validation_only
-handoff_enabled: false
-enable_active_opportunity_universe_handoff: false
+Publication modes (Sprint 7J.1 two-key activation gate):
 
-The live bot does NOT consume these files while
-enable_active_opportunity_universe_handoff is False.
+  validation_only (default):
+    handoff_enabled = false
+    publication_mode = validation_only
+    Bot cannot consume — reader fails closed on handoff_disabled_in_manifest.
+
+  controlled_activation:
+    handoff_enabled = true
+    publication_mode = controlled_activation
+    handoff_mode = live (reader-accepted)
+    Bot can consume when enable_active_opportunity_universe_handoff = True.
+
+BOTH keys must be set for live bot consumption:
+  1. enable_active_opportunity_universe_handoff = True  (config flag)
+  2. handoff_enabled = true                             (manifest gate, set by controlled_activation)
+
+CLI usage:
+  python3 handoff_publisher.py                              # validation_only (default)
+  python3 handoff_publisher.py --mode validation_only       # explicit default
+  python3 handoff_publisher.py --mode controlled_activation # activation gate
 
 Atomic write policy:
     1. Write .tmp file
@@ -56,8 +71,24 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _SCHEMA_VERSION = "1.0"
-_PUBLICATION_MODE = "validation_only"
-_HANDOFF_MODE = "production_validation"
+
+# Sprint 7J.1: valid publication modes.  Default is validation_only.
+# controlled_activation sets handoff_enabled=true and handoff_mode=live in the
+# manifest so handoff_reader.load_production_handoff() allows bot consumption.
+_VALID_PUBLICATION_MODES = {"validation_only", "controlled_activation"}
+_DEFAULT_PUBLICATION_MODE = "validation_only"
+
+# Legacy constant kept for backward compat with non-mode-aware callers.
+_PUBLICATION_MODE = _DEFAULT_PUBLICATION_MODE
+
+# handoff_mode written to manifest per publication mode.
+# "live" is the value handoff_reader.validate_manifest() accepts for production.
+_HANDOFF_MODES = {
+    "validation_only":    "production_validation",
+    "controlled_activation": "live",
+}
+_HANDOFF_MODE = _HANDOFF_MODES[_DEFAULT_PUBLICATION_MODE]
+
 _UNIVERSE_MODE = "production_handoff_universe"
 
 _EXPIRY_HOURS = 15  # minutes expressed as hours — 15 min = 0.25 h
@@ -205,6 +236,8 @@ def _append_run_log(
     manifest_expires_at: str,
     source_shadow_file: str,
     warnings: list[str],
+    publication_mode: str = _DEFAULT_PUBLICATION_MODE,
+    handoff_enabled: bool = False,
 ) -> bool:
     """
     Append one JSON line to publisher_run_log.jsonl after a fully successful cycle.
@@ -212,6 +245,10 @@ def _append_run_log(
     Called only after all 4 outputs (universe, manifest, report, heartbeat) are written.
     If append fails: records run_log_write_failed warning, does NOT corrupt manifest.
     Returns True on success, False on failure.
+
+    publication_mode and handoff_enabled reflect the actual values written to the manifest.
+    enable_active_opportunity_universe_handoff is always False in the run log — the
+    publisher does not read the bot config flag.
 
     Classification: production observability output — never read by live bot.
     """
@@ -223,8 +260,8 @@ def _append_run_log(
         "completed_at": _ts(now),
         "utc_date": now.strftime("%Y-%m-%d"),
         "validation_status": "pass",
-        "publication_mode": _PUBLICATION_MODE,
-        "handoff_enabled": False,
+        "publication_mode": publication_mode,
+        "handoff_enabled": handoff_enabled,
         "enable_active_opportunity_universe_handoff": False,
         "active_universe_file": _OUTPUT_UNIVERSE,
         "current_manifest_file": _OUTPUT_MANIFEST,
@@ -368,7 +405,10 @@ def _validate_output_candidate(c: dict) -> list[str]:
     return errors
 
 
-def _validate_output_universe(data: dict) -> list[str]:
+def _validate_output_universe(
+    data: dict,
+    publication_mode: str = _DEFAULT_PUBLICATION_MODE,
+) -> list[str]:
     errors: list[str] = []
     required_top = (
         "schema_version", "generated_at", "expires_at", "mode",
@@ -382,8 +422,8 @@ def _validate_output_universe(data: dict) -> list[str]:
             errors.append(f"active_universe: missing required field '{k}'")
     if data.get("mode") != _UNIVERSE_MODE:
         errors.append(f"active_universe: mode must be '{_UNIVERSE_MODE}', got {data.get('mode')!r}")
-    if data.get("publication_mode") != _PUBLICATION_MODE:
-        errors.append(f"active_universe: publication_mode must be '{_PUBLICATION_MODE}'")
+    if data.get("publication_mode") != publication_mode:
+        errors.append(f"active_universe: publication_mode must be '{publication_mode}', got {data.get('publication_mode')!r}")
     if data.get("no_executable_trade_instructions") is not True:
         errors.append("active_universe: no_executable_trade_instructions must be true")
     for flag in ("live_output_changed", "secrets_exposed", "env_values_logged"):
@@ -394,7 +434,18 @@ def _validate_output_universe(data: dict) -> list[str]:
     return errors
 
 
-def _validate_output_manifest(data: dict, check_universe_exists: bool = False) -> list[str]:
+def _validate_output_manifest(
+    data: dict,
+    check_universe_exists: bool = False,
+    publication_mode: str = _DEFAULT_PUBLICATION_MODE,
+    handoff_enabled: bool = False,
+) -> list[str]:
+    """Validate the manifest doc in-memory.
+
+    publication_mode and handoff_enabled must match what was passed to _build_manifest.
+    For validation_only: handoff_enabled=False.
+    For controlled_activation: handoff_enabled=True.
+    """
     errors: list[str] = []
     required_top = (
         "schema_version", "published_at", "expires_at", "validation_status",
@@ -406,10 +457,13 @@ def _validate_output_manifest(data: dict, check_universe_exists: bool = False) -
     for k in required_top:
         if k not in data:
             errors.append(f"manifest: missing required field '{k}'")
-    if data.get("handoff_enabled") is not False:
-        errors.append(f"manifest: handoff_enabled must be false, got {data.get('handoff_enabled')!r}")
-    if data.get("publication_mode") != _PUBLICATION_MODE:
-        errors.append(f"manifest: publication_mode must be '{_PUBLICATION_MODE}'")
+    if data.get("handoff_enabled") is not handoff_enabled:
+        errors.append(
+            f"manifest: handoff_enabled must be {handoff_enabled!r}, "
+            f"got {data.get('handoff_enabled')!r}"
+        )
+    if data.get("publication_mode") != publication_mode:
+        errors.append(f"manifest: publication_mode must be '{publication_mode}', got {data.get('publication_mode')!r}")
     if data.get("enable_flag_required") is not True:
         errors.append("manifest: enable_flag_required must be true")
     if data.get("no_executable_trade_instructions") is not True:
@@ -436,6 +490,7 @@ def _build_active_universe(
     generated_at: datetime,
     warnings: list[str],
     validation_status: str,
+    publication_mode: str = _DEFAULT_PUBLICATION_MODE,
 ) -> dict:
     expires_at = generated_at + timedelta(minutes=_EXPIRY_MINUTES)
     src_files = shadow.get("source_files") or []
@@ -445,7 +500,7 @@ def _build_active_universe(
         "generated_at": _ts(generated_at),
         "expires_at": _ts(expires_at),
         "mode": _UNIVERSE_MODE,
-        "publication_mode": _PUBLICATION_MODE,
+        "publication_mode": publication_mode,
         "source_shadow_file": _SHADOW_UNIVERSE_PATH,
         "source_files": src_files,
         "validation_status": validation_status,
@@ -472,16 +527,20 @@ def _build_manifest(
     fail_closed_reason: str | None,
     source_versions: dict,
     warnings: list[str],
+    publication_mode: str = _DEFAULT_PUBLICATION_MODE,
+    handoff_enabled: bool = False,
+    handoff_mode: str | None = None,
 ) -> dict:
     expires_at = generated_at + timedelta(minutes=_EXPIRY_MINUTES)
+    resolved_handoff_mode = handoff_mode or _HANDOFF_MODES.get(publication_mode, _HANDOFF_MODE)
     return {
         "schema_version": _SCHEMA_VERSION,
         "published_at": _ts(generated_at),
         "expires_at": _ts(expires_at),
         "validation_status": validation_status,
-        "handoff_mode": _HANDOFF_MODE,
-        "publication_mode": _PUBLICATION_MODE,
-        "handoff_enabled": False,
+        "handoff_mode": resolved_handoff_mode,
+        "publication_mode": publication_mode,
+        "handoff_enabled": handoff_enabled,
         "enable_flag_required": True,
         "ready_for_consumption": validation_status == "pass",
         "active_universe_file": _OUTPUT_UNIVERSE,
@@ -511,12 +570,14 @@ def _build_publisher_report(
     validation_status: str,
     fail_closed_reason: str | None,
     warnings: list[str],
+    publication_mode: str = _DEFAULT_PUBLICATION_MODE,
+    handoff_enabled: bool = False,
 ) -> dict:
     return {
         "schema_version": _SCHEMA_VERSION,
         "generated_at": _ts(generated_at),
         "mode": "handoff_publisher_report",
-        "publication_mode": _PUBLICATION_MODE,
+        "publication_mode": publication_mode,
         "source_files": source_files,
         "output_files": [_OUTPUT_UNIVERSE, _OUTPUT_MANIFEST, _OUTPUT_HEARTBEAT],
         "validation_summary": validation_summary,
@@ -526,7 +587,8 @@ def _build_publisher_report(
         "heartbeat_summary": heartbeat_summary,
         "safety_flags": {k: v for k, v in _SAFETY.items()},
         "ready_for_consumption": validation_status == "pass",
-        "handoff_enabled": False,
+        "handoff_enabled": handoff_enabled,
+        # publisher does not read the bot config flag; always False
         "enable_active_opportunity_universe_handoff_config_state": False,
         **_SAFETY,
     }
@@ -559,13 +621,26 @@ def _build_heartbeat(
 # ---------------------------------------------------------------------------
 
 
-def run_publisher() -> dict:
+def run_publisher(mode: str = _DEFAULT_PUBLICATION_MODE) -> dict:
     """
     Execute one publish cycle.
+
+    mode: "validation_only" (default) or "controlled_activation".
+      validation_only    — handoff_enabled=false, reader rejects for bot consumption.
+      controlled_activation — handoff_enabled=true, handoff_mode=live, reader allows.
 
     Returns the publisher report dict (also written to disk).
     Fail-closed: on any validation failure, does not overwrite valid output files.
     """
+    if mode not in _VALID_PUBLICATION_MODES:
+        raise ValueError(
+            f"Invalid publication mode {mode!r}. "
+            f"Valid: {sorted(_VALID_PUBLICATION_MODES)}"
+        )
+
+    handoff_enabled = (mode == "controlled_activation")
+    handoff_mode    = _HANDOFF_MODES[mode]
+
     now = _now_utc()
     attempt_ts = _ts(now)
     warnings: list[str] = []
@@ -577,7 +652,8 @@ def run_publisher() -> dict:
     if err:
         fail_closed_reason = f"source_read_error: {err}"
         log.warning("[handoff_publisher] fail_closed: %s", fail_closed_reason)
-        return _fail_closed_cycle(now, attempt_ts, fail_closed_reason, warnings)
+        return _fail_closed_cycle(now, attempt_ts, fail_closed_reason, warnings,
+                                  publication_mode=mode, handoff_enabled=handoff_enabled)
 
     # --- Step 2: Validate shadow source ---
     source_errors = _validate_shadow_source(shadow)
@@ -585,7 +661,8 @@ def run_publisher() -> dict:
         fail_closed_reason = f"source_validation_failed: {source_errors[0]}"
         log.warning("[handoff_publisher] fail_closed: %s", fail_closed_reason)
         return _fail_closed_cycle(now, attempt_ts, fail_closed_reason, warnings,
-                                  extra_context={"source_errors": source_errors})
+                                  extra_context={"source_errors": source_errors},
+                                  publication_mode=mode, handoff_enabled=handoff_enabled)
 
     # --- Step 3: Transform candidates ---
     raw_candidates = shadow.get("candidates") or []
@@ -605,7 +682,8 @@ def run_publisher() -> dict:
     if not accepted:
         fail_closed_reason = "zero_accepted_candidates"
         return _fail_closed_cycle(now, attempt_ts, fail_closed_reason, warnings,
-                                  extra_context={"rejected_count": len(rejected_candidates)})
+                                  extra_context={"rejected_count": len(rejected_candidates)},
+                                  publication_mode=mode, handoff_enabled=handoff_enabled)
 
     # --- Step 4: Build output documents (in-memory) ---
     source_versions: dict[str, str] = {}
@@ -618,19 +696,31 @@ def run_publisher() -> dict:
             if data:
                 source_versions[path] = data.get("generated_at") or _ts(now)
 
-    universe_doc = _build_active_universe(shadow, accepted, now, warnings, "pass")
-    manifest_doc = _build_manifest(now, "pass", None, source_versions, warnings)
+    universe_doc = _build_active_universe(
+        shadow, accepted, now, warnings, "pass",
+        publication_mode=mode,
+    )
+    manifest_doc = _build_manifest(
+        now, "pass", None, source_versions, warnings,
+        publication_mode=mode,
+        handoff_enabled=handoff_enabled,
+        handoff_mode=handoff_mode,
+    )
 
     # --- Step 5a: Validate universe in-memory before writing ---
-    universe_errors = _validate_output_universe(universe_doc)
+    universe_errors = _validate_output_universe(universe_doc, publication_mode=mode)
     # Validate manifest structure in-memory (skip file-existence check — universe not written yet)
-    manifest_errors = _validate_output_manifest(manifest_doc, check_universe_exists=False)
+    manifest_errors = _validate_output_manifest(
+        manifest_doc, check_universe_exists=False,
+        publication_mode=mode, handoff_enabled=handoff_enabled,
+    )
 
     all_output_errors = universe_errors + manifest_errors
     if all_output_errors:
         fail_closed_reason = f"output_validation_failed: {all_output_errors[0]}"
         return _fail_closed_cycle(now, attempt_ts, fail_closed_reason, warnings,
-                                  extra_context={"output_errors": all_output_errors})
+                                  extra_context={"output_errors": all_output_errors},
+                                  publication_mode=mode, handoff_enabled=handoff_enabled)
 
     # --- Step 6: Atomic writes (universe first, then manifest) ---
     atomic_summary: dict = {"universe_written": False, "manifest_written": False,
@@ -640,21 +730,27 @@ def run_publisher() -> dict:
         atomic_summary["universe_written"] = True
     except Exception as exc:
         fail_closed_reason = f"universe_write_failed: {exc}"
-        return _fail_closed_cycle(now, attempt_ts, fail_closed_reason, warnings)
+        return _fail_closed_cycle(now, attempt_ts, fail_closed_reason, warnings,
+                                  publication_mode=mode, handoff_enabled=handoff_enabled)
 
     # Step 5b: Re-validate manifest now that the universe file exists
-    post_write_errors = _validate_output_manifest(manifest_doc, check_universe_exists=True)
+    post_write_errors = _validate_output_manifest(
+        manifest_doc, check_universe_exists=True,
+        publication_mode=mode, handoff_enabled=handoff_enabled,
+    )
     if post_write_errors:
         fail_closed_reason = f"manifest_post_write_validation_failed: {post_write_errors[0]}"
         return _fail_closed_cycle(now, attempt_ts, fail_closed_reason, warnings,
-                                  extra_context={"post_write_errors": post_write_errors})
+                                  extra_context={"post_write_errors": post_write_errors},
+                                  publication_mode=mode, handoff_enabled=handoff_enabled)
 
     try:
         _write_atomic(_OUTPUT_MANIFEST, manifest_doc)
         atomic_summary["manifest_written"] = True
     except Exception as exc:
         fail_closed_reason = f"manifest_write_failed: {exc}"
-        return _fail_closed_cycle(now, attempt_ts, fail_closed_reason, warnings)
+        return _fail_closed_cycle(now, attempt_ts, fail_closed_reason, warnings,
+                                  publication_mode=mode, handoff_enabled=handoff_enabled)
 
     # --- Step 7: Heartbeat (only on full success) ---
     heartbeat_doc = _build_heartbeat(now, "pass", len(accepted), None, attempt_ts)
@@ -669,6 +765,8 @@ def run_publisher() -> dict:
     run_log_ok = _append_run_log(
         now, len(accepted), manifest_doc.get("expires_at", ""),
         _SHADOW_UNIVERSE_PATH, warnings,
+        publication_mode=mode,
+        handoff_enabled=handoff_enabled,
     )
     atomic_summary["run_log_written"] = run_log_ok
 
@@ -692,6 +790,8 @@ def run_publisher() -> dict:
         now, source_files, validation_summary, candidate_summary,
         rejected_candidates, atomic_summary, heartbeat_summary,
         "pass", None, warnings,
+        publication_mode=mode,
+        handoff_enabled=handoff_enabled,
     )
     try:
         _write_atomic(_OUTPUT_REPORT, report)
@@ -700,8 +800,8 @@ def run_publisher() -> dict:
 
     log.info(
         "[handoff_publisher] publish_cycle=success accepted=%d rejected=%d "
-        "handoff_enabled=false publication_mode=%s live_output_changed=false",
-        len(accepted), len(rejected_candidates), _PUBLICATION_MODE,
+        "handoff_enabled=%s publication_mode=%s live_output_changed=false",
+        len(accepted), len(rejected_candidates), handoff_enabled, mode,
     )
     return report
 
@@ -712,6 +812,8 @@ def _fail_closed_cycle(
     fail_closed_reason: str,
     warnings: list[str],
     extra_context: dict | None = None,
+    publication_mode: str = _DEFAULT_PUBLICATION_MODE,
+    handoff_enabled: bool = False,
 ) -> dict:
     """
     Write publisher report and heartbeat (fail state). Do NOT write universe or manifest.
@@ -741,6 +843,8 @@ def _fail_closed_cycle(
         validation_status="fail",
         fail_closed_reason=fail_closed_reason,
         warnings=warnings + [f"fail diagnostic written to {fail_path}"],
+        publication_mode=publication_mode,
+        handoff_enabled=handoff_enabled,
     )
     try:
         _write_atomic(_OUTPUT_REPORT, report)
@@ -754,14 +858,37 @@ def _fail_closed_cycle(
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    import argparse as _argparse
+    _parser = _argparse.ArgumentParser(
+        description="Handoff publisher — Sprint 7J.1 two-key activation gate."
+    )
+    _parser.add_argument(
+        "--mode",
+        choices=sorted(_VALID_PUBLICATION_MODES),
+        default=_DEFAULT_PUBLICATION_MODE,
+        help=(
+            "Publication mode. "
+            "'validation_only' (default): handoff_enabled=false, reader rejects. "
+            "'controlled_activation': handoff_enabled=true, reader allows bot consumption "
+            "when enable_active_opportunity_universe_handoff=True in config."
+        ),
+    )
+    _args = _parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
-    report = run_publisher()
+    report = run_publisher(mode=_args.mode)
     status = report.get("validation_summary", {}).get("overall_status", "unknown")
     count = report.get("candidate_summary", {}).get("accepted_count", 0)
     reason = report.get("fail_closed_reason")
+    _he = report.get("handoff_enabled", False)
+    _pm = report.get("publication_mode", _args.mode)
     if status == "pass":
-        print(f"[handoff_publisher] SUCCESS: {count} candidates published. "
-              f"publication_mode={_PUBLICATION_MODE} handoff_enabled=false live_output_changed=false")
+        print(
+            f"[handoff_publisher] SUCCESS: {count} candidates published. "
+            f"publication_mode={_pm} handoff_enabled={str(_he).lower()} "
+            f"live_output_changed=false"
+        )
     else:
-        print(f"[handoff_publisher] FAIL-CLOSED: {reason}. "
-              f"Universe and manifest NOT updated. Heartbeat and report written.")
+        print(
+            f"[handoff_publisher] FAIL-CLOSED: {reason}. "
+            f"Universe and manifest NOT updated. Heartbeat and report written."
+        )
