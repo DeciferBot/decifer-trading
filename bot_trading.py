@@ -72,6 +72,9 @@ from signal_dispatcher import dispatch_signals as _dispatch_signals
 from signal_pipeline import run_signal_pipeline
 from signal_types import Signal
 from signals import fetch_multi_timeframe
+from utils.log_rotation import rotate_jsonl_if_needed
+
+_TIER_D_FUNNEL_MAX_BYTES = int(CONFIG.get("tier_d_funnel_max_mb", 10)) * 1_048_576
 
 log = logging.getLogger("decifer.bot")
 
@@ -2803,6 +2806,7 @@ def run_scan():
                 "tier_d_count_sent_to_apex": len(_td_after),
             }
             _funnel_path = Path(__file__).parent / "data" / "tier_d_funnel.jsonl"
+            rotate_jsonl_if_needed(str(_funnel_path), _TIER_D_FUNNEL_MAX_BYTES)
             with open(_funnel_path, "a") as _cap_f:
                 _cap_f.write(json.dumps(_cap_record) + "\n")
             if _td_before:

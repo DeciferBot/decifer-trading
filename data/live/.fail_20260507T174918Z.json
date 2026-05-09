@@ -1,9 +1,0 @@
-{
-  "fail_closed_reason": "source_validation_failed: candidate BAD: source executable=true \u2014 shadow candidates must not be executable",
-  "context": {
-    "source_errors": [
-      "candidate BAD: source executable=true \u2014 shadow candidates must not be executable"
-    ]
-  },
-  "generated_at": "2026-05-07T17:49:18Z"
-}

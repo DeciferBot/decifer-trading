@@ -1,0 +1,3538 @@
+{
+  "generated": "2026-05-09T11:49:37.217847+00:00",
+  "audit_branch": "cleanup/codebase-bloat-retirement-audit",
+  "summary": {
+    "total_files_classified": 290,
+    "by_classification": {
+      "live_runtime": 114,
+      "advisory_only": 20,
+      "validation_only": 10,
+      "shadow_only": 6,
+      "unknown_requires_review": 6,
+      "backtest_only": 4,
+      "production_runtime_candidate": 1,
+      "adapter_only": 5,
+      "scheduled_worker": 5,
+      "migration_tool": 6,
+      "documentation_only": 4,
+      "test_only": 108,
+      "legacy_scanner_path": 1
+    },
+    "validator_result": "PASS \u2014 all 40 intelligence files valid",
+    "smoke_result": "9 passed, 1 skipped (test_smoke_passes_for_7f expected skip), 0 failed \u2014 5.25s"
+  },
+  "files": [
+    {
+      "path": "advisory_logger.py",
+      "classification": "live_runtime",
+      "current_purpose": "Low-level advisory log writer used by apex_orchestrator for structured logging",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Removes structured advisory logging from live scan cycle",
+      "owner_layer": "trading_engine",
+      "notes": "Imported transitively; advisory_logger \u2260 advisory_reporter. Do not conflate."
+    },
+    {
+      "path": "alpaca_data.py",
+      "classification": "live_runtime",
+      "current_purpose": "Primary market data source: bars, quotes, snapshots via Alpaca Algo Trader Plus",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Breaks all price/bar fetching in live cycle",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "alpaca_news.py",
+      "classification": "live_runtime",
+      "current_purpose": "Real-time news feed from Alpaca; feeds news_sentinel",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Kills news dimension input",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "alpaca_options.py",
+      "classification": "live_runtime",
+      "current_purpose": "Alpaca options chain data and Greeks",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Breaks options scanning and entry",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "alpaca_stream.py",
+      "classification": "live_runtime",
+      "current_purpose": "WebSocket streaming for real-time quotes/trades from Alpaca",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Breaks real-time quote streaming",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "alpha_decay.py",
+      "classification": "live_runtime",
+      "current_purpose": "Alpha decay analytics; imported by analytics pipeline",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Breaks alpha performance tracking",
+      "owner_layer": "intelligence",
+      "notes": "In live chain via analytics. Feature works but not blocking for trading."
+    },
+    {
+      "path": "alpha_vantage_client.py",
+      "classification": "live_runtime",
+      "current_purpose": "Alpha Vantage macro/economic data client; fallback for fundamentals",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Removes macro data fallback",
+      "owner_layer": "trading_engine",
+      "notes": "fx_enabled=False currently so FX path is inactive"
+    },
+    {
+      "path": "analytics.py",
+      "classification": "live_runtime",
+      "current_purpose": "Performance analytics: PnL, drawdown, alpha metrics",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Breaks performance analytics and IC feed",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "apex_cap_score.py",
+      "classification": "live_runtime",
+      "current_purpose": "Scores candidate capacity for Apex shortlist (2KB, lean)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Breaks Apex candidate ranking",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "apex_orchestrator.py",
+      "classification": "live_runtime",
+      "current_purpose": "Orchestrates Apex Single-Synthesizer calls (Track A/B/Shadow)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Kills all AI-driven entry and PM decisions",
+      "owner_layer": "trading_engine",
+      "notes": "Core of Decifer 3.0 \u2014 never retire"
+    },
+    {
+      "path": "bot.py",
+      "classification": "live_runtime",
+      "current_purpose": "Main process entry point: scheduling, IPC, log setup",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Bot does not start",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "bot_account.py",
+      "classification": "live_runtime",
+      "current_purpose": "Account data retrieval: equity, cash, FX, news headlines",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Breaks account state refresh each cycle",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "bot_dashboard.py",
+      "classification": "live_runtime",
+      "current_purpose": "Operational Dash dashboard (port configurable); 'the dashboard'",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Removes operational monitoring UI",
+      "owner_layer": "trading_engine",
+      "notes": "TERMINOLOGY: 'dashboard' always means this file, never Chief Decifer"
+    },
+    {
+      "path": "bot_hot_reload.py",
+      "classification": "live_runtime",
+      "current_purpose": "Hot-reload mechanism for live code updates without restart",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Disables hot-reload; requires full restart for updates",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "bot_ibkr.py",
+      "classification": "live_runtime",
+      "current_purpose": "IBKR TWS connection, order sync, disconnect handling",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Breaks all broker connectivity",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "bot_sentinel.py",
+      "classification": "live_runtime",
+      "current_purpose": "Background surveillance: margin, drawdown, regime alerts",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Removes margin/drawdown monitoring",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "bot_state.py",
+      "classification": "live_runtime",
+      "current_purpose": "Global state: active_trades, clog, dash, subscription registry",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Breaks all state management",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "bot_trading.py",
+      "classification": "live_runtime",
+      "current_purpose": "Core scan/trade cycle: run_scan, PM review, cash rebalance",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Kills all trading logic",
+      "owner_layer": "trading_engine",
+      "notes": "Primary live anchor \u2014 do not touch"
+    },
+    {
+      "path": "bot_voice.py",
+      "classification": "live_runtime",
+      "current_purpose": "Text-to-speech for trade events via macOS say",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Removes voice alerts only; non-critical",
+      "owner_layer": "trading_engine",
+      "notes": "Low risk if retired \u2014 voice is convenience feature"
+    },
+    {
+      "path": "bracket_health.py",
+      "classification": "live_runtime",
+      "current_purpose": "Monitors and syncs bracket orders (OCO) with IBKR",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Bracket orders drift without health checks",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "catalyst_engine.py",
+      "classification": "live_runtime",
+      "current_purpose": "Scores EDGAR filings, earnings surprises, analyst actions for score boost",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Disables catalyst-driven score boost for entries",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "config.py",
+      "classification": "live_runtime",
+      "current_purpose": "All thresholds, flags, feature gates \u2014 authoritative config",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Total system failure",
+      "owner_layer": "trading_engine",
+      "notes": "LOCKED \u2014 never change flags without Amit approval"
+    },
+    {
+      "path": "earnings_calendar.py",
+      "classification": "live_runtime",
+      "current_purpose": "Fetches earnings dates; used by entry gate to avoid earnings risk",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Entries may fire into earnings windows",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "entry_gate.py",
+      "classification": "live_runtime",
+      "current_purpose": "Final binary entry gate: aggregates all dimension signals",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "No entries are generated",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "event_log.py",
+      "classification": "live_runtime",
+      "current_purpose": "Write-ahead ORDER_INTENT/FILLED/CLOSED log (JSONL WAL)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Breaks trade metadata persistence \u2014 CRITICAL",
+      "owner_layer": "trading_engine",
+      "notes": "Metadata immutability rule depends on this"
+    },
+    {
+      "path": "execution_agent.py",
+      "classification": "live_runtime",
+      "current_purpose": "Execution monitoring: fill detection, order state tracking",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Fills may not be detected",
+      "owner_layer": "trading_engine",
+      "notes": "In live chain; not standalone"
+    },
+    {
+      "path": "fill_watcher.py",
+      "classification": "live_runtime",
+      "current_purpose": "Watches for order fills from IBKR callbacks",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Fills not confirmed in local state",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "fmp_client.py",
+      "classification": "live_runtime",
+      "current_purpose": "Financial Modeling Prep client: fundamentals, events, analyst data",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Breaks fundamental data fetching for signals",
+      "owner_layer": "trading_engine",
+      "notes": "Primary fundamentals source \u2014 paid premium tier"
+    },
+    {
+      "path": "fred_client.py",
+      "classification": "live_runtime",
+      "current_purpose": "FRED macroeconomic indicators client",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Removes macro indicator input to regime detection",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "fx_signals.py",
+      "classification": "live_runtime",
+      "current_purpose": "FX signal generation; currently disabled (fx_enabled=False)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "No FX signals generated, but already inactive",
+      "owner_layer": "trading_engine",
+      "notes": "Safe to retire after cutover since fx_enabled=False and not a live data path"
+    },
+    {
+      "path": "guardrails.py",
+      "classification": "live_runtime",
+      "current_purpose": "Hard-stop safety guardrails: max position, drawdown, margin limits",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Safety limits unenforced \u2014 HIGH RISK",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "handoff_candidate_adapter.py",
+      "classification": "live_runtime",
+      "current_purpose": "Adapts scored candidates to handoff format (4KB, lean adapter)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Handoff candidate format broken",
+      "owner_layer": "handoff",
+      "notes": ""
+    },
+    {
+      "path": "handoff_reader.py",
+      "classification": "live_runtime",
+      "current_purpose": "Reads live handoff manifests from data/live/; used by scanner",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Scanner cannot read opportunity universe from handoff",
+      "owner_layer": "handoff",
+      "notes": "Active since enable_active_opportunity_universe_handoff=True"
+    },
+    {
+      "path": "ibkr_reconciler.py",
+      "classification": "live_runtime",
+      "current_purpose": "Reconciles local position state with IBKR TWS",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Position state diverges from broker \u2014 HIGH RISK",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "ibkr_streaming.py",
+      "classification": "live_runtime",
+      "current_purpose": "IBKR streaming market data (mktData callbacks)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Real-time price stream broken",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "ic_calculator.py",
+      "classification": "live_runtime",
+      "current_purpose": "Calculates Information Coefficients for signal weighting",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "IC-weighted entries fall back to equal weights",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "learning.py",
+      "classification": "live_runtime",
+      "current_purpose": "Trade logging, equity history, IC data persistence",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Trade records not persisted",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "llm_client.py",
+      "classification": "live_runtime",
+      "current_purpose": "Claude API client wrapper (anthropic SDK calls)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "All Apex calls fail",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "macro_calendar.py",
+      "classification": "live_runtime",
+      "current_purpose": "Economic calendar: FOMC, CPI, NFP event schedule",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Macro event context missing from Apex prompts",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "market_intelligence.py",
+      "classification": "live_runtime",
+      "current_purpose": "Apex call builder: classify_signals, apex_call, session context",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "All Apex-driven decisions fail",
+      "owner_layer": "trading_engine",
+      "notes": "Core of AI integration \u2014 never retire"
+    },
+    {
+      "path": "market_observer.py",
+      "classification": "live_runtime",
+      "current_purpose": "MarketObservation cache: regime, session character, VIX",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Apex receives stale or empty market context",
+      "owner_layer": "trading_engine",
+      "notes": "Imported by market_intelligence; in live chain despite 'observer' name"
+    },
+    {
+      "path": "ml_engine.py",
+      "classification": "live_runtime",
+      "current_purpose": "ML inference engine (ml_enabled=True); pattern scoring",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "ML pattern scoring disabled at runtime",
+      "owner_layer": "intelligence",
+      "notes": "ml_enabled=True; gate met (\u226550 trades). Awaiting Amit approval for full activation."
+    },
+    {
+      "path": "momentum_sentinel.py",
+      "classification": "live_runtime",
+      "current_purpose": "Background momentum monitoring for breakout detection",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Momentum breakout signals delayed",
+      "owner_layer": "trading_engine",
+      "notes": "momentum_sentinel_enabled=True"
+    },
+    {
+      "path": "news.py",
+      "classification": "live_runtime",
+      "current_purpose": "News aggregation from Alpaca, FMP, RSS sources",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "News dimension has no input data",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "news_infrastructure.py",
+      "classification": "live_runtime",
+      "current_purpose": "News infrastructure: dedup, materiality gating, caching",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "News pipeline broken",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "news_sentinel.py",
+      "classification": "live_runtime",
+      "current_purpose": "NEWS_INTERRUPT sentinel: watches for breaking news triggers",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "News interrupt events not handled",
+      "owner_layer": "trading_engine",
+      "notes": "sentinel_enabled=True"
+    },
+    {
+      "path": "options.py",
+      "classification": "live_runtime",
+      "current_purpose": "Options position monitoring and exit logic",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Options positions not managed",
+      "owner_layer": "trading_engine",
+      "notes": "options_enabled=True"
+    },
+    {
+      "path": "options_entries.py",
+      "classification": "live_runtime",
+      "current_purpose": "Options entry execution logic",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Options entries fail",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "options_scanner.py",
+      "classification": "live_runtime",
+      "current_purpose": "Options universe screener for ATM delta-0.50 candidates",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Options universe empty",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "orders.py",
+      "classification": "live_runtime",
+      "current_purpose": "Order wrapper interface (thin layer over orders_core)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Order interface broken",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "orders_contracts.py",
+      "classification": "live_runtime",
+      "current_purpose": "IBKR contract qualification and selection logic",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Orders cannot be qualified with IBKR",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "orders_core.py",
+      "classification": "live_runtime",
+      "current_purpose": "Core order execution: execute_buy, execute_sell, execute_short (131KB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "All order execution fails \u2014 CRITICAL",
+      "owner_layer": "trading_engine",
+      "notes": "LOCKED \u2014 do not touch"
+    },
+    {
+      "path": "orders_guards.py",
+      "classification": "live_runtime",
+      "current_purpose": "Order validation guards: PDT, margin, duplicate, size checks",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Orders bypass safety validation",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "orders_options.py",
+      "classification": "live_runtime",
+      "current_purpose": "Options-specific order execution (53KB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "All options order execution fails",
+      "owner_layer": "trading_engine",
+      "notes": "LOCKED \u2014 do not touch"
+    },
+    {
+      "path": "orders_portfolio.py",
+      "classification": "live_runtime",
+      "current_purpose": "Portfolio-level order management: flatten, trim, rebalance (120KB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Portfolio management order execution fails",
+      "owner_layer": "trading_engine",
+      "notes": "LOCKED \u2014 do not touch"
+    },
+    {
+      "path": "orders_state.py",
+      "classification": "live_runtime",
+      "current_purpose": "Order and position state tracking; _safe_set_trade immutability guard",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Position state and metadata immutability broken \u2014 CRITICAL",
+      "owner_layer": "trading_engine",
+      "notes": "METADATA_IMMUTABILITY rule enforced here"
+    },
+    {
+      "path": "overnight_research.py",
+      "classification": "live_runtime",
+      "current_purpose": "Pre-market research tasks: macro, catalysts, regime prep (41KB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Apex starts with no overnight context",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "pattern_library.py",
+      "classification": "live_runtime",
+      "current_purpose": "Trading pattern definitions and performance lookup",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Apex prompt loses pattern context",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "pdt_rule.py",
+      "classification": "live_runtime",
+      "current_purpose": "Pattern Day Trader rule enforcement",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "PDT violations possible in paper account",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "phase_gate.py",
+      "classification": "live_runtime",
+      "current_purpose": "Phase-based feature gating (blocks features until phase criteria met)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Phase gates bypass \u2014 features activate before ready",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "portfolio.py",
+      "classification": "live_runtime",
+      "current_purpose": "Portfolio abstraction layer",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Portfolio state unavailable",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "portfolio_manager.py",
+      "classification": "live_runtime",
+      "current_purpose": "Portfolio lifecycle: lightweight_cycle_check, thesis validation",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "PM cycle check and thesis validation disabled",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "portfolio_optimizer.py",
+      "classification": "live_runtime",
+      "current_purpose": "Portfolio optimization: position sizing, correlation management (32KB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Position sizing reverts to baseline",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "position_sizing.py",
+      "classification": "live_runtime",
+      "current_purpose": "Position size calculations based on Kelly, ATR, account size",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Position sizes miscalculated",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "presession.py",
+      "classification": "live_runtime",
+      "current_purpose": "Pre-market session setup: universe warm-up, data prefetch (16KB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Session starts cold \u2014 slower first cycle",
+      "owner_layer": "trading_engine",
+      "notes": "presession_enabled=True, presession_dry_run=True"
+    },
+    {
+      "path": "price_updater.py",
+      "classification": "live_runtime",
+      "current_purpose": "Real-time price update distribution to positions",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Position P&L stale between cycles",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "risk.py",
+      "classification": "live_runtime",
+      "current_purpose": "Position sizing, drawdown limits, HWM tracking (50KB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Risk limits unenforced \u2014 CRITICAL",
+      "owner_layer": "trading_engine",
+      "notes": "LOCKED \u2014 do not touch"
+    },
+    {
+      "path": "risk_gates.py",
+      "classification": "live_runtime",
+      "current_purpose": "Risk check gates: cash rebalance, margin, exposure ceiling",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Cash rebalance and margin gates disabled",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "safety_overlay.py",
+      "classification": "live_runtime",
+      "current_purpose": "Additional safety overlay: circuit breakers, kill switches",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Circuit breakers inactive",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "scanner.py",
+      "classification": "live_runtime",
+      "current_purpose": "Three-tier universe assembler + regime classification",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "No candidates \u2014 trading stops",
+      "owner_layer": "trading_engine",
+      "notes": "LOCKED \u2014 do not touch"
+    },
+    {
+      "path": "schemas.py",
+      "classification": "live_runtime",
+      "current_purpose": "Shared data schemas and type definitions (9KB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Type validation broken across modules",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "sentinel_agents.py",
+      "classification": "live_runtime",
+      "current_purpose": "Sentinel agent stub (3KB); minimal remaining code post-migration",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Sentinel integration broken",
+      "owner_layer": "trading_engine",
+      "notes": "Post-Decifer 3.0 stub. In live chain. Review before retiring."
+    },
+    {
+      "path": "signal_dispatcher.py",
+      "classification": "live_runtime",
+      "current_purpose": "Routes signal results to appropriate handlers",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Signal dispatch broken",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "signal_pipeline.py",
+      "classification": "live_runtime",
+      "current_purpose": "Signal processing pipeline: batch scoring, aggregation",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "All dimension scoring fails",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "signal_types.py",
+      "classification": "live_runtime",
+      "current_purpose": "Signal type enum definitions (lightweight)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Signal type references break",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "smart_execution.py",
+      "classification": "live_runtime",
+      "current_purpose": "TWAP/VWAP/Iceberg execution for orders >$10K/500 shares",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Large orders use simple limit instead of smart routing",
+      "owner_layer": "trading_engine",
+      "notes": "Threshold: $10K notional or 500 shares"
+    },
+    {
+      "path": "social_sentiment.py",
+      "classification": "live_runtime",
+      "current_purpose": "Social sentiment scoring (Reddit/Twitter); social dimension config-gated",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Social dimension inactive \u2014 no trading impact",
+      "owner_layer": "trading_engine",
+      "notes": "social flag enabled in config but no API key wired in paper; safe after cutover"
+    },
+    {
+      "path": "sympathy_scanner.py",
+      "classification": "live_runtime",
+      "current_purpose": "Sympathy/correlation scanner for sector moves",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Sympathy plays not identified",
+      "owner_layer": "trading_engine",
+      "notes": "sympathy_scanner_enabled=True"
+    },
+    {
+      "path": "telegram_bot.py",
+      "classification": "live_runtime",
+      "current_purpose": "Telegram notification integration for trade alerts",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Removes Telegram alerts only; non-critical",
+      "owner_layer": "trading_engine",
+      "notes": "Low risk if retired \u2014 convenience notification"
+    },
+    {
+      "path": "theme_tracker.py",
+      "classification": "live_runtime",
+      "current_purpose": "Theme performance tracking in live chain",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Theme performance metrics unavailable",
+      "owner_layer": "trading_engine",
+      "notes": "In live chain despite being intelligence-adjacent"
+    },
+    {
+      "path": "trade_context.py",
+      "classification": "live_runtime",
+      "current_purpose": "Trade context and metadata builder (24KB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Trade metadata incomplete at entry",
+      "owner_layer": "trading_engine",
+      "notes": "Required for metadata immutability compliance"
+    },
+    {
+      "path": "training_store.py",
+      "classification": "live_runtime",
+      "current_purpose": "ML training records persistence (JSONL); Phase C gate source",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Training records not written \u2014 ML data generation stops",
+      "owner_layer": "trading_engine",
+      "notes": "Post-JSONL-migration authoritative store"
+    },
+    {
+      "path": "universe_committed.py",
+      "classification": "live_runtime",
+      "current_purpose": "Committed universe (top-1000 by dollar volume, weekly refresh)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Trading universe empty",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "universe_position.py",
+      "classification": "live_runtime",
+      "current_purpose": "Position-level universe management (in live chain)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Position universe state broken",
+      "owner_layer": "trading_engine",
+      "notes": "In live chain despite 'universe' prefix"
+    },
+    {
+      "path": "universe_promoter.py",
+      "classification": "live_runtime",
+      "current_purpose": "Daily promoted list generator (promoter_enabled=True)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Daily promotions not generated",
+      "owner_layer": "trading_engine",
+      "notes": "In live chain \u2014 runs as part of scheduled work"
+    },
+    {
+      "path": "version.py",
+      "classification": "live_runtime",
+      "current_purpose": "Version and codename constants (lightweight)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Version display broken; non-critical",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "advisory_log_reviewer.py",
+      "classification": "advisory_only",
+      "current_purpose": "Reads and summarizes advisory runtime logs; intelligence_first_advisory_enabled=False",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Advisory log review unavailable \u2014 already inactive",
+      "owner_layer": "advisory",
+      "notes": "Flagged off. Safe to retire after intelligence-first cutover."
+    },
+    {
+      "path": "advisory_reporter.py",
+      "classification": "advisory_only",
+      "current_purpose": "Generates advisory analysis reports (35KB); flagged off",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Advisory reports not generated \u2014 already inactive",
+      "owner_layer": "advisory",
+      "notes": "intelligence_first_advisory_enabled=False. Cloud exclusion candidate."
+    },
+    {
+      "path": "alpha_validation.py",
+      "classification": "validation_only",
+      "current_purpose": "Validates alpha signal quality metrics offline (17KB)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Alpha validation reports unavailable \u2014 offline tool only",
+      "owner_layer": "intelligence",
+      "notes": "Run on-demand, not part of live cycle"
+    },
+    {
+      "path": "apex_divergence.py",
+      "classification": "shadow_only",
+      "current_purpose": "Logs divergence between Track A and Shadow Apex decisions (17KB)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Divergence tracking disabled \u2014 shadow analysis only, USE_APEX_V3_SHADOW=True",
+      "owner_layer": "trading_engine",
+      "notes": "Safe to retire once shadow mode confirmed and deactivated"
+    },
+    {
+      "path": "audit_candle_gate.py",
+      "classification": "unknown_requires_review",
+      "current_purpose": "Candle audit for entry confirmation; not in live import chain",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Unclear \u2014 may be called dynamically; investigate before deleting",
+      "owner_layer": "trading_engine",
+      "notes": "Not imported by entry_gate or any live chain module. Verify if called via schedule or importlib."
+    },
+    {
+      "path": "backtest_intelligence.py",
+      "classification": "backtest_only",
+      "current_purpose": "Intelligence system for backtests: factor replay, regime simulation (100KB)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Backtest intelligence runs unavailable \u2014 offline only",
+      "owner_layer": "intelligence",
+      "notes": "Largest bloat risk in intelligence layer. Cloud exclusion candidate."
+    },
+    {
+      "path": "backtester.py",
+      "classification": "backtest_only",
+      "current_purpose": "Core backtesting engine (38KB)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Backtests unavailable \u2014 offline only",
+      "owner_layer": "intelligence",
+      "notes": "Cloud exclusion candidate. Never deploy to live container."
+    },
+    {
+      "path": "build_brain.py",
+      "classification": "validation_only",
+      "current_purpose": "Offline ML model training: builds classifier/regressor/scaler (47KB)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "ML models cannot be retrained \u2014 offline tool only",
+      "owner_layer": "intelligence",
+      "notes": "Cloud exclusion candidate. Run locally before live deployment."
+    },
+    {
+      "path": "candidate_resolver.py",
+      "classification": "unknown_requires_review",
+      "current_purpose": "Candidate resolution logic; not imported by any live chain module",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Unclear purpose; investigate before deleting",
+      "owner_layer": "trading_engine",
+      "notes": "Only referenced in itself. May be obsolete from old pipeline."
+    },
+    {
+      "path": "compare_universes.py",
+      "classification": "validation_only",
+      "current_purpose": "Universe comparison utilities (offline analysis)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Universe diff analysis unavailable \u2014 offline only",
+      "owner_layer": "intelligence",
+      "notes": ""
+    },
+    {
+      "path": "daily_journal.py",
+      "classification": "unknown_requires_review",
+      "current_purpose": "Daily trading journal (20KB); not in live import chain",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Daily journal entries not written if active",
+      "owner_layer": "trading_engine",
+      "notes": "Not imported by bot.py or bot_trading.py. May be called via bot.py scheduler dynamically."
+    },
+    {
+      "path": "factor_registry.py",
+      "classification": "validation_only",
+      "current_purpose": "Factor definitions and registry (61KB); only referenced by intelligence_schema_validator",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Factor registry unavailable \u2014 offline validation only",
+      "owner_layer": "intelligence",
+      "notes": "Cloud exclusion candidate. Not called from live bot."
+    },
+    {
+      "path": "handoff_publisher.py",
+      "classification": "production_runtime_candidate",
+      "current_purpose": "Publishes opportunity universe to data/live/ manifests (36KB); separate process",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Live manifests not updated \u2014 scanner falls back to committed universe",
+      "owner_layer": "handoff",
+      "notes": "enable_active_opportunity_universe_handoff=True. Runs as separate process not imported by bot. Production-critical but not a bot.py import."
+    },
+    {
+      "path": "handoff_publisher_observer.py",
+      "classification": "shadow_only",
+      "current_purpose": "Observes handoff publisher for discrepancies (39KB); shadow only",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Observer data unavailable \u2014 shadow analysis only",
+      "owner_layer": "handoff",
+      "notes": "Shadow mode. Not in live execution path. Safe to retire after activation confirmed."
+    },
+    {
+      "path": "ic_validator.py",
+      "classification": "validation_only",
+      "current_purpose": "IC gate validation for Phase B unlock (15KB)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "IC validation reports unavailable \u2014 gate already passed (IC Phase 2 complete)",
+      "owner_layer": "intelligence",
+      "notes": "IC Phase 2 already complete. This file's primary purpose is served."
+    },
+    {
+      "path": "intelligence_adapters.py",
+      "classification": "adapter_only",
+      "current_purpose": "Intelligence source adapters for flagged-off intelligence layer (29KB)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Intelligence adapters unavailable \u2014 already inactive",
+      "owner_layer": "intelligence",
+      "notes": "intelligence_first_advisory_enabled=False. Cloud exclusion candidate."
+    },
+    {
+      "path": "intelligence_engine.py",
+      "classification": "advisory_only",
+      "current_purpose": "Intelligence engine core (34KB); intelligence_first_advisory_enabled=False",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Intelligence engine inactive \u2014 already flagged off",
+      "owner_layer": "intelligence",
+      "notes": "Cloud exclusion candidate post-cutover."
+    },
+    {
+      "path": "intelligence_schema_validator.py",
+      "classification": "validation_only",
+      "current_purpose": "Schema validation for intelligence files (158KB \u2014 LARGEST FILE)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Intelligence schema validation unavailable \u2014 offline tool",
+      "owner_layer": "intelligence",
+      "notes": "158KB is the largest file in the repo. Cloud exclusion candidate."
+    },
+    {
+      "path": "iv_skew.py",
+      "classification": "adapter_only",
+      "current_purpose": "IV skew analysis; IV Skew dimension is config-gated",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "IV Skew dimension unavailable \u2014 already config-gated",
+      "owner_layer": "trading_engine",
+      "notes": "iv_skew flag enabled but not in live chain. Investigate flag wiring."
+    },
+    {
+      "path": "macro_transmission_matrix.py",
+      "classification": "adapter_only",
+      "current_purpose": "Macro signal transmission rules (not in live chain)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Macro transmission inactive \u2014 intelligence layer not enabled",
+      "owner_layer": "intelligence",
+      "notes": ""
+    },
+    {
+      "path": "paper_handoff_builder.py",
+      "classification": "shadow_only",
+      "current_purpose": "Builds paper trading handoff for comparison (16KB)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Paper handoff comparison unavailable \u2014 shadow only",
+      "owner_layer": "handoff",
+      "notes": "Safe to retire after intelligence-first activation confirmed"
+    },
+    {
+      "path": "paper_handoff_comparator.py",
+      "classification": "shadow_only",
+      "current_purpose": "Compares paper vs live handoffs (37KB); shadow only",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Paper/live comparison unavailable \u2014 shadow only",
+      "owner_layer": "handoff",
+      "notes": "Safe to retire after activation confirmed"
+    },
+    {
+      "path": "provider_fetch_tester.py",
+      "classification": "validation_only",
+      "current_purpose": "Tests data provider connectivity (21KB); offline validation",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Provider connectivity testing unavailable \u2014 offline only",
+      "owner_layer": "intelligence",
+      "notes": ""
+    },
+    {
+      "path": "quota_allocator.py",
+      "classification": "adapter_only",
+      "current_purpose": "Quota allocation for intelligence layer (not in live bot chain)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Intelligence quota allocation inactive",
+      "owner_layer": "intelligence",
+      "notes": "Used by handoff_publisher, intelligence_engine, universe_builder \u2014 all non-live-chain"
+    },
+    {
+      "path": "quota_capacity_calibrator.py",
+      "classification": "validation_only",
+      "current_purpose": "Quota capacity calibration scenarios (33KB); offline analysis",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Quota calibration unavailable \u2014 already run, results in data/live/",
+      "owner_layer": "intelligence",
+      "notes": ""
+    },
+    {
+      "path": "reachability.py",
+      "classification": "validation_only",
+      "current_purpose": "API reachability checks (10KB); standalone probe tool",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Reachability probe unavailable \u2014 offline tool only",
+      "owner_layer": "intelligence",
+      "notes": "Run on-demand; no live dependency"
+    },
+    {
+      "path": "reference_data_builder.py",
+      "classification": "scheduled_worker",
+      "current_purpose": "Builds reference data: symbol master, factor registry, sector schema",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Reference data not refreshed on schedule",
+      "owner_layer": "intelligence",
+      "notes": "Not in live bot import chain but runs on schedule. Keep."
+    },
+    {
+      "path": "route_tagger.py",
+      "classification": "adapter_only",
+      "current_purpose": "Signal/route tagging for intelligence layer (not in live chain)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Route tagging inactive \u2014 intelligence layer disabled",
+      "owner_layer": "intelligence",
+      "notes": ""
+    },
+    {
+      "path": "theme_activation_engine.py",
+      "classification": "advisory_only",
+      "current_purpose": "Theme activation logic (19KB); only referenced by backtest_intelligence",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Theme activation engine inactive \u2014 intelligence layer only",
+      "owner_layer": "intelligence",
+      "notes": "Not called from live bot or overnight_research."
+    },
+    {
+      "path": "thesis_store.py",
+      "classification": "advisory_only",
+      "current_purpose": "Thesis storage and management (16KB); not in live chain",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Thesis store unavailable \u2014 advisory layer only",
+      "owner_layer": "intelligence",
+      "notes": "Referenced by advisory_reporter, handoff_publisher, paper_handoff_builder. Not bot-critical."
+    },
+    {
+      "path": "universe_builder.py",
+      "classification": "scheduled_worker",
+      "current_purpose": "Active opportunity universe construction (scheduled, not imported by bot)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Opportunity universe not refreshed",
+      "owner_layer": "intelligence",
+      "notes": "Feeds data/universe_builder/. Not a bot.py import but scheduled separately."
+    },
+    {
+      "path": "signals/__init__.py",
+      "classification": "live_runtime",
+      "current_purpose": "Signals package init; exports fetch_multi_timeframe",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Signal fetching broken",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "signals/fetch.py",
+      "classification": "live_runtime",
+      "current_purpose": "Multi-timeframe signal fetch (imported as signals.fetch_multi_timeframe)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Signal fetching broken",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "signals/dimensions.py",
+      "classification": "live_runtime",
+      "current_purpose": "Individual dimension scoring functions (10 dimensions)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Dimension scoring broken",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "signals/scoring.py",
+      "classification": "live_runtime",
+      "current_purpose": "Signal aggregation and composite scoring",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Score aggregation broken",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "signals/filters.py",
+      "classification": "live_runtime",
+      "current_purpose": "Pre-scoring candidate filters",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Candidate filtering broken",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "ic/__init__.py",
+      "classification": "live_runtime",
+      "current_purpose": "IC package init",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "IC framework broken",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "ic/engine.py",
+      "classification": "live_runtime",
+      "current_purpose": "IC calculation engine",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "IC calculations broken",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "ic/store.py",
+      "classification": "live_runtime",
+      "current_purpose": "IC record store",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "IC records not persisted",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "ic/validator.py",
+      "classification": "live_runtime",
+      "current_purpose": "IC validation logic",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "IC validation broken",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "ic/weights.py",
+      "classification": "live_runtime",
+      "current_purpose": "IC-based signal weight computation",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "IC-weighted entries fall back to equal weights",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "ic/calculator.py",
+      "classification": "live_runtime",
+      "current_purpose": "IC per-dimension calculator",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Per-dimension IC unavailable",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "ic/reporter.py",
+      "classification": "live_runtime",
+      "current_purpose": "IC report generation",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "IC reports unavailable",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "ic/gates.py",
+      "classification": "live_runtime",
+      "current_purpose": "IC phase gates",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "IC gates unavailable",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "scripts/analyze_entry_timing.py",
+      "classification": "advisory_only",
+      "current_purpose": "Analyzes entry timing quality vs outcomes (post-hoc analysis)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Entry timing analysis unavailable \u2014 offline tool",
+      "owner_layer": "advisory",
+      "notes": ""
+    },
+    {
+      "path": "scripts/apex_cap_replay.py",
+      "classification": "advisory_only",
+      "current_purpose": "Replays Apex capacity scenarios for analysis",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Apex cap replay unavailable \u2014 offline tool",
+      "owner_layer": "advisory",
+      "notes": ""
+    },
+    {
+      "path": "scripts/apex_flip_proposer.py",
+      "classification": "advisory_only",
+      "current_purpose": "Proposes Apex strategy direction flips based on divergence",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Flip proposals unavailable \u2014 advisory only",
+      "owner_layer": "advisory",
+      "notes": ""
+    },
+    {
+      "path": "scripts/apex_shadow_report.py",
+      "classification": "shadow_only",
+      "current_purpose": "Generates shadow trading report comparing Track A vs Shadow",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Shadow report unavailable \u2014 USE_APEX_V3_SHADOW=True but no live impact",
+      "owner_layer": "advisory",
+      "notes": ""
+    },
+    {
+      "path": "scripts/backfill_may5_trades.py",
+      "classification": "migration_tool",
+      "current_purpose": "One-time backfill of May 5 trades missing from training store",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "One-time migration already run; no ongoing use",
+      "owner_layer": "trading_engine",
+      "notes": "BLOAT: one-time migration tool. Safe to delete now."
+    },
+    {
+      "path": "scripts/backfill_position_closed.py",
+      "classification": "migration_tool",
+      "current_purpose": "One-time backfill of position_closed records",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "One-time migration already run; no ongoing use",
+      "owner_layer": "trading_engine",
+      "notes": "BLOAT: one-time migration tool. Safe to delete now."
+    },
+    {
+      "path": "scripts/cancel_orphan_orders.py",
+      "classification": "advisory_only",
+      "current_purpose": "Cancels orphaned orders in IBKR on-demand",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Orphan cleanup must be done manually via TWS",
+      "owner_layer": "trading_engine",
+      "notes": "Operational emergency tool \u2014 keep but rarely needed"
+    },
+    {
+      "path": "scripts/factor_analysis.py",
+      "classification": "advisory_only",
+      "current_purpose": "Factor performance analysis (offline, post-hoc)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Factor analysis unavailable \u2014 offline tool",
+      "owner_layer": "intelligence",
+      "notes": ""
+    },
+    {
+      "path": "scripts/migrate_trades_to_training_store.py",
+      "classification": "migration_tool",
+      "current_purpose": "One-time migration of trades.json to training_store JSONL",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "One-time migration already run; training_records.jsonl populated",
+      "owner_layer": "trading_engine",
+      "notes": "BLOAT: one-time migration already complete (2026-04-28). Safe to delete now."
+    },
+    {
+      "path": "scripts/phase1_session_report.py",
+      "classification": "advisory_only",
+      "current_purpose": "Session reporting for Phase 1 Tier D analysis",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Phase 1 session reports unavailable",
+      "owner_layer": "advisory",
+      "notes": ""
+    },
+    {
+      "path": "scripts/pru_ab_comparison.py",
+      "classification": "advisory_only",
+      "current_purpose": "A/B comparison for position research universe",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "PRU A/B comparison unavailable \u2014 offline tool",
+      "owner_layer": "intelligence",
+      "notes": ""
+    },
+    {
+      "path": "scripts/rebuild_positions_from_intents.py",
+      "classification": "migration_tool",
+      "current_purpose": "Reconstructs positions from ORDER_INTENT events (disaster recovery)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Cannot reconstruct positions from event log if needed",
+      "owner_layer": "trading_engine",
+      "notes": "Disaster recovery tool \u2014 KEEP for now. Not yet used but valuable insurance."
+    },
+    {
+      "path": "scripts/reconcile_trades_json.py",
+      "classification": "migration_tool",
+      "current_purpose": "Reconciles trade JSON files post-migration",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "One-time reconciliation already complete",
+      "owner_layer": "trading_engine",
+      "notes": "BLOAT: one-time tool. Safe to delete now."
+    },
+    {
+      "path": "scripts/recover_pattern_ids.py",
+      "classification": "migration_tool",
+      "current_purpose": "Recovers lost pattern IDs in trade metadata",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "One-time recovery already run",
+      "owner_layer": "trading_engine",
+      "notes": "BLOAT: one-time tool. Safe to delete now."
+    },
+    {
+      "path": "scripts/tier_d_evidence_report.py",
+      "classification": "advisory_only",
+      "current_purpose": "Tier D funnel evidence compilation (active Phase 1 analysis)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Tier D Phase 2 gate assessment blocked",
+      "owner_layer": "advisory",
+      "notes": "ACTIVE: Phase 2 gate depends on this. Do not delete."
+    },
+    {
+      "path": "scripts/tier_d_test_scan.py",
+      "classification": "advisory_only",
+      "current_purpose": "Test scan for Tier D visibility",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Tier D test scans unavailable",
+      "owner_layer": "advisory",
+      "notes": "Active Phase 1 tooling \u2014 keep"
+    },
+    {
+      "path": "scripts/validate_intelligence_files.py",
+      "classification": "validation_only",
+      "current_purpose": "Validates all data/intelligence/*.json schemas (CI gate)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Intelligence file validation breaks \u2014 needed for CI",
+      "owner_layer": "intelligence",
+      "notes": "Run in every audit. Keep permanently."
+    },
+    {
+      "path": "scripts/setup.sh",
+      "classification": "documentation_only",
+      "current_purpose": "Initial environment setup script",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "New machine setup requires manual steps",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "scripts/store-secrets.sh",
+      "classification": "documentation_only",
+      "current_purpose": "Secret management via iCloud Keychain",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Secret storage requires manual steps",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "scripts/bump-version.sh",
+      "classification": "documentation_only",
+      "current_purpose": "Version bump automation",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Version bumps must be manual",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "scripts/icloud-sync.sh",
+      "classification": "scheduled_worker",
+      "current_purpose": "iCloud sync automation",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "iCloud sync for backups disabled",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "scripts/com.decifer.auto-push.plist",
+      "classification": "scheduled_worker",
+      "current_purpose": "Launch agent for auto-push daemon",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Auto-push daemon not installed",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "scripts/com.decifer.icloud-sync.plist",
+      "classification": "scheduled_worker",
+      "current_purpose": "Launch agent for iCloud sync daemon",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "iCloud sync daemon not installed",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "scripts/brew-deps.txt",
+      "classification": "documentation_only",
+      "current_purpose": "Homebrew dependency list",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Brew dependencies not documented",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "tests/test_alpaca_data.py",
+      "classification": "test_only",
+      "current_purpose": "Alpaca data fetching: bars, quotes, snapshots",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Alpaca data regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_alpaca_order_guards.py",
+      "classification": "test_only",
+      "current_purpose": "Alpaca order guard validation",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Order guard regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_alpaca_stream.py",
+      "classification": "test_only",
+      "current_purpose": "Alpaca WebSocket streaming",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Stream regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_alpha_decay.py",
+      "classification": "test_only",
+      "current_purpose": "Alpha decay analytics",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Alpha decay regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "release_only_regression"
+    },
+    {
+      "path": "tests/test_alpha_validation.py",
+      "classification": "test_only",
+      "current_purpose": "Alpha signal validation (offline)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Alpha validation regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "release_only_regression"
+    },
+    {
+      "path": "tests/test_alpha_vantage_client.py",
+      "classification": "test_only",
+      "current_purpose": "Alpha Vantage client",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "AV client regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_apex_divergence.py",
+      "classification": "test_only",
+      "current_purpose": "Apex divergence logging",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Divergence test regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "release_only_regression; safe after shadow mode retired"
+    },
+    {
+      "path": "tests/test_apex_flip_proposer.py",
+      "classification": "test_only",
+      "current_purpose": "Apex flip proposer script",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Flip proposer regression undetected",
+      "owner_layer": "advisory",
+      "notes": "release_only_regression"
+    },
+    {
+      "path": "tests/test_apex_live_execute_path.py",
+      "classification": "test_only",
+      "current_purpose": "Phase 8A.1 Apex execute path (execute=True wiring)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Execute path regression undetected \u2014 CRITICAL",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression; core activation path test"
+    },
+    {
+      "path": "tests/test_apex_migration_guards.py",
+      "classification": "test_only",
+      "current_purpose": "Regression guards that Decifer 3.0 migration is complete",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Migration regression: deleted code paths could resurface",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression; guards 4 deleted micro-tests. Consolidated 2026-05-04."
+    },
+    {
+      "path": "tests/test_apex_prompt_architecture.py",
+      "classification": "test_only",
+      "current_purpose": "Apex prompt structure and content validation",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Prompt architecture regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_apex_shadow_report.py",
+      "classification": "test_only",
+      "current_purpose": "Shadow report generation",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Shadow report regression undetected",
+      "owner_layer": "advisory",
+      "notes": "release_only_regression; retire after shadow mode ends"
+    },
+    {
+      "path": "tests/test_atr_sizer_integration.py",
+      "classification": "test_only",
+      "current_purpose": "ATR-based position sizer integration",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "ATR sizing regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_backfill_direction.py",
+      "classification": "test_only",
+      "current_purpose": "Backfill direction logic",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Backfill regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "migration_test; safe to retire once confirmed no re-runs needed"
+    },
+    {
+      "path": "tests/test_bot.py",
+      "classification": "test_only",
+      "current_purpose": "Bot process startup and scheduling",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Bot startup regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression; requires logs/ dir to collect"
+    },
+    {
+      "path": "tests/test_bot_dashboard_data.py",
+      "classification": "test_only",
+      "current_purpose": "Bot dashboard data endpoints",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Dashboard data regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_candle_gate.py",
+      "classification": "test_only",
+      "current_purpose": "Candle entry gate logic",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Candle gate regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_catalyst_pipeline.py",
+      "classification": "test_only",
+      "current_purpose": "Catalyst engine pipeline (EDGAR, earnings, analyst)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Catalyst pipeline regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_config.py",
+      "classification": "test_only",
+      "current_purpose": "Configuration validation",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Config regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_cycle_check.py",
+      "classification": "test_only",
+      "current_purpose": "Lightweight cycle check logic",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Cycle check regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_dashboard.py",
+      "classification": "test_only",
+      "current_purpose": "Dashboard HTML structure validation",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Dashboard regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_dim_flags.py",
+      "classification": "test_only",
+      "current_purpose": "Dimension flag configuration",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Dimension flag regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_drawdown_brake.py",
+      "classification": "test_only",
+      "current_purpose": "Drawdown brake circuit breaker",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Drawdown brake regression \u2014 HIGH RISK if undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_duplicate_order_guard.py",
+      "classification": "test_only",
+      "current_purpose": "Duplicate order prevention guard",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Duplicate orders possible if regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_entry_gate.py",
+      "classification": "test_only",
+      "current_purpose": "Entry gate signal validation",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Entry gate regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_event_log_and_training_store.py",
+      "classification": "test_only",
+      "current_purpose": "Event log WAL and training store (smoke marked)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Event log regression \u2014 CRITICAL metadata immutability risk",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression; smoke marked"
+    },
+    {
+      "path": "tests/test_execution_agent.py",
+      "classification": "test_only",
+      "current_purpose": "Execution agent monitoring",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Execution monitoring regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_fill_watcher.py",
+      "classification": "test_only",
+      "current_purpose": "Fill watcher callback logic",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Fill detection regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_flatten_all_hardened.py",
+      "classification": "test_only",
+      "current_purpose": "Flatten-all (EOD/emergency exit) hardening",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "EOD flatten regression \u2014 HIGH RISK if undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_guardrails.py",
+      "classification": "test_only",
+      "current_purpose": "Hard-stop guardrails",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Guardrail regression \u2014 HIGH RISK",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_handoff_activation_gate.py",
+      "classification": "test_only",
+      "current_purpose": "Handoff activation gate (smoke marked)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Activation gate regression undetected",
+      "owner_layer": "handoff",
+      "notes": "permanent_regression; smoke marked"
+    },
+    {
+      "path": "tests/test_handoff_publisher.py",
+      "classification": "test_only",
+      "current_purpose": "Handoff publisher (smoke marked, 1 skipped)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Publisher regression undetected",
+      "owner_layer": "handoff",
+      "notes": "permanent_regression; smoke marked"
+    },
+    {
+      "path": "tests/test_handoff_publisher_observer.py",
+      "classification": "test_only",
+      "current_purpose": "Publisher observer (smoke marked)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Observer regression undetected",
+      "owner_layer": "handoff",
+      "notes": "release_only_regression; retire after shadow mode ends"
+    },
+    {
+      "path": "tests/test_handoff_wiring_integration.py",
+      "classification": "test_only",
+      "current_purpose": "Handoff wiring integration (smoke marked)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Wiring regression undetected",
+      "owner_layer": "handoff",
+      "notes": "permanent_regression; smoke marked"
+    },
+    {
+      "path": "tests/test_ibkr_reconciler.py",
+      "classification": "test_only",
+      "current_purpose": "IBKR reconciliation logic",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Reconcile regression \u2014 position drift possible",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_ic_calculator.py",
+      "classification": "test_only",
+      "current_purpose": "IC calculation accuracy",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "IC calculation regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_ic_validator.py",
+      "classification": "test_only",
+      "current_purpose": "IC gate validation logic",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "IC gate regression \u2014 gate already passed",
+      "owner_layer": "intelligence",
+      "notes": "release_only_regression; IC Phase 2 complete"
+    },
+    {
+      "path": "tests/test_ic_weighted_direction.py",
+      "classification": "test_only",
+      "current_purpose": "IC-weighted direction scoring",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "IC weighting regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_imports.py",
+      "classification": "test_only",
+      "current_purpose": "Import sanity check: all modules importable",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Silent import breakage undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression; catches module split regressions"
+    },
+    {
+      "path": "tests/test_intelligence_day2.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint Day 2 development progress test",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Intelligence sprint dev regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test; tracks Day 2 build progress. Release-only candidate."
+    },
+    {
+      "path": "tests/test_intelligence_day3.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint Day 3 development progress test",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Intelligence sprint dev regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_day4.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint Day 4 development progress test",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Intelligence sprint dev regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_day5.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint Day 5 development progress test",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Intelligence sprint dev regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_day6.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint Day 6 development progress test",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Intelligence sprint dev regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_day7.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint Day 7 development progress test",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Intelligence sprint dev regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_factor_registry.py",
+      "classification": "test_only",
+      "current_purpose": "Factor registry structure validation",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Factor registry regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test; factor_registry.py not in live chain"
+    },
+    {
+      "path": "tests/test_intelligence_reference_data.py",
+      "classification": "test_only",
+      "current_purpose": "Reference data builder validation",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Reference data regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_sprint2.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint 2 development progress",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Sprint 2 regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_sprint3.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint 3 development progress",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Sprint 3 regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_sprint4a.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint 4A development progress",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Sprint 4A regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_sprint4b.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint 4B development progress",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Sprint 4B regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_sprint5a.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint 5A development progress",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Sprint 5A regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_sprint5b.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint 5B development progress",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Sprint 5B regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_sprint6a.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint 6A development progress",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Sprint 6A regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_sprint6b.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint 6B development progress",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Sprint 6B regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_sprint6c.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint 6C development progress",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Sprint 6C regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_sprint7a2.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint 7A2 development progress",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Sprint 7A2 regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "dev_sprint_test"
+    },
+    {
+      "path": "tests/test_intelligence_sprint7b.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint 7B (smoke marked)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Sprint 7B smoke regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "permanent_regression; smoke marked \u2014 this sprint established handoff wiring"
+    },
+    {
+      "path": "tests/test_intelligence_sprint7c.py",
+      "classification": "test_only",
+      "current_purpose": "Intelligence sprint 7C (smoke marked)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Sprint 7C smoke regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "permanent_regression; smoke marked \u2014 activation mode-awareness"
+    },
+    {
+      "path": "tests/test_iv_skew.py",
+      "classification": "test_only",
+      "current_purpose": "IV skew dimension scoring",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "IV skew regression undetected \u2014 already config-gated",
+      "owner_layer": "trading_engine",
+      "notes": "release_only_regression"
+    },
+    {
+      "path": "tests/test_learning.py",
+      "classification": "test_only",
+      "current_purpose": "Trade logging and equity history persistence",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Learning module regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_margin_exposure.py",
+      "classification": "test_only",
+      "current_purpose": "Margin exposure calculations",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Margin exposure regression \u2014 HIGH RISK",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_margin_readiness.py",
+      "classification": "test_only",
+      "current_purpose": "Margin readiness gate",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Margin gate regression \u2014 HIGH RISK",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_ml_engine.py",
+      "classification": "test_only",
+      "current_purpose": "ML inference engine (skipif sklearn unavailable)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "ML engine regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_mtf_gate.py",
+      "classification": "test_only",
+      "current_purpose": "Multi-timeframe gate logic",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "MTF gate regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_news.py",
+      "classification": "test_only",
+      "current_purpose": "News aggregation pipeline",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "News dimension regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_news_sentinel.py",
+      "classification": "test_only",
+      "current_purpose": "News sentinel interrupt handler",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Sentinel regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_options.py",
+      "classification": "test_only",
+      "current_purpose": "Options position monitoring and exits",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Options regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_options_entries.py",
+      "classification": "test_only",
+      "current_purpose": "Options entry execution",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Options entry regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_options_scanner.py",
+      "classification": "test_only",
+      "current_purpose": "Options universe scanning",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Options scan regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_orders.py",
+      "classification": "test_only",
+      "current_purpose": "Order wrapper interface",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Order interface regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_orders_core.py",
+      "classification": "test_only",
+      "current_purpose": "Core order execution (smoke marked)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Order execution regression \u2014 CRITICAL",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression; smoke marked"
+    },
+    {
+      "path": "tests/test_orders_execute.py",
+      "classification": "test_only",
+      "current_purpose": "Order execution paths (11 TODO stubs \u2014 no real assertions)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "DEAD TEST: 11 TODOs, no assertions. Provides false coverage confidence.",
+      "owner_layer": "trading_engine",
+      "notes": "STALE: All test functions are TODO stubs. Either implement or delete. Bloat risk."
+    },
+    {
+      "path": "tests/test_orders_guard.py",
+      "classification": "test_only",
+      "current_purpose": "Order validation guards",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Guard regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_orders_regression.py",
+      "classification": "test_only",
+      "current_purpose": "Orders regression suite (targeted bug fixes)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Regression suite regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_pass1_robustness.py",
+      "classification": "test_only",
+      "current_purpose": "Weekend Robustness Audit regression fixes",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Robustness regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_phase_gate.py",
+      "classification": "test_only",
+      "current_purpose": "Phase-based entry gating",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Phase gate regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_pm_exit_reason.py",
+      "classification": "test_only",
+      "current_purpose": "PM exit reason classification",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "PM exit reason regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_portfolio.py",
+      "classification": "test_only",
+      "current_purpose": "Portfolio abstraction layer",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Portfolio regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_portfolio_optimizer.py",
+      "classification": "test_only",
+      "current_purpose": "Portfolio optimization logic",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Optimizer regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_position_closed_completeness.py",
+      "classification": "test_only",
+      "current_purpose": "Position closed record completeness",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Position closure metadata incomplete if regression",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_positions_persistence.py",
+      "classification": "test_only",
+      "current_purpose": "Position state persistence",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Position persistence regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_quota_capacity_calibrator.py",
+      "classification": "test_only",
+      "current_purpose": "Quota capacity calibrator scenarios",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Quota calibration regression undetected",
+      "owner_layer": "intelligence",
+      "notes": "release_only_regression"
+    },
+    {
+      "path": "tests/test_quota_policy_promotion.py",
+      "classification": "test_only",
+      "current_purpose": "Quota policy promotion (75/35 Sprint 7I)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Quota policy regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_reconnect.py",
+      "classification": "test_only",
+      "current_purpose": "IBKR reconnection logic",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Reconnect regression \u2014 bot goes dark if undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_regime_router.py",
+      "classification": "test_only",
+      "current_purpose": "Regime routing (skipif sklearn unavailable)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Regime routing regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_risk.py",
+      "classification": "test_only",
+      "current_purpose": "Risk calculations and HWM tracking",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Risk regression \u2014 HIGH RISK if undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_safe_download.py",
+      "classification": "test_only",
+      "current_purpose": "Safe download: Alpaca-first bar data migration",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Migration regression \u2014 tests that Alpaca is primary source",
+      "owner_layer": "trading_engine",
+      "notes": "migration_test; retire after confirmed stable"
+    },
+    {
+      "path": "tests/test_scanner.py",
+      "classification": "test_only",
+      "current_purpose": "Three-tier universe assembly and regime classification",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Scanner regression \u2014 trading universe broken",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_schemas.py",
+      "classification": "test_only",
+      "current_purpose": "Shared data schema validation",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Schema regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_signal_dispatch.py",
+      "classification": "test_only",
+      "current_purpose": "Signal dispatch routing",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Signal dispatch regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_signal_pipeline.py",
+      "classification": "test_only",
+      "current_purpose": "Signal processing pipeline",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Pipeline regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_signals.py",
+      "classification": "test_only",
+      "current_purpose": "Dimension signal scoring",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Signal scoring regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_sizing_pipeline.py",
+      "classification": "test_only",
+      "current_purpose": "Position sizing pipeline",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Sizing regression \u2014 position sizes wrong if undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_sl_lifecycle.py",
+      "classification": "test_only",
+      "current_purpose": "Stop-loss order lifecycle",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Stop-loss regression \u2014 exits may not fire",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_social_sentiment.py",
+      "classification": "test_only",
+      "current_purpose": "Social sentiment dimension (config-gated)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Social sentiment regression undetected \u2014 already gated",
+      "owner_layer": "trading_engine",
+      "notes": "release_only_regression"
+    },
+    {
+      "path": "tests/test_system_interactions.py",
+      "classification": "test_only",
+      "current_purpose": "Cross-module system interaction tests",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "System integration regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_telegram_kill_switch.py",
+      "classification": "test_only",
+      "current_purpose": "Telegram kill switch command",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Kill switch regression \u2014 cannot halt bot via Telegram",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_theme_tracker.py",
+      "classification": "test_only",
+      "current_purpose": "Theme performance tracking",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Theme tracker regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_thesis_performance.py",
+      "classification": "test_only",
+      "current_purpose": "Thesis performance lookup",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Thesis performance regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_tier_d_evidence_report.py",
+      "classification": "test_only",
+      "current_purpose": "Tier D evidence report generation",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Tier D evidence regression \u2014 Phase 2 gate blocked",
+      "owner_layer": "advisory",
+      "notes": "permanent_regression; Phase 1 active"
+    },
+    {
+      "path": "tests/test_tier_d_visibility.py",
+      "classification": "test_only",
+      "current_purpose": "Tier D candidate visibility in funnel",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Tier D visibility regression undetected",
+      "owner_layer": "advisory",
+      "notes": "permanent_regression; Phase 1 active"
+    },
+    {
+      "path": "tests/test_trailing_stop.py",
+      "classification": "test_only",
+      "current_purpose": "Trailing stop logic (2 pre-existing failures noted in CLAUDE.md)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Trailing stop regression \u2014 2 known pre-existing failures",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression; note 2 pre-existing failures unrelated to current work"
+    },
+    {
+      "path": "tests/test_tranche_exits.py",
+      "classification": "test_only",
+      "current_purpose": "Tranche exit logic",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Tranche exit regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_universe_committed.py",
+      "classification": "test_only",
+      "current_purpose": "Committed universe management",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Universe regression \u2014 trading universe broken",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_universe_position.py",
+      "classification": "test_only",
+      "current_purpose": "Position-level universe management",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Universe position regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_universe_promoter.py",
+      "classification": "test_only",
+      "current_purpose": "Daily promoter list generation",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Promoter regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "tests/test_vix_kelly.py",
+      "classification": "test_only",
+      "current_purpose": "VIX-Kelly position sizing integration",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "VIX-Kelly sizing regression undetected",
+      "owner_layer": "trading_engine",
+      "notes": "permanent_regression"
+    },
+    {
+      "path": "data/trades.json",
+      "classification": "live_runtime",
+      "current_purpose": "Active position state and trade history (1.6MB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "All position state lost \u2014 CATASTROPHIC",
+      "owner_layer": "trading_engine",
+      "notes": "Source of truth for IBKR paper positions"
+    },
+    {
+      "path": "data/training_records.jsonl",
+      "classification": "live_runtime",
+      "current_purpose": "ML training records (JSONL); Phase C gate source (336KB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Training data generation stops \u2014 ML engine starved",
+      "owner_layer": "trading_engine",
+      "notes": "Post-migration authoritative store"
+    },
+    {
+      "path": "data/trade_events.jsonl",
+      "classification": "live_runtime",
+      "current_purpose": "ORDER_INTENT/FILLED/CLOSED write-ahead log (470KB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Trade event history lost \u2014 metadata immutability violated",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "data/ic_validation_result.json",
+      "classification": "live_runtime",
+      "current_purpose": "IC gate result (Phase B unlock proof)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Phase B gate re-verification fails",
+      "owner_layer": "intelligence",
+      "notes": ""
+    },
+    {
+      "path": "data/ic_weights.json",
+      "classification": "live_runtime",
+      "current_purpose": "Current IC signal weights (1.2KB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "IC weighting reverts to equal weights",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "data/committed_universe.json",
+      "classification": "live_runtime",
+      "current_purpose": "Top-1000 by dollar volume universe (201KB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Trading universe collapses to dynamic-only",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "data/apex_shadow_log.jsonl",
+      "classification": "shadow_only",
+      "current_purpose": "Apex shadow divergence log (11MB \u2014 LARGEST DATA FILE)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Shadow comparison data lost \u2014 USE_APEX_V3_SHADOW=True",
+      "owner_layer": "trading_engine",
+      "notes": "BLOAT: 11MB and growing. Log rotation policy needed."
+    },
+    {
+      "path": "data/signals_log.jsonl",
+      "classification": "live_runtime",
+      "current_purpose": "Signal scoring history (14MB \u2014 LARGEST JSONL)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Signal audit trail lost",
+      "owner_layer": "trading_engine",
+      "notes": "BLOAT: 14MB and growing. Log rotation policy needed urgently."
+    },
+    {
+      "path": "data/apex_decision_audit.jsonl",
+      "classification": "live_runtime",
+      "current_purpose": "Apex decision audit trail (4MB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Apex decision history lost",
+      "owner_layer": "trading_engine",
+      "notes": "BLOAT: 4MB and growing unboundedly"
+    },
+    {
+      "path": "data/apex_prompt_snapshot.jsonl",
+      "classification": "advisory_only",
+      "current_purpose": "Apex prompt debug snapshots (2.9MB)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Debug prompt snapshots lost \u2014 non-critical",
+      "owner_layer": "trading_engine",
+      "notes": "BLOAT: 2.9MB debug artifact. Consider size cap."
+    },
+    {
+      "path": "data/apex_response_snapshot.jsonl",
+      "classification": "advisory_only",
+      "current_purpose": "Apex response debug snapshots (783KB)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Debug response snapshots lost \u2014 non-critical",
+      "owner_layer": "advisory",
+      "notes": "BLOAT: debug artifact"
+    },
+    {
+      "path": "data/tier_d_funnel.jsonl",
+      "classification": "advisory_only",
+      "current_purpose": "Tier D funnel evidence log (2.9MB)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Phase 2 gate evidence lost \u2014 Phase 1 active",
+      "owner_layer": "advisory",
+      "notes": "ACTIVE: Phase 2 gate assessment needs this. Do not delete."
+    },
+    {
+      "path": "data/audit_log.jsonl",
+      "classification": "live_runtime",
+      "current_purpose": "Operational audit log (1.9MB)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Audit trail incomplete",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": "data/live/",
+      "classification": "live_runtime",
+      "current_purpose": "Live handoff manifests directory (paper/prod manifests)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Handoff system loses current manifest state",
+      "owner_layer": "handoff",
+      "notes": "SACRED PATH: data/live/ \u2014 do not restructure"
+    },
+    {
+      "path": "data/models/",
+      "classification": "live_runtime",
+      "current_purpose": "ML model files: classifier, regressor, scaler, features (pkl)",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "ML inference fails without model files",
+      "owner_layer": "intelligence",
+      "notes": "Cloud deployment must include these"
+    },
+    {
+      "path": "data/intelligence/",
+      "classification": "advisory_only",
+      "current_purpose": "Intelligence layer outputs: advisory, thematic, economic context",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Intelligence layer has no cached state",
+      "owner_layer": "intelligence",
+      "notes": "Required by validate_intelligence_files.py (CI gate)"
+    },
+    {
+      "path": "data/intelligence/backtest/",
+      "classification": "backtest_only",
+      "current_purpose": "Intelligence backtest fixture results",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Intelligence backtests unavailable \u2014 offline only",
+      "owner_layer": "intelligence",
+      "notes": "Cloud exclusion candidate"
+    },
+    {
+      "path": "backtest_results/",
+      "classification": "backtest_only",
+      "current_purpose": "Backtesting engine results directory (1 result file)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Backtest results lost \u2014 offline only",
+      "owner_layer": "intelligence",
+      "notes": "Cloud exclusion candidate"
+    },
+    {
+      "path": "data/reference/",
+      "classification": "live_runtime",
+      "current_purpose": "Symbol master, factor registry, sector schema, provider matrix",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Reference data unavailable for signal scoring",
+      "owner_layer": "intelligence",
+      "notes": ""
+    },
+    {
+      "path": "data/universe_builder/",
+      "classification": "advisory_only",
+      "current_purpose": "Universe builder pipeline snapshots and shadow comparisons",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Universe builder analysis unavailable",
+      "owner_layer": "intelligence",
+      "notes": "shadow comparison files here"
+    },
+    {
+      "path": "Chief-Decifer-recovered/",
+      "classification": "legacy_scanner_path",
+      "current_purpose": "Recovered Chief Decifer app from earlier version; contains __pycache__ and compiled .pyc",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Recovery reference lost \u2014 historical only",
+      "owner_layer": "Chief",
+      "notes": "CLOUD EXCLUSION: Never deploy to live container. Contains .pyc bytecode and dev artifacts."
+    },
+    {
+      "path": "chief-decifer/",
+      "classification": "live_runtime",
+      "current_purpose": "Chief Decifer read-only monitoring dashboard (port 8181)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Monitoring dashboard loses state",
+      "owner_layer": "Chief",
+      "notes": "State path: chief-decifer/state/. SACRED PATH."
+    },
+    {
+      "path": "Decifer Trading.app/",
+      "classification": "unknown_requires_review",
+      "current_purpose": "macOS app bundle in repo (binary)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "App bundle loses its source repo reference \u2014 offline only",
+      "owner_layer": "trading_engine",
+      "notes": "BLOAT: binary blobs in git. Should be excluded from cloud container and ideally from git via .gitignore."
+    },
+    {
+      "path": "Decifer.app/",
+      "classification": "unknown_requires_review",
+      "current_purpose": "Alternative macOS app bundle (binary)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "App bundle loses reference \u2014 offline only",
+      "owner_layer": "trading_engine",
+      "notes": "BLOAT: duplicate binary app bundle. Investigate if both are needed."
+    },
+    {
+      "path": "tools/signal_correlation.py",
+      "classification": "advisory_only",
+      "current_purpose": "Signal correlation analysis tool (offline)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Signal correlation analysis unavailable",
+      "owner_layer": "intelligence",
+      "notes": ""
+    },
+    {
+      "path": "lib/",
+      "classification": "live_runtime",
+      "current_purpose": "Frontend JS libraries: tom-select, vis-9.1.2, dashboard bindings",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Dashboard JS components broken",
+      "owner_layer": "trading_engine",
+      "notes": "Bundled in repo rather than CDN \u2014 minor bloat"
+    },
+    {
+      "path": "static/dashboard.html",
+      "classification": "live_runtime",
+      "current_purpose": "Dashboard HTML template",
+      "imported_by_live_bot": true,
+      "safe_to_delete_now": false,
+      "safe_to_delete_after_cutover": false,
+      "risk_if_deleted": "Dashboard renders blank",
+      "owner_layer": "trading_engine",
+      "notes": ""
+    },
+    {
+      "path": ".fail_* files in data/live/",
+      "classification": "unknown_requires_review",
+      "current_purpose": "Failed handoff attempt records (6 files from 2026-05-07)",
+      "imported_by_live_bot": false,
+      "safe_to_delete_now": true,
+      "safe_to_delete_after_cutover": true,
+      "risk_if_deleted": "Failed handoff history lost \u2014 debug value only",
+      "owner_layer": "handoff",
+      "notes": "BLOAT: 6 failure files from 2026-05-07. Safe to delete after review."
+    }
+  ],
+  "bloat_concerns": [
+    {
+      "rank": 1,
+      "concern": "signals_log.jsonl growing unboundedly (14MB)",
+      "path": "data/signals_log.jsonl",
+      "reason": "Every scan cycle appends all dimension scores. No rotation policy. Will hit disk limits before cloud launch.",
+      "action": "Implement log rotation or sampling; cap at 7-day rolling window."
+    },
+    {
+      "rank": 2,
+      "concern": "apex_shadow_log.jsonl growing unboundedly (11MB)",
+      "path": "data/apex_shadow_log.jsonl",
+      "reason": "USE_APEX_V3_SHADOW=True logs every shadow decision. 11MB in paper mode \u2014 will be much larger live.",
+      "action": "Rotate daily or cap at 10K entries. Decide shadow lifetime after activation."
+    },
+    {
+      "rank": 3,
+      "concern": "intelligence_schema_validator.py is 158KB \u2014 largest single file in repo",
+      "path": "intelligence_schema_validator.py",
+      "reason": "Not in live import chain. Pure validation tool. 158KB is a significant maintenance burden with no live runtime value.",
+      "action": "Cloud exclusion. Move to scripts/ or a CI-only directory."
+    },
+    {
+      "rank": 4,
+      "concern": "23 intelligence sprint/day test files (test_intelligence_day2-7, sprint2-7c)",
+      "path": "tests/test_intelligence_day*.py + tests/test_intelligence_sprint*.py",
+      "reason": "These files tracked weekly development progress across the intelligence-first sprint series. They are not permanent regression tests. They add ~15K+ lines to the test suite and inflate test run time.",
+      "action": "Move to tests/archive/ or delete after intelligence-first activation is confirmed. Keep sprint7b and sprint7c (smoke marked)."
+    },
+    {
+      "rank": 5,
+      "concern": "backtest_intelligence.py is 100KB \u2014 second largest file",
+      "path": "backtest_intelligence.py",
+      "reason": "Offline backtesting only. Not in live import chain. 100KB of rarely-run code inflates container size.",
+      "action": "Cloud exclusion. Keep locally for research. Never deploy to live container."
+    },
+    {
+      "rank": 6,
+      "concern": "5 one-time migration scripts still in scripts/",
+      "path": "scripts/migrate_trades_to_training_store.py, scripts/backfill_may5_trades.py, scripts/backfill_position_closed.py, scripts/reconcile_trades_json.py, scripts/recover_pattern_ids.py",
+      "reason": "All migrations completed (2026-04-28). These scripts serve no future purpose and create false confidence that they might be run again.",
+      "action": "Delete now. One exception: scripts/rebuild_positions_from_intents.py is a disaster recovery tool \u2014 keep."
+    },
+    {
+      "rank": 7,
+      "concern": "apex_decision_audit.jsonl at 4MB and growing",
+      "path": "data/apex_decision_audit.jsonl",
+      "reason": "Every Apex decision is audited. No size cap. This duplicates information in apex_conversation_log.jsonl.",
+      "action": "Implement rotation or deduplication with apex_conversation_log.jsonl."
+    },
+    {
+      "rank": 8,
+      "concern": "test_orders_execute.py is 100% TODO stubs \u2014 no real assertions",
+      "path": "tests/test_orders_execute.py",
+      "reason": "11 test functions all contain only TODO comments. This file provides false confidence of coverage for critical execution paths (stop-loss, bracket orders, options contract selection, partial fills).",
+      "action": "Implement the 11 test cases OR delete the file. Do not leave TODO-only test files in CI."
+    },
+    {
+      "rank": 9,
+      "concern": "Chief-Decifer-recovered/ contains compiled .pyc bytecode in git",
+      "path": "Chief-Decifer-recovered/__pycache__/, Chief-Decifer-recovered/signals/__pycache__/, Chief-Decifer-recovered/panels/__pycache__/",
+      "reason": "__pycache__ directories and .pyc files should never be committed to git. They are machine-specific Python 3.11 bytecode.",
+      "action": "Add to .gitignore. Delete committed bytecode files. This is a housekeeping issue."
+    },
+    {
+      "rank": 10,
+      "concern": "Two macOS app bundles checked into git (Decifer Trading.app, Decifer.app)",
+      "path": "Decifer Trading.app/, Decifer.app/",
+      "reason": "Binary blobs in git inflate repo size. App bundles should be distributed separately, not version-controlled.",
+      "action": "Add to .gitignore. Distribute as separate release artifacts."
+    },
+    {
+      "rank": 11,
+      "concern": "apex_prompt_snapshot.jsonl + apex_response_snapshot.jsonl (3.7MB combined debug artifacts)",
+      "path": "data/apex_prompt_snapshot.jsonl, data/apex_response_snapshot.jsonl",
+      "reason": "Debug snapshots only. Already have apex_conversation_log.jsonl as the canonical record. Three overlapping Apex logs.",
+      "action": "Consider whether prompt/response snapshots are needed separately from conversation log. If not, disable and remove."
+    },
+    {
+      "rank": 12,
+      "concern": "Advisory layer (advisory_reporter.py + advisory_logger [as advisor] + advisory_log_reviewer.py) \u2014 64KB of flagged-off code",
+      "path": "advisory_reporter.py, advisory_log_reviewer.py, intelligence_engine.py, intelligence_adapters.py",
+      "reason": "intelligence_first_advisory_enabled=False. These modules are not called in any live cycle. They represent an entire feature tier that is currently inactive.",
+      "action": "Cloud exclusion after intelligence-first activation. Archive or delete advisory_log_reviewer and advisory_reporter post-cutover."
+    },
+    {
+      "rank": 13,
+      "concern": "handoff_publisher_observer.py (39KB) + paper_handoff_comparator.py (37KB) \u2014 shadow observation only",
+      "path": "handoff_publisher_observer.py, paper_handoff_comparator.py, paper_handoff_builder.py",
+      "reason": "These are shadow-mode only tools for comparing paper vs live handoffs. After activation is confirmed they serve no purpose.",
+      "action": "Retire after activation confirmed. Cloud exclusion candidate."
+    },
+    {
+      "rank": 14,
+      "concern": "6 .fail_* files accumulating in data/live/",
+      "path": "data/live/.fail_20260507T*.json",
+      "reason": "Failed handoff attempt records from 2026-05-07. No cleanup mechanism \u2014 these will accumulate indefinitely.",
+      "action": "Implement automatic cleanup of .fail_* files older than 7 days. Delete the 6 existing ones now."
+    },
+    {
+      "rank": 15,
+      "concern": "tier_d_funnel.jsonl at 2.9MB for Phase 1 evidence only",
+      "path": "data/tier_d_funnel.jsonl",
+      "reason": "Tier D Phase 1 evidence collection. After Phase 2 gate decision, this file's evidence purpose is fulfilled. Will grow unboundedly if not capped.",
+      "action": "After Phase 2 gate reviewed with Amit, cap to last 1000 entries or archive the current file."
+    },
+    {
+      "rank": 16,
+      "concern": "factor_registry.py is 61KB but not in live import chain",
+      "path": "factor_registry.py",
+      "reason": "61KB factor registry only referenced by intelligence_schema_validator.py (also not in live chain). No live runtime value.",
+      "action": "Cloud exclusion. Move to intelligence/offline/ or similar. Never deploy to live container."
+    },
+    {
+      "rank": 17,
+      "concern": "audit_candle_gate.py not imported by entry_gate or any live chain module",
+      "path": "audit_candle_gate.py",
+      "reason": "Expected to be used in entry validation, but AST import analysis shows it's not in the live transitive closure. May be a dead code path from an old pipeline.",
+      "action": "Investigate: is it called dynamically (importlib) or via bot.py scheduler? If unused, retire."
+    },
+    {
+      "rank": 18,
+      "concern": "candidate_resolver.py has no callers in live chain",
+      "path": "candidate_resolver.py",
+      "reason": "Module exists but is not imported by scanner, entry_gate, or any live-chain module. May be a residual from old pipeline or intended for intelligence layer.",
+      "action": "Investigate: if not actively called, this is dead code from the pre-Apex pipeline."
+    },
+    {
+      "rank": 19,
+      "concern": "build_brain.py (47KB) is in repo root alongside bot.py",
+      "path": "build_brain.py",
+      "reason": "Offline ML training tool at top level. Should be in scripts/ or ml/ directory to make the repo root's intent clearer.",
+      "action": "Move to scripts/ or an ml/ subdirectory. Cloud exclusion candidate."
+    },
+    {
+      "rank": 20,
+      "concern": "quota_capacity_calibrator.py (33KB) \u2014 calibration already run, results in data/live/",
+      "path": "quota_capacity_calibrator.py, tests/test_quota_capacity_calibrator.py",
+      "reason": "Quota calibration was run and 5 scenario results are persisted in data/live/. The calibrator served its purpose but remains at top level.",
+      "action": "Move to scripts/ post-activation. Cloud exclusion candidate."
+    }
+  ],
+  "cleanup_sequence": [
+    {
+      "step": 1,
+      "when": "immediately",
+      "action": "Delete 5 completed migration scripts",
+      "files": [
+        "scripts/migrate_trades_to_training_store.py",
+        "scripts/backfill_may5_trades.py",
+        "scripts/backfill_position_closed.py",
+        "scripts/reconcile_trades_json.py",
+        "scripts/recover_pattern_ids.py"
+      ],
+      "risk": "low"
+    },
+    {
+      "step": 2,
+      "when": "immediately",
+      "action": "Add .gitignore entries for __pycache__, *.pyc, *.app/ bundles",
+      "files": [
+        ".gitignore"
+      ],
+      "risk": "low"
+    },
+    {
+      "step": 3,
+      "when": "immediately",
+      "action": "Implement log rotation for signals_log.jsonl and apex_shadow_log.jsonl",
+      "files": [
+        "data/signals_log.jsonl",
+        "data/apex_shadow_log.jsonl"
+      ],
+      "risk": "low"
+    },
+    {
+      "step": 4,
+      "when": "immediately",
+      "action": "Clean up 6 .fail_* files in data/live/",
+      "files": [
+        "data/live/.fail_*.json"
+      ],
+      "risk": "low"
+    },
+    {
+      "step": 5,
+      "when": "before_cloud_deploy",
+      "action": "Implement or delete test_orders_execute.py (11 TODOs)",
+      "files": [
+        "tests/test_orders_execute.py"
+      ],
+      "risk": "medium"
+    },
+    {
+      "step": 6,
+      "when": "after_activation_confirmed",
+      "action": "Retire handoff shadow modules",
+      "files": [
+        "handoff_publisher_observer.py",
+        "paper_handoff_builder.py",
+        "paper_handoff_comparator.py",
+        "tests/test_handoff_publisher_observer.py",
+        "tests/test_apex_shadow_report.py"
+      ],
+      "risk": "low"
+    },
+    {
+      "step": 7,
+      "when": "after_activation_confirmed",
+      "action": "Retire advisory layer (flagged-off modules)",
+      "files": [
+        "advisory_reporter.py",
+        "advisory_log_reviewer.py",
+        "intelligence_engine.py",
+        "intelligence_adapters.py",
+        "intelligence_schema_validator.py"
+      ],
+      "risk": "low"
+    },
+    {
+      "step": 8,
+      "when": "after_activation_confirmed",
+      "action": "Archive 21 intelligence sprint/day dev tests (keep sprint7b, sprint7c)",
+      "files": [
+        "tests/test_intelligence_day2-7.py",
+        "tests/test_intelligence_sprint2-7a2.py",
+        "tests/test_intelligence_factor_registry.py",
+        "tests/test_intelligence_reference_data.py"
+      ],
+      "risk": "low"
+    },
+    {
+      "step": 9,
+      "when": "after_activation_confirmed",
+      "action": "Move build_brain.py, backtester.py, backtest_intelligence.py to scripts/ml/ or offline/",
+      "files": [
+        "build_brain.py",
+        "backtester.py",
+        "backtest_intelligence.py"
+      ],
+      "risk": "medium"
+    },
+    {
+      "step": 10,
+      "when": "before_cloud_deploy",
+      "action": "Build cloud container exclusion list and add to Dockerfile / deploy config",
+      "files": [
+        ".dockerignore or deploy config"
+      ],
+      "risk": "medium"
+    }
+  ],
+  "do_not_touch": [
+    {
+      "path": "bot_trading.py",
+      "reason": "Live trading cycle \u2014 LOCKED"
+    },
+    {
+      "path": "scanner.py",
+      "reason": "Universe assembly and regime \u2014 LOCKED"
+    },
+    {
+      "path": "risk.py",
+      "reason": "Risk limits \u2014 LOCKED"
+    },
+    {
+      "path": "orders_core.py",
+      "reason": "Order execution \u2014 LOCKED"
+    },
+    {
+      "path": "orders_portfolio.py",
+      "reason": "Portfolio orders \u2014 LOCKED"
+    },
+    {
+      "path": "orders_options.py",
+      "reason": "Options orders \u2014 LOCKED"
+    },
+    {
+      "path": "config.py",
+      "reason": "No flag changes \u2014 LOCKED"
+    },
+    {
+      "path": "handoff_publisher.py",
+      "reason": "Active production pipeline \u2014 do not touch until activation confirmed"
+    },
+    {
+      "path": "data/live/",
+      "reason": "Live manifest directory \u2014 sacred path"
+    },
+    {
+      "path": "chief-decifer/state/",
+      "reason": "Chief state path \u2014 sacred path"
+    },
+    {
+      "path": "data/trades.json",
+      "reason": "Active position state \u2014 CATASTROPHIC if deleted"
+    },
+    {
+      "path": "data/training_records.jsonl",
+      "reason": "ML training data \u2014 loss is irreversible"
+    },
+    {
+      "path": "data/trade_events.jsonl",
+      "reason": "Trade event WAL \u2014 metadata immutability depends on this"
+    },
+    {
+      "path": "tests/test_apex_migration_guards.py",
+      "reason": "Guards against re-introduction of deleted Decifer 3.0 code"
+    },
+    {
+      "path": "scripts/rebuild_positions_from_intents.py",
+      "reason": "Disaster recovery tool \u2014 keep despite being a migration-class script"
+    },
+    {
+      "path": "scripts/tier_d_evidence_report.py",
+      "reason": "Phase 2 gate depends on this \u2014 active Phase 1 work"
+    },
+    {
+      "path": "scripts/validate_intelligence_files.py",
+      "reason": "CI gate \u2014 must remain for every branch"
+    }
+  ]
+}
