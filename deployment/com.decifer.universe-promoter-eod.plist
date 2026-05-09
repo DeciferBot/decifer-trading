@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.decifer.universe-promoter-eod.plist
+  Classification: documentation only / deployment template
+
+  Standalone launchd daemon for the universe promoter post-close run.
+
+  Worker: universe_promoter_worker
+  Schedule: Monday–Friday at 16:15 local time (post NYSE close).
+  Reads committed_universe.json, scores via gap+vol+catalyst, writes top-50
+  to data/daily_promoted.json. No broker writes. No order placement.
+
+  INSTALLATION:
+    cp deployment/com.decifer.universe-promoter-eod.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.decifer.universe-promoter-eod.plist
+
+  EVIDENCE:
+    Heartbeat: data/heartbeats/universe_promoter_worker.json
+    Stdout:    /tmp/decifer-universe-promoter-eod.log
+    Stderr:    /tmp/decifer-universe-promoter-eod.err
+
+  NOTE: bot.py also schedules run_promoter() at 16:15 as a fallback.
+  Once this daemon is confirmed reliable, the bot.py registration can
+  be removed (see promoter_eod tag in bot.py line ~623).
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.decifer.universe-promoter-eod</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/python3.11</string>
+    <string>universe_promoter.py</string>
+    <string>--run-once</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/amitchopra/Desktop/decifer trading</string>
+
+  <!-- 16:15 Monday–Friday -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict>
+      <key>Weekday</key><integer>1</integer>
+      <key>Hour</key><integer>16</integer>
+      <key>Minute</key><integer>15</integer>
+    </dict>
+    <dict>
+      <key>Weekday</key><integer>2</integer>
+      <key>Hour</key><integer>16</integer>
+      <key>Minute</key><integer>15</integer>
+    </dict>
+    <dict>
+      <key>Weekday</key><integer>3</integer>
+      <key>Hour</key><integer>16</integer>
+      <key>Minute</key><integer>15</integer>
+    </dict>
+    <dict>
+      <key>Weekday</key><integer>4</integer>
+      <key>Hour</key><integer>16</integer>
+      <key>Minute</key><integer>15</integer>
+    </dict>
+    <dict>
+      <key>Weekday</key><integer>5</integer>
+      <key>Hour</key><integer>16</integer>
+      <key>Minute</key><integer>15</integer>
+    </dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/decifer-universe-promoter-eod.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/decifer-universe-promoter-eod.err</string>
+
+  <key>KeepAlive</key>
+  <false/>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

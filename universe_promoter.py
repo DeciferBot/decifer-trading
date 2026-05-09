@@ -213,7 +213,133 @@ def load_promoted_universe(max_staleness_hours: int | None = None) -> list[str]:
     return [r["ticker"] for r in payload.get("symbols", [])]
 
 
+# ---------------------------------------------------------------------------
+# Standalone worker entry point
+# Classification: worker runtime
+#
+# Run-once mode (pre/post-market safe, no broker writes, no order placement):
+#   python3 -m universe_promoter
+#   python3 universe_promoter.py --run-once
+#
+# Exits 0 on success, 1 on failure. Writes a heartbeat evidence file to
+# data/heartbeats/universe_promoter_worker.json on every attempt.
+# ---------------------------------------------------------------------------
+
+_HEARTBEAT_PATH = os.path.join("data", "heartbeats", "universe_promoter_worker.json")
+
+
+def _write_heartbeat(
+    status: str,
+    *,
+    count: int = 0,
+    elapsed_seconds: float = 0.0,
+    artifact_age_seconds: float | None = None,
+    error: str | None = None,
+) -> None:
+    """Write a structured evidence file after each worker attempt."""
+    import time as _time
+
+    now_utc = datetime.now(UTC).isoformat()
+    artifact_age: float | None = artifact_age_seconds
+    if artifact_age is None and os.path.exists(_PROMOTED_PATH):
+        try:
+            mtime = os.path.getmtime(_PROMOTED_PATH)
+            artifact_age = round(_time.time() - mtime, 1)
+        except OSError:
+            artifact_age = None
+
+    record = {
+        "worker": "universe_promoter_worker",
+        "last_attempt_at": now_utc,
+        "last_success_at": now_utc if status == "success" else None,
+        "status": status,
+        "artifact_path": _PROMOTED_PATH,
+        "artifact_age_seconds": artifact_age,
+        "count": count,
+        "elapsed_seconds": round(elapsed_seconds, 2),
+        "error": error,
+        "live_output_changed": False,
+        "broker_called": False,
+        "order_placed": False,
+    }
+    try:
+        os.makedirs(os.path.dirname(_HEARTBEAT_PATH), exist_ok=True)
+        tmp = _HEARTBEAT_PATH + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump(record, fh, indent=2)
+        os.replace(tmp, _HEARTBEAT_PATH)
+    except OSError as exc:
+        log.warning(f"_write_heartbeat: could not write {_HEARTBEAT_PATH} — {exc}")
+
+
+def _main(argv: list[str] | None = None) -> int:
+    """
+    Worker entry point. Returns exit code (0=success, 1=failure).
+
+    Always runs once and exits. Scheduling is the caller's responsibility
+    (launchd, cron, or human operator).
+    """
+    import argparse
+    import time
+
+    parser = argparse.ArgumentParser(
+        prog="universe_promoter_worker",
+        description=(
+            "Standalone worker: rebuild data/daily_promoted.json. "
+            "Pre/post-market safe. No broker writes. No order placement."
+        ),
+    )
+    parser.add_argument(
+        "--run-once",
+        action="store_true",
+        default=True,
+        help="Run one promotion cycle and exit (default).",
+    )
+    parser.add_argument(
+        "--top-n",
+        type=int,
+        default=None,
+        help="Override promoter_top_n from config.",
+    )
+    args = parser.parse_args(argv)
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+    )
+
+    t0 = time.monotonic()
+    print(f"[universe_promoter_worker] starting run — {datetime.now(UTC).isoformat()}")
+
+    try:
+        result = run_promoter(top_n=args.top_n)
+    except Exception as exc:
+        elapsed = time.monotonic() - t0
+        _write_heartbeat("fail", elapsed_seconds=elapsed, error=str(exc))
+        print(f"[universe_promoter_worker] FAILED — {exc}", flush=True)
+        return 1
+
+    elapsed = time.monotonic() - t0
+
+    if not result:
+        _write_heartbeat("fail", count=0, elapsed_seconds=elapsed,
+                         error="run_promoter returned empty list (committed universe empty or no snapshots)")
+        print("[universe_promoter_worker] FAILED — run_promoter returned empty list", flush=True)
+        return 1
+
+    _write_heartbeat("success", count=len(result), elapsed_seconds=elapsed)
+
+    top3 = [(r["ticker"], f"{r['score']:.2f}", r["reason"]) for r in result[:3]]
+    print(
+        f"[universe_promoter_worker] SUCCESS — {len(result)} promoted "
+        f"in {elapsed:.1f}s → {_PROMOTED_PATH}",
+        flush=True,
+    )
+    print(f"  top 3 : {top3}")
+    print(f"  heartbeat : {_HEARTBEAT_PATH}")
+    return 0
+
+
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-    result = run_promoter()
-    print(f"\nTop 10: {[(r['ticker'], r['score'], r['reason']) for r in result[:10]]}")
+    import sys
+    sys.exit(_main())
