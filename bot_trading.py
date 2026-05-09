@@ -1701,9 +1701,15 @@ def run_scan():
         from datetime import datetime as _dt
 
         _cov_path = "data/universe_coverage.jsonl"
+        _handoff_active = (
+            CONFIG.get("enable_active_opportunity_universe_handoff", False)
+            and not _handoff_fail_closed_reason
+        )
         _cov_record = {
             "ts": _dt.now(_UTC).isoformat(),
             "regime": regime_name,
+            "candidate_source": "handoff" if _handoff_active else "scanner",
+            "handoff_fail_closed_reason": _handoff_fail_closed_reason,
             "core": _cov_core,
             "equities": _cov_equities,
             "promoted": _cov_promoted,
