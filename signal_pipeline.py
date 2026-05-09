@@ -22,6 +22,14 @@ from learning import log_signal_scan
 from news import batch_news_sentiment
 from signal_types import SIGNALS_LOG, Signal
 from signals import get_regime_threshold, score_universe
+from utils.log_rotation import rotate_jsonl_if_needed
+
+# Maximum size for tier_d_funnel.jsonl before rotation; configurable via CONFIG.
+try:
+    from config import CONFIG as _CFG
+    _TIER_D_FUNNEL_MAX_BYTES = int(_CFG.get("tier_d_funnel_max_mb", 10)) * 1_048_576
+except Exception:
+    _TIER_D_FUNNEL_MAX_BYTES = 10 * 1_048_576
 
 log = logging.getLogger("decifer.pipeline")
 
@@ -719,6 +727,7 @@ def run_signal_pipeline(
         _funnel_path_sc = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "data", "tier_d_funnel.jsonl"
         )
+        rotate_jsonl_if_needed(_funnel_path_sc, _TIER_D_FUNNEL_MAX_BYTES)
         with open(_funnel_path_sc, "a") as _scf:
             _scf.write(
                 _scj.dumps(
@@ -890,6 +899,7 @@ def run_signal_pipeline(
             _funnel_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)), "data", "tier_d_funnel.jsonl"
             )
+            rotate_jsonl_if_needed(_funnel_path, _TIER_D_FUNNEL_MAX_BYTES)
             with open(_funnel_path, "a") as _ff:
                 _ff.write(_tj.dumps(_td_funnel) + "\n")
         except Exception as _fe:

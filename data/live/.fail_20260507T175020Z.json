@@ -1,5 +1,0 @@
-{
-  "fail_closed_reason": "source_read_error: invalid JSON in /var/folders/93/_t7k5kmd4tlc0p5x244dd1th0000gn/T/tmplpoyaxqf/bad.json: Expecting value: line 1 column 1 (char 0)",
-  "context": {},
-  "generated_at": "2026-05-07T17:50:20Z"
-}

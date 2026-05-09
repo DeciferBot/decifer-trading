@@ -39,6 +39,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from config import CONFIG
+from utils.log_rotation import rotate_jsonl_if_needed
 
 log = logging.getLogger("decifer.apex_orchestrator")
 
@@ -60,13 +61,21 @@ _RESPONSE_SNAPSHOT_PATH = os.path.join(
 _audit_log_lock = threading.Lock()
 _snapshot_lock  = threading.Lock()
 
+# Maximum file size before rotation; configurable via CONFIG (values in MB).
+_SHADOW_LOG_MAX_BYTES        = int(CONFIG.get("apex_shadow_log_max_mb",       50)) * 1_048_576
+_AUDIT_LOG_MAX_BYTES         = int(CONFIG.get("apex_decision_audit_max_mb",   50)) * 1_048_576
+_PROMPT_SNAPSHOT_MAX_BYTES   = int(CONFIG.get("apex_prompt_snapshot_max_mb",  25)) * 1_048_576
+_RESPONSE_SNAPSHOT_MAX_BYTES = int(CONFIG.get("apex_response_snapshot_max_mb", 25)) * 1_048_576
+
 
 def _write_apex_audit(record: dict) -> None:
     """Append one JSON line to apex_decision_audit.jsonl. Non-critical — never raises."""
     try:
         os.makedirs(os.path.dirname(os.path.abspath(_AUDIT_LOG_PATH)), exist_ok=True)
-        with _audit_log_lock, open(_AUDIT_LOG_PATH, "a") as _fh:
-            _fh.write(json.dumps(record, default=str) + "\n")
+        with _audit_log_lock:
+            rotate_jsonl_if_needed(_AUDIT_LOG_PATH, _AUDIT_LOG_MAX_BYTES)
+            with open(_AUDIT_LOG_PATH, "a") as _fh:
+                _fh.write(json.dumps(record, default=str) + "\n")
     except Exception as _e:
         log.debug("apex_orchestrator: audit log write failed — %s", _e)
 
@@ -80,8 +89,10 @@ def _write_prompt_snapshot(cycle_id: str, user_prompt: str) -> None:
             "cycle_id": cycle_id,
             "user_prompt": user_prompt,
         }
-        with _snapshot_lock, open(_PROMPT_SNAPSHOT_PATH, "a") as _fh:
-            _fh.write(json.dumps(record, default=str) + "\n")
+        with _snapshot_lock:
+            rotate_jsonl_if_needed(_PROMPT_SNAPSHOT_PATH, _PROMPT_SNAPSHOT_MAX_BYTES)
+            with open(_PROMPT_SNAPSHOT_PATH, "a") as _fh:
+                _fh.write(json.dumps(record, default=str) + "\n")
     except Exception as _e:
         log.debug("apex_orchestrator: prompt snapshot write failed — %s", _e)
 
@@ -95,8 +106,10 @@ def _write_response_snapshot(cycle_id: str, raw_response: str) -> None:
             "cycle_id": cycle_id,
             "raw_response": raw_response,
         }
-        with _snapshot_lock, open(_RESPONSE_SNAPSHOT_PATH, "a") as _fh:
-            _fh.write(json.dumps(record, default=str) + "\n")
+        with _snapshot_lock:
+            rotate_jsonl_if_needed(_RESPONSE_SNAPSHOT_PATH, _RESPONSE_SNAPSHOT_MAX_BYTES)
+            with open(_RESPONSE_SNAPSHOT_PATH, "a") as _fh:
+                _fh.write(json.dumps(record, default=str) + "\n")
     except Exception as _e:
         log.debug("apex_orchestrator: response snapshot write failed — %s", _e)
 
@@ -203,8 +216,10 @@ def log_shadow_result(
             "note": result.get("note", ""),
             "apex_meta": _apex_meta or {},
         }
-        with _shadow_log_lock, open(_SHADOW_LOG_PATH, "a") as fh:
-            fh.write(json.dumps(entry, default=str) + "\n")
+        with _shadow_log_lock:
+            rotate_jsonl_if_needed(_SHADOW_LOG_PATH, _SHADOW_LOG_MAX_BYTES)
+            with open(_SHADOW_LOG_PATH, "a") as fh:
+                fh.write(json.dumps(entry, default=str) + "\n")
     except Exception as e:
         log.warning("apex_orchestrator: shadow log write failed — %s", e)
 

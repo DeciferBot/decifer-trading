@@ -7,6 +7,7 @@
 # ╚══════════════════════════════════════════════════════════════╝
 
 import logging
+import os
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -18,6 +19,9 @@ from orders_core import execute_buy, execute_short
 from orders_options import execute_buy_option
 from pattern_library import record_entry
 from position_sizing import calculate_stops
+from utils.log_rotation import rotate_jsonl_if_needed
+
+_TIER_D_FUNNEL_MAX_BYTES = int(CONFIG.get("tier_d_funnel_max_mb", 10)) * 1_048_576
 from signal_types import Signal
 
 def _lazy_pru_tickers() -> frozenset:
@@ -638,6 +642,7 @@ def dispatch_signals(
             _funnel_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)), "data", "tier_d_funnel.jsonl"
             )
+            rotate_jsonl_if_needed(_funnel_path, _TIER_D_FUNNEL_MAX_BYTES)
             with open(_funnel_path, "a") as _tdf:
                 _tdf.write(_tdj.dumps(_td_dispatch_record) + "\n")
         except Exception as _tde:
