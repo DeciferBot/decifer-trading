@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.decifer.universe-committed.plist
+  Classification: documentation only / deployment template
+
+  Standalone launchd daemon for the committed universe weekly refresh.
+
+  Worker: universe_committed_worker
+  Schedule: Every Sunday at 23:00 local time (adjust TZ as needed).
+  Runs independently of bot.py — weekend-safe.
+
+  INSTALLATION (one-time):
+    1. Edit WorkingDirectory to match your repo path.
+    2. Edit ProgramArguments Python path if needed (check: which python3.11).
+    3. Copy to ~/Library/LaunchAgents/:
+         cp deployment/com.decifer.universe-committed.plist ~/Library/LaunchAgents/
+    4. Load:
+         launchctl load ~/Library/LaunchAgents/com.decifer.universe-committed.plist
+    5. Verify:
+         launchctl list | grep decifer.universe-committed
+
+  EVIDENCE:
+    Heartbeat written to: data/heartbeats/universe_committed_worker.json
+    Stdout log:           /tmp/decifer-universe-committed.log
+    Stderr log:           /tmp/decifer-universe-committed.err
+
+  UNINSTALL:
+    launchctl unload ~/Library/LaunchAgents/com.decifer.universe-committed.plist
+    rm ~/Library/LaunchAgents/com.decifer.universe-committed.plist
+
+  NOTE: bot.py also schedules refresh_committed_universe() as a fallback.
+  Once this daemon is confirmed reliable across ≥2 weekly cycles, the
+  schedule.every().sunday registration in bot.py can be removed.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.decifer.universe-committed</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/python3.11</string>
+    <string>universe_committed.py</string>
+    <string>--run-once</string>
+  </array>
+
+  <!-- Adjust this path to your local repo root -->
+  <key>WorkingDirectory</key>
+  <string>/Users/amitchopra/Desktop/decifer trading</string>
+
+  <!-- Sunday 23:00 local time -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key>
+    <integer>0</integer>
+    <key>Hour</key>
+    <integer>23</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/decifer-universe-committed.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/decifer-universe-committed.err</string>
+
+  <!-- Do not restart automatically on failure — heartbeat records the fail state. -->
+  <key>KeepAlive</key>
+  <false/>
+
+  <!-- Run at load only when StartCalendarInterval fires (not on every boot). -->
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>
