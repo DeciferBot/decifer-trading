@@ -2,14 +2,23 @@
 # Classification: test only
 #
 # Validates standalone worker behaviour for universe_committed and universe_promoter.
-# Tests cover:
-#   1. Import isolation — workers must not import bot.py or execution modules.
-#   2. CLI smoke — _main() succeeds with mocked APIs, returns 0.
-#   3. Failure exit code — _main() returns 1 on controlled failure.
-#   4. Heartbeat file — written on both success and failure.
-#   5. No-bot-import guarantee at the module level.
+#
+# Spec coverage (per standalone_universe_workers task spec):
+#   1.  committed worker CLI importable without bot.py
+#   2.  promoter worker CLI importable without bot.py
+#   3.  committed worker run-once path exists and works
+#   4.  promoter worker run-once path exists and works
+#   5.  controlled failure exits non-zero (exit 1)
+#   6.  evidence JSONL written on success
+#   7.  evidence JSONL written on controlled failure
+#   8.  no order module imported by standalone workers
+#   9.  no risk module imported by standalone workers
+#   10. no broker/execution module imported by standalone workers
+#   11. worker commands do not trigger live trading
+#       (verified by checking banned modules + no IBKR import in isolation check)
 #
 # No Alpaca API calls — all I/O is mocked via unittest.mock.patch.
+# Import isolation tests run in subprocess to avoid test-session contamination.
 
 from __future__ import annotations
 
@@ -418,3 +427,162 @@ def test_heartbeat_safety_flags_are_always_false(tmp_path, monkeypatch):
     assert hb["live_output_changed"] is False
     assert hb["broker_called"] is False
     assert hb["order_placed"] is False
+
+
+# ===========================================================================
+# H. JSONL evidence file — written on success AND failure (spec items 6 + 7)
+# ===========================================================================
+
+_EVIDENCE_PATH_REL = "data/runtime/universe_worker_evidence.jsonl"
+
+
+def _load_evidence_records(tmp_path) -> list[dict]:
+    p = tmp_path / _EVIDENCE_PATH_REL
+    if not p.exists():
+        return []
+    records = []
+    for line in p.read_text().splitlines():
+        line = line.strip()
+        if line:
+            records.append(json.loads(line))
+    return records
+
+
+def test_committed_evidence_jsonl_written_on_success(tmp_path, monkeypatch):
+    """Successful committed run must append a record to the evidence JSONL."""
+    monkeypatch.chdir(tmp_path)
+
+    from universe_committed import _main
+
+    with patch("universe_committed.get_all_tradable_equities", return_value=_MOCK_ASSETS), \
+         patch("universe_committed.fetch_snapshots_batched", return_value=_MOCK_SNAPS):
+        code = _main([])
+
+    assert code == 0
+    records = _load_evidence_records(tmp_path)
+    assert records, "Evidence JSONL not written on success"
+    latest = records[-1]
+    assert latest["worker_name"] == "universe_committed_worker"
+    assert latest["success"] is True
+    assert latest["failure_reason"] is None
+    assert latest["output_artifact_path"] == "data/committed_universe.json"
+    assert latest["run_mode"] == "run_once"
+    assert latest["source"] == "standalone_cli"
+    assert latest["live_output_changed"] is False
+    assert latest["broker_called"] is False
+    assert latest["order_placed"] is False
+
+
+def test_committed_evidence_jsonl_written_on_failure(tmp_path, monkeypatch):
+    """Failed committed run must append a failure record to the evidence JSONL."""
+    monkeypatch.chdir(tmp_path)
+
+    from universe_committed import _main
+
+    with patch("universe_committed.get_all_tradable_equities", return_value=[]):
+        code = _main([])
+
+    assert code == 1
+    records = _load_evidence_records(tmp_path)
+    assert records, "Evidence JSONL not written on failure"
+    latest = records[-1]
+    assert latest["worker_name"] == "universe_committed_worker"
+    assert latest["success"] is False
+    assert latest["failure_reason"] is not None
+    assert latest["live_output_changed"] is False
+    assert latest["order_placed"] is False
+
+
+def test_promoter_evidence_jsonl_written_on_success(tmp_path, monkeypatch):
+    """Successful promoter run must append a record to the evidence JSONL."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data").mkdir()
+
+    from universe_promoter import _main
+
+    with patch("universe_promoter.load_committed_universe", return_value=_MOCK_COMMITTED), \
+         patch("universe_promoter.fetch_snapshots_batched", return_value=_MOCK_SNAPS), \
+         patch("universe_promoter._catalyst_score_for", return_value=0.0):
+        code = _main([])
+
+    assert code == 0
+    records = _load_evidence_records(tmp_path)
+    assert records, "Evidence JSONL not written on success"
+    latest = records[-1]
+    assert latest["worker_name"] == "universe_promoter_worker"
+    assert latest["success"] is True
+    assert latest["failure_reason"] is None
+    assert latest["output_artifact_path"] == "data/daily_promoted.json"
+    assert latest["live_output_changed"] is False
+    assert latest["order_placed"] is False
+
+
+def test_promoter_evidence_jsonl_written_on_failure(tmp_path, monkeypatch):
+    """Failed promoter run must append a failure record to the evidence JSONL."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data").mkdir()
+
+    from universe_promoter import _main
+
+    with patch("universe_promoter.load_committed_universe", return_value=[]):
+        code = _main([])
+
+    assert code == 1
+    records = _load_evidence_records(tmp_path)
+    assert records, "Evidence JSONL not written on failure"
+    latest = records[-1]
+    assert latest["worker_name"] == "universe_promoter_worker"
+    assert latest["success"] is False
+    assert latest["failure_reason"] is not None
+    assert latest["order_placed"] is False
+
+
+def test_evidence_jsonl_is_append_only(tmp_path, monkeypatch):
+    """Multiple runs must accumulate records in JSONL — not overwrite."""
+    monkeypatch.chdir(tmp_path)
+
+    from universe_committed import _main
+
+    # Run twice — evidence should have 2 records
+    for _ in range(2):
+        with patch("universe_committed.get_all_tradable_equities", return_value=_MOCK_ASSETS), \
+             patch("universe_committed.fetch_snapshots_batched", return_value=_MOCK_SNAPS):
+            _main([])
+
+    records = _load_evidence_records(tmp_path)
+    assert len(records) >= 2, f"Expected ≥2 records for 2 runs, got {len(records)}"
+
+
+def test_evidence_record_has_required_schema(tmp_path, monkeypatch):
+    """Every evidence record must contain all required spec fields."""
+    monkeypatch.chdir(tmp_path)
+
+    from universe_committed import _main
+
+    with patch("universe_committed.get_all_tradable_equities", return_value=_MOCK_ASSETS), \
+         patch("universe_committed.fetch_snapshots_batched", return_value=_MOCK_SNAPS):
+        _main([])
+
+    records = _load_evidence_records(tmp_path)
+    assert records
+    r = records[-1]
+
+    # All fields required by spec
+    required_fields = [
+        "worker_name", "started_at", "finished_at", "duration_seconds",
+        "success", "failure_reason", "output_artifact_path",
+        "output_artifact_exists", "output_artifact_mtime",
+        "output_artifact_age_seconds", "run_mode", "git_branch", "source",
+        "live_output_changed", "broker_called", "order_placed",
+    ]
+    for field in required_fields:
+        assert field in r, f"Evidence record missing required field: {field!r}"
+
+
+def test_evidence_worker_evidence_module_no_banned_imports():
+    """worker_evidence.py itself must not import any banned execution module."""
+    banned = _check_imports("worker_evidence")
+    assert not banned, (
+        f"worker_evidence imported banned modules: {banned}. "
+        "Evidence module must be fully isolated from execution logic."
+    )

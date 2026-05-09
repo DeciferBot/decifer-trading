@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 
 from alpaca_data import fetch_snapshots_batched, get_all_tradable_equities
 from config import CONFIG
+import worker_evidence as _evidence
 
 log = logging.getLogger("decifer.universe_committed")
 
@@ -246,25 +247,43 @@ def _main(argv: list[str] | None = None) -> int:
     )
 
     t0 = time.monotonic()
-    print(f"[universe_committed_worker] starting run — {datetime.now(UTC).isoformat()}")
+    started_at = datetime.now(UTC)
+    print(f"[universe_committed_worker] starting run — {started_at.isoformat()}")
 
     try:
         result = refresh_committed_universe(top_n=args.top_n)
     except Exception as exc:
+        finished_at = datetime.now(UTC)
         elapsed = time.monotonic() - t0
         _write_heartbeat("fail", elapsed_seconds=elapsed, error=str(exc))
+        _evidence.append_evidence(
+            "universe_committed_worker", started_at, finished_at,
+            success=False, output_artifact_path=_COMMITTED_PATH,
+            failure_reason=str(exc),
+        )
         print(f"[universe_committed_worker] FAILED — {exc}", flush=True)
         return 1
 
+    finished_at = datetime.now(UTC)
     elapsed = time.monotonic() - t0
 
     if not result:
-        _write_heartbeat("fail", count=0, elapsed_seconds=elapsed,
-                         error="refresh returned empty list")
+        reason = "refresh returned empty list"
+        _write_heartbeat("fail", count=0, elapsed_seconds=elapsed, error=reason)
+        _evidence.append_evidence(
+            "universe_committed_worker", started_at, finished_at,
+            success=False, output_artifact_path=_COMMITTED_PATH,
+            failure_reason=reason,
+        )
         print("[universe_committed_worker] FAILED — refresh returned empty list", flush=True)
         return 1
 
     _write_heartbeat("success", count=len(result), elapsed_seconds=elapsed)
+    _evidence.append_evidence(
+        "universe_committed_worker", started_at, finished_at,
+        success=True, output_artifact_path=_COMMITTED_PATH,
+        extra={"symbol_count": len(result)},
+    )
 
     print(
         f"[universe_committed_worker] SUCCESS — {len(result)} symbols "
@@ -274,6 +293,7 @@ def _main(argv: list[str] | None = None) -> int:
     print(f"  top 5 : {[r['symbol'] for r in result[:5]]}")
     print(f"  bottom 5 : {[r['symbol'] for r in result[-5:]]}")
     print(f"  heartbeat : {_HEARTBEAT_PATH}")
+    print(f"  evidence  : {_evidence._EVIDENCE_PATH}")
     return 0
 
 
