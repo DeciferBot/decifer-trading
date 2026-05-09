@@ -440,12 +440,19 @@ class TestSafetyInvariants(unittest.TestCase):
         data = _load_publisher_output("current_manifest.json")
         self.assertIs(data.get("handoff_enabled"), False)
 
-    def test_enable_active_opportunity_universe_handoff_config_false(self):
-        """enable_active_opportunity_universe_handoff config state must be false."""
+    def test_enable_active_opportunity_universe_handoff_config_true_sprint7j4(self):
+        """Sprint 7J.4 activated Key 1: config flag must be True.
+        Publisher run_log always records enable_active_opportunity_universe_handoff=False
+        (the publisher does not read the bot config; this is intentional — see publisher docstring).
+        The config flag being True means bot Key 1 is active; Key 2 (manifest handoff_enabled)
+        is set by --mode controlled_activation at publish time."""
         sys.path.insert(0, _ROOT)
         import config
         val = config.CONFIG.get("enable_active_opportunity_universe_handoff", False)
-        self.assertFalse(val)
+        self.assertTrue(val, (
+            "enable_active_opportunity_universe_handoff must be True (Sprint 7J.4 activated Key 1). "
+            "If False, Key 1 was rolled back — check config.py."
+        ))
 
     def test_publisher_does_not_modify_bot_trading(self):
         """handoff_publisher.py source does not import or call bot_trading."""
@@ -805,12 +812,17 @@ class TestSprintRegression(unittest.TestCase):
             result = isv.validate_paper_manifest(path)
             self.assertTrue(result.ok, f"Sprint 7B regression: {result.errors}")
 
-    def test_enable_handoff_flag_still_false(self):
-        """enable_active_opportunity_universe_handoff must remain false."""
+    def test_enable_handoff_flag_active_sprint7j4(self):
+        """Sprint 7J.4 regression: enable_active_opportunity_universe_handoff must be True.
+        Sprint 7J.1 guard was: flag must stay False.
+        Sprint 7J.4 intentionally flipped it to True (Key 1 activation).
+        This test now guards against accidental rollback of Key 1."""
         sys.path.insert(0, _ROOT)
         import config
-        self.assertFalse(
-            config.CONFIG.get("enable_active_opportunity_universe_handoff", False)
+        self.assertTrue(
+            config.CONFIG.get("enable_active_opportunity_universe_handoff", False),
+            "enable_active_opportunity_universe_handoff must be True (Sprint 7J.4). "
+            "If False, Key 1 was accidentally reverted — check config.py."
         )
 
 
