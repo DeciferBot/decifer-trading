@@ -160,10 +160,12 @@ class TestFlagFalsePath(unittest.TestCase):
     """Group 1: enable_active_opportunity_universe_handoff defaults False."""
 
     def test_flag_defaults_false(self):
-        """Flag is False by default in config."""
+        """Flag is False by default; skips when intentionally set True for controlled activation."""
         sys.path.insert(0, _ROOT)
         import config
         val = config.CONFIG.get("enable_active_opportunity_universe_handoff", False)
+        if val is True:
+            pytest.skip("Flag is intentionally True — Sprint 7J.4 controlled activation")
         self.assertFalse(val, "Flag must default to False")
 
     def test_flag_false_get_handoff_symbol_universe_not_called(self):
@@ -1105,12 +1107,12 @@ class TestSafetyFlags(unittest.TestCase):
     """Group 10: Safety flag invariants."""
 
     def test_production_candidate_source_changed_false_when_flag_false(self):
-        """When flag=False, the production candidate source is unchanged."""
+        """When flag=False, the production candidate source is unchanged; skips when intentionally True for controlled activation."""
         import config
-        self.assertFalse(
-            config.CONFIG.get("enable_active_opportunity_universe_handoff", False),
-            "Flag must be False — production candidate source must not have changed",
-        )
+        val = config.CONFIG.get("enable_active_opportunity_universe_handoff", False)
+        if val is True:
+            pytest.skip("Flag is intentionally True — Sprint 7J.4 controlled activation")
+        self.assertFalse(val, "Flag must be False — production candidate source must not have changed")
 
     def test_scanner_fallback_attempted_false_invariant_in_source(self):
         """scanner_fallback_attempted=False is present in all handoff paths."""
@@ -1157,9 +1159,11 @@ class TestSafetyFlags(unittest.TestCase):
         self.assertNotIn("active_opportunity_universe", src)
 
     def test_enable_active_opportunity_universe_handoff_default_false(self):
-        """The flag defaults to False in config."""
+        """The flag defaults to False in config; skips when intentionally True for controlled activation."""
         import config
         val = config.CONFIG.get("enable_active_opportunity_universe_handoff", False)
+        if val is True:
+            pytest.skip("Flag is intentionally True — Sprint 7J.4 controlled activation")
         self.assertFalse(val)
 
 

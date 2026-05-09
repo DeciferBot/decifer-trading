@@ -143,9 +143,13 @@ class TestModeAndSchemaFields:
         report = _load_report()
         assert "generated_at" in report
 
-    def test_publication_mode_correct(self):
+    def test_publication_mode_is_valid(self):
+        # Sprint 7J.4: accepts both validation_only and controlled_activation modes.
         report = _load_report()
-        assert report.get("publication_mode") == "validation_only"
+        valid_modes = {"validation_only", "controlled_activation"}
+        assert report.get("publication_mode") in valid_modes, (
+            f"publication_mode {report.get('publication_mode')!r} not in {valid_modes}"
+        )
 
     def test_source_files_is_list(self):
         report = _load_report()
@@ -196,8 +200,17 @@ class TestSafetyInvariants:
     def test_enable_active_opportunity_universe_handoff_false(self):
         assert _load_report().get("enable_active_opportunity_universe_handoff") is False
 
-    def test_handoff_enabled_false(self):
-        assert _load_report().get("handoff_enabled") is False
+    def test_handoff_enabled_matches_mode(self):
+        # Sprint 7J.4: handoff_enabled reflects the manifest state.
+        # validation_only → handoff_enabled must be False.
+        # controlled_activation → handoff_enabled must be True.
+        report = _load_report()
+        pub_mode = report.get("publication_mode")
+        expected = pub_mode == "controlled_activation"
+        assert report.get("handoff_enabled") is expected, (
+            f"publication_mode={pub_mode!r} requires handoff_enabled={expected}, "
+            f"got {report.get('handoff_enabled')!r}"
+        )
 
     def test_live_output_changed_false(self):
         assert _load_report().get("live_output_changed") is False
@@ -236,20 +249,12 @@ class TestReadinessGate:
             f"readiness_gate {gate!r} not in valid set"
         )
 
-    def test_readiness_gate_is_valid(self):
-        # Sprint 7G: gate starts at insufficient_observation.
-        # Sprint 7I/7J: gate advances to validation_only_stable once both thresholds
-        # (successful_runs>=10, distinct_sessions>=3) are met under 75/35 quota policy.
-        _valid_gates = {
-            "insufficient_observation",
-            "validation_only_stable",
-            "validation_only_unstable",
-            "fix_publisher_before_flag_activation",
-            "ready_for_flag_activation_design",
-        }
+    def test_readiness_gate_is_valid_for_current_mode(self):
+        # Sprint 7J.4: duplicate removed; uses module-level _VALID_READINESS_GATES
+        # which includes both validation_only and controlled_activation gate values.
         gate = _load_report().get("readiness_gate")
-        assert gate in _valid_gates, (
-            f"readiness_gate {gate!r} not in valid set {_valid_gates}"
+        assert gate in _VALID_READINESS_GATES, (
+            f"readiness_gate {gate!r} not in valid set {_VALID_READINESS_GATES}"
         )
 
 
@@ -293,9 +298,17 @@ class TestManifestAndUniverseValidity:
             f"manifest validation_status: {mv.get('validation_status')}"
         )
 
-    def test_manifest_handoff_enabled_false(self):
-        mv = _load_report().get("manifest_validity_analysis", {})
-        assert mv.get("handoff_enabled") is False
+    def test_manifest_handoff_enabled_matches_mode(self):
+        # Sprint 7J.4: handoff_enabled in manifest analysis reflects the manifest state.
+        # validation_only → False; controlled_activation → True.
+        report = _load_report()
+        pub_mode = report.get("publication_mode")
+        expected = pub_mode == "controlled_activation"
+        mv = report.get("manifest_validity_analysis", {})
+        assert mv.get("handoff_enabled") is expected, (
+            f"publication_mode={pub_mode!r} requires manifest handoff_enabled={expected}, "
+            f"got {mv.get('handoff_enabled')!r}"
+        )
 
     def test_universe_validity_passes(self):
         uv = _load_report().get("active_universe_validity_analysis", {})
@@ -407,7 +420,13 @@ class TestSmokeSpotCheck:
         assert report.get("mode") == "validation_only_handoff_publisher_observation"
         assert report.get("live_bot_consuming_handoff") is False
         assert report.get("live_output_changed") is False
-        assert report.get("handoff_enabled") is False
+        # Sprint 7J.4: handoff_enabled reflects manifest state — mode-aware check.
+        pub_mode = report.get("publication_mode")
+        expected_handoff = pub_mode == "controlled_activation"
+        assert report.get("handoff_enabled") is expected_handoff, (
+            f"publication_mode={pub_mode!r} requires handoff_enabled={expected_handoff}, "
+            f"got {report.get('handoff_enabled')!r}"
+        )
         assert report.get("enable_active_opportunity_universe_handoff") is False
         assert report.get("readiness_gate") in _VALID_READINESS_GATES
         assert isinstance(report.get("observation_summary"), dict)
@@ -832,8 +851,14 @@ class TestModeAwareness:
 
     # Test 8 — controlled_activation report states bot flag disabled when config flag=False
     def test_ca_mode_context_reports_bot_flag_disabled(self):
+        """Validates pre-activation state: manifest CA-ready but bot flag=False → blocked.
+        Skips during Sprint 7J.4 controlled activation when the flag is intentionally True."""
         sys.path.insert(0, _ROOT)
+        import config
         import handoff_publisher_observer as hpo
+
+        if config.CONFIG.get("enable_active_opportunity_universe_handoff", False) is True:
+            pytest.skip("Flag is intentionally True — Sprint 7J.4 controlled activation; bot_consumption_allowed is now True")
 
         manifest_analysis = self._ca_manifest_analysis()
         universe_analysis = self._clean_universe()
