@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-09T09:10:22Z",
-  "expires_at": "2026-05-09T09:25:22Z",
+  "generated_at": "2026-05-09T11:11:38Z",
+  "expires_at": "2026-05-09T11:26:38Z",
   "mode": "production_handoff_universe",
-  "publication_mode": "validation_only",
+  "publication_mode": "controlled_activation",
   "source_shadow_file": "data/universe_builder/active_opportunity_universe_shadow.json",
   "source_files": [
     "data/intelligence/economic_candidate_feed.json",

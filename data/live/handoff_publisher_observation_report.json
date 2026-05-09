@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-09T06:47:33Z",
+  "generated_at": "2026-05-09T11:12:23Z",
   "mode": "validation_only_handoff_publisher_observation",
   "source_files": [
     "data/live/current_manifest.json",
@@ -13,15 +13,15 @@
     "data/live/publisher_run_log.jsonl"
   ],
   "observation_summary": {
-    "records_observed": 37,
+    "records_observed": 203,
     "first_observed_at": "2026-05-07T16:11:11Z",
-    "last_observed_at": "2026-05-09T06:47:16Z",
-    "publisher_runs_detected": 37,
-    "successful_publishes": 30,
-    "failed_publishes": 7,
+    "last_observed_at": "2026-05-09T11:11:38Z",
+    "publisher_runs_detected": 203,
+    "successful_publishes": 194,
+    "failed_publishes": 9,
     "run_log_exists": true,
-    "run_log_records": 30,
-    "successful_publisher_runs": 30,
+    "run_log_records": 194,
+    "successful_publisher_runs": 194,
     "distinct_utc_sessions": 3,
     "distinct_utc_dates": [
       "2026-05-07",
@@ -34,13 +34,13 @@
     "active_universe_exists": true,
     "heartbeat_exists": true,
     "publisher_report_exists": true,
-    "readiness_gate": "validation_only_stable",
+    "readiness_gate": "controlled_activation_ready",
     "quota_policy_version": "75_35",
     "quota_policy_total_cap": 75,
     "quota_policy_structural_cap": 35,
     "quota_observation_required": true,
     "quota_observation_start": "2026-05-07T18:27:59Z",
-    "successful_runs_for_current_quota": 18,
+    "successful_runs_for_current_quota": 182,
     "distinct_sessions_for_current_quota": 3,
     "candidate_count": 75,
     "structural_count": 35,
@@ -56,12 +56,12 @@
     }
   },
   "freshness_analysis": {
-    "manifest_age_seconds": 17.3,
+    "manifest_age_seconds": 45.8,
     "manifest_freshness": "fresh",
-    "manifest_expires_at": "2026-05-09T07:02:16Z",
-    "universe_age_seconds": 17.3,
+    "manifest_expires_at": "2026-05-09T11:26:38Z",
+    "universe_age_seconds": 45.8,
     "universe_freshness": "fresh",
-    "heartbeat_age_seconds": 17.3,
+    "heartbeat_age_seconds": 45.8,
     "heartbeat_freshness": "fresh",
     "sla_primary_threshold_seconds": 600,
     "sla_stale_threshold_seconds": 900,
@@ -69,14 +69,14 @@
     "sla_met": true,
     "stale_count": 0,
     "expired_count": 0,
-    "max_age_seconds": 17.3,
-    "average_age_seconds": 17.3
+    "max_age_seconds": 45.8,
+    "average_age_seconds": 45.8
   },
   "manifest_validity_analysis": {
     "exists": true,
     "validation_status": "pass",
-    "handoff_enabled": false,
-    "publication_mode": "validation_only",
+    "handoff_enabled": true,
+    "publication_mode": "controlled_activation",
     "enable_flag_required": true,
     "ready_for_consumption": true,
     "active_universe_file": "data/live/active_opportunity_universe.json",
@@ -89,7 +89,7 @@
   "active_universe_validity_analysis": {
     "exists": true,
     "mode": "production_handoff_universe",
-    "publication_mode": "validation_only",
+    "publication_mode": "controlled_activation",
     "validation_status": "pass",
     "candidate_count": 75,
     "structural_count": 35,
@@ -115,9 +115,9 @@
     "exists": true,
     "worker": "handoff_publisher",
     "validation_status": "pass",
-    "last_success_at": "2026-05-09T06:47:16Z",
-    "last_attempt_at": "2026-05-09T06:47:16Z",
-    "last_success_age_seconds": 17.3,
+    "last_success_at": "2026-05-09T11:11:38Z",
+    "last_attempt_at": "2026-05-09T11:11:38Z",
+    "last_success_age_seconds": 45.8,
     "last_success_freshness": "fresh",
     "candidate_count": 75,
     "fail_closed_reason": null
@@ -130,8 +130,8 @@
     "universe_written": true,
     "manifest_written": true,
     "heartbeat_written": true,
-    "handoff_enabled": false,
-    "publication_mode": "validation_only",
+    "handoff_enabled": true,
+    "publication_mode": "controlled_activation",
     "live_output_changed": false,
     "issues": [],
     "issue_count": 0
@@ -221,10 +221,10 @@
     "route_changes": null,
     "quota_group_changes": null,
     "validation_status_changes": null,
-    "note": "run_log_records=30 \u2014 candidate-level stability diff requires snapshot archive (not yet implemented)"
+    "note": "run_log_records=194 \u2014 candidate-level stability diff requires snapshot archive (not yet implemented)"
   },
   "fail_closed_observations": {
-    "fail_closed_events": 7,
+    "fail_closed_events": 9,
     "fail_diagnostics_found": [
       {
         "file": "data/live/.fail_20260507T152529Z.json",
@@ -260,6 +260,16 @@
         "file": "data/live/.fail_20260507T185125Z.json",
         "fail_closed_reason": "source_read_error: file not found: /var/folders/93/_t7k5kmd4tlc0p5x244dd1th0000gn/T/tmp45m4du68/nonexistent.json",
         "generated_at": "2026-05-07T18:51:25Z"
+      },
+      {
+        "file": "data/live/.fail_20260509T085939Z.json",
+        "fail_closed_reason": "source_read_error: file not found: /var/folders/93/_t7k5kmd4tlc0p5x244dd1th0000gn/T/tmpqelavxxq/nonexistent.json",
+        "generated_at": "2026-05-09T08:59:39Z"
+      },
+      {
+        "file": "data/live/.fail_20260509T090450Z.json",
+        "fail_closed_reason": "source_read_error: file not found: /var/folders/93/_t7k5kmd4tlc0p5x244dd1th0000gn/T/tmpgx3yv4_3/nonexistent.json",
+        "generated_at": "2026-05-09T09:04:50Z"
       }
     ],
     "manifest_missing_events": 0,
@@ -269,10 +279,23 @@
     "invalid_candidate_events": 0,
     "last_heartbeat_fail_reason": null
   },
+  "mode_context": {
+    "publication_mode": "controlled_activation",
+    "handoff_enabled": true,
+    "mode_interpretation": "controlled_activation_precheck",
+    "expected_handoff_enabled_for_mode": true,
+    "manifest_mode_valid": true,
+    "manifest_allows_handoff": true,
+    "bot_flag_state": true,
+    "bot_consumption_allowed": true,
+    "bot_consumption_note": null,
+    "candidate_count": 75,
+    "executable_violations": [],
+    "order_instruction_violations": []
+  },
   "safety_analysis": {
     "live_bot_consuming_handoff": false,
     "enable_active_opportunity_universe_handoff": false,
-    "handoff_enabled": false,
     "production_candidate_source_changed": false,
     "scanner_output_changed": false,
     "apex_input_changed": false,
@@ -281,13 +304,13 @@
     "live_output_changed": false,
     "all_safety_invariants_hold": true
   },
-  "readiness_gate": "validation_only_stable",
+  "readiness_gate": "controlled_activation_ready",
   "warnings": [],
+  "handoff_enabled": true,
+  "publication_mode": "controlled_activation",
   "production_candidate_source_changed": false,
   "live_bot_consuming_handoff": false,
   "enable_active_opportunity_universe_handoff": false,
-  "handoff_enabled": false,
-  "publication_mode": "validation_only",
   "apex_input_changed": false,
   "scanner_output_changed": false,
   "risk_logic_changed": false,
