@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.decifer.universe-promoter-preopen.plist
+  Classification: documentation only / deployment template
+
+  Standalone launchd daemon — universe promoter pre-open run.
+  Runs independently of bot.py.
+
+  Worker module  : universe_promoter.py
+  Entry point    : python3 universe_promoter.py --run-once
+  Schedule       : Monday–Friday 08:00 local time (pre NYSE open)
+  Output artifact: data/daily_promoted.json  (atomic write)
+  Evidence log   : data/runtime/universe_worker_evidence.jsonl  (JSONL append)
+
+  Both EOD and pre-open runs share the same heartbeat and evidence files.
+  The most recent record is authoritative.
+
+  INSTALLATION:
+    cp ops/launchd/com.decifer.universe-promoter-preopen.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.decifer.universe-promoter-preopen.plist
+-->
+<plist version="1.0">
+<dict>
+
+  <key>Label</key>
+  <string>com.decifer.universe-promoter-preopen</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/python3.11</string>
+    <string>universe_promoter.py</string>
+    <string>--run-once</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/amitchopra/Desktop/decifer trading</string>
+
+  <!-- 08:00 Monday–Friday -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/decifer-universe-promoter-preopen.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/decifer-universe-promoter-preopen.err</string>
+
+  <key>KeepAlive</key>
+  <false/>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+</dict>
+</plist>

@@ -25,6 +25,7 @@ from datetime import UTC, datetime
 from alpaca_data import fetch_snapshots_batched
 from config import CONFIG
 from universe_committed import load_committed_universe
+import worker_evidence as _evidence
 
 log = logging.getLogger("decifer.universe_promoter")
 
@@ -309,25 +310,43 @@ def _main(argv: list[str] | None = None) -> int:
     )
 
     t0 = time.monotonic()
-    print(f"[universe_promoter_worker] starting run — {datetime.now(UTC).isoformat()}")
+    started_at = datetime.now(UTC)
+    print(f"[universe_promoter_worker] starting run — {started_at.isoformat()}")
 
     try:
         result = run_promoter(top_n=args.top_n)
     except Exception as exc:
+        finished_at = datetime.now(UTC)
         elapsed = time.monotonic() - t0
         _write_heartbeat("fail", elapsed_seconds=elapsed, error=str(exc))
+        _evidence.append_evidence(
+            "universe_promoter_worker", started_at, finished_at,
+            success=False, output_artifact_path=_PROMOTED_PATH,
+            failure_reason=str(exc),
+        )
         print(f"[universe_promoter_worker] FAILED — {exc}", flush=True)
         return 1
 
+    finished_at = datetime.now(UTC)
     elapsed = time.monotonic() - t0
 
     if not result:
-        _write_heartbeat("fail", count=0, elapsed_seconds=elapsed,
-                         error="run_promoter returned empty list (committed universe empty or no snapshots)")
+        reason = "run_promoter returned empty list (committed universe empty or no snapshots)"
+        _write_heartbeat("fail", count=0, elapsed_seconds=elapsed, error=reason)
+        _evidence.append_evidence(
+            "universe_promoter_worker", started_at, finished_at,
+            success=False, output_artifact_path=_PROMOTED_PATH,
+            failure_reason=reason,
+        )
         print("[universe_promoter_worker] FAILED — run_promoter returned empty list", flush=True)
         return 1
 
     _write_heartbeat("success", count=len(result), elapsed_seconds=elapsed)
+    _evidence.append_evidence(
+        "universe_promoter_worker", started_at, finished_at,
+        success=True, output_artifact_path=_PROMOTED_PATH,
+        extra={"promoted_count": len(result)},
+    )
 
     top3 = [(r["ticker"], f"{r['score']:.2f}", r["reason"]) for r in result[:3]]
     print(
@@ -337,6 +356,7 @@ def _main(argv: list[str] | None = None) -> int:
     )
     print(f"  top 3 : {top3}")
     print(f"  heartbeat : {_HEARTBEAT_PATH}")
+    print(f"  evidence  : {_evidence._EVIDENCE_PATH}")
     return 0
 
 

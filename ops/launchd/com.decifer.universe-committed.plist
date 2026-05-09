@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.decifer.universe-committed.plist
+  Classification: documentation only / deployment template
+
+  Standalone launchd daemon — committed universe weekly refresh.
+  Runs independently of bot.py. bot.py's matching schedule.every().sunday
+  registration remains as a fallback until this daemon is confirmed over
+  ≥2 weekly cycles.
+
+  Worker module  : universe_committed.py
+  Entry point    : python3 universe_committed.py --run-once
+  Schedule       : Sunday 23:00 local time
+  Output artifact: data/committed_universe.json  (atomic write)
+  Heartbeat      : data/heartbeats/universe_committed_worker.json
+  Evidence log   : data/runtime/universe_worker_evidence.jsonl  (JSONL append)
+  Stdout log     : /tmp/decifer-universe-committed.log
+  Stderr log     : /tmp/decifer-universe-committed.err
+
+  INSTALLATION (manual — do not auto-install):
+    1. Edit WorkingDirectory to your actual repo path if different.
+    2. Verify Python path: which python3.11
+    3. cp ops/launchd/com.decifer.universe-committed.plist ~/Library/LaunchAgents/
+    4. launchctl load ~/Library/LaunchAgents/com.decifer.universe-committed.plist
+    5. launchctl list | grep decifer.universe-committed
+
+  MANUAL TEST RUN (before installing — verifies worker is safe):
+    cd /path/to/decifer-trading
+    python3 universe_committed.py --run-once
+    cat data/heartbeats/universe_committed_worker.json
+    tail -1 data/runtime/universe_worker_evidence.jsonl
+
+  UNINSTALL:
+    launchctl unload ~/Library/LaunchAgents/com.decifer.universe-committed.plist
+    rm ~/Library/LaunchAgents/com.decifer.universe-committed.plist
+
+  EXIT CODES:
+    0 = success  (committed_universe.json written, evidence record appended)
+    1 = failure  (heartbeat status=fail, evidence record appended with failure_reason)
+-->
+<plist version="1.0">
+<dict>
+
+  <key>Label</key>
+  <string>com.decifer.universe-committed</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/python3.11</string>
+    <string>universe_committed.py</string>
+    <string>--run-once</string>
+  </array>
+
+  <!-- Adjust to your repo root if different -->
+  <key>WorkingDirectory</key>
+  <string>/Users/amitchopra/Desktop/decifer trading</string>
+
+  <!-- Sunday 23:00 local time -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key><integer>0</integer>
+    <key>Hour</key><integer>23</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/decifer-universe-committed.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/decifer-universe-committed.err</string>
+
+  <!-- Run-once-and-exit: do not keep alive or restart automatically. -->
+  <key>KeepAlive</key>
+  <false/>
+
+  <!-- Do not run on launchctl load; only on the calendar schedule. -->
+  <key>RunAtLoad</key>
+  <false/>
+
+</dict>
+</plist>
