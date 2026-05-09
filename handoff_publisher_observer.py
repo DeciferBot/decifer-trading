@@ -1,12 +1,17 @@
 """
-handoff_publisher_observer.py — Validation-only observation of handoff publisher outputs.
+handoff_publisher_observer.py — Mode-aware observation of handoff publisher outputs.
 
-Classification: production observability / validation-only tool
+Classification: production observability tool
 Service layer: Handoff / Operational monitoring
-Sprint: 7G / 7G.1
+Sprint: 7G / 7G.1 / 7J.3
 
 Reads publisher outputs over time and generates a structured observation report.
+Supports two publisher publication modes:
+  - validation_only    (default): manifest has handoff_enabled=false
+  - controlled_activation:        manifest has handoff_enabled=true (Key 2 of two-key gate)
+
 Does NOT run the publisher. Does NOT modify live bot wiring. Does NOT flip any flag.
+Does NOT enable handoff. Does NOT change candidate source.
 
 Inputs:
     data/live/current_manifest.json
@@ -29,12 +34,13 @@ Safety contract (all hardcoded — never from .env or config):
     live_output_changed = false
     live_bot_consuming_handoff = false
     production_candidate_source_changed = false
-    enable_active_opportunity_universe_handoff = false
-    handoff_enabled = false
-    publication_mode = validation_only
+    enable_active_opportunity_universe_handoff = false  (observer never flips this)
     broker_called = false, trading_api_called = false, llm_called = false
     raw_news_used = false, broad_intraday_scan_used = false
     secrets_exposed = false, env_values_logged = false
+
+Note: handoff_enabled and publication_mode at report top-level reflect the MANIFEST state
+(not the observer's own action). The observer never enables handoff.
 
 No imports of: bot_trading, scanner, orders_core, guardrails, bot_ibkr,
 market_intelligence, apex_orchestrator, advisory_reporter, advisory_log_reviewer,
@@ -56,7 +62,21 @@ log = logging.getLogger(__name__)
 
 _SCHEMA_VERSION = "1.0"
 _MODE = "validation_only_handoff_publisher_observation"
-_PUBLICATION_MODE = "validation_only"
+
+# Valid publisher publication modes (Sprint 7J.3: observer is now mode-aware)
+_VALID_PUBLICATION_MODES = {"validation_only", "controlled_activation"}
+
+# Per-mode: expected manifest handoff_enabled value
+_MODE_EXPECTED_HANDOFF_ENABLED: dict[str, bool] = {
+    "validation_only": False,
+    "controlled_activation": True,
+}
+
+# Per-mode: human-readable interpretation label for the observation report
+_MODE_INTERPRETATION: dict[str, str] = {
+    "validation_only": "validation_only_observation",
+    "controlled_activation": "controlled_activation_precheck",
+}
 
 # Freshness SLA thresholds (seconds)
 _SLA_PRIMARY_SECONDS = 10 * 60       # 10 min — primary freshness target
@@ -68,7 +88,8 @@ _VALID_READINESS_GATES = {
     "validation_only_stable",
     "validation_only_unstable",
     "fix_publisher_before_flag_activation",
-    "ready_for_flag_activation_design",
+    "controlled_activation_ready",
+    "controlled_activation_unstable",
 }
 
 # Minimum thresholds for gate advancement
@@ -91,12 +112,13 @@ _RUN_LOG_PATH = "data/live/publisher_run_log.jsonl"
 _OUTPUT_PATH = "data/live/handoff_publisher_observation_report.json"
 
 # Safety block — hardcoded, never from .env
+# Note: handoff_enabled and publication_mode are NOT in _SAFETY — they reflect the manifest
+# state and are set dynamically in run_observer(). All other flags represent the observer's
+# own invariants (the observer never calls brokers, LLMs, changes candidate source, etc.)
 _SAFETY = {
     "production_candidate_source_changed": False,
     "live_bot_consuming_handoff": False,
-    "enable_active_opportunity_universe_handoff": False,
-    "handoff_enabled": False,
-    "publication_mode": _PUBLICATION_MODE,
+    "enable_active_opportunity_universe_handoff": False,  # observer never flips this
     "apex_input_changed": False,
     "scanner_output_changed": False,
     "risk_logic_changed": False,
@@ -233,7 +255,8 @@ def _analyse_freshness(now: datetime, warnings: list[str]) -> dict:
     }
 
 
-def _analyse_manifest(warnings: list[str]) -> dict:
+def _analyse_manifest(warnings: list[str], expected_mode: str = "validation_only") -> dict:
+    """Analyse the current manifest. expected_mode controls what handoff_enabled value is valid."""
     manifest, err = _load_json(_MANIFEST_PATH)
     if err:
         warnings.append(f"manifest: {err}")
@@ -245,11 +268,21 @@ def _analyse_manifest(warnings: list[str]) -> dict:
         manifest.get(f) is False
         for f in ("live_output_changed", "secrets_exposed", "env_values_logged")
     )
+
+    # Mode-aware: expected handoff_enabled depends on the publication_mode
+    expected_handoff_enabled = _MODE_EXPECTED_HANDOFF_ENABLED.get(expected_mode, False)
+
     issues: list[str] = []
-    if manifest.get("handoff_enabled") is not False:
-        issues.append("handoff_enabled is not false")
-    if manifest.get("publication_mode") != _PUBLICATION_MODE:
-        issues.append(f"publication_mode is not '{_PUBLICATION_MODE}'")
+    if manifest.get("handoff_enabled") is not expected_handoff_enabled:
+        issues.append(
+            f"handoff_enabled should be {expected_handoff_enabled} "
+            f"for publication_mode='{expected_mode}'"
+        )
+    if manifest.get("publication_mode") != expected_mode:
+        issues.append(
+            f"publication_mode is '{manifest.get('publication_mode')}' "
+            f"but expected '{expected_mode}'"
+        )
     if manifest.get("enable_flag_required") is not True:
         issues.append("enable_flag_required is not true")
     if not auf_exists:
@@ -276,7 +309,8 @@ def _analyse_manifest(warnings: list[str]) -> dict:
     }
 
 
-def _analyse_active_universe(warnings: list[str]) -> dict:
+def _analyse_active_universe(warnings: list[str], expected_mode: str = "validation_only") -> dict:
+    """Analyse the active opportunity universe. expected_mode controls publication_mode validation."""
     universe, err = _load_json(_UNIVERSE_PATH)
     if err:
         warnings.append(f"active_universe: {err}")
@@ -294,8 +328,12 @@ def _analyse_active_universe(warnings: list[str]) -> dict:
                 field_issues.append(f"{c.get('symbol')}: missing '{field}'")
 
     issues: list[str] = []
-    if universe.get("publication_mode") != _PUBLICATION_MODE:
-        issues.append(f"publication_mode is not '{_PUBLICATION_MODE}'")
+    # Mode-aware: accept publication_mode matching the expected_mode
+    if universe.get("publication_mode") != expected_mode:
+        issues.append(
+            f"publication_mode is '{universe.get('publication_mode')}' "
+            f"but expected '{expected_mode}'"
+        )
     if universe.get("no_executable_trade_instructions") is not True:
         issues.append("no_executable_trade_instructions is not true")
     if executable_violations:
@@ -364,7 +402,8 @@ def _analyse_heartbeat(now: datetime, warnings: list[str]) -> dict:
     }
 
 
-def _analyse_publisher_report(warnings: list[str]) -> dict:
+def _analyse_publisher_report(warnings: list[str], expected_mode: str = "validation_only") -> dict:
+    """Analyse the publisher report. expected_mode controls what handoff_enabled is valid."""
     report, err = _load_json(_PUBLISHER_REPORT_PATH)
     if err:
         warnings.append(f"publisher_report: {err}")
@@ -374,11 +413,16 @@ def _analyse_publisher_report(warnings: list[str]) -> dict:
     cs = report.get("candidate_summary") or {}
     aw = report.get("atomic_write_summary") or {}
 
+    expected_handoff_enabled = _MODE_EXPECTED_HANDOFF_ENABLED.get(expected_mode, False)
+
     issues: list[str] = []
     if vs.get("overall_status") != "pass":
         issues.append(f"overall_status is '{vs.get('overall_status')}' not 'pass'")
-    if report.get("handoff_enabled") is not False:
-        issues.append("handoff_enabled is not false in report")
+    if report.get("handoff_enabled") is not expected_handoff_enabled:
+        issues.append(
+            f"handoff_enabled should be {expected_handoff_enabled} "
+            f"for publication_mode='{expected_mode}' in report"
+        )
     if report.get("live_output_changed") is not False:
         issues.append("live_output_changed is not false in report")
 
@@ -557,6 +601,88 @@ def _read_run_log() -> dict:
     }
 
 
+def _get_current_mode() -> str:
+    """
+    Read the current publication_mode from the live manifest.
+    Returns 'validation_only' as the safe default if the manifest is missing or unreadable.
+    Returns 'unknown' if publication_mode is present but not in _VALID_PUBLICATION_MODES.
+
+    Never modifies any file. Pure read.
+    """
+    manifest, err = _load_json(_MANIFEST_PATH)
+    if err or not manifest:
+        return "validation_only"
+    mode = manifest.get("publication_mode", "validation_only")
+    if mode not in _VALID_PUBLICATION_MODES:
+        return "unknown"
+    return mode
+
+
+def _build_mode_context(
+    current_mode: str,
+    manifest_analysis: dict,
+    universe_analysis: dict,
+) -> dict:
+    """
+    Build the mode_context section of the observation report.
+
+    This section captures the manifest's publication mode state and what it means
+    for bot consumption. It does NOT change any flag or enable any handoff.
+
+    Two-key model:
+      Key 1 — bot config flag: enable_active_opportunity_universe_handoff (config.py)
+      Key 2 — manifest gate:   handoff_enabled = true (controlled_activation mode)
+      Both keys required for live bot consumption.
+    """
+    expected_handoff_enabled = _MODE_EXPECTED_HANDOFF_ENABLED.get(current_mode, False)
+    mode_interpretation = _MODE_INTERPRETATION.get(current_mode, "invalid_mode")
+    manifest_handoff_enabled = manifest_analysis.get("handoff_enabled")
+    manifest_pub_mode = manifest_analysis.get("publication_mode")
+
+    manifest_mode_valid = (
+        current_mode in _VALID_PUBLICATION_MODES
+        and manifest_handoff_enabled is expected_handoff_enabled
+        and manifest_pub_mode == current_mode
+    )
+    manifest_allows_handoff = (
+        current_mode == "controlled_activation"
+        and manifest_handoff_enabled is True
+    )
+
+    # Read bot config flag state (non-critical: may be unavailable in test environments)
+    bot_flag: bool | None
+    try:
+        import config as _cfg  # type: ignore[import]
+        bot_flag = bool(_cfg.CONFIG.get("enable_active_opportunity_universe_handoff", False))
+    except (ImportError, AttributeError, KeyError):
+        bot_flag = None
+
+    bot_consumption_allowed = bool(manifest_allows_handoff and bot_flag is True)
+
+    bot_consumption_note: str | None = None
+    if manifest_allows_handoff and bot_flag is False:
+        bot_consumption_note = "manifest_ready_but_bot_flag_disabled"
+    elif current_mode == "controlled_activation" and not manifest_allows_handoff:
+        bot_consumption_note = "controlled_activation_manifest_handoff_not_enabled"
+    elif current_mode == "validation_only":
+        bot_consumption_note = "validation_only_manifest_handoff_disabled"
+
+    return {
+        "publication_mode": current_mode,
+        "handoff_enabled": manifest_handoff_enabled,
+        "mode_interpretation": mode_interpretation,
+        "expected_handoff_enabled_for_mode": expected_handoff_enabled,
+        "manifest_mode_valid": manifest_mode_valid,
+        "manifest_allows_handoff": manifest_allows_handoff,
+        "bot_flag_state": bot_flag,
+        "bot_consumption_allowed": bot_consumption_allowed,
+        "bot_consumption_note": bot_consumption_note,
+        "candidate_count": universe_analysis.get("candidate_count"),
+        "executable_violations": universe_analysis.get("executable_violations", []),
+        "order_instruction_violations": universe_analysis.get("order_instruction_violations", []),
+    }
+
+
 def _determine_readiness_gate(
     run_log: dict,
     manifest_analysis: dict,
@@ -564,12 +690,19 @@ def _determine_readiness_gate(
     heartbeat_analysis: dict,
     freshness: dict,
     warnings: list[str],
+    current_mode: str = "validation_only",
 ) -> tuple[str, bool, str]:
     """
     Return (gate, threshold_met, threshold_basis).
 
     Threshold: successful_publisher_runs >= 10 OR distinct_utc_sessions >= 3.
     threshold_basis: 'successful_runs' | 'distinct_sessions' | 'not_met'
+
+    Gate is mode-aware (Sprint 7J.3):
+      validation_only mode      → validation_only_stable / validation_only_unstable
+      controlled_activation mode → controlled_activation_ready / controlled_activation_unstable
+      fix_publisher_before_flag_activation fires only for REAL publisher errors
+      (executable candidates, safety flags dirty, missing files) — never for mode mismatch.
     """
     successful_runs = run_log.get("successful_runs", 0)
     distinct_sessions = run_log.get("distinct_sessions", 0)
@@ -593,20 +726,25 @@ def _determine_readiness_gate(
     if not threshold_met:
         return "insufficient_observation", False, "not_met"
 
-    # Gate 2: fix publisher
-    has_publisher_issues = (
+    # Gate 2: fix publisher — real errors only (not mode-mismatch false alarms)
+    # Real errors: safety flags dirty, executable candidates, missing heartbeat, missing files.
+    # NOTE: issue_count is now mode-aware (from _analyse_manifest/universe), so these only
+    # fire when the manifest/universe genuinely doesn't match the expected mode.
+    real_publisher_errors = (
         manifest_analysis.get("issue_count", 0) > 0
         or universe_analysis.get("issue_count", 0) > 0
         or not heartbeat_analysis.get("exists")
     )
-    if has_publisher_issues:
+    if real_publisher_errors:
         return "fix_publisher_before_flag_activation", True, threshold_basis
 
-    # Gate 3: freshness expired
+    # Gate 3: freshness — mode-aware gate name
     if freshness.get("expired_count", 0) > 0:
+        if current_mode == "controlled_activation":
+            return "controlled_activation_unstable", True, threshold_basis
         return "validation_only_unstable", True, threshold_basis
 
-    # Gate 4: all pass
+    # Gate 4: all pass — mode-aware stable gate
     all_pass = (
         manifest_analysis.get("validation_status") == "pass"
         and universe_analysis.get("validation_status") == "pass"
@@ -614,8 +752,12 @@ def _determine_readiness_gate(
         and not freshness.get("expired_count", 0)
     )
     if all_pass:
+        if current_mode == "controlled_activation":
+            return "controlled_activation_ready", True, threshold_basis
         return "validation_only_stable", True, threshold_basis
 
+    if current_mode == "controlled_activation":
+        return "controlled_activation_unstable", True, threshold_basis
     return "validation_only_unstable", True, threshold_basis
 
 
@@ -629,16 +771,22 @@ def run_observer() -> dict:
     Execute one observation cycle. Reads all publisher outputs and generates
     a structured observation report. Writes to _OUTPUT_PATH.
 
-    Pure read — no write to any publisher file.
+    Mode-aware (Sprint 7J.3): reads publication_mode from current manifest and validates
+    all publisher outputs against the expected state for that mode.
+
+    Pure read — no write to any publisher file. Never enables handoff. Never flips config flag.
     """
     now = _now_utc()
     warnings: list[str] = []
 
+    # Determine current publication mode from the manifest (Sprint 7J.3)
+    current_mode = _get_current_mode()
+
     freshness = _analyse_freshness(now, warnings)
-    manifest_analysis = _analyse_manifest(warnings)
-    universe_analysis = _analyse_active_universe(warnings)
+    manifest_analysis = _analyse_manifest(warnings, expected_mode=current_mode)
+    universe_analysis = _analyse_active_universe(warnings, expected_mode=current_mode)
     heartbeat_analysis = _analyse_heartbeat(now, warnings)
-    publisher_report_analysis = _analyse_publisher_report(warnings)
+    publisher_report_analysis = _analyse_publisher_report(warnings, expected_mode=current_mode)
     fail_closed_obs = _analyse_fail_closed(warnings)
 
     run_log = _read_run_log()
@@ -651,7 +799,11 @@ def run_observer() -> dict:
     readiness_gate, threshold_met, threshold_basis = _determine_readiness_gate(
         run_log, manifest_analysis, universe_analysis,
         heartbeat_analysis, freshness, warnings,
+        current_mode=current_mode,
     )
+
+    # Build mode context (Sprint 7J.3)
+    mode_context = _build_mode_context(current_mode, manifest_analysis, universe_analysis)
 
     source_files = [p for p in (
         _MANIFEST_PATH, _UNIVERSE_PATH, _PUBLISHER_REPORT_PATH, _HEARTBEAT_PATH,
@@ -693,6 +845,11 @@ def run_observer() -> dict:
         "quota_watch_status": universe_analysis.get("quota_watch_status"),
     }
 
+    # handoff_enabled and publication_mode at top level reflect the MANIFEST state (Sprint 7J.3).
+    # This allows the validator to do mode-aware checks. The observer itself never enables
+    # handoff — that guarantee is expressed in safety_analysis.
+    manifest_handoff_enabled = manifest_analysis.get("handoff_enabled", False)
+
     report = {
         "schema_version": _SCHEMA_VERSION,
         "generated_at": _ts(now),
@@ -706,10 +863,10 @@ def run_observer() -> dict:
         "publisher_report_analysis": publisher_report_analysis,
         "candidate_stability_analysis": candidate_stability,
         "fail_closed_observations": fail_closed_obs,
+        "mode_context": mode_context,          # Sprint 7J.3: mode-awareness section
         "safety_analysis": {
-            "live_bot_consuming_handoff": False,
-            "enable_active_opportunity_universe_handoff": False,
-            "handoff_enabled": False,
+            "live_bot_consuming_handoff": False,   # observer never consumes
+            "enable_active_opportunity_universe_handoff": False,  # observer never flips this
             "production_candidate_source_changed": False,
             "scanner_output_changed": False,
             "apex_input_changed": False,
@@ -720,6 +877,9 @@ def run_observer() -> dict:
         },
         "readiness_gate": readiness_gate,
         "warnings": warnings,
+        # Dynamic fields: reflect manifest state (not observer action)
+        "handoff_enabled": manifest_handoff_enabled,
+        "publication_mode": current_mode,
         **_SAFETY,
     }
 

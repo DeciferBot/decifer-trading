@@ -1,7 +1,7 @@
 # Intelligence-First Handoff Activation Checklist
 
-**Sprint:** 7H design artefact — updated Sprint 7J.1 for two-key activation model — for use in controlled activation sprint only
-**Status:** Pre-activation. Flag is False. Checklist is not active. Two-key model implemented (Sprint 7J.1).
+**Sprint:** 7H design artefact — updated Sprint 7J.1 for two-key activation model; observer mode-aware patch Sprint 7J.3 — for use in controlled activation sprint only
+**Status:** Pre-activation. Flag is False. Checklist is not active. Two-key model implemented (Sprint 7J.1). Observer mode-aware (Sprint 7J.3).
 **Classification:** Advisory/design document. Do not use until Amit explicitly approves activation sprint.
 
 ---
