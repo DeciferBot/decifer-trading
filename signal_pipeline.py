@@ -24,12 +24,14 @@ from signal_types import SIGNALS_LOG, Signal
 from signals import get_regime_threshold, score_universe
 from utils.log_rotation import rotate_jsonl_if_needed
 
-# Maximum size for tier_d_funnel.jsonl before rotation; configurable via CONFIG.
+# Maximum sizes for JSONL logs before rotation; configurable via CONFIG.
 try:
     from config import CONFIG as _CFG
     _TIER_D_FUNNEL_MAX_BYTES = int(_CFG.get("tier_d_funnel_max_mb", 10)) * 1_048_576
+    _SIGNALS_LOG_MAX_BYTES   = int(_CFG.get("signals_log_max_mb", 20)) * 1_048_576
 except Exception:
     _TIER_D_FUNNEL_MAX_BYTES = 10 * 1_048_576
+    _SIGNALS_LOG_MAX_BYTES   = 20 * 1_048_576
 
 log = logging.getLogger("decifer.pipeline")
 
@@ -645,6 +647,7 @@ def _append_signals_log(signals: list, log_path: str) -> None:
     if not signals:
         return
     try:
+        rotate_jsonl_if_needed(log_path, _SIGNALS_LOG_MAX_BYTES)
         with open(log_path, "a") as f:
             for s in signals:
                 f.write(s.to_json() + "\n")
