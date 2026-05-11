@@ -612,17 +612,20 @@ def _apply_tier_d_scoring_cap(
     return new_filtered, counters
 
 
-def _scored_to_signals(scored: list, regime_name: str) -> list:
+def _scored_to_signals(scored: list, regime_name: str, governance_map: dict | None = None) -> list:
     """Convert score_universe() raw dicts → typed Signal objects."""
     now = datetime.now(UTC)
+    gov = governance_map or {}
     signals = []
     for s in scored:
         direction = s.get("direction", "NEUTRAL")
         if direction not in ("LONG", "SHORT", "NEUTRAL"):
             direction = "NEUTRAL"
+        sym = s["symbol"]
+        candidate = gov.get(sym)
         signals.append(
             Signal(
-                symbol=s["symbol"],
+                symbol=sym,
                 direction=direction,
                 conviction_score=round(s.get("score", 0) / 5.0, 3),
                 dimension_scores=s.get("score_breakdown", {}),
@@ -635,6 +638,11 @@ def _scored_to_signals(scored: list, regime_name: str) -> list:
                 instrument=s.get("instrument", "stock"),
                 scanner_tier=s.get("scanner_tier", ""),
                 extension_at_entry=s.get("extension_at_entry"),
+                handoff_source_labels=candidate.get("source_labels") if candidate else None,
+                handoff_route=candidate.get("route") if candidate else None,
+                handoff_reason_to_care=candidate.get("reason_to_care") if candidate else None,
+                handoff_freshness_status=candidate.get("freshness_status") if candidate else None,
+                handoff_candidate_id=candidate.get("candidate_id") if candidate else None,
             )
         )
     return signals
@@ -663,6 +671,7 @@ def run_signal_pipeline(
     favourites: list,
     signals_log_path: str = SIGNALS_LOG,
     ib=None,
+    governance_map: dict | None = None,
 ) -> SignalPipelineResult:
     """
     Execute the full signal data pipeline for one scan cycle.
@@ -851,8 +860,8 @@ def run_signal_pipeline(
     # 6. IC audit log — write all scored symbols for forward-return tracking
     log_signal_scan(all_scored, regime)
 
-    # 7. Build typed Signal objects
-    signals = _scored_to_signals(scored, regime_name)
+    # 7. Build typed Signal objects (governance_map attaches handoff provenance when available)
+    signals = _scored_to_signals(scored, regime_name, governance_map=governance_map)
 
     # 8. Append to signals_log.jsonl for IC calculator
     _append_signals_log(signals, log_path=signals_log_path)
