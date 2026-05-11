@@ -67,7 +67,7 @@ def _load_env() -> None:
     """Load .env without exposing secrets."""
     try:
         from dotenv import load_dotenv
-        load_dotenv()
+        load_dotenv(override=True)
     except ImportError:
         pass
 
