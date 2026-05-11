@@ -43,7 +43,7 @@
 | 17 | Promoter worker heartbeat fresh | `DONE_AND_PROVEN` | `data/heartbeats/universe_promoter_worker.json` — `last_success_at: 2026-05-11T06:17:53Z`, count=50 | `cat data/heartbeats/universe_promoter_worker.json` (master repo) | — |
 | 18 | Handoff publisher plist exists | `DONE_AND_PROVEN` | `ops/launchd/com.decifer.handoff-publisher.plist` — created in this sprint, StartInterval=600 | `ls ops/launchd/` | Install: `cp ops/launchd/com.decifer.handoff-publisher.plist ~/Library/LaunchAgents/` then `launchctl load` |
 | 19 | Handoff publisher plist installed | `DONE_AND_PROVEN` | Sprint 2: `cp ops/launchd/com.decifer.handoff-publisher.plist ~/Library/LaunchAgents/ && launchctl load ... && launchctl kickstart ...` — exit_code=0; `launchctl list com.decifer.handoff-publisher` shows ProgramArguments with `--mode controlled_activation` | `launchctl list com.decifer.handoff-publisher` | — |
-| 20 | Handoff publisher heartbeat fresh | `DONE_AND_PROVEN` | Sprint 2: cron `*/10 * * * *` running; last_success_at=2026-05-11T07:20:00Z (cron run). Launchd agent also installed (StartInterval=600). Both use `--mode controlled_activation`. | `cat data/heartbeats/handoff_publisher.json` | — |
+| 20 | Handoff publisher heartbeat fresh | `DONE_AND_PROVEN` | Sprint 2: launchd `com.decifer.handoff-publisher` installed (StartInterval=600, `--mode controlled_activation`). Cron `*/10 * * * *` also active as temporary proof-window redundancy. last_success_at=2026-05-11T07:40:00Z. After proof window (checks 26+27): remove cron, launchd is sole authority. | `cat data/heartbeats/handoff_publisher.json` | Remove cron after checks 26+27 proven |
 
 ---
 

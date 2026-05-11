@@ -9,5 +9,5 @@
 #   ./scripts/bump-version.sh <MAJOR.MINOR.PATCH> "<Codename>"
 
 
-__version__ = "4.0.6"
+__version__ = "4.0.7"
 __codename__ = "Nexus"

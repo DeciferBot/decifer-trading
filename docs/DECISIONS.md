@@ -326,3 +326,14 @@ These decisions are inferred from the current codebase. Future entries will be l
 **Why one path**: A memory substrate with two locations is not memory — it is ambiguity. If the hook reads one place and Cowork writes another, the brain drifts and is silently stale. Chief's whole purpose is to be the single source of truth about bot state, past work, and intent. Two paths = two truths = no truth.
 
 **Rule**: `research-*.json` belongs in `research/`, never in `specs/`. Specs describe feature intent or completed work; research files are knowledge-base entries from `researcher.py` or Cowork investigations. Mixing them collapses the contract.
+
+---
+
+### Publisher Scheduler: launchd Is the Single Authority After Proof Window (Local Mac)
+**Decision**: Both cron (`*/10 * * * *`) and launchd (`com.decifer.handoff-publisher`, `StartInterval=600`) are temporarily installed during the controlled-activation proof window as redundancy. After the first successful market-hours handoff-consumption proof (proof matrix checks 26 + 27 confirmed), the cron entry is removed and launchd becomes the sole scheduler for local Mac operation.
+
+Cloud scheduling is out of scope until the cloud deployment phase. Do not conflate local Mac launchd scheduling with cloud scheduling.
+
+**Why temporary redundancy**: Activation is happening for the first time in production. Running two schedulers during the proof window ensures the manifest stays fresh even if one scheduler misfires. Once the consumption path is proven, the redundancy is noise.
+
+**Rule**: After proof confirmed — run `crontab -e` and remove the `*/10 * * * *` handoff-publisher line. launchd remains. Do not install cron again for the publisher on local Mac.

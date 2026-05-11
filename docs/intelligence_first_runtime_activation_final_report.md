@@ -49,14 +49,18 @@ fail_closed_reason: null
 
 ## 4. Publisher Scheduling
 
-| Scheduler | Command | Interval | Status |
-|-----------|---------|----------|--------|
-| cron | `python3.11 handoff_publisher.py --mode controlled_activation` | Every 10 min (`*/10 * * * *`) | **Active** |
-| launchd (`com.decifer.handoff-publisher`) | Same | `StartInterval=600` | **Installed, exit_code=0** |
+**Environment:** Local Mac (laptop), not cloud. Cloud scheduling is out of scope for this sprint.
+
+| Scheduler | Command | Interval | Status | Role |
+|-----------|---------|----------|--------|------|
+| launchd (`com.decifer.handoff-publisher`) | `--mode controlled_activation` | `StartInterval=600` | **Installed, exit_code=0** | **Target authority** |
+| cron (`*/10 * * * *`) | `--mode controlled_activation` | Every 10 min | Active | Temporary proof-window redundancy |
 
 Manifest TTL = 15 minutes. Publisher runs every ≤10 minutes → 5-minute expiry margin.
 
-**Manifest reversion investigation (Sprint 2):** Apparent reversion observed during testing was caused by the test suite spawning 24+ parallel publisher instances in a single second (07:17:23Z). All entries at the same timestamp with alternating modes confirm this. The cron job restored `controlled_activation` at 07:20:00Z. This is not a production issue — the scheduler is stable.
+**Scheduler operating model (Amit, 2026-05-11):** Both cron and launchd are installed as temporary activation redundancy during the proof window only. launchd is the intended single scheduler authority for local Mac operation. The cron entry will be removed after the first successful market-hours handoff-consumption proof (proof matrix checks 26 + 27 close). Cloud scheduling is handled separately during the cloud deployment phase.
+
+**Manifest reversion investigation (Sprint 2):** Apparent reversion observed during testing was caused by the test suite spawning 24+ parallel publisher instances in a single second (07:17:23Z). Not a production issue — both schedulers run `--mode controlled_activation`.
 
 ---
 
