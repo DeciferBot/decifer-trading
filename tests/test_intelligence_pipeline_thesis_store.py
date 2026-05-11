@@ -54,13 +54,19 @@ class TestIntelligencePipelineThesisStore:
         ]
 
     def test_thesis_store_step_does_not_crash_on_missing_inputs(self, tmp_path):
+        import os
         import thesis_store as ts
-        original_output = ts._OUTPUT_PATH
+
+        # Route all input paths to an empty tmp directory so none exist
+        saved = (ts._ACTIVATION_PATH, ts._CONTEXT_PATH, ts._FEED_PATH, ts._SHADOW_PATH)
         try:
-            ts._OUTPUT_PATH = str(tmp_path / "thesis_store.json")
+            ts._ACTIVATION_PATH = str(tmp_path / "theme_activation.json")
+            ts._CONTEXT_PATH = str(tmp_path / "current_economic_context.json")
+            ts._FEED_PATH = str(tmp_path / "economic_candidate_feed.json")
+            ts._SHADOW_PATH = str(tmp_path / "active_opportunity_universe_shadow.json")
             result = ts.generate_thesis_store(output_path=str(tmp_path / "thesis_store.json"))
         finally:
-            ts._OUTPUT_PATH = original_output
+            ts._ACTIVATION_PATH, ts._CONTEXT_PATH, ts._FEED_PATH, ts._SHADOW_PATH = saved
 
         assert isinstance(result, dict)
         assert "unavailable_sources" in result
