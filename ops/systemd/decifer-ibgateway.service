@@ -1,0 +1,81 @@
+# ops/systemd/decifer-ibgateway.service
+#
+# PURPOSE:
+#   Starts IB Gateway in paper mode, managed by IBC (IBController) for
+#   headless automatic login.
+#
+# DEPENDENCY ORDER:
+#   decifer-xvfb.service      ← must be running first (Xvfb provides display)
+#   decifer-ibgateway.service ← this file
+#   decifer-docker-stack.service ← depends on this service
+#
+# PREREQUISITES (must be true before enabling this service):
+#   1. Xvfb installed: apt-get install xvfb
+#   2. Java 17 installed: apt-get install openjdk-17-jre-headless
+#   3. IB Gateway installed at /opt/ibgateway/ (see ops/ibc/README.md)
+#   4. IBC installed at /opt/decifer/ibc/ (see ops/ibc/README.md)
+#   5. /opt/decifer/ibc/config.ini exists with real credentials (chmod 600)
+#
+# SAFETY NOTES:
+#   - IbPort=4002 in config.ini ensures Gateway listens on paper port only
+#   - Gateway binds to 127.0.0.1 — the firewall blocks 4002 on public interfaces
+#   - TradingMode=paper in config.ini — confirmed before enabling
+#   - This service must not be started without verifying firewall (setup_firewall.sh)
+#
+# INSTALLATION:
+#   Run: scripts/cloud/install_systemd_services.sh
+#   Do NOT enable until ops/ibc/README.md installation steps are complete.
+
+[Unit]
+Description=Decifer — IB Gateway paper mode (managed by IBC)
+Documentation=file:///opt/decifer/current/ops/ibc/README.md
+After=network.target decifer-xvfb.service
+Requires=decifer-xvfb.service
+Before=decifer-docker-stack.service
+
+[Service]
+Type=simple
+User=decifer
+Group=decifer
+WorkingDirectory=/opt/decifer/ibc
+
+# DISPLAY must match the Xvfb service (:1)
+Environment=DISPLAY=:1
+Environment=JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+# IBC startup command.
+# Arguments:
+#   $1 = path to IBC config.ini (contains credentials — never in git)
+#   $2 = path to IB Gateway installation
+#   $3 = IBC log directory
+#
+# ⚠️  /opt/decifer/ibc/config.ini must exist and have chmod 600 before this
+#     service can start. If the file is missing, ExecStartPre will fail fast.
+ExecStartPre=/bin/test -f /opt/decifer/ibc/config.ini
+ExecStartPre=/bin/bash -c 'perms=$(stat -c "%a" /opt/decifer/ibc/config.ini); [ "$perms" = "600" ] || (echo "SECURITY: config.ini permissions are $perms, expected 600" && exit 1)'
+
+ExecStart=/bin/bash /opt/decifer/ibc/scripts/ibcstart.sh \
+  /opt/decifer/ibc/config.ini \
+  --IbDir=/opt/ibgateway \
+  --LogDir=/opt/decifer/ibc/logs \
+  --LogToConsole=yes
+
+# Wait up to 90 seconds for Gateway to become ready before reporting failure
+TimeoutStartSec=90
+
+# Restart policy — on-failure:3 prevents restart storms if credentials are wrong
+Restart=on-failure
+RestartSec=30
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+# On permanent failure, stop the Docker stack too (prevents bot connecting to dead Gateway)
+OnFailure=decifer-docker-stack.service
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=decifer-ibgateway
+
+[Install]
+WantedBy=multi-user.target

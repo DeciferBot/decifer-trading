@@ -89,6 +89,14 @@ services:
   # ── Live Trading Bot ───────────────────────────────────────────────────────
   # Always-on during market hours. Requires IBKR Gateway accessible on the host.
   #
+  # ⚠️  COMPOSE PROFILE: "live"
+  #   This service is gated behind the "live" Compose profile.
+  #   It will NOT start with `docker compose up` (default).
+  #   It will NOT start with the decifer-docker-stack.service systemd unit.
+  #
+  #   To start live-bot (Amit approval required, never during market hours):
+  #     docker compose --profile live up -d live-bot
+  #
   # network_mode: host — required on Linux so the container reaches IBKR Gateway
   # at 127.0.0.1:4002 (IB Gateway paper) on the host. Ports declared below are
   # informational only (host networking ignores the ports: directive).
@@ -99,6 +107,7 @@ services:
   # NEVER change command to python3 bot.py without Amit's explicit approval.
   # NEVER set HANDOFF_PUBLISHER_MODE=controlled_activation without Amit's approval.
   live-bot:
+    profiles: [live]   # Safety gate: requires --profile live to start
     build: .
     image: decifer-trading:latest
     command: python3 scripts/healthcheck.py   # safe default — NOT bot.py

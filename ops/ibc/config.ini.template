@@ -1,0 +1,104 @@
+# IBC Configuration Template — Decifer Trading Phase 1
+#
+# ⚠️  THIS IS A TEMPLATE. IT CONTAINS PLACEHOLDERS, NOT REAL CREDENTIALS.
+#
+# INSTRUCTIONS:
+#   1. Copy this file to /opt/decifer/ibc/config.ini on the VM
+#   2. Replace every <PLACEHOLDER> with the real value
+#   3. Set permissions immediately: chmod 600 /opt/decifer/ibc/config.ini
+#   4. Set ownership: chown root:root /opt/decifer/ibc/config.ini
+#   5. NEVER commit config.ini to git — it contains your IBKR password
+#   6. NEVER use live account credentials in Phase 1 — paper account only
+#
+# IBC version compatibility: 3.18.x / 3.19.x
+# IB Gateway target: stable channel, paper mode, port 4002
+# Reference: https://github.com/IbcAlpha/IBC/blob/master/userguide.md
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IBKR LOGIN CREDENTIALS (paper account only — never live credentials here)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Your IBKR paper account username (NOT your live username)
+IbLoginId=<YOUR_IBKR_PAPER_USERNAME>
+
+# Your IBKR paper account password
+# This file must have chmod 600 and be owned by root to protect this value
+IbPassword=<YOUR_IBKR_PAPER_PASSWORD>
+
+# Trading mode — must be "paper" for Phase 1
+# Do NOT change to "live" without Amit's explicit approval
+TradingMode=paper
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IB GATEWAY SETTINGS
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Which application to start: "gateway" (headless, preferred) or "tws" (full UI)
+# IB Gateway is lighter and better suited to headless cloud operation
+IbDir=<PATH_TO_IBGATEWAY_INSTALL>
+# Default install path: /opt/ibgateway
+
+# Gateway API port — must match IBKR_PORT in .env and firewall config
+# Paper Gateway: 4002 (lighter, preferred for cloud)
+# Paper TWS: 7497
+# NEVER use port 4001 (live) in Phase 1
+IbPort=4002
+
+# Override port (ensures Gateway uses exactly this port, not a default)
+OverrideTwsApiPort=4002
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SESSION AND RESTART SETTINGS
+# ─────────────────────────────────────────────────────────────────────────────
+
+# What to do if an existing Gateway session is detected at login
+# "primary" — become the primary session (correct for single-bot operation)
+ExistingSessionDetectedAction=primary
+
+# What to do when Gateway asks to restart for a software update
+# "accept" — allow updates automatically
+# "ignore" — skip updates (safer if you want to control Gateway versions)
+AcceptIncomingConnectionAction=accept
+
+# Automatically restart the Gateway when IBC detects it has shut down
+# "yes" — IBC will restart the Gateway process
+ReloginAfterSecondFactorAuthenticationTimeout=yes
+
+# How long (in minutes) IBC waits for the 2FA prompt before timing out
+SecondFactorAuthenticationTimeout=40
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HEADLESS DISPLAY (Xvfb)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# DISPLAY environment variable is set by the Xvfb systemd service (DISPLAY=:1)
+# IBC reads it from the environment — no setting needed here.
+# Ensure decifer-xvfb.service is running before decifer-ibgateway.service starts.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LOGGING
+# ─────────────────────────────────────────────────────────────────────────────
+
+# IBC log file location — written by IBC, not the bot
+# Default: ~/ibc/logs/ibc.log  (overridden in the systemd service ExecStart)
+LogToConsole=yes
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY NOTES (read before deploying)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# 1. This file contains your IBKR password in plaintext.
+#    It must have chmod 600 and chown root:root at all times.
+#    Never give non-root users read access to this file.
+#
+# 2. IbPort=4002 must match the Gateway binding address.
+#    Confirm in the firewall (setup_firewall.sh) that port 4002 is NOT open
+#    on any public interface — loopback (127.0.0.1) only.
+#
+# 3. TradingMode=paper must remain "paper" for all of Phase 1.
+#    Changing this to "live" without Amit approval violates governance rules.
+#
+# 4. NEVER commit this file to git.
+#    Add to .gitignore if there is any risk of accidental commit:
+#    echo "ops/ibc/config.ini" >> .gitignore
+#    (The template config.ini.template is safe to commit — no credentials.)

@@ -1,0 +1,49 @@
+# ops/systemd/decifer-xvfb.service
+#
+# PURPOSE:
+#   Starts a headless X11 virtual framebuffer (Xvfb) on display :1.
+#   IB Gateway requires a display to render its Java GUI — Xvfb provides
+#   this without a physical screen or VNC connection.
+#
+# DEPENDENCY ORDER:
+#   decifer-xvfb.service     ← starts first (this file)
+#   decifer-ibgateway.service ← depends on xvfb
+#   decifer-docker-stack.service ← depends on ibgateway
+#
+# INSTALLATION:
+#   Run: scripts/cloud/install_systemd_services.sh
+#   Do NOT copy manually unless you understand the dependencies.
+#
+# NOTES:
+#   - DISPLAY=:1 is exported so IBC and IB Gateway processes find the display
+#   - Screen resolution 1024x768x24 is sufficient for IB Gateway GUI rendering
+#   - Xvfb must be installed: apt-get install xvfb
+
+[Unit]
+Description=Decifer — Xvfb headless X11 display for IB Gateway
+Documentation=file:///opt/decifer/current/ops/ibc/README.md
+After=network.target
+Before=decifer-ibgateway.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+# Start Xvfb on display :1 with sufficient screen size for IB Gateway
+ExecStart=/usr/bin/Xvfb :1 -screen 0 1024x768x24 -nolisten tcp
+
+# Restart on failure — Xvfb crashing would bring down IB Gateway
+Restart=on-failure
+RestartSec=5
+
+# Environment
+Environment=DISPLAY=:1
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=decifer-xvfb
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,73 @@
+# ops/systemd/decifer-docker-stack.service
+#
+# PURPOSE:
+#   Starts the Decifer Docker Compose stack for NON-TRADING services only.
+#   By default, this starts: handoff-publisher and handoff-observer.
+#
+# ⚠️  CRITICAL SAFETY NOTE:
+#   This service DOES NOT start the live-bot container.
+#   The live-bot service has the Compose profile "live" and is excluded from
+#   the default `docker compose up` command used here.
+#
+#   To start live-bot, Amit must manually run (after explicit approval):
+#     docker compose --profile live up -d live-bot
+#   from /opt/decifer/current/
+#
+# DEPENDENCY ORDER:
+#   decifer-xvfb.service         ← must be running
+#   decifer-ibgateway.service    ← must be running (for future live-bot use)
+#   decifer-docker-stack.service ← this file (starts publisher + observer only)
+#
+# INSTALLATION:
+#   Run: scripts/cloud/install_systemd_services.sh
+#   Enabling this service will start handoff-publisher and handoff-observer
+#   on boot. The live-bot requires a separate manual step.
+
+[Unit]
+Description=Decifer — Docker Compose stack (publisher + observer, no live-bot)
+Documentation=file:///opt/decifer/current/docs/cloud_phase1_vm_deployment_runbook.md
+After=network.target docker.service decifer-xvfb.service decifer-ibgateway.service
+Requires=docker.service
+Wants=decifer-xvfb.service decifer-ibgateway.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/decifer/current
+
+User=root
+Group=root
+
+# Environment file — Docker Compose reads this automatically
+EnvironmentFile=/opt/decifer/current/.env
+
+# ── Start: non-trading services only ────────────────────────────────────────
+# Explicitly names the services to start — does NOT use `docker compose up`
+# without arguments, which would start ALL services including live-bot.
+#
+# handoff-publisher: intelligence universe publishing (no IBKR required)
+# handoff-observer:  monitoring the publisher (no IBKR required)
+#
+# live-bot: NOT started here — requires `--profile live` + Amit approval
+ExecStart=/usr/bin/docker compose up -d handoff-publisher handoff-observer
+
+# ── Stop: bring down only the services this unit started ────────────────────
+# Does NOT stop live-bot here (it was started separately and should be
+# stopped separately with explicit intent).
+ExecStop=/usr/bin/docker compose stop handoff-publisher handoff-observer
+
+# Reload: pull new image and restart non-trading services
+ExecReload=/usr/bin/docker compose pull handoff-publisher handoff-observer
+ExecReload=/usr/bin/docker compose up -d handoff-publisher handoff-observer
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=decifer-docker-stack
+
+# Restart policy — restart on failure but not on clean exit
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
