@@ -648,14 +648,39 @@ def main():
     # Stream subscribes to 1-minute bars for the initial universe.
     # fetch_multi_timeframe() reads from BAR_CACHE on every scan — no further
     # wiring needed. Universe subscriptions refresh each scan in run_scan().
+    # When Nexus handoff is active, seed from handoff candidates so BAR_CACHE
+    # pre-warms for the correct universe instead of the full scanner list.
     try:
         from alpaca_stream import AlpacaBarStream
-        from scanner import get_dynamic_universe
 
-        _initial_universe = get_dynamic_universe(bot_state.ib, {})
+        _initial_universe: list[str] = []
+        _startup_bar_source = "scanner"
+
+        if CONFIG.get("enable_active_opportunity_universe_handoff", False):
+            try:
+                from handoff_reader import load_production_handoff
+                _hoff = load_production_handoff("data/live/current_manifest.json")
+                if _hoff.get("handoff_allowed") and _hoff.get("accepted_candidates"):
+                    _initial_universe = list({
+                        c["symbol"] for c in _hoff["accepted_candidates"]
+                        if c.get("symbol")
+                    })
+                    _startup_bar_source = "handoff_reader"
+            except Exception as _hoff_err:
+                clog("INFO", f"📶 Alpaca startup: handoff unavailable ({_hoff_err}) — falling back to scanner")
+
+        if not _initial_universe:
+            from scanner import get_dynamic_universe
+            _initial_universe = get_dynamic_universe(bot_state.ib, {})
+            _startup_bar_source = "scanner"
+
         bot_state._bar_stream = AlpacaBarStream()
         bot_state._bar_stream.start(_initial_universe)
-        clog("INFO", f"📶 Alpaca bar stream active | {len(_initial_universe)} symbols subscribed")
+        clog(
+            "INFO",
+            f"📶 Alpaca bar stream active | {len(_initial_universe)} symbols "
+            f"subscribed | source={_startup_bar_source}",
+        )
     except Exception as _as_err:
         clog("INFO", f"📶 Alpaca bar stream skipped: {_as_err}")
 
