@@ -791,8 +791,8 @@ def backfill_trades_from_ibkr():
                             if abs((t2 - t1).total_seconds()) < 300:
                                 already = True
                                 break
-                        except Exception:
-                            pass
+                        except Exception as _dt_e:
+                            log.debug("backfill_dedup_ts_parse: sym=%s err=%s", sym, _dt_e)
                 if already:
                     continue
 
@@ -898,8 +898,8 @@ def backfill_trades_from_ibkr():
                             if abs((t2 - t1).total_seconds()) < 300:
                                 already = True
                                 break
-                        except Exception:
-                            pass
+                        except Exception as _dt_e:
+                            log.debug("backfill_dedup_ts_parse_short: sym=%s err=%s", sym, _dt_e)
                 if already:
                     continue
 
@@ -1029,8 +1029,8 @@ def backfill_trades_from_ibkr():
                             if abs((t2 - t1).total_seconds()) < 300:
                                 already = True
                                 break
-                        except Exception:
-                            pass
+                        except Exception as _dt_e:
+                            log.debug("backfill_dedup_ts_parse_opt: sym=%s err=%s", sym, _dt_e)
                 if already:
                     continue
 
@@ -1156,8 +1156,8 @@ def backfill_trades_from_ibkr():
                             deduped[s_idx] = merged
                         is_dupe = True
                         break
-                except Exception:
-                    pass
+                except Exception as _dedup_e:
+                    log.debug("trade_dedup_ts_parse: sym=%s err=%s", sym, _dedup_e)
 
             if not is_dupe:
                 seen.append((sym, qty, ts, ep, len(deduped)))

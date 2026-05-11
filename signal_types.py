@@ -54,10 +54,17 @@ class Signal:
     instrument: str = "stock"  # "stock", "fx", "option" — routes get_contract()
     scanner_tier: str = ""  # "D" for Position Research Universe; "" for Tier A/B/C
     extension_at_entry: dict | None = None  # {atr_distance_50ema, pct_from_20d_low, pct_above_donch_high}
+    # Handoff provenance — populated when the symbol originated from the active opportunity universe.
+    # Preserved in signals_log.jsonl so downstream analysis can attribute signal quality to source.
+    handoff_source_labels: list | None = None
+    handoff_route: str | None = None
+    handoff_reason_to_care: str | None = None
+    handoff_freshness_status: str | None = None
+    handoff_candidate_id: str | None = None
 
     def to_dict(self) -> dict:
         """Serialise to a JSON-safe dict (timestamp as ISO string)."""
-        return {
+        d = {
             "symbol": self.symbol,
             "direction": self.direction,
             "conviction_score": round(self.conviction_score, 3),
@@ -69,6 +76,17 @@ class Signal:
             "atr": self.atr,
             "atr_daily": self.atr_daily,
         }
+        if self.handoff_source_labels is not None:
+            d["handoff_source_labels"] = self.handoff_source_labels
+        if self.handoff_route is not None:
+            d["handoff_route"] = self.handoff_route
+        if self.handoff_reason_to_care is not None:
+            d["handoff_reason_to_care"] = self.handoff_reason_to_care
+        if self.handoff_freshness_status is not None:
+            d["handoff_freshness_status"] = self.handoff_freshness_status
+        if self.handoff_candidate_id is not None:
+            d["handoff_candidate_id"] = self.handoff_candidate_id
+        return d
 
     def to_json(self) -> str:
         """Single-line JSON string for appending to signals_log.jsonl."""

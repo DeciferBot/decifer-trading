@@ -1659,6 +1659,7 @@ def run_scan():
         session=get_session(),
         favourites=pipeline_favs,
         ib=ib,
+        governance_map=_handoff_governance_map if _handoff_governance_map else None,
     )
     signals = pipeline.signals
     scored = pipeline.scored

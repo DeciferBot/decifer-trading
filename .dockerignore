@@ -1,0 +1,51 @@
+# Decifer Trading — .dockerignore
+# Keeps secrets and large runtime files out of the build context.
+
+# Secrets — must never be baked into image
+.env
+.env.*
+*.pem
+*.key
+
+# Local state — mounted as volumes at runtime
+data/
+logs/
+
+# Git history (large, not needed in image)
+.git/
+.claude/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Test and dev artifacts
+tests/
+*.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docs (not needed for runtime)
+docs/
+roadmap/
+
+# Large data files that should come via volume mount
+data/committed_universe.json
+data/signals_log.jsonl
+data/tier_d_funnel.jsonl
+data/training_records.jsonl
+data/trades.json
