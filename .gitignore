@@ -113,6 +113,13 @@ data/bot_stdout.log
 data/publisher_cron.log
 data/runtime/
 
+# Operational noise — overwritten every run, no git history value
+data/heartbeats/
+data/live/publisher_run_log.jsonl
+data/live/handoff_publisher_report.json
+data/margin_account_snapshots.jsonl
+data/threshold_history.json
+
 # Graphify output — regenerable, not source
 graphify-out/
 
