@@ -35,11 +35,11 @@ from thesis_store import generate_thesis_store
 def run() -> None:
     print("=== Intelligence Pipeline ===")
 
-    print("[1/3] Resolving candidates...")
+    print("[1/4] Resolving candidates...")
     feed = generate_feed()
     print(f"      {len(feed.candidates)} candidates → data/intelligence/economic_candidate_feed.json")
 
-    print("[2/3] Generating economic intelligence...")
+    print("[2/4] Generating economic intelligence...")
     daily_state, _ = generate_economic_intelligence()
     active_drivers = len(daily_state.get("active_drivers", []))
     print(f"      {active_drivers} active drivers → daily_economic_state.json + current_economic_context.json")
