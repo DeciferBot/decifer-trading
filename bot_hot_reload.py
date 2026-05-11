@@ -60,6 +60,8 @@ def _init_hashes() -> None:
     for name in [*list(WATCHED_MODULES.keys()), "bot", "config"]:
         path = os.path.join(base, f"{name}.py")
         _file_hashes[name] = _file_hash(path)
+    # dashboard_html tracks static/dashboard.html separately from dashboard.py
+    _file_hashes["dashboard_html"] = _file_hash(os.path.join(base, "static", "dashboard.html"))
 
 
 def check_and_reload() -> list:
@@ -88,14 +90,14 @@ def check_and_reload() -> list:
     # Special case: dashboard HTML — watch the static file, not the loader
     dash_path = os.path.join(base, "static", "dashboard.html")
     dash_current = _file_hash(dash_path)
-    if dash_current and dash_current != _file_hashes.get("dashboard", ""):
+    if dash_current and dash_current != _file_hashes.get("dashboard_html", ""):
         try:
             import dashboard as _dash
 
             importlib.reload(_dash)
             if _bot:
                 _bot.DASHBOARD_HTML = _dash.DASHBOARD_HTML
-            _file_hashes["dashboard"] = dash_current
+            _file_hashes["dashboard_html"] = dash_current
             changed.append("dashboard")
             clog("INFO", "🔄 Hot reload: dashboard.html updated — refresh browser to see changes")
         except Exception as e:
