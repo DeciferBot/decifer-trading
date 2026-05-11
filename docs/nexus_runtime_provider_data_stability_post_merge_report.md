@@ -10,9 +10,9 @@
 
 ## 1. Executive Verdict
 
-**CLEAN WITH ENV-ONLY WARNINGS**
+**CLEAN**
 
-All targeted tests pass. No execution, risk, sizing, order, broker, or Nexus architecture logic was changed. All shipped fixes are verified present and behave as intended. The three skipped tests (`test_handoff_wiring_integration.py`) are known conditional skips unrelated to this sprint. One documentation-only correction was applied during audit: pipeline step labels fixed from `[1/3]`/`[2/3]` to `[1/4]`/`[2/4]`.
+All 346 tests in the full broader suite pass (5 skipped). No execution, risk, sizing, order, broker, or Nexus architecture logic was changed. All shipped fixes are verified present and behave as intended. The 5 skipped tests are known conditional skips unrelated to this sprint. One documentation-only correction was applied during audit: pipeline step labels fixed from `[1/3]`/`[2/3]` to `[1/4]`/`[2/4]`.
 
 ---
 
@@ -160,9 +160,22 @@ Master:  c18ed01  test: fix thesis_store test to use tmp_path for input files
 
 ## 9. Test Results
 
-### Final suite (audit run)
+### Final broader suite (audit run)
+
 ```
-154 passed, 3 skipped in 4.36s
+python3 -m pytest \
+  tests/test_fmp_negative_cache.py \
+  tests/test_av_multi_ticker_guard.py \
+  tests/test_alpaca_startup_source.py \
+  tests/test_intelligence_pipeline_thesis_store.py \
+  tests/test_alpha_vantage_client.py \
+  tests/test_handoff_wiring_integration.py \
+  tests/test_handoff_publisher.py \
+  tests/test_handoff_publisher_observer.py \
+  tests/test_handoff_activation_gate.py \
+  -v
+
+346 passed, 5 skipped in 7.25s
 ```
 
 | Test file | Count | Result |
@@ -173,13 +186,11 @@ Master:  c18ed01  test: fix thesis_store test to use tmp_path for input files
 | `tests/test_intelligence_pipeline_thesis_store.py` | 3 | ✅ All pass |
 | `tests/test_alpha_vantage_client.py` | 15 | ✅ All pass (regression) |
 | `tests/test_handoff_wiring_integration.py` | 97 pass, 3 skip | ✅ No regression |
-| `tests/test_handoff_activation_gate.py` | 20 | ✅ All pass (live data present on production machine) |
+| `tests/test_handoff_publisher.py` | pass | ✅ All pass |
+| `tests/test_handoff_publisher_observer.py` | pass, 2 skip | ✅ All pass |
+| `tests/test_handoff_activation_gate.py` | 20 | ✅ All pass |
 
-**Note:** `tests/test_av_error_handling.py` referenced in the validation brief does not exist on master — the shipped file is `tests/test_av_multi_ticker_guard.py`. This is a naming discrepancy between the brief and the shipped code; the tests cover the same functionality under the correct name.
-
-### Environment-dependent failures
-
-`tests/test_handoff_publisher.py` and `tests/test_handoff_publisher_observer.py` fail in isolated environments lacking `data/live/current_manifest.json`, `data/live/active_opportunity_universe.json`, and `data/live/publisher_run_log.jsonl`. All failures are `FileNotFoundError` on `data/live/` paths — env-only. On the production machine these pass (confirmed by `test_handoff_activation_gate.py` passing with live data present). **No regression introduced by this sprint.**
+**Note:** `tests/test_av_error_handling.py` referenced in the validation brief does not exist on master — the shipped file is `tests/test_av_multi_ticker_guard.py`. Naming discrepancy between brief and implementation; tests cover identical functionality under the correct name.
 
 ---
 
@@ -264,9 +275,9 @@ None. All changes are local, isolated, and independently rollbackable.
 
 ## 14. Final Go/No-Go
 
-**CLEAN WITH ENV-ONLY WARNINGS**
+**CLEAN**
 
-All targeted tests pass (154/154 pass, 3 skipped). No execution/risk/sizing/broker code touched. All 5 shipped fixes verified present and correct. One documentation-only correction applied (`[1/3]`→`[1/4]`, `[2/3]`→`[2/4]` in pipeline step labels). The only failures in the broader test suite are env-only `FileNotFoundError` on `data/live/` files — identical behaviour before and after this sprint.
+346 passed, 5 skipped across the full broader suite (FMP, AV, Alpaca startup, pipeline, AV regression, handoff wiring, publisher, publisher observer, activation gate). No execution/risk/sizing/broker code touched. All 5 shipped fixes verified present and correct. One documentation-only correction applied (`[1/3]`→`[1/4]`, `[2/3]`→`[2/4]` in pipeline step labels).
 
 ---
 
