@@ -983,6 +983,26 @@ CONFIG = {
     "intelligence_first_universe_builder_enabled": False, # run shadow universe builder (safe to enable)
     "intelligence_first_advisory_enabled":        False,  # advisory logging alongside live bot — Sprint 6C observation complete, gate met (advisory_ready_for_handoff_design)
     "enable_active_opportunity_universe_handoff": True,   # PRODUCTION WIRING — Sprint 7J.4 controlled activation — Amit approved 2026-05-09
+
+    # ── Nexus contamination controls (fix/nexus-contamination-controls) ───────
+    # options_universe_handoff_filter: when True and Nexus handoff is active,
+    #   OPTIONABLE_UNIVERSE symbols not already in the handoff+held+favs universe
+    #   are filtered out. Prevents scanner-era hardcoded list from bypassing
+    #   intelligence-first candidate authority. Default True.
+    "options_universe_handoff_filter": True,
+
+    # nexus_enable_pru_rescue: when False (default), PRU / Tier D rescue is
+    #   disabled in Nexus mode — stale PRU data cannot lower live scoring
+    #   thresholds. PRU tagging and funnel evidence remain active.
+    "nexus_enable_pru_rescue": False,
+
+    # nexus_pru_rescue_requires_freshness: when True, rescue only applies if PRU
+    #   age is within nexus_pru_max_age_days. Ignored when nexus_enable_pru_rescue=False.
+    "nexus_pru_rescue_requires_freshness": True,
+
+    # nexus_pru_max_age_days: maximum PRU age (days) for rescue eligibility.
+    #   PRU older than this is treated as stale and rescue is blocked.
+    "nexus_pru_max_age_days": 2,
 }
 
 
