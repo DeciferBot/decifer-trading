@@ -51,11 +51,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Build TA-Lib 0.4.0 C shared library from source.
 # Pinned to 0.4.0 — the version the TA-Lib Python wrapper (>=0.4.28) targets.
 # Installing to /usr/local so the shared library is found by the Python wheel.
+#
+# NOTE: make is intentionally NOT parallelised (-j1 / no -j flag).
+# TA-Lib 0.4.0 src/tools/gen_code has a race condition under parallel make on
+# newer Debian/gcc: two jobs both try to mv .deps/gen_code-gen_code.Tpo → .Po,
+# one wins, the other fails with "cannot stat .Tpo". Sequential make is the fix.
+# Adds ~2 min to build time — fully reliable across all target environments.
 RUN wget -q https://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz \
     && tar -xzf ta-lib-0.4.0-src.tar.gz \
     && cd ta-lib \
     && ./configure --prefix=/usr/local \
-    && make -j"$(nproc)" \
+    && make \
     && make install \
     && cd .. \
     && rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
