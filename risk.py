@@ -828,12 +828,24 @@ def check_combined_exposure(
         # C. Freshness gate — refuse to use stale or absent account data.
         from bot_state import account_values_updated_at as _ts
         max_age = margin_cfg.get("max_account_values_age_seconds", 300)
+        warn_age = max_age - 60  # warning at 240s (or 60s before limit)
         if _ts is None:
+            import logging as _rl
+            _rl.getLogger("decifer.risk").warning(
+                "[account_health] account_values_status=missing block_reason=account_values_missing_block"
+            )
             return False, (
                 "Account values not yet received from IBKR — margin mode requires live account state"
             ), "account_values_missing_block"
         age_s = _time_mod.time() - _ts
+        _av_status = "fresh" if age_s < warn_age else ("warning" if age_s < max_age else "stale")
         if age_s > max_age:
+            import logging as _rl
+            _rl.getLogger("decifer.risk").warning(
+                "[account_health] account_values_age_seconds=%.0f account_values_status=%s "
+                "block_reason=account_values_stale_block",
+                age_s, _av_status,
+            )
             return False, (
                 f"Account values stale: last update {age_s:.0f}s ago (limit: {max_age}s)"
             ), "account_values_stale_block"
