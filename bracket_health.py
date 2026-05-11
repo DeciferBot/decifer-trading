@@ -222,7 +222,7 @@ def audit_bracket_orders(ib: IB) -> None:
     changed = False
     for key, pos in snapshot:
         try:
-            if pos.get("status") not in ("ACTIVE", "TRIMMING"):
+            if pos.get("status") not in ("ACTIVE", "TRIMMING", "FILLED"):
                 continue
             if pos.get("instrument") not in ("stock", None):
                 continue
@@ -393,7 +393,7 @@ def audit_bracket_orders(ib: IB) -> None:
                 )
 
             # ── Pass 1: TP bracket ────────────────────────────────────────────
-            if tp_count == 0 and pos.get("status") == "ACTIVE":
+            if tp_count == 0 and pos.get("status") in ("ACTIVE", "FILLED"):
                 if not _in_cooldown(symbol):
                     if not atr:
                         log.warning("[BRACKET_AUDIT] %s tp missing but no ATR — skipping", symbol)
@@ -499,18 +499,18 @@ def audit_bracket_orders(ib: IB) -> None:
             desired_long: set[str] = {
                 p.get("symbol", k)
                 for k, p in active_trades.items()
-                if p.get("status") in ("ACTIVE", "TRIMMING") and p.get("direction") == "LONG"
+                if p.get("status") in ("ACTIVE", "TRIMMING", "FILLED") and p.get("direction") == "LONG"
             }
             desired_short: set[str] = {
                 p.get("symbol", k)
                 for k, p in active_trades.items()
-                if p.get("status") in ("ACTIVE", "TRIMMING") and p.get("direction") == "SHORT"
+                if p.get("status") in ("ACTIVE", "TRIMMING", "FILLED") and p.get("direction") == "SHORT"
             }
             # Build trade_id → symbol map for orderRef-based lookup
             ref_to_symbol: dict[str, str] = {
                 p.get("trade_id", ""): p.get("symbol", k)
                 for k, p in active_trades.items()
-                if p.get("trade_id") and p.get("status") in ("ACTIVE", "TRIMMING")
+                if p.get("trade_id") and p.get("status") in ("ACTIVE", "TRIMMING", "FILLED")
             }
 
         for _t in ibkr_map.values():

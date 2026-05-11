@@ -749,7 +749,8 @@ def execute_buy(
                         from event_log import append_fill as _el_fill
                         _el_fill(_trade_id, symbol,
                                  fill_price=_fill_price,
-                                 fill_qty=int(stats.filled_quantity))
+                                 fill_qty=int(stats.filled_quantity),
+                                 order_id=int(_result.get("order_id") or 0))
                     except Exception as _elf_err:
                         log.warning("execute_buy %s: ORDER_FILLED write failed (non-fatal): %s", symbol, _elf_err)
                     _save_positions_file()
