@@ -271,11 +271,13 @@ class TestCurrentManifest(unittest.TestCase):
     def test_manifest_is_dict(self):
         self.assertIsInstance(self.data, dict)
 
-    def test_handoff_enabled_false(self):
-        self.assertIs(self.data.get("handoff_enabled"), False)
+    def test_handoff_enabled_true(self):
+        # Sprint 7J.4: current_manifest.json is written only by controlled_activation,
+        # which always stamps handoff_enabled=True. validation_only writes to validation_manifest.json.
+        self.assertIs(self.data.get("handoff_enabled"), True)
 
-    def test_publication_mode_validation_only(self):
-        self.assertEqual(self.data.get("publication_mode"), "validation_only")
+    def test_publication_mode_controlled_activation(self):
+        self.assertEqual(self.data.get("publication_mode"), "controlled_activation")
 
     def test_enable_flag_required_true(self):
         self.assertIs(self.data.get("enable_flag_required"), True)
@@ -435,10 +437,11 @@ class TestSafetyInvariants(unittest.TestCase):
         data = _load_publisher_output("active_opportunity_universe.json")
         self.assertEqual(data.get("publication_mode"), "validation_only")
 
-    def test_handoff_enabled_false_in_manifest(self):
-        """handoff_enabled must remain false in Sprint 7F."""
+    def test_handoff_enabled_true_in_manifest(self):
+        """Sprint 7J.4: current_manifest.json is written only by controlled_activation.
+        handoff_enabled must be True. validation_only writes to validation_manifest.json."""
         data = _load_publisher_output("current_manifest.json")
-        self.assertIs(data.get("handoff_enabled"), False)
+        self.assertIs(data.get("handoff_enabled"), True)
 
     def test_enable_active_opportunity_universe_handoff_config_true_sprint7j4(self):
         """Sprint 7J.4 activated Key 1: config flag must be True.
@@ -494,8 +497,10 @@ class TestFailClosedConditions(unittest.TestCase):
                 patch.object(hp, "_SHADOW_UNIVERSE_PATH", shadow_path),
                 patch.object(hp, "_OUTPUT_UNIVERSE", sentinel_universe),
                 patch.object(hp, "_OUTPUT_MANIFEST", sentinel_manifest),
+                patch.object(hp, "_OUTPUT_VALIDATION_MANIFEST", sentinel_manifest),
                 patch.object(hp, "_OUTPUT_REPORT", sentinel_report),
                 patch.object(hp, "_OUTPUT_HEARTBEAT", sentinel_heartbeat),
+                patch.object(hp, "_FAIL_DIR", tmpdir),
             ):
                 report = hp.run_publisher()
             return report
@@ -513,8 +518,10 @@ class TestFailClosedConditions(unittest.TestCase):
                 patch.object(hp, "_SHADOW_UNIVERSE_PATH", missing_path),
                 patch.object(hp, "_OUTPUT_UNIVERSE", sentinel_universe),
                 patch.object(hp, "_OUTPUT_MANIFEST", sentinel_manifest),
+                patch.object(hp, "_OUTPUT_VALIDATION_MANIFEST", sentinel_manifest),
                 patch.object(hp, "_OUTPUT_REPORT", sentinel_report),
                 patch.object(hp, "_OUTPUT_HEARTBEAT", sentinel_heartbeat),
+                patch.object(hp, "_FAIL_DIR", tmpdir),
             ):
                 return hp.run_publisher()
 
@@ -631,8 +638,10 @@ class TestFailClosedConditions(unittest.TestCase):
                 patch.object(hp, "_SHADOW_UNIVERSE_PATH", missing),
                 patch.object(hp, "_OUTPUT_UNIVERSE", sentinel_universe),
                 patch.object(hp, "_OUTPUT_MANIFEST", sentinel_manifest),
+                patch.object(hp, "_OUTPUT_VALIDATION_MANIFEST", sentinel_manifest),
                 patch.object(hp, "_OUTPUT_REPORT", os.path.join(tmpdir, "report.json")),
                 patch.object(hp, "_OUTPUT_HEARTBEAT", os.path.join(tmpdir, "hb.json")),
+                patch.object(hp, "_FAIL_DIR", tmpdir),
             ):
                 hp.run_publisher()
 
@@ -655,12 +664,15 @@ class TestFailClosedConditions(unittest.TestCase):
         self.assertTrue(hs.get("written"))
 
     def test_fail_diagnostic_written_on_failed_publish(self):
-        """Fail diagnostic file written on publish failure."""
+        """Fail diagnostic file written on publish failure — must write to _FAIL_DIR, not production."""
         import handoff_publisher as hp
         with tempfile.TemporaryDirectory() as tmpdir:
-            diag_path = hp._write_fail_diagnostic("test_reason", {"info": "test"})
-            # The function returns the path — we can't check tmpdir but we verify it ran
+            with patch.object(hp, "_FAIL_DIR", tmpdir):
+                diag_path = hp._write_fail_diagnostic("test_reason", {"info": "test"})
             self.assertIn(".fail_", diag_path)
+            # Diagnostic must be inside the temp dir, not in production data/live/
+            self.assertTrue(diag_path.startswith(tmpdir),
+                f"Fail diagnostic must write to _FAIL_DIR ({tmpdir!r}), got {diag_path!r}")
 
     def test_tmp_file_used_in_atomic_write(self):
         """Atomic write creates .tmp file then renames."""
@@ -675,6 +687,19 @@ class TestFailClosedConditions(unittest.TestCase):
             with open(target) as f:
                 data = json.load(f)
             self.assertTrue(data.get("test"))
+
+    def test_missing_shadow_does_not_write_fail_to_production(self):
+        """A missing shadow source must not write .fail_*.json to data/live/."""
+        import glob
+        import handoff_publisher as hp
+        production_fail_dir = "data/live"
+        before = set(glob.glob(os.path.join(production_fail_dir, ".fail_*.json")))
+        self._run_with_missing_shadow()
+        after = set(glob.glob(os.path.join(production_fail_dir, ".fail_*.json")))
+        new_files = after - before
+        self.assertEqual(len(new_files), 0,
+            f"_run_with_missing_shadow must not write to production data/live/. "
+            f"New fail files found: {sorted(new_files)}")
 
 
 # ---------------------------------------------------------------------------

@@ -34,6 +34,11 @@ def _load_manifest() -> dict:
         return json.load(f)
 
 
+def _load_validation_manifest() -> dict:
+    with open("data/live/validation_manifest.json") as f:
+        return json.load(f)
+
+
 def _load_universe() -> dict:
     with open("data/live/active_opportunity_universe.json") as f:
         return json.load(f)
@@ -58,10 +63,10 @@ def test_publisher_default_mode_is_validation_only():
 # 2. validation_only manifest has handoff_enabled=false
 # ---------------------------------------------------------------------------
 def test_validation_only_manifest_has_handoff_enabled_false():
-    """After a validation_only publish cycle, the manifest must have handoff_enabled=false."""
+    """After a validation_only publish cycle, the validation manifest must have handoff_enabled=false."""
     report = _run_publisher_mode("validation_only")
     assert report.get("validation_summary", {}).get("overall_status") == "pass"
-    manifest = _load_manifest()
+    manifest = _load_validation_manifest()
     assert manifest.get("handoff_enabled") is False, \
         f"validation_only manifest must have handoff_enabled=false, got {manifest.get('handoff_enabled')!r}"
     assert manifest.get("publication_mode") == "validation_only"
@@ -74,7 +79,7 @@ def test_validation_only_manifest_rejected_by_reader():
     """Reader must fail-closed on validation_only manifests (handoff_disabled_in_manifest)."""
     # Ensure we have a fresh validation_only manifest
     _run_publisher_mode("validation_only")
-    result = _load_production_handoff()
+    result = _load_production_handoff(manifest_path="data/live/validation_manifest.json")
     assert result.get("handoff_allowed") is False, \
         "Reader must not allow handoff for validation_only manifest"
     assert result.get("fail_closed_reason") == "handoff_disabled_in_manifest", \
@@ -262,7 +267,7 @@ def test_controlled_activation_fails_if_manifest_stale():
 def test_reader_fails_closed_on_handoff_disabled():
     """Reader must return handoff_allowed=False when manifest has handoff_enabled=false."""
     _run_publisher_mode("validation_only")
-    result = _load_production_handoff()
+    result = _load_production_handoff(manifest_path="data/live/validation_manifest.json")
     assert result.get("handoff_allowed") is False
     assert result.get("fail_closed_reason") == "handoff_disabled_in_manifest"
     assert result.get("accepted_candidate_count", -1) == 0
@@ -317,14 +322,14 @@ def test_no_manual_manifest_edit_required():
 # 16. publisher can return to validation_only mode
 # ---------------------------------------------------------------------------
 def test_publisher_can_return_to_validation_only():
-    """After controlled_activation, publisher can revert to validation_only."""
+    """After controlled_activation, publisher can run validation_only (writes to separate path)."""
     _run_publisher_mode("controlled_activation")
     manifest_ca = _load_manifest()
     assert manifest_ca.get("handoff_enabled") is True   # activation state
 
     _run_publisher_mode("validation_only")
-    manifest_vo = _load_manifest()
-    assert manifest_vo.get("handoff_enabled") is False  # reverted
+    manifest_vo = _load_validation_manifest()
+    assert manifest_vo.get("handoff_enabled") is False  # validation manifest has handoff_enabled=false
     assert manifest_vo.get("publication_mode") == "validation_only"
 
 
@@ -332,15 +337,15 @@ def test_publisher_can_return_to_validation_only():
 # 17. validation_only mode after controlled_activation sets handoff_enabled=false again
 # ---------------------------------------------------------------------------
 def test_validation_only_after_controlled_activation_resets_handoff_enabled():
-    """Reverting to validation_only must set handoff_enabled=false in manifest."""
+    """validation_only writes handoff_enabled=false to validation_manifest.json (not current_manifest.json)."""
     _run_publisher_mode("controlled_activation")
     _run_publisher_mode("validation_only")
-    manifest = _load_manifest()
+    manifest = _load_validation_manifest()
     assert manifest.get("handoff_enabled") is False, \
-        "After reverting to validation_only, handoff_enabled must be false"
-    result = _load_production_handoff()
+        "validation_only manifest must have handoff_enabled=false"
+    result = _load_production_handoff(manifest_path="data/live/validation_manifest.json")
     assert result.get("handoff_allowed") is False, \
-        "After reverting to validation_only, reader must again reject the manifest"
+        "Reader must reject validation_only manifest"
 
 
 # ---------------------------------------------------------------------------
@@ -367,7 +372,7 @@ def test_two_key_gate_key1_now_active():
 
     # (b) Key 1 alone is insufficient — validation_only manifest must fail closed
     _run_publisher_mode("validation_only")
-    result_vo = _load_production_handoff()
+    result_vo = _load_production_handoff(manifest_path="data/live/validation_manifest.json")
     assert result_vo.get("handoff_allowed") is False, (
         "Key 1 alone must NOT be sufficient: reader must reject validation_only manifest "
         "even when enable_active_opportunity_universe_handoff=True in config."
@@ -409,7 +414,7 @@ def test_track_a_blocked_without_key2():
     """
     _run_publisher_mode("validation_only")
 
-    result = _load_production_handoff()
+    result = _load_production_handoff(manifest_path="data/live/validation_manifest.json")
 
     # Reader must be fail-closed
     assert result.get("handoff_allowed") is False, (
@@ -425,6 +430,38 @@ def test_track_a_blocked_without_key2():
     assert isinstance(reason, str) and reason, (
         f"fail_closed_reason must be a non-empty string for the Track A guard, got {reason!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# 21. validation_only must not touch current_manifest.json
+# ---------------------------------------------------------------------------
+def test_validation_only_does_not_write_current_manifest():
+    """validation_only must write to validation_manifest.json only — current_manifest.json unchanged."""
+    import time
+    current_path = "data/live/current_manifest.json"
+    validation_path = "data/live/validation_manifest.json"
+
+    # Record pre-run state of current_manifest.json
+    pre_mtime = os.path.getmtime(current_path) if os.path.exists(current_path) else None
+
+    # Run validation_only
+    _run_publisher_mode("validation_only")
+
+    # current_manifest.json must be unchanged
+    post_mtime = os.path.getmtime(current_path) if os.path.exists(current_path) else None
+    assert pre_mtime == post_mtime, (
+        "validation_only must not modify current_manifest.json — "
+        f"mtime changed from {pre_mtime} to {post_mtime}"
+    )
+
+    # validation_manifest.json must exist and have handoff_enabled=false
+    assert os.path.exists(validation_path), \
+        "validation_only must write data/live/validation_manifest.json"
+    vm = _load_validation_manifest()
+    assert vm.get("handoff_enabled") is False, \
+        f"validation_manifest.json must have handoff_enabled=false, got {vm.get('handoff_enabled')!r}"
+    assert vm.get("publication_mode") == "validation_only", \
+        f"validation_manifest.json must have publication_mode=validation_only"
 
 
 # ---------------------------------------------------------------------------

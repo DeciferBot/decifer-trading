@@ -1088,11 +1088,11 @@ class TestEdgeCases:
             atr=2.0,
             score=30,
             portfolio_value=100_000,
-            regime={"regime": "BULL"},
+            regime={"regime": "TRENDING_UP"},
         )
 
         assert result is True
-        assert orders.open_trades["AAPL"]["entry_regime"] == "BULL"
+        assert orders.open_trades["AAPL"]["entry_regime"] == "TRENDING_UP"
 
     @patch("orders.CONFIG")
     @patch("orders.calculate_position_size")
@@ -2066,3 +2066,56 @@ class TestBlockReasonInstrumentation:
         assert "extended_hours_rejected" in reason_codes, (
             "orders_core.py is missing _block_reason assignment for 'extended_hours_rejected'"
         )
+
+
+# ---------------------------------------------------------------------------
+# _resolve_regime structural allowlist guard
+# ---------------------------------------------------------------------------
+
+class TestResolveRegimeAllowlist:
+    """Verify that _resolve_regime rejects non-structural labels."""
+
+    def test_fear_elevated_returns_unknown(self):
+        """FEAR_ELEVATED is a session_character label — must be rejected as structural regime."""
+        import sys, os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+        from orders_core import _resolve_regime
+        assert _resolve_regime({"regime": "FEAR_ELEVATED"}) == "UNKNOWN"
+
+    def test_momentum_bull_returns_unknown(self):
+        """MOMENTUM_BULL is a session_character label — must be rejected as structural regime."""
+        from orders_core import _resolve_regime
+        assert _resolve_regime({"regime": "MOMENTUM_BULL"}) == "UNKNOWN"
+
+    def test_trending_up_accepted(self):
+        """TRENDING_UP is a valid structural label — must pass through."""
+        from orders_core import _resolve_regime
+        assert _resolve_regime({"regime": "TRENDING_UP"}) == "TRENDING_UP"
+
+    def test_trending_down_accepted(self):
+        from orders_core import _resolve_regime
+        assert _resolve_regime({"regime": "TRENDING_DOWN"}) == "TRENDING_DOWN"
+
+    def test_capitulation_accepted(self):
+        from orders_core import _resolve_regime
+        assert _resolve_regime({"regime": "CAPITULATION"}) == "CAPITULATION"
+
+    def test_range_bound_accepted(self):
+        from orders_core import _resolve_regime
+        assert _resolve_regime({"regime": "RANGE_BOUND"}) == "RANGE_BOUND"
+
+    def test_relief_rally_accepted(self):
+        from orders_core import _resolve_regime
+        assert _resolve_regime({"regime": "RELIEF_RALLY"}) == "RELIEF_RALLY"
+
+    def test_unknown_label_accepted(self):
+        from orders_core import _resolve_regime
+        assert _resolve_regime({"regime": "UNKNOWN"}) == "UNKNOWN"
+
+    def test_none_returns_unknown(self):
+        from orders_core import _resolve_regime
+        assert _resolve_regime(None) == "UNKNOWN"
+
+    def test_empty_dict_returns_unknown(self):
+        from orders_core import _resolve_regime
+        assert _resolve_regime({}) == "UNKNOWN"

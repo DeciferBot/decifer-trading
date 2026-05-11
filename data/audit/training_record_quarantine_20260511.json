@@ -1,0 +1,26 @@
+{
+  "quarantine_created_at": "2026-05-11",
+  "purpose": "Quarantine records with non-structural regime labels from ML/training use.",
+  "data_trades_json_not_modified": true,
+  "upstream_root_cause": "UNKNOWN — the code path that wrote a non-structural label to the regime field of these records was not traced in this session.",
+  "records": [
+    {
+      "symbol": "CVX",
+      "entry_time": "2026-05-11T09:32:07.050633+00:00",
+      "regime_field_value": "FEAR_ELEVATED",
+      "entry_regime_field_value": null,
+      "issue": "regime field contains FEAR_ELEVATED which is a session_character label, not a structural regime label. Structural labels are: CAPITULATION, TRENDING_UP, TRENDING_DOWN, RELIEF_RALLY, RANGE_BOUND, BEAR_TRENDING, UNKNOWN.",
+      "evidence": "Directly read from data/trades.json on 2026-05-11"
+    },
+    {
+      "symbol": "XLK",
+      "entry_time": "2026-05-11T09:32:21.199174+00:00",
+      "regime_field_value": "FEAR_ELEVATED",
+      "entry_regime_field_value": null,
+      "issue": "regime field contains FEAR_ELEVATED which is a session_character label, not a structural regime label.",
+      "evidence": "Directly read from data/trades.json on 2026-05-11"
+    }
+  ],
+  "action": "Exclude these two records from any ML training or Alphalens analysis that uses the regime field as a feature dimension until the upstream root cause is identified and fixed.",
+  "remediation": "A structural regime allowlist (_STRUCTURAL_REGIME_LABELS) was added to orders_core._resolve_regime() to prevent future non-structural labels from being accepted. This is a defensive guard — the root cause is not yet confirmed."
+}

@@ -110,7 +110,9 @@ _PAPER_COMPARISON_REPORT_PATH = "data/live/paper_handoff_comparison_report.json"
 
 _OUTPUT_UNIVERSE = "data/live/active_opportunity_universe.json"
 _OUTPUT_MANIFEST = "data/live/current_manifest.json"
+_OUTPUT_VALIDATION_MANIFEST = "data/live/validation_manifest.json"
 _OUTPUT_REPORT = "data/live/handoff_publisher_report.json"
+_FAIL_DIR = "data/live"
 _OUTPUT_HEARTBEAT = "data/heartbeats/handoff_publisher.json"
 _OUTPUT_RUN_LOG = "data/live/publisher_run_log.jsonl"
 
@@ -213,9 +215,9 @@ def _write_atomic(path: str, data: dict) -> None:
 def _write_fail_diagnostic(reason: str, context: dict) -> str:
     """Write a fail diagnostic JSON alongside the publisher report dir."""
     stamp = _ts(_now_utc()).replace(":", "").replace("-", "")
-    fail_path = f"data/live/.fail_{stamp}.json"
+    fail_path = os.path.join(_FAIL_DIR, f".fail_{stamp}.json")
     try:
-        os.makedirs("data/live", exist_ok=True)
+        os.makedirs(_FAIL_DIR, exist_ok=True)
         with open(fail_path, "w", encoding="utf-8") as fh:
             json.dump({"fail_closed_reason": reason, "context": context,
                        "generated_at": _ts(_now_utc())}, fh, indent=2)
@@ -744,8 +746,9 @@ def run_publisher(mode: str = _DEFAULT_PUBLICATION_MODE) -> dict:
                                   extra_context={"post_write_errors": post_write_errors},
                                   publication_mode=mode, handoff_enabled=handoff_enabled)
 
+    _manifest_out = _OUTPUT_VALIDATION_MANIFEST if mode == "validation_only" else _OUTPUT_MANIFEST
     try:
-        _write_atomic(_OUTPUT_MANIFEST, manifest_doc)
+        _write_atomic(_manifest_out, manifest_doc)
         atomic_summary["manifest_written"] = True
     except Exception as exc:
         fail_closed_reason = f"manifest_write_failed: {exc}"

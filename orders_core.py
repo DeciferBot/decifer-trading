@@ -63,6 +63,17 @@ _block_reason: dict[str, str] = {}
 _exposure_block_details: dict[str, dict] = {}
 
 
+_STRUCTURAL_REGIME_LABELS: frozenset[str] = frozenset({
+    "CAPITULATION",
+    "TRENDING_UP",
+    "TRENDING_DOWN",
+    "RELIEF_RALLY",
+    "RANGE_BOUND",
+    "BEAR_TRENDING",
+    "UNKNOWN",
+})
+
+
 def _resolve_regime(regime: dict | str | None) -> str:
     """Extract the structural regime label — never session_character.
 
@@ -72,16 +83,30 @@ def _resolve_regime(regime: dict | str | None) -> str:
 
     Always use the structural label ("TRENDING_UP", "RANGE_BOUND", etc.) so
     entry_regime stored on position records is stable and comparable across cycles.
+
+    Non-structural labels (e.g. "FEAR_ELEVATED", "MOMENTUM_BULL") are rejected
+    and mapped to "UNKNOWN" to prevent session_character values from contaminating
+    structural regime fields in trade records.
     """
     if isinstance(regime, dict):
-        return (
+        candidate = (
             regime.get("regime")
             or regime.get("name")
             or "UNKNOWN"
         )
-    if isinstance(regime, str) and regime:
-        return regime
-    return "UNKNOWN"
+    elif isinstance(regime, str) and regime:
+        candidate = regime
+    else:
+        return "UNKNOWN"
+
+    if candidate not in _STRUCTURAL_REGIME_LABELS:
+        log.warning(
+            "_resolve_regime: non-structural label %r rejected — returning UNKNOWN. "
+            "This label belongs to session_character, not the structural regime.",
+            candidate,
+        )
+        return "UNKNOWN"
+    return candidate
 
 
 def _validate_order_context(
