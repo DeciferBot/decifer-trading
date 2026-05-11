@@ -86,8 +86,9 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/bin/python3.11</string>
-    <string>run_intelligence_pipeline.py</string>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <string>/usr/local/bin/python3.11 run_intelligence_pipeline.py &amp;&amp; /usr/local/bin/python3.11 universe_builder.py &amp;&amp; /usr/local/bin/python3.11 handoff_publisher.py --mode controlled_activation</string>
   </array>
 
   <!-- Repo root — adjust if repo was cloned to a different path -->
