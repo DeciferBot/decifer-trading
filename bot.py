@@ -439,9 +439,9 @@ def main():
   ██████╔╝███████╗╚██████╗██║██║     ███████╗██║  ██║
   ╚═════╝ ╚══════╝ ╚═════╝╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 {Style.RESET_ALL}
-  {Fore.WHITE}<>  Autonomous AI Trading System  v3.0{Style.RESET_ALL}
+  {Fore.WHITE}<>  Autonomous AI Trading System  v{__version__} ({__codename__}){Style.RESET_ALL}
   {Fore.WHITE}Account : {Fore.YELLOW}{CONFIG["active_account"]}{Style.RESET_ALL}
-  {Fore.WHITE}Engine  : {Fore.YELLOW}Apex Synthesizer (claude-sonnet-4-6) | min score: {CONFIG["min_score_to_trade"]}{Style.RESET_ALL}
+  {Fore.WHITE}Engine  : {Fore.YELLOW}Apex Synthesizer (claude-sonnet-4-6) + Handoff Universe | min score: {CONFIG["min_score_to_trade"]}{Style.RESET_ALL}
   {Fore.WHITE}Risk    : {Fore.YELLOW}{CONFIG["risk_pct_per_trade"] * 100:.1f}% per trade | {int(CONFIG["daily_loss_limit"] * 100)}% daily limit{Style.RESET_ALL}
   {Fore.WHITE}Dashboard: {Fore.CYAN}http://localhost:{CONFIG["dashboard_port"]}{Style.RESET_ALL}
 """)

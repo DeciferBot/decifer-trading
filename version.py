@@ -9,5 +9,5 @@
 #   ./scripts/bump-version.sh <MAJOR.MINOR.PATCH> "<Codename>"
 
 
-__version__ = "3.7.49"
-__codename__ = "Apex"
+__version__ = "4.0.0"
+__codename__ = "Nexus"
