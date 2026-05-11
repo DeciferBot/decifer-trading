@@ -646,16 +646,85 @@ def main():
 
     # ── Start Alpaca bar stream (pre-warms cache before first scan) ───────────
     # Stream subscribes to 1-minute bars for the initial universe.
-    # fetch_multi_timeframe() reads from BAR_CACHE on every scan — no further
-    # wiring needed. Universe subscriptions refresh each scan in run_scan().
+    # Nexus contamination control: when Nexus handoff is enabled, we try the
+    # current handoff universe first (startup_bar_universe_source=handoff_reader).
+    # Falls back to scanner get_dynamic_universe() when handoff is unavailable or
+    # Nexus is not enabled (startup_bar_universe_source=legacy_scanner_fallback /
+    # legacy_scanner_mode).  Universe subscriptions refresh each scan in run_scan().
     try:
         from alpaca_stream import AlpacaBarStream
-        from scanner import get_dynamic_universe
 
-        _initial_universe = get_dynamic_universe(bot_state.ib, {})
+        _bar_stream_universe = None
+        _bar_stream_source = "unknown"
+
+        if CONFIG.get("enable_active_opportunity_universe_handoff", False):
+            try:
+                import handoff_reader as _startup_hr
+                _startup_hoff = _startup_hr.load_production_handoff(
+                    "data/live/current_manifest.json"
+                )
+                if _startup_hoff.get("handoff_allowed"):
+                    _startup_candidates = _startup_hoff.get("accepted_candidates") or []
+                    _bar_stream_universe = [
+                        c["symbol"] for c in _startup_candidates if c.get("symbol")
+                    ]
+                    # Always include held positions — they must receive bar data
+                    # for real-time PM review regardless of handoff state.
+                    try:
+                        from orders_state import get_open_positions as _gop_startup
+                        _startup_held = [
+                            p.get("symbol") for p in _gop_startup()
+                            if p.get("symbol") and p.get("instrument") != "option"
+                        ]
+                        if _startup_held:
+                            _bar_stream_universe = list(
+                                set(_bar_stream_universe + _startup_held)
+                            )
+                    except Exception:
+                        pass
+                    _bar_stream_source = "handoff_reader"
+                    clog(
+                        "INFO",
+                        f"📶 Bar stream startup: startup_bar_universe_source=handoff_reader "
+                        f"symbols={len(_bar_stream_universe)}",
+                    )
+                else:
+                    _bar_stream_source = "legacy_scanner_fallback"
+                    _startup_reason = _startup_hoff.get("fail_closed_reason") or "handoff_not_allowed"
+                    clog(
+                        "INFO",
+                        f"📶 Bar stream handoff unavailable at startup — "
+                        f"startup_bar_universe_source=legacy_scanner_fallback "
+                        f"reason={_startup_reason}",
+                    )
+            except Exception as _startup_hoff_err:
+                _bar_stream_source = "legacy_scanner_fallback"
+                clog(
+                    "INFO",
+                    f"📶 Bar stream handoff load failed at startup — "
+                    f"startup_bar_universe_source=legacy_scanner_fallback "
+                    f"reason={_startup_hoff_err}",
+                )
+        else:
+            _bar_stream_source = "legacy_scanner_mode"
+
+        if _bar_stream_universe is None:
+            from scanner import get_dynamic_universe
+            _bar_stream_universe = get_dynamic_universe(bot_state.ib, {})
+            if _bar_stream_source == "legacy_scanner_mode":
+                clog(
+                    "INFO",
+                    f"📶 Bar stream startup: startup_bar_universe_source=legacy_scanner_mode "
+                    f"symbols={len(_bar_stream_universe)} (Nexus handoff not enabled)",
+                )
+
         bot_state._bar_stream = AlpacaBarStream()
-        bot_state._bar_stream.start(_initial_universe)
-        clog("INFO", f"📶 Alpaca bar stream active | {len(_initial_universe)} symbols subscribed")
+        bot_state._bar_stream.start(_bar_stream_universe)
+        clog(
+            "INFO",
+            f"📶 Alpaca bar stream active | {len(_bar_stream_universe)} symbols subscribed "
+            f"| source={_bar_stream_source}",
+        )
     except Exception as _as_err:
         clog("INFO", f"📶 Alpaca bar stream skipped: {_as_err}")
 

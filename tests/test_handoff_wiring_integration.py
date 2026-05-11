@@ -990,10 +990,10 @@ class TestRollbackBehaviour(unittest.TestCase):
         src_path = os.path.join(_ROOT, "bot_trading.py")
         with open(src_path) as f:
             src = f.read()
-        # Confirm structure: if flag → handoff; else → scanner
-        self.assertIn(
-            "else:\n        clog(\"SCAN\", \"Building dynamic universe", src,
-        )
+        # Confirm structure: if flag → handoff; else → scanner (legacy_scanner_mode)
+        self.assertIn("candidate_source=legacy_scanner", src)
+        self.assertIn("Building dynamic universe (Alpaca screening)", src)
+        self.assertIn("get_dynamic_universe(ib, regime)", src)
 
     def test_flag_false_does_not_corrupt_governance_map(self):
         """When flag is False, _handoff_governance_map is reset to empty dict."""

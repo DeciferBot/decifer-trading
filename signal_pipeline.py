@@ -95,6 +95,40 @@ def _save_threshold_history() -> None:
 # Load persisted history on module import (runs once at bot startup).
 _load_threshold_history()
 
+
+def _check_pru_freshness() -> tuple[bool, float, str]:
+    """
+    Return (is_fresh, age_days, status_label) for the Position Research Universe.
+
+    Reads built_at from data/position_research_universe.json.  Returns
+    (True, age, "fresh") when PRU is within nexus_pru_max_age_days, else
+    (False, age, "stale").  Returns (False, -1, "unavailable") on any error.
+
+    Called by the PRU rescue gate in run_signal_pipeline() to enforce Nexus
+    contamination control nexus_pru_rescue_requires_freshness.
+    """
+    try:
+        from config import CONFIG as _fcfg
+        max_age = float(_fcfg.get("nexus_pru_max_age_days", 2))
+        _pru_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "data", "position_research_universe.json")
+        with open(_pru_path) as _f:
+            _pru_doc = json.load(_f)
+        built_at_str = _pru_doc.get("built_at")
+        if not built_at_str:
+            return False, -1.0, "unavailable_no_built_at"
+        from datetime import timezone
+        built_dt = datetime.fromisoformat(built_at_str.replace("Z", "+00:00"))
+        if built_dt.tzinfo is None:
+            built_dt = built_dt.replace(tzinfo=timezone.utc)
+        age_days = (datetime.now(UTC) - built_dt).total_seconds() / 86400
+        is_fresh = age_days <= max_age
+        return is_fresh, round(age_days, 2), ("fresh" if is_fresh else "stale")
+    except Exception as _fe:
+        log.debug("PRU freshness check failed (non-critical): %s", _fe)
+        return False, -1.0, "unavailable_error"
+
+
 # Symbols that must always be in the scan universe. Authoritative — computed
 # from scanner's CORE_SYMBOLS + CORE_EQUITIES so the two lists can never drift.
 # Used as an always-in-universe assertion for tests; Tier A (scanner.get_dynamic_universe)
@@ -354,6 +388,14 @@ def _apply_strategy_threshold(scored: list, strategy_mode: dict, regime_name: st
     effective = used_threshold + adj
     tier_d_floor = int(_cfg.get("position_research_min_intraday_score_floor", 6))
 
+    # Nexus contamination control: when Nexus handoff is active and PRU rescue is
+    # disabled, do NOT apply a lower floor for Tier D candidates — treat them the same
+    # as any other candidate. The tier_d_floor lower threshold is a PRU-era mechanism
+    # that should not silently modify scoring in Nexus mode.
+    _nexus_pru_rescue_enabled = _cfg.get("nexus_enable_pru_rescue", False)
+    _nexus_handoff_active = _cfg.get("enable_active_opportunity_universe_handoff", False)
+    _pru_threshold_active = not (_nexus_handoff_active and not _nexus_pru_rescue_enabled)
+
     parts = []
     if mode_adj:
         parts.append(f"mode={strategy_mode.get('mode', '?')}+{mode_adj}")
@@ -363,13 +405,13 @@ def _apply_strategy_threshold(scored: list, strategy_mode: dict, regime_name: st
     # When adj > 0, re-filter non-Tier-D candidates by the raised threshold.
     # When adj == 0, non-Tier-D candidates pass through unchanged — score_universe() already
     # filtered by the base threshold; this function only raises the bar further.
-    # Tier D candidates always go through the floor check regardless of adj.
+    # Tier D candidates use lower floor only when PRU threshold is allowed (see above).
     tier_d_present = any(s.get("scanner_tier") == "D" for s in scored)
 
-    if adj > 0 or tier_d_present:
+    if adj > 0 or (tier_d_present and _pru_threshold_active):
         filtered = []
         for s in scored:
-            if s.get("scanner_tier") == "D":
+            if s.get("scanner_tier") == "D" and _pru_threshold_active:
                 if s["score"] >= tier_d_floor:
                     filtered.append(s)
                 else:
@@ -382,13 +424,19 @@ def _apply_strategy_threshold(scored: list, strategy_mode: dict, regime_name: st
                     if s["score"] >= effective:
                         filtered.append(s)
                 else:
-                    filtered.append(s)  # adj==0: pass non-Tier-D through unchanged
+                    filtered.append(s)  # adj==0: pass through unchanged
+
+        if not _pru_threshold_active and tier_d_present:
+            log.info(
+                "[nexus_pru_gate] PRU threshold floor disabled in Nexus mode "
+                "(nexus_enable_pru_rescue=False) — Tier D candidates use standard threshold.",
+            )
 
         if adj > 0:
             reason = " | ".join(parts)
             log.info(
                 f"Scored: {len(scored)} → {len(filtered)} after threshold filter "
-                f"(raised {used_threshold}→{effective} [{reason}]; tier_d_floor={tier_d_floor})"
+                f"(raised {used_threshold}→{effective} [{reason}]; tier_d_floor={tier_d_floor if _pru_threshold_active else 'disabled'})"
             )
             if edge_adj:
                 log.warning(
@@ -398,7 +446,7 @@ def _apply_strategy_threshold(scored: list, strategy_mode: dict, regime_name: st
         else:
             log.info(
                 f"Scored: {len(scored)} → {len(filtered)} "
-                f"[{regime_name}] edge={edge_state} tier_d_floor={tier_d_floor}"
+                f"[{regime_name}] edge={edge_state} tier_d_floor={tier_d_floor if _pru_threshold_active else 'disabled(nexus)'}"
             )
         return filtered
 
@@ -849,13 +897,57 @@ def run_signal_pipeline(
 
     # 5d. Tier D post-gate rescue — candidates that were dropped by strategy threshold
     # or persistence gate may be rescued if they meet discovery_score or archetype criteria.
+    #
+    # Nexus contamination control: rescue is gated by nexus_enable_pru_rescue (default False).
+    # When disabled, PRU cannot lower thresholds or bring back filtered candidates.
+    # PRU tagging and funnel evidence remain active regardless of this gate.
+    # When enabled, freshness is also checked: PRU must be within nexus_pru_max_age_days.
+    from config import CONFIG as _rescue_cfg
+    _nexus_pru_rescue_enabled = _rescue_cfg.get("nexus_enable_pru_rescue", False)
+    _nexus_handoff_active_rescue = _rescue_cfg.get("enable_active_opportunity_universe_handoff", False)
+    _pru_rescue_allowed = True
+    _pru_rescue_blocked_reason = None
+    _pru_freshness_status = "unchecked"
+    _pru_age_days = -1.0
+
+    if _nexus_handoff_active_rescue:
+        if not _nexus_pru_rescue_enabled:
+            _pru_rescue_allowed = False
+            _pru_rescue_blocked_reason = "nexus_pru_rescue_disabled"
+            _pru_freshness_status = "not_checked_rescue_disabled"
+        elif _rescue_cfg.get("nexus_pru_rescue_requires_freshness", True):
+            _pru_is_fresh, _pru_age_days, _pru_freshness_status = _check_pru_freshness()
+            if not _pru_is_fresh:
+                _pru_rescue_allowed = False
+                _pru_rescue_blocked_reason = f"pru_stale_age={_pru_age_days:.1f}d_max={_rescue_cfg.get('nexus_pru_max_age_days', 2)}d"
+
     _td_pre_rescue_in_scored = {s.get("symbol") for s in scored if s.get("scanner_tier") == "D"}
     _td_rescue_pool = sum(
         1 for s in all_scored
         if s.get("scanner_tier") == "D" and s.get("symbol") not in _td_pre_rescue_in_scored
     )
-    if _tier_d_meta:
+    _pru_rescue_applied_count = 0
+    _pru_rescue_blocked_count = 0
+
+    if _tier_d_meta and _pru_rescue_allowed:
         scored = _rescue_tier_d(scored, all_scored, _tier_d_meta)
+        _pru_rescue_applied_count = sum(
+            1 for s in scored
+            if s.get("scanner_tier") == "D" and s.get("symbol") not in _td_pre_rescue_in_scored
+        )
+    elif _tier_d_meta and not _pru_rescue_allowed:
+        _pru_rescue_blocked_count = _td_rescue_pool
+        log.info(
+            "[nexus_pru_gate] PRU rescue blocked — %s "
+            "nexus_enable_pru_rescue=%s pru_freshness=%s pru_age_days=%.1f "
+            "rescue_pool_blocked=%d",
+            _pru_rescue_blocked_reason,
+            _nexus_pru_rescue_enabled,
+            _pru_freshness_status,
+            _pru_age_days,
+            _pru_rescue_blocked_count,
+        )
+
     _td_pipeline_output = sum(1 for s in scored if s.get("scanner_tier") == "D")
     _td_rescued = _td_pipeline_output - len(_td_pre_rescue_in_scored)
     _td_dropped_final = _td_rescue_pool - _td_rescued
@@ -904,6 +996,15 @@ def run_signal_pipeline(
         "tier_d_removed_before_scoring":  _scoring_cap_counters.get("tier_d_removed_before_scoring", 0),
         # After score adjuster (apex_cap_score.py bonus) — same as pipeline_output at this stage
         "tier_d_count_after_score_adjuster": _td_pipeline_output,
+        # Nexus PRU rescue governance fields (fix/nexus-contamination-controls)
+        "nexus_enable_pru_rescue":       _nexus_pru_rescue_enabled,
+        "nexus_handoff_active":          _nexus_handoff_active_rescue,
+        "pru_rescue_allowed":            _pru_rescue_allowed,
+        "pru_rescue_blocked_reason":     _pru_rescue_blocked_reason,
+        "pru_freshness_status":          _pru_freshness_status,
+        "pru_age_days":                  _pru_age_days,
+        "pru_rescue_applied_count":      _pru_rescue_applied_count,
+        "pru_rescue_blocked_count":      _pru_rescue_blocked_count,
     }
     if _td_pru_loaded > 0:
         try:

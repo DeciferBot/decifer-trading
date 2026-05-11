@@ -1564,7 +1564,14 @@ def run_scan():
             universe = _hoff_symbols
             clog("SCAN", f"[handoff_wiring] candidate_source=handoff_reader universe={len(universe)} symbols")
     else:
-        clog("SCAN", "Building dynamic universe (Alpaca screening)...")
+        # Nexus handoff disabled — running legacy 3.0 scanner discovery.
+        # candidate_source=legacy_scanner. This path is the emergency fallback
+        # and should not execute in normal Nexus operation.
+        clog(
+            "SCAN",
+            "candidate_source=legacy_scanner startup_bar_universe_source=legacy_scanner_mode "
+            "Building dynamic universe (Alpaca screening) — Nexus handoff is disabled.",
+        )
         universe = get_dynamic_universe(ib, regime)
 
     # Sector bias is cached inside get_dynamic_universe — fetch the cached result for the dashboard.
@@ -1616,17 +1623,55 @@ def run_scan():
     # Merge held symbols with favourites for downstream protected-set consumers.
     pipeline_favs = list(set(favs + held_syms))
 
-    # Tier C — options universe: always score liquid options names so stock and
-    # options signals are evaluated together. These names may not make the daily
-    # promoted list on defensive rotation days (e.g. DDOG, SMCI, COIN on value days).
+    # Tier C — options universe: score liquid options names alongside stock signals.
+    # Nexus contamination control: when options_universe_handoff_filter=True and Nexus
+    # handoff is active, only symbols already in the Nexus-authorised universe (handoff
+    # + held positions + favourites) pass through. Symbols on the hardcoded optionable
+    # list but NOT in the handoff are blocked — they cannot bypass intelligence-first
+    # candidate authority. Legacy passthrough preserved when filter is disabled.
     _cov_opts = 0
+    _opt_filtered_count = 0
     try:
         from options_scanner import OPTIONABLE_UNIVERSE as _OPT_UNIVERSE
+        _nexus_handoff_active = (
+            CONFIG.get("enable_active_opportunity_universe_handoff", False)
+            and not _handoff_fail_closed_reason
+        )
+        _opt_filter_enabled = (
+            CONFIG.get("options_universe_handoff_filter", True)
+            and _nexus_handoff_active
+        )
+        # Snapshot of the Nexus-authorised universe BEFORE the options merge.
+        # Contains: handoff symbols + held positions + favourites.
+        _pre_opts_set = set(universe)
         before = len(universe)
-        universe = list(set(universe + _OPT_UNIVERSE))
-        _cov_opts = len(universe) - before
-        if _cov_opts:
-            clog("INFO", f"Options universe: {_cov_opts} symbol(s) pinned into scoring (not in Tier A/B today)")
+
+        if _opt_filter_enabled:
+            _opt_in_allowed = [s for s in _OPT_UNIVERSE if s in _pre_opts_set]
+            _opt_blocked     = [s for s in _OPT_UNIVERSE if s not in _pre_opts_set]
+            _opt_filtered_count = len(_opt_blocked)
+            universe = list(set(universe + _opt_in_allowed))
+            _cov_opts = len(universe) - before
+            clog(
+                "SCAN",
+                f"[nexus_optionable_filter] options_universe_handoff_filter=True "
+                f"optionable_universe_candidates_count={len(_OPT_UNIVERSE)} "
+                f"optionable_universe_already_in_handoff_count={len(_opt_in_allowed)} "
+                f"optionable_universe_added_count={_cov_opts} "
+                f"optionable_universe_filtered_count={_opt_filtered_count} "
+                f"optionable_filter_reason=not_in_nexus_handoff",
+            )
+        else:
+            universe = list(set(universe + _OPT_UNIVERSE))
+            _cov_opts = len(universe) - before
+            if _nexus_handoff_active:
+                clog(
+                    "SCAN",
+                    f"Nexus optionable passthrough enabled: optionable symbols may enter beyond handoff. "
+                    f"options_universe_handoff_filter=False added={_cov_opts}",
+                )
+            elif _cov_opts:
+                clog("INFO", f"Options universe: {_cov_opts} symbol(s) pinned into scoring (not in Tier A/B today)")
     except Exception:
         pass
 
@@ -1709,7 +1754,19 @@ def run_scan():
         _cov_record = {
             "ts": _dt.now(_UTC).isoformat(),
             "regime": regime_name,
-            "candidate_source": "handoff" if _handoff_active else "scanner",
+            # candidate_source distinguishes three states clearly:
+            #   handoff_reader       → Nexus active, manifest valid
+            #   handoff_fail_closed  → Nexus active but manifest expired/invalid (Track A blocked)
+            #   legacy_scanner       → Nexus disabled, 3.0 scanner discovery running
+            "candidate_source": (
+                "handoff_reader"
+                if _handoff_active
+                else (
+                    "handoff_fail_closed"
+                    if CONFIG.get("enable_active_opportunity_universe_handoff", False)
+                    else "legacy_scanner"
+                )
+            ),
             "handoff_fail_closed_reason": _handoff_fail_closed_reason,
             "core": _cov_core,
             "equities": _cov_equities,
