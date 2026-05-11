@@ -58,6 +58,8 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 # Rotating file handler — 50MB per file, keep 10 backups (500MB ceiling).
 # Prevents decifer.log from ballooning (9.4GB on 2026-04-14 before the OOM crash).
 from logging.handlers import RotatingFileHandler as _RotatingFileHandler
+import pathlib as _pathlib
+_pathlib.Path(CONFIG["log_file"]).parent.mkdir(parents=True, exist_ok=True)
 
 _file_handler = _RotatingFileHandler(
     CONFIG["log_file"],
