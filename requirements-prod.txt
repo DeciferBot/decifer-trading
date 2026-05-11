@@ -1,0 +1,112 @@
+# Decifer Trading — Production Dependencies
+#
+# Generated from: requirements.txt (Decifer 4.0.1, 2026-05-11)
+# Method: all packages in requirements.txt audited; every package is required
+#         by at least one production module. No packages are dev/test-only.
+#         Test-only packages live exclusively in requirements-test.txt.
+#
+# Purpose of this file:
+#   Use this file for production image builds where you want the curated,
+#   reviewed subset rather than requirements.txt which may evolve faster.
+#   Both files should stay in sync; update this file when requirements.txt changes.
+#
+# System prerequisite for TA-Lib (built automatically in Dockerfile):
+#   TA-Lib 0.4.0 C shared library (built from source in Dockerfile builder stage)
+#
+# Install:
+#   pip install -r requirements-prod.txt
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# CLASSIFICATION
+#
+# CORE     — required; bot will not start without it
+# MARKET   — required for market data; degraded operation without it
+# SIGNALS  — required for signal generation; degraded operation without it
+# ML       — optional; graceful fallback exists in ml_engine.py
+# NLP      — optional; graceful fallback exists in social_sentiment.py
+# UTIL     — utility; required for scheduling, timezone, calendar logic
+# BROKER   — required for IBKR connectivity
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── BROKER — IBKR connectivity ───────────────────────────────────────────────
+ib_async>=0.9.86            # [CORE] Interactive Brokers async API
+                            # Imported as: from ib_async import IB
+                            # Used by: bot_state.py, orders_core.py, bracket_health.py,
+                            #          fill_watcher.py, ibkr_streaming.py
+
+# ── LLM — Apex synthesizer ───────────────────────────────────────────────────
+anthropic>=0.25.0           # [CORE] Claude API for Apex Single-Synthesizer
+                            # Used by: apex_orchestrator.py, market_intelligence.py
+
+# ── MARKET DATA ──────────────────────────────────────────────────────────────
+alpaca-py>=0.13.0           # [MARKET] Alpaca Algo Trader Plus — real-time quotes,
+                            #          options chains, OPRA feed
+                            # Used by: alpaca_data.py, alpaca_stream.py, alpaca_options.py
+
+yfinance>=0.2.40            # [MARKET] Fallback OHLCV, options chains, fundamentals
+                            # Used by: signals.py, scanner.py, options.py
+
+# ── DATA / NUMERICAL ─────────────────────────────────────────────────────────
+pandas>=2.0.0               # [CORE] DataFrames throughout
+numpy>=1.24.0               # [CORE] Numerical computation
+pyarrow>=14.0.0             # [CORE] Parquet for ML training data persistence
+
+# ── TECHNICAL ANALYSIS ───────────────────────────────────────────────────────
+TA-Lib>=0.4.28              # [SIGNALS] Technical indicators (RSI, MACD, Bollinger, ATR, etc.)
+                            # Requires: TA-Lib 0.4.0 C library (built in Dockerfile)
+                            # Pure-Python fallback exists in signals.py if import fails
+
+# ── OPTIONS GREEKS ────────────────────────────────────────────────────────────
+py_vollib>=1.0.1            # [SIGNALS] Black-Scholes Greeks (delta, gamma, theta, vega)
+                            # Used by: options.py
+
+# ── ML / LEARNING LOOP ───────────────────────────────────────────────────────
+scikit-learn>=1.3.0         # [ML] RandomForest + GradientBoosting for trade prediction
+                            # Used by: ml_engine.py — graceful fallback if missing
+joblib>=1.3.0               # [ML] Model persistence (.pkl serialization)
+                            # Used by: ml_engine.py — graceful fallback if missing
+statsmodels>=0.14.0         # [SIGNALS] ADF test for mean-reversion REVERSION dimension
+                            # Used by: signals.py — graceful fallback if missing
+
+# ── NLP / SENTIMENT ──────────────────────────────────────────────────────────
+nltk>=3.8.0                 # [NLP] VADER sentiment analysis
+                            # Used by: social_sentiment.py — graceful fallback if missing
+                            # Post-install: python3 -c "import nltk; nltk.download('vader_lexicon')"
+
+# ── HTML PARSING ─────────────────────────────────────────────────────────────
+lxml>=4.9.0                 # [SIGNALS] Required by pd.read_html() in catalyst_screen.py
+                            # Used to fetch S&P 500 constituent list
+
+# ── HTTP / NETWORKING ────────────────────────────────────────────────────────
+requests>=2.31.0            # [CORE] HTTP client for news feeds, Reddit, ApeWisdom
+                            # Used by: news.py, news_sentinel.py, social_sentiment.py
+
+# ── UTILITIES ────────────────────────────────────────────────────────────────
+schedule>=1.2.0             # [UTIL] Task scheduling loop in bot.py
+colorama>=0.4.6             # [UTIL] Terminal colour output (cosmetic; harmless in cloud)
+pytz>=2024.1                # [UTIL] Timezone handling — risk.py, backtester.py
+pandas-market-calendars>=4.0.0  # [UTIL] NYSE holiday calendar — is_trading_day() in risk.py
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PACKAGES THAT ARE DEV/TEST-ONLY (not in this file; see requirements-test.txt)
+# ─────────────────────────────────────────────────────────────────────────────
+# pytest>=7.4.0
+# pytest-asyncio>=0.23.0
+# pytest-mock>=3.12.0
+#
+# Note: pandas, numpy, pytz are in requirements-test.txt too, but they are
+# genuine production deps — they belong here, not just in the test file.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REVIEW NOTES BEFORE PRODUCTION
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. colorama: cosmetic terminal colours. Can be removed in cloud where stdout
+#    goes to a log aggregator. Low priority.
+# 2. py_vollib: options Greeks. If options trading is disabled for a cloud run,
+#    this can be removed. Verify: is options module loaded unconditionally?
+# 3. nltk / vader_lexicon: requires a post-install download step. Must be
+#    handled in Dockerfile or a bootstrap script, not at runtime.
+# 4. yfinance: fallback only. If Alpaca is always available in cloud, yfinance
+#    calls are rare but still used in scanner.py.
+# 5. pyarrow: used for Parquet ML training data. If ML is disabled for initial
+#    cloud run, can be deferred — but keep it for now.

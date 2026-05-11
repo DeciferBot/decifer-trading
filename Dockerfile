@@ -1,67 +1,112 @@
-# Decifer Trading — Cloud Runtime Container
+# Decifer Trading — Production Runtime Image
 #
-# Purpose: cloud preflight verification and intelligence worker execution.
-#          Does NOT start live trading by default.
+# Purpose: packages the Decifer 4.0+ runtime for future cloud deployment.
+#          This image is NOT currently deployed. It exists for validation and
+#          readiness preparation only.
 #
-# TA-Lib requires the C shared library installed in the base image.
-# Uses python:3.11-slim + ta-lib build from source (minimal install).
+# Key decisions:
+#   - Runs as non-root user `decifer` (UID 1000) for security.
+#   - Multi-stage build: build tools excluded from final image.
+#   - TA-Lib 0.4.0 built from source — reliable across cloud base images.
+#   - No secrets baked in; all keys injected via --env-file or environment.
+#   - archive/, tests/, data/, logs/ excluded via .dockerignore.
+#   - Default CMD: lightweight healthcheck. NOT the live bot.
 #
-# Build:
-#   docker build -t decifer-trading .
+# Build (validation only — does not start the bot):
+#   docker build -t decifer-trading:4.0 .
 #
-# Preflight check (safe — no broker, no orders):
-#   docker run --rm --env-file .env decifer-trading python3 scripts/cloud_preflight.py
+# Lightweight health check (safe — no broker, no orders):
+#   docker run --rm decifer-trading:4.0
 #
-# Universe committed worker (safe — data only):
-#   docker run --rm --env-file .env -v $(pwd)/data:/app/data decifer-trading \
-#     python3 universe_committed.py --run-once
+# Full preflight check (requires env + data mount):
+#   docker run --rm --env-file .env \
+#     -v "$(pwd)/data:/app/data" \
+#     decifer-trading:4.0 \
+#     python3 scripts/cloud_preflight.py
 #
-# The bot itself (bot.py) is NOT the default CMD.
-# Never add live order submission capability to this image without Amit approval.
+# The live bot (bot.py) requires IBKR Gateway accessible and all env vars set.
+# Never change the default CMD to bot.py without explicit Amit approval.
 
-FROM python:3.11-slim AS base
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 1: builder — system deps + TA-Lib source build + Python packages
+# ─────────────────────────────────────────────────────────────────────────────
+FROM python:3.11-slim AS builder
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+ARG DEBIAN_FRONTEND=noninteractive
 
-WORKDIR /app
-
-# ── System deps for TA-Lib C library ─────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    wget \
-    curl \
+        build-essential \
+        wget \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Build TA-Lib C library from source (required before pip install TA-Lib).
-# Version pinned to match requirements.txt TA-Lib>=0.4.28.
+# Build TA-Lib 0.4.0 C shared library from source.
+# Pinned to 0.4.0 — the version the TA-Lib Python wrapper (>=0.4.28) targets.
+# Installing to /usr/local so the shared library is found by the Python wheel.
 RUN wget -q https://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz \
     && tar -xzf ta-lib-0.4.0-src.tar.gz \
     && cd ta-lib \
-    && ./configure --prefix=/usr \
+    && ./configure --prefix=/usr/local \
     && make -j"$(nproc)" \
     && make install \
     && cd .. \
     && rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
 
-# ── Python dependencies ───────────────────────────────────────────────────────
+WORKDIR /build
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install all Python packages into /install prefix for clean stage copy
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# ── Application source ────────────────────────────────────────────────────────
-# Secrets are never baked into the image. All keys must come from --env-file or
-# environment variables at runtime.
+# ─────────────────────────────────────────────────────────────────────────────
+# Stage 2: runtime — lean image, no compiler, no wget
+# ─────────────────────────────────────────────────────────────────────────────
+FROM python:3.11-slim
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy TA-Lib shared library and headers from builder
+COPY --from=builder /usr/local/lib /usr/local/lib
+COPY --from=builder /usr/local/include/ta-lib /usr/local/include/ta-lib
+
+# Refresh dynamic linker cache so libta_lib.so is found at import time
+RUN ldconfig
+
+# Copy installed Python packages from builder
+COPY --from=builder /install /usr/local
+
+# ── Non-root user ─────────────────────────────────────────────────────────────
+# Running as root inside a container is a security anti-pattern.
+# Host bind-mount directories (./data, ./logs) must be writable by UID 1000.
+# On Linux: chown -R 1000:1000 ./data ./logs before first docker-compose up.
+RUN groupadd --gid 1000 decifer \
+    && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash decifer
+
+WORKDIR /app
+
+# Copy application source (archive/, tests/, data/, logs/ excluded by .dockerignore)
 COPY . .
 
-# Remove any local .env file that may have been copied (safety guard).
-RUN rm -f .env .env.local
+# Belt-and-suspenders: remove any .env that slipped past .dockerignore
+RUN rm -f .env .env.local .env.*.local
 
-# Ensure runtime dirs exist inside the container (writable via volume mount).
-RUN mkdir -p data/live data/heartbeats data/runtime data/intelligence data/reference logs
+# Create runtime directories; chown everything to the non-root user
+RUN mkdir -p data/live data/heartbeats data/intelligence data/universe_builder \
+             data/reference data/runtime logs \
+    && chown -R decifer:decifer /app
 
-# ── Default: preflight check ──────────────────────────────────────────────────
-# Override CMD to run workers or other safe processes.
-# Never override CMD to start bot.py without explicit Amit approval.
-CMD ["python3", "scripts/cloud_preflight.py"]
+USER decifer
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# ── Default: lightweight health check ────────────────────────────────────────
+# Confirms the runtime is intact (imports, dirs, env var presence) without
+# touching the broker, placing orders, or requiring IBKR connectivity.
+# Override CMD for specific workers; never hard-code bot.py here.
+CMD ["python3", "scripts/healthcheck.py"]

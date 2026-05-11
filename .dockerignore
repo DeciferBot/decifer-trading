@@ -1,21 +1,51 @@
 # Decifer Trading — .dockerignore
-# Keeps secrets and large runtime files out of the build context.
+# Strict exclusion list for production runtime image.
+# Rules: secrets never in image; runtime state comes via volume mounts;
+# development, archive, and test artefacts are excluded entirely.
+#
+# .env.example is intentionally NOT excluded — it is documentation, not secrets.
 
-# Secrets — must never be baked into image
+# ── Secrets ───────────────────────────────────────────────────────────────────
 .env
-.env.*
+.env.local
+.env.*.local
 *.pem
 *.key
+# .env.example kept — documentation only
 
-# Local state — mounted as volumes at runtime
+# ── Runtime state (bind-mounted from host at runtime) ─────────────────────────
 data/
 logs/
 
-# Git history (large, not needed in image)
+# ── Archived / retired modules (not part of production runtime) ───────────────
+archive/
+tests/archive/
+
+# ── Test suite (not needed in production image) ───────────────────────────────
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── Backtest and offline research ─────────────────────────────────────────────
+backtest_results/
+data/intelligence/backtest/
+
+# ── Diagnostic / fail files (ephemeral; never needed in image) ────────────────
+data/live/.fail_*
+.fail_*
+
+# ── Git / version control ─────────────────────────────────────────────────────
 .git/
+.github/
+.githooks/
+.gitignore
+
+# ── Claude Code internal state ────────────────────────────────────────────────
 .claude/
 
-# Python artifacts
+# ── Python build artefacts ───────────────────────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
@@ -25,27 +55,48 @@ dist/
 build/
 .eggs/
 
-# Test and dev artifacts
-tests/
-*.pytest_cache/
-.coverage
-htmlcov/
-.tox/
+# ── Lint / type check caches ─────────────────────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+ruff.toml
 
-# IDE / OS
+# ── IDE / OS artefacts ───────────────────────────────────────────────────────
 .DS_Store
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# Docs (not needed for runtime)
+# ── macOS app bundles and launchers (invalid in Linux container) ──────────────
+*.app/
+*.command
+Decifer Trading.app/
+Decifer.app/
+
+# ── Docs and roadmap (not needed at runtime) ──────────────────────────────────
 docs/
 roadmap/
 
-# Large data files that should come via volume mount
-data/committed_universe.json
-data/signals_log.jsonl
-data/tier_d_funnel.jsonl
-data/training_records.jsonl
-data/trades.json
+# ── Local knowledge graph ────────────────────────────────────────────────────
+graphify-out/
+
+# ── Recovered / development-only components ──────────────────────────────────
+Chief-Decifer-recovered/
+
+# ── Chief Decifer state (runtime; separate mount if needed) ──────────────────
+chief-decifer/state/
+
+# ── Office documents ──────────────────────────────────────────────────────────
+*.docx
+*.xlsx
+
+# ── Rotated / archived logs ───────────────────────────────────────────────────
+logs/*.log.*
+logs/*.gz
+
+# ── Local export artefacts ────────────────────────────────────────────────────
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.pdf
