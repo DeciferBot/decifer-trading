@@ -118,6 +118,7 @@ data/heartbeats/
 data/live/
 data/universe_builder/
 chief-decifer/state/internal/
+chief-decifer/state/operational_state.json
 data/margin_account_snapshots.jsonl
 data/threshold_history.json
 data/execution_ic.jsonl
