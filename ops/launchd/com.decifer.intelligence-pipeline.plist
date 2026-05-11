@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.decifer.intelligence-pipeline.plist
+  Classification: documentation only / deployment template
+
+  Standalone launchd daemon — intelligence pipeline pre-open run.
+  Regenerates economic intelligence files before US market open each weekday.
+  Runs independently of bot.py, handoff_publisher.py, and universe_promoter.py.
+
+  Worker         : run_intelligence_pipeline.py
+  Entry point    : python3.11 run_intelligence_pipeline.py
+  Schedule       : Monday–Friday 16:45 Dubai local time (UTC+4)
+                   = 12:45 UTC during US EDT (UTC-4)
+                   = 45 minutes before NYSE open (13:30 UTC / 09:30 ET)
+
+  TIMING NOTE:
+    Dubai is UTC+4 year-round (no DST). During US EDT (Mar–Nov) market
+    opens at 13:30 UTC. Running at 12:45 UTC gives 45 minutes of runway
+    before open. During US EST (Nov–Mar) market opens at 14:30 UTC — this
+    run fires 105 minutes before open. Both windows are safe.
+    launchd fires at 16:45 Mac local time. Verify local tz with:
+      systemsetup -gettimezone
+
+  Pipeline sequence (no LLM, no broker, no live data):
+    Step 1: candidate_resolver.generate_feed()
+            → data/intelligence/economic_candidate_feed.json
+    Step 2: intelligence_engine.generate_economic_intelligence()
+            → data/intelligence/daily_economic_state.json
+            → data/intelligence/current_economic_context.json
+    Step 3: theme_activation_engine.generate_theme_activation()
+            → data/intelligence/theme_activation.json
+
+  After this job finishes, the next handoff_publisher run (every 10 min)
+  picks up the fresh intelligence files automatically.
+
+  Stdout log : /tmp/decifer-intelligence-pipeline.log
+  Stderr log : /tmp/decifer-intelligence-pipeline.err
+
+  INSTALLATION (manual — do not auto-install):
+    1. Verify Python path: which python3.11
+    2. cp ops/launchd/com.decifer.intelligence-pipeline.plist ~/Library/LaunchAgents/
+    3. launchctl load ~/Library/LaunchAgents/com.decifer.intelligence-pipeline.plist
+    4. launchctl list | grep decifer.intelligence-pipeline
+
+  VERIFY SCHEDULED (check next fire time):
+    launchctl list | grep intelligence-pipeline
+    # Column 1: PID (- = not running), Column 2: last exit code (0 = success)
+
+  KICKSTART (run immediately without waiting for schedule):
+    launchctl kickstart -p gui/$(id -u)/com.decifer.intelligence-pipeline
+
+  MANUAL TEST RUN (before installing — verify pipeline is safe):
+    cd "/Users/amitchopra/Desktop/decifer trading"
+    python3.11 run_intelligence_pipeline.py
+
+  VIEW LOGS:
+    tail -f /tmp/decifer-intelligence-pipeline.log
+    tail -f /tmp/decifer-intelligence-pipeline.err
+
+  UNLOAD (suspend without deleting):
+    launchctl unload ~/Library/LaunchAgents/com.decifer.intelligence-pipeline.plist
+
+  UNINSTALL:
+    launchctl unload ~/Library/LaunchAgents/com.decifer.intelligence-pipeline.plist
+    rm ~/Library/LaunchAgents/com.decifer.intelligence-pipeline.plist
+
+  EXIT CODES:
+    0 = all three steps completed successfully
+    1 = one or more steps failed (check stderr log)
+
+  WHAT THIS DOES NOT CHANGE:
+    - bot.py execution logic
+    - orders_core.py / risk logic
+    - handoff_publisher.py (untouched)
+    - active_opportunity_universe.json (written only by handoff_publisher)
+    - current_manifest.json (written only by handoff_publisher)
+    - No LLM calls. No broker calls. No live data fetched.
+-->
+<plist version="1.0">
+<dict>
+
+  <key>Label</key>
+  <string>com.decifer.intelligence-pipeline</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/python3.11</string>
+    <string>run_intelligence_pipeline.py</string>
+  </array>
+
+  <!-- Repo root — adjust if repo was cloned to a different path -->
+  <key>WorkingDirectory</key>
+  <string>/Users/amitchopra/Desktop/decifer trading</string>
+
+  <!-- 16:45 Monday–Friday Dubai local time (Mac clock must be set to Asia/Dubai) -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>45</integer></dict>
+    <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>45</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>45</integer></dict>
+    <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>45</integer></dict>
+    <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>16</integer><key>Minute</key><integer>45</integer></dict>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/decifer-intelligence-pipeline.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/decifer-intelligence-pipeline.err</string>
+
+  <!-- Run once and exit on the scheduled interval. No KeepAlive. -->
+  <key>KeepAlive</key>
+  <false/>
+
+  <!-- Do not run immediately on launchctl load. -->
+  <key>RunAtLoad</key>
+  <false/>
+
+</dict>
+</plist>
