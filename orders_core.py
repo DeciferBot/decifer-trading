@@ -17,6 +17,7 @@ checks), and orders_contracts (price/contract utilities).
 from __future__ import annotations
 
 import threading
+import time
 import zoneinfo
 from datetime import UTC, datetime
 
@@ -1976,7 +1977,7 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             _safe_update_trade(_trade_key, {"status": "ACTIVE"})  # revert so execute_sell_option can set EXITING
             from orders_options import execute_sell_option as _eso
             return _eso(ib, _trade_key, reason=reason)
-        _safe_update_trade(_trade_key, {"status": "EXITING"})
+        _safe_update_trade(_trade_key, {"status": "EXITING", "_exiting_since": time.time()})
 
     _is_partial = qty_override is not None and qty_override < info["qty"]
     sell_qty = qty_override if _is_partial else info["qty"]

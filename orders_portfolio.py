@@ -10,6 +10,7 @@ Imports from orders_state (shared state) and orders_contracts (utilities).
 
 from __future__ import annotations
 
+import time
 from datetime import UTC, date, datetime
 
 from ib_async import IB, LimitOrder, MarketOrder
@@ -497,10 +498,25 @@ def reset_stale_exits(ib: IB) -> list[str]:
             sym = pos.get("symbol", key)
 
             # ── Case 1: order is gone from IBKR ─────────────────────────────
+            # Grace period: IBKR may take a few seconds to register a newly placed
+            # order.  Don't reset to ACTIVE if the position only entered EXITING
+            # in the last 30 seconds — prevents a race where we place a close order,
+            # reset_stale_exits runs before IBKR acks it, and we place a duplicate.
+            _CASE1_GRACE_SECS = 30
             if not close_oid or close_oid not in live_trades:
+                _exiting_since = pos.get("_exiting_since", 0.0)
+                _age = time.time() - _exiting_since if _exiting_since else _CASE1_GRACE_SECS + 1
+                if _age < _CASE1_GRACE_SECS:
+                    log.debug(
+                        "reset_stale_exits: %s close order #%s not in IBKR yet "
+                        "(exiting_age=%.0fs < grace=%ds) — holding EXITING",
+                        sym, close_oid, _age, _CASE1_GRACE_SECS,
+                    )
+                    continue
                 log.warning(
-                    "reset_stale_exits: %s close order #%s not in IBKR — resetting to ACTIVE",
-                    sym, close_oid,
+                    "reset_stale_exits: %s close order #%s not in IBKR "
+                    "(exiting_age=%.0fs) — resetting to ACTIVE",
+                    sym, close_oid, _age,
                 )
                 _safe_update_trade(key, {"status": "ACTIVE", "close_order_id": None})
                 reset.append(sym)
@@ -973,8 +989,11 @@ def reconcile_with_ibkr(ib: IB):
                             active_trades[key]["current_premium"] = round(validated_price, 4)
                         # Store IBKR's live price as a reference so price_updater can
                         # detect when Alpaca streaming quotes have drifted from IBKR.
+                        # ibkr_last_ts records when the price was observed so the drift
+                        # guard can skip a stale anchor rather than rejecting fresh Alpaca data.
                         if ibkr_price_for_validation > 0:
                             active_trades[key]["ibkr_last"] = round(ibkr_price_for_validation, 4)
+                            active_trades[key]["ibkr_last_ts"] = time.time()
                     log.debug(f"Reconcile {key}: price updated to ${validated_price:.4f} via {src_desc}")
 
                     # ── Metadata recovery for known positions with UNKNOWN trade_type ──

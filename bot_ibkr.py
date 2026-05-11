@@ -43,6 +43,12 @@ CONFIG.setdefault("reconnect_max_wait_secs", 60)
 CONFIG.setdefault("reconnect_base_wait_secs", 1)
 CONFIG.setdefault("reconnect_alert_webhook", "")
 
+# Account value refresh tracking — used by _heartbeat_worker to avoid spamming IBKR.
+# Fires a re-subscribe before account values cross the 300s hard stale limit.
+_account_refresh_last_requested: float = 0.0
+_ACCOUNT_REFRESH_COOLDOWN_SECS: int = 60
+_ACCOUNT_REFRESH_WARNING_SECS: int = 240  # request refresh before hard 300s stale limit
+
 
 # ── Subscription registry helpers ────────────────────────────────────────────
 
@@ -347,8 +353,14 @@ def _heartbeat_worker() -> None:
     """
     Background thread: send a lightweight reqCurrentTime() to IBKR every
     CONFIG['heartbeat_interval_secs'] seconds to prevent idle-timeout disconnects.
+
+    Also monitors account value freshness.  When account values approach the
+    300s hard stale limit (warning at 240s), re-subscribes via reqAccountUpdates
+    so the stream resumes before risk.py blocks entries.
     """
     import asyncio
+
+    global _account_refresh_last_requested
 
     # ib_async's synchronous wrappers require an event loop on the calling thread.
     # Create one for this daemon thread so reqCurrentTime() doesn't raise
@@ -362,13 +374,40 @@ def _heartbeat_worker() -> None:
     while True:
         time.sleep(tick)
         elapsed += tick
-        if elapsed < interval:
-            continue
-        elapsed = 0
+
         ib = bot_state.ib
         if not ib.isConnected():
             log.debug("Heartbeat skipped — not connected.")
             continue
+
+        # ── Account value freshness monitor (runs every tick, not just heartbeat interval) ──
+        _ts = bot_state.account_values_updated_at
+        _now = time.time()
+        if _ts is not None:
+            age_s = _now - _ts
+            cooldown_ok = (_now - _account_refresh_last_requested) >= _ACCOUNT_REFRESH_COOLDOWN_SECS
+            if age_s >= _ACCOUNT_REFRESH_WARNING_SECS and cooldown_ok:
+                account = CONFIG.get("active_account", "")
+                log.warning(
+                    "[account_health] account_values_age=%.0fs — approaching stale limit; "
+                    "requesting refresh (account=%s)",
+                    age_s, account,
+                )
+                try:
+                    ib.reqAccountUpdates(account)
+                    _account_refresh_last_requested = _now
+                    log.info(
+                        "[account_health] refresh_requested=true last_refresh_attempt=%.0f age_at_request=%.0fs",
+                        _now, age_s,
+                    )
+                except Exception as _re:
+                    log.warning("[account_health] refresh_requested=true refresh_failed=true error=%s", _re)
+                    _account_refresh_last_requested = _now  # still set cooldown to avoid spam
+
+        if elapsed < interval:
+            continue
+        elapsed = 0
+
         try:
             ib.reqCurrentTime()
             log.debug("IBKR heartbeat sent (reqCurrentTime).")

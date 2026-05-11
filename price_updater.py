@@ -252,22 +252,44 @@ class PriceUpdater:
                         )
                         continue
                     mid = round((quote["bid"] + quote["ask"]) / 2, 4)
-                    # If IBKR has a recent validated price, guard against large drift
-                    # which would indicate the stream dropped and reconnected mid-move.
+                    # Drift guard: if IBKR has a recent price, reject Alpaca quotes
+                    # that diverge >1%.  Skip the anchor when it is itself stale —
+                    # a stale IBKR price (e.g. from a 5-min-old reconcile after a
+                    # large move) would reject the correct fresh Alpaca price.
+                    _IBKR_ANCHOR_MAX_AGE = 300  # seconds; matches account stale limit
                     ibkr_ref = trade.get("ibkr_last", 0)
-                    if ibkr_ref > 0:
-                        _drift = abs(mid - ibkr_ref) / ibkr_ref
-                        if _drift > 0.01:
+                    ibkr_ref_ts = trade.get("ibkr_last_ts", 0.0)
+                    _now_pu = time.time()
+                    ibkr_anchor_age = (_now_pu - ibkr_ref_ts) if ibkr_ref_ts else _IBKR_ANCHOR_MAX_AGE + 1
+                    _chosen_price = mid
+                    _chosen_source = "alpaca_stream"
+                    _drift_pct: float = 0.0
+                    _decision = "accept"
+                    if ibkr_ref > 0 and ibkr_anchor_age <= _IBKR_ANCHOR_MAX_AGE:
+                        _drift_pct = abs(mid - ibkr_ref) / ibkr_ref
+                        if _drift_pct > 0.01:
                             log.warning(
-                                "PriceUpdater: skipping Alpaca quote for %s "
-                                "(Alpaca=$%.2f, IBKR_last=$%.2f, drift=%.1f%%)",
-                                sym, mid, ibkr_ref, _drift * 100,
+                                "[price_health] symbol=%s alpaca_price=%.4f alpaca_age=%.0fs "
+                                "ibkr_last=%.4f ibkr_age=%.0fs chosen_source=none "
+                                "drift_pct=%.2f decision=reject_alpaca",
+                                sym, mid, quote_age, ibkr_ref, ibkr_anchor_age, _drift_pct * 100,
                             )
-                            continue
+                            _decision = "reject_alpaca"
+                    elif ibkr_ref > 0 and ibkr_anchor_age > _IBKR_ANCHOR_MAX_AGE:
+                        # Stale IBKR anchor — do not use it to reject a fresh Alpaca quote
+                        log.warning(
+                            "[price_health] symbol=%s alpaca_price=%.4f alpaca_age=%.0fs "
+                            "ibkr_last=%.4f ibkr_age=%.0fs chosen_price=%.4f chosen_source=alpaca_stream "
+                            "decision=accept_ibkr_stale_skipped",
+                            sym, mid, quote_age, ibkr_ref, ibkr_anchor_age, mid,
+                        )
+                        _decision = "accept_ibkr_stale_skipped"
+                    if _decision.startswith("reject"):
+                        continue
                     with _trades_lock:
                         if key in active_trades:
                             active_trades[key]["current"] = mid
-                            active_trades[key]["current_ts"] = time.time()
+                            active_trades[key]["current_ts"] = _now_pu
                 else:
                     df = BAR_CACHE.get_5m(sym)
                     if df is not None and not df.empty:
