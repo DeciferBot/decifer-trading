@@ -89,15 +89,13 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.5,
-      "sentiment_claude": 0.1,
+      "sentiment_score": 0.0,
+      "sentiment_claude": null,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.10",
-        "(Claude only)",
-        "Neutral"
+        "No sentiment data"
       ],
-      "catalyst_score": 5.4
+      "catalyst_score": 4.5
     },
     {
       "ticker": "LULU",
@@ -252,11 +250,11 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 6.0,
-      "sentiment_claude": 0.2,
+      "sentiment_score": 5.8,
+      "sentiment_claude": 0.15,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.20",
+        "Claude: +0.15",
         "(Claude only)",
         "Neutral"
       ],
@@ -444,15 +442,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.5,
-      "sentiment_claude": 0.1,
+      "sentiment_score": 6.0,
+      "sentiment_claude": 0.2,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.10",
+        "Claude: +0.20",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 3.6
+      "catalyst_score": 3.7
     },
     {
       "ticker": "HUM",
@@ -947,15 +945,13 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.8,
-      "sentiment_claude": 0.15,
+      "sentiment_score": 0.0,
+      "sentiment_claude": null,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.15",
-        "(Claude only)",
-        "Neutral"
+        "No sentiment data"
       ],
-      "catalyst_score": 3.0
+      "catalyst_score": 2.1
     },
     {
       "ticker": "ERIE",
@@ -977,15 +973,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.8,
-      "sentiment_claude": 0.15,
+      "sentiment_score": 5.5,
+      "sentiment_claude": 0.1,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.15",
+        "Claude: +0.10",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 3.0
+      "catalyst_score": 2.9
     },
     {
       "ticker": "PLTR",
@@ -1101,15 +1097,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 6.0,
-      "sentiment_claude": 0.2,
+      "sentiment_score": 5.5,
+      "sentiment_claude": 0.1,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.20",
+        "Claude: +0.10",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 3.0
+      "catalyst_score": 2.9
     },
     {
       "ticker": "BLDR",
@@ -1257,11 +1253,11 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.5,
-      "sentiment_claude": 0.1,
+      "sentiment_score": 5.2,
+      "sentiment_claude": 0.05,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.10",
+        "Claude: +0.05",
         "(Claude only)",
         "Neutral"
       ],
@@ -1287,11 +1283,11 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 6.0,
-      "sentiment_claude": 0.2,
+      "sentiment_score": 5.8,
+      "sentiment_claude": 0.15,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.20",
+        "Claude: +0.15",
         "(Claude only)",
         "Neutral"
       ],
@@ -1538,15 +1534,15 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.5,
-      "sentiment_claude": 0.1,
+      "sentiment_score": 6.0,
+      "sentiment_claude": 0.2,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.10",
+        "Claude: +0.20",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 3.6
+      "catalyst_score": 3.7
     },
     {
       "ticker": "ODFL",
@@ -2158,15 +2154,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.5,
-      "sentiment_claude": 0.1,
+      "sentiment_score": 6.0,
+      "sentiment_claude": 0.2,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.10",
+        "Claude: +0.20",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 2.9
+      "catalyst_score": 3.0
     },
     {
       "ticker": "NWS",
@@ -2218,11 +2214,11 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 6.0,
-      "sentiment_claude": 0.2,
+      "sentiment_score": 5.8,
+      "sentiment_claude": 0.15,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.20",
+        "Claude: +0.15",
         "(Claude only)",
         "Neutral"
       ],
@@ -2462,15 +2458,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.5,
-      "sentiment_claude": 0.1,
+      "sentiment_score": 5.0,
+      "sentiment_claude": 0.0,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.10",
+        "Claude: +0.00",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 2.9
+      "catalyst_score": 2.8
     },
     {
       "ticker": "STX",
@@ -3325,15 +3321,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.8,
-      "sentiment_claude": 0.15,
+      "sentiment_score": 5.5,
+      "sentiment_claude": 0.1,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.15",
+        "Claude: +0.10",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 3.0
+      "catalyst_score": 2.9
     },
     {
       "ticker": "SNA",
@@ -3447,15 +3443,15 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 8.0,
-      "sentiment_claude": 0.6,
+      "sentiment_score": 6.8,
+      "sentiment_claude": 0.35,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.60",
+        "Claude: +0.35",
         "(Claude only)",
         "Bullish"
       ],
-      "catalyst_score": 4.0
+      "catalyst_score": 3.8
     },
     {
       "ticker": "TAP",
@@ -3601,11 +3597,11 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.5,
-      "sentiment_claude": 0.1,
+      "sentiment_score": 5.8,
+      "sentiment_claude": 0.15,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.10",
+        "Claude: +0.15",
         "(Claude only)",
         "Neutral"
       ],
@@ -4022,15 +4018,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 6.0,
-      "sentiment_claude": 0.2,
+      "sentiment_score": 6.5,
+      "sentiment_claude": 0.3,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.20",
+        "Claude: +0.30",
         "(Claude only)",
-        "Neutral"
+        "Bullish"
       ],
-      "catalyst_score": 2.3
+      "catalyst_score": 2.4
     },
     {
       "ticker": "VLTO",
@@ -4294,15 +4290,15 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.5,
-      "sentiment_claude": 0.1,
+      "sentiment_score": 6.0,
+      "sentiment_claude": 0.2,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.10",
+        "Claude: +0.20",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 5.0
+      "catalyst_score": 5.1
     },
     {
       "ticker": "CSGP",
@@ -4501,15 +4497,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.5,
-      "sentiment_claude": 0.1,
+      "sentiment_score": 5.0,
+      "sentiment_claude": 0.0,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.10",
+        "Claude: +0.00",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 2.2
+      "catalyst_score": 2.1
     },
     {
       "ticker": "MPWR",
@@ -4530,15 +4526,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.8,
-      "sentiment_claude": 0.15,
+      "sentiment_score": 5.5,
+      "sentiment_claude": 0.1,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.15",
+        "Claude: +0.10",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 2.3
+      "catalyst_score": 2.2
     },
     {
       "ticker": "TRMB",
@@ -4801,15 +4797,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 6.0,
-      "sentiment_claude": 0.2,
+      "sentiment_score": 5.5,
+      "sentiment_claude": 0.1,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.20",
+        "Claude: +0.10",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 2.3
+      "catalyst_score": 2.2
     },
     {
       "ticker": "DD",
@@ -4832,15 +4828,15 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.5,
-      "sentiment_claude": 0.1,
+      "sentiment_score": 5.8,
+      "sentiment_claude": 0.15,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.10",
+        "Claude: +0.15",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 2.9
+      "catalyst_score": 3.0
     },
     {
       "ticker": "DOW",
@@ -5190,15 +5186,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.0,
-      "sentiment_claude": 0.0,
+      "sentiment_score": 5.5,
+      "sentiment_claude": 0.1,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.00",
+        "Claude: +0.10",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 2.1
+      "catalyst_score": 2.2
     },
     {
       "ticker": "CBOE",
@@ -5219,11 +5215,11 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 6.0,
-      "sentiment_claude": 0.2,
+      "sentiment_score": 5.8,
+      "sentiment_claude": 0.15,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.20",
+        "Claude: +0.15",
         "(Claude only)",
         "Neutral"
       ],
@@ -5248,15 +5244,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.5,
-      "sentiment_claude": 0.1,
+      "sentiment_score": 5.0,
+      "sentiment_claude": 0.0,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.10",
+        "Claude: +0.00",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 2.2
+      "catalyst_score": 2.1
     },
     {
       "ticker": "HWM",
@@ -5368,15 +5364,15 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.8,
-      "sentiment_claude": 0.15,
+      "sentiment_score": 5.5,
+      "sentiment_claude": 0.1,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.15",
+        "Claude: +0.10",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 3.0
+      "catalyst_score": 2.9
     },
     {
       "ticker": "LNT",
@@ -5426,15 +5422,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.8,
-      "sentiment_claude": 0.15,
+      "sentiment_score": 5.5,
+      "sentiment_claude": 0.1,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.15",
+        "Claude: +0.10",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 2.3
+      "catalyst_score": 2.2
     },
     {
       "ticker": "AJG",
@@ -5670,11 +5666,11 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.8,
-      "sentiment_claude": 0.15,
+      "sentiment_score": 6.0,
+      "sentiment_claude": 0.2,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.15",
+        "Claude: +0.20",
         "(Claude only)",
         "Neutral"
       ],
@@ -5764,15 +5760,15 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.0,
-      "sentiment_claude": 0.0,
+      "sentiment_score": 5.5,
+      "sentiment_claude": 0.1,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.00",
+        "Claude: +0.10",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 3.9
+      "catalyst_score": 4.0
     },
     {
       "ticker": "PNR",
@@ -5795,11 +5791,11 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.8,
-      "sentiment_claude": 0.15,
+      "sentiment_score": 6.0,
+      "sentiment_claude": 0.2,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.15",
+        "Claude: +0.20",
         "(Claude only)",
         "Neutral"
       ],
@@ -6308,15 +6304,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.5,
-      "sentiment_claude": 0.1,
+      "sentiment_score": 5.0,
+      "sentiment_claude": 0.0,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.10",
+        "Claude: +0.00",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 2.2
+      "catalyst_score": 2.1
     },
     {
       "ticker": "RL",
@@ -6424,13 +6420,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 0.0,
-      "sentiment_claude": null,
+      "sentiment_score": 5.2,
+      "sentiment_claude": 0.05,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "No sentiment data"
+        "Claude: +0.05",
+        "(Claude only)",
+        "Neutral"
       ],
-      "catalyst_score": 1.4
+      "catalyst_score": 2.2
     },
     {
       "ticker": "LEN",
@@ -7255,15 +7253,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 6.0,
-      "sentiment_claude": 0.2,
+      "sentiment_score": 5.5,
+      "sentiment_claude": 0.1,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.20",
+        "Claude: +0.10",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 2.3
+      "catalyst_score": 2.2
     },
     {
       "ticker": "EFX",
@@ -7398,11 +7396,11 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.2,
-      "sentiment_claude": 0.05,
+      "sentiment_score": 5.5,
+      "sentiment_claude": 0.1,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.05",
+        "Claude: +0.10",
         "(Claude only)",
         "Neutral"
       ],
@@ -7605,15 +7603,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.0,
-      "sentiment_claude": 0.0,
+      "sentiment_score": 5.5,
+      "sentiment_claude": 0.1,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.00",
+        "Claude: +0.10",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 2.1
+      "catalyst_score": 2.2
     },
     {
       "ticker": "CNP",
@@ -8062,15 +8060,15 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 6.2,
-      "sentiment_claude": 0.25,
+      "sentiment_score": 6.8,
+      "sentiment_claude": 0.35,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.25",
+        "Claude: +0.35",
         "(Claude only)",
-        "Neutral"
+        "Bullish"
       ],
-      "catalyst_score": 3.0
+      "catalyst_score": 3.1
     },
     {
       "ticker": "DIS",
@@ -8151,11 +8149,11 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.8,
-      "sentiment_claude": 0.15,
+      "sentiment_score": 6.0,
+      "sentiment_claude": 0.2,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.15",
+        "Claude: +0.20",
         "(Claude only)",
         "Neutral"
       ],
@@ -8182,15 +8180,15 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.0,
-      "sentiment_claude": 0.0,
+      "sentiment_score": 5.5,
+      "sentiment_claude": 0.1,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.00",
+        "Claude: +0.10",
         "(Claude only)",
         "Neutral"
       ],
-      "catalyst_score": 2.8
+      "catalyst_score": 2.9
     },
     {
       "ticker": "CLX",
@@ -8360,11 +8358,11 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 6.0,
-      "sentiment_claude": 0.2,
+      "sentiment_score": 5.8,
+      "sentiment_claude": 0.15,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.20",
+        "Claude: +0.15",
         "(Claude only)",
         "Neutral"
       ],
@@ -8505,15 +8503,15 @@
       "options_anomaly_flags": [],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 5.8,
-      "sentiment_claude": 0.15,
+      "sentiment_score": 6.5,
+      "sentiment_claude": 0.3,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.15",
+        "Claude: +0.30",
         "(Claude only)",
-        "Neutral"
+        "Bullish"
       ],
-      "catalyst_score": 2.3
+      "catalyst_score": 2.4
     },
     {
       "ticker": "GD",
@@ -8565,15 +8563,15 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 6.2,
-      "sentiment_claude": 0.25,
+      "sentiment_score": 6.8,
+      "sentiment_claude": 0.35,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.25",
+        "Claude: +0.35",
         "(Claude only)",
-        "Neutral"
+        "Bullish"
       ],
-      "catalyst_score": 3.0
+      "catalyst_score": 3.1
     },
     {
       "ticker": "HAL",
@@ -8683,11 +8681,11 @@
       ],
       "edgar_score": 0,
       "edgar_events": [],
-      "sentiment_score": 9.0,
-      "sentiment_claude": 0.8,
+      "sentiment_score": 8.8,
+      "sentiment_claude": 0.75,
       "sentiment_finbert": null,
       "sentiment_flags": [
-        "Claude: +0.80",
+        "Claude: +0.75",
         "(Claude only)",
         "Bullish"
       ],

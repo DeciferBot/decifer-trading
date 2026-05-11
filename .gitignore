@@ -108,6 +108,14 @@ brain_cache.json
 Thumbs.db
 .~lock.*
 
+# Runtime stdout / cron logs — machine-specific, never commit
+data/bot_stdout.log
+data/publisher_cron.log
+data/runtime/
+
+# Graphify output — regenerable, not source
+graphify-out/
+
 # macOS app bundles (machine-specific binaries)
 *.app/
 
