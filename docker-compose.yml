@@ -1,0 +1,124 @@
+# docker-compose.yml — Decifer Trading Phase 1 Cloud Stack
+#
+# Purpose: packages the three Decifer services for future cloud deployment.
+#          This file is NOT currently used in production. It exists for
+#          validation, readiness preparation, and future cloud deployment only.
+#
+# Services:
+#   handoff-publisher   — Intelligence handoff publisher (no IBKR required)
+#   handoff-observer    — Monitoring observer for handoff publisher (no IBKR required)
+#   live-bot            — Live trading bot (requires IBKR Gateway)
+#
+# Startup order:  handoff-publisher → handoff-observer → live-bot
+# Shutdown order: live-bot → handoff-observer → handoff-publisher
+#
+# Usage:
+#   docker compose config          # validate this file
+#   docker compose build           # build image
+#   docker compose up -d handoff-publisher handoff-observer   # start without bot
+#   docker compose up -d live-bot  # start bot (requires IBKR Gateway running)
+#   docker compose ps              # check status
+#   docker compose logs -f         # tail all logs
+#
+# IBKR Gateway note:
+#   live-bot uses network_mode: host on Linux so the container can reach
+#   the IBKR Gateway on the host at 127.0.0.1:4002. On macOS Docker Desktop,
+#   set IBKR_HOST=host.docker.internal in .env instead (requires config.py to
+#   read IBKR_HOST env var — already implemented).
+#
+# Never change the live-bot CMD to bot.py without explicit Amit approval.
+# Never set HANDOFF_PUBLISHER_MODE=controlled_activation without Amit approval.
+
+services:
+
+  # ── Handoff Publisher ──────────────────────────────────────────────────────
+  # Scheduled intelligence worker. Runs one publish cycle then exits.
+  # Restarted by the compose restart policy on-failure.
+  # No IBKR dependency — safe to run 24/7.
+  #
+  # In production, pair with a cron job or systemd timer for reliable scheduling:
+  #   */15 * * * * docker compose -f /opt/decifer/docker-compose.yml restart handoff-publisher
+  handoff-publisher:
+    build: .
+    image: decifer-trading:latest
+    command: python3 handoff_publisher.py
+    restart: "on-failure:3"
+    volumes:
+      - decifer-data:/app/data
+      - ./logs:/app/logs
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      # Pass if heartbeat file was written within the last 20 minutes (1200s).
+      # Fails if publisher has not completed a cycle recently.
+      test:
+        - "CMD"
+        - "python3"
+        - "-c"
+        - |
+          import json, time, sys
+          try:
+            h = json.load(open('data/heartbeats/handoff_publisher.json'))
+            age = time.time() - h.get('last_success_ts', 0)
+            sys.exit(0 if age < 1200 else 1)
+          except Exception:
+            sys.exit(1)
+      interval: 5m
+      timeout: 10s
+      retries: 2
+      start_period: 60s
+
+  # ── Handoff Observer ───────────────────────────────────────────────────────
+  # Monitoring-only service. Read-only. Does not affect the live bot.
+  # No IBKR dependency.
+  handoff-observer:
+    build: .
+    image: decifer-trading:latest
+    command: python3 handoff_publisher_observer.py
+    restart: "on-failure:3"
+    depends_on:
+      - handoff-publisher
+    volumes:
+      - decifer-data:/app/data
+      - ./logs:/app/logs
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  # ── Live Trading Bot ───────────────────────────────────────────────────────
+  # Always-on during market hours. Requires IBKR Gateway accessible on the host.
+  #
+  # network_mode: host — required on Linux so the container reaches IBKR Gateway
+  # at 127.0.0.1:4002 (IB Gateway paper) on the host. Ports declared below are
+  # informational only (host networking ignores the ports: directive).
+  #
+  # macOS Docker Desktop: remove network_mode: host and set IBKR_HOST=host.docker.internal
+  # in .env. config.py reads IBKR_HOST env var.
+  #
+  # NEVER change command to python3 bot.py without Amit's explicit approval.
+  # NEVER set HANDOFF_PUBLISHER_MODE=controlled_activation without Amit's approval.
+  live-bot:
+    build: .
+    image: decifer-trading:latest
+    command: python3 scripts/healthcheck.py   # safe default — NOT bot.py
+    restart: unless-stopped
+    network_mode: host    # Linux only — required for IBKR localhost connection
+    depends_on:
+      - handoff-publisher
+    volumes:
+      - decifer-data:/app/data
+      - ./logs:/app/logs
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    # Informational port list (host networking — ports: is ignored at runtime)
+    # ports:
+    #   - "8080:8080"   # bot dashboard
+
+# ── Named volume ──────────────────────────────────────────────────────────────
+# On first deploy, seed data/ via rsync from dev machine before compose up.
+# Then: chown -R 1000:1000 /opt/decifer/data /opt/decifer/logs
+volumes:
+  decifer-data:
+    driver: local

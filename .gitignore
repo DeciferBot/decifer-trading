@@ -115,10 +115,26 @@ data/runtime/
 
 # Operational noise — overwritten every run, no git history value
 data/heartbeats/
-data/live/publisher_run_log.jsonl
-data/live/handoff_publisher_report.json
+data/live/
+data/universe_builder/
+chief-decifer/state/internal/
 data/margin_account_snapshots.jsonl
 data/threshold_history.json
+data/execution_ic.jsonl
+data/tier_d_funnel.jsonl
+data/voice_log.jsonl
+data/universe_coverage.jsonl
+data/apex_conversation_log.jsonl
+data/apex_divergence_log.jsonl
+data/intelligence/current_economic_context.json
+data/intelligence/daily_economic_state.json
+data/intelligence/economic_candidate_feed.json
+data/intelligence/theme_activation.json
+data/intelligence/thesis_store.json
+data/intelligence/advisory_log_review.json
+data/intelligence/advisory_report.json
+data/intelligence/advisory_runtime_log.jsonl
+docs/intelligence_first_paper_validation_report.md
 
 # Graphify output — regenerable, not source
 graphify-out/
