@@ -105,22 +105,22 @@ Code wired end-to-end. Evidence pending first market-hours scan cycle.
 
 ## 8. Paper Validation Report (2026-05-11T07:22:39Z)
 
-**Overall status: PARTIAL_DATA** — market closed Sunday, last scan cycle was May 8.
+**Overall status: PARTIAL_DATA** — pre-market Mon 2026-05-11 (last scan cycle was Thu May 8). Clears after 09:30 ET.
 
 | Q# | Question | Status |
 |----|---------|--------|
-| 1 | Did handoff candidates enter Track A? | NOT_PROVEN — no handoff labels in signals_log (pre-sprint) |
+| 1 | Did handoff candidates enter Track A? | NOT_PROVEN — no handoff labels in signals_typed.jsonl yet (first post-activation scan pending) |
 | 2 | Did handoff candidates enter Apex payload? | NOT_ENOUGH_DATA — no dispatch records yet |
 | 3 | Did handoff candidates appear in tier_d_funnel? | PARTIAL_DATA — 1,468 funnel records, 274 pipeline-stage records |
 | 4 | Dispatch/rejection logs present? | PROVEN — 245 apex_cap cycles, 9,143 candidates, 2,838 rejected |
-| 5 | Handoff metadata preserved in signals_log? | NOT_ENOUGH_DATA — awaiting live scan |
+| 5 | Handoff metadata preserved in signals_typed.jsonl? | NOT_ENOUGH_DATA — awaiting live scan |
 | 6 | Dispatch distribution (POSITION/SWING/INTRADAY/AVOID)? | NOT_ENOUGH_DATA — awaiting dispatch records |
 | 7 | Position candidates surface appropriately? | NOT_ENOUGH_DATA — awaiting dispatch records |
 | 8 | False positive rate vs baseline? | NOT_ENOUGH_DATA — 0 handoff-sourced trades |
 | 9 | Options candidates rejected on spread/slippage? | PARTIAL_DATA — 3 options trades; gate enforced in orders_options.py |
 | 10 | Drawdown and concentration limits respected? | PARTIAL_DATA — 422 closed trades; concentration acceptable |
 
-Expected: NOT_ENOUGH_DATA clears on Monday May 12 market open with first scan cycle under controlled_activation manifest.
+Expected: NOT_ENOUGH_DATA clears today (Mon 2026-05-11) after 09:30 ET first scan cycle under controlled_activation manifest.
 
 ---
 
@@ -174,20 +174,20 @@ Safe default CMD: `python3 scripts/cloud_preflight.py` (never submits orders).
 | `NOT_ENOUGH_DATA` | 0 |
 | **Total** | **37** |
 
-Two remaining `DONE_NOT_PROVEN` checks (26: signals_log handoff labels, 27: tier_d_funnel handoff labels)
-clear automatically on the first market-hours scan cycle Monday May 12.
+Two remaining `DONE_NOT_PROVEN` checks (26: signals_typed.jsonl handoff labels, 27: tier_d_funnel handoff labels)
+clear automatically on today's first scan cycle after 09:30 ET.
 
 ---
 
-## 13. What Happens Monday
+## 13. What Happens Today (2026-05-11, after 09:30 ET)
 
-At market open (09:30 ET, Monday 2026-05-13):
+At market open (09:30 ET, Mon 2026-05-11):
 
 1. Publisher cron fires at :00, :10, :20 → manifest refreshed with 75 candidates
 2. Bot scan cycle starts — `_get_handoff_symbol_universe()` reads manifest, loads universe
 3. `_handoff_governance_map` built from 75 candidates
 4. `run_signal_pipeline(governance_map=...)` runs → signals scored against handoff universe
-5. Any signals with handoff origin get `handoff_source_labels`, `handoff_route`, `handoff_reason_to_care` in `signals_log.jsonl`
+5. Any signals with handoff origin get `handoff_source_labels`, `handoff_route`, `handoff_reason_to_care` in `signals_typed.jsonl`
 6. `tier_d_funnel.jsonl` gets `stage=dispatch` records showing Apex classification per symbol
 7. Paper validation report re-run → Q1, Q2, Q5, Q6, Q7 clear to `PROVEN` or `PARTIAL_DATA`
 
@@ -198,6 +198,6 @@ At market open (09:30 ET, Monday 2026-05-13):
 | Item | Reason Not Blocking | Resolution Path |
 |------|---------------------|-----------------|
 | Docker build untested | Docker not available locally; Dockerfile structurally complete | Test on cloud host or CI |
-| signals_log handoff labels | Market closed; code wired | Monday scan cycle |
-| tier_d_funnel dispatch records | Market closed; code wired | Monday scan cycle |
-| trading performance proof | Market closed (Sunday) | Monday scan cycle |
+| signals_typed.jsonl handoff labels | Pre-market; code wired | Today after 09:30 ET |
+| tier_d_funnel dispatch records | Pre-market; code wired | Today after 09:30 ET |
+| trading performance proof | Pre-market Mon 2026-05-11 | Today after 09:30 ET |
