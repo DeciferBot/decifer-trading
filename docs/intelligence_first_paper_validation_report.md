@@ -1,11 +1,11 @@
 # Intelligence-First Paper Validation Report
 
-**Generated:** 2026-05-11T07:22:39.522317+00:00  
+**Generated:** 2026-05-11T07:40:25.088231+00:00  
 **Overall Status:** `PARTIAL_DATA`
 
 ## Data Sources
 
-- `tier_d_funnel_records`: `1468`
+- `tier_d_funnel_records`: `1496`
 - `signals_log_records`: `10000`
 - `training_records`: `422`
 - `manifest_loaded`: `True`
@@ -40,9 +40,9 @@
 
 **Status:** 🔶 `PARTIAL_DATA`
 
-- `total_funnel_records`: `1468`
-- `pipeline_stage_records`: `274`
-- `stages_seen`: `['pipeline', 'apex_cap_adjusted_score_live_compare', 'scoring_cap', 'apex_cap_candidate_audit', 'apex_cap']`
+- `total_funnel_records`: `1496`
+- `pipeline_stage_records`: `288`
+- `stages_seen`: `['apex_cap', 'scoring_cap', 'pipeline', 'apex_cap_candidate_audit', 'apex_cap_adjusted_score_live_compare']`
 - `note`: `handoff source label propagation to funnel requires market-hours scan cycle with controlled_activation manifest`
 
 ### Q4: Did handoff candidates appear in dispatch/rejection logs?
@@ -59,7 +59,7 @@
 
 **Status:** ⚠️ `NOT_ENOUGH_DATA`
 
-- `missing_evidence`: `['no handoff_source_labels in signals_log.jsonl — signals log not yet receiving handoff metadata', 'fix: run scan cycle with controlled_activation manifest after sprint merge']`
+- `missing_evidence`: `['no handoff_source_labels in signals_typed.jsonl — signals log not yet receiving handoff metadata', 'fix: run scan cycle with controlled_activation manifest after sprint merge']`
 - `result`: `None`
 
 ### Q6: What was the distribution across POSITION, SWING, INTRADAY, AVOID, and rejected?

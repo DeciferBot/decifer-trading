@@ -29,7 +29,7 @@ _MD_ONLY = "--md-only" in sys.argv
 _JSON_ONLY = "--json-only" in sys.argv
 
 TIER_D_FUNNEL   = os.path.join(_REPO, "data", "tier_d_funnel.jsonl")
-SIGNALS_LOG     = os.path.join(_REPO, "data", "signals_log.jsonl")
+SIGNALS_LOG     = os.path.join(_REPO, "data", "signals_typed.jsonl")
 MANIFEST_PATH   = os.path.join(_REPO, "data", "live", "current_manifest.json")
 UNIVERSE_PATH   = os.path.join(_REPO, "data", "live", "active_opportunity_universe.json")
 TRAINING_RECS   = os.path.join(_REPO, "data", "training_records.jsonl")
@@ -89,7 +89,7 @@ def q1_handoff_in_track_a(funnel_records: list[dict], signals_records: list[dict
     handoff_signals = [r for r in signals_records if r.get("handoff_source_labels")]
     cap_records = [r for r in funnel_records if r.get("stage") == "apex_cap_candidate_audit"]
     if not handoff_signals and not cap_records:
-        return _NOT_ENOUGH_DATA(q, ["no handoff_source_labels in signals_log.jsonl",
+        return _NOT_ENOUGH_DATA(q, ["no handoff_source_labels in signals_typed.jsonl",
                                      "no apex_cap_candidate_audit in tier_d_funnel.jsonl"])
     handoff_syms_in_signals = {r["symbol"] for r in handoff_signals}
     in_cap = sum(
@@ -177,7 +177,7 @@ def q5_metadata_preservation(signals_records: list[dict], funnel_records: list[d
     cap_recs = [r for r in funnel_records if r.get("stage") == "apex_cap_candidate_audit"]
     if not handoff_signals:
         return _NOT_ENOUGH_DATA(q, [
-            "no handoff_source_labels in signals_log.jsonl — signals log not yet receiving handoff metadata",
+            "no handoff_source_labels in signals_typed.jsonl — signals log not yet receiving handoff metadata",
             "fix: run scan cycle with controlled_activation manifest after sprint merge",
         ])
     sample = handoff_signals[:3]
