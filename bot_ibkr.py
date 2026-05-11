@@ -1240,11 +1240,18 @@ def sync_orders_from_ibkr():
             )
 
             if mapped_status == "FILLED" and fill_price > 0 and order.action == "BUY" and instrument == "stock":
-                from orders_state import _safe_update_trade
+                from orders_state import _safe_update_trade, _trades_lock, active_trades
 
                 sym = contract.symbol
+                with _trades_lock:
+                    _cur_status = active_trades.get(sym, {}).get("status", "")
                 total_qty = int(order.totalQuantity)
-                updates = {"entry": fill_price, "status": "FILLED"}
+                updates = {"entry": fill_price}
+                # Only regress to FILLED when the position is still PENDING/SUBMITTED.
+                # Overwriting ACTIVE → FILLED on repeated sync events undoes the
+                # FILLED→ACTIVE transition that reconcile correctly applies.
+                if _cur_status in ("PENDING", "SUBMITTED"):
+                    updates["status"] = "FILLED"
                 if 0 < filled_qty < total_qty:
                     updates["qty"] = filled_qty
                     clog(
@@ -1369,7 +1376,12 @@ def _on_order_status_event(trade):
 
                 # Long entry fill — update tracker and announce
                 total_qty = int(order.totalQuantity)
-                updates = {"entry": fill_price, "status": "FILLED"}
+                updates = {"entry": fill_price}
+                # Only set FILLED when position is still PENDING/SUBMITTED.
+                # Repeated IBKR status events for the same filled order must not
+                # regress a position that reconcile already advanced to ACTIVE.
+                if _t_pre.get("status") in ("PENDING", "SUBMITTED"):
+                    updates["status"] = "FILLED"
                 if 0 < filled_qty < total_qty:
                     updates["qty"] = filled_qty
                     clog(
@@ -1416,13 +1428,17 @@ def _on_order_status_event(trade):
                 _el_tid = _t_pre.get("trade_id") or _t.get("trade_id", "")
                 if _el_tid and _t_pre.get("direction") == "LONG" and _t_pre.get("status") in ("PENDING", "SUBMITTED"):
                     _el_qty = filled_qty or int(order.totalQuantity)
-                    try:
-                        from event_log import append_fill as _el_fill_cb
-                        _el_fill_cb(_el_tid, sym, fill_price=fill_price, fill_qty=_el_qty,
-                                    order_id=int(order.orderId or 0))
-                        _safe_update_trade(sym, {"_fill_confirmed": True})
-                    except Exception as _elf_e:
-                        clog("WARNING", f"ORDER_FILLED write failed for {sym}: {_elf_e}")
+                    _el_oid = int(order.orderId) if order.orderId else 0
+                    if _el_oid == 0:
+                        clog("WARNING", f"ORDER_FILLED for {sym}: orderId not yet assigned — skipping write to avoid order_id=0 record")
+                    else:
+                        try:
+                            from event_log import append_fill as _el_fill_cb
+                            _el_fill_cb(_el_tid, sym, fill_price=fill_price, fill_qty=_el_qty,
+                                        order_id=_el_oid)
+                            _safe_update_trade(sym, {"_fill_confirmed": True})
+                        except Exception as _elf_e:
+                            clog("WARNING", f"ORDER_FILLED write failed for {sym}: {_elf_e}")
 
                 # Voice: fires only on first fill (pre-update status is PENDING/SUBMITTED).
                 # Guard matches the SHORT path — prevents double-speak if IBKR re-sends FILLED.

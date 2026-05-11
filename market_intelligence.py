@@ -1317,12 +1317,26 @@ def apex_call(
 
     try:
         start = raw.find("{")
-        end = raw.rfind("}")
-        if start < 0 or end <= start:
+        if start < 0:
             raise ValueError("no JSON object in response")
-        decision = json.loads(raw[start : end + 1])
+        # raw_decode extracts the first complete JSON object starting at `start`
+        # and ignores any trailing content (text, second JSON block, etc.).
+        # The old rfind("}") approach incorrectly extended the slice to the last
+        # "}" in the full response, causing "Extra data" errors when Claude
+        # appended commentary or a second JSON block after the decision object.
+        decision, _ = json.JSONDecoder().raw_decode(raw, start)
     except Exception as e:
-        log.error("apex_call: JSON parse failed — %s | raw head: %s", e, raw[:200])
+        log.error(
+            "apex_call: JSON parse failed\n"
+            "  stage=%s cycle_id=%s candidates=%d\n"
+            "  error=%s\n"
+            "  raw[:500]=%s",
+            apex_input.get("trigger_type", "UNKNOWN"),
+            apex_input.get("scan_ts", "UNKNOWN"),
+            len((apex_input.get("track_a") or {}).get("candidates") or []),
+            e,
+            raw[:500],
+        )
         fb = _fallback_decision(apex_input, reason=f"parse_error:{e}")
         fb["_meta"] = {**_meta, "error": "parse_error"}
         return fb
