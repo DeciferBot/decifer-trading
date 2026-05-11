@@ -31,9 +31,15 @@ Exit codes:
     0  All checks pass — runtime is healthy
     1  One or more blocking checks failed — runtime is not usable
 
+Modes:
+    Default (local) — recommended env vars produce warnings, not failures.
+    --strict        — recommended env vars are treated as blocking failures.
+                      Use --strict before any cloud deployment.
+
 Usage:
     python3 scripts/healthcheck.py
-    python3 scripts/healthcheck.py --quiet   # suppress table, only exit code
+    python3 scripts/healthcheck.py --quiet    # suppress table, only exit code
+    python3 scripts/healthcheck.py --strict   # cloud-grade: recommended = blocking
 """
 from __future__ import annotations
 
@@ -44,7 +50,8 @@ import time
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _REPO_ROOT)
 
-_QUIET = "--quiet" in sys.argv
+_QUIET  = "--quiet"  in sys.argv
+_STRICT = "--strict" in sys.argv
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Check definitions
@@ -177,15 +184,47 @@ def check_env_vars() -> list[dict]:
             present,
             "set" if present else "MISSING",
         ))
+    # In --strict mode recommended vars are blocking; otherwise they are warnings.
     for var in RECOMMENDED_ENV_VARS:
         present = bool(os.environ.get(var, "").strip())
+        detail = "set" if present else (
+            "MISSING" if _STRICT else "not set — degraded operation"
+        )
         results.append(_result(
             f"env:{var} (recommended)",
             present,
-            "set" if present else "not set — degraded operation",
-            blocking=False,
+            detail,
+            blocking=_STRICT,
         ))
     return results
+
+
+def check_nltk_vader() -> dict:
+    """Non-blocking: confirm vader_lexicon is available for social_sentiment.py."""
+    try:
+        import nltk  # noqa: F401
+        from nltk.sentiment import SentimentIntensityAnalyzer
+        SentimentIntensityAnalyzer()  # forces lexicon load; raises LookupError if absent
+        return _result("nltk:vader_lexicon", True, "ok", blocking=False)
+    except ImportError:
+        return _result(
+            "nltk:vader_lexicon", False,
+            "nltk not installed — add to requirements.txt",
+            blocking=False,
+        )
+    except LookupError:
+        return _result(
+            "nltk:vader_lexicon", False,
+            "vader_lexicon not found — fix: python3 -m nltk.downloader vader_lexicon"
+            " (pre-downloaded in Docker image via NLTK_DATA=/usr/share/nltk_data)",
+            blocking=False,
+        )
+    except Exception as exc:
+        return _result(
+            "nltk:vader_lexicon", False,
+            f"Unexpected error: {type(exc).__name__}: {exc}",
+            blocking=False,
+        )
 
 
 def check_fail_sentinels() -> dict:
@@ -234,14 +273,16 @@ def run_healthcheck() -> list[dict]:
     checks.extend(check_core_modules())
     checks.extend(check_dirs())
     checks.extend(check_env_vars())
+    checks.append(check_nltk_vader())
     checks.append(check_fail_sentinels())
     return checks
 
 
 def _print_table(checks: list[dict]) -> None:
     width = 52
+    mode_label = "[STRICT mode]" if _STRICT else "[LOCAL mode]"
     print(f"\n{'─' * width}")
-    print("  Decifer Runtime Health Check")
+    print(f"  Decifer Runtime Health Check  {mode_label}")
     print(f"{'─' * width}")
     for c in checks:
         if c["ok"]:
@@ -261,6 +302,8 @@ def _print_table(checks: list[dict]) -> None:
 
     if not blocking_failures:
         print(f"  PASS  {passed}/{len(checks)} checks ok  ({len(warnings)} warning(s))")
+        if not _STRICT:
+            print(f"  Tip: run with --strict before any cloud deployment.")
     else:
         print(f"  FAIL  {len(blocking_failures)} blocking failure(s)")
         for c in blocking_failures:
