@@ -1,20 +1,20 @@
 # Intelligence-First Paper Validation Report
 
-**Generated:** 2026-05-11T06:56:53.927559+00:00  
+**Generated:** 2026-05-11T07:22:39.522317+00:00  
 **Overall Status:** `PARTIAL_DATA`
 
 ## Data Sources
 
-- `tier_d_funnel_records`: `1461`
+- `tier_d_funnel_records`: `1468`
 - `signals_log_records`: `10000`
 - `training_records`: `422`
 - `manifest_loaded`: `True`
-- `manifest_publication_mode`: `validation_only`
-- `manifest_handoff_enabled`: `False`
+- `manifest_publication_mode`: `controlled_activation`
+- `manifest_handoff_enabled`: `True`
 
 ## Activation Gate
 
-- ❌ `manifest_in_controlled_activation`: `False`
+- ✅ `manifest_in_controlled_activation`: `True`
 - ❌ `signals_log_has_handoff_labels`: `False`
 - ❌ `funnel_has_dispatch_records`: `False`
 - ✅ `training_records_exist`: `True`
@@ -40,9 +40,9 @@
 
 **Status:** 🔶 `PARTIAL_DATA`
 
-- `total_funnel_records`: `1461`
+- `total_funnel_records`: `1468`
 - `pipeline_stage_records`: `274`
-- `stages_seen`: `['pipeline', 'apex_cap', 'apex_cap_adjusted_score_live_compare', 'apex_cap_candidate_audit', 'scoring_cap']`
+- `stages_seen`: `['pipeline', 'apex_cap_adjusted_score_live_compare', 'scoring_cap', 'apex_cap_candidate_audit', 'apex_cap']`
 - `note`: `handoff source label propagation to funnel requires market-hours scan cycle with controlled_activation manifest`
 
 ### Q4: Did handoff candidates appear in dispatch/rejection logs?

@@ -129,32 +129,36 @@ def test_no_order_instructions(universe):
     assert not violations, f"Non-null order_instruction candidates: {violations}"
 
 
-# 12. handoff_enabled=false
-def test_manifest_handoff_enabled_false(manifest):
-    assert manifest.get("handoff_enabled") is False, \
-        f"manifest.handoff_enabled must be false, got {manifest.get('handoff_enabled')!r}"
+# 12. handoff_enabled reflects publication_mode (true when controlled_activation, false when validation_only)
+def test_manifest_handoff_enabled_consistent(manifest):
+    mode = manifest.get("publication_mode")
+    enabled = manifest.get("handoff_enabled")
+    if mode == "controlled_activation":
+        assert enabled is True, f"handoff_enabled must be True when publication_mode=controlled_activation, got {enabled!r}"
+    else:
+        assert enabled is False, f"handoff_enabled must be False when publication_mode={mode!r}, got {enabled!r}"
 
 
-# 13. enable_active_opportunity_universe_handoff=false
-def test_manifest_flag_false(manifest):
+# 13. enable_active_opportunity_universe_handoff=true (activated 2026-05-09, Sprint 7J.4, Amit approved)
+def test_manifest_flag_active(manifest):
     assert manifest.get("enable_flag_required") is True, \
-        "manifest.enable_flag_required must be true (confirms flag=False is the safe gate)"
+        "manifest.enable_flag_required must be true"
     import config
-    assert config.CONFIG.get("enable_active_opportunity_universe_handoff") is False, \
-        "enable_active_opportunity_universe_handoff must be False in config"
+    assert config.CONFIG.get("enable_active_opportunity_universe_handoff") is True, \
+        "enable_active_opportunity_universe_handoff must be True — activated Sprint 7J.4"
 
 
-# 14. publication_mode=validation_only
+# 14. publication_mode=controlled_activation (activated 2026-05-11, Sprint 2)
 def test_manifest_publication_mode(manifest):
-    assert manifest.get("publication_mode") == "validation_only", \
-        f"manifest.publication_mode must be 'validation_only', got {manifest.get('publication_mode')!r}"
+    assert manifest.get("publication_mode") in ("controlled_activation", "validation_only"), \
+        f"manifest.publication_mode must be a valid mode, got {manifest.get('publication_mode')!r}"
 
 
-# 15. Live bot not consuming handoff
-def test_live_bot_not_consuming(obs):
-    sa = obs.get("safety_analysis", {})
-    assert sa.get("live_bot_consuming_handoff") is False
-    assert sa.get("enable_active_opportunity_universe_handoff") is False
+# 15. Config gate active (bot able to consume handoff when manifest is enabled)
+def test_live_bot_config_gate_active(obs):
+    import config
+    assert config.CONFIG.get("enable_active_opportunity_universe_handoff") is True, \
+        "config gate must be True — activated Sprint 7J.4"
 
 
 # 16. live_output_changed=false

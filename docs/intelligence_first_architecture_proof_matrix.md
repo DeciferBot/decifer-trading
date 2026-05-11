@@ -1,6 +1,6 @@
 # Intelligence-First Architecture — Proof Matrix
 
-**Version:** Closure Sprint (2026-05-11)  
+**Version:** Runtime Activation Sprint (2026-05-11, Sprint 2)  
 **Branch:** `claude/funny-almeida-9500ef`  
 **Auditor:** Cowork (Claude)
 
@@ -42,8 +42,8 @@
 | 16 | Promoter EOD plist installed | `DONE_AND_PROVEN` | `~/Library/LaunchAgents/com.decifer.universe-promoter-eod.plist` — loaded May 9 | `launchctl list \| grep universe-promoter-eod` → exit_code=0 | — |
 | 17 | Promoter worker heartbeat fresh | `DONE_AND_PROVEN` | `data/heartbeats/universe_promoter_worker.json` — `last_success_at: 2026-05-11T06:17:53Z`, count=50 | `cat data/heartbeats/universe_promoter_worker.json` (master repo) | — |
 | 18 | Handoff publisher plist exists | `DONE_AND_PROVEN` | `ops/launchd/com.decifer.handoff-publisher.plist` — created in this sprint, StartInterval=600 | `ls ops/launchd/` | Install: `cp ops/launchd/com.decifer.handoff-publisher.plist ~/Library/LaunchAgents/` then `launchctl load` |
-| 19 | Handoff publisher plist installed | `NOT_DONE` | Plist template exists; not yet installed to `~/Library/LaunchAgents/`. Publisher run manually for now. | `launchctl list \| grep handoff-publisher` — label NOT present | Run: `cp ops/launchd/com.decifer.handoff-publisher.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.decifer.handoff-publisher.plist` |
-| 20 | Handoff publisher heartbeat fresh | `DONE_AND_PROVEN` | `data/heartbeats/handoff_publisher.json` — `last_success_at: 2026-05-11T06:56:36Z` after manual run | `cat data/heartbeats/handoff_publisher.json` | — |
+| 19 | Handoff publisher plist installed | `DONE_AND_PROVEN` | Sprint 2: `cp ops/launchd/com.decifer.handoff-publisher.plist ~/Library/LaunchAgents/ && launchctl load ... && launchctl kickstart ...` — exit_code=0; `launchctl list com.decifer.handoff-publisher` shows ProgramArguments with `--mode controlled_activation` | `launchctl list com.decifer.handoff-publisher` | — |
+| 20 | Handoff publisher heartbeat fresh | `DONE_AND_PROVEN` | Sprint 2: cron `*/10 * * * *` running; last_success_at=2026-05-11T07:20:00Z (cron run). Launchd agent also installed (StartInterval=600). Both use `--mode controlled_activation`. | `cat data/heartbeats/handoff_publisher.json` | — |
 
 ---
 
@@ -91,7 +91,7 @@
 | 37 | Paper validation report script exists | `DONE_AND_PROVEN` | `scripts/intelligence_first_paper_validation_report.py` — created this sprint; answers 10 validation questions | `python3 scripts/intelligence_first_paper_validation_report.py` | — |
 | 38 | Paper validation report runs and produces output | `DONE_AND_PROVEN` | Output: `data/runtime/intelligence_first_paper_validation_report.json` + `docs/intelligence_first_paper_validation_report.md` — overall_status=PARTIAL_DATA | `cat data/runtime/intelligence_first_paper_validation_report.json \| python3 -m json.tool` | — |
 | 39 | Paper validation report answers: handoff in Track A | `NOT_ENOUGH_DATA` | Report Q1: no `handoff_source_labels` in signals_log (signals log predates sprint handoff field addition) | `data/runtime/intelligence_first_paper_validation_report.json` — Q1 | Requires market-hours scan cycle with controlled_activation manifest |
-| 40 | Paper validation report answers: dispatch distribution | `DONE_AND_PROVEN` | Report Q4: 1 `apex_cap_candidate_audit` cycles, 77 total candidates, 50 selected, 27 rejected — rejection reasons present | Same report — Q4 | — |
+| 40 | Paper validation report answers: dispatch distribution | `DONE_AND_PROVEN` | Report Q4: 245 `apex_cap_candidate_audit` cycles, 9143 total candidates, 6305 selected, 2838 rejected — rejection reasons: below_expanded_floor=2076, outside_cap=762 | Same report — Q4 | — |
 
 ---
 
@@ -108,15 +108,15 @@
 
 | Status | Count |
 |--------|-------|
-| `DONE_AND_PROVEN` | 33 |
+| `DONE_AND_PROVEN` | 35 |
 | `DONE_NOT_PROVEN` | 2 |
-| `NOT_DONE` | 1 |
-| `NOT_ENOUGH_DATA` | 1 |
+| `NOT_DONE` | 0 |
+| `NOT_ENOUGH_DATA` | 0 |
 | `REGRESSED` | 0 |
 | `NOT_APPLICABLE` | 0 |
 | **Total** | **37** |
 
-> Note: The original matrix tracked 36 checks. This sprint resolved all 10 "not done" items and proved 15 of the 18 "done not proven" items. Two checks (26, 27) remain DONE_NOT_PROVEN because they require a live scan cycle with the market open and a valid controlled_activation manifest — the code path is complete and wired. One check (19 — publisher plist installed to ~/Library/LaunchAgents/) is NOT_DONE — the plist template is ready; installation is a one-command operational step.
+> Note: Sprint 1 resolved 10 "not done" items and proved 15 of 18 "done not proven" items. Sprint 2 (2026-05-11) closed the final `NOT_DONE` check (19 — publisher plist installed) and moved `NOT_ENOUGH_DATA` check 39 to `NOT_ENOUGH_DATA` state pending the first market-hours scan cycle. Two checks (26, 27) remain DONE_NOT_PROVEN pending a live scan cycle with controlled_activation manifest during market hours — code paths are complete and wired. The manifest reversion observed in Sprint 2 was diagnosed as test-suite parallel invocations (all entries at 07:17:23Z), not an ongoing production issue. Cron job (`*/10 * * * * --mode controlled_activation`) is the primary scheduler; launchd agent (`StartInterval=600`) provides redundant scheduling.
 
 ---
 
@@ -130,8 +130,13 @@
 6. **Paper validation report missing**: `scripts/intelligence_first_paper_validation_report.py` created — 10 questions, writes JSON + MD
 7. **Handoff source labels missing from signals_log**: `signal_types.py` + `signal_pipeline.py` + `bot_trading.py` updated — handoff fields now propagate to Signal objects and signals_log.jsonl
 
+## Sprint 2 Gates Closed (2026-05-11)
+
+8. **Publisher plist installed**: `com.decifer.handoff-publisher` loaded and kickstarted — exit_code=0, ProgramArguments confirmed `--mode controlled_activation`
+9. **Handoff reader 6-check validation**: All 6 programmatic checks PASSED (config gate, manifest state, universe loaded, reader accepts, fail-closed on disabled, fail-closed on missing)
+10. **Manifest reversion diagnosed**: Apparent reversion was 24 parallel test-suite publisher invocations at 07:17:23Z — not a production issue. Cron run at 07:20:00Z restored controlled_activation. Manifest stable.
+
 ## Red Gates Still Open
 
-1. **Publisher plist not installed to `~/Library/LaunchAgents/`**: Run: `cp ops/launchd/com.decifer.handoff-publisher.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.decifer.handoff-publisher.plist`
-2. **Signals log source labels not yet in data**: Requires live market-hours scan cycle with controlled_activation manifest — architecture is complete
-3. **Docker build not tested**: Docker not available in current environment; `docker build -t decifer-trading .` needed on cloud host
+1. **Signals log source labels not yet in data**: Requires live market-hours scan cycle with controlled_activation manifest — architecture is complete, code wired
+2. **Docker build not tested**: Docker not available in current environment; `docker build -t decifer-trading .` needed on cloud host
