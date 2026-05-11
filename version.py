@@ -10,5 +10,5 @@
 
 
 
-__version__ = "4.0.26"
+__version__ = "4.0.27"
 __codename__ = "Nexus"
