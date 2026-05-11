@@ -49,18 +49,74 @@ fail_closed_reason: null
 
 ## 4. Publisher Scheduling
 
-**Environment:** Local Mac (laptop), not cloud. Cloud scheduling is out of scope for this sprint.
+### 4.1 Current Environment
+
+**Local Mac laptop testing.** This is not cloud mode. Cloud scheduling is out of scope for this sprint and will be addressed separately during the cloud deployment phase.
+
+### 4.2 Current Scheduler State (Temporary Activation Redundancy)
+
+Both cron and launchd are currently running the handoff publisher every ~10 minutes. This is intentional temporary redundancy during the controlled-activation proof window — not the target operating model.
 
 | Scheduler | Command | Interval | Status | Role |
 |-----------|---------|----------|--------|------|
-| launchd (`com.decifer.handoff-publisher`) | `--mode controlled_activation` | `StartInterval=600` | **Installed, exit_code=0** | **Target authority** |
-| cron (`*/10 * * * *`) | `--mode controlled_activation` | Every 10 min | Active | Temporary proof-window redundancy |
+| launchd (`com.decifer.handoff-publisher`) | `--mode controlled_activation` | `StartInterval=600` | **Installed, exit_code=0** | **Target single authority** |
+| cron (`*/10 * * * *`) | `--mode controlled_activation` | Every 10 min | Active | **Temporary — disable after proof** |
 
-Manifest TTL = 15 minutes. Publisher runs every ≤10 minutes → 5-minute expiry margin.
+Manifest TTL = 15 minutes. Either scheduler alone keeps the manifest fresh with ≥5-minute margin.
 
-**Scheduler operating model (Amit, 2026-05-11):** Both cron and launchd are installed as temporary activation redundancy during the proof window only. launchd is the intended single scheduler authority for local Mac operation. The cron entry will be removed after the first successful market-hours handoff-consumption proof (proof matrix checks 26 + 27 close). Cloud scheduling is handled separately during the cloud deployment phase.
+### 4.3 Target Local Scheduler Authority
 
-**Manifest reversion investigation (Sprint 2):** Apparent reversion observed during testing was caused by the test suite spawning 24+ parallel publisher instances in a single second (07:17:23Z). Not a production issue — both schedulers run `--mode controlled_activation`.
+**launchd is the intended single scheduler for local Mac operation.** Once the first successful market-hours handoff-consumption proof is confirmed (proof matrix checks 26 + 27 close), the cron entry must be disabled. launchd remains.
+
+### 4.4 Disable Cron After Proof
+
+```bash
+# Verify current cron entry
+crontab -l | grep handoff_publisher
+
+# Remove it (non-destructive: rewrites crontab without the publisher line)
+crontab -l | grep -v "handoff_publisher" | crontab -
+
+# Confirm gone
+crontab -l | grep handoff_publisher  # should produce no output
+```
+
+### 4.5 Confirm launchd Remains Active
+
+```bash
+# Confirm agent is loaded and last exit was clean
+launchctl list com.decifer.handoff-publisher
+# Expected: "LastExitStatus" = 0; ProgramArguments includes --mode controlled_activation
+
+# Confirm manifest is fresh (age < 600s)
+python3.11 -c "
+import json, datetime
+m = json.load(open('data/live/current_manifest.json'))
+now = datetime.datetime.now(datetime.timezone.utc)
+exp = datetime.datetime.fromisoformat(m['expires_at'])
+print('mode:', m['publication_mode'], '| enabled:', m['handoff_enabled'], '| expired:', now > exp)
+"
+```
+
+### 4.6 Overlapping Runs — Safety Analysis
+
+**Are overlapping publisher runs possible?** Yes. cron fires at :00/:10/:20/... and launchd fires at `StartInterval=600` from whenever it was loaded — these intervals are not synchronised. They will occasionally overlap within the same ~30-second window.
+
+**Are manifest writes atomic?** Yes. `_write_atomic()` in `handoff_publisher.py:193` uses the `write → tmp → validate → os.replace()` pattern. `os.replace()` is an atomic rename on macOS (POSIX). The reader never sees a partial write.
+
+**Is there a single-writer lock?** No. There is no `flock`, `fcntl`, `pidfile`, or process-level concurrency guard in the publisher.
+
+**Is concurrent execution safe?** Yes, for this specific case. Both processes run identical code, identical source data, and identical `--mode controlled_activation` arguments. They produce byte-identical manifests. The `.tmp` file path (`current_manifest.json.tmp`) is shared, so last-writer-wins on the tmp — but since both write the same content, `os.replace()` always lands a valid manifest regardless of interleave order. The only observable effect is two entries in `publisher_run_log.jsonl` per 10-minute window.
+
+**Residual risk:** If two publishers run and one crashes mid-write (e.g. after writing `.tmp` but before `os.replace`), the surviving process's `os.replace` still succeeds cleanly. The crashed process cleans up `.tmp` in its `except` handler. No corruption path exists.
+
+**Conclusion:** Overlapping runs are safe due to atomic writes and identical output. No lock is needed during the dual-scheduler proof window. Removing cron after proof is still the right call — not for safety but for operational clarity.
+
+### 4.7 Future Cloud Deployment
+
+Cloud scheduling authority (cron, systemd timer, Kubernetes CronJob, or cloud scheduler) must be chosen separately during the cloud deployment phase. Do not assume launchd extends to cloud. The publisher itself is cloud-portable — only the scheduler wrapper changes.
+
+**Manifest reversion investigation (Sprint 2):** Apparent reversion during testing was caused by the test suite spawning 24 parallel publisher instances at 07:17:23Z — not a scheduler conflict. Both schedulers run `--mode controlled_activation`.
 
 ---
 

@@ -330,10 +330,17 @@ These decisions are inferred from the current codebase. Future entries will be l
 ---
 
 ### Publisher Scheduler: launchd Is the Single Authority After Proof Window (Local Mac)
-**Decision**: Both cron (`*/10 * * * *`) and launchd (`com.decifer.handoff-publisher`, `StartInterval=600`) are temporarily installed during the controlled-activation proof window as redundancy. After the first successful market-hours handoff-consumption proof (proof matrix checks 26 + 27 confirmed), the cron entry is removed and launchd becomes the sole scheduler for local Mac operation.
+**Decision (2026-05-11, Amit)**: We are in local Mac laptop testing mode, not cloud mode. Both cron (`*/10 * * * *`) and launchd (`com.decifer.handoff-publisher`, `StartInterval=600`) are temporarily installed during the controlled-activation proof window as redundancy. After the first successful market-hours handoff-consumption proof (proof matrix checks 26 + 27 confirmed), the cron entry is disabled and launchd becomes the sole scheduler for local Mac operation.
 
-Cloud scheduling is out of scope until the cloud deployment phase. Do not conflate local Mac launchd scheduling with cloud scheduling.
+Cloud scheduling is out of scope until the cloud deployment phase. Cloud must choose its own scheduler authority (cron, systemd, CronJob, etc.) independently. Do not conflate local Mac launchd with cloud scheduling.
 
-**Why temporary redundancy**: Activation is happening for the first time in production. Running two schedulers during the proof window ensures the manifest stays fresh even if one scheduler misfires. Once the consumption path is proven, the redundancy is noise.
+**Concurrent run safety**: No process lock exists in the publisher. Overlapping runs are safe because (1) `_write_atomic()` uses `write → .tmp → os.replace()` which is atomic on macOS, and (2) both processes produce byte-identical manifests from identical inputs and flags. Last-writer-wins on `.tmp` is benign. Only observable effect: doubled run_log entries.
 
-**Rule**: After proof confirmed — run `crontab -e` and remove the `*/10 * * * *` handoff-publisher line. launchd remains. Do not install cron again for the publisher on local Mac.
+**Why temporary redundancy**: Belt-and-suspenders for first-ever activation. Once consumption path is proven, dual scheduling is noise.
+
+**Rule**: After proof confirmed (checks 26 + 27 close):
+```bash
+crontab -l | grep -v "handoff_publisher" | crontab -   # disable cron
+launchctl list com.decifer.handoff-publisher            # confirm launchd remains
+```
+Do not reinstall cron for the publisher on local Mac.
