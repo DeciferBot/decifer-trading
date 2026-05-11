@@ -2001,7 +2001,8 @@ def _resolve_orphaned_pending(ib: IB, price_map: dict, positions_keys: set) -> N
             if _tid and _actual_fill and _actual_qty and not active_trades.get(_key, {}).get("_fill_confirmed"):
                 try:
                     from event_log import append_fill as _el_fill
-                    _el_fill(_tid, _key.split("|")[0], fill_price=_actual_fill, fill_qty=_actual_qty)
+                    _el_fill(_tid, _key.split("|")[0], fill_price=_actual_fill, fill_qty=_actual_qty,
+                             order_id=active_trades.get(_key, {}).get("order_id") or 0)
                     _safe_update_trade(_key, {"_fill_confirmed": True})
                 except Exception as _elf_err:
                     log.warning("Reconcile: ORDER_FILLED write failed for %s: %s", _key, _elf_err)

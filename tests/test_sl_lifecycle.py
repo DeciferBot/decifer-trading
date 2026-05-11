@@ -53,17 +53,18 @@ class TestPass2OrphanSweep:
         Invoke just the Pass 2 logic extracted from audit_bracket_orders.
         Returns list of (symbol, orderType, orderId) that were cancelled.
         """
+        from bracket_health import _PROTECTION_STATUSES
         cancelled = []
 
         desired_long = {
             p.get("symbol", k)
             for k, p in active_positions.items()
-            if p.get("status") in ("ACTIVE", "TRIMMING") and p.get("direction") == "LONG"
+            if p.get("status") in _PROTECTION_STATUSES and p.get("direction") == "LONG"
         }
         desired_short = {
             p.get("symbol", k)
             for k, p in active_positions.items()
-            if p.get("status") in ("ACTIVE", "TRIMMING") and p.get("direction") == "SHORT"
+            if p.get("status") in _PROTECTION_STATUSES and p.get("direction") == "SHORT"
         }
 
         for _t in open_trades_list:
@@ -368,4 +369,124 @@ class TestAuditSlTpOcaGroup:
         text = src.read_text()
         assert "def cancel_orphan_stop_orders" not in text, (
             "cancel_orphan_stop_orders() was not deleted — Pass 2 makes it redundant"
+        )
+
+
+# ── FILLED-status bracket protection (P1 bug regression) ─────────────────────
+
+class TestFilledStatusProtection:
+    """
+    Regression tests for the bracket lifecycle bug where FILLED positions were
+    not treated as active-for-protection, causing Pass 2 to cancel their SL orders.
+    """
+
+    # ── A: FILLED + qty > 0 is active-for-protection ─────────────────────────
+
+    def test_filled_long_with_qty_is_active_for_protection(self):
+        from bracket_health import _PROTECTION_STATUSES
+        pos = {"symbol": "VRT", "status": "FILLED", "direction": "LONG", "qty": 100}
+        assert pos["status"] in _PROTECTION_STATUSES
+
+    def test_filled_short_with_qty_is_active_for_protection(self):
+        from bracket_health import _PROTECTION_STATUSES
+        pos = {"symbol": "XOM", "status": "FILLED", "direction": "SHORT", "qty": 50}
+        assert pos["status"] in _PROTECTION_STATUSES
+
+    def test_closed_is_not_active_for_protection(self):
+        from bracket_health import _PROTECTION_STATUSES
+        assert "CLOSED" not in _PROTECTION_STATUSES
+
+    def test_exiting_is_not_active_for_protection(self):
+        from bracket_health import _PROTECTION_STATUSES
+        assert "EXITING" not in _PROTECTION_STATUSES
+
+    # ── B: Pass 2 does not cancel SL for FILLED LONG ─────────────────────────
+
+    def test_pass2_skips_sl_with_filled_long(self):
+        t = _make_trade("VRT", "SELL", "STPLMT", 1101, order_ref="SL:vrt_tid")
+        positions = {"VRT": {"symbol": "VRT", "status": "FILLED", "direction": "LONG", "qty": 100}}
+        result = TestPass2OrphanSweep()._run_pass2([t], positions)
+        assert ("VRT", "STPLMT", 1101) not in result, (
+            "Pass 2 must not cancel SL for a FILLED LONG position — VRT regression"
+        )
+
+    # ── C: Pass 2 does not cancel SL for FILLED SHORT ────────────────────────
+
+    def test_pass2_skips_sl_with_filled_short(self):
+        t = _make_trade("XOM", "BUY", "STPLMT", 1102, order_ref="SL:xom_tid")
+        positions = {"XOM": {"symbol": "XOM", "status": "FILLED", "direction": "SHORT", "qty": 50}}
+        result = TestPass2OrphanSweep()._run_pass2([t], positions)
+        assert ("XOM", "STPLMT", 1102) not in result, (
+            "Pass 2 must not cancel SL for a FILLED SHORT position — XOM regression"
+        )
+
+    # ── D: Pass 2 does not cancel TP for FILLED LONG ─────────────────────────
+
+    def test_pass2_skips_tp_with_filled_long(self):
+        t = _make_trade("USO", "SELL", "LMT", 1103, order_ref="TP:uso_tid")
+        positions = {"USO": {"symbol": "USO", "status": "FILLED", "direction": "LONG", "qty": 200}}
+        result = TestPass2OrphanSweep()._run_pass2([t], positions)
+        assert ("USO", "LMT", 1103) not in result, (
+            "Pass 2 must not cancel TP for a FILLED LONG position — USO regression"
+        )
+
+    # ── E: ACTIVE position bracket repair still works ─────────────────────────
+
+    def test_pass2_still_skips_sl_with_active_long(self):
+        """Existing ACTIVE path must not regress."""
+        t = _make_trade("AAPL", "SELL", "STPLMT", 1104, order_ref="SL:aapl_tid")
+        positions = {"AAPL": {"symbol": "AAPL", "status": "ACTIVE", "direction": "LONG", "qty": 100}}
+        result = TestPass2OrphanSweep()._run_pass2([t], positions)
+        assert ("AAPL", "STPLMT", 1104) not in result
+
+    # ── F: Pass 1 loop guard allows FILLED status ────────────────────────────
+
+    def test_pass1_guard_includes_filled_in_protection_statuses(self):
+        """The Pass 1 loop guard must include FILLED — verified against source."""
+        import ast, pathlib
+        src = pathlib.Path(__file__).parent.parent / "bracket_health.py"
+        text = src.read_text()
+        assert "_PROTECTION_STATUSES" in text, (
+            "bracket_health.py must define _PROTECTION_STATUSES"
+        )
+        assert '"FILLED"' in text or "'FILLED'" in text, (
+            "_PROTECTION_STATUSES must include FILLED"
+        )
+
+    # ── G: Pass 1 TP guard allows FILLED status ──────────────────────────────
+
+    def test_pass1_tp_guard_does_not_restrict_to_active_only(self):
+        """Pass 1 TP submission must not restrict to status == 'ACTIVE'."""
+        import ast, pathlib
+        src = pathlib.Path(__file__).parent.parent / "bracket_health.py"
+        text = src.read_text()
+        assert 'pos.get("status") == "ACTIVE"' not in text, (
+            'Pass 1 TP guard still uses == "ACTIVE" — must use _PROTECTION_STATUSES'
+        )
+
+    # ── H: CLOSED position SL is still cancelled as orphan ───────────────────
+
+    def test_pass2_cancels_sl_for_closed_position(self):
+        """A CLOSED position must still trigger orphan cancellation."""
+        t = _make_trade("MSFT", "SELL", "STPLMT", 1105, order_ref="SL:msft_old")
+        positions = {"MSFT": {"symbol": "MSFT", "status": "CLOSED", "direction": "LONG", "qty": 0}}
+        result = TestPass2OrphanSweep()._run_pass2([t], positions)
+        assert ("MSFT", "STPLMT", 1105) in result
+
+    def test_pass2_cancels_sl_for_exiting_position(self):
+        """An EXITING position must still trigger orphan cancellation (no bracket needed)."""
+        t = _make_trade("NVDA", "SELL", "STPLMT", 1106, order_ref="SL:nvda_exiting")
+        positions = {"NVDA": {"symbol": "NVDA", "status": "EXITING", "direction": "LONG", "qty": 100}}
+        result = TestPass2OrphanSweep()._run_pass2([t], positions)
+        assert ("NVDA", "STPLMT", 1106) in result
+
+    # ── I: ORDER_FILLED records stored order_id from active_trades ──────────
+
+    def test_reconcile_order_filled_passes_order_id(self):
+        """Reconcile path append_fill call must pass order_id from active_trades."""
+        import ast, pathlib
+        src = pathlib.Path(__file__).parent.parent / "orders_portfolio.py"
+        text = src.read_text()
+        assert 'order_id=active_trades.get(_key, {}).get("order_id") or 0' in text, (
+            "Reconcile append_fill call must pass order_id from active_trades to avoid order_id=0"
         )

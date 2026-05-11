@@ -43,6 +43,12 @@ _RETRY_COOLDOWN_S: int = 300  # 5 minutes between new-order submissions per symb
 _retry_ts: dict[str, float] = {}
 _sl_place_ts: dict[str, float] = {}  # last time Pass 1 placed a new SL (grace period guard)
 
+# Statuses that represent deployed capital requiring protective orders.
+# FILLED must be included: a BUY fill transitions to FILLED before reconcile
+# promotes it to ACTIVE, and the bracket audit must not treat that window as
+# an orphan condition.
+_PROTECTION_STATUSES: frozenset[str] = frozenset({"ACTIVE", "TRIMMING", "FILLED"})
+
 
 def _in_cooldown(symbol: str) -> bool:
     return (time.monotonic() - _retry_ts.get(symbol, 0)) < _RETRY_COOLDOWN_S
@@ -137,7 +143,7 @@ def sync_bracket_prices(ib: IB) -> None:
     changed = False
     with _trades_lock:
         for key, pos in active_trades.items():
-            if pos.get("status") not in ("ACTIVE", "TRIMMING"):
+            if pos.get("status") not in _PROTECTION_STATUSES:
                 continue
             if pos.get("instrument") not in ("stock", None):
                 continue
@@ -222,7 +228,7 @@ def audit_bracket_orders(ib: IB) -> None:
     changed = False
     for key, pos in snapshot:
         try:
-            if pos.get("status") not in ("ACTIVE", "TRIMMING", "FILLED"):
+            if pos.get("status") not in _PROTECTION_STATUSES:
                 continue
             if pos.get("instrument") not in ("stock", None):
                 continue
@@ -393,7 +399,7 @@ def audit_bracket_orders(ib: IB) -> None:
                 )
 
             # ── Pass 1: TP bracket ────────────────────────────────────────────
-            if tp_count == 0 and pos.get("status") in ("ACTIVE", "FILLED"):
+            if tp_count == 0 and pos.get("status") in _PROTECTION_STATUSES:
                 if not _in_cooldown(symbol):
                     if not atr:
                         log.warning("[BRACKET_AUDIT] %s tp missing but no ATR — skipping", symbol)
@@ -499,18 +505,18 @@ def audit_bracket_orders(ib: IB) -> None:
             desired_long: set[str] = {
                 p.get("symbol", k)
                 for k, p in active_trades.items()
-                if p.get("status") in ("ACTIVE", "TRIMMING", "FILLED") and p.get("direction") == "LONG"
+                if p.get("status") in _PROTECTION_STATUSES and p.get("direction") == "LONG"
             }
             desired_short: set[str] = {
                 p.get("symbol", k)
                 for k, p in active_trades.items()
-                if p.get("status") in ("ACTIVE", "TRIMMING", "FILLED") and p.get("direction") == "SHORT"
+                if p.get("status") in _PROTECTION_STATUSES and p.get("direction") == "SHORT"
             }
             # Build trade_id → symbol map for orderRef-based lookup
             ref_to_symbol: dict[str, str] = {
                 p.get("trade_id", ""): p.get("symbol", k)
                 for k, p in active_trades.items()
-                if p.get("trade_id") and p.get("status") in ("ACTIVE", "TRIMMING", "FILLED")
+                if p.get("trade_id") and p.get("status") in _PROTECTION_STATUSES
             }
 
         for _t in ibkr_map.values():
