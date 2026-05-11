@@ -43,6 +43,12 @@ _MAX_429_RETRIES  = 3             # max retries on HTTP 429 (rate limit)
 # ── In-memory cache (key → (data, fetched_at)) ───────────────────────────────
 _cache: dict[str, tuple[object, float]] = {}
 
+# ── Negative cache: suppresses repeated network hits for known-failing endpoints ─
+# key → blocked_until (epoch float seconds)
+_neg_cache: dict[str, float] = {}
+_NEG_TTL_402 = 24 * 3600   # 402 = account entitlement — won't change until plan upgrade
+_NEG_TTL_ERR = 4 * 3600    # "Error Message" — quota-based, retry after fundamentals window
+
 
 def _api_key() -> str:
     return CONFIG.get("fmp_api_key", "") or os.environ.get("FMP_API_KEY", "")
@@ -65,6 +71,11 @@ def _get(endpoint: str, params: dict, version: str = "", ttl: float | None = Non
         return None
 
     cache_key = f"{endpoint}?{json.dumps(params, sort_keys=True)}"
+
+    # Negative cache: skip known-failing endpoints until TTL expires
+    if _time.time() < _neg_cache.get(cache_key, 0.0):
+        return None
+
     cached, fetched_at = _cache.get(cache_key, (None, 0.0))
     effective_ttl = ttl if ttl is not None else _CACHE_TTL
     if cached is not None and (_time.time() - fetched_at) < effective_ttl:
@@ -78,6 +89,7 @@ def _get(endpoint: str, params: dict, version: str = "", ttl: float | None = Non
         # FMP returns {"Error Message": "..."} on bad key / limit exceeded
         if isinstance(data, dict) and "Error Message" in data:
             log.warning("fmp_client: API error — %s", data["Error Message"])
+            _neg_cache[cache_key] = _time.time() + _NEG_TTL_ERR
             return None
         _cache[cache_key] = (data, _time.time())
         return data
@@ -93,6 +105,7 @@ def _get(endpoint: str, params: dict, version: str = "", ttl: float | None = Non
                     data = resp.json()
                     if isinstance(data, dict) and "Error Message" in data:
                         log.warning("fmp_client: API error — %s", data["Error Message"])
+                        _neg_cache[cache_key] = _time.time() + _NEG_TTL_ERR
                         return None
                     _cache[cache_key] = (data, _time.time())
                     return data
@@ -101,6 +114,13 @@ def _get(endpoint: str, params: dict, version: str = "", ttl: float | None = Non
                         break
             log.warning("fmp_client: HTTP 429 for %s (retries exhausted)", endpoint)
             return None
+        elif status == 402:
+            log.warning(
+                "fmp_client: HTTP 402 (account entitlement) for %s — "
+                "endpoint requires higher FMP plan; suppressing for 24h",
+                endpoint,
+            )
+            _neg_cache[cache_key] = _time.time() + _NEG_TTL_402
         # 403/404 on legacy endpoints expected after Aug 2025 — demote to debug
         elif status in (403, 404):
             log.debug("fmp_client: HTTP %s for %s (legacy endpoint)", status, endpoint)

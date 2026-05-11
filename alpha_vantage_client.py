@@ -149,6 +149,18 @@ def get_news_sentiment(tickers: list[str]) -> dict[str, dict]:
     """
     if not tickers:
         return {}
+    # AV NEWS_SENTIMENT tickers= is a simultaneous-mention filter — articles must mention
+    # ALL listed tickers simultaneously. Multi-ticker calls for unrelated symbols return
+    # near-zero articles and are not valid for broad universe enrichment.
+    # Single-symbol calls (len == 1) are semantically correct and proceed normally.
+    # Per-symbol redesign (quota-controlled top-N) is deferred to a future sprint.
+    if len(tickers) > 1:
+        log.info(
+            "AV news sentiment skipped: multi-ticker request not valid for unrelated universe "
+            "enrichment (simultaneous-mention filter); RSS-only fallback in effect. "
+            "Per-symbol top-N redesign is deferred."
+        )
+        return {}
     batch = tickers[:50]
     cache_key = ",".join(sorted(t.upper() for t in batch))
     now = time.monotonic()
@@ -177,8 +189,8 @@ def get_news_sentiment(tickers: list[str]) -> dict[str, dict]:
             return {}
 
         # AV returns rate-limit messages as JSON keys rather than HTTP errors
-        if "Note" in data or "Information" in data:
-            msg = (data.get("Note") or data.get("Information", ""))[:150]
+        if "Note" in data or "Information" in data or "Error Message" in data:
+            msg = (data.get("Note") or data.get("Information") or data.get("Error Message", ""))[:150]
             log.warning("AV API message: %s", msg)
             # Cache the empty result so we don't burn another API call on the
             # next scan. Use a 30-min TTL so it retries later rather than
@@ -293,8 +305,8 @@ def get_news_articles(tickers: list[str], limit: int = 50) -> list[dict]:
             log.warning("AV articles HTTP %d", status)
             return cached_articles or []
 
-        if "Note" in data or "Information" in data:
-            msg = (data.get("Note") or data.get("Information", ""))[:150]
+        if "Note" in data or "Information" in data or "Error Message" in data:
+            msg = (data.get("Note") or data.get("Information") or data.get("Error Message", ""))[:150]
             log.warning("AV API message (articles): %s", msg)
             # Cache empty list so repeated dashboard fetches don't burn API
             # calls on errors. 30-min TTL so it retries after a cooldown.
@@ -417,8 +429,8 @@ def get_sector_performance() -> dict[str, dict]:
             log.warning("AV SECTOR HTTP %d", status)
             return {}
 
-        if "Note" in data or "Information" in data:
-            msg = (data.get("Note") or data.get("Information", ""))[:150]
+        if "Note" in data or "Information" in data or "Error Message" in data:
+            msg = (data.get("Note") or data.get("Information") or data.get("Error Message", ""))[:150]
             log.warning("AV API message: %s", msg)
             return {}
 
