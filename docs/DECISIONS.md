@@ -330,17 +330,22 @@ These decisions are inferred from the current codebase. Future entries will be l
 ---
 
 ### Publisher Scheduler: launchd Is the Single Authority After Proof Window (Local Mac)
-**Decision (2026-05-11, Amit)**: We are in local Mac laptop testing mode, not cloud mode. Both cron (`*/10 * * * *`) and launchd (`com.decifer.handoff-publisher`, `StartInterval=600`) are temporarily installed during the controlled-activation proof window as redundancy. After the first successful market-hours handoff-consumption proof (proof matrix checks 26 + 27 confirmed), the cron entry is disabled and launchd becomes the sole scheduler for local Mac operation.
+**Decision (2026-05-11, Amit):**
 
-Cloud scheduling is out of scope until the cloud deployment phase. Cloud must choose its own scheduler authority (cron, systemd, CronJob, etc.) independently. Do not conflate local Mac launchd with cloud scheduling.
+This sprint was executed in local Mac laptop testing mode, not cloud mode.
 
-**Concurrent run safety**: No process lock exists in the publisher. Overlapping runs are safe because (1) `_write_atomic()` uses `write → .tmp → os.replace()` which is atomic on macOS, and (2) both processes produce byte-identical manifests from identical inputs and flags. Last-writer-wins on `.tmp` is benign. Only observable effect: doubled run_log entries.
+Both cron (`*/10 * * * *`) and launchd (`com.decifer.handoff-publisher`, `StartInterval=600`) are currently running the handoff publisher every 10 minutes as temporary activation redundancy. Code inspection confirms that overlapping runs are possible because the two intervals are not synchronised.
 
-**Why temporary redundancy**: Belt-and-suspenders for first-ever activation. Once consumption path is proven, dual scheduling is noise.
+Manifest writes are atomic through `_write_atomic()`, which writes to a temporary file and then uses `os.replace()`. Therefore, the final manifest is protected from partial writes. Because both schedulers currently produce the same `controlled_activation` manifest, overlapping runs are low risk during the activation proof window. The main side effect is duplicated run-log evidence.
 
-**Rule**: After proof confirmed (checks 26 + 27 close):
+There is currently no lock, flock, fcntl guard, or pidfile enforcing a single writer. For this reason, dual scheduling should not remain the steady-state local runtime.
+
+After the first successful market-hours handoff-consumption proof (proof matrix checks 26 + 27 confirmed), cron should be disabled and launchd should remain the single local Mac scheduler authority.
+
 ```bash
 crontab -l | grep -v "handoff_publisher" | crontab -   # disable cron
 launchctl list com.decifer.handoff-publisher            # confirm launchd remains
+# Expected: LastExitStatus = 0; ProgramArguments includes --mode controlled_activation
 ```
-Do not reinstall cron for the publisher on local Mac.
+
+Cloud scheduling is out of scope for this sprint and will be handled later during the cloud deployment phase.
