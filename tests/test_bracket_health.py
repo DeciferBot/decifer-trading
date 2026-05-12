@@ -325,3 +325,165 @@ class TestBotIbkrFillHandling:
         assert fill_calls[0].get("order_id") == 16945, (
             f"ORDER_FILLED must record order_id=16945, got {fill_calls[0]!r}"
         )
+
+
+# ── Tests I–L: Pass 3 — cancel-before-close (HIMS 2026-05-11 regression) ─────
+
+class TestPass3MissedStopCancelBeforeClose:
+    """
+    Regression tests for the HIMS position-inversion incident (2026-05-11).
+
+    Root cause: Pass 3 placed a close LimitOrder without first cancelling the
+    live TP and SL bracket orders, resulting in two simultaneous SELL orders
+    that together oversold LONG 2148 into SHORT 2216.
+
+    I: cancelOrder is called for every live bracket leg before placeOrder fires.
+    J: The close placeOrder is NOT called if bracket cancel confirmation times out.
+    K: When no bracket orders exist, the close order is placed directly (no cancel).
+    L: Normal Pass 1 SL repair is unaffected (no regression from the fix).
+    """
+
+    def _make_hims_position(self, sl_oid=5002, tp_oid=5001):
+        pos = _make_position(
+            "HIMS", "ACTIVE",
+            sl_oid=sl_oid, tp_oid=tp_oid,
+            qty=2148, trade_id="HIMS_20260508_181621_615409",
+        )
+        pos["current"] = 26.60  # below SL → sl_breached
+        pos["sl"] = 26.80
+        pos["tp"] = 29.34
+        return pos
+
+    def _make_sl_trade(self, order_id=5002):
+        return _make_ibkr_trade("HIMS", "STP LMT", "SELL", order_id=order_id,
+                                ref="SL:HIMS_20260508_1816")
+
+    def _make_tp_trade(self, order_id=5001):
+        t = _make_ibkr_trade("HIMS", "LMT", "SELL", order_id=order_id,
+                             ref="TP:HIMS_20260508_1816")
+        t.order.lmtPrice = 29.34
+        return t
+
+    def _run_audit_pass3(self, pos, open_trades, cancel_side_effect=None):
+        import bracket_health
+        ib = _make_ib(open_trades)
+        placed = MagicMock()
+        placed.order.orderId = 99999
+        placed.orderStatus.status = "Submitted"
+        ib.placeOrder.return_value = placed
+        if cancel_side_effect is not None:
+            ib.cancelOrder.side_effect = cancel_side_effect
+        trades = {"HIMS": pos}
+        with (
+            patch.object(bracket_health, "active_trades", trades),
+            patch.object(bracket_health, "_retry_ts", {}),
+            patch.object(bracket_health, "_sl_place_ts", {}),
+            patch("bracket_health._save_positions_file"),
+            patch("bracket_health._safe_update_trade"),
+            patch("bracket_health.is_equities_extended_hours", return_value=True),
+            patch("bracket_health.get_contract", return_value=MagicMock()),
+            patch("bracket_health._get_ibkr_bid_ask", return_value=(26.55, 26.65)),
+        ):
+            bracket_health.audit_bracket_orders(ib)
+        return ib
+
+    def test_I_cancel_sent_for_all_bracket_legs_before_close(self):
+        """
+        When a missed stop fires and both SL and TP orders are live, cancelOrder
+        must be called for BOTH bracket legs before placeOrder fires for the close.
+        This is the exact failure mode from the HIMS 2026-05-11 incident.
+        """
+        sl_trade = self._make_sl_trade(5002)
+        tp_trade = self._make_tp_trade(5001)
+        cancelled_before_place: list[int] = []
+        place_call_count_at_first_place: list[int] = []
+
+        def _cancel(order):
+            cancelled_before_place.append(order.orderId)
+            # Simulate IBKR confirming the cancel
+            if order.orderId == sl_trade.order.orderId:
+                sl_trade.orderStatus.status = "Cancelled"
+            elif order.orderId == tp_trade.order.orderId:
+                tp_trade.orderStatus.status = "Cancelled"
+
+        pos = self._make_hims_position()
+        ib = self._run_audit_pass3(pos, [sl_trade, tp_trade], cancel_side_effect=_cancel)
+
+        assert ib.cancelOrder.call_count >= 2, (
+            f"cancelOrder must be called for both bracket legs (SL + TP), "
+            f"got {ib.cancelOrder.call_count} call(s)"
+        )
+        assert ib.placeOrder.called, "close placeOrder must be called after brackets are cancelled"
+        # Verify both bracket order IDs were cancelled
+        cancelled_ids = {c.args[0].orderId for c in ib.cancelOrder.call_args_list}
+        assert 5001 in cancelled_ids, "TP order #5001 must be cancelled"
+        assert 5002 in cancelled_ids, "SL order #5002 must be cancelled"
+        # Verify cancels preceded the close placeOrder in the call sequence
+        cancel_indices = [
+            i for i, c in enumerate(ib.mock_calls)
+            if c[0] == "cancelOrder"
+        ]
+        place_indices = [
+            i for i, c in enumerate(ib.mock_calls)
+            if c[0] == "placeOrder"
+        ]
+        assert cancel_indices, "cancelOrder must appear in mock_calls"
+        assert place_indices, "placeOrder must appear in mock_calls"
+        assert max(cancel_indices) < min(place_indices), (
+            "All cancelOrder calls must precede the close placeOrder call — "
+            f"cancel at positions {cancel_indices}, place at positions {place_indices}"
+        )
+
+    def test_J_close_not_submitted_when_cancel_confirmation_times_out(self):
+        """
+        If bracket cancel confirmation does not arrive within the timeout,
+        the close order must NOT be submitted. This prevents the double-SELL
+        scenario when IBKR is slow to confirm cancellations.
+        """
+        sl_trade = self._make_sl_trade(5002)
+        tp_trade = self._make_tp_trade(5001)
+        # cancelOrder does NOT update status — simulates IBKR cancel timeout
+        pos = self._make_hims_position()
+        ib = self._run_audit_pass3(pos, [sl_trade, tp_trade], cancel_side_effect=None)
+
+        assert ib.cancelOrder.call_count >= 1, "cancelOrder must still be attempted even when it times out"
+        assert not ib.placeOrder.called, (
+            "placeOrder for the close MUST NOT be called when bracket cancel "
+            "confirmation times out — the position could be inverted otherwise"
+        )
+
+    def test_K_close_placed_directly_when_no_bracket_orders_live(self):
+        """
+        When no bracket orders are live in IBKR (e.g. already cancelled or
+        filled by an earlier path), the close order must be placed immediately
+        without waiting for any cancel confirmation.
+        """
+        pos = self._make_hims_position(sl_oid=None, tp_oid=None)
+        # No open trades — bracket map is empty
+        ib = self._run_audit_pass3(pos, open_trades=[])
+
+        assert not ib.cancelOrder.called, "cancelOrder must not be called when no brackets are live"
+        assert ib.placeOrder.called, "close placeOrder must be called when no brackets need cancelling"
+
+    def test_L_pass1_sl_repair_unaffected_by_pass3_fix(self):
+        """
+        Regression: Pass 1 SL repair for ACTIVE positions must still work.
+        The Pass 3 cancel-before-close change must not affect normal bracket management.
+        """
+        pos = _make_position("IWM", "ACTIVE", sl_oid=None, trade_id="IWM_tid")
+        # current > sl so sl_breached is False — Pass 3 must not fire
+        pos["current"] = 105.0
+        pos["sl"] = 95.0
+        trades = {"IWM": pos}
+        import bracket_health
+        ib = _make_ib([])  # no live brackets
+        with (
+            patch.object(bracket_health, "active_trades", trades),
+            patch.object(bracket_health, "_retry_ts", {}),
+            patch.object(bracket_health, "_sl_place_ts", {}),
+            patch("bracket_health._save_positions_file"),
+            patch("bracket_health._safe_update_trade"),
+        ):
+            bracket_health.audit_bracket_orders(ib)
+        assert ib.placeOrder.called, "Pass 1 must still submit a new SL for ACTIVE positions with no live SL"
+        assert not ib.cancelOrder.called, "cancelOrder must not be called during a normal Pass 1 SL repair"

@@ -43,6 +43,14 @@ _RETRY_COOLDOWN_S: int = 300  # 5 minutes between new-order submissions per symb
 _retry_ts: dict[str, float] = {}
 _sl_place_ts: dict[str, float] = {}  # last time Pass 1 placed a new SL (grace period guard)
 
+# Pass 3: bracket cancel-before-close safety constants.
+# Before submitting a missed-stop close order, ALL live bracket legs must be
+# confirmed cancelled. If confirmation doesn't arrive within the timeout the
+# close order is NOT submitted — preventing simultaneous SELL orders that would
+# oversell the position into an unintended short (HIMS incident 2026-05-11).
+_BRACKET_CANCEL_TIMEOUT_S: float = 5.0  # max seconds to wait for cancel confirmation
+_CANCEL_POLL_S: float = 0.3             # poll interval during confirmation wait
+
 # Statuses that represent deployed capital requiring protective orders.
 # FILLED must be included: a BUY fill transitions to FILLED before reconcile
 # promotes it to ACTIVE, and the bracket audit must not treat that window as
@@ -272,10 +280,63 @@ def audit_bracket_orders(ib: IB) -> None:
                     )
                     continue
                 log.warning(
-                    "[BRACKET_AUDIT] %s missed stop: current=%.2f below sl=%.2f — "
-                    "closing at limit",
+                    "[BRACKET_AUDIT] %s missed stop: current=%.2f sl=%.2f — "
+                    "cancelling brackets then closing at limit",
                     symbol, current, sl,
                 )
+
+                # Lock out all other close paths before any IBKR calls.
+                _prev_status = pos.get("status")
+                _safe_update_trade(key, {
+                    "status": "EXITING",
+                    "pending_exit_reason": "bracket_audit_missed_stop",
+                })
+                changed = True
+
+                # Cancel ALL live bracket orders before submitting the close.
+                # Without this, a live TP coexists with the new close order —
+                # both fill and invert the position (HIMS incident 2026-05-11).
+                _all_bracket_trades = sl_candidates + tp_candidates
+                _cancel_confirmed = True
+                if _all_bracket_trades:
+                    for _bt in _all_bracket_trades:
+                        try:
+                            ib.cancelOrder(_bt.order)
+                            log.info(
+                                "[BRACKET_AUDIT] %s pre-close cancel sent for bracket #%d",
+                                symbol, _bt.order.orderId,
+                            )
+                        except Exception as _ce:
+                            log.warning(
+                                "[BRACKET_AUDIT] %s pre-close cancel failed for #%d: %s",
+                                symbol, _bt.order.orderId, _ce,
+                            )
+                    # Poll for cancellation confirmation before placing close order.
+                    _elapsed = 0.0
+                    while _elapsed < _BRACKET_CANCEL_TIMEOUT_S:
+                        ib.sleep(_CANCEL_POLL_S)
+                        _elapsed += _CANCEL_POLL_S
+                        _still_live = [
+                            t for t in _all_bracket_trades
+                            if t.orderStatus.status not in ("Cancelled", "Filled", "Inactive")
+                        ]
+                        if not _still_live:
+                            break
+                    else:
+                        _still_ids = [t.order.orderId for t in _all_bracket_trades
+                                      if t.orderStatus.status not in ("Cancelled", "Filled", "Inactive")]
+                        log.error(
+                            "[BRACKET_AUDIT] %s missed-stop: bracket cancel timed out after %.1fs "
+                            "(orders still live: %s) — NOT submitting close to prevent position inversion",
+                            symbol, _BRACKET_CANCEL_TIMEOUT_S, _still_ids,
+                        )
+                        _safe_update_trade(key, {"status": _prev_status})
+                        _cancel_confirmed = False
+
+                if not _cancel_confirmed:
+                    _mark_retry(symbol)
+                    continue
+
                 try:
                     contract = get_contract(symbol, "stock")
                     ib.qualifyContracts(contract)
@@ -293,21 +354,20 @@ def audit_bracket_orders(ib: IB) -> None:
                     close_status = close_trade.orderStatus.status if close_trade else ""
                     if close_status in ("Submitted", "PreSubmitted"):
                         _safe_update_trade(key, {
-                            "status": "EXITING",
                             "close_order_id": close_trade.order.orderId,
-                            "pending_exit_reason": "bracket_audit_missed_stop",
                         })
-                        changed = True
                         log.info(
                             "[BRACKET_AUDIT] %s close at limit %.2f placed (order #%d)",
                             symbol, limit_px, close_trade.order.orderId,
                         )
                     else:
+                        _safe_update_trade(key, {"status": _prev_status})
                         log.warning(
                             "[BRACKET_AUDIT] %s limit close rejected (status=%r) — retry next cycle",
                             symbol, close_status,
                         )
                 except Exception as _ce:
+                    _safe_update_trade(key, {"status": _prev_status})
                     log.error("[BRACKET_AUDIT] %s missed-stop close failed: %s", symbol, _ce)
                 _mark_retry(symbol)
                 continue  # don't audit brackets when already trying to close
