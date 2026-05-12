@@ -1,0 +1,402 @@
+{
+  "meta": {
+    "since": "2026-05-11",
+    "generated": "2026-05-12T03:08:58.650218+00:00"
+  },
+  "section_0": {
+    "since": "2026-05-11",
+    "regime": "TRENDING_UP",
+    "cycles": 66,
+    "candidates": 1269,
+    "selections": 183,
+    "open_positions": 16,
+    "closed_trades": 26,
+    "open_pnl": 16110.88,
+    "closed_pnl": -7081.6,
+    "session_pnl": 9029.28
+  },
+  "section_1": {
+    "sequence": [
+      {
+        "symbol": "NVDA",
+        "open_time": "2026-05-06T18:31",
+        "score": 75.0,
+        "notional": 61075.21,
+        "cum_notional": 61075.21,
+        "cum_exp_pct": 6.28,
+        "trade_type": "POSITION"
+      },
+      {
+        "symbol": "AAPL",
+        "open_time": "2026-05-07T10:58",
+        "score": 85.0,
+        "notional": 58802.55,
+        "cum_notional": 119877.76,
+        "cum_exp_pct": 12.32,
+        "trade_type": "POSITION"
+      },
+      {
+        "symbol": "MSFT",
+        "open_time": "2026-05-07T11:17",
+        "score": 63.0,
+        "notional": 56830.47,
+        "cum_notional": 176708.23,
+        "cum_exp_pct": 18.16,
+        "trade_type": "POSITION"
+      },
+      {
+        "symbol": "HIMS",
+        "open_time": "2026-05-08T18:16",
+        "score": 64.0,
+        "notional": 107829.6,
+        "cum_notional": 284537.83,
+        "cum_exp_pct": 29.25,
+        "trade_type": "POSITION"
+      },
+      {
+        "symbol": "SNDK",
+        "open_time": "2026-05-08T19:46",
+        "score": 37.0,
+        "notional": 56898.79,
+        "cum_notional": 341436.61,
+        "cum_exp_pct": 35.1,
+        "trade_type": "POSITION"
+      },
+      {
+        "symbol": "WDC",
+        "open_time": "2026-05-08T20:47",
+        "score": 27.0,
+        "notional": 62122.8,
+        "cum_notional": 403559.41,
+        "cum_exp_pct": 41.48,
+        "trade_type": "POSITION"
+      },
+      {
+        "symbol": "CEG",
+        "open_time": "2026-05-11T08:28",
+        "score": 59.0,
+        "notional": 97918.51,
+        "cum_notional": 501477.93,
+        "cum_exp_pct": 51.55,
+        "trade_type": "SWING"
+      },
+      {
+        "symbol": "TSM",
+        "open_time": "2026-05-11T08:49",
+        "score": 39.0,
+        "notional": 57391.43,
+        "cum_notional": 558869.36,
+        "cum_exp_pct": 57.45,
+        "trade_type": "SWING"
+      },
+      {
+        "symbol": "CVX",
+        "open_time": "2026-05-11T09:32",
+        "score": 44.0,
+        "notional": 94951.22,
+        "cum_notional": 653820.58,
+        "cum_exp_pct": 67.21,
+        "trade_type": "SWING"
+      },
+      {
+        "symbol": "XLK",
+        "open_time": "2026-05-11T09:32",
+        "score": 26.0,
+        "notional": 58016.59,
+        "cum_notional": 711837.17,
+        "cum_exp_pct": 73.17,
+        "trade_type": "SWING"
+      },
+      {
+        "symbol": "IWM",
+        "open_time": "2026-05-11T14:29",
+        "score": 83.0,
+        "notional": 56810.52,
+        "cum_notional": 768647.69,
+        "cum_exp_pct": 79.01,
+        "trade_type": "SWING"
+      },
+      {
+        "symbol": "VRT",
+        "open_time": "2026-05-11T14:29",
+        "score": 68.0,
+        "notional": 58275.93,
+        "cum_notional": 826923.62,
+        "cum_exp_pct": 85.0,
+        "trade_type": "SWING"
+      },
+      {
+        "symbol": "XOM",
+        "open_time": "2026-05-11T14:29",
+        "score": 63.0,
+        "notional": 58468.18,
+        "cum_notional": 885391.8,
+        "cum_exp_pct": 91.01,
+        "trade_type": "SWING"
+      },
+      {
+        "symbol": "PWR",
+        "open_time": "2026-05-11T16:22",
+        "score": 74.0,
+        "notional": 57893.16,
+        "cum_notional": 943284.96,
+        "cum_exp_pct": 96.96,
+        "trade_type": "SWING"
+      },
+      {
+        "symbol": "USO",
+        "open_time": "2026-05-11T16:22",
+        "score": 71.0,
+        "notional": 57537.68,
+        "cum_notional": 1000822.64,
+        "cum_exp_pct": 102.88,
+        "trade_type": "SWING"
+      },
+      {
+        "symbol": "XLP",
+        "open_time": "2026-05-11T16:59",
+        "score": 68.0,
+        "notional": 57810.2,
+        "cum_notional": 1058632.84,
+        "cum_exp_pct": 108.82,
+        "trade_type": "SWING"
+      }
+    ],
+    "final_cum_notional": 1058632.84,
+    "nlv": 972841.25
+  },
+  "section_2": {
+    "unique_blocked": 4,
+    "book_avg_score": 59.125,
+    "blocked_avg_score": 67.25,
+    "outscores_15_count": 1,
+    "outscores_20_count": 0,
+    "rows": [
+      {
+        "symbol": "TSLA",
+        "score": 74.0,
+        "book_avg": 59.125,
+        "gap": 14.9,
+        "outscores_15": false,
+        "outscores_20": false,
+        "total_pct": 115.6
+      },
+      {
+        "symbol": "ASML",
+        "score": 74.0,
+        "book_avg": 59.125,
+        "gap": 14.9,
+        "outscores_15": false,
+        "outscores_20": false,
+        "total_pct": 115.6
+      },
+      {
+        "symbol": "NBIS",
+        "score": 46.0,
+        "book_avg": 59.125,
+        "gap": -13.1,
+        "outscores_15": false,
+        "outscores_20": false,
+        "total_pct": 115.6
+      },
+      {
+        "symbol": "AVGO",
+        "score": 75.0,
+        "book_avg": 59.125,
+        "gap": 15.9,
+        "outscores_15": true,
+        "outscores_20": false,
+        "total_pct": 115.4
+      }
+    ],
+    "reconstruction_confidence": "MEDIUM"
+  },
+  "section_3": {
+    "total_skips": 334,
+    "pru_displacement_watch_count": 17
+  },
+  "section_4": {
+    "open_buckets": {
+      "QUESTIONABLE (<35)": {
+        "count": 2,
+        "symbols": [
+          "WDC",
+          "XLK"
+        ],
+        "notional": 120139.39000000001
+      },
+      "LOW (35-49)": {
+        "count": 3,
+        "symbols": [
+          "SNDK",
+          "TSM",
+          "CVX"
+        ],
+        "notional": 209241.435
+      },
+      "MEDIUM (50-64)": {
+        "count": 4,
+        "symbols": [
+          "MSFT",
+          "CEG",
+          "XOM",
+          "HIMS"
+        ],
+        "notional": 321046.77
+      },
+      "HIGH (65+)": {
+        "count": 7,
+        "symbols": [
+          "NVDA",
+          "AAPL",
+          "IWM",
+          "VRT",
+          "PWR",
+          "USO",
+          "XLP"
+        ],
+        "notional": 408205.245
+      }
+    },
+    "closed_buckets": {
+      "QUESTIONABLE (<35)": {
+        "count": 0,
+        "avg_pnl": null,
+        "total_pnl": 0,
+        "wins": 0,
+        "losses": 0
+      },
+      "LOW (35-49)": {
+        "count": 2,
+        "avg_pnl": 616.0,
+        "total_pnl": 1232.0,
+        "wins": 2,
+        "losses": 0
+      },
+      "MEDIUM (50-64)": {
+        "count": 9,
+        "avg_pnl": -0.37,
+        "total_pnl": -3.31,
+        "wins": 3,
+        "losses": 6
+      },
+      "HIGH (65+)": {
+        "count": 15,
+        "avg_pnl": -554.02,
+        "total_pnl": -8310.29,
+        "wins": 6,
+        "losses": 9
+      }
+    }
+  },
+  "section_5": {
+    "etf_overlap_flags": 1,
+    "flagged_etfs": [
+      "XLK"
+    ],
+    "flagged_below_35": [
+      "XLK"
+    ]
+  },
+  "section_6": {
+    "clusters": {
+      "Consumer / Defensive": {
+        "count": 1,
+        "symbols": [
+          "XLP"
+        ],
+        "notional": 57810.2,
+        "pct_nlv": 5.94,
+        "avg_score": 68.0
+      },
+      "Energy": {
+        "count": 3,
+        "symbols": [
+          "CVX",
+          "XOM",
+          "USO"
+        ],
+        "notional": 210957.08,
+        "pct_nlv": 21.68,
+        "avg_score": 59.3
+      },
+      "Healthcare / Biotech": {
+        "count": 1,
+        "symbols": [
+          "HIMS"
+        ],
+        "notional": 107829.6,
+        "pct_nlv": 11.08,
+        "avg_score": 64.0
+      },
+      "Other": {
+        "count": 1,
+        "symbols": [
+          "IWM"
+        ],
+        "notional": 56810.52,
+        "pct_nlv": 5.84,
+        "avg_score": 83.0
+      },
+      "Power / Infrastructure": {
+        "count": 3,
+        "symbols": [
+          "CEG",
+          "VRT",
+          "PWR"
+        ],
+        "notional": 214087.61,
+        "pct_nlv": 22.01,
+        "avg_score": 67.0
+      },
+      "Tech / AI / Semis": {
+        "count": 7,
+        "symbols": [
+          "NVDA",
+          "AAPL",
+          "MSFT",
+          "SNDK",
+          "WDC",
+          "TSM",
+          "XLK"
+        ],
+        "notional": 411137.84,
+        "pct_nlv": 42.26,
+        "avg_score": 50.3
+      }
+    }
+  },
+  "section_7": {
+    "pru_candidates": 161,
+    "pru_selected": 51,
+    "avg_pru_sel_score": 37.0,
+    "avg_norm_sel_score": 58.7,
+    "pru_displacement_cases": 33,
+    "verdict": "PRU_DISCOVERY_OVERSELECTION_WATCH"
+  },
+  "section_8": {
+    "book_avg_score": 59.1,
+    "below_35_count": 2,
+    "low_count": 3,
+    "blocked_avg": 67.25,
+    "outscores_15": 1,
+    "outscores_20": 0,
+    "etf_flags": 1,
+    "etf_below_35_flag": true,
+    "pru_displacement_flags": 17,
+    "verdict": "WEAK_ENTRIES_DETECTED",
+    "recommended_action": "KEEP OBSERVING"
+  },
+  "section_9": {
+    "issues": [
+      "entry_score field missing or empty in 26/26 training records \u2014 normalized from score field.",
+      "Section 2 book-state reconstruction uses end-of-session positions, not intraday snapshots. Score gap analysis is directionally correct; temporal ordering is best-effort (MEDIUM confidence).",
+      "Log timestamps use local timezone offset; UTC audit record timestamps are not correlated exactly. Symbol-to-score lookup uses max score seen in file as an approximation."
+    ]
+  },
+  "data_quality": {
+    "missing_files": [],
+    "malformed_lines": {},
+    "warnings": []
+  }
+}
