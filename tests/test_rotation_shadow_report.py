@@ -747,7 +747,123 @@ class TestMalformedJSONL:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Test 13 — Full report integration
+# Test 13 — Snapshot timing tolerance (trigger-based matching)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestSnapshotTimingTolerance:
+    """
+    Snapshots written 1-2ms after the block record must be matched via trigger
+    field or tolerance window, not rejected by a strict ts <= block_ts guard.
+    """
+
+    _BLOCK_TS = datetime(2026, 5, 12, 17, 3, 48, tzinfo=timezone.utc)
+
+    def _write_snapshot(self, tmp_path: pathlib.Path, trigger: str, delta_ms: float) -> pathlib.Path:
+        obs = tmp_path / "rotation_observability"
+        obs.mkdir(parents=True, exist_ok=True)
+        snap_ts = self._BLOCK_TS + __import__("datetime").timedelta(milliseconds=delta_ms)
+        snap = {
+            "ts": snap_ts.isoformat(),
+            "trigger": trigger,
+            "positions": {
+                "XLK": {"symbol": "XLK", "score": 26, "qty": 100, "entry": 220.0,
+                        "open_time": "2026-05-12T09:30:00+00:00", "pnl": -200.0,
+                        "trade_type": "POSITION", "direction": "LONG"},
+                "WDC": {"symbol": "WDC", "score": 27, "qty": 200, "entry": 75.0,
+                        "open_time": "2026-05-11T09:30:00+00:00", "pnl": 50.0,
+                        "trade_type": "POSITION", "direction": "LONG"},
+            },
+        }
+        snap_file = obs / "position_snapshots.jsonl"
+        with snap_file.open("a") as f:
+            f.write(json.dumps(snap) + "\n")
+        return obs
+
+    def test_snapshot_1ms_after_block_matched_via_trigger(self, tmp_path):
+        """Snapshot written 1ms after block is matched when trigger == margin_block:DVA."""
+        obs = self._write_snapshot(tmp_path, "margin_block:DVA", delta_ms=1)
+        result = rsr.load_position_snapshot_at(obs, self._BLOCK_TS, block_symbol="DVA")
+        assert result is not None
+        syms = {p["symbol"] for p in result}
+        assert "XLK" in syms
+
+    def test_snapshot_2ms_after_block_matched_via_trigger(self, tmp_path):
+        """Snapshot written 2ms after block is matched when trigger matches."""
+        obs = self._write_snapshot(tmp_path, "margin_block:DVA", delta_ms=2)
+        result = rsr.load_position_snapshot_at(obs, self._BLOCK_TS, block_symbol="DVA")
+        assert result is not None
+
+    def test_snapshot_within_tolerance_no_trigger_match(self, tmp_path):
+        """Snapshot within 5s but with non-matching trigger still matched via tolerance."""
+        obs = self._write_snapshot(tmp_path, "margin_block:OTHER", delta_ms=500)
+        result = rsr.load_position_snapshot_at(obs, self._BLOCK_TS, block_symbol="DVA")
+        assert result is not None
+
+    def test_snapshot_outside_5s_tolerance_not_matched_unless_before(self, tmp_path):
+        """Snapshot 10s after block_ts is outside tolerance and is not a trigger match."""
+        obs = self._write_snapshot(tmp_path, "margin_block:OTHER", delta_ms=10_000)
+        # No trigger match, 10s after block, but still within legacy (ts > block_ts so NOT legacy)
+        result = rsr.load_position_snapshot_at(obs, self._BLOCK_TS, block_symbol="DVA")
+        # 10s after block_ts is outside tolerance, not a trigger match, not ts <= block_ts
+        assert result is None
+
+    def test_trigger_match_preferred_over_closer_non_trigger(self, tmp_path):
+        """Trigger-matching snapshot is preferred even if another is temporally closer."""
+        obs = tmp_path / "rotation_observability"
+        obs.mkdir(parents=True, exist_ok=True)
+        import datetime as _dt
+        # Non-trigger snapshot: 0.1ms after block (closer temporally)
+        ts_close = self._BLOCK_TS + _dt.timedelta(milliseconds=0.1)
+        # Trigger snapshot: 2ms after block
+        ts_trigger = self._BLOCK_TS + _dt.timedelta(milliseconds=2)
+        snap_file = obs / "position_snapshots.jsonl"
+        with snap_file.open("w") as f:
+            f.write(json.dumps({
+                "ts": ts_close.isoformat(), "trigger": "other_trigger",
+                "positions": {"AAPL": {"symbol": "AAPL", "score": 80, "qty": 10,
+                                        "entry": 200.0, "pnl": 0.0,
+                                        "trade_type": "POSITION", "direction": "LONG"}},
+            }) + "\n")
+            f.write(json.dumps({
+                "ts": ts_trigger.isoformat(), "trigger": "margin_block:DVA",
+                "positions": {"XLK": {"symbol": "XLK", "score": 26, "qty": 100,
+                                       "entry": 220.0, "pnl": -200.0,
+                                       "trade_type": "POSITION", "direction": "LONG"}},
+            }) + "\n")
+        result = rsr.load_position_snapshot_at(obs, self._BLOCK_TS, block_symbol="DVA")
+        assert result is not None
+        syms = {p["symbol"] for p in result}
+        # Should return the trigger-matched snapshot (XLK), not the closer non-trigger (AAPL)
+        assert "XLK" in syms
+        assert "AAPL" not in syms
+
+    def test_legacy_snapshot_before_block_matched_when_nothing_else(self, tmp_path):
+        """Snapshot from before block_ts matched when no trigger/tolerance match exists."""
+        obs = tmp_path / "rotation_observability"
+        obs.mkdir(parents=True, exist_ok=True)
+        import datetime as _dt
+        ts_before = self._BLOCK_TS - _dt.timedelta(seconds=30)
+        snap_file = obs / "position_snapshots.jsonl"
+        snap_file.write_text(json.dumps({
+            "ts": ts_before.isoformat(), "trigger": "unrelated",
+            "positions": {"WDC": {"symbol": "WDC", "score": 27, "qty": 200,
+                                   "entry": 75.0, "pnl": 50.0,
+                                   "trade_type": "POSITION", "direction": "LONG"}},
+        }) + "\n")
+        result = rsr.load_position_snapshot_at(obs, self._BLOCK_TS, block_symbol="DVA")
+        assert result is not None
+        assert result[0]["symbol"] == "WDC"
+
+    def test_missing_snapshot_file_returns_none(self, tmp_path):
+        """Missing position_snapshots.jsonl returns None without crashing."""
+        obs = tmp_path / "rotation_observability"
+        obs.mkdir()
+        result = rsr.load_position_snapshot_at(obs, self._BLOCK_TS, block_symbol="DVA")
+        assert result is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test 14 — Full report integration
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestFullReportIntegration:

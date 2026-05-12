@@ -425,18 +425,29 @@ def load_margin_blocks_jsonl(
 def load_position_snapshot_at(
     obs_dir: pathlib.Path,
     block_ts: datetime,
+    block_symbol: str = "",
+    tolerance_seconds: float = 5.0,
 ) -> list[dict] | None:
     """
-    Return the position snapshot from position_snapshots.jsonl whose timestamp
-    is closest to and not after block_ts. Returns None if no snapshot is available.
+    Return the position list from position_snapshots.jsonl best matching block_ts.
 
-    Used by the shadow report to get an exact book reconstruction at block time
-    instead of relying on open_time inference from positions.json.
+    Matching priority:
+      1. trigger field == "margin_block:{block_symbol}" within tolerance window
+      2. any snapshot within tolerance window (closest by abs diff)
+      3. legacy: snapshot whose ts <= block_ts (closest to block_ts)
+
+    Priority 1 & 2 handle the 1-2ms write lag where snapshots land just after the
+    block record. Priority 3 preserves backward compatibility with older data.
     """
     path = obs_dir / "position_snapshots.jsonl"
     if not path.exists():
         return None
-    best: tuple[float, list[dict]] | None = None
+
+    trigger_key = f"margin_block:{block_symbol}" if block_symbol else ""
+    trigger_candidates: list[tuple[float, list[dict]]] = []
+    tolerance_candidates: list[tuple[float, list[dict]]] = []
+    legacy_candidates: list[tuple[float, list[dict]]] = []
+
     try:
         with path.open(encoding="utf-8", errors="replace") as fh:
             for raw in fh:
@@ -456,15 +467,26 @@ def load_position_snapshot_at(
                         ts = ts.replace(tzinfo=timezone.utc)
                 except ValueError:
                     continue
-                if ts > block_ts:
-                    continue
-                diff = (block_ts - ts).total_seconds()
-                if best is None or diff < best[0]:
-                    positions_dict = rec.get("positions") or {}
-                    best = (diff, list(positions_dict.values()))
+                positions_dict = rec.get("positions") or {}
+                pos_list = list(positions_dict.values())
+                abs_diff = abs((ts - block_ts).total_seconds())
+                if trigger_key and rec.get("trigger") == trigger_key and abs_diff <= tolerance_seconds:
+                    trigger_candidates.append((abs_diff, pos_list))
+                elif abs_diff <= tolerance_seconds:
+                    tolerance_candidates.append((abs_diff, pos_list))
+                elif ts <= block_ts:
+                    diff = (block_ts - ts).total_seconds()
+                    legacy_candidates.append((diff, pos_list))
     except OSError:
         return None
-    return best[1] if best is not None else None
+
+    if trigger_candidates:
+        return min(trigger_candidates, key=lambda x: x[0])[1]
+    if tolerance_candidates:
+        return min(tolerance_candidates, key=lambda x: x[0])[1]
+    if legacy_candidates:
+        return min(legacy_candidates, key=lambda x: x[0])[1]
+    return None
 
 
 def build_hold_protected_set(
@@ -985,6 +1007,7 @@ def section_2(
     positions: list[dict],
     nlv: float | None,
     since: date,
+    obs_dir: pathlib.Path | None = None,
 ) -> tuple[list[str], dict]:
     lines = [
         "",
@@ -1006,8 +1029,15 @@ def section_2(
             # Not a high-value block — still show but abbreviated
             pass
 
-        book = book_at_block_time(positions, ts)
-        conf = book_reconstruction_confidence(positions, ts)
+        jsonl_book = None
+        if obs_dir is not None and ts is not None:
+            jsonl_book = load_position_snapshot_at(obs_dir, ts, block_symbol=sym)
+        if jsonl_book is not None:
+            book = jsonl_book
+            conf = book_reconstruction_confidence(jsonl_book, ts)
+        else:
+            book = book_at_block_time(positions, ts)
+            conf = book_reconstruction_confidence(positions, ts)
         ts_str = ts.strftime("%Y-%m-%dT%H:%M:%SZ") if isinstance(ts, datetime) else "UNKNOWN"
 
         lines += [
@@ -1077,6 +1107,7 @@ def section_3(
     since: date,
     pru_syms: set[str],
     hold_protected_syms: frozenset[str] | None = None,
+    obs_dir: pathlib.Path | None = None,
 ) -> tuple[list[str], dict]:
     lines = [
         "",
@@ -1101,7 +1132,6 @@ def section_3(
         lines.append("  No high-score blocked candidates (gap >15). No shadow ranking produced.")
         return lines, {"rankings": []}
 
-    held_syms = frozenset(p.get("symbol", "") for p in positions)
     all_rankings: list[dict] = []
 
     for b in high_value_blocks:
@@ -1109,7 +1139,12 @@ def section_3(
         score = b.get("score")
         ts    = b.get("ts")
 
-        book = book_at_block_time(positions, ts)
+        jsonl_book_s3 = None
+        if obs_dir is not None and ts is not None:
+            jsonl_book_s3 = load_position_snapshot_at(obs_dir, ts, block_symbol=sym)
+        book = jsonl_book_s3 if jsonl_book_s3 is not None else book_at_block_time(positions, ts)
+        held_syms = frozenset(p.get("symbol", "") for p in book)
+
         candidates = build_shadow_candidates(
             b, book, since, pru_syms, held_syms,
             hold_protected_syms=hold_protected_syms or frozenset(),
@@ -1836,12 +1871,26 @@ def run_report(
                 except (TypeError, ValueError):
                     pass
 
-    # Book average
+    # Book average — prefer block-time JSONL snapshot (exact) over EOD positions.json
     book_avg = tqr_artifact.get("section_2", {}).get("book_avg_score") if tqr_artifact else None
     if book_avg is None:
-        scores = [s for p in positions if (s := _position_score(p)) is not None]
         from statistics import mean as _mean
-        book_avg = _mean(scores) if scores else None
+        # Try block-time JSONL snapshot for exact book-average at block time
+        _snap_scores: list[float] = []
+        _snaps_path = obs_dir / "position_snapshots.jsonl"
+        if margin_blocks and _snaps_path.exists():
+            _first_block = margin_blocks[0]
+            _first_ts = _first_block.get("ts")
+            _first_sym = _first_block.get("symbol", "")
+            if _first_ts is not None:
+                _snap_pos = load_position_snapshot_at(obs_dir, _first_ts, block_symbol=_first_sym)
+                if _snap_pos:
+                    _snap_scores = [s for p in _snap_pos if (s := _position_score(p)) is not None]
+        if _snap_scores:
+            book_avg = _mean(_snap_scores)
+        else:
+            scores = [s for p in positions if (s := _position_score(p)) is not None]
+            book_avg = _mean(scores) if scores else None
 
     # Seed sym_score_index with candidate_score from JSONL blocks (exact at block time)
     for b in margin_blocks:
@@ -1876,8 +1925,8 @@ def run_report(
     # ── Sections ──────────────────────────────────────────────────────────────
     s0_lines, s0_data = section_0(since, tqr_artifact, positions, unique_blocks, tqr_reports_used, dq, files_read)
     s1_lines, s1_data = section_1(unique_blocks, sym_score_index, book_avg, spread_blocked)
-    s2_lines, s2_data = section_2(unique_blocks, positions, nlv, since)
-    s3_lines, s3_data = section_3(unique_blocks, positions, since, pru_syms, hold_protected_syms=hold_protected_syms)
+    s2_lines, s2_data = section_2(unique_blocks, positions, nlv, since, obs_dir=obs_dir)
+    s3_lines, s3_data = section_3(unique_blocks, positions, since, pru_syms, hold_protected_syms=hold_protected_syms, obs_dir=obs_dir)
     s4_lines, s4_data = section_4(s3_data["rankings"], nlv)
     s5_lines, s5_data = section_5(s3_data["rankings"], positions, prior_sessions)
     s6_lines, s6_data = section_6(s3_data["rankings"], positions, unique_blocks, nlv)
