@@ -11,10 +11,13 @@
     This plist starts bot.py automatically on system boot and restarts it
     on crash. Before installing, confirm all of the following:
 
-    1. IBKR TWS / IB Gateway is running and accepting connections on port 4002.
-       bot.py will crash immediately if IBKR is unreachable at startup.
-       Recommended: ensure com.decifer.ibgateway (systemd) or manual IB Gateway
-       is started BEFORE bot.py. On macOS this means IB Gateway must be open.
+    1. IBKR TWS is open, logged in, API-enabled, and connected BEFORE bot.py starts.
+       Current setup: local laptop POC using TWS with daily manual login. TWS requires
+       Amit to authenticate each day — there is no unattended broker authentication.
+       bot.py will crash immediately if TWS is unreachable at startup.
+       NOTE: IB Gateway (headless, auto-login via IBC) is a future cloud-migration option
+       only. It is NOT relevant to the current local POC. Do not treat Gateway auto-start
+       as a prerequisite here.
 
     2. .env is present and all API keys are valid.
        Missing keys cause import errors at startup — bot.py will crash-loop.
@@ -27,7 +30,8 @@
        The current production convention is foreground launch (python3 bot.py).
 
   Safe to install once:
-    - IB Gateway start is automated or always running before mac login
+    - TWS is reliably open and authenticated before Mac login (e.g. auto-login + IBKR
+      saved credentials) so bot.py does not crash-loop on a cold start
     - All pre-flight checks in docs/cloud_readiness_contract.md pass
 
   ─────────────────────────────────────────────────────────────────────────────

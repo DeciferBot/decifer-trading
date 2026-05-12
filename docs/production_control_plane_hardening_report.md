@@ -26,8 +26,9 @@ both paths fire simultaneously.
 
 **Finding (restart-on-failure):** `bot.py` has no automatic restart mechanism. The launchd
 template `com.decifer.bot.plist` exists in `ops/launchd/` but was not installed due to 4
-unresolved blockers (IBKR auto-start, .env validity, Amit approval for daemon mode,
-crash-loop safety).
+unresolved blockers (TWS daily manual login dependency for current local POC, .env validity,
+Amit approval for daemon mode, crash-loop safety). IB Gateway is a future cloud-migration
+option — it is not relevant to the current local POC.
 
 ---
 
@@ -113,7 +114,7 @@ scheduler independently trigger `refresh_committed_universe()` and `run_promoter
 | `RunAtLoad` | `true` | Start immediately on launchctl load |
 
 **4 blockers documented in plist header (must be resolved before installation):**
-1. IB Gateway must be running before bot.py starts — plist has no dependency ordering mechanism
+1. TWS must be open, logged in, and API-enabled before bot.py starts — current local POC requires daily manual TWS login; plist has no dependency ordering mechanism. (IB Gateway headless auto-login via IBC is a cloud-migration option, not applicable here.)
 2. `.env` must be present and valid — missing keys cause import errors at startup
 3. Amit must explicitly approve running bot.py as a background daemon
 4. `auto-push` and `icloud-sync` plists must be installed to prevent crash-loop commits
