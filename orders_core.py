@@ -379,6 +379,24 @@ def execute_buy(
                     "max_alloc_pct":           CONFIG.get("max_portfolio_allocation", 1.0),
                     "max_single_pct":          CONFIG.get("max_single_position", 0.10),
                 }
+                try:
+                    import rotation_observability as _ro
+                    _ro.write_margin_block(
+                        symbol=symbol,
+                        candidate_score=score,
+                        direction="LONG",
+                        exp_code=exp_code or "exposure_block",
+                        exp_reason=exp_reason,
+                        estimated_notional=est_value,
+                        portfolio_value=portfolio_value,
+                        open_position_count=len(active_trades),
+                        max_positions=CONFIG.get("max_positions", 100),
+                        max_alloc_pct=CONFIG.get("max_portfolio_allocation", 1.0),
+                        max_single_pct=CONFIG.get("max_single_position", 0.10),
+                        active_trades=dict(active_trades),
+                    )
+                except Exception:
+                    pass
                 return False
 
             # ── FIX #2: Sector concentration check ────────────────────
@@ -1420,6 +1438,24 @@ def execute_short(
                     "max_alloc_pct":           CONFIG.get("max_portfolio_allocation", 1.0),
                     "max_single_pct":          CONFIG.get("max_single_position", 0.10),
                 }
+                try:
+                    import rotation_observability as _ro
+                    _ro.write_margin_block(
+                        symbol=symbol,
+                        candidate_score=score,
+                        direction="SHORT",
+                        exp_code=exp_code or "exposure_block",
+                        exp_reason=exp_reason,
+                        estimated_notional=est_value,
+                        portfolio_value=portfolio_value,
+                        open_position_count=len(active_trades),
+                        max_positions=CONFIG.get("max_positions", 100),
+                        max_alloc_pct=CONFIG.get("max_portfolio_allocation", 1.0),
+                        max_single_pct=CONFIG.get("max_single_position", 0.10),
+                        active_trades=dict(active_trades),
+                    )
+                except Exception:
+                    pass
                 return False
             sec_ok, sec_reason = check_sector_concentration(
                 symbol, list(active_trades.values()), portfolio_value, regime.get("regime", "NORMAL")

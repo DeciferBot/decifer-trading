@@ -356,6 +356,168 @@ def parse_margin_blocks(log_path: pathlib.Path, since: date, dq: DataQuality) ->
     return events
 
 
+def load_margin_blocks_jsonl(
+    obs_dir: pathlib.Path,
+    since: date,
+    dq: DataQuality,
+) -> list[dict]:
+    """
+    Load margin block events from data/rotation_observability/margin_blocks.jsonl.
+
+    Returns a list of block dicts normalized to match the format produced by
+    parse_margin_blocks() so downstream code is source-agnostic. Extra fields
+    (candidate_score, estimated_notional) are preserved for richer analysis.
+
+    Returns empty list if the file doesn't exist — caller falls back to log parsing.
+    """
+    path = obs_dir / "margin_blocks.jsonl"
+    if not path.exists():
+        return []
+    events: list[dict] = []
+    malformed = 0
+    try:
+        with path.open(encoding="utf-8", errors="replace") as fh:
+            for raw in fh:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    rec = json.loads(raw)
+                except json.JSONDecodeError:
+                    malformed += 1
+                    continue
+                ts_raw = rec.get("ts")
+                if not ts_raw:
+                    continue
+                try:
+                    ts = datetime.fromisoformat(ts_raw)
+                    if ts.tzinfo is None:
+                        ts = ts.replace(tzinfo=timezone.utc)
+                except ValueError:
+                    continue
+                if ts.date() < since:
+                    continue
+                events.append({
+                    "ts":               ts,
+                    "symbol":           rec.get("symbol", ""),
+                    "candidate_score":  rec.get("candidate_score"),
+                    "direction":        rec.get("direction", "LONG"),
+                    "exp_code":         rec.get("exp_code", "exposure_block"),
+                    "exp_reason":       rec.get("exp_reason", ""),
+                    "estimated_notional": rec.get("estimated_notional"),
+                    "notional_is_estimate": True,
+                    "portfolio_value":  rec.get("portfolio_value"),
+                    "open_position_count": rec.get("open_position_count"),
+                    "block_reason":     rec.get("exp_code", "margin_cap"),
+                    # fields expected by downstream that don't exist in JSONL
+                    "deployed":         None,
+                    "new_position":     None,
+                    "total_pct":        None,
+                    "limit_pct":        None,
+                })
+    except OSError as exc:
+        dq.warn(f"margin_blocks.jsonl could not be read: {exc}")
+    if malformed:
+        dq.warn(f"margin_blocks.jsonl: {malformed} malformed line(s) skipped")
+    return events
+
+
+def load_position_snapshot_at(
+    obs_dir: pathlib.Path,
+    block_ts: datetime,
+) -> list[dict] | None:
+    """
+    Return the position snapshot from position_snapshots.jsonl whose timestamp
+    is closest to and not after block_ts. Returns None if no snapshot is available.
+
+    Used by the shadow report to get an exact book reconstruction at block time
+    instead of relying on open_time inference from positions.json.
+    """
+    path = obs_dir / "position_snapshots.jsonl"
+    if not path.exists():
+        return None
+    best: tuple[float, list[dict]] | None = None
+    try:
+        with path.open(encoding="utf-8", errors="replace") as fh:
+            for raw in fh:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    rec = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                ts_raw = rec.get("ts")
+                if not ts_raw:
+                    continue
+                try:
+                    ts = datetime.fromisoformat(ts_raw)
+                    if ts.tzinfo is None:
+                        ts = ts.replace(tzinfo=timezone.utc)
+                except ValueError:
+                    continue
+                if ts > block_ts:
+                    continue
+                diff = (block_ts - ts).total_seconds()
+                if best is None or diff < best[0]:
+                    positions_dict = rec.get("positions") or {}
+                    best = (diff, list(positions_dict.values()))
+    except OSError:
+        return None
+    return best[1] if best is not None else None
+
+
+def build_hold_protected_set(
+    apex_audit_path: pathlib.Path,
+    since: date,
+) -> frozenset[str]:
+    """
+    Return the set of symbols that received a Track B HOLD decision on or after `since`.
+
+    Reads apex_decision_audit.jsonl for pm_action records with action=HOLD.
+    A symbol in this set is flagged as hold_protected in the shadow candidate output
+    — informational only, does not remove it from the candidate list.
+    """
+    if not apex_audit_path.exists():
+        return frozenset()
+    protected: set[str] = set()
+    try:
+        with apex_audit_path.open(encoding="utf-8", errors="replace") as fh:
+            for raw in fh:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    rec = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                ts_raw = rec.get("ts")
+                if ts_raw:
+                    try:
+                        ts = datetime.fromisoformat(ts_raw)
+                        if ts.tzinfo is None:
+                            ts = ts.replace(tzinfo=timezone.utc)
+                        if ts.date() < since:
+                            continue
+                    except ValueError:
+                        pass
+                # pm_action records store action + symbol directly
+                action = (rec.get("action") or rec.get("pm_action") or "").upper()
+                sym = rec.get("symbol")
+                if action == "HOLD" and sym:
+                    protected.add(sym)
+                # Also check nested pm_actions list if present
+                for pm in rec.get("pm_actions") or []:
+                    if isinstance(pm, dict):
+                        a = (pm.get("action") or "").upper()
+                        s = pm.get("symbol")
+                        if a == "HOLD" and s:
+                            protected.add(s)
+    except OSError:
+        pass
+    return frozenset(protected)
+
+
 def parse_nlv(log_path: pathlib.Path, since: date) -> float | None:
     if not log_path.exists():
         return None
@@ -547,6 +709,7 @@ def build_shadow_candidates(
     since: date,
     pru_syms: set[str],
     held_syms: frozenset[str],
+    hold_protected_syms: frozenset[str] | None = None,
 ) -> list[dict]:
     """
     For a single blocked candidate, return ranked shadow rotation candidates.
@@ -637,6 +800,7 @@ def build_shadow_candidates(
             "is_carry":            is_carry,
             "open_time":           open_time_str,
             "cluster":             cluster_of(sym),
+            "hold_protected":      sym in (hold_protected_syms or frozenset()),
         })
 
     candidates.sort(key=lambda c: c["rotation_shadow_score"], reverse=True)
@@ -912,6 +1076,7 @@ def section_3(
     positions: list[dict],
     since: date,
     pru_syms: set[str],
+    hold_protected_syms: frozenset[str] | None = None,
 ) -> tuple[list[str], dict]:
     lines = [
         "",
@@ -945,7 +1110,10 @@ def section_3(
         ts    = b.get("ts")
 
         book = book_at_block_time(positions, ts)
-        candidates = build_shadow_candidates(b, book, since, pru_syms, held_syms)
+        candidates = build_shadow_candidates(
+            b, book, since, pru_syms, held_syms,
+            hold_protected_syms=hold_protected_syms or frozenset(),
+        )
 
         lines += [
             f"  ── Blocked: {sym}  score={score}  gap={b.get('gap', '?'):+}  "
@@ -959,13 +1127,13 @@ def section_3(
             all_rankings.append({"blocked": sym, "candidates": []})
             continue
 
-        W3 = [6, 6, 9, 11, 7, 10, 9, 10, 8, 4]
+        W3 = [6, 6, 9, 11, 7, 10, 9, 10, 8, 6, 4]
         hdr = _fmt_row(
             "SYM", "SCORE", "Δ_SCORE", "NOTIONAL", "ETF_OV",
-            "CLUSTER_F", "PRU_FLAG", "RSR_SCORE", "CARRY", "RNK",
+            "CLUSTER_F", "PRU_FLAG", "RSR_SCORE", "CARRY", "HOLD_P", "RNK",
             widths=W3,
         )
-        lines += ["    " + hdr, "    " + "─" * 90]
+        lines += ["    " + hdr, "    " + "─" * 97]
 
         for c in candidates[:10]:
             lines.append("    " + _fmt_row(
@@ -978,6 +1146,7 @@ def section_3(
                 "Y" if c["pru_displacement"] else "n",
                 f"{c['rotation_shadow_score']:.1f}",
                 "carry" if c["is_carry"] else "sess",
+                "Y" if c.get("hold_protected") else "n",
                 str(c["rotation_shadow_rank"]),
                 widths=W3,
             ))
@@ -1597,6 +1766,7 @@ def run_report(
     apex_audit_path  = data_dir / "apex_decision_audit.jsonl"
     tier_d_path      = data_dir / "tier_d_funnel.jsonl"
     tqr_dir          = data_dir / "trade_quality_reports"
+    obs_dir          = data_dir / "rotation_observability"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     files_read: list[str] = []
@@ -1615,11 +1785,20 @@ def run_report(
     if tier_d_path.exists():
         files_read.append(str(tier_d_path))
 
-    margin_blocks  = parse_margin_blocks(log_path, since, dq)
+    # Prefer structured JSONL over log parsing — falls back to log if JSONL is absent
+    margin_blocks_jsonl = load_margin_blocks_jsonl(obs_dir, since, dq)
+    if margin_blocks_jsonl:
+        margin_blocks = margin_blocks_jsonl
+        files_read.append(str(obs_dir / "margin_blocks.jsonl"))
+    else:
+        margin_blocks = parse_margin_blocks(log_path, since, dq)
     spread_blocked = parse_spread_blocks(log_path, since)
     nlv            = parse_nlv(log_path, since)
     if log_path.exists():
         files_read.append(str(log_path))
+
+    # Hold-protected set — Track B HOLD decisions from apex_decision_audit
+    hold_protected_syms = build_hold_protected_set(apex_audit_path, since)
 
     tqr_artifact   = load_latest_tqr_artifact(tqr_dir, since, dq)
     if tqr_artifact:
@@ -1664,6 +1843,18 @@ def run_report(
         from statistics import mean as _mean
         book_avg = _mean(scores) if scores else None
 
+    # Seed sym_score_index with candidate_score from JSONL blocks (exact at block time)
+    for b in margin_blocks:
+        cs = b.get("candidate_score")
+        sym = b.get("symbol", "")
+        if cs is not None and sym:
+            try:
+                v = float(cs)
+                if v > sym_score_index.get(sym, -1):
+                    sym_score_index[sym] = v
+            except (TypeError, ValueError):
+                pass
+
     # Deduplicate margin blocks by symbol (keep first / earliest)
     seen_syms: dict[str, dict] = {}
     for b in margin_blocks:
@@ -1686,7 +1877,7 @@ def run_report(
     s0_lines, s0_data = section_0(since, tqr_artifact, positions, unique_blocks, tqr_reports_used, dq, files_read)
     s1_lines, s1_data = section_1(unique_blocks, sym_score_index, book_avg, spread_blocked)
     s2_lines, s2_data = section_2(unique_blocks, positions, nlv, since)
-    s3_lines, s3_data = section_3(unique_blocks, positions, since, pru_syms)
+    s3_lines, s3_data = section_3(unique_blocks, positions, since, pru_syms, hold_protected_syms=hold_protected_syms)
     s4_lines, s4_data = section_4(s3_data["rankings"], nlv)
     s5_lines, s5_data = section_5(s3_data["rankings"], positions, prior_sessions)
     s6_lines, s6_data = section_6(s3_data["rankings"], positions, unique_blocks, nlv)
