@@ -147,6 +147,22 @@ def get_ic_health(ic_weights_path: str | None = None) -> ICHealthReport:
         log.warning("get_ic_health: failed to read cache: %s", e)
         return _empty
 
+    # Staleness warning — ic_weights.json is manually refreshed weekly.
+    # Warn if older than 14 days so the operator knows to rerun ic_calculator.
+    _updated_str = data.get("updated")
+    if _updated_str:
+        try:
+            from freshness_checks import check_ic_weights_freshness
+            _ic_fresh = check_ic_weights_freshness(path, warn_age_days=14.0)
+            if not _ic_fresh["ok"]:
+                log.warning(
+                    "get_ic_health: ic_weights.json is %.1f days old — "
+                    "run ic_calculator.update_ic_weights() to refresh",
+                    _ic_fresh.get("age_days") or 0,
+                )
+        except ImportError:
+            pass
+
     raw_ic: dict = data.get("raw_ic", {})
     n_records: int = int(data.get("n_records", 0))
     using_equal: bool = bool(data.get("using_equal_weights", True))

@@ -510,6 +510,19 @@ def adapt_committed_universe(path: str = _COMMITTED_PATH) -> AdapterResult:
     else:
         symbols = [s for s in raw_symbols if isinstance(s, str) and s.strip()]
 
+    # Staleness warning — committed_universe.json is refreshed weekly (Sunday 23:00 ET).
+    # Warn if >7 days old; this surfaces a failed universe refresh without blocking reads.
+    try:
+        from freshness_checks import check_committed_universe_freshness
+        _cu_fresh = check_committed_universe_freshness(path)
+        if not _cu_fresh["ok"] or _cu_fresh.get("warn"):
+            import logging as _log_mod
+            _log_mod.getLogger("decifer.intelligence_adapters").warning(
+                "adapt_committed_universe: %s", _cu_fresh["detail"]
+            )
+    except ImportError:
+        pass
+
     return AdapterResult(
         adapter_name="committed_universe",
         source_status="available",

@@ -94,6 +94,18 @@ _UNIVERSE_MODE = "production_handoff_universe"
 _EXPIRY_HOURS = 15  # minutes expressed as hours — 15 min = 0.25 h
 _EXPIRY_MINUTES = 15
 
+# Maximum age for intelligence files before publication is blocked (fail closed).
+# Set to 25h to give a 1-hour buffer over the daily 24h refresh cycle.
+# The intelligence pipeline plist fires Mon–Fri at 16:45 Dubai time (12:45 UTC).
+# Override via CONFIG["handoff_intelligence_max_age_hours"] if needed.
+try:
+    from config import CONFIG as _cfg
+    _INTELLIGENCE_MAX_AGE_HOURS: float = float(
+        _cfg.get("handoff_intelligence_max_age_hours", 25.0)
+    )
+except Exception:
+    _INTELLIGENCE_MAX_AGE_HOURS = 25.0
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -665,6 +677,27 @@ def run_publisher(mode: str = _DEFAULT_PUBLICATION_MODE) -> dict:
         return _fail_closed_cycle(now, attempt_ts, fail_closed_reason, warnings,
                                   extra_context={"source_errors": source_errors},
                                   publication_mode=mode, handoff_enabled=handoff_enabled)
+
+    # --- Step 2.5: Intelligence freshness gate ---
+    # Fail closed if any intelligence file is missing or older than _INTELLIGENCE_MAX_AGE_HOURS.
+    # This prevents stale economic context / themes from silently entering the live manifest.
+    # The intelligence pipeline plist refreshes these files daily (Mon–Fri 16:45 Dubai / 12:45 UTC).
+    try:
+        from freshness_checks import check_intelligence_freshness
+        _intel_fresh = check_intelligence_freshness(
+            [_ECONOMIC_CONTEXT_PATH, _THEME_ACTIVATION_PATH, _THESIS_STORE_PATH],
+            max_age_hours=_INTELLIGENCE_MAX_AGE_HOURS,
+        )
+        if not _intel_fresh["ok"]:
+            fail_closed_reason = f"intelligence_files_stale_or_missing: {_intel_fresh['detail']}"
+            log.warning("[handoff_publisher] fail_closed: %s", fail_closed_reason)
+            return _fail_closed_cycle(
+                now, attempt_ts, fail_closed_reason, warnings,
+                extra_context={"intel_freshness": _intel_fresh},
+                publication_mode=mode, handoff_enabled=handoff_enabled,
+            )
+    except ImportError:
+        log.warning("[handoff_publisher] freshness_checks not available — intelligence age unverified")
 
     # --- Step 3: Transform candidates ---
     raw_candidates = shadow.get("candidates") or []
