@@ -744,14 +744,18 @@ def execute_sell_option(ib: IB, opt_key: str, reason: str = "signal", contracts_
                 log.warning("event_log.append_close failed for %s: %s", opt_key, _el_err_opt)
             try:
                 import training_store as _ts_opt
+                _opt_fp = float(pos.get("entry", 0.0))
+                _opt_qty = float(pos.get("qty") or pos.get("contracts") or 1)
+                _opt_pnl_pct = round(round(pnl, 2) / (_opt_fp * _opt_qty), 4) if _opt_fp * _opt_qty else 0.0
                 _ts_opt.append({
                     "trade_id": _close_trade_id_opt, "symbol": pos["symbol"],
                     "direction": pos.get("direction", "LONG"),
                     "trade_type": pos.get("trade_type") or "SCALP",
                     "instrument": "option",
-                    "fill_price": float(pos.get("entry", 0.0)),
+                    "fill_price": _opt_fp,
                     "intended_price": float(pos.get("intended_price") or pos.get("entry", 0.0)),
                     "exit_price": round(current, 4), "pnl": round(pnl, 2),
+                    "pnl_pct": _opt_pnl_pct,
                     "hold_minutes": 0, "exit_reason": reason,
                     "regime": pos.get("entry_regime", "UNKNOWN"),
                     "signal_scores": pos.get("signal_scores") or {},

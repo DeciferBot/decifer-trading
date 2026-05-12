@@ -1,84 +1,90 @@
 {
-  "n_live_trades": 14,
-  "ready": false,
-  "progress_pct": 28.0,
-  "agreement_r": null,
-  "agreement_label": "PENDING",
+  "n_live_trades": 259,
+  "ready": true,
+  "progress_pct": 100,
+  "agreement_r": 0.0167,
+  "agreement_label": "DIVERGENT",
   "dim_comparison": {
     "trend": {
-      "live": 0.085,
-      "hist": -0.0144,
-      "agree": false
+      "live": 0.0446,
+      "hist": 0.0394,
+      "agree": true
     },
     "momentum": {
-      "live": -0.4119,
-      "hist": 0.0073,
+      "live": 0.0257,
+      "hist": -0.0224,
       "agree": false
     },
     "squeeze": {
-      "live": 0.4079,
-      "hist": -0.0031,
-      "agree": false
+      "live": -0.039,
+      "hist": -0.0559,
+      "agree": true
     },
     "flow": {
-      "live": -0.4451,
-      "hist": 0.0251,
+      "live": -0.0307,
+      "hist": 0.0262,
       "agree": false
     },
     "breakout": {
-      "live": 0.0,
-      "hist": 0.0275,
+      "live": 0.0627,
+      "hist": 0.0166,
       "agree": true
     },
     "mtf": {
-      "live": -0.209,
-      "hist": 0.0361,
-      "agree": false
+      "live": -0.0857,
+      "hist": -0.0007,
+      "agree": true
     },
     "news": {
-      "live": -0.2864,
-      "hist": 0.055,
+      "live": -0.0591,
+      "hist": 0.1089,
       "agree": false
     },
     "social": {
-      "live": 0.1519,
-      "hist": 0.0,
+      "live": 0.0036,
+      "hist": 0.0528,
       "agree": true
     },
     "reversion": {
-      "live": 0.0344,
-      "hist": -0.0243,
-      "agree": false
+      "live": 0.0198,
+      "hist": 0.0307,
+      "agree": true
     }
   },
   "recommend_disable": false,
   "live_ic": {
-    "trend": 0.08502540152475499,
-    "momentum": -0.41192986951307714,
-    "squeeze": 0.4078666469381175,
-    "flow": -0.445061518552492,
-    "breakout": 0.0,
-    "mtf": -0.2090366085074662,
-    "news": -0.2863962840844738,
-    "social": 0.15191090506254998,
-    "reversion": 0.034401045807689073,
-    "iv_skew": 0.15191090506254998,
+    "trend": 0.04456007263852938,
+    "momentum": 0.025743226034852042,
+    "squeeze": -0.03900791766278881,
+    "flow": -0.03069661359551723,
+    "breakout": 0.0627243437532031,
+    "mtf": -0.08567100064082504,
+    "news": -0.05908621225574479,
+    "social": 0.0036445716346143516,
+    "reversion": 0.019827900097849446,
+    "iv_skew": 0.02307347405608492,
     "pead": 0.0,
-    "short_squeeze": 0.15191090506254998
+    "short_squeeze": -0.09459529967988121,
+    "overnight_drift": -0.08962854963333257,
+    "analyst_revision": 0.0,
+    "insider_buying": -0.009041469132008472
   },
   "hist_ic": {
-    "trend": -0.014365286955911489,
-    "momentum": 0.007272439721862367,
-    "squeeze": -0.0031471698714302027,
-    "flow": 0.025101338138202645,
-    "breakout": 0.027466970063117248,
-    "mtf": 0.0361385834565723,
-    "news": 0.05502275222060637,
-    "social": 0.0,
-    "reversion": -0.024333879583616394,
-    "iv_skew": 0.008669933169524115,
+    "trend": 0.039365546963313916,
+    "momentum": -0.02239630619015892,
+    "squeeze": -0.05586044812718644,
+    "flow": 0.02618126896276786,
+    "breakout": 0.016609273434644876,
+    "mtf": -0.0007101996140290833,
+    "news": 0.10888396832840147,
+    "social": 0.05280084667040065,
+    "reversion": 0.03069356226062309,
+    "iv_skew": -0.08688928029574829,
     "pead": 0.0,
-    "short_squeeze": 0.041778087985189706
+    "short_squeeze": 0.0072382051240252945,
+    "overnight_drift": -0.05826494164479063,
+    "analyst_revision": 0.0,
+    "insider_buying": -0.11372448674359338
   },
-  "timestamp": "2026-04-14T15:46:36.084621+00:00"
+  "timestamp": "2026-05-12T16:05:25.989094+00:00"
 }

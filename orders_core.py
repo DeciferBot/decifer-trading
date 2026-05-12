@@ -2490,16 +2490,20 @@ def execute_sell(ib: IB, symbol: str, reason: str = "Agent signal", qty_override
             # Record uses actual fill_price (entry), not intended_price, for ML accuracy.
             try:
                 from training_store import append as _ts_append
+                _ts_fp = float(info.get("entry", 0.0))
+                _ts_qty = float(info.get("qty", 0) or 0)
+                _ts_pnl_pct = round(pnl / (_ts_fp * _ts_qty), 4) if _ts_fp * _ts_qty else 0.0
                 _ts_append({
                     "trade_id": _close_trade_id,
                     "symbol": symbol,
                     "direction": info.get("direction", "LONG"),
                     "trade_type": info.get("trade_type") or "INTRADAY",
                     "instrument": info.get("instrument", "stock"),
-                    "fill_price": float(info.get("entry", 0.0)),
+                    "fill_price": _ts_fp,
                     "intended_price": float(info.get("intended_price") or info.get("entry", 0.0)),
                     "exit_price": _exit_price_val,
                     "pnl": pnl,
+                    "pnl_pct": _ts_pnl_pct,
                     "hold_minutes": _hold_mins,
                     "exit_reason": reason,
                     "regime": info.get("entry_regime") or _resolve_regime(info.get("regime")) or "UNKNOWN",

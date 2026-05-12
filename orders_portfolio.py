@@ -232,16 +232,20 @@ def _close_position_record(
     try:
         from training_store import append as _ts
         _now_ts = datetime.now(UTC).isoformat()
+        _cp_fp = float(_t.get("entry", 0.0))
+        _cp_qty = float(_t.get("qty", 0) or 0)
+        _cp_pnl_pct = round(pnl / (_cp_fp * _cp_qty), 4) if _cp_fp * _cp_qty else 0.0
         _ts({
             "trade_id": _tid,
             "symbol": _sym,
             "direction": _t.get("direction", "LONG"),
             "trade_type": _t.get("trade_type", "INTRADAY"),
             "instrument": _t.get("instrument", "stock"),
-            "fill_price": float(_t.get("entry", 0.0)),
+            "fill_price": _cp_fp,
             "intended_price": float(_t.get("intended_price") or _t.get("entry") or 0.0),
             "exit_price": exit_price,
             "pnl": pnl,
+            "pnl_pct": _cp_pnl_pct,
             "hold_minutes": hold_minutes,
             "exit_reason": exit_reason,
             "regime": _t.get("entry_regime") or _t.get("regime", "UNKNOWN"),
@@ -1803,6 +1807,7 @@ def _resolve_exiting_positions(ib: IB, price_map: dict, positions_keys: set) -> 
                 "intended_price": float(_t.get("intended_price") or _t.get("entry", 0.0)),
                 "exit_price": _exit_px,
                 "pnl": _pnl,
+                "pnl_pct": _pnl_pct,
                 "hold_minutes": 0,
                 "exit_reason": _exit_reason,
                 "regime": _t.get("entry_regime") or _t.get("regime", "UNKNOWN"),
