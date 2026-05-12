@@ -400,20 +400,13 @@ class TestNoTradingBehaviourChange:
         new_in_branch = [p for p in plists if "ic-wiring" in p.name.lower()]
         assert new_in_branch == [], f"Unexpected new daemon plist(s): {new_in_branch}"
 
-    def test_run_intelligence_pipeline_is_only_new_caller(self):
-        """Only run_intelligence_pipeline.py was modified to call IC update fns."""
-        import subprocess
-        result = subprocess.run(
-            ["git", "diff", "--name-only", "HEAD"],
-            capture_output=True, text=True,
-            cwd=PROJECT_ROOT,
-        )
-        changed = set(result.stdout.strip().splitlines())
-        ic_callers = {f for f in changed if "broker" in f or "order" in f.lower()
-                      and "ic_" not in f}
-        # orders_* files changed only to add pnl_pct — not to change any IC call path
-        # The IC wiring entry-point is run_intelligence_pipeline.py only
-        assert "run_intelligence_pipeline.py" in changed
+    def test_run_intelligence_pipeline_is_the_ic_wiring_entry_point(self):
+        """run_intelligence_pipeline.py is the sole entry point for IC update calls."""
+        import inspect
+        import run_intelligence_pipeline as rip
+        src = inspect.getsource(rip.run)
+        for fn in ("update_ic_weights", "update_live_ic", "validate_and_persist"):
+            assert fn in src, f"run_intelligence_pipeline.run() must call {fn}"
 
     def test_pnl_pct_is_not_in_required_fields(self):
         """pnl_pct must NOT be in training_store._REQUIRED_FIELDS.
@@ -423,3 +416,199 @@ class TestNoTradingBehaviourChange:
         """
         import training_store
         assert "pnl_pct" not in training_store._REQUIRED_FIELDS
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Step 5 fail-soft hardening tests
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestStep5FailSoft:
+    """
+    Step 5 (IC update) must fail soft.
+
+    If update_ic_weights() / update_live_ic() / validate_and_persist() raise,
+    run_intelligence_pipeline.run() must:
+      - log a WARNING
+      - NOT re-raise
+      - return normally (exit 0 from __main__)
+    Steps 1–4 must complete before Step 5 is attempted.
+    """
+
+    def _mock_steps_1_to_4(self, rip):
+        """Return a context manager that mocks all four intelligence steps."""
+        from contextlib import ExitStack
+        from unittest.mock import patch
+
+        stack = ExitStack()
+        stack.enter_context(
+            patch.object(rip, "generate_feed", return_value=MagicMock(candidates=[]))
+        )
+        stack.enter_context(
+            patch.object(rip, "generate_economic_intelligence", return_value=({}, {}))
+        )
+        stack.enter_context(
+            patch.object(
+                rip,
+                "generate_theme_activation",
+                return_value={"activation_summary": {"activated": 0, "total_themes": 0}},
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                rip,
+                "generate_thesis_store",
+                return_value={"thesis_summary": {"total_theses": 0},
+                              "unavailable_sources": []},
+            )
+        )
+        return stack
+
+    # (1) Step 5 success path — normal execution
+    def test_step5_success_path_completes(self):
+        import run_intelligence_pipeline as rip
+
+        with self._mock_steps_1_to_4(rip):
+            with (
+                patch.object(rip, "update_ic_weights", return_value={"trend": 0.1}) as m_uiw,
+                patch.object(rip, "update_live_ic", return_value={}) as m_uli,
+                patch.object(
+                    rip, "validate_and_persist",
+                    return_value=MagicMock(ready_for_live=True, weights={})
+                ) as m_vp,
+            ):
+                rip.run()   # must not raise
+
+        m_uiw.assert_called_once()
+        m_uli.assert_called_once()
+        m_vp.assert_called_once()
+
+    # (2) Step 5 exception — update_ic_weights raises, pipeline continues
+    def test_step5_exception_does_not_propagate(self):
+        import run_intelligence_pipeline as rip
+
+        with self._mock_steps_1_to_4(rip):
+            with (
+                patch.object(
+                    rip, "update_ic_weights",
+                    side_effect=RuntimeError("yfinance timeout"),
+                ),
+                patch.object(rip, "update_live_ic", return_value={}),
+                patch.object(
+                    rip, "validate_and_persist",
+                    return_value=MagicMock(ready_for_live=False, weights={}),
+                ),
+            ):
+                rip.run()   # must NOT raise — fail soft
+
+    # (3) Steps 1–4 all run even when Step 5 raises
+    def test_steps_1_to_4_run_before_step5_failure(self):
+        import run_intelligence_pipeline as rip
+
+        executed = []
+
+        def _feed(*a, **kw):
+            executed.append("step1")
+            return MagicMock(candidates=[])
+
+        def _econ(*a, **kw):
+            executed.append("step2")
+            return {}, {}
+
+        def _theme(*a, **kw):
+            executed.append("step3")
+            return {"activation_summary": {"activated": 0, "total_themes": 0}}
+
+        def _thesis(*a, **kw):
+            executed.append("step4")
+            return {"thesis_summary": {"total_theses": 0}, "unavailable_sources": []}
+
+        with (
+            patch.object(rip, "generate_feed", side_effect=_feed),
+            patch.object(rip, "generate_economic_intelligence", side_effect=_econ),
+            patch.object(rip, "generate_theme_activation", side_effect=_theme),
+            patch.object(rip, "generate_thesis_store", side_effect=_thesis),
+            patch.object(
+                rip, "update_ic_weights",
+                side_effect=ConnectionError("market data unavailable"),
+            ),
+            patch.object(rip, "update_live_ic", return_value={}),
+            patch.object(
+                rip, "validate_and_persist",
+                return_value=MagicMock(ready_for_live=False, weights={}),
+            ),
+        ):
+            rip.run()
+
+        assert executed == ["step1", "step2", "step3", "step4"], (
+            f"Expected all 4 steps to run before Step 5 failure, got: {executed}"
+        )
+
+    # (4) Step 5 failure → run() returns normally → sys.exit(0) path succeeds
+    def test_step5_failure_exits_zero_via_main(self):
+        """__main__ block calls sys.exit(0) after run() — confirm exit code is 0."""
+        import run_intelligence_pipeline as rip
+
+        with self._mock_steps_1_to_4(rip):
+            with (
+                patch.object(
+                    rip, "update_ic_weights",
+                    side_effect=OSError("disk full"),
+                ),
+                patch.object(rip, "update_live_ic", return_value={}),
+                patch.object(
+                    rip, "validate_and_persist",
+                    return_value=MagicMock(ready_for_live=False, weights={}),
+                ),
+            ):
+                # run() itself must not raise — that is what guarantees exit 0
+                try:
+                    rip.run()
+                    exited_normally = True
+                except Exception:
+                    exited_normally = False
+
+        assert exited_normally, "run() raised on Step 5 failure — pipeline would exit non-zero"
+
+    # (5) No trading-sensitive functions touched by this file
+    def test_no_trading_sensitive_imports_in_pipeline(self):
+        """run_intelligence_pipeline must not import order, broker, or sizing modules."""
+        import importlib, inspect
+        import run_intelligence_pipeline as rip
+
+        src = inspect.getsource(rip)
+        forbidden = (
+            "orders_core", "orders_portfolio", "orders_options",
+            "execute_buy", "execute_sell", "execute_short",
+            "place_order", "reqPlaceOrder",
+            "calculate_position_size", "check_combined_exposure",
+            "apex_call", "market_intelligence",
+        )
+        for name in forbidden:
+            assert name not in src, (
+                f"run_intelligence_pipeline.py must not reference '{name}'"
+            )
+
+    def test_step5_warning_is_logged_on_failure(self, caplog):
+        """A clear WARNING must be emitted when Step 5 fails."""
+        import logging
+        import run_intelligence_pipeline as rip
+
+        with self._mock_steps_1_to_4(rip):
+            with (
+                patch.object(
+                    rip, "update_ic_weights",
+                    side_effect=ValueError("bad data"),
+                ),
+                patch.object(rip, "update_live_ic", return_value={}),
+                patch.object(
+                    rip, "validate_and_persist",
+                    return_value=MagicMock(ready_for_live=False, weights={}),
+                ),
+            ):
+                with caplog.at_level(logging.WARNING, logger="decifer.intelligence_pipeline"):
+                    rip.run()
+
+        assert any(
+            "IC update failed" in r.message and r.levelno == logging.WARNING
+            for r in caplog.records
+        ), "Expected a WARNING log containing 'IC update failed'"

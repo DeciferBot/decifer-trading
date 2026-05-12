@@ -19,19 +19,22 @@ Step 4: thesis_store.generate_thesis_store()
                 economic_candidate_feed.json, active_opportunity_universe_shadow.json
          writes: data/intelligence/thesis_store.json
 
-Step 5: IC weights update + validation refresh
+Step 5: IC weights update + validation refresh  [FAIL-SOFT]
          reads: data/signals_log.jsonl (+ yfinance for forward returns)
          writes: data/ic_weights.json
                  data/ic_weights_history.jsonl
                  data/ic_weights_live.json
                  data/ic_weights_live_history.jsonl
                  data/ic_validation_result.json
+         failure: logged at WARNING; pipeline exits 0 so Steps 1–4 output
+                  reaches universe_builder.py and handoff_publisher.py.
 
 No LLM calls. No broker calls. Safe to run at any time (Step 5 makes yfinance calls).
 """
 
 from __future__ import annotations
 
+import logging
 import sys
 
 from candidate_resolver import generate_feed
@@ -40,6 +43,8 @@ from ic_validator import validate_and_persist
 from intelligence_engine import generate_economic_intelligence
 from theme_activation_engine import generate_theme_activation
 from thesis_store import generate_thesis_store
+
+log = logging.getLogger("decifer.intelligence_pipeline")
 
 
 def run() -> None:
@@ -71,12 +76,19 @@ def run() -> None:
         print(f"      {ts_count} theses → data/intelligence/thesis_store.json")
 
     print("[5/5] Updating IC weights + validation...")
-    weights = update_ic_weights()
-    update_live_ic()
-    result = validate_and_persist()
-    n_pos = sum(1 for v in weights.values() if v > 1.0 / len(weights) + 0.01)
-    print(f"      IC weights updated (ready_for_live={result.ready_for_live}, {n_pos} dims above equal weight)")
-    print(f"      → data/ic_weights.json + data/ic_validation_result.json")
+    try:
+        weights = update_ic_weights()
+        update_live_ic()
+        result = validate_and_persist()
+        n_pos = sum(1 for v in weights.values() if v > 1.0 / len(weights) + 0.01)
+        print(f"      IC weights updated (ready_for_live={result.ready_for_live}, {n_pos} dims above equal weight)")
+        print(f"      → data/ic_weights.json + data/ic_validation_result.json")
+    except Exception as _ic_err:
+        log.warning(
+            "IC update failed (non-fatal) — universe and handoff will still run: %s: %s",
+            type(_ic_err).__name__, _ic_err,
+        )
+        print(f"      [WARN] IC update skipped due to error: {type(_ic_err).__name__}: {_ic_err}")
 
     print("=== Done ===")
 
