@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.decifer.bot.plist
+  Classification: DEPLOYMENT TEMPLATE — NOT YET INSTALLED
+
+  Restart-on-failure launchd daemon for bot.py.
+
+  ⚠️  BLOCKER — DO NOT INSTALL UNTIL RESOLVED:
+    This plist starts bot.py automatically on system boot and restarts it
+    on crash. Before installing, confirm all of the following:
+
+    1. IBKR TWS / IB Gateway is running and accepting connections on port 4002.
+       bot.py will crash immediately if IBKR is unreachable at startup.
+       Recommended: ensure com.decifer.ibgateway (systemd) or manual IB Gateway
+       is started BEFORE bot.py. On macOS this means IB Gateway must be open.
+
+    2. .env is present and all API keys are valid.
+       Missing keys cause import errors at startup — bot.py will crash-loop.
+       Set DECIFER_NO_AUTO_RESTART=1 to suppress KeepAlive if needed.
+
+    3. The auto-push and iCloud sync plists are installed.
+       Without these, a crash-loop would push broken commits continuously.
+
+    4. Amit has explicitly approved running bot.py as a background daemon.
+       The current production convention is foreground launch (python3 bot.py).
+
+  Safe to install once:
+    - IB Gateway start is automated or always running before mac login
+    - All pre-flight checks in docs/cloud_readiness_contract.md pass
+
+  ─────────────────────────────────────────────────────────────────────────────
+  Worker         : bot.py
+  Entry point    : /usr/local/bin/python3.11 bot.py
+  Restart policy : KeepAlive=true, ThrottleInterval=60s (prevents crash-loop)
+  Schedule       : Runs at launchctl load; restarts on crash
+  Stdout log     : /tmp/decifer-bot.log
+  Stderr log     : /tmp/decifer-bot.err
+
+  ─────────────────────────────────────────────────────────────────────────────
+  INSTALLATION (only after blocker above is resolved):
+
+    1. Review and confirm all blockers above.
+    2. cp ops/launchd/com.decifer.bot.plist ~/Library/LaunchAgents/
+    3. launchctl load ~/Library/LaunchAgents/com.decifer.bot.plist
+    4. launchctl list | grep decifer.bot
+       # Column 1: PID (non-dash = running), Column 2: last exit code
+
+  VIEW LOGS:
+    tail -f /tmp/decifer-bot.log
+    tail -f /tmp/decifer-bot.err
+
+  CHECK STATUS:
+    launchctl list | grep decifer.bot
+
+  ─────────────────────────────────────────────────────────────────────────────
+  EMERGENCY STOP (prevents restart loop):
+
+    Method 1 — unload (preferred):
+      launchctl unload ~/Library/LaunchAgents/com.decifer.bot.plist
+
+    Method 2 — if unload is unavailable:
+      launchctl stop com.decifer.bot
+      touch /tmp/decifer-bot-emergency-stop    # sentinel file (not read by plist)
+
+    Method 3 — kill immediately:
+      pkill -f "python3.11 bot.py"
+      launchctl unload ~/Library/LaunchAgents/com.decifer.bot.plist
+
+  To restart after stop:
+    launchctl load ~/Library/LaunchAgents/com.decifer.bot.plist
+
+  ─────────────────────────────────────────────────────────────────────────────
+  WHAT THIS DOES NOT CHANGE:
+    - No order logic. No risk rules. No broker calls.
+    - bot.py starts exactly as if you ran: python3.11 bot.py
+    - All safety flags in config.py remain in effect.
+    - Paper account isolation remains enforced by config.
+-->
+<plist version="1.0">
+<dict>
+
+  <key>Label</key>
+  <string>com.decifer.bot</string>
+
+  <!-- KeepAlive=true + ThrottleInterval=60s: if bot.py crashes, launchd
+       waits 60 seconds before restarting. Prevents rapid crash-loops that
+       could exhaust IBKR reconnect budget or API rate limits. -->
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+
+  <!-- RunAtLoad=true: bot.py starts immediately when plist is loaded. -->
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/python3.11</string>
+    <string>bot.py</string>
+  </array>
+
+  <!-- Repo root — adjust if cloned to a different path -->
+  <key>WorkingDirectory</key>
+  <string>/Users/amitchopra/Desktop/decifer trading</string>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/decifer-bot.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/decifer-bot.err</string>
+
+  <!-- ExitTimeout: give bot.py 30 seconds to shut down cleanly (flush
+       event_log, close IBKR connection) before launchd SIGKILLs it. -->
+  <key>ExitTimeout</key>
+  <integer>30</integer>
+
+</dict>
+</plist>
