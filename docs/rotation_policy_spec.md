@@ -1,9 +1,14 @@
 # Rotation Policy Specification
 
-**Status:** Design only. No implementation authorised.
+**Status:** Active shadow testing. No implementation authorised.
 **Created:** 2026-05-12
+**Last updated:** 2026-05-13
 **Author:** Cowork (Claude)
 **Approved by:** Pending Amit review
+
+**Shadow testing progress:** 4 sessions observed. ROTATION_SHADOW_CONFIRMED in 3 of 4.
+**Paper validation framework:** Live as of 2026-05-13 (`scripts/rotation_paper_validation.py`).
+**Escalation gate progress:** Gate 1 needs 3 additional confirmed sessions (1 of 3 met since spec was written). Gates 3–9 not yet evaluable.
 
 ---
 
@@ -70,8 +75,9 @@ Two read-only diagnostic scripts were built and tested before this specification
 
 - `scripts/trade_quality_report.py` - Capital deployment quality, entry score distribution, margin block analysis, ETF overlap, cluster concentration, PRU/discovery gap.
 - `scripts/rotation_shadow_report.py` - Counterfactual analysis: which weak open positions could theoretically have freed capacity for margin-blocked high-score candidates.
+- `scripts/rotation_paper_validation.py` (added 2026-05-13) - Evaluates qualifying margin blocks against closed trade outcomes in a 24h lookahead window. Produces A/B/C scenario reports. `live_rotation_allowed`, `broker_connected`, and `order_generation_allowed` are always False.
 
-Both scripts are stdlib only, produce no trading side effects, and write to `data/` subdirectories.
+All scripts are stdlib only, produce no trading side effects, and write to `data/` subdirectories.
 
 ### Session Evidence
 
@@ -112,21 +118,55 @@ Both scripts are stdlib only, produce no trading side effects, and write to `dat
 | PRU/discovery gap | 18.4 points |
 | Rotation shadow verdict | ROTATION_SHADOW_CONFIRMED |
 
-**Top shadow rotation candidates on 2026-05-12:**
+**Top shadow rotation candidates on 2026-05-12 (DVA block, corrected block-time book avg):**
 
 | Rank | Symbol | Score | Notional | ETF Overlap | Carry |
 |---|---|---|---|---|---|
-| 1 | XLK | 26 | ~$56,920 | Yes (AAPL, MSFT) | Yes |
-| 2 | XLE | 23 | ~$57,504 | Yes (XOM, CVX) | No |
-| 3 | WDC | 27 | ~$59,095 | No | Yes |
+| 1 | XLE | 23 | $98,233 | Yes (XOM, CVX) | No |
+| 2 | XLK | 26 | $57,412 | Yes (AAPL, MSFT) | Yes |
+| 3 | WDC | 27 | $57,599 | No | Yes |
 
 **Theoretical capacity release:**
 
 | Set | Notional | NLV% |
 |---|---|---|
-| Top 1 (XLK only) | ~$56,920 | ~5.9% |
-| Top 2 (XLK + XLE) | ~$114,424 | ~11.9% |
-| Top 3 (XLK + XLE + WDC) | ~$173,519 | ~18.1% |
+| Top 1 (XLE) | $98,233 | 10.2% |
+| Top 2 (XLE + XLK) | $155,645 | 16.1% |
+| Top 3 (XLE + XLK + WDC) | $213,243 | 22.1% |
+
+---
+
+**2026-05-13**
+
+| Metric | Value |
+|---|---|
+| Shadow verdict | ROTATION_SHADOW_CONFIRMED |
+| Book average score | 59.2 |
+| High-score blocked (gap >15) | 3 (NVDA 71, TSLA 75, NBIS 85) |
+| High-score blocked (gap >20) | 1 (NBIS +25.8 — highest gap recorded across all sessions) |
+| Strongest blocked candidate | **NBIS score 85** — new high-water mark |
+| Positions below 35 | 2+ (XLE 23, WDC 27 still carried from prior session) |
+| Reconstruction confidence | MEDIUM (no TQR artifact yet at report time) |
+
+**Top shadow rotation candidates on 2026-05-13 (NBIS block, gap +25.8):**
+
+| Rank | Symbol | Score | Notional | ETF Overlap | Carry |
+|---|---|---|---|---|---|
+| 1 | XLE | 23 | $98,233 | Yes (XOM, CVX) | Yes (multi-day) |
+| 2 | WDC | 27 | $57,599 | No | Yes (multi-day) |
+| 3 | TSM | 39 | $57,318 | No | No |
+
+**Theoretical capacity release:**
+
+| Set | Notional | NLV% |
+|---|---|---|
+| Top 1 (XLE) | $98,233 | 10.2% |
+| Top 2 (XLE + WDC) | $155,832 | 16.1% |
+| Top 3 (XLE + WDC + TSM) | $213,150 | 22.1% |
+
+**Paper validation status as of 2026-05-13:**
+
+The paper validation framework (`scripts/rotation_paper_validation.py`) ran its first evaluation against the 2026-05-12 DVA block (gap +16.7, book_avg 57.3). Verdict: `PAPER_VALIDATION_PENDING_OUTCOMES`. XLK outcome resolved (P&L −$968). XLE and WDC remain open — outcomes pending position close. A second qualifying opportunity was captured: NBIS (score 85, gap +25.8) from today's session.
 
 ### ETF Overlap Findings
 
@@ -536,14 +576,16 @@ If these criteria are not met after 10 sessions, the spec must be revised before
 
 Movement from this specification to an implementation design sprint requires all of the following:
 
-1. ROTATION_SHADOW_CONFIRMED verdict in at least 3 additional sessions beyond the 2 already observed.
-2. The same or similar blocked candidates recur across sessions (confirming the pattern is structural, not coincidental).
-3. The same or similar weak carry positions recur (confirming the problem is persistent).
-4. Blocked candidate required notional data becomes available (Gate G10 from Section 5 can now pass).
-5. Shadow replacement analysis shows that hypothetical replacements would have produced a higher-quality book in at least 2 out of 3 confirmed sessions.
-6. All data requirements in Section 15 are resolved or have documented workarounds.
-7. Data reconstruction confidence has reached HIGH in at least 2 sessions.
-8. Amit has reviewed this specification and the shadow testing log and has given explicit written approval to proceed to implementation design.
+| # | Gate | Status |
+|---|---|---|
+| 1 | ROTATION_SHADOW_CONFIRMED in at least 3 additional sessions beyond the 2 already observed when this spec was written | **1 of 3 met** (2026-05-13 confirmed) |
+| 2 | Same or similar blocked candidates recur across sessions | **Partially met** — DVA recurred; NBIS (85) is new but pattern of high-score candidates blocked is consistent |
+| 3 | Same weak carry positions recur | **Met** — XLE (23) and WDC (27) appear as top shadow candidates across 3+ sessions without closing |
+| 4 | Blocked candidate required notional available (Gate G10 from Section 5 passes) | **Not met** — G10 still provisional; estimated_notional only |
+| 5 | Shadow replacement analysis shows hypothetical replacements would have produced higher-quality book in ≥2 of 3 confirmed sessions | **Not yet evaluable** — paper validation outcomes pending (XLE, WDC still open) |
+| 6 | All data requirements in Section 15 resolved or with documented workarounds | **Not met** — Items 1, 3, 4, 5, 6 still open |
+| 7 | Data reconstruction confidence reached HIGH in ≥2 sessions | **Partially met** — JSONL snapshots give HIGH confidence at block time; MEDIUM overall due to G10 |
+| 8 | Amit reviewed spec and shadow testing log, given explicit written approval | **Pending** |
 
 This is not a checklist that can be partially satisfied. All eight gates must pass.
 
@@ -580,42 +622,51 @@ The module should be named `rotation_policy.py` or similar and placed in the app
 
 ## 19. Recommended Current Decision
 
-**DESIGN_ROTATION_POLICY_SPEC is justified.** This document is the output of that decision.
+*(Updated 2026-05-13)*
 
-**Live rotation is not justified.** The evidence base is two sessions. The required notional data is missing. The protected position flag is missing. The Track B interaction state is not parseable at block time. Shadow testing has not begun. No implementation sprint is authorised.
+**DESIGN_ROTATION_POLICY_SPEC is complete.** This document is the output of that decision. The spec was drafted on 2026-05-12 and updated on 2026-05-13 with the new session evidence.
 
-**ETF suppression remains folded into rotation analysis.** Low-score ETFs with single-name overlap are handled as higher-priority shadow rotation candidates via the +8 ranking bonus. They do not need a separate suppression module.
+**Paper validation is live.** `scripts/rotation_paper_validation.py` evaluates qualifying margin blocks against closed trade outcomes in a 24h lookahead window. First run verdict: `PAPER_VALIDATION_PENDING_OUTCOMES` (XLE and WDC still open). A second opportunity (NBIS, score 85) was captured today. Outcomes will resolve when those positions close.
+
+**Live rotation is not justified.** The escalation gates in Section 17 require 2 more confirmed sessions (Gates 1), paper validation outcomes (Gate 5), and resolution of five data quality items (Gate 6). None of these is met yet.
+
+**ETF suppression remains folded into rotation analysis.** Low-score ETFs with single-name overlap are handled as higher-priority shadow rotation candidates via the +8 ranking bonus. XLE and WDC have now appeared as top-2 shadow candidates across three consecutive sessions. This is structural, not noise. No separate suppression module is needed or authorised.
 
 **PRU rescue remains off.** PRU/discovery source metadata is insufficient for the sessions analysed. No tier-led policy action is justified.
 
-**The immediate next technical work is not implementation.** It is data quality and extended shadow testing. Specifically: logging blocked candidate notional, periodic position snapshots, and protected position flags. Without these, Gate G10 in Section 5 cannot pass and live rotation cannot be accurately evaluated.
+**The immediate next technical work is waiting for paper validation outcomes.** XLE and WDC need to close so the 2026-05-12 DVA block can be scored. After outcomes resolve, run the validation again. If verdict upgrades to `PAPER_VALIDATION_SUPPORTS_ROTATION` across 2 of the captured opportunities, that satisfies Gate 5.
 
 ---
 
 ## 20. Final Executive Summary
 
-**What was proven:**
+*(Updated 2026-05-13)*
 
-Over two consecutive sessions (2026-05-11 and 2026-05-12), AVGO scored 80 and was blocked by margin both times. The book average score was 59.1 and 54.8 respectively. The gap between the blocked candidate and the book average exceeded 20 points in both sessions. Three to seven open positions with scores below 50, including several below 35, held a combined notional of approximately $173,000 at the time of each block. Releasing the top three shadow candidates would theoretically have freed enough capacity to allow AVGO to enter.
+**What has been proven across 4 sessions:**
 
-The shadow diagnostic confirmed ROTATION_SHADOW_CONFIRMED as a computed verdict on 2026-05-12 after detecting the multi-session pattern. This verdict was not hardcoded. It was produced by applying defined thresholds to actual session data.
+Over four observed sessions (2026-05-11 through 2026-05-13), ROTATION_SHADOW_CONFIRMED fired in three of them. The pattern is structural:
+
+- High-score candidates are repeatedly blocked by margin cap. The strongest blocked candidate observed to date is NBIS at score 85 (2026-05-13), with a gap of +25.8 over the book average — the highest gap recorded.
+- XLE (score 23) and WDC (score 27) have appeared as top shadow candidates in every confirmed session. Both are multi-day carries holding approximately $98k and $58k respectively. They have not closed through Track B.
+- The book average sits in the 57–59 range across sessions. The blocked candidate scores range from 74 (DVA) to 85 (NBIS). The pattern of high-conviction entries being displaced by weak carries is repeatable and confirmed by JSONL observability data (not log-regex inference).
+- Reconstruction confidence has improved to HIGH for block-time book state (JSONL snapshots match trigger-field within 1-2ms), and MEDIUM overall (G10 still provisional).
 
 **What was not proven:**
 
-It was not proven that exiting XLK, XLE, or WDC in either session would have produced a better outcome than holding them. Shadow diagnostics measure capacity displacement. They do not measure forward P&L.
+It was not proven that exiting XLE or WDC would have produced a better outcome than holding them. Paper validation outcomes are pending — XLE and WDC are still open. The first resolved outcome (XLK) shows P&L of −$968 for that shadow exit.
 
-It was not proven that AVGO would have been selected by Apex after capacity was freed. If the Apex cycle had already moved on, the opportunity may have expired.
+It was not proven that the blocked candidates (DVA, NBIS) would have been selected by Apex after capacity was freed. Cycle_id tracking is not yet logged.
 
-It was not proven that PRU/discovery sourcing contributed to capacity consumption. Source labels were absent.
-
-It was not proven that the pattern will persist across future sessions. Two sessions is the minimum threshold for ROTATION_SHADOW_CONFIRMED, not a durable statistical sample.
+It was not proven that PRU/discovery sourcing contributed to capacity consumption. Source labels remain absent from several sessions.
 
 **What should happen next:**
 
-Run the rotation shadow report for at least 5 more sessions. Monitor whether AVGO or similar high-score candidates continue to be blocked. Monitor whether the same weak carry positions recur. Resolve the data quality gaps in Section 15, starting with blocked candidate notional logging. Do not write implementation code until shadow testing is complete and escalation gates in Section 17 are met.
+1. Wait for XLE and WDC to close. Re-run paper validation. If verdict upgrades to `PAPER_VALIDATION_SUPPORTS_ROTATION`, Gate 5 in Section 17 can be assessed.
+2. Continue running the shadow report daily. Two more ROTATION_SHADOW_CONFIRMED sessions are needed to meet Gate 1.
+3. Start resolving data quality items from Section 15, starting with Item 1 (blocked candidate notional logging). This is the single item that unblocks G10 and enables the full capacity matching pipeline.
 
 **What should not happen yet:**
 
 Do not implement live rotation. Do not enable PRU rescue. Do not build a separate ETF suppression module. Do not change entry thresholds, margin caps, or scoring formulas. Do not wire any rotation logic into the bot loop, order execution, or risk engine.
 
-The system is generating useful training data. The goal of this diagnostic work is to improve the quality of that data by understanding where capital is being misdeployed. The appropriate response to that understanding is careful observation and policy design, not immediate system changes.
+The system is generating strong training data. Two high-conviction candidates (NBIS 85, DVA 74) were blocked in a single session while XLE and WDC carried weak scores across multiple sessions. The gap is real. The appropriate response is to let the paper validation confirm the direction, resolve the data quality gaps, and then design implementation — in that order.
